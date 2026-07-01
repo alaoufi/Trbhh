@@ -1,15 +1,33 @@
 import Redis from 'ioredis';
 
-const globalForRedis = globalThis as unknown as { redis?: Redis };
+const globalForRedis = globalThis as unknown as { redis?: Redis | null };
 
-/** Redis is optional in development. Returns null if REDIS_URL is not set. */
-export const redis: Redis | null =
-  globalForRedis.redis ??
-  (process.env.REDIS_URL
-    ? new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 2, lazyConnect: false })
-    : null);
+/**
+ * Redis is an OPTIONAL cache. It must NEVER crash the app:
+ * - lazy connect + short retries so a missing/unreachable Redis fails fast
+ * - an 'error' handler so ioredis never throws an unhandled 'error' event
+ *   (which would take down the whole Node process)
+ */
+function createRedis(): Redis | null {
+  const url = process.env.REDIS_URL;
+  if (!url) return null;
+  const client = new Redis(url, {
+    lazyConnect: true,
+    maxRetriesPerRequest: 1,
+    enableOfflineQueue: false,
+    connectTimeout: 3000,
+    retryStrategy: (times) => (times > 10 ? null : Math.min(times * 300, 3000)),
+  });
+  client.on('error', () => {
+    /* swallow — the app runs fine without the cache */
+  });
+  client.connect().catch(() => {});
+  return client;
+}
 
-if (process.env.NODE_ENV !== 'production' && redis) globalForRedis.redis = redis;
+export const redis: Redis | null = globalForRedis.redis ?? createRedis();
+
+if (process.env.NODE_ENV !== 'production') globalForRedis.redis = redis;
 
 /** Simple cache-aside helper. Falls back to the loader when Redis is unavailable. */
 export async function cached<T>(key: string, ttlSeconds: number, loader: () => Promise<T>): Promise<T> {

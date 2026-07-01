@@ -60,6 +60,33 @@ function similarity(a: string, b: string): number {
 }
 
 /**
+ * Detect keyword-stuffing (حشو الكلمات): the same word or short phrase repeated
+ * many times to manipulate Google search. Returns true when the text is spammy.
+ */
+function isKeywordStuffing(title: string, detail: string): boolean {
+  const words = normalizeAr(`${title} ${detail}`).split(' ').filter((w) => w.length >= 3);
+  if (words.length < 8) return false;
+
+  // 1) a single word dominating the text (e.g. "تأجير تأجير تأجير …")
+  const freq = new Map<string, number>();
+  for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
+  let topCount = 0;
+  for (const c of freq.values()) if (c > topCount) topCount = c;
+  if (topCount >= 6 && topCount / words.length >= 0.28) return true;
+  if (topCount >= 12) return true; // extreme absolute repetition regardless of length
+
+  // 2) a repeated adjacent phrase (bigram), e.g. "رافعة شوكية رافعة شوكية …"
+  const bigrams = new Map<string, number>();
+  for (let i = 0; i < words.length - 1; i++) {
+    const key = `${words[i]} ${words[i + 1]}`;
+    bigrams.set(key, (bigrams.get(key) || 0) + 1);
+  }
+  for (const c of bigrams.values()) if (c >= 4) return true;
+
+  return false;
+}
+
+/**
  * Decide whether a new ad must be held for admin approval before publishing.
  * Triggers when — versus any existing PUBLISHED ad:
  *   • title similarity ≥ 90%, OR
@@ -110,6 +137,8 @@ export async function createAdAction(formData: FormData) {
   if (!title || !detail || !category_id) return;
   // جوال أو واتساب إجباري حتى يستطيع العملاء التواصل مع صاحب الإعلان
   if (!phone && !whatsapp) redirect('/ads/new?error=contact');
+  // منع حشو الكلمات (تكرار العبارات لخداع محرك البحث)
+  if (isKeywordStuffing(title, detail)) redirect('/ads/new?error=repeat');
 
   // احفظ وسيلة التواصل في ملف العضو حتى تظهر في الإعلان
   await prisma.users.update({
@@ -169,7 +198,10 @@ export async function updateAdAction(formData: FormData) {
 
   const phone = String(formData.get('phone') || '').trim();
   const whatsapp = String(formData.get('whatsapp') || '').trim();
+  const eTitle = String(formData.get('title') || '').trim();
+  const eDetail = String(formData.get('detail') || '').trim();
   if (!phone && !whatsapp) redirect(`/ads/${toInt(adId)}/edit?error=contact`);
+  if (isKeywordStuffing(eTitle, eDetail)) redirect(`/ads/${toInt(adId)}/edit?error=repeat`);
   await prisma.users.update({
     where: { id: BigInt(session.uid) },
     data: {

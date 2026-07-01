@@ -62,6 +62,11 @@ export function AdForm({
           يجب إدخال رقم الجوال أو الواتساب قبل نشر الإعلان.
         </div>
       )}
+      {error === 'repeat' && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+          يوجد تكرار مبالغ فيه للعبارات أو الكلمات في العنوان/التفاصيل. الرجاء كتابة وصف طبيعي دون تكرار الكلمات لأغراض محركات البحث.
+        </div>
+      )}
 
       <div className="flex gap-2">
         {[{ v: 'offer', l: 'عرض' }, { v: 'request', l: 'طلب' }].map((t) => (

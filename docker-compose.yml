@@ -1,8 +1,12 @@
 services:
+  # Bundled MySQL — used only for local/testing. When you connect the app to
+  # your real (production) database via DATABASE_URL, this stays OFF.
+  # Start it explicitly with:  docker compose --profile localdb up -d
   db:
     image: mysql:8.0
     container_name: trbhh-db
     restart: unless-stopped
+    profiles: ["localdb"]
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-changeme_root}
@@ -33,10 +37,15 @@ services:
     container_name: trbhh-app
     restart: unless-stopped
     depends_on:
-      db: { condition: service_healthy }
       redis: { condition: service_started }
+    # Lets the container reach a MySQL running on the VPS host itself
+    # (use DATABASE_URL host = host.docker.internal when the DB is on the same server).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      DATABASE_URL: "mysql://${DB_USER:-trbhh}:${DB_PASSWORD:-changeme}@db:3306/${DB_NAME:-trbhhdb}"
+      # Point to your real DB by setting DATABASE_URL in .env. Falls back to the
+      # bundled `db` container (profile "localdb") for local testing.
+      DATABASE_URL: "${DATABASE_URL:-mysql://${DB_USER:-trbhh}:${DB_PASSWORD:-changeme}@db:3306/${DB_NAME:-trbhhdb}}"
       REDIS_URL: "redis://redis:6379"
       AUTH_SECRET: ${AUTH_SECRET:-please_change_this_secret}
       # set to 'true' ONLY when serving over HTTPS (behind SSL). On http://IP:PORT keep false.

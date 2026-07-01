@@ -48,13 +48,21 @@ services:
     volumes:
       # persist uploaded media across deploys
       - ./storage:/app/storage
+    # Published directly on host port ${APP_PORT} so the app is reachable
+    # without the bundled nginx (avoids clashing with an existing panel on 80/443).
+    ports:
+      - "${APP_PORT:-8080}:3000"
     expose: ["3000"]
     networks: [trbhh]
 
+  # Optional reverse proxy (domain + SSL). Disabled by default to avoid port
+  # conflicts with control panels (CloudPanel/aaPanel) already using 80/443.
+  # Enable with:  docker compose --profile nginx up -d
   nginx:
     image: nginx:alpine
     container_name: trbhh-nginx
     restart: unless-stopped
+    profiles: ["nginx"]
     depends_on: [app]
     ports:
       - "80:80"

@@ -191,9 +191,15 @@ export async function searchAds(params: {
   countryId?: number;
   cityId?: number;
   type?: 'offer' | 'request';
+  sort?: 'newest' | 'price_asc' | 'price_desc';
+  special?: boolean;
   take?: number;
 }) {
-  const { q, categoryId, countryId, cityId, type, take = 30 } = params;
+  const { q, categoryId, countryId, cityId, type, sort = 'newest', special, take = 48 } = params;
+  const orderBy =
+    sort === 'price_asc' ? [{ price: 'asc' as const }] :
+    sort === 'price_desc' ? [{ price: 'desc' as const }] :
+    [{ adsSpecial: 'desc' as const }, { id: 'desc' as const }];
   const rows = await prisma.ads.findMany({
     where: {
       ...activeAdWhere,
@@ -201,9 +207,10 @@ export async function searchAds(params: {
       ...(countryId ? { country_id: countryId } : {}),
       ...(cityId ? { city_id: BigInt(cityId) } : {}),
       ...(type ? { adsType: type } : {}),
+      ...(special ? { adsSpecial: 'checked' as const } : {}),
       ...(q ? { OR: [{ title: { contains: q } }, { detail: { contains: q } }] } : {}),
     },
-    orderBy: [{ adsSpecial: 'desc' }, { id: 'desc' }],
+    orderBy,
     take,
     select: adSelect,
   });
@@ -300,4 +307,27 @@ export async function getAdForEdit(id: number, userId: number) {
     phoneAllow: ad.phoneAllow === 1,
     commentAllow: ad.commentAllow === 1,
   };
+}
+
+/** Record a unique view (deduped per viewer key). Safe to call on every render. */
+export async function recordView(adId: number, viewerKey: string) {
+  try {
+    const existing = await prisma.ads_views.findFirst({ where: { ads_id: BigInt(adId), user_id: viewerKey } });
+    if (!existing) {
+      await prisma.ads_views.create({ data: { ads_id: BigInt(adId), user_id: viewerKey } });
+    }
+  } catch {
+    /* views are best-effort */
+  }
+}
+
+/** Similar ads from the same category (excluding the current ad). */
+export async function getSimilarAds(adId: number, categoryId: number, take = 6) {
+  const rows = await prisma.ads.findMany({
+    where: { ...activeAdWhere, category_id: BigInt(categoryId), id: { not: BigInt(adId) } },
+    orderBy: [{ adsSpecial: 'desc' }, { id: 'desc' }],
+    take,
+    select: adSelect,
+  });
+  return toCards(rows);
 }

@@ -1,16 +1,22 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { MapPin, Eye, Phone, MessageCircle, BadgeCheck, Calendar, Tag, Flag, Send } from 'lucide-react';
-import { getAd } from '@/lib/data';
+import { getAd, getSimilarAds, recordView } from '@/lib/data';
 import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
 import { formatPrice, timeAgo } from '@/lib/utils';
+import { SITE } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { FavoriteButton } from '@/components/favorite-button';
+import { ShareButtons } from '@/components/share-buttons';
+import { AdGrid } from '@/components/ad-card';
+import { Stars } from '@/components/stars';
+import { getSellerRating } from '@/lib/reviews';
 import { addCommentAction } from '@/app/ads/comment-actions';
 
 export const dynamic = 'force-dynamic';
@@ -32,10 +38,20 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   if (!ad) notFound();
 
   const session = await getSession();
-  const [comments, favorited] = await Promise.all([
+  const vid = (await cookies()).get('trbhh_vid')?.value;
+  const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
+  if (viewerKey && (!session || session.uid !== ad.seller?.id)) {
+    await recordView(ad.id, viewerKey);
+  }
+
+  const [comments, favorited, similar, sellerRating] = await Promise.all([
     getComments(ad.id),
     session ? isFavorited(session.uid, ad.id) : Promise.resolve(false),
+    ad.category ? getSimilarAds(ad.id, ad.category.id, 6) : Promise.resolve([]),
+    ad.seller ? getSellerRating(ad.seller.id) : Promise.resolve({ avg: 0, count: 0 }),
   ]);
+
+  const shareUrl = `https://${SITE.domain}/ads/${ad.id}`;
 
   const waNumber = ad.seller?.whatsapp?.replace(/[^\d]/g, '');
   const jsonLd = {
@@ -95,7 +111,8 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
             </div>
             <div className="mt-4 text-2xl font-bold text-primary">{formatPrice(ad.price)}</div>
             <p className="mt-4 whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
-            <div className="mt-4 flex items-center gap-3 border-t pt-3 text-sm">
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-sm">
+              <ShareButtons url={shareUrl} title={ad.title} />
               <Link href={`/report?type=ad&id=${ad.id}`} className="flex items-center gap-1 text-muted-foreground hover:text-destructive">
                 <Flag className="h-4 w-4" /> إبلاغ عن الإعلان
               </Link>
@@ -152,6 +169,11 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
                 {ad.seller?.memberSince && (
                   <div className="text-xs text-muted-foreground">عضو منذ {timeAgo(ad.seller.memberSince)}</div>
                 )}
+                {sellerRating.count > 0 && (
+                  <div className="mt-0.5 flex items-center gap-1 text-xs">
+                    <Stars value={sellerRating.avg} /> <span className="text-muted-foreground">({sellerRating.count})</span>
+                  </div>
+                )}
               </div>
             </Link>
 
@@ -183,6 +205,13 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
           <DisclaimerBar variant="full" />
         </aside>
       </div>
+
+      {similar.length > 0 && (
+        <section className="pt-2">
+          <h2 className="mb-3 text-lg font-bold">إعلانات مشابهة</h2>
+          <AdGrid ads={similar} />
+        </section>
+      )}
     </div>
   );
 }

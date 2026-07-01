@@ -19,5 +19,8 @@ export async function sendMessageAction(formData: FormData) {
       type_to_user: 'user',
     },
   });
+  await prisma.notfications
+    .create({ data: { title: `رسالة جديدة من ${session.name}`, route: `/messages/${session.uid}`, user_id: String(reciverId), type: 'message' } })
+    .catch(() => {});
   revalidatePath(`/messages/${reciverId}`);
 }

@@ -58,3 +58,21 @@ export async function getSession(): Promise<SessionPayload | null> {
 export async function destroySession(): Promise<void> {
   (await cookies()).delete(COOKIE);
 }
+
+/** Load the full user record for the current session (or null). */
+export async function getCurrentUser() {
+  const session = await getSession();
+  if (!session) return null;
+  const { prisma } = await import('./prisma');
+  return prisma.users.findUnique({ where: { id: BigInt(session.uid) } });
+}
+
+/** Guard: return session or redirect to /login. */
+export async function requireUser() {
+  const session = await getSession();
+  if (!session) {
+    const { redirect } = await import('next/navigation');
+    redirect('/login');
+  }
+  return session!;
+}

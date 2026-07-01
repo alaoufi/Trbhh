@@ -4,6 +4,7 @@ import './globals.css';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { MobileNav } from '@/components/mobile-nav';
+import { PwaRegister } from '@/components/pwa-register';
 import { SITE } from '@/lib/constants';
 
 const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', display: 'swap' });
@@ -20,6 +21,9 @@ export const metadata: Metadata = {
     description: SITE.description,
   },
   robots: { index: true, follow: true },
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, statusBarStyle: 'default', title: SITE.name },
+  icons: { icon: '/icon.svg', apple: '/apple-icon.png' },
 };
 
 export const viewport: Viewport = {
@@ -35,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="container min-h-[60vh] pb-24 pt-4 md:pb-8">{children}</main>
         <Footer />
         <MobileNav />
+        <PwaRegister />
       </body>
     </html>
   );

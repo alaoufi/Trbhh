@@ -20,6 +20,8 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><Link href="/" className="hover:text-primary">الرئيسية</Link></li>
               <li><Link href="/categories" className="hover:text-primary">الأقسام</Link></li>
+              <li><Link href="/companies" className="hover:text-primary">الشركات</Link></li>
+              <li><Link href="/debates" className="hover:text-primary">النقاشات</Link></li>
               <li><Link href="/search" className="hover:text-primary">بحث متقدم</Link></li>
               <li><Link href="/pages/privacy" className="hover:text-primary">سياسة الخصوصية</Link></li>
             </ul>

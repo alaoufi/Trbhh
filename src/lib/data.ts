@@ -273,3 +273,31 @@ export async function getCountries() {
     return rows.map((c) => ({ id: toInt(c.id), name: c.name }));
   });
 }
+
+export async function getSubCategories() {
+  const rows = await prisma.sub_categories.findMany({ where: { active: 1 }, orderBy: { order: 'desc' } });
+  return rows.map((s) => ({ id: toInt(s.id), name: s.name, categoryId: s.category_id }));
+}
+
+export async function getCities() {
+  const rows = await prisma.cities.findMany({ orderBy: { ordered: 'desc' } });
+  return rows.map((c) => ({ id: toInt(c.id), name: c.name, countryId: c.country_id }));
+}
+
+export async function getAdForEdit(id: number, userId: number) {
+  const ad = await prisma.ads.findUnique({ where: { id: BigInt(id) } });
+  if (!ad || toInt(ad.user_id) !== userId) return null;
+  return {
+    id: toInt(ad.id),
+    title: ad.title,
+    detail: ad.detail,
+    price: ad.price,
+    adsType: ad.adsType as string,
+    categoryId: toInt(ad.category_id),
+    subcategoryId: ad.subcategory_id ?? null,
+    countryId: ad.country_id ?? null,
+    cityId: toInt(ad.city_id),
+    phoneAllow: ad.phoneAllow === 1,
+    commentAllow: ad.commentAllow === 1,
+  };
+}

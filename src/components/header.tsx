@@ -1,11 +1,13 @@
 import Link from 'next/link';
-import { Search, PlusCircle, LogIn, LayoutGrid } from 'lucide-react';
+import { Search, PlusCircle, LogIn, LayoutGrid, Shield } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
+import { isAdmin } from '@/lib/admin';
 import { Button } from '@/components/ui/button';
 
 export async function Header() {
   const session = await getSession();
+  const admin = session ? await isAdmin(session.uid) : false;
   return (
     <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="container flex h-16 items-center gap-4">
@@ -29,6 +31,11 @@ export async function Header() {
           <Link href="/categories" className="hidden md:block">
             <Button variant="ghost" size="sm"><LayoutGrid className="h-4 w-4" /> الأقسام</Button>
           </Link>
+          {admin && (
+            <Link href="/admin" className="hidden md:block">
+              <Button variant="ghost" size="sm"><Shield className="h-4 w-4" /> الإدارة</Button>
+            </Link>
+          )}
           {session ? (
             <Link href="/account">
               <Button variant="outline" size="sm">{session.name || 'حسابي'}</Button>

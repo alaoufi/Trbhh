@@ -1,15 +1,19 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { MapPin, Eye, Phone, MessageCircle, BadgeCheck, Calendar, Tag } from 'lucide-react';
+import { MapPin, Eye, Phone, MessageCircle, BadgeCheck, Calendar, Tag, Flag, Send } from 'lucide-react';
 import { getAd } from '@/lib/data';
+import { getComments } from '@/lib/comments';
+import { getSession } from '@/lib/auth';
+import { isFavorited } from '@/lib/account';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
-import { SITE } from '@/lib/constants';
+import { FavoriteButton } from '@/components/favorite-button';
+import { addCommentAction } from '@/app/ads/comment-actions';
 
-export const revalidate = 30;
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,6 +30,12 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   const { id } = await params;
   const ad = await getAd(Number(id));
   if (!ad) notFound();
+
+  const session = await getSession();
+  const [comments, favorited] = await Promise.all([
+    getComments(ad.id),
+    session ? isFavorited(session.uid, ad.id) : Promise.resolve(false),
+  ]);
 
   const waNumber = ad.seller?.whatsapp?.replace(/[^\d]/g, '');
   const jsonLd = {
@@ -85,13 +95,52 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
             </div>
             <div className="mt-4 text-2xl font-bold text-primary">{formatPrice(ad.price)}</div>
             <p className="mt-4 whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
+            <div className="mt-4 flex items-center gap-3 border-t pt-3 text-sm">
+              <Link href={`/report?type=ad&id=${ad.id}`} className="flex items-center gap-1 text-muted-foreground hover:text-destructive">
+                <Flag className="h-4 w-4" /> إبلاغ عن الإعلان
+              </Link>
+            </div>
           </div>
+
+          {/* Comments */}
+          {ad.commentAllow && (
+            <div className="rounded-xl border bg-card p-4 shadow-sm">
+              <h2 className="mb-3 font-bold">التعليقات ({comments.length})</h2>
+              {session ? (
+                <form action={addCommentAction} className="mb-4 flex gap-2">
+                  <input type="hidden" name="adId" value={ad.id} />
+                  <input type="hidden" name="parentId" value={0} />
+                  <input name="comment" required placeholder="اكتب تعليقاً..." className="h-10 flex-1 rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                  <Button size="icon" aria-label="إرسال"><Send className="h-4 w-4" /></Button>
+                </form>
+              ) : (
+                <Link href="/login" className="mb-4 block text-sm text-primary hover:underline">سجّل الدخول للتعليق</Link>
+              )}
+              <ul className="space-y-3">
+                {comments.map((c) => (
+                  <li key={c.id} className="flex gap-2">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-bold text-accent-foreground">
+                      {c.author.charAt(0)}
+                    </span>
+                    <div className="rounded-lg bg-secondary p-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">{c.author}</span>
+                        <span className="text-xs text-muted-foreground">{timeAgo(c.createdAt)}</span>
+                      </div>
+                      <p className="text-sm">{c.comment}</p>
+                    </div>
+                  </li>
+                ))}
+                {comments.length === 0 && <p className="text-sm text-muted-foreground">لا توجد تعليقات بعد.</p>}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Sidebar: seller + contact */}
         <aside className="space-y-4">
           <div className="rounded-xl border bg-card p-4 shadow-sm">
-            <div className="flex items-center gap-3">
+            <Link href={`/users/${ad.seller?.id}`} className="flex items-center gap-3">
               <span className="grid h-12 w-12 place-items-center rounded-full bg-accent text-lg font-bold text-accent-foreground">
                 {ad.seller?.name?.charAt(0) ?? 'ت'}
               </span>
@@ -104,7 +153,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
                   <div className="text-xs text-muted-foreground">عضو منذ {timeAgo(ad.seller.memberSince)}</div>
                 )}
               </div>
-            </div>
+            </Link>
 
             <div className="mt-4 space-y-2">
               {waNumber ? (
@@ -117,9 +166,15 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
                   <Button variant="outline" className="w-full"><Phone className="h-4 w-4" /> اتصال</Button>
                 </a>
               ) : null}
-              {!waNumber && !ad.seller?.phone && (
-                <Link href="/login" className="block">
-                  <Button variant="outline" className="w-full">سجّل الدخول لعرض وسائل التواصل</Button>
+              {ad.seller && session && session.uid !== ad.seller.id && (
+                <Link href={`/messages/${ad.seller.id}`} className="block">
+                  <Button variant="secondary" className="w-full"><MessageCircle className="h-4 w-4" /> مراسلة</Button>
+                </Link>
+              )}
+              <FavoriteButton adId={ad.id} active={favorited} disabled={!session} />
+              {!waNumber && !ad.seller?.phone && !session && (
+                <Link href="/login" className="block text-center text-xs text-muted-foreground hover:text-primary">
+                  سجّل الدخول لعرض وسائل التواصل
                 </Link>
               )}
             </div>

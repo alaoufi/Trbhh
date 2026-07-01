@@ -38,3 +38,7 @@ next-env.d.ts
 
 # database dump (kept gzipped in database/)
 /database/*.sql
+
+# runtime uploaded media (persist as a volume in production)
+/storage/uploads/*
+!/storage/uploads/.gitkeep

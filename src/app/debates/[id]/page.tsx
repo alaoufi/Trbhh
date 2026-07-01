@@ -18,9 +18,9 @@ export default async function DebatePage({ params }: { params: Promise<{ id: str
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex items-center gap-2">
         <Link href="/debates" className="rounded-lg p-2 hover:bg-secondary"><ArrowRight className="h-5 w-5" /></Link>
-        <h1 className="text-xl font-bold">{d.title}</h1>
+        <h1 className="text-xl font-bold text-primary">{d.title}</h1>
       </div>
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="card-3d rounded-xl p-4">
         {d.description && <p className="whitespace-pre-line leading-7">{d.description}</p>}
         <div className="mt-3 flex items-center gap-3 border-t pt-3">
           <form action={toggleDebateLikeAction}>
@@ -33,7 +33,7 @@ export default async function DebatePage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="card-3d rounded-xl p-4">
         <h2 className="mb-3 font-bold">المشاركات ({d.comments.length})</h2>
         {session ? (
           <form action={addDebateCommentAction} className="mb-4 flex gap-2">

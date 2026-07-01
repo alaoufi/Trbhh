@@ -30,7 +30,7 @@ export default async function SearchPage({
 
   return (
     <div className="space-y-4">
-      <form className="grid gap-3 rounded-xl border bg-card p-4 shadow-sm md:grid-cols-6">
+      <form className="grid gap-3 card-3d rounded-xl p-4 md:grid-cols-6">
         <div className="relative md:col-span-2">
           <SearchIcon className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input

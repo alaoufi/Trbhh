@@ -29,7 +29,7 @@ export default async function VerifyPage() {
         </div>
       )}
       <p className="text-sm text-muted-foreground">ارفع وثائقك الرسمية ليقوم فريق الإدارة بمراجعتها ومنحك علامة التوثيق.</p>
-      <form action={submitVerificationAction} className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
+      <form action={submitVerificationAction} className="space-y-4 card-3d rounded-xl p-5">
         <div><label className="mb-1 block text-sm font-medium">الهوية الوطنية</label><input name="national_identity" type="file" accept="image/*,application/pdf" className={field} /></div>
         <div><label className="mb-1 block text-sm font-medium">السجل التجاري (للشركات)</label><input name="commercial_register" type="file" accept="image/*,application/pdf" className={field} /></div>
         <div><label className="mb-1 block text-sm font-medium">تصريح العمل (اختياري)</label><input name="work_permit" type="file" accept="image/*,application/pdf" className={field} /></div>

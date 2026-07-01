@@ -18,7 +18,7 @@ export default async function AdminCategories() {
       </form>
       <div className="grid gap-2 sm:grid-cols-2">
         {cats.map((c) => (
-          <div key={toInt(c.id)} className="flex items-center justify-between rounded-xl border bg-card p-3 shadow-sm">
+          <div key={toInt(c.id)} className="flex items-center justify-between card-3d rounded-xl p-3">
             <span className="font-medium">{c.name}</span>
             <div className="flex items-center gap-2">
               <Badge variant={c.is_active === 'yes' ? 'trusted' : 'muted'}>{c.is_active === 'yes' ? 'مفعّل' : 'موقوف'}</Badge>

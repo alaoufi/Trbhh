@@ -1,12 +1,14 @@
 import Link from 'next/link';
-import { Search, SlidersHorizontal, Menu, LogIn, Shield } from 'lucide-react';
-import { SITE } from '@/lib/constants';
+import { Search, SlidersHorizontal } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
+import { getCategories } from '@/lib/data';
+import { SiteMenu } from '@/components/site-menu';
 
 export async function Header() {
   const session = await getSession();
   const admin = session ? await isAdmin(session.uid) : false;
+  const categories = await getCategories();
   return (
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
       <div className="container flex h-16 items-center gap-2">
@@ -28,20 +30,7 @@ export async function Header() {
           </div>
         </form>
 
-        {admin && (
-          <Link href="/admin" aria-label="الإدارة" className="hidden text-primary sm:block">
-            <Shield className="h-6 w-6" />
-          </Link>
-        )}
-        {session ? (
-          <Link href="/account" aria-label="حسابي" className="text-primary">
-            <Menu className="h-7 w-7" />
-          </Link>
-        ) : (
-          <Link href="/login" className="flex items-center gap-1 rounded-full border border-primary/40 px-3 py-1.5 text-sm text-primary">
-            <LogIn className="h-4 w-4" /> دخول
-          </Link>
-        )}
+        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} />
       </div>
     </header>
   );

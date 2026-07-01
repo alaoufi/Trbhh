@@ -54,7 +54,7 @@ export function AdForm({
   const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';
 
   return (
-    <form action={action} className="max-w-2xl space-y-4 rounded-xl border bg-card p-5 shadow-sm">
+    <form action={action} className="max-w-2xl space-y-4 card-3d rounded-xl p-5">
       {initial?.id && <input type="hidden" name="adId" value={initial.id} />}
 
       {error === 'contact' && (

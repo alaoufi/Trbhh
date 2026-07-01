@@ -21,7 +21,7 @@ export default async function AdminReports() {
       {reports.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد بلاغات.</p>}
       <div className="space-y-2">
         {reports.map((r) => (
-          <div key={toInt(r.id)} className="rounded-xl border bg-card p-3 shadow-sm">
+          <div key={toInt(r.id)} className="card-3d rounded-xl p-3">
             <div className="flex items-center justify-between">
               <Link href={`/ads/${r.ads_id}`} className="font-medium hover:text-primary">{adById.get(r.ads_id) || `إعلان #${r.ads_id}`}</Link>
               <span className="text-xs text-muted-foreground">{timeAgo(r.created_at)}</span>

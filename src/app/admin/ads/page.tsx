@@ -29,7 +29,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
       {ads.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد إعلانات{onlyPending ? ' بانتظار الموافقة' : ''}.</p>}
       <div className="space-y-2">
         {ads.map((a) => (
-          <div key={toInt(a.id)} className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 shadow-sm">
+          <div key={toInt(a.id)} className="flex flex-wrap items-center gap-2 card-3d rounded-xl p-3">
             <Link href={`/ads/${toInt(a.id)}`} className="min-w-0 flex-1 truncate font-medium hover:text-primary">{a.title}</Link>
             <span className="text-sm text-primary">{formatPrice(a.price)}</span>
             {a.adsSpecial === 'checked' && <Badge variant="special">مميّز</Badge>}

@@ -15,7 +15,7 @@ export function ReviewForm({ reciverId }: { reciverId: number }) {
   const [star, setStar] = useState(5);
   const [hover, setHover] = useState(0);
   return (
-    <form action={submitReviewAction} className="space-y-3 rounded-xl border bg-card p-4 shadow-sm">
+    <form action={submitReviewAction} className="space-y-3 card-3d rounded-xl p-4">
       <input type="hidden" name="reciverId" value={reciverId} />
       <input type="hidden" name="star" value={star} />
       <div className="flex items-center gap-1">

@@ -14,7 +14,7 @@ type Initial = { name: string; phoneNumber: string; phone_whatsapp: string; allo
 export function ProfileForm({ initial }: { initial: Initial }) {
   const [state, action] = useFormState(updateProfileAction, null as { ok?: boolean } | null);
   return (
-    <form action={action} className="max-w-lg space-y-4 rounded-xl border bg-card p-5 shadow-sm">
+    <form action={action} className="max-w-lg space-y-4 card-3d rounded-xl p-5">
       {initial.trusted && (
         <div className="flex items-center gap-2 rounded-lg bg-accent p-2 text-sm text-accent-foreground">
           <BadgeCheck className="h-4 w-4" /> حساب موثّق

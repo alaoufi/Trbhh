@@ -17,7 +17,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
   return (
     <div className="mx-auto max-w-md space-y-4">
       <h1 className="text-xl font-bold">الإبلاغ عن {sp.type === 'ad' ? 'إعلان' : 'محتوى'}</h1>
-      <form action={submitReportAction} className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
+      <form action={submitReportAction} className="space-y-4 card-3d rounded-xl p-5">
         <input type="hidden" name="type" value={sp.type || 'ad'} />
         <input type="hidden" name="targetId" value={sp.id || ''} />
         <div>

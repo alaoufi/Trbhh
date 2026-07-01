@@ -17,7 +17,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
   if (!session) redirect('/login');
   return (
     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-      <aside className="h-fit rounded-xl border bg-card p-3 shadow-sm">
+      <aside className="h-fit card-3d rounded-xl p-3">
         <div className="mb-3 flex items-center gap-2 border-b pb-3">
           <span className="grid h-9 w-9 place-items-center rounded-full bg-accent font-bold text-accent-foreground">
             {session.name?.charAt(0) ?? 'ع'}

@@ -28,7 +28,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {ads.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد إعلانات بعد.</p>}
       <div className="space-y-3">
         {ads.map((ad) => (
-          <div key={ad.id} className="flex gap-3 rounded-xl border bg-card p-3 shadow-sm">
+          <div key={ad.id} className="flex gap-3 card-3d rounded-xl p-3">
             <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
               <Image src={ad.image} alt={ad.title} fill sizes="80px" className="object-cover" />
             </div>

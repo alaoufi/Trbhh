@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   await requireAdmin();
   return (
     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-      <aside className="h-fit rounded-xl border bg-card p-3 shadow-sm">
+      <aside className="h-fit card-3d rounded-xl p-3">
         <div className="mb-3 border-b pb-3 text-sm font-bold text-primary">لوحة التحكم</div>
         <nav className="space-y-1">
           {nav.map(({ href, label, icon: Icon }) => (

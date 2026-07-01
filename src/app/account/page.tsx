@@ -18,7 +18,7 @@ export default async function AccountHome() {
       <h1 className="text-xl font-bold">مرحباً {session!.name} 👋</h1>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {cards.map(({ href, label, value, icon: Icon }) => (
-          <Link key={href} href={href} className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm hover:border-primary">
+          <Link key={href} href={href} className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
             <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><Icon className="h-5 w-5" /></span>
             <div><div className="text-xl font-bold">{value}</div><div className="text-xs text-muted-foreground">{label}</div></div>
           </Link>

@@ -14,7 +14,7 @@ export default async function AdminVerifications() {
       {users.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد طلبات توثيق معلّقة.</p>}
       <div className="space-y-2">
         {users.map((u) => (
-          <div key={toInt(u.id)} className="flex items-center justify-between rounded-xl border bg-card p-3 shadow-sm">
+          <div key={toInt(u.id)} className="flex items-center justify-between card-3d rounded-xl p-3">
             <div>
               <div className="font-medium">{u.name || u.userName || '—'}</div>
               <div className="text-xs text-muted-foreground" dir="ltr">{u.phoneNumber} · {timeAgo(u.created_at)}</div>

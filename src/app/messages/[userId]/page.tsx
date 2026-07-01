@@ -28,7 +28,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
 
       <DisclaimerBar className="mb-3" />
 
-      <div className="flex min-h-[45vh] flex-col gap-2 rounded-xl border bg-card p-3 shadow-sm">
+      <div className="flex min-h-[45vh] flex-col gap-2 card-3d rounded-xl p-3">
         {thread.messages.length === 0 && <p className="m-auto text-sm text-muted-foreground">ابدأ المحادثة الآن</p>}
         {thread.messages.map((m) => (
           <div key={m.id} className={cn('max-w-[75%] rounded-2xl px-3 py-2 text-sm', m.fromMe ? 'self-start bg-primary text-primary-foreground' : 'self-end bg-secondary')}>

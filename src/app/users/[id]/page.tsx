@@ -35,7 +35,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border bg-card p-5 shadow-sm">
+      <div className="card-3d rounded-xl p-5">
         <div className="flex items-center gap-4">
           <span className="grid h-16 w-16 place-items-center rounded-full bg-accent text-2xl font-bold text-accent-foreground">
             {(user.name || user.userName || 'ع').charAt(0)}
@@ -64,7 +64,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
         {allowReview && <ReviewForm reciverId={uid} />}
         <ul className="space-y-2">
           {reviews.map((r) => (
-            <li key={r.id} className="rounded-xl border bg-card p-3 shadow-sm">
+            <li key={r.id} className="card-3d rounded-xl p-3">
               <div className="flex items-center justify-between">
                 <span className="font-semibold">{r.author}</span>
                 <Stars value={r.star} />

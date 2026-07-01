@@ -24,7 +24,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
   const wa = s.whatsapp?.replace(/[^\d]/g, '');
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border bg-card p-5 shadow-sm">
+      <div className="card-3d rounded-xl p-5">
         <div className="flex flex-wrap items-center gap-4">
           <div className="relative h-20 w-20 overflow-hidden rounded-xl bg-muted"><Image src={s.logo} alt={s.name} fill sizes="80px" className="object-cover" /></div>
           <div className="flex-1">
@@ -40,7 +40,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
       </div>
 
       {s.branches.length > 0 && (
-        <div className="rounded-xl border bg-card p-4 shadow-sm">
+        <div className="card-3d rounded-xl p-4">
           <h2 className="mb-2 flex items-center gap-2 font-bold"><Building2 className="h-4 w-4" /> الفروع</h2>
           <ul className="space-y-1 text-sm">
             {s.branches.map((b) => <li key={b.id} className="flex items-center gap-2"><MapPin className="h-3 w-3 text-muted-foreground" /> <b>{b.name}</b> {b.address && <span className="text-muted-foreground">— {b.address}</span>}</li>)}

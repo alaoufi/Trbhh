@@ -23,7 +23,7 @@ export default async function ManageCompanyPage() {
         {store && <Link href={`/companies/${store.id}`} className="text-sm text-primary hover:underline">عرض الصفحة العامة</Link>}
       </div>
 
-      <form action={saveCompanyAction} className="max-w-lg space-y-4 rounded-xl border bg-card p-5 shadow-sm">
+      <form action={saveCompanyAction} className="max-w-lg space-y-4 card-3d rounded-xl p-5">
         {logoUrl && <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-muted"><Image src={logoUrl} alt="logo" fill sizes="64px" className="object-cover" /></div>}
         <div><label className="mb-1 block text-sm font-medium">شعار الشركة</label><input name="logo" type="file" accept="image/*" className="w-full rounded-lg border bg-background p-2 text-sm" /></div>
         <div><label className="mb-1 block text-sm font-medium">وصف الشركة / ملف الأعمال</label><textarea name="description" defaultValue={store?.description ?? ''} rows={5} className="w-full rounded-lg border bg-background p-3 text-sm" placeholder="نبذة عن نشاط الشركة والخدمات المقدمة" /></div>
@@ -32,7 +32,7 @@ export default async function ManageCompanyPage() {
       </form>
 
       {store && (
-        <div className="max-w-lg space-y-3 rounded-xl border bg-card p-5 shadow-sm">
+        <div className="max-w-lg space-y-3 card-3d rounded-xl p-5">
           <h2 className="font-bold">الفروع</h2>
           <ul className="space-y-1 text-sm">
             {branches.map((b) => <li key={toInt(b.id)}>• {b.name} {b.address && <span className="text-muted-foreground">— {b.address}</span>}</li>)}

@@ -1,7 +1,19 @@
 'use server';
+import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
+import { toInt } from '@/lib/utils';
+
+export async function createDebateAction(formData: FormData) {
+  await requireUser();
+  const title = String(formData.get('title') || '').trim();
+  const description = String(formData.get('description') || '').trim();
+  if (!title) redirect('/debates');
+  const d = await prisma.debates.create({ data: { title, description: description || null, hide: 0 } });
+  revalidatePath('/debates');
+  redirect(`/debates/${toInt(d.id)}`);
+}
 
 export async function addDebateCommentAction(formData: FormData) {
   const session = await requireUser();

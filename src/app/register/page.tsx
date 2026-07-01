@@ -13,7 +13,7 @@ export default function RegisterPage() {
   const [state, action] = useFormState(registerAction, null as { error?: string } | null);
   return (
     <div className="mx-auto max-w-sm py-8">
-      <div className="rounded-xl border bg-card p-6 shadow-sm">
+      <div className="card-3d rounded-xl p-6">
         <h1 className="mb-1 text-xl font-bold">إنشاء حساب جديد</h1>
         <p className="mb-5 text-sm text-muted-foreground">انضم إلى منصة تربح للأعمال.</p>
         <form action={action} className="space-y-3">

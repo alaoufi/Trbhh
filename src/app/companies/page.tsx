@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { BadgeCheck, Building2, MapPin } from 'lucide-react';
 import { getStores } from '@/lib/stores';
 
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الشركات' };
 
 export default async function CompaniesPage() {

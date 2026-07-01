@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { getCategory, getAdsByCategory } from '@/lib/data';
 import { AdGrid } from '@/components/ad-card';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

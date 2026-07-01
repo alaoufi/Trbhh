@@ -3,7 +3,7 @@ import { MessagesSquare, Heart, MessageCircle } from 'lucide-react';
 import { getDebates } from '@/lib/debates';
 import { timeAgo } from '@/lib/utils';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'النقاشات' };
 
 export default async function DebatesPage() {

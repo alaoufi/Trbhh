@@ -12,7 +12,7 @@ import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { DisclaimerBar } from '@/components/disclaimer';
 
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 
 function Stat({ icon: Icon, value, label }: { icon: React.ElementType; value: number; label: string }) {
   return (

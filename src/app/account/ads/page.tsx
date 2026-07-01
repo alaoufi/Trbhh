@@ -7,10 +7,12 @@ import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { deleteAdAction, toggleAdStatusAction } from '../actions';
 
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
 
-export default async function MyAdsPage() {
+export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string }> }) {
   const session = await getSession();
+  const sp = await searchParams;
   const ads = await getMyAds(session!.uid);
   return (
     <div className="space-y-4">
@@ -18,6 +20,11 @@ export default async function MyAdsPage() {
         <h1 className="text-xl font-bold">إعلاناتي ({ads.length})</h1>
         <Link href="/ads/new" className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">أضف إعلان</Link>
       </div>
+      {sp.pending === '1' && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          إعلانك مشابه لإعلان قائم (تطابق ٩٠٪ في العنوان/التفاصيل أو الصور)، فتم حفظه <b>بانتظار موافقة الإدارة</b> قبل نشره.
+        </div>
+      )}
       {ads.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد إعلانات بعد.</p>}
       <div className="space-y-3">
         {ads.map((ad) => (
@@ -30,7 +37,7 @@ export default async function MyAdsPage() {
                 <Link href={`/ads/${ad.id}`} className="line-clamp-1 font-semibold hover:text-primary">{ad.title}</Link>
                 <div className="flex shrink-0 gap-1">
                   {ad.special && <Badge variant="special">مميّز</Badge>}
-                  <Badge variant={ad.status === 1 ? 'trusted' : 'muted'}>{ad.status === 1 ? 'نشط' : 'موقوف'}</Badge>
+                  <Badge variant={ad.status === 1 ? 'trusted' : 'special'}>{ad.status === 1 ? 'نشط' : 'بانتظار الموافقة'}</Badge>
                 </div>
               </div>
               <span className="text-sm font-bold text-primary">{formatPrice(ad.price)}</span>

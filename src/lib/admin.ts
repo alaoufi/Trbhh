@@ -18,13 +18,14 @@ export async function isAdmin(userId: number) {
 }
 
 export async function adminStats() {
-  const [users, ads, activeAds, pendingVerify, reports, debates] = await Promise.all([
+  const [users, ads, activeAds, pendingAds, pendingVerify, reports, debates] = await Promise.all([
     prisma.users.count(),
     prisma.ads.count(),
     prisma.ads.count({ where: { status: 1, state: 'active' } }),
+    prisma.ads.count({ where: { status: 0 } }),
     prisma.users.count({ where: { step: { gt: 0 }, trusted: 0 } }),
     prisma.repord_ads.count(),
     prisma.debates.count(),
   ]);
-  return { users, ads, activeAds, pendingVerify, reports, debates };
+  return { users, ads, activeAds, pendingAds, pendingVerify, reports, debates };
 }

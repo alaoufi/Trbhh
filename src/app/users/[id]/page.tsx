@@ -31,7 +31,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
     canReview(uid, session?.uid),
   ]);
   const active = myAds.filter((a) => a.status === 1);
-  const ads = active.map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0 }));
+  const ads = active.map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
 
   return (
     <div className="space-y-4">

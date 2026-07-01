@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from 'next';
 import { Cairo } from 'next/font/google';
 import './globals.css';
+import { TopBar } from '@/components/top-bar';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { MobileNav } from '@/components/mobile-nav';
 import { PwaRegister } from '@/components/pwa-register';
 import { SITE } from '@/lib/constants';
+import { getSession } from '@/lib/auth';
+import { getMyStats } from '@/lib/account';
 
 const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', display: 'swap' });
 
@@ -27,18 +30,29 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0f766e',
+  themeColor: '#1c7ed6',
   width: 'device-width',
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await getSession();
+  let unread = 0;
+  if (session) {
+    try {
+      unread = (await getMyStats(session.uid)).unread;
+    } catch {
+      /* ignore */
+    }
+  }
   return (
     <html lang="ar" dir="rtl" className={cairo.variable}>
-      <body className="min-h-screen font-sans antialiased">        <Header />
-        <main className="container min-h-[60vh] pb-24 pt-4 md:pb-8">{children}</main>
+      <body className="min-h-screen font-sans antialiased">
+        <TopBar />
+        <Header />
+        <main className="container min-h-[60vh] pb-24 pt-3 md:pb-8">{children}</main>
         <Footer />
-        <MobileNav />
+        <MobileNav unread={unread} />
         <PwaRegister />
       </body>
     </html>

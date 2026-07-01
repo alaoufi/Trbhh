@@ -1,54 +1,47 @@
 import Link from 'next/link';
-import { Search, PlusCircle, LogIn, LayoutGrid, Shield } from 'lucide-react';
+import { Search, SlidersHorizontal, Menu, LogIn, Shield } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
-import { Button } from '@/components/ui/button';
 
 export async function Header() {
   const session = await getSession();
   const admin = session ? await isAdmin(session.uid) : false;
   return (
-    <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-      <div className="container flex h-16 items-center gap-4">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-lg font-bold text-primary-foreground">
+    <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
+      <div className="container flex h-16 items-center gap-2">
+        <Link href="/" className="shrink-0">
+          <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-primary bg-white text-lg font-extrabold text-primary">
             ت
           </span>
-          <span className="text-xl font-bold text-foreground">{SITE.name}</span>
         </Link>
 
-        <form action="/search" className="relative mx-auto hidden w-full max-w-xl md:block">
-          <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <form action="/search" className="relative flex-1">
           <input
             name="q"
-            placeholder="ابحث عن خدمة، معدة، مورد..."
-            className="h-10 w-full rounded-lg border bg-background pr-10 pl-4 text-sm outline-none focus:ring-2 focus:ring-ring"
+            placeholder="أبحث هنا"
+            className="h-11 w-full rounded-full border border-primary/40 bg-white pr-4 pl-20 text-sm outline-none focus:ring-2 focus:ring-primary/40"
           />
+          <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2 text-primary">
+            <button type="submit" aria-label="بحث"><Search className="h-5 w-5" /></button>
+            <Link href="/search" aria-label="بحث متقدم"><SlidersHorizontal className="h-5 w-5" /></Link>
+          </div>
         </form>
 
-        <nav className="mr-auto flex items-center gap-2">
-          <Link href="/categories" className="hidden md:block">
-            <Button variant="ghost" size="sm"><LayoutGrid className="h-4 w-4" /> الأقسام</Button>
+        {admin && (
+          <Link href="/admin" aria-label="الإدارة" className="hidden text-primary sm:block">
+            <Shield className="h-6 w-6" />
           </Link>
-          {admin && (
-            <Link href="/admin" className="hidden md:block">
-              <Button variant="ghost" size="sm"><Shield className="h-4 w-4" /> الإدارة</Button>
-            </Link>
-          )}
-          {session ? (
-            <Link href="/account">
-              <Button variant="outline" size="sm">{session.name || 'حسابي'}</Button>
-            </Link>
-          ) : (
-            <Link href="/login">
-              <Button variant="outline" size="sm"><LogIn className="h-4 w-4" /> دخول</Button>
-            </Link>
-          )}
-          <Link href="/ads/new" className="hidden sm:block">
-            <Button size="sm"><PlusCircle className="h-4 w-4" /> أضف إعلان</Button>
+        )}
+        {session ? (
+          <Link href="/account" aria-label="حسابي" className="text-primary">
+            <Menu className="h-7 w-7" />
           </Link>
-        </nav>
+        ) : (
+          <Link href="/login" className="flex items-center gap-1 rounded-full border border-primary/40 px-3 py-1.5 text-sm text-primary">
+            <LogIn className="h-4 w-4" /> دخول
+          </Link>
+        )}
       </div>
     </header>
   );

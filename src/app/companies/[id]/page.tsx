@@ -20,7 +20,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
   const s = await getStore(Number(id));
   if (!s) notFound();
   const myAds = await getMyAds(s.userId);
-  const active = myAds.filter((a) => a.status === 1).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0 }));
+  const active = myAds.filter((a) => a.status === 1).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
   const wa = s.whatsapp?.replace(/[^\d]/g, '');
   return (
     <div className="space-y-4">

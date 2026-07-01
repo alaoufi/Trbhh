@@ -15,7 +15,19 @@ export type AdCard = {
   createdAt: string | null;
   special: boolean;
   views: number;
+  sellerName: string | null;
+  sellerTrusted: boolean;
 };
+
+async function sellerInfo(ids: bigint[]): Promise<Map<number, { name: string; trusted: boolean }>> {
+  const uniq = [...new Set(ids.map(toInt))].filter(Boolean).map((n) => BigInt(n));
+  if (!uniq.length) return new Map();
+  const rows = await prisma.users.findMany({
+    where: { id: { in: uniq } },
+    select: { id: true, name: true, userName: true, trusted: true },
+  });
+  return new Map(rows.map((r) => [toInt(r.id), { name: r.name || r.userName || 'مستخدم', trusted: r.trusted === 1 }]));
+}
 
 // ---- batched manual joins (the legacy DB has no foreign keys) ----
 
@@ -72,6 +84,7 @@ type AdRow = {
   price: number;
   adsType: string;
   adsSpecial: string;
+  user_id: bigint;
   city_id: bigint;
   category_id: bigint;
   created_at: Date | null;
@@ -79,24 +92,30 @@ type AdRow = {
 
 async function toCards(rows: AdRow[]): Promise<AdCard[]> {
   const ids = rows.map((r) => r.id);
-  const [images, views, cities, cats] = await Promise.all([
+  const [images, views, cities, cats, sellers] = await Promise.all([
     primaryImages(ids),
     viewCounts(ids),
     cityNames(rows.map((r) => r.city_id)),
     categoryNames(rows.map((r) => r.category_id)),
+    sellerInfo(rows.map((r) => r.user_id)),
   ]);
-  return rows.map((r) => ({
-    id: toInt(r.id),
-    title: r.title,
-    price: r.price,
-    adsType: r.adsType,
-    image: images.get(toInt(r.id)) ?? PLACEHOLDER,
-    cityName: cities.get(toInt(r.city_id)) ?? null,
-    categoryName: cats.get(toInt(r.category_id)) ?? null,
-    createdAt: r.created_at ? r.created_at.toISOString() : null,
-    special: r.adsSpecial === 'checked',
-    views: views.get(toInt(r.id)) ?? 0,
-  }));
+  return rows.map((r) => {
+    const s = sellers.get(toInt(r.user_id));
+    return {
+      id: toInt(r.id),
+      title: r.title,
+      price: r.price,
+      adsType: r.adsType,
+      image: images.get(toInt(r.id)) ?? PLACEHOLDER,
+      cityName: cities.get(toInt(r.city_id)) ?? null,
+      categoryName: cats.get(toInt(r.category_id)) ?? null,
+      createdAt: r.created_at ? r.created_at.toISOString() : null,
+      special: r.adsSpecial === 'checked',
+      views: views.get(toInt(r.id)) ?? 0,
+      sellerName: s?.name ?? null,
+      sellerTrusted: s?.trusted ?? false,
+    };
+  });
 }
 
 const activeAdWhere = { status: 1, state: 'active' as const };
@@ -107,6 +126,7 @@ const adSelect = {
   price: true,
   adsType: true,
   adsSpecial: true,
+  user_id: true,
   city_id: true,
   category_id: true,
   created_at: true,

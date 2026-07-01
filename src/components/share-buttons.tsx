@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Share2, Link2, QrCode, Check, X } from 'lucide-react';
 
-export function ShareButtons({ url, title }: { url: string; title: string }) {
+export function ShareButtons({ url, title, compact }: { url: string; title: string; compact?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [qr, setQr] = useState(false);
   const wa = `https://wa.me/?text=${encodeURIComponent(title + ' - ' + url)}`;
@@ -15,6 +15,14 @@ export function ShareButtons({ url, title }: { url: string; title: string }) {
   const share = async () => {
     if (navigator.share) { try { await navigator.share({ title, url }); } catch {} } else copy();
   };
+
+  if (compact) {
+    return (
+      <button onClick={share} className="flex flex-col items-center gap-1 text-sm font-medium text-primary">
+        <Share2 className="h-5 w-5" /> مشاركة
+      </button>
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2">

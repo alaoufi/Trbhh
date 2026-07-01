@@ -1,0 +1,981 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model admins {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  password   String
+  user_name  String
+  email      String?
+  phone      String
+  role_id    Int       @default(0)
+  image      Int       @default(0)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model ads {
+  id               BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  adsType          ads_adsType
+  user_id          BigInt         @db.UnsignedBigInt
+  city_id          BigInt         @db.UnsignedBigInt
+  category_id      BigInt         @db.UnsignedBigInt
+  title            String         @db.VarChar(255)
+  detail           String         @db.Text
+  video_path       String         @db.Text
+  phoneAllow       Int            @default(0) @db.TinyInt
+  commentAllow     Int            @default(0) @db.TinyInt
+  adsSpecial       ads_adsSpecial
+  state            ads_state      @default(dbgenerated("1"))
+  Tactive          Int            @default(300)
+  editAds          Int            @default(12)
+  arc_msg          String?        @db.VarChar(225)
+  country_id       Int?
+  created_at       DateTime?      @db.Timestamp(0)
+  updated_at       DateTime?      @db.Timestamp(0)
+  status           Int            @default(1) @db.TinyInt
+  data_archive     String?
+  data_delete      String?
+  price            Float          @default(0)
+  edit_date        String?
+  sale_type        String?
+  price_type       String?
+  quantity_offered String?
+  delivery_type    String?
+  min_price        Float          @default(0)
+  max_price        Float          @default(0)
+  lat              String?
+  lng              String?
+  area_id          Int?
+  count_share      Int            @default(0)
+  subcategory_id   Int?
+  end_date_price   String?
+  start_date_price String?
+
+  @@index([category_id], map: "ads_category_id_foreign")
+  @@index([city_id], map: "ads_city_id_foreign")
+  @@index([user_id], map: "ads_user_id_foreign")
+}
+
+model ads_admins {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  description String    @db.Text
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  image       Int       @default(0)
+}
+
+model ads_chats {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  ads_id     Int
+  user_id    Int
+  chat       String    @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model ads_cities {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  city_id    Int
+  ads_id     Int
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model ads_prices {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name        String
+  phone       String
+  description String    @db.Text
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  start_date  String?
+  end_date    String?
+  image       String?
+  video       String?
+  views       Int       @default(0)
+  count_views Int       @default(0)
+  area_id     Int?
+  ads         String?   @db.Text
+  whatsapp    String?
+  user_id     Int?
+  transaction Int?
+  status      Int       @default(1) @db.TinyInt
+}
+
+model ads_views {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    String
+  ads_id     BigInt    @db.UnsignedBigInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+
+  @@index([ads_id], map: "ads_views_ads_id_foreign")
+  @@index([user_id], map: "ads_views_user_id_foreign")
+}
+
+model areas {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  city_id    Int
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model categories {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String    @db.VarChar(255)
+  photo_path String    @db.Text
+  is_active  String    @default("no") @db.VarChar(225)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  ordered    Int       @default(0)
+}
+
+model category__users {
+  id          BigInt    @id @db.UnsignedBigInt
+  user_id     BigInt    @db.UnsignedBigInt
+  category_id BigInt    @db.UnsignedBigInt
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+
+  @@index([category_id], map: "category_user_category_id_foreign")
+  @@index([user_id], map: "category_user_user_id_foreign")
+}
+
+model category_ads {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  count_day  Int
+  price      Int       @default(0)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model category_pages {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model chat_ads {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  ads_id     Int
+  ads_user   Int
+  user_id    Int
+  message    String?   @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model chat_messages {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  from_user  Int
+  to_user    Int
+  from_type  String
+  to_type    String
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model chats {
+  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  sender_id      Int       @default(0)
+  reciver_id     Int       @default(0)
+  message        String    @db.VarChar(255)
+  is_read        Int       @default(0) @db.TinyInt
+  created_at     DateTime? @db.Timestamp(0)
+  updated_at     DateTime? @db.Timestamp(0)
+  type_from_user String    @default("user")
+  type_to_user   String    @default("user")
+  chat_id        Int
+}
+
+model checkforupdate {
+  id      Int    @id @default(autoincrement()) @db.UnsignedInt
+  version String @db.VarChar(225)
+  code    String @db.VarChar(225)
+  link    String @default("https://public.haftastore.com/index2.html") @db.VarChar(255)
+}
+
+model cities {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String    @db.VarChar(255)
+  country_id Int       @db.UnsignedInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  ordered    Int       @default(0)
+}
+
+model comments {
+  id         BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  sender_id  BigInt          @db.UnsignedBigInt
+  ads_id     BigInt          @db.UnsignedBigInt
+  comment    String          @db.VarChar(255)
+  report     comments_report @default(dbgenerated("لا"))
+  active     String          @default("5") @db.VarChar(200)
+  hide       String          @default("no") @db.VarChar(225)
+  created_at DateTime?       @db.Timestamp(0)
+  updated_at DateTime?       @db.Timestamp(0)
+  date_edit  String?
+  parent_id  Int             @default(0)
+
+  @@index([ads_id], map: "comments_ads_id_foreign")
+  @@index([sender_id], map: "comments_sender_id_foreign")
+}
+
+model contacts {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  phone      String?
+  message    String?   @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  subject    String?   @db.Text
+  type       String?
+}
+
+model countries {
+  id           Int       @id @default(autoincrement()) @db.UnsignedInt
+  name         String    @db.VarChar(255)
+  is_active    Int       @default(1) @db.TinyInt
+  created_at   DateTime? @db.Timestamp(0)
+  updated_at   DateTime? @db.Timestamp(0)
+  ordered      Int       @default(0)
+  key          String?   @db.VarChar(10)
+  send_sms     Int       @default(0) @db.TinyInt
+  key_whatsapp String?
+  whatsapp     Int?
+}
+
+model debate_comments {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  debate_id  Int
+  user_id    Int
+  comment    String    @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  parent     Int       @default(0)
+}
+
+model debate_likes {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  debate_id  Int
+  user_id    Int
+  like       Int       @default(1) @db.TinyInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model debates {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  title       String    @db.Text
+  description String?   @db.Text
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  hide        Int       @default(0) @db.TinyInt
+}
+
+model failed_jobs {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  uuid       String   @unique(map: "failed_jobs_uuid_unique")
+  connection String   @db.Text
+  queue      String   @db.Text
+  payload    String   @db.LongText
+  exception  String   @db.LongText
+  failed_at  DateTime @default(now()) @db.Timestamp(0)
+}
+
+model favorites {
+  id      BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id BigInt @db.UnsignedBigInt
+  ads_id  BigInt @db.UnsignedBigInt
+
+  @@index([ads_id], map: "favorites_ads_id_foreign")
+  @@index([user_id], map: "favorites_user_id_foreign")
+}
+
+model fire_bace_users {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int
+  fcm_token  String    @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model image_stocks {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  noimgandvideo String    @db.VarChar(255)
+  noimgbutvideo String    @db.VarChar(255)
+  needbutnoimg  String    @db.VarChar(255)
+  created_at    DateTime? @db.Timestamp(0)
+  updated_at    DateTime? @db.Timestamp(0)
+}
+
+model information {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  title       String
+  description String    @db.Text
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+}
+
+model jobs {
+  id           BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  queue        String
+  payload      String @db.LongText
+  attempts     Int    @db.UnsignedTinyInt
+  reserved_at  Int?   @db.UnsignedInt
+  available_at Int    @db.UnsignedInt
+  created_at   Int    @db.UnsignedInt
+
+  @@index([queue], map: "jobs_queue_index")
+}
+
+model kaywords {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  text       String    @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model like_users {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int
+  like_user  Int
+  status     Int       @default(0) @db.TinyInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model message_users {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int
+  message_id Int
+  send       Int       @default(0) @db.TinyInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model message_watsapps {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  message    String    @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model migrations {
+  id        Int    @id @default(autoincrement()) @db.UnsignedInt
+  migration String @db.VarChar(255)
+  batch     Int
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model model_has_permissions {
+  permission_id BigInt @db.UnsignedBigInt
+  model_type    String @db.VarChar(255)
+  model_id      BigInt @db.UnsignedBigInt
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model model_has_roles {
+  role_id    BigInt @db.UnsignedBigInt
+  model_type String @db.VarChar(255)
+  model_id   BigInt @db.UnsignedBigInt
+
+  @@ignore
+}
+
+model notfication_users {
+  id              BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id         Int
+  notification_id Int
+  status          Int       @default(0) @db.TinyInt
+  created_at      DateTime? @db.Timestamp(0)
+  updated_at      DateTime? @db.Timestamp(0)
+}
+
+model notfications {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  title      String
+  route      String    @db.Text
+  user_id    String
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  type       String?
+  model_id   Int       @default(0)
+}
+
+model notifications {
+  id         BigInt             @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    BigInt             @db.UnsignedBigInt
+  type       notifications_type
+  ads_id     BigInt             @db.UnsignedBigInt
+  push_id    Int?
+  is_read    Boolean            @default(false)
+  created_at DateTime?          @db.Timestamp(0)
+  updated_at DateTime?          @db.Timestamp(0)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model oauth_access_tokens {
+  id         String    @db.VarChar(100)
+  user_id    BigInt?   @db.UnsignedBigInt
+  client_id  String    @db.Char(36)
+  name       String?
+  scopes     String?   @db.Text
+  revoked    Boolean
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  expires_at DateTime? @db.DateTime(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model oauth_auth_codes {
+  id         String    @db.VarChar(100)
+  user_id    BigInt    @db.UnsignedBigInt
+  client_id  String    @db.Char(36)
+  scopes     String?   @db.Text
+  revoked    Boolean
+  expires_at DateTime? @db.DateTime(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model oauth_clients {
+  id                     String    @db.Char(36)
+  user_id                BigInt?   @db.UnsignedBigInt
+  name                   String
+  secret                 String?   @db.VarChar(100)
+  provider               String?
+  redirect               String    @db.Text
+  personal_access_client Boolean
+  password_client        Boolean
+  revoked                Boolean
+  created_at             DateTime? @db.Timestamp(0)
+  updated_at             DateTime? @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model oauth_personal_access_clients {
+  id         BigInt    @db.UnsignedBigInt
+  client_id  String    @db.Char(36)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model oauth_refresh_tokens {
+  id              String    @db.VarChar(100)
+  access_token_id String    @db.VarChar(100)
+  revoked         Boolean
+  expires_at      DateTime? @db.DateTime(0)
+
+  @@ignore
+}
+
+model paid_advertisements {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  title       String
+  description String?   @db.Text
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model password_resets {
+  email      String    @db.VarChar(255)
+  token      String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+
+  @@ignore
+}
+
+model payings {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    BigInt    @db.UnsignedBigInt
+  ads_id     BigInt    @db.UnsignedBigInt
+  rations_id BigInt    @db.UnsignedBigInt
+  val        Float
+  bank       String    @db.VarChar(255)
+  date       String    @db.VarChar(255)
+  img        String?   @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model permissans {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model permissions {
+  id         BigInt    @db.UnsignedBigInt
+  name       String    @db.VarChar(255)
+  guard_name String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+
+  @@ignore
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model personal_access_tokens {
+  id             BigInt    @db.UnsignedBigInt
+  tokenable_type String    @db.VarChar(255)
+  tokenable_id   BigInt    @db.UnsignedBigInt
+  name           String    @db.VarChar(255)
+  token          String    @db.VarChar(64)
+  abilities      String?   @db.Text
+  last_used_at   DateTime? @db.Timestamp(0)
+  created_at     DateTime? @db.Timestamp(0)
+  updated_at     DateTime? @db.Timestamp(0)
+
+  @@ignore
+}
+
+model phone_whatsapps {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  phone      String
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  name       String?
+  block      Int       @default(0) @db.TinyInt
+}
+
+model photos {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  photo_path String    @db.Text
+  other_id   BigInt    @db.UnsignedBigInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model privacies {
+  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  privacy_policy String    @db.Text
+  market_policy  String    @db.Text
+  created_at     DateTime? @db.Timestamp(0)
+  updated_at     DateTime? @db.Timestamp(0)
+}
+
+model push_notifications {
+  id         BigInt    @id @default(autoincrement())
+  title      String    @db.VarChar(255)
+  body       String    @db.VarChar(255)
+  image      String?   @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model questions {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  question   String    @db.Text
+  answer     String    @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+  as_active  Int       @default(1) @db.TinyInt
+  ordered    Int       @default(0)
+}
+
+model ratios {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  num        Float
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model replies {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  sender_id  BigInt    @db.UnsignedBigInt
+  comment_id BigInt    @db.UnsignedBigInt
+  comment    String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model reply_supports {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  sender_id  BigInt    @db.UnsignedBigInt
+  reply      String    @db.VarChar(255)
+  support_id BigInt    @db.UnsignedBigInt
+  is_read    Int       @default(0) @db.TinyInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model repord_ads {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  ads_id     Int
+  reason_id  Int
+  user_id    Int
+  comment    String?   @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model report_resons {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  reason     String
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model reports {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    BigInt    @db.UnsignedBigInt
+  comment_id BigInt    @db.UnsignedBigInt
+  message    String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model reports_reviews {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    BigInt    @db.UnsignedBigInt
+  review_id  BigInt    @db.UnsignedBigInt
+  message    String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model review_ads {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  sender_id   BigInt    @db.UnsignedBigInt
+  ads_id      BigInt    @db.UnsignedBigInt
+  star        Int
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  comment     String?   @db.Text
+  description String?   @db.Text
+}
+
+model reviews {
+  id         BigInt         @id @default(autoincrement()) @db.UnsignedBigInt
+  sender_id  BigInt         @db.UnsignedBigInt
+  reciver_id BigInt         @db.UnsignedBigInt
+  review     String         @db.VarChar(255)
+  star       Int
+  report     reviews_report @default(dbgenerated("لا"))
+  created_at DateTime?      @db.Timestamp(0)
+  updated_at DateTime?      @db.Timestamp(0)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model role_has_permissions {
+  permission_id BigInt @db.UnsignedBigInt
+  role_id       BigInt @db.UnsignedBigInt
+
+  @@ignore
+}
+
+model role_permissans {
+  id            BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  role_id       Int
+  permission_id Int
+  created_at    DateTime? @db.Timestamp(0)
+  updated_at    DateTime? @db.Timestamp(0)
+}
+
+model roles {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model sessions {
+  id            String  @db.VarChar(255)
+  user_id       BigInt? @db.UnsignedBigInt
+  ip_address    String? @db.VarChar(45)
+  user_agent    String? @db.Text
+  payload       String  @db.Text
+  last_activity Int
+
+  @@ignore
+}
+
+model setting_businesses {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  setting    String?   @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model settings {
+  id                  BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name                String
+  email               String?
+  phone               String?
+  whatsapp            String?
+  category_image      String?
+  logo                Int
+  default_image       Int
+  icon                Int?
+  app_image           Int?
+  maintenance         Int       @default(0) @db.TinyInt
+  active_register     Int       @default(1) @db.TinyInt
+  maintenance_message String?   @db.Text
+  description         String?   @db.Text
+  notification        String?   @db.Text
+  Section             String?   @db.Text
+  commission          Float     @default(0)
+  Comment_update      Int       @default(0)
+  adds_update         Int       @default(0)
+  adds_time           Int       @default(0)
+  adds_archive        Int       @default(0)
+  created_at          DateTime? @db.Timestamp(0)
+  updated_at          DateTime? @db.Timestamp(0)
+  facebook            String?
+  youtube             String?
+  twitter             String?
+  Instagram           String?
+  snap                String?
+  tiktok              String?
+  maroof              String?
+  count_adds          Int?
+  hour_adds           Int?
+  adds_build          Int?
+  login_message       String?   @db.Text
+}
+
+model settings_tags {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  setting_id Int
+  tag        String
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model short_links {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  short      String
+  route      String    @db.Text
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model sociles {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model socket_users {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_type  String
+  user_id    Int
+  socket     String?
+  status     Int       @default(0) @db.TinyInt
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model static_pages {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  title       String
+  description String    @db.LongText
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  parent_id   Int
+}
+
+model store_branches {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  store_id   Int
+  name       String
+  address    String?
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model stores {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id     Int
+  logo        Int       @default(0)
+  description String?   @db.Text
+  address     String?
+  city        Int?
+  category_id Int?
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+}
+
+model sub_categories {
+  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  category_id Int
+  name        String
+  created_at  DateTime? @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+  order       Int       @default(0)
+  active      Int       @default(1) @db.TinyInt
+}
+
+model supports {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  sender_id  BigInt    @db.UnsignedBigInt
+  title      String    @db.VarChar(255)
+  subject    String    @db.VarChar(255)
+  type       Int       @default(1)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model swears {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  text       String    @db.VarChar(255)
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model transactions {
+  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  transaction_id String?
+  ads_id         Int
+  image          Int?
+  status         Boolean   @default(false)
+  created_at     DateTime? @db.Timestamp(0)
+  updated_at     DateTime? @db.Timestamp(0)
+}
+
+model uploads {
+  id                 BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  file_original_name String?
+  file_name          String?
+  extension          String?
+  type               String?
+  file_size          Int?
+  user_id            Int?
+  deleted_at         DateTime? @db.Timestamp(0)
+  created_at         DateTime? @db.Timestamp(0)
+  updated_at         DateTime? @db.Timestamp(0)
+}
+
+model user_colors {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  name       String
+  color      String
+  type       String
+  count      Int
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model user_subscripes {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    Int
+  employ_id  Int?
+  created_at DateTime? @db.Timestamp(0)
+  updated_at DateTime? @db.Timestamp(0)
+}
+
+model users {
+  id                        BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
+  userName                  String?    @db.VarChar(255)
+  password                  String?    @db.VarChar(255)
+  two_factor_secret         String?    @db.Text
+  two_factor_recovery_codes String?    @db.Text
+  phoneNumber               String?    @db.VarChar(255)
+  city_id                   BigInt?    @db.UnsignedBigInt
+  photo_path                String?    @db.Text
+  remember_token            String?    @db.Text
+  type                      users_type
+  ban                       users_ban  @default(no)
+  token                     String?    @db.Text
+  user_ip                   String?    @db.Text
+  country_id                Int?
+  created_at                DateTime?  @db.Timestamp(0)
+  updated_at                DateTime?  @db.Timestamp(0)
+  name                      String?
+  email                     String?
+  active_code               Int?
+  email_verify              String?
+  national_identity         Int?
+  commercial_register       Int?
+  favour                    Int?
+  work_permit               Int?
+  sajal_madaniun            String?
+  trusted                   Int        @default(0) @db.TinyInt
+  allow_phone               Int        @default(0) @db.TinyInt
+  whatsapp                  Int        @default(0) @db.TinyInt
+  step                      Int        @default(0) @db.TinyInt
+  forget                    Int        @default(0) @db.TinyInt
+  trusted_message           String?    @db.Text
+  fcm_token                 String?    @db.Text
+  phone_whatsapp            String?
+  is_admin                  Int        @default(0) @db.TinyInt
+  color                     String?
+  end_block                 String?
+  reason_block              String?    @db.Text
+  count_adds                Int?
+  hour_adds                 Int?
+  adds_build                Int?
+}
+
+model users_notif {
+  id       Int @id @default(autoincrement()) @db.UnsignedInt
+  user_id  Int @db.UnsignedInt
+  notif_id Int @db.UnsignedInt
+  is_read  Int @default(0) @db.TinyInt
+}
+
+enum ads_adsType {
+  offer   @map("عرض")
+  request @map("طلب")
+}
+
+enum notifications_type {
+  ads
+  pay
+  admin
+}
+
+enum comments_report {
+  yes @map("نعم")
+  no  @map("لا")
+}
+
+enum reviews_report {
+  yes @map("نعم")
+  no  @map("لا")
+}
+
+enum users_type {
+  admin
+  user
+}
+
+enum ads_adsSpecial {
+  checked
+  no
+}
+
+enum users_ban {
+  checked
+  no
+}
+
+enum ads_state {
+  inactive @map("0")
+  active   @map("1")
+}

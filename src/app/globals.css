@@ -5,23 +5,23 @@
 :root {
   --background: 0 0% 100%;
   --foreground: 214 60% 21%;
-  --card: 205 88% 94%;               /* light blue card like the original */
-  --card-foreground: 214 70% 27%;
-  --primary: 207 84% 45%;            /* trbhh blue */
+  --card: 206 100% 93%;              /* #def1ff — exact original card blue */
+  --card-foreground: 210 60% 27%;
+  --primary: 210 69% 53%;            /* #3287da — exact original brand blue */
   --primary-foreground: 0 0% 100%;
-  --secondary: 205 70% 92%;
-  --secondary-foreground: 214 60% 25%;
-  --muted: 205 40% 96%;
-  --muted-foreground: 214 20% 45%;
-  --accent: 205 90% 90%;             /* light blue accent */
-  --accent-foreground: 207 84% 35%;
+  --secondary: 206 90% 90%;
+  --secondary-foreground: 210 60% 25%;
+  --muted: 206 40% 96%;
+  --muted-foreground: 210 18% 45%;
+  --accent: 206 100% 93%;            /* #def1ff light blue accent */
+  --accent-foreground: 210 69% 40%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
-  --new: 28 96% 54%;                 /* orange "جديد" highlight */
+  --new: 24 100% 55%;                /* #ff7418 — exact original orange */
   --new-foreground: 0 0% 100%;
-  --border: 207 70% 78%;
-  --input: 207 70% 78%;
-  --ring: 207 84% 45%;
+  --border: 210 65% 78%;
+  --input: 210 65% 78%;
+  --ring: 210 69% 53%;
   --radius: 0.9rem;
 }
 
@@ -44,7 +44,7 @@ body {
 /* elevated 3D card look — solid blue outline like the original site */
 .card-3d {
   background-image: linear-gradient(180deg, #ffffff 0%, hsl(var(--card)) 100%);
-  border: 2px solid hsl(var(--primary) / 0.55);
+  border: 2px solid hsl(var(--primary));
   box-shadow: 0 1px 0 rgba(255,255,255,0.9) inset,
               0 6px 16px -4px hsl(var(--primary) / 0.30),
               0 2px 6px -2px rgba(0,0,0,0.10);
@@ -52,7 +52,7 @@ body {
 }
 .card-3d:hover {
   transform: translateY(-3px);
-  border-color: hsl(var(--primary) / 0.8);
+  border-color: hsl(var(--primary));
   box-shadow: 0 1px 0 rgba(255,255,255,0.9) inset,
               0 14px 28px -6px hsl(var(--primary) / 0.40),
               0 6px 12px -4px rgba(0,0,0,0.12);

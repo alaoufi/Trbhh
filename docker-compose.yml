@@ -39,8 +39,15 @@ services:
       DATABASE_URL: "mysql://${DB_USER:-trbhh}:${DB_PASSWORD:-changeme}@db:3306/${DB_NAME:-trbhhdb}"
       REDIS_URL: "redis://redis:6379"
       AUTH_SECRET: ${AUTH_SECRET:-please_change_this_secret}
-      NEXT_PUBLIC_MEDIA_BASE: ${NEXT_PUBLIC_MEDIA_BASE:-https://trbhh.com}
+      # LEGACY_MEDIA_BASE proxies not-yet-migrated images from the original site.
+      LEGACY_MEDIA_BASE: ${LEGACY_MEDIA_BASE:-https://trbhh.com}
+      # NEXT_PUBLIC_MEDIA_BASE empty => media served same-origin via /media route.
+      NEXT_PUBLIC_MEDIA_BASE: ${NEXT_PUBLIC_MEDIA_BASE:-}
+      STORAGE_DIR: /app/storage
       NODE_ENV: production
+    volumes:
+      # persist uploaded media across deploys
+      - ./storage:/app/storage
     expose: ["3000"]
     networks: [trbhh]
 

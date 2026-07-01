@@ -6,10 +6,11 @@ import { updateAdAction } from '../../actions';
 
 export const metadata = { title: 'تعديل الإعلان' };
 
-export default async function EditAdPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditAdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
   const { id } = await params;
+  const { error } = await searchParams;
   const [initial, categories, subcategories, countries, cities] = await Promise.all([
     getAdForEdit(Number(id), session.uid),
     getCategories(), getSubCategories(), getCountries(), getCities(),
@@ -26,6 +27,7 @@ export default async function EditAdPage({ params }: { params: Promise<{ id: str
         cities={cities}
         initial={initial}
         submitLabel="حفظ التعديلات"
+        error={error}
       />
     </div>
   );

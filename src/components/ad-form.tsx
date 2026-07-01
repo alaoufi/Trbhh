@@ -10,7 +10,8 @@ type City = { id: number; name: string; countryId: number };
 type Initial = Partial<{
   id: number; title: string; detail: string; price: number; adsType: string;
   categoryId: number; subcategoryId: number | null; countryId: number | null; cityId: number;
-  phoneAllow: boolean; commentAllow: boolean;
+  phoneAllow: boolean; commentAllow: boolean; phone: string; whatsapp: string;
+  lat: string | null; lng: string | null;
 }>;
 
 function Submit({ label }: { label: string }) {
@@ -19,14 +20,31 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, initial, submitLabel,
+  action, categories, subcategories, countries, cities, initial, submitLabel, error,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[];
-  initial?: Initial; submitLabel: string;
+  initial?: Initial; submitLabel: string; error?: string;
 }) {
   const [category, setCategory] = useState(initial?.categoryId ?? categories[0]?.id ?? 0);
   const [country, setCountry] = useState(initial?.countryId ?? countries[0]?.id ?? 0);
+  const [geo, setGeo] = useState<{ lat: string; lng: string } | null>(
+    initial?.lat && initial?.lng ? { lat: initial.lat, lng: initial.lng } : null,
+  );
+  const [geoBusy, setGeoBusy] = useState(false);
+
+  function useMyLocation() {
+    if (!navigator.geolocation) return;
+    setGeoBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeo({ lat: pos.coords.latitude.toFixed(5), lng: pos.coords.longitude.toFixed(5) });
+        setGeoBusy(false);
+      },
+      () => setGeoBusy(false),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
   const subs = useMemo(() => subcategories.filter((s) => s.categoryId === category), [subcategories, category]);
   const filteredCities = useMemo(
     () => cities.filter((c) => c.countryId === country),
@@ -38,6 +56,12 @@ export function AdForm({
   return (
     <form action={action} className="max-w-2xl space-y-4 rounded-xl border bg-card p-5 shadow-sm">
       {initial?.id && <input type="hidden" name="adId" value={initial.id} />}
+
+      {error === 'contact' && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+          يجب إدخال رقم الجوال أو الواتساب قبل نشر الإعلان.
+        </div>
+      )}
 
       <div className="flex gap-2">
         {[{ v: 'offer', l: 'عرض' }, { v: 'request', l: 'طلب' }].map((t) => (
@@ -94,6 +118,35 @@ export function AdForm({
       <div>
         <label className="mb-1 block text-sm font-medium">الصور {initial?.id ? '(إضافة المزيد)' : '(حتى 10 صور)'}</label>
         <input name="images" type="file" accept="image/*" multiple className="w-full rounded-lg border bg-background p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1" />
+      </div>
+
+      <div className="rounded-lg border border-primary/20 bg-accent/40 p-3">
+        <p className="mb-2 text-sm font-semibold text-primary">موقع الإعلان <span className="text-muted-foreground">(اختياري)</span></p>
+        <p className="mb-3 text-xs text-muted-foreground">حدّد موقع الإعلان لعرض المسافة للباحثين القريبين منك.</p>
+        <input type="hidden" name="lat" value={geo?.lat ?? ''} />
+        <input type="hidden" name="lng" value={geo?.lng ?? ''} />
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={useMyLocation} disabled={geoBusy} className="flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm text-primary disabled:opacity-60">
+            {geoBusy ? 'جارٍ تحديد الموقع...' : 'استخدم موقعي الحالي'}
+          </button>
+          {geo && <span className="text-xs text-green-700">✓ تم تحديد الموقع</span>}
+          {geo && <button type="button" onClick={() => setGeo(null)} className="text-xs text-red-600 hover:underline">إزالة</button>}
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-primary/20 bg-accent/40 p-3">
+        <p className="mb-2 text-sm font-semibold text-primary">وسيلة التواصل <span className="text-red-600">*</span></p>
+        <p className="mb-3 text-xs text-muted-foreground">يجب إدخال رقم الجوال أو الواتساب على الأقل حتى يتمكن العملاء من التواصل معك.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium">رقم الجوال</label>
+            <input name="phone" type="tel" inputMode="tel" defaultValue={initial?.phone ?? ''} maxLength={20} className={field} placeholder="05xxxxxxxx" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">رقم الواتساب</label>
+            <input name="whatsapp" type="tel" inputMode="tel" defaultValue={initial?.whatsapp ?? ''} maxLength={20} className={field} placeholder="9665xxxxxxxx" />
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-4">

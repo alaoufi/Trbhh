@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { getCategories, getSubCategories, getCountries, getCities } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
 import { createAdAction } from '../actions';
@@ -7,11 +8,13 @@ import { createAdAction } from '../actions';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'أضف إعلان' };
 
-export default async function NewAdPage() {
+export default async function NewAdPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
-  const [categories, subcategories, countries, cities] = await Promise.all([
+  const { error } = await searchParams;
+  const [categories, subcategories, countries, cities, user] = await Promise.all([
     getCategories(), getSubCategories(), getCountries(), getCities(),
+    prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true, phone_whatsapp: true } }),
   ]);
   return (
     <div className="space-y-4">
@@ -22,7 +25,9 @@ export default async function NewAdPage() {
         subcategories={subcategories}
         countries={countries}
         cities={cities}
+        initial={{ phone: user?.phoneNumber ?? '', whatsapp: user?.phone_whatsapp ?? '' }}
         submitLabel="نشر الإعلان"
+        error={error}
       />
     </div>
   );

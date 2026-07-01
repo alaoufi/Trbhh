@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import {
   MapPin, Eye, Phone, MessageCircle, Timer, Tag, Flag, Send,
-  User, BadgeCheck, Hash, ArrowLeftRight, Star, Share2, Heart,
+  User, BadgeCheck, Hash, ArrowLeftRight, Star, Share2, Heart, Navigation,
 } from 'lucide-react';
 import { getAd, getSimilarAds, recordView } from '@/lib/data';
 import { getComments } from '@/lib/comments';
@@ -18,6 +18,7 @@ import { FavoriteButton } from '@/components/favorite-button';
 import { ShareButtons } from '@/components/share-buttons';
 import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
+import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
 
 export const dynamic = 'force-dynamic';
@@ -63,6 +64,13 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
 
   const shareUrl = `https://${SITE.domain}/ads/${ad.id}`;
   const waNumber = ad.seller?.whatsapp?.replace(/[^\d]/g, '');
+  // "مراسلة" is always available; WhatsApp/call only when the seller provides them
+  const contactCols = 1 + (waNumber ? 1 : 0) + (ad.seller?.phone ? 1 : 0);
+
+  // Distance between the visitor (from the trbhh_geo cookie) and the ad location
+  const viewerLoc = await getViewerLocation();
+  const adLoc = parseLatLng(ad.lat && ad.lng ? `${ad.lat},${ad.lng}` : null);
+  const distanceLabel = viewerLoc && adLoc ? formatDistanceAr(haversineKm(viewerLoc, adLoc)) : null;
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -120,6 +128,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         <InfoItem icon={Star}>{sellerRating.count ? `${sellerRating.avg} (${sellerRating.count})` : '0/0'}</InfoItem>
         <InfoItem icon={Hash}>#{ad.id}</InfoItem>
         <InfoItem icon={Eye}>{ad.views} مشاهدة</InfoItem>
+        {distanceLabel && <InfoItem icon={Navigation}>{distanceLabel}</InfoItem>}
       </div>
 
       {/* Price + description */}
@@ -128,21 +137,17 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         <p className="whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
       </div>
 
-      {/* Contact tiles */}
-      <div className="grid grid-cols-3 gap-3">
-        {waNumber ? (
+      {/* Contact tiles — only show channels the seller actually offers */}
+      <div className={`grid gap-3 ${contactCols === 3 ? 'grid-cols-3' : contactCols === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {waNumber && (
           <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-[#25D366]">
             <MessageCircle className="h-6 w-6" /> واتساب
           </a>
-        ) : (
-          <span className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm text-muted-foreground"><MessageCircle className="h-6 w-6" /> واتساب</span>
         )}
-        {ad.seller?.phone ? (
+        {ad.seller?.phone && (
           <a href={`tel:${ad.seller.phone}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
             <Phone className="h-6 w-6" /> اتصال
           </a>
-        ) : (
-          <span className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm text-muted-foreground"><Phone className="h-6 w-6" /> اتصال</span>
         )}
         {ad.seller && session && session.uid !== ad.seller.id ? (
           <Link href={`/messages/${ad.seller.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">

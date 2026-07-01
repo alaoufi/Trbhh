@@ -6,6 +6,7 @@ import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { MobileNav } from '@/components/mobile-nav';
 import { PwaRegister } from '@/components/pwa-register';
+import { GeoPrompt } from '@/components/geo-prompt';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
@@ -53,6 +54,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main className="container min-h-[60vh] pb-24 pt-3 md:pb-8">{children}</main>
         <Footer />
         <MobileNav unread={unread} />
+        <GeoPrompt />
         <PwaRegister />
       </body>
     </html>

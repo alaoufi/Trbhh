@@ -314,6 +314,7 @@ export async function getCities() {
 export async function getAdForEdit(id: number, userId: number) {
   const ad = await prisma.ads.findUnique({ where: { id: BigInt(id) } });
   if (!ad || toInt(ad.user_id) !== userId) return null;
+  const owner = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { phoneNumber: true, phone_whatsapp: true } });
   return {
     id: toInt(ad.id),
     title: ad.title,
@@ -326,6 +327,10 @@ export async function getAdForEdit(id: number, userId: number) {
     cityId: toInt(ad.city_id),
     phoneAllow: ad.phoneAllow === 1,
     commentAllow: ad.commentAllow === 1,
+    phone: owner?.phoneNumber ?? '',
+    whatsapp: owner?.phone_whatsapp ?? '',
+    lat: ad.lat ?? null,
+    lng: ad.lng ?? null,
   };
 }
 

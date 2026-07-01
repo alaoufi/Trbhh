@@ -103,7 +103,22 @@ export async function createAdAction(formData: FormData) {
   const subRaw = String(formData.get('subcategory_id') || '');
   const cityId = String(formData.get('city_id') || '0');
   const countryRaw = String(formData.get('country_id') || '');
+  const phone = String(formData.get('phone') || '').trim();
+  const whatsapp = String(formData.get('whatsapp') || '').trim();
+  const lat = String(formData.get('lat') || '').trim();
+  const lng = String(formData.get('lng') || '').trim();
   if (!title || !detail || !category_id) return;
+  // جوال أو واتساب إجباري حتى يستطيع العملاء التواصل مع صاحب الإعلان
+  if (!phone && !whatsapp) redirect('/ads/new?error=contact');
+
+  // احفظ وسيلة التواصل في ملف العضو حتى تظهر في الإعلان
+  await prisma.users.update({
+    where: { id: BigInt(session.uid) },
+    data: {
+      ...(phone ? { phoneNumber: phone, allow_phone: 1 } : {}),
+      ...(whatsapp ? { phone_whatsapp: whatsapp, whatsapp: 1 } : {}),
+    },
+  }).catch(() => {});
 
   const images = await readImages(formData);
 
@@ -119,6 +134,8 @@ export async function createAdAction(formData: FormData) {
       country_id: countryRaw ? Number(countryRaw) : (user?.country_id ?? null),
       user_id: BigInt(session.uid),
       video_path: '',
+      lat: lat || null,
+      lng: lng || null,
       phoneAllow: formData.get('phoneAllow') ? 1 : 0,
       commentAllow: formData.get('commentAllow') ? 1 : 0,
       adsSpecial: 'no',
@@ -150,6 +167,17 @@ export async function updateAdAction(formData: FormData) {
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
 
+  const phone = String(formData.get('phone') || '').trim();
+  const whatsapp = String(formData.get('whatsapp') || '').trim();
+  if (!phone && !whatsapp) redirect(`/ads/${toInt(adId)}/edit?error=contact`);
+  await prisma.users.update({
+    where: { id: BigInt(session.uid) },
+    data: {
+      ...(phone ? { phoneNumber: phone, allow_phone: 1 } : {}),
+      ...(whatsapp ? { phone_whatsapp: whatsapp, whatsapp: 1 } : {}),
+    },
+  }).catch(() => {});
+
   await prisma.ads.update({
     where: { id: adId },
     data: {
@@ -160,6 +188,8 @@ export async function updateAdAction(formData: FormData) {
       category_id: BigInt(String(formData.get('category_id') || '0')),
       subcategory_id: formData.get('subcategory_id') ? Number(formData.get('subcategory_id')) : null,
       city_id: BigInt(String(formData.get('city_id') || '0')),
+      lat: String(formData.get('lat') || '').trim() || null,
+      lng: String(formData.get('lng') || '').trim() || null,
       phoneAllow: formData.get('phoneAllow') ? 1 : 0,
       commentAllow: formData.get('commentAllow') ? 1 : 0,
     },

@@ -10,12 +10,12 @@ export function CategoryGrid({ categories }: { categories: Cat[] }) {
         <Link
           key={c.id}
           href={`/categories/${c.id}`}
-          className="flex flex-col items-center gap-2 rounded-xl border bg-card p-3 text-center shadow-sm transition-colors hover:border-primary hover:bg-accent"
+          className="card-3d flex flex-col items-center gap-2 rounded-2xl p-3 text-center"
         >
           <div className="relative h-12 w-12 overflow-hidden">
             <Image src={c.icon} alt={c.name} fill sizes="48px" className="object-contain" />
           </div>
-          <span className="line-clamp-2 text-xs font-medium leading-4">{c.name}</span>
+          <span className="line-clamp-2 text-xs font-medium leading-4 text-primary">{c.name}</span>
         </Link>
       ))}
     </div>

@@ -29,6 +29,51 @@ function hashName(s: string) {
   return h;
 }
 
+/** Normalize Arabic text for duplicate comparison. */
+function normalizeAr(s: string): string {
+  return s
+    .replace(/[ً-ٰٟ]/g, '') // diacritics
+    .replace(/[إأآا]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ') // drop punctuation/emoji
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/** Token-overlap (Jaccard) similarity between two normalized strings. */
+function similarity(a: string, b: string): number {
+  const ta = new Set(a.split(' ').filter(Boolean));
+  const tb = new Set(b.split(' ').filter(Boolean));
+  if (!ta.size || !tb.size) return 0;
+  let inter = 0;
+  for (const t of ta) if (tb.has(t)) inter++;
+  return inter / (ta.size + tb.size - inter);
+}
+
+/** Smart duplicate detection: same user posting a near-identical ad. */
+async function isDuplicateAd(userId: number, title: string, detail: string, categoryId: bigint): Promise<boolean> {
+  const recent = await prisma.ads.findMany({
+    where: { user_id: BigInt(userId), status: 1 },
+    select: { title: true, detail: true, category_id: true },
+    orderBy: { id: 'desc' },
+    take: 60,
+  });
+  const nTitle = normalizeAr(title);
+  const nDetail = normalizeAr(detail);
+  for (const r of recent) {
+    const tSim = similarity(nTitle, normalizeAr(r.title));
+    const dSim = similarity(nDetail, normalizeAr(r.detail));
+    const sameCat = toInt(r.category_id) === toInt(categoryId);
+    // exact title, or very similar title, or (similar title + similar body in same category)
+    if (nTitle === normalizeAr(r.title)) return true;
+    if (tSim >= 0.85) return true;
+    if (sameCat && tSim >= 0.6 && dSim >= 0.7) return true;
+  }
+  return false;
+}
+
 export async function createAdAction(formData: FormData) {
   const session = await requireUser();
   const user = await prisma.users.findUnique({ where: { id: BigInt(session.uid) } });
@@ -42,6 +87,11 @@ export async function createAdAction(formData: FormData) {
   const cityId = String(formData.get('city_id') || '0');
   const countryRaw = String(formData.get('country_id') || '');
   if (!title || !detail || !category_id) return;
+
+  // smart duplicate guard
+  if (await isDuplicateAd(session.uid, title, detail, category_id)) {
+    redirect('/ads/new?dup=1');
+  }
 
   const ad = await prisma.ads.create({
     data: {

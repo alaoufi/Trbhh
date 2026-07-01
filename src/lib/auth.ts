@@ -37,7 +37,10 @@ export async function createSession(payload: SessionPayload): Promise<void> {
     .sign(secret);
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    // Only require HTTPS-only cookies when explicitly behind SSL.
+    // (On a plain http://IP:PORT deployment this must stay false, otherwise
+    // the browser drops the cookie and the user appears logged out.)
+    secure: process.env.COOKIE_SECURE === 'true',
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 30,

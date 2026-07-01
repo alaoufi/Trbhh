@@ -39,6 +39,8 @@ services:
       DATABASE_URL: "mysql://${DB_USER:-trbhh}:${DB_PASSWORD:-changeme}@db:3306/${DB_NAME:-trbhhdb}"
       REDIS_URL: "redis://redis:6379"
       AUTH_SECRET: ${AUTH_SECRET:-please_change_this_secret}
+      # set to 'true' ONLY when serving over HTTPS (behind SSL). On http://IP:PORT keep false.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # LEGACY_MEDIA_BASE proxies not-yet-migrated images from the original site.
       LEGACY_MEDIA_BASE: ${LEGACY_MEDIA_BASE:-https://trbhh.com}
       # NEXT_PUBLIC_MEDIA_BASE empty => media served same-origin via /media route.

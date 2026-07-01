@@ -3,6 +3,9 @@
 # ---- deps ----
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
+# openssl is required for Prisma to detect the correct engine (debian-openssl-3.0.x)
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 COPY package.json pnpm-lock.yaml* ./
 COPY prisma ./prisma
@@ -11,6 +14,8 @@ RUN pnpm install --frozen-lockfile || pnpm install
 # ---- builder ----
 FROM node:22-bookworm-slim AS builder
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -28,12 +33,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
     && addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
 
-# standalone output
+# Standalone output already bundles the traced node_modules (including the
+# Prisma client + native query engine), so we only copy public/ and static/.
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-# prisma engine + schema for runtime
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# schema kept for reference / optional CLI use
 COPY --from=builder /app/prisma ./prisma
 
 USER nextjs

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "منصة تربح — إعلانات مبوبة B2B",
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

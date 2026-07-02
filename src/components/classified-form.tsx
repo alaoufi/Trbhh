@@ -43,7 +43,6 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
   const [pattern, setPattern] = useState<Pattern>(initial?.pattern ?? 'none');
   const [accent, setAccent] = useState<Accent>(initial?.accent ?? 'none');
   const [layout, setLayout] = useState<'auto' | 'manual'>(initial?.layout ?? 'auto');
-  const [advanced, setAdvanced] = useState(false);
 
   function applyTemplate(t: Template) {
     setTplId(t.id); setTheme(t.theme); setPos(t.pos); setAlign(t.align);
@@ -54,9 +53,6 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
   const t = CLASSIFIED_THEMES[theme];
   const dark = t.text === 'dark' && !imgUrl;
   const wa = whatsapp.replace(/[^\d]/g, '');
-  const posBtn = (p: Pos, Icon: React.ElementType) => (
-    <button type="button" onClick={() => setPos(p)} className={`flex-1 rounded-lg border p-2 ${pos === p ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}><Icon className="mx-auto h-4 w-4" /></button>
-  );
 
   const [imgBusy, setImgBusy] = useState(false);
   async function onImage(e: React.ChangeEvent<HTMLInputElement>) {
@@ -112,6 +108,51 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
               )}
             </div>
           </div>
+        </div>
+
+        {/* تخصيص الشكل — بارز تحت الصندوق مباشرة، والتعديل يظهر فوراً في المعاينة بالأعلى */}
+        <div className="space-y-3 rounded-xl border-2 border-primary/25 bg-accent/30 p-3">
+          <p className="text-sm font-extrabold text-primary">🎨 تخصيص الشكل <span className="text-xs font-bold text-muted-foreground">— التعديل يظهر فوراً في المعاينة بالأعلى</span></p>
+          {!imgUrl && (
+            <div>
+              <p className="mb-1 text-xs font-bold text-foreground">لون خلفية التصميم</p>
+              <div className="flex flex-wrap gap-2">
+                {CLASSIFIED_THEMES.map((th, i) => (
+                  <button key={i} type="button" onClick={() => setTheme(i)} aria-label={`لون ${i + 1}`}
+                    className={`h-8 w-8 rounded-full ring-2 ${theme === i ? 'ring-primary ring-offset-2' : 'ring-transparent'}`}
+                    style={{ backgroundImage: `linear-gradient(150deg, ${th.from}, ${th.to})` }} />
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <p className="mb-1 text-xs font-bold text-foreground">مكان النص داخل التصميم (أعلى / وسط / أسفل)</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {([['top', 'أعلى', ArrowUpToLine], ['center', 'وسط', AlignVerticalJustifyCenter], ['bottom', 'أسفل', ArrowDownToLine]] as const).map(([p, label, Icon]) => (
+                <button key={p} type="button" onClick={() => setPos(p)} className={`flex flex-col items-center gap-1 rounded-lg border-2 p-2 text-xs font-bold ${pos === p ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-white'}`}>
+                  <Icon className="h-4 w-4" /> {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="mb-1 text-xs font-bold text-foreground">محاذاة النص</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button type="button" onClick={() => setAlign('right')} className={`flex items-center justify-center gap-1 rounded-lg border-2 p-2 text-xs font-bold ${align === 'right' ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-white'}`}><AlignRight className="h-4 w-4" /> يمين</button>
+                <button type="button" onClick={() => setAlign('center')} className={`flex items-center justify-center gap-1 rounded-lg border-2 p-2 text-xs font-bold ${align === 'center' ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-white'}`}><AlignCenter className="h-4 w-4" /> وسط</button>
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-bold text-foreground">حجم الخط</p>
+              <div className="grid grid-cols-3 gap-1">
+                {(['sm', 'md', 'lg'] as Size[]).map((s) => (
+                  <button key={s} type="button" onClick={() => setSize(s)} className={`rounded-lg border-2 py-1.5 text-xs font-bold ${size === s ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-white'}`}>{s === 'sm' ? 'صغير' : s === 'md' ? 'متوسط' : 'كبير'}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-bold"><input type="checkbox" checked={bold} onChange={(e) => setBold(e.target.checked)} className="h-4 w-4 accent-primary" /> خط غامق للنص</label>
         </div>
 
         {/* template library */}
@@ -181,11 +222,11 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
               <button type="button" onClick={() => setLayout('auto')} className={`flex-1 rounded-lg border p-2 text-xs font-medium ${layout === 'auto' ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}>
                 ✨ ترتيب تلقائي جميل
               </button>
-              <button type="button" onClick={() => { setLayout('manual'); setAdvanced(true); }} className={`flex-1 rounded-lg border p-2 text-xs font-medium ${layout === 'manual' ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}>
+              <button type="button" onClick={() => setLayout('manual')} className={`flex-1 rounded-lg border p-2 text-xs font-medium ${layout === 'manual' ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}>
                 🎯 أتحكّم في مكان النص
               </button>
             </div>
-            {layout === 'manual' && <p className="mt-2 text-xs text-muted-foreground">استخدم «التخصيص المتقدّم» بالأسفل لضبط موضع النص ومحاذاته.</p>}
+            {layout === 'manual' && <p className="mt-2 text-xs text-muted-foreground">اضبط مكان النص ومحاذاته من «تخصيص الشكل» بجانب المعاينة بالأعلى.</p>}
           </div>
         )}
 
@@ -201,51 +242,6 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
           <label className="mb-1 block text-sm font-medium">رابط يحوّل إليه (اختياري)</label>
           <input name="link" value={link} onChange={(e) => setLink(e.target.value)} maxLength={500} className={field} placeholder="https://…" />
         </div>
-
-        {/* advanced fine-tuning */}
-        <button type="button" onClick={() => setAdvanced((v) => !v)} className="text-sm font-medium text-primary underline-offset-2 hover:underline">
-          {advanced ? 'إخفاء التخصيص المتقدّم' : 'تخصيص متقدّم للشكل'}
-        </button>
-        {advanced && (
-          <div className="space-y-3 rounded-xl border border-primary/15 bg-accent/30 p-3">
-            {!imgUrl && (
-              <div>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">اللون</p>
-                <div className="flex flex-wrap gap-2">
-                  {CLASSIFIED_THEMES.map((th, i) => (
-                    <button key={i} type="button" onClick={() => setTheme(i)} aria-label={`لون ${i + 1}`}
-                      className={`h-7 w-7 rounded-full ring-2 ${theme === i ? 'ring-primary' : 'ring-transparent'}`}
-                      style={{ backgroundImage: `linear-gradient(150deg, ${th.from}, ${th.to})` }} />
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">موضع المحتوى</p>
-                <div className="flex gap-1">{posBtn('top', ArrowUpToLine)}{posBtn('center', AlignVerticalJustifyCenter)}{posBtn('bottom', ArrowDownToLine)}</div>
-              </div>
-              <div>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">المحاذاة</p>
-                <div className="flex gap-1">
-                  <button type="button" onClick={() => setAlign('right')} className={`flex-1 rounded-lg border p-2 ${align === 'right' ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}><AlignRight className="mx-auto h-4 w-4" /></button>
-                  <button type="button" onClick={() => setAlign('center')} className={`flex-1 rounded-lg border p-2 ${align === 'center' ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}><AlignCenter className="mx-auto h-4 w-4" /></button>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-end justify-between gap-3">
-              <div className="flex-1">
-                <p className="mb-1 text-xs font-medium text-muted-foreground">حجم الخط</p>
-                <div className="flex gap-1">
-                  {(['sm', 'md', 'lg'] as Size[]).map((s) => (
-                    <button key={s} type="button" onClick={() => setSize(s)} className={`flex-1 rounded-lg border py-1.5 text-xs ${size === s ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}>{s === 'sm' ? 'صغير' : s === 'md' ? 'متوسط' : 'كبير'}</button>
-                  ))}
-                </div>
-              </div>
-              <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm"><input type="checkbox" checked={bold} onChange={(e) => setBold(e.target.checked)} /> غامق</label>
-            </div>
-          </div>
-        )}
 
         <Submit label={submitLabel ?? 'صمّم وانشر'} />
       </form>

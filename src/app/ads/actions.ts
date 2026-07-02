@@ -11,6 +11,7 @@ import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@
 import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { setAdMedia } from '@/lib/ad-media';
 import { setUserArea } from '@/lib/user-location';
+import { scanContent } from '@/lib/content-guard';
 import { toInt } from '@/lib/utils';
 
 /** Save a raw media file (video/audio) from the form; returns the stored path or null. */
@@ -170,6 +171,16 @@ export async function createAdAction(formData: FormData) {
   // منع حشو الكلمات (تكرار العبارات لخداع محرك البحث)
   if (isKeywordStuffing(title, detail)) redirect('/ads/new?error=repeat');
 
+  // فحص ذكي للمحتوى: يمنع السياسي/المخدرات/الأمني/الأخلاقي — والأخلاقي يحظر مباشرة
+  const badContent = scanContent(title, detail);
+  if (badContent) {
+    if (badContent.category === 'immoral') {
+      await banUser(session.uid);
+      redirect('/ads/new?error=blocked&cat=immoral&banned=1');
+    }
+    redirect(`/ads/new?error=blocked&cat=${badContent.category}`);
+  }
+
   // حدود الباقة: عدد الإعلانات باليوم والفارق الزمني بين إعلان وآخر
   const pkg = await getUserPackage(session.uid);
   if (pkg.adsPerDay > 0 && (await countAdsToday(session.uid)) >= pkg.adsPerDay) {
@@ -198,6 +209,17 @@ export async function createAdAction(formData: FormData) {
   if (areaRaw) await setUserArea(session.uid, Number(areaRaw)).catch(() => {});
 
   const images = await readImages(formData);
+
+  // فحص أسماء ملفات الصور/الفيديو لكشف المحتوى غير الأخلاقي المصرّح باسمه
+  const mediaName = String((formData.get('video') as File | null)?.name || '');
+  const nameHit = scanContent(images.map((i) => i.name).join(' '), mediaName);
+  if (nameHit) {
+    if (nameHit.category === 'immoral') {
+      await banUser(session.uid);
+      redirect('/ads/new?error=blocked&cat=immoral&banned=1');
+    }
+    redirect(`/ads/new?error=blocked&cat=${nameHit.category}`);
+  }
 
   // منع تكرار الإعلان: تحذير ٣ محاولات ثم حظر الحساب
   if (await isOwnDuplicate(session.uid, title, detail, images)) {
@@ -260,6 +282,11 @@ export async function updateAdAction(formData: FormData) {
   const eDetail = String(formData.get('detail') || '').trim();
   if (!phone && !whatsapp) redirect(`/ads/${toInt(adId)}/edit?error=contact`);
   if (isKeywordStuffing(eTitle, eDetail)) redirect(`/ads/${toInt(adId)}/edit?error=repeat`);
+  const eBad = scanContent(eTitle, eDetail);
+  if (eBad) {
+    if (eBad.category === 'immoral') { await banUser(session.uid); redirect('/account/ads?error=blocked'); }
+    redirect(`/ads/${toInt(adId)}/edit?error=blocked&cat=${eBad.category}`);
+  }
   await prisma.users.update({
     where: { id: BigInt(session.uid) },
     data: {

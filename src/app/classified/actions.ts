@@ -8,6 +8,8 @@ import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified } from '@/lib/classified';
 import { getMemberWindows, withinWindow } from '@/lib/settings';
+import { scanContent } from '@/lib/content-guard';
+import { banUser } from '@/lib/moderation';
 import { toInt } from '@/lib/utils';
 
 async function saveOneImage(formData: FormData): Promise<string | null> {
@@ -52,6 +54,12 @@ export async function createClassifiedAction(formData: FormData) {
   if (!image && !body && !title) redirect('/classified/new?error=content');
   // جوال أو واتساب إجباري (أحدهما)
   if (!phone && !whatsapp) redirect('/classified/new?error=contact');
+  // فحص ذكي للمحتوى — الأخلاقي يحظر مباشرة
+  const bad = scanContent(title, body);
+  if (bad) {
+    if (bad.category === 'immoral') { await banUser(session.uid); redirect('/classified/new?error=blocked&cat=immoral&banned=1'); }
+    redirect(`/classified/new?error=blocked&cat=${bad.category}`);
+  }
 
   const theme = parseInt(String(formData.get('theme') || ''), 10);
   const pos = String(formData.get('pos') || 'bottom');

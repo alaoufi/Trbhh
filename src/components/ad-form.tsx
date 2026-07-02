@@ -43,13 +43,14 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, limitMax, gapHours, gapWait,
+  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, limitMax, gapHours, gapWait, blockCat, banned,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string;
-  limitMax?: string; gapHours?: string; gapWait?: string;
+  limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean;
 }) {
+  const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
   const isReq = adsType === 'request';
   const [category, setCategory] = useState(initial?.categoryId ?? categories[0]?.id ?? 0);
@@ -111,6 +112,12 @@ export function AdForm({
       {error === 'pledge' && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           يجب الموافقة على التعهّد بصحة الإعلان وتحمّل المسؤولية قبل النشر.
+        </div>
+      )}
+      {error === 'blocked' && (
+        <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
+          🚫 رُفض هذا الإعلان لاحتوائه على <b>{catLabel}</b> — النشر ممنوع منعاً باتاً.
+          {banned && <div className="mt-1">وتم <b>حظر حسابك فوراً</b> لمخالفة سياسة المحتوى. للاعتراض تواصل مع الإدارة.</div>}
         </div>
       )}
       {error === 'repeat' && (

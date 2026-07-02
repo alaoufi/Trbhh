@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { isAdmin } from '@/lib/admin';
@@ -13,9 +14,7 @@ export async function Header() {
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
       <div className="container flex h-16 items-center gap-2">
         <Link href="/" className="shrink-0">
-          <span className="grid h-11 w-11 place-items-center rounded-full border-2 border-primary bg-white text-lg font-extrabold text-primary">
-            ت
-          </span>
+          <Image src="/logo-icon.png" alt="تربح" width={44} height={44} priority className="h-11 w-11 rounded-lg object-contain" />
         </Link>
 
         <form action="/search" className="relative flex-1">

@@ -12,7 +12,7 @@ import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { PromoSlot } from '@/components/promo-slot';
 import { DisclaimerBar } from '@/components/disclaimer';
-import { getSettingBool, SETTING_SHOW_STATS } from '@/lib/settings';
+import { getHomeStats } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,14 +27,20 @@ function Stat({ icon: Icon, value, label }: { icon: React.ElementType; value: nu
 }
 
 export default async function HomePage() {
-  const [categories, featured, latest, mostViewed, stats, showStats] = await Promise.all([
+  const [categories, featured, latest, mostViewed, stats, homeStats] = await Promise.all([
     getCategories(),
     getFeaturedAds(8),
     getLatestAds(12),
     getMostViewedAds(8),
     getStats(),
-    getSettingBool(SETTING_SHOW_STATS, true).catch(() => true),
+    getHomeStats().catch(() => new Set(['ads', 'users', 'views', 'cats'])),
   ]);
+  const statCards = [
+    { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط' },
+    { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
+    { key: 'views', icon: Eye, value: stats.views, label: 'مشاهدة' },
+    { key: 'cats', icon: LayoutGrid, value: stats.cats, label: 'قسم' },
+  ].filter((s) => homeStats.has(s.key));
 
   return (
     <div className="space-y-4">
@@ -44,13 +50,10 @@ export default async function HomePage() {
       {/* Category tabs */}
       <CategoryTabs categories={categories} />
 
-      {/* Stats — toggled from the admin control panel */}
-      {showStats && (
-        <div className="grid grid-cols-4 gap-2">
-          <Stat icon={Megaphone} value={stats.ads} label="إعلان نشط" />
-          <Stat icon={Users} value={stats.users} label="عضو مسجّل" />
-          <Stat icon={Eye} value={stats.views} label="مشاهدة" />
-          <Stat icon={LayoutGrid} value={stats.cats} label="قسم" />
+      {/* Stats — the admin selects which cards to show */}
+      {statCards.length > 0 && (
+        <div className={`grid gap-2 ${['', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'][statCards.length] || 'grid-cols-4'}`}>
+          {statCards.map((s) => <Stat key={s.key} icon={s.icon} value={s.value} label={s.label} />)}
         </div>
       )}
 

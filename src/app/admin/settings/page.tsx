@@ -1,6 +1,6 @@
 import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, SETTING_SHOW_STATS, SETTING_ADS_APPROVAL } from '@/lib/settings';
+import { getMemberWindows, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -9,7 +9,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, showStats, statsAudience, classifiedDays, adsApproval] = await Promise.all([searchParams, getMemberWindows(), getSettingBool(SETTING_SHOW_STATS, true), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getSettingBool(SETTING_ADS_APPROVAL, false)]);
+  const [{ saved }, w, homeStats, statsAudience, classifiedDays, adsApproval] = await Promise.all([searchParams, getMemberWindows(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getSettingBool(SETTING_ADS_APPROVAL, false)]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -32,11 +32,16 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
         </label>
 
         <div className="border-t border-primary/15 pt-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><BarChart3 className="h-4 w-4" /> الصفحة الرئيسية</div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="showStats" defaultChecked={showStats} className="h-4 w-4 accent-primary" />
-            إظهار الإحصائيات في الصفحة الرئيسية (عدد الإعلانات، الأعضاء، المشاهدات، الأقسام)
-          </label>
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><BarChart3 className="h-4 w-4" /> إحصائيات الصفحة الرئيسية</div>
+          <p className="mb-2 text-xs text-muted-foreground">اختر البطاقات التي تريد عرضها في الصفحة الرئيسية. إذا لم تختر أي بطاقة، لن يظهر أي شيء.</p>
+          <div className="grid grid-cols-2 gap-2">
+            {HOME_STAT_KEYS.map((k) => (
+              <label key={k} className="flex items-center gap-2 rounded-lg border border-primary/20 bg-white px-3 py-2 text-sm">
+                <input type="checkbox" name={`stat_${k}`} defaultChecked={homeStats.has(k)} className="h-4 w-4 accent-primary" />
+                {HOME_STAT_LABELS[k]}
+              </label>
+            ))}
+          </div>
         </div>
 
         <div className="border-t border-primary/15 pt-3">

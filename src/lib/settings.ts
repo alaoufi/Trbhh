@@ -41,8 +41,20 @@ export async function getSettingBool(k: string, fallback = true): Promise<boolea
 export const SETTING_AD_EDIT_HOURS = 'ad_edit_hours';
 export const SETTING_AD_DELETE_HOURS = 'ad_delete_hours';
 
-/* Toggle the stats row on the home page (1/0). */
-export const SETTING_SHOW_STATS = 'show_home_stats';
+/* Which stat cards show on the home page (CSV of keys; unset => all). */
+export const SETTING_SHOW_STATS = 'show_home_stats'; // legacy on/off (kept for compat)
+export const SETTING_HOME_STATS = 'home_stats';
+export const HOME_STAT_KEYS = ['ads', 'users', 'views', 'cats'] as const;
+export type HomeStatKey = typeof HOME_STAT_KEYS[number];
+export const HOME_STAT_LABELS: Record<HomeStatKey, string> = {
+  ads: 'إعلان نشط', users: 'عضو مسجّل', views: 'مشاهدة', cats: 'قسم',
+};
+/** Set of enabled home-stat keys. Unset setting => all shown by default. */
+export async function getHomeStats(): Promise<Set<string>> {
+  const v = await getSetting(SETTING_HOME_STATS, '__all__');
+  if (v === '__all__') return new Set(HOME_STAT_KEYS);
+  return new Set(v.split(',').map((s) => s.trim()).filter(Boolean));
+}
 
 /* Require admin approval before a new regular ad is published (1/0). */
 export const SETTING_ADS_APPROVAL = 'ads_require_approval';

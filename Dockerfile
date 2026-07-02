@@ -42,6 +42,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # schema kept for reference / optional CLI use
 COPY --from=builder /app/prisma ./prisma
 
+# Writable, persistent upload dir owned by the runtime user. A named volume
+# mounted here inherits this ownership, so uploads (ad/classified/promo images)
+# can be written even though the app runs as the non-root `nextjs` user.
+RUN mkdir -p /app/storage/uploads && chown -R nextjs:nodejs /app/storage
+
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000 HOSTNAME=0.0.0.0

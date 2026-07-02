@@ -57,8 +57,10 @@ services:
       STORAGE_DIR: /app/storage
       NODE_ENV: production
     volumes:
-      # persist uploaded media across deploys
-      - ./storage:/app/storage
+      # Named volume (not a host bind mount) so it inherits the image's
+      # nextjs-owned /app/storage — the non-root app user can write uploads,
+      # and images persist across deploys.
+      - trbhh-storage:/app/storage
     # Published directly on host port ${APP_PORT} so the app is reachable
     # without the bundled nginx (avoids clashing with an existing panel on 80/443).
     ports:
@@ -83,6 +85,10 @@ services:
       - ./docker/certbot/conf:/etc/letsencrypt:ro
       - ./docker/certbot/www:/var/www/certbot:ro
     networks: [trbhh]
+
+volumes:
+  # persistent uploaded media (ad/classified/promo images)
+  trbhh-storage:
 
 networks:
   trbhh:

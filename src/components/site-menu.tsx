@@ -49,7 +49,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
   const drawer = open ? (
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/40" onClick={close} />
-      <nav className="absolute inset-y-0 right-0 flex w-80 max-w-[85%] flex-col overflow-y-auto bg-white shadow-2xl">
+      <nav className="absolute inset-y-0 right-0 flex w-80 max-w-[85%] flex-col overflow-y-auto bg-card text-card-foreground shadow-2xl">
         <div className="flex items-center justify-between border-b border-primary/15 bg-accent/60 p-4">
           <span className="text-lg font-bold text-primary">القائمة</span>
           <button onClick={close} aria-label="إغلاق" className="text-primary"><X className="h-6 w-6" /></button>

@@ -269,6 +269,15 @@ body {
   100% { transform: translateX(320%); }
 }
 
+/* Dark-theme harmony: hard-coded white surfaces adopt the theme's card
+   colour + readable text so nothing stays low-contrast. Form controls keep
+   their white background (their text is dark by default → still readable). */
+[data-theme="night"] .bg-white:not(input):not(select):not(textarea) {
+  background-color: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border-color: hsl(var(--border));
+}
+
 /* WhatsApp-style "typing…" indicator dots */
 .typing-dot {
   width: 6px; height: 6px; border-radius: 9999px;

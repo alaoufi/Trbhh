@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Phone, MessageCircle, ExternalLink, Pause, Play, LogIn, Sparkles } from 'lucide-react';
-import { type Classified, CLASSIFIED_THEMES, POS_CLASS } from '@/lib/classified-theme';
+import { Phone, MessageCircle, ExternalLink, Pause, Play, LogIn, Sparkles, ArrowRight } from 'lucide-react';
+import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY, SIZE_TITLE_POSTER, SIZE_BODY_POSTER } from '@/lib/classified-theme';
 import { ClassifiedDecor } from '@/components/classified-decor';
 
 const DURATION = 9000; // ms the entry splash stays before auto-entering the site
@@ -11,17 +11,16 @@ const DURATION = 9000; // ms the entry splash stays before auto-entering the sit
 const TILE_TITLE: Record<string, string> = { sm: 'text-sm', md: 'text-base', lg: 'text-lg' };
 const TILE_BODY: Record<string, string> = { sm: 'text-[11px]', md: 'text-xs', lg: 'text-xs' };
 
-function Tile({ ad, delay, onNavigate }: { ad: Classified; delay: number; onNavigate: () => void }) {
+/** The square ad visual, sized for a grid tile (compact) or the focused view (big). */
+function Visual({ ad, big }: { ad: Classified; big?: boolean }) {
   const theme = CLASSIFIED_THEMES[ad.theme % CLASSIFIED_THEMES.length];
   const poster = !ad.image;
   const dark = theme.text === 'dark' && poster;
-  const wa = ad.whatsapp?.replace(/[^\d]/g, '');
-  const titleCls = TILE_TITLE[ad.size] || TILE_TITLE.md;
-  const bodyCls = TILE_BODY[ad.size] || TILE_BODY.md;
-
-  const card = (
+  const titleCls = big ? (poster ? SIZE_TITLE_POSTER[ad.size] : SIZE_TITLE[ad.size]) : (TILE_TITLE[ad.size] || TILE_TITLE.md);
+  const bodyCls = big ? (poster ? SIZE_BODY_POSTER[ad.size] : SIZE_BODY[ad.size]) : (TILE_BODY[ad.size] || TILE_BODY.md);
+  return (
     <div
-      className={`relative flex aspect-square flex-col overflow-hidden rounded-t-2xl shadow-2xl ring-1 ring-white/20 ${poster ? 'justify-center' : POS_CLASS[ad.pos]} ${dark ? 'text-slate-900' : 'text-white'}`}
+      className={`relative flex aspect-square flex-col overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/20 ${poster ? 'justify-center' : POS_CLASS[ad.pos]} ${dark ? 'text-slate-900' : 'text-white'}`}
       style={ad.image ? undefined : { backgroundImage: `linear-gradient(150deg, ${theme.from}, ${theme.to})` }}
     >
       {ad.image && (
@@ -33,23 +32,23 @@ function Tile({ ad, delay, onNavigate }: { ad: Classified; delay: number; onNavi
       )}
       <ClassifiedDecor pattern={ad.pattern} accent={ad.accent} dark={dark} />
       {ad.link && <span className="absolute right-2 top-2 z-10 rounded-full bg-white/25 p-1 backdrop-blur"><ExternalLink className="h-3.5 w-3.5" /></span>}
-      <div className={`relative z-10 flex max-h-full min-h-0 flex-col justify-center gap-1 overflow-hidden p-3 ${poster ? 'text-center' : ad.align === 'center' ? 'text-center' : 'text-right'}`}>
-        {ad.title && <h3 className={`min-w-0 break-words leading-tight drop-shadow line-clamp-3 ${titleCls} ${ad.bold ? 'font-extrabold' : 'font-semibold'}`}>{ad.title}</h3>}
-        {ad.text && <p className={`min-w-0 break-words leading-snug drop-shadow line-clamp-2 ${bodyCls} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{ad.text}</p>}
+      <div className={`relative z-10 flex max-h-full min-h-0 flex-col justify-center gap-1 overflow-hidden ${big ? 'p-6' : 'p-3'} ${poster ? 'text-center' : ad.align === 'center' ? 'text-center' : 'text-right'}`}>
+        {ad.title && <h3 className={`min-w-0 break-words leading-tight drop-shadow ${big ? 'line-clamp-5' : 'line-clamp-3'} ${titleCls} ${ad.bold ? 'font-extrabold' : 'font-semibold'}`}>{ad.title}</h3>}
+        {ad.text && <p className={`min-w-0 break-words leading-snug drop-shadow ${big ? 'line-clamp-4' : 'line-clamp-2'} ${bodyCls} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{ad.text}</p>}
       </div>
     </div>
   );
+}
 
+function Contact({ ad, big }: { ad: Classified; big?: boolean }) {
+  const wa = ad.whatsapp?.replace(/[^\d]/g, '');
+  if (!wa && !ad.phone) return null;
+  const sz = big ? 'py-3 text-sm' : 'py-2 text-xs';
+  const ic = big ? 'h-5 w-5' : 'h-3.5 w-3.5';
   return (
-    <div className="float-3d" style={{ animationDelay: `${delay}ms` }}>
-      {/* الضغط يفتح الإعلان مكبّراً في صفحته (ومن هناك يمكن الدخول على الرابط) */}
-      <a href={`/classified/${ad.id}`} onClick={onNavigate} className="block">{card}</a>
-      {(wa || ad.phone) && (
-        <div className="flex gap-1 rounded-b-2xl bg-black/30 p-1.5">
-          {ad.phone && <a href={`tel:${ad.phone}`} onClick={onNavigate} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-600 py-2 text-xs font-bold text-white"><Phone className="h-3.5 w-3.5" /> اتصال</a>}
-          {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" onClick={onNavigate} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#25D366] py-2 text-xs font-bold text-white"><MessageCircle className="h-3.5 w-3.5" /> واتساب</a>}
-        </div>
-      )}
+    <div className="mt-1 flex gap-1.5">
+      {ad.phone && <a href={`tel:${ad.phone}`} className={`flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-600 font-bold text-white ${sz}`}><Phone className={ic} /> اتصال</a>}
+      {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" className={`flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#25D366] font-bold text-white ${sz}`}><MessageCircle className={ic} /> واتساب</a>}
     </div>
   );
 }
@@ -59,7 +58,9 @@ export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
   const [show, setShow] = useState(false);
   const [remaining, setRemaining] = useState(DURATION);
   const [paused, setPaused] = useState(false);
+  const [focused, setFocused] = useState<Classified | null>(null);
   const pausedRef = useRef(false);
+  const focusedRef = useRef(false);
   const total = ads.length;
 
   useEffect(() => {
@@ -70,7 +71,7 @@ export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
       const now = performance.now();
       const dt = now - last;
       last = now;
-      if (pausedRef.current) return;
+      if (pausedRef.current || focusedRef.current) return; // freeze countdown while viewing one ad
       setRemaining((r) => {
         const next = r - dt;
         if (next <= 0) {
@@ -88,6 +89,14 @@ export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
     pausedRef.current = !pausedRef.current;
     setPaused(pausedRef.current);
   }
+  function openAd(ad: Classified) {
+    focusedRef.current = true; // pause auto-dismiss while zoomed on one ad
+    setFocused(ad);
+  }
+  function closeAd() {
+    focusedRef.current = false;
+    setFocused(null);
+  }
   function enterSite() {
     setShow(false);
     router.push('/'); // go to the regular ads home page
@@ -104,26 +113,52 @@ export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
     <div className="fixed inset-0 z-[200] flex flex-col bg-gradient-to-b from-primary via-[hsl(var(--primary)/0.9)] to-slate-900 backdrop-blur-md">
       {/* header */}
       <div className="flex items-center justify-between gap-3 border-b border-white/15 bg-black/10 px-4 py-3">
-        <div className="flex items-center gap-2 text-white">
-          <Sparkles className="h-5 w-5 text-amber-300" />
-          <span className="text-sm font-bold">الإعلانات المبوّبة</span>
-        </div>
+        {focused ? (
+          <button onClick={closeAd} className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/25">
+            <ArrowRight className="h-4 w-4" /> رجوع
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 text-white">
+            <Sparkles className="h-5 w-5 text-amber-300" />
+            <span className="text-sm font-bold">الإعلانات المبوّبة</span>
+          </div>
+        )}
         <div className="relative h-11 w-11">
           <svg className="h-11 w-11 -rotate-90" viewBox="0 0 44 44">
             <circle cx="22" cy="22" r={R} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3" />
             <circle cx="22" cy="22" r={R} fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - progress)} style={{ transition: 'stroke-dashoffset 60ms linear' }} />
           </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">{paused ? '⏸' : seconds}</span>
+          <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">{focused || paused ? '⏸' : seconds}</span>
         </div>
       </div>
 
-      {/* scrollable grid — newest first, 2 per row (3 on wider screens), floating 3D */}
+      {/* body: focused single ad (enlarged) OR the grid */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
-        <div className="mx-auto grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-3">
-          {ads.map((ad, i) => (
-            <Tile key={ad.id} ad={ad} delay={(i % 6) * 250} onNavigate={() => setShow(false)} />
-          ))}
-        </div>
+        {focused ? (
+          <div className="mx-auto max-w-sm">
+            {focused.link ? (
+              <a href={`/classified/${focused.id}/go`} className="block"><Visual ad={focused} big /></a>
+            ) : (
+              <Visual ad={focused} big />
+            )}
+            <Contact ad={focused} big />
+            {focused.link && (
+              <a href={`/classified/${focused.id}/go`} className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-bold text-primary">
+                <ExternalLink className="h-5 w-5" /> زيارة الرابط
+              </a>
+            )}
+          </div>
+        ) : (
+          <div className="mx-auto grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-3">
+            {ads.map((ad, i) => (
+              <div key={ad.id} className="float-3d" style={{ animationDelay: `${(i % 6) * 250}ms` }}>
+                {/* الضغط يكبّر الإعلان وحده مع سهم الرجوع — بدون انتقال صفحة (لا وميض) */}
+                <button onClick={() => openAd(ad)} className="block w-full text-right"><Visual ad={ad} /></button>
+                <Contact ad={ad} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* sticky footer controls */}

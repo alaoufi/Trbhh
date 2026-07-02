@@ -55,7 +55,7 @@ export async function createClassifiedAction(formData: FormData) {
   // جوال أو واتساب إجباري (أحدهما)
   if (!phone && !whatsapp) redirect('/classified/new?error=contact');
   // فحص ذكي للمحتوى — الأخلاقي يحظر مباشرة
-  const bad = scanContent(title, body);
+  const bad = await scanContent(title, body);
   if (bad) {
     if (bad.category === 'immoral') { await banUser(session.uid); redirect('/classified/new?error=blocked&cat=immoral&banned=1'); }
     redirect(`/classified/new?error=blocked&cat=${bad.category}`);

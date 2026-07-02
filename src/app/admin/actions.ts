@@ -6,6 +6,7 @@ import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, type Role } fro
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
+import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
 import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_SHOW_STATS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
@@ -121,6 +122,21 @@ export async function deleteBannedWordAction(formData: FormData) {
   const id = Number(formData.get('id'));
   if (id) await deleteBannedWord(id);
   revalidatePath('/admin/words');
+}
+
+export async function addGuardWordAction(formData: FormData) {
+  await requireAction('words', 'add');
+  const category = String(formData.get('category') || '') as GuardCategory;
+  const word = String(formData.get('word') || '').trim();
+  if (word && GUARD_CATEGORIES.includes(category)) await addGuardWord(category, word);
+  revalidatePath('/admin/guard-words');
+}
+
+export async function deleteGuardWordAction(formData: FormData) {
+  await requireAction('words', 'delete');
+  const id = Number(formData.get('id'));
+  if (id) await deleteGuardWord(id);
+  revalidatePath('/admin/guard-words');
 }
 
 export async function adminDeleteClassifiedAction(formData: FormData) {

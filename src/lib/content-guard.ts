@@ -1,6 +1,8 @@
 import 'server-only';
+import { prisma } from './prisma';
 
 export type GuardCategory = 'immoral' | 'drugs' | 'weapons' | 'political';
+export const GUARD_CATEGORIES: GuardCategory[] = ['immoral', 'drugs', 'weapons', 'political'];
 
 export const CATEGORY_LABEL: Record<GuardCategory, string> = {
   immoral: 'محتوى غير أخلاقي',
@@ -12,7 +14,7 @@ export const CATEGORY_LABEL: Record<GuardCategory, string> = {
 /** Normalize Arabic for robust matching (strip diacritics, unify letters). */
 function normalize(s: string): string {
   return (s || '')
-    .replace(/[ً-ْٰـ]/g, '') // diacritics + tatweel
+    .replace(/[ً-ْٰـ]/g, '')
     .replace(/[إأآا]/g, 'ا')
     .replace(/ى/g, 'ي')
     .replace(/ة/g, 'ه')
@@ -32,8 +34,8 @@ const HARD: { sub: string; cat: GuardCategory }[] = [
   { sub: 'هيروين', cat: 'drugs' }, { sub: 'شبو', cat: 'drugs' },
 ];
 
-/** Whole-word / phrase terms per category. */
-const TERMS: Record<GuardCategory, string[]> = {
+/** Built-in whole-word / phrase terms per category (defaults). */
+export const BUILTIN: Record<GuardCategory, string[]> = {
   immoral: [
     'جنس', 'جنسي', 'جنسيه', 'نيك', 'متعه', 'مساج جنسي', 'مساج مثير', 'تعري', 'عاري', 'عاريه',
     'بورن', 'sex', 'مثليه', 'شذوذ', 'لواط', 'سحاق', 'بنات للمتعه', 'مكالمات جنسيه', 'تعارف للكبار',
@@ -53,22 +55,66 @@ const TERMS: Record<GuardCategory, string[]> = {
   ],
 };
 
+/* ---- custom (admin-editable) words ---- */
+let ensured = false;
+async function ensure() {
+  if (ensured) return;
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS guard_words (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      category VARCHAR(12) NOT NULL,
+      word VARCHAR(120) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  ensured = true;
+}
+
+let custom: Record<GuardCategory, string[]> = { immoral: [], drugs: [], weapons: [], political: [] };
+let loadedAt = 0;
+async function loadGuardWords() {
+  if (Date.now() - loadedAt < 60000) return; // 60s cache
+  await ensure();
+  const rows = await prisma.$queryRawUnsafe<{ category: string; word: string }[]>(`SELECT category, word FROM guard_words`).catch(() => []);
+  const next: Record<GuardCategory, string[]> = { immoral: [], drugs: [], weapons: [], political: [] };
+  for (const r of rows) if ((GUARD_CATEGORIES as string[]).includes(r.category)) next[r.category as GuardCategory].push(r.word);
+  custom = next;
+  loadedAt = Date.now();
+}
+
 /**
  * Scan free text for prohibited content. Returns the first matching category
- * (immoral first — strictest), or null when clean.
+ * (immoral first — strictest), or null when clean. Uses built-in + admin words.
  */
-export function scanContent(...parts: (string | null | undefined)[]): { category: GuardCategory; term: string } | null {
+export async function scanContent(...parts: (string | null | undefined)[]): Promise<{ category: GuardCategory; term: string } | null> {
+  await loadGuardWords().catch(() => {});
   const t = normalize(parts.filter(Boolean).join(' '));
   if (!t) return null;
   for (const h of HARD) if (t.includes(h.sub)) return { category: h.cat, term: h.sub };
   const padded = ` ${t} `;
-  // check immoral first, then the rest
-  const order: GuardCategory[] = ['immoral', 'drugs', 'weapons', 'political'];
-  for (const cat of order) {
-    for (const term of TERMS[cat]) {
+  for (const cat of GUARD_CATEGORIES) {
+    for (const term of [...BUILTIN[cat], ...custom[cat]]) {
       const nt = normalize(term);
       if (nt && padded.includes(` ${nt} `)) return { category: cat, term };
     }
   }
   return null;
+}
+
+/* ---- admin management ---- */
+export async function getGuardWords(): Promise<{ id: number; category: GuardCategory; word: string }[]> {
+  await ensure();
+  const rows = await prisma.$queryRawUnsafe<{ id: number; category: string; word: string }[]>(`SELECT id, category, word FROM guard_words ORDER BY id DESC`).catch(() => []);
+  return rows.filter((r) => (GUARD_CATEGORIES as string[]).includes(r.category)).map((r) => ({ id: Number(r.id), category: r.category as GuardCategory, word: r.word }));
+}
+export async function addGuardWord(category: GuardCategory, word: string) {
+  await ensure();
+  const w = word.trim();
+  if (!w || !GUARD_CATEGORIES.includes(category)) return;
+  await prisma.$executeRawUnsafe(`INSERT INTO guard_words (category, word) VALUES (?, ?)`, category, w.slice(0, 120));
+  loadedAt = 0;
+}
+export async function deleteGuardWord(id: number) {
+  await ensure();
+  await prisma.$executeRawUnsafe(`DELETE FROM guard_words WHERE id = ?`, id);
+  loadedAt = 0;
 }

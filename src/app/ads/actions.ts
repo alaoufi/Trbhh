@@ -172,7 +172,7 @@ export async function createAdAction(formData: FormData) {
   if (isKeywordStuffing(title, detail)) redirect('/ads/new?error=repeat');
 
   // فحص ذكي للمحتوى: يمنع السياسي/المخدرات/الأمني/الأخلاقي — والأخلاقي يحظر مباشرة
-  const badContent = scanContent(title, detail);
+  const badContent = await scanContent(title, detail);
   if (badContent) {
     if (badContent.category === 'immoral') {
       await banUser(session.uid);
@@ -212,7 +212,7 @@ export async function createAdAction(formData: FormData) {
 
   // فحص أسماء ملفات الصور/الفيديو لكشف المحتوى غير الأخلاقي المصرّح باسمه
   const mediaName = String((formData.get('video') as File | null)?.name || '');
-  const nameHit = scanContent(images.map((i) => i.name).join(' '), mediaName);
+  const nameHit = await scanContent(images.map((i) => i.name).join(' '), mediaName);
   if (nameHit) {
     if (nameHit.category === 'immoral') {
       await banUser(session.uid);
@@ -282,7 +282,7 @@ export async function updateAdAction(formData: FormData) {
   const eDetail = String(formData.get('detail') || '').trim();
   if (!phone && !whatsapp) redirect(`/ads/${toInt(adId)}/edit?error=contact`);
   if (isKeywordStuffing(eTitle, eDetail)) redirect(`/ads/${toInt(adId)}/edit?error=repeat`);
-  const eBad = scanContent(eTitle, eDetail);
+  const eBad = await scanContent(eTitle, eDetail);
   if (eBad) {
     if (eBad.category === 'immoral') { await banUser(session.uid); redirect('/account/ads?error=blocked'); }
     redirect(`/ads/${toInt(adId)}/edit?error=blocked&cat=${eBad.category}`);

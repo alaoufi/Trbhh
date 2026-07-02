@@ -37,6 +37,16 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   };
 }
 
+// varied elegant frames to break the monotony of a uniform gallery
+const GALLERY_FRAMES = [
+  'rounded-2xl',
+  'rounded-full',
+  'rounded-tl-[1.75rem] rounded-br-[1.75rem]',
+  'rounded-xl',
+  'rounded-[1.75rem]',
+  'rounded-tr-[1.75rem] rounded-bl-[1.75rem]',
+];
+
 function InfoItem({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 text-primary">
@@ -101,7 +111,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
       {ad.images.length > 1 && (
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
           {ad.images.slice(0, 10).map((img, i) => (
-            <div key={i} className="relative aspect-square overflow-hidden rounded-xl border-2 border-primary/20 bg-white shadow-sm ring-1 ring-primary/5 transition hover:-translate-y-0.5 hover:ring-primary/40">
+            <div key={i} className={`relative aspect-square overflow-hidden border-2 border-primary/25 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 ${GALLERY_FRAMES[i % GALLERY_FRAMES.length]}`}>
               <Image src={img} alt={`${ad.title} ${i + 1}`} fill sizes="20vw" className="object-cover" />
             </div>
           ))}

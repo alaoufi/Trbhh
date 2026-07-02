@@ -11,6 +11,7 @@ import { createPackage, updatePackage, deletePackage, assignUserPackage, type Ti
 import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
+import { MSG_KEYS } from '@/lib/sms';
 import { toInt } from '@/lib/utils';
 
 function readPromoPkgForm(formData: FormData) {
@@ -251,6 +252,28 @@ export async function saveRolePermsAction(formData: FormData) {
   await setRolePermKeys(role, keys);
   revalidatePath('/admin/roles');
   redirect(`/admin/roles?saved=${role}`);
+}
+
+/** Save messaging/verification gateway settings (SMS + WhatsApp). */
+export async function saveVerificationAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const s = (k: string) => String(formData.get(k) || '').trim();
+  const ch = s('channel');
+  const channel = ch === 'whatsapp' || ch === 'both' ? ch : 'sms';
+  await Promise.all([
+    setSetting(MSG_KEYS.smsUrl, s('sms_url') || 'http://www.4jawaly.net/api/sendsms.php'),
+    setSetting(MSG_KEYS.smsUser, s('sms_username')),
+    setSetting(MSG_KEYS.smsPass, s('sms_password')),
+    setSetting(MSG_KEYS.smsSender, s('sms_sender') || 'SouqAlhafta'),
+    setSetting(MSG_KEYS.smsUnicode, s('sms_unicode') || 'e'),
+    setSetting(MSG_KEYS.waUrl, s('wa_url') || 'https://user.4whats.net/api/sendMessage'),
+    setSetting(MSG_KEYS.waInstance, s('wa_instance')),
+    setSetting(MSG_KEYS.waToken, s('wa_token')),
+    setSetting(MSG_KEYS.channel, channel),
+    setSetting(MSG_KEYS.enabled, formData.get('enabled') !== null ? '1' : '0'),
+  ]);
+  revalidatePath('/admin/verification');
+  redirect('/admin/verification?saved=1');
 }
 
 /* ---- Database backup / restore ---- */

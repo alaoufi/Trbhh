@@ -2,12 +2,39 @@ import 'server-only';
 import { randomInt } from 'node:crypto';
 import { prisma } from './prisma';
 import { hashPassword } from './auth';
+import { getSetting } from './settings';
 
-const SMS_URL = process.env.SMS_URL || 'http://www.4jawaly.net/api/sendsms.php';
-const SMS_USERNAME = process.env.SMS_USERNAME || '';
-const SMS_PASSWORD = process.env.SMS_PASSWORD || '';
-const SMS_SENDER = process.env.SMS_SENDER || 'SouqAlhafta';
-const SMS_UNICODE = process.env.SMS_UNICODE || 'e';
+/* Setting keys (editable from the admin). */
+export const MSG_KEYS = {
+  smsUrl: 'sms_url', smsUser: 'sms_username', smsPass: 'sms_password', smsSender: 'sms_sender', smsUnicode: 'sms_unicode',
+  waUrl: 'wa_url', waInstance: 'wa_instance', waToken: 'wa_token',
+  channel: 'otp_channel', enabled: 'otp_enabled',
+} as const;
+
+export type OtpChannel = 'sms' | 'whatsapp' | 'both';
+export type MessagingConfig = {
+  smsUrl: string; smsUser: string; smsPass: string; smsSender: string; smsUnicode: string;
+  waUrl: string; waInstance: string; waToken: string;
+  channel: OtpChannel; enabled: boolean;
+};
+
+/** Load messaging config from the DB (editable in admin), falling back to env. */
+export async function getMessagingConfig(): Promise<MessagingConfig> {
+  const [smsUrl, smsUser, smsPass, smsSender, smsUnicode, waUrl, waInstance, waToken, channel, enabled] = await Promise.all([
+    getSetting(MSG_KEYS.smsUrl, process.env.SMS_URL || 'http://www.4jawaly.net/api/sendsms.php'),
+    getSetting(MSG_KEYS.smsUser, process.env.SMS_USERNAME || ''),
+    getSetting(MSG_KEYS.smsPass, process.env.SMS_PASSWORD || ''),
+    getSetting(MSG_KEYS.smsSender, process.env.SMS_SENDER || 'SouqAlhafta'),
+    getSetting(MSG_KEYS.smsUnicode, process.env.SMS_UNICODE || 'e'),
+    getSetting(MSG_KEYS.waUrl, process.env.WA_URL || 'https://user.4whats.net/api/sendMessage'),
+    getSetting(MSG_KEYS.waInstance, process.env.WA_INSTANCE || ''),
+    getSetting(MSG_KEYS.waToken, process.env.WA_TOKEN || ''),
+    getSetting(MSG_KEYS.channel, 'sms'),
+    getSetting(MSG_KEYS.enabled, '1'),
+  ]);
+  const ch: OtpChannel = channel === 'whatsapp' || channel === 'both' ? channel : 'sms';
+  return { smsUrl, smsUser, smsPass, smsSender, smsUnicode, waUrl, waInstance, waToken, channel: ch, enabled: enabled !== '0' };
+}
 
 /** Normalize a Saudi number to 9665XXXXXXXX (digits only). */
 export function normalizeSaudi(phone: string): string {
@@ -15,40 +42,53 @@ export function normalizeSaudi(phone: string): string {
   if (p.startsWith('00')) p = p.slice(2);
   if (p.startsWith('966')) return p;
   if (p.startsWith('0')) p = p.slice(1);
-  if (p.length === 9 && p.startsWith('5')) return '966' + p;
   if (p.startsWith('5')) return '966' + p;
   return p.startsWith('966') ? p : '966' + p;
 }
 
-/** Send an SMS via the 4jawaly gateway. Returns true on apparent success. */
-export async function sendSms(phone: string, message: string): Promise<boolean> {
-  if (!SMS_USERNAME || !SMS_PASSWORD) return false;
+/** Send an SMS via the 4jawaly gateway. */
+export async function sendSms(phone: string, message: string, c?: MessagingConfig): Promise<boolean> {
+  const cfg = c || (await getMessagingConfig());
+  if (!cfg.smsUser || !cfg.smsPass) return false;
   const body = new URLSearchParams({
-    username: SMS_USERNAME,
-    password: SMS_PASSWORD,
-    message,
-    numbers: normalizeSaudi(phone),
-    sender: SMS_SENDER,
-    unicode: SMS_UNICODE,
-    Rmduplicated: '1',
-    return: 'xml',
+    username: cfg.smsUser, password: cfg.smsPass, message,
+    numbers: normalizeSaudi(phone), sender: cfg.smsSender,
+    unicode: cfg.smsUnicode, Rmduplicated: '1', return: 'xml',
   }).toString();
   try {
-    const res = await fetch(SMS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-      cache: 'no-store',
-    });
-    const text = await res.text().catch(() => '');
+    const res = await fetch(cfg.smsUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body, cache: 'no-store' });
     if (!res.ok) return false;
-    // 4jawaly returns xml; a leading "1" / <code>1</code> means accepted
+    const text = await res.text().catch(() => '');
     if (/<code>\s*1\s*<\/code>/i.test(text)) return true;
     if (/error|invalid|fail|رصيد|غير صحيح/i.test(text)) return false;
     return true;
   } catch {
     return false;
   }
+}
+
+/** Send a WhatsApp message via the 4whats.net gateway. */
+export async function sendWhatsApp(phone: string, message: string, c?: MessagingConfig): Promise<boolean> {
+  const cfg = c || (await getMessagingConfig());
+  if (!cfg.waInstance || !cfg.waToken) return false;
+  const url = `${cfg.waUrl}?instanceid=${encodeURIComponent(cfg.waInstance)}&token=${encodeURIComponent(cfg.waToken)}&phone=${encodeURIComponent(normalizeSaudi(phone))}&body=${encodeURIComponent(message)}`;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return false;
+    const text = await res.text().catch(() => '');
+    return !/error|invalid|fail|not.?found/i.test(text);
+  } catch {
+    return false;
+  }
+}
+
+/** Send a message through the currently configured channel(s). */
+export async function sendVerification(phone: string, message: string): Promise<boolean> {
+  const cfg = await getMessagingConfig();
+  let ok = false;
+  if (cfg.channel === 'sms' || cfg.channel === 'both') ok = (await sendSms(phone, message, cfg)) || ok;
+  if (cfg.channel === 'whatsapp' || cfg.channel === 'both') ok = (await sendWhatsApp(phone, message, cfg)) || ok;
+  return ok;
 }
 
 /* ---------------- Password-reset OTP ---------------- */
@@ -75,9 +115,11 @@ export async function userExistsByPhone(phone: string): Promise<boolean> {
   return !!u;
 }
 
-/** Generate a 6-digit code, store it, and SMS it. Rate-limited to 1/60s. */
+/** Generate a 6-digit code, store it, and send via the active channel(s). */
 export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; error?: string }> {
   await ensureOtp();
+  const cfg = await getMessagingConfig();
+  if (!cfg.enabled) return { ok: false, error: 'خدمة استعادة كلمة المرور غير مفعّلة حالياً' };
   const norm = normalizeSaudi(phone);
   const rows = await prisma.$queryRawUnsafe<{ secs: number | bigint }[]>(
     `SELECT TIMESTAMPDIFF(SECOND, last_sent, NOW()) secs FROM password_otps WHERE phone = ?`, norm,
@@ -92,8 +134,8 @@ export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; er
      ON DUPLICATE KEY UPDATE code = VALUES(code), expires_at = VALUES(expires_at), attempts = 0, last_sent = NOW()`,
     norm, code,
   );
-  const sent = await sendSms(norm, `رمز استعادة كلمة المرور في تربح: ${code}`);
-  if (!sent) return { ok: false, error: 'تعذّر إرسال الرسالة حالياً، حاول لاحقاً' };
+  const sent = await sendVerification(norm, `رمز استعادة كلمة المرور في تربح: ${code}`);
+  if (!sent) return { ok: false, error: 'تعذّر إرسال الرمز حالياً، حاول لاحقاً' };
   return { ok: true };
 }
 

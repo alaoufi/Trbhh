@@ -13,9 +13,8 @@ export async function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
       <div className="container flex h-16 items-center gap-2">
-        <Link href="/" className="shrink-0">
-          <Image src="/logo-icon.png" alt="تربح" width={44} height={44} priority className="h-11 w-11 rounded-lg object-contain" />
-        </Link>
+        {/* hamburger on the right (RTL: first child) */}
+        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} />
 
         <form action="/search" className="relative flex-1">
           <input
@@ -29,7 +28,10 @@ export async function Header() {
           </div>
         </form>
 
-        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} />
+        {/* logo on the left (RTL: last child) */}
+        <Link href="/" className="shrink-0">
+          <Image src="/logo-icon.png" alt="تربح" width={44} height={44} priority className="h-11 w-11 rounded-lg object-contain" />
+        </Link>
       </div>
     </header>
   );

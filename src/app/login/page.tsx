@@ -1,5 +1,7 @@
 'use client';
+import { Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
 import { loginAction } from './actions';
 import { Button } from '@/components/ui/button';
@@ -9,13 +11,15 @@ function Submit() {
   return <Button className="w-full" disabled={pending}>{pending ? '...' : 'دخول'}</Button>;
 }
 
-export default function LoginPage() {
+function LoginInner() {
   const [state, action] = useFormState(loginAction, null as { error?: string } | null);
+  const reset = useSearchParams().get('reset');
   return (
     <div className="mx-auto max-w-sm py-8">
       <div className="card-3d rounded-xl p-6">
         <h1 className="mb-1 text-xl font-bold">تسجيل الدخول</h1>
         <p className="mb-5 text-sm text-muted-foreground">ادخل بنفس بياناتك المسجّلة سابقاً.</p>
+        {reset && <p className="mb-3 rounded-lg border border-green-300 bg-green-50 p-2 text-sm font-bold text-green-800">تم تغيير كلمة المرور بنجاح، سجّل الدخول بها الآن.</p>}
         <form action={action} className="space-y-3">
           <input name="identifier" placeholder="الجوال أو اسم المستخدم أو البريد"
             className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
@@ -24,10 +28,21 @@ export default function LoginPage() {
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
           <Submit />
         </form>
+        <p className="mt-3 text-center text-sm">
+          <Link href="/forgot" className="font-bold text-primary hover:underline">نسيت كلمة المرور؟</Link>
+        </p>
         <p className="mt-4 text-center text-sm text-muted-foreground">
           ليس لديك حساب؟ <Link href="/register" className="text-primary hover:underline">أنشئ حساباً</Link>
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-sm py-8" />}>
+      <LoginInner />
+    </Suspense>
   );
 }

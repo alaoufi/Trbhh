@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { SubmitOverlay } from '@/components/submit-overlay';
 
 type Cat = { id: number; name: string };
 type Sub = { id: number; name: string; categoryId: number };
@@ -56,6 +57,7 @@ export function AdForm({
 
   return (
     <form action={action} className="max-w-2xl space-y-4 card-3d rounded-xl p-5">
+      <SubmitOverlay label="جارٍ رفع الإعلان…" />
       {initial?.id && <input type="hidden" name="adId" value={initial.id} />}
 
       {error === 'contact' && (

@@ -4,6 +4,7 @@ import { useFormStatus } from 'react-dom';
 import { Phone, MessageCircle, ExternalLink, Megaphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PLACEMENTS, type PromoPackage, type PromoPlacement } from '@/lib/promo-placements';
+import { SubmitOverlay } from '@/components/submit-overlay';
 
 function Submit() {
   const { pending } = useFormStatus();
@@ -72,6 +73,7 @@ export function PromoDesigner({
 
       {/* form */}
       <form action={action} className="order-2 space-y-4 md:order-1">
+        <SubmitOverlay label="جارٍ رفع الإعلان الترويجي…" />
         {error === 'content' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">أضف صورة أو نصاً على الأقل.</div>}
         {error === 'contact' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">أضف رقم جوال أو واتساب.</div>}
         {error === 'package' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">اختر باقة صحيحة.</div>}

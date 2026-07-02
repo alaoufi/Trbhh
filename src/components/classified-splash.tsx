@@ -1,38 +1,65 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { Phone, MessageCircle, ExternalLink, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Phone, MessageCircle, ExternalLink, Pause, Play, LogIn } from 'lucide-react';
 import { type Classified, CLASSIFIED_THEMES } from '@/lib/classified-theme';
 
-const DURATION = 5000; // ms shown before auto-dismiss
+const DURATION = 6000; // ms shown before auto-dismiss
 
 export function ClassifiedSplash({ ad }: { ad: Classified | null }) {
   const [show, setShow] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [remaining, setRemaining] = useState(DURATION);
+  const [paused, setPaused] = useState(false);
+  const pausedRef = useRef(false);
 
   useEffect(() => {
     if (!ad) return;
     if (sessionStorage.getItem('trbhh_splash') === '1') return;
     sessionStorage.setItem('trbhh_splash', '1');
     setShow(true);
-    const start = Date.now();
+    let last = performance.now();
     const iv = setInterval(() => {
-      const p = Math.min(1, (Date.now() - start) / DURATION);
-      setProgress(p);
-      if (p >= 1) { clearInterval(iv); setShow(false); }
+      const now = performance.now();
+      const dt = now - last;
+      last = now;
+      if (pausedRef.current) return;
+      setRemaining((r) => {
+        const next = r - dt;
+        if (next <= 0) { clearInterval(iv); setShow(false); return 0; }
+        return next;
+      });
     }, 50);
     return () => clearInterval(iv);
   }, [ad]);
+
+  function togglePause() {
+    pausedRef.current = !pausedRef.current;
+    setPaused(pausedRef.current);
+  }
 
   if (!ad || !show) return null;
   const theme = CLASSIFIED_THEMES[ad.theme % CLASSIFIED_THEMES.length];
   const wa = ad.whatsapp?.replace(/[^\d]/g, '');
   const href = ad.link || (wa ? `https://wa.me/${wa}` : ad.phone ? `tel:${ad.phone}` : null);
 
+  const progress = remaining / DURATION; // 1 → 0
+  const R = 26;
+  const C = 2 * Math.PI * R;
+  const seconds = Math.ceil(remaining / 1000);
+
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-4 bg-black/80 p-6 backdrop-blur-sm">
-      <button onClick={() => setShow(false)} className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-sm text-white">
-        تخطّي <X className="h-4 w-4" />
-      </button>
+    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-5 bg-black/85 p-6 backdrop-blur-sm">
+      {/* elegant circular countdown */}
+      <div className="relative h-16 w-16">
+        <svg className="h-16 w-16 -rotate-90" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r={R} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
+          <circle
+            cx="32" cy="32" r={R} fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round"
+            strokeDasharray={C} strokeDashoffset={C * (1 - progress)}
+            style={{ transition: 'stroke-dashoffset 60ms linear' }}
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-white">{paused ? '⏸' : seconds}</span>
+      </div>
 
       <a
         href={href || undefined}
@@ -64,10 +91,16 @@ export function ClassifiedSplash({ ad }: { ad: Classified | null }) {
         </div>
       </a>
 
-      <div className="h-1 w-full max-w-xs overflow-hidden rounded-full bg-white/20">
-        <div className="h-full bg-white transition-[width] duration-75" style={{ width: `${progress * 100}%` }} />
+      {/* controls: stay (pause) / enter site */}
+      <div className="flex items-center gap-3">
+        <button onClick={togglePause} className="flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white hover:bg-white/25">
+          {paused ? <><Play className="h-4 w-4" /> متابعة</> : <><Pause className="h-4 w-4" /> البقاء</>}
+        </button>
+        <button onClick={() => setShow(false)} className="flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-bold text-primary hover:bg-white/90">
+          <LogIn className="h-4 w-4" /> الدخول للموقع
+        </button>
       </div>
-      <p className="text-xs text-white/70">إعلان — ينتقل للموقع تلقائياً</p>
+      <p className="text-xs text-white/60">{paused ? 'العرض متوقف — اضغط «الدخول للموقع» متى شئت' : 'ينتقل للموقع تلقائياً'}</p>
     </div>
   );
 }

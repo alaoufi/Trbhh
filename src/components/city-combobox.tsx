@@ -34,8 +34,8 @@ export function CityCombobox({ name, cities, defaultId, placeholder = 'اختر 
     <div className="relative" ref={boxRef}>
       <input type="hidden" name={name} value={selected} />
       <button type="button" onClick={() => setOpen((v) => !v)}
-        className="flex h-11 w-full items-center justify-between rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40">
-        <span className={selectedName ? 'text-foreground' : 'text-muted-foreground'}>
+        className="flex h-11 w-full items-center justify-between rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/40">
+        <span className={selectedName ? 'text-foreground' : 'font-medium text-muted-foreground'}>
           <MapPin className="ml-1 inline h-4 w-4 text-primary" />{selectedName || placeholder}
         </span>
         <ChevronDown className={`h-4 w-4 text-primary transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -45,14 +45,14 @@ export function CityCombobox({ name, cities, defaultId, placeholder = 'اختر 
           <div className="flex items-center gap-2 border-b p-2">
             <Search className="h-4 w-4 text-muted-foreground" />
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث عن المدينة…"
-              className="w-full text-sm outline-none" />
+              className="w-full text-sm font-bold outline-none" />
           </div>
           <div className="max-h-60 overflow-y-auto">
             {filtered.length === 0 && <p className="p-3 text-center text-xs text-muted-foreground">لا توجد نتيجة</p>}
             {filtered.map((c) => (
               <button key={c.id} type="button"
                 onClick={() => { setSelected(c.id); setOpen(false); setQ(''); }}
-                className={`flex w-full items-center justify-between px-3 py-2.5 text-right text-sm hover:bg-accent ${selected === c.id ? 'bg-accent font-bold text-primary' : ''}`}>
+                className={`flex w-full items-center justify-between px-3 py-2.5 text-right text-sm font-bold hover:bg-accent ${selected === c.id ? 'bg-accent text-primary' : 'text-foreground'}`}>
                 {c.name}
                 {selected === c.id && <Check className="h-4 w-4 text-primary" />}
               </button>

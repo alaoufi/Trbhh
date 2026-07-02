@@ -6,8 +6,8 @@ import { sendCodeAction, resetAction } from './actions';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'استعادة كلمة المرور' };
 
-export default async function ForgotPage({ searchParams }: { searchParams: Promise<{ phone?: string; sent?: string; error?: string }> }) {
-  const { phone = '', sent, error } = await searchParams;
+export default async function ForgotPage({ searchParams }: { searchParams: Promise<{ phone?: string; sent?: string; error?: string; warn?: string }> }) {
+  const { phone = '', sent, error, warn } = await searchParams;
   const field = 'h-11 w-full rounded-lg border border-primary/30 bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40';
 
   return (
@@ -37,6 +37,11 @@ export default async function ForgotPage({ searchParams }: { searchParams: Promi
           <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-2 text-xs font-bold text-green-800">
             <ShieldCheck className="h-4 w-4 shrink-0" /> أرسلنا رمزاً إلى {phone}. أدخله مع كلمة المرور الجديدة.
           </div>
+          {warn && (
+            <div className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs font-bold text-amber-800">
+              <AlertTriangle className="h-4 w-4 shrink-0" /> لم نتمكّن من تأكيد وصول الرسالة. إن لم يصلك الرمز خلال دقيقة، تحقّق من إعدادات البوابة أو أعد الإرسال.
+            </div>
+          )}
           <input type="hidden" name="phone" value={phone} />
           <label className="block space-y-1">
             <span className="text-sm font-bold">رمز التحقّق</span>

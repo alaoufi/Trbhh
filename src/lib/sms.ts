@@ -115,17 +115,24 @@ export async function userExistsByPhone(phone: string): Promise<boolean> {
   return !!u;
 }
 
-/** Generate a 6-digit code, store it, and send via the active channel(s). */
-export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; error?: string }> {
+/** Generate a 6-digit code, store it, and send via the active channel(s).
+ *  ok    = the code was created and the gateway is configured (advance to entry)
+ *  delivered = the send call reported success (best-effort; detection can vary) */
+export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; delivered: boolean; error?: string }> {
   await ensureOtp();
   const cfg = await getMessagingConfig();
-  if (!cfg.enabled) return { ok: false, error: 'خدمة استعادة كلمة المرور غير مفعّلة حالياً' };
+  if (!cfg.enabled) return { ok: false, delivered: false, error: 'خدمة استعادة كلمة المرور غير مفعّلة حالياً' };
+  const smsReady = !!(cfg.smsUser && cfg.smsPass);
+  const waReady = !!(cfg.waInstance && cfg.waToken);
+  const configured = (cfg.channel === 'sms' && smsReady) || (cfg.channel === 'whatsapp' && waReady) || (cfg.channel === 'both' && (smsReady || waReady));
+  if (!configured) return { ok: false, delivered: false, error: 'لم تُضبط بيانات بوابة الإرسال في الإدارة (بوابات التحقق)' };
+
   const norm = normalizeSaudi(phone);
   const rows = await prisma.$queryRawUnsafe<{ secs: number | bigint }[]>(
     `SELECT TIMESTAMPDIFF(SECOND, last_sent, NOW()) secs FROM password_otps WHERE phone = ?`, norm,
   ).catch(() => [] as { secs: number }[]);
   const secs = rows[0] ? Number(rows[0].secs) : 999;
-  if (secs < 60) return { ok: false, error: `انتظر ${60 - secs} ثانية قبل إعادة إرسال الرمز` };
+  if (secs < 60) return { ok: false, delivered: false, error: `انتظر ${60 - secs} ثانية قبل إعادة إرسال الرمز` };
 
   const code = String(randomInt(100000, 1000000));
   await prisma.$executeRawUnsafe(
@@ -134,9 +141,8 @@ export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; er
      ON DUPLICATE KEY UPDATE code = VALUES(code), expires_at = VALUES(expires_at), attempts = 0, last_sent = NOW()`,
     norm, code,
   );
-  const sent = await sendVerification(norm, `رمز استعادة كلمة المرور في تربح: ${code}`);
-  if (!sent) return { ok: false, error: 'تعذّر إرسال الرمز حالياً، حاول لاحقاً' };
-  return { ok: true };
+  const delivered = await sendVerification(norm, `رمز استعادة كلمة المرور في تربح: ${code}`);
+  return { ok: true, delivered };
 }
 
 /** Validate a code (max 5 attempts, 10-minute window). */

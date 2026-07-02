@@ -13,7 +13,8 @@ export async function sendCodeAction(formData: FormData) {
   }
   const r = await createAndSendOtp(phone);
   if (!r.ok) redirect(`/forgot?phone=${enc(phone)}&error=${enc(r.error || 'تعذّر الإرسال')}`);
-  redirect(`/forgot?phone=${enc(phone)}&sent=1`);
+  // advance to code entry even if delivery is unconfirmed (detection can vary)
+  redirect(`/forgot?phone=${enc(phone)}&sent=1${r.delivered ? '' : '&warn=1'}`);
 }
 
 export async function resetAction(formData: FormData) {

@@ -29,14 +29,19 @@ export function localAbsPath(relPath: string): string | null {
   return abs.startsWith(STORAGE_DIR) ? abs : null;
 }
 
-/** Return { abs, size } for an existing local file, else null. */
-export async function statLocal(relPath: string): Promise<{ abs: string; size: number } | null> {
-  const abs = localAbsPath(relPath);
-  if (!abs) return null;
+/** Return { abs, size } for an existing file inside baseDir (traversal-safe). */
+export async function statInDir(baseDir: string, relPath: string): Promise<{ abs: string; size: number } | null> {
+  const abs = path.join(baseDir, relPath);
+  if (!abs.startsWith(baseDir)) return null;
   try {
     const st = await fs.stat(abs);
     return st.isFile() ? { abs, size: st.size } : null;
   } catch {
     return null;
   }
+}
+
+/** Return { abs, size } for an existing local (uploads) file, else null. */
+export async function statLocal(relPath: string): Promise<{ abs: string; size: number } | null> {
+  return statInDir(STORAGE_DIR, relPath);
 }

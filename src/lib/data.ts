@@ -284,6 +284,12 @@ export async function getAd(id: number) {
     .filter(Boolean)
     .map((f) => mediaUrl(f as string));
 
+  // video_path stores an uploads id ("0"/"" = none) — resolve to its file name
+  const videoUploadId = parseInt(ad.video_path || '', 10) || 0;
+  const videoFile = videoUploadId > 0
+    ? (await prisma.uploads.findUnique({ where: { id: BigInt(videoUploadId) }, select: { file_name: true } }).catch(() => null))?.file_name || null
+    : null;
+
   await loadBanned();
   return {
     id: toInt(ad.id),
@@ -295,7 +301,7 @@ export async function getAd(id: number) {
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,
     lng: ad.lng,
-    videoPath: ad.video_path || null,
+    videoPath: videoFile,
     phoneAllow: ad.phoneAllow === 1,
     commentAllow: ad.commentAllow === 1,
     images: images.length ? images : [PLACEHOLDER],

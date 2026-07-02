@@ -50,8 +50,12 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:-please_change_this_secret}
       # set to 'true' ONLY when serving over HTTPS (behind SSL). On http://IP:PORT keep false.
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      # LEGACY_MEDIA_BASE proxies not-yet-migrated images from the original site.
-      LEGACY_MEDIA_BASE: ${LEGACY_MEDIA_BASE:-https://trbhh.com}
+      # LEGACY_MEDIA_BASE proxies media over HTTP from another origin. Leave EMPTY
+      # once the domain points at this app (else /media would loop back to itself).
+      LEGACY_MEDIA_BASE: ${LEGACY_MEDIA_BASE:-}
+      # LEGACY_LOCAL_DIR: read-only mount of the original site's media dir, so old
+      # ad images/videos are served locally (with HTTP Range) without copying.
+      LEGACY_LOCAL_DIR: ${LEGACY_LOCAL_DIR:-}
       # NEXT_PUBLIC_MEDIA_BASE empty => media served same-origin via /media route.
       NEXT_PUBLIC_MEDIA_BASE: ${NEXT_PUBLIC_MEDIA_BASE:-}
       STORAGE_DIR: /app/storage
@@ -61,6 +65,9 @@ services:
       # nextjs-owned /app/storage — the non-root app user can write uploads,
       # and images persist across deploys.
       - trbhh-storage:/app/storage
+      # Original site's media (haftastore/public) mounted read-only so legacy
+      # ad images & videos resolve. Host path set via LEGACY_HOST_MEDIA in .env.
+      - ${LEGACY_HOST_MEDIA:-/tmp}:/app/legacy:ro
     # Published directly on host port ${APP_PORT} so the app is reachable
     # without the bundled nginx (avoids clashing with an existing panel on 80/443).
     ports:

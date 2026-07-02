@@ -9,28 +9,36 @@ import {
 } from '@/lib/classified-theme';
 import { ClassifiedDecor } from '@/components/classified-decor';
 
-function Submit() {
+function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
-  return <Button size="lg" className="w-full gap-2" disabled={pending}><Sparkles className="h-4 w-4" /> {pending ? 'جارٍ التصميم والنشر...' : 'صمّم وانشر'}</Button>;
+  return <Button size="lg" className="w-full gap-2" disabled={pending}><Sparkles className="h-4 w-4" /> {pending ? 'جارٍ التصميم والنشر...' : label}</Button>;
 }
 
-export function ClassifiedForm({ action, error }: { action: (fd: FormData) => void | Promise<void>; error?: string }) {
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [phone, setPhone] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
-  const [link, setLink] = useState('');
-  const [imgUrl, setImgUrl] = useState<string | null>(null);
+export type ClassifiedInitial = {
+  id?: number; title?: string | null; body?: string | null; phone?: string | null; whatsapp?: string | null;
+  link?: string | null; image?: string | null;
+  theme?: number; pos?: Pos; align?: Align; size?: Size; bold?: boolean; pattern?: Pattern; accent?: Accent;
+};
+
+export function ClassifiedForm({ action, error, initial, submitLabel }: {
+  action: (fd: FormData) => void | Promise<void>; error?: string; initial?: ClassifiedInitial; submitLabel?: string;
+}) {
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [body, setBody] = useState(initial?.body ?? '');
+  const [phone, setPhone] = useState(initial?.phone ?? '');
+  const [whatsapp, setWhatsapp] = useState(initial?.whatsapp ?? '');
+  const [link, setLink] = useState(initial?.link ?? '');
+  const [imgUrl, setImgUrl] = useState<string | null>(initial?.image ?? null);
 
   // style state (driven by the chosen template, tweakable via advanced controls)
   const [tplId, setTplId] = useState(CLASSIFIED_TEMPLATES[0].id);
-  const [theme, setTheme] = useState(0);
-  const [pos, setPos] = useState<Pos>('bottom');
-  const [align, setAlign] = useState<Align>('right');
-  const [size, setSize] = useState<Size>('md');
-  const [bold, setBold] = useState(true);
-  const [pattern, setPattern] = useState<Pattern>('none');
-  const [accent, setAccent] = useState<Accent>('none');
+  const [theme, setTheme] = useState(initial?.theme ?? 0);
+  const [pos, setPos] = useState<Pos>(initial?.pos ?? 'bottom');
+  const [align, setAlign] = useState<Align>(initial?.align ?? 'right');
+  const [size, setSize] = useState<Size>(initial?.size ?? 'md');
+  const [bold, setBold] = useState(initial?.bold ?? true);
+  const [pattern, setPattern] = useState<Pattern>(initial?.pattern ?? 'none');
+  const [accent, setAccent] = useState<Accent>(initial?.accent ?? 'none');
   const [advanced, setAdvanced] = useState(false);
 
   function applyTemplate(t: Template) {
@@ -114,6 +122,7 @@ export function ClassifiedForm({ action, error }: { action: (fd: FormData) => vo
 
       {/* form */}
       <form action={action} className="order-2 space-y-4 md:order-1">
+        {initial?.id && <input type="hidden" name="id" value={initial.id} />}
         {error === 'content' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">أضف صورة أو نصّاً على الأقل.</div>}
         {error === 'contact' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">أضف رقم جوال أو واتساب على الأقل.</div>}
         {error === 'save' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">تعذّر حفظ الإعلان. حاول مرة أخرى، وإذا تكرّر أخبرنا.</div>}
@@ -138,6 +147,7 @@ export function ClassifiedForm({ action, error }: { action: (fd: FormData) => vo
         <div>
           <label className="mb-1 block text-sm font-medium">الصورة (اختياري إن كتبت نصاً)</label>
           <input name="image" type="file" accept="image/*" onChange={onImage} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1" />
+          {initial?.id && initial?.image && <p className="mt-1 text-xs text-muted-foreground">اترك الحقل فارغاً للإبقاء على الصورة الحالية.</p>}
         </div>
 
         <div className="rounded-lg border border-primary/20 bg-accent/40 p-3">
@@ -198,7 +208,7 @@ export function ClassifiedForm({ action, error }: { action: (fd: FormData) => vo
           </div>
         )}
 
-        <Submit />
+        <Submit label={submitLabel ?? 'صمّم وانشر'} />
       </form>
     </div>
   );

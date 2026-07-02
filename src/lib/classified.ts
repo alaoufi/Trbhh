@@ -94,6 +94,55 @@ export async function getAllClassifieds(limit = 120): Promise<Classified[]> {
   return rows.map(toClassified);
 }
 
+/** A member's own classified ads (for editing/deleting). */
+export async function getMyClassifieds(userId: number): Promise<Classified[]> {
+  await ensureClassifiedTable();
+  await loadBanned();
+  const rows = await prisma.$queryRawUnsafe<Row[]>(
+    `SELECT * FROM classified_ads WHERE user_id = ? ORDER BY id DESC LIMIT 100`, userId,
+  ).catch(() => []);
+  return rows.map(toClassified);
+}
+
+export async function getClassifiedById(id: number): Promise<Classified | null> {
+  await ensureClassifiedTable();
+  await loadBanned();
+  const rows = await prisma.$queryRawUnsafe<Row[]>(`SELECT * FROM classified_ads WHERE id = ?`, id).catch(() => []);
+  return rows[0] ? toClassified(rows[0]) : null;
+}
+
+/** Update a classified ad's content/style (image optional — keep existing when null). */
+export async function updateClassified(id: number, data: {
+  title: string | null; body: string | null; image?: string | null;
+  phone: string | null; whatsapp: string | null; link: string | null;
+  theme?: number; pos?: string; align?: string; size?: string; bold?: boolean; pattern?: string; accent?: string;
+}) {
+  await ensureClassifiedTable();
+  const theme = typeof data.theme === 'number' && data.theme >= 0 ? data.theme % CLASSIFIED_THEMES.length : 0;
+  const pos = ['top', 'center', 'bottom'].includes(data.pos || '') ? data.pos : 'bottom';
+  const align = data.align === 'center' ? 'center' : 'right';
+  const size = ['sm', 'md', 'lg'].includes(data.size || '') ? data.size : 'md';
+  const bold = data.bold === false ? 0 : 1;
+  const pattern = ['none', 'dots', 'stripes', 'grid', 'rays'].includes(data.pattern || '') ? data.pattern : 'none';
+  const accent = ['none', 'bar', 'corner', 'frame'].includes(data.accent || '') ? data.accent : 'none';
+  const setImage = data.image !== undefined && data.image !== null;
+  try {
+    await prisma.$executeRawUnsafe(
+      `UPDATE classified_ads SET title=?, body=?, phone=?, whatsapp=?, link=?, theme=?, content_pos=?, text_align=?, font_size=?, bold=?, pattern=?, accent=?${setImage ? ', image=?' : ''} WHERE id=?`,
+      ...(setImage
+        ? [data.title, data.body, data.phone, data.whatsapp, data.link, theme, pos, align, size, bold, pattern, accent, data.image, id]
+        : [data.title, data.body, data.phone, data.whatsapp, data.link, theme, pos, align, size, bold, pattern, accent, id]),
+    );
+  } catch {
+    await prisma.$executeRawUnsafe(
+      `UPDATE classified_ads SET title=?, body=?, phone=?, whatsapp=?, link=?, theme=?${setImage ? ', image=?' : ''} WHERE id=?`,
+      ...(setImage
+        ? [data.title, data.body, data.phone, data.whatsapp, data.link, theme, data.image, id]
+        : [data.title, data.body, data.phone, data.whatsapp, data.link, theme, id]),
+    );
+  }
+}
+
 export async function countClassifieds(): Promise<number> {
   await ensureClassifiedTable();
   const rows = await prisma.$queryRawUnsafe<{ c: bigint | number }[]>(`SELECT COUNT(*) AS c FROM classified_ads WHERE status = 1`);

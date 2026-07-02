@@ -174,6 +174,11 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         )}
       </div>
 
+      {/* تنويه يظهر في تفاصيل الإعلان فقط */}
+      <p className="rounded-xl border border-amber-300/70 bg-amber-50 p-3 text-center text-xs font-medium text-amber-900">
+        التعامل والدفع يتم خارج المنصة مباشرة بين الطرفين. المنصة وسيلة عرض وربط فقط.
+      </p>
+
       {/* Action tiles: report / rate / share / favorite */}
       <div className="grid grid-cols-4 gap-3">
         <Link href={`/report?type=ad&id=${ad.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">

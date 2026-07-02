@@ -7,7 +7,13 @@ import sharp from 'sharp';
  */
 export async function watermarkImage(buf: Buffer, ext: string): Promise<Buffer> {
   try {
-    const base = sharp(buf, { failOn: 'none' }).rotate(); // respect EXIF orientation
+    // Downscale first: large phone photos (e.g. 4000×3000) are slow to process and
+    // can hang the request. Resizing to ≤1600px keeps it fast and low on memory.
+    const resized = await sharp(buf, { failOn: 'none' })
+      .rotate() // respect EXIF orientation
+      .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+      .toBuffer();
+    const base = sharp(resized, { failOn: 'none' });
     const meta = await base.metadata();
     const w = meta.width || 800;
     const h = meta.height || 800;

@@ -28,14 +28,18 @@ async function readImages(formData: FormData): Promise<PreparedImage[]> {
 
 async function storeImages(images: PreparedImage[], userId: number, adId: bigint) {
   for (const img of images) {
-    // content-addressed filename → identical images resolve to the same file
-    const safe = `${img.hash}.${img.ext}`;
-    const stamped = await watermarkImage(img.buf, img.ext); // burn "تربح" watermark
-    const rel = await saveUpload(stamped, safe);
-    const up = await prisma.uploads.create({
-      data: { file_name: rel, file_original_name: img.name, extension: img.ext, type: 'ad', file_size: img.buf.length, user_id: userId },
-    });
-    await prisma.photos.create({ data: { photo_path: String(toInt(up.id)), other_id: adId } });
+    try {
+      // content-addressed filename → identical images resolve to the same file
+      const safe = `${img.hash}.${img.ext}`;
+      const stamped = await watermarkImage(img.buf, img.ext); // burn "تربح" watermark (also downscales)
+      const rel = await saveUpload(stamped, safe);
+      const up = await prisma.uploads.create({
+        data: { file_name: rel, file_original_name: img.name, extension: img.ext, type: 'ad', file_size: img.buf.length, user_id: userId },
+      });
+      await prisma.photos.create({ data: { photo_path: String(toInt(up.id)), other_id: adId } });
+    } catch {
+      // skip a problematic image rather than failing the whole publish
+    }
   }
 }
 

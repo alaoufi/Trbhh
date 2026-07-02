@@ -44,6 +44,14 @@ export const SETTING_AD_DELETE_HOURS = 'ad_delete_hours';
 /* Toggle the stats row on the home page (1/0). */
 export const SETTING_SHOW_STATS = 'show_home_stats';
 
+/* Who can see classified ad stats (views/clicks): 'all' | 'owner' | 'admin'. */
+export const SETTING_CLASSIFIED_STATS = 'classified_stats_vis';
+export type StatsAudience = 'all' | 'owner' | 'admin';
+export async function getClassifiedStatsAudience(): Promise<StatsAudience> {
+  const v = await getSetting(SETTING_CLASSIFIED_STATS, 'owner');
+  return (v === 'all' || v === 'admin' ? v : 'owner');
+}
+
 export type MemberWindows = { editHours: number; deleteHours: number };
 export async function getMemberWindows(): Promise<MemberWindows> {
   const [editHours, deleteHours] = await Promise.all([

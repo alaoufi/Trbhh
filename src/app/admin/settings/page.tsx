@@ -1,6 +1,6 @@
-import { Settings, Check, BarChart3 } from 'lucide-react';
+import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getSettingBool, SETTING_SHOW_STATS } from '@/lib/settings';
+import { getMemberWindows, getSettingBool, getClassifiedStatsAudience, SETTING_SHOW_STATS } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -9,7 +9,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, showStats] = await Promise.all([searchParams, getMemberWindows(), getSettingBool(SETTING_SHOW_STATS, true)]);
+  const [{ saved }, w, showStats, statsAudience] = await Promise.all([searchParams, getMemberWindows(), getSettingBool(SETTING_SHOW_STATS, true), getClassifiedStatsAudience()]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -36,6 +36,18 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="showStats" defaultChecked={showStats} className="h-4 w-4 accent-primary" />
             إظهار الإحصائيات في الصفحة الرئيسية (عدد الإعلانات، الأعضاء، المشاهدات، الأقسام)
+          </label>
+        </div>
+
+        <div className="border-t border-primary/15 pt-3">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><Eye className="h-4 w-4" /> إحصائيات الإعلانات المبوّبة (المشاهدات والنقرات)</div>
+          <label className="block space-y-1">
+            <span className="text-sm">من يستطيع رؤيتها؟</span>
+            <select name="classifiedStats" defaultValue={statsAudience} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40">
+              <option value="all">الجميع (كل من يشاهد الإعلان)</option>
+              <option value="owner">صاحب الإعلان والإدارة فقط</option>
+              <option value="admin">الإدارة فقط</option>
+            </select>
           </label>
         </div>
 

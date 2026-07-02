@@ -5,6 +5,7 @@ import { Sparkles, ExternalLink, Eye, MousePointerClick, ArrowRight, Pencil } fr
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { getClassifiedById, recordClassifiedView } from '@/lib/classified';
+import { getClassifiedStatsAudience } from '@/lib/settings';
 import { ClassifiedVisual, ClassifiedContact } from '@/components/classified-card';
 import { DisclaimerBar } from '@/components/disclaimer';
 
@@ -25,7 +26,9 @@ export default async function ClassifiedDetailPage({ params }: { params: Promise
   const session = await getSession().catch(() => null);
   const admin = session ? await hasAnyAdmin(session.uid).catch(() => false) : false;
   const isOwner = !!session && c.userId === session.uid;
-  const canSeeStats = isOwner || admin;
+  // who may see stats is controlled from the admin control panel
+  const audience = await getClassifiedStatsAudience().catch(() => 'owner' as const);
+  const canSeeStats = audience === 'all' ? true : audience === 'admin' ? admin : (isOwner || admin);
 
   // record a unique view (not counted for the owner)
   const vid = (await cookies()).get('trbhh_vid')?.value;
@@ -62,7 +65,7 @@ export default async function ClassifiedDetailPage({ params }: { params: Promise
       {canSeeStats && (
         <div className="space-y-2 rounded-xl border border-primary/20 bg-card p-3">
           <div className="flex items-center gap-2 text-sm font-bold text-primary">
-            <Sparkles className="h-4 w-4" /> إحصائيات الإعلان {isOwner ? '(تظهر لك ولإدارة الموقع فقط)' : '(عرض إداري)'}
+            <Sparkles className="h-4 w-4" /> إحصائيات الإعلان {audience === 'all' ? '' : isOwner ? '(تظهر لك وللإدارة)' : '(عرض إداري)'}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="flex items-center gap-2 rounded-lg bg-white p-3">

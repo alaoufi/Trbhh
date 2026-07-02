@@ -12,8 +12,6 @@ import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { PromoSlot } from '@/components/promo-slot';
 import { DisclaimerBar } from '@/components/disclaimer';
-import { getClassifieds } from '@/lib/classified';
-import { ClassifiedGrid } from '@/components/classified-card';
 import { getSettingBool, SETTING_SHOW_STATS } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
@@ -29,13 +27,12 @@ function Stat({ icon: Icon, value, label }: { icon: React.ElementType; value: nu
 }
 
 export default async function HomePage() {
-  const [categories, featured, latest, mostViewed, stats, classifieds, showStats] = await Promise.all([
+  const [categories, featured, latest, mostViewed, stats, showStats] = await Promise.all([
     getCategories(),
     getFeaturedAds(8),
     getLatestAds(12),
     getMostViewedAds(8),
     getStats(),
-    getClassifieds(9).catch(() => []),
     getSettingBool(SETTING_SHOW_STATS, true).catch(() => true),
   ]);
 
@@ -68,12 +65,6 @@ export default async function HomePage() {
         </span>
         <ChevronLeft className="h-5 w-5 shrink-0 text-primary" />
       </Link>
-
-      {classifieds.length > 0 && (
-        <Section title="الإعلانات المبوّبة" href="/classified">
-          <ClassifiedGrid items={classifieds} />
-        </Section>
-      )}
 
       {featured.length > 0 && (
         <Section title="إعلانات مميّزة" href="/search?special=1">

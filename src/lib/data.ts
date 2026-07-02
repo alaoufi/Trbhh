@@ -3,7 +3,7 @@ import { prisma } from './prisma';
 import { cached } from './redis';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { loadBanned, censorSync } from './censor';
-import { sweepExpiredFeatured, getFeaturedTierMap } from './packages';
+import { sweepExpiredFeatured, getFeaturedTierMap, getUsersAdMeta } from './packages';
 import { toInt } from './utils';
 
 export type AdCard = {
@@ -19,6 +19,7 @@ export type AdCard = {
   views: number;
   sellerName: string | null;
   sellerTrusted: boolean;
+  tier?: 'gold' | 'silver' | '';
 };
 
 async function sellerInfo(ids: bigint[]): Promise<Map<number, { name: string; trusted: boolean }>> {
@@ -94,31 +95,41 @@ type AdRow = {
 
 async function toCards(rows: AdRow[]): Promise<AdCard[]> {
   const ids = rows.map((r) => r.id);
-  const [images, views, cities, cats, sellers] = await Promise.all([
+  const [images, views, cities, cats, sellers, adMeta] = await Promise.all([
     primaryImages(ids),
     viewCounts(ids),
     cityNames(rows.map((r) => r.city_id)),
     categoryNames(rows.map((r) => r.category_id)),
     sellerInfo(rows.map((r) => r.user_id)),
+    getUsersAdMeta(rows.map((r) => toInt(r.user_id))).catch(() => new Map()),
   ]);
   await loadBanned();
-  return rows.map((r) => {
-    const s = sellers.get(toInt(r.user_id));
-    return {
-      id: toInt(r.id),
-      title: censorSync(r.title),
-      price: r.price,
-      adsType: r.adsType,
-      image: images.get(toInt(r.id)) ?? PLACEHOLDER,
-      cityName: cities.get(toInt(r.city_id)) ?? null,
-      categoryName: cats.get(toInt(r.category_id)) ?? null,
-      createdAt: r.created_at ? r.created_at.toISOString() : null,
-      special: r.adsSpecial === 'checked',
-      views: views.get(toInt(r.id)) ?? 0,
-      sellerName: s?.name ?? null,
-      sellerTrusted: s?.trusted ?? false,
-    };
-  });
+  const now = Date.now();
+  return rows
+    .filter((r) => {
+      // ad lifetime by the owner's package (0 => unlimited)
+      const days = adMeta.get(toInt(r.user_id))?.adDays ?? 0;
+      if (!days || !r.created_at) return true;
+      return (now - r.created_at.getTime()) / 86400000 <= days;
+    })
+    .map((r) => {
+      const s = sellers.get(toInt(r.user_id));
+      return {
+        id: toInt(r.id),
+        title: censorSync(r.title),
+        price: r.price,
+        adsType: r.adsType,
+        image: images.get(toInt(r.id)) ?? PLACEHOLDER,
+        cityName: cities.get(toInt(r.city_id)) ?? null,
+        categoryName: cats.get(toInt(r.category_id)) ?? null,
+        createdAt: r.created_at ? r.created_at.toISOString() : null,
+        special: r.adsSpecial === 'checked',
+        views: views.get(toInt(r.id)) ?? 0,
+        sellerName: s?.name ?? null,
+        sellerTrusted: s?.trusted ?? false,
+        tier: adMeta.get(toInt(r.user_id))?.tier ?? '',
+      };
+    });
 }
 
 const activeAdWhere = { status: 1, state: 'active' as const };

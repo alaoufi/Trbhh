@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { MapPin, Eye, Timer, User, BadgeCheck } from 'lucide-react';
+import { MapPin, Eye, Timer, User, BadgeCheck, Star } from 'lucide-react';
 import type { AdCard as AdCardType } from '@/lib/data';
 import { timeAgo } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,11 @@ export function AdCard({ ad }: { ad: AdCardType }) {
           {ad.special && (
             <span className="absolute right-1 top-1 rounded bg-[hsl(var(--new))] px-1.5 py-0.5 text-[10px] font-bold text-white">
               مميّز
+            </span>
+          )}
+          {(ad.tier === 'gold' || ad.tier === 'silver') && (
+            <span className={`absolute left-1 top-1 grid h-6 w-6 place-items-center rounded-full shadow ${ad.tier === 'gold' ? 'bg-amber-400' : 'bg-slate-300'}`} title={ad.tier === 'gold' ? 'باقة ذهبية' : 'باقة فضية'}>
+              <Star className={`h-3.5 w-3.5 ${ad.tier === 'gold' ? 'fill-amber-700 text-amber-700' : 'fill-slate-600 text-slate-600'}`} />
             </span>
           )}
         </div>

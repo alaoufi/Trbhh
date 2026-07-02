@@ -54,6 +54,16 @@ export default async function PackagesPage() {
                   <Clock className="h-4 w-4 shrink-0 text-primary" />
                   {p.gapHours > 0 ? <span>فارق <b>{p.gapHours}</b> ساعة بين كل إعلان</span> : <span>بدون فاصل زمني بين الإعلانات</span>}
                 </li>
+                <li className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 shrink-0 text-primary" />
+                  {p.adDays > 0 ? <span>بقاء الإعلان <b>{p.adDays}</b> يوم</span> : <span>بقاء الإعلان <b>بلا مدة</b></span>}
+                </li>
+                {p.tier && (
+                  <li className="flex items-center gap-2">
+                    <Star className={`h-4 w-4 shrink-0 ${p.tier === 'gold' ? 'fill-amber-400 text-amber-400' : 'fill-slate-400 text-slate-400'}`} />
+                    <span>نجمة {p.tier === 'gold' ? 'ذهبية' : 'فضية'} مميّزة على إعلاناتك</span>
+                  </li>
+                )}
                 {p.featuredSlots > 0 && (
                   <li className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 shrink-0 text-amber-500" />

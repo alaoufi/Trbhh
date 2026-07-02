@@ -42,6 +42,7 @@ function PackageFields({ p }: { p?: Package }) {
         <Field label="فارق بالساعات (0 = بلا)" name="gapHours" defaultValue={p?.gapHours} />
         <Field label="عدد إعلانات التميز بالأعلى" name="featuredSlots" defaultValue={p?.featuredSlots} />
         <Field label="أيام البقاء بالأعلى" name="featuredDays" defaultValue={p?.featuredDays} />
+        <Field label="مدة بقاء الإعلان (أيام، 0=دائم)" name="adDays" defaultValue={p?.adDays} />
         <TierSelect value={p?.tier} />
         <Field label="الترتيب" name="sort" defaultValue={p?.sort} />
       </div>

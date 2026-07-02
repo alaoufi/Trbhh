@@ -1,7 +1,9 @@
 'use server';
+import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
+import { getMemberWindows, withinWindow } from '@/lib/settings';
 import { toInt } from '@/lib/utils';
 
 export async function deleteAdAction(formData: FormData) {
@@ -9,6 +11,10 @@ export async function deleteAdAction(formData: FormData) {
   const adId = BigInt(String(formData.get('adId')));
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (ad && toInt(ad.user_id) === session.uid) {
+    const { deleteHours } = await getMemberWindows();
+    if (!withinWindow(ad.created_at, deleteHours)) {
+      redirect(`/account/ads?error=deleteWindow&hours=${deleteHours}`);
+    }
     await prisma.photos.deleteMany({ where: { other_id: adId } });
     await prisma.ads.delete({ where: { id: adId } });
   }

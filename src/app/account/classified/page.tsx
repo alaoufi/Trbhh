@@ -8,7 +8,7 @@ import { deleteMyClassifiedAction } from '@/app/classified/actions';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي المبوّبة' };
 
-export default async function MyClassifiedPage({ searchParams }: { searchParams: Promise<{ updated?: string; deleted?: string }> }) {
+export default async function MyClassifiedPage({ searchParams }: { searchParams: Promise<{ updated?: string; deleted?: string; error?: string }> }) {
   const session = await requireUser();
   const [items, sp] = await Promise.all([getMyClassifieds(session.uid), searchParams]);
   return (
@@ -25,6 +25,7 @@ export default async function MyClassifiedPage({ searchParams }: { searchParams:
 
       {sp.updated === '1' && <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800"><Check className="h-4 w-4" /> تم حفظ التعديلات.</div>}
       {sp.deleted === '1' && <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800"><Check className="h-4 w-4" /> تم حذف الإعلان.</div>}
+      {sp.error === 'deleteWindow' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">انتهت المدة المسموح بها لحذف الإعلان حسب إعدادات الموقع. للحذف تواصل مع الإدارة.</div>}
 
       {items.length === 0 ? (
         <div className="card-3d rounded-2xl p-8 text-center">

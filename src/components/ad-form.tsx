@@ -81,6 +81,11 @@ export function AdForm({
           🚫 تم حظر حسابك بسبب تكرار نشر إعلانات مكرّرة. للتواصل مع الإدارة راسلنا.
         </div>
       )}
+      {error === 'editWindow' && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          انتهت المدة المسموح بها لتعديل هذا الإعلان{gapHours ? ` (${gapHours} ساعة من النشر)` : ''} حسب إعدادات الموقع. يمكنك التواصل مع الإدارة.
+        </div>
+      )}
       {error === 'limit' && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           لقد بلغت الحد اليومي لعدد الإعلانات في باقتك{limitMax ? ` (${limitMax} إعلان/اليوم)` : ''}. للمزيد بإمكانك ترقية باقتك من صفحة <a href="/packages" className="font-bold underline">الباقات</a>.

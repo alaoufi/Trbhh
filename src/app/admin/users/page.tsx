@@ -1,20 +1,14 @@
+import Link from 'next/link';
 import { BadgeCheck, Ban, Check, ShieldCheck } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { requirePerm, getRolesFor, ROLE_LABELS, type Role } from '@/lib/roles';
+import { requirePerm, getUserRole, ROLE_LABELS } from '@/lib/roles';
 import { getPackages, getUserPackageMap } from '@/lib/packages';
-import { banUserAction, trustUserAction, setUserRoleAction, assignUserPackageAction } from '../actions';
+import { banUserAction, trustUserAction, assignUserPackageAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المستخدمين' };
-
-const ROLE_OPTIONS: { value: Role | 'none'; label: string }[] = [
-  { value: 'none', label: 'بدون صلاحية' },
-  { value: 'monitor', label: ROLE_LABELS.monitor },
-  { value: 'moderator', label: ROLE_LABELS.moderator },
-  { value: 'manager', label: ROLE_LABELS.manager },
-];
 
 export default async function AdminUsers({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   await requirePerm('users');
@@ -25,36 +19,33 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
     take: 50,
   });
   const ids = users.map((u) => toInt(u.id));
-  const [roles, packages, pkgMap] = await Promise.all([
-    getRolesFor(ids),
+  const [packages, pkgMap, roleLabels] = await Promise.all([
     getPackages(),
     getUserPackageMap(ids),
+    Promise.all(ids.map((id) => getUserRole(id))),
   ]);
+  const roleById = new Map(ids.map((id, i) => [id, roleLabels[i]]));
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">المستخدمون</h1>
       <form className="flex gap-2"><input name="q" defaultValue={q} placeholder="بحث بالاسم أو الجوال" className="h-10 flex-1 rounded-lg border bg-background px-3 text-sm" /><button className="rounded-lg bg-primary px-4 text-sm text-primary-foreground">بحث</button></form>
       <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
         <table className="w-full text-sm">
-          <thead className="border-b bg-secondary/50 text-right"><tr><th className="p-3">الاسم</th><th className="p-3">الجوال</th><th className="p-3">الحالة</th><th className="p-3">الصلاحية</th><th className="p-3">الباقة</th><th className="p-3">إجراءات</th></tr></thead>
+          <thead className="border-b bg-secondary/50 text-right"><tr><th className="p-3">الاسم</th><th className="p-3">الجوال</th><th className="p-3">الحالة</th><th className="p-3">الصلاحيات</th><th className="p-3">الباقة</th><th className="p-3">إجراءات</th></tr></thead>
           <tbody>
             {users.map((u) => {
               const id = toInt(u.id);
-              const current: Role | 'none' = roles.get(id) ?? (u.is_admin === 1 ? 'manager' : 'none');
+              const role = roleById.get(id);
+              const label = role ? ROLE_LABELS[role] : (u.is_admin === 1 ? 'مدير' : null);
               return (
               <tr key={id} className="border-b last:border-0">
                 <td className="p-3"><div className="flex items-center gap-1 font-medium">{u.name || u.userName || '—'}{u.trusted === 1 && <BadgeCheck className="h-4 w-4 text-primary" />}</div><div className="text-xs text-muted-foreground">{timeAgo(u.created_at)}</div></td>
                 <td className="p-3" dir="ltr">{u.phoneNumber || '—'}</td>
                 <td className="p-3">{u.ban === 'checked' ? <Badge variant="muted">محظور</Badge> : <Badge variant="trusted">نشط</Badge>}</td>
                 <td className="p-3">
-                  <form action={setUserRoleAction} className="flex items-center gap-1">
-                    <input type="hidden" name="userId" value={id} />
-                    <ShieldCheck className={`h-3.5 w-3.5 ${current === 'none' ? 'text-muted-foreground' : 'text-primary'}`} />
-                    <select name="role" defaultValue={current} className="rounded-md border bg-background px-1.5 py-1 text-xs">
-                      {ROLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                    <button className="rounded-md border px-2 py-1 text-xs hover:bg-secondary">حفظ</button>
-                  </form>
+                  <Link href={`/admin/users/${id}/permissions`} className="inline-flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1 text-xs text-primary hover:bg-accent">
+                    <ShieldCheck className="h-3.5 w-3.5" /> {label || 'الصلاحيات'}
+                  </Link>
                 </td>
                 <td className="p-3">
                   <form action={assignUserPackageAction} className="flex items-center gap-1">

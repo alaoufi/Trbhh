@@ -8,6 +8,7 @@ import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
+import { getMemberWindows, withinWindow } from '@/lib/settings';
 import { toInt } from '@/lib/utils';
 
 type PreparedImage = { buf: Buffer; name: string; ext: string; hash: string };
@@ -216,6 +217,10 @@ export async function updateAdAction(formData: FormData) {
   const adId = BigInt(String(formData.get('adId')));
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
+
+  // مدة السماح بالتعديل التي تحددها الإدارة
+  const { editHours } = await getMemberWindows();
+  if (!withinWindow(ad.created_at, editHours)) redirect(`/ads/${toInt(adId)}/edit?error=editWindow&hours=${editHours}`);
 
   const phone = String(formData.get('phone') || '').trim();
   const whatsapp = String(formData.get('whatsapp') || '').trim();

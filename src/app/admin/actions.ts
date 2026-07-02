@@ -2,11 +2,12 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requirePerm, setUserRole, type Role } from '@/lib/roles';
+import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, type Role } from '@/lib/roles';
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS } from '@/lib/settings';
 import { toInt } from '@/lib/utils';
 
 function readPackageForm(formData: FormData) {
@@ -26,14 +27,14 @@ function readPackageForm(formData: FormData) {
 }
 
 export async function createPackageAction(formData: FormData) {
-  await requirePerm('packages');
+  await requireAction('packages', 'add');
   await createPackage(readPackageForm(formData));
   revalidatePath('/admin/packages');
   revalidatePath('/packages');
 }
 
 export async function updatePackageAction(formData: FormData) {
-  await requirePerm('packages');
+  await requireAction('packages', 'edit');
   const id = Number(formData.get('id'));
   if (id) await updatePackage(id, readPackageForm(formData));
   revalidatePath('/admin/packages');
@@ -41,7 +42,7 @@ export async function updatePackageAction(formData: FormData) {
 }
 
 export async function deletePackageAction(formData: FormData) {
-  await requirePerm('packages');
+  await requireAction('packages', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deletePackage(id);
   revalidatePath('/admin/packages');
@@ -49,7 +50,7 @@ export async function deletePackageAction(formData: FormData) {
 }
 
 export async function assignUserPackageAction(formData: FormData) {
-  await requirePerm('packages');
+  await requireAction('packages', 'edit');
   const userId = Number(formData.get('userId'));
   const packageId = Number(formData.get('packageId')) || 0;
   const days = parseInt(String(formData.get('days') || '0')) || 0;
@@ -58,21 +59,21 @@ export async function assignUserPackageAction(formData: FormData) {
 }
 
 export async function addBannedWordAction(formData: FormData) {
-  await requirePerm('words');
+  await requireAction('words', 'add');
   const word = String(formData.get('word') || '').trim();
   if (word) await addBannedWord(word);
   revalidatePath('/admin/words');
 }
 
 export async function deleteBannedWordAction(formData: FormData) {
-  await requirePerm('words');
+  await requireAction('words', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deleteBannedWord(id);
   revalidatePath('/admin/words');
 }
 
 export async function adminDeleteClassifiedAction(formData: FormData) {
-  await requirePerm('classified');
+  await requireAction('classified', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deleteClassified(id);
   revalidatePath('/admin/classified');
@@ -81,7 +82,7 @@ export async function adminDeleteClassifiedAction(formData: FormData) {
 
 /** Delete an ad from its detail page (admin), then go home. */
 export async function adminDeleteAdRedirectAction(formData: FormData) {
-  await requirePerm('ads');
+  await requireAction('ads', 'delete');
   const id = BigInt(String(formData.get('adId')));
   await prisma.photos.deleteMany({ where: { other_id: id } }).catch(() => {});
   await prisma.ads.delete({ where: { id } }).catch(() => {});
@@ -90,7 +91,7 @@ export async function adminDeleteAdRedirectAction(formData: FormData) {
 
 /** Archive (hide) an ad from its detail page (admin). */
 export async function adminArchiveAdAction(formData: FormData) {
-  await requirePerm('ads');
+  await requireAction('ads', 'archive');
   const id = BigInt(String(formData.get('adId')));
   const a = await prisma.ads.findUnique({ where: { id } });
   if (a) await prisma.ads.update({ where: { id }, data: { status: a.status === 1 ? 0 : 1 } }).catch(() => {});
@@ -99,7 +100,7 @@ export async function adminArchiveAdAction(formData: FormData) {
 
 /** Ban/unban the seller from the ad detail page (admin). */
 export async function adminBanSellerAction(formData: FormData) {
-  await requirePerm('ads');
+  await requireAction('users', 'edit');
   const uid = BigInt(String(formData.get('userId')));
   const u = await prisma.users.findUnique({ where: { id: uid } });
   if (u) await prisma.users.update({ where: { id: uid }, data: { ban: u.ban === 'checked' ? 'no' : 'checked' } });
@@ -108,7 +109,7 @@ export async function adminBanSellerAction(formData: FormData) {
 }
 
 export async function adminDeleteDuplicatesAction() {
-  await requirePerm('duplicates');
+  await requireAction('duplicates', 'delete');
   const { groups } = await findDuplicateAds();
   const dupIds = groups.flatMap((g) => g.dups.map((d) => BigInt(d.id)));
   let deleted = 0;
@@ -123,23 +124,47 @@ export async function adminDeleteDuplicatesAction() {
 }
 
 export async function banUserAction(formData: FormData) {
-  await requirePerm('users');
+  await requireAction('users', 'edit');
   const id = BigInt(String(formData.get('userId')));
   const u = await prisma.users.findUnique({ where: { id } });
   if (u) await prisma.users.update({ where: { id }, data: { ban: u.ban === 'checked' ? 'no' : 'checked' } });
   revalidatePath('/admin/users');
 }
 
-export async function setUserRoleAction(formData: FormData) {
-  await requirePerm('users');
+/** Save a user's granular permissions from the permissions matrix (checkboxes named perm[]). */
+export async function setUserPermsAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const id = Number(formData.get('userId'));
+  if (!id) redirect('/admin/users');
+  const keys = formData.getAll('perm').map((v) => String(v)).filter((k) => ALL_KEYS.includes(k));
+  await setUserPerms(id, keys);
+  revalidatePath('/admin/users');
+  redirect(`/admin/users/${id}/permissions?saved=1`);
+}
+
+/** Apply a quick role preset (manager/moderator/monitor/none) to a user. */
+export async function applyPresetAction(formData: FormData) {
+  await requireAction('users', 'edit');
   const id = Number(formData.get('userId'));
   const role = String(formData.get('role') || 'none') as Role | 'none';
-  if (id) await setUserRole(id, role);
+  if (id) await applyRolePreset(id, role);
   revalidatePath('/admin/users');
+  redirect(`/admin/users/${id}/permissions?saved=1`);
+}
+
+/** Save the member self-service windows (edit/delete allowed period, hours). */
+export async function saveSettingsAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const editH = Math.max(0, parseInt(String(formData.get('editHours') || '0')) || 0);
+  const delH = Math.max(0, parseInt(String(formData.get('deleteHours') || '0')) || 0);
+  await setSetting(SETTING_AD_EDIT_HOURS, String(editH));
+  await setSetting(SETTING_AD_DELETE_HOURS, String(delH));
+  revalidatePath('/admin/settings');
+  redirect('/admin/settings?saved=1');
 }
 
 export async function trustUserAction(formData: FormData) {
-  await requirePerm('verifications');
+  await requireAction('verifications', 'edit');
   const id = BigInt(String(formData.get('userId')));
   const u = await prisma.users.findUnique({ where: { id } });
   if (u) await prisma.users.update({ where: { id }, data: { trusted: u.trusted === 1 ? 0 : 1, step: 0 } });
@@ -148,7 +173,7 @@ export async function trustUserAction(formData: FormData) {
 }
 
 export async function adminDeleteAdAction(formData: FormData) {
-  await requirePerm('ads');
+  await requireAction('ads', 'delete');
   const id = BigInt(String(formData.get('adId')));
   await prisma.photos.deleteMany({ where: { other_id: id } });
   await prisma.ads.delete({ where: { id } }).catch(() => {});
@@ -156,7 +181,7 @@ export async function adminDeleteAdAction(formData: FormData) {
 }
 
 export async function adminToggleSpecialAction(formData: FormData) {
-  await requirePerm('ads');
+  await requireAction('ads', 'archive');
   const id = BigInt(String(formData.get('adId')));
   const a = await prisma.ads.findUnique({ where: { id } });
   if (a) await prisma.ads.update({ where: { id }, data: { adsSpecial: a.adsSpecial === 'checked' ? 'no' : 'checked' } });
@@ -164,7 +189,7 @@ export async function adminToggleSpecialAction(formData: FormData) {
 }
 
 export async function adminToggleAdStatusAction(formData: FormData) {
-  await requirePerm('ads');
+  await requireAction('ads', 'archive');
   const id = BigInt(String(formData.get('adId')));
   const a = await prisma.ads.findUnique({ where: { id } });
   if (a) await prisma.ads.update({ where: { id }, data: { status: a.status === 1 ? 0 : 1 } });
@@ -172,7 +197,7 @@ export async function adminToggleAdStatusAction(formData: FormData) {
 }
 
 export async function addCategoryAction(formData: FormData) {
-  await requirePerm('categories');
+  await requireAction('categories', 'add');
   const name = String(formData.get('name') || '').trim();
   if (!name) return;
   await prisma.categories.create({ data: { name, photo_path: '0', is_active: 'yes', ordered: 0 } });
@@ -180,7 +205,7 @@ export async function addCategoryAction(formData: FormData) {
 }
 
 export async function toggleCategoryAction(formData: FormData) {
-  await requirePerm('categories');
+  await requireAction('categories', 'edit');
   const id = BigInt(String(formData.get('catId')));
   const c = await prisma.categories.findUnique({ where: { id } });
   if (c) await prisma.categories.update({ where: { id }, data: { is_active: c.is_active === 'yes' ? 'no' : 'yes' } });

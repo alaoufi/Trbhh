@@ -8,7 +8,7 @@ import {
   ShieldAlert, Trash2, Archive, Ban,
 } from 'lucide-react';
 import { getAd, getSimilarAds, recordView } from '@/lib/data';
-import { hasPerm } from '@/lib/roles';
+import { hasAction } from '@/lib/roles';
 import { adminArchiveAdAction, adminBanSellerAction, adminDeleteAdRedirectAction } from '@/app/admin/actions';
 import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
@@ -62,7 +62,14 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   if (!ad) notFound();
 
   const session = await getSession();
-  const admin = session ? await hasPerm(session.uid, 'ads') : false;
+  const [canArchive, canDeleteAd, canBanSeller] = session
+    ? await Promise.all([
+        hasAction(session.uid, 'ads', 'archive'),
+        hasAction(session.uid, 'ads', 'delete'),
+        hasAction(session.uid, 'users', 'edit'),
+      ])
+    : [false, false, false];
+  const admin = canArchive || canDeleteAd || canBanSeller;
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
   if (viewerKey && (!session || session.uid !== ad.seller?.id)) {
@@ -230,14 +237,17 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
           <div className="mb-3 flex items-center gap-2 text-amber-800">
             <ShieldAlert className="h-5 w-5" /> <span className="font-bold">أدوات الإدارة</span>
           </div>
+          <p className="mb-3 text-xs text-amber-800/80">لا يُسمح بتعديل محتوى إعلان العضو حفاظاً على خصوصيته — الأرشفة أو الحذف فقط.</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <form action={adminArchiveAdAction}>
-              <input type="hidden" name="adId" value={ad.id} />
-              <button className="flex w-full items-center justify-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
-                <Archive className="h-4 w-4" /> أرشفة / إظهار
-              </button>
-            </form>
-            {ad.seller && (
+            {canArchive && (
+              <form action={adminArchiveAdAction}>
+                <input type="hidden" name="adId" value={ad.id} />
+                <button className="flex w-full items-center justify-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
+                  <Archive className="h-4 w-4" /> أرشفة / إظهار
+                </button>
+              </form>
+            )}
+            {canBanSeller && ad.seller && (
               <form action={adminBanSellerAction}>
                 <input type="hidden" name="userId" value={ad.seller.id} />
                 <input type="hidden" name="adId" value={ad.id} />
@@ -246,12 +256,14 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
                 </button>
               </form>
             )}
-            <form action={adminDeleteAdRedirectAction}>
-              <input type="hidden" name="adId" value={ad.id} />
-              <button className="flex w-full items-center justify-center gap-1 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90">
-                <Trash2 className="h-4 w-4" /> حذف الإعلان
-              </button>
-            </form>
+            {canDeleteAd && (
+              <form action={adminDeleteAdRedirectAction}>
+                <input type="hidden" name="adId" value={ad.id} />
+                <button className="flex w-full items-center justify-center gap-1 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90">
+                  <Trash2 className="h-4 w-4" /> حذف الإعلان
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

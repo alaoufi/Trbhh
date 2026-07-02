@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified } from '@/lib/classified';
+import { getMemberWindows, withinWindow } from '@/lib/settings';
 import { toInt } from '@/lib/utils';
 
 async function saveOneImage(formData: FormData): Promise<string | null> {
@@ -79,6 +80,9 @@ export async function updateClassifiedAction(formData: FormData) {
   const existing = id ? await getClassifiedById(id) : null;
   if (!existing || existing.userId !== session.uid) redirect('/account/classified');
 
+  const { editHours } = await getMemberWindows();
+  if (!withinWindow(existing.createdAt, editHours)) redirect(`/classified/${id}/edit?error=window`);
+
   const title = String(formData.get('title') || '').trim().slice(0, 255) || null;
   const body = String(formData.get('body') || '').trim().slice(0, 2000) || null;
   const phone = String(formData.get('phone') || '').trim().slice(0, 40) || null;
@@ -116,6 +120,8 @@ export async function deleteMyClassifiedAction(formData: FormData) {
   const id = Number(formData.get('id'));
   const existing = id ? await getClassifiedById(id) : null;
   if (!existing || existing.userId !== session.uid) redirect('/account/classified');
+  const { deleteHours } = await getMemberWindows();
+  if (!withinWindow(existing.createdAt, deleteHours)) redirect('/account/classified?error=deleteWindow');
   await deleteClassified(id);
   revalidatePath('/');
   revalidatePath('/classified');

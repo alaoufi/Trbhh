@@ -2,6 +2,7 @@ import 'server-only';
 import { redirect } from 'next/navigation';
 import { prisma } from './prisma';
 import { getSession } from './auth';
+import { findDuplicateAds } from './duplicates';
 
 /** Gate: require an admin (users.is_admin = 1). Redirects otherwise. */
 export async function requireAdmin() {
@@ -18,7 +19,7 @@ export async function isAdmin(userId: number) {
 }
 
 export async function adminStats() {
-  const [users, ads, activeAds, pendingAds, pendingVerify, reports, debates] = await Promise.all([
+  const [users, ads, activeAds, pendingAds, pendingVerify, reports, debates, dup] = await Promise.all([
     prisma.users.count(),
     prisma.ads.count(),
     prisma.ads.count({ where: { status: 1, state: 'active' } }),
@@ -26,6 +27,7 @@ export async function adminStats() {
     prisma.users.count({ where: { step: { gt: 0 }, trusted: 0 } }),
     prisma.repord_ads.count(),
     prisma.debates.count(),
+    findDuplicateAds().then((r) => r.dupCount).catch(() => 0),
   ]);
-  return { users, ads, activeAds, pendingAds, pendingVerify, reports, debates };
+  return { users, ads, activeAds, pendingAds, pendingVerify, reports, debates, duplicateAds: dup };
 }

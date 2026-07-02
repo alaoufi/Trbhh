@@ -60,3 +60,17 @@ body {
 .icon-badge {
   filter: drop-shadow(0 2px 2px hsl(var(--primary) / 0.25));
 }
+
+/* moving announcement ticker (top bar) */
+.marquee { overflow: hidden; white-space: nowrap; }
+.marquee-track {
+  display: inline-flex;
+  gap: 3rem;
+  will-change: transform;
+  animation: marquee 22s linear infinite;
+}
+.marquee:hover .marquee-track { animation-play-state: paused; }
+@keyframes marquee {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0); }
+}

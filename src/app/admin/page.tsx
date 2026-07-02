@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock } from 'lucide-react';
+import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy } from 'lucide-react';
 import { adminStats } from '@/lib/admin';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +14,7 @@ export default async function AdminHome() {
     { label: 'إعلانات نشطة', value: s.activeAds, icon: Megaphone, href: '/admin/ads' },
     { label: 'طلبات توثيق معلّقة', value: s.pendingVerify, icon: ShieldCheck, href: '/admin/verifications' },
     { label: 'البلاغات', value: s.reports, icon: Flag, href: '/admin/reports' },
+    { label: 'الإعلانات المكررة', value: s.duplicateAds, icon: Copy, href: '/admin/duplicates', highlight: true },
     { label: 'النقاشات', value: s.debates, icon: MessagesSquare, href: '/admin' },
   ];
   return (

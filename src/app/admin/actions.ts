@@ -1,8 +1,25 @@
 'use server';
+import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/admin';
+import { findDuplicateAds } from '@/lib/duplicates';
 import { toInt } from '@/lib/utils';
+
+export async function adminDeleteDuplicatesAction() {
+  await requireAdmin();
+  const { groups } = await findDuplicateAds();
+  const dupIds = groups.flatMap((g) => g.dups.map((d) => BigInt(d.id)));
+  let deleted = 0;
+  for (const id of dupIds) {
+    await prisma.photos.deleteMany({ where: { other_id: id } }).catch(() => {});
+    const ok = await prisma.ads.delete({ where: { id } }).then(() => true).catch(() => false);
+    if (ok) deleted++;
+  }
+  revalidatePath('/admin/ads');
+  revalidatePath('/admin/duplicates');
+  redirect(`/admin/duplicates?deleted=${deleted}`);
+}
 
 export async function banUserAction(formData: FormData) {
   await requireAdmin();

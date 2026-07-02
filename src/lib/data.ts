@@ -4,6 +4,7 @@ import { cached } from './redis';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { loadBanned, censorSync } from './censor';
 import { sweepExpiredFeatured, getFeaturedTierMap, getUsersAdMeta } from './packages';
+import { ensureSaudiAreas } from './seed-areas';
 import { toInt } from './utils';
 
 export type AdCard = {
@@ -260,8 +261,9 @@ export async function getAd(id: number) {
   const ad = await prisma.ads.findFirst({ where: { id: BigInt(id) } });
   if (!ad) return null;
 
-  const [city, category, seller, photos, views] = await Promise.all([
+  const [city, area, category, seller, photos, views] = await Promise.all([
     prisma.cities.findUnique({ where: { id: ad.city_id }, select: { name: true } }),
+    ad.area_id ? prisma.areas.findUnique({ where: { id: BigInt(ad.area_id) }, select: { name: true } }) : Promise.resolve(null),
     prisma.categories.findUnique({ where: { id: ad.category_id }, select: { id: true, name: true } }),
     prisma.users.findUnique({
       where: { id: ad.user_id },
@@ -299,6 +301,7 @@ export async function getAd(id: number) {
     images: images.length ? images : [PLACEHOLDER],
     views,
     city: city?.name ?? null,
+    area: area?.name ?? null,
     category: category ? { id: toInt(category.id), name: category.name } : null,
     seller: seller
       ? {
@@ -333,6 +336,7 @@ export async function getCities() {
 
 /** Governorates / centers (المحافظات والمراكز) grouped under a region (city_id). */
 export async function getAreas() {
+  await ensureSaudiAreas().catch(() => {});
   const rows = await prisma.areas.findMany({ orderBy: { name: 'asc' } });
   return rows.map((a) => ({ id: toInt(a.id), name: a.name, cityId: a.city_id }));
 }

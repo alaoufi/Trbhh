@@ -153,7 +153,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
       <div className="card-3d grid grid-cols-2 gap-x-3 gap-y-3 rounded-2xl p-4">
         <InfoItem icon={ArrowLeftRight}>{ad.adsType === 'offer' ? 'عرض' : 'طلب'}</InfoItem>
         <InfoItem icon={Timer}>{timeAgo(ad.createdAt)}</InfoItem>
-        <InfoItem icon={MapPin}>{ad.city || 'غير محدد'}</InfoItem>
+        <InfoItem icon={MapPin}>{ad.area ? `${ad.area} - ${ad.city}` : (ad.city || 'غير محدد')}</InfoItem>
         <div className="flex items-center gap-2 text-primary">
           <span className="relative">
             <User className="h-5 w-5" />

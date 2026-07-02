@@ -14,6 +14,7 @@ import { PromoSlot } from '@/components/promo-slot';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { getClassifieds } from '@/lib/classified';
 import { ClassifiedGrid } from '@/components/classified-card';
+import { getSettingBool, SETTING_SHOW_STATS } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,13 +29,14 @@ function Stat({ icon: Icon, value, label }: { icon: React.ElementType; value: nu
 }
 
 export default async function HomePage() {
-  const [categories, featured, latest, mostViewed, stats, classifieds] = await Promise.all([
+  const [categories, featured, latest, mostViewed, stats, classifieds, showStats] = await Promise.all([
     getCategories(),
     getFeaturedAds(8),
     getLatestAds(12),
     getMostViewedAds(8),
     getStats(),
     getClassifieds(9).catch(() => []),
+    getSettingBool(SETTING_SHOW_STATS, true).catch(() => true),
   ]);
 
   return (
@@ -45,13 +47,15 @@ export default async function HomePage() {
       {/* Category tabs */}
       <CategoryTabs categories={categories} />
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-2">
-        <Stat icon={Megaphone} value={stats.ads} label="إعلان نشط" />
-        <Stat icon={Users} value={stats.users} label="عضو مسجّل" />
-        <Stat icon={Eye} value={stats.views} label="مشاهدة" />
-        <Stat icon={LayoutGrid} value={stats.cats} label="قسم" />
-      </div>
+      {/* Stats — toggled from the admin control panel */}
+      {showStats && (
+        <div className="grid grid-cols-4 gap-2">
+          <Stat icon={Megaphone} value={stats.ads} label="إعلان نشط" />
+          <Stat icon={Users} value={stats.users} label="عضو مسجّل" />
+          <Stat icon={Eye} value={stats.views} label="مشاهدة" />
+          <Stat icon={LayoutGrid} value={stats.cats} label="قسم" />
+        </div>
+      )}
 
       {/* Classified ads entry link */}
       <Link href="/classified" className="card-3d flex items-center justify-between gap-3 rounded-2xl p-4">

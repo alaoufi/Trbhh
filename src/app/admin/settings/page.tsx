@@ -1,6 +1,6 @@
-import { Settings, Check } from 'lucide-react';
+import { Settings, Check, BarChart3 } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows } from '@/lib/settings';
+import { getMemberWindows, getSettingBool, SETTING_SHOW_STATS } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -9,7 +9,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w] = await Promise.all([searchParams, getMemberWindows()]);
+  const [{ saved }, w, showStats] = await Promise.all([searchParams, getMemberWindows(), getSettingBool(SETTING_SHOW_STATS, true)]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -30,6 +30,15 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
           <span className="text-sm font-medium">مدة السماح بالحذف (ساعات)</span>
           <input name="deleteHours" type="number" min={0} defaultValue={w.deleteHours} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
         </label>
+
+        <div className="border-t border-primary/15 pt-3">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><BarChart3 className="h-4 w-4" /> الصفحة الرئيسية</div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="showStats" defaultChecked={showStats} className="h-4 w-4 accent-primary" />
+            إظهار الإحصائيات في الصفحة الرئيسية (عدد الإعلانات، الأعضاء، المشاهدات، الأقسام)
+          </label>
+        </div>
+
         <Button>حفظ</Button>
       </form>
     </div>

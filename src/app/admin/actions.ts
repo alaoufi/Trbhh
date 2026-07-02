@@ -7,7 +7,7 @@ import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_SHOW_STATS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { toInt } from '@/lib/utils';
 
@@ -207,9 +207,12 @@ export async function saveSettingsAction(formData: FormData) {
   await requireAction('users', 'edit');
   const editH = Math.max(0, parseInt(String(formData.get('editHours') || '0')) || 0);
   const delH = Math.max(0, parseInt(String(formData.get('deleteHours') || '0')) || 0);
+  const showStats = formData.get('showStats') !== null ? '1' : '0';
   await setSetting(SETTING_AD_EDIT_HOURS, String(editH));
   await setSetting(SETTING_AD_DELETE_HOURS, String(delH));
+  await setSetting(SETTING_SHOW_STATS, showStats);
   revalidatePath('/admin/settings');
+  revalidatePath('/');
   redirect('/admin/settings?saved=1');
 }
 

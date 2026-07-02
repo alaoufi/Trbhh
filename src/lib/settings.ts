@@ -32,9 +32,17 @@ export async function setSetting(k: string, v: string) {
   );
 }
 
+export async function getSettingBool(k: string, fallback = true): Promise<boolean> {
+  const v = await getSetting(k, fallback ? '1' : '0');
+  return v !== '0' && v !== '' && v.toLowerCase() !== 'false';
+}
+
 /* Member self-service windows (hours). 0 = unlimited (always allowed). */
 export const SETTING_AD_EDIT_HOURS = 'ad_edit_hours';
 export const SETTING_AD_DELETE_HOURS = 'ad_delete_hours';
+
+/* Toggle the stats row on the home page (1/0). */
+export const SETTING_SHOW_STATS = 'show_home_stats';
 
 export type MemberWindows = { editHours: number; deleteHours: number };
 export async function getMemberWindows(): Promise<MemberWindows> {

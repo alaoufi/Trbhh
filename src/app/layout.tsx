@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Cairo } from 'next/font/google';
+import { cookies } from 'next/headers';
 import './globals.css';
 import { TopBar } from '@/components/top-bar';
 import { Header } from '@/components/header';
@@ -54,8 +55,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   } catch {
     /* classified table may not be ready yet */
   }
+  const theme = (await cookies()).get('theme')?.value || '';
+  const validThemes = ['desert', 'agri', 'spring', 'mint', 'lavender'];
   return (
-    <html lang="ar" dir="rtl" className={cairo.variable}>
+    <html lang="ar" dir="rtl" className={cairo.variable} {...(validThemes.includes(theme) ? { 'data-theme': theme } : {})}>
       <body className="min-h-screen font-sans antialiased">
         <TopBar />
         <Header />

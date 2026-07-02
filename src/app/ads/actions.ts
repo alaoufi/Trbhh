@@ -7,6 +7,7 @@ import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT } from '@/lib/moderation';
+import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
 import { toInt } from '@/lib/utils';
 
 type PreparedImage = { buf: Buffer; name: string; ext: string; hash: string };
@@ -143,6 +144,22 @@ export async function createAdAction(formData: FormData) {
   // منع حشو الكلمات (تكرار العبارات لخداع محرك البحث)
   if (isKeywordStuffing(title, detail)) redirect('/ads/new?error=repeat');
 
+  // حدود الباقة: عدد الإعلانات باليوم والفارق الزمني بين إعلان وآخر
+  const pkg = await getUserPackage(session.uid);
+  if (pkg.adsPerDay > 0 && (await countAdsToday(session.uid)) >= pkg.adsPerDay) {
+    redirect(`/ads/new?error=limit&max=${pkg.adsPerDay}`);
+  }
+  if (pkg.gapHours > 0) {
+    const last = await lastAdAt(session.uid);
+    if (last) {
+      const elapsedH = (Date.now() - new Date(last).getTime()) / 3600000;
+      if (elapsedH < pkg.gapHours) {
+        const wait = Math.max(1, Math.ceil(pkg.gapHours - elapsedH));
+        redirect(`/ads/new?error=gap&hours=${pkg.gapHours}&wait=${wait}`);
+      }
+    }
+  }
+
   // احفظ وسيلة التواصل في ملف العضو حتى تظهر في الإعلان
   await prisma.users.update({
     where: { id: BigInt(session.uid) },
@@ -180,11 +197,13 @@ export async function createAdAction(formData: FormData) {
       adsSpecial: 'no',
       state: 'active',
       status: 1,
+      created_at: new Date(),
     },
   });
 
   await storeImages(images, session.uid, ad.id);
   await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
+  await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز: تثبيت بالأعلى
   redirect(`/ads/${toInt(ad.id)}`);
 }
 

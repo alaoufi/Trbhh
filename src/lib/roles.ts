@@ -5,13 +5,13 @@ import { getSession } from './auth';
 
 export type Perm =
   | 'users' | 'ads' | 'duplicates' | 'classified' | 'categories'
-  | 'words' | 'reports' | 'verifications' | 'debates' | 'comments';
+  | 'words' | 'reports' | 'verifications' | 'debates' | 'comments' | 'packages';
 export type Role = 'manager' | 'moderator' | 'monitor';
 
 export const ROLE_LABELS: Record<Role, string> = { manager: 'مدير', moderator: 'مشرف', monitor: 'مراقب' };
 
 export const ROLE_PERMS: Record<Role, Perm[]> = {
-  manager: ['users', 'ads', 'duplicates', 'classified', 'categories', 'words', 'reports', 'verifications', 'debates', 'comments'],
+  manager: ['users', 'ads', 'duplicates', 'classified', 'categories', 'words', 'reports', 'verifications', 'debates', 'comments', 'packages'],
   moderator: ['ads', 'duplicates', 'classified', 'debates', 'comments', 'reports'],
   monitor: ['reports', 'verifications', 'words'],
 };

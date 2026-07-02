@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles } from 'lucide-react';
+import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles, Crown } from 'lucide-react';
 import { adminStats } from '@/lib/admin';
+import { getPackages } from '@/lib/packages';
 import { requireAnyAdmin, getUserPerms, getUserRole, ROLE_LABELS, type Perm } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +9,7 @@ export const metadata = { title: 'لوحة الإدارة' };
 
 export default async function AdminHome() {
   const session = await requireAnyAdmin();
-  const [s, perms, role] = await Promise.all([adminStats(), getUserPerms(session.uid), getUserRole(session.uid)]);
+  const [s, perms, role, packages] = await Promise.all([adminStats(), getUserPerms(session.uid), getUserRole(session.uid), getPackages().catch(() => [])]);
   const allCards: { label: string; value: number; icon: React.ElementType; href: string; highlight?: boolean; perm: Perm | null }[] = [
     { label: 'إعلانات بانتظار الموافقة', value: s.pendingAds, icon: Clock, href: '/admin/ads?pending=1', highlight: true, perm: 'ads' },
     { label: 'المستخدمون', value: s.users, icon: Users, href: '/admin/users', perm: 'users' },
@@ -18,6 +19,7 @@ export default async function AdminHome() {
     { label: 'البلاغات', value: s.reports, icon: Flag, href: '/admin/reports', perm: 'reports' },
     { label: 'الإعلانات المكررة', value: s.duplicateAds, icon: Copy, href: '/admin/duplicates', highlight: true, perm: 'duplicates' },
     { label: 'الإعلانات المبوّبة', value: s.classified, icon: Sparkles, href: '/admin/classified', perm: 'classified' },
+    { label: 'الباقات', value: packages.length, icon: Crown, href: '/admin/packages', perm: 'packages' },
     { label: 'النقاشات', value: s.debates, icon: MessagesSquare, href: '/debates', perm: null },
   ];
   const cards = allCards.filter((c) => c.perm === null || perms.has(c.perm));

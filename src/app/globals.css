@@ -25,6 +25,88 @@
   --radius: 0.9rem;
 }
 
+/* ===== الثيمات: مجموعة ألوان خفيفة وباردة يختارها العضو ===== */
+[data-theme="desert"] {           /* الصحراء — رملي دافئ خفيف */
+  --background: 40 60% 99%;
+  --foreground: 34 40% 22%;
+  --card: 39 58% 90%;
+  --card-foreground: 34 45% 28%;
+  --primary: 34 48% 46%;
+  --secondary: 40 55% 87%;
+  --secondary-foreground: 34 45% 28%;
+  --muted: 40 40% 95%;
+  --muted-foreground: 34 22% 42%;
+  --accent: 39 58% 90%;
+  --accent-foreground: 34 48% 38%;
+  --border: 36 48% 72%;
+  --input: 36 48% 72%;
+  --ring: 34 48% 46%;
+}
+[data-theme="agri"] {             /* الزراعي — أخضر هادئ */
+  --background: 132 40% 99%;
+  --foreground: 150 38% 18%;
+  --card: 132 44% 92%;
+  --card-foreground: 150 40% 24%;
+  --primary: 138 44% 40%;
+  --secondary: 132 40% 86%;
+  --secondary-foreground: 150 40% 24%;
+  --muted: 132 30% 95%;
+  --muted-foreground: 150 16% 40%;
+  --accent: 132 44% 92%;
+  --accent-foreground: 138 44% 34%;
+  --border: 138 36% 70%;
+  --input: 138 36% 70%;
+  --ring: 138 44% 40%;
+}
+[data-theme="spring"] {           /* الربيعي — وردي فاتح باستيل */
+  --background: 336 60% 99%;
+  --foreground: 330 34% 28%;
+  --card: 336 66% 95%;
+  --card-foreground: 330 36% 32%;
+  --primary: 330 55% 62%;
+  --secondary: 336 55% 91%;
+  --secondary-foreground: 330 36% 32%;
+  --muted: 336 40% 96%;
+  --muted-foreground: 330 18% 46%;
+  --accent: 336 66% 95%;
+  --accent-foreground: 330 50% 50%;
+  --border: 330 45% 82%;
+  --input: 330 45% 82%;
+  --ring: 330 55% 62%;
+}
+[data-theme="mint"] {             /* نعناعي — تركوازي بارد */
+  --background: 172 50% 99%;
+  --foreground: 182 40% 18%;
+  --card: 172 50% 92%;
+  --card-foreground: 182 40% 24%;
+  --primary: 174 56% 40%;
+  --secondary: 172 45% 86%;
+  --secondary-foreground: 182 40% 24%;
+  --muted: 172 35% 95%;
+  --muted-foreground: 182 16% 40%;
+  --accent: 172 50% 92%;
+  --accent-foreground: 174 56% 34%;
+  --border: 174 40% 70%;
+  --input: 174 40% 70%;
+  --ring: 174 56% 40%;
+}
+[data-theme="lavender"] {         /* خزامى — بنفسجي فاتح */
+  --background: 250 60% 99%;
+  --foreground: 250 34% 30%;
+  --card: 250 62% 96%;
+  --card-foreground: 250 36% 34%;
+  --primary: 250 48% 64%;
+  --secondary: 250 52% 92%;
+  --secondary-foreground: 250 36% 34%;
+  --muted: 250 40% 96%;
+  --muted-foreground: 250 18% 48%;
+  --accent: 250 62% 96%;
+  --accent-foreground: 250 48% 54%;
+  --border: 250 42% 84%;
+  --input: 250 42% 84%;
+  --ring: 250 48% 64%;
+}
+
 * { border-color: hsl(var(--border)); }
 
 body {

@@ -2,18 +2,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Phone, MessageCircle, ExternalLink, Pause, Play, LogIn, Sparkles } from 'lucide-react';
-import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY, SIZE_TITLE_POSTER, SIZE_BODY_POSTER } from '@/lib/classified-theme';
+import { type Classified, CLASSIFIED_THEMES, POS_CLASS } from '@/lib/classified-theme';
 import { ClassifiedDecor } from '@/components/classified-decor';
 
 const DURATION = 9000; // ms the entry splash stays before auto-entering the site
+
+// Compact sizes so text always fits inside the small grid tiles (no clipped letters)
+const TILE_TITLE: Record<string, string> = { sm: 'text-sm', md: 'text-base', lg: 'text-lg' };
+const TILE_BODY: Record<string, string> = { sm: 'text-[11px]', md: 'text-xs', lg: 'text-xs' };
 
 function Tile({ ad, delay, onNavigate }: { ad: Classified; delay: number; onNavigate: () => void }) {
   const theme = CLASSIFIED_THEMES[ad.theme % CLASSIFIED_THEMES.length];
   const poster = !ad.image;
   const dark = theme.text === 'dark' && poster;
   const wa = ad.whatsapp?.replace(/[^\d]/g, '');
-  const titleCls = poster ? SIZE_TITLE_POSTER[ad.size] : SIZE_TITLE[ad.size];
-  const bodyCls = poster ? SIZE_BODY_POSTER[ad.size] : SIZE_BODY[ad.size];
+  const titleCls = TILE_TITLE[ad.size] || TILE_TITLE.md;
+  const bodyCls = TILE_BODY[ad.size] || TILE_BODY.md;
 
   const card = (
     <div
@@ -29,9 +33,9 @@ function Tile({ ad, delay, onNavigate }: { ad: Classified; delay: number; onNavi
       )}
       <ClassifiedDecor pattern={ad.pattern} accent={ad.accent} dark={dark} />
       {ad.link && <span className="absolute right-2 top-2 z-10 rounded-full bg-white/25 p-1 backdrop-blur"><ExternalLink className="h-3.5 w-3.5" /></span>}
-      <div className={`relative z-10 space-y-1 p-3 ${poster ? 'text-center' : ad.align === 'center' ? 'text-center' : 'text-right'}`}>
-        {ad.title && <h3 className={`leading-tight drop-shadow ${poster ? 'line-clamp-4' : 'line-clamp-2'} ${titleCls} ${ad.bold ? 'font-extrabold' : 'font-medium'}`}>{ad.title}</h3>}
-        {ad.text && <p className={`leading-snug drop-shadow ${poster ? 'line-clamp-3' : 'line-clamp-2'} ${bodyCls} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{ad.text}</p>}
+      <div className={`relative z-10 flex max-h-full min-h-0 flex-col justify-center gap-1 overflow-hidden p-3 ${poster ? 'text-center' : ad.align === 'center' ? 'text-center' : 'text-right'}`}>
+        {ad.title && <h3 className={`min-w-0 break-words leading-tight drop-shadow line-clamp-3 ${titleCls} ${ad.bold ? 'font-extrabold' : 'font-semibold'}`}>{ad.title}</h3>}
+        {ad.text && <p className={`min-w-0 break-words leading-snug drop-shadow line-clamp-2 ${bodyCls} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{ad.text}</p>}
       </div>
     </div>
   );
@@ -100,9 +104,9 @@ export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
   const seconds = Math.ceil(remaining / 1000);
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col bg-black/85 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[200] flex flex-col bg-gradient-to-b from-primary via-[hsl(var(--primary)/0.9)] to-slate-900 backdrop-blur-md">
       {/* header */}
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border-b border-white/15 bg-black/10 px-4 py-3">
         <div className="flex items-center gap-2 text-white">
           <Sparkles className="h-5 w-5 text-amber-300" />
           <span className="text-sm font-bold">الإعلانات المبوّبة</span>

@@ -6,7 +6,56 @@ import { requirePerm, setUserRole, type Role } from '@/lib/roles';
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
+import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
 import { toInt } from '@/lib/utils';
+
+function readPackageForm(formData: FormData) {
+  const t = String(formData.get('tier') || '');
+  return {
+    name: String(formData.get('name') || '').trim() || 'باقة',
+    price: Math.max(0, parseFloat(String(formData.get('price') || '0')) || 0),
+    adsPerDay: Math.max(0, parseInt(String(formData.get('adsPerDay') || '0')) || 0),
+    gapHours: Math.max(0, parseInt(String(formData.get('gapHours') || '0')) || 0),
+    featuredSlots: Math.max(0, parseInt(String(formData.get('featuredSlots') || '0')) || 0),
+    featuredDays: Math.max(0, parseInt(String(formData.get('featuredDays') || '0')) || 0),
+    tier: (t === 'gold' || t === 'silver' ? t : '') as Tier,
+    isDefault: !!formData.get('isDefault'),
+    sort: parseInt(String(formData.get('sort') || '0')) || 0,
+    active: formData.get('active') !== null,
+  };
+}
+
+export async function createPackageAction(formData: FormData) {
+  await requirePerm('packages');
+  await createPackage(readPackageForm(formData));
+  revalidatePath('/admin/packages');
+  revalidatePath('/packages');
+}
+
+export async function updatePackageAction(formData: FormData) {
+  await requirePerm('packages');
+  const id = Number(formData.get('id'));
+  if (id) await updatePackage(id, readPackageForm(formData));
+  revalidatePath('/admin/packages');
+  revalidatePath('/packages');
+}
+
+export async function deletePackageAction(formData: FormData) {
+  await requirePerm('packages');
+  const id = Number(formData.get('id'));
+  if (id) await deletePackage(id);
+  revalidatePath('/admin/packages');
+  revalidatePath('/packages');
+}
+
+export async function assignUserPackageAction(formData: FormData) {
+  await requirePerm('packages');
+  const userId = Number(formData.get('userId'));
+  const packageId = Number(formData.get('packageId')) || 0;
+  const days = parseInt(String(formData.get('days') || '0')) || 0;
+  if (userId) await assignUserPackage(userId, packageId, days);
+  revalidatePath('/admin/users');
+}
 
 export async function addBannedWordAction(formData: FormData) {
   await requirePerm('words');

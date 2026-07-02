@@ -20,11 +20,12 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, initial, submitLabel, error, dupLeft,
+  action, categories, subcategories, countries, cities, initial, submitLabel, error, dupLeft, limitMax, gapHours, gapWait,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string;
+  limitMax?: string; gapHours?: string; gapWait?: string;
 }) {
   const [category, setCategory] = useState(initial?.categoryId ?? categories[0]?.id ?? 0);
   const [country, setCountry] = useState(initial?.countryId ?? countries[0]?.id ?? 0);
@@ -78,6 +79,16 @@ export function AdForm({
       {error === 'banned' && (
         <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
           🚫 تم حظر حسابك بسبب تكرار نشر إعلانات مكرّرة. للتواصل مع الإدارة راسلنا.
+        </div>
+      )}
+      {error === 'limit' && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          لقد بلغت الحد اليومي لعدد الإعلانات في باقتك{limitMax ? ` (${limitMax} إعلان/اليوم)` : ''}. للمزيد بإمكانك ترقية باقتك من صفحة <a href="/packages" className="font-bold underline">الباقات</a>.
+        </div>
+      )}
+      {error === 'gap' && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          يجب الانتظار{gapHours ? ` ${gapHours} ساعة` : ''} بين كل إعلان وآخر في باقتك{gapWait ? ` — تبقّى نحو ${gapWait} ساعة` : ''}. للترقية طالع صفحة <a href="/packages" className="font-bold underline">الباقات</a>.
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 import { cached } from './redis';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { loadBanned, censorSync } from './censor';
+import { sweepExpiredFeatured, getFeaturedTierMap } from './packages';
 import { toInt } from './utils';
 
 export type AdCard = {
@@ -154,13 +155,18 @@ export async function getLatestAds(take = 12) {
 }
 
 export async function getFeaturedAds(take = 8) {
+  await sweepExpiredFeatured().catch(() => {});
   const rows = await prisma.ads.findMany({
     where: { ...activeAdWhere, adsSpecial: 'checked' },
     orderBy: { id: 'desc' },
-    take,
+    take: take * 3,
     select: adSelect,
   });
-  return toCards(rows);
+  // ذهبي أولاً ثم فضي ثم البقية (الأحدث ضمن كل فئة)
+  const tiers = await getFeaturedTierMap(rows.map((r) => toInt(r.id))).catch(() => new Map());
+  const rank = (id: number) => (tiers.get(id) === 'gold' ? 0 : tiers.get(id) === 'silver' ? 1 : 2);
+  const ordered = [...rows].sort((a, b) => rank(toInt(a.id)) - rank(toInt(b.id)) || toInt(b.id) - toInt(a.id));
+  return toCards(ordered.slice(0, take));
 }
 
 export async function getMostViewedAds(take = 8) {

@@ -3,7 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { requirePerm, getRolesFor, ROLE_LABELS, type Role } from '@/lib/roles';
-import { banUserAction, trustUserAction, setUserRoleAction } from '../actions';
+import { getPackages, getUserPackageMap } from '@/lib/packages';
+import { banUserAction, trustUserAction, setUserRoleAction, assignUserPackageAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المستخدمين' };
@@ -23,14 +24,19 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
     orderBy: { id: 'desc' },
     take: 50,
   });
-  const roles = await getRolesFor(users.map((u) => toInt(u.id)));
+  const ids = users.map((u) => toInt(u.id));
+  const [roles, packages, pkgMap] = await Promise.all([
+    getRolesFor(ids),
+    getPackages(),
+    getUserPackageMap(ids),
+  ]);
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">المستخدمون</h1>
       <form className="flex gap-2"><input name="q" defaultValue={q} placeholder="بحث بالاسم أو الجوال" className="h-10 flex-1 rounded-lg border bg-background px-3 text-sm" /><button className="rounded-lg bg-primary px-4 text-sm text-primary-foreground">بحث</button></form>
       <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
         <table className="w-full text-sm">
-          <thead className="border-b bg-secondary/50 text-right"><tr><th className="p-3">الاسم</th><th className="p-3">الجوال</th><th className="p-3">الحالة</th><th className="p-3">الصلاحية</th><th className="p-3">إجراءات</th></tr></thead>
+          <thead className="border-b bg-secondary/50 text-right"><tr><th className="p-3">الاسم</th><th className="p-3">الجوال</th><th className="p-3">الحالة</th><th className="p-3">الصلاحية</th><th className="p-3">الباقة</th><th className="p-3">إجراءات</th></tr></thead>
           <tbody>
             {users.map((u) => {
               const id = toInt(u.id);
@@ -47,6 +53,17 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                     <select name="role" defaultValue={current} className="rounded-md border bg-background px-1.5 py-1 text-xs">
                       {ROLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
+                    <button className="rounded-md border px-2 py-1 text-xs hover:bg-secondary">حفظ</button>
+                  </form>
+                </td>
+                <td className="p-3">
+                  <form action={assignUserPackageAction} className="flex items-center gap-1">
+                    <input type="hidden" name="userId" value={id} />
+                    <select name="packageId" defaultValue={pkgMap.get(id) ?? 0} className="rounded-md border bg-background px-1.5 py-1 text-xs">
+                      <option value={0}>—</option>
+                      {packages.map((p) => <option key={p.id} value={p.id}>{p.name}{p.price === 0 ? ' (مجانية)' : ` (${p.price})`}</option>)}
+                    </select>
+                    <input name="days" type="number" min={0} placeholder="أيام" title="مدة الاشتراك بالأيام (0 = دائم)" className="w-14 rounded-md border bg-background px-1.5 py-1 text-xs" />
                     <button className="rounded-md border px-2 py-1 text-xs hover:bg-secondary">حفظ</button>
                   </form>
                 </td>

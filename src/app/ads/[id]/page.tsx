@@ -55,7 +55,8 @@ function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath
     <div className="space-y-3">
       {videoPath && (
         <div className="card-3d overflow-hidden rounded-2xl p-2">
-          <video src={mediaUrl(videoPath)} controls playsInline className="w-full rounded-xl bg-black" />
+          <div className="mb-1 flex items-center gap-1.5 px-1 text-sm font-bold text-primary">🎬 فيديو الإعلان</div>
+          <video src={mediaUrl(videoPath)} controls playsInline preload="metadata" className="max-h-[70vh] w-full rounded-xl bg-black" />
         </div>
       )}
       {audioPath && (
@@ -122,6 +123,9 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
       {/* Gallery with tap-to-zoom lightbox */}
       <AdGallery images={ad.images} title={ad.title} special={ad.special} adsType={ad.adsType} />
 
+      {/* Video / audio — shown prominently right below the images */}
+      <AdMedia videoPath={ad.videoPath} audioPath={await getAdAudio(ad.id).catch(() => null)} />
+
       <h1 className="text-xl font-bold text-primary">{ad.title}</h1>
 
       {/* Info grid card */}
@@ -155,8 +159,6 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         <p className="whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
       </div>
 
-      {/* Video / audio when present */}
-      <AdMedia videoPath={ad.videoPath} audioPath={await getAdAudio(ad.id).catch(() => null)} />
 
       {/* Paid banner — inside ad details */}
       <PromoSlot placement="ad_detail" />

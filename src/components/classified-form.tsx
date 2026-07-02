@@ -4,7 +4,7 @@ import { useFormStatus } from 'react-dom';
 import { Phone, MessageCircle, ExternalLink, Sparkles, AlignRight, AlignCenter, ArrowUpToLine, ArrowDownToLine, AlignVerticalJustifyCenter, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  CLASSIFIED_THEMES, CLASSIFIED_TEMPLATES, POS_CLASS, SIZE_TITLE, SIZE_BODY,
+  CLASSIFIED_THEMES, CLASSIFIED_TEMPLATES, POS_CLASS, SIZE_TITLE, SIZE_BODY, SIZE_TITLE_POSTER, SIZE_BODY_POSTER,
   type Pos, type Align, type Size, type Pattern, type Accent, type Template,
 } from '@/lib/classified-theme';
 import { ClassifiedDecor } from '@/components/classified-decor';
@@ -60,7 +60,7 @@ export function ClassifiedForm({ action, error }: { action: (fd: FormData) => vo
           <div className="mx-auto max-w-[260px]">
             <div className="card-3d overflow-hidden rounded-2xl">
               <div
-                className={`relative flex aspect-square flex-col ${POS_CLASS[pos]} overflow-hidden ${dark ? 'text-slate-900' : 'text-white'}`}
+                className={`relative flex aspect-square flex-col overflow-hidden ${!imgUrl ? 'justify-center' : POS_CLASS[pos]} ${dark ? 'text-slate-900' : 'text-white'}`}
                 style={imgUrl ? undefined : { backgroundImage: `linear-gradient(150deg, ${t.from}, ${t.to})` }}
               >
                 {imgUrl && (
@@ -72,10 +72,10 @@ export function ClassifiedForm({ action, error }: { action: (fd: FormData) => vo
                 )}
                 <ClassifiedDecor pattern={pattern} accent={accent} dark={dark} />
                 {link && <span className="absolute right-2 top-2 z-10 rounded-full bg-white/25 p-1 backdrop-blur"><ExternalLink className="h-3.5 w-3.5" /></span>}
-                <div className={`relative z-10 space-y-1 p-3 ${align === 'center' ? 'text-center' : 'text-right'}`}>
-                  {title && <h3 className={`line-clamp-3 leading-tight drop-shadow ${SIZE_TITLE[size]} ${bold ? 'font-extrabold' : 'font-medium'}`}>{title}</h3>}
-                  {body && <p className={`line-clamp-4 leading-snug drop-shadow ${SIZE_BODY[size]} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{body}</p>}
-                  {!title && !body && !imgUrl && <p className="text-xs opacity-80">اكتب نصاً أو أضف صورة…</p>}
+                <div className={`relative z-10 space-y-1.5 p-4 ${!imgUrl ? 'text-center' : align === 'center' ? 'text-center' : 'text-right'}`}>
+                  {title && <h3 className={`line-clamp-4 leading-tight drop-shadow ${(!imgUrl ? SIZE_TITLE_POSTER : SIZE_TITLE)[size]} ${bold ? 'font-extrabold' : 'font-medium'}`}>{title}</h3>}
+                  {body && <p className={`line-clamp-3 leading-snug drop-shadow ${(!imgUrl ? SIZE_BODY_POSTER : SIZE_BODY)[size]} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{body}</p>}
+                  {!title && !body && !imgUrl && <p className="text-sm opacity-80">اكتب نصاً أو أضف صورة…</p>}
                 </div>
               </div>
               {(wa || phone) && (

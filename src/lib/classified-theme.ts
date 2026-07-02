@@ -54,6 +54,10 @@ export const POS_CLASS: Record<string, string> = {
 export const SIZE_TITLE: Record<string, string> = { sm: 'text-sm', md: 'text-base', lg: 'text-xl' };
 export const SIZE_BODY: Record<string, string> = { sm: 'text-[11px]', md: 'text-xs', lg: 'text-sm' };
 
+// "poster" sizes for text-only ads (no image) → big text that fills the card
+export const SIZE_TITLE_POSTER: Record<string, string> = { sm: 'text-2xl', md: 'text-3xl', lg: 'text-4xl' };
+export const SIZE_BODY_POSTER: Record<string, string> = { sm: 'text-sm', md: 'text-base', lg: 'text-lg' };
+
 /** Decorative overlay pattern as an inline style. */
 export function patternStyle(pattern: Pattern, dark: boolean): Record<string, string> {
   const c = dark ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.16)';

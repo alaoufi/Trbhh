@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Phone, MessageCircle, ExternalLink, Pause, Play, LogIn } from 'lucide-react';
-import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY } from '@/lib/classified-theme';
+import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY, SIZE_TITLE_POSTER, SIZE_BODY_POSTER } from '@/lib/classified-theme';
 import { ClassifiedDecor } from '@/components/classified-decor';
 
 const DURATION = 6000; // ms shown before auto-dismiss
@@ -63,9 +63,12 @@ export function ClassifiedSplash({ ad }: { ad: Classified | null }) {
 
       <div className="w-full max-w-xs">
         {(() => {
+          const poster = !ad.image;
+          const titleCls = poster ? SIZE_TITLE_POSTER[ad.size] : SIZE_TITLE[ad.size];
+          const bodyCls = poster ? SIZE_BODY_POSTER[ad.size] : SIZE_BODY[ad.size];
           const card = (
             <div
-              className={`relative flex aspect-square flex-col ${POS_CLASS[ad.pos]} overflow-hidden rounded-t-3xl shadow-2xl ring-1 ring-white/20 ${dark ? 'text-slate-900' : 'text-white'}`}
+              className={`relative flex aspect-square flex-col overflow-hidden rounded-t-3xl shadow-2xl ring-1 ring-white/20 ${poster ? 'justify-center' : POS_CLASS[ad.pos]} ${dark ? 'text-slate-900' : 'text-white'}`}
               style={ad.image ? undefined : { backgroundImage: `linear-gradient(150deg, ${theme.from}, ${theme.to})` }}
             >
               {ad.image && (
@@ -77,9 +80,9 @@ export function ClassifiedSplash({ ad }: { ad: Classified | null }) {
               )}
               <ClassifiedDecor pattern={ad.pattern} accent={ad.accent} dark={dark} />
               {ad.link && <span className="absolute right-3 top-3 z-10 rounded-full bg-white/25 p-1.5 backdrop-blur"><ExternalLink className="h-4 w-4" /></span>}
-              <div className={`relative z-10 space-y-1 p-5 ${ad.align === 'center' ? 'text-center' : 'text-right'}`}>
-                {ad.title && <h3 className={`line-clamp-3 leading-tight drop-shadow ${SIZE_TITLE[ad.size]} ${ad.bold ? 'font-extrabold' : 'font-medium'}`}>{ad.title}</h3>}
-                {ad.text && <p className={`line-clamp-4 leading-snug drop-shadow ${SIZE_BODY[ad.size]} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{ad.text}</p>}
+              <div className={`relative z-10 space-y-2 p-6 ${poster ? 'text-center' : ad.align === 'center' ? 'text-center' : 'text-right'}`}>
+                {ad.title && <h3 className={`leading-tight drop-shadow ${poster ? 'line-clamp-4' : 'line-clamp-3'} ${titleCls} ${ad.bold ? 'font-extrabold' : 'font-medium'}`}>{ad.title}</h3>}
+                {ad.text && <p className={`leading-snug drop-shadow ${poster ? 'line-clamp-3' : 'line-clamp-4'} ${bodyCls} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{ad.text}</p>}
               </div>
             </div>
           );

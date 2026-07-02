@@ -116,6 +116,7 @@ export function ClassifiedForm({ action, error }: { action: (fd: FormData) => vo
       <form action={action} className="order-2 space-y-4 md:order-1">
         {error === 'content' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">أضف صورة أو نصّاً على الأقل.</div>}
         {error === 'contact' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">أضف رقم جوال أو واتساب على الأقل.</div>}
+        {error === 'save' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">تعذّر حفظ الإعلان. حاول مرة أخرى، وإذا تكرّر أخبرنا.</div>}
 
         {/* hidden style fields */}
         <input type="hidden" name="theme" value={theme} />

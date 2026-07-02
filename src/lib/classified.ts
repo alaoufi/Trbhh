@@ -126,10 +126,18 @@ export async function createClassified(data: {
   const bold = data.bold === false ? 0 : 1;
   const pattern = ['none', 'dots', 'stripes', 'grid', 'rays'].includes(data.pattern || '') ? data.pattern : 'none';
   const accent = ['none', 'bar', 'corner', 'frame'].includes(data.accent || '') ? data.accent : 'none';
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO classified_ads (user_id, title, body, image, phone, whatsapp, link, theme, content_pos, text_align, font_size, bold, pattern, accent, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-    data.userId, data.title, data.body, data.image, data.phone, data.whatsapp, data.link, theme, pos, align, size, bold, pattern, accent,
-  );
+  try {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO classified_ads (user_id, title, body, image, phone, whatsapp, link, theme, content_pos, text_align, font_size, bold, pattern, accent, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      data.userId, data.title, data.body, data.image, data.phone, data.whatsapp, data.link, theme, pos, align, size, bold, pattern, accent,
+    );
+  } catch {
+    // fallback: guarantee the ad persists even if the style columns are unavailable
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO classified_ads (user_id, title, body, image, phone, whatsapp, link, theme, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      data.userId, data.title, data.body, data.image, data.phone, data.whatsapp, data.link, theme,
+    );
+  }
   const rows = await prisma.$queryRawUnsafe<{ id: bigint | number }[]>(`SELECT LAST_INSERT_ID() AS id`);
   return Number(rows[0]?.id || 0);
 }

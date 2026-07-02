@@ -55,10 +55,14 @@ export async function createClassifiedAction(formData: FormData) {
   const pattern = String(formData.get('pattern') || 'none');
   const accent = String(formData.get('accent') || 'none');
 
-  await createClassified({
-    userId: session.uid, title, body, image, phone, whatsapp, link,
-    theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent,
-  });
+  try {
+    await createClassified({
+      userId: session.uid, title, body, image, phone, whatsapp, link,
+      theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent,
+    });
+  } catch {
+    redirect('/classified/new?error=save');
+  }
   revalidatePath('/');
   revalidatePath('/classified');
   redirect('/classified?created=1');

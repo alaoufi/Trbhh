@@ -4,7 +4,7 @@ import { SITE } from '@/lib/constants';
 export function TopBar() {
   // one repeated unit, duplicated so the -50% loop is seamless
   const Item = () => (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex items-center gap-2 pe-16">
       <Phone className="h-3.5 w-3.5" />
       للاستفسار والملاحظات والاقتراحات
       <a href={`tel:${SITE.phone}`} dir="ltr" className="font-semibold underline-offset-2 hover:underline">{SITE.phone}</a>

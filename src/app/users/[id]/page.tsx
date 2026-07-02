@@ -59,9 +59,17 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
       <h2 className="text-lg font-bold">إعلانات العضو</h2>
       <AdGrid ads={ads} />
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-bold">التقييمات ({reviews.length})</h2>
-        {allowReview && <ReviewForm reciverId={uid} />}
+      <section id="review" className="scroll-mt-20 space-y-3">
+        <h2 className="text-lg font-bold text-primary">التقييمات ({reviews.length})</h2>
+        {allowReview ? (
+          <ReviewForm reciverId={uid} />
+        ) : !session ? (
+          <a href="/login" className="card-3d block rounded-xl p-3 text-center text-sm text-primary">سجّل الدخول لتقييم هذا العضو</a>
+        ) : session.uid === uid ? (
+          <p className="text-sm text-muted-foreground">لا يمكنك تقييم نفسك.</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">لقد قيّمت هذا العضو مسبقاً.</p>
+        )}
         <ul className="space-y-2">
           {reviews.map((r) => (
             <li key={r.id} className="card-3d rounded-xl p-3">

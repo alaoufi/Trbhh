@@ -165,7 +165,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         <Link href={`/report?type=ad&id=${ad.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
           <Flag className="h-5 w-5" /> بلاغ
         </Link>
-        <Link href={`/users/${ad.seller?.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+        <Link href={`/users/${ad.seller?.id}#review`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
           <Star className="h-5 w-5" /> تقييم
         </Link>
         <div className="card-3d flex items-center justify-center rounded-2xl py-3 text-primary">

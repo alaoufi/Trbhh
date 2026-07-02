@@ -16,8 +16,11 @@ export function AdCard({ ad }: { ad: AdCardType }) {
       href={`/ads/${ad.id}`}
       className="card-3d block overflow-hidden rounded-2xl"
     >
-      {/* title + image */}
+      {/* title (right) + image (left) — matches the original layout */}
       <div className="flex items-stretch gap-3 p-3">
+        <h3 className="line-clamp-3 flex-1 text-right text-base font-bold leading-7 text-primary">
+          {ad.title}
+        </h3>
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-white">
           <Image src={ad.image} alt={ad.title} fill sizes="96px" className="object-cover" />
           {ad.special && (
@@ -26,9 +29,6 @@ export function AdCard({ ad }: { ad: AdCardType }) {
             </span>
           )}
         </div>
-        <h3 className="line-clamp-3 flex-1 text-right text-base font-bold leading-7 text-primary">
-          {ad.title}
-        </h3>
       </div>
 
       <div className="mx-3 border-t border-primary/15" />

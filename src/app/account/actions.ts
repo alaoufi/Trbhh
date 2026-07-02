@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { getMemberWindows, withinWindow } from '@/lib/settings';
+import { setUserArea } from '@/lib/user-location';
 import { toInt } from '@/lib/utils';
 
 export async function deleteAdAction(formData: FormData) {
@@ -38,10 +39,13 @@ export async function updateProfileAction(_prev: unknown, formData: FormData) {
   const phone_whatsapp = String(formData.get('phone_whatsapp') || '').trim();
   const allow_phone = formData.get('allow_phone') ? 1 : 0;
   const whatsapp = formData.get('whatsapp') ? 1 : 0;
+  const cityId = Number(formData.get('city_id')) || 0; // المنطقة
+  const areaId = Number(formData.get('area_id')) || 0; // المدينة / المحافظة
   await prisma.users.update({
     where: { id: BigInt(session.uid) },
-    data: { name, phoneNumber, phone_whatsapp, allow_phone, whatsapp },
+    data: { name, phoneNumber, phone_whatsapp, allow_phone, whatsapp, ...(cityId ? { city_id: BigInt(cityId) } : {}) },
   });
+  await setUserArea(session.uid, areaId || null);
   revalidatePath('/account/profile');
   return { ok: true };
 }

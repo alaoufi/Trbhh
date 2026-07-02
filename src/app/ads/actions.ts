@@ -10,6 +10,7 @@ import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT } from '@/lib/mod
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
 import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { setAdMedia } from '@/lib/ad-media';
+import { setUserArea } from '@/lib/user-location';
 import { toInt } from '@/lib/utils';
 
 /** Save a raw media file (video/audio) from the form; returns the stored path or null. */
@@ -185,14 +186,16 @@ export async function createAdAction(formData: FormData) {
     }
   }
 
-  // احفظ وسيلة التواصل في ملف العضو حتى تظهر في الإعلان
+  // احفظ وسيلة التواصل والموقع في ملف العضو تلقائياً حتى تظهر في إعلاناته وملفه
   await prisma.users.update({
     where: { id: BigInt(session.uid) },
     data: {
       ...(phone ? { phoneNumber: phone, allow_phone: 1 } : {}),
       ...(whatsapp ? { phone_whatsapp: whatsapp, whatsapp: 1 } : {}),
+      ...(cityId && cityId !== '0' ? { city_id: BigInt(cityId) } : {}),
     },
   }).catch(() => {});
+  if (areaRaw) await setUserArea(session.uid, Number(areaRaw)).catch(() => {});
 
   const images = await readImages(formData);
 

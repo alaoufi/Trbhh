@@ -5,7 +5,7 @@ import { Tag, MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck } from 
 import { Button } from '@/components/ui/button';
 import { SubmitOverlay } from '@/components/submit-overlay';
 import { compressInputFiles } from '@/lib/image-compress';
-import { CityCombobox } from '@/components/city-combobox';
+import { RegionCityPicker } from '@/components/region-city-picker';
 import { AudioRecorder } from '@/components/audio-recorder';
 
 const MAX_VIDEO = 25 * 1024 * 1024; // 25MB
@@ -53,8 +53,8 @@ export function AdForm({
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
   const isReq = adsType === 'request';
   const [category, setCategory] = useState(initial?.categoryId ?? categories[0]?.id ?? 0);
-  const [country, setCountry] = useState(initial?.countryId ?? countries[0]?.id ?? 0);
-  const [region, setRegion] = useState<number>(initial?.cityId ?? 0);
+  // الموقع موجّه للسعودية فقط
+  const saudiId = useMemo(() => countries.find((c) => /سعود/.test(c.name))?.id ?? countries[0]?.id ?? 1, [countries]);
   const [geo, setGeo] = useState<{ lat: string; lng: string } | null>(
     initial?.lat && initial?.lng ? { lat: initial.lat, lng: initial.lng } : null,
   );
@@ -73,8 +73,7 @@ export function AdForm({
     );
   }
   const subs = useMemo(() => subcategories.filter((s) => s.categoryId === category), [subcategories, category]);
-  const regions = useMemo(() => cities.filter((c) => c.countryId === country), [cities, country]);
-  const regionCities = useMemo(() => areas.filter((a) => a.cityId === region), [areas, region]);
+  const regions = useMemo(() => cities.filter((c) => c.countryId === saudiId), [cities, saudiId]);
 
   const [imgBusy, setImgBusy] = useState(false);
   const [imgReady, setImgReady] = useState(0);
@@ -192,27 +191,8 @@ export function AdForm({
       </Section>
 
       <Section icon={MapPin} title="المنطقة والمدينة">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className={lbl}>الدولة</label>
-            <select name="country_id" value={country} onChange={(e) => { setCountry(Number(e.target.value)); setRegion(0); }} className={field}>
-              {countries.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={lbl}>المنطقة</label>
-            <select name="city_id" value={region} onChange={(e) => setRegion(Number(e.target.value))} className={field}>
-              <option value={0}>— اختر المنطقة —</option>
-              {regions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-        </div>
-        <div>
-          <label className={lbl}>المدينة <span className="font-normal text-muted-foreground">(المحافظة / المركز)</span></label>
-          {region && regionCities.length > 0
-            ? <CityCombobox name="area_id" cities={regionCities} defaultId={initial?.areaId ?? undefined} placeholder="ابحث عن المدينة / المحافظة" />
-            : <p className="rounded-lg border-2 border-dashed border-primary/25 bg-accent/20 p-2.5 text-xs text-muted-foreground">اختر المنطقة أولاً لعرض المدن والمحافظات.</p>}
-        </div>
+        <input type="hidden" name="country_id" value={saudiId} />
+        <RegionCityPicker regions={regions} areas={areas} initialRegion={initial?.cityId} initialArea={initial?.areaId} />
         <div className="rounded-lg border-2 border-dashed border-primary/25 bg-accent/30 p-3">
           <p className="mb-2 text-sm font-bold text-primary">تحديد الموقع بدقّة <span className="font-normal text-muted-foreground">(اختياري)</span></p>
           <input type="hidden" name="lat" value={geo?.lat ?? ''} />

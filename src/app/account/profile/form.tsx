@@ -3,15 +3,24 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { BadgeCheck } from 'lucide-react';
 import { updateProfileAction } from '../actions';
 import { Button } from '@/components/ui/button';
+import { RegionCityPicker } from '@/components/region-city-picker';
 
 function Save() {
   const { pending } = useFormStatus();
   return <Button disabled={pending}>{pending ? 'جارٍ الحفظ...' : 'حفظ التغييرات'}</Button>;
 }
 
-type Initial = { name: string; phoneNumber: string; phone_whatsapp: string; allow_phone: boolean; whatsapp: boolean; trusted: boolean };
+type Region = { id: number; name: string };
+type Area = { id: number; name: string; cityId: number };
+type Initial = {
+  name: string; phoneNumber: string; phone_whatsapp: string; allow_phone: boolean; whatsapp: boolean; trusted: boolean;
+  regionId: number | null; areaId: number | null;
+};
 
-export function ProfileForm({ initial }: { initial: Initial }) {
+const field = 'h-11 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40';
+const lbl = 'mb-1 block text-sm font-bold text-foreground';
+
+export function ProfileForm({ initial, regions, areas }: { initial: Initial; regions: Region[]; areas: Area[] }) {
   const [state, action] = useFormState(updateProfileAction, null as { ok?: boolean } | null);
   return (
     <form action={action} className="max-w-lg space-y-4 card-3d rounded-xl p-5">
@@ -21,20 +30,25 @@ export function ProfileForm({ initial }: { initial: Initial }) {
         </div>
       )}
       <div>
-        <label className="mb-1 block text-sm font-medium">الاسم</label>
-        <input name="name" defaultValue={initial.name} className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+        <label className={lbl}>الاسم</label>
+        <input name="name" defaultValue={initial.name} className={field} />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">رقم الجوال</label>
-        <input name="phoneNumber" defaultValue={initial.phoneNumber} className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+        <label className={lbl}>رقم الجوال</label>
+        <input name="phoneNumber" type="tel" inputMode="tel" defaultValue={initial.phoneNumber} className={field} placeholder="05xxxxxxxx" />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">رقم الواتساب</label>
-        <input name="phone_whatsapp" defaultValue={initial.phone_whatsapp} className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+        <label className={lbl}>رقم الواتساب</label>
+        <input name="phone_whatsapp" type="tel" inputMode="tel" defaultValue={initial.phone_whatsapp} className={field} placeholder="9665xxxxxxxx" />
       </div>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="allow_phone" defaultChecked={initial.allow_phone} /> إظهار رقم الجوال في إعلاناتي</label>
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="whatsapp" defaultChecked={initial.whatsapp} /> تفعيل زر الواتساب</label>
-      {state?.ok && <p className="text-sm text-primary">تم حفظ التغييرات ✓</p>}
+
+      <div className="rounded-lg border-2 border-primary/15 bg-accent/20 p-3">
+        <RegionCityPicker regions={regions} areas={areas} initialRegion={initial.regionId} initialArea={initial.areaId} labelClass={lbl} fieldClass={field} />
+      </div>
+
+      <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="allow_phone" defaultChecked={initial.allow_phone} className="accent-primary" /> إظهار رقم الجوال في إعلاناتي</label>
+      <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="whatsapp" defaultChecked={initial.whatsapp} className="accent-primary" /> تفعيل زر الواتساب</label>
+      {state?.ok && <p className="text-sm font-bold text-green-600">تم حفظ التغييرات ✓</p>}
       <Save />
     </form>
   );

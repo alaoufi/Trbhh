@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
-import { getCategories, getSubCategories, getCountries, getCities, getAdForEdit } from '@/lib/data';
+import { getCategories, getSubCategories, getCountries, getCities, getAreas, getAdForEdit } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
 import { updateAdAction } from '../../actions';
 
@@ -11,9 +11,9 @@ export default async function EditAdPage({ params, searchParams }: { params: Pro
   if (!session) redirect('/login');
   const { id } = await params;
   const { error, hours } = await searchParams;
-  const [initial, categories, subcategories, countries, cities] = await Promise.all([
+  const [initial, categories, subcategories, countries, cities, areas] = await Promise.all([
     getAdForEdit(Number(id), session.uid),
-    getCategories(), getSubCategories(), getCountries(), getCities(),
+    getCategories(), getSubCategories(), getCountries(), getCities(), getAreas(),
   ]);
   if (!initial) notFound();
   return (
@@ -25,6 +25,7 @@ export default async function EditAdPage({ params, searchParams }: { params: Pro
         subcategories={subcategories}
         countries={countries}
         cities={cities}
+        areas={areas}
         initial={initial}
         submitLabel="حفظ التعديلات"
         error={error}

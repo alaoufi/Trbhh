@@ -29,9 +29,10 @@ type Cat = { id: number; name: string };
 type Sub = { id: number; name: string; categoryId: number };
 type Country = { id: number; name: string };
 type City = { id: number; name: string; countryId: number };
+type Area = { id: number; name: string; cityId: number };
 type Initial = Partial<{
   id: number; title: string; detail: string; price: number; adsType: string;
-  categoryId: number; subcategoryId: number | null; countryId: number | null; cityId: number;
+  categoryId: number; subcategoryId: number | null; countryId: number | null; cityId: number; areaId: number | null;
   phoneAllow: boolean; commentAllow: boolean; phone: string; whatsapp: string;
   lat: string | null; lng: string | null;
 }>;
@@ -42,15 +43,18 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, initial, submitLabel, error, dupLeft, limitMax, gapHours, gapWait,
+  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, limitMax, gapHours, gapWait,
 }: {
   action: (fd: FormData) => void | Promise<void>;
-  categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[];
+  categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string;
   limitMax?: string; gapHours?: string; gapWait?: string;
 }) {
+  const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
+  const isReq = adsType === 'request';
   const [category, setCategory] = useState(initial?.categoryId ?? categories[0]?.id ?? 0);
   const [country, setCountry] = useState(initial?.countryId ?? countries[0]?.id ?? 0);
+  const [region, setRegion] = useState<number>(initial?.cityId ?? 0);
   const [geo, setGeo] = useState<{ lat: string; lng: string } | null>(
     initial?.lat && initial?.lng ? { lat: initial.lat, lng: initial.lng } : null,
   );
@@ -69,10 +73,8 @@ export function AdForm({
     );
   }
   const subs = useMemo(() => subcategories.filter((s) => s.categoryId === category), [subcategories, category]);
-  const filteredCities = useMemo(
-    () => cities.filter((c) => c.countryId === country),
-    [cities, country],
-  );
+  const regions = useMemo(() => cities.filter((c) => c.countryId === country), [cities, country]);
+  const regionCities = useMemo(() => areas.filter((a) => a.cityId === region), [areas, region]);
 
   const [imgBusy, setImgBusy] = useState(false);
   const [imgReady, setImgReady] = useState(0);
@@ -146,18 +148,23 @@ export function AdForm({
         </div>
       )}
 
-      <div className="flex gap-2">
-        {[{ v: 'offer', l: 'عرض' }, { v: 'request', l: 'طلب' }].map((t) => (
-          <label key={t.v} className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-primary/25 bg-white p-2.5 text-sm font-bold has-[:checked]:border-primary has-[:checked]:bg-primary has-[:checked]:text-white">
-            <input type="radio" name="adsType" value={t.v} defaultChecked={(initial?.adsType ?? 'offer') === t.v} className="accent-[hsl(var(--primary))]" /> {t.l}
-          </label>
+      <input type="hidden" name="adsType" value={adsType} />
+      <div className="grid grid-cols-2 gap-2">
+        {([{ v: 'offer', l: 'عرض (لديّ)', cls: 'border-primary bg-primary text-white' }, { v: 'request', l: 'طلب (أبحث عن)', cls: 'border-amber-500 bg-amber-500 text-white' }] as const).map((t) => (
+          <button type="button" key={t.v} onClick={() => setAdsType(t.v)}
+            className={`rounded-lg border-2 p-2.5 text-sm font-extrabold transition ${adsType === t.v ? t.cls : 'border-primary/25 bg-white text-foreground'}`}>
+            {t.l}
+          </button>
         ))}
       </div>
+      <div className={`rounded-lg p-2 text-center text-xs font-bold ${isReq ? 'bg-amber-100 text-amber-900' : 'bg-primary/10 text-primary'}`}>
+        {isReq ? 'إعلان طلب: تصف ما تبحث عنه، والصور والسعر اختيارية.' : 'إعلان عرض: تعرض منتجك أو خدمتك للبيع/الإيجار.'}
+      </div>
 
-      <Section icon={Tag} title="بيانات الإعلان">
+      <Section icon={Tag} title={isReq ? 'بيانات الطلب' : 'بيانات العرض'}>
         <div>
-          <label className={lbl}>عنوان الإعلان</label>
-          <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder="مثال: رافعة سيزرلفت للإيجار بالدمام" />
+          <label className={lbl}>{isReq ? 'ماذا تطلب؟' : 'عنوان الإعلان'}</label>
+          <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مثال: مطلوب رافعة شوكية للإيجار بالدمام' : 'مثال: رافعة سيزرلفت للإيجار بالدمام'} />
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -175,25 +182,36 @@ export function AdForm({
           </div>
         </div>
         <div>
-          <label className={lbl}>السعر <span className="font-normal text-muted-foreground">(اتركه 0 لـ «على السوم»)</span></label>
-          <input name="price" type="number" min="0" step="any" defaultValue={initial?.price ?? 0} className={field} />
+          <label className={lbl}>{isReq ? 'الميزانية المتوقّعة' : 'السعر'}</label>
+          <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="اتركه فارغاً إذا ترغب «على السوم»" />
         </div>
         <div>
-          <label className={lbl}>التفاصيل</label>
-          <textarea name="detail" required defaultValue={initial?.detail} rows={6} className="w-full rounded-lg border-2 border-primary/25 bg-white p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40" placeholder="اكتب وصفاً واضحاً للخدمة أو المنتج..." />
+          <label className={lbl}>{isReq ? 'تفاصيل الطلب' : 'التفاصيل'}</label>
+          <textarea name="detail" required defaultValue={initial?.detail} rows={6} className="w-full rounded-lg border-2 border-primary/25 bg-white p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40" placeholder={isReq ? 'اكتب تفاصيل ما تبحث عنه بدقّة...' : 'اكتب وصفاً واضحاً للخدمة أو المنتج...'} />
         </div>
       </Section>
 
-      <Section icon={MapPin} title="المدينة والموقع">
-        <div>
-          <label className={lbl}>الدولة</label>
-          <select name="country_id" value={country} onChange={(e) => setCountry(Number(e.target.value))} className={field}>
-            {countries.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+      <Section icon={MapPin} title="المنطقة والمدينة">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className={lbl}>الدولة</label>
+            <select name="country_id" value={country} onChange={(e) => { setCountry(Number(e.target.value)); setRegion(0); }} className={field}>
+              {countries.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={lbl}>المنطقة</label>
+            <select name="city_id" value={region} onChange={(e) => setRegion(Number(e.target.value))} className={field}>
+              <option value={0}>— اختر المنطقة —</option>
+              {regions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
         </div>
         <div>
-          <label className={lbl}>المدينة / المنطقة</label>
-          <CityCombobox name="city_id" cities={filteredCities} defaultId={initial?.cityId} />
+          <label className={lbl}>المدينة <span className="font-normal text-muted-foreground">(المحافظة / المركز)</span></label>
+          {region && regionCities.length > 0
+            ? <CityCombobox name="area_id" cities={regionCities} defaultId={initial?.areaId ?? undefined} placeholder="ابحث عن المدينة / المحافظة" />
+            : <p className="rounded-lg border-2 border-dashed border-primary/25 bg-accent/20 p-2.5 text-xs text-muted-foreground">اختر المنطقة أولاً لعرض المدن والمحافظات.</p>}
         </div>
         <div className="rounded-lg border-2 border-dashed border-primary/25 bg-accent/30 p-3">
           <p className="mb-2 text-sm font-bold text-primary">تحديد الموقع بدقّة <span className="font-normal text-muted-foreground">(اختياري)</span></p>

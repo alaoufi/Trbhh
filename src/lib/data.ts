@@ -331,6 +331,12 @@ export async function getCities() {
   return rows.map((c) => ({ id: toInt(c.id), name: c.name, countryId: c.country_id }));
 }
 
+/** Governorates / centers (المحافظات والمراكز) grouped under a region (city_id). */
+export async function getAreas() {
+  const rows = await prisma.areas.findMany({ orderBy: { name: 'asc' } });
+  return rows.map((a) => ({ id: toInt(a.id), name: a.name, cityId: a.city_id }));
+}
+
 export async function getAdForEdit(id: number, userId: number) {
   const ad = await prisma.ads.findUnique({ where: { id: BigInt(id) } });
   if (!ad || toInt(ad.user_id) !== userId) return null;
@@ -345,6 +351,7 @@ export async function getAdForEdit(id: number, userId: number) {
     subcategoryId: ad.subcategory_id ?? null,
     countryId: ad.country_id ?? null,
     cityId: toInt(ad.city_id),
+    areaId: ad.area_id ?? null,
     phoneAllow: ad.phoneAllow === 1,
     commentAllow: ad.commentAllow === 1,
     phone: owner?.phoneNumber ?? '',

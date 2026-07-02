@@ -155,6 +155,7 @@ export async function createAdAction(formData: FormData) {
   const category_id = BigInt(String(formData.get('category_id') || '0'));
   const subRaw = String(formData.get('subcategory_id') || '');
   const cityId = String(formData.get('city_id') || '0');
+  const areaRaw = String(formData.get('area_id') || '');
   const countryRaw = String(formData.get('country_id') || '');
   const phone = String(formData.get('phone') || '').trim();
   const whatsapp = String(formData.get('whatsapp') || '').trim();
@@ -215,6 +216,7 @@ export async function createAdAction(formData: FormData) {
       category_id,
       subcategory_id: subRaw ? Number(subRaw) : null,
       city_id: BigInt(cityId || '0'),
+      area_id: areaRaw ? Number(areaRaw) : null,
       country_id: countryRaw ? Number(countryRaw) : (user?.country_id ?? null),
       user_id: BigInt(session.uid),
       video_path: video || '',
@@ -273,6 +275,7 @@ export async function updateAdAction(formData: FormData) {
       category_id: BigInt(String(formData.get('category_id') || '0')),
       subcategory_id: formData.get('subcategory_id') ? Number(formData.get('subcategory_id')) : null,
       city_id: BigInt(String(formData.get('city_id') || '0')),
+      area_id: formData.get('area_id') ? Number(formData.get('area_id')) : null,
       lat: String(formData.get('lat') || '').trim() || null,
       lng: String(formData.get('lng') || '').trim() || null,
       phoneAllow: formData.get('phoneAllow') ? 1 : 0,

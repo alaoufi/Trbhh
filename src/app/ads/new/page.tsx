@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getCategories, getSubCategories, getCountries, getCities } from '@/lib/data';
+import { getCategories, getSubCategories, getCountries, getCities, getAreas } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
 import { createAdAction } from '../actions';
 
@@ -12,8 +12,8 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   const session = await getSession();
   if (!session) redirect('/login');
   const { error, left, max, hours, wait } = await searchParams;
-  const [categories, subcategories, countries, cities, user] = await Promise.all([
-    getCategories(), getSubCategories(), getCountries(), getCities(),
+  const [categories, subcategories, countries, cities, areas, user] = await Promise.all([
+    getCategories(), getSubCategories(), getCountries(), getCities(), getAreas(),
     prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true, phone_whatsapp: true } }),
   ]);
   return (
@@ -25,6 +25,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
         subcategories={subcategories}
         countries={countries}
         cities={cities}
+        areas={areas}
         initial={{ phone: user?.phoneNumber ?? '', whatsapp: user?.phone_whatsapp ?? '' }}
         submitLabel="نشر الإعلان"
         error={error}

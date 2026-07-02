@@ -11,16 +11,22 @@ function timeShort(iso: string | null) {
 }
 
 export function AdCard({ ad }: { ad: AdCardType }) {
+  const isReq = ad.adsType === 'request';
   return (
     <Link
       href={`/ads/${ad.id}`}
-      className="card-3d block overflow-hidden rounded-2xl"
+      className={cn('card-3d block overflow-hidden rounded-2xl', isReq && '!border-amber-400 bg-amber-50')}
     >
       {/* title (right) + image (left) — matches the original layout */}
       <div className="flex items-stretch gap-3 p-3">
-        <h3 className="line-clamp-3 flex-1 text-right text-base font-bold leading-7 text-primary">
-          {ad.title}
-        </h3>
+        <div className="flex-1">
+          <span className={cn('mb-1 inline-block rounded px-2 py-0.5 text-[10px] font-extrabold text-white', isReq ? 'bg-amber-500' : 'bg-primary')}>
+            {isReq ? 'طلب' : 'عرض'}
+          </span>
+          <h3 className="line-clamp-3 text-right text-base font-bold leading-7 text-primary">
+            {ad.title}
+          </h3>
+        </div>
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-white">
           <Image src={ad.image} alt={ad.title} fill sizes="96px" className="object-cover" />
           {ad.special && (

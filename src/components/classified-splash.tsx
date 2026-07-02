@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { Phone, MessageCircle, ExternalLink, Pause, Play, LogIn } from 'lucide-react';
-import { type Classified, CLASSIFIED_THEMES } from '@/lib/classified-theme';
+import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY } from '@/lib/classified-theme';
 
 const DURATION = 6000; // ms shown before auto-dismiss
 
@@ -37,8 +37,8 @@ export function ClassifiedSplash({ ad }: { ad: Classified | null }) {
 
   if (!ad || !show) return null;
   const theme = CLASSIFIED_THEMES[ad.theme % CLASSIFIED_THEMES.length];
+  const dark = theme.text === 'dark' && !ad.image;
   const wa = ad.whatsapp?.replace(/[^\d]/g, '');
-  const href = ad.link || (wa ? `https://wa.me/${wa}` : ad.phone ? `tel:${ad.phone}` : null);
 
   const progress = remaining / DURATION; // 1 → 0
   const R = 20;
@@ -60,35 +60,40 @@ export function ClassifiedSplash({ ad }: { ad: Classified | null }) {
         <span className="absolute inset-0 flex items-center justify-center text-base font-bold text-white">{paused ? '⏸' : seconds}</span>
       </div>
 
-      <a
-        href={href || undefined}
-        target={ad.link ? '_blank' : undefined}
-        rel="noopener noreferrer"
-        onClick={() => setShow(false)}
-        className="block w-full max-w-xs"
-      >
-        <div
-          className="relative flex aspect-square flex-col justify-end overflow-hidden rounded-3xl text-white shadow-2xl ring-1 ring-white/20"
-          style={ad.image ? undefined : { backgroundImage: `linear-gradient(150deg, ${theme.from}, ${theme.to})` }}
-        >
-          {ad.image && (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ad.image} alt={ad.title || ''} className="absolute inset-0 h-full w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
-            </>
-          )}
-          {ad.link && <span className="absolute right-3 top-3 z-10 rounded-full bg-white/25 p-1.5 backdrop-blur"><ExternalLink className="h-4 w-4" /></span>}
-          <div className="relative z-10 space-y-1 p-5">
-            {ad.title && <h3 className="line-clamp-2 text-lg font-extrabold leading-tight drop-shadow">{ad.title}</h3>}
-            {ad.text && <p className="line-clamp-4 text-sm leading-snug text-white/90 drop-shadow">{ad.text}</p>}
-            <div className="flex items-center gap-2 pt-1">
-              {ad.whatsapp && <span className="rounded-full bg-[#25D366] p-1.5"><MessageCircle className="h-4 w-4" /></span>}
-              {ad.phone && <span className="rounded-full bg-white/25 p-1.5 backdrop-blur"><Phone className="h-4 w-4" /></span>}
+      <div className="w-full max-w-xs">
+        {(() => {
+          const card = (
+            <div
+              className={`relative flex aspect-square flex-col ${POS_CLASS[ad.pos]} overflow-hidden rounded-t-3xl shadow-2xl ring-1 ring-white/20 ${dark ? 'text-slate-900' : 'text-white'}`}
+              style={ad.image ? undefined : { backgroundImage: `linear-gradient(150deg, ${theme.from}, ${theme.to})` }}
+            >
+              {ad.image && (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={ad.image} alt={ad.title || ''} className="absolute inset-0 h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+                </>
+              )}
+              {ad.link && <span className="absolute right-3 top-3 z-10 rounded-full bg-white/25 p-1.5 backdrop-blur"><ExternalLink className="h-4 w-4" /></span>}
+              <div className={`relative z-10 space-y-1 p-5 ${ad.align === 'center' ? 'text-center' : 'text-right'}`}>
+                {ad.title && <h3 className={`line-clamp-3 leading-tight drop-shadow ${SIZE_TITLE[ad.size]} ${ad.bold ? 'font-extrabold' : 'font-medium'}`}>{ad.title}</h3>}
+                {ad.text && <p className={`line-clamp-4 leading-snug drop-shadow ${SIZE_BODY[ad.size]} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{ad.text}</p>}
+              </div>
             </div>
+          );
+          return ad.link
+            ? <a href={ad.link} target="_blank" rel="noopener noreferrer" onClick={() => setShow(false)} className="block">{card}</a>
+            : card;
+        })()}
+
+        {/* prominent contact buttons */}
+        {(wa || ad.phone) && (
+          <div className="flex gap-2 rounded-b-3xl bg-black/30 p-2">
+            {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" onClick={() => setShow(false)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#25D366] py-3 text-base font-bold text-white"><MessageCircle className="h-5 w-5" /> واتساب</a>}
+            {ad.phone && <a href={`tel:${ad.phone}`} onClick={() => setShow(false)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-red-600 py-3 text-base font-bold text-white"><Phone className="h-5 w-5" /> اتصال</a>}
           </div>
-        </div>
-      </a>
+        )}
+      </div>
 
       {/* controls: stay (pause) / enter site */}
       <div className="flex items-center gap-3">

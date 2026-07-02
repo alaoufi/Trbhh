@@ -45,7 +45,16 @@ export async function createClassifiedAction(formData: FormData) {
   // جوال أو واتساب إجباري (أحدهما)
   if (!phone && !whatsapp) redirect('/classified/new?error=contact');
 
-  await createClassified({ userId: session.uid, title, body, image, phone, whatsapp, link });
+  const theme = parseInt(String(formData.get('theme') || ''), 10);
+  const pos = String(formData.get('pos') || 'bottom');
+  const align = String(formData.get('align') || 'right');
+  const size = String(formData.get('size') || 'md');
+  const bold = formData.get('bold') ? true : false;
+
+  await createClassified({
+    userId: session.uid, title, body, image, phone, whatsapp, link,
+    theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold,
+  });
   revalidatePath('/');
   revalidatePath('/classified');
   redirect('/classified?created=1');

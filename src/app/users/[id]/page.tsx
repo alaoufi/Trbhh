@@ -8,6 +8,7 @@ import { getSession } from '@/lib/auth';
 import { AdGrid } from '@/components/ad-card';
 import { Stars } from '@/components/stars';
 import { ReviewForm } from '@/components/review-form';
+import { PromoSlot } from '@/components/promo-slot';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +36,9 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-4">
+      {/* Paid banner — member page */}
+      <PromoSlot placement="member" />
+
       <div className="card-3d rounded-xl p-5">
         <div className="flex items-center gap-4">
           <span className="grid h-16 w-16 place-items-center rounded-full bg-accent text-2xl font-bold text-accent-foreground">

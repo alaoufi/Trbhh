@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Home, Copy, Sparkles, Ban, Crown, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Home, Copy, Sparkles, Ban, Crown, Settings, MonitorPlay } from 'lucide-react';
 import { requireAnyAdmin, getUserPerms, getUserRole, ROLE_LABELS, type Perm } from '@/lib/roles';
 
 const nav: { href: string; label: string; icon: React.ElementType; perm: Perm | null }[] = [
@@ -13,6 +13,7 @@ const nav: { href: string; label: string; icon: React.ElementType; perm: Perm | 
   { href: '/admin/reports', label: 'البلاغات', icon: Flag, perm: 'reports' },
   { href: '/admin/verifications', label: 'طلبات التوثيق', icon: ShieldCheck, perm: 'verifications' },
   { href: '/admin/packages', label: 'الباقات', icon: Crown, perm: 'packages' },
+  { href: '/admin/promos', label: 'الإعلانات الترويجية', icon: MonitorPlay, perm: 'promos' },
   { href: '/admin/settings', label: 'الإعدادات', icon: Settings, perm: 'users' },
 ];
 

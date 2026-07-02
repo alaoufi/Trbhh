@@ -23,6 +23,7 @@ import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
+import { PromoSlot } from '@/components/promo-slot';
 
 export const dynamic = 'force-dynamic';
 
@@ -157,6 +158,9 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         <div className="mb-3 text-2xl font-bold text-primary">{formatPrice(ad.price)}</div>
         <p className="whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
       </div>
+
+      {/* Paid banner — inside ad details */}
+      <PromoSlot placement="ad_detail" />
 
       {/* Contact tiles — only show channels the seller actually offers */}
       <div className={`grid gap-3 ${contactCols === 3 ? 'grid-cols-3' : contactCols === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>

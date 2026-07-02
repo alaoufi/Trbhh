@@ -65,6 +65,8 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
           <Item href="/classified/new" icon={Sparkles} onClick={close}>المصمم الذكي</Item>
           {isAuthed && <Item href="/account/classified" icon={Sparkles} onClick={close}>إعلاناتي المبوّبة</Item>}
           <Item href="/packages" icon={Crown} onClick={close}>الباقات</Item>
+          <Item href="/promote" icon={Megaphone} onClick={close}>أعلن معنا</Item>
+          {isAuthed && <Item href="/account/promos" icon={Megaphone} onClick={close}>إعلاناتي الترويجية</Item>}
           <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>
           <Item href="/messages" icon={Mail} onClick={close}>مراسلة الإدارة</Item>
           <Item href="/companies" icon={Building2} onClick={close}>الشركات</Item>

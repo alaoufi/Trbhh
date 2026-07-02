@@ -10,6 +10,7 @@ import {
 import { CategoryTabs } from '@/components/category-tabs';
 import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
+import { PromoSlot } from '@/components/promo-slot';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { getClassifieds } from '@/lib/classified';
 import { ClassifiedGrid } from '@/components/classified-card';
@@ -38,6 +39,9 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-4">
+      {/* Paid banner — top of home */}
+      <PromoSlot placement="home_top" />
+
       {/* Category tabs */}
       <CategoryTabs categories={categories} />
 
@@ -74,7 +78,12 @@ export default async function HomePage() {
       )}
 
       <Section title="أحدث الإعلانات" href="/search">
-        <AdGrid ads={latest} />
+        <div className="space-y-4">
+          <AdGrid ads={latest.slice(0, 4)} />
+          {/* Paid banner — in-feed after 4 ads */}
+          <PromoSlot placement="feed" />
+          {latest.length > 4 && <AdGrid ads={latest.slice(4)} />}
+        </div>
       </Section>
 
       {mostViewed.length > 0 && (

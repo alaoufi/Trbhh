@@ -8,7 +8,57 @@ import { deleteClassified } from '@/lib/classified';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
 import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS } from '@/lib/settings';
+import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { toInt } from '@/lib/utils';
+
+function readPromoPkgForm(formData: FormData) {
+  return {
+    name: String(formData.get('name') || '').trim() || 'باقة',
+    days: Math.max(1, parseInt(String(formData.get('days') || '30')) || 30),
+    price: Math.max(0, parseFloat(String(formData.get('price') || '0')) || 0),
+    sort: parseInt(String(formData.get('sort') || '0')) || 0,
+    active: formData.get('active') !== null,
+  };
+}
+
+export async function approvePromoAction(formData: FormData) {
+  await requireAction('promos', 'edit');
+  const id = Number(formData.get('id'));
+  if (id) await approvePromo(id);
+  revalidatePath('/admin/promos');
+}
+export async function rejectPromoAction(formData: FormData) {
+  await requireAction('promos', 'edit');
+  const id = Number(formData.get('id'));
+  if (id) await rejectPromo(id);
+  revalidatePath('/admin/promos');
+}
+export async function deletePromoAction(formData: FormData) {
+  await requireAction('promos', 'delete');
+  const id = Number(formData.get('id'));
+  if (id) await deletePromo(id);
+  revalidatePath('/admin/promos');
+}
+export async function createPromoPackageAction(formData: FormData) {
+  await requireAction('promos', 'add');
+  await createPromoPackage(readPromoPkgForm(formData));
+  revalidatePath('/admin/promos/packages');
+  revalidatePath('/promote');
+}
+export async function updatePromoPackageAction(formData: FormData) {
+  await requireAction('promos', 'edit');
+  const id = Number(formData.get('id'));
+  if (id) await updatePromoPackage(id, readPromoPkgForm(formData));
+  revalidatePath('/admin/promos/packages');
+  revalidatePath('/promote');
+}
+export async function deletePromoPackageAction(formData: FormData) {
+  await requireAction('promos', 'delete');
+  const id = Number(formData.get('id'));
+  if (id) await deletePromoPackage(id);
+  revalidatePath('/admin/promos/packages');
+  revalidatePath('/promote');
+}
 
 function readPackageForm(formData: FormData) {
   const t = String(formData.get('tier') || '');

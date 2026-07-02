@@ -5,7 +5,7 @@ import { getSession } from './auth';
 
 export type Service =
   | 'users' | 'ads' | 'duplicates' | 'classified' | 'categories'
-  | 'words' | 'reports' | 'verifications' | 'debates' | 'comments' | 'packages';
+  | 'words' | 'reports' | 'verifications' | 'debates' | 'comments' | 'packages' | 'promos';
 export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive';
 
 /** Backward-compat alias: a "Perm" is a service (page-level access). */
@@ -28,6 +28,7 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
   { key: 'debates',       label: 'النقاشات',           actions: ['view', 'delete'] },
   { key: 'comments',      label: 'التعليقات',          actions: ['view', 'delete'] },
   { key: 'packages',      label: 'الباقات',            actions: ['view', 'add', 'edit', 'delete'] },
+  { key: 'promos',        label: 'الإعلانات الترويجية',  actions: ['view', 'add', 'edit', 'delete'] },
 ];
 
 export const ACTION_LABELS: Record<Action, string> = {
@@ -51,6 +52,7 @@ export const ROLE_PRESET: Record<Role, string[]> = {
     'debates:view', 'debates:delete',
     'reports:view', 'reports:delete',
     'duplicates:view', 'duplicates:delete',
+    'promos:view', 'promos:edit', 'promos:delete',
   ],
   monitor: ['reports:view', 'verifications:view', 'verifications:edit', 'words:view', 'words:add', 'words:delete'],
 };

@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from './prisma';
 import { mediaUrl } from './media';
+import { loadBanned, censorSync } from './censor';
 import { CLASSIFIED_THEMES, type Classified } from './classified-theme';
 
 export { CLASSIFIED_THEMES };
@@ -57,8 +58,8 @@ function toClassified(r: Row): Classified {
   return {
     id: Number(r.id),
     userId: r.user_id == null ? null : Number(r.user_id),
-    title: r.title,
-    text: r.body,
+    title: censorSync(r.title) || null,
+    text: censorSync(r.body) || null,
     image: r.image ? mediaUrl(r.image) : null,
     phone: r.phone,
     whatsapp: r.whatsapp,
@@ -76,6 +77,7 @@ function toClassified(r: Row): Classified {
 
 export async function getClassifieds(limit = 30): Promise<Classified[]> {
   await ensureClassifiedTable();
+  await loadBanned();
   const rows = await prisma.$queryRawUnsafe<Row[]>(
     `SELECT * FROM classified_ads WHERE status = 1 ORDER BY id DESC LIMIT ${Math.max(1, Math.min(100, limit))}`,
   );
@@ -85,6 +87,7 @@ export async function getClassifieds(limit = 30): Promise<Classified[]> {
 /** All classifieds for admin moderation. */
 export async function getAllClassifieds(limit = 120): Promise<Classified[]> {
   await ensureClassifiedTable();
+  await loadBanned();
   const rows = await prisma.$queryRawUnsafe<Row[]>(
     `SELECT * FROM classified_ads ORDER BY id DESC LIMIT ${Math.max(1, Math.min(200, limit))}`,
   );
@@ -105,6 +108,7 @@ export async function deleteClassified(id: number) {
 /** One random classified ad for the entry splash. */
 export async function getRandomClassified(): Promise<Classified | null> {
   await ensureClassifiedTable();
+  await loadBanned();
   const rows = await prisma.$queryRawUnsafe<Row[]>(
     `SELECT * FROM classified_ads WHERE status = 1 ORDER BY RAND() LIMIT 1`,
   );

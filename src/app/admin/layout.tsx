@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Home, Copy, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Home, Copy, Sparkles, Ban } from 'lucide-react';
 import { requireAdmin } from '@/lib/admin';
 
 const nav = [
@@ -9,6 +9,7 @@ const nav = [
   { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy },
   { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles },
   { href: '/admin/categories', label: 'الأقسام', icon: LayoutGrid },
+  { href: '/admin/words', label: 'الكلمات المرفوضة', icon: Ban },
   { href: '/admin/reports', label: 'البلاغات', icon: Flag },
   { href: '/admin/verifications', label: 'طلبات التوثيق', icon: ShieldCheck },
 ];

@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from './prisma';
 import { cached } from './redis';
 import { mediaUrl, PLACEHOLDER } from './media';
+import { loadBanned, censorSync } from './censor';
 import { toInt } from './utils';
 
 export type AdCard = {
@@ -99,11 +100,12 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
     categoryNames(rows.map((r) => r.category_id)),
     sellerInfo(rows.map((r) => r.user_id)),
   ]);
+  await loadBanned();
   return rows.map((r) => {
     const s = sellers.get(toInt(r.user_id));
     return {
       id: toInt(r.id),
-      title: r.title,
+      title: censorSync(r.title),
       price: r.price,
       adsType: r.adsType,
       image: images.get(toInt(r.id)) ?? PLACEHOLDER,
@@ -263,10 +265,11 @@ export async function getAd(id: number) {
     .filter(Boolean)
     .map((f) => mediaUrl(f as string));
 
+  await loadBanned();
   return {
     id: toInt(ad.id),
-    title: ad.title,
-    detail: ad.detail,
+    title: censorSync(ad.title),
+    detail: censorSync(ad.detail),
     price: ad.price,
     adsType: ad.adsType,
     special: ad.adsSpecial === 'checked',

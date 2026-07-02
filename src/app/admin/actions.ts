@@ -5,7 +5,22 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/admin';
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
+import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { toInt } from '@/lib/utils';
+
+export async function addBannedWordAction(formData: FormData) {
+  await requireAdmin();
+  const word = String(formData.get('word') || '').trim();
+  if (word) await addBannedWord(word);
+  revalidatePath('/admin/words');
+}
+
+export async function deleteBannedWordAction(formData: FormData) {
+  await requireAdmin();
+  const id = Number(formData.get('id'));
+  if (id) await deleteBannedWord(id);
+  revalidatePath('/admin/words');
+}
 
 export async function adminDeleteClassifiedAction(formData: FormData) {
   await requireAdmin();

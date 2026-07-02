@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
+import { watermarkImage } from '@/lib/watermark';
 import { toInt } from '@/lib/utils';
 
 type PreparedImage = { buf: Buffer; name: string; ext: string; hash: string };
@@ -27,7 +28,8 @@ async function storeImages(images: PreparedImage[], userId: number, adId: bigint
   for (const img of images) {
     // content-addressed filename → identical images resolve to the same file
     const safe = `${img.hash}.${img.ext}`;
-    const rel = await saveUpload(img.buf, safe);
+    const stamped = await watermarkImage(img.buf, img.ext); // burn "تربح" watermark
+    const rel = await saveUpload(stamped, safe);
     const up = await prisma.uploads.create({
       data: { file_name: rel, file_original_name: img.name, extension: img.ext, type: 'ad', file_size: img.buf.length, user_id: userId },
     });

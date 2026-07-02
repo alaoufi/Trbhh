@@ -28,7 +28,8 @@ FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+# openssl for Prisma; fonts-kacst provides Arabic glyphs for the image watermark
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates fonts-kacst fontconfig \
     && rm -rf /var/lib/apt/lists/* \
     && addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs

@@ -7,6 +7,8 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
+  // keep sharp external so the standalone output traces its native binaries
+  serverExternalPackages: ['sharp'],
   // The app compiles fine; don't let lint/type-check warnings block production builds.
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },

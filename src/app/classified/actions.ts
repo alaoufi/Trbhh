@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { saveUpload } from '@/lib/storage';
+import { watermarkImage } from '@/lib/watermark';
 import { createClassified } from '@/lib/classified';
 import { toInt } from '@/lib/utils';
 
@@ -16,7 +17,8 @@ async function saveOneImage(formData: FormData): Promise<string | null> {
   if (!buf.length) return null;
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const hash = createHash('sha256').update(new Uint8Array(buf)).digest('hex');
-  const rel = await saveUpload(buf, `${hash}.${ext}`);
+  const stamped = await watermarkImage(buf, ext); // burn "تربح" watermark
+  const rel = await saveUpload(stamped, `${hash}.${ext}`);
   // register in uploads for consistency (best-effort)
   await prisma.uploads
     .create({ data: { file_name: rel, file_original_name: file.name, extension: ext, type: 'classified', file_size: buf.length, user_id: 0 } })

@@ -99,9 +99,9 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         </div>
       </div>
       {ad.images.length > 1 && (
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
           {ad.images.slice(0, 10).map((img, i) => (
-            <div key={i} className="relative aspect-square overflow-hidden rounded-lg border border-primary/20 bg-white">
+            <div key={i} className="relative aspect-square overflow-hidden rounded-xl border-2 border-primary/20 bg-white shadow-sm ring-1 ring-primary/5 transition hover:-translate-y-0.5 hover:ring-primary/40">
               <Image src={img} alt={`${ad.title} ${i + 1}`} fill sizes="20vw" className="object-cover" />
             </div>
           ))}

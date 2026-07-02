@@ -10,6 +10,8 @@ import { CategoryTabs } from '@/components/category-tabs';
 import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { DisclaimerBar } from '@/components/disclaimer';
+import { getClassifieds } from '@/lib/classified';
+import { ClassifiedGrid } from '@/components/classified-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,12 +26,13 @@ function Stat({ icon: Icon, value, label }: { icon: React.ElementType; value: nu
 }
 
 export default async function HomePage() {
-  const [categories, featured, latest, mostViewed, stats] = await Promise.all([
+  const [categories, featured, latest, mostViewed, stats, classifieds] = await Promise.all([
     getCategories(),
     getFeaturedAds(8),
     getLatestAds(12),
     getMostViewedAds(8),
     getStats(),
+    getClassifieds(9).catch(() => []),
   ]);
 
   return (
@@ -44,6 +47,12 @@ export default async function HomePage() {
         <Stat icon={Eye} value={stats.views} label="مشاهدة" />
         <Stat icon={LayoutGrid} value={stats.cats} label="قسم" />
       </div>
+
+      {classifieds.length > 0 && (
+        <Section title="الإعلانات المبوّبة" href="/classified">
+          <ClassifiedGrid items={classifieds} />
+        </Section>
+      )}
 
       {featured.length > 0 && (
         <Section title="إعلانات مميّزة" href="/search?special=1">

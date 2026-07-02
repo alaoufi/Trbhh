@@ -7,6 +7,8 @@ import { Footer } from '@/components/footer';
 import { MobileNav } from '@/components/mobile-nav';
 import { PwaRegister } from '@/components/pwa-register';
 import { GeoPrompt } from '@/components/geo-prompt';
+import { ClassifiedSplash } from '@/components/classified-splash';
+import { getRandomClassified } from '@/lib/classified';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
@@ -46,6 +48,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       /* ignore */
     }
   }
+  let splashAd = null;
+  try {
+    splashAd = await getRandomClassified();
+  } catch {
+    /* classified table may not be ready yet */
+  }
   return (
     <html lang="ar" dir="rtl" className={cairo.variable}>
       <body className="min-h-screen font-sans antialiased">
@@ -55,6 +63,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Footer />
         <MobileNav unread={unread} />
         <GeoPrompt />
+        <ClassifiedSplash ad={splashAd} />
         <PwaRegister />
       </body>
     </html>

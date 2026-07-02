@@ -50,10 +50,12 @@ export async function createClassifiedAction(formData: FormData) {
   const align = String(formData.get('align') || 'right');
   const size = String(formData.get('size') || 'md');
   const bold = formData.get('bold') ? true : false;
+  const pattern = String(formData.get('pattern') || 'none');
+  const accent = String(formData.get('accent') || 'none');
 
   await createClassified({
     userId: session.uid, title, body, image, phone, whatsapp, link,
-    theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold,
+    theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent,
   });
   revalidatePath('/');
   revalidatePath('/classified');

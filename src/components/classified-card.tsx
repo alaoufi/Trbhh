@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { Phone, MessageCircle, ExternalLink } from 'lucide-react';
 import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY } from '@/lib/classified-theme';
+import { ClassifiedDecor } from '@/components/classified-decor';
 
 export function ClassifiedCard({ c }: { c: Classified }) {
   const theme = CLASSIFIED_THEMES[c.theme % CLASSIFIED_THEMES.length];
@@ -18,6 +19,7 @@ export function ClassifiedCard({ c }: { c: Classified }) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
         </>
       )}
+      <ClassifiedDecor pattern={c.pattern} accent={c.accent} dark={dark} />
       {c.link && (
         <span className="absolute right-2 top-2 z-10 rounded-full bg-white/25 p-1 backdrop-blur"><ExternalLink className="h-3.5 w-3.5" /></span>
       )}

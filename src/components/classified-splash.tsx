@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Phone, MessageCircle, ExternalLink, Pause, Play, LogIn } from 'lucide-react';
 import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY } from '@/lib/classified-theme';
+import { ClassifiedDecor } from '@/components/classified-decor';
 
 const DURATION = 6000; // ms shown before auto-dismiss
 
@@ -74,6 +75,7 @@ export function ClassifiedSplash({ ad }: { ad: Classified | null }) {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
                 </>
               )}
+              <ClassifiedDecor pattern={ad.pattern} accent={ad.accent} dark={dark} />
               {ad.link && <span className="absolute right-3 top-3 z-10 rounded-full bg-white/25 p-1.5 backdrop-blur"><ExternalLink className="h-4 w-4" /></span>}
               <div className={`relative z-10 space-y-1 p-5 ${ad.align === 'center' ? 'text-center' : 'text-right'}`}>
                 {ad.title && <h3 className={`line-clamp-3 leading-tight drop-shadow ${SIZE_TITLE[ad.size]} ${ad.bold ? 'font-extrabold' : 'font-medium'}`}>{ad.title}</h3>}

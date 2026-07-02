@@ -32,6 +32,8 @@ export async function ensureClassifiedTable() {
     `ADD COLUMN text_align VARCHAR(10) NOT NULL DEFAULT 'right'`,
     `ADD COLUMN font_size VARCHAR(4) NOT NULL DEFAULT 'md'`,
     `ADD COLUMN bold TINYINT NOT NULL DEFAULT 1`,
+    `ADD COLUMN pattern VARCHAR(10) NOT NULL DEFAULT 'none'`,
+    `ADD COLUMN accent VARCHAR(10) NOT NULL DEFAULT 'none'`,
   ]) {
     await prisma.$executeRawUnsafe(`ALTER TABLE classified_ads ${col}`).catch(() => {});
   }
@@ -43,12 +45,15 @@ type Row = {
   body: string | null; image: string | null; phone: string | null;
   whatsapp: string | null; link: string | null; theme: number; created_at: Date | null;
   content_pos?: string | null; text_align?: string | null; font_size?: string | null; bold?: number | null;
+  pattern?: string | null; accent?: string | null;
 };
 
 function toClassified(r: Row): Classified {
   const pos = (r.content_pos as Classified['pos']) || 'bottom';
   const align = (r.text_align as Classified['align']) || 'right';
   const size = (r.font_size as Classified['size']) || 'md';
+  const pattern = (r.pattern as Classified['pattern']) || 'none';
+  const accent = (r.accent as Classified['accent']) || 'none';
   return {
     id: Number(r.id),
     userId: r.user_id == null ? null : Number(r.user_id),
@@ -63,6 +68,8 @@ function toClassified(r: Row): Classified {
     align: align === 'center' ? 'center' : 'right',
     size: ['sm', 'md', 'lg'].includes(size) ? size : 'md',
     bold: r.bold == null ? true : Number(r.bold) === 1,
+    pattern: (['none', 'dots', 'stripes', 'grid', 'rays'].includes(pattern) ? pattern : 'none') as Classified['pattern'],
+    accent: (['none', 'bar', 'corner', 'frame'].includes(accent) ? accent : 'none') as Classified['accent'],
     createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
   };
 }
@@ -107,7 +114,7 @@ export async function getRandomClassified(): Promise<Classified | null> {
 export async function createClassified(data: {
   userId: number | null; title: string | null; body: string | null; image: string | null;
   phone: string | null; whatsapp: string | null; link: string | null;
-  theme?: number; pos?: string; align?: string; size?: string; bold?: boolean;
+  theme?: number; pos?: string; align?: string; size?: string; bold?: boolean; pattern?: string; accent?: string;
 }): Promise<number> {
   await ensureClassifiedTable();
   const theme = typeof data.theme === 'number' && data.theme >= 0
@@ -117,9 +124,11 @@ export async function createClassified(data: {
   const align = data.align === 'center' ? 'center' : 'right';
   const size = ['sm', 'md', 'lg'].includes(data.size || '') ? data.size : 'md';
   const bold = data.bold === false ? 0 : 1;
+  const pattern = ['none', 'dots', 'stripes', 'grid', 'rays'].includes(data.pattern || '') ? data.pattern : 'none';
+  const accent = ['none', 'bar', 'corner', 'frame'].includes(data.accent || '') ? data.accent : 'none';
   await prisma.$executeRawUnsafe(
-    `INSERT INTO classified_ads (user_id, title, body, image, phone, whatsapp, link, theme, content_pos, text_align, font_size, bold, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-    data.userId, data.title, data.body, data.image, data.phone, data.whatsapp, data.link, theme, pos, align, size, bold,
+    `INSERT INTO classified_ads (user_id, title, body, image, phone, whatsapp, link, theme, content_pos, text_align, font_size, bold, pattern, accent, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    data.userId, data.title, data.body, data.image, data.phone, data.whatsapp, data.link, theme, pos, align, size, bold, pattern, accent,
   );
   const rows = await prisma.$queryRawUnsafe<{ id: bigint | number }[]>(`SELECT LAST_INSERT_ID() AS id`);
   return Number(rows[0]?.id || 0);

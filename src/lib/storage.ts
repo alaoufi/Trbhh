@@ -22,3 +22,21 @@ export async function readLocal(relPath: string): Promise<Buffer | null> {
     return null;
   }
 }
+
+/** Absolute path of a stored file if it is inside STORAGE_DIR (traversal-safe). */
+export function localAbsPath(relPath: string): string | null {
+  const abs = path.join(STORAGE_DIR, relPath);
+  return abs.startsWith(STORAGE_DIR) ? abs : null;
+}
+
+/** Return { abs, size } for an existing local file, else null. */
+export async function statLocal(relPath: string): Promise<{ abs: string; size: number } | null> {
+  const abs = localAbsPath(relPath);
+  if (!abs) return null;
+  try {
+    const st = await fs.stat(abs);
+    return st.isFile() ? { abs, size: st.size } : null;
+  } catch {
+    return null;
+  }
+}

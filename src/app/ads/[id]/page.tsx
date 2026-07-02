@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
@@ -26,6 +25,7 @@ import { addCommentAction } from '@/app/ads/comment-actions';
 import { PromoSlot } from '@/components/promo-slot';
 import { getAdAudio } from '@/lib/ad-media';
 import { mediaUrl } from '@/lib/media';
+import { AdGallery } from '@/components/ad-gallery';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,16 +39,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     openGraph: { images: ad.images.slice(0, 1), title: ad.title },
   };
 }
-
-// varied elegant frames to break the monotony of a uniform gallery
-const GALLERY_FRAMES = [
-  'rounded-2xl',
-  'rounded-full',
-  'rounded-tl-[1.75rem] rounded-br-[1.75rem]',
-  'rounded-xl',
-  'rounded-[1.75rem]',
-  'rounded-tr-[1.75rem] rounded-bl-[1.75rem]',
-];
 
 function InfoItem({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) {
   return (
@@ -129,23 +119,8 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
     <div className="space-y-4 pb-16 md:pb-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      {/* Gallery */}
-      <div className="relative aspect-video overflow-hidden rounded-2xl border-2 border-primary/20 bg-white shadow-sm">
-        <Image src={ad.images[0]} alt={ad.title} fill sizes="(max-width:1024px) 100vw, 66vw" className="object-contain" priority />
-        <div className="absolute right-3 top-3 flex gap-1">
-          {ad.special && <span className="rounded bg-[hsl(var(--new))] px-2 py-0.5 text-xs font-bold text-white">مميّز</span>}
-          <span className="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">{ad.adsType === 'offer' ? 'عرض' : 'طلب'}</span>
-        </div>
-      </div>
-      {ad.images.length > 1 && (
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-          {ad.images.slice(0, 10).map((img, i) => (
-            <div key={i} className={`relative aspect-square overflow-hidden border-2 border-primary/25 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 ${GALLERY_FRAMES[i % GALLERY_FRAMES.length]}`}>
-              <Image src={img} alt={`${ad.title} ${i + 1}`} fill sizes="20vw" className="object-cover" />
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Gallery with tap-to-zoom lightbox */}
+      <AdGallery images={ad.images} title={ad.title} special={ad.special} adsType={ad.adsType} />
 
       <h1 className="text-xl font-bold text-primary">{ad.title}</h1>
 

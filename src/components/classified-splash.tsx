@@ -42,8 +42,8 @@ function Tile({ ad, delay, onNavigate }: { ad: Classified; delay: number; onNavi
 
   return (
     <div className="float-3d" style={{ animationDelay: `${delay}ms` }}>
-      {/* الضغط يفتح الإعلان مكبّراً؛ وإن كان له رابط يُحتسب كنقرة عبر مسار /go */}
-      <a href={ad.link ? `/classified/${ad.id}/go` : `/classified/${ad.id}`} onClick={onNavigate} className="block">{card}</a>
+      {/* الضغط يفتح الإعلان مكبّراً في صفحته (ومن هناك يمكن الدخول على الرابط) */}
+      <a href={`/classified/${ad.id}`} onClick={onNavigate} className="block">{card}</a>
       {(wa || ad.phone) && (
         <div className="flex gap-1 rounded-b-2xl bg-black/30 p-1.5">
           {ad.phone && <a href={`tel:${ad.phone}`} onClick={onNavigate} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-600 py-2 text-xs font-bold text-white"><Phone className="h-3.5 w-3.5" /> اتصال</a>}

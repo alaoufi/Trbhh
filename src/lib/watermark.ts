@@ -1,16 +1,19 @@
 import 'server-only';
-import sharp from 'sharp';
+
+const TIMEOUT_MS = 8000; // never let image processing hang a publish request
 
 /**
  * Burn a "تربح" watermark into an uploaded image (copyright protection),
- * and auto-orient/clean it. Returns the original buffer on any failure.
+ * auto-orient and downscale it. Returns the ORIGINAL buffer on any failure
+ * or if processing exceeds a hard timeout, so publishing never hangs/crashes.
  */
 export async function watermarkImage(buf: Buffer, ext: string): Promise<Buffer> {
-  try {
-    // Downscale first: large phone photos (e.g. 4000×3000) are slow to process and
-    // can hang the request. Resizing to ≤1600px keeps it fast and low on memory.
+  const work = (async (): Promise<Buffer> => {
+    // dynamic import so a missing/broken native sharp binary degrades gracefully
+    const sharp = (await import('sharp')).default;
+    // Downscale first: large phone photos (e.g. 4000×3000) are slow and memory-heavy.
     const resized = await sharp(buf, { failOn: 'none' })
-      .rotate() // respect EXIF orientation
+      .rotate()
       .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
       .toBuffer();
     const base = sharp(resized, { failOn: 'none' });
@@ -30,8 +33,13 @@ export async function watermarkImage(buf: Buffer, ext: string): Promise<Buffer> 
     let out = base.composite([{ input: svg, top: 0, left: 0 }]);
     if (ext === 'png') out = out.png();
     else if (ext === 'webp') out = out.webp();
-    else out = out.jpeg({ quality: 86 });
+    else out = out.jpeg({ quality: 82 });
     return await out.toBuffer();
+  })();
+
+  const timeout = new Promise<Buffer>((resolve) => setTimeout(() => resolve(buf), TIMEOUT_MS));
+  try {
+    return await Promise.race([work.catch(() => buf), timeout]);
   } catch {
     return buf;
   }

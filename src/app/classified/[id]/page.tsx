@@ -18,11 +18,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ClassifiedDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const c = await getClassifiedById(Number(id));
+  const numId = Number(id);
+  const c = Number.isFinite(numId) ? await getClassifiedById(numId).catch(() => null) : null;
   if (!c) notFound();
 
-  const session = await getSession();
-  const admin = session ? await hasAnyAdmin(session.uid) : false;
+  const session = await getSession().catch(() => null);
+  const admin = session ? await hasAnyAdmin(session.uid).catch(() => false) : false;
   const isOwner = !!session && c.userId === session.uid;
   const canSeeStats = isOwner || admin;
 

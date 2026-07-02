@@ -1,8 +1,8 @@
-import { requireAnyAdmin } from '@/lib/roles';
 import {
   BookOpen, LayoutDashboard, Users, Megaphone, Copy, Sparkles, LayoutGrid, Ban, Flag,
   ShieldCheck, Crown, MonitorPlay, Settings, ArrowUp, Target, ListChecks,
 } from 'lucide-react';
+import { ScrollTop } from '@/components/scroll-top';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'دليل الاستخدام' };
@@ -117,10 +117,10 @@ const SECTIONS: Section[] = [
   },
 ];
 
-export default async function AdminGuide() {
-  await requireAnyAdmin();
+export default async function GuidePage() {
   return (
     <div id="guide-top" className="space-y-5 scroll-mt-20">
+      <ScrollTop targetId="guide-top" />
       {/* header */}
       <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-[#1b4f8a] p-5 text-white shadow-lg">
         <div className="flex items-center gap-3">
@@ -135,11 +135,11 @@ export default async function AdminGuide() {
       {/* index / فهرس */}
       <div id="guide-index" className="scroll-mt-20 rounded-2xl border-2 border-primary/20 bg-card p-4 shadow-sm">
         <div className="mb-3 flex items-center gap-2 font-extrabold text-primary"><ListChecks className="h-5 w-5" /> الفهرس — اضغط للانتقال</div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {SECTIONS.map((s, i) => (
             <a key={s.id} href={`#${s.id}`} className="flex items-center gap-2 rounded-xl border-2 border-primary/15 bg-white px-3 py-2.5 text-sm font-bold text-primary transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md">
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundImage: `linear-gradient(135deg, ${s.from}, ${s.to})` }}><s.icon className="h-4 w-4" /></span>
-              <span className="line-clamp-1">{i + 1}. {s.title}</span>
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundImage: `linear-gradient(135deg, ${s.from}, ${s.to})` }}><s.icon className="h-4 w-4" /></span>
+              <span className="min-w-0 flex-1 whitespace-normal break-words leading-snug">{i + 1}. {s.title}</span>
             </a>
           ))}
         </div>

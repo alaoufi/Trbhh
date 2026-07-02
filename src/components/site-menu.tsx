@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen,
 } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { ThemePicker } from '@/components/theme-picker';
@@ -57,6 +57,9 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
 
         <div className="flex-1 p-2">
           <Item href="/" icon={Home} onClick={close}>الرئيسية</Item>
+          <Link href="/guide" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-3 text-[15px] font-extrabold text-primary hover:bg-primary/15">
+            <BookOpen className="h-5 w-5 shrink-0" /> <span>دليل الاستخدام</span>
+          </Link>
           <Item href={isAuthed ? '/account' : '/login'} icon={User} onClick={close}>حسابي</Item>
           <Item href="/account/favorites" icon={Heart} onClick={close}>المفضلة</Item>
           <Item href="/account/ads" icon={Megaphone} onClick={close}>إعلاناتي</Item>

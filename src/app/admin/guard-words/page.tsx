@@ -59,14 +59,14 @@ export default async function GuardWordsPage() {
                 </div>
               )}
 
-              <details className="text-xs">
-                <summary className="cursor-pointer font-extrabold text-muted-foreground">القائمة الأساسية المدمجة ({BUILTIN[cat].length})</summary>
-                <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="text-xs">
+                <p className="mb-1 font-extrabold text-muted-foreground">القائمة الأساسية المدمجة ({BUILTIN[cat].length})</p>
+                <div className="flex flex-wrap gap-1.5">
                   {BUILTIN[cat].map((w) => (
                     <span key={w} className="rounded bg-muted px-2 py-0.5 font-bold text-muted-foreground">{w}</span>
                   ))}
                 </div>
-              </details>
+              </div>
             </div>
           </section>
         );

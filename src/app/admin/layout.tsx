@@ -5,7 +5,7 @@ import { ScrollTop } from '@/components/scroll-top';
 
 const nav: { href: string; label: string; icon: React.ElementType; perm: Perm | null }[] = [
   { href: '/admin', label: 'لوحة الإدارة', icon: LayoutDashboard, perm: null },
-  { href: '/admin/guide', label: 'دليل الاستخدام', icon: BookOpen, perm: null },
+  { href: '/guide', label: 'دليل الاستخدام', icon: BookOpen, perm: null },
   { href: '/admin/users', label: 'المستخدمون', icon: Users, perm: 'users' },
   { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone, perm: 'ads' },
   { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy, perm: 'duplicates' },

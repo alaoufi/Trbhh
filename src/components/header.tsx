@@ -20,7 +20,7 @@ export async function Header() {
           <input
             name="q"
             placeholder="أبحث هنا"
-            className="h-11 w-full rounded-full border border-primary/40 bg-white pr-4 pl-20 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+            className="h-11 w-full rounded-full border border-primary/40 bg-background text-foreground placeholder:text-muted-foreground pr-4 pl-20 text-sm outline-none focus:ring-2 focus:ring-primary/40"
           />
           <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2 text-primary">
             <button type="submit" aria-label="بحث"><Search className="h-5 w-5" /></button>

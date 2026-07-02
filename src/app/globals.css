@@ -286,6 +286,8 @@ body {
   border-color: hsl(var(--border));
 }
 [data-theme="night"] ::placeholder { color: hsl(var(--muted-foreground)); opacity: 1; }
+/* top announcement ticker: dark-themed strip in night instead of bright blue */
+[data-theme="night"] .site-ticker { background-color: hsl(var(--card)); color: hsl(var(--card-foreground)); }
 
 /* WhatsApp-style "typing…" indicator dots */
 .typing-dot {

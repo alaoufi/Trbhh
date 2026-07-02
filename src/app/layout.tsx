@@ -33,11 +33,20 @@ export const metadata: Metadata = {
   icons: { icon: '/icon.svg', apple: '/apple-icon.png' },
 };
 
-export const viewport: Viewport = {
-  themeColor: '#3287da',
-  width: 'device-width',
-  initialScale: 1,
+const THEME_BAR: Record<string, string> = {
+  night: '#16213b', desert: '#c9a55c', agri: '#3f8f52', spring: '#e59ac0',
+  mint: '#3fb8ad', lavender: '#8b7fd6', sea: '#2f9fd6', snow: '#6fb3e0',
+  mountain: '#7a9464', sunset: '#e08a3c',
 };
+
+export async function generateViewport(): Promise<Viewport> {
+  const theme = (await cookies()).get('theme')?.value || '';
+  return {
+    themeColor: THEME_BAR[theme] || '#3287da',
+    width: 'device-width',
+    initialScale: 1,
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();

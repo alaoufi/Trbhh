@@ -13,7 +13,7 @@ export function TopBar() {
     </span>
   );
   return (
-    <div className="bg-primary text-primary-foreground">
+    <div className="site-ticker bg-primary text-primary-foreground">
       <div className="marquee container h-9 text-xs leading-9 sm:text-sm">
         <div className="marquee-track">
           <Item />

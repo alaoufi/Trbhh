@@ -6,22 +6,28 @@ import { getSetting } from './settings';
 
 /* Setting keys (editable from the admin). */
 export const MSG_KEYS = {
-  smsUrl: 'sms_url', smsUser: 'sms_username', smsPass: 'sms_password', smsSender: 'sms_sender', smsUnicode: 'sms_unicode',
+  smsProvider: 'sms_provider', smsUrl: 'sms_url', smsUser: 'sms_username', smsPass: 'sms_password', smsSender: 'sms_sender', smsUnicode: 'sms_unicode',
   waUrl: 'wa_url', waInstance: 'wa_instance', waToken: 'wa_token',
   channel: 'otp_channel', enabled: 'otp_enabled',
 } as const;
 
+/** jawaly_v1 = current REST API (app_key/app_secret, Basic auth + JSON).
+ *  legacy    = old username/password form POST (deprecated on most gateways). */
+export type SmsProvider = 'jawaly_v1' | 'legacy';
+export const JAWALY_V1_URL = 'https://api-sms.4jawaly.com/api/v1/account/area/sms/send';
+
 export type OtpChannel = 'sms' | 'whatsapp' | 'both';
 export type MessagingConfig = {
-  smsUrl: string; smsUser: string; smsPass: string; smsSender: string; smsUnicode: string;
+  smsProvider: SmsProvider; smsUrl: string; smsUser: string; smsPass: string; smsSender: string; smsUnicode: string;
   waUrl: string; waInstance: string; waToken: string;
   channel: OtpChannel; enabled: boolean;
 };
 
 /** Load messaging config from the DB (editable in admin), falling back to env. */
 export async function getMessagingConfig(): Promise<MessagingConfig> {
-  const [smsUrl, smsUser, smsPass, smsSender, smsUnicode, waUrl, waInstance, waToken, channel, enabled] = await Promise.all([
-    getSetting(MSG_KEYS.smsUrl, process.env.SMS_URL || 'http://www.4jawaly.net/api/sendsms.php'),
+  const [smsProvider, smsUrl, smsUser, smsPass, smsSender, smsUnicode, waUrl, waInstance, waToken, channel, enabled] = await Promise.all([
+    getSetting(MSG_KEYS.smsProvider, process.env.SMS_PROVIDER || 'jawaly_v1'),
+    getSetting(MSG_KEYS.smsUrl, process.env.SMS_URL || JAWALY_V1_URL),
     getSetting(MSG_KEYS.smsUser, process.env.SMS_USERNAME || ''),
     getSetting(MSG_KEYS.smsPass, process.env.SMS_PASSWORD || ''),
     getSetting(MSG_KEYS.smsSender, process.env.SMS_SENDER || 'SouqAlhafta'),
@@ -33,7 +39,8 @@ export async function getMessagingConfig(): Promise<MessagingConfig> {
     getSetting(MSG_KEYS.enabled, '1'),
   ]);
   const ch: OtpChannel = channel === 'whatsapp' || channel === 'both' ? channel : 'sms';
-  return { smsUrl, smsUser, smsPass, smsSender, smsUnicode, waUrl, waInstance, waToken, channel: ch, enabled: enabled !== '0' };
+  const prov: SmsProvider = smsProvider === 'legacy' ? 'legacy' : 'jawaly_v1';
+  return { smsProvider: prov, smsUrl, smsUser, smsPass, smsSender, smsUnicode, waUrl, waInstance, waToken, channel: ch, enabled: enabled !== '0' };
 }
 
 /** Normalize a Saudi number to 9665XXXXXXXX (digits only). */
@@ -46,10 +53,27 @@ export function normalizeSaudi(phone: string): string {
   return p.startsWith('966') ? p : '966' + p;
 }
 
-/** Send an SMS via the 4jawaly gateway. */
-export async function sendSms(phone: string, message: string, c?: MessagingConfig): Promise<boolean> {
-  const cfg = c || (await getMessagingConfig());
-  if (!cfg.smsUser || !cfg.smsPass) return false;
+/** Send an SMS via the current 4jawaly REST API (app_key/app_secret). */
+async function sendJawalyV1(phone: string, message: string, cfg: MessagingConfig): Promise<boolean> {
+  const url = cfg.smsUrl || JAWALY_V1_URL;
+  const auth = Buffer.from(`${cfg.smsUser}:${cfg.smsPass}`).toString('base64');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ messages: [{ text: message, numbers: [normalizeSaudi(phone)], sender: cfg.smsSender }] }),
+      cache: 'no-store',
+    });
+    const text = await res.text().catch(() => '');
+    if (res.status === 200 && /"(code|status)"\s*:\s*200|"job_id"|success|"total_success"/i.test(text)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/** Send via a legacy username/password form gateway (deprecated). */
+async function sendLegacyForm(phone: string, message: string, cfg: MessagingConfig): Promise<boolean> {
   const body = new URLSearchParams({
     username: cfg.smsUser, password: cfg.smsPass, message,
     numbers: normalizeSaudi(phone), sender: cfg.smsSender,
@@ -60,11 +84,18 @@ export async function sendSms(phone: string, message: string, c?: MessagingConfi
     if (!res.ok) return false;
     const text = await res.text().catch(() => '');
     if (/<code>\s*1\s*<\/code>/i.test(text)) return true;
-    if (/error|invalid|fail|رصيد|غير صحيح/i.test(text)) return false;
+    if (/error|invalid|fail|رصيد|غير صحيح|<html|<!doctype/i.test(text)) return false;
     return true;
   } catch {
     return false;
   }
+}
+
+/** Send an SMS via the configured provider. */
+export async function sendSms(phone: string, message: string, c?: MessagingConfig): Promise<boolean> {
+  const cfg = c || (await getMessagingConfig());
+  if (!cfg.smsUser || !cfg.smsPass) return false;
+  return cfg.smsProvider === 'legacy' ? sendLegacyForm(phone, message, cfg) : sendJawalyV1(phone, message, cfg);
 }
 
 /** Send a WhatsApp message via the 4whats.net gateway. */

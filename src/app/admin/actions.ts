@@ -260,8 +260,11 @@ export async function saveVerificationAction(formData: FormData) {
   const s = (k: string) => String(formData.get(k) || '').trim();
   const ch = s('channel');
   const channel = ch === 'whatsapp' || ch === 'both' ? ch : 'sms';
+  const provider = s('sms_provider') === 'legacy' ? 'legacy' : 'jawaly_v1';
+  const defUrl = provider === 'legacy' ? '' : 'https://api-sms.4jawaly.com/api/v1/account/area/sms/send';
   await Promise.all([
-    setSetting(MSG_KEYS.smsUrl, s('sms_url') || 'http://www.4jawaly.net/api/sendsms.php'),
+    setSetting(MSG_KEYS.smsProvider, provider),
+    setSetting(MSG_KEYS.smsUrl, s('sms_url') || defUrl),
     setSetting(MSG_KEYS.smsUser, s('sms_username')),
     setSetting(MSG_KEYS.smsPass, s('sms_password')),
     setSetting(MSG_KEYS.smsSender, s('sms_sender') || 'SouqAlhafta'),

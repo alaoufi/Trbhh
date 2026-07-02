@@ -59,8 +59,11 @@ services:
       # NEXT_PUBLIC_MEDIA_BASE empty => media served same-origin via /media route.
       NEXT_PUBLIC_MEDIA_BASE: ${NEXT_PUBLIC_MEDIA_BASE:-}
       STORAGE_DIR: /app/storage
-      # SMS gateway (4jawaly) for password-reset OTP — set values in .env
-      SMS_URL: ${SMS_URL:-http://www.4jawaly.net/api/sendsms.php}
+      # SMS/verification gateways are configured from the admin UI (stored in DB).
+      # These envs are only first-run fallbacks. Provider: jawaly_v1 (default) uses
+      # app_key/app_secret; legacy uses username/password.
+      SMS_PROVIDER: ${SMS_PROVIDER:-jawaly_v1}
+      SMS_URL: ${SMS_URL:-}
       SMS_USERNAME: ${SMS_USERNAME:-}
       SMS_PASSWORD: ${SMS_PASSWORD:-}
       SMS_SENDER: ${SMS_SENDER:-SouqAlhafta}

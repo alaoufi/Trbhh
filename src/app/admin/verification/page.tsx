@@ -47,11 +47,20 @@ export default async function VerificationPage({ searchParams }: { searchParams:
             <Smartphone className="h-5 w-5" /> <h2 className="font-extrabold drop-shadow">بوابة SMS (4jawaly)</h2>
           </div>
           <div className="space-y-3 p-4">
+            <L label="نوع الواجهة">
+              <select name="sms_provider" defaultValue={c.smsProvider} className={field}>
+                <option value="jawaly_v1">4jawaly الحديثة (app_key / app_secret)</option>
+                <option value="legacy">قديمة (username / password)</option>
+              </select>
+            </L>
+            <p className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">
+              للواجهة الحديثة: احصل على <b>app_key</b> و<b>app_secret</b> من لوحة تحكّم 4jawaly (الإعدادات ← تطبيقاتي/API)، وضع الـapp_key في «المفتاح» والـapp_secret في «السر».
+            </p>
             <L label="رابط الـAPI"><input name="sms_url" defaultValue={c.smsUrl} className={field} /></L>
-            <L label="اسم المستخدم (username)"><input name="sms_username" defaultValue={c.smsUser} className={field} /></L>
-            <L label="كلمة المرور (password)"><input name="sms_password" defaultValue={c.smsPass} className={field} /></L>
+            <L label="المفتاح (app_key / username)"><input name="sms_username" defaultValue={c.smsUser} className={field} /></L>
+            <L label="السر (app_secret / password)"><input name="sms_password" defaultValue={c.smsPass} className={field} /></L>
             <L label="اسم المرسِل (sender)"><input name="sms_sender" defaultValue={c.smsSender} className={field} /></L>
-            <L label="الترميز (unicode)"><input name="sms_unicode" defaultValue={c.smsUnicode} className={field} /></L>
+            <L label="الترميز (للقديمة فقط)"><input name="sms_unicode" defaultValue={c.smsUnicode} className={field} /></L>
           </div>
         </section>
 

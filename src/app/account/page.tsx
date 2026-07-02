@@ -1,13 +1,14 @@
 import Link from 'next/link';
 import { Megaphone, Heart, Mail } from 'lucide-react';
-import { getSession } from '@/lib/auth';
+import { requireUser } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
 
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'لوحة التحكم' };
 
 export default async function AccountHome() {
-  const session = await getSession();
-  const stats = await getMyStats(session!.uid);
+  const session = await requireUser();
+  const stats = await getMyStats(session.uid);
   const cards = [
     { href: '/account/ads', label: 'إعلاناتي', value: stats.ads, icon: Megaphone },
     { href: '/account/favorites', label: 'المفضلة', value: stats.favorites, icon: Heart },
@@ -15,7 +16,7 @@ export default async function AccountHome() {
   ];
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">مرحباً {session!.name} 👋</h1>
+      <h1 className="text-xl font-bold text-primary">مرحباً {session.name} 👋</h1>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {cards.map(({ href, label, value, icon: Icon }) => (
           <Link key={href} href={href} className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">

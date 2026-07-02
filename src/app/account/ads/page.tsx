@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Pencil, Trash2, Eye, EyeOff } from 'lucide-react';
-import { getSession } from '@/lib/auth';
+import { requireUser } from '@/lib/auth';
 import { getMyAds } from '@/lib/account';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -11,9 +11,9 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
 
 export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string }> }) {
-  const session = await getSession();
+  const session = await requireUser();
   const sp = await searchParams;
-  const ads = await getMyAds(session!.uid);
+  const ads = await getMyAds(session.uid);
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">

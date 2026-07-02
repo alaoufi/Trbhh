@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { getSession } from '@/lib/auth';
+import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
 import { mediaUrl } from '@/lib/media';
 import { prisma } from '@/lib/prisma';
@@ -8,11 +8,12 @@ import { toInt } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { saveCompanyAction, addBranchAction } from './actions';
 
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'شركتي' };
 
 export default async function ManageCompanyPage() {
-  const session = await getSession();
-  const store = await getStoreByUser(session!.uid);
+  const session = await requireUser();
+  const store = await getStoreByUser(session.uid);
   const branches = store ? await prisma.store_branches.findMany({ where: { store_id: store.id } }) : [];
   const logoUrl = store?.logo ? mediaUrl((await prisma.uploads.findUnique({ where: { id: BigInt(store.logo) } }))?.file_name) : null;
   const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';

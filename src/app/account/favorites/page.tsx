@@ -1,12 +1,13 @@
-import { getSession } from '@/lib/auth';
+import { requireUser } from '@/lib/auth';
 import { getMyFavorites } from '@/lib/account';
 import { AdGrid } from '@/components/ad-card';
 
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'المفضلة' };
 
 export default async function FavoritesPage() {
-  const session = await getSession();
-  const favs = await getMyFavorites(session!.uid);
+  const session = await requireUser();
+  const favs = await getMyFavorites(session.uid);
   const ads = favs.map((f) => ({
     ...f, image: f.image, cityName: null, categoryName: null, special: false, views: 0,
   }));

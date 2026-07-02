@@ -3,6 +3,7 @@ import { BadgeCheck, ShieldCheck, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { submitVerificationAction } from './actions';
 
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'توثيق الحساب' };
 
 export default async function VerifyPage() {

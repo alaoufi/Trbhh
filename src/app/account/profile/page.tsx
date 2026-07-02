@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/lib/auth';
 import { ProfileForm } from './form';
 
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الملف الشخصي' };
 
 export default async function ProfilePage() {

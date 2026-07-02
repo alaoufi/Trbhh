@@ -16,7 +16,7 @@ export default async function AdminHome() {
     { label: 'البلاغات', value: s.reports, icon: Flag, href: '/admin/reports' },
     { label: 'الإعلانات المكررة', value: s.duplicateAds, icon: Copy, href: '/admin/duplicates', highlight: true },
     { label: 'الإعلانات المبوّبة', value: s.classified, icon: Sparkles, href: '/admin/classified' },
-    { label: 'النقاشات', value: s.debates, icon: MessagesSquare, href: '/admin' },
+    { label: 'النقاشات', value: s.debates, icon: MessagesSquare, href: '/debates' },
   ];
   return (
     <div className="space-y-4">

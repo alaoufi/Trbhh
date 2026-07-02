@@ -5,7 +5,7 @@ import { Sparkles, ExternalLink, Eye, MousePointerClick, ArrowRight, Pencil } fr
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { getClassifiedById, recordClassifiedView } from '@/lib/classified';
-import { getClassifiedStatsAudience } from '@/lib/settings';
+import { getClassifiedStatsAudience, getClassifiedLifetimeDays } from '@/lib/settings';
 import { ClassifiedVisual, ClassifiedContact } from '@/components/classified-card';
 import { DisclaimerBar } from '@/components/disclaimer';
 
@@ -26,6 +26,13 @@ export default async function ClassifiedDetailPage({ params }: { params: Promise
   const session = await getSession().catch(() => null);
   const admin = session ? await hasAnyAdmin(session.uid).catch(() => false) : false;
   const isOwner = !!session && c.userId === session.uid;
+
+  // hide expired classifieds from the public (owner/admin can still view)
+  const lifeDays = await getClassifiedLifetimeDays().catch(() => 0);
+  if (lifeDays > 0 && c.createdAt && !isOwner && !admin) {
+    const ageDays = (Date.now() - new Date(c.createdAt).getTime()) / 86400000;
+    if (ageDays > lifeDays) notFound();
+  }
   // who may see stats is controlled from the admin control panel
   const audience = await getClassifiedStatsAudience().catch(() => 'owner' as const);
   const canSeeStats = audience === 'all' ? true : audience === 'admin' ? admin : (isOwner || admin);

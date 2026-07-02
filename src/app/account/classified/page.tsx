@@ -2,15 +2,21 @@ import Link from 'next/link';
 import { Sparkles, Pencil, Trash2, Plus, Check, ExternalLink } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyClassifieds } from '@/lib/classified';
+import { getClassifiedLifetimeDays } from '@/lib/settings';
 import { ClassifiedCard } from '@/components/classified-card';
 import { deleteMyClassifiedAction } from '@/app/classified/actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي المبوّبة' };
 
+function isExpired(createdAt: string | null, days: number): boolean {
+  if (!days || !createdAt) return false;
+  return (Date.now() - new Date(createdAt).getTime()) / 86400000 > days;
+}
+
 export default async function MyClassifiedPage({ searchParams }: { searchParams: Promise<{ updated?: string; deleted?: string; error?: string }> }) {
   const session = await requireUser();
-  const [items, sp] = await Promise.all([getMyClassifieds(session.uid), searchParams]);
+  const [items, sp, lifeDays] = await Promise.all([getMyClassifieds(session.uid), searchParams, getClassifiedLifetimeDays()]);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -36,7 +42,12 @@ export default async function MyClassifiedPage({ searchParams }: { searchParams:
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           {items.map((c) => (
             <div key={c.id} className="space-y-1.5">
-              <ClassifiedCard c={c} float={false} />
+              <div className="relative">
+                <ClassifiedCard c={c} float={false} />
+                {isExpired(c.createdAt, lifeDays) && (
+                  <span className="absolute right-2 top-2 z-10 rounded-full bg-slate-800/85 px-2 py-0.5 text-[11px] font-medium text-white">منتهٍ</span>
+                )}
+              </div>
               <div className="flex gap-1.5">
                 <Link href={`/classified/${c.id}/edit`} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-primary/30 py-1.5 text-xs font-medium text-primary hover:bg-accent">
                   <Pencil className="h-3.5 w-3.5" /> تعديل

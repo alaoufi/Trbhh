@@ -44,6 +44,12 @@ export const SETTING_AD_DELETE_HOURS = 'ad_delete_hours';
 /* Toggle the stats row on the home page (1/0). */
 export const SETTING_SHOW_STATS = 'show_home_stats';
 
+/* How many days a classified ad stays published (0 = unlimited). */
+export const SETTING_CLASSIFIED_DAYS = 'classified_days';
+export async function getClassifiedLifetimeDays(): Promise<number> {
+  return getSettingNum(SETTING_CLASSIFIED_DAYS, 0);
+}
+
 /* Who can see classified ad stats (views/clicks): 'all' | 'owner' | 'admin'. */
 export const SETTING_CLASSIFIED_STATS = 'classified_stats_vis';
 export type StatsAudience = 'all' | 'owner' | 'admin';

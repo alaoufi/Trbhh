@@ -1,6 +1,6 @@
 import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getSettingBool, getClassifiedStatsAudience, SETTING_SHOW_STATS } from '@/lib/settings';
+import { getMemberWindows, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, SETTING_SHOW_STATS } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -9,7 +9,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, showStats, statsAudience] = await Promise.all([searchParams, getMemberWindows(), getSettingBool(SETTING_SHOW_STATS, true), getClassifiedStatsAudience()]);
+  const [{ saved }, w, showStats, statsAudience, classifiedDays] = await Promise.all([searchParams, getMemberWindows(), getSettingBool(SETTING_SHOW_STATS, true), getClassifiedStatsAudience(), getClassifiedLifetimeDays()]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -37,6 +37,15 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <input type="checkbox" name="showStats" defaultChecked={showStats} className="h-4 w-4 accent-primary" />
             إظهار الإحصائيات في الصفحة الرئيسية (عدد الإعلانات، الأعضاء، المشاهدات، الأقسام)
           </label>
+        </div>
+
+        <div className="border-t border-primary/15 pt-3">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><BarChart3 className="h-4 w-4" /> الإعلانات المبوّبة</div>
+          <label className="block space-y-1">
+            <span className="text-sm">مدة بقاء الإعلان المبوّب (بالأيام) — اكتب 0 ليبقى دائماً</span>
+            <input name="classifiedDays" type="number" min={0} defaultValue={classifiedDays} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </label>
+          <p className="mt-1 text-xs text-muted-foreground">بعد انتهاء المدة يختفي الإعلان المبوّب من العرض تلقائياً.</p>
         </div>
 
         <div className="border-t border-primary/15 pt-3">

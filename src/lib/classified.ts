@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from './prisma';
 import { mediaUrl } from './media';
 import { loadBanned, censorSync } from './censor';
+import { getClassifiedLifetimeDays } from './settings';
 import { CLASSIFIED_THEMES, type Classified } from './classified-theme';
 
 export { CLASSIFIED_THEMES };
@@ -89,11 +90,18 @@ function toClassified(r: Row): Classified {
   };
 }
 
+/** SQL fragment hiding classifieds past the admin-set lifetime (empty when unlimited). */
+async function lifetimeClause(): Promise<string> {
+  const days = await getClassifiedLifetimeDays().catch(() => 0);
+  return days > 0 ? ` AND (created_at IS NULL OR created_at >= DATE_SUB(NOW(), INTERVAL ${Math.floor(days)} DAY))` : '';
+}
+
 export async function getClassifieds(limit = 30): Promise<Classified[]> {
   await ensureClassifiedTable();
   await loadBanned();
+  const life = await lifetimeClause();
   const rows = await prisma.$queryRawUnsafe<Row[]>(
-    `SELECT * FROM classified_ads WHERE status = 1 ORDER BY id DESC LIMIT ${Math.max(1, Math.min(100, limit))}`,
+    `SELECT * FROM classified_ads WHERE status = 1${life} ORDER BY id DESC LIMIT ${Math.max(1, Math.min(100, limit))}`,
   );
   return rows.map(toClassified);
 }
@@ -190,8 +198,9 @@ export async function deleteClassified(id: number) {
 export async function getSplashClassifieds(limit = 12): Promise<Classified[]> {
   await ensureClassifiedTable();
   await loadBanned();
+  const life = await lifetimeClause();
   const rows = await prisma.$queryRawUnsafe<Row[]>(
-    `SELECT * FROM classified_ads WHERE status = 1 ORDER BY id DESC LIMIT ${Math.max(1, Math.min(24, limit))}`,
+    `SELECT * FROM classified_ads WHERE status = 1${life} ORDER BY id DESC LIMIT ${Math.max(1, Math.min(24, limit))}`,
   );
   return rows.map(toClassified);
 }

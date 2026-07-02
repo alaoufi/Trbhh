@@ -67,12 +67,12 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
           <Item href="/companies" icon={Building2} onClick={close}>الشركات</Item>
           <Item href="/search" icon={Search} onClick={close}>بحث متقدم</Item>
 
-          {/* الإعلانات المبوبة (الأقسام) */}
+          {/* الأقسام (تصفّح حسب القسم) */}
           <button
             onClick={() => setCatOpen((v) => !v)}
             className="mt-1 flex w-full items-center justify-between rounded-lg bg-primary px-3 py-3 text-[15px] font-bold text-white"
           >
-            <span>الإعلانات المبوّبة</span>
+            <span>الأقسام</span>
             <ChevronDown className={`h-5 w-5 transition-transform ${catOpen ? 'rotate-180' : ''}`} />
           </button>
           {catOpen && cats.length > 0 && (

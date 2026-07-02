@@ -42,23 +42,23 @@ export function ClassifiedSplash({ ad }: { ad: Classified | null }) {
   const href = ad.link || (wa ? `https://wa.me/${wa}` : ad.phone ? `tel:${ad.phone}` : null);
 
   const progress = remaining / DURATION; // 1 → 0
-  const R = 26;
+  const R = 20;
   const C = 2 * Math.PI * R;
   const seconds = Math.ceil(remaining / 1000);
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-5 bg-black/85 p-6 backdrop-blur-sm">
-      {/* elegant circular countdown */}
-      <div className="relative h-16 w-16">
-        <svg className="h-16 w-16 -rotate-90" viewBox="0 0 64 64">
-          <circle cx="32" cy="32" r={R} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
+      {/* elegant circular countdown — above the ad, does not cover it */}
+      <div className="relative h-14 w-14">
+        <svg className="h-14 w-14 -rotate-90" viewBox="0 0 48 48">
+          <circle cx="24" cy="24" r={R} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3.5" />
           <circle
-            cx="32" cy="32" r={R} fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round"
+            cx="24" cy="24" r={R} fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round"
             strokeDasharray={C} strokeDashoffset={C * (1 - progress)}
             style={{ transition: 'stroke-dashoffset 60ms linear' }}
           />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-white">{paused ? '⏸' : seconds}</span>
+        <span className="absolute inset-0 flex items-center justify-center text-base font-bold text-white">{paused ? '⏸' : seconds}</span>
       </div>
 
       <a

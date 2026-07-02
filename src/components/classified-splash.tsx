@@ -13,8 +13,7 @@ export function ClassifiedSplash({ ad }: { ad: Classified | null }) {
 
   useEffect(() => {
     if (!ad) return;
-    if (sessionStorage.getItem('trbhh_splash') === '1') return;
-    sessionStorage.setItem('trbhh_splash', '1');
+    // shows on every page load/refresh (per the requested behavior)
     setShow(true);
     let last = performance.now();
     const iv = setInterval(() => {

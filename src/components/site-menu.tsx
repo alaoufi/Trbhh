@@ -4,8 +4,9 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone,
 } from 'lucide-react';
+import { SITE } from '@/lib/constants';
 
 type Cat = { id: number; name: string };
 
@@ -88,6 +89,9 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
           <Item href="/pages/faq" icon={HelpCircle} onClick={close}>الأسئلة الشائعة</Item>
           <Item href="/pages/privacy" icon={Shield} onClick={close}>سياسة الخصوصية</Item>
           <Item href="/pages/terms" icon={FileText} onClick={close}>الشروط والأحكام</Item>
+          <a href={`tel:${SITE.phone}`} onClick={close} className="flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium text-foreground hover:bg-accent">
+            <Phone className="h-5 w-5 shrink-0 text-primary" /> <span>تواصل معنا</span>
+          </a>
           {isAdmin && <Item href="/admin" icon={Shield} onClick={close}>لوحة الإدارة</Item>}
 
           <button onClick={share} className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium text-primary hover:bg-accent">

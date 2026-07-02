@@ -1,11 +1,13 @@
 import Link from 'next/link';
-import { LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Home } from 'lucide-react';
+import { LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Home, Copy, Sparkles } from 'lucide-react';
 import { requireAdmin } from '@/lib/admin';
 
 const nav = [
   { href: '/admin', label: 'لوحة الإدارة', icon: LayoutDashboard },
   { href: '/admin/users', label: 'المستخدمون', icon: Users },
   { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone },
+  { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy },
+  { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles },
   { href: '/admin/categories', label: 'الأقسام', icon: LayoutGrid },
   { href: '/admin/reports', label: 'البلاغات', icon: Flag },
   { href: '/admin/verifications', label: 'طلبات التوثيق', icon: ShieldCheck },

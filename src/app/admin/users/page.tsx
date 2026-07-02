@@ -16,7 +16,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
   });
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">المستخدمون</h1>
+      <h1 className="text-xl font-bold text-primary">المستخدمون</h1>
       <form className="flex gap-2"><input name="q" defaultValue={q} placeholder="بحث بالاسم أو الجوال" className="h-10 flex-1 rounded-lg border bg-background px-3 text-sm" /><button className="rounded-lg bg-primary px-4 text-sm text-primary-foreground">بحث</button></form>
       <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
         <table className="w-full text-sm">

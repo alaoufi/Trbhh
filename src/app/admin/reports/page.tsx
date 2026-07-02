@@ -17,7 +17,7 @@ export default async function AdminReports() {
   const adById = new Map(ads.map((a) => [toInt(a.id), a.title]));
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">بلاغات الإعلانات ({reports.length})</h1>
+      <h1 className="text-xl font-bold text-primary">بلاغات الإعلانات ({reports.length})</h1>
       {reports.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد بلاغات.</p>}
       <div className="space-y-2">
         {reports.map((r) => (

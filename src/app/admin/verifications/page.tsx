@@ -10,7 +10,7 @@ export default async function AdminVerifications() {
   const users = await prisma.users.findMany({ where: { step: { gt: 0 }, trusted: 0 }, orderBy: { id: 'desc' }, take: 100 });
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold">طلبات التوثيق ({users.length})</h1></div>
+      <div className="flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold text-primary">طلبات التوثيق ({users.length})</h1></div>
       {users.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد طلبات توثيق معلّقة.</p>}
       <div className="space-y-2">
         {users.map((u) => (

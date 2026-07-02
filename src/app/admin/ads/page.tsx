@@ -18,7 +18,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold">الإعلانات</h1>
+        <h1 className="text-xl font-bold text-primary">الإعلانات</h1>
         <div className="flex gap-2 text-sm">
           <Link href="/admin/ads" className={`rounded-lg border px-3 py-1.5 ${!onlyPending ? 'bg-primary text-white' : 'text-primary'}`}>الكل</Link>
           <Link href="/admin/ads?pending=1" className={`rounded-lg border px-3 py-1.5 ${onlyPending ? 'bg-primary text-white' : 'text-primary'}`}>

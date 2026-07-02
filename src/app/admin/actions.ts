@@ -4,7 +4,44 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/admin';
 import { findDuplicateAds } from '@/lib/duplicates';
+import { deleteClassified } from '@/lib/classified';
 import { toInt } from '@/lib/utils';
+
+export async function adminDeleteClassifiedAction(formData: FormData) {
+  await requireAdmin();
+  const id = Number(formData.get('id'));
+  if (id) await deleteClassified(id);
+  revalidatePath('/admin/classified');
+  revalidatePath('/classified');
+}
+
+/** Delete an ad from its detail page (admin), then go home. */
+export async function adminDeleteAdRedirectAction(formData: FormData) {
+  await requireAdmin();
+  const id = BigInt(String(formData.get('adId')));
+  await prisma.photos.deleteMany({ where: { other_id: id } }).catch(() => {});
+  await prisma.ads.delete({ where: { id } }).catch(() => {});
+  redirect('/');
+}
+
+/** Archive (hide) an ad from its detail page (admin). */
+export async function adminArchiveAdAction(formData: FormData) {
+  await requireAdmin();
+  const id = BigInt(String(formData.get('adId')));
+  const a = await prisma.ads.findUnique({ where: { id } });
+  if (a) await prisma.ads.update({ where: { id }, data: { status: a.status === 1 ? 0 : 1 } }).catch(() => {});
+  revalidatePath(`/ads/${toInt(id)}`);
+}
+
+/** Ban/unban the seller from the ad detail page (admin). */
+export async function adminBanSellerAction(formData: FormData) {
+  await requireAdmin();
+  const uid = BigInt(String(formData.get('userId')));
+  const u = await prisma.users.findUnique({ where: { id: uid } });
+  if (u) await prisma.users.update({ where: { id: uid }, data: { ban: u.ban === 'checked' ? 'no' : 'checked' } });
+  const adId = String(formData.get('adId') || '');
+  if (adId) revalidatePath(`/ads/${adId}`);
+}
 
 export async function adminDeleteDuplicatesAction() {
   await requireAdmin();

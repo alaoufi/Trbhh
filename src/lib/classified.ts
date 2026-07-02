@@ -58,6 +58,26 @@ export async function getClassifieds(limit = 30): Promise<Classified[]> {
   return rows.map(toClassified);
 }
 
+/** All classifieds for admin moderation. */
+export async function getAllClassifieds(limit = 120): Promise<Classified[]> {
+  await ensureClassifiedTable();
+  const rows = await prisma.$queryRawUnsafe<Row[]>(
+    `SELECT * FROM classified_ads ORDER BY id DESC LIMIT ${Math.max(1, Math.min(200, limit))}`,
+  );
+  return rows.map(toClassified);
+}
+
+export async function countClassifieds(): Promise<number> {
+  await ensureClassifiedTable();
+  const rows = await prisma.$queryRawUnsafe<{ c: bigint | number }[]>(`SELECT COUNT(*) AS c FROM classified_ads WHERE status = 1`);
+  return Number(rows[0]?.c || 0);
+}
+
+export async function deleteClassified(id: number) {
+  await ensureClassifiedTable();
+  await prisma.$executeRawUnsafe(`DELETE FROM classified_ads WHERE id = ?`, id);
+}
+
 /** One random classified ad for the entry splash. */
 export async function getRandomClassified(): Promise<Classified | null> {
   await ensureClassifiedTable();

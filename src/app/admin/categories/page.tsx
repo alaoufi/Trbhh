@@ -11,7 +11,7 @@ export default async function AdminCategories() {
   const cats = await prisma.categories.findMany({ orderBy: { ordered: 'desc' } });
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">الأقسام</h1>
+      <h1 className="text-xl font-bold text-primary">الأقسام</h1>
       <form action={addCategoryAction} className="flex gap-2">
         <input name="name" required placeholder="اسم قسم جديد" className="h-10 flex-1 rounded-lg border bg-background px-3 text-sm" />
         <Button size="sm">إضافة</Button>

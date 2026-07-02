@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy } from 'lucide-react';
+import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles } from 'lucide-react';
 import { adminStats } from '@/lib/admin';
 
 export const dynamic = 'force-dynamic';
@@ -15,6 +15,7 @@ export default async function AdminHome() {
     { label: 'طلبات توثيق معلّقة', value: s.pendingVerify, icon: ShieldCheck, href: '/admin/verifications' },
     { label: 'البلاغات', value: s.reports, icon: Flag, href: '/admin/reports' },
     { label: 'الإعلانات المكررة', value: s.duplicateAds, icon: Copy, href: '/admin/duplicates', highlight: true },
+    { label: 'الإعلانات المبوّبة', value: s.classified, icon: Sparkles, href: '/admin/classified' },
     { label: 'النقاشات', value: s.debates, icon: MessagesSquare, href: '/admin' },
   ];
   return (
@@ -25,7 +26,7 @@ export default async function AdminHome() {
           <Link
             key={c.label}
             href={c.href}
-            className={`flex items-center gap-3 rounded-xl border p-4 shadow-sm ${c.highlight && c.value > 0 ? 'border-amber-300 bg-amber-50' : 'bg-card'}`}
+            className={`flex items-center gap-3 card-3d rounded-xl p-4 ${c.highlight && c.value > 0 ? '!border-amber-400 bg-amber-50' : ''}`}
           >
             <span className="grid h-11 w-11 place-items-center rounded-lg bg-primary/10 text-primary"><c.icon className="h-5 w-5" /></span>
             <div><div className="text-xl font-bold text-primary">{new Intl.NumberFormat('ar-SA').format(c.value)}</div><div className="text-xs text-muted-foreground">{c.label}</div></div>

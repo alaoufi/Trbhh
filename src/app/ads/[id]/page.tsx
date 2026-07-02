@@ -5,8 +5,11 @@ import { notFound } from 'next/navigation';
 import {
   MapPin, Eye, Phone, MessageCircle, Timer, Tag, Flag, Send,
   User, BadgeCheck, Hash, ArrowLeftRight, Star, Share2, Heart, Navigation,
+  ShieldAlert, Trash2, Archive, Ban,
 } from 'lucide-react';
 import { getAd, getSimilarAds, recordView } from '@/lib/data';
+import { isAdmin } from '@/lib/admin';
+import { adminArchiveAdAction, adminBanSellerAction, adminDeleteAdRedirectAction } from '@/app/admin/actions';
 import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
@@ -49,6 +52,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   if (!ad) notFound();
 
   const session = await getSession();
+  const admin = session ? await isAdmin(session.uid) : false;
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
   if (viewerKey && (!session || session.uid !== ad.seller?.id)) {
@@ -202,6 +206,38 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
             ))}
             {comments.length === 0 && <p className="text-sm text-muted-foreground">لا توجد تعليقات بعد.</p>}
           </ul>
+        </div>
+      )}
+
+      {/* Admin moderation controls (only visible to admins) */}
+      {admin && (
+        <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-4">
+          <div className="mb-3 flex items-center gap-2 text-amber-800">
+            <ShieldAlert className="h-5 w-5" /> <span className="font-bold">أدوات الإدارة</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <form action={adminArchiveAdAction}>
+              <input type="hidden" name="adId" value={ad.id} />
+              <button className="flex w-full items-center justify-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
+                <Archive className="h-4 w-4" /> أرشفة / إظهار
+              </button>
+            </form>
+            {ad.seller && (
+              <form action={adminBanSellerAction}>
+                <input type="hidden" name="userId" value={ad.seller.id} />
+                <input type="hidden" name="adId" value={ad.id} />
+                <button className="flex w-full items-center justify-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
+                  <Ban className="h-4 w-4" /> حظر العضو
+                </button>
+              </form>
+            )}
+            <form action={adminDeleteAdRedirectAction}>
+              <input type="hidden" name="adId" value={ad.id} />
+              <button className="flex w-full items-center justify-center gap-1 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90">
+                <Trash2 className="h-4 w-4" /> حذف الإعلان
+              </button>
+            </form>
+          </div>
         </div>
       )}
 

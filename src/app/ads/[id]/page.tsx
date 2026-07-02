@@ -24,6 +24,8 @@ import { getSellerRating } from '@/lib/reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
 import { PromoSlot } from '@/components/promo-slot';
+import { getAdAudio } from '@/lib/ad-media';
+import { mediaUrl } from '@/lib/media';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +55,25 @@ function InfoItem({ icon: Icon, children }: { icon: React.ElementType; children:
     <div className="flex items-center gap-2 text-primary">
       <Icon className="h-5 w-5 shrink-0" />
       <span className="line-clamp-1 text-sm font-medium">{children}</span>
+    </div>
+  );
+}
+
+function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath: string | null }) {
+  if (!videoPath && !audioPath) return null;
+  return (
+    <div className="space-y-3">
+      {videoPath && (
+        <div className="card-3d overflow-hidden rounded-2xl p-2">
+          <video src={mediaUrl(videoPath)} controls playsInline className="w-full rounded-xl bg-black" />
+        </div>
+      )}
+      {audioPath && (
+        <div className="card-3d flex items-center gap-3 rounded-2xl p-3">
+          <span className="text-sm font-bold text-primary">🎙️ تسجيل صوتي</span>
+          <audio src={mediaUrl(audioPath)} controls className="h-9 flex-1" />
+        </div>
+      )}
     </div>
   );
 }
@@ -158,6 +179,9 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         <div className="mb-3 text-2xl font-bold text-primary">{formatPrice(ad.price)}</div>
         <p className="whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
       </div>
+
+      {/* Video / audio when present */}
+      <AdMedia videoPath={ad.videoPath} audioPath={await getAdAudio(ad.id).catch(() => null)} />
 
       {/* Paid banner — inside ad details */}
       <PromoSlot placement="ad_detail" />

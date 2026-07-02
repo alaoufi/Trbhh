@@ -8,8 +8,25 @@ import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
-import { getMemberWindows, withinWindow } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
+import { setAdMedia } from '@/lib/ad-media';
 import { toInt } from '@/lib/utils';
+
+/** Save a raw media file (video/audio) from the form; returns the stored path or null. */
+async function saveMediaFile(formData: FormData, key: string, maxBytes: number, exts: string[]): Promise<string | null> {
+  try {
+    const file = formData.get(key);
+    if (!(file instanceof File) || file.size === 0 || file.size > maxBytes) return null;
+    const buf = Buffer.from(await file.arrayBuffer());
+    if (!buf.length) return null;
+    let ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (!exts.includes(ext)) ext = exts[0];
+    const hash = createHash('sha256').update(new Uint8Array(buf)).digest('hex');
+    return await saveUpload(buf, `${key}_${hash}.${ext}`);
+  } catch {
+    return null;
+  }
+}
 
 type PreparedImage = { buf: Buffer; name: string; ext: string; hash: string };
 
@@ -144,6 +161,8 @@ export async function createAdAction(formData: FormData) {
   const lat = String(formData.get('lat') || '').trim();
   const lng = String(formData.get('lng') || '').trim();
   if (!title || !detail || !category_id) return;
+  // تعهّد صحة الإعلان وتحمّل المسؤولية إجباري
+  if (!formData.get('pledge')) redirect('/ads/new?error=pledge');
   // جوال أو واتساب إجباري حتى يستطيع العملاء التواصل مع صاحب الإعلان
   if (!phone && !whatsapp) redirect('/ads/new?error=contact');
   // منع حشو الكلمات (تكرار العبارات لخداع محرك البحث)
@@ -186,6 +205,10 @@ export async function createAdAction(formData: FormData) {
     redirect(`/ads/new?error=duplicate&left=${Math.max(0, DUP_LIMIT - n)}`);
   }
 
+  // النشر الفوري ما لم تُفعّل الإدارة «مراجعة الإعلانات قبل النشر»
+  const requireApproval = await getSettingBool(SETTING_ADS_APPROVAL, false).catch(() => false);
+  const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
+
   const ad = await prisma.ads.create({
     data: {
       title, detail, price, adsType,
@@ -194,21 +217,25 @@ export async function createAdAction(formData: FormData) {
       city_id: BigInt(cityId || '0'),
       country_id: countryRaw ? Number(countryRaw) : (user?.country_id ?? null),
       user_id: BigInt(session.uid),
-      video_path: '',
+      video_path: video || '',
       lat: lat || null,
       lng: lng || null,
       phoneAllow: formData.get('phoneAllow') ? 1 : 0,
       commentAllow: formData.get('commentAllow') ? 1 : 0,
       adsSpecial: 'no',
       state: 'active',
-      status: 1,
+      status: requireApproval ? 0 : 1,
       created_at: new Date(),
     },
   });
 
   await storeImages(images, session.uid, ad.id);
+  const audio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);
+  if (audio) await setAdMedia(ad.id, 'audio', audio).catch(() => {});
   await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
   await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز: تثبيت بالأعلى
+  // ينشر مباشرة، إلا إذا كان مقيّداً بالموافقة
+  if (requireApproval) redirect('/account/ads?pending=1');
   redirect(`/ads/${toInt(ad.id)}`);
 }
 
@@ -255,6 +282,10 @@ export async function updateAdAction(formData: FormData) {
 
   const images = await readImages(formData);
   if (images.length) await storeImages(images, session.uid, adId);
+  const newVideo = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
+  if (newVideo) await prisma.ads.update({ where: { id: adId }, data: { video_path: newVideo } }).catch(() => {});
+  const newAudio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);
+  if (newAudio) await setAdMedia(adId, 'audio', newAudio).catch(() => {});
 
   revalidatePath(`/ads/${toInt(adId)}`);
   redirect(`/ads/${toInt(adId)}`);

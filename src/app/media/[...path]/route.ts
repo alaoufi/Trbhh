@@ -6,6 +6,8 @@ const LEGACY = (process.env.LEGACY_MEDIA_BASE || 'https://trbhh.com').replace(/\
 const TYPES: Record<string, string> = {
   webp: 'image/webp', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
   gif: 'image/gif', svg: 'image/svg+xml', mp4: 'video/mp4', avif: 'image/avif',
+  mov: 'video/quicktime', m4v: 'video/mp4', webm: 'video/webm',
+  ogg: 'audio/ogg', mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav',
 };
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {

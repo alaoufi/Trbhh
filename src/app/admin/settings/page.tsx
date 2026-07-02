@@ -1,6 +1,6 @@
 import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, SETTING_SHOW_STATS } from '@/lib/settings';
+import { getMemberWindows, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, SETTING_SHOW_STATS, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -9,7 +9,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, showStats, statsAudience, classifiedDays] = await Promise.all([searchParams, getMemberWindows(), getSettingBool(SETTING_SHOW_STATS, true), getClassifiedStatsAudience(), getClassifiedLifetimeDays()]);
+  const [{ saved }, w, showStats, statsAudience, classifiedDays, adsApproval] = await Promise.all([searchParams, getMemberWindows(), getSettingBool(SETTING_SHOW_STATS, true), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getSettingBool(SETTING_ADS_APPROVAL, false)]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -37,6 +37,15 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <input type="checkbox" name="showStats" defaultChecked={showStats} className="h-4 w-4 accent-primary" />
             إظهار الإحصائيات في الصفحة الرئيسية (عدد الإعلانات، الأعضاء، المشاهدات، الأقسام)
           </label>
+        </div>
+
+        <div className="border-t border-primary/15 pt-3">
+          <div className="mb-2 text-sm font-bold text-primary">نشر الإعلانات</div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="adsApproval" defaultChecked={adsApproval} className="h-4 w-4 accent-primary" />
+            مراجعة الإعلانات قبل النشر (إذا فُعّلت، لا يُنشر الإعلان إلا بموافقة الإدارة)
+          </label>
+          <p className="mt-1 text-xs text-muted-foreground">افتراضياً يُنشر الإعلان مباشرة ما لم يكن مكرّراً.</p>
         </div>
 
         <div className="border-t border-primary/15 pt-3">

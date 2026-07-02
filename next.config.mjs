@@ -21,9 +21,9 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['lucide-react'],
-    // Server Actions cap the request body at 1MB by default — too small for photo
-    // uploads (ads, classified, promo banners). Raise it so image publishes work.
-    serverActions: { bodySizeLimit: '15mb' },
+    // Server Actions cap the request body at 1MB by default — too small for photo/
+    // video/audio uploads (ads, classified, promo banners). Raise it accordingly.
+    serverActions: { bodySizeLimit: '30mb' },
   },
 };
 export default nextConfig;

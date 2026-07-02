@@ -1,9 +1,29 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { Tag, MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SubmitOverlay } from '@/components/submit-overlay';
 import { compressInputFiles } from '@/lib/image-compress';
+import { CityCombobox } from '@/components/city-combobox';
+import { AudioRecorder } from '@/components/audio-recorder';
+
+const MAX_VIDEO = 25 * 1024 * 1024; // 25MB
+
+function Section({ icon: Icon, title, hint, children }: { icon: React.ElementType; title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="overflow-hidden rounded-xl border-2 border-primary/20 bg-white shadow-sm">
+      <div className="flex items-center gap-2 border-b-2 border-primary/20 bg-primary/10 px-4 py-2.5">
+        <Icon className="h-5 w-5 text-primary" />
+        <h3 className="text-sm font-extrabold text-primary">{title}</h3>
+      </div>
+      <div className="space-y-3 p-4">
+        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        {children}
+      </div>
+    </section>
+  );
+}
 
 type Cat = { id: number; name: string };
 type Sub = { id: number; name: string; categoryId: number };
@@ -65,16 +85,31 @@ export function AdForm({
     setImgBusy(false);
   }
 
-  const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';
+  const [vidName, setVidName] = useState('');
+  const [vidErr, setVidErr] = useState('');
+  function onVideo(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) { setVidName(''); setVidErr(''); return; }
+    if (f.size > MAX_VIDEO) { e.target.value = ''; setVidName(''); setVidErr('حجم الفيديو كبير (الحد 25 ميجابايت). اختر مقطعاً أقصر.'); return; }
+    setVidErr(''); setVidName(f.name);
+  }
+
+  const field = 'h-11 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40';
+  const lbl = 'mb-1 block text-sm font-bold text-foreground';
 
   return (
-    <form action={action} className="max-w-2xl space-y-4 card-3d rounded-xl p-5">
+    <form action={action} className="max-w-2xl space-y-4">
       <SubmitOverlay label="جارٍ رفع الإعلان…" />
       {initial?.id && <input type="hidden" name="adId" value={initial.id} />}
 
       {error === 'contact' && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           يجب إدخال رقم الجوال أو الواتساب قبل نشر الإعلان.
+        </div>
+      )}
+      {error === 'pledge' && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+          يجب الموافقة على التعهّد بصحة الإعلان وتحمّل المسؤولية قبل النشر.
         </div>
       )}
       {error === 'repeat' && (
@@ -113,100 +148,107 @@ export function AdForm({
 
       <div className="flex gap-2">
         {[{ v: 'offer', l: 'عرض' }, { v: 'request', l: 'طلب' }].map((t) => (
-          <label key={t.v} className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border p-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-accent">
+          <label key={t.v} className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-primary/25 bg-white p-2.5 text-sm font-bold has-[:checked]:border-primary has-[:checked]:bg-primary has-[:checked]:text-white">
             <input type="radio" name="adsType" value={t.v} defaultChecked={(initial?.adsType ?? 'offer') === t.v} className="accent-[hsl(var(--primary))]" /> {t.l}
           </label>
         ))}
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">عنوان الإعلان</label>
-        <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder="مثال: رافعة سيزرلفت للإيجار بالدمام" />
-      </div>
+      <Section icon={Tag} title="بيانات الإعلان">
+        <div>
+          <label className={lbl}>عنوان الإعلان</label>
+          <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder="مثال: رافعة سيزرلفت للإيجار بالدمام" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className={lbl}>القسم</label>
+            <select name="category_id" value={category} onChange={(e) => setCategory(Number(e.target.value))} className={field}>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={lbl}>التصنيف الفرعي</label>
+            <select name="subcategory_id" defaultValue={initial?.subcategoryId ?? ''} className={field}>
+              <option value="">— بدون —</option>
+              {subs.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className={lbl}>السعر <span className="font-normal text-muted-foreground">(اتركه 0 لـ «على السوم»)</span></label>
+          <input name="price" type="number" min="0" step="any" defaultValue={initial?.price ?? 0} className={field} />
+        </div>
+        <div>
+          <label className={lbl}>التفاصيل</label>
+          <textarea name="detail" required defaultValue={initial?.detail} rows={6} className="w-full rounded-lg border-2 border-primary/25 bg-white p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40" placeholder="اكتب وصفاً واضحاً للخدمة أو المنتج..." />
+        </div>
+      </Section>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <Section icon={MapPin} title="المدينة والموقع">
         <div>
-          <label className="mb-1 block text-sm font-medium">القسم</label>
-          <select name="category_id" value={category} onChange={(e) => setCategory(Number(e.target.value))} className={field}>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">التصنيف الفرعي</label>
-          <select name="subcategory_id" defaultValue={initial?.subcategoryId ?? ''} className={field}>
-            <option value="">— بدون —</option>
-            {subs.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">الدولة</label>
+          <label className={lbl}>الدولة</label>
           <select name="country_id" value={country} onChange={(e) => setCountry(Number(e.target.value))} className={field}>
             {countries.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">المدينة</label>
-          <select name="city_id" defaultValue={initial?.cityId ?? ''} className={field}>
-            <option value="">— اختر —</option>
-            {filteredCities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <label className={lbl}>المدينة / المنطقة</label>
+          <CityCombobox name="city_id" cities={filteredCities} defaultId={initial?.cityId} />
         </div>
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">السعر (اتركه 0 لـ «على السوم»)</label>
-        <input name="price" type="number" min="0" step="any" defaultValue={initial?.price ?? 0} className={field} />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">التفاصيل</label>
-        <textarea name="detail" required defaultValue={initial?.detail} rows={6} className="w-full rounded-lg border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="اكتب وصفاً واضحاً للخدمة أو المنتج..." />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">الصور {initial?.id ? '(إضافة المزيد)' : '(حتى 10 صور)'}</label>
-        <input name="images" type="file" accept="image/*" multiple onChange={onImages} className="w-full rounded-lg border bg-background p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1" />
-        {imgBusy && <p className="mt-1 text-xs text-primary">⏳ جارٍ تجهيز الصور وتصغيرها للرفع السريع…</p>}
-        {!imgBusy && imgReady > 0 && <p className="mt-1 text-xs text-green-600">✓ {imgReady} صورة جاهزة</p>}
-      </div>
-
-      <div className="rounded-lg border border-primary/20 bg-accent/40 p-3">
-        <p className="mb-2 text-sm font-semibold text-primary">موقع الإعلان <span className="text-muted-foreground">(اختياري)</span></p>
-        <p className="mb-3 text-xs text-muted-foreground">حدّد موقع الإعلان لعرض المسافة للباحثين القريبين منك.</p>
-        <input type="hidden" name="lat" value={geo?.lat ?? ''} />
-        <input type="hidden" name="lng" value={geo?.lng ?? ''} />
-        <div className="flex flex-wrap items-center gap-3">
-          <button type="button" onClick={useMyLocation} disabled={geoBusy} className="flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-2 text-sm text-primary disabled:opacity-60">
-            {geoBusy ? 'جارٍ تحديد الموقع...' : 'استخدم موقعي الحالي'}
-          </button>
-          {geo && <span className="text-xs text-green-700">✓ تم تحديد الموقع</span>}
-          {geo && <button type="button" onClick={() => setGeo(null)} className="text-xs text-red-600 hover:underline">إزالة</button>}
+        <div className="rounded-lg border-2 border-dashed border-primary/25 bg-accent/30 p-3">
+          <p className="mb-2 text-sm font-bold text-primary">تحديد الموقع بدقّة <span className="font-normal text-muted-foreground">(اختياري)</span></p>
+          <input type="hidden" name="lat" value={geo?.lat ?? ''} />
+          <input type="hidden" name="lng" value={geo?.lng ?? ''} />
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={useMyLocation} disabled={geoBusy} className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white disabled:opacity-60">
+              <MapPin className="h-4 w-4" /> {geoBusy ? 'جارٍ تحديد الموقع…' : 'استخدم موقعي الحالي'}
+            </button>
+            {geo && <span className="text-xs font-medium text-green-700">✓ تم تحديد الموقع ({geo.lat}, {geo.lng})</span>}
+            {geo && <button type="button" onClick={() => setGeo(null)} className="text-xs text-red-600 hover:underline">إزالة</button>}
+          </div>
         </div>
-      </div>
+      </Section>
 
-      <div className="rounded-lg border border-primary/20 bg-accent/40 p-3">
-        <p className="mb-2 text-sm font-semibold text-primary">وسيلة التواصل <span className="text-red-600">*</span></p>
-        <p className="mb-3 text-xs text-muted-foreground">يجب إدخال رقم الجوال أو الواتساب على الأقل حتى يتمكن العملاء من التواصل معك.</p>
-        <div className="grid gap-4 sm:grid-cols-2">
+      <Section icon={ImageIcon} title="الصور" hint={initial?.id ? 'أضِف المزيد من الصور (تُضغط تلقائياً للرفع السريع).' : 'حتى 10 صور — تُضغط تلقائياً للرفع السريع.'}>
+        <input name="images" type="file" accept="image/*" multiple onChange={onImages} className="w-full rounded-lg border-2 border-primary/25 bg-white p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-primary file:px-3 file:py-1 file:font-bold file:text-white" />
+        {imgBusy && <p className="text-xs font-bold text-primary">⏳ جارٍ تجهيز الصور…</p>}
+        {!imgBusy && imgReady > 0 && <p className="text-xs font-bold text-green-600">✓ {imgReady} صورة جاهزة</p>}
+      </Section>
+
+      <Section icon={Video} title="فيديو" hint="مقطع قصير للإعلان (اختياري، الحد 25 ميجابايت).">
+        <input name="video" type="file" accept="video/*" onChange={onVideo} className="w-full rounded-lg border-2 border-primary/25 bg-white p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-primary file:px-3 file:py-1 file:font-bold file:text-white" />
+        {vidName && <p className="text-xs font-bold text-green-600">✓ {vidName}</p>}
+        {vidErr && <p className="text-xs font-bold text-red-600">{vidErr}</p>}
+      </Section>
+
+      <Section icon={Mic} title="تسجيل صوتي" hint="سجّل رسالة صوتية تعرّف بإعلانك (اختياري، حتى دقيقتين).">
+        <AudioRecorder name="audio" />
+      </Section>
+
+      <Section icon={Phone} title="وسيلة التواصل">
+        <p className="text-xs text-muted-foreground">يجب إدخال رقم الجوال أو الواتساب على الأقل. <span className="font-bold text-red-600">*</span></p>
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium">رقم الجوال</label>
+            <label className={lbl}>رقم الجوال</label>
             <input name="phone" type="tel" inputMode="tel" defaultValue={initial?.phone ?? ''} maxLength={20} className={field} placeholder="05xxxxxxxx" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">رقم الواتساب</label>
+            <label className={lbl}>رقم الواتساب</label>
             <input name="whatsapp" type="tel" inputMode="tel" defaultValue={initial?.whatsapp ?? ''} maxLength={20} className={field} placeholder="9665xxxxxxxx" />
           </div>
         </div>
-      </div>
+        <div className="flex flex-wrap gap-4 pt-1">
+          <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="phoneAllow" defaultChecked={initial?.phoneAllow ?? true} className="accent-primary" /> إظهار رقم الجوال</label>
+          <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="commentAllow" defaultChecked={initial?.commentAllow ?? true} className="accent-primary" /> السماح بالتعليقات</label>
+        </div>
+      </Section>
 
-      <div className="flex flex-wrap gap-4">
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="phoneAllow" defaultChecked={initial?.phoneAllow ?? true} /> إظهار رقم الجوال</label>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="commentAllow" defaultChecked={initial?.commentAllow ?? true} /> السماح بالتعليقات</label>
-      </div>
-
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-        بنشر الإعلان أنت تقرّ أن التعامل والدفع يتمّان خارج المنصة، وأن المنصة وسيلة عرض وربط فقط.
-      </div>
+      <Section icon={ShieldCheck} title="التعهّد">
+        <label className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-900">
+          <input type="checkbox" name="pledge" required className="mt-0.5 h-4 w-4 accent-primary" />
+          <span>أتعهّد بأن جميع بيانات هذا الإعلان صحيحة، وأتحمّل كامل المسؤولية عنه. وأقرّ أن التعامل والدفع يتمّان خارج المنصة، وأن المنصة وسيلة عرض وربط فقط.</span>
+        </label>
+      </Section>
 
       <Submit label={submitLabel} />
     </form>

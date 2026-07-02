@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Copy, Trash2, Check } from 'lucide-react';
-import { requireAdmin } from '@/lib/admin';
+import { requirePerm } from '@/lib/roles';
 import { findDuplicateAds } from '@/lib/duplicates';
 import { timeAgo } from '@/lib/utils';
 import { adminDeleteDuplicatesAction } from '../actions';
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الإعلانات المكررة' };
 
 export default async function AdminDuplicates({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
-  await requireAdmin();
+  await requirePerm('duplicates');
   const sp = await searchParams;
   const { groups, dupCount } = await findDuplicateAds();
 

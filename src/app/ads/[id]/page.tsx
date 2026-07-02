@@ -8,7 +8,7 @@ import {
   ShieldAlert, Trash2, Archive, Ban,
 } from 'lucide-react';
 import { getAd, getSimilarAds, recordView } from '@/lib/data';
-import { isAdmin } from '@/lib/admin';
+import { hasPerm } from '@/lib/roles';
 import { adminArchiveAdAction, adminBanSellerAction, adminDeleteAdRedirectAction } from '@/app/admin/actions';
 import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
@@ -62,7 +62,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   if (!ad) notFound();
 
   const session = await getSession();
-  const admin = session ? await isAdmin(session.uid) : false;
+  const admin = session ? await hasPerm(session.uid, 'ads') : false;
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
   if (viewerKey && (!session || session.uid !== ad.seller?.id)) {

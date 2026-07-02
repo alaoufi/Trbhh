@@ -2,12 +2,14 @@ import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { requirePerm } from '@/lib/roles';
 import { addCategoryAction, toggleCategoryAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الأقسام' };
 
 export default async function AdminCategories() {
+  await requirePerm('categories');
   const cats = await prisma.categories.findMany({ orderBy: { ordered: 'desc' } });
   return (
     <div className="space-y-4">

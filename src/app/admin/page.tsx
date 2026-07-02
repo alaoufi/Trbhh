@@ -1,26 +1,39 @@
 import Link from 'next/link';
 import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles } from 'lucide-react';
 import { adminStats } from '@/lib/admin';
+import { requireAnyAdmin, getUserPerms, getUserRole, ROLE_LABELS, type Perm } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'لوحة الإدارة' };
 
 export default async function AdminHome() {
-  const s = await adminStats();
-  const cards = [
-    { label: 'إعلانات بانتظار الموافقة', value: s.pendingAds, icon: Clock, href: '/admin/ads?pending=1', highlight: true },
-    { label: 'المستخدمون', value: s.users, icon: Users, href: '/admin/users' },
-    { label: 'إجمالي الإعلانات', value: s.ads, icon: Megaphone, href: '/admin/ads' },
-    { label: 'إعلانات نشطة', value: s.activeAds, icon: Megaphone, href: '/admin/ads' },
-    { label: 'طلبات توثيق معلّقة', value: s.pendingVerify, icon: ShieldCheck, href: '/admin/verifications' },
-    { label: 'البلاغات', value: s.reports, icon: Flag, href: '/admin/reports' },
-    { label: 'الإعلانات المكررة', value: s.duplicateAds, icon: Copy, href: '/admin/duplicates', highlight: true },
-    { label: 'الإعلانات المبوّبة', value: s.classified, icon: Sparkles, href: '/admin/classified' },
-    { label: 'النقاشات', value: s.debates, icon: MessagesSquare, href: '/debates' },
+  const session = await requireAnyAdmin();
+  const [s, perms, role] = await Promise.all([adminStats(), getUserPerms(session.uid), getUserRole(session.uid)]);
+  const allCards: { label: string; value: number; icon: React.ElementType; href: string; highlight?: boolean; perm: Perm | null }[] = [
+    { label: 'إعلانات بانتظار الموافقة', value: s.pendingAds, icon: Clock, href: '/admin/ads?pending=1', highlight: true, perm: 'ads' },
+    { label: 'المستخدمون', value: s.users, icon: Users, href: '/admin/users', perm: 'users' },
+    { label: 'إجمالي الإعلانات', value: s.ads, icon: Megaphone, href: '/admin/ads', perm: 'ads' },
+    { label: 'إعلانات نشطة', value: s.activeAds, icon: Megaphone, href: '/admin/ads', perm: 'ads' },
+    { label: 'طلبات توثيق معلّقة', value: s.pendingVerify, icon: ShieldCheck, href: '/admin/verifications', perm: 'verifications' },
+    { label: 'البلاغات', value: s.reports, icon: Flag, href: '/admin/reports', perm: 'reports' },
+    { label: 'الإعلانات المكررة', value: s.duplicateAds, icon: Copy, href: '/admin/duplicates', highlight: true, perm: 'duplicates' },
+    { label: 'الإعلانات المبوّبة', value: s.classified, icon: Sparkles, href: '/admin/classified', perm: 'classified' },
+    { label: 'النقاشات', value: s.debates, icon: MessagesSquare, href: '/debates', perm: null },
   ];
+  const cards = allCards.filter((c) => c.perm === null || perms.has(c.perm));
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold text-primary">لوحة الإدارة</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-bold text-primary">لوحة الإدارة</h1>
+        {role && (
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+            صلاحيتك: {ROLE_LABELS[role]}
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-muted-foreground">
+        الأقسام المتاحة لك حسب صلاحياتك: {[...perms].length} قسم.
+      </p>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {cards.map((c) => (
           <Link

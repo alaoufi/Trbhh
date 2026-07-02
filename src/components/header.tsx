@@ -2,13 +2,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { getSession } from '@/lib/auth';
-import { isAdmin } from '@/lib/admin';
+import { hasAnyAdmin } from '@/lib/roles';
 import { getCategories } from '@/lib/data';
 import { SiteMenu } from '@/components/site-menu';
 
 export async function Header() {
   const session = await getSession();
-  const admin = session ? await isAdmin(session.uid) : false;
+  const admin = session ? await hasAnyAdmin(session.uid) : false;
   const categories = await getCategories();
   return (
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">

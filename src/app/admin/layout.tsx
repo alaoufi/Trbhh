@@ -1,27 +1,32 @@
 import Link from 'next/link';
 import { LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Home, Copy, Sparkles, Ban } from 'lucide-react';
-import { requireAdmin } from '@/lib/admin';
+import { requireAnyAdmin, getUserPerms, getUserRole, ROLE_LABELS, type Perm } from '@/lib/roles';
 
-const nav = [
-  { href: '/admin', label: 'لوحة الإدارة', icon: LayoutDashboard },
-  { href: '/admin/users', label: 'المستخدمون', icon: Users },
-  { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone },
-  { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy },
-  { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles },
-  { href: '/admin/categories', label: 'الأقسام', icon: LayoutGrid },
-  { href: '/admin/words', label: 'الكلمات المرفوضة', icon: Ban },
-  { href: '/admin/reports', label: 'البلاغات', icon: Flag },
-  { href: '/admin/verifications', label: 'طلبات التوثيق', icon: ShieldCheck },
+const nav: { href: string; label: string; icon: React.ElementType; perm: Perm | null }[] = [
+  { href: '/admin', label: 'لوحة الإدارة', icon: LayoutDashboard, perm: null },
+  { href: '/admin/users', label: 'المستخدمون', icon: Users, perm: 'users' },
+  { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone, perm: 'ads' },
+  { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy, perm: 'duplicates' },
+  { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles, perm: 'classified' },
+  { href: '/admin/categories', label: 'الأقسام', icon: LayoutGrid, perm: 'categories' },
+  { href: '/admin/words', label: 'الكلمات المرفوضة', icon: Ban, perm: 'words' },
+  { href: '/admin/reports', label: 'البلاغات', icon: Flag, perm: 'reports' },
+  { href: '/admin/verifications', label: 'طلبات التوثيق', icon: ShieldCheck, perm: 'verifications' },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await requireAdmin();
+  const session = await requireAnyAdmin();
+  const [perms, role] = await Promise.all([getUserPerms(session.uid), getUserRole(session.uid)]);
+  const items = nav.filter((n) => n.perm === null || perms.has(n.perm));
   return (
     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
       <aside className="h-fit card-3d rounded-xl p-3">
-        <div className="mb-3 border-b pb-3 text-sm font-bold text-primary">لوحة التحكم</div>
+        <div className="mb-3 border-b pb-3">
+          <div className="text-sm font-bold text-primary">لوحة التحكم</div>
+          {role && <div className="mt-1 text-xs text-muted-foreground">صلاحيتك: <span className="font-medium text-primary">{ROLE_LABELS[role]}</span></div>}
+        </div>
         <nav className="space-y-1">
-          {nav.map(({ href, label, icon: Icon }) => (
+          {items.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary">
               <Icon className="h-4 w-4" /> {label}
             </Link>

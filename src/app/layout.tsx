@@ -50,7 +50,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   let splashAds: Awaited<ReturnType<typeof getSplashClassifieds>> = [];
   try {
-    splashAds = await getSplashClassifieds(5);
+    splashAds = await getSplashClassifieds(12);
   } catch {
     /* classified table may not be ready yet */
   }

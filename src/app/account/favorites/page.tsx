@@ -10,6 +10,7 @@ export default async function FavoritesPage() {
   const favs = await getMyFavorites(session.uid);
   const ads = favs.map((f) => ({
     ...f, image: f.image, cityName: null, categoryName: null, special: false, views: 0,
+    sellerName: null, sellerTrusted: false,
   }));
   return (
     <div className="space-y-4">

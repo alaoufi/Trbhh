@@ -2,12 +2,14 @@ import { Sparkles, Trash2, ExternalLink } from 'lucide-react';
 import { getAllClassifieds } from '@/lib/classified';
 import { CLASSIFIED_THEMES } from '@/lib/classified-theme';
 import { timeAgo } from '@/lib/utils';
+import { requirePerm } from '@/lib/roles';
 import { adminDeleteClassifiedAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الإعلانات المبوّبة' };
 
 export default async function AdminClassified() {
+  await requirePerm('classified');
   const items = await getAllClassifieds(120);
   return (
     <div className="space-y-4">

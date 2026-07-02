@@ -3,12 +3,14 @@ import { Star, Trash2, Eye, EyeOff, Check } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { requirePerm } from '@/lib/roles';
 import { adminDeleteAdAction, adminToggleSpecialAction, adminToggleAdStatusAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الإعلانات' };
 
 export default async function AdminAds({ searchParams }: { searchParams: Promise<{ pending?: string }> }) {
+  await requirePerm('ads');
   const sp = await searchParams;
   const onlyPending = sp.pending === '1';
   const [ads, pendingCount] = await Promise.all([

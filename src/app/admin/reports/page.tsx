@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
+import { requirePerm } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'البلاغات' };
 
 export default async function AdminReports() {
+  await requirePerm('reports');
   const reports = await prisma.repord_ads.findMany({ orderBy: { id: 'desc' }, take: 100 });
   const reasonIds = [...new Set(reports.map((r) => r.reason_id))].map((n) => BigInt(n));
   const adIds = [...new Set(reports.map((r) => BigInt(r.ads_id)))];

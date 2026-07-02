@@ -2,11 +2,13 @@ import { ShieldCheck, Check } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { trustUserAction } from '../actions';
+import { requirePerm } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'طلبات التوثيق' };
 
 export default async function AdminVerifications() {
+  await requirePerm('verifications');
   const users = await prisma.users.findMany({ where: { step: { gt: 0 }, trusted: 0 }, orderBy: { id: 'desc' }, take: 100 });
   return (
     <div className="space-y-4">

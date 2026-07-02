@@ -1,5 +1,5 @@
 import { Ban, Trash2 } from 'lucide-react';
-import { requireAdmin } from '@/lib/admin';
+import { requirePerm } from '@/lib/roles';
 import { getBannedWords } from '@/lib/censor';
 import { Button } from '@/components/ui/button';
 import { addBannedWordAction, deleteBannedWordAction } from '../actions';
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الكلمات المرفوضة' };
 
 export default async function AdminWords() {
-  await requireAdmin();
+  await requirePerm('words');
   const words = await getBannedWords();
   return (
     <div className="space-y-4">

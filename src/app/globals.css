@@ -67,7 +67,7 @@ body {
   display: flex;
   width: max-content;
   will-change: transform;
-  animation: marquee 30s linear infinite;
+  animation: marquee 18s linear infinite;
 }
 @keyframes marquee {
   from { transform: translateX(0); }

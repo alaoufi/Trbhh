@@ -62,6 +62,7 @@ export async function getThread(userId: number, otherId: number) {
       fromMe: r.sender_id === userId,
       message: r.message,
       at: r.created_at ? r.created_at.toISOString() : null,
+      read: r.sender_id === userId ? r.is_read === 1 : true,
     })),
   };
 }

@@ -1,12 +1,10 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { ArrowRight, Send } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getThread } from '@/lib/messages';
-import { timeAgo, cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
-import { sendMessageAction } from '../actions';
+import { ChatRoom } from '@/components/chat-room';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,21 +26,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
 
       <DisclaimerBar className="mb-3" />
 
-      <div className="flex min-h-[45vh] flex-col gap-2 card-3d rounded-xl p-3">
-        {thread.messages.length === 0 && <p className="m-auto text-sm text-muted-foreground">ابدأ المحادثة الآن</p>}
-        {thread.messages.map((m) => (
-          <div key={m.id} className={cn('max-w-[75%] rounded-2xl px-3 py-2 text-sm', m.fromMe ? 'self-start bg-primary text-primary-foreground' : 'self-end bg-secondary')}>
-            <p>{m.message}</p>
-            <span className={cn('mt-1 block text-[10px]', m.fromMe ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{timeAgo(m.at)}</span>
-          </div>
-        ))}
-      </div>
-
-      <form action={sendMessageAction} className="mt-3 flex gap-2">
-        <input type="hidden" name="reciverId" value={otherId} />
-        <input name="message" required autoComplete="off" placeholder="اكتب رسالة..." className="h-11 flex-1 rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
-        <Button size="icon" aria-label="إرسال"><Send className="h-4 w-4" /></Button>
-      </form>
+      <ChatRoom peerId={otherId} initial={thread.messages} />
     </div>
   );
 }

@@ -2,11 +2,12 @@ import 'server-only';
 import { redirect } from 'next/navigation';
 import { prisma } from './prisma';
 import { getSession } from './auth';
+import { getSetting, setSetting } from './settings';
 
 export type Service =
   | 'users' | 'ads' | 'duplicates' | 'classified' | 'categories'
   | 'words' | 'reports' | 'verifications' | 'debates' | 'comments' | 'packages' | 'promos' | 'backup';
-export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive';
+export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive' | 'suspend';
 
 /** Backward-compat alias: a "Perm" is a service (page-level access). */
 export type Perm = Service;
@@ -33,7 +34,7 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
 ];
 
 export const ACTION_LABELS: Record<Action, string> = {
-  view: 'عرض', add: 'إضافة', edit: 'تعديل', delete: 'حذف', archive: 'أرشفة',
+  view: 'عرض', add: 'إضافة', edit: 'تعديل', delete: 'حذف', archive: 'أرشفة', suspend: 'تعطيل',
 };
 
 export const ALL_KEYS: string[] = SERVICES.flatMap((s) => s.actions.map((a) => `${s.key}:${a}`));
@@ -41,9 +42,12 @@ const KEY_SET = new Set(ALL_KEYS);
 export const key = (s: Service, a: Action) => `${s}:${a}`;
 
 /* ---- role presets (quick-apply bundles of granular permissions) ---- */
-export type Role = 'manager' | 'moderator' | 'monitor';
-export const ROLE_LABELS: Record<Role, string> = { manager: 'مدير', moderator: 'مشرف', monitor: 'مراقب' };
+export type Role = 'manager' | 'moderator' | 'monitor' | 'member' | 'visitor';
+export const ROLE_LABELS: Record<Role, string> = {
+  manager: 'مدير عام', moderator: 'مشرف', monitor: 'مراقب', member: 'عضو', visitor: 'زائر',
+};
 
+/** Admin-granular presets (applied to a single admin user's admin_perms). */
 export const ROLE_PRESET: Record<Role, string[]> = {
   manager: ALL_KEYS,
   moderator: [
@@ -56,6 +60,8 @@ export const ROLE_PRESET: Record<Role, string[]> = {
     'promos:view', 'promos:edit', 'promos:delete',
   ],
   monitor: ['reports:view', 'verifications:view', 'verifications:edit', 'words:view', 'words:add', 'words:delete'],
+  member: [],
+  visitor: [],
 };
 
 /** Backward-compat: services a role can reach (used by older callers). */
@@ -63,7 +69,96 @@ export const ROLE_PERMS: Record<Role, Perm[]> = {
   manager: SERVICES.map((s) => s.key),
   moderator: ['ads', 'classified', 'comments', 'debates', 'reports', 'duplicates'],
   monitor: ['reports', 'verifications', 'words'],
+  member: [],
+  visitor: [],
 };
+
+/* ============================================================
+   Detailed 5-role permission matrix — editable from the admin.
+   Roles: manager / moderator / monitor / member / visitor.
+   Actions per section: view / add / edit / delete / suspend (تعطيل).
+   'suspend' also satisfies the legacy 'archive' gate on enforcement.
+   ============================================================ */
+export const MATRIX_ACTIONS: Action[] = ['view', 'add', 'edit', 'delete', 'suspend'];
+export const MATRIX_ROLES: Role[] = ['manager', 'moderator', 'monitor', 'member', 'visitor'];
+// staff may NEVER be granted the ability to edit a member's ad content (privacy)
+export const MATRIX_LOCKED = new Set<string>(['ads:edit']);
+export const ALL_MATRIX_KEYS: string[] = SERVICES
+  .flatMap((s) => MATRIX_ACTIONS.map((a) => `${s.key}:${a}`))
+  .filter((k) => !MATRIX_LOCKED.has(k));
+const MATRIX_SET = new Set(ALL_MATRIX_KEYS);
+const toSuspend = (k: string) => k.replace(/:archive$/, ':suspend');
+
+export const DEFAULT_ROLE_PERMS: Record<Role, string[]> = {
+  manager: ALL_MATRIX_KEYS,
+  moderator: ROLE_PRESET.moderator.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
+  monitor: ROLE_PRESET.monitor.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
+  member: ['ads:view', 'ads:add', 'classified:view', 'classified:add', 'comments:view', 'comments:add', 'debates:view', 'debates:add'].filter((k) => MATRIX_SET.has(k)),
+  visitor: ['ads:view', 'classified:view', 'categories:view', 'comments:view', 'debates:view'].filter((k) => MATRIX_SET.has(k)),
+};
+
+let rolePermsEnsured = false;
+async function ensureRolePerms() {
+  if (rolePermsEnsured) return;
+  await ensureTables();
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS role_perms (
+      role VARCHAR(20) NOT NULL,
+      perm VARCHAR(40) NOT NULL,
+      PRIMARY KEY (role, perm)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `).catch(() => {});
+  // seed sensible defaults exactly once (so clearing a role later isn't reseeded)
+  const seeded = await getSetting('role_perms_seeded', '0').catch(() => '0');
+  if (seeded !== '1') {
+    for (const role of MATRIX_ROLES) {
+      for (const k of DEFAULT_ROLE_PERMS[role]) {
+        await prisma.$executeRawUnsafe(`INSERT IGNORE INTO role_perms (role, perm) VALUES (?, ?)`, role, k).catch(() => {});
+      }
+    }
+    await setSetting('role_perms_seeded', '1').catch(() => {});
+  }
+  rolePermsEnsured = true;
+}
+
+let rolePermCache: { at: number; map: Map<string, Set<string>> } | null = null;
+async function loadRolePerms(): Promise<Map<string, Set<string>>> {
+  await ensureRolePerms();
+  if (rolePermCache && Date.now() - rolePermCache.at < 30000) return rolePermCache.map;
+  const rows = await prisma.$queryRawUnsafe<{ role: string; perm: string }[]>(`SELECT role, perm FROM role_perms`).catch(() => []);
+  const map = new Map<string, Set<string>>();
+  for (const r of rows) {
+    if (!map.has(r.role)) map.set(r.role, new Set());
+    if (MATRIX_SET.has(r.perm)) map.get(r.role)!.add(r.perm);
+  }
+  rolePermCache = { at: Date.now(), map };
+  return map;
+}
+
+/** Enabled matrix keys for a role (e.g. "ads:add"). */
+export async function getRolePermKeys(role: Role): Promise<Set<string>> {
+  return (await loadRolePerms()).get(role) ?? new Set<string>();
+}
+
+/** Replace a role's matrix permissions with the given key list. */
+export async function setRolePermKeys(role: Role, keys: string[]) {
+  await ensureRolePerms();
+  const valid = [...new Set(keys.filter((k) => MATRIX_SET.has(k)))];
+  await prisma.$executeRawUnsafe(`DELETE FROM role_perms WHERE role = ?`, role);
+  for (const k of valid) await prisma.$executeRawUnsafe(`INSERT IGNORE INTO role_perms (role, perm) VALUES (?, ?)`, role, k);
+  rolePermCache = null;
+}
+
+/** Can a role perform an action on a section (matrix-based). */
+export async function roleCan(role: Role, service: Service, action: Action): Promise<boolean> {
+  return (await getRolePermKeys(role)).has(`${service}:${action}`);
+}
+
+/** Site-capability role of the current viewer (visitor if signed out, else member). */
+export async function viewerRole(): Promise<Role> {
+  const session = await getSession();
+  return session ? 'member' : 'visitor';
+}
 
 let ensured = false;
 async function ensureTables() {
@@ -97,10 +192,22 @@ export async function getUserPermKeys(userId: number): Promise<Set<string>> {
   const perms = await prisma.$queryRawUnsafe<{ perm: string }[]>(`SELECT perm FROM admin_perms WHERE user_id = ?`, userId).catch(() => []);
   for (const p of perms) if (KEY_SET.has(p.perm)) out.add(p.perm);
 
-  // expand any legacy role assignment into keys
+  // expand any role assignment into keys using the editable matrix
   const roleRows = await prisma.$queryRawUnsafe<{ role: string }[]>(`SELECT role FROM admin_roles WHERE user_id = ?`, userId).catch(() => []);
   const role = roleRows[0]?.role as Role | undefined;
-  if (role && ROLE_PRESET[role]) for (const k of ROLE_PRESET[role]) out.add(k);
+  if (role) {
+    const rk = await getRolePermKeys(role).catch(() => new Set<string>());
+    for (const k of rk) {
+      if (KEY_SET.has(k)) out.add(k);
+      // 'suspend' in the matrix also satisfies the legacy 'archive' gate
+      if (k.endsWith(':suspend')) {
+        const arch = k.replace(/:suspend$/, ':archive');
+        if (KEY_SET.has(arch)) out.add(arch);
+      }
+    }
+    // safety net: if the matrix is somehow empty for a known admin role, use preset
+    if (rk.size === 0 && ROLE_PRESET[role]?.length) for (const k of ROLE_PRESET[role]) out.add(k);
+  }
 
   return out;
 }

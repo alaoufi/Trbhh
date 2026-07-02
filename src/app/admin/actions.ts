@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, type Role } from '@/lib/roles';
+import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
@@ -240,6 +240,17 @@ export async function saveSettingsAction(formData: FormData) {
   revalidatePath('/');
   revalidatePath('/classified');
   redirect('/admin/settings?saved=1');
+}
+
+/** Save the permission matrix for one role (checkbox keys named "k"). */
+export async function saveRolePermsAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const role = String(formData.get('role') || '') as Role;
+  if (!MATRIX_ROLES.includes(role)) return;
+  const keys = formData.getAll('k').map((v) => String(v));
+  await setRolePermKeys(role, keys);
+  revalidatePath('/admin/roles');
+  redirect(`/admin/roles?saved=${role}`);
 }
 
 /* ---- Database backup / restore ---- */

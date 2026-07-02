@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Home, Copy, Sparkles, Ban, Crown, Settings, MonitorPlay, BookOpen, ShieldAlert, DatabaseBackup } from 'lucide-react';
+import { LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Home, Copy, Sparkles, Ban, Crown, Settings, MonitorPlay, BookOpen, ShieldAlert, DatabaseBackup, KeyRound } from 'lucide-react';
 import { requireAnyAdmin, getUserPerms, getUserRole, ROLE_LABELS, type Perm } from '@/lib/roles';
 import { ScrollTop } from '@/components/scroll-top';
 
@@ -7,6 +7,7 @@ const nav: { href: string; label: string; icon: React.ElementType; perm: Perm | 
   { href: '/admin', label: 'لوحة الإدارة', icon: LayoutDashboard, perm: null },
   { href: '/guide', label: 'دليل الاستخدام', icon: BookOpen, perm: null },
   { href: '/admin/users', label: 'المستخدمون', icon: Users, perm: 'users' },
+  { href: '/admin/roles', label: 'الأدوار والصلاحيات', icon: KeyRound, perm: 'users' },
   { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone, perm: 'ads' },
   { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy, perm: 'duplicates' },
   { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles, perm: 'classified' },

@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
+import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT } from '@/lib/moderation';
 import { toInt } from '@/lib/utils';
 
 type PreparedImage = { buf: Buffer; name: string; ext: string; hash: string };
@@ -95,25 +96,24 @@ function isKeywordStuffing(title: string, detail: string): boolean {
  *   • detail similarity ≥ 90%, OR
  *   • an uploaded image is byte-identical to an existing ad image.
  */
-async function needsReview(title: string, detail: string, images: PreparedImage[]): Promise<boolean> {
-  // 1) identical image (content hash is embedded in the stored file_name)
+/** Duplicate against the SAME user's own ads (reposting the same ad). */
+async function isOwnDuplicate(userId: number, title: string, detail: string, images: PreparedImage[]): Promise<boolean> {
   if (images.length) {
     const found = await prisma.uploads.findFirst({
-      where: { OR: images.map((i) => ({ file_name: { contains: i.hash } })) },
+      where: { user_id: userId, OR: images.map((i) => ({ file_name: { contains: i.hash } })) },
       select: { id: true },
     });
     if (found) return true;
   }
-  // 2) text similarity against recent published ads
-  const recent = await prisma.ads.findMany({
-    where: { status: 1 },
+  const mine = await prisma.ads.findMany({
+    where: { user_id: BigInt(userId) },
     select: { title: true, detail: true },
     orderBy: { id: 'desc' },
-    take: 400,
+    take: 300,
   });
   const nTitle = normalizeAr(title);
   const nDetail = normalizeAr(detail);
-  for (const r of recent) {
+  for (const r of mine) {
     if (similarity(nTitle, normalizeAr(r.title)) >= 0.9) return true;
     if (similarity(nDetail, normalizeAr(r.detail)) >= 0.9) return true;
   }
@@ -123,6 +123,7 @@ async function needsReview(title: string, detail: string, images: PreparedImage[
 export async function createAdAction(formData: FormData) {
   const session = await requireUser();
   const user = await prisma.users.findUnique({ where: { id: BigInt(session.uid) } });
+  if (user?.ban === 'checked') redirect('/ads/new?error=banned');
 
   const title = String(formData.get('title') || '').trim();
   const detail = String(formData.get('detail') || '').trim();
@@ -153,8 +154,15 @@ export async function createAdAction(formData: FormData) {
 
   const images = await readImages(formData);
 
-  // 90% similar (title/detail) OR identical images => hold for admin approval
-  const pending = await needsReview(title, detail, images);
+  // منع تكرار الإعلان: تحذير ٣ محاولات ثم حظر الحساب
+  if (await isOwnDuplicate(session.uid, title, detail, images)) {
+    const n = await bumpDupAttempts(session.uid);
+    if (n >= DUP_LIMIT) {
+      await banUser(session.uid);
+      redirect('/ads/new?error=banned');
+    }
+    redirect(`/ads/new?error=duplicate&left=${Math.max(0, DUP_LIMIT - n)}`);
+  }
 
   const ad = await prisma.ads.create({
     data: {
@@ -171,24 +179,12 @@ export async function createAdAction(formData: FormData) {
       commentAllow: formData.get('commentAllow') ? 1 : 0,
       adsSpecial: 'no',
       state: 'active',
-      status: pending ? 0 : 1,
+      status: 1,
     },
   });
 
   await storeImages(images, session.uid, ad.id);
-
-  if (pending) {
-    // notify admins to review
-    const admins = await prisma.users.findMany({ where: { is_admin: 1 }, select: { id: true } });
-    await Promise.all(
-      admins.map((a) =>
-        prisma.notfications
-          .create({ data: { title: 'إعلان بانتظار الموافقة (مشابه لإعلان قائم)', route: '/admin/ads?pending=1', user_id: String(toInt(a.id)), type: 'review' } })
-          .catch(() => {}),
-      ),
-    );
-    redirect('/account/ads?pending=1');
-  }
+  await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
   redirect(`/ads/${toInt(ad.id)}`);
 }
 

@@ -20,11 +20,11 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, initial, submitLabel, error,
+  action, categories, subcategories, countries, cities, initial, submitLabel, error, dupLeft,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[];
-  initial?: Initial; submitLabel: string; error?: string;
+  initial?: Initial; submitLabel: string; error?: string; dupLeft?: string;
 }) {
   const [category, setCategory] = useState(initial?.categoryId ?? categories[0]?.id ?? 0);
   const [country, setCountry] = useState(initial?.countryId ?? countries[0]?.id ?? 0);
@@ -65,6 +65,19 @@ export function AdForm({
       {error === 'repeat' && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           يوجد تكرار مبالغ فيه للعبارات أو الكلمات في العنوان/التفاصيل. الرجاء كتابة وصف طبيعي دون تكرار الكلمات لأغراض محركات البحث.
+        </div>
+      )}
+      {error === 'duplicate' && (
+        <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-medium text-red-800">
+          ⚠️ لا تُكرّر نفس الإعلان. هذا الإعلان مطابق لإعلان سابق لك ولم يُنشر.
+          {dupLeft && Number(dupLeft) > 0
+            ? ` تبقّى لك ${dupLeft} ${Number(dupLeft) === 1 ? 'محاولة' : 'محاولات'} قبل حظر حسابك.`
+            : ' هذه محاولتك الأخيرة قبل الحظر.'}
+        </div>
+      )}
+      {error === 'banned' && (
+        <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
+          🚫 تم حظر حسابك بسبب تكرار نشر إعلانات مكرّرة. للتواصل مع الإدارة راسلنا.
         </div>
       )}
 

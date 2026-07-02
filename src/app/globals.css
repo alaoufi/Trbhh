@@ -106,6 +106,91 @@
   --input: 250 42% 84%;
   --ring: 250 48% 64%;
 }
+[data-theme="sea"] {              /* بحري — تركوازي أزرق */
+  --background: 195 60% 99%;
+  --foreground: 200 55% 20%;
+  --card: 190 60% 91%;
+  --card-foreground: 200 50% 26%;
+  --primary: 195 75% 42%;
+  --secondary: 190 52% 85%;
+  --secondary-foreground: 200 50% 26%;
+  --muted: 195 40% 95%;
+  --muted-foreground: 200 22% 42%;
+  --accent: 190 60% 91%;
+  --accent-foreground: 195 75% 36%;
+  --border: 195 45% 72%;
+  --input: 195 45% 72%;
+  --ring: 195 75% 42%;
+}
+[data-theme="snow"] {             /* ثلجي — أبيض مزرقّ بارد */
+  --background: 205 60% 99%;
+  --foreground: 210 40% 24%;
+  --card: 200 55% 95%;
+  --card-foreground: 210 40% 28%;
+  --primary: 202 72% 52%;
+  --secondary: 200 50% 91%;
+  --secondary-foreground: 210 40% 28%;
+  --muted: 205 40% 97%;
+  --muted-foreground: 210 20% 46%;
+  --accent: 200 55% 95%;
+  --accent-foreground: 202 72% 44%;
+  --border: 202 45% 84%;
+  --input: 202 45% 84%;
+  --ring: 202 72% 52%;
+}
+[data-theme="mountain"] {         /* جبلي — أخضر ترابي هادئ */
+  --background: 96 20% 98%;
+  --foreground: 95 28% 20%;
+  --card: 92 26% 90%;
+  --card-foreground: 95 30% 26%;
+  --primary: 95 32% 40%;
+  --secondary: 92 22% 85%;
+  --secondary-foreground: 95 30% 26%;
+  --muted: 96 20% 95%;
+  --muted-foreground: 95 16% 40%;
+  --accent: 92 26% 90%;
+  --accent-foreground: 95 32% 34%;
+  --border: 95 24% 70%;
+  --input: 95 24% 70%;
+  --ring: 95 32% 40%;
+}
+[data-theme="sunset"] {           /* غروب — برتقالي وردي دافئ */
+  --background: 22 70% 99%;
+  --foreground: 15 45% 25%;
+  --card: 22 82% 93%;
+  --card-foreground: 15 45% 30%;
+  --primary: 14 82% 56%;
+  --secondary: 22 72% 89%;
+  --secondary-foreground: 15 45% 30%;
+  --muted: 22 50% 96%;
+  --muted-foreground: 15 25% 46%;
+  --accent: 22 82% 93%;
+  --accent-foreground: 14 82% 48%;
+  --border: 18 68% 80%;
+  --input: 18 68% 80%;
+  --ring: 14 82% 56%;
+}
+[data-theme="night"] {            /* ليلي — داكن مريح */
+  --background: 222 47% 11%;
+  --foreground: 210 40% 96%;
+  --card: 222 40% 18%;
+  --card-foreground: 210 40% 94%;
+  --primary: 210 90% 66%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 222 30% 24%;
+  --secondary-foreground: 210 40% 94%;
+  --muted: 222 30% 20%;
+  --muted-foreground: 215 20% 72%;
+  --accent: 222 38% 22%;
+  --accent-foreground: 210 90% 78%;
+  --border: 222 25% 32%;
+  --input: 222 25% 32%;
+  --ring: 210 90% 66%;
+}
+/* الوضع الليلي: بطاقات داكنة بدل التدرّج الأبيض */
+[data-theme="night"] .card-3d {
+  background-image: linear-gradient(180deg, hsl(222 40% 22%) 0%, hsl(var(--card)) 100%);
+}
 
 * { border-color: hsl(var(--border)); }
 

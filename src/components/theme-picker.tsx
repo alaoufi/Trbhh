@@ -4,11 +4,16 @@ import { Check, Palette } from 'lucide-react';
 
 export const THEMES: { id: string; name: string; color: string }[] = [
   { id: '', name: 'أزرق', color: '#3287da' },
-  { id: 'desert', name: 'الصحراء', color: '#b5893f' },
-  { id: 'agri', name: 'الزراعي', color: '#3f9d5b' },
+  { id: 'desert', name: 'الصحراوي', color: '#b5893f' },
   { id: 'spring', name: 'الربيعي', color: '#d56fa0' },
-  { id: 'mint', name: 'نعناعي', color: '#2fb0a3' },
-  { id: 'lavender', name: 'خزامى', color: '#8a7fd6' },
+  { id: 'agri', name: 'الزراعي', color: '#3f9d5b' },
+  { id: 'sea', name: 'البحري', color: '#1aa3c2' },
+  { id: 'snow', name: 'الثلجي', color: '#5ab0e0' },
+  { id: 'mountain', name: 'الجبلي', color: '#5a8a45' },
+  { id: 'sunset', name: 'الغروب', color: '#e2683a' },
+  { id: 'night', name: 'الليلي', color: '#1e293b' },
+  { id: 'mint', name: 'النعناعي', color: '#2fb0a3' },
+  { id: 'lavender', name: 'الخزامى', color: '#8a7fd6' },
 ];
 
 function applyTheme(id: string) {

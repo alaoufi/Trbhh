@@ -56,7 +56,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     /* classified table may not be ready yet */
   }
   const theme = (await cookies()).get('theme')?.value || '';
-  const validThemes = ['desert', 'agri', 'spring', 'mint', 'lavender'];
+  const validThemes = ['desert', 'agri', 'spring', 'mint', 'lavender', 'sea', 'snow', 'mountain', 'sunset', 'night'];
   return (
     <html lang="ar" dir="rtl" className={cairo.variable} {...(validThemes.includes(theme) ? { 'data-theme': theme } : {})}>
       <body className="min-h-screen font-sans antialiased">

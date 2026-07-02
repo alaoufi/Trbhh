@@ -36,7 +36,7 @@ export default async function MyClassifiedPage({ searchParams }: { searchParams:
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           {items.map((c) => (
             <div key={c.id} className="space-y-1.5">
-              <ClassifiedCard c={c} />
+              <ClassifiedCard c={c} float={false} />
               <div className="flex gap-1.5">
                 <Link href={`/classified/${c.id}/edit`} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-primary/30 py-1.5 text-xs font-medium text-primary hover:bg-accent">
                   <Pencil className="h-3.5 w-3.5" /> تعديل

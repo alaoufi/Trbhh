@@ -54,9 +54,12 @@ export function ClassifiedContact({ c }: { c: Classified }) {
   );
 }
 
-export function ClassifiedCard({ c }: { c: Classified }) {
+export function ClassifiedCard({ c, i = 0, float = true }: { c: Classified; i?: number; float?: boolean }) {
   return (
-    <div className="card-3d overflow-hidden rounded-2xl">
+    <div
+      className={`card-3d overflow-hidden rounded-2xl ${float ? 'float-3d' : ''}`}
+      style={float ? { animationDelay: `${(i % 6) * 260}ms` } : undefined}
+    >
       {/* الضغط على الإعلان يفتحه مكبّراً في صفحته */}
       <Link href={`/classified/${c.id}`} className="block"><ClassifiedVisual c={c} /></Link>
       <ClassifiedContact c={c} />
@@ -64,11 +67,11 @@ export function ClassifiedCard({ c }: { c: Classified }) {
   );
 }
 
-export function ClassifiedGrid({ items }: { items: Classified[] }) {
+export function ClassifiedGrid({ items, float = true }: { items: Classified[]; float?: boolean }) {
   if (!items.length) return null;
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-      {items.map((c) => <ClassifiedCard key={c.id} c={c} />)}
+      {items.map((c, i) => <ClassifiedCard key={c.id} c={c} i={i} float={float} />)}
     </div>
   );
 }

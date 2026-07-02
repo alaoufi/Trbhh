@@ -1,4 +1,5 @@
-import { Users, Megaphone, LayoutGrid, Eye } from 'lucide-react';
+import Link from 'next/link';
+import { Users, Megaphone, LayoutGrid, Eye, Sparkles, ChevronLeft } from 'lucide-react';
 import {
   getCategories,
   getFeaturedAds,
@@ -47,6 +48,18 @@ export default async function HomePage() {
         <Stat icon={Eye} value={stats.views} label="مشاهدة" />
         <Stat icon={LayoutGrid} value={stats.cats} label="قسم" />
       </div>
+
+      {/* Classified ads entry link */}
+      <Link href="/classified" className="card-3d flex items-center justify-between gap-3 rounded-2xl p-4">
+        <span className="flex items-center gap-3">
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary"><Sparkles className="h-6 w-6" /></span>
+          <span>
+            <span className="block font-bold text-primary">الإعلانات المبوّبة</span>
+            <span className="block text-xs text-muted-foreground">تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي</span>
+          </span>
+        </span>
+        <ChevronLeft className="h-5 w-5 shrink-0 text-primary" />
+      </Link>
 
       {classifieds.length > 0 && (
         <Section title="الإعلانات المبوّبة" href="/classified">

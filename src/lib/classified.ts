@@ -105,14 +105,14 @@ export async function deleteClassified(id: number) {
   await prisma.$executeRawUnsafe(`DELETE FROM classified_ads WHERE id = ?`, id);
 }
 
-/** One random classified ad for the entry splash. */
-export async function getRandomClassified(): Promise<Classified | null> {
+/** Random classified ads for the entry splash (cycles through them). */
+export async function getSplashClassifieds(limit = 5): Promise<Classified[]> {
   await ensureClassifiedTable();
   await loadBanned();
   const rows = await prisma.$queryRawUnsafe<Row[]>(
-    `SELECT * FROM classified_ads WHERE status = 1 ORDER BY RAND() LIMIT 1`,
+    `SELECT * FROM classified_ads WHERE status = 1 ORDER BY RAND() LIMIT ${Math.max(1, Math.min(10, limit))}`,
   );
-  return rows.length ? toClassified(rows[0]) : null;
+  return rows.map(toClassified);
 }
 
 export async function createClassified(data: {

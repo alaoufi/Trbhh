@@ -9,6 +9,7 @@ import {
 } from '@/lib/classified-theme';
 import { ClassifiedDecor } from '@/components/classified-decor';
 import { SubmitOverlay } from '@/components/submit-overlay';
+import { compressInputFiles } from '@/lib/image-compress';
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -55,9 +56,14 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
     <button type="button" onClick={() => setPos(p)} className={`flex-1 rounded-lg border p-2 ${pos === p ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}><Icon className="mx-auto h-4 w-4" /></button>
   );
 
-  function onImage(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    setImgUrl(f ? URL.createObjectURL(f) : null);
+  const [imgBusy, setImgBusy] = useState(false);
+  async function onImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    if (!input.files?.length) { setImgUrl(null); return; }
+    setImgBusy(true);
+    const small = await compressInputFiles(input); // shrink before upload (fast on slow نت)
+    setImgUrl(small ? URL.createObjectURL(small) : null);
+    setImgBusy(false);
   }
 
   return (
@@ -150,6 +156,8 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
         <div>
           <label className="mb-1 block text-sm font-medium">الصورة (اختياري إن كتبت نصاً)</label>
           <input name="image" type="file" accept="image/*" onChange={onImage} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1" />
+          {imgBusy && <p className="mt-1 text-xs text-primary">⏳ جارٍ تجهيز الصورة وتصغيرها للرفع السريع…</p>}
+          {!imgBusy && imgUrl && <p className="mt-1 text-xs text-green-600">✓ الصورة جاهزة</p>}
           {initial?.id && initial?.image && <p className="mt-1 text-xs text-muted-foreground">اترك الحقل فارغاً للإبقاء على الصورة الحالية.</p>}
         </div>
 

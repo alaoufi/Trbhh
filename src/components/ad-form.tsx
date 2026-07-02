@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { SubmitOverlay } from '@/components/submit-overlay';
+import { compressInputFiles } from '@/lib/image-compress';
 
 type Cat = { id: number; name: string };
 type Sub = { id: number; name: string; categoryId: number };
@@ -52,6 +53,17 @@ export function AdForm({
     () => cities.filter((c) => c.countryId === country),
     [cities, country],
   );
+
+  const [imgBusy, setImgBusy] = useState(false);
+  const [imgReady, setImgReady] = useState(0);
+  async function onImages(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    if (!input.files?.length) { setImgReady(0); return; }
+    setImgBusy(true);
+    await compressInputFiles(input); // shrink before upload (fast on slow نت)
+    setImgReady(input.files?.length || 0);
+    setImgBusy(false);
+  }
 
   const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';
 
@@ -153,7 +165,9 @@ export function AdForm({
 
       <div>
         <label className="mb-1 block text-sm font-medium">الصور {initial?.id ? '(إضافة المزيد)' : '(حتى 10 صور)'}</label>
-        <input name="images" type="file" accept="image/*" multiple className="w-full rounded-lg border bg-background p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1" />
+        <input name="images" type="file" accept="image/*" multiple onChange={onImages} className="w-full rounded-lg border bg-background p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1" />
+        {imgBusy && <p className="mt-1 text-xs text-primary">⏳ جارٍ تجهيز الصور وتصغيرها للرفع السريع…</p>}
+        {!imgBusy && imgReady > 0 && <p className="mt-1 text-xs text-green-600">✓ {imgReady} صورة جاهزة</p>}
       </div>
 
       <div className="rounded-lg border border-primary/20 bg-accent/40 p-3">

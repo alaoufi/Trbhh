@@ -5,6 +5,7 @@ import { Phone, MessageCircle, ExternalLink, Megaphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PLACEMENTS, type PromoPackage, type PromoPlacement } from '@/lib/promo-placements';
 import { SubmitOverlay } from '@/components/submit-overlay';
+import { compressInputFiles } from '@/lib/image-compress';
 
 function Submit() {
   const { pending } = useFormStatus();
@@ -37,9 +38,14 @@ export function PromoDesigner({
   const pkg = packages.find((p) => p.id === pkgId);
   const wa = whatsapp.replace(/[^\d]/g, '');
 
-  function onImage(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    setImgUrl(f ? URL.createObjectURL(f) : null);
+  const [imgBusy, setImgBusy] = useState(false);
+  async function onImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const input = e.target;
+    if (!input.files?.length) { setImgUrl(null); return; }
+    setImgBusy(true);
+    const small = await compressInputFiles(input); // shrink static images (GIF kept as-is)
+    setImgUrl(small ? URL.createObjectURL(small) : null);
+    setImgBusy(false);
   }
 
   return (
@@ -108,6 +114,8 @@ export function PromoDesigner({
         <div>
           <label className="mb-1 block text-sm font-medium">الصورة (ثابتة أو متحركة GIF)</label>
           <input name="image" type="file" accept="image/*" onChange={onImage} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1" />
+          {imgBusy && <p className="mt-1 text-xs text-primary">⏳ جارٍ تجهيز الصورة…</p>}
+          {!imgBusy && imgUrl && <p className="mt-1 text-xs text-green-600">✓ الصورة جاهزة</p>}
         </div>
 
         <div className="rounded-lg border border-primary/20 bg-accent/40 p-3">

@@ -29,7 +29,7 @@ export default async function EditClassifiedPage({
         submitLabel="حفظ التعديلات"
         initial={{
           id: c.id, title: c.title, body: c.text, phone: c.phone, whatsapp: c.whatsapp, link: c.link, image: c.image,
-          theme: c.theme, pos: c.pos, align: c.align, size: c.size, bold: c.bold, pattern: c.pattern, accent: c.accent,
+          theme: c.theme, pos: c.pos, align: c.align, size: c.size, bold: c.bold, pattern: c.pattern, accent: c.accent, layout: c.layout,
         }}
       />
     </div>

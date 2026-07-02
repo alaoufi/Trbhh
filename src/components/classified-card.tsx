@@ -9,11 +9,13 @@ export function ClassifiedVisual({ c, big = false }: { c: Classified; big?: bool
   const theme = CLASSIFIED_THEMES[c.theme % CLASSIFIED_THEMES.length];
   const dark = theme.text === 'dark' && !c.image;
   const poster = !c.image; // text-only → big, centered
+  const auto = !!c.image && c.layout !== 'manual'; // smart tidy arrangement over the image
   const titleCls = poster ? SIZE_TITLE_POSTER[c.size] : SIZE_TITLE[c.size];
   const bodyCls = poster ? SIZE_BODY_POSTER[c.size] : SIZE_BODY[c.size];
+  const hasText = !!(c.title || c.text);
   return (
     <div
-      className={`relative flex aspect-square flex-col overflow-hidden rounded-t-2xl ${poster ? 'justify-center' : POS_CLASS[c.pos]} ${dark ? 'text-slate-900' : 'text-white'}`}
+      className={`relative flex aspect-square flex-col overflow-hidden rounded-t-2xl ${poster ? 'justify-center' : auto ? 'justify-end' : POS_CLASS[c.pos]} ${dark ? 'text-slate-900' : 'text-white'}`}
       style={c.image ? undefined : { backgroundImage: `linear-gradient(150deg, ${theme.from}, ${theme.to})` }}
     >
       {c.image && (
@@ -26,10 +28,20 @@ export function ClassifiedVisual({ c, big = false }: { c: Classified; big?: bool
       {c.link && (
         <span className="absolute right-2 top-2 z-10 rounded-full bg-white/25 p-1 backdrop-blur"><ExternalLink className="h-3.5 w-3.5" /></span>
       )}
-      <div className={`relative z-10 space-y-1.5 ${big ? 'p-6' : 'p-4'} ${poster ? 'text-center' : c.align === 'center' ? 'text-center' : 'text-right'}`}>
-        {c.title && <h3 className={`leading-tight drop-shadow ${poster ? 'line-clamp-5' : 'line-clamp-4'} ${titleCls} ${c.bold ? 'font-extrabold' : 'font-medium'}`}>{c.title}</h3>}
-        {c.text && <p className={`leading-snug drop-shadow ${poster ? 'line-clamp-4' : 'line-clamp-6'} ${bodyCls} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{c.text}</p>}
-      </div>
+      {auto && hasText ? (
+        // ترتيب تلقائي أنيق: لوحة نصية شفافة أسفل الصورة
+        <div className={`relative z-10 ${big ? 'p-3' : 'p-2'}`}>
+          <div className={`rounded-xl bg-black/45 text-center backdrop-blur-sm ${big ? 'p-4' : 'p-2.5'}`}>
+            {c.title && <h3 className={`leading-tight drop-shadow ${big ? 'line-clamp-3' : 'line-clamp-2'} ${titleCls} ${c.bold ? 'font-extrabold' : 'font-semibold'}`}>{c.title}</h3>}
+            {c.text && <p className={`mt-0.5 leading-snug text-white/90 drop-shadow ${big ? 'line-clamp-3' : 'line-clamp-2'} ${bodyCls}`}>{c.text}</p>}
+          </div>
+        </div>
+      ) : (
+        <div className={`relative z-10 space-y-1.5 ${big ? 'p-6' : 'p-4'} ${poster ? 'text-center' : c.align === 'center' ? 'text-center' : 'text-right'}`}>
+          {c.title && <h3 className={`leading-tight drop-shadow ${poster ? 'line-clamp-5' : 'line-clamp-4'} ${titleCls} ${c.bold ? 'font-extrabold' : 'font-medium'}`}>{c.title}</h3>}
+          {c.text && <p className={`leading-snug drop-shadow ${poster ? 'line-clamp-4' : 'line-clamp-6'} ${bodyCls} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{c.text}</p>}
+        </div>
+      )}
     </div>
   );
 }

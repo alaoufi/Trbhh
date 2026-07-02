@@ -15,12 +15,14 @@ const TILE_BODY: Record<string, string> = { sm: 'text-[11px]', md: 'text-xs', lg
 function Visual({ ad, big }: { ad: Classified; big?: boolean }) {
   const theme = CLASSIFIED_THEMES[ad.theme % CLASSIFIED_THEMES.length];
   const poster = !ad.image;
+  const auto = !!ad.image && ad.layout !== 'manual';
   const dark = theme.text === 'dark' && poster;
+  const hasText = !!(ad.title || ad.text);
   const titleCls = big ? (poster ? SIZE_TITLE_POSTER[ad.size] : SIZE_TITLE[ad.size]) : (TILE_TITLE[ad.size] || TILE_TITLE.md);
   const bodyCls = big ? (poster ? SIZE_BODY_POSTER[ad.size] : SIZE_BODY[ad.size]) : (TILE_BODY[ad.size] || TILE_BODY.md);
   return (
     <div
-      className={`relative flex aspect-square flex-col overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/20 ${poster ? 'justify-center' : POS_CLASS[ad.pos]} ${dark ? 'text-slate-900' : 'text-white'}`}
+      className={`relative flex aspect-square flex-col overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/20 ${poster ? 'justify-center' : auto ? 'justify-end' : POS_CLASS[ad.pos]} ${dark ? 'text-slate-900' : 'text-white'}`}
       style={ad.image ? undefined : { backgroundImage: `linear-gradient(150deg, ${theme.from}, ${theme.to})` }}
     >
       {ad.image && (
@@ -32,10 +34,19 @@ function Visual({ ad, big }: { ad: Classified; big?: boolean }) {
       )}
       <ClassifiedDecor pattern={ad.pattern} accent={ad.accent} dark={dark} />
       {ad.link && <span className="absolute right-2 top-2 z-10 rounded-full bg-white/25 p-1 backdrop-blur"><ExternalLink className="h-3.5 w-3.5" /></span>}
-      <div className={`relative z-10 flex max-h-full min-h-0 flex-col justify-center gap-1 overflow-hidden ${big ? 'p-6' : 'p-3'} ${poster ? 'text-center' : ad.align === 'center' ? 'text-center' : 'text-right'}`}>
-        {ad.title && <h3 className={`min-w-0 break-words leading-tight drop-shadow ${big ? 'line-clamp-5' : 'line-clamp-3'} ${titleCls} ${ad.bold ? 'font-extrabold' : 'font-semibold'}`}>{ad.title}</h3>}
-        {ad.text && <p className={`min-w-0 break-words leading-snug drop-shadow ${big ? 'line-clamp-4' : 'line-clamp-2'} ${bodyCls} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{ad.text}</p>}
-      </div>
+      {auto && hasText ? (
+        <div className={`relative z-10 ${big ? 'p-3' : 'p-2'}`}>
+          <div className={`rounded-xl bg-black/45 text-center backdrop-blur-sm ${big ? 'p-4' : 'p-2'}`}>
+            {ad.title && <h3 className={`min-w-0 break-words leading-tight drop-shadow line-clamp-2 ${titleCls} ${ad.bold ? 'font-extrabold' : 'font-semibold'}`}>{ad.title}</h3>}
+            {ad.text && <p className={`mt-0.5 min-w-0 break-words leading-snug text-white/90 drop-shadow line-clamp-2 ${bodyCls}`}>{ad.text}</p>}
+          </div>
+        </div>
+      ) : (
+        <div className={`relative z-10 flex max-h-full min-h-0 flex-col justify-center gap-1 overflow-hidden ${big ? 'p-6' : 'p-3'} ${poster ? 'text-center' : ad.align === 'center' ? 'text-center' : 'text-right'}`}>
+          {ad.title && <h3 className={`min-w-0 break-words leading-tight drop-shadow ${big ? 'line-clamp-5' : 'line-clamp-3'} ${titleCls} ${ad.bold ? 'font-extrabold' : 'font-semibold'}`}>{ad.title}</h3>}
+          {ad.text && <p className={`min-w-0 break-words leading-snug drop-shadow ${big ? 'line-clamp-4' : 'line-clamp-2'} ${bodyCls} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{ad.text}</p>}
+        </div>
+      )}
     </div>
   );
 }

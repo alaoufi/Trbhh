@@ -5,6 +5,8 @@ export type Align = 'right' | 'center';
 export type Size = 'sm' | 'md' | 'lg';
 export type Pattern = 'none' | 'dots' | 'stripes' | 'grid' | 'rays';
 export type Accent = 'none' | 'bar' | 'corner' | 'frame';
+/** With an image + text: 'auto' = smart tidy arrangement, 'manual' = user places the text. */
+export type Layout = 'auto' | 'manual';
 
 export type Classified = {
   id: number;
@@ -22,6 +24,7 @@ export type Classified = {
   bold: boolean;
   pattern: Pattern;
   accent: Accent;
+  layout: Layout;
   createdAt: string | null;
   views: number;
   clicks: number;

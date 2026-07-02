@@ -20,6 +20,7 @@ export type ClassifiedInitial = {
   id?: number; title?: string | null; body?: string | null; phone?: string | null; whatsapp?: string | null;
   link?: string | null; image?: string | null;
   theme?: number; pos?: Pos; align?: Align; size?: Size; bold?: boolean; pattern?: Pattern; accent?: Accent;
+  layout?: 'auto' | 'manual';
 };
 
 export function ClassifiedForm({ action, error, initial, submitLabel }: {
@@ -41,6 +42,7 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
   const [bold, setBold] = useState(initial?.bold ?? true);
   const [pattern, setPattern] = useState<Pattern>(initial?.pattern ?? 'none');
   const [accent, setAccent] = useState<Accent>(initial?.accent ?? 'none');
+  const [layout, setLayout] = useState<'auto' | 'manual'>(initial?.layout ?? 'auto');
   const [advanced, setAdvanced] = useState(false);
 
   function applyTemplate(t: Template) {
@@ -75,7 +77,7 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
           <div className="mx-auto max-w-[260px]">
             <div className="card-3d overflow-hidden rounded-2xl">
               <div
-                className={`relative flex aspect-square flex-col overflow-hidden ${!imgUrl ? 'justify-center' : POS_CLASS[pos]} ${dark ? 'text-slate-900' : 'text-white'}`}
+                className={`relative flex aspect-square flex-col overflow-hidden ${!imgUrl ? 'justify-center' : imgUrl && layout === 'auto' ? 'justify-end' : POS_CLASS[pos]} ${dark ? 'text-slate-900' : 'text-white'}`}
                 style={imgUrl ? undefined : { backgroundImage: `linear-gradient(150deg, ${t.from}, ${t.to})` }}
               >
                 {imgUrl && (
@@ -87,11 +89,20 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
                 )}
                 <ClassifiedDecor pattern={pattern} accent={accent} dark={dark} />
                 {link && <span className="absolute right-2 top-2 z-10 rounded-full bg-white/25 p-1 backdrop-blur"><ExternalLink className="h-3.5 w-3.5" /></span>}
-                <div className={`relative z-10 space-y-1.5 p-4 ${!imgUrl ? 'text-center' : align === 'center' ? 'text-center' : 'text-right'}`}>
-                  {title && <h3 className={`line-clamp-4 leading-tight drop-shadow ${(!imgUrl ? SIZE_TITLE_POSTER : SIZE_TITLE)[size]} ${bold ? 'font-extrabold' : 'font-medium'}`}>{title}</h3>}
-                  {body && <p className={`line-clamp-3 leading-snug drop-shadow ${(!imgUrl ? SIZE_BODY_POSTER : SIZE_BODY)[size]} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{body}</p>}
-                  {!title && !body && !imgUrl && <p className="text-sm opacity-80">اكتب نصاً أو أضف صورة…</p>}
-                </div>
+                {imgUrl && layout === 'auto' && (title || body) ? (
+                  <div className="relative z-10 p-2">
+                    <div className="rounded-xl bg-black/45 p-2.5 text-center backdrop-blur-sm">
+                      {title && <h3 className={`line-clamp-2 leading-tight drop-shadow ${SIZE_TITLE[size]} ${bold ? 'font-extrabold' : 'font-semibold'}`}>{title}</h3>}
+                      {body && <p className={`mt-0.5 line-clamp-2 leading-snug text-white/90 drop-shadow ${SIZE_BODY[size]}`}>{body}</p>}
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`relative z-10 space-y-1.5 p-4 ${!imgUrl ? 'text-center' : align === 'center' ? 'text-center' : 'text-right'}`}>
+                    {title && <h3 className={`line-clamp-4 leading-tight drop-shadow ${(!imgUrl ? SIZE_TITLE_POSTER : SIZE_TITLE)[size]} ${bold ? 'font-extrabold' : 'font-medium'}`}>{title}</h3>}
+                    {body && <p className={`line-clamp-3 leading-snug drop-shadow ${(!imgUrl ? SIZE_BODY_POSTER : SIZE_BODY)[size]} ${dark ? 'text-slate-700' : 'text-white/90'}`}>{body}</p>}
+                    {!title && !body && !imgUrl && <p className="text-sm opacity-80">اكتب نصاً أو أضف صورة…</p>}
+                  </div>
+                )}
               </div>
               {(wa || phone) && (
                 <div className="flex gap-1.5 p-1.5">
@@ -143,6 +154,7 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
         <input type="hidden" name="size" value={size} />
         <input type="hidden" name="pattern" value={pattern} />
         <input type="hidden" name="accent" value={accent} />
+        <input type="hidden" name="layout" value={layout} />
         {bold && <input type="hidden" name="bold" value="1" />}
 
         <div>
@@ -160,6 +172,22 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
           {!imgBusy && imgUrl && <p className="mt-1 text-xs text-green-600">✓ الصورة جاهزة</p>}
           {initial?.id && initial?.image && <p className="mt-1 text-xs text-muted-foreground">اترك الحقل فارغاً للإبقاء على الصورة الحالية.</p>}
         </div>
+
+        {/* صورة + نص: اختر ترتيباً تلقائياً جميلاً أو تحكّم في مكان النص */}
+        {imgUrl && (title || body) && (
+          <div className="rounded-lg border border-primary/20 bg-accent/30 p-3">
+            <p className="mb-2 text-sm font-semibold text-primary">ترتيب النص فوق الصورة</p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setLayout('auto')} className={`flex-1 rounded-lg border p-2 text-xs font-medium ${layout === 'auto' ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}>
+                ✨ ترتيب تلقائي جميل
+              </button>
+              <button type="button" onClick={() => { setLayout('manual'); setAdvanced(true); }} className={`flex-1 rounded-lg border p-2 text-xs font-medium ${layout === 'manual' ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}>
+                🎯 أتحكّم في مكان النص
+              </button>
+            </div>
+            {layout === 'manual' && <p className="mt-2 text-xs text-muted-foreground">استخدم «التخصيص المتقدّم» بالأسفل لضبط موضع النص ومحاذاته.</p>}
+          </div>
+        )}
 
         <div className="rounded-lg border border-primary/20 bg-accent/40 p-3">
           <p className="mb-2 text-sm font-semibold text-primary">وسيلة التواصل <span className="text-red-600">*</span></p>

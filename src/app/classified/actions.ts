@@ -60,11 +60,12 @@ export async function createClassifiedAction(formData: FormData) {
   const bold = formData.get('bold') ? true : false;
   const pattern = String(formData.get('pattern') || 'none');
   const accent = String(formData.get('accent') || 'none');
+  const layout = String(formData.get('layout') || 'auto');
 
   try {
     await createClassified({
       userId: session.uid, title, body, image, phone, whatsapp, link,
-      theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent,
+      theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent, layout,
     });
   } catch {
     redirect('/classified/new?error=save');
@@ -100,11 +101,12 @@ export async function updateClassifiedAction(formData: FormData) {
   const bold = formData.get('bold') ? true : false;
   const pattern = String(formData.get('pattern') || 'none');
   const accent = String(formData.get('accent') || 'none');
+  const layout = String(formData.get('layout') || 'auto');
 
   try {
     await updateClassified(id, {
       title, body, image: newImage ?? undefined, phone, whatsapp, link,
-      theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent,
+      theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent, layout,
     });
   } catch {
     redirect(`/classified/${id}/edit?error=save`);

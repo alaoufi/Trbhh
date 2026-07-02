@@ -5,7 +5,7 @@ import { getSession } from './auth';
 
 export type Service =
   | 'users' | 'ads' | 'duplicates' | 'classified' | 'categories'
-  | 'words' | 'reports' | 'verifications' | 'debates' | 'comments' | 'packages' | 'promos';
+  | 'words' | 'reports' | 'verifications' | 'debates' | 'comments' | 'packages' | 'promos' | 'backup';
 export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive';
 
 /** Backward-compat alias: a "Perm" is a service (page-level access). */
@@ -29,6 +29,7 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
   { key: 'comments',      label: 'التعليقات',          actions: ['view', 'delete'] },
   { key: 'packages',      label: 'الباقات',            actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'promos',        label: 'الإعلانات الترويجية',  actions: ['view', 'add', 'edit', 'delete'] },
+  { key: 'backup',        label: 'النسخ الاحتياطي',      actions: ['view', 'add', 'edit', 'delete'] },
 ];
 
 export const ACTION_LABELS: Record<Action, string> = {

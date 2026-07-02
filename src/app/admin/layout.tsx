@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Home, Copy, Sparkles, Ban, Crown, Settings, MonitorPlay, BookOpen, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Home, Copy, Sparkles, Ban, Crown, Settings, MonitorPlay, BookOpen, ShieldAlert, DatabaseBackup } from 'lucide-react';
 import { requireAnyAdmin, getUserPerms, getUserRole, ROLE_LABELS, type Perm } from '@/lib/roles';
 import { ScrollTop } from '@/components/scroll-top';
 
@@ -18,6 +18,7 @@ const nav: { href: string; label: string; icon: React.ElementType; perm: Perm | 
   { href: '/admin/packages', label: 'الباقات', icon: Crown, perm: 'packages' },
   { href: '/admin/promos', label: 'الإعلانات الترويجية', icon: MonitorPlay, perm: 'promos' },
   { href: '/admin/settings', label: 'الإعدادات', icon: Settings, perm: 'users' },
+  { href: '/admin/backup', label: 'نسخ احتياطي واستعادة', icon: DatabaseBackup, perm: 'backup' },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

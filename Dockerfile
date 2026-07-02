@@ -29,7 +29,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 # openssl for Prisma; fonts-kacst provides Arabic glyphs for the image watermark
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates fonts-kacst fontconfig \
+# openssl for Prisma; fonts-kacst for Arabic watermark glyphs;
+# default-mysql-client provides mysqldump/mysql for DB backup & restore.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates fonts-kacst fontconfig default-mysql-client \
     && rm -rf /var/lib/apt/lists/* \
     && addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs

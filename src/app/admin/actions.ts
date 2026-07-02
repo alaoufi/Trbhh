@@ -10,6 +10,7 @@ import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } f
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
 import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
+import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { toInt } from '@/lib/utils';
 
 function readPromoPkgForm(formData: FormData) {
@@ -239,6 +240,55 @@ export async function saveSettingsAction(formData: FormData) {
   revalidatePath('/');
   revalidatePath('/classified');
   redirect('/admin/settings?saved=1');
+}
+
+/* ---- Database backup / restore ---- */
+const errUrl = (msg: string) => `/admin/backup?error=${encodeURIComponent(msg).slice(0, 200)}`;
+
+export async function createBackupAction() {
+  await requireAction('backup', 'add');
+  let dest = '/admin/backup?done=backup';
+  try {
+    const name = await createBackup();
+    dest = `/admin/backup?done=backup&name=${encodeURIComponent(name)}`;
+  } catch (e) {
+    dest = errUrl(e instanceof Error ? e.message : 'فشل إنشاء النسخة');
+  }
+  revalidatePath('/admin/backup');
+  redirect(dest);
+}
+
+export async function deleteBackupAction(formData: FormData) {
+  await requireAction('backup', 'delete');
+  const name = String(formData.get('name') || '');
+  let dest = '/admin/backup?done=deleted';
+  try {
+    await deleteBackup(name);
+  } catch (e) {
+    dest = errUrl(e instanceof Error ? e.message : 'فشل الحذف');
+  }
+  revalidatePath('/admin/backup');
+  redirect(dest);
+}
+
+export async function restoreBackupAction(formData: FormData) {
+  await requireAction('backup', 'edit');
+  const name = String(formData.get('name') || '');
+  const confirm = String(formData.get('confirm') || '').trim();
+  const agree = formData.get('agree') !== null;
+  let dest: string;
+  if (!agree || confirm !== 'استعادة') {
+    dest = errUrl('لم تُؤكّد الاستعادة بشكل صحيح — يجب كتابة كلمة «استعادة» وتعليم الإقرار.');
+  } else {
+    try {
+      const { safety } = await restoreBackup(name);
+      dest = `/admin/backup?done=restore&name=${encodeURIComponent(name)}&safety=${encodeURIComponent(safety)}`;
+    } catch (e) {
+      dest = errUrl(e instanceof Error ? e.message : 'فشلت الاستعادة');
+    }
+  }
+  revalidatePath('/admin/backup');
+  redirect(dest);
 }
 
 export async function trustUserAction(formData: FormData) {

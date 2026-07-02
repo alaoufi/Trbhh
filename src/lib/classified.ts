@@ -35,9 +35,19 @@ export async function ensureClassifiedTable() {
     `ADD COLUMN bold TINYINT NOT NULL DEFAULT 1`,
     `ADD COLUMN pattern VARCHAR(10) NOT NULL DEFAULT 'none'`,
     `ADD COLUMN accent VARCHAR(10) NOT NULL DEFAULT 'none'`,
+    `ADD COLUMN views INT NOT NULL DEFAULT 0`,
+    `ADD COLUMN clicks INT NOT NULL DEFAULT 0`,
   ]) {
     await prisma.$executeRawUnsafe(`ALTER TABLE classified_ads ${col}`).catch(() => {});
   }
+  // per-viewer dedup for views (mirrors ads_views)
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS classified_views (
+      ad_id BIGINT UNSIGNED NOT NULL,
+      viewer VARCHAR(64) NOT NULL,
+      PRIMARY KEY (ad_id, viewer)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `).catch(() => {});
   ensured = true;
 }
 
@@ -46,7 +56,7 @@ type Row = {
   body: string | null; image: string | null; phone: string | null;
   whatsapp: string | null; link: string | null; theme: number; created_at: Date | null;
   content_pos?: string | null; text_align?: string | null; font_size?: string | null; bold?: number | null;
-  pattern?: string | null; accent?: string | null;
+  pattern?: string | null; accent?: string | null; views?: number | null; clicks?: number | null;
 };
 
 function toClassified(r: Row): Classified {
@@ -72,6 +82,8 @@ function toClassified(r: Row): Classified {
     pattern: (['none', 'dots', 'stripes', 'grid', 'rays'].includes(pattern) ? pattern : 'none') as Classified['pattern'],
     accent: (['none', 'bar', 'corner', 'frame'].includes(accent) ? accent : 'none') as Classified['accent'],
     createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+    views: Number(r.views) || 0,
+    clicks: Number(r.clicks) || 0,
   };
 }
 
@@ -147,6 +159,23 @@ export async function countClassifieds(): Promise<number> {
   await ensureClassifiedTable();
   const rows = await prisma.$queryRawUnsafe<{ c: bigint | number }[]>(`SELECT COUNT(*) AS c FROM classified_ads WHERE status = 1`);
   return Number(rows[0]?.c || 0);
+}
+
+/** Count a unique view for a classified ad (deduped per viewer). */
+export async function recordClassifiedView(id: number, viewer: string) {
+  await ensureClassifiedTable();
+  try {
+    await prisma.$executeRawUnsafe(`INSERT INTO classified_views (ad_id, viewer) VALUES (?, ?)`, id, viewer);
+    await prisma.$executeRawUnsafe(`UPDATE classified_ads SET views = views + 1 WHERE id = ?`, id);
+  } catch {
+    // duplicate (ad_id, viewer) → already counted; ignore
+  }
+}
+
+/** Count a click-through on a classified ad's link. */
+export async function recordClassifiedClick(id: number) {
+  await ensureClassifiedTable();
+  await prisma.$executeRawUnsafe(`UPDATE classified_ads SET clicks = clicks + 1 WHERE id = ?`, id).catch(() => {});
 }
 
 export async function deleteClassified(id: number) {

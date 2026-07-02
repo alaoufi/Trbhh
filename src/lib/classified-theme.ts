@@ -23,6 +23,8 @@ export type Classified = {
   pattern: Pattern;
   accent: Accent;
   createdAt: string | null;
+  views: number;
+  clicks: number;
 };
 
 /** Gradient color themes. `text` = readable text color on this background. */

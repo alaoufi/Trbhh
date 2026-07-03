@@ -1,5 +1,5 @@
 // Trbhh service worker — lightweight offline shell + runtime cache.
-const CACHE = 'trbhh-v3';
+const CACHE = 'trbhh-v4';
 const CORE = ['/', '/manifest.webmanifest', '/icon-192.png', '/placeholder-ad.svg'];
 
 self.addEventListener('install', (e) => {

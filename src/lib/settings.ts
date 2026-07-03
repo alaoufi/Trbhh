@@ -41,10 +41,12 @@ export async function getSettingBool(k: string, fallback = true): Promise<boolea
 export const SETTING_AD_EDIT_HOURS = 'ad_edit_hours';
 export const SETTING_AD_DELETE_HOURS = 'ad_delete_hours';
 
-/* Grace period (minutes) a member may delete their own chat message. 0 = unlimited. */
+/* Grace period (minutes) a member may delete their own chat message.
+   0 = unlimited (always allowed) — the default, so deletion just works;
+   set a positive number from the admin to restrict it to a grace period. */
 export const SETTING_MSG_DELETE_MINUTES = 'msg_delete_minutes';
 export async function getMsgDeleteMinutes(): Promise<number> {
-  return getSettingNum(SETTING_MSG_DELETE_MINUTES, 60);
+  return getSettingNum(SETTING_MSG_DELETE_MINUTES, 0);
 }
 
 /* Which stat cards show on the home page (CSV of keys; unset => all). */

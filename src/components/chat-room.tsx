@@ -135,16 +135,16 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0 }: { peerId: num
           >
             <p className="whitespace-pre-wrap break-words leading-relaxed">{m.message}</p>
             <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-gray-500">
-              {/* حذف الرسالة (لرسائلي فقط وضمن فترة السماح) — يحذف الرسالة وحدها لا المحادثة */}
+              {/* حذف الرسالة (لرسائلي فقط) — يحذف الرسالة وحدها لا المحادثة */}
               {canDelete(m) && (
                 <button
                   type="button"
                   onClick={() => removeMsg(m.id)}
                   aria-label="حذف الرسالة"
                   title="حذف الرسالة"
-                  className="ml-auto mr-0 text-gray-400 opacity-70 transition hover:text-red-600 group-hover:opacity-100"
+                  className="ml-auto mr-0 flex items-center gap-0.5 rounded-md bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white hover:bg-red-700"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-3 w-3" /> حذف
                 </button>
               )}
               {fmtTime(m.at)}

@@ -6,7 +6,25 @@ import { requireUser } from '@/lib/auth';
 import { getMemberWindows, withinWindow } from '@/lib/settings';
 import { setUserArea } from '@/lib/user-location';
 import { toLocalSaudi } from '@/lib/sms';
+import { respondToReport } from '@/lib/alerts';
+import { setInterests } from '@/lib/interests';
 import { toInt } from '@/lib/utils';
+
+export async function respondToReportAction(formData: FormData) {
+  const session = await requireUser();
+  const reportId = Number(formData.get('reportId') || 0);
+  const text = String(formData.get('response') || '').trim();
+  if (reportId && text) await respondToReport(session.uid, reportId, text);
+  revalidatePath('/account/reports');
+}
+
+export async function setInterestsAction(formData: FormData) {
+  const session = await requireUser();
+  const ids = formData.getAll('categoryId').map((v) => Number(v)).filter((n) => Number.isFinite(n) && n > 0);
+  await setInterests(session.uid, ids);
+  revalidatePath('/account');
+  revalidatePath('/');
+}
 
 export async function deleteAdAction(formData: FormData) {
   const session = await requireUser();

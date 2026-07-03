@@ -6,6 +6,7 @@ import {
   getLatestAds,
   getMostViewedAds,
   getStats,
+  getAdsByCategory,
 } from '@/lib/data';
 import { CategoryTabs } from '@/components/category-tabs';
 import { AdGrid } from '@/components/ad-card';
@@ -13,6 +14,8 @@ import { Section } from '@/components/section';
 import { PromoSlot } from '@/components/promo-slot';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { getHomeStats } from '@/lib/settings';
+import { getSession } from '@/lib/auth';
+import { getInterests } from '@/lib/interests';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +51,16 @@ export default async function HomePage() {
     { key: 'cats', icon: LayoutGrid, value: stats.cats, label: 'قسم', href: '/search' },
   ].filter((s) => homeStats.has(s.key));
 
+  // "أقسام تهمّك" — a logged-in member's chosen categories, pinned to the top
+  const session = await getSession().catch(() => null);
+  const interestIds = session ? await getInterests(session.uid).catch(() => []) : [];
+  const nameById = new Map(categories.map((c) => [c.id, c.name]));
+  const pinned = (
+    await Promise.all(
+      interestIds.slice(0, 5).map(async (id) => ({ id, name: nameById.get(id) || 'قسم', ads: await getAdsByCategory(id, 4).catch(() => []) })),
+    )
+  ).filter((p) => p.ads.length > 0);
+
   return (
     <div className="space-y-4">
       {/* Paid banner — top of home */}
@@ -60,6 +73,21 @@ export default async function HomePage() {
       {statCards.length > 0 && (
         <div className={`grid gap-2 ${['', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'][statCards.length] || 'grid-cols-4'}`}>
           {statCards.map((s) => <Stat key={s.key} icon={s.icon} value={s.value} label={s.label} href={s.href} />)}
+        </div>
+      )}
+
+      {/* أقسام تهمّك — مثبّتة بالأعلى حسب اختيار العضو */}
+      {pinned.length > 0 && (
+        <div className="space-y-4 rounded-2xl border-2 border-primary/20 bg-primary/5 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-extrabold text-primary">⭐ أقسام تهمّك</span>
+            <Link href="/account" className="text-xs text-primary hover:underline">تعديل اهتماماتي</Link>
+          </div>
+          {pinned.map((p) => (
+            <Section key={p.id} title={p.name} href={`/categories/${p.id}`}>
+              <AdGrid ads={p.ads} />
+            </Section>
+          ))}
         </div>
       )}
 

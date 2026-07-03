@@ -17,6 +17,11 @@ export default async function AdminReports() {
   ]);
   const reasonById = new Map(reasons.map((r) => [toInt(r.id), r.reason]));
   const adById = new Map(ads.map((a) => [toInt(a.id), a.title]));
+  // member responses live in a column Prisma doesn't map → read raw (ignore if column not present yet)
+  const respRows = await prisma.$queryRawUnsafe<{ id: bigint | number; response: string | null }[]>(
+    `SELECT id, response FROM repord_ads ORDER BY id DESC LIMIT 100`,
+  ).catch(() => []);
+  const respById = new Map(respRows.map((r) => [toInt(r.id), r.response]));
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">بلاغات الإعلانات ({reports.length})</h1>
@@ -29,6 +34,10 @@ export default async function AdminReports() {
               <span className="text-xs text-muted-foreground">{timeAgo(r.created_at)}</span>
             </div>
             <div className="mt-1 text-sm"><span className="rounded bg-destructive/10 px-2 py-0.5 text-xs text-destructive">{reasonById.get(r.reason_id) || 'بلاغ'}</span> {r.comment && <span className="text-muted-foreground">— {r.comment}</span>}</div>
+            <div className="mt-1 text-xs text-muted-foreground">المُبلِّغ: <Link href={`/admin/users/${r.user_id}`} className="text-primary hover:underline">عضو #{r.user_id}</Link></div>
+            {respById.get(toInt(r.id)) && (
+              <div className="mt-2 rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-sm text-emerald-900"><b>ردّ صاحب الإعلان:</b> {respById.get(toInt(r.id))}</div>
+            )}
           </div>
         ))}
       </div>

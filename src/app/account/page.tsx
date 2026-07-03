@@ -1,8 +1,13 @@
 import Link from 'next/link';
-import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell } from 'lucide-react';
+import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, ListFilter } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
 import { getMemberAlerts } from '@/lib/alerts';
+import { getCategories } from '@/lib/data';
+import { getInterests } from '@/lib/interests';
+import { getSellerRating } from '@/lib/reviews';
+import { InterestsPicker } from '@/components/interests-picker';
+import { setInterestsAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'لوحة التحكم' };
@@ -11,7 +16,9 @@ const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
 
 export default async function AccountHome() {
   const session = await requireUser();
-  const [stats, alerts] = await Promise.all([getMyStats(session.uid), getMemberAlerts(session.uid)]);
+  const [stats, alerts, categories, interests, rating] = await Promise.all([
+    getMyStats(session.uid), getMemberAlerts(session.uid), getCategories(), getInterests(session.uid), getSellerRating(session.uid),
+  ]);
   const cards = [
     { href: '/account/ads', label: 'إعلاناتي', value: stats.ads, icon: Megaphone },
     { href: '/account/favorites', label: 'المفضلة', value: stats.favorites, icon: Heart },
@@ -53,6 +60,25 @@ export default async function AccountHome() {
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><Sparkles className="h-5 w-5" /></span>
         <div><div className="font-bold">إعلاناتي المبوّبة</div><div className="text-xs text-muted-foreground">تعديل أو حذف إعلاناتك المبوّبة</div></div>
       </Link>
+
+      {/* كل ما يخص العضو: تقييماتي والبلاغات */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Link href={`/users/${session.uid}`} className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
+          <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><Star className="h-5 w-5" /></span>
+          <div><div className="font-bold">تقييماتي</div><div className="text-xs text-muted-foreground">{rating.count ? `${rating.avg} من 5 (${en(rating.count)} تقييم)` : 'لا تقييمات بعد'}</div></div>
+        </Link>
+        <Link href="/account/reports" className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
+          <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><Flag className="h-5 w-5" /></span>
+          <div><div className="font-bold">البلاغات على إعلاناتي</div><div className="text-xs text-muted-foreground">راجع البلاغات وأرسل ردّك للإدارة</div></div>
+        </Link>
+      </div>
+
+      {/* الأقسام ذات الاهتمام — تظهر دائماً بأعلى الرئيسية */}
+      <div className="card-3d space-y-2 rounded-xl p-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-primary"><ListFilter className="h-4 w-4" /> أقسامي المهمّة</div>
+        <p className="text-xs text-muted-foreground">اختر الأقسام التي تهمّك من القائمة، وستظهر إعلاناتها دائماً في أعلى الصفحة الرئيسية.</p>
+        <InterestsPicker categories={categories} selected={interests} action={setInterestsAction} />
+      </div>
     </div>
   );
 }

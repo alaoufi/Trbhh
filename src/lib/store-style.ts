@@ -64,6 +64,39 @@ export const STORE_LAYOUTS: { id: StoreLayout; name: string; desc: string }[] = 
   { id: 'bold', name: 'جريء', desc: 'ألوان وعناوين كبيرة' },
 ];
 
+/**
+ * Catalog display styles (شكل عرض الإعلانات): how a store's products are laid
+ * out. The merchant picks any style freely, independent of the site design.
+ */
+export type CatalogStyle = 'tiles' | 'list' | 'cards' | 'gallery';
+export const CATALOG_STYLES: { id: CatalogStyle; name: string; desc: string }[] = [
+  { id: 'tiles', name: 'شبكة', desc: 'مربّعات صور (متجر)' },
+  { id: 'list', name: 'قائمة', desc: 'صورة جانبية وتفاصيل' },
+  { id: 'cards', name: 'بطاقات', desc: 'بطاقة مفصّلة' },
+  { id: 'gallery', name: 'معرض', desc: 'صور كبيرة بعمود' },
+];
+export function isCatalogStyle(v: string | null | undefined): v is CatalogStyle {
+  return v === 'tiles' || v === 'list' || v === 'cards' || v === 'gallery';
+}
+
+/** Fields the merchant may show/hide on product cards. */
+export type CatalogField = 'price' | 'city' | 'views' | 'time' | 'type' | 'special';
+export const CATALOG_FIELDS: { id: CatalogField; name: string }[] = [
+  { id: 'price', name: 'السعر' },
+  { id: 'city', name: 'المدينة' },
+  { id: 'views', name: 'المشاهدات' },
+  { id: 'time', name: 'التاريخ' },
+  { id: 'type', name: 'شارة عرض/طلب' },
+  { id: 'special', name: 'شارة مميّز' },
+];
+export const DEFAULT_CATALOG_FIELDS = 'price,city,views,time,type,special';
+/** Keep only recognised field ids from a comma list. */
+export function cleanFields(csv: string): string {
+  const allowed = new Set(CATALOG_FIELDS.map((f) => f.id));
+  const picked = csv.split(',').map((s) => s.trim()).filter((s) => allowed.has(s as CatalogField));
+  return [...new Set(picked)].join(',');
+}
+
 export type LayoutTokens = { hero: string; card: string; logo: string; align: 'bottom' | 'center'; title: string };
 /** Visual tokens (Tailwind classes) for a store layout template. */
 export function layoutTokens(id: string | null | undefined): LayoutTokens {

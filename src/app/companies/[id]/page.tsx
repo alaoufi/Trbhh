@@ -6,12 +6,12 @@ import { getMyAds } from '@/lib/account';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds } from '@/lib/merchant';
-import { AdGrid } from '@/components/ad-card';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { StoreBottomNav } from '@/components/store-bottomnav';
+import { StoreCatalog } from '@/components/store-catalog';
 import { waLink } from '@/lib/classified-theme';
-import { bannerBackground, storeTier, isLightColor, layoutTokens } from '@/lib/store-style';
+import { bannerBackground, storeTier, isLightColor, layoutTokens, isCatalogStyle, DEFAULT_CATALOG_FIELDS } from '@/lib/store-style';
 import { timeAgo } from '@/lib/utils';
 import { followStoreAction, rateStoreAction, sendCollabAction } from '../actions';
 
@@ -70,6 +70,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const year = s.createdAt ? new Date(s.createdAt).getFullYear() : null;
   const onBrand = isLightColor(brand) ? '#0f172a' : '#ffffff';
   const tk = layoutTokens(meta.layout);
+  const catalogStyle = isCatalogStyle(meta.catalog) ? meta.catalog : 'tiles';
+  const catalogFields = new Set((meta.fields || DEFAULT_CATALOG_FIELDS).split(',').filter(Boolean));
   const tierStyle: Record<string, string> = { gold: 'bg-amber-100 text-amber-800', silver: 'bg-slate-200 text-slate-700', active: 'bg-emerald-100 text-emerald-700', new: 'bg-sky-100 text-sky-700' };
 
   return (
@@ -156,13 +158,13 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           <h2 className="mb-2 text-lg font-bold" style={{ color: brand }}>
             {query ? `نتائج البحث «${query}» (${en(active.length)})` : `كتالوج المتجر (${en(active.length)})`}
           </h2>
-          {active.length > 0 ? <AdGrid ads={active} /> : <p className="rounded-xl bg-white p-6 text-center text-sm text-muted-foreground shadow-sm">{query ? 'لا توجد منتجات مطابقة لبحثك.' : 'لا توجد منتجات معروضة بعد.'}</p>}
+          {active.length > 0 ? <StoreCatalog ads={active} style={catalogStyle} fields={catalogFields} brand={brand} /> : <p className="rounded-xl bg-white p-6 text-center text-sm text-muted-foreground shadow-sm">{query ? 'لا توجد منتجات مطابقة لبحثك.' : 'لا توجد منتجات معروضة بعد.'}</p>}
         </div>
 
         {partnerAds.length > 0 && (
           <div className="scroll-mt-28">
             <h2 className="mb-2 flex items-center gap-2 text-lg font-bold" style={{ color: brand }}><Handshake className="h-5 w-5" /> منتجات شركائنا</h2>
-            <AdGrid ads={partnerAds} />
+            <StoreCatalog ads={partnerAds} style={catalogStyle} fields={catalogFields} brand={brand} />
           </div>
         )}
 

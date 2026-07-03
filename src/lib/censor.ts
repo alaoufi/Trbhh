@@ -1,19 +1,8 @@
 import 'server-only';
 import { prisma } from './prisma';
+import { ensureSchema } from '@/data/schema-sync';
 
-let ensured = false;
-async function ensureTable() {
-  if (ensured) return;
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS banned_words (
-      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-      word VARCHAR(100) NOT NULL,
-      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-  ensured = true;
-}
+const ensureTable = ensureSchema;
 
 let cache: { list: string[]; re: RegExp | null; exp: number } = { list: [], re: null, exp: 0 };
 
@@ -36,7 +25,7 @@ export async function loadBanned(): Promise<void> {
   if (Date.now() < cache.exp && cache.list.length >= 0) return;
   try {
     await ensureTable();
-    const rows = await prisma.$queryRawUnsafe<{ word: string }[]>(`SELECT word FROM banned_words`);
+    const rows = await prisma.banned_words.findMany({ select: { word: true } });
     const list = rows.map((r) => r.word).filter(Boolean);
     cache = { list, re: buildRegex(list), exp: Date.now() + 60_000 };
   } catch {
@@ -59,7 +48,7 @@ export async function censor(text: string | null | undefined): Promise<string> {
 
 export async function getBannedWords(): Promise<{ id: number; word: string }[]> {
   await ensureTable();
-  const rows = await prisma.$queryRawUnsafe<{ id: bigint | number; word: string }[]>(`SELECT id, word FROM banned_words ORDER BY id DESC`);
+  const rows = await prisma.banned_words.findMany({ orderBy: { id: 'desc' } });
   return rows.map((r) => ({ id: Number(r.id), word: r.word }));
 }
 
@@ -67,12 +56,12 @@ export async function addBannedWord(word: string) {
   await ensureTable();
   const w = word.trim().slice(0, 100);
   if (!w) return;
-  await prisma.$executeRawUnsafe(`INSERT INTO banned_words (word) VALUES (?)`, w);
+  await prisma.banned_words.create({ data: { word: w } });
   cache.exp = 0; // invalidate
 }
 
 export async function deleteBannedWord(id: number) {
   await ensureTable();
-  await prisma.$executeRawUnsafe(`DELETE FROM banned_words WHERE id = ?`, id);
+  await prisma.banned_words.deleteMany({ where: { id: BigInt(id) } });
   cache.exp = 0;
 }

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2 } from 'lucide-react';
@@ -58,7 +59,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary text-3xl">{pending ? '⏳' : '🚫'}</div>
         <h1 className="text-lg font-extrabold text-primary">{pending ? 'هذا المتجر قيد المراجعة' : 'هذا المتجر غير متاح حالياً'}</h1>
         <p className="text-sm text-muted-foreground">{pending ? 'يخضع المتجر لموافقة الإدارة وسيظهر للعملاء بعد اعتماده.' : 'تم إيقاف هذا المتجر مؤقتاً من قبل الإدارة.'}</p>
-        <a href="/" className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">الصفحة الرئيسية</a>
+        <Link href="/" className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">الصفحة الرئيسية</Link>
       </div>
     );
   }

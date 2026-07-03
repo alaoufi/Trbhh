@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomInt } from 'node:crypto';
 import { prisma } from './prisma';
+import { ensureSchema } from '@/data/schema-sync';
 import { hashPassword } from './auth';
 import { getSetting } from './settings';
 
@@ -130,20 +131,7 @@ export async function sendVerification(phone: string, message: string): Promise<
 }
 
 /* ---------------- Password-reset OTP ---------------- */
-let otpEnsured = false;
-async function ensureOtp() {
-  if (otpEnsured) return;
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS password_otps (
-      phone VARCHAR(20) NOT NULL PRIMARY KEY,
-      code VARCHAR(6) NOT NULL,
-      expires_at DATETIME NOT NULL,
-      attempts INT NOT NULL DEFAULT 0,
-      last_sent DATETIME NOT NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `).catch(() => {});
-  otpEnsured = true;
-}
+const ensureOtp = ensureSchema;
 
 /** Whether a member is registered with this phone. */
 export async function userExistsByPhone(phone: string): Promise<boolean> {
@@ -166,19 +154,13 @@ export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; de
   if (!configured) return { ok: false, delivered: false, error: 'لم تُضبط بيانات بوابة الإرسال في الإدارة (بوابات التحقق)' };
 
   const norm = normalizeSaudi(phone);
-  const rows = await prisma.$queryRawUnsafe<{ secs: number | bigint }[]>(
-    `SELECT TIMESTAMPDIFF(SECOND, last_sent, NOW()) secs FROM password_otps WHERE phone = ?`, norm,
-  ).catch(() => [] as { secs: number }[]);
-  const secs = rows[0] ? Number(rows[0].secs) : 999;
+  const otp = await prisma.password_otps.findUnique({ where: { phone: norm } }).catch(() => null);
+  const secs = otp ? Math.floor((Date.now() - otp.last_sent.getTime()) / 1000) : 999;
   if (secs < 60) return { ok: false, delivered: false, error: `انتظر ${60 - secs} ثانية قبل إعادة إرسال الرمز` };
 
   const code = String(randomInt(100000, 1000000));
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO password_otps (phone, code, expires_at, attempts, last_sent)
-     VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE), 0, NOW())
-     ON DUPLICATE KEY UPDATE code = VALUES(code), expires_at = VALUES(expires_at), attempts = 0, last_sent = NOW()`,
-    norm, code,
-  );
+  const fresh = { code, expires_at: new Date(Date.now() + 10 * 60_000), attempts: 0, last_sent: new Date() };
+  await prisma.password_otps.upsert({ where: { phone: norm }, create: { phone: norm, ...fresh }, update: fresh });
   const delivered = await sendVerification(norm, `رمز استعادة كلمة المرور في تربح: ${code}`);
   return { ok: true, delivered };
 }
@@ -198,13 +180,10 @@ export async function sendNewPasswordToUser(userId: number): Promise<{ ok: boole
 export async function verifyOtp(phone: string, code: string): Promise<boolean> {
   await ensureOtp();
   const norm = normalizeSaudi(phone);
-  const rows = await prisma.$queryRawUnsafe<{ code: string; expired: number | bigint; attempts: number | bigint }[]>(
-    `SELECT code, (expires_at < NOW()) expired, attempts FROM password_otps WHERE phone = ?`, norm,
-  ).catch(() => [] as { code: string; expired: number; attempts: number }[]);
-  const r = rows[0];
+  const r = await prisma.password_otps.findUnique({ where: { phone: norm } }).catch(() => null);
   if (!r) return false;
-  if (Number(r.expired) === 1 || Number(r.attempts) >= 5) return false;
-  await prisma.$executeRawUnsafe(`UPDATE password_otps SET attempts = attempts + 1 WHERE phone = ?`, norm);
+  if (r.expires_at.getTime() < Date.now() || r.attempts >= 5) return false;
+  await prisma.password_otps.update({ where: { phone: norm }, data: { attempts: { increment: 1 } } });
   return String(r.code) === String(code).trim();
 }
 
@@ -216,6 +195,6 @@ export async function resetPasswordByPhone(phone: string, newPassword: string): 
   if (!user) return false;
   const hash = await hashPassword(newPassword);
   await prisma.users.update({ where: { id: user.id }, data: { password: hash } });
-  await prisma.$executeRawUnsafe(`DELETE FROM password_otps WHERE phone = ?`, norm).catch(() => {});
+  await prisma.password_otps.deleteMany({ where: { phone: norm } }).catch(() => {});
   return true;
 }

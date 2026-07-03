@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from './prisma';
+import { ensureSchema } from '@/data/schema-sync';
 import { toInt } from './utils';
 
 /**
@@ -9,30 +10,12 @@ import { toInt } from './utils';
  */
 export type MemberAlerts = { messages: number; reviews: number; reports: number };
 
-let ensured = false;
-async function ensure() {
-  if (ensured) return;
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS member_seen (
-      user_id BIGINT UNSIGNED NOT NULL,
-      kind VARCHAR(16) NOT NULL,
-      seen_id BIGINT NOT NULL DEFAULT 0,
-      updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (user_id, kind)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `).catch(() => {});
-  // let the reported member write a defence/response to a report on their ad
-  await prisma.$executeRawUnsafe(`ALTER TABLE repord_ads ADD COLUMN response TEXT NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE repord_ads ADD COLUMN responded_at TIMESTAMP NULL`).catch(() => {});
-  ensured = true;
-}
+const ensure = ensureSchema;
 
 async function seenId(userId: number, kind: string): Promise<number> {
   await ensure();
-  const rows = await prisma.$queryRawUnsafe<{ seen_id: bigint | number }[]>(
-    `SELECT seen_id FROM member_seen WHERE user_id = ? AND kind = ?`, userId, kind,
-  ).catch(() => []);
-  return Number(rows[0]?.seen_id || 0);
+  const row = await prisma.member_seen.findUnique({ where: { user_id_kind: { user_id: BigInt(userId), kind } } }).catch(() => null);
+  return Number(row?.seen_id ?? 0);
 }
 
 /** Mark a category as seen up to the newest current item (clears the alert). */
@@ -49,11 +32,15 @@ export async function markSeen(userId: number, kind: 'reviews' | 'reports') {
       maxId = r ? toInt(r.id) : 0;
     }
   }
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO member_seen (user_id, kind, seen_id) VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE seen_id = GREATEST(seen_id, VALUES(seen_id)), updated_at = CURRENT_TIMESTAMP`,
-    userId, kind, maxId,
-  ).catch(() => {});
+  // never regress the watermark (the raw version used GREATEST)
+  const key = { user_id_kind: { user_id: BigInt(userId), kind } };
+  const cur = await prisma.member_seen.findUnique({ where: key }).catch(() => null);
+  const next = BigInt(Math.max(maxId, Number(cur?.seen_id ?? 0)));
+  await prisma.member_seen.upsert({
+    where: key,
+    create: { user_id: BigInt(userId), kind, seen_id: next },
+    update: { seen_id: next, updated_at: new Date() },
+  }).catch(() => {});
 }
 
 async function myAdIds(userId: number): Promise<number[]> {
@@ -85,12 +72,8 @@ export async function getMyAdReports(userId: number) {
   const titleOf = new Map(ads.map((a) => [toInt(a.id), a.title]));
   const reasons = await prisma.report_resons.findMany().catch(() => [] as { id: bigint | number; reason: string }[]);
   const reasonOf = new Map(reasons.map((r) => [toInt(r.id), r.reason]));
-  // responses live in columns Prisma doesn't know about → read them raw
-  const resp = await prisma.$queryRawUnsafe<{ id: bigint | number; response: string | null }[]>(
-    `SELECT id, response FROM repord_ads WHERE id IN (${rows.map(() => '?').join(',') || 'NULL'})`,
-    ...rows.map((r) => toInt(r.id)),
-  ).catch(() => []);
-  const respOf = new Map(resp.map((r) => [toInt(r.id), r.response]));
+  // schema.prisma now declares repord_ads.response — it's already on the rows
+  const respOf = new Map(rows.map((r) => [toInt(r.id), r.response]));
   return rows.map((r) => ({
     id: toInt(r.id),
     adId: r.ads_id,
@@ -109,9 +92,10 @@ export async function respondToReport(userId: number, reportId: number, text: st
   if (!adIds.length) return false;
   const rep = await prisma.repord_ads.findFirst({ where: { id: BigInt(reportId), ads_id: { in: adIds } }, select: { id: true } });
   if (!rep) return false; // not a report on my ad
-  await prisma.$executeRawUnsafe(
-    `UPDATE repord_ads SET response = ?, responded_at = NOW() WHERE id = ?`, text.slice(0, 1000), reportId,
-  ).catch(() => {});
+  await prisma.repord_ads.updateMany({
+    where: { id: BigInt(reportId) },
+    data: { response: text.slice(0, 1000), responded_at: new Date() },
+  }).catch(() => {});
   return true;
 }
 

@@ -1,22 +1,9 @@
 import 'server-only';
 import { prisma } from './prisma';
+import { ensureSchema } from '@/data/schema-sync';
 import { toInt } from './utils';
 
-let ensured = false;
-async function ensureChatExtras() {
-  if (ensured) return;
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS chat_typing (
-      user_id INT NOT NULL,
-      peer_id INT NOT NULL,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      PRIMARY KEY (user_id, peer_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `).catch(() => {});
-  // allow longer chat messages (original column is VARCHAR(255))
-  await prisma.$executeRawUnsafe(`ALTER TABLE chats MODIFY message TEXT`).catch(() => {});
-  ensured = true;
-}
+const ensureChatExtras = ensureSchema;
 
 /** Persist a chat message; clears the sender's "typing" flag. Returns new id. */
 export async function sendChat(fromId: number, toId: number, message: string): Promise<number> {
@@ -29,17 +16,18 @@ export async function sendChat(fromId: number, toId: number, message: string): P
       type_from_user: 'user', type_to_user: 'user', created_at: now, updated_at: now,
     },
   });
-  await prisma.$executeRawUnsafe(`DELETE FROM chat_typing WHERE user_id = ? AND peer_id = ?`, fromId, toId).catch(() => {});
+  await prisma.chat_typing.deleteMany({ where: { user_id: fromId, peer_id: toId } }).catch(() => {});
   return toInt(row.id);
 }
 
 /** Mark the sender as currently typing to the peer. */
 export async function setTyping(fromId: number, toId: number) {
   await ensureChatExtras();
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO chat_typing (user_id, peer_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP`,
-    fromId, toId,
-  ).catch(() => {});
+  await prisma.chat_typing.upsert({
+    where: { user_id_peer_id: { user_id: fromId, peer_id: toId } },
+    create: { user_id: fromId, peer_id: toId },
+    update: { updated_at: new Date() },
+  }).catch(() => {});
 }
 
 /**
@@ -132,11 +120,8 @@ export async function pollThread(userId: number, otherId: number, afterId: numbe
   });
   const myReadMax = readRow ? toInt(readRow.id) : 0;
 
-  const typ = await prisma.$queryRawUnsafe<{ n: bigint | number }[]>(
-    `SELECT COUNT(*) n FROM chat_typing WHERE user_id = ? AND peer_id = ? AND updated_at >= (NOW() - INTERVAL 5 SECOND)`,
-    otherId, userId,
-  ).catch(() => [] as { n: number }[]);
-  const typing = Number(typ[0]?.n || 0) > 0;
+  const typ = await prisma.chat_typing.findUnique({ where: { user_id_peer_id: { user_id: otherId, peer_id: userId } } }).catch(() => null);
+  const typing = !!typ && typ.updated_at.getTime() >= Date.now() - 5_000;
 
   // Full id set of the thread so the client can drop any message the other
   // party deleted (poll only appends new ids; this reconciles removals).

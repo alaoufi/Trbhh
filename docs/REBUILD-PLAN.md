@@ -94,7 +94,7 @@ src/
 |---|---|---|---|
 | 0 | تهيئة Vitest + Playwright config + GitHub Actions | CI أخضر على الفرع | ✅ (اختبارات e2e لاحقاً — تحتاج DB اختبار) |
 | 1 | **اختبارات توصيف** لقواعد العمل الـ14 + رحلات e2e الحرجة | السلوك الحالي محفوظ رقمياً | 🟡 35 اختباراً (تسعير/نص/متاجر/أدوار) — **اصطاد أول خطأ حقيقي** في normalizeAr |
-| 2 | Prisma baseline migration + استئصال `ensure()` + طبقة `data/` | صفر SQL خام خارج `data/`، الاختبارات خضراء | 🟡 DDL موحّد في `data/schema-sync.ts` يعمل عند الإقلاع؛ schema.prisma مصدر الحقيقة؛ **merchant + moderation + roles صفر SQL خام** (إجمالي src: 193→107)؛ N+1 في adminStoreList أُصلح (1+4N→6)، وupsert أسقط استعلامات المتابعة في العدّادات؛ بقية الوحدات تباعاً |
+| 2 | Prisma baseline migration + استئصال `ensure()` + طبقة `data/` | صفر SQL خام خارج `data/`، الاختبارات خضراء | 🟡 DDL موحّد في `data/schema-sync.ts` يعمل عند الإقلاع؛ schema.prisma مصدر الحقيقة؛ **13 وحدة صفر SQL خام** (merchant, moderation, roles, settings, interests, user-location, ad-media, censor, content-guard, alerts, chat, sms — إجمالي src: 193→65)؛ N+1 أُصلح وupsert أسقط الاستعلامات المزدوجة؛ المتبقي: packages/promos/classified الكبيرة + analytics (تجميع مشروع) |
 | 3 | استخراج `domain/` (moderation, merchant, roles, pricing) وإعادة كتابتها | نفس الاختبارات خضراء على الكود الجديد |
 | 4 | أداء: إصلاح N+1 + caching للصفحات العامة | قياس قبل/بعد موثّق | 🟡 بدأت: أحدث/مميّزة/الأكثر مشاهدة/واجهة المتاجر مُخزّنة في Redis بنمط `cached()` المجرَّب (TTL 60–120ث بلا نقاط إبطال قابلة للانجراف) — الرئيسية الآن شبه بلا استعلامات في الزيارات المتتابعة |
 | 5 | تنظيف الصفحات لتصبح رقيقة + توسيع تغطية الاختبارات | — |

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Home, LayoutGrid, MessageCircle, Store } from 'lucide-react';
 
 /**
@@ -10,7 +11,7 @@ export function StoreBottomNav({ brand, wa, isOwner }: { brand: string; wa: stri
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur">
       <div className="mx-auto flex max-w-2xl">
-        <a href="/" className={item}><Home className="h-5 w-5" /> الرئيسية</a>
+        <Link href="/" className={item}><Home className="h-5 w-5" /> الرئيسية</Link>
         <a href="#catalog" className={item} style={{ color: brand }}><LayoutGrid className="h-5 w-5" /> المنتجات</a>
         {wa
           ? <a href={wa} target="_blank" rel="noopener noreferrer" className={item}><MessageCircle className="h-5 w-5" /> تواصل</a>

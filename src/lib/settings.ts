@@ -1,22 +1,13 @@
 import 'server-only';
 import { prisma } from './prisma';
+import { ensureSchema } from '@/data/schema-sync';
 
-let ensured = false;
-async function ensure() {
-  if (ensured) return;
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS site_settings (
-      k VARCHAR(60) NOT NULL PRIMARY KEY,
-      v VARCHAR(255) NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-  ensured = true;
-}
+const ensure = ensureSchema;
 
 export async function getSetting(k: string, fallback = ''): Promise<string> {
   await ensure();
-  const rows = await prisma.$queryRawUnsafe<{ v: string | null }[]>(`SELECT v FROM site_settings WHERE k = ?`, k).catch(() => []);
-  return rows[0]?.v ?? fallback;
+  const row = await prisma.site_settings.findUnique({ where: { k } }).catch(() => null);
+  return row?.v ?? fallback;
 }
 
 export async function getSettingNum(k: string, fallback = 0): Promise<number> {
@@ -27,9 +18,7 @@ export async function getSettingNum(k: string, fallback = 0): Promise<number> {
 
 export async function setSetting(k: string, v: string) {
   await ensure();
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO site_settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)`, k, v,
-  );
+  await prisma.site_settings.upsert({ where: { k }, create: { k, v }, update: { v } });
 }
 
 export async function getSettingBool(k: string, fallback = true): Promise<boolean> {

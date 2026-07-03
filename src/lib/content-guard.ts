@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from './prisma';
+import { ensureSchema } from '@/data/schema-sync';
 
 export type GuardCategory = 'immoral' | 'drugs' | 'weapons' | 'political';
 export const GUARD_CATEGORIES: GuardCategory[] = ['immoral', 'drugs', 'weapons', 'political'];
@@ -56,25 +57,14 @@ export const BUILTIN: Record<GuardCategory, string[]> = {
 };
 
 /* ---- custom (admin-editable) words ---- */
-let ensured = false;
-async function ensure() {
-  if (ensured) return;
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS guard_words (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      category VARCHAR(12) NOT NULL,
-      word VARCHAR(120) NOT NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-  ensured = true;
-}
+const ensure = ensureSchema;
 
 let custom: Record<GuardCategory, string[]> = { immoral: [], drugs: [], weapons: [], political: [] };
 let loadedAt = 0;
 async function loadGuardWords() {
   if (Date.now() - loadedAt < 60000) return; // 60s cache
   await ensure();
-  const rows = await prisma.$queryRawUnsafe<{ category: string; word: string }[]>(`SELECT category, word FROM guard_words`).catch(() => []);
+  const rows = await prisma.guard_words.findMany({ select: { category: true, word: true } }).catch(() => []);
   const next: Record<GuardCategory, string[]> = { immoral: [], drugs: [], weapons: [], political: [] };
   for (const r of rows) if ((GUARD_CATEGORIES as string[]).includes(r.category)) next[r.category as GuardCategory].push(r.word);
   custom = next;
@@ -103,18 +93,18 @@ export async function scanContent(...parts: (string | null | undefined)[]): Prom
 /* ---- admin management ---- */
 export async function getGuardWords(): Promise<{ id: number; category: GuardCategory; word: string }[]> {
   await ensure();
-  const rows = await prisma.$queryRawUnsafe<{ id: number; category: string; word: string }[]>(`SELECT id, category, word FROM guard_words ORDER BY id DESC`).catch(() => []);
+  const rows = await prisma.guard_words.findMany({ orderBy: { id: 'desc' } }).catch(() => []);
   return rows.filter((r) => (GUARD_CATEGORIES as string[]).includes(r.category)).map((r) => ({ id: Number(r.id), category: r.category as GuardCategory, word: r.word }));
 }
 export async function addGuardWord(category: GuardCategory, word: string) {
   await ensure();
   const w = word.trim();
   if (!w || !GUARD_CATEGORIES.includes(category)) return;
-  await prisma.$executeRawUnsafe(`INSERT INTO guard_words (category, word) VALUES (?, ?)`, category, w.slice(0, 120));
+  await prisma.guard_words.create({ data: { category, word: w.slice(0, 120) } });
   loadedAt = 0;
 }
 export async function deleteGuardWord(id: number) {
   await ensure();
-  await prisma.$executeRawUnsafe(`DELETE FROM guard_words WHERE id = ?`, id);
+  await prisma.guard_words.deleteMany({ where: { id } });
   loadedAt = 0;
 }

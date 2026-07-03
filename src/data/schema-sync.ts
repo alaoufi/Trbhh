@@ -113,6 +113,67 @@ const STATEMENTS: string[] = [
     perm VARCHAR(40) NOT NULL,
     PRIMARY KEY (role, perm)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  /* ---- settings / word filters ---- */
+  `CREATE TABLE IF NOT EXISTS site_settings (
+    k VARCHAR(60) NOT NULL PRIMARY KEY,
+    v VARCHAR(255) NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS banned_words (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    word VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS guard_words (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category VARCHAR(12) NOT NULL,
+    word VARCHAR(120) NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  /* ---- member preferences & media ---- */
+  `CREATE TABLE IF NOT EXISTS member_interests (
+    user_id BIGINT UNSIGNED NOT NULL,
+    category_id INT NOT NULL,
+    PRIMARY KEY (user_id, category_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS user_area (
+    user_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    area_id INT NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS ad_media (
+    ad_id BIGINT UNSIGNED NOT NULL,
+    kind VARCHAR(10) NOT NULL,
+    path VARCHAR(255) NOT NULL,
+    PRIMARY KEY (ad_id, kind)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS member_seen (
+    user_id BIGINT UNSIGNED NOT NULL,
+    kind VARCHAR(16) NOT NULL,
+    seen_id BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, kind)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  /* ---- auth / chat ---- */
+  `CREATE TABLE IF NOT EXISTS password_otps (
+    phone VARCHAR(20) NOT NULL PRIMARY KEY,
+    code VARCHAR(6) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    last_sent DATETIME NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS chat_typing (
+    user_id INT NOT NULL,
+    peer_id INT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, peer_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  /* ---- legacy-table amendments ---- */
+  `ALTER TABLE repord_ads ADD COLUMN response TEXT NULL`,
+  `ALTER TABLE repord_ads ADD COLUMN responded_at TIMESTAMP NULL`,
+  `ALTER TABLE chats MODIFY message TEXT`,
 ];
 
 let syncPromise: Promise<void> | null = null;

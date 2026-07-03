@@ -1,220 +1,155 @@
 import {
-  BookOpen, LayoutDashboard, Users, Megaphone, Copy, Sparkles, LayoutGrid, Ban, Flag,
-  ShieldCheck, Crown, MonitorPlay, Settings, ArrowUp, Target, ListChecks,
-  UserPlus, PlusCircle, MessageCircle, BarChart3, Rocket,
+  BookOpen, UserPlus, PlusCircle, Pencil, Sparkles, Heart, MessageCircle, Star,
+  Flag, ShieldCheck, Crown, MonitorPlay, BarChart3, ShieldAlert, Rocket,
 } from 'lucide-react';
-import { ScrollTop } from '@/components/scroll-top';
-
-// دليل العضو — خطوات البدء السريعة
-const MEMBER: { icon: React.ElementType; title: string; text: string; from: string; to: string }[] = [
-  { icon: UserPlus, title: 'أنشئ حسابك', text: 'سجّل برقم جوالك خلال ثوانٍ، وادخل بأمان في أي وقت.', from: '#3287da', to: '#1b4f8a' },
-  { icon: PlusCircle, title: 'أضف إعلانك', text: 'اضغط «أضف إعلان»، اكتب التفاصيل والسعر والموقع، وأرفق صوراً واضحة أو فيديو.', from: '#0ea5e9', to: '#0369a1' },
-  { icon: Sparkles, title: 'صمّم إعلاناً مبوّباً', text: 'بالمصمم الذكي اصنع بطاقة إعلانية جذّابة تلفت الأنظار بسرعة.', from: '#22c55e', to: '#15803d' },
-  { icon: ShieldCheck, title: 'وثّق حسابك', text: 'ارفع وثائقك الرسمية لتحصل على شارة «موثّق» تزيد ثقة العملاء بك.', from: '#10b981', to: '#047857' },
-  { icon: MessageCircle, title: 'تواصل واستقبل', text: 'استقبل العملاء عبر الاتصال أو واتساب أو المراسلة داخل المنصة مباشرة.', from: '#a855f7', to: '#7e22ce' },
-  { icon: Crown, title: 'ميّز إعلانك', text: 'اشترك بباقة أو خدمة تمييز ليظهر إعلانك بشكل بارز وفي أعلى القوائم.', from: '#eab308', to: '#a16207' },
-  { icon: BarChart3, title: 'تابع حسابك', text: 'اطّلع على رسائلك وتقييماتك والبلاغات وردّك عليها، وشاهد تحليلات إعلاناتك.', from: '#f97316', to: '#c2410c' },
-];
+import { GuideView, type GuideSection } from '@/components/guide-view';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'دليل الاستخدام' };
+export const metadata = { title: 'دليل المستخدم' };
 
-type Section = {
-  id: string; title: string; icon: React.ElementType; from: string; to: string;
-  goal: string; steps: string[];
-};
+// بدء سريع بأيقونات وأرقام
+const QUICK: { icon: React.ElementType; title: string; text: string; from: string; to: string }[] = [
+  { icon: UserPlus, title: 'أنشئ حسابك', text: 'سجّل برقم جوالك خلال ثوانٍ.', from: '#3287da', to: '#1b4f8a' },
+  { icon: PlusCircle, title: 'أضف إعلانك', text: 'تفاصيل وصور أو فيديو ووسيلة تواصل.', from: '#0ea5e9', to: '#0369a1' },
+  { icon: Sparkles, title: 'صمّم مبوّباً', text: 'بطاقة جذّابة بالمصمم الذكي.', from: '#22c55e', to: '#15803d' },
+  { icon: ShieldCheck, title: 'وثّق حسابك', text: 'شارة موثّق تزيد ثقة العملاء.', from: '#10b981', to: '#047857' },
+  { icon: MessageCircle, title: 'تواصل', text: 'اتصال/واتساب/مراسلة داخل المنصة.', from: '#a855f7', to: '#7e22ce' },
+  { icon: Crown, title: 'ميّز إعلانك', text: 'باقات ترفعه لأعلى القوائم.', from: '#eab308', to: '#a16207' },
+  { icon: BarChart3, title: 'تابع', text: 'رسائل وتقييمات وبلاغات وتحليلات.', from: '#f97316', to: '#c2410c' },
+];
 
-const SECTIONS: Section[] = [
+const SECTIONS: GuideSection[] = [
   {
-    id: 'dashboard', title: 'لوحة الإدارة', icon: LayoutDashboard, from: '#3287da', to: '#1b4f8a',
-    goal: 'نظرة سريعة على حالة الموقع وأهم الأرقام والمهام العاجلة.',
+    id: 'account', title: 'الحساب: الإنشاء والدخول', icon: UserPlus, from: '#3287da', to: '#1b4f8a',
+    goal: 'إنشاء حسابك والدخول إليه واستعادته بسهولة وأمان.',
     steps: [
-      'تعرض بطاقات بأعداد: الإعلانات، المستخدمين، البلاغات، الإعلانات المكررة، الترويجية بانتظار الموافقة…',
-      'اضغط أي بطاقة للانتقال مباشرة إلى قسمها.',
-      'تظهر لك فقط الأقسام المصرّح لك بها حسب صلاحيتك.',
+      'اضغط «تسجيل الدخول ← إنشاء حساب»، وأدخل الاسم ورقم الجوال وكلمة مرور (6 أحرف على الأقل).',
+      'يُقبل رقم جوالك بأي صيغة (05 / 5 / 966) ويُحفظ بالصيغة الصحيحة تلقائياً.',
+      'نسيت كلمة المرور؟ اضغط «نسيت كلمة المرور» ليصلك رمز عبر رسالة نصية لإعادة تعيينها.',
+      'من «حسابي ← الملف الشخصي» عدّل بياناتك ووسائل تواصلك وموقعك في أي وقت.',
     ],
   },
   {
-    id: 'users', title: 'المستخدمون والصلاحيات', icon: Users, from: '#6366f1', to: '#3730a3',
-    goal: 'إدارة الأعضاء ومنح صلاحيات دقيقة لكل موظف إدارة.',
+    id: 'add', title: 'إضافة إعلان', icon: PlusCircle, from: '#0ea5e9', to: '#0369a1',
+    goal: 'نشر إعلان احترافي يصل للعملاء المهتمّين بسرعة.',
     steps: [
-      'ابحث عن العضو بالاسم أو الجوال.',
-      'وثِّق / ألغِ توثيق العضو، أو احظره / ارفع الحظر.',
-      'عيّن له باقة اشتراك ومدّتها بالأيام.',
-      'اضغط «الصلاحيات» لفتح مصفوفة الصلاحيات: فعّل لكل خدمة (عرض/إضافة/تعديل/حذف/أرشفة) ما يستطيع فعله.',
-      'أو استخدم التعيين السريع: مدير / مشرف / مراقب. ملاحظة: الإعلانات لا تتضمّن «تعديل» حفاظاً على خصوصية الأعضاء.',
+      'اضغط «أضف إعلان»، واختر عرض/طلب والقسم المناسب.',
+      'اكتب عنواناً واضحاً وتفاصيل دقيقة وسعراً، وحدّد المدينة/الموقع.',
+      'أرفق صوراً واضحة (تُضغط تلقائياً)، ويمكن إضافة فيديو أو تسجيل صوتي.',
+      'أدخل جوالاً أو واتساب (إلزامي) ليصلك العملاء، ووافق على تعهّد صحة الإعلان.',
+      'انشر — يظهر فوراً ما لم تُفعّل الإدارة مراجعة الإعلانات قبل النشر.',
     ],
   },
   {
-    id: 'ads', title: 'الإعلانات', icon: Megaphone, from: '#0ea5e9', to: '#0369a1',
-    goal: 'مراجعة إعلانات الأعضاء والتحكم في ظهورها.',
+    id: 'edit', title: 'تعديل وحذف إعلانك', icon: Pencil, from: '#6366f1', to: '#3730a3',
+    goal: 'التحكم بإعلاناتك بعد نشرها.',
     steps: [
-      'استعرض كل الإعلانات أو «بانتظار الموافقة» فقط (عند تفعيل المراجعة).',
-      'ميّز الإعلان (مثبّت بالأعلى) أو أوقفه/فعّله، أو احذفه.',
-      'داخل صفحة الإعلان: أرشفة أو حذف أو حظر العضو — لا يُسمح بتعديل محتوى إعلان العضو.',
+      'من «حسابي ← إعلاناتي» تجد كل إعلاناتك.',
+      'عدّل أو أوقف/فعّل أو احذف الإعلان.',
+      'يُسمح بالتعديل والحذف خلال المدة التي تحددها الإدارة بعد النشر.',
     ],
   },
   {
-    id: 'duplicates', title: 'الإعلانات المكررة', icon: Copy, from: '#f59e0b', to: '#b45309',
-    goal: 'كشف وإزالة الإعلانات المكررة لنفس العضو.',
+    id: 'classified', title: 'المصمم الذكي (المبوّبة)', icon: Sparkles, from: '#22c55e', to: '#15803d',
+    goal: 'تصميم بطاقة إعلانية جذّابة تُعرض في الإعلانات المبوّبة.',
     steps: [
-      'يعرض النظام مجموعات الإعلانات المتطابقة (عنوان/تفاصيل/صور).',
-      'يُبقى دائماً أقدم إعلان في المجموعة.',
-      'اضغط «حذف كل المكرر» لإزالة النسخ الزائدة دفعة واحدة.',
+      'اضغط «المصمم الذكي»، واكتب النص واختر الثيم والألوان والتنسيق.',
+      'أضف صورة أو اجعلها نصية، وحدّد وسيلة تواصل ورابطاً إن رغبت.',
+      'انشر — تظهر بطاقتك ضمن «الإعلانات المبوّبة»، وتتابع مشاهداتها ونقراتها.',
     ],
   },
   {
-    id: 'classified', title: 'الإعلانات المبوّبة', icon: Sparkles, from: '#22c55e', to: '#15803d',
-    goal: 'إدارة بطاقات المصمم الذكي التي يصممها الأعضاء.',
+    id: 'favorites', title: 'المفضلة', icon: Heart, from: '#ef4444', to: '#991b1b',
+    goal: 'حفظ الإعلانات التي تهمّك للرجوع إليها.',
+    steps: ['اضغط القلب على أي إعلان لإضافته للمفضلة.', 'راجعها من «حسابي ← المفضلة» في أي وقت.'],
+  },
+  {
+    id: 'messages', title: 'المراسلات ومراسلة الإدارة', icon: MessageCircle, from: '#a855f7', to: '#7e22ce',
+    goal: 'التواصل داخل المنصة مع المعلنين ومع الإدارة.',
     steps: [
-      'استعرض جميع الإعلانات المبوّبة.',
-      'احذف أي إعلان مخالف.',
-      'تُضبط مدة بقائها ومن يرى إحصائياتها من صفحة «الإعدادات».',
+      'من صفحة الإعلان اضغط «مراسلة» للدردشة مع المعلن (بعلامات ✓✓ و«يكتب الآن»).',
+      'يمكنك حذف رسالتك خلال فترة السماح، وتختفي عند الطرف الآخر بلا أثر.',
+      'من القائمة «مراسلات الإدارة» ثم «مراسلة الإدارة» لبدء محادثة مع الإدارة.',
+      'يصلك ردّ فوري تلقائي، ثم يتابع فريق الدعم طلبك.',
     ],
   },
   {
-    id: 'categories', title: 'الأقسام', icon: LayoutGrid, from: '#14b8a6', to: '#0f766e',
-    goal: 'تنظيم أقسام الموقع التي تُصنّف تحتها الإعلانات.',
-    steps: ['أضف قسماً جديداً بكتابة اسمه.', 'فعّل أو أوقف ظهور أي قسم.'],
+    id: 'reviews', title: 'التقييمات', icon: Star, from: '#eab308', to: '#a16207',
+    goal: 'بناء سمعة موثوقة عبر تقييمات العملاء.',
+    steps: ['قيّم البائع من صفحة ملفه بعد التعامل.', 'تظهر تقييماتك على ملفك، ويصلك تنبيه بأي تقييم جديد.'],
   },
   {
-    id: 'words', title: 'الكلمات المرفوضة وحارس المحتوى', icon: Ban, from: '#ef4444', to: '#991b1b',
-    goal: 'حجب الألفاظ غير اللائقة، ومنع الإعلانات المخالفة تلقائياً.',
+    id: 'reports', title: 'البلاغات والرد عليها', icon: Flag, from: '#f97316', to: '#c2410c',
+    goal: 'الإبلاغ عن المخالفات، والدفاع عن إعلانك عند وجود بلاغ عليه.',
     steps: [
-      'أضف كلمات تُحجب وتظهر مظللة بالأسود (مطابقة كلمة كاملة).',
-      'حارس المحتوى الذكي يفحص كل إعلان ويمنع: السياسي / المخدرات / الأمني / الأخلاقي.',
-      'المحتوى غير الأخلاقي يُرفض ويُحظر الحساب فوراً.',
-      'من صفحة «كلمات الحارس» يمكنك تعديل قوائم كل فئة.',
+      'للإبلاغ: اضغط «إبلاغ» على الإعلان المخالف واختر السبب (هويتك سرّية).',
+      'عند ورود بلاغ على إعلانك يظهر لك في «حسابي ← البلاغات على إعلاناتي».',
+      'اكتب ردّك ومبرّرك ليصل للإدارة — وهوية المُبلِّغ لا تظهر لك.',
     ],
   },
   {
-    id: 'reports', title: 'البلاغات', icon: Flag, from: '#f97316', to: '#c2410c',
-    goal: 'متابعة بلاغات الأعضاء عن الإعلانات المخالفة.',
-    steps: ['استعرض البلاغات وسببها والإعلان المبلّغ عنه.', 'انتقل للإعلان لاتخاذ إجراء (أرشفة/حذف/حظر).'],
+    id: 'verify', title: 'توثيق الحساب', icon: ShieldCheck, from: '#10b981', to: '#047857',
+    goal: 'الحصول على شارة «موثّق» التي تزيد ثقة العملاء.',
+    steps: ['من «حسابي» اختر «توثيق الحساب».', 'ارفع وثائقك الرسمية (السجل/الهوية) لمراجعتها.', 'بعد الاعتماد تظهر شارة موثّق على إعلاناتك وملفك.'],
   },
   {
-    id: 'verifications', title: 'طلبات التوثيق', icon: ShieldCheck, from: '#10b981', to: '#047857',
-    goal: 'اعتماد توثيق حسابات الأعضاء الموثوقين.',
-    steps: ['استعرض الطلبات المعلّقة.', 'اضغط «توثيق» لاعتماد الحساب فيظهر بشارة موثّق.'],
+    id: 'packages', title: 'الباقات والتمييز', icon: Crown, from: '#f59e0b', to: '#b45309',
+    goal: 'إبراز إعلاناتك ورفعها لأعلى القوائم.',
+    steps: ['طالع «الباقات» واختر ما يناسبك.', 'الباقات تمنحك عدد إعلانات أكبر وتميّزاً ذهبياً/فضياً.', 'يظهر الإعلان المميّز بإطار بارز وفي مقدمة القوائم.'],
   },
   {
-    id: 'packages', title: 'الباقات', icon: Crown, from: '#eab308', to: '#a16207',
-    goal: 'تحديد باقات الأعضاء: عدد الإعلانات، مدة البقاء، والتميّز.',
+    id: 'promote', title: 'أعلن معنا (الترويجية)', icon: MonitorPlay, from: '#7c3aed', to: '#5b21b6',
+    goal: 'حجز بانر ترويجي في أماكن بارزة بالموقع.',
+    steps: ['من «أعلن معنا» اختر مدة الباقة، وارفع تصميم البانر ورابطه.', 'يراجع طلبك فريق الإدارة.', 'يبدأ العرض بعد الموافقة وينتهي تلقائياً بانتهاء المدة.'],
+  },
+  {
+    id: 'analytics', title: 'اهتماماتي وتحليلات إعلاناتي', icon: BarChart3, from: '#0891b2', to: '#155e75',
+    goal: 'تخصيص تجربتك ومتابعة أداء إعلاناتك.',
     steps: [
-      'لكل باقة: السعر (0 = مجانية)، عدد الإعلانات/اليوم، الفارق الزمني بالساعات.',
-      'مدة بقاء الإعلان بالأيام (الأقل تختفي أسرع)، والترتيب.',
-      'نجمة تميّز ذهبية أو فضية تظهر على إعلانات صاحب الباقة.',
-      'عدد إعلانات التميّز المثبّتة بالأعلى وعدد أيامها.',
+      'من «حسابي» اختر أقسامك المهمّة لتظهر إعلاناتها بأعلى الصفحة الرئيسية.',
+      'افتح «تحليلات إعلاناتي» لرؤية المشاهدات اليومية وأفضل إعلاناتك أداءً.',
     ],
   },
   {
-    id: 'promos', title: 'الإعلانات الترويجية', icon: MonitorPlay, from: '#a855f7', to: '#7e22ce',
-    goal: 'إدارة البانرات المدفوعة في أماكن ثابتة بالموقع.',
+    id: 'safety', title: 'سلامتك وحماية المحتوى', icon: ShieldAlert, from: '#dc2626', to: '#7f1d1d',
+    goal: 'معرفة القواعد لحماية حسابك وتجنّب الحظر.',
     steps: [
-      'حدّد «باقات المدد والأسعار» (أسبوعان/شهر/ستة أشهر/سنة).',
-      'راجع طلبات الأعضاء: وافق وانشر، ارفض، أو احذف.',
-      'يبدأ عرض الإعلان من تاريخ الموافقة وينتهي تلقائياً.',
-    ],
-  },
-  {
-    id: 'settings', title: 'الإعدادات', icon: Settings, from: '#64748b', to: '#334155',
-    goal: 'ضبط سياسات الموقع العامة.',
-    steps: [
-      'مدة سماح العضو بتعديل/حذف إعلانه (بالساعات).',
-      'إظهار/إخفاء إحصائيات الصفحة الرئيسية.',
-      'من يرى إحصائيات الإعلانات المبوّبة (الجميع/المالك/الإدارة).',
-      'مدة بقاء الإعلان المبوّب بالأيام.',
-      'مراجعة الإعلانات قبل النشر (أو النشر الفوري).',
+      'يُمنع المحتوى غير الأخلاقي أو الأمني أو السياسي أو المخدرات — نصاً وصورةً.',
+      'المحتوى غير الأخلاقي يؤدي لحظر الحساب فوراً، وتكرار المخالفات يحظره.',
+      'تجنّب تكرار نفس الإعلان أو النشر المتسارع (الإغراق) أو حشو الكلمات.',
+      'المدفوعات تتم مباشرة بينك وبين الطرف الآخر — تحقّق جيداً قبل أي تحويل.',
     ],
   },
 ];
 
 export default async function GuidePage() {
   return (
-    <div id="guide-top" className="space-y-5 scroll-mt-20">
-      <ScrollTop targetId="guide-top" />
-      {/* header */}
-      <div className="card-3d overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-[#1b4f8a] p-5 text-white shadow-lg">
-        <div className="flex items-center gap-3">
-          <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/20"><BookOpen className="h-7 w-7" /></span>
-          <div>
-            <h1 className="text-xl font-extrabold">دليل الاستخدام</h1>
-            <p className="text-sm font-bold text-white/85">للأعضاء: كيف تبدأ خطوة بخطوة — وللإدارة: شرح كل خدمة.</p>
-          </div>
-        </div>
-      </div>
-
-      {/* دليل العضو — بدء سريع */}
+    <GuideView
+      topId="guide-top"
+      headerIcon={BookOpen}
+      title="دليل المستخدم"
+      subtitle="كل ما تحتاجه لتنشر وتبيع وتتواصل باحتراف — بالهدف والخطوات."
+      grad="from-primary to-[#1b4f8a]"
+      sections={SECTIONS}
+    >
+      {/* بدء سريع */}
       <section className="card-3d overflow-hidden rounded-2xl">
         <div className="flex items-center gap-3 bg-gradient-to-l from-emerald-600 to-teal-700 p-4 text-white">
           <span className="grid h-11 w-11 place-items-center rounded-xl bg-white/20 ring-1 ring-white/30"><Rocket className="h-6 w-6" /></span>
-          <div><h2 className="text-lg font-extrabold drop-shadow">للأعضاء — ابدأ في 7 خطوات</h2><p className="text-xs font-bold text-white/85">كل ما تحتاجه لتنشر وتبيع وتتواصل باحتراف.</p></div>
+          <div><h2 className="text-lg font-extrabold drop-shadow">ابدأ في 7 خطوات</h2><p className="text-xs font-bold text-white/85">نظرة سريعة، والتفصيل الكامل بالأسفل.</p></div>
         </div>
         <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-          {MEMBER.map((m, i) => (
+          {QUICK.map((m, i) => (
             <div key={i} className="card-3d flex items-start gap-3 rounded-xl p-3">
               <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow-md" style={{ backgroundImage: `linear-gradient(135deg, ${m.from}, ${m.to})` }}>
                 <m.icon className="h-5 w-5" />
                 <span className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-white text-[11px] font-extrabold text-primary shadow ring-1 ring-primary/20">{i + 1}</span>
               </span>
-              <div className="min-w-0">
-                <div className="font-extrabold text-primary">{m.title}</div>
-                <p className="text-sm leading-6 text-foreground/90">{m.text}</p>
-              </div>
+              <div className="min-w-0"><div className="font-extrabold text-primary">{m.title}</div><p className="text-sm leading-6 text-foreground/90">{m.text}</p></div>
             </div>
           ))}
         </div>
       </section>
-
-      {/* index / فهرس (لوحة الإدارة) */}
-      <div className="rounded-xl bg-primary/10 px-4 py-2 text-sm font-extrabold text-primary">القسم التالي مخصّص للإدارة 👇</div>
-
-      {/* index / فهرس */}
-      <div id="guide-index" className="scroll-mt-20 rounded-2xl border-2 border-primary/20 bg-card p-4 shadow-sm">
-        <div className="mb-3 flex items-center gap-2 font-extrabold text-primary"><ListChecks className="h-5 w-5" /> الفهرس — اضغط للانتقال</div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {SECTIONS.map((s, i) => (
-            <a key={s.id} href={`#${s.id}`} className="flex items-center gap-2 rounded-xl border-2 border-primary/15 bg-white px-3 py-2.5 text-sm font-bold text-primary transition hover:-translate-y-0.5 hover:border-primary hover:shadow-md">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundImage: `linear-gradient(135deg, ${s.from}, ${s.to})` }}><s.icon className="h-4 w-4" /></span>
-              <span className="min-w-0 flex-1 whitespace-normal break-words leading-snug">{i + 1}. {s.title}</span>
-            </a>
-          ))}
-        </div>
-      </div>
-
-      {/* sections */}
-      {SECTIONS.map((s, i) => (
-        <section key={s.id} id={s.id} className="scroll-mt-20 overflow-hidden rounded-2xl border-2 border-primary/15 bg-white shadow-sm">
-          {/* colored 3D header */}
-          <div className="flex items-center justify-between gap-3 p-4 text-white" style={{ backgroundImage: `linear-gradient(135deg, ${s.from}, ${s.to})` }}>
-            <div className="flex items-center gap-3">
-              <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/20 shadow-inner ring-1 ring-white/30"><s.icon className="h-7 w-7" /></span>
-              <h2 className="text-lg font-extrabold drop-shadow">{i + 1}. {s.title}</h2>
-            </div>
-            <a href="#guide-index" className="flex items-center gap-1 rounded-full bg-white/20 px-3 py-1.5 text-xs font-bold hover:bg-white/30" title="العودة للفهرس">
-              <ArrowUp className="h-4 w-4" /> الفهرس
-            </a>
-          </div>
-
-          <div className="space-y-3 p-4">
-            <div className="flex items-start gap-2 rounded-xl bg-primary/5 p-3">
-              <Target className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-              <div><div className="text-xs font-extrabold text-primary">الهدف</div><p className="text-sm font-bold text-foreground/90">{s.goal}</p></div>
-            </div>
-            <div>
-              <div className="mb-2 flex items-center gap-2 text-xs font-extrabold text-primary"><ListChecks className="h-4 w-4" /> الإجراء والطريقة</div>
-              <ol className="space-y-2">
-                {s.steps.map((st, j) => (
-                  <li key={j} className="flex items-start gap-2 rounded-lg border border-primary/10 bg-accent/20 p-2.5">
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-extrabold text-white">{j + 1}</span>
-                    <span className="text-sm font-bold text-foreground/90">{st}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        </section>
-      ))}
-    </div>
+    </GuideView>
   );
 }

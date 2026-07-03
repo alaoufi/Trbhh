@@ -61,7 +61,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
         <div className="flex-1 p-2">
           <Item href="/" icon={Home} onClick={close}>الرئيسية</Item>
           <Link href="/guide" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-3 text-[15px] font-extrabold text-primary hover:bg-primary/15">
-            <BookOpen className="h-5 w-5 shrink-0" /> <span>دليل الاستخدام</span>
+            <BookOpen className="h-5 w-5 shrink-0" /> <span>دليل المستخدم</span>
           </Link>
 
           <Group label="حسابي" />
@@ -117,6 +117,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
           <Item href="/pages/privacy" icon={Shield} onClick={close}>سياسة الخصوصية</Item>
           <Item href="/pages/terms" icon={FileText} onClick={close}>الشروط والأحكام</Item>
           {isAdmin && <Item href="/admin" icon={Shield} onClick={close}>لوحة الإدارة</Item>}
+          {isAdmin && <Item href="/admin/guide" icon={BookOpen} onClick={close}>دليل الإدارة</Item>}
         </div>
 
         <div className="border-t border-primary/15 p-3">

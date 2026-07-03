@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles, Crown, MonitorPlay, ShieldAlert, Mail } from 'lucide-react';
+import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles, Crown, MonitorPlay, ShieldAlert, Mail, BookOpen } from 'lucide-react';
 import { adminStats } from '@/lib/admin';
 import { getPackages } from '@/lib/packages';
 import { countPendingPromos } from '@/lib/promos';
@@ -27,6 +27,7 @@ export default async function AdminHome() {
     { label: 'الباقات', value: packages.length, icon: Crown, href: '/admin/packages', perm: 'packages' },
     { label: 'إعلانات ترويجية بانتظار الموافقة', value: pendingPromos, icon: MonitorPlay, href: '/admin/promos', highlight: true, perm: 'promos' },
     { label: 'النقاشات', value: s.debates, icon: MessagesSquare, href: '/debates', perm: null },
+    { label: 'دليل الإدارة', value: 0, icon: BookOpen, href: '/admin/guide', perm: null },
   ];
   const cards = allCards.filter((c) => c.perm === null || perms.has(c.perm));
   return (

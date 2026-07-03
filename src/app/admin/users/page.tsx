@@ -5,6 +5,7 @@ import { toInt, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { requirePerm, getUserRole, ROLE_LABELS } from '@/lib/roles';
 import { getPackages, getUserPackageMap } from '@/lib/packages';
+import { AdminSearch } from '@/components/admin-search';
 import { banUserAction, trustUserAction, assignUserPackageAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -47,7 +48,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">المستخدمون</h1>
-      <form className="flex gap-2"><input name="q" defaultValue={q} placeholder="بحث بالاسم أو الجوال" className="h-10 flex-1 rounded-lg border bg-background px-3 text-sm" /><button className="rounded-lg bg-primary px-4 text-sm text-primary-foreground">بحث</button></form>
+      <AdminSearch basePath="/admin/users" defaultValue={q} placeholder="بحث فوري بالاسم أو اسم المستخدم أو الجوال…" />
       <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead className="border-b bg-secondary/50 text-right"><tr><th className="p-3">الاسم</th><th className="p-3">الجوال</th><th className="p-3">الحالة</th><th className="p-3">الصلاحيات</th><th className="p-3">الباقة</th><th className="p-3">إجراءات</th></tr></thead>
@@ -58,7 +59,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
               const label = role ? ROLE_LABELS[role] : (u.is_admin === 1 ? 'مدير' : null);
               return (
               <tr key={id} className="border-b last:border-0">
-                <td className="p-3"><div className="flex items-center gap-1 font-medium">{u.name || u.userName || '—'}{u.trusted === 1 && <BadgeCheck className="h-4 w-4 text-primary" />}</div><div className="text-xs text-muted-foreground">{timeAgo(u.created_at)}</div></td>
+                <td className="p-3"><Link href={`/admin/users/${id}`} className="flex items-center gap-1 font-medium text-primary hover:underline">{u.name || u.userName || '—'}{u.trusted === 1 && <BadgeCheck className="h-4 w-4 text-primary" />}</Link><div className="text-xs text-muted-foreground">{timeAgo(u.created_at)}</div></td>
                 <td className="p-3" dir="ltr">{u.phoneNumber || '—'}</td>
                 <td className="p-3">{u.ban === 'checked' ? <Badge variant="muted">محظور</Badge> : <Badge variant="trusted">نشط</Badge>}</td>
                 <td className="p-3">

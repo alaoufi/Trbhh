@@ -1,10 +1,10 @@
-import { Trash2, Save } from 'lucide-react';
+import { Trash2, Save, ChevronUp, ChevronDown } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { requirePerm } from '@/lib/roles';
-import { addCategoryAction, toggleCategoryAction, updateCategoryAction, deleteCategoryAction } from '../actions';
+import { addCategoryAction, toggleCategoryAction, updateCategoryAction, deleteCategoryAction, moveCategoryAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الأقسام' };
@@ -27,12 +27,23 @@ export default async function AdminCategories() {
       <p className="text-xs font-bold text-muted-foreground">الترتيب: الرقم الأكبر يظهر أولاً. «موقوف» يختفي من الموقع خلال ثوانٍ.</p>
 
       <div className="grid gap-2">
-        {cats.map((c) => (
+        {cats.map((c, i) => (
           <div key={toInt(c.id)} className="flex flex-wrap items-center gap-2 card-3d rounded-xl p-3">
+            <div className="flex flex-col">
+              <form action={moveCategoryAction}>
+                <input type="hidden" name="catId" value={toInt(c.id)} />
+                <input type="hidden" name="dir" value="up" />
+                <button disabled={i === 0} className="rounded-md border px-1.5 py-0.5 text-xs hover:bg-secondary disabled:opacity-30" title="تحريك لأعلى"><ChevronUp className="h-4 w-4" /></button>
+              </form>
+              <form action={moveCategoryAction}>
+                <input type="hidden" name="catId" value={toInt(c.id)} />
+                <input type="hidden" name="dir" value="down" />
+                <button disabled={i === cats.length - 1} className="rounded-md border px-1.5 py-0.5 text-xs hover:bg-secondary disabled:opacity-30" title="تحريك لأسفل"><ChevronDown className="h-4 w-4" /></button>
+              </form>
+            </div>
             <form action={updateCategoryAction} className="flex flex-1 items-center gap-2">
               <input type="hidden" name="catId" value={toInt(c.id)} />
               <input name="name" defaultValue={c.name} required className={`${field} min-w-0 flex-1`} />
-              <input name="ordered" type="number" defaultValue={c.ordered} title="الترتيب" className={`${field} w-16`} />
               <button className="flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1.5 text-xs font-bold text-primary hover:bg-accent" title="حفظ التعديل">
                 <Save className="h-3.5 w-3.5" /> حفظ
               </button>

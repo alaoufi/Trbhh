@@ -183,6 +183,17 @@ export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; de
   return { ok: true, delivered };
 }
 
+/** Admin action: set a fresh random password for a member and SMS it to them. */
+export async function sendNewPasswordToUser(userId: number): Promise<{ ok: boolean; error?: string }> {
+  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { phoneNumber: true } }).catch(() => null);
+  if (!u?.phoneNumber) return { ok: false, error: 'لا يوجد رقم جوال لهذا العضو' };
+  const pass = String(randomInt(100000, 1000000));
+  await prisma.users.update({ where: { id: BigInt(userId) }, data: { password: await hashPassword(pass) } });
+  const sent = await sendVerification(u.phoneNumber, `كلمة مرورك الجديدة في تربح: ${pass}`);
+  if (!sent) return { ok: false, error: 'حُدّثت كلمة المرور لكن تعذّر إرسال الرسالة (تحقّق من إعداد البوابة)' };
+  return { ok: true };
+}
+
 /** Validate a code (max 5 attempts, 10-minute window). */
 export async function verifyOtp(phone: string, code: string): Promise<boolean> {
   await ensureOtp();

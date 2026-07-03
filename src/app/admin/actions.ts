@@ -11,7 +11,8 @@ import { createPackage, updatePackage, deletePackage, assignUserPackage, type Ti
 import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
-import { MSG_KEYS } from '@/lib/sms';
+import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
+import { hashPassword } from '@/lib/auth';
 import { cacheDel } from '@/lib/redis';
 import { toInt } from '@/lib/utils';
 
@@ -399,4 +400,54 @@ export async function deleteCategoryAction(formData: FormData) {
   const id = BigInt(String(formData.get('catId')));
   await prisma.categories.delete({ where: { id } }).catch(() => {});
   await refreshCategories();
+}
+
+export async function moveCategoryAction(formData: FormData) {
+  await requireAction('categories', 'edit');
+  const id = BigInt(String(formData.get('catId')));
+  const dir = String(formData.get('dir')); // 'up' | 'down'
+  const cats = await prisma.categories.findMany({ orderBy: [{ ordered: 'desc' }, { id: 'desc' }], select: { id: true } });
+  const ids = cats.map((c) => c.id);
+  const idx = ids.findIndex((x) => x === id);
+  const swap = dir === 'up' ? idx - 1 : idx + 1;
+  if (idx >= 0 && swap >= 0 && swap < ids.length) {
+    [ids[idx], ids[swap]] = [ids[swap], ids[idx]];
+    const n = ids.length;
+    for (let i = 0; i < n; i++) await prisma.categories.update({ where: { id: ids[i] }, data: { ordered: n - i } }).catch(() => {});
+  }
+  await refreshCategories();
+}
+
+/* ---- User view / edit / send-password ---- */
+export async function updateUserAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const id = BigInt(String(formData.get('userId')));
+  const uid = toInt(id);
+  const name = String(formData.get('name') || '').trim();
+  const phoneRaw = String(formData.get('phoneNumber') || '').trim();
+  const email = String(formData.get('email') || '').trim();
+  const data: { name?: string; phoneNumber?: string; email?: string | null } = {};
+  if (name) data.name = name;
+  if (phoneRaw) data.phoneNumber = toLocalSaudi(phoneRaw);
+  data.email = email || null;
+  await prisma.users.update({ where: { id }, data }).catch(() => {});
+  revalidatePath(`/admin/users/${uid}`);
+  revalidatePath('/admin/users');
+  redirect(`/admin/users/${uid}?saved=1`);
+}
+
+export async function sendUserPasswordAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const uid = Number(formData.get('userId'));
+  const r = await sendNewPasswordToUser(uid);
+  redirect(`/admin/users/${uid}?${r.ok ? 'sent=1' : 'error=' + encodeURIComponent(r.error || 'فشل الإرسال')}`);
+}
+
+export async function setUserPasswordAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const uid = Number(formData.get('userId'));
+  const pass = String(formData.get('password') || '');
+  if (pass.length < 6) redirect(`/admin/users/${uid}?error=${encodeURIComponent('كلمة المرور 6 أحرف على الأقل')}`);
+  await prisma.users.update({ where: { id: BigInt(uid) }, data: { password: await hashPassword(pass) } }).catch(() => {});
+  redirect(`/admin/users/${uid}?setpass=1`);
 }

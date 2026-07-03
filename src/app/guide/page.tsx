@@ -1,8 +1,20 @@
 import {
   BookOpen, LayoutDashboard, Users, Megaphone, Copy, Sparkles, LayoutGrid, Ban, Flag,
   ShieldCheck, Crown, MonitorPlay, Settings, ArrowUp, Target, ListChecks,
+  UserPlus, PlusCircle, MessageCircle, BarChart3, Rocket,
 } from 'lucide-react';
 import { ScrollTop } from '@/components/scroll-top';
+
+// دليل العضو — خطوات البدء السريعة
+const MEMBER: { icon: React.ElementType; title: string; text: string; from: string; to: string }[] = [
+  { icon: UserPlus, title: 'أنشئ حسابك', text: 'سجّل برقم جوالك خلال ثوانٍ، وادخل بأمان في أي وقت.', from: '#3287da', to: '#1b4f8a' },
+  { icon: PlusCircle, title: 'أضف إعلانك', text: 'اضغط «أضف إعلان»، اكتب التفاصيل والسعر والموقع، وأرفق صوراً واضحة أو فيديو.', from: '#0ea5e9', to: '#0369a1' },
+  { icon: Sparkles, title: 'صمّم إعلاناً مبوّباً', text: 'بالمصمم الذكي اصنع بطاقة إعلانية جذّابة تلفت الأنظار بسرعة.', from: '#22c55e', to: '#15803d' },
+  { icon: ShieldCheck, title: 'وثّق حسابك', text: 'ارفع وثائقك الرسمية لتحصل على شارة «موثّق» تزيد ثقة العملاء بك.', from: '#10b981', to: '#047857' },
+  { icon: MessageCircle, title: 'تواصل واستقبل', text: 'استقبل العملاء عبر الاتصال أو واتساب أو المراسلة داخل المنصة مباشرة.', from: '#a855f7', to: '#7e22ce' },
+  { icon: Crown, title: 'ميّز إعلانك', text: 'اشترك بباقة أو خدمة تمييز ليظهر إعلانك بشكل بارز وفي أعلى القوائم.', from: '#eab308', to: '#a16207' },
+  { icon: BarChart3, title: 'تابع حسابك', text: 'اطّلع على رسائلك وتقييماتك والبلاغات وردّك عليها، وشاهد تحليلات إعلاناتك.', from: '#f97316', to: '#c2410c' },
+];
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'دليل الاستخدام' };
@@ -122,15 +134,40 @@ export default async function GuidePage() {
     <div id="guide-top" className="space-y-5 scroll-mt-20">
       <ScrollTop targetId="guide-top" />
       {/* header */}
-      <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-[#1b4f8a] p-5 text-white shadow-lg">
+      <div className="card-3d overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-[#1b4f8a] p-5 text-white shadow-lg">
         <div className="flex items-center gap-3">
           <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/20"><BookOpen className="h-7 w-7" /></span>
           <div>
-            <h1 className="text-xl font-extrabold">دليل استخدام لوحة الإدارة</h1>
-            <p className="text-sm font-bold text-white/85">لكل خدمة: الهدف منها، وطريقة استخدامها خطوة بخطوة.</p>
+            <h1 className="text-xl font-extrabold">دليل الاستخدام</h1>
+            <p className="text-sm font-bold text-white/85">للأعضاء: كيف تبدأ خطوة بخطوة — وللإدارة: شرح كل خدمة.</p>
           </div>
         </div>
       </div>
+
+      {/* دليل العضو — بدء سريع */}
+      <section className="card-3d overflow-hidden rounded-2xl">
+        <div className="flex items-center gap-3 bg-gradient-to-l from-emerald-600 to-teal-700 p-4 text-white">
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-white/20 ring-1 ring-white/30"><Rocket className="h-6 w-6" /></span>
+          <div><h2 className="text-lg font-extrabold drop-shadow">للأعضاء — ابدأ في 7 خطوات</h2><p className="text-xs font-bold text-white/85">كل ما تحتاجه لتنشر وتبيع وتتواصل باحتراف.</p></div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+          {MEMBER.map((m, i) => (
+            <div key={i} className="card-3d flex items-start gap-3 rounded-xl p-3">
+              <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow-md" style={{ backgroundImage: `linear-gradient(135deg, ${m.from}, ${m.to})` }}>
+                <m.icon className="h-5 w-5" />
+                <span className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-white text-[11px] font-extrabold text-primary shadow ring-1 ring-primary/20">{i + 1}</span>
+              </span>
+              <div className="min-w-0">
+                <div className="font-extrabold text-primary">{m.title}</div>
+                <p className="text-sm leading-6 text-foreground/90">{m.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* index / فهرس (لوحة الإدارة) */}
+      <div className="rounded-xl bg-primary/10 px-4 py-2 text-sm font-extrabold text-primary">القسم التالي مخصّص للإدارة 👇</div>
 
       {/* index / فهرس */}
       <div id="guide-index" className="scroll-mt-20 rounded-2xl border-2 border-primary/20 bg-card p-4 shadow-sm">

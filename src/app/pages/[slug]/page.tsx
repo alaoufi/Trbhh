@@ -1,6 +1,7 @@
 import {
   Building2, ShieldCheck, FileText, HelpCircle, Phone, MessageCircle, Send,
   Database, Lock, UserCog, Cookie, CheckCircle2, AlertTriangle, Ban, Scale, Sparkles, Clock,
+  Search, BarChart3, Megaphone, Handshake,
 } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { SITE, DISCLAIMER } from '@/lib/constants';
@@ -85,6 +86,46 @@ function Hero({ slug }: { slug: string }) {
   );
 }
 
+function AboutExtras() {
+  const features = [
+    { icon: ShieldCheck, title: 'ثقة وأمان', text: 'توثيق للحسابات وحماية ذكية ضد المحتوى المخالف.' },
+    { icon: MessageCircle, title: 'تواصل مباشر', text: 'اتصال وواتساب ومراسلة داخل المنصة بين الطرفين.' },
+    { icon: Search, title: 'وصول أوسع', text: 'تصنيفات ومدن وبحث متقدّم يوصل إعلانك للمهتمّين.' },
+    { icon: BarChart3, title: 'أدوات احترافية', text: 'تحليلات لإعلاناتك وباقات تميّز ترفعها للأعلى.' },
+  ];
+  const steps = [
+    { icon: Megaphone, title: 'انشر إعلانك', text: 'أضف تفاصيلك وصورك في دقائق.' },
+    { icon: Search, title: 'يصلك العملاء', text: 'يظهر إعلانك للباحثين عن خدمتك.' },
+    { icon: Handshake, title: 'تتّفقون مباشرة', text: 'تتواصلون وتُتمّون الصفقة بينكم.' },
+  ];
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        {features.map((f, i) => (
+          <div key={i} className="card-3d flex flex-col items-center gap-2 rounded-2xl p-4 text-center">
+            <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary"><f.icon className="h-6 w-6" /></span>
+            <span className="font-extrabold text-primary">{f.title}</span>
+            <span className="text-xs leading-6 text-muted-foreground">{f.text}</span>
+          </div>
+        ))}
+      </div>
+      <div className="card-3d rounded-2xl p-4">
+        <div className="mb-3 flex items-center gap-2 font-extrabold text-primary"><Sparkles className="h-5 w-5" /> كيف تعمل المنصة؟</div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {steps.map((s, i) => (
+            <div key={i} className="relative rounded-xl border-2 border-primary/15 bg-accent/20 p-3 text-center">
+              <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-primary text-xs font-extrabold text-white">{i + 1}</span>
+              <s.icon className="mx-auto mb-1 h-7 w-7 text-primary" />
+              <div className="font-extrabold text-primary">{s.title}</div>
+              <p className="text-xs leading-6 text-muted-foreground">{s.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 function ContactCards() {
   const cards = [
     { icon: Phone, label: 'اتصال هاتفي', sub: telPhone, href: `tel:${telPhone}`, cls: 'bg-red-600' },
@@ -114,6 +155,8 @@ export default async function StaticPage({ params }: { params: Promise<{ slug: s
       <Hero slug={slug} />
 
       {slug === 'faq' && <FaqAccordion items={FAQ} />}
+
+      {slug === 'about' && <AboutExtras />}
 
       {slug === 'contact' && (
         <>

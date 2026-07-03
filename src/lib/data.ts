@@ -398,7 +398,9 @@ export async function recordView(adId: number, viewerKey: string) {
   try {
     const existing = await prisma.ads_views.findFirst({ where: { ads_id: BigInt(adId), user_id: viewerKey } });
     if (!existing) {
-      await prisma.ads_views.create({ data: { ads_id: BigInt(adId), user_id: viewerKey } });
+      // stamp created_at so the seller analytics time-series has a real date
+      const now = new Date();
+      await prisma.ads_views.create({ data: { ads_id: BigInt(adId), user_id: viewerKey, created_at: now, updated_at: now } });
     }
   } catch {
     /* views are best-effort */

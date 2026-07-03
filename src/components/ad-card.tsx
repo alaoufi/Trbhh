@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { MapPin, Eye, Timer, User, BadgeCheck, Star } from 'lucide-react';
+import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown } from 'lucide-react';
 import type { AdCard as AdCardType } from '@/lib/data';
 import { timeAgo } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -10,22 +10,40 @@ function timeShort(iso: string | null) {
   return s.replace('قبل ', 'منذ ');
 }
 
+// Premium (paid) look per tier — attention-grabbing frame, glow, accent + ribbon.
+const PREMIUM = {
+  gold: { border: '!border-amber-400', ring: 'ring-2 ring-amber-400/70', glow: 'shadow-[0_14px_36px_-8px_rgba(245,158,11,0.55)]', tint: '!bg-gradient-to-b !from-amber-50 !to-white', bar: 'from-amber-400 to-amber-600', chip: 'bg-gradient-to-l from-amber-500 to-amber-600', label: 'إعلان ذهبي مميّز' },
+  silver: { border: '!border-slate-400', ring: 'ring-2 ring-slate-300', glow: 'shadow-[0_12px_30px_-8px_rgba(100,116,139,0.45)]', tint: '!bg-gradient-to-b !from-slate-50 !to-white', bar: 'from-slate-300 to-slate-500', chip: 'bg-gradient-to-l from-slate-500 to-slate-600', label: 'إعلان فضي مميّز' },
+  special: { border: '', ring: 'ring-2 ring-primary/45', glow: 'shadow-[0_12px_30px_-8px_hsl(var(--primary)/0.5)]', tint: '', bar: 'from-primary to-[hsl(var(--primary)/0.55)]', chip: 'bg-primary', label: 'إعلان مميّز' },
+} as const;
+
 export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: 'raised' | 'inset' }) {
   const isReq = ad.adsType === 'request';
   const inset = variant === 'inset';
+  const tier = ad.tier === 'gold' ? 'gold' : ad.tier === 'silver' ? 'silver' : null;
+  const P = tier ? PREMIUM[tier] : ad.special ? PREMIUM.special : null; // paid ads stand out
   return (
     <Link
       href={`/ads/${ad.id}`}
       className={cn(
         'card-3d relative block overflow-hidden rounded-2xl',
-        // بارز: حلقة وارتفاع أوضح — والتالي غائر للداخل لإعطاء تباين وجذب
-        !inset && 'z-10 ring-2 ring-primary/20',
-        inset && 'scale-[0.965] !border-primary/20 bg-secondary/50 !shadow-[inset_0_2px_12px_rgba(0,0,0,0.10)]',
-        isReq && '!border-amber-400 bg-amber-50',
+        // المدفوع أولاً: إطار فاخر وتوهّج جذّاب
+        P && ['z-20', P.border, P.ring, P.glow, P.tint],
+        // العادي: تناوب بارز/غائر لإعطاء إيقاع بصري
+        !P && !inset && 'z-10 ring-2 ring-primary/20',
+        !P && inset && 'scale-[0.965] !border-primary/20 bg-secondary/50 !shadow-[inset_0_2px_12px_rgba(0,0,0,0.10)]',
+        !P && isReq && '!border-amber-400 bg-amber-50',
       )}
     >
-      {/* شريط لوني على حافة البداية (يمين RTL) يميّز البطاقة البارزة */}
-      {!inset && <span className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-b from-primary to-[hsl(var(--primary)/0.55)]" />}
+      {/* شريط لوني على حافة البداية (يمين RTL) */}
+      {(P || !inset) && <span className={cn('absolute inset-y-0 right-0 w-1.5 bg-gradient-to-b', P ? P.bar : 'from-primary to-[hsl(var(--primary)/0.55)]')} />}
+
+      {/* شريط علوي بارز للإعلان المدفوع */}
+      {P && (
+        <div className={cn('flex items-center justify-center gap-1 py-1 text-[11px] font-extrabold text-white', P.chip)}>
+          {tier === 'gold' ? <Crown className="h-3.5 w-3.5" /> : <Star className="h-3.5 w-3.5 fill-white" />} {P.label}
+        </div>
+      )}
       {/* title (right) + image (left) — matches the original layout */}
       <div className="flex items-stretch gap-3 p-3">
         <div className="flex-1">

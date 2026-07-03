@@ -185,12 +185,18 @@ export async function sweepExpiredArchived() {
 }
 
 export async function getLatestAds(take = 12) {
-  sweepExpiredArchived().catch(() => {});
-  const rows = await prisma.ads.findMany({ where: activeAdWhere, orderBy: { id: 'desc' }, take, select: adSelect });
-  return toCards(rows);
+  return cached(`ads:latest:${take}`, 60, async () => {
+    sweepExpiredArchived().catch(() => {});
+    const rows = await prisma.ads.findMany({ where: activeAdWhere, orderBy: { id: 'desc' }, take, select: adSelect });
+    return toCards(rows);
+  });
 }
 
 export async function getFeaturedAds(take = 8) {
+  return cached(`ads:featured:${take}`, 60, () => loadFeaturedAds(take));
+}
+
+async function loadFeaturedAds(take: number) {
   await sweepExpiredFeatured().catch(() => {});
   const rows = await prisma.ads.findMany({
     where: { ...activeAdWhere, adsSpecial: 'checked' },
@@ -206,6 +212,10 @@ export async function getFeaturedAds(take = 8) {
 }
 
 export async function getMostViewedAds(take = 8) {
+  return cached(`ads:mostviewed:${take}`, 120, () => loadMostViewedAds(take));
+}
+
+async function loadMostViewedAds(take: number) {
   const groups = await prisma.ads_views.groupBy({
     by: ['ads_id'],
     _count: true,

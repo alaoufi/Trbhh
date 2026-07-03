@@ -25,34 +25,28 @@ const ensureTables = ensureSchema;
 /** Increment a user's duplicate-attempt counter and return the new total. */
 export async function bumpDupAttempts(userId: number): Promise<number> {
   await ensureTables();
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO dup_attempts (user_id, count) VALUES (?, 1)
-     ON DUPLICATE KEY UPDATE count = count + 1, updated_at = CURRENT_TIMESTAMP`,
-    userId,
-  );
-  const rows = await prisma.$queryRawUnsafe<{ count: number }[]>(
-    `SELECT count FROM dup_attempts WHERE user_id = ?`, userId,
-  );
-  return Number(rows[0]?.count || 0);
+  const row = await prisma.dup_attempts.upsert({
+    where: { user_id: BigInt(userId) },
+    create: { user_id: BigInt(userId), count: 1 },
+    update: { count: { increment: 1 }, updated_at: new Date() },
+  });
+  return row.count;
 }
 
 export async function resetDupAttempts(userId: number) {
   await ensureTables();
-  await prisma.$executeRawUnsafe(`DELETE FROM dup_attempts WHERE user_id = ?`, userId).catch(() => {});
+  await prisma.dup_attempts.deleteMany({ where: { user_id: BigInt(userId) } }).catch(() => {});
 }
 
 /** Increment a strike counter of a given kind and return the new total. */
 export async function recordStrike(userId: number, kind: string): Promise<number> {
   await ensureTables();
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO user_strikes (user_id, kind, count) VALUES (?, ?, 1)
-     ON DUPLICATE KEY UPDATE count = count + 1, updated_at = CURRENT_TIMESTAMP`,
-    userId, kind,
-  );
-  const rows = await prisma.$queryRawUnsafe<{ count: number }[]>(
-    `SELECT count FROM user_strikes WHERE user_id = ? AND kind = ?`, userId, kind,
-  );
-  return Number(rows[0]?.count || 0);
+  const row = await prisma.user_strikes.upsert({
+    where: { user_id_kind: { user_id: BigInt(userId), kind } },
+    create: { user_id: BigInt(userId), kind, count: 1 },
+    update: { count: { increment: 1 }, updated_at: new Date() },
+  });
+  return row.count;
 }
 
 /** Ban a user's account (permanent — used by auto-moderation). */
@@ -66,32 +60,31 @@ const ensureBanCol = ensureSchema;
 /** Auto-lift any temporary bans whose end date has passed. */
 export async function liftExpiredBans() {
   await ensureBanCol();
-  await prisma.$executeRawUnsafe(`UPDATE users SET ban = 'no', ban_until = NULL WHERE ban = 'checked' AND ban_until IS NOT NULL AND ban_until < NOW()`).catch(() => {});
+  await prisma.users.updateMany({
+    where: { ban: 'checked', ban_until: { not: null, lt: new Date() } },
+    data: { ban: 'no', ban_until: null },
+  }).catch(() => {});
 }
 
 /** Ban a user for `days` days, or permanently when days ≤ 0. */
 export async function banUserFor(userId: number, days: number) {
   await ensureBanCol();
-  if (days > 0) {
-    await prisma.$executeRawUnsafe(`UPDATE users SET ban = 'checked', ban_until = DATE_ADD(NOW(), INTERVAL ? DAY) WHERE id = ?`, Math.min(days, 3650), userId).catch(() => {});
-  } else {
-    await prisma.$executeRawUnsafe(`UPDATE users SET ban = 'checked', ban_until = NULL WHERE id = ?`, userId).catch(() => {});
-  }
+  const until = days > 0 ? new Date(Date.now() + Math.min(days, 3650) * 86_400_000) : null;
+  await prisma.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'checked', ban_until: until } }).catch(() => {});
 }
 
 /** Lift a user's ban. */
 export async function unbanUser(userId: number) {
   await ensureBanCol();
-  await prisma.$executeRawUnsafe(`UPDATE users SET ban = 'no', ban_until = NULL WHERE id = ?`, userId).catch(() => {});
+  await prisma.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'no', ban_until: null } }).catch(() => {});
 }
 
 /** Is the user currently banned? (auto-lifts an expired temporary ban first.) */
 export async function isUserBanned(userId: number): Promise<boolean> {
   await ensureBanCol();
-  const rows = await prisma.$queryRawUnsafe<{ ban: string | null; ban_until: Date | null }[]>(`SELECT ban, ban_until FROM users WHERE id = ?`, userId).catch(() => []);
-  const r = rows[0];
+  const r = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { ban: true, ban_until: true } }).catch(() => null);
   if (!r || r.ban !== 'checked') return false;
-  if (r.ban_until && new Date(r.ban_until).getTime() < Date.now()) { await unbanUser(userId); return false; }
+  if (r.ban_until && r.ban_until.getTime() < Date.now()) { await unbanUser(userId); return false; }
   return true;
 }
 
@@ -102,10 +95,11 @@ export async function getBanMap(ids: number[]): Promise<Map<number, Date | null>
   if (!ids.length) return map;
   const list = ids.map((n) => Number(n)).filter(Number.isFinite);
   if (!list.length) return map;
-  const rows = await prisma.$queryRawUnsafe<{ id: number | bigint; ban_until: Date | null }[]>(
-    `SELECT id, ban_until FROM users WHERE ban = 'checked' AND id IN (${list.map(() => '?').join(',')})`, ...list,
-  ).catch(() => []);
-  for (const r of rows) map.set(Number(r.id), r.ban_until ? new Date(r.ban_until) : null);
+  const rows = await prisma.users.findMany({
+    where: { ban: 'checked', id: { in: list.map((n) => BigInt(n)) } },
+    select: { id: true, ban_until: true },
+  }).catch(() => []);
+  for (const r of rows) map.set(Number(r.id), r.ban_until ?? null);
   return map;
 }
 
@@ -115,10 +109,12 @@ export async function logMod(
   e: { kind: string; category?: string | null; term?: string | null; snippet?: string | null; action: 'blocked' | 'banned' },
 ) {
   await ensureTables();
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO mod_log (user_id, kind, category, term, snippet, action) VALUES (?, ?, ?, ?, ?, ?)`,
-    userId, e.kind, e.category ?? null, (e.term ?? null)?.slice?.(0, 160) ?? null, (e.snippet ?? null)?.slice?.(0, 300) ?? null, e.action,
-  ).catch(() => {});
+  await prisma.mod_log.create({
+    data: {
+      user_id: BigInt(userId), kind: e.kind, category: e.category ?? null,
+      term: e.term?.slice(0, 160) ?? null, snippet: e.snippet?.slice(0, 300) ?? null, action: e.action,
+    },
+  }).catch(() => {});
 }
 
 export type ProhibitedOutcome = { banned: boolean; left: number; category: GuardCategory };
@@ -194,9 +190,7 @@ export async function getModLog(limit = 200): Promise<{
   id: number; userId: number; kind: string; category: string | null; term: string | null; snippet: string | null; action: string; createdAt: string | null;
 }[]> {
   await ensureTables();
-  const rows = await prisma.$queryRawUnsafe<{ id: number; user_id: bigint | number; kind: string; category: string | null; term: string | null; snippet: string | null; action: string; created_at: Date | null }[]>(
-    `SELECT id, user_id, kind, category, term, snippet, action, created_at FROM mod_log ORDER BY id DESC LIMIT ?`, limit,
-  ).catch(() => []);
+  const rows = await prisma.mod_log.findMany({ orderBy: { id: 'desc' }, take: limit }).catch(() => []);
   return rows.map((r) => ({
     id: Number(r.id),
     userId: Number(r.user_id),

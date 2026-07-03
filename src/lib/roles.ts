@@ -111,19 +111,17 @@ async function ensureRolePerms() {
   // seed sensible defaults exactly once (so clearing a role later isn't reseeded)
   const seeded = await getSetting('role_perms_seeded', '0').catch(() => '0');
   if (seeded !== '1') {
-    for (const role of MATRIX_ROLES) {
-      for (const k of DEFAULT_ROLE_PERMS[role]) {
-        await prisma.$executeRawUnsafe(`INSERT IGNORE INTO role_perms (role, perm) VALUES (?, ?)`, role, k).catch(() => {});
-      }
-    }
+    const seed = MATRIX_ROLES.flatMap((role) => DEFAULT_ROLE_PERMS[role].map((perm) => ({ role, perm })));
+    await prisma.role_perms.createMany({ data: seed, skipDuplicates: true }).catch(() => {});
     await setSetting('role_perms_seeded', '1').catch(() => {});
   }
   // targeted one-time seed for the store-monitor role (added after initial seeding)
   const storesSeeded = await getSetting('role_perms_stores_seeded_v2', '0').catch(() => '0');
   if (storesSeeded !== '1') {
-    for (const k of DEFAULT_ROLE_PERMS.store_monitor) {
-      await prisma.$executeRawUnsafe(`INSERT IGNORE INTO role_perms (role, perm) VALUES (?, ?)`, 'store_monitor', k).catch(() => {});
-    }
+    await prisma.role_perms.createMany({
+      data: DEFAULT_ROLE_PERMS.store_monitor.map((perm) => ({ role: 'store_monitor', perm })),
+      skipDuplicates: true,
+    }).catch(() => {});
     await setSetting('role_perms_stores_seeded_v2', '1').catch(() => {});
   }
   rolePermsEnsured = true;
@@ -133,7 +131,7 @@ let rolePermCache: { at: number; map: Map<string, Set<string>> } | null = null;
 async function loadRolePerms(): Promise<Map<string, Set<string>>> {
   await ensureRolePerms();
   if (rolePermCache && Date.now() - rolePermCache.at < 30000) return rolePermCache.map;
-  const rows = await prisma.$queryRawUnsafe<{ role: string; perm: string }[]>(`SELECT role, perm FROM role_perms`).catch(() => []);
+  const rows = await prisma.role_perms.findMany().catch(() => []);
   const map = new Map<string, Set<string>>();
   for (const r of rows) {
     if (!map.has(r.role)) map.set(r.role, new Set());
@@ -152,8 +150,8 @@ export async function getRolePermKeys(role: Role): Promise<Set<string>> {
 export async function setRolePermKeys(role: Role, keys: string[]) {
   await ensureRolePerms();
   const valid = [...new Set(keys.filter((k) => MATRIX_SET.has(k)))];
-  await prisma.$executeRawUnsafe(`DELETE FROM role_perms WHERE role = ?`, role);
-  for (const k of valid) await prisma.$executeRawUnsafe(`INSERT IGNORE INTO role_perms (role, perm) VALUES (?, ?)`, role, k);
+  await prisma.role_perms.deleteMany({ where: { role } });
+  if (valid.length) await prisma.role_perms.createMany({ data: valid.map((perm) => ({ role, perm })), skipDuplicates: true });
   rolePermCache = null;
 }
 
@@ -178,12 +176,12 @@ export async function getUserPermKeys(userId: number): Promise<Set<string>> {
   if (u?.is_admin === 1) return new Set(ALL_KEYS);
 
   const out = new Set<string>();
-  const perms = await prisma.$queryRawUnsafe<{ perm: string }[]>(`SELECT perm FROM admin_perms WHERE user_id = ?`, userId).catch(() => []);
+  const perms = await prisma.admin_perms.findMany({ where: { user_id: BigInt(userId) }, select: { perm: true } }).catch(() => []);
   for (const p of perms) if (KEY_SET.has(p.perm)) out.add(p.perm);
 
   // expand any role assignment into keys using the editable matrix
-  const roleRows = await prisma.$queryRawUnsafe<{ role: string }[]>(`SELECT role FROM admin_roles WHERE user_id = ?`, userId).catch(() => []);
-  const role = roleRows[0]?.role as Role | undefined;
+  const roleRow = await prisma.admin_roles.findUnique({ where: { user_id: BigInt(userId) } }).catch(() => null);
+  const role = roleRow?.role as Role | undefined;
   if (role) {
     const rk = await getRolePermKeys(role).catch(() => new Set<string>());
     for (const k of rk) {
@@ -232,10 +230,10 @@ export async function isManager(userId: number): Promise<boolean> {
 export async function setUserPerms(userId: number, keys: string[]) {
   await ensureTables();
   const valid = [...new Set(keys.filter((k) => KEY_SET.has(k)))];
-  await prisma.$executeRawUnsafe(`DELETE FROM admin_perms WHERE user_id = ?`, userId);
-  await prisma.$executeRawUnsafe(`DELETE FROM admin_roles WHERE user_id = ?`, userId).catch(() => {});
-  for (const k of valid) {
-    await prisma.$executeRawUnsafe(`INSERT IGNORE INTO admin_perms (user_id, perm) VALUES (?, ?)`, userId, k);
+  await prisma.admin_perms.deleteMany({ where: { user_id: BigInt(userId) } });
+  await prisma.admin_roles.deleteMany({ where: { user_id: BigInt(userId) } }).catch(() => {});
+  if (valid.length) {
+    await prisma.admin_perms.createMany({ data: valid.map((perm) => ({ user_id: BigInt(userId), perm })), skipDuplicates: true });
   }
 }
 

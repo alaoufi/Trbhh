@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { toInt } from './utils';
 import { ensureSchema } from '@/data/schema-sync';
+import { cached } from './redis';
 
 async function logoUrl(logoId: number | null): Promise<string> {
   if (!logoId) return PLACEHOLDER;
@@ -343,6 +344,11 @@ export async function homeFeaturedStores(limit = 6): Promise<{ userId: number; s
 
 /** Active ads from platform stores, shaped for AdGrid + labelled "من متجر …". */
 export async function homeFeaturedAds() {
+  // one getMyAds round per merchant — cache the assembled showcase briefly
+  return cached('stores:home-ads', 120, () => loadHomeFeaturedAds());
+}
+
+async function loadHomeFeaturedAds() {
   const stores = await homeFeaturedStores(6);
   if (!stores.length) return [];
   const { getMyAds } = await import('./account');

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
-import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings } from '@/lib/merchant';
 import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
@@ -30,6 +30,8 @@ export default async function ManageCompanyPage({ searchParams }: { searchParams
   const offers = store ? await incomingOffers(store.id) : [];
   const collabIds = store ? await collaboratorStoreIds(store.id) : [];
   const collabs = store ? (await Promise.all(collabIds.map((id) => storeCard(id)))).filter(Boolean) : [];
+  const warnings = store ? await getStoreWarnings(store.id) : [];
+  const fmtDate = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d); };
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';
   return (
@@ -48,6 +50,24 @@ export default async function ManageCompanyPage({ searchParams }: { searchParams
       {store && meta && (
         <div className={`card-3d rounded-xl p-3 text-sm font-bold ${meta.status === 1 ? 'text-emerald-700' : meta.status === 0 ? 'text-amber-700' : 'text-red-700'}`}>
           {meta.status === 1 ? '✓ متجرك مُعتمَد وظاهر للجميع.' : meta.status === 0 ? '⏳ متجرك بانتظار موافقة الإدارة قبل الظهور.' : '⛔ متجرك موقوف. تواصل مع الإدارة.'}
+        </div>
+      )}
+
+      {/* تعهّد الشروط الموثّق (نسخة لدى العضو ونسخة لدى الإدارة) */}
+      {store && meta?.termsAgreed && (
+        <div className="card-3d rounded-xl p-3 text-sm">
+          <div className="font-bold text-emerald-700">📄 تعهّدك موثّق</div>
+          <p className="mt-1 text-muted-foreground">وافقت على <Link href="/store-terms" target="_blank" className="font-bold text-primary underline">الشروط والأحكام وسياسة الخصوصية</Link> وتحمّل مسؤولية منتجاتك{meta.termsAgreedAt ? ` بتاريخ ${fmtDate(meta.termsAgreedAt)}` : ''}. (صفحة مقروءة غير قابلة للتعديل، نسخة محفوظة لديك ونسخة لدى إدارة متاجر تربّح).</p>
+        </div>
+      )}
+
+      {/* إنذارات المخالفة الموجّهة للمتجر */}
+      {store && warnings.length > 0 && (
+        <div className="card-3d rounded-xl border-2 border-red-200 bg-red-50/50 p-3 text-sm">
+          <div className="font-bold text-red-700">⚠️ إنذارات ({en(warnings.length)}/3) — عند بلوغ ٣ يُوقف المتجر</div>
+          <ul className="mt-1 space-y-1 text-foreground/80">
+            {warnings.map((w) => <li key={w.id} className="flex justify-between gap-2"><span>• {w.reason || 'مخالفة'}</span><span className="shrink-0 text-xs text-muted-foreground">{w.at ? fmtDate(w.at) : ''}</span></li>)}
+          </ul>
         </div>
       )}
 
@@ -138,7 +158,7 @@ export default async function ManageCompanyPage({ searchParams }: { searchParams
         {!store && (
           <label className="flex items-start gap-2 rounded-xl border-2 border-primary/25 bg-primary/5 p-3 text-sm">
             <input type="checkbox" name="agreeTerms" required className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
-            <span>أوافق على <Link href="/store-terms" target="_blank" className="font-bold text-primary underline">شروط المتجر</Link> وأتحمّل كامل مسؤولية منتجاتي وصحّة بياناتي.</span>
+            <span>أتعهّد بالموافقة على <Link href="/store-terms" target="_blank" className="font-bold text-primary underline">الشروط والأحكام وسياسة الخصوصية</Link> وأتحمّل كامل مسؤولية منتجاتي وصحّة بياناتي.</span>
           </label>
         )}
 

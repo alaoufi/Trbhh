@@ -6,7 +6,7 @@ import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
-import { setStoreStatus, adminRequestHome } from '@/lib/merchant';
+import { setStoreStatus, adminRequestHome, addStoreWarning } from '@/lib/merchant';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
@@ -167,6 +167,24 @@ export async function requestStoreHomeAction(formData: FormData) {
   await requireAction('users', 'edit');
   const id = Number(formData.get('storeId'));
   if (id) await adminRequestHome(id);
+  revalidatePath('/admin/stores');
+}
+
+/** Suspend (stop) or reactivate a store. */
+export async function toggleStoreStatusAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const id = Number(formData.get('storeId'));
+  const suspend = String(formData.get('action')) === 'suspend';
+  if (id) await setStoreStatus(id, suspend ? 2 : 1);
+  revalidatePath('/admin/stores');
+}
+
+/** Issue a violation warning against a store (3 warnings → auto-suspend). */
+export async function warnStoreAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const id = Number(formData.get('storeId'));
+  const reason = String(formData.get('reason') || '').trim();
+  if (id && reason) await addStoreWarning(id, reason);
   revalidatePath('/admin/stores');
 }
 

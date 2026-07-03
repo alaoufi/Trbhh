@@ -62,18 +62,92 @@ async function ensure() {
       created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE KEY uniq_store_user (store_id, user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`).catch(() => {});
+  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN terms_agreed_at TIMESTAMP NULL`).catch(() => {});
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS store_warnings (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      store_id INT NOT NULL, reason VARCHAR(300) NULL,
+      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`).catch(() => {});
   ensured = true;
 }
 
-export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; onPlatform: boolean; nationalId: string | null; phone: string | null; email: string | null; contacts: string | null; status: number };
+export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; onPlatform: boolean; nationalId: string | null; phone: string | null; email: string | null; contacts: string | null; termsAgreed: boolean; termsAgreedAt: string | null; status: number };
 
 export async function getStoreMeta(storeId: number): Promise<StoreMeta> {
   await ensure();
-  const rows = await prisma.$queryRawUnsafe<{ store_name: string | null; brand_color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; catalog_fields: string | null; activity_since: string | null; specialty: string | null; audience: string | null; show_on_platform: number | bigint | null; national_id: string | null; store_phone: string | null; store_email: string | null; contacts: string | null; status: number | bigint }[]>(
-    `SELECT store_name, brand_color, about, banner, tagline, layout, catalog, catalog_fields, activity_since, specialty, audience, show_on_platform, national_id, store_phone, store_email, contacts, status FROM stores WHERE id = ?`, storeId,
+  const rows = await prisma.$queryRawUnsafe<{ store_name: string | null; brand_color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; catalog_fields: string | null; activity_since: string | null; specialty: string | null; audience: string | null; show_on_platform: number | bigint | null; national_id: string | null; store_phone: string | null; store_email: string | null; contacts: string | null; terms_agreed: number | bigint | null; terms_agreed_at: Date | null; status: number | bigint }[]>(
+    `SELECT store_name, brand_color, about, banner, tagline, layout, catalog, catalog_fields, activity_since, specialty, audience, show_on_platform, national_id, store_phone, store_email, contacts, terms_agreed, terms_agreed_at, status FROM stores WHERE id = ?`, storeId,
   ).catch(() => []);
   const r = rows[0];
-  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, since: r?.activity_since ?? null, specialty: r?.specialty ?? null, audience: r?.audience ?? null, onPlatform: Number(r?.show_on_platform ?? 0) === 1, nationalId: r?.national_id ?? null, phone: r?.store_phone ?? null, email: r?.store_email ?? null, contacts: r?.contacts ?? null, status: Number(r?.status ?? 1) };
+  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, since: r?.activity_since ?? null, specialty: r?.specialty ?? null, audience: r?.audience ?? null, onPlatform: Number(r?.show_on_platform ?? 0) === 1, nationalId: r?.national_id ?? null, phone: r?.store_phone ?? null, email: r?.store_email ?? null, contacts: r?.contacts ?? null, termsAgreed: Number(r?.terms_agreed ?? 0) === 1, termsAgreedAt: r?.terms_agreed_at ? new Date(r.terms_agreed_at).toISOString() : null, status: Number(r?.status ?? 1) };
+}
+
+/* ---- Warnings & admin store oversight ---- */
+
+/** All warnings issued against a store (newest first). */
+export async function getStoreWarnings(storeId: number): Promise<{ id: number; reason: string | null; at: string | null }[]> {
+  await ensure();
+  const rows = await prisma.$queryRawUnsafe<{ id: number | bigint; reason: string | null; created_at: Date | null }[]>(
+    `SELECT id, reason, created_at FROM store_warnings WHERE store_id = ? ORDER BY id DESC`, storeId,
+  ).catch(() => []);
+  return rows.map((r) => ({ id: Number(r.id), reason: r.reason ?? null, at: r.created_at ? new Date(r.created_at).toISOString() : null }));
+}
+
+export async function warningsCount(storeId: number): Promise<number> {
+  await ensure();
+  const rows = await prisma.$queryRawUnsafe<{ n: number | bigint }[]>(`SELECT COUNT(*) n FROM store_warnings WHERE store_id = ?`, storeId).catch(() => []);
+  return Number(rows[0]?.n || 0);
+}
+
+/** Issue a violation warning. On the 3rd warning the store is auto-suspended;
+ *  earlier warnings are kept on record. Returns the new count + suspension state. */
+export async function addStoreWarning(storeId: number, reason: string): Promise<{ count: number; suspended: boolean }> {
+  await ensure();
+  await prisma.$executeRawUnsafe(`INSERT INTO store_warnings (store_id, reason) VALUES (?, ?)`, storeId, reason.slice(0, 300) || null).catch(() => {});
+  const count = await warningsCount(storeId);
+  let suspended = false;
+  if (count >= 3) { await setStoreStatus(storeId, 2); suspended = true; }
+  return { count, suspended };
+}
+
+export type AdminStore = {
+  id: number; userId: number; ownerName: string; storeName: string | null; status: number; createdAt: string | null;
+  specialty: string | null; audience: string | null; since: string | null;
+  phone: string | null; email: string | null; contacts: string | null; nationalId: string | null;
+  onPlatform: boolean; termsAgreed: boolean; termsAgreedAt: string | null;
+  followers: number; ratingAvg: number; ratingCount: number; adsCount: number;
+  warnings: { id: number; reason: string | null; at: string | null }[];
+};
+
+/** Full oversight list for the admin store manager (all stores, richest first). */
+export async function adminStoreList(): Promise<AdminStore[]> {
+  await ensure();
+  const rows = await prisma.$queryRawUnsafe<{ id: number | bigint; user_id: number; store_name: string | null; status: number | bigint; created_at: Date | null; activity_since: string | null; specialty: string | null; audience: string | null; store_phone: string | null; store_email: string | null; contacts: string | null; national_id: string | null; show_on_platform: number | bigint | null; terms_agreed: number | bigint | null; terms_agreed_at: Date | null }[]>(
+    `SELECT id, user_id, store_name, status, created_at, activity_since, specialty, audience, store_phone, store_email, contacts, national_id, show_on_platform, terms_agreed, terms_agreed_at FROM stores ORDER BY status ASC, id DESC LIMIT 200`,
+  ).catch(() => []);
+  if (!rows.length) return [];
+  const userIds = [...new Set(rows.map((r) => Number(r.user_id)))];
+  const users = await prisma.users.findMany({ where: { id: { in: userIds.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } });
+  const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || 'عضو']));
+  const out: AdminStore[] = [];
+  for (const r of rows) {
+    const id = Number(r.id);
+    const [followers, rating, adsCount, warnings] = await Promise.all([
+      followersCount(id), getStoreRating(id),
+      prisma.ads.count({ where: { user_id: BigInt(Number(r.user_id)), status: 1 } }).catch(() => 0),
+      getStoreWarnings(id),
+    ]);
+    out.push({
+      id, userId: Number(r.user_id), ownerName: nameById.get(Number(r.user_id)) || 'عضو', storeName: r.store_name ?? null,
+      status: Number(r.status ?? 1), createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+      specialty: r.specialty ?? null, audience: r.audience ?? null, since: r.activity_since ?? null,
+      phone: r.store_phone ?? null, email: r.store_email ?? null, contacts: r.contacts ?? null, nationalId: r.national_id ?? null,
+      onPlatform: Number(r.show_on_platform ?? 0) === 1, termsAgreed: Number(r.terms_agreed ?? 0) === 1, termsAgreedAt: r.terms_agreed_at ? new Date(r.terms_agreed_at).toISOString() : null,
+      followers, ratingAvg: rating.avg, ratingCount: rating.count, adsCount, warnings,
+    });
+  }
+  return out;
 }
 
 /** Save branding fields on the caller's store. */
@@ -95,7 +169,7 @@ export async function saveStoreMeta(userId: number, data: { storeName: string; c
 /** Record that the owner agreed to the store terms (accountability). */
 export async function agreeStoreTerms(userId: number) {
   await ensure();
-  await prisma.$executeRawUnsafe(`UPDATE stores SET terms_agreed = 1 WHERE user_id = ?`, userId).catch(() => {});
+  await prisma.$executeRawUnsafe(`UPDATE stores SET terms_agreed = 1, terms_agreed_at = CURRENT_TIMESTAMP WHERE user_id = ?`, userId).catch(() => {});
 }
 
 /** Does this user own an admin-approved store? (its ads publish directly). */

@@ -1,56 +1,128 @@
 import Link from 'next/link';
-import { Store, Check, X, Home } from 'lucide-react';
+import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone, Phone, Mail, Link2, IdCard, CalendarDays, FileCheck2, AlertTriangle } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getPendingStores, approvedStoreIds } from '@/lib/merchant';
-import { getStores } from '@/lib/stores';
+import { getPendingStores, adminStoreList, type AdminStore } from '@/lib/merchant';
 import { timeAgo } from '@/lib/utils';
-import { approveStoreAction, requestStoreHomeAction } from '../actions';
+import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'اعتماد المتاجر' };
+export const metadata = { title: 'إدارة المتاجر' };
+
+const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
+const STATUS: Record<number, { label: string; cls: string }> = {
+  1: { label: 'معتمد', cls: 'bg-emerald-100 text-emerald-700' },
+  0: { label: 'بانتظار الاعتماد', cls: 'bg-amber-100 text-amber-700' },
+  2: { label: 'موقوف', cls: 'bg-red-100 text-red-700' },
+};
+
+function fmtDate(iso: string | null) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d);
+}
+
+function StoreCard({ s }: { s: AdminStore }) {
+  const st = STATUS[s.status] || STATUS[1];
+  const warns = s.warnings.length;
+  return (
+    <div className="card-3d space-y-3 rounded-2xl p-4">
+      {/* الرأس */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Link href={`/companies/${s.id}`} className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate font-bold text-primary">{s.storeName || `متجر #${s.id}`}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.label}</span>
+            {warns > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700"><AlertTriangle className="h-3 w-3" /> {en(warns)}/3 إنذار</span>}
+          </div>
+          <div className="text-xs text-muted-foreground">التاجر: {s.ownerName} · فُتح {timeAgo(s.createdAt)}</div>
+        </Link>
+      </div>
+
+      {/* المعلومات الكاملة */}
+      <div className="grid gap-1.5 rounded-xl bg-secondary/30 p-3 text-xs sm:grid-cols-2">
+        {s.specialty && <div><span className="text-muted-foreground">التخصّص: </span><b>{s.specialty}</b></div>}
+        {s.audience && <div><span className="text-muted-foreground">الطبقة المستهدفة: </span><b>{s.audience}</b></div>}
+        <div className="flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5 text-muted-foreground" /> مزاولة النشاط: <b>{s.since || '—'}</b></div>
+        <div className="flex items-center gap-1"><IdCard className="h-3.5 w-3.5 text-muted-foreground" /> الهوية/السجل: <b dir="ltr">{s.nationalId || '—'}</b></div>
+        <div className="flex items-center gap-1"><Phone className="h-3.5 w-3.5 text-muted-foreground" /> الجوال: <b dir="ltr">{s.phone || '—'}</b></div>
+        <div className="flex items-center gap-1"><Mail className="h-3.5 w-3.5 text-muted-foreground" /> البريد: <b dir="ltr">{s.email || '—'}</b></div>
+        {s.contacts && <div className="flex items-center gap-1 sm:col-span-2"><Link2 className="h-3.5 w-3.5 text-muted-foreground" /> وسائل تواصل: <b dir="ltr" className="truncate">{s.contacts}</b></div>}
+      </div>
+
+      {/* النشاط والإحصائيات */}
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold text-primary"><Users className="h-4 w-4" /> {en(s.followers)}</div><div className="text-[10px] text-muted-foreground">متابع</div></div>
+        <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold text-primary"><Star className="h-4 w-4 fill-amber-400 text-amber-400" /> {s.ratingCount ? s.ratingAvg : '—'}</div><div className="text-[10px] text-muted-foreground">تقييم ({en(s.ratingCount)})</div></div>
+        <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold text-primary"><Megaphone className="h-4 w-4" /> {en(s.adsCount)}</div><div className="text-[10px] text-muted-foreground">إعلان نشط</div></div>
+      </div>
+
+      {/* تعهّد الشروط */}
+      <div className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-bold ${s.termsAgreed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+        <FileCheck2 className="h-4 w-4 shrink-0" />
+        {s.termsAgreed ? <>وقّع التعهّد بالموافقة على الشروط والأحكام والخصوصية بتاريخ {fmtDate(s.termsAgreedAt)}</> : 'لم يوقّع التعهّد بعد'}
+        <Link href="/store-terms" target="_blank" className="mr-auto underline">عرض التعهّد</Link>
+      </div>
+
+      {/* سِجل الإنذارات */}
+      {warns > 0 && (
+        <div className="space-y-1 rounded-xl border border-red-200 bg-red-50/50 p-3">
+          <div className="flex items-center gap-1 text-xs font-bold text-red-700"><ShieldAlert className="h-4 w-4" /> سِجل الإنذارات ({en(warns)})</div>
+          {s.warnings.map((w) => (
+            <div key={w.id} className="flex items-start justify-between gap-2 text-[11px] text-foreground/80">
+              <span>• {w.reason || 'مخالفة'}</span>
+              <span className="shrink-0 text-muted-foreground">{timeAgo(w.at)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* الإجراءات */}
+      <div className="flex flex-wrap items-center gap-2">
+        {s.status === 0 && (
+          <>
+            <form action={approveStoreAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="approve" /><button className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد</button></form>
+            <form action={approveStoreAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="reject" /><button className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</button></form>
+          </>
+        )}
+        {s.status === 1 && (
+          <>
+            <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend" /><button className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف</button></form>
+            <form action={requestStoreHomeAction}><input type="hidden" name="storeId" value={s.id} /><button className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white"><Home className="h-3.5 w-3.5" /> اطلب للرئيسية</button></form>
+          </>
+        )}
+        {s.status === 2 && (
+          <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="activate" /><button className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Play className="h-3.5 w-3.5" /> إعادة تفعيل</button></form>
+        )}
+      </div>
+
+      {/* إنذار مخالفة منتجات */}
+      <form action={warnStoreAction} className="flex items-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50/40 p-2">
+        <input type="hidden" name="storeId" value={s.id} />
+        <input name="reason" required maxLength={300} placeholder="سبب الإنذار (منتج مخالف…)" className="h-9 min-w-0 flex-1 rounded-lg border bg-white px-2 text-xs outline-none" />
+        <button className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white"><ShieldAlert className="h-3.5 w-3.5" /> إنذار</button>
+      </form>
+    </div>
+  );
+}
 
 export default async function AdminStores() {
   await requireAction('users', 'edit');
-  const [pending, all, approvedIds] = await Promise.all([getPendingStores(), getStores(), approvedStoreIds()]);
-  const approved = all.filter((s) => approvedIds.has(s.id));
+  const [pending, stores] = await Promise.all([getPendingStores(), adminStoreList()]);
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold text-primary">اعتماد المتاجر</h1></div>
-      <p className="text-sm text-muted-foreground">المتاجر الجديدة تنتظر موافقتك قبل ظهورها للعملاء.</p>
-      {pending.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد متاجر بانتظار الاعتماد.</p>}
-      <div className="space-y-2">
-        {pending.map((s) => (
-          <div key={s.id} className="flex flex-wrap items-center gap-2 card-3d rounded-xl p-3">
-            <Link href={`/companies/${s.id}`} className="min-w-0 flex-1">
-              <div className="truncate font-bold text-primary">{s.storeName || `متجر #${s.id}`}</div>
-              <div className="text-xs text-muted-foreground">التاجر: {s.owner} · {timeAgo(s.at)}</div>
-            </Link>
-            <form action={approveStoreAction}>
-              <input type="hidden" name="storeId" value={s.id} />
-              <input type="hidden" name="action" value="approve" />
-              <button className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد</button>
-            </form>
-            <form action={approveStoreAction}>
-              <input type="hidden" name="storeId" value={s.id} />
-              <input type="hidden" name="action" value="reject" />
-              <button className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</button>
-            </form>
-          </div>
-        ))}
-      </div>
+      <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold text-primary">إدارة المتاجر</h1></div>
+      <p className="text-sm text-muted-foreground">معلومات كاملة عن كل متجر ونشاطه، مع الاعتماد والإيقاف والإنذار من المنتجات المخالفة. عند تكرار الإنذارات ٣ مرات يُوقف المتجر تلقائياً وتبقى الإنذارات موثّقة.</p>
 
-      <div className="flex items-center gap-2 pt-2"><Home className="h-5 w-5 text-primary" /><h2 className="font-bold text-primary">اطلب عرض متجر في الصفحة الرئيسية</h2></div>
-      <p className="text-xs text-muted-foreground">تُرسل طلباً لصاحب المتجر؛ عند قبوله تظهر منتجاته في الرئيسية.</p>
-      <div className="space-y-2">
-        {approved.map((s) => (
-          <div key={s.id} className="flex items-center gap-2 card-3d rounded-xl p-3">
-            <Link href={`/companies/${s.id}`} className="min-w-0 flex-1 truncate font-medium hover:text-primary">{s.name}</Link>
-            <form action={requestStoreHomeAction}>
-              <input type="hidden" name="storeId" value={s.id} />
-              <button className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white"><Home className="h-3.5 w-3.5" /> اطلب للرئيسية</button>
-            </form>
-          </div>
-        ))}
+      {pending.length > 0 && (
+        <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/40 p-3">
+          <div className="mb-1 flex items-center gap-2 font-bold text-amber-700"><ShieldAlert className="h-5 w-5" /> بانتظار الاعتماد ({en(pending.length)})</div>
+          <p className="text-xs text-muted-foreground">راجع بيانات المتجر ونشاطه أدناه قبل الاعتماد.</p>
+        </div>
+      )}
+
+      {stores.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد متاجر بعد.</p>}
+      <div className="space-y-3">
+        {stores.map((s) => <StoreCard key={s.id} s={s} />)}
       </div>
     </div>
   );

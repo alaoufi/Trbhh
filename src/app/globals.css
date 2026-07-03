@@ -365,3 +365,16 @@ button:active { }
   transform: none;
   box-shadow: 6px 6px 0 hsl(var(--primary) / 0.28);
 }
+
+/* «متجر (شبكة)» — clean product-grid tiles like a shopping app */
+:root[data-design="shop"]:not([data-theme="night"]) body { background: #f3f4f6; }
+[data-design="shop"] .card-3d {
+  border-width: 1px;
+  border-color: hsl(var(--border));
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+[data-design="shop"] .card-3d:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px -8px rgba(0,0,0,0.20);
+}

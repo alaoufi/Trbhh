@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { cookies } from 'next/headers';
 import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown } from 'lucide-react';
 import type { AdCard as AdCardType } from '@/lib/data';
-import { timeAgo } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+import { timeAgo, formatPrice, cn } from '@/lib/utils';
 
 function timeShort(iso: string | null) {
   const s = timeAgo(iso); // e.g. "قبل 3 يوم"
@@ -105,9 +105,54 @@ function Cell({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-col items-center justify-start">{children}</div>;
 }
 
-export function AdGrid({ ads, className }: { ads: AdCardType[]; className?: string }) {
+/**
+ * Shopping-style tile (متجر / Temu-like): big image on top, bold red price,
+ * badges, rating-ish meta — used when the member picks the "متجر" design.
+ */
+export function AdCardShop({ ad }: { ad: AdCardType }) {
+  const isReq = ad.adsType === 'request';
+  const tier = ad.tier === 'gold' ? 'gold' : ad.tier === 'silver' ? 'silver' : null;
+  return (
+    <Link href={`/ads/${ad.id}`} className="card-3d group flex flex-col overflow-hidden rounded-2xl">
+      <div className="relative aspect-square w-full overflow-hidden bg-white">
+        <Image src={ad.image} alt={ad.title} fill sizes="(max-width:640px) 50vw, 33vw" className="object-cover transition group-hover:scale-105" />
+        {/* شارات فوق الصورة */}
+        <span className={cn('absolute right-0 top-2 rounded-l-full px-2 py-0.5 text-[10px] font-extrabold text-white shadow', isReq ? 'bg-amber-500' : 'bg-primary')}>
+          {isReq ? 'طلب' : 'عرض'}
+        </span>
+        {ad.special && <span className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow">مميّز</span>}
+        {tier && (
+          <span className={cn('absolute left-2 bottom-2 grid h-6 w-6 place-items-center rounded-full shadow', tier === 'gold' ? 'bg-amber-400' : 'bg-slate-300')}>
+            <Star className={cn('h-3.5 w-3.5', tier === 'gold' ? 'fill-amber-700 text-amber-700' : 'fill-slate-600 text-slate-600')} />
+          </span>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-1 p-2">
+        <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-tight text-foreground/90">{ad.title}</h3>
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" /> {new Intl.NumberFormat('en-US').format(ad.views)}</span>
+          {ad.cityName && <span className="flex items-center gap-0.5 truncate"><MapPin className="h-3 w-3" /> {ad.cityName}</span>}
+        </div>
+        <div className="mt-auto flex items-end justify-between gap-1 pt-1">
+          <span className="text-lg font-extrabold text-red-600">{formatPrice(ad.price)}</span>
+          <span className="text-[10px] text-muted-foreground">{timeShort(ad.createdAt)}</span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+export async function AdGrid({ ads, className }: { ads: AdCardType[]; className?: string }) {
   if (!ads.length) {
     return <p className="py-12 text-center text-muted-foreground">لا توجد إعلانات لعرضها حالياً.</p>;
+  }
+  const design = (await cookies()).get('design')?.value || '';
+  if (design === 'shop') {
+    return (
+      <div className={cn('grid grid-cols-2 gap-2.5 sm:grid-cols-3', className)}>
+        {ads.map((ad) => <AdCardShop key={ad.id} ad={ad} />)}
+      </div>
+    );
   }
   return (
     <div className={cn('space-y-3', className)}>

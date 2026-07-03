@@ -13,11 +13,30 @@ export const metadata = { title: 'إدارة المستخدمين' };
 export default async function AdminUsers({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   await requirePerm('users');
   const { q } = await searchParams;
-  const users = await prisma.users.findMany({
-    where: q ? { OR: [{ name: { contains: q } }, { phoneNumber: { contains: q } }, { userName: { contains: q } }] } : {},
-    orderBy: { id: 'desc' },
-    take: 50,
-  });
+  const term = (q || '').trim();
+  type Row = { id: bigint; name: string | null; userName: string | null; phoneNumber: string | null; trusted: number | null; ban: string | null; is_admin: number | null; created_at: Date | null };
+  let users: Row[];
+  if (term) {
+    const like = `%${term}%`;
+    const digits = term.replace(/\D/g, '');
+    // reduce to the significant local part so it matches 05.., 5.., 9665.. formats
+    let sig = digits.startsWith('966') ? digits.slice(3) : digits;
+    sig = sig.replace(/^0+/, '');
+    const phoneLike = `%${sig || digits || term}%`;
+    users = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT id, name, userName, phoneNumber, trusted, ban, is_admin, created_at
+       FROM users
+       WHERE name LIKE ? OR userName LIKE ? OR email LIKE ?
+          OR REPLACE(REPLACE(REPLACE(REPLACE(IFNULL(phoneNumber,''),'+',''),' ',''),'-',''),'00','') LIKE ?
+       ORDER BY id DESC LIMIT 50`,
+      like, like, like, phoneLike,
+    ).catch(() => [] as Row[]);
+  } else {
+    users = (await prisma.users.findMany({
+      orderBy: { id: 'desc' }, take: 50,
+      select: { id: true, name: true, userName: true, phoneNumber: true, trusted: true, ban: true, is_admin: true, created_at: true },
+    })) as unknown as Row[];
+  }
   const ids = users.map((u) => toInt(u.id));
   const [packages, pkgMap, roleLabels] = await Promise.all([
     getPackages(),

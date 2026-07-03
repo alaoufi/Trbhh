@@ -1,6 +1,6 @@
 import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL } from '@/lib/settings';
+import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -9,7 +9,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, homeStats, statsAudience, classifiedDays, adsApproval] = await Promise.all([searchParams, getMemberWindows(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getSettingBool(SETTING_ADS_APPROVAL, false)]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, adsApproval] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getSettingBool(SETTING_ADS_APPROVAL, false)]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -29,6 +29,11 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
         <label className="block space-y-1">
           <span className="text-sm font-medium">مدة السماح بالحذف (ساعات)</span>
           <input name="deleteHours" type="number" min={0} defaultValue={w.deleteHours} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">مدة السماح بحذف الرسالة (دقائق)</span>
+          <input name="msgDeleteMinutes" type="number" min={0} defaultValue={msgDeleteMin} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          <span className="block text-xs text-muted-foreground">خلالها يستطيع العضو حذف رسالته في المحادثة. 0 = دائماً.</span>
         </label>
 
         <div className="border-t border-primary/15 pt-3">

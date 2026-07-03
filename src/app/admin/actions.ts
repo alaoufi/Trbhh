@@ -5,10 +5,11 @@ import { prisma } from '@/lib/prisma';
 import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
+import { adminDeleteMessage } from '@/lib/chat';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_ADS_APPROVAL } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -151,6 +152,14 @@ export async function adminDeleteClassifiedAction(formData: FormData) {
   revalidatePath('/classified');
 }
 
+/** Admin removes a single (inappropriate) chat message from a monitored thread. */
+export async function adminDeleteMessageAction(formData: FormData) {
+  await requireAction('messages', 'delete');
+  const id = Number(formData.get('messageId'));
+  if (id) await adminDeleteMessage(id);
+  revalidatePath('/admin/messages');
+}
+
 /** Delete an ad from its detail page (admin), then go home. */
 export async function adminDeleteAdRedirectAction(formData: FormData) {
   await requireAction('ads', 'delete');
@@ -234,6 +243,7 @@ export async function saveSettingsAction(formData: FormData) {
   await requireAction('users', 'edit');
   const editH = Math.max(0, parseInt(String(formData.get('editHours') || '0')) || 0);
   const delH = Math.max(0, parseInt(String(formData.get('deleteHours') || '0')) || 0);
+  const msgDelMin = Math.max(0, parseInt(String(formData.get('msgDeleteMinutes') || '0')) || 0);
   const homeStats = HOME_STAT_KEYS.filter((k) => formData.get(`stat_${k}`) !== null).join(',');
   const cs = String(formData.get('classifiedStats') || 'owner');
   const classifiedStats = ['all', 'owner', 'admin'].includes(cs) ? cs : 'owner';
@@ -242,6 +252,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_ADS_APPROVAL, adsApproval);
   await setSetting(SETTING_AD_EDIT_HOURS, String(editH));
   await setSetting(SETTING_AD_DELETE_HOURS, String(delH));
+  await setSetting(SETTING_MSG_DELETE_MINUTES, String(msgDelMin));
   await setSetting(SETTING_HOME_STATS, homeStats);
   await setSetting(SETTING_CLASSIFIED_STATS, classifiedStats);
   await setSetting(SETTING_CLASSIFIED_DAYS, String(classifiedDays));

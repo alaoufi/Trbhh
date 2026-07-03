@@ -31,6 +31,11 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
     getUserReviews(uid),
     canReview(uid, session?.uid),
   ]);
+  // viewing your OWN profile clears the "new reviews" alert
+  if (session && session.uid === uid) {
+    const { markSeen } = await import('@/lib/alerts');
+    await markSeen(uid, 'reviews').catch(() => {});
+  }
   const active = myAds.filter((a) => a.status === 1);
   const ads = active.map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
 

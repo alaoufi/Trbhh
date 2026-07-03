@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { pollThread, sendChat, setTyping, deleteChatMessage } from '@/lib/chat';
+import { getMsgDeleteMinutes } from '@/lib/settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ peerId: 
   const body = await req.json().catch(() => ({} as { messageId?: number }));
   const messageId = Number(body.messageId || 0);
   if (!messageId) return Response.json({ ok: false });
-  const ok = await deleteChatMessage(session.uid, messageId);
-  return Response.json({ ok });
+  const windowMin = await getMsgDeleteMinutes();
+  const ok = await deleteChatMessage(session.uid, messageId, windowMin);
+  return Response.json({ ok, expired: !ok });
 }

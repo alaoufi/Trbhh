@@ -13,7 +13,13 @@ function fmtTime(at: string | null): string {
   }
 }
 
-export function ChatRoom({ peerId, initial }: { peerId: number; initial: Msg[] }) {
+export function ChatRoom({ peerId, initial, deleteWindowMin = 0 }: { peerId: number; initial: Msg[]; deleteWindowMin?: number }) {
+  const canDelete = (m: Msg) => {
+    if (!m.fromMe) return false;
+    if (!deleteWindowMin) return true; // unlimited
+    if (!m.at) return true;
+    return (Date.now() - new Date(m.at).getTime()) / 60000 <= deleteWindowMin;
+  };
   const [messages, setMessages] = useState<Msg[]>(initial);
   const [typing, setTyping] = useState(false);
   const [text, setText] = useState('');
@@ -129,8 +135,8 @@ export function ChatRoom({ peerId, initial }: { peerId: number; initial: Msg[] }
           >
             <p className="whitespace-pre-wrap break-words leading-relaxed">{m.message}</p>
             <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-gray-500">
-              {/* حذف الرسالة (لرسائلي فقط) — يحذف الرسالة وحدها لا المحادثة */}
-              {m.fromMe && (
+              {/* حذف الرسالة (لرسائلي فقط وضمن فترة السماح) — يحذف الرسالة وحدها لا المحادثة */}
+              {canDelete(m) && (
                 <button
                   type="button"
                   onClick={() => removeMsg(m.id)}

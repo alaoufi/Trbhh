@@ -43,12 +43,65 @@ export async function setTyping(fromId: number, toId: number) {
 }
 
 /**
- * Delete a SINGLE message. A user may delete only a message they sent
- * (delete-for-everyone). Returns true when a row was removed.
+ * Delete a SINGLE message the user sent (delete-for-everyone), but only within
+ * the configured grace period. `windowMin` = 0 means unlimited.
  */
-export async function deleteChatMessage(userId: number, messageId: number): Promise<boolean> {
+export async function deleteChatMessage(userId: number, messageId: number, windowMin: number): Promise<boolean> {
+  const msg = await prisma.chats.findFirst({ where: { id: BigInt(messageId), sender_id: userId }, select: { created_at: true } });
+  if (!msg) return false;
+  if (windowMin > 0) {
+    const ageMin = msg.created_at ? (Date.now() - msg.created_at.getTime()) / 60000 : Infinity;
+    if (ageMin > windowMin) return false; // grace period passed
+  }
   const res = await prisma.chats.deleteMany({ where: { id: BigInt(messageId), sender_id: userId } });
   return res.count > 0;
+}
+
+/** Admin removes ANY message (no ownership/window check). */
+export async function adminDeleteMessage(messageId: number): Promise<boolean> {
+  const res = await prisma.chats.deleteMany({ where: { id: BigInt(messageId) } });
+  return res.count > 0;
+}
+
+/** Recent conversations across the whole site (for admin monitoring). */
+export async function listAllConversations(limit = 120) {
+  const rows = await prisma.chats.findMany({ orderBy: { id: 'desc' }, take: 1500 });
+  const pairs = new Map<string, { a: number; b: number; last: string; at: string | null; count: number }>();
+  for (const c of rows) {
+    const a = Math.min(c.sender_id, c.reciver_id);
+    const b = Math.max(c.sender_id, c.reciver_id);
+    if (!a || !b) continue;
+    const k = `${a}-${b}`;
+    const ex = pairs.get(k);
+    if (ex) { ex.count += 1; continue; }
+    pairs.set(k, { a, b, last: c.message, at: c.created_at ? c.created_at.toISOString() : null, count: 1 });
+  }
+  const list = [...pairs.values()].slice(0, limit);
+  const ids = [...new Set(list.flatMap((p) => [p.a, p.b]))].map((n) => BigInt(n));
+  const users = ids.length ? await prisma.users.findMany({ where: { id: { in: ids } }, select: { id: true, name: true, userName: true } }) : [];
+  const nameOf = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || 'مستخدم']));
+  return list.map((p) => ({ ...p, aName: nameOf.get(p.a) || `#${p.a}`, bName: nameOf.get(p.b) || `#${p.b}` }));
+}
+
+/** Full message list between two users, for admin review (no read-marking). */
+export async function getAdminThread(a: number, b: number) {
+  const rows = await prisma.chats.findMany({
+    where: { OR: [{ sender_id: a, reciver_id: b }, { sender_id: b, reciver_id: a }] },
+    orderBy: { id: 'asc' },
+    take: 1000,
+  });
+  const users = await prisma.users.findMany({ where: { id: { in: [BigInt(a), BigInt(b)] } }, select: { id: true, name: true, userName: true } });
+  const nameOf = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || 'مستخدم']));
+  return {
+    aName: nameOf.get(a) || `#${a}`,
+    bName: nameOf.get(b) || `#${b}`,
+    messages: rows.map((r) => ({
+      id: toInt(r.id),
+      senderName: nameOf.get(r.sender_id) || `#${r.sender_id}`,
+      message: r.message,
+      at: r.created_at ? r.created_at.toISOString() : null,
+    })),
+  };
 }
 
 export type ChatMsg = { id: number; fromMe: boolean; message: string; at: string | null; read: boolean };

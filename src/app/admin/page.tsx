@@ -20,6 +20,7 @@ export default async function AdminHome() {
     { label: 'البلاغات', value: s.reports, icon: Flag, href: '/admin/reports', perm: 'reports' },
     { label: 'الإعلانات المكررة', value: s.duplicateAds, icon: Copy, href: '/admin/duplicates', highlight: true, perm: 'duplicates' },
     { label: 'سجل الحماية', value: 0, icon: ShieldAlert, href: '/admin/moderation', perm: 'reports' },
+    { label: 'مراقبة المراسلات', value: 0, icon: MessagesSquare, href: '/admin/messages', perm: 'messages' },
     { label: 'الإعلانات المبوّبة', value: s.classified, icon: Sparkles, href: '/admin/classified', perm: 'classified' },
     { label: 'الباقات', value: packages.length, icon: Crown, href: '/admin/packages', perm: 'packages' },
     { label: 'إعلانات ترويجية بانتظار الموافقة', value: pendingPromos, icon: MonitorPlay, href: '/admin/promos', highlight: true, perm: 'promos' },

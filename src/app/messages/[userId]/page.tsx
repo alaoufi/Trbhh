@@ -3,6 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getThread } from '@/lib/messages';
+import { getMsgDeleteMinutes } from '@/lib/settings';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { ChatRoom } from '@/components/chat-room';
 
@@ -14,7 +15,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
   const { userId } = await params;
   const otherId = Number(userId);
   if (otherId === session.uid) redirect('/messages');
-  const thread = await getThread(session.uid, otherId);
+  const [thread, delWindow] = await Promise.all([getThread(session.uid, otherId), getMsgDeleteMinutes()]);
   if (!thread.other) notFound();
 
   return (
@@ -26,7 +27,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
 
       <DisclaimerBar className="mb-3" />
 
-      <ChatRoom peerId={otherId} initial={thread.messages} />
+      <ChatRoom peerId={otherId} initial={thread.messages} deleteWindowMin={delWindow} />
     </div>
   );
 }

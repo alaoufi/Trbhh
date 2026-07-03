@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Phone, MessageCircle, ExternalLink, Pause, Play, Home, Sparkles, ArrowRight } from 'lucide-react';
-import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY, SIZE_TITLE_POSTER, SIZE_BODY_POSTER } from '@/lib/classified-theme';
+import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY, SIZE_TITLE_POSTER, SIZE_BODY_POSTER, waLink } from '@/lib/classified-theme';
 import { ClassifiedDecor } from '@/components/classified-decor';
 
 const DURATION = 9000; // ms the entry splash stays before auto-entering the site
@@ -52,14 +52,14 @@ function Visual({ ad, big }: { ad: Classified; big?: boolean }) {
 }
 
 function Contact({ ad, big }: { ad: Classified; big?: boolean }) {
-  const wa = ad.whatsapp?.replace(/[^\d]/g, '');
+  const wa = waLink(ad.whatsapp);
   if (!wa && !ad.phone) return null;
   const sz = big ? 'py-3 text-sm' : 'py-2 text-xs';
   const ic = big ? 'h-5 w-5' : 'h-3.5 w-3.5';
   return (
     <div className="mt-1 flex gap-1.5">
       {ad.phone && <a href={`tel:${ad.phone}`} className={`flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-600 font-bold text-white ${sz}`}><Phone className={ic} /> اتصال</a>}
-      {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" className={`flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#25D366] font-bold text-white ${sz}`}><MessageCircle className={ic} /> واتساب</a>}
+      {wa && <a href={wa} target="_blank" rel="noopener noreferrer" className={`flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#25D366] font-bold text-white ${sz}`}><MessageCircle className={ic} /> واتساب</a>}
     </div>
   );
 }

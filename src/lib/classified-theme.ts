@@ -30,6 +30,29 @@ export type Classified = {
   clicks: number;
 };
 
+/**
+ * Build a working wa.me link from any phone format the advertiser entered.
+ * WhatsApp requires the full international number with country code and no
+ * leading zero or "+", e.g. 9665XXXXXXXX. Saudi locals like 05XXXXXXXX are
+ * converted to 9665XXXXXXXX; numbers already carrying 966/00966/+966 are kept.
+ * Returns null when there is no usable number.
+ */
+export function waLink(raw: string | null | undefined): string | null {
+  let p = (raw || '').replace(/\D/g, '');
+  if (!p) return null;
+  if (p.startsWith('00')) p = p.slice(2); // 00966… → 966…
+  if (p.startsWith('966')) {
+    // ok as-is
+  } else if (p.startsWith('05')) {
+    p = '966' + p.slice(1); // 05XXXXXXXX → 9665XXXXXXXX
+  } else if (p.startsWith('5') && p.length === 9) {
+    p = '966' + p; // 5XXXXXXXX → 9665XXXXXXXX
+  } else if (p.startsWith('0')) {
+    p = '966' + p.slice(1); // other local → assume Saudi
+  }
+  return `https://wa.me/${p}`;
+}
+
 /** Gradient color themes. `text` = readable text color on this background. */
 export const CLASSIFIED_THEMES: { from: string; to: string; text: 'light' | 'dark' }[] = [
   { from: '#3287da', to: '#1b4f8a', text: 'light' },

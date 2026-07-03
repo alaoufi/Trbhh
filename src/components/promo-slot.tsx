@@ -1,18 +1,19 @@
 import { ExternalLink, Phone, MessageCircle } from 'lucide-react';
 import { getActivePromos } from '@/lib/promos';
 import { PLACEMENT_RATIO, type Promo, type PromoPlacement } from '@/lib/promo-placements';
+import { waLink } from '@/lib/classified-theme';
 
 function bannerHref(p: Promo): string | null {
   if (p.link) return `/promo/${p.id}/go`;
-  const wa = p.whatsapp?.replace(/[^\d]/g, '');
-  if (wa) return `https://wa.me/${wa}`;
+  const wa = waLink(p.whatsapp);
+  if (wa) return wa;
   if (p.phone) return `tel:${p.phone}`;
   return null;
 }
 
 function Banner({ p }: { p: Promo }) {
   const ratio = PLACEMENT_RATIO[p.placement] || '3 / 1';
-  const wa = p.whatsapp?.replace(/[^\d]/g, '');
+  const wa = waLink(p.whatsapp);
   const inner = (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden text-center text-white" style={{ aspectRatio: ratio }}>
       {p.image && (

@@ -6,6 +6,7 @@ import { getMyAds } from '@/lib/account';
 import { AdGrid } from '@/components/ad-card';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
+import { waLink } from '@/lib/classified-theme';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
   if (!s) notFound();
   const myAds = await getMyAds(s.userId);
   const active = myAds.filter((a) => a.status === 1).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
-  const wa = s.whatsapp?.replace(/[^\d]/g, '');
+  const wa = waLink(s.whatsapp);
   return (
     <div className="space-y-4">
       <div className="card-3d rounded-xl p-5">
@@ -32,7 +33,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
             {s.address && <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{s.address}</div>}
           </div>
           <div className="flex gap-2">
-            {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer"><Button variant="whatsapp"><MessageCircle className="h-4 w-4" /> واتساب</Button></a>}
+            {wa && <a href={wa} target="_blank" rel="noopener noreferrer"><Button variant="whatsapp"><MessageCircle className="h-4 w-4" /> واتساب</Button></a>}
             {s.phone && <a href={`tel:${s.phone}`}><Button variant="outline"><Phone className="h-4 w-4" /> اتصال</Button></a>}
           </div>
         </div>

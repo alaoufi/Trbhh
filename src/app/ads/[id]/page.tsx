@@ -13,6 +13,7 @@ import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
 import { formatPrice, timeAgo } from '@/lib/utils';
+import { waLink } from '@/lib/classified-theme';
 import { SITE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -97,7 +98,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   ]);
 
   const shareUrl = `https://${SITE.domain}/ads/${ad.id}`;
-  const waNumber = ad.seller?.whatsapp?.replace(/[^\d]/g, '');
+  const waNumber = waLink(ad.seller?.whatsapp);
   // "مراسلة" is always available; WhatsApp/call only when the seller provides them
   const contactCols = 1 + (waNumber ? 1 : 0) + (ad.seller?.phone ? 1 : 0);
 
@@ -166,7 +167,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
       {/* Contact tiles — only show channels the seller actually offers */}
       <div className={`grid gap-3 ${contactCols === 3 ? 'grid-cols-3' : contactCols === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
         {waNumber && (
-          <a href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-[#25D366]">
+          <a href={waNumber} target="_blank" rel="noopener noreferrer" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-[#25D366]">
             <MessageCircle className="h-6 w-6" /> واتساب
           </a>
         )}

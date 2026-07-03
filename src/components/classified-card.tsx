@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Phone, MessageCircle, ExternalLink } from 'lucide-react';
-import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY, SIZE_TITLE_POSTER, SIZE_BODY_POSTER } from '@/lib/classified-theme';
+import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY, SIZE_TITLE_POSTER, SIZE_BODY_POSTER, waLink } from '@/lib/classified-theme';
 import { ClassifiedDecor } from '@/components/classified-decor';
 
 /** The square ad visual (image/text card). `big` uses larger fonts for the detail view. */
@@ -48,12 +48,12 @@ export function ClassifiedVisual({ c, big = false }: { c: Classified; big?: bool
 
 /** Contact buttons (whatsapp/phone) shared by card + detail. */
 export function ClassifiedContact({ c }: { c: Classified }) {
-  const wa = c.whatsapp?.replace(/[^\d]/g, '');
+  const wa = waLink(c.whatsapp);
   if (!wa && !c.phone) return null;
   return (
     <div className="flex gap-1.5 p-1.5">
       {wa && (
-        <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer" className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#25D366] py-2.5 text-sm font-bold text-white">
+        <a href={wa} target="_blank" rel="noopener noreferrer" className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#25D366] py-2.5 text-sm font-bold text-white">
           <MessageCircle className="h-5 w-5" /> واتساب
         </a>
       )}

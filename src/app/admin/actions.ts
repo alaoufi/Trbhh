@@ -383,11 +383,15 @@ export async function deleteAllPendingAdsAction() {
     select: { id: true },
   });
   const ids = pend.map((p) => p.id);
-  if (ids.length) {
-    await prisma.photos.deleteMany({ where: { other_id: { in: ids } } }).catch(() => {});
-    await prisma.ads.deleteMany({ where: { id: { in: ids } } }).catch(() => {});
+  // Delete in chunks so a large backlog (1000+) never overflows the IN clause or times out.
+  const chunk = 200;
+  for (let i = 0; i < ids.length; i += chunk) {
+    const slice = ids.slice(i, i + chunk);
+    await prisma.photos.deleteMany({ where: { other_id: { in: slice } } }).catch(() => {});
+    await prisma.ads.deleteMany({ where: { id: { in: slice } } }).catch(() => {});
   }
   revalidatePath('/admin/ads');
+  revalidatePath('/admin');
 }
 
 async function refreshCategories() {

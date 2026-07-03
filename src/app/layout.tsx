@@ -66,8 +66,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   const theme = (await cookies()).get('theme')?.value || '';
   const validThemes = ['desert', 'agri', 'spring', 'mint', 'lavender', 'sea', 'snow', 'mountain', 'sunset', 'night'];
+  const design = (await cookies()).get('design')?.value || '';
+  const validDesigns = ['flat', 'soft', 'sharp'];
   return (
-    <html lang="ar" dir="rtl" className={cairo.variable} {...(validThemes.includes(theme) ? { 'data-theme': theme } : {})}>
+    <html
+      lang="ar"
+      dir="rtl"
+      className={cairo.variable}
+      {...(validThemes.includes(theme) ? { 'data-theme': theme } : {})}
+      {...(validDesigns.includes(design) ? { 'data-design': design } : {})}
+    >
       <body className="min-h-screen font-sans antialiased">
         <TopBar />
         <Header />

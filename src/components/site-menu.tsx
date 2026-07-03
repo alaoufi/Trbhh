@@ -7,6 +7,7 @@ import {
   Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
+import { DesignPicker } from '@/components/design-picker';
 
 type Cat = { id: number; name: string };
 
@@ -108,6 +109,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
           </button>
 
           <div className="my-2 border-t border-primary/10" />
+          <DesignPicker />
           <ThemePicker />
           <div className="my-2 border-t border-primary/10" />
 

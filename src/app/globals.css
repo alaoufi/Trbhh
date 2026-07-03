@@ -316,3 +316,52 @@ button:active { }
   0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
   40%           { transform: translateY(-4px); opacity: 1; }
 }
+
+/* ============================================================
+   Design presets — alternative site-wide visual identities.
+   Selected via the `design` cookie → data-design on <html>.
+   Only shape/shadow/radius/background are changed so every page
+   keeps working (never touches gradient heroes' background-image).
+   ============================================================ */
+
+/* «مسطّح عصري» — clean, thin borders, minimal shadow, tight radius */
+:root[data-design="flat"] { --radius: 0.5rem; }
+:root[data-design="flat"]:not([data-theme="night"]) body { background: #f4f5f7; }
+[data-design="flat"] .card-3d {
+  border-width: 1px;
+  border-color: hsl(var(--border));
+  border-radius: 0.6rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+[data-design="flat"] .card-3d:hover {
+  transform: none;
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+
+/* «ناعم (Soft UI)» — borderless, dual soft shadows, big radius */
+:root[data-design="soft"] { --radius: 1.4rem; }
+:root[data-design="soft"]:not([data-theme="night"]) body { background: #e9edf3; }
+[data-design="soft"] .card-3d {
+  border: none;
+  border-radius: 1.5rem;
+  box-shadow: 6px 6px 14px rgba(0,0,0,0.10), -6px -6px 14px rgba(255,255,255,0.85);
+}
+[data-design="soft"] .card-3d:hover {
+  transform: translateY(-2px);
+  box-shadow: 8px 8px 18px rgba(0,0,0,0.12), -8px -8px 18px rgba(255,255,255,0.9);
+}
+
+/* «جريء (Bold)» — sharp corners, side accent bar, hard offset shadow */
+:root[data-design="sharp"] { --radius: 0.2rem; }
+:root[data-design="sharp"]:not([data-theme="night"]) body { background: #f1f2f4; }
+[data-design="sharp"] .card-3d {
+  border: 1px solid hsl(var(--border));
+  border-right: 5px solid hsl(var(--primary));
+  border-radius: 0.15rem;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.08);
+}
+[data-design="sharp"] .card-3d:hover {
+  transform: none;
+  box-shadow: 6px 6px 0 hsl(var(--primary) / 0.28);
+}

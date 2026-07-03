@@ -13,6 +13,7 @@ const PRESETS: { role: Role | 'none'; label: string }[] = [
   { role: 'manager', label: ROLE_LABELS.manager },
   { role: 'moderator', label: ROLE_LABELS.moderator },
   { role: 'monitor', label: ROLE_LABELS.monitor },
+  { role: 'store_monitor', label: ROLE_LABELS.store_monitor },
   { role: 'none', label: 'بدون صلاحيات' },
 ];
 

@@ -13,6 +13,7 @@ const ROLE_COLORS: Record<Role, string> = {
   manager: 'from-indigo-600 to-indigo-800',
   moderator: 'from-emerald-600 to-emerald-800',
   monitor: 'from-amber-500 to-amber-700',
+  store_monitor: 'from-teal-600 to-teal-800',
   member: 'from-sky-600 to-sky-800',
   visitor: 'from-slate-500 to-slate-700',
 };

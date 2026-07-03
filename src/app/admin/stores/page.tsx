@@ -106,7 +106,7 @@ function StoreCard({ s }: { s: AdminStore }) {
 }
 
 export default async function AdminStores() {
-  await requireAction('users', 'edit');
+  await requireAction('stores', 'view');
   const [pending, stores] = await Promise.all([getPendingStores(), adminStoreList()]);
   return (
     <div className="space-y-4">

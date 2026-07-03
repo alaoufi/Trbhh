@@ -19,6 +19,7 @@ type Card = { group: string; label: string; icon: React.ElementType; href: strin
 const GROUPS: { key: string; label: string }[] = [
   { key: 'ads', label: 'الإعلانات والمحتوى' },
   { key: 'members', label: 'الأعضاء والصلاحيات' },
+  { key: 'stores', label: 'إدارة المتاجر' },
   { key: 'safety', label: 'الحماية والرقابة' },
   { key: 'marketing', label: 'التسويق والباقات' },
   { key: 'system', label: 'النظام والإعدادات' },
@@ -44,8 +45,9 @@ export default async function AdminHome() {
     { group: 'members', label: 'المستخدمون', value: s.users, icon: Users, href: '/admin/users', perm: 'users' },
     { group: 'members', label: 'طلبات توثيق معلّقة', value: s.pendingVerify, icon: ShieldCheck, href: '/admin/verifications', highlight: true, perm: 'verifications' },
     { group: 'members', label: 'الأدوار والصلاحيات', icon: KeyRound, href: '/admin/roles', perm: 'users', nav: true },
-    { group: 'members', label: 'اعتماد المتاجر', icon: Store, href: '/admin/stores', perm: 'users', nav: true },
     { group: 'members', label: 'بوّابات التوثيق (SMS/واتساب)', icon: Smartphone, href: '/admin/verification', perm: 'users', nav: true },
+    // إدارة المتاجر
+    { group: 'stores', label: 'إدارة المتاجر', icon: Store, href: '/admin/stores', perm: 'stores', nav: true },
     // الحماية والرقابة
     { group: 'safety', label: 'البلاغات', value: s.reports, icon: Flag, href: '/admin/reports', perm: 'reports' },
     { group: 'safety', label: 'سجل الحماية', icon: ShieldAlert, href: '/admin/moderation', perm: 'reports', nav: true },

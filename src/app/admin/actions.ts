@@ -155,7 +155,7 @@ export async function adminDeleteClassifiedAction(formData: FormData) {
 
 /** Approve or reject a merchant store. */
 export async function approveStoreAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireAction('stores', 'edit');
   const id = Number(formData.get('storeId'));
   const approve = String(formData.get('action')) === 'approve';
   if (id) await setStoreStatus(id, approve ? 1 : 2);
@@ -164,7 +164,7 @@ export async function approveStoreAction(formData: FormData) {
 
 /** Admin asks an approved store to feature its products on the home page. */
 export async function requestStoreHomeAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireAction('stores', 'edit');
   const id = Number(formData.get('storeId'));
   if (id) await adminRequestHome(id);
   revalidatePath('/admin/stores');
@@ -172,7 +172,7 @@ export async function requestStoreHomeAction(formData: FormData) {
 
 /** Suspend (stop) or reactivate a store. */
 export async function toggleStoreStatusAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireAction('stores', 'suspend');
   const id = Number(formData.get('storeId'));
   const suspend = String(formData.get('action')) === 'suspend';
   if (id) await setStoreStatus(id, suspend ? 2 : 1);
@@ -181,7 +181,7 @@ export async function toggleStoreStatusAction(formData: FormData) {
 
 /** Issue a violation warning against a store (3 warnings → auto-suspend). */
 export async function warnStoreAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireAction('stores', 'edit');
   const id = Number(formData.get('storeId'));
   const reason = String(formData.get('reason') || '').trim();
   if (id && reason) await addStoreWarning(id, reason);

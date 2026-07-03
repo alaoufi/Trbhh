@@ -6,7 +6,7 @@ import { getSetting, setSetting } from './settings';
 
 export type Service =
   | 'users' | 'ads' | 'duplicates' | 'classified' | 'categories'
-  | 'words' | 'reports' | 'verifications' | 'debates' | 'comments' | 'packages' | 'promos' | 'backup' | 'messages';
+  | 'words' | 'reports' | 'verifications' | 'debates' | 'comments' | 'packages' | 'promos' | 'backup' | 'messages' | 'stores';
 export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive' | 'suspend';
 
 /** Backward-compat alias: a "Perm" is a service (page-level access). */
@@ -32,6 +32,7 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
   { key: 'packages',      label: 'الباقات',            actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'promos',        label: 'الإعلانات الترويجية',  actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'backup',        label: 'النسخ الاحتياطي',      actions: ['view', 'add', 'edit', 'delete'] },
+  { key: 'stores',        label: 'المتاجر',            actions: ['view', 'edit', 'suspend', 'delete'] },
 ];
 
 export const ACTION_LABELS: Record<Action, string> = {
@@ -43,9 +44,9 @@ const KEY_SET = new Set(ALL_KEYS);
 export const key = (s: Service, a: Action) => `${s}:${a}`;
 
 /* ---- role presets (quick-apply bundles of granular permissions) ---- */
-export type Role = 'manager' | 'moderator' | 'monitor' | 'member' | 'visitor';
+export type Role = 'manager' | 'moderator' | 'monitor' | 'store_monitor' | 'member' | 'visitor';
 export const ROLE_LABELS: Record<Role, string> = {
-  manager: 'مدير عام', moderator: 'مشرف', monitor: 'مراقب', member: 'عضو', visitor: 'زائر',
+  manager: 'مدير عام', moderator: 'مشرف', monitor: 'مراقب', store_monitor: 'مراقب متاجر تربّح', member: 'عضو', visitor: 'زائر',
 };
 
 /** Admin-granular presets (applied to a single admin user's admin_perms). */
@@ -62,6 +63,7 @@ export const ROLE_PRESET: Record<Role, string[]> = {
     'promos:view', 'promos:edit', 'promos:delete',
   ],
   monitor: ['reports:view', 'verifications:view', 'verifications:edit', 'words:view', 'words:add', 'words:delete'],
+  store_monitor: ['stores:view', 'stores:edit', 'stores:suspend'],
   member: [],
   visitor: [],
 };
@@ -71,6 +73,7 @@ export const ROLE_PERMS: Record<Role, Perm[]> = {
   manager: SERVICES.map((s) => s.key),
   moderator: ['ads', 'classified', 'comments', 'debates', 'reports', 'duplicates', 'messages'],
   monitor: ['reports', 'verifications', 'words'],
+  store_monitor: ['stores'],
   member: [],
   visitor: [],
 };
@@ -82,7 +85,7 @@ export const ROLE_PERMS: Record<Role, Perm[]> = {
    'suspend' also satisfies the legacy 'archive' gate on enforcement.
    ============================================================ */
 export const MATRIX_ACTIONS: Action[] = ['view', 'add', 'edit', 'delete', 'suspend'];
-export const MATRIX_ROLES: Role[] = ['manager', 'moderator', 'monitor', 'member', 'visitor'];
+export const MATRIX_ROLES: Role[] = ['manager', 'moderator', 'monitor', 'store_monitor', 'member', 'visitor'];
 // staff may NEVER be granted the ability to edit a member's ad content (privacy)
 export const MATRIX_LOCKED = new Set<string>(['ads:edit']);
 export const ALL_MATRIX_KEYS: string[] = SERVICES
@@ -95,6 +98,7 @@ export const DEFAULT_ROLE_PERMS: Record<Role, string[]> = {
   manager: ALL_MATRIX_KEYS,
   moderator: ROLE_PRESET.moderator.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
   monitor: ROLE_PRESET.monitor.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
+  store_monitor: ROLE_PRESET.store_monitor.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
   member: ['ads:view', 'ads:add', 'classified:view', 'classified:add', 'comments:view', 'comments:add', 'debates:view', 'debates:add'].filter((k) => MATRIX_SET.has(k)),
   visitor: ['ads:view', 'classified:view', 'categories:view', 'comments:view', 'debates:view'].filter((k) => MATRIX_SET.has(k)),
 };
@@ -119,6 +123,14 @@ async function ensureRolePerms() {
       }
     }
     await setSetting('role_perms_seeded', '1').catch(() => {});
+  }
+  // targeted one-time seed for the store-monitor role (added after initial seeding)
+  const storesSeeded = await getSetting('role_perms_stores_seeded', '0').catch(() => '0');
+  if (storesSeeded !== '1') {
+    for (const k of DEFAULT_ROLE_PERMS.store_monitor) {
+      await prisma.$executeRawUnsafe(`INSERT IGNORE INTO role_perms (role, perm) VALUES (?, ?)`, 'store_monitor', k).catch(() => {});
+    }
+    await setSetting('role_perms_stores_seeded', '1').catch(() => {});
   }
   rolePermsEnsured = true;
 }
@@ -268,6 +280,7 @@ export async function getUserRole(userId: number): Promise<Role | null> {
   const sameAs = (r: Role) => ROLE_PRESET[r].length === keys.size && ROLE_PRESET[r].every((k) => keys.has(k));
   if (sameAs('moderator')) return 'moderator';
   if (sameAs('monitor')) return 'monitor';
+  if (sameAs('store_monitor')) return 'store_monitor';
   return null; // custom set
 }
 

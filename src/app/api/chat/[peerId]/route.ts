@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { pollThread, sendChat, setTyping, deleteChatMessage } from '@/lib/chat';
 import { getMsgDeleteMinutes } from '@/lib/settings';
+import { getPrimaryAdminId, smartAdminReply, shouldAutoReply } from '@/lib/admin-inbox';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,6 +37,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ peerId: st
   await prisma.notfications
     .create({ data: { title: `رسالة جديدة من ${session.name || 'عضو'}`, route: `/messages/${session.uid}`, user_id: String(other), type: 'message' } })
     .catch(() => {});
+
+  // Smart automatic acknowledgement when a member messages the administration
+  try {
+    const adminId = await getPrimaryAdminId();
+    if (adminId && other === adminId && session.uid !== adminId && (await shouldAutoReply(adminId, session.uid))) {
+      await sendChat(adminId, session.uid, smartAdminReply(message));
+    }
+  } catch {
+    /* auto-reply is best-effort */
+  }
   return Response.json({ ok: true, id });
 }
 

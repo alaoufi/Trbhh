@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles, Crown, MonitorPlay, ShieldAlert } from 'lucide-react';
+import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles, Crown, MonitorPlay, ShieldAlert, Mail } from 'lucide-react';
 import { adminStats } from '@/lib/admin';
 import { getPackages } from '@/lib/packages';
 import { countPendingPromos } from '@/lib/promos';
+import { countAdminUnread, getPrimaryAdminId } from '@/lib/admin-inbox';
 import { requireAnyAdmin, getUserPerms, getUserRole, ROLE_LABELS, type Perm } from '@/lib/roles';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +11,8 @@ export const metadata = { title: 'لوحة الإدارة' };
 
 export default async function AdminHome() {
   const session = await requireAnyAdmin();
-  const [s, perms, role, packages, pendingPromos] = await Promise.all([adminStats(), getUserPerms(session.uid), getUserRole(session.uid), getPackages().catch(() => []), countPendingPromos().catch(() => 0)]);
+  const [s, perms, role, packages, pendingPromos, adminUnread, primaryAdminId] = await Promise.all([adminStats(), getUserPerms(session.uid), getUserRole(session.uid), getPackages().catch(() => []), countPendingPromos().catch(() => 0), countAdminUnread().catch(() => 0), getPrimaryAdminId().catch(() => 0)]);
+  const isPrimaryAdmin = primaryAdminId === session.uid;
   const allCards: { label: string; value: number; icon: React.ElementType; href: string; highlight?: boolean; perm: Perm | null }[] = [
     { label: 'إعلانات بانتظار الموافقة', value: s.pendingAds, icon: Clock, href: '/admin/ads?view=pending', highlight: true, perm: 'ads' },
     { label: 'المستخدمون', value: s.users, icon: Users, href: '/admin/users', perm: 'users' },
@@ -40,6 +42,19 @@ export default async function AdminHome() {
       <p className="text-sm text-muted-foreground">
         الأقسام المتاحة لك حسب صلاحياتك: {[...perms].length} قسم.
       </p>
+
+      {/* رسائل الأعضاء للإدارة — تبقى بارزة حتى يُرَدّ عليها */}
+      {isPrimaryAdmin && adminUnread > 0 && (
+        <Link href="/messages" className="flex items-center gap-3 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 shadow-sm hover:bg-amber-100">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-amber-500 text-white"><Mail className="h-5 w-5" /></span>
+          <div className="flex-1">
+            <div className="font-bold text-amber-900">لديك {new Intl.NumberFormat('en-US').format(adminUnread)} رسالة من الأعضاء بانتظار الرد</div>
+            <div className="text-xs text-amber-800">اضغط للاطّلاع والرد — ستبقى بارزة حتى تتم قراءتها والرد عليها.</div>
+          </div>
+          <span className="shrink-0 text-sm font-bold text-amber-700">فتح ←</span>
+        </Link>
+      )}
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {cards.map((c) => (
           <Link

@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Send,
 } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { ThemePicker } from '@/components/theme-picker';
@@ -71,7 +71,8 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
           <Item href="/promote" icon={Megaphone} onClick={close}>أعلن معنا</Item>
           {isAuthed && <Item href="/account/promos" icon={Megaphone} onClick={close}>إعلاناتي الترويجية</Item>}
           <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>
-          <Item href="/messages" icon={Mail} onClick={close}>مراسلة الإدارة</Item>
+          {isAuthed && <Item href="/messages" icon={Mail} onClick={close}>مراسلات الإدارة</Item>}
+          {isAuthed && <Item href="/messages/admin" icon={Send} onClick={close}>مراسلة الإدارة</Item>}
           <Item href="/companies" icon={Building2} onClick={close}>الشركات</Item>
           <Item href="/search" icon={Search} onClick={close}>بحث متقدم</Item>
 

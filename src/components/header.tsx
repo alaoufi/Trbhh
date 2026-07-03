@@ -1,32 +1,34 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { Store } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { getCategories } from '@/lib/data';
+import { storeIdOfUser } from '@/lib/merchant';
 import { SiteMenu } from '@/components/site-menu';
+import { HeaderSearch } from '@/components/header-search';
 
 export async function Header() {
   const session = await getSession();
   const admin = session ? await hasAnyAdmin(session.uid) : false;
   const categories = await getCategories();
+  const myStoreId = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   return (
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
-      <div className="container flex h-16 items-center gap-2">
+      <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
         <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} />
 
-        <form action="/search" className="relative flex-1">
-          <input
-            name="q"
-            placeholder="أبحث هنا"
-            className="h-11 w-full rounded-full border border-primary/40 bg-background text-foreground placeholder:text-muted-foreground pr-4 pl-20 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-          />
-          <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2 text-primary">
-            <button type="submit" aria-label="بحث"><Search className="h-5 w-5" /></button>
-            <Link href="/search" aria-label="بحث متقدم"><SlidersHorizontal className="h-5 w-5" /></Link>
-          </div>
-        </form>
+        {/* دعوة فتح المتجر تشغل مساحة البحث بعد تصغيره لعدسة */}
+        <Link
+          href={myStoreId > 0 ? `/companies/${myStoreId}` : '/account/company'}
+          className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95"
+        >
+          <Store className="h-5 w-5" /> {myStoreId > 0 ? 'متجري' : 'افتح متجرك'}
+        </Link>
+
+        {/* بحث مصغّر: عدسة تفتح حقل البحث */}
+        <HeaderSearch />
 
         {/* logo on the left (RTL: last child) */}
         <Link href="/" className="shrink-0">

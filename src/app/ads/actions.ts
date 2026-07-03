@@ -15,6 +15,7 @@ import { scanContent } from '@/lib/content-guard';
 import { scanImages, imageModerationEnabled } from '@/lib/nsfw';
 import { parseMapsUrl, type LatLng } from '@/lib/maps';
 import { toInt } from '@/lib/utils';
+import { isApprovedStoreOwner } from '@/lib/merchant';
 
 /** Resolve coordinates from a pasted maps link — follows shortened goo.gl links. */
 async function resolveMapsUrl(input: string): Promise<LatLng | null> {
@@ -271,8 +272,10 @@ export async function createAdAction(formData: FormData) {
     redirect(`/ads/new?error=duplicate&left=${Math.max(0, DUP_LIMIT - n)}`);
   }
 
-  // النشر الفوري ما لم تُفعّل الإدارة «مراجعة الإعلانات قبل النشر»
-  const requireApproval = await getSettingBool(SETTING_ADS_APPROVAL, false).catch(() => false);
+  // النشر الفوري ما لم تُفعّل الإدارة «مراجعة الإعلانات قبل النشر».
+  // صاحب متجر معتمد: إعلاناته تُنشر مباشرة (الموافقة على المتجر تُغني عن مراجعة كل إعلان).
+  const approvedStoreOwner = await isApprovedStoreOwner(session.uid).catch(() => false);
+  const requireApproval = approvedStoreOwner ? false : await getSettingBool(SETTING_ADS_APPROVAL, false).catch(() => false);
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
   const ad = await prisma.ads.create({

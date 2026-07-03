@@ -22,6 +22,7 @@ export async function saveCompanyAction(formData: FormData) {
   const since = String(formData.get('since') || '').trim();
   const specialty = String(formData.get('specialty') || '').trim();
   const audience = String(formData.get('audience') || '').trim();
+  const onPlatform = !!formData.get('onPlatform');
 
   let logoId: number | undefined;
   const logo = formData.get('logo');
@@ -40,7 +41,7 @@ export async function saveCompanyAction(formData: FormData) {
     await prisma.stores.create({ data: { user_id: session.uid, description, address, logo: logoId ?? 0 } });
     await markStorePending(session.uid); // new store waits for admin approval
   }
-  await saveStoreMeta(session.uid, { storeName, color, about, banner, tagline, layout, catalog, fields, since, specialty, audience });
+  await saveStoreMeta(session.uid, { storeName, color, about, banner, tagline, layout, catalog, fields, since, specialty, audience, onPlatform });
   revalidatePath('/account/company');
   // land the merchant on their own (independent) store page
   const mine = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true } });

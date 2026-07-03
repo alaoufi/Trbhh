@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Phone, MessageCircle, ExternalLink, Pause, Play, LogIn, Sparkles, ArrowRight } from 'lucide-react';
+import { Phone, MessageCircle, ExternalLink, Pause, Play, Home, Sparkles, ArrowRight } from 'lucide-react';
 import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY, SIZE_TITLE_POSTER, SIZE_BODY_POSTER } from '@/lib/classified-theme';
 import { ClassifiedDecor } from '@/components/classified-decor';
 
@@ -160,15 +160,26 @@ export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
             )}
           </div>
         ) : (
-          <div className="mx-auto grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-3">
-            {ads.map((ad, i) => (
-              <div key={ad.id} className="float-3d" style={{ animationDelay: `${(i % 6) * 250}ms` }}>
-                {/* الضغط يكبّر الإعلان وحده مع سهم الرجوع — بدون انتقال صفحة (لا وميض) */}
-                <button onClick={() => openAd(ad)} className="block w-full text-right"><Visual ad={ad} /></button>
-                <Contact ad={ad} />
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="mx-auto grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-3">
+              {ads.map((ad, i) => (
+                <div key={ad.id} className="float-3d" style={{ animationDelay: `${(i % 6) * 250}ms` }}>
+                  {/* الضغط يكبّر الإعلان وحده مع سهم الرجوع — بدون انتقال صفحة (لا وميض) */}
+                  <button onClick={() => openAd(ad)} className="block w-full text-right"><Visual ad={ad} /></button>
+                  <Contact ad={ad} />
+                </div>
+              ))}
+            </div>
+            {/* تحت آخر إعلان — بارز وقريب من العين */}
+            <div className="mx-auto mt-7 flex max-w-2xl flex-col items-center gap-2 pb-2">
+              <button onClick={enterSite} className="flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl bg-white py-3.5 text-base font-extrabold text-primary shadow-xl hover:bg-white/90">
+                <Home className="h-5 w-5" /> الصفحة الرئيسية
+              </button>
+              <button onClick={togglePause} className="flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white hover:bg-white/25">
+                {paused ? <><Play className="h-4 w-4" /> متابعة</> : <><Pause className="h-4 w-4" /> البقاء</>}
+              </button>
+            </div>
+          </>
         )}
       </div>
 
@@ -178,7 +189,7 @@ export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
           {paused ? <><Play className="h-4 w-4" /> متابعة</> : <><Pause className="h-4 w-4" /> البقاء</>}
         </button>
         <button onClick={enterSite} className="flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-primary hover:bg-white/90">
-          <LogIn className="h-4 w-4" /> الدخول للموقع
+          <Home className="h-4 w-4" /> الصفحة الرئيسية
         </button>
       </div>
     </div>

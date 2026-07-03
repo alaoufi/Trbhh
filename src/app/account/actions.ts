@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { getMemberWindows, withinWindow } from '@/lib/settings';
 import { setUserArea } from '@/lib/user-location';
+import { toLocalSaudi } from '@/lib/sms';
 import { toInt } from '@/lib/utils';
 
 export async function deleteAdAction(formData: FormData) {
@@ -35,8 +36,10 @@ export async function toggleAdStatusAction(formData: FormData) {
 export async function updateProfileAction(_prev: unknown, formData: FormData) {
   const session = await requireUser();
   const name = String(formData.get('name') || '').trim();
-  const phoneNumber = String(formData.get('phoneNumber') || '').trim();
-  const phone_whatsapp = String(formData.get('phone_whatsapp') || '').trim();
+  const phoneRaw = String(formData.get('phoneNumber') || '').trim();
+  const waRaw = String(formData.get('phone_whatsapp') || '').trim();
+  const phoneNumber = phoneRaw ? toLocalSaudi(phoneRaw) : phoneRaw; // canonical 05XXXXXXXX
+  const phone_whatsapp = waRaw ? toLocalSaudi(waRaw) : waRaw;
   const allow_phone = formData.get('allow_phone') ? 1 : 0;
   const whatsapp = formData.get('whatsapp') ? 1 : 0;
   const cityId = Number(formData.get('city_id')) || 0; // المنطقة

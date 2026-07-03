@@ -2,6 +2,7 @@
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { verifyPassword, hashPassword, createSession } from '@/lib/auth';
+import { toLocalSaudi, userExistsByPhone } from '@/lib/sms';
 import { toInt } from '@/lib/utils';
 
 export async function loginAction(_prev: unknown, formData: FormData) {
@@ -48,14 +49,14 @@ export async function registerAction(_prev: unknown, formData: FormData) {
   if (!name || !phone || password.length < 6) {
     return { error: 'أكمل البيانات (كلمة المرور 6 أحرف على الأقل)' };
   }
-  const exists = await prisma.users.findFirst({ where: { phoneNumber: phone } });
-  if (exists) return { error: 'رقم الجوال مسجّل مسبقاً' };
+  const phoneLocal = toLocalSaudi(phone); // store canonical 05XXXXXXXX
+  if (await userExistsByPhone(phone)) return { error: 'رقم الجوال مسجّل مسبقاً' };
 
   const user = await prisma.users.create({
     data: {
       name,
-      userName: phone,
-      phoneNumber: phone,
+      userName: phoneLocal,
+      phoneNumber: phoneLocal,
       password: await hashPassword(password),
       type: 'user',
       ban: 'no',

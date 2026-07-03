@@ -53,6 +53,13 @@ export function normalizeSaudi(phone: string): string {
   return p.startsWith('966') ? p : '966' + p;
 }
 
+/** Canonical local Saudi format for storage/display: 05XXXXXXXX. */
+export function toLocalSaudi(phone: string): string {
+  const n = normalizeSaudi(phone);
+  if (n.startsWith('966') && n.length === 12) return '0' + n.slice(3);
+  return (phone || '').trim();
+}
+
 /** Send an SMS via the current 4jawaly REST API (app_key/app_secret). */
 async function sendJawalyV1(phone: string, message: string, cfg: MessagingConfig): Promise<boolean> {
   const url = cfg.smsUrl || JAWALY_V1_URL;

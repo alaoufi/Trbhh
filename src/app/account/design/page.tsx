@@ -7,6 +7,21 @@ import { DESIGNS, applyDesign } from '@/components/design-picker';
 // A small live sample rendered inside a data-design wrapper so its identity
 // shows exactly as it would site-wide — a real preview before adopting.
 function Preview({ id }: { id: string }) {
+  if (id === 'list') {
+    return (
+      <div data-design="list" className="rounded-2xl bg-background p-3">
+        <div className="card-3d flex gap-3 rounded-2xl p-3">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="h-2.5 w-full rounded bg-foreground/15" />
+            <div className="mt-1 h-2.5 w-2/3 rounded bg-foreground/10" />
+            <div className="mt-2 text-base font-extrabold text-red-600">1,200 ر.س</div>
+            <span className="mt-2 inline-flex w-fit rounded-full border border-primary/40 px-2.5 py-0.5 text-[10px] font-bold text-primary">عرض التفاصيل ←</span>
+          </div>
+          <div className="aspect-square w-24 shrink-0 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5" />
+        </div>
+      </div>
+    );
+  }
   if (id === 'shop') {
     return (
       <div data-design="shop" className="grid grid-cols-2 gap-2 rounded-2xl bg-background p-3">

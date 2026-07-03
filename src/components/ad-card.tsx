@@ -144,6 +144,45 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
   );
 }
 
+/**
+ * List row (قائمة / Made-in-China style): a large square image on the left and
+ * rich details on the right — title, bold red price, meta and an action pill.
+ */
+export function AdCardList({ ad }: { ad: AdCardType }) {
+  const isReq = ad.adsType === 'request';
+  const tier = ad.tier === 'gold' ? 'gold' : ad.tier === 'silver' ? 'silver' : null;
+  return (
+    <Link href={`/ads/${ad.id}`} className="card-3d flex gap-3 overflow-hidden rounded-2xl p-3">
+      {/* details (right in RTL) */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="mb-1 flex items-center gap-1.5">
+          <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-extrabold text-white', isReq ? 'bg-amber-500' : 'bg-primary')}>{isReq ? 'طلب' : 'عرض'}</span>
+          {ad.special && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">مميّز</span>}
+        </div>
+        <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground/90">{ad.title}</h3>
+        <div className="mt-1 text-base font-extrabold text-red-600">
+          {ad.price > 0 ? <>{new Intl.NumberFormat('en-US').format(ad.price)} <span className="text-[11px] font-bold">ر.س</span></> : <span className="text-amber-600">على السوم</span>}
+        </div>
+        <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-0.5 pt-1.5 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" /> {new Intl.NumberFormat('en-US').format(ad.views)}</span>
+          {ad.cityName && <span className="flex min-w-0 items-center gap-0.5"><MapPin className="h-3 w-3 shrink-0" /> <span className="truncate">{ad.cityName}</span></span>}
+          <span className="flex items-center gap-0.5"><Timer className="h-3 w-3" /> {timeShort(ad.createdAt)}</span>
+        </div>
+        <span className="mt-2 inline-flex w-fit items-center rounded-full border border-primary/40 px-3 py-1 text-[11px] font-bold text-primary">عرض التفاصيل ←</span>
+      </div>
+      {/* large image (left in RTL) */}
+      <div className="relative aspect-square w-28 shrink-0 self-start overflow-hidden rounded-xl bg-white sm:w-36">
+        <Image src={ad.image} alt={ad.title} fill sizes="(max-width:640px) 112px, 144px" className="object-cover" />
+        {tier && (
+          <span className={cn('absolute left-1 top-1 grid h-6 w-6 place-items-center rounded-full shadow', tier === 'gold' ? 'bg-amber-400' : 'bg-slate-300')}>
+            <Star className={cn('h-3.5 w-3.5', tier === 'gold' ? 'fill-amber-700 text-amber-700' : 'fill-slate-600 text-slate-600')} />
+          </span>
+        )}
+      </div>
+    </Link>
+  );
+}
+
 export async function AdGrid({ ads, className }: { ads: AdCardType[]; className?: string }) {
   if (!ads.length) {
     return <p className="py-12 text-center text-muted-foreground">لا توجد إعلانات لعرضها حالياً.</p>;
@@ -153,6 +192,13 @@ export async function AdGrid({ ads, className }: { ads: AdCardType[]; className?
     return (
       <div className={cn('grid grid-cols-2 gap-2.5 sm:grid-cols-3', className)}>
         {ads.map((ad) => <AdCardShop key={ad.id} ad={ad} />)}
+      </div>
+    );
+  }
+  if (design === 'list') {
+    return (
+      <div className={cn('space-y-3', className)}>
+        {ads.map((ad) => <AdCardList key={ad.id} ad={ad} />)}
       </div>
     );
   }

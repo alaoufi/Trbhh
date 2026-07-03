@@ -67,7 +67,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = (await cookies()).get('theme')?.value || '';
   const validThemes = ['desert', 'agri', 'spring', 'mint', 'lavender', 'sea', 'snow', 'mountain', 'sunset', 'night'];
   const design = (await cookies()).get('design')?.value || '';
-  const validDesigns = ['aurora', 'shop', 'flat', 'soft', 'sharp'];
+  const validDesigns = ['aurora', 'shop', 'list', 'flat', 'soft', 'sharp'];
   return (
     <html
       lang="ar"

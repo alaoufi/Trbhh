@@ -160,6 +160,28 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         <p className="whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
       </div>
 
+      {/* الموقع على الخريطة — يظهر عند تحديد المعلن لموقع الإعلان */}
+      {adLoc && (
+        <div className="card-3d rounded-2xl p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><MapPin className="h-4 w-4" /> موقع الإعلان</div>
+          {distanceLabel ? (
+            <div className="mb-3 flex items-center gap-2 rounded-xl bg-primary/5 p-2.5 text-sm font-bold text-primary">
+              <Navigation className="h-4 w-4 shrink-0" /> {distanceLabel}
+            </div>
+          ) : (
+            <p className="mb-3 text-xs text-muted-foreground">فعّل موقعك لعرض المسافة بينك وبين الإعلان.</p>
+          )}
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${adLoc.lat},${adLoc.lng}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:bg-primary/90"
+          >
+            <Navigation className="h-5 w-5" /> افتح في خرائط قوقل
+          </a>
+        </div>
+      )}
+
 
       {/* Paid banner — inside ad details */}
       <PromoSlot placement="ad_detail" />

@@ -27,7 +27,8 @@ export async function getStores() {
 }
 
 export async function getStore(id: number) {
-  const s = await prisma.stores.findUnique({ where: { id: BigInt(id) } });
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const s = await prisma.stores.findUnique({ where: { id: BigInt(id) } }).catch(() => null);
   if (!s) return null;
   const [owner, branches] = await Promise.all([
     prisma.users.findUnique({ where: { id: BigInt(s.user_id) }, select: { id: true, name: true, userName: true, trusted: true, phoneNumber: true, allow_phone: true, whatsapp: true, phone_whatsapp: true } }),

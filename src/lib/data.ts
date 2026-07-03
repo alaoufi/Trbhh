@@ -233,7 +233,8 @@ export async function getStats() {
 }
 
 export async function getCategory(id: number) {
-  const cat = await prisma.categories.findUnique({ where: { id: BigInt(id) } });
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const cat = await prisma.categories.findUnique({ where: { id: BigInt(id) } }).catch(() => null);
   if (!cat) return null;
   return { id: toInt(cat.id), name: cat.name };
 }
@@ -282,7 +283,8 @@ export async function searchAds(params: {
 }
 
 export async function getAd(id: number) {
-  const ad = await prisma.ads.findFirst({ where: { id: BigInt(id) } });
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const ad = await prisma.ads.findFirst({ where: { id: BigInt(id) } }).catch(() => null);
   if (!ad) return null;
 
   const [city, area, category, seller, photos, views] = await Promise.all([

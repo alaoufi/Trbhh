@@ -41,6 +41,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const { q } = await searchParams;
   const query = (q || '').trim();
   const storeId = Number(id);
+  if (!Number.isInteger(storeId) || storeId <= 0) notFound();
   const s = await getStore(storeId);
   if (!s) notFound();
 
@@ -48,8 +49,19 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const isOwner = !!session && s.userId === session.uid;
   const admin = session ? await hasAnyAdmin(session.uid).catch(() => false) : false;
   const meta = await getStoreMeta(storeId);
-  // approval gate: pending/suspended stores are visible only to the owner and admins
-  if (meta.status !== 1 && !isOwner && !admin) notFound();
+  // approval gate: pending/suspended stores aren't public. Instead of a bare 404,
+  // show a friendly status page (e.g. when a merchant previews a store still under review).
+  if (meta.status !== 1 && !isOwner && !admin) {
+    const pending = meta.status === 0;
+    return (
+      <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary text-3xl">{pending ? '⏳' : '🚫'}</div>
+        <h1 className="text-lg font-extrabold text-primary">{pending ? 'هذا المتجر قيد المراجعة' : 'هذا المتجر غير متاح حالياً'}</h1>
+        <p className="text-sm text-muted-foreground">{pending ? 'يخضع المتجر لموافقة الإدارة وسيظهر للعملاء بعد اعتماده.' : 'تم إيقاف هذا المتجر مؤقتاً من قبل الإدارة.'}</p>
+        <a href="/" className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">الصفحة الرئيسية</a>
+      </div>
+    );
+  }
 
   const [myAds, followers, rating, reviews, following] = await Promise.all([
     getMyAds(s.userId),

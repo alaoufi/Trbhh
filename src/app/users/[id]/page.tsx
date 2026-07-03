@@ -14,13 +14,16 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const u = await prisma.users.findUnique({ where: { id: BigInt(Number(id)) }, select: { name: true, userName: true } });
+  const uid = Number(id);
+  if (!Number.isInteger(uid) || uid <= 0) return { title: 'ملف العضو' };
+  const u = await prisma.users.findUnique({ where: { id: BigInt(uid) }, select: { name: true, userName: true } }).catch(() => null);
   return { title: u?.name || u?.userName || 'ملف العضو' };
 }
 
 export default async function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const uid = Number(id);
+  if (!Number.isInteger(uid) || uid <= 0) notFound();
   const user = await prisma.users.findUnique({ where: { id: BigInt(uid) } });
   if (!user) notFound();
 

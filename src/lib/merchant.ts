@@ -190,6 +190,21 @@ export async function setStoreStatus(storeId: number, status: number) {
   await prisma.$executeRawUnsafe(`UPDATE stores SET status = ? WHERE id = ?`, status, storeId).catch(() => {});
 }
 
+/**
+ * Delete a store and ONLY its store-scoped data (branches, warnings, follows,
+ * reviews, collaboration offers). Never touches the owner's platform account
+ * or their ads — the user simply reverts to a normal member; their ads remain.
+ */
+export async function deleteStore(storeId: number) {
+  await ensure();
+  await prisma.$executeRawUnsafe(`DELETE FROM store_warnings WHERE store_id = ?`, storeId).catch(() => {});
+  await prisma.$executeRawUnsafe(`DELETE FROM store_follows WHERE store_id = ?`, storeId).catch(() => {});
+  await prisma.$executeRawUnsafe(`DELETE FROM store_reviews WHERE store_id = ?`, storeId).catch(() => {});
+  await prisma.$executeRawUnsafe(`DELETE FROM store_offers WHERE from_store = ? OR to_store = ?`, storeId, storeId).catch(() => {});
+  await prisma.store_branches.deleteMany({ where: { store_id: storeId } }).catch(() => {});
+  await prisma.stores.delete({ where: { id: BigInt(storeId) } }).catch(() => {});
+}
+
 /* ---- followers ---- */
 export async function toggleFollow(userId: number, storeId: number): Promise<boolean> {
   await ensure();

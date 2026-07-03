@@ -63,7 +63,7 @@ export const ROLE_PRESET: Record<Role, string[]> = {
     'promos:view', 'promos:edit', 'promos:delete',
   ],
   monitor: ['reports:view', 'verifications:view', 'verifications:edit', 'words:view', 'words:add', 'words:delete'],
-  store_monitor: ['stores:view', 'stores:edit', 'stores:suspend'],
+  store_monitor: ['stores:view', 'stores:edit', 'stores:suspend', 'stores:delete'],
   member: [],
   visitor: [],
 };
@@ -125,12 +125,12 @@ async function ensureRolePerms() {
     await setSetting('role_perms_seeded', '1').catch(() => {});
   }
   // targeted one-time seed for the store-monitor role (added after initial seeding)
-  const storesSeeded = await getSetting('role_perms_stores_seeded', '0').catch(() => '0');
+  const storesSeeded = await getSetting('role_perms_stores_seeded_v2', '0').catch(() => '0');
   if (storesSeeded !== '1') {
     for (const k of DEFAULT_ROLE_PERMS.store_monitor) {
       await prisma.$executeRawUnsafe(`INSERT IGNORE INTO role_perms (role, perm) VALUES (?, ?)`, 'store_monitor', k).catch(() => {});
     }
-    await setSetting('role_perms_stores_seeded', '1').catch(() => {});
+    await setSetting('role_perms_stores_seeded_v2', '1').catch(() => {});
   }
   rolePermsEnsured = true;
 }

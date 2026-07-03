@@ -6,7 +6,7 @@ import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
-import { setStoreStatus, adminRequestHome, addStoreWarning } from '@/lib/merchant';
+import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore } from '@/lib/merchant';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
@@ -185,6 +185,14 @@ export async function warnStoreAction(formData: FormData) {
   const id = Number(formData.get('storeId'));
   const reason = String(formData.get('reason') || '').trim();
   if (id && reason) await addStoreWarning(id, reason);
+  revalidatePath('/admin/stores');
+}
+
+/** Delete a store (store-scoped only; the owner's account and ads are untouched). */
+export async function deleteStoreAction(formData: FormData) {
+  await requireAction('stores', 'delete');
+  const id = Number(formData.get('storeId'));
+  if (id && formData.get('confirm')) await deleteStore(id);
   revalidatePath('/admin/stores');
 }
 

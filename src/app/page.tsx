@@ -16,6 +16,7 @@ import { DisclaimerBar } from '@/components/disclaimer';
 import { getHomeStats } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
 import { getInterests } from '@/lib/interests';
+import { homeFeaturedAds } from '@/lib/merchant';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,6 +66,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     )
   ).filter((p) => p.ads.length > 0);
   const pinnedLabel = catsParam.length ? 'الأقسام المختارة' : '⭐ أقسام تهمّك';
+  const storeAds = await homeFeaturedAds().catch(() => []);
 
   return (
     <div className="space-y-4">
@@ -111,6 +113,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </span>
         <ChevronLeft className="h-5 w-5 shrink-0 text-primary" />
       </Link>
+
+      {storeAds.length > 0 && (
+        <Section title="متاجر مميّزة" href="/companies">
+          <AdGrid ads={storeAds} />
+        </Section>
+      )}
 
       {featured.length > 0 && (
         <Section title="إعلانات مميّزة" href="/search?special=1">

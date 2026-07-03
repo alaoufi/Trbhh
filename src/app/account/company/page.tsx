@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
-import { getStoreMeta, followersCount, getStoreRating } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard } from '@/lib/merchant';
 import { StoreDesigner } from '@/components/store-designer';
-import { Palette } from 'lucide-react';
+import { StoreMiniCard } from '@/components/store-mini-card';
+import { respondOfferAction } from '@/app/companies/actions';
+import { Palette, Handshake, Home } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
@@ -22,6 +24,9 @@ export default async function ManageCompanyPage() {
   const stats = store
     ? { followers: await followersCount(store.id), rating: await getStoreRating(store.id), ads: await prisma.ads.count({ where: { user_id: BigInt(session.uid), status: 1 } }) }
     : null;
+  const offers = store ? await incomingOffers(store.id) : [];
+  const collabIds = store ? await collaboratorStoreIds(store.id) : [];
+  const collabs = store ? (await Promise.all(collabIds.map((id) => storeCard(id)))).filter(Boolean) : [];
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';
   return (
@@ -51,6 +56,31 @@ export default async function ManageCompanyPage() {
         <div className="card-3d flex items-center justify-between gap-2 rounded-xl p-3 text-sm">
           <span className="min-w-0 truncate text-muted-foreground" dir="ltr">/companies/{store.id}</span>
           <span className="shrink-0 font-bold text-primary">رابط متجرك الخاص</span>
+        </div>
+      )}
+
+      {store && offers.length > 0 && (
+        <div className="card-3d space-y-3 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary"><Handshake className="h-5 w-5" /> دعوات واردة</div>
+          {offers.map((o) => (
+            <div key={o.id} className="space-y-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
+              <div className="flex items-center gap-1.5 text-sm font-bold text-primary">
+                {o.kind === 'home' ? <><Home className="h-4 w-4" /> طلب من الإدارة بعرض منتجاتك في الصفحة الرئيسية</> : <><Handshake className="h-4 w-4" /> دعوة تعاون لعرض المنتجات المتبادل</>}
+              </div>
+              {o.from && <StoreMiniCard s={o.from} />}
+              <div className="flex gap-2">
+                <form action={respondOfferAction}><input type="hidden" name="offerId" value={o.id} /><input type="hidden" name="action" value="accept" /><button className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white">قبول</button></form>
+                <form action={respondOfferAction}><input type="hidden" name="offerId" value={o.id} /><input type="hidden" name="action" value="reject" /><button className="rounded-lg border border-destructive/40 px-4 py-1.5 text-xs font-bold text-destructive">رفض</button></form>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {store && collabs.length > 0 && (
+        <div className="card-3d space-y-2 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary"><Handshake className="h-5 w-5" /> شركاء متجرك ({collabs.length})</div>
+          {collabs.map((c) => c && <StoreMiniCard key={c.id} s={c} href={`/companies/${c.id}`} />)}
         </div>
       )}
 

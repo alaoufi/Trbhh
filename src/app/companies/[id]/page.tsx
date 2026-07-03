@@ -5,14 +5,15 @@ import { getStore } from '@/lib/stores';
 import { getMyAds } from '@/lib/account';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
-import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds } from '@/lib/merchant';
 import { AdGrid } from '@/components/ad-card';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { waLink } from '@/lib/classified-theme';
 import { bannerBackground } from '@/lib/store-style';
 import { timeAgo } from '@/lib/utils';
-import { followStoreAction, rateStoreAction } from '../actions';
+import { followStoreAction, rateStoreAction, sendCollabAction } from '../actions';
+import { Handshake } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +56,11 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
   ]);
   const active = myAds.filter((a) => a.status === 1).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
   const wa = waLink(s.whatsapp);
+  // collaboration: can this viewer (a merchant) invite this store?
+  const viewerStoreId = session && !isOwner ? await storeIdOfUser(session.uid) : 0;
+  const alreadyPartner = viewerStoreId ? await isCollaborator(viewerStoreId, storeId) : false;
+  const canInvite = viewerStoreId > 0 && viewerStoreId !== storeId && !alreadyPartner;
+  const partnerAds = await collaboratorAds(storeId).catch(() => []);
   const brand = meta.color || '#3287da';
   const name = meta.storeName || s.name;
 
@@ -97,6 +103,13 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
             )}
             {wa && <a href={wa} target="_blank" rel="noopener noreferrer"><Button variant="whatsapp"><MessageCircle className="h-4 w-4" /> واتساب</Button></a>}
             {s.phone && <a href={`tel:${s.phone}`}><Button variant="outline"><Phone className="h-4 w-4" /> اتصال</Button></a>}
+            {canInvite && (
+              <form action={sendCollabAction}>
+                <input type="hidden" name="toStore" value={storeId} />
+                <Button variant="outline"><Handshake className="h-4 w-4" /> دعوة للتعاون</Button>
+              </form>
+            )}
+            {alreadyPartner && <span className="flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700"><Handshake className="h-4 w-4" /> شريك متعاون</span>}
           </div>
 
           {(meta.about || s.description) && <p className="mt-4 whitespace-pre-line leading-7 text-foreground/90">{meta.about || s.description}</p>}
@@ -114,6 +127,13 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
 
       <h2 className="text-lg font-bold" style={{ color: brand }}>كتالوج المتجر ({en(active.length)})</h2>
       <AdGrid ads={active} />
+
+      {partnerAds.length > 0 && (
+        <>
+          <h2 className="flex items-center gap-2 text-lg font-bold" style={{ color: brand }}><Handshake className="h-5 w-5" /> منتجات شركائنا</h2>
+          <AdGrid ads={partnerAds} />
+        </>
+      )}
 
       {/* التقييمات وملاحظات العملاء */}
       <div className="card-3d space-y-3 rounded-2xl p-4">

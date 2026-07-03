@@ -6,7 +6,7 @@ import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
-import { setStoreStatus } from '@/lib/merchant';
+import { setStoreStatus, adminRequestHome } from '@/lib/merchant';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
@@ -159,6 +159,14 @@ export async function approveStoreAction(formData: FormData) {
   const id = Number(formData.get('storeId'));
   const approve = String(formData.get('action')) === 'approve';
   if (id) await setStoreStatus(id, approve ? 1 : 2);
+  revalidatePath('/admin/stores');
+}
+
+/** Admin asks an approved store to feature its products on the home page. */
+export async function requestStoreHomeAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const id = Number(formData.get('storeId'));
+  if (id) await adminRequestHome(id);
   revalidatePath('/admin/stores');
 }
 

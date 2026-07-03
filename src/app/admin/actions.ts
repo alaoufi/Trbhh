@@ -160,12 +160,18 @@ export async function adminDeleteAdRedirectAction(formData: FormData) {
   redirect('/');
 }
 
-/** Archive (hide) an ad from its detail page (admin). */
+/** Archive (hide) an ad from its detail page (admin). Auto-deleted after 30 days. */
 export async function adminArchiveAdAction(formData: FormData) {
   await requireAction('ads', 'archive');
   const id = BigInt(String(formData.get('adId')));
   const a = await prisma.ads.findUnique({ where: { id } });
-  if (a) await prisma.ads.update({ where: { id }, data: { status: a.status === 1 ? 0 : 1 } }).catch(() => {});
+  if (a) {
+    const archiving = a.status === 1;
+    await prisma.ads.update({
+      where: { id },
+      data: { status: archiving ? 0 : 1, data_archive: archiving ? new Date().toISOString() : null },
+    }).catch(() => {});
+  }
   revalidatePath(`/ads/${toInt(id)}`);
 }
 
@@ -359,7 +365,28 @@ export async function adminToggleAdStatusAction(formData: FormData) {
   await requireAction('ads', 'archive');
   const id = BigInt(String(formData.get('adId')));
   const a = await prisma.ads.findUnique({ where: { id } });
-  if (a) await prisma.ads.update({ where: { id }, data: { status: a.status === 1 ? 0 : 1 } });
+  if (a) {
+    const archiving = a.status === 1; // hiding => archive (stamp date); showing => clear
+    await prisma.ads.update({
+      where: { id },
+      data: { status: archiving ? 0 : 1, data_archive: archiving ? new Date().toISOString() : null },
+    });
+  }
+  revalidatePath('/admin/ads');
+}
+
+/** Delete ALL ads that are waiting for approval (status 0, not archived). */
+export async function deleteAllPendingAdsAction() {
+  await requireAction('ads', 'delete');
+  const pend = await prisma.ads.findMany({
+    where: { status: 0, OR: [{ data_archive: null }, { data_archive: '' }] },
+    select: { id: true },
+  });
+  const ids = pend.map((p) => p.id);
+  if (ids.length) {
+    await prisma.photos.deleteMany({ where: { other_id: { in: ids } } }).catch(() => {});
+    await prisma.ads.deleteMany({ where: { id: { in: ids } } }).catch(() => {});
+  }
   revalidatePath('/admin/ads');
 }
 

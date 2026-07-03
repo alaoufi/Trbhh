@@ -4,38 +4,58 @@ import { prisma } from '@/lib/prisma';
 import { toInt, formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { requirePerm } from '@/lib/roles';
-import { adminDeleteAdAction, adminToggleSpecialAction, adminToggleAdStatusAction } from '../actions';
+import { adminDeleteAdAction, adminToggleSpecialAction, adminToggleAdStatusAction, deleteAllPendingAdsAction } from '../actions';
+import { sweepExpiredArchived } from '@/lib/data';
+import { Button } from '@/components/ui/button';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الإعلانات' };
 
-export default async function AdminAds({ searchParams }: { searchParams: Promise<{ pending?: string }> }) {
+const notArchived = { OR: [{ data_archive: null }, { data_archive: '' }] };
+const archived = { NOT: [{ data_archive: null }, { data_archive: '' }] };
+
+export default async function AdminAds({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   await requirePerm('ads');
-  const sp = await searchParams;
-  const onlyPending = sp.pending === '1';
-  const [ads, pendingCount] = await Promise.all([
-    prisma.ads.findMany({ where: onlyPending ? { status: 0 } : {}, orderBy: { id: 'desc' }, take: 60 }),
-    prisma.ads.count({ where: { status: 0 } }),
+  await sweepExpiredArchived().catch(() => {});
+  const { view } = await searchParams;
+  const tab = view === 'pending' || view === 'archived' ? view : 'all';
+  const where = tab === 'pending' ? { status: 0, ...notArchived } : tab === 'archived' ? archived : {};
+  const [ads, pendingCount, archivedCount] = await Promise.all([
+    prisma.ads.findMany({ where, orderBy: { id: 'desc' }, take: 60 }),
+    prisma.ads.count({ where: { status: 0, ...notArchived } }),
+    prisma.ads.count({ where: archived }),
   ]);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-bold text-primary">الإعلانات</h1>
-        <div className="flex gap-2 text-sm">
-          <Link href="/admin/ads" className={`rounded-lg border px-3 py-1.5 ${!onlyPending ? 'bg-primary text-white' : 'text-primary'}`}>الكل</Link>
-          <Link href="/admin/ads?pending=1" className={`rounded-lg border px-3 py-1.5 ${onlyPending ? 'bg-primary text-white' : 'text-primary'}`}>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <Link href="/admin/ads" className={`rounded-lg border px-3 py-1.5 ${tab === 'all' ? 'bg-primary text-white' : 'text-primary'}`}>الكل</Link>
+          <Link href="/admin/ads?view=pending" className={`rounded-lg border px-3 py-1.5 ${tab === 'pending' ? 'bg-primary text-white' : 'text-primary'}`}>
             بانتظار الموافقة {pendingCount > 0 && <span className="mr-1 rounded-full bg-red-500 px-1.5 text-xs text-white">{pendingCount}</span>}
+          </Link>
+          <Link href="/admin/ads?view=archived" className={`rounded-lg border px-3 py-1.5 ${tab === 'archived' ? 'bg-primary text-white' : 'text-primary'}`}>
+            المؤرشفة {archivedCount > 0 && <span className="mr-1 rounded-full bg-amber-500 px-1.5 text-xs text-white">{archivedCount}</span>}
           </Link>
         </div>
       </div>
-      {ads.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد إعلانات{onlyPending ? ' بانتظار الموافقة' : ''}.</p>}
+
+      {tab === 'pending' && pendingCount > 0 && (
+        <form action={deleteAllPendingAdsAction} className="flex items-center justify-between gap-2 rounded-xl border-2 border-destructive/30 bg-destructive/5 p-3">
+          <span className="text-sm font-bold text-destructive">حذف كل الإعلانات المنتظِرة للموافقة ({pendingCount})؟ لا يمكن التراجع.</span>
+          <Button size="sm" className="bg-destructive hover:bg-destructive/90"><Trash2 className="h-4 w-4" /> حذف الكل</Button>
+        </form>
+      )}
+      {tab === 'archived' && <p className="text-xs font-bold text-amber-700">الإعلانات المؤرشفة تُحذف تلقائياً بعد 30 يوماً من أرشفتها.</p>}
+
+      {ads.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد إعلانات هنا.</p>}
       <div className="space-y-2">
         {ads.map((a) => (
           <div key={toInt(a.id)} className="flex flex-wrap items-center gap-2 card-3d rounded-xl p-3">
             <Link href={`/ads/${toInt(a.id)}`} className="min-w-0 flex-1 truncate font-medium hover:text-primary">{a.title}</Link>
             <span className="text-sm text-primary">{formatPrice(a.price)}</span>
             {a.adsSpecial === 'checked' && <Badge variant="special">مميّز</Badge>}
-            <Badge variant={a.status === 1 ? 'trusted' : 'special'}>{a.status === 1 ? 'نشط' : 'بانتظار الموافقة'}</Badge>
+            <Badge variant={a.status === 1 ? 'trusted' : a.data_archive ? 'muted' : 'special'}>{a.status === 1 ? 'نشط' : a.data_archive ? 'مؤرشف' : 'بانتظار الموافقة'}</Badge>
             <span className="text-xs text-muted-foreground">{timeAgo(a.created_at)}</span>
             <div className="flex gap-1">
               {a.status === 0 && (

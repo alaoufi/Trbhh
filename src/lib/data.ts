@@ -161,7 +161,29 @@ export async function getCategories() {
   });
 }
 
+/** Auto-delete ads that have been archived for more than 30 days. Throttled. */
+let lastArchiveSweep = 0;
+export async function sweepExpiredArchived() {
+  const now = Date.now();
+  if (now - lastArchiveSweep < 3600_000) return; // at most once/hour
+  lastArchiveSweep = now;
+  const cutoff = now - 30 * 86400_000;
+  const rows = await prisma.ads.findMany({
+    where: { NOT: [{ data_archive: null }, { data_archive: '' }] },
+    select: { id: true, data_archive: true },
+  }).catch(() => [] as { id: bigint; data_archive: string | null }[]);
+  const expired = rows.filter((r) => {
+    const t = new Date(r.data_archive || '').getTime();
+    return Number.isFinite(t) && t < cutoff;
+  }).map((r) => r.id);
+  if (expired.length) {
+    await prisma.photos.deleteMany({ where: { other_id: { in: expired } } }).catch(() => {});
+    await prisma.ads.deleteMany({ where: { id: { in: expired } } }).catch(() => {});
+  }
+}
+
 export async function getLatestAds(take = 12) {
+  sweepExpiredArchived().catch(() => {});
   const rows = await prisma.ads.findMany({ where: activeAdWhere, orderBy: { id: 'desc' }, take, select: adSelect });
   return toCards(rows);
 }

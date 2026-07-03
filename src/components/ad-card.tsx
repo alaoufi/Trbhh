@@ -174,14 +174,16 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
       {/* حاجز فاصل بين التفاصيل والصورة */}
       <span className="w-px self-stretch bg-primary/15" />
 
-      {/* large framed image (left in RTL) — إطار وظلّ ليتمايز */}
-      <div className="relative aspect-square w-28 shrink-0 self-center overflow-hidden rounded-xl bg-white ring-1 ring-primary/20 shadow-sm sm:w-36">
-        <Image src={ad.image} alt={ad.title} fill sizes="(max-width:640px) 112px, 144px" className="object-cover" />
-        {tier && (
-          <span className={cn('absolute left-1 top-1 grid h-6 w-6 place-items-center rounded-full shadow', tier === 'gold' ? 'bg-amber-400' : 'bg-slate-300')}>
-            <Star className={cn('h-3.5 w-3.5', tier === 'gold' ? 'fill-amber-700 text-amber-700' : 'fill-slate-600 text-slate-600')} />
-          </span>
-        )}
+      {/* برواز على الصورة — إطار أبيض بحدّ ملوّن وظلّ (يسار RTL) */}
+      <div className="shrink-0 self-center rounded-2xl border-2 border-primary/30 bg-white p-1 shadow-md">
+        <div className="relative aspect-square w-24 overflow-hidden rounded-xl sm:w-32">
+          <Image src={ad.image} alt={ad.title} fill sizes="(max-width:640px) 96px, 128px" className="object-cover" />
+          {tier && (
+            <span className={cn('absolute left-1 top-1 grid h-6 w-6 place-items-center rounded-full shadow', tier === 'gold' ? 'bg-amber-400' : 'bg-slate-300')}>
+              <Star className={cn('h-3.5 w-3.5', tier === 'gold' ? 'fill-amber-700 text-amber-700' : 'fill-slate-600 text-slate-600')} />
+            </span>
+          )}
+        </div>
       </div>
     </Link>
   );

@@ -18,7 +18,9 @@ function Preview({ id }: { id: string }) {
             <span className="mt-2 inline-flex w-fit rounded-full border border-primary/40 px-2.5 py-0.5 text-[10px] font-bold text-primary">عرض التفاصيل ←</span>
           </div>
           <span className="w-px self-stretch bg-primary/15" />
-          <div className="aspect-square w-24 shrink-0 self-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 ring-1 ring-primary/20 shadow-sm" />
+          <div className="shrink-0 self-center rounded-2xl border-2 border-primary/30 bg-white p-1 shadow-md">
+            <div className="aspect-square w-20 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5" />
+          </div>
         </div>
       </div>
     );

@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(req: NextRequest) {
-  const res = NextResponse.next();
+  // expose the current path so server guards can send the user back after login
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-pathname', req.nextUrl.pathname + req.nextUrl.search);
+  const res = NextResponse.next({ request: { headers: requestHeaders } });
   if (!req.cookies.get('trbhh_vid')) {
     const vid = crypto.randomUUID();
     res.cookies.set('trbhh_vid', vid, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });

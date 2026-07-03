@@ -70,12 +70,15 @@ export async function getCurrentUser() {
   return prisma.users.findUnique({ where: { id: BigInt(session.uid) } });
 }
 
-/** Guard: return session or redirect to /login. */
+/** Guard: return session or redirect to /login (remembering where to return). */
 export async function requireUser() {
   const session = await getSession();
   if (!session) {
     const { redirect } = await import('next/navigation');
-    redirect('/login');
+    const { headers } = await import('next/headers');
+    const path = (await headers()).get('x-pathname') || '';
+    const next = path && path.startsWith('/') && !path.startsWith('/login') ? `?next=${encodeURIComponent(path)}` : '';
+    redirect(`/login${next}`);
   }
   return session!;
 }

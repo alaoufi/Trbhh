@@ -36,7 +36,9 @@ export async function saveCompanyAction(formData: FormData) {
   }
   await saveStoreMeta(session.uid, { storeName, color, about, banner, tagline });
   revalidatePath('/account/company');
-  redirect('/account/company');
+  // land the merchant on their own (independent) store page
+  const mine = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true } });
+  redirect(mine ? `/companies/${toInt(mine.id)}` : '/account/company');
 }
 
 export async function addBranchAction(formData: FormData) {

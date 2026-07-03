@@ -16,7 +16,8 @@ import { DisclaimerBar } from '@/components/disclaimer';
 import { getHomeStats } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
 import { getInterests } from '@/lib/interests';
-import { homeFeaturedAds } from '@/lib/merchant';
+import { homeFeaturedAds, storeIdOfUser } from '@/lib/merchant';
+import { Store } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,11 +68,27 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   ).filter((p) => p.ads.length > 0);
   const pinnedLabel = catsParam.length ? 'الأقسام المختارة' : '⭐ أقسام تهمّك';
   const storeAds = await homeFeaturedAds().catch(() => []);
+  // If the logged-in member owns a store, offer a quick jump to it.
+  const myStoreId = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
 
   return (
     <div className="space-y-4">
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
+
+      {/* اختصار للانتقال لمتجر العضو إن كان يملك متجراً */}
+      {myStoreId > 0 && (
+        <Link href={`/companies/${myStoreId}`} className="flex items-center justify-between gap-3 rounded-2xl border-2 border-primary/30 bg-gradient-to-l from-primary/10 to-primary/5 p-4 transition hover:-translate-y-0.5 hover:border-primary/50">
+          <span className="flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-white"><Store className="h-6 w-6" /></span>
+            <span>
+              <span className="block font-bold text-primary">الانتقال إلى متجري</span>
+              <span className="block text-xs text-muted-foreground">إدارة متجرك وعرض منتجاتك</span>
+            </span>
+          </span>
+          <ChevronLeft className="h-5 w-5 shrink-0 text-primary" />
+        </Link>
+      )}
 
       {/* Category dropdown — pick one or more categories to show */}
       <CategorySelect categories={categories} initial={catsParam} />

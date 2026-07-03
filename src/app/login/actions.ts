@@ -39,7 +39,8 @@ export async function loginAction(_prev: unknown, formData: FormData) {
   if (user.ban === 'checked') return { error: 'هذا الحساب محظور' };
 
   await createSession({ uid: toInt(user.id), name: user.name || user.userName || 'عضو', type: user.type });
-  redirect('/');
+  const next = String(formData.get('next') || '');
+  redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/');
 }
 
 export async function registerAction(_prev: unknown, formData: FormData) {

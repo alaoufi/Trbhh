@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Store, Heart } from 'lucide-react';
+import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Store, Heart, Home } from 'lucide-react';
 import { getStore } from '@/lib/stores';
 import { getMyAds } from '@/lib/account';
 import { getSession } from '@/lib/auth';
@@ -66,6 +66,18 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="space-y-4">
+      {/* شريط تنقّل: العودة للرئيسية + إدارة المتجر لصاحبه */}
+      <div className="flex items-center justify-between gap-2">
+        <a href="/" className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-bold text-primary hover:bg-accent">
+          <Home className="h-4 w-4" /> الصفحة الرئيسية
+        </a>
+        {isOwner && (
+          <a href="/account/company" className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">
+            <Store className="h-4 w-4" /> إدارة متجري
+          </a>
+        )}
+      </div>
+
       {meta.status !== 1 && (isOwner || admin) && (
         <div className="card-3d rounded-xl p-3 text-sm font-bold text-amber-700">⏳ هذا المتجر {meta.status === 0 ? 'بانتظار موافقة الإدارة' : 'موقوف'} — يظهر لك فقط حالياً.</div>
       )}

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles, Crown, MonitorPlay } from 'lucide-react';
+import { Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles, Crown, MonitorPlay, ShieldAlert } from 'lucide-react';
 import { adminStats } from '@/lib/admin';
 import { getPackages } from '@/lib/packages';
 import { countPendingPromos } from '@/lib/promos';
@@ -19,6 +19,7 @@ export default async function AdminHome() {
     { label: 'طلبات توثيق معلّقة', value: s.pendingVerify, icon: ShieldCheck, href: '/admin/verifications', perm: 'verifications' },
     { label: 'البلاغات', value: s.reports, icon: Flag, href: '/admin/reports', perm: 'reports' },
     { label: 'الإعلانات المكررة', value: s.duplicateAds, icon: Copy, href: '/admin/duplicates', highlight: true, perm: 'duplicates' },
+    { label: 'سجل الحماية', value: 0, icon: ShieldAlert, href: '/admin/moderation', perm: 'reports' },
     { label: 'الإعلانات المبوّبة', value: s.classified, icon: Sparkles, href: '/admin/classified', perm: 'classified' },
     { label: 'الباقات', value: packages.length, icon: Crown, href: '/admin/packages', perm: 'packages' },
     { label: 'إعلانات ترويجية بانتظار الموافقة', value: pendingPromos, icon: MonitorPlay, href: '/admin/promos', highlight: true, perm: 'promos' },

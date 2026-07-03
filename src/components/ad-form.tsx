@@ -117,7 +117,16 @@ export function AdForm({
       {error === 'blocked' && (
         <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
           🚫 رُفض هذا الإعلان لاحتوائه على <b>{catLabel}</b> — النشر ممنوع منعاً باتاً.
-          {banned && <div className="mt-1">وتم <b>حظر حسابك فوراً</b> لمخالفة سياسة المحتوى. للاعتراض تواصل مع الإدارة.</div>}
+          {banned ? (
+            <div className="mt-1">وتم <b>حظر حسابك فوراً</b> لمخالفة سياسة المحتوى. للاعتراض تواصل مع الإدارة.</div>
+          ) : (
+            <div className="mt-1">هذه <b>مخالفة مسجّلة</b> على حسابك. تكرار المحاولة يؤدي إلى <b>حظر الحساب فوراً</b>{dupLeft ? ` (تبقّى ${dupLeft})` : ''}.</div>
+          )}
+        </div>
+      )}
+      {error === 'flood' && (
+        <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          ⏳ أنت تنشر بسرعة كبيرة (إغراق). الرجاء الانتظار{gapWait ? ` نحو ${gapWait} ثانية` : ' قليلاً'} قبل نشر إعلان آخر.
         </div>
       )}
       {error === 'repeat' && (

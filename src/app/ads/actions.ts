@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
-import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT } from '@/lib/moderation';
+import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
 import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { setAdMedia } from '@/lib/ad-media';
@@ -171,15 +171,17 @@ export async function createAdAction(formData: FormData) {
   // منع حشو الكلمات (تكرار العبارات لخداع محرك البحث)
   if (isKeywordStuffing(title, detail)) redirect('/ads/new?error=repeat');
 
-  // فحص ذكي للمحتوى: يمنع السياسي/المخدرات/الأمني/الأخلاقي — والأخلاقي يحظر مباشرة
+  // فحص ذكي للمحتوى: يمنع السياسي/المخدرات/الأمني/الأخلاقي.
+  // الأخلاقي يحظر فوراً، والبقية تُسجَّل مخالفة ويُحظر عند التكرار (بدون تردد).
   const badContent = await scanContent(title, detail);
   if (badContent) {
-    if (badContent.category === 'immoral') {
-      await banUser(session.uid);
-      redirect('/ads/new?error=blocked&cat=immoral&banned=1');
-    }
-    redirect(`/ads/new?error=blocked&cat=${badContent.category}`);
+    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `${title} ${detail}`);
+    redirect(`/ads/new?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : `&left=${o.left}`}`);
   }
+
+  // حاجز إغراق صلب لكل الأعضاء (فوق حدود الباقة): يمنع النشر المتسارع
+  const flood = await checkFlood(session.uid);
+  if (flood.blocked) redirect(`/ads/new?error=flood&wait=${flood.waitSec}`);
 
   // حدود الباقة: عدد الإعلانات باليوم والفارق الزمني بين إعلان وآخر
   const pkg = await getUserPackage(session.uid);
@@ -214,16 +216,14 @@ export async function createAdAction(formData: FormData) {
   const mediaName = String((formData.get('video') as File | null)?.name || '');
   const nameHit = await scanContent(images.map((i) => i.name).join(' '), mediaName);
   if (nameHit) {
-    if (nameHit.category === 'immoral') {
-      await banUser(session.uid);
-      redirect('/ads/new?error=blocked&cat=immoral&banned=1');
-    }
-    redirect(`/ads/new?error=blocked&cat=${nameHit.category}`);
+    const o = await handleProhibited(session.uid, nameHit.category, nameHit.term, `filename: ${images.map((i) => i.name).join(' ')} ${mediaName}`);
+    redirect(`/ads/new?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : `&left=${o.left}`}`);
   }
 
   // منع تكرار الإعلان: تحذير ٣ محاولات ثم حظر الحساب
   if (await isOwnDuplicate(session.uid, title, detail, images)) {
     const n = await bumpDupAttempts(session.uid);
+    await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: title.slice(0, 120) });
     if (n >= DUP_LIMIT) {
       await banUser(session.uid);
       redirect('/ads/new?error=banned');
@@ -284,8 +284,9 @@ export async function updateAdAction(formData: FormData) {
   if (isKeywordStuffing(eTitle, eDetail)) redirect(`/ads/${toInt(adId)}/edit?error=repeat`);
   const eBad = await scanContent(eTitle, eDetail);
   if (eBad) {
-    if (eBad.category === 'immoral') { await banUser(session.uid); redirect('/account/ads?error=blocked'); }
-    redirect(`/ads/${toInt(adId)}/edit?error=blocked&cat=${eBad.category}`);
+    const o = await handleProhibited(session.uid, eBad.category, eBad.term, `${eTitle} ${eDetail}`);
+    if (o.banned) redirect('/account/ads?error=blocked');
+    redirect(`/ads/${toInt(adId)}/edit?error=blocked&cat=${o.category}&left=${o.left}`);
   }
   await prisma.users.update({
     where: { id: BigInt(session.uid) },

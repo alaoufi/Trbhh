@@ -9,7 +9,7 @@ import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified } from '@/lib/classified';
 import { getMemberWindows, withinWindow } from '@/lib/settings';
 import { scanContent } from '@/lib/content-guard';
-import { banUser } from '@/lib/moderation';
+import { handleProhibited } from '@/lib/moderation';
 import { toInt } from '@/lib/utils';
 
 async function saveOneImage(formData: FormData): Promise<string | null> {
@@ -54,11 +54,11 @@ export async function createClassifiedAction(formData: FormData) {
   if (!image && !body && !title) redirect('/classified/new?error=content');
   // جوال أو واتساب إجباري (أحدهما)
   if (!phone && !whatsapp) redirect('/classified/new?error=contact');
-  // فحص ذكي للمحتوى — الأخلاقي يحظر مباشرة
+  // فحص ذكي للمحتوى — الأخلاقي يحظر فوراً، والأمني/السياسي/المخدرات يُحظر عند التكرار
   const bad = await scanContent(title, body);
   if (bad) {
-    if (bad.category === 'immoral') { await banUser(session.uid); redirect('/classified/new?error=blocked&cat=immoral&banned=1'); }
-    redirect(`/classified/new?error=blocked&cat=${bad.category}`);
+    const o = await handleProhibited(session.uid, bad.category, bad.term, `${title || ''} ${body || ''}`);
+    redirect(`/classified/new?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : `&left=${o.left}`}`);
   }
 
   const theme = parseInt(String(formData.get('theme') || ''), 10);
@@ -101,6 +101,12 @@ export async function updateClassifiedAction(formData: FormData) {
 
   if (!newImage && !existing!.image && !body && !title) redirect(`/classified/${id}/edit?error=content`);
   if (!phone && !whatsapp) redirect(`/classified/${id}/edit?error=contact`);
+  // امنع إدخال محتوى ممنوع عبر التعديل بعد نشر نظيف
+  const eBad = await scanContent(title, body);
+  if (eBad) {
+    const o = await handleProhibited(session.uid, eBad.category, eBad.term, `${title || ''} ${body || ''}`);
+    redirect(`/classified/${id}/edit?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : `&left=${o.left}`}`);
+  }
 
   const theme = parseInt(String(formData.get('theme') || ''), 10);
   const pos = String(formData.get('pos') || 'bottom');

@@ -12,6 +12,7 @@ import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_HOM
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS } from '@/lib/sms';
+import { cacheDel } from '@/lib/redis';
 import { toInt } from '@/lib/utils';
 
 function readPromoPkgForm(formData: FormData) {
@@ -361,12 +362,19 @@ export async function adminToggleAdStatusAction(formData: FormData) {
   revalidatePath('/admin/ads');
 }
 
+async function refreshCategories() {
+  await cacheDel('categories:active');
+  revalidatePath('/admin/categories');
+  revalidatePath('/');
+}
+
 export async function addCategoryAction(formData: FormData) {
   await requireAction('categories', 'add');
   const name = String(formData.get('name') || '').trim();
   if (!name) return;
-  await prisma.categories.create({ data: { name, photo_path: '0', is_active: 'yes', ordered: 0 } });
-  revalidatePath('/admin/categories');
+  const ordered = parseInt(String(formData.get('ordered') || '0')) || 0;
+  await prisma.categories.create({ data: { name, photo_path: '0', is_active: 'yes', ordered } });
+  await refreshCategories();
 }
 
 export async function toggleCategoryAction(formData: FormData) {
@@ -374,5 +382,21 @@ export async function toggleCategoryAction(formData: FormData) {
   const id = BigInt(String(formData.get('catId')));
   const c = await prisma.categories.findUnique({ where: { id } });
   if (c) await prisma.categories.update({ where: { id }, data: { is_active: c.is_active === 'yes' ? 'no' : 'yes' } });
-  revalidatePath('/admin/categories');
+  await refreshCategories();
+}
+
+export async function updateCategoryAction(formData: FormData) {
+  await requireAction('categories', 'edit');
+  const id = BigInt(String(formData.get('catId')));
+  const name = String(formData.get('name') || '').trim();
+  const ordered = parseInt(String(formData.get('ordered') || '0')) || 0;
+  if (name) await prisma.categories.update({ where: { id }, data: { name, ordered } }).catch(() => {});
+  await refreshCategories();
+}
+
+export async function deleteCategoryAction(formData: FormData) {
+  await requireAction('categories', 'delete');
+  const id = BigInt(String(formData.get('catId')));
+  await prisma.categories.delete({ where: { id } }).catch(() => {});
+  await refreshCategories();
 }

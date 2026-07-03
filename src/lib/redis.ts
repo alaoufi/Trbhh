@@ -29,6 +29,16 @@ export const redis: Redis | null = globalForRedis.redis ?? createRedis();
 
 if (process.env.NODE_ENV !== 'production') globalForRedis.redis = redis;
 
+/** Invalidate one or more cache keys (no-op when Redis is unavailable). */
+export async function cacheDel(...keys: string[]): Promise<void> {
+  if (!redis || !keys.length) return;
+  try {
+    await redis.del(...keys);
+  } catch {
+    /* ignore cache delete errors */
+  }
+}
+
 /** Simple cache-aside helper. Falls back to the loader when Redis is unavailable. */
 export async function cached<T>(key: string, ttlSeconds: number, loader: () => Promise<T>): Promise<T> {
   if (!redis) return loader();

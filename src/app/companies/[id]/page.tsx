@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { StoreBottomNav } from '@/components/store-bottomnav';
 import { waLink } from '@/lib/classified-theme';
-import { bannerBackground, storeTier, isLightColor } from '@/lib/store-style';
+import { bannerBackground, storeTier, isLightColor, layoutTokens } from '@/lib/store-style';
 import { timeAgo } from '@/lib/utils';
 import { followStoreAction, rateStoreAction, sendCollabAction } from '../actions';
 
@@ -69,6 +69,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const tier = storeTier(followers, rating.avg, rating.count);
   const year = s.createdAt ? new Date(s.createdAt).getFullYear() : null;
   const onBrand = isLightColor(brand) ? '#0f172a' : '#ffffff';
+  const tk = layoutTokens(meta.layout);
   const tierStyle: Record<string, string> = { gold: 'bg-amber-100 text-amber-800', silver: 'bg-slate-200 text-slate-700', active: 'bg-emerald-100 text-emerald-700', new: 'bg-sky-100 text-sky-700' };
 
   return (
@@ -91,13 +92,13 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           <div className="rounded-xl border bg-white p-3 text-sm font-bold text-amber-700 shadow-sm">⏳ هذا المتجر {meta.status === 0 ? 'بانتظار موافقة الإدارة' : 'موقوف'} — يظهر لك فقط حالياً.</div>
         )}
 
-        {/* ===== رأس المتجر بهويته البصرية ===== */}
-        <div className="overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-black/5">
-          <div className="relative h-36 w-full" style={{ background: bannerBackground(meta.banner, brand) }}>
-            <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 p-4">
-              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-muted shadow-lg"><Image src={s.logo} alt={name} fill sizes="80px" className="object-cover" /></div>
-              <div className="min-w-0 pb-1" style={{ color: onBrand }}>
-                <div className="flex items-center gap-1 text-xl font-extrabold drop-shadow">{name}{s.trusted && <BadgeCheck className="h-5 w-5" />}</div>
+        {/* ===== رأس المتجر بهويته البصرية (حسب القالب) ===== */}
+        <div className={`overflow-hidden bg-white shadow-md ring-1 ring-black/5 ${tk.card}`}>
+          <div className={`relative w-full ${tk.hero}`} style={{ background: bannerBackground(meta.banner, brand) }}>
+            <div className={`absolute inset-0 flex p-4 ${tk.align === 'center' ? 'flex-col items-center justify-center gap-2 text-center' : 'items-end gap-3'}`}>
+              <div className={`relative h-20 w-20 shrink-0 overflow-hidden border-4 border-white bg-muted shadow-lg ${tk.logo}`}><Image src={s.logo} alt={name} fill sizes="80px" className="object-cover" /></div>
+              <div className={tk.align === 'center' ? '' : 'min-w-0 pb-1'} style={{ color: onBrand }}>
+                <div className={`flex items-center gap-1 font-extrabold drop-shadow ${tk.title} ${tk.align === 'center' ? 'justify-center' : ''}`}>{name}{s.trusted && <BadgeCheck className="h-5 w-5" />}</div>
                 {meta.tagline && <div className="truncate text-sm opacity-95 drop-shadow">{meta.tagline}</div>}
               </div>
             </div>

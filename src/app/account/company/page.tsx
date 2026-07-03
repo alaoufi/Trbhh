@@ -86,7 +86,7 @@ export default async function ManageCompanyPage() {
 
       <form action={saveCompanyAction} className="max-w-lg space-y-4 card-3d rounded-xl p-5">
         <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><Palette className="h-5 w-5" /> مصمّم المتجر الذكي</div>
-        <StoreDesigner initial={{ storeName: meta?.storeName, color: meta?.color, banner: meta?.banner, tagline: meta?.tagline, about: meta?.about, logoUrl }} />
+        <StoreDesigner initial={{ storeName: meta?.storeName, color: meta?.color, banner: meta?.banner, tagline: meta?.tagline, about: meta?.about, layout: meta?.layout, logoUrl }} />
         <div><label className="mb-1 block text-sm font-medium">شعار المتجر (صورة)</label><input name="logo" type="file" accept="image/*" className="w-full rounded-lg border bg-background p-2 text-sm" /></div>
         <div><label className="mb-1 block text-sm font-medium">وصف النشاط / ملف الأعمال</label><textarea name="description" defaultValue={store?.description ?? ''} rows={4} className="w-full rounded-lg border bg-background p-3 text-sm" placeholder="نبذة عن نشاط المتجر والخدمات المقدمة" /></div>
         <div><label className="mb-1 block text-sm font-medium">العنوان</label><input name="address" defaultValue={store?.address ?? ''} className={field} /></div>

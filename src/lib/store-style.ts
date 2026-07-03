@@ -39,7 +39,50 @@ export const STORE_TEMPLATES: StoreTemplate[] = [
   { id: 'sky', name: 'سماوي هادئ', color: '#0ea5e9', banner: 'gradient', vibe: 'خفيف ومريح' },
   { id: 'emerald', name: 'زمرّدي', color: '#10b981', banner: 'mesh', vibe: 'أنيق ومنعش' },
   { id: 'slate', name: 'رمادي احترافي', color: '#334155', banner: 'gradient', vibe: 'محايد واحترافي' },
+  { id: 'indigo', name: 'نيلي عميق', color: '#4f46e5', banner: 'aurora', vibe: 'جريء وعصري' },
+  { id: 'cyan', name: 'سماوي منعش', color: '#06b6d4', banner: 'mesh', vibe: 'نظيف وحيوي' },
+  { id: 'lime', name: 'ليموني نشِط', color: '#65a30d', banner: 'gradient', vibe: 'شبابي وحيوي' },
+  { id: 'amber', name: 'كهرماني دافئ', color: '#f59e0b', banner: 'sunset', vibe: 'ودود ومبهج' },
+  { id: 'crimson', name: 'قرمزي فاخر', color: '#be123c', banner: 'night', vibe: 'فخم وجذّاب' },
+  { id: 'fuchsia', name: 'أرجواني زاهي', color: '#d946ef', banner: 'aurora', vibe: 'عصري ولافت' },
+  { id: 'ocean', name: 'أزرق محيطي', color: '#0891b2', banner: 'night', vibe: 'هادئ وعميق' },
+  { id: 'charcoal', name: 'فحمي راقٍ', color: '#0f172a', banner: 'mesh', vibe: 'راقٍ وقوي' },
 ];
+
+/**
+ * Store layout templates (قوالب): each restructures the storefront hero — logo
+ * shape, hero height & alignment, corner radius, and title scale — so different
+ * stores feel genuinely different, not just recolored.
+ */
+export type StoreLayout = 'classic' | 'modern' | 'minimal' | 'luxury' | 'grid' | 'bold';
+export const STORE_LAYOUTS: { id: StoreLayout; name: string; desc: string }[] = [
+  { id: 'classic', name: 'كلاسيكي', desc: 'شعار واسم على الواجهة' },
+  { id: 'modern', name: 'عصري', desc: 'واجهة متمركزة أنيقة' },
+  { id: 'minimal', name: 'مبسّط', desc: 'نظيف وخفيف' },
+  { id: 'luxury', name: 'فاخر', desc: 'واجهة كبيرة فخمة' },
+  { id: 'grid', name: 'شبكي', desc: 'يبرز المنتجات' },
+  { id: 'bold', name: 'جريء', desc: 'ألوان وعناوين كبيرة' },
+];
+
+export type LayoutTokens = { hero: string; card: string; logo: string; align: 'bottom' | 'center'; title: string };
+/** Visual tokens (Tailwind classes) for a store layout template. */
+export function layoutTokens(id: string | null | undefined): LayoutTokens {
+  switch (id) {
+    case 'modern':
+      return { hero: 'h-40', card: 'rounded-3xl', logo: 'rounded-2xl', align: 'center', title: 'text-2xl' };
+    case 'minimal':
+      return { hero: 'h-24', card: 'rounded-lg', logo: 'rounded-full', align: 'bottom', title: 'text-lg' };
+    case 'luxury':
+      return { hero: 'h-48', card: 'rounded-3xl', logo: 'rounded-full', align: 'center', title: 'text-3xl' };
+    case 'grid':
+      return { hero: 'h-28', card: 'rounded-xl', logo: 'rounded-xl', align: 'bottom', title: 'text-lg' };
+    case 'bold':
+      return { hero: 'h-44', card: 'rounded-2xl', logo: 'rounded-2xl', align: 'center', title: 'text-3xl' };
+    case 'classic':
+    default:
+      return { hero: 'h-36', card: 'rounded-2xl', logo: 'rounded-2xl', align: 'bottom', title: 'text-xl' };
+  }
+}
 
 /** Loyalty/quality tier of a store from its followers + rating (like a store badge). */
 export function storeTier(followers: number, ratingAvg: number, ratingCount: number): { key: 'gold' | 'silver' | 'active' | 'new'; label: string } {

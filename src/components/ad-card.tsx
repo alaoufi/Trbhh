@@ -10,13 +10,22 @@ function timeShort(iso: string | null) {
   return s.replace('قبل ', 'منذ ');
 }
 
-export function AdCard({ ad }: { ad: AdCardType }) {
+export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: 'raised' | 'inset' }) {
   const isReq = ad.adsType === 'request';
+  const inset = variant === 'inset';
   return (
     <Link
       href={`/ads/${ad.id}`}
-      className={cn('card-3d block overflow-hidden rounded-2xl', isReq && '!border-amber-400 bg-amber-50')}
+      className={cn(
+        'card-3d relative block overflow-hidden rounded-2xl',
+        // بارز: حلقة وارتفاع أوضح — والتالي غائر للداخل لإعطاء تباين وجذب
+        !inset && 'z-10 ring-2 ring-primary/20',
+        inset && 'scale-[0.965] !border-primary/20 bg-secondary/50 !shadow-[inset_0_2px_12px_rgba(0,0,0,0.10)]',
+        isReq && '!border-amber-400 bg-amber-50',
+      )}
     >
+      {/* شريط لوني على حافة البداية (يمين RTL) يميّز البطاقة البارزة */}
+      {!inset && <span className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-b from-primary to-[hsl(var(--primary)/0.55)]" />}
       {/* title (right) + image (left) — matches the original layout */}
       <div className="flex items-stretch gap-3 p-3">
         <div className="flex-1">
@@ -84,8 +93,8 @@ export function AdGrid({ ads, className }: { ads: AdCardType[]; className?: stri
   }
   return (
     <div className={cn('space-y-3', className)}>
-      {ads.map((ad) => (
-        <AdCard key={ad.id} ad={ad} />
+      {ads.map((ad, i) => (
+        <AdCard key={ad.id} ad={ad} variant={i % 2 === 0 ? 'raised' : 'inset'} />
       ))}
     </div>
   );

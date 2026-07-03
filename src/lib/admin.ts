@@ -24,7 +24,8 @@ export async function adminStats() {
     prisma.users.count(),
     prisma.ads.count(),
     prisma.ads.count({ where: { status: 1, state: 'active' } }),
-    prisma.ads.count({ where: { status: 0 } }),
+    // "بانتظار الموافقة" = غير منشور (status 0) وغير مؤرشف — نفس تعريف تبويب الإعلانات
+    prisma.ads.count({ where: { status: 0, OR: [{ data_archive: null }, { data_archive: '' }] } }),
     prisma.users.count({ where: { step: { gt: 0 }, trusted: 0 } }),
     prisma.repord_ads.count(),
     prisma.debates.count(),

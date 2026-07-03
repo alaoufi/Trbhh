@@ -9,11 +9,29 @@ export async function loginAction(_prev: unknown, formData: FormData) {
   const password = String(formData.get('password') || '');
   if (!identifier || !password) return { error: 'أدخل بيانات الدخول كاملة' };
 
-  const user = await prisma.users.findFirst({
+  let user = await prisma.users.findFirst({
     where: {
       OR: [{ userName: identifier }, { email: identifier }, { phoneNumber: identifier }],
     },
   });
+
+  // Fallback: match the phone in any stored format (05.., 5.., 9665.., +9665..)
+  if (!user) {
+    const digits = identifier.replace(/\D/g, '');
+    if (digits.length >= 8) {
+      let sig = digits.startsWith('966') ? digits.slice(3) : digits;
+      sig = sig.replace(/^0+/, '');
+      const forms = [sig, `0${sig}`, `966${sig}`, `00966${sig}`, `+966${sig}`];
+      const rows = await prisma.$queryRawUnsafe<{ id: bigint }[]>(
+        `SELECT id FROM users
+         WHERE REPLACE(REPLACE(REPLACE(IFNULL(phoneNumber,''),' ',''),'-','') , '+','') IN (?,?,?,?,?)
+         ORDER BY id LIMIT 1`,
+        forms[0], forms[1], forms[2], forms[3], forms[4].replace('+', ''),
+      ).catch(() => [] as { id: bigint }[]);
+      if (rows[0]) user = await prisma.users.findUnique({ where: { id: rows[0].id } });
+    }
+  }
+
   if (!user || !(await verifyPassword(password, user.password))) {
     return { error: 'بيانات الدخول غير صحيحة' };
   }

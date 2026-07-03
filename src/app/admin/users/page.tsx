@@ -27,7 +27,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
       `SELECT id, name, userName, phoneNumber, trusted, ban, is_admin, created_at
        FROM users
        WHERE name LIKE ? OR userName LIKE ? OR email LIKE ?
-          OR REPLACE(REPLACE(REPLACE(REPLACE(IFNULL(phoneNumber,''),'+',''),' ',''),'-',''),'00','') LIKE ?
+          OR REPLACE(REPLACE(REPLACE(IFNULL(phoneNumber,''),'+',''),' ',''),'-','') LIKE ?
        ORDER BY id DESC LIMIT 50`,
       like, like, like, phoneLike,
     ).catch(() => [] as Row[]);

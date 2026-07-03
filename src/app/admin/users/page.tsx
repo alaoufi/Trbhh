@@ -1,54 +1,85 @@
 import Link from 'next/link';
+import type { Prisma } from '@prisma/client';
 import { BadgeCheck, Ban, Check, ShieldCheck } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { requirePerm, getUserRole, ROLE_LABELS } from '@/lib/roles';
 import { getPackages, getUserPackageMap } from '@/lib/packages';
+import { liftExpiredBans, getBanMap } from '@/lib/moderation';
 import { AdminSearch } from '@/components/admin-search';
-import { banUserAction, trustUserAction, assignUserPackageAction } from '../actions';
+import { banUserAction, unbanUserAction, trustUserAction, assignUserPackageAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المستخدمين' };
 
-export default async function AdminUsers({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+const FILTERS = [{ k: 'all', l: 'الكل' }, { k: 'active', l: 'نشط' }, { k: 'banned', l: 'محظور' }] as const;
+const fmtDate = (d: Date | null) => (d ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d) : '');
+
+export default async function AdminUsers({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string }> }) {
   await requirePerm('users');
-  const { q } = await searchParams;
+  const { q, filter: filterRaw } = await searchParams;
   const term = (q || '').trim();
+  const filter = filterRaw === 'active' || filterRaw === 'banned' ? filterRaw : 'all';
+  await liftExpiredBans(); // so ban='checked' reflects only still-active bans
+
   type Row = { id: bigint; name: string | null; userName: string | null; phoneNumber: string | null; trusted: number | null; ban: string | null; is_admin: number | null; created_at: Date | null };
   let users: Row[];
   if (term) {
     const like = `%${term}%`;
     const digits = term.replace(/\D/g, '');
-    // reduce to the significant local part so it matches 05.., 5.., 9665.. formats
     let sig = digits.startsWith('966') ? digits.slice(3) : digits;
     sig = sig.replace(/^0+/, '');
     const phoneLike = `%${sig || digits || term}%`;
+    const banCond = filter === 'banned' ? `AND ban = 'checked'` : filter === 'active' ? `AND (ban IS NULL OR ban <> 'checked')` : '';
     users = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT id, name, userName, phoneNumber, trusted, ban, is_admin, created_at
        FROM users
-       WHERE name LIKE ? OR userName LIKE ? OR email LIKE ?
-          OR REPLACE(REPLACE(REPLACE(IFNULL(phoneNumber,''),'+',''),' ',''),'-','') LIKE ?
+       WHERE (name LIKE ? OR userName LIKE ? OR email LIKE ?
+          OR REPLACE(REPLACE(REPLACE(IFNULL(phoneNumber,''),'+',''),' ',''),'-','') LIKE ?) ${banCond}
        ORDER BY id DESC LIMIT 50`,
       like, like, like, phoneLike,
     ).catch(() => [] as Row[]);
   } else {
+    const where: Prisma.usersWhereInput = filter === 'banned' ? { ban: 'checked' } : filter === 'active' ? { ban: { not: 'checked' } } : {};
     users = (await prisma.users.findMany({
-      orderBy: { id: 'desc' }, take: 50,
+      where, orderBy: { id: 'desc' }, take: 50,
       select: { id: true, name: true, userName: true, phoneNumber: true, trusted: true, ban: true, is_admin: true, created_at: true },
     })) as unknown as Row[];
   }
   const ids = users.map((u) => toInt(u.id));
-  const [packages, pkgMap, roleLabels] = await Promise.all([
+  const [packages, pkgMap, roleLabels, banMap] = await Promise.all([
     getPackages(),
     getUserPackageMap(ids),
     Promise.all(ids.map((id) => getUserRole(id))),
+    getBanMap(ids),
   ]);
   const roleById = new Map(ids.map((id, i) => [id, roleLabels[i]]));
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">المستخدمون</h1>
       <AdminSearch basePath="/admin/users" defaultValue={q} placeholder="بحث فوري بالاسم أو اسم المستخدم أو الجوال…" />
+
+      {/* تصنيف: الكل / نشط / محظور */}
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map((f) => {
+          const params = new URLSearchParams();
+          if (term) params.set('q', term);
+          if (f.k !== 'all') params.set('filter', f.k);
+          const qs = params.toString();
+          const on = filter === f.k;
+          return (
+            <Link key={f.k} href={`/admin/users${qs ? `?${qs}` : ''}`}
+              className={`rounded-full px-4 py-1.5 text-sm font-bold transition ${on ? 'bg-primary text-white shadow' : 'card-3d text-primary hover:border-primary/40'}`}>
+              {f.l}
+            </Link>
+          );
+        })}
+      </div>
+
+      {users.length === 0 && <p className="py-8 text-center text-muted-foreground">لا يوجد مستخدمون في هذا التصنيف.</p>}
+
       <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead className="border-b bg-secondary/50 text-right"><tr><th className="p-3">الاسم</th><th className="p-3">الجوال</th><th className="p-3">الحالة</th><th className="p-3">الصلاحيات</th><th className="p-3">الباقة</th><th className="p-3">إجراءات</th></tr></thead>
@@ -57,11 +88,17 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
               const id = toInt(u.id);
               const role = roleById.get(id);
               const label = role ? ROLE_LABELS[role] : (u.is_admin === 1 ? 'مدير' : null);
+              const banned = u.ban === 'checked';
+              const until = banMap.get(id) ?? null; // Date = temporary, null (while banned) = permanent
               return (
               <tr key={id} className="border-b last:border-0">
                 <td className="p-3"><Link href={`/admin/users/${id}`} className="flex items-center gap-1 font-medium text-primary hover:underline">{u.name || u.userName || '—'}{u.trusted === 1 && <BadgeCheck className="h-4 w-4 text-primary" />}</Link><div className="text-xs text-muted-foreground">{timeAgo(u.created_at)}</div></td>
                 <td className="p-3" dir="ltr">{u.phoneNumber || '—'}</td>
-                <td className="p-3">{u.ban === 'checked' ? <Badge variant="muted">محظور</Badge> : <Badge variant="trusted">نشط</Badge>}</td>
+                <td className="p-3">
+                  {banned
+                    ? <div className="flex flex-col gap-0.5"><Badge variant="muted">محظور</Badge><span className="text-[10px] text-muted-foreground">{until ? `حتى ${fmtDate(until)}` : 'دائم'}</span></div>
+                    : <Badge variant="trusted">نشط</Badge>}
+                </td>
                 <td className="p-3">
                   <Link href={`/admin/users/${id}/permissions`} className="inline-flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1 text-xs text-primary hover:bg-accent">
                     <ShieldCheck className="h-3.5 w-3.5" /> {label || 'الصلاحيات'}
@@ -79,9 +116,20 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                   </form>
                 </td>
                 <td className="p-3">
-                  <div className="flex gap-1">
+                  <div className="flex flex-wrap items-center gap-1">
                     <form action={trustUserAction}><input type="hidden" name="userId" value={id} /><button className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Check className="h-3 w-3" />{u.trusted === 1 ? 'إلغاء التوثيق' : 'توثيق'}</button></form>
-                    <form action={banUserAction}><input type="hidden" name="userId" value={id} /><button className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"><Ban className="h-3 w-3" />{u.ban === 'checked' ? 'رفع الحظر' : 'حظر'}</button></form>
+                    {banned ? (
+                      <form action={unbanUserAction}><input type="hidden" name="userId" value={id} /><button className="flex items-center gap-1 rounded-md border border-emerald-400 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50"><Ban className="h-3 w-3" /> رفع الحظر</button></form>
+                    ) : (
+                      <>
+                        <form action={banUserAction} className="flex items-center gap-1 rounded-md border border-destructive/30 p-0.5">
+                          <input type="hidden" name="userId" value={id} />
+                          <input name="days" type="number" min={1} placeholder="أيام" title="مدة الحظر بالأيام" className="w-14 rounded bg-background px-1.5 py-1 text-xs" />
+                          <button className="flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive"><Ban className="h-3 w-3" /> حظر</button>
+                        </form>
+                        <form action={banUserAction}><input type="hidden" name="userId" value={id} /><input type="hidden" name="permanent" value="1" /><button className="rounded-md border border-destructive/40 px-2 py-1 text-xs font-bold text-destructive hover:bg-destructive/10">دائم</button></form>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

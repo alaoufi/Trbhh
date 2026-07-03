@@ -91,9 +91,63 @@ export async function recordStrike(userId: number, kind: string): Promise<number
   return Number(rows[0]?.count || 0);
 }
 
-/** Ban a user's account. */
+/** Ban a user's account (permanent — used by auto-moderation). */
 export async function banUser(userId: number) {
   await prisma.users.update({ where: { id: BigInt(userId) }, data: { ban: 'checked' } }).catch(() => {});
+}
+
+/* ---- ban duration (temporary N days / permanent) ---- */
+let banColEnsured = false;
+async function ensureBanCol() {
+  if (banColEnsured) return;
+  await prisma.$executeRawUnsafe(`ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`).catch(() => {});
+  banColEnsured = true;
+}
+
+/** Auto-lift any temporary bans whose end date has passed. */
+export async function liftExpiredBans() {
+  await ensureBanCol();
+  await prisma.$executeRawUnsafe(`UPDATE users SET ban = 'no', ban_until = NULL WHERE ban = 'checked' AND ban_until IS NOT NULL AND ban_until < NOW()`).catch(() => {});
+}
+
+/** Ban a user for `days` days, or permanently when days ≤ 0. */
+export async function banUserFor(userId: number, days: number) {
+  await ensureBanCol();
+  if (days > 0) {
+    await prisma.$executeRawUnsafe(`UPDATE users SET ban = 'checked', ban_until = DATE_ADD(NOW(), INTERVAL ? DAY) WHERE id = ?`, Math.min(days, 3650), userId).catch(() => {});
+  } else {
+    await prisma.$executeRawUnsafe(`UPDATE users SET ban = 'checked', ban_until = NULL WHERE id = ?`, userId).catch(() => {});
+  }
+}
+
+/** Lift a user's ban. */
+export async function unbanUser(userId: number) {
+  await ensureBanCol();
+  await prisma.$executeRawUnsafe(`UPDATE users SET ban = 'no', ban_until = NULL WHERE id = ?`, userId).catch(() => {});
+}
+
+/** Is the user currently banned? (auto-lifts an expired temporary ban first.) */
+export async function isUserBanned(userId: number): Promise<boolean> {
+  await ensureBanCol();
+  const rows = await prisma.$queryRawUnsafe<{ ban: string | null; ban_until: Date | null }[]>(`SELECT ban, ban_until FROM users WHERE id = ?`, userId).catch(() => []);
+  const r = rows[0];
+  if (!r || r.ban !== 'checked') return false;
+  if (r.ban_until && new Date(r.ban_until).getTime() < Date.now()) { await unbanUser(userId); return false; }
+  return true;
+}
+
+/** ban_until (or null=permanent) for currently-banned users among the given ids. */
+export async function getBanMap(ids: number[]): Promise<Map<number, Date | null>> {
+  await liftExpiredBans();
+  const map = new Map<number, Date | null>();
+  if (!ids.length) return map;
+  const list = ids.map((n) => Number(n)).filter(Number.isFinite);
+  if (!list.length) return map;
+  const rows = await prisma.$queryRawUnsafe<{ id: number | bigint; ban_until: Date | null }[]>(
+    `SELECT id, ban_until FROM users WHERE ban = 'checked' AND id IN (${list.map(() => '?').join(',')})`, ...list,
+  ).catch(() => []);
+  for (const r of rows) map.set(Number(r.id), r.ban_until ? new Date(r.ban_until) : null);
+  return map;
 }
 
 /** Write one moderation event to the audit log (best-effort). */

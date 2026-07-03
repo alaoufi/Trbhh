@@ -295,7 +295,7 @@ export async function getAd(id: number) {
       where: { id: ad.user_id },
       select: {
         id: true, name: true, userName: true, phoneNumber: true, phone_whatsapp: true,
-        allow_phone: true, whatsapp: true, trusted: true, photo_path: true, created_at: true,
+        allow_phone: true, whatsapp: true, trusted: true, photo_path: true, created_at: true, ban: true,
       },
     }),
     prisma.photos.findMany({ where: { other_id: ad.id }, orderBy: { id: 'asc' } }),
@@ -342,6 +342,7 @@ export async function getAd(id: number) {
           phone: seller.allow_phone ? seller.phoneNumber : null,
           whatsapp: seller.whatsapp ? seller.phone_whatsapp || seller.phoneNumber : null,
           trusted: seller.trusted === 1,
+          banned: seller.ban === 'checked',
           avatar: seller.photo_path ? mediaUrl(seller.photo_path) : null,
           memberSince: seller.created_at ? seller.created_at.toISOString() : null,
         }

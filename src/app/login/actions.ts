@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyPassword, hashPassword, createSession } from '@/lib/auth';
 import { toLocalSaudi, userExistsByPhone } from '@/lib/sms';
 import { storeIdOfUser } from '@/lib/merchant';
+import { isUserBanned } from '@/lib/moderation';
 import { toInt } from '@/lib/utils';
 
 export async function loginAction(_prev: unknown, formData: FormData) {
@@ -37,9 +38,9 @@ export async function loginAction(_prev: unknown, formData: FormData) {
   if (!user || !(await verifyPassword(password, user.password))) {
     return { error: 'بيانات الدخول غير صحيحة' };
   }
-  if (user.ban === 'checked') return { error: 'هذا الحساب محظور' };
-
   const uid = toInt(user.id);
+  if (await isUserBanned(uid)) return { error: 'هذا الحساب محظور' };
+
   await createSession({ uid, name: user.name || user.userName || 'عضو', type: user.type });
   const next = String(formData.get('next') || '');
   if (next.startsWith('/') && !next.startsWith('//')) redirect(next);

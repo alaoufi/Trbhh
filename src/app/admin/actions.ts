@@ -7,6 +7,7 @@ import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
 import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore } from '@/lib/merchant';
+import { banUserFor, unbanUser } from '@/lib/moderation';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
@@ -228,12 +229,21 @@ export async function adminArchiveAdAction(formData: FormData) {
   revalidatePath(`/ads/${toInt(id)}`);
 }
 
-/** Ban/unban the seller from the ad detail page (admin). */
+/** Ban/unban the seller from the ad detail page (admin). Asks for duration:
+ *  `permanent` flag → permanent, else `days` (temporary). If already banned → unban. */
 export async function adminBanSellerAction(formData: FormData) {
   await requireAction('users', 'edit');
-  const uid = BigInt(String(formData.get('userId')));
-  const u = await prisma.users.findUnique({ where: { id: uid } });
-  if (u) await prisma.users.update({ where: { id: uid }, data: { ban: u.ban === 'checked' ? 'no' : 'checked' } });
+  const uid = Number(formData.get('userId'));
+  const u = await prisma.users.findUnique({ where: { id: BigInt(uid) } });
+  if (u) {
+    if (u.ban === 'checked') {
+      await unbanUser(uid);
+    } else {
+      const permanent = !!formData.get('permanent');
+      const days = Math.max(0, parseInt(String(formData.get('days') || '0')) || 0);
+      await banUserFor(uid, permanent ? 0 : days);
+    }
+  }
   const adId = String(formData.get('adId') || '');
   if (adId) revalidatePath(`/ads/${adId}`);
 }
@@ -253,11 +263,21 @@ export async function adminDeleteDuplicatesAction() {
   redirect(`/admin/duplicates?deleted=${deleted}`);
 }
 
+/** Ban a member for a chosen duration (days) or permanently. */
 export async function banUserAction(formData: FormData) {
   await requireAction('users', 'edit');
-  const id = BigInt(String(formData.get('userId')));
-  const u = await prisma.users.findUnique({ where: { id } });
-  if (u) await prisma.users.update({ where: { id }, data: { ban: u.ban === 'checked' ? 'no' : 'checked' } });
+  const id = Number(formData.get('userId'));
+  const permanent = !!formData.get('permanent');
+  const days = Math.max(0, parseInt(String(formData.get('days') || '0')) || 0);
+  await banUserFor(id, permanent ? 0 : days);
+  revalidatePath('/admin/users');
+}
+
+/** Lift a member's ban. */
+export async function unbanUserAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const id = Number(formData.get('userId'));
+  await unbanUser(id);
   revalidatePath('/admin/users');
 }
 

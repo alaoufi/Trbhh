@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
-import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod } from '@/lib/moderation';
+import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
 import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { setAdMedia } from '@/lib/ad-media';
@@ -171,7 +171,7 @@ async function isOwnDuplicate(userId: number, title: string, detail: string, ima
 export async function createAdAction(formData: FormData) {
   const session = await requireUser();
   const user = await prisma.users.findUnique({ where: { id: BigInt(session.uid) } });
-  if (user?.ban === 'checked') redirect('/ads/new?error=banned');
+  if (await isUserBanned(session.uid)) redirect('/ads/new?error=banned');
 
   const title = String(formData.get('title') || '').trim();
   const detail = String(formData.get('detail') || '').trim();

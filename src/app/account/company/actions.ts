@@ -14,6 +14,8 @@ export async function saveCompanyAction(formData: FormData) {
   const storeName = String(formData.get('storeName') || '').trim();
   const color = String(formData.get('color') || '').trim();
   const about = String(formData.get('about') || '').trim();
+  const banner = String(formData.get('banner') || '').trim();
+  const tagline = String(formData.get('tagline') || '').trim();
 
   let logoId: number | undefined;
   const logo = formData.get('logo');
@@ -32,7 +34,7 @@ export async function saveCompanyAction(formData: FormData) {
     await prisma.stores.create({ data: { user_id: session.uid, description, address, logo: logoId ?? 0 } });
     await markStorePending(session.uid); // new store waits for admin approval
   }
-  await saveStoreMeta(session.uid, { storeName, color, about });
+  await saveStoreMeta(session.uid, { storeName, color, about, banner, tagline });
   revalidatePath('/account/company');
   redirect('/account/company');
 }

@@ -10,6 +10,7 @@ import { AdGrid } from '@/components/ad-card';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { waLink } from '@/lib/classified-theme';
+import { bannerBackground } from '@/lib/store-style';
 import { timeAgo } from '@/lib/utils';
 import { followStoreAction, rateStoreAction } from '../actions';
 
@@ -63,17 +64,19 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
         <div className="card-3d rounded-xl p-3 text-sm font-bold text-amber-700">⏳ هذا المتجر {meta.status === 0 ? 'بانتظار موافقة الإدارة' : 'موقوف'} — يظهر لك فقط حالياً.</div>
       )}
 
-      {/* رأس المتجر بلون هويته */}
+      {/* رأس المتجر بهويته البصرية (نمط البانر + اللون) */}
       <div className="card-3d overflow-hidden rounded-2xl">
-        <div className="h-20 w-full" style={{ background: `linear-gradient(120deg, ${brand}, ${brand}bb)` }} />
-        <div className="p-5">
-          <div className="-mt-14 flex flex-wrap items-end gap-4">
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-muted shadow"><Image src={s.logo} alt={name} fill sizes="80px" className="object-cover" /></div>
-            <div className="flex-1">
-              <div className="flex items-center gap-1 text-xl font-extrabold" style={{ color: brand }}><Store className="h-5 w-5" /> {name}{s.trusted && <BadgeCheck className="h-5 w-5" />}</div>
-              {s.address && <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{s.address}</div>}
+        <div className="relative h-32 w-full" style={{ background: bannerBackground(meta.banner, brand) }}>
+          <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 p-4">
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-muted shadow-lg"><Image src={s.logo} alt={name} fill sizes="80px" className="object-cover" /></div>
+            <div className="min-w-0 pb-1 text-white drop-shadow">
+              <div className="flex items-center gap-1 text-xl font-extrabold">{name}{s.trusted && <BadgeCheck className="h-5 w-5" />}</div>
+              {meta.tagline && <div className="truncate text-sm opacity-95">{meta.tagline}</div>}
             </div>
           </div>
+        </div>
+        <div className="p-5">
+          {s.address && <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{s.address}</div>}
 
           {/* إحصائيات: متابعون · تقييم · إعلانات */}
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">

@@ -14,6 +14,8 @@ async function ensure() {
   await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN store_name VARCHAR(120) NULL`).catch(() => {});
   await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN brand_color VARCHAR(9) NULL`).catch(() => {});
   await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN about TEXT NULL`).catch(() => {});
+  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN banner VARCHAR(16) NULL`).catch(() => {});
+  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN tagline VARCHAR(160) NULL`).catch(() => {});
   await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN status TINYINT NOT NULL DEFAULT 1`).catch(() => {});
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS store_follows (
@@ -32,23 +34,24 @@ async function ensure() {
   ensured = true;
 }
 
-export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; status: number };
+export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; status: number };
 
 export async function getStoreMeta(storeId: number): Promise<StoreMeta> {
   await ensure();
-  const rows = await prisma.$queryRawUnsafe<{ store_name: string | null; brand_color: string | null; about: string | null; status: number | bigint }[]>(
-    `SELECT store_name, brand_color, about, status FROM stores WHERE id = ?`, storeId,
+  const rows = await prisma.$queryRawUnsafe<{ store_name: string | null; brand_color: string | null; about: string | null; banner: string | null; tagline: string | null; status: number | bigint }[]>(
+    `SELECT store_name, brand_color, about, banner, tagline, status FROM stores WHERE id = ?`, storeId,
   ).catch(() => []);
   const r = rows[0];
-  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, status: Number(r?.status ?? 1) };
+  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, status: Number(r?.status ?? 1) };
 }
 
 /** Save branding fields on the caller's store. */
-export async function saveStoreMeta(userId: number, data: { storeName: string; color: string; about: string }) {
+export async function saveStoreMeta(userId: number, data: { storeName: string; color: string; about: string; banner: string; tagline: string }) {
   await ensure();
+  const banner = ['gradient', 'mesh', 'aurora', 'sunset', 'night', 'solid'].includes(data.banner) ? data.banner : 'gradient';
   await prisma.$executeRawUnsafe(
-    `UPDATE stores SET store_name = ?, brand_color = ?, about = ? WHERE user_id = ?`,
-    data.storeName.slice(0, 120) || null, /^#[0-9a-fA-F]{6}$/.test(data.color) ? data.color : null, data.about.slice(0, 2000) || null, userId,
+    `UPDATE stores SET store_name = ?, brand_color = ?, about = ?, banner = ?, tagline = ? WHERE user_id = ?`,
+    data.storeName.slice(0, 120) || null, /^#[0-9a-fA-F]{6}$/.test(data.color) ? data.color : null, data.about.slice(0, 2000) || null, banner, data.tagline.slice(0, 160) || null, userId,
   ).catch(() => {});
 }
 

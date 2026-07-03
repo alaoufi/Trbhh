@@ -1,8 +1,9 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
 import { getStoreMeta, followersCount, getStoreRating } from '@/lib/merchant';
+import { StoreDesigner } from '@/components/store-designer';
+import { Palette } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
@@ -54,18 +55,12 @@ export default async function ManageCompanyPage() {
       )}
 
       <form action={saveCompanyAction} className="max-w-lg space-y-4 card-3d rounded-xl p-5">
-        {logoUrl && <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-muted"><Image src={logoUrl} alt="logo" fill sizes="64px" className="object-cover" /></div>}
-        <div><label className="mb-1 block text-sm font-medium">اسم المتجر</label><input name="storeName" defaultValue={meta?.storeName ?? ''} className={field} placeholder="اسم متجرك التجاري" /></div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">لون هوية المتجر</label>
-          <input name="color" type="color" defaultValue={meta?.color ?? '#3287da'} className="h-11 w-20 cursor-pointer rounded-lg border bg-background p-1" />
-          <span className="mr-2 text-xs text-muted-foreground">يظهر في رأس متجرك وأزراره.</span>
-        </div>
-        <div><label className="mb-1 block text-sm font-medium">شعار المتجر</label><input name="logo" type="file" accept="image/*" className="w-full rounded-lg border bg-background p-2 text-sm" /></div>
-        <div><label className="mb-1 block text-sm font-medium">نبذة عن المتجر</label><textarea name="about" defaultValue={meta?.about ?? ''} rows={3} className="w-full rounded-lg border bg-background p-3 text-sm" placeholder="تعريف مختصر جذّاب بمتجرك" /></div>
+        <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><Palette className="h-5 w-5" /> مصمّم المتجر الذكي</div>
+        <StoreDesigner initial={{ storeName: meta?.storeName, color: meta?.color, banner: meta?.banner, tagline: meta?.tagline, about: meta?.about, logoUrl }} />
+        <div><label className="mb-1 block text-sm font-medium">شعار المتجر (صورة)</label><input name="logo" type="file" accept="image/*" className="w-full rounded-lg border bg-background p-2 text-sm" /></div>
         <div><label className="mb-1 block text-sm font-medium">وصف النشاط / ملف الأعمال</label><textarea name="description" defaultValue={store?.description ?? ''} rows={4} className="w-full rounded-lg border bg-background p-3 text-sm" placeholder="نبذة عن نشاط المتجر والخدمات المقدمة" /></div>
         <div><label className="mb-1 block text-sm font-medium">العنوان</label><input name="address" defaultValue={store?.address ?? ''} className={field} /></div>
-        <Button>{store ? 'حفظ' : 'إنشاء المتجر'}</Button>
+        <Button>{store ? 'حفظ المتجر' : 'إنشاء المتجر'}</Button>
       </form>
 
       {store && (

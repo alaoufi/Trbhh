@@ -4,6 +4,7 @@ import { Check, LayoutTemplate } from 'lucide-react';
 
 export const DESIGNS: { id: string; name: string; desc: string }[] = [
   { id: '', name: 'ثلاثي الأبعاد', desc: 'الحالي — بطاقات بارزة بإطار وظلّ' },
+  { id: 'aurora', name: 'فضاء (Aurora)', desc: 'خلفية متدرّجة وبطاقات عائمة ورأس زجاجي' },
   { id: 'shop', name: 'متجر (شبكة)', desc: 'صورة كبيرة وسعر أحمر بارز بعمودين' },
   { id: 'flat', name: 'مسطّح عصري', desc: 'حدود رفيعة وظلّ خفيف وزوايا مرتّبة' },
   { id: 'soft', name: 'ناعم', desc: 'بلا حدود، ظلال ناعمة، زوايا دائرية' },

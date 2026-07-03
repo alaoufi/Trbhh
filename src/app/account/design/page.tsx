@@ -23,8 +23,12 @@ function Preview({ id }: { id: string }) {
       </div>
     );
   }
+  const wrap = id === 'aurora'
+    ? 'rounded-2xl p-3'
+    : 'rounded-2xl bg-background p-3';
+  const wrapStyle = id === 'aurora' ? { background: 'linear-gradient(160deg,#eef2ff,#fbeafe,#e6fbff)' } : undefined;
   return (
-    <div data-design={id} className="rounded-2xl bg-background p-3">
+    <div data-design={id} className={wrap} style={wrapStyle}>
       <div className="mb-2 flex items-center gap-2">
         <span className="h-5 w-1.5 rounded-full bg-gradient-to-b from-primary to-[hsl(var(--primary)/0.55)]" />
         <span className="text-sm font-extrabold text-primary">عنوان قسم</span>

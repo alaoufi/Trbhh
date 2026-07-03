@@ -378,3 +378,33 @@ button:active { }
   transform: translateY(-2px);
   box-shadow: 0 10px 22px -8px rgba(0,0,0,0.20);
 }
+
+/* «فضاء (Aurora)» — عالم متدرّج حالم: بطاقات عائمة بلا حدود، رأس زجاجي */
+:root[data-design="aurora"] { --radius: 1.2rem; }
+:root[data-design="aurora"]:not([data-theme="night"]) body {
+  background: linear-gradient(160deg, #eef2ff 0%, #fbeafe 42%, #e6fbff 100%);
+  background-attachment: fixed;
+}
+[data-design="aurora"] .card-3d {
+  border: none;
+  border-radius: 1.5rem;
+  box-shadow: 0 18px 45px -18px rgba(99,102,241,0.45), 0 6px 16px -8px rgba(236,72,153,0.22);
+}
+[data-design="aurora"] .card-3d:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 26px 60px -20px rgba(99,102,241,0.55), 0 10px 24px -10px rgba(236,72,153,0.30);
+}
+:root[data-design="aurora"]:not([data-theme="night"]) header {
+  background: rgba(255,255,255,0.5) !important;
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255,255,255,0.6);
+  box-shadow: 0 10px 30px -14px rgba(99,102,241,0.40);
+}
+[data-design="aurora"] .site-ticker {
+  background: linear-gradient(90deg, #6366f1, #ec4899) !important;
+}
+:root[data-design="aurora"]:not([data-theme="night"]) nav.fixed {
+  background: rgba(255,255,255,0.6) !important;
+  backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(255,255,255,0.6);
+}

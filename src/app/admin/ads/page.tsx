@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { toInt, formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { requirePerm } from '@/lib/roles';
-import { adminDeleteAdAction, adminToggleSpecialAction, adminToggleAdStatusAction, deleteAllPendingAdsAction } from '../actions';
+import { adminDeleteAdAction, adminToggleSpecialAction, adminToggleAdStatusAction, deleteAllPendingAdsAction, deleteAllArchivedAdsAction } from '../actions';
 import { sweepExpiredArchived } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 
@@ -46,7 +46,17 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
           <Button size="sm" className="bg-destructive hover:bg-destructive/90"><Trash2 className="h-4 w-4" /> حذف الكل</Button>
         </form>
       )}
-      {tab === 'archived' && <p className="text-xs font-bold text-amber-700">الإعلانات المؤرشفة تُحذف تلقائياً بعد 30 يوماً من أرشفتها.</p>}
+      {tab === 'archived' && (
+        <>
+          {archivedCount > 0 && (
+            <form action={deleteAllArchivedAdsAction} className="flex items-center justify-between gap-2 rounded-xl border-2 border-destructive/30 bg-destructive/5 p-3">
+              <span className="text-sm font-bold text-destructive">حذف كل الإعلانات المؤرشفة ({archivedCount})؟ لا يمكن التراجع.</span>
+              <Button size="sm" className="bg-destructive hover:bg-destructive/90"><Trash2 className="h-4 w-4" /> حذف الكل</Button>
+            </form>
+          )}
+          <p className="text-xs font-bold text-amber-700">الإعلانات المؤرشفة تُحذف تلقائياً بعد 30 يوماً من أرشفتها.</p>
+        </>
+      )}
 
       {ads.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد إعلانات هنا.</p>}
       <div className="space-y-2">

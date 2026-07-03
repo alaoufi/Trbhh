@@ -405,6 +405,23 @@ export async function deleteAllPendingAdsAction() {
   revalidatePath('/admin');
 }
 
+export async function deleteAllArchivedAdsAction() {
+  await requireAction('ads', 'delete');
+  const arch = await prisma.ads.findMany({
+    where: { NOT: [{ data_archive: null }, { data_archive: '' }] },
+    select: { id: true },
+  });
+  const ids = arch.map((p) => p.id);
+  const chunk = 200;
+  for (let i = 0; i < ids.length; i += chunk) {
+    const slice = ids.slice(i, i + chunk);
+    await prisma.photos.deleteMany({ where: { other_id: { in: slice } } }).catch(() => {});
+    await prisma.ads.deleteMany({ where: { id: { in: slice } } }).catch(() => {});
+  }
+  revalidatePath('/admin/ads');
+  revalidatePath('/admin');
+}
+
 async function refreshCategories() {
   await cacheDel('categories:active');
   revalidatePath('/admin/categories');

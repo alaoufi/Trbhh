@@ -7,6 +7,7 @@ import { SubmitOverlay } from '@/components/submit-overlay';
 import { compressInputFiles } from '@/lib/image-compress';
 import { RegionCityPicker } from '@/components/region-city-picker';
 import { AudioRecorder } from '@/components/audio-recorder';
+import { parseMapsUrl } from '@/lib/maps';
 
 const MAX_VIDEO = 25 * 1024 * 1024; // 25MB
 
@@ -60,6 +61,19 @@ export function AdForm({
     initial?.lat && initial?.lng ? { lat: initial.lat, lng: initial.lng } : null,
   );
   const [geoBusy, setGeoBusy] = useState(false);
+  const [mapLink, setMapLink] = useState('');
+  const [mapErr, setMapErr] = useState('');
+
+  function applyMapLink() {
+    const ll = parseMapsUrl(mapLink);
+    if (ll) {
+      setGeo({ lat: ll.lat.toFixed(5), lng: ll.lng.toFixed(5) });
+      setMapErr('');
+    } else if (mapLink.trim()) {
+      // couldn't read it here (e.g. shortened goo.gl link) — the server will try on submit
+      setMapErr('سيتم محاولة قراءة الموقع من الرابط عند الحفظ. أو استخدم «موقعي الحالي».');
+    }
+  }
 
   function useMyLocation() {
     if (!navigator.geolocation) return;
@@ -225,6 +239,20 @@ export function AdForm({
             {geo && <span className="text-xs font-medium text-green-700">✓ تم تحديد الموقع ({geo.lat}, {geo.lng})</span>}
             {geo && <button type="button" onClick={() => setGeo(null)} className="text-xs text-red-600 hover:underline">إزالة</button>}
           </div>
+          {/* أو الصق رابط الموقع من خرائط قوقل (اختياري) */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              name="mapLink"
+              value={mapLink}
+              onChange={(e) => setMapLink(e.target.value)}
+              placeholder="أو الصق رابط الموقع من خرائط قوقل"
+              className="h-10 min-w-[200px] flex-1 rounded-lg border-2 border-primary/25 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <button type="button" onClick={applyMapLink} className="rounded-lg border-2 border-primary/30 px-3 py-2 text-sm font-bold text-primary hover:bg-accent">
+              استخدم الرابط
+            </button>
+          </div>
+          {mapErr && <p className="mt-1 text-xs font-bold text-red-600">{mapErr}</p>}
         </div>
       </Section>
 

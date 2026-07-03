@@ -13,7 +13,28 @@ import { setAdMedia } from '@/lib/ad-media';
 import { setUserArea } from '@/lib/user-location';
 import { scanContent } from '@/lib/content-guard';
 import { scanImages, imageModerationEnabled } from '@/lib/nsfw';
+import { parseMapsUrl, type LatLng } from '@/lib/maps';
 import { toInt } from '@/lib/utils';
+
+/** Resolve coordinates from a pasted maps link — follows shortened goo.gl links. */
+async function resolveMapsUrl(input: string): Promise<LatLng | null> {
+  const s = (input || '').trim();
+  if (!s) return null;
+  const direct = parseMapsUrl(s);
+  if (direct) return direct;
+  if (/^https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl|g\.co)\//i.test(s)) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 6000);
+      const res = await fetch(s, { redirect: 'follow', signal: ctrl.signal });
+      clearTimeout(t);
+      return parseMapsUrl(res.url) || parseMapsUrl(await res.text().catch(() => ''));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
 
 /** Save a raw media file (video/audio) from the form; returns the stored path or null. */
 async function saveMediaFile(formData: FormData, key: string, maxBytes: number, exts: string[]): Promise<string | null> {
@@ -162,8 +183,13 @@ export async function createAdAction(formData: FormData) {
   const countryRaw = String(formData.get('country_id') || '');
   const phone = String(formData.get('phone') || '').trim();
   const whatsapp = String(formData.get('whatsapp') || '').trim();
-  const lat = String(formData.get('lat') || '').trim();
-  const lng = String(formData.get('lng') || '').trim();
+  let lat = String(formData.get('lat') || '').trim();
+  let lng = String(formData.get('lng') || '').trim();
+  // اختياري: استخراج الإحداثيات من رابط خرائط قوقل الملصق
+  if (!lat || !lng) {
+    const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
+    if (ll) { lat = String(ll.lat); lng = String(ll.lng); }
+  }
   if (!title || !detail || !category_id) return;
   // تعهّد صحة الإعلان وتحمّل المسؤولية إجباري
   if (!formData.get('pledge')) redirect('/ads/new?error=pledge');
@@ -310,6 +336,12 @@ export async function updateAdAction(formData: FormData) {
     },
   }).catch(() => {});
 
+  let eLat = String(formData.get('lat') || '').trim();
+  let eLng = String(formData.get('lng') || '').trim();
+  if (!eLat || !eLng) {
+    const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
+    if (ll) { eLat = String(ll.lat); eLng = String(ll.lng); }
+  }
   await prisma.ads.update({
     where: { id: adId },
     data: {
@@ -321,8 +353,8 @@ export async function updateAdAction(formData: FormData) {
       subcategory_id: formData.get('subcategory_id') ? Number(formData.get('subcategory_id')) : null,
       city_id: BigInt(String(formData.get('city_id') || '0')),
       area_id: formData.get('area_id') ? Number(formData.get('area_id')) : null,
-      lat: String(formData.get('lat') || '').trim() || null,
-      lng: String(formData.get('lng') || '').trim() || null,
+      lat: eLat || null,
+      lng: eLng || null,
       phoneAllow: formData.get('phoneAllow') ? 1 : 0,
       commentAllow: formData.get('commentAllow') ? 1 : 0,
     },

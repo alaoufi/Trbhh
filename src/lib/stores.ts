@@ -41,6 +41,7 @@ export async function getStore(id: number) {
     description: s.description,
     address: s.address,
     logo: await logoUrl(s.logo),
+    createdAt: s.created_at,
     phone: owner?.allow_phone ? owner?.phoneNumber : null,
     whatsapp: owner?.whatsapp ? owner?.phone_whatsapp || owner?.phoneNumber : null,
     branches: branches.map((b) => ({ id: toInt(b.id), name: b.name, address: b.address })),

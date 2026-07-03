@@ -19,6 +19,36 @@ export const BANNERS: { id: BannerId; name: string }[] = [
   { id: 'solid', name: 'صلب' },
 ];
 
+/**
+ * Ready-made store templates (مكتبة القوالب): each is a full visual identity
+ * combining a brand color + banner style + a short vibe description. Suggested
+ * to a merchant the first time they open a store so they start from a polished
+ * look instead of a blank canvas.
+ */
+export type StoreTemplate = { id: string; name: string; color: string; banner: BannerId; vibe: string };
+export const STORE_TEMPLATES: StoreTemplate[] = [
+  { id: 'royal', name: 'أزرق ملكي', color: '#2563eb', banner: 'gradient', vibe: 'رسمي وموثوق' },
+  { id: 'teal', name: 'تركوازي عصري', color: '#14b8a6', banner: 'mesh', vibe: 'حديث ونظيف' },
+  { id: 'forest', name: 'أخضر طبيعي', color: '#16a34a', banner: 'gradient', vibe: 'طبيعي وصحّي' },
+  { id: 'sunset', name: 'برتقالي حيوي', color: '#f97316', banner: 'sunset', vibe: 'دافئ وجذّاب' },
+  { id: 'ruby', name: 'أحمر جريء', color: '#dc2626', banner: 'gradient', vibe: 'قوي ولافت' },
+  { id: 'rose', name: 'وردي أنيق', color: '#ec4899', banner: 'mesh', vibe: 'راقٍ وناعم' },
+  { id: 'violet', name: 'بنفسجي فاخر', color: '#7c3aed', banner: 'aurora', vibe: 'فخم ومميّز' },
+  { id: 'midnight', name: 'ليلي أنيق', color: '#0ea5e9', banner: 'night', vibe: 'عصري وهادئ' },
+  { id: 'gold', name: 'ذهبي فخم', color: '#b45309', banner: 'sunset', vibe: 'فخامة وتميّز' },
+  { id: 'sky', name: 'سماوي هادئ', color: '#0ea5e9', banner: 'gradient', vibe: 'خفيف ومريح' },
+  { id: 'emerald', name: 'زمرّدي', color: '#10b981', banner: 'mesh', vibe: 'أنيق ومنعش' },
+  { id: 'slate', name: 'رمادي احترافي', color: '#334155', banner: 'gradient', vibe: 'محايد واحترافي' },
+];
+
+/** Loyalty/quality tier of a store from its followers + rating (like a store badge). */
+export function storeTier(followers: number, ratingAvg: number, ratingCount: number): { key: 'gold' | 'silver' | 'active' | 'new'; label: string } {
+  if (followers >= 50 && ratingAvg >= 4.5 && ratingCount >= 5) return { key: 'gold', label: 'متجر ذهبي' };
+  if ((followers >= 15 && ratingAvg >= 4) || ratingCount >= 10) return { key: 'silver', label: 'متجر فضّي' };
+  if (followers >= 3 || ratingCount >= 1) return { key: 'active', label: 'متجر نشِط' };
+  return { key: 'new', label: 'متجر جديد' };
+}
+
 const hex = (c: string) => (/^#[0-9a-fA-F]{6}$/.test(c) ? c : '#3287da');
 
 /** CSS `background` value for a store banner given its style id and brand color. */

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { verifyPassword, hashPassword, createSession } from '@/lib/auth';
 import { toLocalSaudi, userExistsByPhone } from '@/lib/sms';
+import { storeIdOfUser } from '@/lib/merchant';
 import { toInt } from '@/lib/utils';
 
 export async function loginAction(_prev: unknown, formData: FormData) {
@@ -38,9 +39,13 @@ export async function loginAction(_prev: unknown, formData: FormData) {
   }
   if (user.ban === 'checked') return { error: 'هذا الحساب محظور' };
 
-  await createSession({ uid: toInt(user.id), name: user.name || user.userName || 'عضو', type: user.type });
+  const uid = toInt(user.id);
+  await createSession({ uid, name: user.name || user.userName || 'عضو', type: user.type });
   const next = String(formData.get('next') || '');
-  redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/');
+  if (next.startsWith('/') && !next.startsWith('//')) redirect(next);
+  // No explicit destination: a store owner lands straight in their own store.
+  const myStore = await storeIdOfUser(uid).catch(() => 0);
+  redirect(myStore > 0 ? `/companies/${myStore}` : '/');
 }
 
 export async function registerAction(_prev: unknown, formData: FormData) {

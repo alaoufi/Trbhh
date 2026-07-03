@@ -76,22 +76,19 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 
-      {/* اختصار للانتقال لمتجر العضو إن كان يملك متجراً */}
-      {myStoreId > 0 && (
-        <Link href={`/companies/${myStoreId}`} className="flex items-center justify-between gap-3 rounded-2xl border-2 border-primary/30 bg-gradient-to-l from-primary/10 to-primary/5 p-4 transition hover:-translate-y-0.5 hover:border-primary/50">
-          <span className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary text-white"><Store className="h-6 w-6" /></span>
-            <span>
-              <span className="block font-bold text-primary">الانتقال إلى متجري</span>
-              <span className="block text-xs text-muted-foreground">إدارة متجرك وعرض منتجاتك</span>
-            </span>
-          </span>
-          <ChevronLeft className="h-5 w-5 shrink-0 text-primary" />
+      {/* صف مختصر: الأقسام + زر المتجر ثلاثي الأبعاد بجانبها */}
+      <div className="flex items-stretch gap-2">
+        <div className="min-w-0 flex-1">
+          <CategorySelect categories={categories} initial={catsParam} />
+        </div>
+        <Link
+          href={myStoreId > 0 ? `/companies/${myStoreId}` : '/account/company'}
+          className="card-3d flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl p-2 text-center transition hover:-translate-y-0.5 hover:border-primary/50"
+        >
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-white shadow-md"><Store className="h-5 w-5" /></span>
+          <span className="text-[11px] font-extrabold leading-tight text-primary">{myStoreId > 0 ? 'متجري' : 'افتح متجرك'}</span>
         </Link>
-      )}
-
-      {/* Category dropdown — pick one or more categories to show */}
-      <CategorySelect categories={categories} initial={catsParam} />
+      </div>
 
       {/* Stats — the admin selects which cards to show */}
       {statCards.length > 0 && (

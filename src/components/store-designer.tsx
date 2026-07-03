@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { Store, Check, Users, Star, Palette, LayoutTemplate } from 'lucide-react';
-import { STORE_COLORS, BANNERS, bannerBackground } from '@/lib/store-style';
+import { Store, Check, Users, Star, Palette, LayoutTemplate, Sparkles } from 'lucide-react';
+import { STORE_COLORS, BANNERS, STORE_TEMPLATES, bannerBackground } from '@/lib/store-style';
 
 type Initial = { storeName?: string | null; color?: string | null; banner?: string | null; tagline?: string | null; about?: string | null; logoUrl?: string | null };
 
@@ -15,9 +15,41 @@ export function StoreDesigner({ initial }: { initial: Initial }) {
   const [tagline, setTagline] = useState(initial.tagline || '');
   const [color, setColor] = useState(initial.color || '#3287da');
   const [banner, setBanner] = useState<string>(initial.banner || 'gradient');
+  // A brand-new store (no saved color yet) gets the template library open by default.
+  const isNew = !initial.color;
+  const [pickedTpl, setPickedTpl] = useState<string>('');
+
+  const applyTemplate = (t: (typeof STORE_TEMPLATES)[number]) => {
+    setColor(t.color);
+    setBanner(t.banner);
+    setPickedTpl(t.id);
+  };
 
   return (
     <div className="space-y-4">
+      {/* مكتبة القوالب — اقتراح قالب جاهز عند أول فتح للمتجر */}
+      <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-3">
+        <div className="mb-1 flex items-center gap-1.5 text-sm font-extrabold text-primary">
+          <Sparkles className="h-4 w-4" /> مكتبة القوالب
+          {isNew && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white">اختر قالباً للبداية</span>}
+        </div>
+        <p className="mb-3 text-xs text-muted-foreground">اختر هوية جاهزة لمتجرك بلمسة واحدة، ثم عدّل ما تشاء بالأسفل.</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {STORE_TEMPLATES.map((t) => (
+            <button type="button" key={t.id} onClick={() => applyTemplate(t)}
+              className={`overflow-hidden rounded-xl border-2 text-right transition ${pickedTpl === t.id ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:-translate-y-0.5'}`}>
+              <span className="relative flex h-12 w-full items-end" style={{ background: bannerBackground(t.banner, t.color) }}>
+                {pickedTpl === t.id && <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-white text-primary shadow"><Check className="h-3.5 w-3.5" /></span>}
+              </span>
+              <span className="block bg-white px-2 py-1">
+                <span className="block text-[11px] font-bold text-foreground">{t.name}</span>
+                <span className="block text-[9px] text-muted-foreground">{t.vibe}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* live preview */}
       <div className="overflow-hidden rounded-2xl shadow-md ring-1 ring-black/5">
         <div className="relative h-28" style={{ background: bannerBackground(banner, color) }}>

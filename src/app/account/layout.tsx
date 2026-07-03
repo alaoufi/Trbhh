@@ -33,9 +33,10 @@ export default async function AccountLayout({ children }: { children: React.Reac
               <Icon className="h-4 w-4" /> {label}
             </Link>
           ))}
-          <Link href="/logout" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10">
+          {/* خروج: رابط عادي (لا يُستبق تلقائياً) حتى لا يُلغى الجلسة عند التصفّح */}
+          <a href="/logout" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10">
             <LogOut className="h-4 w-4" /> خروج
-          </Link>
+          </a>
         </nav>
       </aside>
       <section className="min-w-0">{children}</section>

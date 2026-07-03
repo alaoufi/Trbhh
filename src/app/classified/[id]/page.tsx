@@ -77,11 +77,11 @@ export default async function ClassifiedDetailPage({ params }: { params: Promise
           <div className="grid grid-cols-2 gap-2">
             <div className="flex items-center gap-2 rounded-lg bg-white p-3">
               <Eye className="h-5 w-5 text-primary" />
-              <div><div className="text-lg font-bold">{new Intl.NumberFormat('ar-SA').format(c.views)}</div><div className="text-xs text-muted-foreground">مشاهدة</div></div>
+              <div><div className="text-lg font-bold">{new Intl.NumberFormat('en-US').format(c.views)}</div><div className="text-xs text-muted-foreground">مشاهدة</div></div>
             </div>
             <div className="flex items-center gap-2 rounded-lg bg-white p-3">
               <MousePointerClick className="h-5 w-5 text-primary" />
-              <div><div className="text-lg font-bold">{new Intl.NumberFormat('ar-SA').format(c.clicks)}</div><div className="text-xs text-muted-foreground">نقرة على الرابط</div></div>
+              <div><div className="text-lg font-bold">{new Intl.NumberFormat('en-US').format(c.clicks)}</div><div className="text-xs text-muted-foreground">نقرة على الرابط</div></div>
             </div>
           </div>
           {isOwner && (

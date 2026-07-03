@@ -25,7 +25,7 @@ export function timeAgo(date: Date | string | null | undefined): string {
 /** Format a price with Arabic thousands separators; "على السوم" when zero/empty. */
 export function formatPrice(price: number | null | undefined, currency = 'ر.س'): string {
   if (!price || price <= 0) return 'على السوم';
-  return `${new Intl.NumberFormat('ar-SA').format(price)} ${currency}`;
+  return `${new Intl.NumberFormat('en-US').format(price)} ${currency}`;
 }
 
 export function toInt(v: bigint | number | null | undefined): number {

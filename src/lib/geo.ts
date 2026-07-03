@@ -33,7 +33,7 @@ export function haversineKm(a: LatLng, b: LatLng): number {
 
 /** Human, Arabic distance label (e.g. "يبعد عنك ~٣ كم"). */
 export function formatDistanceAr(km: number): string {
-  const fmt = new Intl.NumberFormat('ar-SA', { maximumFractionDigits: km < 10 ? 1 : 0 });
-  if (km < 1) return `يبعد عنك ~${new Intl.NumberFormat('ar-SA').format(Math.round(km * 1000))} م`;
+  const fmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: km < 10 ? 1 : 0 });
+  if (km < 1) return `يبعد عنك ~${new Intl.NumberFormat('en-US').format(Math.round(km * 1000))} م`;
   return `يبعد عنك ~${fmt.format(km)} كم`;
 }

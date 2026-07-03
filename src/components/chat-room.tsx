@@ -7,7 +7,7 @@ export type Msg = { id: number; fromMe: boolean; message: string; at: string | n
 function fmtTime(at: string | null): string {
   if (!at) return '';
   try {
-    return new Intl.DateTimeFormat('ar-SA', { hour: '2-digit', minute: '2-digit' }).format(new Date(at));
+    return new Intl.DateTimeFormat('ar-SA-u-nu-latn', { hour: '2-digit', minute: '2-digit' }).format(new Date(at));
   } catch {
     return '';
   }

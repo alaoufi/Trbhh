@@ -9,7 +9,7 @@ export const metadata = { title: 'النسخ الاحتياطي والاستعا
 
 function fmtDate(ms: number): string {
   try {
-    return new Intl.DateTimeFormat('ar-SA', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms));
+    return new Intl.DateTimeFormat('ar-SA-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms));
   } catch {
     return new Date(ms).toISOString();
   }

@@ -41,7 +41,7 @@ export default async function PackagesPage() {
                 {p.price === 0 ? (
                   <span className="text-2xl font-extrabold text-green-600">مجانية</span>
                 ) : (
-                  <span className="text-2xl font-extrabold text-primary">{new Intl.NumberFormat('ar-SA').format(p.price)} <span className="text-sm font-medium text-muted-foreground">﷼</span></span>
+                  <span className="text-2xl font-extrabold text-primary">{new Intl.NumberFormat('en-US').format(p.price)} <span className="text-sm font-medium text-muted-foreground">﷼</span></span>
                 )}
               </div>
 

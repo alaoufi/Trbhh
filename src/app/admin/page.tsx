@@ -46,7 +46,7 @@ export default async function AdminHome() {
             className={`flex items-center gap-3 card-3d rounded-xl p-4 ${c.highlight && c.value > 0 ? '!border-amber-400 bg-amber-50' : ''}`}
           >
             <span className="grid h-11 w-11 place-items-center rounded-lg bg-primary/10 text-primary"><c.icon className="h-5 w-5" /></span>
-            <div><div className="text-xl font-bold text-primary">{new Intl.NumberFormat('ar-SA').format(c.value)}</div><div className="text-xs text-muted-foreground">{c.label}</div></div>
+            <div><div className="text-xl font-bold text-primary">{new Intl.NumberFormat('en-US').format(c.value)}</div><div className="text-xs text-muted-foreground">{c.label}</div></div>
           </Link>
         ))}
       </div>

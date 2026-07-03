@@ -20,7 +20,7 @@ function Stat({ icon: Icon, value, label }: { icon: React.ElementType; value: nu
   return (
     <div className="card-3d flex flex-col items-center gap-0.5 rounded-lg p-2 text-center">
       <Icon className="h-4 w-4 text-primary" />
-      <div className="text-sm font-bold leading-tight text-primary">{new Intl.NumberFormat('ar-SA').format(value)}</div>
+      <div className="text-sm font-bold leading-tight text-primary">{new Intl.NumberFormat('en-US').format(value)}</div>
       <div className="text-[10px] leading-tight text-muted-foreground">{label}</div>
     </div>
   );

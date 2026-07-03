@@ -4,12 +4,16 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
+import { saveStoreMeta, markStorePending } from '@/lib/merchant';
 import { toInt } from '@/lib/utils';
 
 export async function saveCompanyAction(formData: FormData) {
   const session = await requireUser();
   const description = String(formData.get('description') || '').trim();
   const address = String(formData.get('address') || '').trim();
+  const storeName = String(formData.get('storeName') || '').trim();
+  const color = String(formData.get('color') || '').trim();
+  const about = String(formData.get('about') || '').trim();
 
   let logoId: number | undefined;
   const logo = formData.get('logo');
@@ -26,7 +30,9 @@ export async function saveCompanyAction(formData: FormData) {
     await prisma.stores.update({ where: { id: existing.id }, data: { description, address, ...(logoId ? { logo: logoId } : {}) } });
   } else {
     await prisma.stores.create({ data: { user_id: session.uid, description, address, logo: logoId ?? 0 } });
+    await markStorePending(session.uid); // new store waits for admin approval
   }
+  await saveStoreMeta(session.uid, { storeName, color, about });
   revalidatePath('/account/company');
   redirect('/account/company');
 }

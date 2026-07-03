@@ -1,43 +1,103 @@
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, MapPin, Phone, MessageCircle, Building2 } from 'lucide-react';
+import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Store, Heart } from 'lucide-react';
 import { getStore } from '@/lib/stores';
 import { getMyAds } from '@/lib/account';
+import { getSession } from '@/lib/auth';
+import { hasAnyAdmin } from '@/lib/roles';
+import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing } from '@/lib/merchant';
 import { AdGrid } from '@/components/ad-card';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { waLink } from '@/lib/classified-theme';
+import { timeAgo } from '@/lib/utils';
+import { followStoreAction, rateStoreAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const s = await getStore(Number(id));
-  return { title: s?.name || 'صفحة الشركة' };
+  const meta = s ? await getStoreMeta(s.id) : null;
+  return { title: meta?.storeName || s?.name || 'متجر' };
+}
+
+const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
+
+function Stars({ value }: { value: number }) {
+  return (
+    <span className="inline-flex" dir="ltr">
+      {[1, 2, 3, 4, 5].map((i) => <Star key={i} className={`h-4 w-4 ${i <= Math.round(value) ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />)}
+    </span>
+  );
 }
 
 export default async function CompanyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const s = await getStore(Number(id));
+  const storeId = Number(id);
+  const s = await getStore(storeId);
   if (!s) notFound();
-  const myAds = await getMyAds(s.userId);
+
+  const session = await getSession().catch(() => null);
+  const isOwner = !!session && s.userId === session.uid;
+  const admin = session ? await hasAnyAdmin(session.uid).catch(() => false) : false;
+  const meta = await getStoreMeta(storeId);
+  // approval gate: pending/suspended stores are visible only to the owner and admins
+  if (meta.status !== 1 && !isOwner && !admin) notFound();
+
+  const [myAds, followers, rating, reviews, following] = await Promise.all([
+    getMyAds(s.userId),
+    followersCount(storeId),
+    getStoreRating(storeId),
+    getStoreReviews(storeId),
+    session && !isOwner ? isFollowing(session.uid, storeId) : Promise.resolve(false),
+  ]);
   const active = myAds.filter((a) => a.status === 1).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
   const wa = waLink(s.whatsapp);
+  const brand = meta.color || '#3287da';
+  const name = meta.storeName || s.name;
+
   return (
     <div className="space-y-4">
-      <div className="card-3d rounded-xl p-5">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="relative h-20 w-20 overflow-hidden rounded-xl bg-muted"><Image src={s.logo} alt={s.name} fill sizes="80px" className="object-cover" /></div>
-          <div className="flex-1">
-            <div className="flex items-center gap-1 text-xl font-bold">{s.name}{s.trusted && <BadgeCheck className="h-5 w-5 text-primary" />}</div>
-            {s.address && <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{s.address}</div>}
+      {meta.status !== 1 && (isOwner || admin) && (
+        <div className="card-3d rounded-xl p-3 text-sm font-bold text-amber-700">⏳ هذا المتجر {meta.status === 0 ? 'بانتظار موافقة الإدارة' : 'موقوف'} — يظهر لك فقط حالياً.</div>
+      )}
+
+      {/* رأس المتجر بلون هويته */}
+      <div className="card-3d overflow-hidden rounded-2xl">
+        <div className="h-20 w-full" style={{ background: `linear-gradient(120deg, ${brand}, ${brand}bb)` }} />
+        <div className="p-5">
+          <div className="-mt-14 flex flex-wrap items-end gap-4">
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-muted shadow"><Image src={s.logo} alt={name} fill sizes="80px" className="object-cover" /></div>
+            <div className="flex-1">
+              <div className="flex items-center gap-1 text-xl font-extrabold" style={{ color: brand }}><Store className="h-5 w-5" /> {name}{s.trusted && <BadgeCheck className="h-5 w-5" />}</div>
+              {s.address && <div className="flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{s.address}</div>}
+            </div>
           </div>
-          <div className="flex gap-2">
+
+          {/* إحصائيات: متابعون · تقييم · إعلانات */}
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Users className="h-4 w-4" /> {en(followers)}</div><div className="text-[11px] text-muted-foreground">متابع</div></div>
+            <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Star className="h-4 w-4 fill-amber-400 text-amber-400" /> {rating.count ? rating.avg : '—'}</div><div className="text-[11px] text-muted-foreground">تقييم ({en(rating.count)})</div></div>
+            <div className="rounded-xl bg-secondary/40 p-2"><div className="font-bold" style={{ color: brand }}>{en(active.length)}</div><div className="text-[11px] text-muted-foreground">إعلان</div></div>
+          </div>
+
+          {/* أزرار: متابعة + تواصل */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {!isOwner && (
+              <form action={followStoreAction}>
+                <input type="hidden" name="storeId" value={storeId} />
+                <button className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold ${following ? 'border-2 text-white' : 'text-white'}`} style={{ background: following ? '#64748b' : brand }}>
+                  <Heart className={`h-4 w-4 ${following ? 'fill-white' : ''}`} /> {following ? 'متابَع ✓' : 'متابعة'}
+                </button>
+              </form>
+            )}
             {wa && <a href={wa} target="_blank" rel="noopener noreferrer"><Button variant="whatsapp"><MessageCircle className="h-4 w-4" /> واتساب</Button></a>}
             {s.phone && <a href={`tel:${s.phone}`}><Button variant="outline"><Phone className="h-4 w-4" /> اتصال</Button></a>}
           </div>
+
+          {(meta.about || s.description) && <p className="mt-4 whitespace-pre-line leading-7 text-foreground/90">{meta.about || s.description}</p>}
         </div>
-        {s.description && <p className="mt-4 whitespace-pre-line leading-7 text-foreground/90">{s.description}</p>}
       </div>
 
       {s.branches.length > 0 && (
@@ -49,8 +109,37 @@ export default async function CompanyPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      <h2 className="text-lg font-bold">كتالوج الخدمات والمنتجات ({active.length})</h2>
+      <h2 className="text-lg font-bold" style={{ color: brand }}>كتالوج المتجر ({en(active.length)})</h2>
       <AdGrid ads={active} />
+
+      {/* التقييمات وملاحظات العملاء */}
+      <div className="card-3d space-y-3 rounded-2xl p-4">
+        <h2 className="flex items-center gap-2 font-bold" style={{ color: brand }}><Star className="h-5 w-5" /> تقييمات العملاء ({en(rating.count)})</h2>
+        {session && !isOwner && (
+          <form action={rateStoreAction} className="space-y-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
+            <input type="hidden" name="storeId" value={storeId} />
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-bold">تقييمك:</span>
+              <select name="star" defaultValue="5" className="h-9 rounded-lg border bg-white px-2 text-sm">
+                {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} ★</option>)}
+              </select>
+            </div>
+            <textarea name="note" rows={2} maxLength={500} placeholder="ملاحظتك عن المتجر (اختياري)" className="w-full rounded-lg border bg-white p-2 text-sm" />
+            <button className="rounded-lg px-4 py-2 text-sm font-bold text-white" style={{ background: brand }}>إرسال التقييم</button>
+          </form>
+        )}
+        {reviews.length === 0 && <p className="text-sm text-muted-foreground">لا توجد تقييمات بعد.</p>}
+        {reviews.map((r) => (
+          <div key={r.id} className="rounded-xl border border-border/60 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-bold text-primary">{r.author}</span>
+              <span className="flex items-center gap-2"><Stars value={r.star} /> <span className="text-xs text-muted-foreground">{timeAgo(r.at)}</span></span>
+            </div>
+            {r.note && <p className="mt-1 text-sm text-foreground/90">{r.note}</p>}
+          </div>
+        ))}
+      </div>
+
       <DisclaimerBar />
     </div>
   );

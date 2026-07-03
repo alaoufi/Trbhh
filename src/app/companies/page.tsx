@@ -1,17 +1,22 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { BadgeCheck, Building2, MapPin } from 'lucide-react';
+import { BadgeCheck, Store, MapPin } from 'lucide-react';
 import { getStores } from '@/lib/stores';
+import { approvedStoreIds } from '@/lib/merchant';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'الشركات' };
+export const metadata = { title: 'المتاجر' };
 
 export default async function CompaniesPage() {
-  const stores = await getStores();
+  const [all, approved] = await Promise.all([getStores(), approvedStoreIds()]);
+  const stores = all.filter((s) => approved.has(s.id));
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2"><Building2 className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold">الشركات والمتاجر</h1></div>
-      {stores.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد شركات مسجّلة بعد. <Link href="/account/company" className="text-primary hover:underline">أنشئ صفحة شركتك</Link></p>}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold">المتاجر</h1></div>
+        <Link href="/account/company" className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white">افتح متجرك</Link>
+      </div>
+      {stores.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد متاجر معتمدة بعد. <Link href="/account/company" className="text-primary hover:underline">افتح متجرك الآن</Link></p>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {stores.map((s) => (
           <Link key={s.id} href={`/companies/${s.id}`} className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">

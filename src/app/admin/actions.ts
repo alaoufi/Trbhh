@@ -6,6 +6,7 @@ import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
+import { setStoreStatus } from '@/lib/merchant';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
@@ -150,6 +151,15 @@ export async function adminDeleteClassifiedAction(formData: FormData) {
   if (id) await deleteClassified(id);
   revalidatePath('/admin/classified');
   revalidatePath('/classified');
+}
+
+/** Approve or reject a merchant store. */
+export async function approveStoreAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const id = Number(formData.get('storeId'));
+  const approve = String(formData.get('action')) === 'approve';
+  if (id) await setStoreStatus(id, approve ? 1 : 2);
+  revalidatePath('/admin/stores');
 }
 
 /** Admin removes a single (inappropriate) chat message from a monitored thread. */

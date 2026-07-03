@@ -81,7 +81,8 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
           <Group label="تصفّح" />
           <Item href="/search" icon={Search} onClick={close}>بحث متقدم</Item>
           <Item href="/classified" icon={Sparkles} onClick={close}>الإعلانات المبوّبة</Item>
-          <Item href="/companies" icon={Building2} onClick={close}>الشركات</Item>
+          <Item href="/companies" icon={Building2} onClick={close}>المتاجر</Item>
+          {isAuthed && <Item href="/account/company" icon={Building2} onClick={close}>متجري</Item>}
           <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>
           {/* الأقسام (تصفّح حسب القسم) */}
           <button

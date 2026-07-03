@@ -23,6 +23,15 @@ export default function RegisterPage() {
             className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
           <input name="password" type="password" placeholder="كلمة المرور (6 أحرف على الأقل)"
             className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+          <label className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+            <input type="checkbox" name="agree" required className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
+            <span className="text-foreground/90">
+              أوافق على{' '}
+              <Link href="/pages/terms" target="_blank" className="font-bold text-primary hover:underline">الشروط والأحكام</Link>
+              {' '}و{' '}
+              <Link href="/pages/privacy" target="_blank" className="font-bold text-primary hover:underline">سياسة الخصوصية</Link>.
+            </span>
+          </label>
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
           <Submit />
         </form>

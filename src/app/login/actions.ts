@@ -49,6 +49,9 @@ export async function registerAction(_prev: unknown, formData: FormData) {
   if (!name || !phone || password.length < 6) {
     return { error: 'أكمل البيانات (كلمة المرور 6 أحرف على الأقل)' };
   }
+  if (!formData.get('agree')) {
+    return { error: 'يجب الموافقة على الشروط والأحكام وسياسة الخصوصية.' };
+  }
   const phoneLocal = toLocalSaudi(phone); // store canonical 05XXXXXXXX
   if (await userExistsByPhone(phone)) return { error: 'رقم الجوال مسجّل مسبقاً' };
 

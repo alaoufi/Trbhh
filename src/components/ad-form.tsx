@@ -124,6 +124,11 @@ export function AdForm({
           )}
         </div>
       )}
+      {error === 'image' && (
+        <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
+          🚫 رُفضت إحدى الصور لاشتباه المحتوى بأنه غير لائق. الرجاء رفع صور مناسبة للإعلان فقط. تكرار المحاولة قد يؤدي لحظر الحساب.
+        </div>
+      )}
       {error === 'flood' && (
         <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
           ⏳ أنت تنشر بسرعة كبيرة (إغراق). الرجاء الانتظار{gapWait ? ` نحو ${gapWait} ثانية` : ' قليلاً'} قبل نشر إعلان آخر.

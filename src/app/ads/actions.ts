@@ -12,6 +12,7 @@ import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL } 
 import { setAdMedia } from '@/lib/ad-media';
 import { setUserArea } from '@/lib/user-location';
 import { scanContent } from '@/lib/content-guard';
+import { scanImages, imageModerationEnabled } from '@/lib/nsfw';
 import { toInt } from '@/lib/utils';
 
 /** Save a raw media file (video/audio) from the form; returns the stored path or null. */
@@ -220,6 +221,19 @@ export async function createAdAction(formData: FormData) {
     redirect(`/ads/new?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : `&left=${o.left}`}`);
   }
 
+  // فحص بصري للصور بالذكاء الاصطناعي: الصور الإباحية = حظر فوري صارم
+  if (imageModerationEnabled() && images.length) {
+    const v = await scanImages(images.map((i) => i.buf));
+    if (v.explicit) {
+      await handleProhibited(session.uid, 'immoral', 'nsfw-image', `صورة إباحية (نسبة ${v.hardcore.toFixed(2)})`);
+      redirect('/ads/new?error=blocked&cat=immoral&banned=1');
+    }
+    if (v.review) {
+      await logMod(session.uid, { kind: 'content', category: 'immoral', term: 'nsfw-image-review', snippet: `مراجعة صورة (إباحي ${v.hardcore.toFixed(2)} / مثير ${v.sexy.toFixed(2)})`, action: 'blocked' });
+      redirect('/ads/new?error=image');
+    }
+  }
+
   // منع تكرار الإعلان: تحذير ٣ محاولات ثم حظر الحساب
   if (await isOwnDuplicate(session.uid, title, detail, images)) {
     const n = await bumpDupAttempts(session.uid);
@@ -315,6 +329,17 @@ export async function updateAdAction(formData: FormData) {
   });
 
   const images = await readImages(formData);
+  if (imageModerationEnabled() && images.length) {
+    const v = await scanImages(images.map((i) => i.buf));
+    if (v.explicit) {
+      await handleProhibited(session.uid, 'immoral', 'nsfw-image', `صورة إباحية (تعديل، نسبة ${v.hardcore.toFixed(2)})`);
+      redirect('/account/ads?error=blocked');
+    }
+    if (v.review) {
+      await logMod(session.uid, { kind: 'content', category: 'immoral', term: 'nsfw-image-review', snippet: `مراجعة صورة (تعديل)`, action: 'blocked' });
+      redirect(`/ads/${toInt(adId)}/edit?error=image`);
+    }
+  }
   if (images.length) await storeImages(images, session.uid, adId);
   const newVideo = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
   if (newVideo) await prisma.ads.update({ where: { id: adId }, data: { video_path: newVideo } }).catch(() => {});

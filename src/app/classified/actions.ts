@@ -9,7 +9,8 @@ import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified } from '@/lib/classified';
 import { getMemberWindows, withinWindow } from '@/lib/settings';
 import { scanContent } from '@/lib/content-guard';
-import { handleProhibited } from '@/lib/moderation';
+import { handleProhibited, logMod } from '@/lib/moderation';
+import { checkImageBuffer, imageModerationEnabled } from '@/lib/nsfw';
 import { toInt } from '@/lib/utils';
 
 async function saveOneImage(formData: FormData): Promise<string | null> {
@@ -48,6 +49,20 @@ export async function createClassifiedAction(formData: FormData) {
   const phone = String(formData.get('phone') || '').trim().slice(0, 40) || null;
   const whatsapp = String(formData.get('whatsapp') || '').trim().slice(0, 40) || null;
   const link = cleanLink(String(formData.get('link') || ''));
+
+  // فحص بصري للصورة قبل الحفظ: الصور الإباحية = حظر فوري صارم
+  const rawImg = formData.get('image');
+  if (imageModerationEnabled() && rawImg instanceof File && rawImg.size > 0 && rawImg.size <= 12 * 1024 * 1024) {
+    const v = await checkImageBuffer(Buffer.from(await rawImg.arrayBuffer()));
+    if (v.explicit) {
+      await handleProhibited(session.uid, 'immoral', 'nsfw-image', `صورة مبوّب إباحية (${v.hardcore.toFixed(2)})`);
+      redirect('/classified/new?error=blocked&cat=immoral&banned=1');
+    }
+    if (v.review) {
+      await logMod(session.uid, { kind: 'content', category: 'immoral', term: 'nsfw-image-review', snippet: 'مراجعة صورة مبوّب', action: 'blocked' });
+      redirect('/classified/new?error=image');
+    }
+  }
   const image = await saveOneImage(formData);
 
   // صورة أو نص إجباري (أحدهما)
@@ -97,6 +112,18 @@ export async function updateClassifiedAction(formData: FormData) {
   const phone = String(formData.get('phone') || '').trim().slice(0, 40) || null;
   const whatsapp = String(formData.get('whatsapp') || '').trim().slice(0, 40) || null;
   const link = cleanLink(String(formData.get('link') || ''));
+  const rawNew = formData.get('image');
+  if (imageModerationEnabled() && rawNew instanceof File && rawNew.size > 0 && rawNew.size <= 12 * 1024 * 1024) {
+    const v = await checkImageBuffer(Buffer.from(await rawNew.arrayBuffer()));
+    if (v.explicit) {
+      await handleProhibited(session.uid, 'immoral', 'nsfw-image', `صورة مبوّب إباحية (تعديل ${v.hardcore.toFixed(2)})`);
+      redirect('/classified/new?error=blocked&cat=immoral&banned=1');
+    }
+    if (v.review) {
+      await logMod(session.uid, { kind: 'content', category: 'immoral', term: 'nsfw-image-review', snippet: 'مراجعة صورة مبوّب (تعديل)', action: 'blocked' });
+      redirect(`/classified/${id}/edit?error=image`);
+    }
+  }
   const newImage = await saveOneImage(formData); // null when no new file (keep current)
 
   if (!newImage && !existing!.image && !body && !title) redirect(`/classified/${id}/edit?error=content`);

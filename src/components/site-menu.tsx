@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Send,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen,
 } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { ThemePicker } from '@/components/theme-picker';
@@ -13,11 +13,15 @@ type Cat = { id: number; name: string };
 
 function Item({ href, icon: Icon, children, onClick }: { href: string; icon: React.ElementType; children: React.ReactNode; onClick: () => void }) {
   return (
-    <Link href={href} onClick={onClick} className="flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium text-foreground hover:bg-accent">
+    <Link href={href} onClick={onClick} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-foreground hover:bg-accent">
       <Icon className="h-5 w-5 shrink-0 text-primary" />
       <span>{children}</span>
     </Link>
   );
+}
+
+function Group({ label }: { label: string }) {
+  return <div className="mb-1 mt-3 px-3 text-xs font-extrabold uppercase tracking-wide text-muted-foreground">{label}</div>;
 }
 
 export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[] }) {
@@ -60,22 +64,25 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
           <Link href="/guide" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-3 text-[15px] font-extrabold text-primary hover:bg-primary/15">
             <BookOpen className="h-5 w-5 shrink-0" /> <span>دليل الاستخدام</span>
           </Link>
-          <Item href={isAuthed ? '/account' : '/login'} icon={User} onClick={close}>حسابي</Item>
-          <Item href="/account/favorites" icon={Heart} onClick={close}>المفضلة</Item>
-          <Item href="/account/ads" icon={Megaphone} onClick={close}>إعلاناتي</Item>
-          <Item href="/ads/new" icon={PlusCircle} onClick={close}>أضف إعلان</Item>
-          <Item href="/classified" icon={Sparkles} onClick={close}>الإعلانات المبوّبة</Item>
-          <Item href="/classified/new" icon={Sparkles} onClick={close}>المصمم الذكي</Item>
-          {isAuthed && <Item href="/account/classified" icon={Sparkles} onClick={close}>إعلاناتي المبوّبة</Item>}
-          <Item href="/packages" icon={Crown} onClick={close}>الباقات</Item>
-          <Item href="/promote" icon={Megaphone} onClick={close}>أعلن معنا</Item>
-          {isAuthed && <Item href="/account/promos" icon={Megaphone} onClick={close}>إعلاناتي الترويجية</Item>}
-          <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>
-          {isAuthed && <Item href="/messages" icon={Mail} onClick={close}>مراسلات الإدارة</Item>}
-          {isAuthed && <Item href="/messages/admin" icon={Send} onClick={close}>مراسلة الإدارة</Item>}
-          <Item href="/companies" icon={Building2} onClick={close}>الشركات</Item>
-          <Item href="/search" icon={Search} onClick={close}>بحث متقدم</Item>
 
+          <Group label="حسابي" />
+          <Item href={isAuthed ? '/account' : '/login'} icon={User} onClick={close}>حسابي</Item>
+          <Item href="/account/ads" icon={Megaphone} onClick={close}>إعلاناتي</Item>
+          <Item href="/account/favorites" icon={Heart} onClick={close}>المفضلة</Item>
+          {isAuthed && <Item href="/account/classified" icon={Sparkles} onClick={close}>إعلاناتي المبوّبة</Item>}
+          {isAuthed && <Item href="/account/promos" icon={Megaphone} onClick={close}>إعلاناتي الترويجية</Item>}
+
+          <Group label="النشر والإعلان" />
+          <Item href="/ads/new" icon={PlusCircle} onClick={close}>أضف إعلان</Item>
+          <Item href="/classified/new" icon={Sparkles} onClick={close}>المصمم الذكي (إعلان مبوّب)</Item>
+          <Item href="/promote" icon={Megaphone} onClick={close}>أعلن معنا</Item>
+          <Item href="/packages" icon={Crown} onClick={close}>الباقات</Item>
+
+          <Group label="تصفّح" />
+          <Item href="/search" icon={Search} onClick={close}>بحث متقدم</Item>
+          <Item href="/classified" icon={Sparkles} onClick={close}>الإعلانات المبوّبة</Item>
+          <Item href="/companies" icon={Building2} onClick={close}>الشركات</Item>
+          <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>
           {/* الأقسام (تصفّح حسب القسم) */}
           <button
             onClick={() => setCatOpen((v) => !v)}
@@ -94,24 +101,25 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
             </div>
           )}
 
-          <div className="my-2 border-t border-primary/10" />
+          <Group label="التواصل" />
+          {isAuthed && <Item href="/messages" icon={Mail} onClick={close}>مراسلات الإدارة</Item>}
+          <a href={`tel:${SITE.phone}`} onClick={close} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-foreground hover:bg-accent">
+            <Phone className="h-5 w-5 shrink-0 text-primary" /> <span>تواصل معنا</span>
+          </a>
+          <button onClick={share} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-primary hover:bg-accent">
+            <Share2 className="h-5 w-5 shrink-0" /> مشاركة الموقع
+          </button>
 
+          <div className="my-2 border-t border-primary/10" />
           <ThemePicker />
-
           <div className="my-2 border-t border-primary/10" />
 
+          <Group label="معلومات" />
           <Item href="/pages/about" icon={Building2} onClick={close}>من نحن</Item>
           <Item href="/pages/faq" icon={HelpCircle} onClick={close}>الأسئلة الشائعة</Item>
           <Item href="/pages/privacy" icon={Shield} onClick={close}>سياسة الخصوصية</Item>
           <Item href="/pages/terms" icon={FileText} onClick={close}>الشروط والأحكام</Item>
-          <a href={`tel:${SITE.phone}`} onClick={close} className="flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium text-foreground hover:bg-accent">
-            <Phone className="h-5 w-5 shrink-0 text-primary" /> <span>تواصل معنا</span>
-          </a>
           {isAdmin && <Item href="/admin" icon={Shield} onClick={close}>لوحة الإدارة</Item>}
-
-          <button onClick={share} className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium text-primary hover:bg-accent">
-            <Share2 className="h-5 w-5 shrink-0" /> مشاركة الموقع
-          </button>
         </div>
 
         <div className="border-t border-primary/15 p-3">

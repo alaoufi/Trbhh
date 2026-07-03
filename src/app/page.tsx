@@ -8,7 +8,7 @@ import {
   getStats,
   getAdsByCategory,
 } from '@/lib/data';
-import { CategoryTabs } from '@/components/category-tabs';
+import { CategorySelect } from '@/components/category-select';
 import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { PromoSlot } from '@/components/promo-slot';
@@ -35,7 +35,8 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
   );
 }
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ cats?: string }> }) {
+  const { cats } = await searchParams;
   const [categories, featured, latest, mostViewed, stats, homeStats] = await Promise.all([
     getCategories(),
     getFeaturedAds(8),
@@ -44,6 +45,7 @@ export default async function HomePage() {
     getStats(),
     getHomeStats().catch(() => new Set(['ads', 'users', 'views', 'cats'])),
   ]);
+  const catsParam = (cats || '').split(',').map((n) => parseInt(n, 10)).filter((n) => Number.isFinite(n) && n > 0);
   const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
     { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
     { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
@@ -51,23 +53,26 @@ export default async function HomePage() {
     { key: 'cats', icon: LayoutGrid, value: stats.cats, label: 'قسم', href: '/search' },
   ].filter((s) => homeStats.has(s.key));
 
-  // "أقسام تهمّك" — a logged-in member's chosen categories, pinned to the top
+  // Categories to pin at the top: the dropdown selection (?cats=) if present,
+  // otherwise the logged-in member's chosen "interests".
   const session = await getSession().catch(() => null);
   const interestIds = session ? await getInterests(session.uid).catch(() => []) : [];
+  const showIds = catsParam.length ? catsParam : interestIds;
   const nameById = new Map(categories.map((c) => [c.id, c.name]));
   const pinned = (
     await Promise.all(
-      interestIds.slice(0, 5).map(async (id) => ({ id, name: nameById.get(id) || 'قسم', ads: await getAdsByCategory(id, 4).catch(() => []) })),
+      showIds.slice(0, 6).map(async (id) => ({ id, name: nameById.get(id) || 'قسم', ads: await getAdsByCategory(id, 4).catch(() => []) })),
     )
   ).filter((p) => p.ads.length > 0);
+  const pinnedLabel = catsParam.length ? 'الأقسام المختارة' : '⭐ أقسام تهمّك';
 
   return (
     <div className="space-y-4">
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 
-      {/* Category tabs */}
-      <CategoryTabs categories={categories} />
+      {/* Category dropdown — pick one or more categories to show */}
+      <CategorySelect categories={categories} initial={catsParam} />
 
       {/* Stats — the admin selects which cards to show */}
       {statCards.length > 0 && (
@@ -80,8 +85,12 @@ export default async function HomePage() {
       {pinned.length > 0 && (
         <div className="space-y-4 rounded-2xl border-2 border-primary/20 bg-primary/5 p-3">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-extrabold text-primary">⭐ أقسام تهمّك</span>
-            <Link href="/account" className="text-xs text-primary hover:underline">تعديل اهتماماتي</Link>
+            <span className="text-sm font-extrabold text-primary">{pinnedLabel}</span>
+            {catsParam.length ? (
+              <Link href="/" className="text-xs text-primary hover:underline">إلغاء التصفية</Link>
+            ) : (
+              <Link href="/account" className="text-xs text-primary hover:underline">تعديل اهتماماتي</Link>
+            )}
           </div>
           {pinned.map((p) => (
             <Section key={p.id} title={p.name} href={`/categories/${p.id}`}>

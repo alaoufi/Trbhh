@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Send } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getConversations } from '@/lib/messages';
 import { timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'الرسائل' };
+export const metadata = { title: 'مراسلات الإدارة' };
 
 export default async function MessagesPage() {
  const session = await getSession();
@@ -15,7 +15,12 @@ export default async function MessagesPage() {
  const convos = await getConversations(session.uid);
  return (
  <div className="mx-auto max-w-2xl space-y-4">
- <h1 className="text-xl font-bold">الرسائل</h1>
+ <div className="flex items-center justify-between gap-2">
+ <h1 className="text-xl font-bold">مراسلات الإدارة</h1>
+ <Link href="/messages/admin" className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90">
+ <Send className="h-4 w-4" /> مراسلة الإدارة
+ </Link>
+ </div>
  {convos.length === 0 && (
  <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
  <MessageCircle className="mx-auto mb-2 h-8 w-8" />

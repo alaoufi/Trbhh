@@ -21,6 +21,8 @@ export type AdCard = {
   sellerName: string | null;
   sellerTrusted: boolean;
   tier?: 'gold' | 'silver' | '';
+  storeName?: string | null;
+  storeId?: number | null;
 };
 
 async function sellerInfo(ids: bigint[]): Promise<Map<number, { name: string; trusted: boolean }>> {

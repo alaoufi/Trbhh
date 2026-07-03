@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { cookies } from 'next/headers';
-import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown } from 'lucide-react';
+import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown, Store } from 'lucide-react';
 import type { AdCard as AdCardType } from '@/lib/data';
 import { timeAgo, formatPrice, cn } from '@/lib/utils';
 
@@ -53,6 +53,7 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
           <h3 className="line-clamp-3 text-right text-base font-bold leading-7 text-primary">
             {ad.title}
           </h3>
+          {ad.storeName && <div className="mt-1"><StoreTag name={ad.storeName} /></div>}
         </div>
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-white">
           <Image src={ad.image} alt={ad.title} fill sizes="96px" className="object-cover" />
@@ -105,6 +106,16 @@ function Cell({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-col items-center justify-start">{children}</div>;
 }
 
+/** "من متجر …" label for ads surfaced on the Trbhh platform from a store. */
+function StoreTag({ name }: { name?: string | null }) {
+  if (!name) return null;
+  return (
+    <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+      <Store className="h-3 w-3 shrink-0" /> <span className="truncate">من متجر {name}</span>
+    </span>
+  );
+}
+
 /**
  * Shopping-style tile (متجر / Temu-like): big image on top, bold red price,
  * badges, rating-ish meta — used when the member picks the "متجر" design.
@@ -129,6 +140,7 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
       </div>
       <div className="flex flex-1 flex-col gap-0.5 p-2">
         <h3 className="line-clamp-2 min-h-[2.2rem] text-[13px] font-bold leading-snug text-foreground/90">{ad.title}</h3>
+        {ad.storeName && <StoreTag name={ad.storeName} />}
         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
           <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" /> {new Intl.NumberFormat('en-US').format(ad.views)}</span>
           {ad.cityName && <span className="flex min-w-0 items-center gap-0.5 truncate"><MapPin className="h-3 w-3 shrink-0" /> <span className="truncate">{ad.cityName}</span></span>}
@@ -158,6 +170,7 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
         <div className="mb-1 flex items-center gap-1.5">
           <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-extrabold text-white', isReq ? 'bg-amber-500' : 'bg-primary')}>{isReq ? 'طلب' : 'عرض'}</span>
           {ad.special && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">مميّز</span>}
+          {ad.storeName && <StoreTag name={ad.storeName} />}
         </div>
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground/90">{ad.title}</h3>
         <div className="mt-1 text-base font-extrabold text-red-600">

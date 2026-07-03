@@ -24,7 +24,7 @@ export async function Header() {
           href={myStoreId > 0 ? `/companies/${myStoreId}` : '/account/company'}
           className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95"
         >
-          <Store className="h-5 w-5" /> {myStoreId > 0 ? 'متجري' : 'افتح متجرك'}
+          <Store className="h-5 w-5" /> {myStoreId > 0 ? 'رابط المتجر' : 'افتح متجرك'}
         </Link>
 
         {/* بحث مصغّر: عدسة تفتح حقل البحث */}

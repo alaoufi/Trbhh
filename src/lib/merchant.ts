@@ -279,15 +279,25 @@ export async function homeFeaturedOwnerIds(limit = 12): Promise<number[]> {
   return rows.map((r) => Number(r.user_id));
 }
 
-/** Active ads from home-featured stores, shaped for AdGrid (home showcase). */
+/** Stores shown on the Trbhh platform, with their id/name for labelling. */
+export async function homeFeaturedStores(limit = 6): Promise<{ userId: number; storeId: number; storeName: string | null }[]> {
+  await ensure();
+  const rows = await prisma.$queryRawUnsafe<{ user_id: number; id: number | bigint; store_name: string | null }[]>(
+    `SELECT user_id, id, store_name FROM stores WHERE status = 1 AND (home_featured = 1 OR show_on_platform = 1) ORDER BY home_featured DESC, id DESC LIMIT ?`, limit,
+  ).catch(() => []);
+  return rows.map((r) => ({ userId: Number(r.user_id), storeId: Number(r.id), storeName: r.store_name ?? null }));
+}
+
+/** Active ads from platform stores, shaped for AdGrid + labelled "من متجر …". */
 export async function homeFeaturedAds() {
-  const owners = await homeFeaturedOwnerIds(6);
-  if (!owners.length) return [];
+  const stores = await homeFeaturedStores(6);
+  if (!stores.length) return [];
   const { getMyAds } = await import('./account');
-  const out: { id: number; title: string; price: number; adsType: string; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; views: number; sellerName: null; sellerTrusted: boolean }[] = [];
-  for (const uid of owners) {
-    const a = (await getMyAds(uid)).filter((x) => x.status === 1).slice(0, 4);
-    for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, views: 0, sellerName: null, sellerTrusted: false });
+  const out: { id: number; title: string; price: number; adsType: string; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; views: number; sellerName: null; sellerTrusted: boolean; storeName: string | null; storeId: number }[] = [];
+  for (const st of stores) {
+    const label = st.storeName || (await getStoreMeta(st.storeId)).storeName;
+    const a = (await getMyAds(st.userId)).filter((x) => x.status === 1).slice(0, 4);
+    for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, views: 0, sellerName: null, sellerTrusted: false, storeName: label, storeId: st.storeId });
   }
   return out.slice(0, 12);
 }

@@ -6,7 +6,6 @@ import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
   Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen,
 } from 'lucide-react';
-import { SITE } from '@/lib/constants';
 import { ThemePicker } from '@/components/theme-picker';
 
 type Cat = { id: number; name: string };
@@ -103,9 +102,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
 
           <Group label="التواصل" />
           {isAuthed && <Item href="/messages" icon={Mail} onClick={close}>مراسلات الإدارة</Item>}
-          <a href={`tel:${SITE.phone}`} onClick={close} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-foreground hover:bg-accent">
-            <Phone className="h-5 w-5 shrink-0 text-primary" /> <span>تواصل معنا</span>
-          </a>
+          <Item href="/pages/contact" icon={Phone} onClick={close}>تواصل معنا</Item>
           <button onClick={share} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-primary hover:bg-accent">
             <Share2 className="h-5 w-5 shrink-0" /> مشاركة الموقع
           </button>

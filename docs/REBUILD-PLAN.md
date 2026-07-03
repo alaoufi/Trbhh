@@ -94,7 +94,7 @@ src/
 |---|---|---|---|
 | 0 | تهيئة Vitest + Playwright config + GitHub Actions | CI أخضر على الفرع | ✅ (اختبارات e2e لاحقاً — تحتاج DB اختبار) |
 | 1 | **اختبارات توصيف** لقواعد العمل الـ14 + رحلات e2e الحرجة | السلوك الحالي محفوظ رقمياً | 🟡 35 اختباراً (تسعير/نص/متاجر/أدوار) — **اصطاد أول خطأ حقيقي** في normalizeAr |
-| 2 | Prisma baseline migration + استئصال `ensure()` + طبقة `data/` | صفر SQL خام خارج `data/`، الاختبارات خضراء | 🟡 DDL موحّد في `data/schema-sync.ts` يعمل عند الإقلاع (instrumentation)؛ schema.prisma صار مصدر الحقيقة (stores+11 جدولاً/عموداً)؛ merchant/moderation/roles محوّلة — بقية الوحدات الـ13 تباعاً |
+| 2 | Prisma baseline migration + استئصال `ensure()` + طبقة `data/` | صفر SQL خام خارج `data/`، الاختبارات خضراء | 🟡 DDL موحّد في `data/schema-sync.ts` يعمل عند الإقلاع (instrumentation)؛ schema.prisma صار مصدر الحقيقة؛ **merchant.ts أصبح صفر SQL خام** (24→0، وإجمالي src من 193→130) مع إصلاح N+1 في adminStoreList (1+4N→6 استعلامات)؛ بقية الوحدات تباعاً |
 | 3 | استخراج `domain/` (moderation, merchant, roles, pricing) وإعادة كتابتها | نفس الاختبارات خضراء على الكود الجديد |
 | 4 | أداء: إصلاح N+1 + caching للصفحات العامة | قياس قبل/بعد موثّق |
 | 5 | تنظيف الصفحات لتصبح رقيقة + توسيع تغطية الاختبارات | — |

@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Send, Check, CheckCheck } from 'lucide-react';
+import { Send, Check, CheckCheck, Trash2 } from 'lucide-react';
 
 export type Msg = { id: number; fromMe: boolean; message: string; at: string | null; read: boolean };
 
@@ -43,6 +43,11 @@ export function ChatRoom({ peerId, initial }: { peerId: number; initial: Msg[] }
       if (typeof d.myReadMax === 'number' && d.myReadMax > 0) {
         setMessages((prev) => prev.map((m) => (m.fromMe && !m.read && m.id <= d.myReadMax ? { ...m, read: true } : m)));
       }
+      // drop any message the other party deleted (id no longer in the live set)
+      if (Array.isArray(d.ids)) {
+        const live = new Set(d.ids as number[]);
+        setMessages((prev) => prev.filter((m) => m.id < 0 || live.has(m.id)));
+      }
       setTyping(!!d.typing);
     } catch {
       /* ignore transient poll errors */
@@ -65,6 +70,21 @@ export function ChatRoom({ peerId, initial }: { peerId: number; initial: Msg[] }
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ kind: 'typing' }),
       }).catch(() => {});
+    }
+  };
+
+  const removeMsg = async (id: number) => {
+    if (!confirm('حذف هذه الرسالة؟')) return;
+    setMessages((prev) => prev.filter((m) => m.id !== id)); // optimistic
+    if (id < 0) return; // never persisted (temp bubble)
+    try {
+      await fetch(`/api/chat/${peerId}`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ messageId: id }),
+      });
+    } catch {
+      /* next poll reconciles if it failed */
     }
   };
 
@@ -103,12 +123,24 @@ export function ChatRoom({ peerId, initial }: { peerId: number; initial: Msg[] }
         {messages.map((m) => (
           <div
             key={m.id}
-            className={`max-w-[80%] rounded-2xl px-3 py-1.5 text-sm shadow-sm ${
+            className={`group max-w-[80%] rounded-2xl px-3 py-1.5 text-sm shadow-sm ${
               m.fromMe ? 'self-start rounded-tr-sm bg-[#dcf8c6] text-gray-900' : 'self-end rounded-tl-sm bg-white text-gray-900'
             }`}
           >
             <p className="whitespace-pre-wrap break-words leading-relaxed">{m.message}</p>
             <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-gray-500">
+              {/* حذف الرسالة (لرسائلي فقط) — يحذف الرسالة وحدها لا المحادثة */}
+              {m.fromMe && (
+                <button
+                  type="button"
+                  onClick={() => removeMsg(m.id)}
+                  aria-label="حذف الرسالة"
+                  title="حذف الرسالة"
+                  className="ml-auto mr-0 text-gray-400 opacity-70 transition hover:text-red-600 group-hover:opacity-100"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
               {fmtTime(m.at)}
               {m.fromMe && (m.read ? <CheckCheck className="h-3.5 w-3.5 text-sky-500" /> : <Check className="h-3.5 w-3.5" />)}
             </span>

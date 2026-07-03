@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { pollThread, sendChat, setTyping } from '@/lib/chat';
+import { pollThread, sendChat, setTyping, deleteChatMessage } from '@/lib/chat';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,4 +36,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ peerId: st
     .create({ data: { title: `رسالة جديدة من ${session.name || 'عضو'}`, route: `/messages/${session.uid}`, user_id: String(other), type: 'message' } })
     .catch(() => {});
   return Response.json({ ok: true, id });
+}
+
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ peerId: string }> }) {
+  const session = await getSession();
+  if (!session) return Response.json({ error: 'unauth' }, { status: 401 });
+  await ctx.params; // peer is implied by the message ownership check
+  const body = await req.json().catch(() => ({} as { messageId?: number }));
+  const messageId = Number(body.messageId || 0);
+  if (!messageId) return Response.json({ ok: false });
+  const ok = await deleteChatMessage(session.uid, messageId);
+  return Response.json({ ok });
 }

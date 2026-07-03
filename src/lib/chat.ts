@@ -42,8 +42,17 @@ export async function setTyping(fromId: number, toId: number) {
   ).catch(() => {});
 }
 
+/**
+ * Delete a SINGLE message. A user may delete only a message they sent
+ * (delete-for-everyone). Returns true when a row was removed.
+ */
+export async function deleteChatMessage(userId: number, messageId: number): Promise<boolean> {
+  const res = await prisma.chats.deleteMany({ where: { id: BigInt(messageId), sender_id: userId } });
+  return res.count > 0;
+}
+
 export type ChatMsg = { id: number; fromMe: boolean; message: string; at: string | null; read: boolean };
-export type PollResult = { messages: ChatMsg[]; myReadMax: number; typing: boolean };
+export type PollResult = { messages: ChatMsg[]; myReadMax: number; typing: boolean; ids: number[] };
 
 /**
  * Poll a thread: marks incoming messages as read, returns messages newer than
@@ -76,6 +85,15 @@ export async function pollThread(userId: number, otherId: number, afterId: numbe
   ).catch(() => [] as { n: number }[]);
   const typing = Number(typ[0]?.n || 0) > 0;
 
+  // Full id set of the thread so the client can drop any message the other
+  // party deleted (poll only appends new ids; this reconciles removals).
+  const allRows = await prisma.chats.findMany({
+    where: { OR: [{ sender_id: userId, reciver_id: otherId }, { sender_id: otherId, reciver_id: userId }] },
+    orderBy: { id: 'asc' },
+    take: 500,
+    select: { id: true },
+  });
+
   return {
     messages: rows.map((r) => ({
       id: toInt(r.id),
@@ -86,5 +104,6 @@ export async function pollThread(userId: number, otherId: number, afterId: numbe
     })),
     myReadMax,
     typing,
+    ids: allRows.map((r) => toInt(r.id)),
   };
 }

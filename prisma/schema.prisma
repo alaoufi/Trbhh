@@ -811,15 +811,123 @@ model store_branches {
 }
 
 model stores {
-  id          BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  user_id     Int
-  logo        Int       @default(0)
-  description String?   @db.Text
-  address     String?
-  city        Int?
-  category_id Int?
-  created_at  DateTime? @db.Timestamp(0)
-  updated_at  DateTime? @db.Timestamp(0)
+  id               BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id          Int
+  logo             Int       @default(0)
+  description      String?   @db.Text
+  address          String?
+  city             Int?
+  category_id      Int?
+  created_at       DateTime? @db.Timestamp(0)
+  updated_at       DateTime? @db.Timestamp(0)
+  // -- self-provisioned merchant columns (see src/data/schema-sync.ts) --
+  store_name       String?   @db.VarChar(120)
+  brand_color      String?   @db.VarChar(9)
+  about            String?   @db.Text
+  banner           String?   @db.VarChar(16)
+  tagline          String?   @db.VarChar(160)
+  status           Int       @default(1) @db.TinyInt
+  home_featured    Int       @default(0) @db.TinyInt
+  layout           String?   @db.VarChar(16)
+  catalog          String?   @db.VarChar(16)
+  catalog_fields   String?   @db.VarChar(120)
+  activity_since   String?   @db.VarChar(20)
+  specialty        String?   @db.VarChar(120)
+  audience         String?   @db.VarChar(160)
+  show_on_platform Int       @default(0) @db.TinyInt
+  national_id      String?   @db.VarChar(30)
+  store_phone      String?   @db.VarChar(24)
+  store_email      String?   @db.VarChar(120)
+  contacts         String?   @db.VarChar(500)
+  terms_agreed     Int       @default(0) @db.TinyInt
+  terms_agreed_at  DateTime? @db.Timestamp(0)
+}
+
+// ---- self-provisioned tables (source of truth: src/data/schema-sync.ts) ----
+
+model store_offers {
+  id         Int       @id @default(autoincrement())
+  from_store Int
+  to_store   Int
+  kind       String    @db.VarChar(12)
+  status     Int       @default(0) @db.TinyInt
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@unique([from_store, to_store, kind], map: "uniq_offer")
+}
+
+model store_follows {
+  store_id   Int
+  user_id    Int
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@id([store_id, user_id])
+}
+
+model store_reviews {
+  id         Int       @id @default(autoincrement())
+  store_id   Int
+  user_id    Int
+  star       Int       @default(5) @db.TinyInt
+  note       String?   @db.VarChar(500)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@unique([store_id, user_id], map: "uniq_store_user")
+}
+
+model store_warnings {
+  id         Int       @id @default(autoincrement())
+  store_id   Int
+  reason     String?   @db.VarChar(300)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model dup_attempts {
+  user_id    BigInt    @id @db.UnsignedBigInt
+  count      Int       @default(0)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model user_strikes {
+  user_id    BigInt    @db.UnsignedBigInt
+  kind       String    @db.VarChar(16)
+  count      Int       @default(0)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@id([user_id, kind])
+}
+
+model mod_log {
+  id         Int       @id @default(autoincrement())
+  user_id    BigInt    @db.UnsignedBigInt
+  kind       String    @db.VarChar(16)
+  category   String?   @db.VarChar(16)
+  term       String?   @db.VarChar(160)
+  snippet    String?   @db.VarChar(300)
+  action     String    @db.VarChar(16)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([user_id], map: "mod_log_user")
+  @@index([created_at], map: "mod_log_created")
+}
+
+model admin_perms {
+  user_id BigInt @db.UnsignedBigInt
+  perm    String @db.VarChar(40)
+
+  @@id([user_id, perm])
+}
+
+model admin_roles {
+  user_id BigInt @id @db.UnsignedBigInt
+  role    String @db.VarChar(20)
+}
+
+model role_perms {
+  role String @db.VarChar(20)
+  perm String @db.VarChar(40)
+
+  @@id([role, perm])
 }
 
 model sub_categories {
@@ -902,6 +1010,7 @@ model users {
   remember_token            String?    @db.Text
   type                      users_type
   ban                       users_ban  @default(no)
+  ban_until                 DateTime?  @db.DateTime(0) // self-provisioned: temporary-ban expiry
   token                     String?    @db.Text
   user_ip                   String?    @db.Text
   country_id                Int?

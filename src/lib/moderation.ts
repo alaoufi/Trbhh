@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from './prisma';
+import { ensureSchema } from '@/data/schema-sync';
 import type { GuardCategory } from './content-guard';
 
 /** Max duplicate attempts before the account is banned. */
@@ -19,44 +20,7 @@ export const FLOOD = {
   perHour: 12, // max publishes in a rolling hour
 };
 
-let ensured = false;
-async function ensureTables() {
-  if (ensured) return;
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS dup_attempts (
-      user_id BIGINT UNSIGNED NOT NULL,
-      count INT NOT NULL DEFAULT 0,
-      updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (user_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-  // generic strike counter keyed by (user, kind): content | flood | …
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS user_strikes (
-      user_id BIGINT UNSIGNED NOT NULL,
-      kind VARCHAR(16) NOT NULL,
-      count INT NOT NULL DEFAULT 0,
-      updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (user_id, kind)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-  // audit trail the admin can review
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS mod_log (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id BIGINT UNSIGNED NOT NULL,
-      kind VARCHAR(16) NOT NULL,
-      category VARCHAR(16) NULL,
-      term VARCHAR(160) NULL,
-      snippet VARCHAR(300) NULL,
-      action VARCHAR(16) NOT NULL,
-      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-      INDEX mod_log_user (user_id),
-      INDEX mod_log_created (created_at)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-  ensured = true;
-}
+const ensureTables = ensureSchema;
 
 /** Increment a user's duplicate-attempt counter and return the new total. */
 export async function bumpDupAttempts(userId: number): Promise<number> {
@@ -97,12 +61,7 @@ export async function banUser(userId: number) {
 }
 
 /* ---- ban duration (temporary N days / permanent) ---- */
-let banColEnsured = false;
-async function ensureBanCol() {
-  if (banColEnsured) return;
-  await prisma.$executeRawUnsafe(`ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`).catch(() => {});
-  banColEnsured = true;
-}
+const ensureBanCol = ensureSchema;
 
 /** Auto-lift any temporary bans whose end date has passed. */
 export async function liftExpiredBans() {

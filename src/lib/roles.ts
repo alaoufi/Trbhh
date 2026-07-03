@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from './prisma';
 import { getSession } from './auth';
 import { getSetting, setSetting } from './settings';
+import { ensureSchema } from '@/data/schema-sync';
 
 export type Service =
   | 'users' | 'ads' | 'duplicates' | 'classified' | 'categories'
@@ -106,14 +107,7 @@ export const DEFAULT_ROLE_PERMS: Record<Role, string[]> = {
 let rolePermsEnsured = false;
 async function ensureRolePerms() {
   if (rolePermsEnsured) return;
-  await ensureTables();
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS role_perms (
-      role VARCHAR(20) NOT NULL,
-      perm VARCHAR(40) NOT NULL,
-      PRIMARY KEY (role, perm)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `).catch(() => {});
+  await ensureSchema(); // DDL consolidated in data/schema-sync
   // seed sensible defaults exactly once (so clearing a role later isn't reseeded)
   const seeded = await getSetting('role_perms_seeded', '0').catch(() => '0');
   if (seeded !== '1') {
@@ -174,26 +168,7 @@ export async function viewerRole(): Promise<Role> {
   return session ? 'member' : 'visitor';
 }
 
-let ensured = false;
-async function ensureTables() {
-  if (ensured) return;
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS admin_perms (
-      user_id BIGINT UNSIGNED NOT NULL,
-      perm VARCHAR(40) NOT NULL,
-      PRIMARY KEY (user_id, perm)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-  // legacy preset table (kept for back-compat with earlier assignments)
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS admin_roles (
-      user_id BIGINT UNSIGNED NOT NULL,
-      role VARCHAR(20) NOT NULL,
-      PRIMARY KEY (user_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-  ensured = true;
-}
+const ensureTables = ensureSchema;
 
 /** The full set of granular permission keys granted to a user. */
 export async function getUserPermKeys(userId: number): Promise<Set<string>> {

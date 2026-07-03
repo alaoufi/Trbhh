@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from './prisma';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { toInt } from './utils';
+import { ensureSchema } from '@/data/schema-sync';
 
 async function logoUrl(logoId: number | null): Promise<string> {
   if (!logoId) return PLACEHOLDER;
@@ -14,63 +15,7 @@ async function logoUrl(logoId: number | null): Promise<string> {
  * branding (name/color/about), admin approval status, followers and reviews.
  * New columns/tables are self-provisioned (the legacy DB has no migrations).
  */
-let ensured = false;
-async function ensure() {
-  if (ensured) return;
-  // status default 1 so pre-existing stores stay visible; new stores are set to 0 (pending) on creation.
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN store_name VARCHAR(120) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN brand_color VARCHAR(9) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN about TEXT NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN banner VARCHAR(16) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN tagline VARCHAR(160) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN status TINYINT NOT NULL DEFAULT 1`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN home_featured TINYINT NOT NULL DEFAULT 0`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN layout VARCHAR(16) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN catalog VARCHAR(16) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN catalog_fields VARCHAR(120) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN activity_since VARCHAR(20) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN specialty VARCHAR(120) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN audience VARCHAR(160) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN show_on_platform TINYINT NOT NULL DEFAULT 0`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN national_id VARCHAR(30) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN store_phone VARCHAR(24) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN store_email VARCHAR(120) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN contacts VARCHAR(500) NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN terms_agreed TINYINT NOT NULL DEFAULT 0`).catch(() => {});
-  // offers: store↔store collaboration ('collab') and admin→store home feature ('home')
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS store_offers (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      from_store INT NOT NULL,
-      to_store INT NOT NULL,
-      kind VARCHAR(12) NOT NULL,
-      status TINYINT NOT NULL DEFAULT 0,
-      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE KEY uniq_offer (from_store, to_store, kind)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`).catch(() => {});
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS store_follows (
-      store_id INT NOT NULL, user_id INT NOT NULL,
-      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (store_id, user_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`).catch(() => {});
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS store_reviews (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      store_id INT NOT NULL, user_id INT NOT NULL,
-      star TINYINT NOT NULL DEFAULT 5, note VARCHAR(500) NULL,
-      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE KEY uniq_store_user (store_id, user_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`).catch(() => {});
-  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN terms_agreed_at TIMESTAMP NULL`).catch(() => {});
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS store_warnings (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      store_id INT NOT NULL, reason VARCHAR(300) NULL,
-      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`).catch(() => {});
-  ensured = true;
-}
+const ensure = ensureSchema;
 
 export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; onPlatform: boolean; nationalId: string | null; phone: string | null; email: string | null; contacts: string | null; termsAgreed: boolean; termsAgreedAt: string | null; status: number };
 

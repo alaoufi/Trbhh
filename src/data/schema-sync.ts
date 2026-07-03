@@ -1,0 +1,136 @@
+import 'server-only';
+import { prisma } from '@/lib/prisma';
+
+/**
+ * Single source of truth for every column/table the app self-provisions on the
+ * legacy database. Consolidates the DDL that used to be scattered across
+ * per-module `ensure()` functions (merchant, moderation, roles, …).
+ *
+ * - Every statement is idempotent (CREATE IF NOT EXISTS; ALTER swallowed when
+ *   the column already exists), so re-running is always safe.
+ * - Promise-cached: concurrent first requests share one run (the old
+ *   per-module `let ensured = false` flags raced on cold start).
+ * - Invoked once at server boot via src/instrumentation.ts, and lazily by the
+ *   data modules as a belt-and-suspenders guard.
+ *
+ * NOTE (Phase 2 of docs/REBUILD-PLAN.md): this module is the stepping stone to
+ * real `prisma migrate` baselining — the DDL below must stay in lockstep with
+ * prisma/schema.prisma, which now declares all of these columns/tables.
+ */
+
+const STATEMENTS: string[] = [
+  /* ---- stores: merchant branding & business metadata ---- */
+  `ALTER TABLE stores ADD COLUMN store_name VARCHAR(120) NULL`,
+  `ALTER TABLE stores ADD COLUMN brand_color VARCHAR(9) NULL`,
+  `ALTER TABLE stores ADD COLUMN about TEXT NULL`,
+  `ALTER TABLE stores ADD COLUMN banner VARCHAR(16) NULL`,
+  `ALTER TABLE stores ADD COLUMN tagline VARCHAR(160) NULL`,
+  `ALTER TABLE stores ADD COLUMN status TINYINT NOT NULL DEFAULT 1`,
+  `ALTER TABLE stores ADD COLUMN home_featured TINYINT NOT NULL DEFAULT 0`,
+  `ALTER TABLE stores ADD COLUMN layout VARCHAR(16) NULL`,
+  `ALTER TABLE stores ADD COLUMN catalog VARCHAR(16) NULL`,
+  `ALTER TABLE stores ADD COLUMN catalog_fields VARCHAR(120) NULL`,
+  `ALTER TABLE stores ADD COLUMN activity_since VARCHAR(20) NULL`,
+  `ALTER TABLE stores ADD COLUMN specialty VARCHAR(120) NULL`,
+  `ALTER TABLE stores ADD COLUMN audience VARCHAR(160) NULL`,
+  `ALTER TABLE stores ADD COLUMN show_on_platform TINYINT NOT NULL DEFAULT 0`,
+  `ALTER TABLE stores ADD COLUMN national_id VARCHAR(30) NULL`,
+  `ALTER TABLE stores ADD COLUMN store_phone VARCHAR(24) NULL`,
+  `ALTER TABLE stores ADD COLUMN store_email VARCHAR(120) NULL`,
+  `ALTER TABLE stores ADD COLUMN contacts VARCHAR(500) NULL`,
+  `ALTER TABLE stores ADD COLUMN terms_agreed TINYINT NOT NULL DEFAULT 0`,
+  `ALTER TABLE stores ADD COLUMN terms_agreed_at TIMESTAMP NULL`,
+
+  /* ---- store relations ---- */
+  `CREATE TABLE IF NOT EXISTS store_offers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    from_store INT NOT NULL,
+    to_store INT NOT NULL,
+    kind VARCHAR(12) NOT NULL,
+    status TINYINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_offer (from_store, to_store, kind)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS store_follows (
+    store_id INT NOT NULL, user_id INT NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (store_id, user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS store_reviews (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    store_id INT NOT NULL, user_id INT NOT NULL,
+    star TINYINT NOT NULL DEFAULT 5, note VARCHAR(500) NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_store_user (store_id, user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS store_warnings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    store_id INT NOT NULL, reason VARCHAR(300) NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  /* ---- moderation ---- */
+  `ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`,
+  `CREATE TABLE IF NOT EXISTS dup_attempts (
+    user_id BIGINT UNSIGNED NOT NULL,
+    count INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS user_strikes (
+    user_id BIGINT UNSIGNED NOT NULL,
+    kind VARCHAR(16) NOT NULL,
+    count INT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, kind)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS mod_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    kind VARCHAR(16) NOT NULL,
+    category VARCHAR(16) NULL,
+    term VARCHAR(160) NULL,
+    snippet VARCHAR(300) NULL,
+    action VARCHAR(16) NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX mod_log_user (user_id),
+    INDEX mod_log_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  /* ---- roles & permissions ---- */
+  `CREATE TABLE IF NOT EXISTS admin_perms (
+    user_id BIGINT UNSIGNED NOT NULL,
+    perm VARCHAR(40) NOT NULL,
+    PRIMARY KEY (user_id, perm)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS admin_roles (
+    user_id BIGINT UNSIGNED NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    PRIMARY KEY (user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS role_perms (
+    role VARCHAR(20) NOT NULL,
+    perm VARCHAR(40) NOT NULL,
+    PRIMARY KEY (role, perm)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+];
+
+let syncPromise: Promise<void> | null = null;
+
+async function run(): Promise<void> {
+  for (const sql of STATEMENTS) {
+    // Best-effort: "duplicate column" on re-run is expected and harmless.
+    await prisma.$executeRawUnsafe(sql).catch(() => {});
+  }
+}
+
+/** Idempotent schema sync — shared promise so concurrent callers run it once. */
+export function ensureSchema(): Promise<void> {
+  if (!syncPromise) {
+    syncPromise = run().catch((e) => {
+      syncPromise = null; // allow retry on a later call
+      throw e;
+    });
+  }
+  return syncPromise;
+}

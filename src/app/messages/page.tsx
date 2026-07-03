@@ -22,7 +22,7 @@ export default async function MessagesPage() {
  </Link>
  </div>
  {convos.length === 0 && (
- <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
+ <div className="card-3d rounded-2xl p-8 text-center text-muted-foreground">
  <MessageCircle className="mx-auto mb-2 h-8 w-8" />
  لا توجد محادثات بعد.
  </div>

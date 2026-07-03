@@ -20,7 +20,7 @@ export default async function NotificationsPage() {
  <div className="mx-auto max-w-2xl space-y-4">
  <div className="flex items-center gap-2"><Bell className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold">التنبيهات</h1></div>
  {rows.length === 0 && (
- <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
+ <div className="card-3d rounded-2xl p-8 text-center text-muted-foreground">
  <Bell className="mx-auto mb-2 h-8 w-8" /> لا توجد تنبيهات.
  </div>
  )}

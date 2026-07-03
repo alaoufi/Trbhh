@@ -127,15 +127,17 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
           </span>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-1 p-2">
-        <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-tight text-foreground/90">{ad.title}</h3>
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+      <div className="flex flex-1 flex-col gap-0.5 p-2">
+        <h3 className="line-clamp-2 min-h-[2.2rem] text-[13px] font-bold leading-snug text-foreground/90">{ad.title}</h3>
+        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
           <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" /> {new Intl.NumberFormat('en-US').format(ad.views)}</span>
-          {ad.cityName && <span className="flex items-center gap-0.5 truncate"><MapPin className="h-3 w-3" /> {ad.cityName}</span>}
+          {ad.cityName && <span className="flex min-w-0 items-center gap-0.5 truncate"><MapPin className="h-3 w-3 shrink-0" /> <span className="truncate">{ad.cityName}</span></span>}
         </div>
-        <div className="mt-auto flex items-end justify-between gap-1 pt-1">
-          <span className="text-lg font-extrabold text-red-600">{formatPrice(ad.price)}</span>
-          <span className="text-[10px] text-muted-foreground">{timeShort(ad.createdAt)}</span>
+        <div className="mt-auto flex items-end justify-between gap-1 pt-0.5">
+          {ad.price > 0
+            ? <span className="truncate text-[15px] font-extrabold text-red-600">{new Intl.NumberFormat('en-US').format(ad.price)} <span className="text-[11px] font-bold">ر.س</span></span>
+            : <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-700">على السوم</span>}
+          <span className="shrink-0 text-[9px] text-muted-foreground">{timeShort(ad.createdAt)}</span>
         </div>
       </div>
     </Link>

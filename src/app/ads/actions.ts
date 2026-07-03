@@ -16,6 +16,7 @@ import { scanImages, imageModerationEnabled } from '@/lib/nsfw';
 import { parseMapsUrl, type LatLng } from '@/lib/maps';
 import { toInt } from '@/lib/utils';
 import { isApprovedStoreOwner } from '@/lib/merchant';
+import { normalizeAr, similarity, isKeywordStuffing } from '@/domain/text';
 
 /** Resolve coordinates from a pasted maps link — follows shortened goo.gl links. */
 async function resolveMapsUrl(input: string): Promise<LatLng | null> {
@@ -84,57 +85,6 @@ async function storeImages(images: PreparedImage[], userId: number, adId: bigint
       // skip a problematic image rather than failing the whole publish
     }
   }
-}
-
-/** Normalize Arabic text for duplicate comparison. */
-function normalizeAr(s: string): string {
-  return s
-    .normalize('NFKD')
-    .replace(/[ً-ْٰ]/g, '') // diacritics
-    .replace(/[آأإا]/g, 'ا') // alef variants
-    .replace(/ى/g, 'ي') // alef maqsura -> ya
-    .replace(/ة/g, 'ه') // ta marbuta -> ha
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ') // drop punctuation/emoji
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
-/** Token-overlap (Jaccard) similarity between two normalized strings. */
-function similarity(a: string, b: string): number {
-  const ta = new Set(a.split(' ').filter(Boolean));
-  const tb = new Set(b.split(' ').filter(Boolean));
-  if (!ta.size || !tb.size) return 0;
-  let inter = 0;
-  for (const t of ta) if (tb.has(t)) inter++;
-  return inter / (ta.size + tb.size - inter);
-}
-
-/**
- * Detect keyword-stuffing (حشو الكلمات): the same word or short phrase repeated
- * many times to manipulate Google search. Returns true when the text is spammy.
- */
-function isKeywordStuffing(title: string, detail: string): boolean {
-  const words = normalizeAr(`${title} ${detail}`).split(' ').filter((w) => w.length >= 3);
-  if (words.length < 8) return false;
-
-  // 1) a single word dominating the text (e.g. "تأجير تأجير تأجير …")
-  const freq = new Map<string, number>();
-  for (const w of words) freq.set(w, (freq.get(w) || 0) + 1);
-  let topCount = 0;
-  for (const c of freq.values()) if (c > topCount) topCount = c;
-  if (topCount >= 6 && topCount / words.length >= 0.28) return true;
-  if (topCount >= 12) return true; // extreme absolute repetition regardless of length
-
-  // 2) a repeated adjacent phrase (bigram), e.g. "رافعة شوكية رافعة شوكية …"
-  const bigrams = new Map<string, number>();
-  for (let i = 0; i < words.length - 1; i++) {
-    const key = `${words[i]} ${words[i + 1]}`;
-    bigrams.set(key, (bigrams.get(key) || 0) + 1);
-  }
-  for (const c of bigrams.values()) if (c >= 4) return true;
-
-  return false;
 }
 
 /**

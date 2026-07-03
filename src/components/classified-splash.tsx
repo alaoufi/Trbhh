@@ -170,9 +170,9 @@ export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
                 </div>
               ))}
             </div>
-            {/* تحت آخر إعلان — بارز وقريب من العين */}
-            <div className="mx-auto mt-7 flex max-w-2xl flex-col items-center gap-2 pb-2">
-              <button onClick={enterSite} className="flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl bg-white py-3.5 text-base font-extrabold text-primary shadow-xl hover:bg-white/90">
+            {/* تحت آخر إعلان — بارز وقريب من العين (زر واحد فقط بلا تكرار) */}
+            <div className="mx-auto mt-7 flex max-w-2xl flex-col items-center gap-2 pb-4">
+              <button onClick={enterSite} className="flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-base font-extrabold text-slate-900 shadow-xl ring-1 ring-amber-200/60 hover:bg-amber-300">
                 <Home className="h-5 w-5" /> الصفحة الرئيسية
               </button>
               <button onClick={togglePause} className="flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white hover:bg-white/25">
@@ -181,16 +181,6 @@ export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
             </div>
           </>
         )}
-      </div>
-
-      {/* sticky footer controls */}
-      <div className="flex items-center justify-center gap-2 border-t border-white/10 bg-black/40 px-4 py-3">
-        <button onClick={togglePause} className="flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/25">
-          {paused ? <><Play className="h-4 w-4" /> متابعة</> : <><Pause className="h-4 w-4" /> البقاء</>}
-        </button>
-        <button onClick={enterSite} className="flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-sm font-bold text-primary hover:bg-white/90">
-          <Home className="h-4 w-4" /> الصفحة الرئيسية
-        </button>
       </div>
     </div>
   );

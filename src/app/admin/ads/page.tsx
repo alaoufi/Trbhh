@@ -63,7 +63,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
         {ads.map((a) => (
           <div key={toInt(a.id)} className="flex flex-wrap items-center gap-2 card-3d rounded-xl p-3">
             <Link href={`/ads/${toInt(a.id)}`} className="min-w-0 flex-1 truncate font-medium hover:text-primary">{a.title}</Link>
-            <span className="text-sm text-primary">{formatPrice(a.price)}</span>
+            <span className="text-sm text-primary">{formatPrice(a.price, 'ر.س', a.adsType)}</span>
             {a.adsSpecial === 'checked' && <Badge variant="special">مميّز</Badge>}
             <Badge variant={a.status === 1 ? 'trusted' : a.data_archive ? 'muted' : 'special'}>{a.status === 1 ? 'نشط' : a.data_archive ? 'مؤرشف' : 'بانتظار الموافقة'}</Badge>
             <span className="text-xs text-muted-foreground">{timeAgo(a.created_at)}</span>

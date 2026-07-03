@@ -45,7 +45,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                   <Badge variant={ad.status === 1 ? 'trusted' : 'special'}>{ad.status === 1 ? 'نشط' : 'بانتظار الموافقة'}</Badge>
                 </div>
               </div>
-              <span className="text-sm font-bold text-primary">{formatPrice(ad.price)}</span>
+              <span className="text-sm font-bold text-primary">{formatPrice(ad.price, 'ر.س', ad.adsType)}</span>
               <span className="text-xs text-muted-foreground">{timeAgo(ad.createdAt)}</span>
               <div className="mt-auto flex gap-2 pt-2">
                 <Link href={`/ads/${ad.id}/edit`} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Pencil className="h-3 w-3" /> تعديل</Link>

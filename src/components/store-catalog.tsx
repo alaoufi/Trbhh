@@ -23,7 +23,9 @@ export function StoreCatalog({ ads, style, fields, brand }: { ads: CatalogAd[]; 
   const priceEl = (ad: CatalogAd, size = 'text-[15px]') =>
     ad.price > 0
       ? <span className={cn('font-extrabold text-red-600', size)}>{en(ad.price)} <span className="text-[11px] font-bold">ر.س</span></span>
-      : <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-700">على السوم</span>;
+      : ad.adsType === 'request'
+        ? <span className="rounded bg-secondary/60 px-1.5 py-0.5 text-[11px] font-bold text-muted-foreground">مطلوب</span>
+        : <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-700">على السوم</span>;
   const typeBadge = (ad: CatalogAd) => {
     const isReq = ad.adsType === 'request';
     return <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-extrabold text-white', isReq ? 'bg-amber-500' : 'bg-primary')}>{isReq ? 'طلب' : 'عرض'}</span>;

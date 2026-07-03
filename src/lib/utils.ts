@@ -22,9 +22,11 @@ export function timeAgo(date: Date | string | null | undefined): string {
   return `قبل ${Math.floor(months / 12)} سنة`;
 }
 
-/** Format a price with Arabic thousands separators; "على السوم" when zero/empty. */
-export function formatPrice(price: number | null | undefined, currency = 'ر.س'): string {
-  if (!price || price <= 0) return 'على السوم';
+/** Format a price with Arabic thousands separators. When there's no price:
+ *  "على السوم" for an offer (open to bargaining), but "مطلوب" for a request
+ *  (طلب) — a request must never read "على السوم". */
+export function formatPrice(price: number | null | undefined, currency = 'ر.س', adsType?: string | null): string {
+  if (!price || price <= 0) return adsType === 'request' ? 'مطلوب' : 'على السوم';
   return `${new Intl.NumberFormat('en-US').format(price)} ${currency}`;
 }
 

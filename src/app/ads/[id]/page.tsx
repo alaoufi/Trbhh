@@ -156,7 +156,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
 
       {/* Price + description */}
       <div className="card-3d rounded-2xl p-4">
-        <div className="mb-3 text-2xl font-bold text-primary">{formatPrice(ad.price)}</div>
+        <div className="mb-3 text-2xl font-bold text-primary">{ad.price > 0 ? formatPrice(ad.price) : ad.adsType === 'request' ? 'مطلوب' : 'على السوم'}</div>
         <p className="whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
       </div>
 

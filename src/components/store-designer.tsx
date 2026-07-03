@@ -26,7 +26,6 @@ export function StoreDesigner({ initial }: { initial: Initial }) {
   const [fields, setFields] = useState<Set<string>>(new Set((initial.fields || DEFAULT_CATALOG_FIELDS).split(',').filter(Boolean)));
   const isNew = !initial.color;
   const [pickedTpl, setPickedTpl] = useState<string>('');
-  const [tab, setTab] = useState<'layouts' | 'themes'>('layouts');
   const tk = layoutTokens(layout);
 
   const applyTheme = (t: (typeof STORE_TEMPLATES)[number]) => { setColor(t.color); setBanner(t.banner); setPickedTpl(t.id); };
@@ -42,59 +41,49 @@ export function StoreDesigner({ initial }: { initial: Initial }) {
           {isNew && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white">اختر بداية جاهزة</span>}
         </div>
 
-        {/* تبويب القوالب / التيمات */}
-        <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-white p-1 text-sm font-bold shadow-sm">
-          <button type="button" onClick={() => setTab('layouts')} className={`flex items-center justify-center gap-1.5 rounded-lg py-2 ${tab === 'layouts' ? 'bg-primary text-white' : 'text-muted-foreground'}`}><LayoutTemplate className="h-4 w-4" /> القوالب</button>
-          <button type="button" onClick={() => setTab('themes')} className={`flex items-center justify-center gap-1.5 rounded-lg py-2 ${tab === 'themes' ? 'bg-primary text-white' : 'text-muted-foreground'}`}><Palette className="h-4 w-4" /> التيمات</button>
+        {/* 1) القوالب — شكل الواجهة */}
+        <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-extrabold text-foreground"><LayoutTemplate className="h-4 w-4 text-primary" /> ١) القوالب <span className="font-normal text-muted-foreground">— شكل الواجهة</span></div>
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {STORE_LAYOUTS.map((l) => {
+            const lt = layoutTokens(l.id);
+            const on = layout === l.id;
+            return (
+              <button type="button" key={l.id} onClick={() => setLayout(l.id)}
+                className={`overflow-hidden rounded-xl border-2 bg-white text-right transition ${on ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:-translate-y-0.5'}`}>
+                {/* wireframe mini-preview */}
+                <span className="relative block h-14 w-full p-1.5">
+                  <span className={`flex h-8 w-full overflow-hidden ${lt.card === 'rounded-lg' ? 'rounded-md' : 'rounded-lg'} ${lt.align === 'center' ? 'flex-col items-center justify-center gap-0.5' : 'items-end gap-1 p-1'}`} style={{ background: bannerBackground(banner, color) }}>
+                    <span className={`block ${lt.align === 'center' ? 'h-3 w-3' : 'h-4 w-4'} ${lt.logo === 'rounded-full' ? 'rounded-full' : 'rounded-[3px]'} border border-white bg-white/90`} />
+                    <span className={`block h-1 ${lt.align === 'center' ? 'w-6' : 'w-8'} rounded bg-white/80`} />
+                  </span>
+                  <span className="mt-1 flex gap-1"><span className="h-2 flex-1 rounded bg-muted" /><span className="h-2 flex-1 rounded bg-muted" /></span>
+                  {on && <span className="absolute right-1.5 top-1.5 grid h-4 w-4 place-items-center rounded-full bg-primary text-white"><Check className="h-3 w-3" /></span>}
+                </span>
+                <span className="block px-2 py-1">
+                  <span className="block text-[11px] font-bold text-foreground">{l.name}</span>
+                  <span className="block text-[9px] text-muted-foreground">{l.desc}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        {tab === 'layouts' ? (
-          <>
-            <p className="mb-2 text-xs text-muted-foreground">القالب يحدّد شكل واجهة متجرك وترتيبها.</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {STORE_LAYOUTS.map((l) => {
-                const lt = layoutTokens(l.id);
-                const on = layout === l.id;
-                return (
-                  <button type="button" key={l.id} onClick={() => setLayout(l.id)}
-                    className={`overflow-hidden rounded-xl border-2 text-right transition ${on ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:-translate-y-0.5'}`}>
-                    {/* wireframe mini-preview */}
-                    <span className="relative block h-14 w-full bg-white p-1.5">
-                      <span className={`flex h-8 w-full overflow-hidden ${lt.card === 'rounded-lg' ? 'rounded-md' : 'rounded-lg'} ${lt.align === 'center' ? 'flex-col items-center justify-center gap-0.5' : 'items-end gap-1 p-1'}`} style={{ background: bannerBackground(banner, color) }}>
-                        <span className={`block ${lt.align === 'center' ? 'h-3 w-3' : 'h-4 w-4'} ${lt.logo === 'rounded-full' ? 'rounded-full' : 'rounded-[3px]'} border border-white bg-white/90`} />
-                        <span className={`block h-1 ${lt.align === 'center' ? 'w-6' : 'w-8'} rounded bg-white/80`} />
-                      </span>
-                      <span className="mt-1 flex gap-1"><span className="h-2 flex-1 rounded bg-muted" /><span className="h-2 flex-1 rounded bg-muted" /></span>
-                      {on && <span className="absolute right-1.5 top-1.5 grid h-4 w-4 place-items-center rounded-full bg-primary text-white"><Check className="h-3 w-3" /></span>}
-                    </span>
-                    <span className="block bg-white px-2 py-1">
-                      <span className="block text-[11px] font-bold text-foreground">{l.name}</span>
-                      <span className="block text-[9px] text-muted-foreground">{l.desc}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="mb-2 text-xs text-muted-foreground">التيم يضبط لون الهوية ونمط الواجهة بلمسة واحدة.</p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {STORE_TEMPLATES.map((t) => (
-                <button type="button" key={t.id} onClick={() => applyTheme(t)}
-                  className={`overflow-hidden rounded-xl border-2 text-right transition ${pickedTpl === t.id ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:-translate-y-0.5'}`}>
-                  <span className="relative flex h-12 w-full items-end" style={{ background: bannerBackground(t.banner, t.color) }}>
-                    {pickedTpl === t.id && <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-white text-primary shadow"><Check className="h-3.5 w-3.5" /></span>}
-                  </span>
-                  <span className="block bg-white px-2 py-1">
-                    <span className="block text-[11px] font-bold text-foreground">{t.name}</span>
-                    <span className="block text-[9px] text-muted-foreground">{t.vibe}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+        {/* 2) التيمات — الألوان */}
+        <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-extrabold text-foreground"><Palette className="h-4 w-4 text-primary" /> ٢) التيمات <span className="font-normal text-muted-foreground">— باقة الألوان</span></div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {STORE_TEMPLATES.map((t) => (
+            <button type="button" key={t.id} onClick={() => applyTheme(t)}
+              className={`overflow-hidden rounded-xl border-2 bg-white text-right transition ${pickedTpl === t.id ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:-translate-y-0.5'}`}>
+              <span className="relative flex h-12 w-full items-end" style={{ background: bannerBackground(t.banner, t.color) }}>
+                {pickedTpl === t.id && <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-white text-primary shadow"><Check className="h-3.5 w-3.5" /></span>}
+              </span>
+              <span className="block px-2 py-1">
+                <span className="block text-[11px] font-bold text-foreground">{t.name}</span>
+                <span className="block text-[9px] text-muted-foreground">{t.vibe}</span>
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ===== معاينة حيّة تعكس القالب ===== */}

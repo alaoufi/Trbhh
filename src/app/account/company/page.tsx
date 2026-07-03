@@ -88,6 +88,24 @@ export default async function ManageCompanyPage() {
         <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><Palette className="h-5 w-5" /> مصمّم المتجر الذكي</div>
         <StoreDesigner initial={{ storeName: meta?.storeName, color: meta?.color, banner: meta?.banner, tagline: meta?.tagline, about: meta?.about, layout: meta?.layout, catalog: meta?.catalog, fields: meta?.fields, logoUrl }} />
         <div><label className="mb-1 block text-sm font-medium">شعار المتجر (صورة)</label><input name="logo" type="file" accept="image/*" className="w-full rounded-lg border bg-background p-2 text-sm" /></div>
+
+        {/* بيانات النشاط التجاري */}
+        <div className="space-y-3 rounded-xl border-2 border-primary/15 bg-secondary/20 p-3">
+          <div className="text-sm font-extrabold text-primary">بيانات النشاط التجاري</div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">تخصّص المتجر</label>
+            <input name="specialty" defaultValue={meta?.specialty ?? ''} maxLength={120} className={field} placeholder="مثال: إلكترونيات ومستلزمات الجوّال" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">الطبقة المستهدفة</label>
+            <input name="audience" defaultValue={meta?.audience ?? ''} maxLength={160} className={field} placeholder="مثال: أصحاب المشاريع الصغيرة والأفراد" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">تاريخ مزاولة النشاط <span className="text-muted-foreground">(اختياري)</span></label>
+            <input name="since" type="date" defaultValue={meta?.since ?? ''} className={field} />
+          </div>
+        </div>
+
         <div><label className="mb-1 block text-sm font-medium">وصف النشاط / ملف الأعمال</label><textarea name="description" defaultValue={store?.description ?? ''} rows={4} className="w-full rounded-lg border bg-background p-3 text-sm" placeholder="نبذة عن نشاط المتجر والخدمات المقدمة" /></div>
         <div><label className="mb-1 block text-sm font-medium">العنوان</label><input name="address" defaultValue={store?.address ?? ''} className={field} /></div>
         <Button>{store ? 'حفظ المتجر' : 'إنشاء المتجر'}</Button>

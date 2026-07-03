@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown } from 'lucide-react';
+import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target } from 'lucide-react';
 import { getStore } from '@/lib/stores';
 import { getMyAds } from '@/lib/account';
 import { getSession } from '@/lib/auth';
@@ -67,7 +67,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const brand = meta.color || '#3287da';
   const name = meta.storeName || s.name;
   const tier = storeTier(followers, rating.avg, rating.count);
-  const year = s.createdAt ? new Date(s.createdAt).getFullYear() : null;
+  const sinceDate = meta.since ? new Date(meta.since) : null;
+  const year = sinceDate && !isNaN(sinceDate.getTime()) ? sinceDate.getFullYear() : s.createdAt ? new Date(s.createdAt).getFullYear() : null;
   const onBrand = isLightColor(brand) ? '#0f172a' : '#ffffff';
   const tk = layoutTokens(meta.layout);
   const catalogStyle = isCatalogStyle(meta.catalog) ? meta.catalog : 'tiles';
@@ -107,10 +108,11 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           </div>
 
           <div className="p-4">
-            {/* شارات الثقة: معتمد · المستوى · عمر المتجر */}
+            {/* شارات الثقة: معتمد · المستوى · التخصص · عمر المتجر */}
             <div className="flex flex-wrap items-center gap-1.5">
               {meta.status === 1 && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white"><ShieldCheck className="h-3.5 w-3.5" /> متجر موثّق</span>}
               <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${tierStyle[tier.key]}`}>{tier.key === 'gold' && <Crown className="h-3.5 w-3.5" />}{tier.label}</span>
+              {meta.specialty && <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold text-white" style={{ background: brand }}><Tag className="h-3.5 w-3.5" /> {meta.specialty}</span>}
               {year && <span className="inline-flex items-center gap-1 rounded-full bg-secondary/60 px-2.5 py-1 text-[11px] font-bold text-muted-foreground"><CalendarDays className="h-3.5 w-3.5" /> متجر منذ {year}</span>}
             </div>
 
@@ -169,10 +171,26 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         )}
 
         {/* ===== نبذة ===== */}
-        {(meta.about || s.description) && (
-          <div id="about" className="scroll-mt-28 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
-            <h2 className="mb-2 font-bold" style={{ color: brand }}>عن المتجر</h2>
-            <p className="whitespace-pre-line leading-7 text-foreground/90">{meta.about || s.description}</p>
+        {(meta.about || s.description || meta.specialty || meta.audience) && (
+          <div id="about" className="scroll-mt-28 space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+            <h2 className="font-bold" style={{ color: brand }}>عن المتجر</h2>
+            {(meta.about || s.description) && <p className="whitespace-pre-line leading-7 text-foreground/90">{meta.about || s.description}</p>}
+            {(meta.specialty || meta.audience) && (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {meta.specialty && (
+                  <div className="flex items-start gap-2 rounded-xl bg-secondary/40 p-3">
+                    <Tag className="mt-0.5 h-4 w-4 shrink-0" style={{ color: brand }} />
+                    <div><div className="text-[11px] text-muted-foreground">التخصّص</div><div className="text-sm font-bold text-foreground/90">{meta.specialty}</div></div>
+                  </div>
+                )}
+                {meta.audience && (
+                  <div className="flex items-start gap-2 rounded-xl bg-secondary/40 p-3">
+                    <Target className="mt-0.5 h-4 w-4 shrink-0" style={{ color: brand }} />
+                    <div><div className="text-[11px] text-muted-foreground">الطبقة المستهدفة</div><div className="text-sm font-bold text-foreground/90">{meta.audience}</div></div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

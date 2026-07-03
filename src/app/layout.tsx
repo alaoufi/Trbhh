@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import { Cairo } from 'next/font/google';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import './globals.css';
 import { TopBar } from '@/components/top-bar';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { MobileNav } from '@/components/mobile-nav';
+import { ChromeGate } from '@/components/chrome-gate';
 import { PwaRegister } from '@/components/pwa-register';
 import { GeoPrompt } from '@/components/geo-prompt';
 import { ClassifiedSplash } from '@/components/classified-splash';
@@ -68,10 +69,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const validThemes = ['desert', 'agri', 'spring', 'mint', 'lavender', 'sea', 'snow', 'mountain', 'sunset', 'night'];
   const design = (await cookies()).get('design')?.value || '';
   const validDesigns = ['aurora', 'shop', 'list', 'flat', 'soft', 'sharp'];
-  // A store storefront (/companies/[id]) runs as an INDEPENDENT site: it hides the
-  // main site chrome (top bar, header, footer, mobile nav) and provides its own.
-  const pathname = (await headers()).get('x-pathname') || '';
-  const isStorefront = /^\/companies\/\d+(\/|\?|$)/.test(pathname);
   return (
     <html
       lang="ar"
@@ -81,19 +78,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       {...(validDesigns.includes(design) ? { 'data-design': design } : {})}
     >
       <body className="min-h-screen font-sans antialiased">
-        {isStorefront ? (
-          // Independent storefront shell — the page renders its own header + bottom nav.
-          <main className="min-h-screen">{children}</main>
-        ) : (
-          <>
-            <TopBar />
-            <Header />
-            <main className="container min-h-[60vh] pb-24 pt-3 md:pb-8">{children}</main>
-            <Footer />
-            <MobileNav unread={unread} />
-            <ClassifiedSplash ads={splashAds} />
-          </>
-        )}
+        {/* Storefront (/companies/[id]) = fully independent site: ChromeGate hides
+            the shared header/menu/footer, even across client-side navigation. */}
+        <ChromeGate
+          header={<><TopBar /><Header /></>}
+          footer={<><Footer /><MobileNav unread={unread} /><ClassifiedSplash ads={splashAds} /></>}
+        >
+          {children}
+        </ChromeGate>
         <GeoPrompt />
         <PwaRegister />
       </body>

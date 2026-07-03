@@ -28,6 +28,9 @@ async function ensure() {
   await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN layout VARCHAR(16) NULL`).catch(() => {});
   await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN catalog VARCHAR(16) NULL`).catch(() => {});
   await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN catalog_fields VARCHAR(120) NULL`).catch(() => {});
+  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN activity_since VARCHAR(20) NULL`).catch(() => {});
+  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN specialty VARCHAR(120) NULL`).catch(() => {});
+  await prisma.$executeRawUnsafe(`ALTER TABLE stores ADD COLUMN audience VARCHAR(160) NULL`).catch(() => {});
   // offers: store↔store collaboration ('collab') and admin→store home feature ('home')
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS store_offers (
@@ -56,19 +59,19 @@ async function ensure() {
   ensured = true;
 }
 
-export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; status: number };
+export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; status: number };
 
 export async function getStoreMeta(storeId: number): Promise<StoreMeta> {
   await ensure();
-  const rows = await prisma.$queryRawUnsafe<{ store_name: string | null; brand_color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; catalog_fields: string | null; status: number | bigint }[]>(
-    `SELECT store_name, brand_color, about, banner, tagline, layout, catalog, catalog_fields, status FROM stores WHERE id = ?`, storeId,
+  const rows = await prisma.$queryRawUnsafe<{ store_name: string | null; brand_color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; catalog_fields: string | null; activity_since: string | null; specialty: string | null; audience: string | null; status: number | bigint }[]>(
+    `SELECT store_name, brand_color, about, banner, tagline, layout, catalog, catalog_fields, activity_since, specialty, audience, status FROM stores WHERE id = ?`, storeId,
   ).catch(() => []);
   const r = rows[0];
-  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, status: Number(r?.status ?? 1) };
+  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, since: r?.activity_since ?? null, specialty: r?.specialty ?? null, audience: r?.audience ?? null, status: Number(r?.status ?? 1) };
 }
 
 /** Save branding fields on the caller's store. */
-export async function saveStoreMeta(userId: number, data: { storeName: string; color: string; about: string; banner: string; tagline: string; layout: string; catalog: string; fields: string }) {
+export async function saveStoreMeta(userId: number, data: { storeName: string; color: string; about: string; banner: string; tagline: string; layout: string; catalog: string; fields: string; since: string; specialty: string; audience: string }) {
   await ensure();
   const { isCatalogStyle, cleanFields, DEFAULT_CATALOG_FIELDS } = await import('./store-style');
   const banner = ['gradient', 'mesh', 'aurora', 'sunset', 'night', 'solid'].includes(data.banner) ? data.banner : 'gradient';
@@ -76,8 +79,9 @@ export async function saveStoreMeta(userId: number, data: { storeName: string; c
   const catalog = isCatalogStyle(data.catalog) ? data.catalog : 'tiles';
   const fields = cleanFields(data.fields || DEFAULT_CATALOG_FIELDS) || DEFAULT_CATALOG_FIELDS;
   await prisma.$executeRawUnsafe(
-    `UPDATE stores SET store_name = ?, brand_color = ?, about = ?, banner = ?, tagline = ?, layout = ?, catalog = ?, catalog_fields = ? WHERE user_id = ?`,
-    data.storeName.slice(0, 120) || null, /^#[0-9a-fA-F]{6}$/.test(data.color) ? data.color : null, data.about.slice(0, 2000) || null, banner, data.tagline.slice(0, 160) || null, layout, catalog, fields, userId,
+    `UPDATE stores SET store_name = ?, brand_color = ?, about = ?, banner = ?, tagline = ?, layout = ?, catalog = ?, catalog_fields = ?, activity_since = ?, specialty = ?, audience = ? WHERE user_id = ?`,
+    data.storeName.slice(0, 120) || null, /^#[0-9a-fA-F]{6}$/.test(data.color) ? data.color : null, data.about.slice(0, 2000) || null, banner, data.tagline.slice(0, 160) || null, layout, catalog, fields,
+    data.since.slice(0, 20) || null, data.specialty.slice(0, 120) || null, data.audience.slice(0, 160) || null, userId,
   ).catch(() => {});
 }
 

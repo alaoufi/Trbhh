@@ -12,7 +12,7 @@ export default async function AdminHome() {
   const session = await requireAnyAdmin();
   const [s, perms, role, packages, pendingPromos] = await Promise.all([adminStats(), getUserPerms(session.uid), getUserRole(session.uid), getPackages().catch(() => []), countPendingPromos().catch(() => 0)]);
   const allCards: { label: string; value: number; icon: React.ElementType; href: string; highlight?: boolean; perm: Perm | null }[] = [
-    { label: 'إعلانات بانتظار الموافقة', value: s.pendingAds, icon: Clock, href: '/admin/ads?pending=1', highlight: true, perm: 'ads' },
+    { label: 'إعلانات بانتظار الموافقة', value: s.pendingAds, icon: Clock, href: '/admin/ads?view=pending', highlight: true, perm: 'ads' },
     { label: 'المستخدمون', value: s.users, icon: Users, href: '/admin/users', perm: 'users' },
     { label: 'إجمالي الإعلانات', value: s.ads, icon: Megaphone, href: '/admin/ads', perm: 'ads' },
     { label: 'إعلانات نشطة', value: s.activeAds, icon: Megaphone, href: '/admin/ads', perm: 'ads' },

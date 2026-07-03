@@ -16,13 +16,19 @@ import { getHomeStats } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
-function Stat({ icon: Icon, value, label }: { icon: React.ElementType; value: number; label: string }) {
-  return (
-    <div className="card-3d flex flex-col items-center gap-0.5 rounded-lg p-2 text-center">
+function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; value: number; label: string; href?: string }) {
+  const inner = (
+    <>
       <Icon className="h-4 w-4 text-primary" />
       <div className="text-sm font-bold leading-tight text-primary">{new Intl.NumberFormat('en-US').format(value)}</div>
       <div className="text-[10px] leading-tight text-muted-foreground">{label}</div>
-    </div>
+    </>
+  );
+  const cls = 'card-3d flex flex-col items-center gap-0.5 rounded-lg p-2 text-center';
+  return href ? (
+    <Link href={href} className={`${cls} transition hover:-translate-y-0.5 hover:border-primary/40`}>{inner}</Link>
+  ) : (
+    <div className={cls}>{inner}</div>
   );
 }
 
@@ -35,11 +41,11 @@ export default async function HomePage() {
     getStats(),
     getHomeStats().catch(() => new Set(['ads', 'users', 'views', 'cats'])),
   ]);
-  const statCards = [
-    { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط' },
+  const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
+    { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
     { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
     { key: 'views', icon: Eye, value: stats.views, label: 'مشاهدة' },
-    { key: 'cats', icon: LayoutGrid, value: stats.cats, label: 'قسم' },
+    { key: 'cats', icon: LayoutGrid, value: stats.cats, label: 'قسم', href: '/search' },
   ].filter((s) => homeStats.has(s.key));
 
   return (
@@ -53,7 +59,7 @@ export default async function HomePage() {
       {/* Stats — the admin selects which cards to show */}
       {statCards.length > 0 && (
         <div className={`grid gap-2 ${['', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'][statCards.length] || 'grid-cols-4'}`}>
-          {statCards.map((s) => <Stat key={s.key} icon={s.icon} value={s.value} label={s.label} />)}
+          {statCards.map((s) => <Stat key={s.key} icon={s.icon} value={s.value} label={s.label} href={s.href} />)}
         </div>
       )}
 

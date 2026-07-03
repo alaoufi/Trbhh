@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
-import { saveStoreMeta, markStorePending } from '@/lib/merchant';
+import { saveStoreMeta, markStorePending, agreeStoreTerms } from '@/lib/merchant';
 import { toInt } from '@/lib/utils';
 
 export async function saveCompanyAction(formData: FormData) {
@@ -23,6 +23,11 @@ export async function saveCompanyAction(formData: FormData) {
   const specialty = String(formData.get('specialty') || '').trim();
   const audience = String(formData.get('audience') || '').trim();
   const onPlatform = !!formData.get('onPlatform');
+  const nationalId = String(formData.get('nationalId') || '').trim();
+  const phone = String(formData.get('phone') || '').trim();
+  const email = String(formData.get('email') || '').trim();
+  const contacts = String(formData.get('contacts') || '').trim();
+  const agreeTerms = !!formData.get('agreeTerms');
 
   let logoId: number | undefined;
   const logo = formData.get('logo');
@@ -38,10 +43,13 @@ export async function saveCompanyAction(formData: FormData) {
   if (existing) {
     await prisma.stores.update({ where: { id: existing.id }, data: { description, address, ...(logoId ? { logo: logoId } : {}) } });
   } else {
+    // فتح متجر جديد يتطلب الموافقة على شروط المتجر وتحمّل مسؤولية المنتجات
+    if (!agreeTerms) redirect('/account/company?error=terms');
     await prisma.stores.create({ data: { user_id: session.uid, description, address, logo: logoId ?? 0 } });
     await markStorePending(session.uid); // new store waits for admin approval
+    await agreeStoreTerms(session.uid);
   }
-  await saveStoreMeta(session.uid, { storeName, color, about, banner, tagline, layout, catalog, fields, since, specialty, audience, onPlatform });
+  await saveStoreMeta(session.uid, { storeName, color, about, banner, tagline, layout, catalog, fields, since, specialty, audience, onPlatform, nationalId, phone, email, contacts });
   revalidatePath('/account/company');
   // land the merchant on their own (independent) store page
   const mine = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true } });

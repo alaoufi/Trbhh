@@ -4,9 +4,11 @@ import { getStoreByUser } from '@/lib/stores';
 import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard } from '@/lib/merchant';
 import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
+import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction } from '@/app/companies/actions';
 import { Palette, Handshake, Home } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
+import { SITE } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -15,7 +17,8 @@ import { saveCompanyAction, addBranchAction } from './actions';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'شركتي' };
 
-export default async function ManageCompanyPage() {
+export default async function ManageCompanyPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
   const session = await requireUser();
   const store = await getStoreByUser(session.uid);
   const branches = store ? await prisma.store_branches.findMany({ where: { store_id: store.id } }) : [];
@@ -36,6 +39,12 @@ export default async function ManageCompanyPage() {
         {store && <Link href={`/companies/${store.id}`} className="text-sm text-primary hover:underline">عرض صفحة المتجر</Link>}
       </div>
 
+      {error === 'terms' && (
+        <div className="card-3d rounded-xl border-2 border-destructive/40 p-3 text-sm font-bold text-destructive">
+          يجب الموافقة على شروط المتجر وتحمّل مسؤولية المنتجات قبل فتح المتجر.
+        </div>
+      )}
+
       {store && meta && (
         <div className={`card-3d rounded-xl p-3 text-sm font-bold ${meta.status === 1 ? 'text-emerald-700' : meta.status === 0 ? 'text-amber-700' : 'text-red-700'}`}>
           {meta.status === 1 ? '✓ متجرك مُعتمَد وظاهر للجميع.' : meta.status === 0 ? '⏳ متجرك بانتظار موافقة الإدارة قبل الظهور.' : '⛔ متجرك موقوف. تواصل مع الإدارة.'}
@@ -52,12 +61,7 @@ export default async function ManageCompanyPage() {
         </div>
       )}
 
-      {store && (
-        <div className="card-3d flex items-center justify-between gap-2 rounded-xl p-3 text-sm">
-          <span className="min-w-0 truncate text-muted-foreground" dir="ltr">/companies/{store.id}</span>
-          <span className="shrink-0 font-bold text-primary">رابط متجرك الخاص</span>
-        </div>
-      )}
+      {store && <CopyLink url={`https://${SITE.domain}/companies/${store.id}`} />}
 
       {store && offers.length > 0 && (
         <div className="card-3d space-y-3 rounded-2xl p-4">
@@ -106,8 +110,38 @@ export default async function ManageCompanyPage() {
           </div>
         </div>
 
+        {/* بيانات التواصل والهوية */}
+        <div className="space-y-3 rounded-xl border-2 border-primary/15 bg-secondary/20 p-3">
+          <div className="text-sm font-extrabold text-primary">بيانات التواصل والهوية</div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">رقم الهوية / السجل التجاري <span className="text-muted-foreground">(سرّي — للإدارة فقط)</span></label>
+            <input name="nationalId" defaultValue={meta?.nationalId ?? ''} maxLength={30} inputMode="numeric" className={field} placeholder="10xxxxxxxx" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">رقم الجوال</label>
+            <input name="phone" defaultValue={meta?.phone ?? ''} maxLength={24} inputMode="tel" dir="ltr" className={field} placeholder="05xxxxxxxx" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">البريد الإلكتروني</label>
+            <input name="email" type="email" defaultValue={meta?.email ?? ''} maxLength={120} dir="ltr" className={field} placeholder="store@example.com" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">وسائل تواصل أخرى <span className="text-muted-foreground">(اختياري)</span></label>
+            <input name="contacts" defaultValue={meta?.contacts ?? ''} maxLength={500} dir="ltr" className={field} placeholder="واتساب / تويتر / موقع إلكتروني ..." />
+          </div>
+        </div>
+
         <div><label className="mb-1 block text-sm font-medium">وصف النشاط / ملف الأعمال</label><textarea name="description" defaultValue={store?.description ?? ''} rows={4} className="w-full rounded-lg border bg-background p-3 text-sm" placeholder="نبذة عن نشاط المتجر والخدمات المقدمة" /></div>
         <div><label className="mb-1 block text-sm font-medium">العنوان</label><input name="address" defaultValue={store?.address ?? ''} className={field} /></div>
+
+        {/* الموافقة على شروط المتجر — إلزامية عند فتح متجر جديد */}
+        {!store && (
+          <label className="flex items-start gap-2 rounded-xl border-2 border-primary/25 bg-primary/5 p-3 text-sm">
+            <input type="checkbox" name="agreeTerms" required className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
+            <span>أوافق على <Link href="/store-terms" target="_blank" className="font-bold text-primary underline">شروط المتجر</Link> وأتحمّل كامل مسؤولية منتجاتي وصحّة بياناتي.</span>
+          </label>
+        )}
+
         <Button>{store ? 'حفظ المتجر' : 'إنشاء المتجر'}</Button>
       </form>
 

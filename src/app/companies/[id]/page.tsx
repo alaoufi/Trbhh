@@ -1,6 +1,8 @@
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target } from 'lucide-react';
+import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2 } from 'lucide-react';
+import { SITE } from '@/lib/constants';
+import { CopyLink } from '@/components/copy-link';
 import { getStore } from '@/lib/stores';
 import { getMyAds } from '@/lib/account';
 import { getSession } from '@/lib/auth';
@@ -193,6 +195,19 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             )}
           </div>
         )}
+
+        {/* ===== التواصل ومشاركة رابط المتجر ===== */}
+        <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+          <h2 className="font-bold" style={{ color: brand }}>التواصل مع المتجر</h2>
+          {(meta.phone || meta.email || meta.contacts) && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {meta.phone && <a href={`tel:${meta.phone}`} className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90"><Phone className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr">{meta.phone}</span></a>}
+              {meta.email && <a href={`mailto:${meta.email}`} className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90"><Mail className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr" className="truncate">{meta.email}</span></a>}
+              {meta.contacts && <div className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90 sm:col-span-2"><Link2 className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr" className="truncate">{meta.contacts}</span></div>}
+            </div>
+          )}
+          <CopyLink url={`https://${SITE.domain}/companies/${storeId}`} label="رابط المتجر المباشر" />
+        </div>
 
         {s.branches.length > 0 && (
           <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">

@@ -22,7 +22,7 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
   { key: 'users',         label: 'المستخدمون',         actions: ['view', 'edit', 'delete'] },
   { key: 'ads',           label: 'الإعلانات',          actions: ['view', 'archive', 'delete'] },
   { key: 'duplicates',    label: 'الإعلانات المكررة',   actions: ['view', 'delete'] },
-  { key: 'classified',    label: 'الإعلانات المبوّبة',   actions: ['view', 'delete'] },
+  { key: 'classified',    label: 'الإعلانات المبوّبة',   actions: ['view', 'edit', 'suspend', 'delete'] },
   { key: 'categories',    label: 'الأقسام',            actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'words',         label: 'الكلمات المرفوضة',    actions: ['view', 'add', 'delete'] },
   { key: 'reports',       label: 'البلاغات',           actions: ['view', 'delete'] },

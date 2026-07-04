@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
 import { findDuplicateAds } from '@/lib/duplicates';
-import { deleteClassified } from '@/lib/classified';
+import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
 import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore } from '@/lib/merchant';
 import { banUserFor, unbanUser } from '@/lib/moderation';
@@ -144,6 +144,26 @@ export async function deleteGuardWordAction(formData: FormData) {
   const id = Number(formData.get('id'));
   if (id) await deleteGuardWord(id);
   revalidatePath('/admin/guard-words');
+}
+
+/** Enable/disable a classified ad (hidden from the site while disabled). */
+export async function toggleClassifiedAction(formData: FormData) {
+  await requireAction('classified', 'suspend');
+  const id = Number(formData.get('id'));
+  const enable = String(formData.get('action')) === 'enable';
+  if (id) await setClassifiedStatus(id, enable);
+  revalidatePath('/admin/classified');
+  revalidatePath('/classified');
+}
+
+/** Set a classified ad's lifetime in days from now (0 = follow the global setting). */
+export async function classifiedLifetimeAction(formData: FormData) {
+  await requireAction('classified', 'edit');
+  const id = Number(formData.get('id'));
+  const days = Math.max(0, parseInt(String(formData.get('days') || '0')) || 0);
+  if (id) await setClassifiedLifetime(id, days);
+  revalidatePath('/admin/classified');
+  revalidatePath('/classified');
 }
 
 export async function adminDeleteClassifiedAction(formData: FormData) {

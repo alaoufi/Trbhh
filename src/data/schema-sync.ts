@@ -170,6 +170,47 @@ const STATEMENTS: string[] = [
     PRIMARY KEY (user_id, peer_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  /* ---- classified ads (smart-designer cards) ---- */
+  `CREATE TABLE IF NOT EXISTS classified_ads (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id BIGINT UNSIGNED NULL,
+    title VARCHAR(255) NULL,
+    body TEXT NULL,
+    image VARCHAR(255) NULL,
+    phone VARCHAR(40) NULL,
+    whatsapp VARCHAR(40) NULL,
+    link VARCHAR(500) NULL,
+    theme TINYINT NOT NULL DEFAULT 0,
+    status TINYINT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    content_pos VARCHAR(10) NOT NULL DEFAULT 'bottom',
+    text_align VARCHAR(10) NOT NULL DEFAULT 'right',
+    font_size VARCHAR(4) NOT NULL DEFAULT 'md',
+    bold TINYINT NOT NULL DEFAULT 1,
+    pattern VARCHAR(10) NOT NULL DEFAULT 'none',
+    accent VARCHAR(10) NOT NULL DEFAULT 'none',
+    views INT NOT NULL DEFAULT 0,
+    clicks INT NOT NULL DEFAULT 0,
+    layout VARCHAR(8) NOT NULL DEFAULT 'auto',
+    expires_at DATETIME NULL,
+    PRIMARY KEY (id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `ALTER TABLE classified_ads ADD COLUMN content_pos VARCHAR(10) NOT NULL DEFAULT 'bottom'`,
+  `ALTER TABLE classified_ads ADD COLUMN text_align VARCHAR(10) NOT NULL DEFAULT 'right'`,
+  `ALTER TABLE classified_ads ADD COLUMN font_size VARCHAR(4) NOT NULL DEFAULT 'md'`,
+  `ALTER TABLE classified_ads ADD COLUMN bold TINYINT NOT NULL DEFAULT 1`,
+  `ALTER TABLE classified_ads ADD COLUMN pattern VARCHAR(10) NOT NULL DEFAULT 'none'`,
+  `ALTER TABLE classified_ads ADD COLUMN accent VARCHAR(10) NOT NULL DEFAULT 'none'`,
+  `ALTER TABLE classified_ads ADD COLUMN views INT NOT NULL DEFAULT 0`,
+  `ALTER TABLE classified_ads ADD COLUMN clicks INT NOT NULL DEFAULT 0`,
+  `ALTER TABLE classified_ads ADD COLUMN layout VARCHAR(8) NOT NULL DEFAULT 'auto'`,
+  `ALTER TABLE classified_ads ADD COLUMN expires_at DATETIME NULL`,
+  `CREATE TABLE IF NOT EXISTS classified_views (
+    ad_id BIGINT UNSIGNED NOT NULL,
+    viewer VARCHAR(64) NOT NULL,
+    PRIMARY KEY (ad_id, viewer)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   /* ---- legacy-table amendments ---- */
   `ALTER TABLE repord_ads ADD COLUMN response TEXT NULL`,
   `ALTER TABLE repord_ads ADD COLUMN responded_at TIMESTAMP NULL`,

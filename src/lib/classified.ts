@@ -1,5 +1,7 @@
 import 'server-only';
 import { prisma } from './prisma';
+import { ensureSchema } from '@/data/schema-sync';
+import type { Prisma } from '@prisma/client';
 import { mediaUrl } from './media';
 import { loadBanned, censorSync } from './censor';
 import { getClassifiedLifetimeDays } from './settings';
@@ -8,50 +10,8 @@ import { CLASSIFIED_THEMES, type Classified } from './classified-theme';
 export { CLASSIFIED_THEMES };
 export type { Classified };
 
-let ensured = false;
-/** Self-provision the table so the feature works on any DB without migrations. */
-export async function ensureClassifiedTable() {
-  if (ensured) return;
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS classified_ads (
-      id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-      user_id BIGINT UNSIGNED NULL,
-      title VARCHAR(255) NULL,
-      body TEXT NULL,
-      image VARCHAR(255) NULL,
-      phone VARCHAR(40) NULL,
-      whatsapp VARCHAR(40) NULL,
-      link VARCHAR(500) NULL,
-      theme TINYINT NOT NULL DEFAULT 0,
-      status TINYINT NOT NULL DEFAULT 1,
-      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-  // idempotent column additions for the smart-designer style options
-  for (const col of [
-    `ADD COLUMN content_pos VARCHAR(10) NOT NULL DEFAULT 'bottom'`,
-    `ADD COLUMN text_align VARCHAR(10) NOT NULL DEFAULT 'right'`,
-    `ADD COLUMN font_size VARCHAR(4) NOT NULL DEFAULT 'md'`,
-    `ADD COLUMN bold TINYINT NOT NULL DEFAULT 1`,
-    `ADD COLUMN pattern VARCHAR(10) NOT NULL DEFAULT 'none'`,
-    `ADD COLUMN accent VARCHAR(10) NOT NULL DEFAULT 'none'`,
-    `ADD COLUMN views INT NOT NULL DEFAULT 0`,
-    `ADD COLUMN clicks INT NOT NULL DEFAULT 0`,
-    `ADD COLUMN layout VARCHAR(8) NOT NULL DEFAULT 'auto'`,
-  ]) {
-    await prisma.$executeRawUnsafe(`ALTER TABLE classified_ads ${col}`).catch(() => {});
-  }
-  // per-viewer dedup for views (mirrors ads_views)
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS classified_views (
-      ad_id BIGINT UNSIGNED NOT NULL,
-      viewer VARCHAR(64) NOT NULL,
-      PRIMARY KEY (ad_id, viewer)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `).catch(() => {});
-  ensured = true;
-}
+/** DDL lives in src/data/schema-sync.ts (single source of truth). */
+export const ensureClassifiedTable = ensureSchema;
 
 type Row = {
   id: bigint | number; user_id: bigint | number | null; title: string | null;
@@ -90,30 +50,54 @@ function toClassified(r: Row): Classified {
   };
 }
 
-/** SQL fragment hiding classifieds past the admin-set lifetime (empty when unlimited). */
-async function lifetimeClause(): Promise<string> {
+/**
+ * Visibility filter: enabled (status=1) AND not expired.
+ * Per-ad `expires_at` (set by the admin) OVERRIDES the global lifetime setting;
+ * ads without it follow the global window (unlimited when the setting is 0).
+ */
+async function visibilityWhere(): Promise<Prisma.classified_adsWhereInput> {
   const days = await getClassifiedLifetimeDays().catch(() => 0);
-  return days > 0 ? ` AND (created_at IS NULL OR created_at >= DATE_SUB(NOW(), INTERVAL ${Math.floor(days)} DAY))` : '';
+  const now = new Date();
+  const followsGlobal: Prisma.classified_adsWhereInput = days > 0
+    ? { expires_at: null, OR: [{ created_at: null }, { created_at: { gte: new Date(now.getTime() - Math.floor(days) * 86_400_000) } }] }
+    : { expires_at: null };
+  return { status: 1, OR: [followsGlobal, { expires_at: { gt: now } }] };
 }
 
 export async function getClassifieds(limit = 30): Promise<Classified[]> {
   await ensureClassifiedTable();
   await loadBanned();
-  const life = await lifetimeClause();
-  const rows = await prisma.$queryRawUnsafe<Row[]>(
-    `SELECT * FROM classified_ads WHERE status = 1${life} ORDER BY id DESC LIMIT ${Math.max(1, Math.min(100, limit))}`,
-  );
+  const rows = await prisma.classified_ads.findMany({
+    where: await visibilityWhere(), orderBy: { id: 'desc' }, take: Math.max(1, Math.min(100, limit)),
+  });
   return rows.map(toClassified);
 }
 
-/** All classifieds for admin moderation. */
-export async function getAllClassifieds(limit = 120): Promise<Classified[]> {
+/** Classified + moderation state, for the admin manager. */
+export type AdminClassified = Classified & { status: number; expiresAt: string | null };
+
+/** All classifieds for admin moderation (including disabled/expired ones). */
+export async function getAllClassifieds(limit = 120): Promise<AdminClassified[]> {
   await ensureClassifiedTable();
   await loadBanned();
-  const rows = await prisma.$queryRawUnsafe<Row[]>(
-    `SELECT * FROM classified_ads ORDER BY id DESC LIMIT ${Math.max(1, Math.min(200, limit))}`,
-  );
-  return rows.map(toClassified);
+  const rows = await prisma.classified_ads.findMany({ orderBy: { id: 'desc' }, take: Math.max(1, Math.min(200, limit)) });
+  return rows.map((r) => ({ ...toClassified(r), status: r.status, expiresAt: r.expires_at ? r.expires_at.toISOString() : null }));
+}
+
+/** Admin: enable/disable a classified ad (hidden everywhere while disabled). */
+export async function setClassifiedStatus(id: number, enabled: boolean) {
+  await ensureClassifiedTable();
+  await prisma.classified_ads.updateMany({ where: { id: BigInt(id) }, data: { status: enabled ? 1 : 0 } }).catch(() => {});
+}
+
+/**
+ * Admin: set how long a classified stays live, in days from NOW.
+ * days > 0 → explicit expiry (overrides the global setting); 0 → back to the global default.
+ */
+export async function setClassifiedLifetime(id: number, days: number) {
+  await ensureClassifiedTable();
+  const expires_at = days > 0 ? new Date(Date.now() + Math.min(days, 3650) * 86_400_000) : null;
+  await prisma.classified_ads.updateMany({ where: { id: BigInt(id) }, data: { expires_at } }).catch(() => {});
 }
 
 /** A member's own classified ads (for editing/deleting). */
@@ -191,17 +175,17 @@ export async function recordClassifiedClick(id: number) {
 
 export async function deleteClassified(id: number) {
   await ensureClassifiedTable();
-  await prisma.$executeRawUnsafe(`DELETE FROM classified_ads WHERE id = ?`, id);
+  await prisma.classified_views.deleteMany({ where: { ad_id: BigInt(id) } }).catch(() => {});
+  await prisma.classified_ads.deleteMany({ where: { id: BigInt(id) } });
 }
 
 /** Newest classified ads for the entry splash grid (newest first). */
 export async function getSplashClassifieds(limit = 12): Promise<Classified[]> {
   await ensureClassifiedTable();
   await loadBanned();
-  const life = await lifetimeClause();
-  const rows = await prisma.$queryRawUnsafe<Row[]>(
-    `SELECT * FROM classified_ads WHERE status = 1${life} ORDER BY id DESC LIMIT ${Math.max(1, Math.min(24, limit))}`,
-  );
+  const rows = await prisma.classified_ads.findMany({
+    where: await visibilityWhere(), orderBy: { id: 'desc' }, take: Math.max(1, Math.min(24, limit)),
+  });
   return rows.map(toClassified);
 }
 

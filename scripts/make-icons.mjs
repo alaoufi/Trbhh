@@ -1,30 +1,29 @@
-// Generate all app/store icons from the master logo (public/logo.png 2048²).
-// The hexagon MARK is cropped clean from the master (logo-icon.png has crop
-// artifacts), then composed onto correctly-sized canvases:
+// Generate all app/store icons from the CURRENT master logo
+// (public/logo-horizontal.png 2048×1152 — hexagon+cart mark | تربح TRBHH lockup).
 //   - Play store icon 1024² (solid bg, no alpha, no rounded corners)
-//   - Play feature graphic 1024×500 (mark + wordmark)
+//   - Play feature graphic 1024×500 (mark + wordmark side by side)
 //   - PWA icons 512/192 + a REAL maskable 512 (mark inside the 80% safe zone)
 //   - Apple touch icon 180 (solid bg)
-//   - Optimized 256px header mark (replaces the 545KB logo-icon at 44px)
+//   - Optimized 256px header mark
 // Usage: node scripts/make-icons.mjs
 import sharp from 'sharp';
 import { mkdirSync } from 'node:fs';
 
-const SRC = 'public/logo.png';
+const SRC = 'public/logo-horizontal.png';
 mkdirSync('public/play', { recursive: true });
 
-// Clean crops measured on the 2048² master.
-const MARK = { left: 595, top: 135, width: 813, height: 880 }; // hexagon mark only (right edge stops before the تربح dots)
-const WORD = { left: 505, top: 995, width: 1075, height: 535 }; // تربح + TRBHH
+// Clean crops measured on the 2048×1152 master.
+const MARK = { left: 310, top: 255, width: 580, height: 600 }; // hexagon + arrow + cart (stops before the divider line)
+const WORD = { left: 965, top: 260, width: 870, height: 480 }; // تربح + TRBHH (tagline excluded)
 
 // sharp can't extract+trim in one pipeline (trim measures the pre-extract image) → two steps.
 const markRaw = await sharp(SRC).extract(MARK).png().toBuffer();
-const markBuf = await sharp(markRaw).trim({ threshold: 12 }).png().toBuffer();
+// whiteout: the tagline's dash/letters leak into the crop's bottom-right — erase before trimming
+const markWhite = Buffer.from(`<svg width="230" height="60"><rect width="230" height="60" fill="#ffffff"/></svg>`);
+const markClean = await sharp(markRaw).composite([{ input: markWhite, left: 350, top: 540 }]).png().toBuffer();
+const markBuf = await sharp(markClean).trim({ threshold: 12 }).png().toBuffer();
 const wordRaw = await sharp(SRC).extract(WORD).png().toBuffer();
-// whiteout: the golden hexagon's bottom tip leaks into this band — erase it before trimming
-const whiteout = Buffer.from(`<svg width="320" height="48"><rect width="320" height="48" fill="#ffffff"/></svg>`);
-const wordClean = await sharp(wordRaw).composite([{ input: whiteout, left: 340, top: 0 }]).png().toBuffer();
-const wordBuf = await sharp(wordClean).trim({ threshold: 12 }).png().toBuffer();
+const wordBuf = await sharp(wordRaw).trim({ threshold: 12 }).png().toBuffer();
 
 /** Center the mark on a white square canvas at `scale` of its size. */
 async function iconOn(size, scale, out) {
@@ -53,19 +52,19 @@ await iconOn(256, 0.92, 'public/logo-mark-256.png');
 // Feature graphic 1024×500: mark right (RTL start) + wordmark left, brand strip below.
 {
   const W = 1024, H = 500;
-  const mark = await sharp(markBuf).resize(360, 360, { fit: 'inside' }).toBuffer();
+  const mark = await sharp(markBuf).resize(340, 340, { fit: 'inside' }).toBuffer();
   const mMeta = await sharp(mark).metadata();
-  const word = await sharp(wordBuf).resize(520, 300, { fit: 'inside' }).toBuffer();
+  const word = await sharp(wordBuf).resize(520, 320, { fit: 'inside' }).toBuffer();
   const wMeta = await sharp(word).metadata();
   const strip = Buffer.from(
     `<svg width="${W}" height="16"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="0">
-       <stop offset="0" stop-color="#c9992e"/><stop offset="0.5" stop-color="#3287da"/><stop offset="1" stop-color="#1b4f8a"/>
+       <stop offset="0" stop-color="#e2a63d"/><stop offset="0.5" stop-color="#4da3f5"/><stop offset="1" stop-color="#1b4f8a"/>
      </linearGradient></defs><rect width="${W}" height="16" fill="url(#g)"/></svg>`,
   );
   await sharp({ create: { width: W, height: H, channels: 3, background: '#ffffff' } })
     .composite([
-      { input: mark, left: 640 - Math.round(mMeta.width / 2) + 200, top: Math.round((H - 16 - mMeta.height) / 2) },
-      { input: word, left: 300 - Math.round(wMeta.width / 2), top: Math.round((H - 16 - wMeta.height) / 2) },
+      { input: mark, left: 812 - Math.round(mMeta.width / 2), top: Math.round((H - 16 - mMeta.height) / 2) },
+      { input: word, left: 320 - Math.round(wMeta.width / 2), top: Math.round((H - 16 - wMeta.height) / 2) },
       { input: strip, left: 0, top: H - 16 },
     ])
     .png({ compressionLevel: 9 })

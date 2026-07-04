@@ -211,6 +211,16 @@ const STATEMENTS: string[] = [
     PRIMARY KEY (ad_id, viewer)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  /* ---- account deletion (Google Play data-safety requirement) ---- */
+  `CREATE TABLE IF NOT EXISTS deletion_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    phone VARCHAR(24) NOT NULL,
+    name VARCHAR(120) NULL,
+    note VARCHAR(500) NULL,
+    status TINYINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   /* ---- legacy-table amendments ---- */
   `ALTER TABLE repord_ads ADD COLUMN response TEXT NULL`,
   `ALTER TABLE repord_ads ADD COLUMN responded_at TIMESTAMP NULL`,

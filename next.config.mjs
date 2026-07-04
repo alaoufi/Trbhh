@@ -4,6 +4,14 @@ const mediaHost = (process.env.NEXT_PUBLIC_MEDIA_BASE || 'https://trbhh.com')
   .replace(/\/$/, '');
 
 const nextConfig = {
+  // Public aliases — Google Play's Data-safety checker fetches /privacy directly.
+  async redirects() {
+    return ['about', 'faq', 'privacy', 'terms', 'contact'].map((slug) => ({
+      source: `/${slug}`,
+      destination: `/pages/${slug}`,
+      permanent: true,
+    }));
+  },
   output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,

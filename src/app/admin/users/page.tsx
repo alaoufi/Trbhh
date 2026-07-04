@@ -8,7 +8,8 @@ import { requirePerm, getUserRole, ROLE_LABELS } from '@/lib/roles';
 import { getPackages, getUserPackageMap } from '@/lib/packages';
 import { liftExpiredBans, getBanMap } from '@/lib/moderation';
 import { AdminSearch } from '@/components/admin-search';
-import { banUserAction, unbanUserAction, trustUserAction, assignUserPackageAction } from '../actions';
+import { banUserAction, unbanUserAction, trustUserAction, assignUserPackageAction, executeDeletionRequestAction, dismissDeletionRequestAction } from '../actions';
+import { listDeletionRequests } from '@/lib/account-delete';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المستخدمين' };
@@ -22,6 +23,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
   const term = (q || '').trim();
   const filter = filterRaw === 'active' || filterRaw === 'banned' ? filterRaw : 'all';
   await liftExpiredBans(); // so ban='checked' reflects only still-active bans
+  const deletionRequests = await listDeletionRequests().catch(() => []);
 
   type Row = { id: bigint; name: string | null; userName: string | null; phoneNumber: string | null; trusted: number | null; ban: string | null; is_admin: number | null; created_at: Date | null };
   let users: Row[];
@@ -59,6 +61,32 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">المستخدمون</h1>
+
+      {/* طلبات حذف الحسابات (متطلب Google Play) */}
+      {deletionRequests.length > 0 && (
+        <div className="card-3d space-y-2 rounded-2xl border-2 border-red-200 p-4">
+          <div className="font-bold text-red-700">🗑️ طلبات حذف حسابات ({deletionRequests.length}) — تحقق من ملكية الرقم قبل التنفيذ</div>
+          {deletionRequests.map((r) => (
+            <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-red-50/50 p-2 text-sm">
+              <span dir="ltr" className="font-bold">{r.phone}</span>
+              {r.name && <span className="text-muted-foreground">{r.name}</span>}
+              {r.note && <span className="text-xs text-muted-foreground">— {r.note}</span>}
+              <span className="text-xs text-muted-foreground">{timeAgo(r.at)}</span>
+              <span className="mr-auto flex gap-1">
+                <form action={executeDeletionRequestAction}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <input type="hidden" name="phone" value={r.phone} />
+                  <button className="rounded-md bg-destructive px-3 py-1 text-xs font-bold text-white">تنفيذ الحذف</button>
+                </form>
+                <form action={dismissDeletionRequestAction}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <button className="rounded-md border px-3 py-1 text-xs font-bold text-muted-foreground hover:bg-secondary">تجاهل</button>
+                </form>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <AdminSearch basePath="/admin/users" defaultValue={q} placeholder="بحث فوري بالاسم أو اسم المستخدم أو الجوال…" />
 
       {/* تصنيف: الكل / نشط / محظور */}

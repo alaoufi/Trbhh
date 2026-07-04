@@ -8,6 +8,7 @@ import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/
 import { adminDeleteMessage } from '@/lib/chat';
 import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore } from '@/lib/merchant';
 import { banUserFor, unbanUser } from '@/lib/moderation';
+import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAccountNow } from '@/lib/account-delete';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
@@ -281,6 +282,25 @@ export async function adminDeleteDuplicatesAction() {
   revalidatePath('/admin/ads');
   revalidatePath('/admin/duplicates');
   redirect(`/admin/duplicates?deleted=${deleted}`);
+}
+
+/** Execute a logged-out account-deletion request (Google Play requirement). */
+export async function executeDeletionRequestAction(formData: FormData) {
+  await requireAction('users', 'delete');
+  const id = Number(formData.get('id'));
+  const phone = String(formData.get('phone') || '');
+  const uid = await findUserByPhone(phone);
+  if (uid) await deleteAccountNow(uid);
+  if (id) await closeDeletionRequest(id);
+  revalidatePath('/admin/users');
+}
+
+/** Dismiss a deletion request without deleting (e.g. ownership not verified). */
+export async function dismissDeletionRequestAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const id = Number(formData.get('id'));
+  if (id) await closeDeletionRequest(id);
+  revalidatePath('/admin/users');
 }
 
 /** Ban a member for a chosen duration (days) or permanently. */

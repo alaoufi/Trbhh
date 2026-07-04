@@ -154,6 +154,15 @@ export default async function StaticPage({ params }: { params: Promise<{ slug: s
     <div className="mx-auto max-w-2xl space-y-4">
       <Hero slug={slug} />
 
+      {slug === 'privacy' && (
+        <a href="/delete-account" className="card-3d flex items-center justify-between gap-3 rounded-2xl border-2 border-red-200 p-4 transition hover:-translate-y-0.5">
+          <span>
+            <span className="block font-bold text-red-700">حذف الحساب والبيانات / Account &amp; Data Deletion</span>
+            <span className="block text-xs text-muted-foreground">يمكنك حذف حسابك وكامل بياناتك في أي وقت — بنفسك فوراً أو بطلب للإدارة.</span>
+          </span>
+          <span className="shrink-0 text-sm font-bold text-red-700">افتح ←</span>
+        </a>
+      )}
       {slug === 'faq' && <FaqAccordion items={FAQ} />}
 
       {slug === 'about' && <AboutExtras />}

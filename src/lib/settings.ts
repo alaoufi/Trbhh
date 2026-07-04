@@ -92,3 +92,10 @@ export function withinWindow(createdAt: Date | string | null | undefined, window
   if (!windowHours || windowHours <= 0) return true; // unlimited
   return hoursSince(createdAt) <= windowHours;
 }
+
+/** How long the classified entry splash plays before auto-entering (seconds). */
+export const SETTING_CLASSIFIED_SECONDS = 'classified_splash_seconds';
+export async function getClassifiedSplashSeconds(): Promise<number> {
+  const n = await getSettingNum(SETTING_CLASSIFIED_SECONDS, 5);
+  return Math.min(60, Math.max(2, n || 5));
+}

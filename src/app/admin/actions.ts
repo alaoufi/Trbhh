@@ -11,7 +11,7 @@ import { banUserFor, unbanUser } from '@/lib/moderation';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_ADS_APPROVAL } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -332,6 +332,7 @@ export async function saveSettingsAction(formData: FormData) {
   const cs = String(formData.get('classifiedStats') || 'owner');
   const classifiedStats = ['all', 'owner', 'admin'].includes(cs) ? cs : 'owner';
   const classifiedDays = Math.max(0, parseInt(String(formData.get('classifiedDays') || '0')) || 0);
+  const splashSeconds = Math.min(60, Math.max(2, parseInt(String(formData.get('splashSeconds') || '5')) || 5));
   const adsApproval = formData.get('adsApproval') !== null ? '1' : '0';
   await setSetting(SETTING_ADS_APPROVAL, adsApproval);
   await setSetting(SETTING_AD_EDIT_HOURS, String(editH));
@@ -340,6 +341,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_HOME_STATS, homeStats);
   await setSetting(SETTING_CLASSIFIED_STATS, classifiedStats);
   await setSetting(SETTING_CLASSIFIED_DAYS, String(classifiedDays));
+  await setSetting(SETTING_CLASSIFIED_SECONDS, String(splashSeconds));
   revalidatePath('/admin/settings');
   revalidatePath('/');
   revalidatePath('/classified');

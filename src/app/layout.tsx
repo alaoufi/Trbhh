@@ -11,6 +11,7 @@ import { PwaRegister } from '@/components/pwa-register';
 import { GeoPrompt } from '@/components/geo-prompt';
 import { ClassifiedSplash } from '@/components/classified-splash';
 import { getSplashClassifieds } from '@/lib/classified';
+import { getClassifiedSplashSeconds } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
@@ -65,6 +66,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   } catch {
     /* classified table may not be ready yet */
   }
+  const splashSeconds = await getClassifiedSplashSeconds().catch(() => 5);
   const theme = (await cookies()).get('theme')?.value || '';
   const validThemes = ['desert', 'agri', 'spring', 'mint', 'lavender', 'sea', 'snow', 'mountain', 'sunset', 'night'];
   const design = (await cookies()).get('design')?.value || '';
@@ -82,7 +84,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             the shared header/menu/footer, even across client-side navigation. */}
         <ChromeGate
           header={<><TopBar /><Header /></>}
-          footer={<><Footer /><MobileNav unread={unread} /><ClassifiedSplash ads={splashAds} /></>}
+          footer={<><Footer /><MobileNav unread={unread} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
         >
           {children}
         </ChromeGate>

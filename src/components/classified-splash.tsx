@@ -5,7 +5,7 @@ import { Phone, MessageCircle, ExternalLink, Pause, Play, Home, Sparkles, ArrowR
 import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY, SIZE_TITLE_POSTER, SIZE_BODY_POSTER, waLink } from '@/lib/classified-theme';
 import { ClassifiedDecor } from '@/components/classified-decor';
 
-const DURATION = 9000; // ms the entry splash stays before auto-entering the site
+const DEFAULT_SECONDS = 5; // fallback when the admin setting is absent
 
 // Compact sizes so text always fits inside the small grid tiles (no clipped letters)
 const TILE_TITLE: Record<string, string> = { sm: 'text-sm', md: 'text-base', lg: 'text-lg' };
@@ -64,10 +64,11 @@ function Contact({ ad, big }: { ad: Classified; big?: boolean }) {
   );
 }
 
-export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
+export function ClassifiedSplash({ ads, seconds }: { ads: Classified[]; seconds?: number }) {
   const router = useRouter();
   const [show, setShow] = useState(false);
-  const [remaining, setRemaining] = useState(DURATION);
+  const durationMs = (seconds && seconds > 0 ? seconds : DEFAULT_SECONDS) * 1000; // مدة التشغيل — من إعدادات الإدارة
+  const [remaining, setRemaining] = useState(durationMs);
   const [paused, setPaused] = useState(false);
   const [focused, setFocused] = useState<Classified | null>(null);
   const pausedRef = useRef(false);
@@ -115,10 +116,10 @@ export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
 
   if (!total || !show) return null;
 
-  const progress = remaining / DURATION;
+  const progress = remaining / durationMs;
   const R = 18;
   const C = 2 * Math.PI * R;
-  const seconds = Math.ceil(remaining / 1000);
+  const secondsLeft = Math.ceil(remaining / 1000);
 
   return (
     <div className="fixed inset-0 z-[200] flex flex-col bg-gradient-to-b from-primary via-[hsl(var(--primary)/0.9)] to-slate-900 backdrop-blur-md">
@@ -139,7 +140,7 @@ export function ClassifiedSplash({ ads }: { ads: Classified[] }) {
             <circle cx="22" cy="22" r={R} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3" />
             <circle cx="22" cy="22" r={R} fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - progress)} style={{ transition: 'stroke-dashoffset 60ms linear' }} />
           </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">{focused || paused ? '⏸' : seconds}</span>
+          <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">{focused || paused ? '⏸' : secondsLeft}</span>
         </div>
       </div>
 

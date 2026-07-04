@@ -32,7 +32,7 @@ export async function Header() {
 
         {/* logo on the left (RTL: last child) */}
         <Link href="/" className="shrink-0">
-          <Image src="/logo-icon.png" alt="تربح" width={44} height={44} priority className="h-11 w-11 rounded-lg object-contain" />
+          <Image src="/logo-mark-256.png" alt="تربح" width={44} height={44} priority className="h-11 w-11 rounded-lg object-contain" />
         </Link>
       </div>
     </header>

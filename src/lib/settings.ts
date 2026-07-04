@@ -119,7 +119,12 @@ export type AppConfig = {
 export async function getAppConfig(): Promise<AppConfig> {
   const [pkg, sha, aStore, aMin, iStore, iMin] = await Promise.all([
     getSetting(APP_KEYS.androidPackage, 'com.trbhh.app'),
-    getSetting(APP_KEYS.androidSha256, ''),
+    // الافتراضي: بصمة مفتاح الرفع المولّد في apps/android-twa — بعد النشر أضف
+    // بجانبها بصمة Google من Play Console ← App integrity (مفصولة بفاصلة).
+    getSetting(
+      APP_KEYS.androidSha256,
+      '4F:4B:B5:CA:0C:1E:59:BF:B2:7D:5C:86:CD:17:51:08:33:37:98:CD:08:B4:8C:EC:C7:86:66:F2:FB:09:7A:70',
+    ),
     getSetting(APP_KEYS.androidStoreUrl, ''),
     getSettingNum(APP_KEYS.androidMinCode, 2),
     getSetting(APP_KEYS.iosStoreUrl, ''),

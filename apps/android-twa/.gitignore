@@ -1,0 +1,12 @@
+# مولّدة من bubblewrap update — أعد توليدها عند الحاجة (لا تحرَّر يدوياً)
+app/
+build/
+gradle/
+gradlew
+gradlew.bat
+build.gradle
+settings.gradle
+gradle.properties
+store_icon.png
+manifest-checksum.txt
+.gradle/

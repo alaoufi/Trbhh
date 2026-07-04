@@ -4,26 +4,27 @@
 النسخة: **2.0.0 (versionCode 2)** — تفتح الموقع بـ `/?app=android&v=2` ليعمل
 **التحديث الإجباري**: رفع «أدنى نسخة أندرويد» في إعدادات الإدارة يحجب أي نسخة أقدم بشاشة تحديث.
 
-## البناء (على أي جهاز فيه Node)
+## الحالة: مبني وجاهز للرفع ✅
+- **`app-release-bundle.aab`** جاهز للرفع في Play Console (النسخة 2.0.0 / كود 2).
+- **`android.keystore`** (مفتاح الرفع، alias: `trbhh`) موجود في هذا المجلد —
+  كلمة مروره **ليست** في المستودع (سُلّمت لك في المحادثة؛ احفظها في مدير كلمات مرور).
+- **بصمة SHA-256 لمفتاح الرفع** (مضبوطة افتراضياً في الإعدادات):
+  `4F:4B:B5:CA:0C:1E:59:BF:B2:7D:5C:86:CD:17:51:08:33:37:98:CD:08:B4:8C:EC:C7:86:66:F2:FB:09:7A:70`
+
+### لإعادة البناء (على أي جهاز فيه Node)
 ```bash
 npm i -g @bubblewrap/cli
 cd apps/android-twa
-bubblewrap build        # أول مرة: يثبّت JDK وأدوات أندرويد تلقائياً ويطلب إنشاء keystore
+bubblewrap build        # أول مرة: يثبّت JDK وأدوات أندرويد تلقائياً
 ```
-- سيُنشئ `android.keystore` — **احفظه جيداً + كلمة مروره** (يلزم لكل تحديث قادم).
-- الناتج: `app-release-bundle.aab` (للرفع) و`app-release-signed.apk` (للتجربة على جهازك).
 
-## بعد البناء — 3 خطوات إلزامية
-1. **بصمة SHA-256**: يطبعها الأمر أو استخرجها بـ:
-   ```bash
-   keytool -list -v -keystore android.keystore -alias trbhh | grep SHA256
-   ```
-   ثم ضعها في **إدارة تربح ← الإعدادات ← التطبيقات ← بصمة SHA-256** واحفظ —
-   هذا يفعّل `https://trbhh.com/.well-known/assetlinks.json` فيفتح التطبيق ملء الشاشة بلا شريط متصفح.
-   > ملاحظة: عند استخدام Play App Signing (الافتراضي) أضف أيضاً بصمة Google من
-   > Play Console ← Setup ← App integrity (يمكن وضع البصمتين مفصولتين بفاصلة).
-2. **ارفع `app-release-bundle.aab`** في Play Console ← Production ← Create new release.
-3. بعد النشر ضع **رابط المتجر** في إعدادات الإدارة ← التطبيقات.
+## بعد الرفع — خطوتان إلزاميتان
+1. **بصمة Google**: عند استخدام Play App Signing (الافتراضي) تعيد Google توقيع
+   التطبيق بمفتاحها؛ خذ بصمة SHA-256 من Play Console ← Test and release ←
+   Setup ← **App integrity** وأضفها في **إدارة تربح ← الإعدادات ← التطبيقات ←
+   بصمة SHA-256** بجانب البصمة الحالية مفصولة بفاصلة — هذا يفعّل
+   `https://trbhh.com/.well-known/assetlinks.json` فيفتح التطبيق ملء الشاشة بلا شريط متصفح.
+2. بعد النشر ضع **رابط المتجر** في إعدادات الإدارة ← التطبيقات.
 
 ## قائمة المتجر (Store listing)
 - أيقونة التطبيق: `public/play/store-icon-1024.png`

@@ -1,6 +1,6 @@
 import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL } from '@/lib/settings';
+import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -9,7 +9,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false)]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig()]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -65,6 +65,36 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <input name="classifiedDays" type="number" min={0} defaultValue={classifiedDays} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
             <span className="text-sm">مدة تشغيل شاشة الدخول (بالثواني) — الافتراضي 5</span>
             <input name="splashSeconds" type="number" min={2} max={60} defaultValue={splashSeconds} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </label>
+        </div>
+
+        {/* التطبيقات (أندرويد/آيفون): المتاجر والتحديث الإجباري */}
+        <div className="card-3d rounded-xl p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary">📱 التطبيقات — التحديث الإجباري وروابط المتاجر</div>
+          <p className="mb-2 text-xs text-muted-foreground">رفع «أدنى نسخة» يجبر كل النسخ الأقدم على التحديث فوراً (تُحجب بشاشة تحديث).</p>
+          <label className="mb-2 block space-y-1">
+            <span className="text-sm">اسم حزمة أندرويد (Package)</span>
+            <input name="appAndroidPackage" dir="ltr" defaultValue={appCfg.android.package} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </label>
+          <label className="mb-2 block space-y-1">
+            <span className="text-sm">بصمة SHA-256 (من Play Console ← App integrity — تفعّل assetlinks)</span>
+            <input name="appAndroidSha256" dir="ltr" defaultValue={appCfg.android.sha256} placeholder="AA:BB:CC:…" className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </label>
+          <label className="mb-2 block space-y-1">
+            <span className="text-sm">رابط التطبيق في Google Play</span>
+            <input name="appAndroidStoreUrl" dir="ltr" defaultValue={appCfg.android.storeUrl} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </label>
+          <label className="mb-2 block space-y-1">
+            <span className="text-sm">أدنى نسخة أندرويد مسموحة (versionCode)</span>
+            <input name="appAndroidMinCode" type="number" min={1} defaultValue={appCfg.android.minCode} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </label>
+          <label className="mb-2 block space-y-1">
+            <span className="text-sm">رابط التطبيق في App Store (آيفون)</span>
+            <input name="appIosStoreUrl" dir="ltr" defaultValue={appCfg.ios.storeUrl} placeholder="https://apps.apple.com/app/…" className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </label>
+          <label className="mb-2 block space-y-1">
+            <span className="text-sm">أدنى نسخة آيفون مسموحة (Build)</span>
+            <input name="appIosMinBuild" type="number" min={1} defaultValue={appCfg.ios.minBuild} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </label>
           <p className="mt-1 text-xs text-muted-foreground">بعد انتهاء المدة يختفي الإعلان المبوّب من العرض تلقائياً.</p>
         </div>

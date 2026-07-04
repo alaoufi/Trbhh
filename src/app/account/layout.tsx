@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { LayoutDashboard, Megaphone, Heart, User, LogOut, PlusCircle, Building2, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Megaphone, Heart, User, LogOut, UserX, PlusCircle, Building2, ShieldCheck } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 
 const nav = [
@@ -33,6 +33,10 @@ export default async function AccountLayout({ children }: { children: React.Reac
               <Icon className="h-4 w-4" /> {label}
             </Link>
           ))}
+          {/* حذف الحساب — متطلب متاجر التطبيقات (يظهر داخل التطبيق) */}
+          <Link href="/delete-account" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-destructive/80 hover:bg-destructive/10">
+            <UserX className="h-4 w-4" /> حذف الحساب
+          </Link>
           {/* خروج: رابط عادي (لا يُستبق تلقائياً) حتى لا يُلغى الجلسة عند التصفّح */}
           <a href="/logout" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10">
             <LogOut className="h-4 w-4" /> خروج

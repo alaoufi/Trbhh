@@ -12,7 +12,7 @@ import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAcco
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -362,6 +362,13 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_CLASSIFIED_STATS, classifiedStats);
   await setSetting(SETTING_CLASSIFIED_DAYS, String(classifiedDays));
   await setSetting(SETTING_CLASSIFIED_SECONDS, String(splashSeconds));
+  // native app shells: store links + minimum versions (raising min = forced update)
+  await setSetting(APP_KEYS.androidPackage, String(formData.get('appAndroidPackage') || 'com.trbhh.app').trim());
+  await setSetting(APP_KEYS.androidSha256, String(formData.get('appAndroidSha256') || '').trim());
+  await setSetting(APP_KEYS.androidStoreUrl, String(formData.get('appAndroidStoreUrl') || '').trim());
+  await setSetting(APP_KEYS.androidMinCode, String(Math.max(1, parseInt(String(formData.get('appAndroidMinCode') || '2')) || 2)));
+  await setSetting(APP_KEYS.iosStoreUrl, String(formData.get('appIosStoreUrl') || '').trim());
+  await setSetting(APP_KEYS.iosMinBuild, String(Math.max(1, parseInt(String(formData.get('appIosMinBuild') || '2')) || 2)));
   revalidatePath('/admin/settings');
   revalidatePath('/');
   revalidatePath('/classified');

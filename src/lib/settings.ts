@@ -99,3 +99,39 @@ export async function getClassifiedSplashSeconds(): Promise<number> {
   const n = await getSettingNum(SETTING_CLASSIFIED_SECONDS, 5);
   return Math.min(60, Math.max(2, n || 5));
 }
+
+/* ---- native app shells (Android TWA / iOS wrapper): versions & stores ---- */
+export const APP_KEYS = {
+  androidPackage: 'app_android_package',
+  androidSha256: 'app_android_sha256',
+  androidStoreUrl: 'app_android_store_url',
+  androidMinCode: 'app_android_min_code',
+  iosStoreUrl: 'app_ios_store_url',
+  iosMinBuild: 'app_ios_min_build',
+} as const;
+
+export type AppConfig = {
+  android: { package: string; sha256: string; storeUrl: string; minCode: number };
+  ios: { storeUrl: string; minBuild: number };
+};
+
+/** App-shell config for the force-update gate and assetlinks. */
+export async function getAppConfig(): Promise<AppConfig> {
+  const [pkg, sha, aStore, aMin, iStore, iMin] = await Promise.all([
+    getSetting(APP_KEYS.androidPackage, 'com.trbhh.app'),
+    getSetting(APP_KEYS.androidSha256, ''),
+    getSetting(APP_KEYS.androidStoreUrl, ''),
+    getSettingNum(APP_KEYS.androidMinCode, 2),
+    getSetting(APP_KEYS.iosStoreUrl, ''),
+    getSettingNum(APP_KEYS.iosMinBuild, 2),
+  ]);
+  return {
+    android: {
+      package: pkg,
+      sha256: sha,
+      storeUrl: aStore || `https://play.google.com/store/apps/details?id=${pkg}`,
+      minCode: aMin,
+    },
+    ios: { storeUrl: iStore, minBuild: iMin },
+  };
+}

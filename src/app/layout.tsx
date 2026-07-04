@@ -9,6 +9,7 @@ import { MobileNav } from '@/components/mobile-nav';
 import { ChromeGate } from '@/components/chrome-gate';
 import { PwaRegister } from '@/components/pwa-register';
 import { GeoPrompt } from '@/components/geo-prompt';
+import { ForceUpdateGate } from '@/components/force-update-gate';
 import { ClassifiedSplash } from '@/components/classified-splash';
 import { getSplashClassifieds } from '@/lib/classified';
 import { getClassifiedSplashSeconds } from '@/lib/settings';
@@ -89,6 +90,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {children}
         </ChromeGate>
         <GeoPrompt />
+        <ForceUpdateGate />
         <PwaRegister />
       </body>
     </html>

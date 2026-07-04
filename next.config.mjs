@@ -5,6 +5,10 @@ const mediaHost = (process.env.NEXT_PUBLIC_MEDIA_BASE || 'https://trbhh.com')
 
 const nextConfig = {
   // Public aliases — Google Play's Data-safety checker fetches /privacy directly.
+  // TWA digital asset links must live at /.well-known/ — served by an API route.
+  async rewrites() {
+    return [{ source: '/.well-known/assetlinks.json', destination: '/api/assetlinks' }];
+  },
   async redirects() {
     return ['about', 'faq', 'privacy', 'terms', 'contact'].map((slug) => ({
       source: `/${slug}`,

@@ -68,12 +68,17 @@ async function sendJawalyV1(phone: string, message: string, cfg: MessagingConfig
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ messages: [{ text: message, numbers: [normalizeSaudi(phone)], sender: cfg.smsSender }] }),
+      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': 'Trbhh/1.0' },
+      // per 4jawaly v1: number_iso filters recipients by country; globals carry
+      // the default sender/country for any transmission without its own.
+      body: JSON.stringify({
+        messages: [{ text: message, numbers: [normalizeSaudi(phone)], sender: cfg.smsSender, number_iso: 'SA' }],
+        globals: { number_iso: 'SA', sender: cfg.smsSender },
+      }),
       cache: 'no-store',
     });
     const text = await res.text().catch(() => '');
-    if (res.status === 200 && /"(code|status)"\s*:\s*200|"job_id"|success|"total_success"/i.test(text)) return true;
+    if (res.status === 200 && /"(code|status)"\s*:\s*200|"job_id"|"total_success"\s*:\s*[1-9]|"inserted_numbers"\s*:\s*[1-9]/i.test(text)) return true;
     return false;
   } catch {
     return false;

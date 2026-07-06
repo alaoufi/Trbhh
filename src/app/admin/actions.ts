@@ -416,7 +416,7 @@ export async function saveVerificationAction(formData: FormData) {
     setSetting(MSG_KEYS.smsUrl, s('sms_url') || defUrl),
     setSetting(MSG_KEYS.smsUser, s('sms_username')),
     setSetting(MSG_KEYS.smsPass, s('sms_password')),
-    setSetting(MSG_KEYS.smsSender, s('sms_sender') || 'SouqAlhafta'),
+    setSetting(MSG_KEYS.smsSender, s('sms_sender')),
     setSetting(MSG_KEYS.smsUnicode, s('sms_unicode') || 'e'),
     setSetting(MSG_KEYS.waUrl, s('wa_url') || 'https://user.4whats.net/api/sendMessage'),
     setSetting(MSG_KEYS.waInstance, s('wa_instance')),

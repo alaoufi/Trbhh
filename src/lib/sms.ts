@@ -31,7 +31,9 @@ export async function getMessagingConfig(): Promise<MessagingConfig> {
     getSetting(MSG_KEYS.smsUrl, process.env.SMS_URL || JAWALY_V1_URL),
     getSetting(MSG_KEYS.smsUser, process.env.SMS_USERNAME || ''),
     getSetting(MSG_KEYS.smsPass, process.env.SMS_PASSWORD || ''),
-    getSetting(MSG_KEYS.smsSender, process.env.SMS_SENDER || 'SouqAlhafta'),
+    // اسم المرسِل يأتي من إعدادات الإدارة (يجب أن يكون معتمداً من 4jawaly). لا اسم
+    // افتراضي مكتوب في الكود — يُضبط من لوحة «بوابات التحقق».
+    getSetting(MSG_KEYS.smsSender, process.env.SMS_SENDER || ''),
     getSetting(MSG_KEYS.smsUnicode, process.env.SMS_UNICODE || 'e'),
     getSetting(MSG_KEYS.waUrl, process.env.WA_URL || 'https://user.4whats.net/api/sendMessage'),
     getSetting(MSG_KEYS.waInstance, process.env.WA_INSTANCE || ''),
@@ -107,7 +109,8 @@ async function sendLegacyForm(phone: string, message: string, cfg: MessagingConf
 /** Send an SMS via the configured provider. */
 export async function sendSms(phone: string, message: string, c?: MessagingConfig): Promise<boolean> {
   const cfg = c || (await getMessagingConfig());
-  if (!cfg.smsUser || !cfg.smsPass) return false;
+  // credentials + an (approved) sender name are all required — set in admin.
+  if (!cfg.smsUser || !cfg.smsPass || !cfg.smsSender) return false;
   return cfg.smsProvider === 'legacy' ? sendLegacyForm(phone, message, cfg) : sendJawalyV1(phone, message, cfg);
 }
 

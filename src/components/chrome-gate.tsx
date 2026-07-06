@@ -11,8 +11,9 @@ import { usePathname } from 'next/navigation';
  */
 export function ChromeGate({ header, footer, children }: { header: React.ReactNode; footer: React.ReactNode; children: React.ReactNode }) {
   const pathname = usePathname() || '';
-  // storefront by numeric id OR by handle (subdomain rewrite → /companies/<handle>)
-  const isStorefront = /^\/companies\/[^/]+/.test(pathname);
+  // storefront by numeric id OR by handle (subdomain rewrite → /companies/<handle>),
+  // and the store owner's independent admin dashboard (/store) — both hide Trbhh chrome.
+  const isStorefront = /^\/companies\/[^/]+/.test(pathname) || /^\/store(\/|$)/.test(pathname);
   if (isStorefront) {
     return <main className="min-h-screen">{children}</main>;
   }

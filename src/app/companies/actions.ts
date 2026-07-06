@@ -18,7 +18,7 @@ export async function respondOfferAction(formData: FormData) {
   const accept = String(formData.get('action')) === 'accept';
   if (!session) redirect('/login');
   if (offerId) await respondOffer(session.uid, offerId, accept);
-  revalidatePath('/account/company');
+  revalidatePath('/store');
 }
 
 export async function followStoreAction(formData: FormData) {
@@ -45,7 +45,7 @@ export async function respondTransferAction(formData: FormData) {
   const accept = String(formData.get('action')) === 'accept';
   if (!session) redirect('/login');
   if (storeId) await respondStoreTransfer(session.uid, storeId, accept);
-  revalidatePath('/account/company');
+  revalidatePath('/store');
 }
 
 export async function rateStoreAction(formData: FormData) {

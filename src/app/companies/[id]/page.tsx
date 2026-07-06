@@ -123,7 +123,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <input name="q" defaultValue={query} placeholder="ابحث في المتجر" className="h-10 w-full rounded-full border bg-muted/40 pr-9 pl-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </form>
           {isOwner && (
-            <a href="/account/company" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إدارة المتجر"><Building2 className="h-4 w-4" /></a>
+            <a href="/store" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إدارة المتجر"><Building2 className="h-4 w-4" /></a>
           )}
         </div>
       </div>

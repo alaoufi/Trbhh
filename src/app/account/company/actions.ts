@@ -44,24 +44,24 @@ export async function saveCompanyAction(formData: FormData) {
     await prisma.stores.update({ where: { id: existing.id }, data: { description, address, ...(logoId ? { logo: logoId } : {}) } });
   } else {
     // فتح متجر جديد يتطلب الموافقة على شروط المتجر وتحمّل مسؤولية المنتجات
-    if (!agreeTerms) redirect('/account/company?error=terms');
+    if (!agreeTerms) redirect('/store?error=terms');
     await prisma.stores.create({ data: { user_id: session.uid, description, address, logo: logoId ?? 0 } });
     await markStorePending(session.uid); // new store waits for admin approval
     await agreeStoreTerms(session.uid);
   }
   await saveStoreMeta(session.uid, { storeName, color, about, banner, tagline, layout, catalog, fields, since, specialty, audience, nationalId, phone, email, contacts });
   if (handle || existing) await setStoreHandle(session.uid, handle);
-  revalidatePath('/account/company');
+  revalidatePath('/store');
   // land the merchant on their own (independent) store page
   const mine = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true } });
-  redirect(mine ? `/companies/${toInt(mine.id)}` : '/account/company');
+  redirect(mine ? `/companies/${toInt(mine.id)}` : '/store');
 }
 
 /** Merchant requests to feature their products on the Trbhh platform (admin approves). */
 export async function requestPlatformAction() {
   const session = await requireUser();
   await requestPlatform(session.uid);
-  revalidatePath('/account/company');
+  revalidatePath('/store');
 }
 
 /** Owner picks which of their ads are showcased in the (independent) store. */
@@ -69,7 +69,7 @@ export async function setStoreProductsAction(formData: FormData) {
   const session = await requireUser();
   const ids = formData.getAll('productIds').map((v) => Number(v)).filter((n) => Number.isInteger(n) && n > 0);
   await setStoreProducts(session.uid, ids);
-  revalidatePath('/account/company');
+  revalidatePath('/store');
 }
 
 export async function addBranchAction(formData: FormData) {
@@ -80,5 +80,5 @@ export async function addBranchAction(formData: FormData) {
   const address = String(formData.get('address') || '').trim();
   if (!name) return;
   await prisma.store_branches.create({ data: { store_id: toInt(store.id), name, address } });
-  revalidatePath('/account/company');
+  revalidatePath('/store');
 }

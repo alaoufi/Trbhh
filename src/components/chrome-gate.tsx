@@ -11,7 +11,8 @@ import { usePathname } from 'next/navigation';
  */
 export function ChromeGate({ header, footer, children }: { header: React.ReactNode; footer: React.ReactNode; children: React.ReactNode }) {
   const pathname = usePathname() || '';
-  const isStorefront = /^\/companies\/\d+/.test(pathname);
+  // storefront by numeric id OR by handle (subdomain rewrite → /companies/<handle>)
+  const isStorefront = /^\/companies\/[^/]+/.test(pathname);
   if (isStorefront) {
     return <main className="min-h-screen">{children}</main>;
   }

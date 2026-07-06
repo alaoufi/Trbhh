@@ -414,8 +414,9 @@ export async function saveVerificationAction(formData: FormData) {
   await Promise.all([
     setSetting(MSG_KEYS.smsProvider, provider),
     setSetting(MSG_KEYS.smsUrl, s('sms_url') || defUrl),
-    setSetting(MSG_KEYS.smsUser, s('sms_username')),
-    setSetting(MSG_KEYS.smsPass, s('sms_password')),
+    // المفتاح/السر لا يحتويان مسافات إطلاقاً — تُزال أي مسافة لُصقت بالخطأ.
+    setSetting(MSG_KEYS.smsUser, s('sms_username').replace(/\s+/g, '')),
+    setSetting(MSG_KEYS.smsPass, s('sms_password').replace(/\s+/g, '')),
     setSetting(MSG_KEYS.smsSender, s('sms_sender')),
     setSetting(MSG_KEYS.smsUnicode, s('sms_unicode') || 'e'),
     setSetting(MSG_KEYS.waUrl, s('wa_url') || 'https://user.4whats.net/api/sendMessage'),

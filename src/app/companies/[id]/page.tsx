@@ -24,8 +24,25 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const sid = /^\d+$/.test(id) ? Number(id) : await storeIdByHandle(id);
   const s = sid ? await getStore(sid) : null;
-  const meta = s ? await getStoreMeta(s.id) : null;
-  return { title: meta?.storeName || s?.name || 'متجر' };
+  if (!s) return { title: 'متجر' };
+  const meta = await getStoreMeta(s.id);
+  const name = meta.storeName || s.name || 'متجر';
+  const desc = (meta.tagline || meta.about || `متجر ${name} على منصة تربح`).replace(/\s+/g, ' ').trim().slice(0, 160);
+  // the store's OWN name + logo when shared (WhatsApp/social) — full independence.
+  // fall back to a real PNG only when the merchant hasn't uploaded a logo yet.
+  const rawLogo = s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '/apple-icon.png';
+  const logoAbs = rawLogo.startsWith('http') ? rawLogo : `https://${SITE.domain}${rawLogo.startsWith('/') ? '' : '/'}${rawLogo}`;
+  const url = meta.handle ? `https://${meta.handle}.${SITE.domain}` : `https://${SITE.domain}/companies/${s.id}`;
+  return {
+    title: { absolute: name },
+    description: desc,
+    alternates: { canonical: url },
+    openGraph: {
+      type: 'website', locale: 'ar_SA', siteName: name, title: name, description: desc, url,
+      images: [{ url: logoAbs, width: 512, height: 512, alt: name }],
+    },
+    twitter: { card: 'summary', title: name, description: desc, images: [logoAbs] },
+  };
 }
 
 const en = (n: number) => new Intl.NumberFormat('en-US').format(n);

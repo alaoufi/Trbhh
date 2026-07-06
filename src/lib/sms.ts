@@ -117,7 +117,9 @@ export async function smsDiagnose(phone: string): Promise<SmsDiag> {
     const ok = res.status === 200 && /"(code|status)"\s*:\s*200|"job_id"|"total_success"\s*:\s*[1-9]|"inserted_numbers"\s*:\s*[1-9]/i.test(body);
     if (ok) {
       steps.push('✅ قبِلت البوابة الرسالة — يجب أن تصلك خلال ثوانٍ. لو ظهر تنبيه أصفر في الموقع فالكود المحدَّث لم يُنشر بعد.');
-    } else if (res.status === 401 || res.status === 403 || /unauthenticated|unauthorized|invalid.?(auth|credential|token)/i.test(body)) {
+    } else if (/is_token|"?token"?|منته|مفع|activat|expired|not.?active|disabled/i.test(body)) {
+      steps.push('❌ تطبيق الـAPI في 4jawaly غير مُفعّل أو منتهٍ. ادخل 4jawaly ← تطبيقاتي/API، فعّل التطبيق (أو أنشئ تطبيقاً جديداً وفعّله)، وتأكّد أن وصول API مفعّل لحسابك، ثم انسخ المفتاح والسر الجديدين هنا.');
+    } else if (res.status === 401 || res.status === 403 || /unauthenticated|unauthorized|invalid.?(auth|credential)/i.test(body)) {
       steps.push('❌ فشلت المصادقة — «المفتاح/السر» (app_key/app_secret) غير صحيحين. انسخهما من جديد من 4jawaly.');
     } else if (/sender|مرسِل|sender_?name/i.test(body)) {
       steps.push('❌ مشكلة في «اسم المرسِل» — تأكّد أنه معتمد ومفعّل في حساب 4jawaly (بالضبط كما هو).');

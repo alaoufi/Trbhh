@@ -1,16 +1,18 @@
-import { MessageSquare, Check, Smartphone, Send } from 'lucide-react';
+import { MessageSquare, Check, Smartphone, Send, Stethoscope } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMessagingConfig } from '@/lib/sms';
+import { getMessagingConfig, smsDiagnose } from '@/lib/sms';
 import { Button } from '@/components/ui/button';
 import { saveVerificationAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'بوابات التحقق (SMS/واتساب)' };
 
-export default async function VerificationPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+export default async function VerificationPage({ searchParams }: { searchParams: Promise<{ saved?: string; test?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, c] = await Promise.all([searchParams, getMessagingConfig()]);
+  const [{ saved, test }, c] = await Promise.all([searchParams, getMessagingConfig()]);
   const field = 'h-10 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/40';
+  const testPhone = (test || '').trim();
+  const diag = testPhone ? await smsDiagnose(testPhone) : null;
 
   return (
     <div className="max-w-lg space-y-4">
@@ -23,6 +25,22 @@ export default async function VerificationPage({ searchParams }: { searchParams:
       </p>
 
       {saved === '1' && <div className="flex items-center gap-2 rounded-lg border-2 border-green-300 bg-green-50 p-3 text-sm font-bold text-green-800"><Check className="h-4 w-4" /> تم الحفظ.</div>}
+
+      {/* اختبار البوابة — يرسل رسالة حقيقية ويعرض رد 4jawaly والسبب */}
+      <form method="GET" className="space-y-2 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4">
+        <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><Stethoscope className="h-5 w-5" /> اختبار البوابة (يرسل رسالة تجريبية حقيقية)</div>
+        <div className="flex gap-2">
+          <input name="test" defaultValue={testPhone} inputMode="tel" dir="ltr" placeholder="05xxxxxxxx" className={`${field} flex-1`} />
+          <Button size="sm" type="submit"><Send className="h-4 w-4" /> اختبار</Button>
+        </div>
+        {diag && (
+          <div className={`space-y-1 rounded-xl border-2 p-3 text-sm font-bold ${diag.ok ? 'border-green-300 bg-green-50 text-green-800' : 'border-red-300 bg-red-50 text-red-800'}`}>
+            {diag.steps.map((s, i) => <div key={i}>{s}</div>)}
+            {typeof diag.httpStatus === 'number' && <div className="text-xs font-normal text-muted-foreground">رمز HTTP: {diag.httpStatus}</div>}
+            {diag.body && <pre dir="ltr" className="mt-1 max-h-40 overflow-auto rounded-lg bg-white/70 p-2 text-[11px] font-normal leading-4 text-foreground/80 whitespace-pre-wrap">{diag.body}</pre>}
+          </div>
+        )}
+      </form>
 
       <form action={saveVerificationAction} className="space-y-4">
         {/* channel + enable */}

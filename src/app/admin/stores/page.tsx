@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone, Phone, Mail, Link2, IdCard, CalendarDays, FileCheck2, AlertTriangle, Trash2, UserCog } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getPendingStores, adminStoreList, approvedTransfers, type AdminStore } from '@/lib/merchant';
+import { getPendingStores, adminStoreList, approvedTransfers, platformRequests, type AdminStore } from '@/lib/merchant';
 import { timeAgo } from '@/lib/utils';
-import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction } from '../actions';
+import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتاجر' };
@@ -120,11 +120,30 @@ function StoreCard({ s }: { s: AdminStore }) {
 
 export default async function AdminStores() {
   await requireAction('stores', 'view');
-  const [pending, stores, transfers] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers()]);
+  const [pending, stores, transfers, platformReqs] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers(), platformRequests()]);
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold text-primary">إدارة المتاجر</h1></div>
       <p className="text-sm text-muted-foreground">معلومات كاملة عن كل متجر ونشاطه، مع الاعتماد والإيقاف والإنذار من المنتجات المخالفة. عند تكرار الإنذارات ٣ مرات يُوقف المتجر تلقائياً وتبقى الإنذارات موثّقة.</p>
+
+      {/* طلبات عرض المنتجات في منصة تربح — إعلان المتجر يظهر تلقائياً، والمنتجات بموافقة */}
+      {platformReqs.length > 0 && (
+        <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 p-3">
+          <div className="mb-2 flex items-center gap-2 font-bold text-emerald-700"><Megaphone className="h-5 w-5" /> طلبات عرض المنتجات في منصة تربح ({en(platformReqs.length)})</div>
+          <div className="space-y-2">
+            {platformReqs.map((r) => (
+              <div key={r.storeId} className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 text-sm shadow-sm">
+                <Link href={`/companies/${r.storeId}`} className="min-w-0 flex-1">
+                  <div className="font-bold text-primary">{r.storeName || `متجر #${r.storeId}`}</div>
+                  <div className="text-xs text-muted-foreground">التاجر: {r.ownerName} · طلب {timeAgo(r.at)}</div>
+                </Link>
+                <form action={decidePlatformAction}><input type="hidden" name="storeId" value={r.storeId} /><input type="hidden" name="action" value="approve" /><button className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد العرض</button></form>
+                <form action={decidePlatformAction}><input type="hidden" name="storeId" value={r.storeId} /><input type="hidden" name="action" value="reject" /><button className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</button></form>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* نقل الملكية — بعد طلب المنقول له وموافقة الصاحب الأول، تنفّذ الإدارة النقل */}
       {transfers.length > 0 && (

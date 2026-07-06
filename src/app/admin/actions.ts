@@ -6,7 +6,7 @@ import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
-import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore, completeStoreTransfer } from '@/lib/merchant';
+import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore, completeStoreTransfer, decidePlatformRequest } from '@/lib/merchant';
 import { banUserFor, unbanUser } from '@/lib/moderation';
 import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAccountNow } from '@/lib/account-delete';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
@@ -215,6 +215,15 @@ export async function deleteStoreAction(formData: FormData) {
   await requireAction('stores', 'delete');
   const id = Number(formData.get('storeId'));
   if (id && formData.get('confirm')) await deleteStore(id);
+  revalidatePath('/admin/stores');
+}
+
+/** Admin approves/rejects a merchant's request to feature products on Trbhh. */
+export async function decidePlatformAction(formData: FormData) {
+  await requireAction('stores', 'edit');
+  const id = Number(formData.get('storeId'));
+  const approve = String(formData.get('action')) === 'approve';
+  if (id) await decidePlatformRequest(id, approve);
   revalidatePath('/admin/stores');
 }
 

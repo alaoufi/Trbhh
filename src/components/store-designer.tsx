@@ -4,7 +4,7 @@ import { Store, Check, Users, Star, Palette, LayoutTemplate, Sparkles, LayoutGri
 import { STORE_COLORS, BANNERS, STORE_TEMPLATES, STORE_LAYOUTS, CATALOG_STYLES, CATALOG_FIELDS, DEFAULT_CATALOG_FIELDS, bannerBackground, layoutTokens, isCatalogStyle } from '@/lib/store-style';
 import { StoreCatalog, type CatalogAd } from '@/components/store-catalog';
 
-type Initial = { storeName?: string | null; color?: string | null; banner?: string | null; tagline?: string | null; about?: string | null; layout?: string | null; catalog?: string | null; fields?: string | null; onPlatform?: boolean; logoUrl?: string | null };
+type Initial = { storeName?: string | null; color?: string | null; banner?: string | null; tagline?: string | null; about?: string | null; layout?: string | null; catalog?: string | null; fields?: string | null; handle?: string | null; logoUrl?: string | null };
 
 const SAMPLE_ADS: CatalogAd[] = [
   { id: 0, title: 'منتج تجريبي مميّز بجودة عالية', price: 349, adsType: 'offer', image: '/placeholder-ad.svg', cityName: 'الرياض', createdAt: null, special: true, views: 128, tier: null },
@@ -24,7 +24,7 @@ export function StoreDesigner({ initial }: { initial: Initial }) {
   const [layout, setLayout] = useState<string>(initial.layout || 'classic');
   const [catalog, setCatalog] = useState<string>(isCatalogStyle(initial.catalog) ? initial.catalog : 'tiles');
   const [fields, setFields] = useState<Set<string>>(new Set((initial.fields || DEFAULT_CATALOG_FIELDS).split(',').filter(Boolean)));
-  const [onPlatform, setOnPlatform] = useState(!!initial.onPlatform);
+  const [handle, setHandle] = useState((initial.handle || '').toLowerCase().replace(/[^a-z0-9-]/g, ''));
   const isNew = !initial.color;
   const [pickedTpl, setPickedTpl] = useState<string>('');
   const tk = layoutTokens(layout);
@@ -191,17 +191,22 @@ export function StoreDesigner({ initial }: { initial: Initial }) {
         <input type="hidden" name="fields" value={[...fields].join(',')} />
       </div>
 
-      {/* ===== عرض المنتجات في منصة تربّح (بعد اعتماد المتجر) ===== */}
-      <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border-2 border-primary/25 bg-gradient-to-l from-primary/10 to-transparent p-4 shadow-[0_6px_18px_-8px_hsl(var(--primary)/0.5)] transition hover:-translate-y-0.5">
-        <span className="min-w-0">
-          <span className="flex items-center gap-1.5 text-sm font-extrabold text-primary"><Globe className="h-4 w-4" /> عرض منتجاتي في منصة تربّح</span>
-          <span className="mt-1 block text-xs leading-5 text-muted-foreground">تظهر منتجاتك في الصفحة الرئيسية لتربّح بعد موافقة الإدارة على متجرك. وبعد اعتماد المتجر يُنشر أي إعلان جديد <b>مباشرةً</b> دون مراجعة.</span>
-        </span>
-        <span className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${onPlatform ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
-          <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-md transition-all ${onPlatform ? 'left-1' : 'right-1'}`} />
-        </span>
-        <input type="checkbox" name="onPlatform" checked={onPlatform} onChange={(e) => setOnPlatform(e.target.checked)} className="sr-only" />
-      </label>
+      {/* ===== معرّف المتجر (الرابط المستقل / النطاق الفرعي) ===== */}
+      <div className="rounded-2xl border-2 border-primary/25 bg-gradient-to-l from-primary/10 to-transparent p-4">
+        <span className="flex items-center gap-1.5 text-sm font-extrabold text-primary"><Globe className="h-4 w-4" /> معرّف المتجر (رابط مستقل)</span>
+        <span className="mt-1 mb-2 block text-xs leading-5 text-muted-foreground">اختر معرّفاً بالإنجليزية ليكون رابط متجرك المستقل. أحرف إنجليزية وأرقام و«-» فقط (٣ خانات فأكثر).</span>
+        <div className="flex items-center gap-1 rounded-lg border-2 border-primary/25 bg-white px-2 text-sm" dir="ltr">
+          <input
+            name="handle"
+            value={handle}
+            onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32))}
+            placeholder="mystore"
+            className="h-11 min-w-0 flex-1 bg-transparent text-left outline-none"
+          />
+          <span className="shrink-0 whitespace-nowrap text-muted-foreground">.trbhh.com</span>
+        </div>
+        {handle && <div className="mt-1.5 text-xs text-muted-foreground" dir="ltr">رابطك: <b className="text-primary">https://{handle}.trbhh.com</b></div>}
+      </div>
 
       <div><label className="mb-1 block text-sm font-bold">نبذة عن المتجر</label>
         <textarea name="about" defaultValue={initial.about || ''} rows={3} className="w-full rounded-lg border-2 border-primary/25 bg-white p-3 text-sm" placeholder="تعريف جذّاب بمتجرك وخدماتك" /></div>

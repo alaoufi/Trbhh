@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
-import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts } from '@/lib/merchant';
+import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform } from '@/lib/merchant';
 import { toInt } from '@/lib/utils';
 
 export async function saveCompanyAction(formData: FormData) {
@@ -22,7 +22,7 @@ export async function saveCompanyAction(formData: FormData) {
   const since = String(formData.get('since') || '').trim();
   const specialty = String(formData.get('specialty') || '').trim();
   const audience = String(formData.get('audience') || '').trim();
-  const onPlatform = !!formData.get('onPlatform');
+  const handle = String(formData.get('handle') || '').trim();
   const nationalId = String(formData.get('nationalId') || '').trim();
   const phone = String(formData.get('phone') || '').trim();
   const email = String(formData.get('email') || '').trim();
@@ -49,11 +49,19 @@ export async function saveCompanyAction(formData: FormData) {
     await markStorePending(session.uid); // new store waits for admin approval
     await agreeStoreTerms(session.uid);
   }
-  await saveStoreMeta(session.uid, { storeName, color, about, banner, tagline, layout, catalog, fields, since, specialty, audience, onPlatform, nationalId, phone, email, contacts });
+  await saveStoreMeta(session.uid, { storeName, color, about, banner, tagline, layout, catalog, fields, since, specialty, audience, nationalId, phone, email, contacts });
+  if (handle || existing) await setStoreHandle(session.uid, handle);
   revalidatePath('/account/company');
   // land the merchant on their own (independent) store page
   const mine = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true } });
   redirect(mine ? `/companies/${toInt(mine.id)}` : '/account/company');
+}
+
+/** Merchant requests to feature their products on the Trbhh platform (admin approves). */
+export async function requestPlatformAction() {
+  const session = await requireUser();
+  await requestPlatform(session.uid);
+  revalidatePath('/account/company');
 }
 
 /** Owner picks which of their ads are showcased in the (independent) store. */

@@ -16,7 +16,8 @@ import { DisclaimerBar } from '@/components/disclaimer';
 import { getHomeStats } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
 import { getInterests } from '@/lib/interests';
-import { homeFeaturedAds } from '@/lib/merchant';
+import { homeFeaturedAds, homeStoreCards } from '@/lib/merchant';
+import { StoreMiniCard, type StoreCardData } from '@/components/store-mini-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,6 +68,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   ).filter((p) => p.ads.length > 0);
   const pinnedLabel = catsParam.length ? 'الأقسام المختارة' : '⭐ أقسام تهمّك';
   const storeAds = await homeFeaturedAds().catch(() => []);
+  const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
 
   return (
     <div className="space-y-4">
@@ -114,8 +116,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <ChevronLeft className="h-5 w-5 shrink-0 text-primary" />
       </Link>
 
+      {/* إعلان المتاجر — يظهر تلقائياً لكل متجر معتمد (بطاقة المتجر) */}
+      {storeCards.length > 0 && (
+        <Section title="متاجر تربح" href="/companies">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {storeCards.map((c) => <StoreMiniCard key={c.id} s={c} href={`/companies/${c.id}`} />)}
+          </div>
+        </Section>
+      )}
+
+      {/* منتجات المتاجر — تظهر فقط للمتاجر التي اعتمدت الإدارة عرض منتجاتها */}
       {storeAds.length > 0 && (
-        <Section title="متاجر مميّزة" href="/companies">
+        <Section title="منتجات المتاجر" href="/companies">
           <AdGrid ads={storeAds} />
         </Section>
       )}

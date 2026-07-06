@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
-import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, platformRequestState } from '@/lib/merchant';
 import { getMyAds } from '@/lib/account';
 import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction } from './actions';
-import { Palette, Handshake, Home, PackageOpen, UserCog } from 'lucide-react';
+import { setStoreProductsAction, requestPlatformAction } from './actions';
+import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
@@ -37,6 +37,7 @@ export default async function ManageCompanyPage({ searchParams }: { searchParams
   const myActiveAds = store ? (await getMyAds(session.uid)).filter((a) => a.status === 1) : [];
   const inStore = new Set(store ? await storeProductAdIds(store.id) : []);
   const pendingTransfer = store ? await pendingTransferForOwner(session.uid) : null;
+  const platformState = store ? await platformRequestState(store.id) : 'none';
   const fmtDate = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d); };
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';
@@ -88,6 +89,32 @@ export default async function ManageCompanyPage({ searchParams }: { searchParams
       )}
 
       {store && <CopyLink url={`https://${SITE.domain}/companies/${store.id}`} />}
+
+      {/* الرابط المستقل للمتجر (نطاق فرعي) */}
+      {store && meta?.handle && (
+        <div className="card-3d space-y-2 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary"><Globe className="h-5 w-5" /> رابط متجرك المستقل</div>
+          <CopyLink url={`https://${meta.handle}.${SITE.domain}`} label="النطاق الفرعي للمتجر" />
+          <p className="text-xs text-muted-foreground">يعمل النطاق الفرعي فور تفعيل إعداد النطاق على الخادم. حتى ذلك الحين يعمل الرابط المختصر <b dir="ltr">{SITE.domain}/companies/{store.id}</b>.</p>
+        </div>
+      )}
+
+      {/* طلب عرض المنتجات في منصة تربح — يعتمده مراقب المتاجر (إعلان المتجر يظهر تلقائياً) */}
+      {store && (
+        <div className="card-3d space-y-2 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary"><Megaphone className="h-5 w-5" /> عرض منتجاتي في منصة تربح</div>
+          <p className="text-xs text-muted-foreground">إعلان متجرك يظهر في تربح تلقائياً بعد الاعتماد. أمّا عرض <b>منتجاتك</b> في صفحة تربح فيحتاج طلباً تعتمده إدارة المتاجر.</p>
+          {platformState === 'approved' ? (
+            <div className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">✓ منتجاتك معتمدة للعرض في منصة تربح.</div>
+          ) : platformState === 'pending' ? (
+            <div className="rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-700">⏳ طلبك قيد المراجعة لدى إدارة المتاجر.</div>
+          ) : (
+            <form action={requestPlatformAction}>
+              <Button size="sm"><Megaphone className="h-4 w-4" /> إرسال طلب عرض المنتجات</Button>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* طلب نقل ملكية وارد — يحتاج موافقة الصاحب الأول قبل تنفيذ الإدارة */}
       {store && pendingTransfer && (
@@ -155,7 +182,7 @@ export default async function ManageCompanyPage({ searchParams }: { searchParams
 
       <form action={saveCompanyAction} className="max-w-lg space-y-4 card-3d rounded-xl p-5">
         <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><Palette className="h-5 w-5" /> مصمّم المتجر الذكي</div>
-        <StoreDesigner initial={{ storeName: meta?.storeName, color: meta?.color, banner: meta?.banner, tagline: meta?.tagline, about: meta?.about, layout: meta?.layout, catalog: meta?.catalog, fields: meta?.fields, onPlatform: meta?.onPlatform, logoUrl }} />
+        <StoreDesigner initial={{ storeName: meta?.storeName, color: meta?.color, banner: meta?.banner, tagline: meta?.tagline, about: meta?.about, layout: meta?.layout, catalog: meta?.catalog, fields: meta?.fields, handle: meta?.handle, logoUrl }} />
         <div><label className="mb-1 block text-sm font-medium">شعار المتجر (صورة)</label><input name="logo" type="file" accept="image/*" className="w-full rounded-lg border bg-background p-2 text-sm" /></div>
 
         {/* بيانات النشاط التجاري */}

@@ -18,14 +18,14 @@ async function logoUrl(logoId: number | null): Promise<string> {
  */
 const ensure = ensureSchema;
 
-export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; onPlatform: boolean; nationalId: string | null; phone: string | null; email: string | null; contacts: string | null; termsAgreed: boolean; termsAgreedAt: string | null; status: number };
+export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; onPlatform: boolean; handle: string | null; nationalId: string | null; phone: string | null; email: string | null; contacts: string | null; termsAgreed: boolean; termsAgreedAt: string | null; status: number };
 
 export async function getStoreMeta(storeId: number): Promise<StoreMeta> {
   await ensure();
   const r = Number.isInteger(storeId) && storeId > 0
     ? await prisma.stores.findUnique({ where: { id: BigInt(storeId) } }).catch(() => null)
     : null;
-  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, since: r?.activity_since ?? null, specialty: r?.specialty ?? null, audience: r?.audience ?? null, onPlatform: (r?.show_on_platform ?? 0) === 1, nationalId: r?.national_id ?? null, phone: r?.store_phone ?? null, email: r?.store_email ?? null, contacts: r?.contacts ?? null, termsAgreed: (r?.terms_agreed ?? 0) === 1, termsAgreedAt: r?.terms_agreed_at ? r.terms_agreed_at.toISOString() : null, status: r?.status ?? 1 };
+  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, since: r?.activity_since ?? null, specialty: r?.specialty ?? null, audience: r?.audience ?? null, onPlatform: (r?.show_on_platform ?? 0) === 1, handle: r?.handle ?? null, nationalId: r?.national_id ?? null, phone: r?.store_phone ?? null, email: r?.store_email ?? null, contacts: r?.contacts ?? null, termsAgreed: (r?.terms_agreed ?? 0) === 1, termsAgreedAt: r?.terms_agreed_at ? r.terms_agreed_at.toISOString() : null, status: r?.status ?? 1 };
 }
 
 /* ---- Warnings & admin store oversight ---- */
@@ -101,8 +101,9 @@ export async function adminStoreList(): Promise<AdminStore[]> {
   });
 }
 
-/** Save branding fields on the caller's store. */
-export async function saveStoreMeta(userId: number, data: { storeName: string; color: string; about: string; banner: string; tagline: string; layout: string; catalog: string; fields: string; since: string; specialty: string; audience: string; onPlatform: boolean; nationalId: string; phone: string; email: string; contacts: string }) {
+/** Save branding fields on the caller's store. (show_on_platform is NOT set
+ *  here — it is granted by admin via decidePlatformRequest.) */
+export async function saveStoreMeta(userId: number, data: { storeName: string; color: string; about: string; banner: string; tagline: string; layout: string; catalog: string; fields: string; since: string; specialty: string; audience: string; nationalId: string; phone: string; email: string; contacts: string }) {
   await ensure();
   const { isCatalogStyle, cleanFields, DEFAULT_CATALOG_FIELDS } = await import('./store-style');
   const banner = ['gradient', 'mesh', 'aurora', 'sunset', 'night', 'solid'].includes(data.banner) ? data.banner : 'gradient';
@@ -119,7 +120,6 @@ export async function saveStoreMeta(userId: number, data: { storeName: string; c
       activity_since: data.since.slice(0, 20) || null,
       specialty: data.specialty.slice(0, 120) || null,
       audience: data.audience.slice(0, 160) || null,
-      show_on_platform: data.onPlatform ? 1 : 0,
       national_id: data.nationalId.slice(0, 30) || null,
       store_phone: data.phone.slice(0, 24) || null,
       store_email: data.email.slice(0, 120) || null,
@@ -251,6 +251,54 @@ export async function approvedStoreIds(): Promise<Set<number>> {
   await ensure();
   const rows = await prisma.stores.findMany({ where: { status: 1 }, select: { id: true } }).catch(() => []);
   return new Set(rows.map((r) => toInt(r.id)));
+}
+
+/* ---- store handle (subdomain / clean URL identity) ---- */
+
+// subdomains that must never be claimed by a store handle
+const RESERVED_HANDLES = new Set([
+  'www', 'api', 'm', 'admin', 'mail', 'ftp', 'cdn', 'static', 'assets', 'app',
+  'apps', 'store', 'stores', 'trbhh', 'ns1', 'ns2', 'blog', 'help', 'support',
+  'account', 'login', 'register', 'media', 'img', 'images', 'dev', 'test', 'staging',
+]);
+
+/** Normalize a requested handle to a safe DNS-label slug (or '' if invalid). */
+export function normalizeHandle(raw: string): string {
+  const h = (raw || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-+|-+$/g, '').slice(0, 32);
+  if (h.length < 3 || RESERVED_HANDLES.has(h)) return '';
+  return h;
+}
+
+/** Set the caller store's handle. Returns the outcome for UI feedback. */
+export async function setStoreHandle(userId: number, raw: string): Promise<{ ok: boolean; handle?: string; msg: string }> {
+  await ensure();
+  const storeId = await storeIdOfUser(userId);
+  if (!storeId) return { ok: false, msg: 'لا يوجد متجر.' };
+  if (!raw.trim()) { // clearing the handle
+    await prisma.stores.update({ where: { id: BigInt(storeId) }, data: { handle: null } }).catch(() => {});
+    return { ok: true, handle: '', msg: 'أُزيل معرّف المتجر.' };
+  }
+  const handle = normalizeHandle(raw);
+  if (!handle) return { ok: false, msg: 'المعرّف غير صالح (أحرف إنجليزية وأرقام و«-» فقط، ٣ خانات فأكثر، وغير محجوز).' };
+  const taken = await prisma.stores.findFirst({ where: { handle, id: { not: BigInt(storeId) } }, select: { id: true } }).catch(() => null);
+  if (taken) return { ok: false, msg: 'هذا المعرّف مستخدم من متجر آخر — اختر غيره.' };
+  await prisma.stores.update({ where: { id: BigInt(storeId) }, data: { handle } }).catch(() => {});
+  return { ok: true, handle, msg: 'تم حفظ معرّف المتجر.' };
+}
+
+/** Resolve a store id from its handle (for subdomain routing). */
+export async function storeIdByHandle(handle: string): Promise<number> {
+  await ensure();
+  const h = normalizeHandle(handle);
+  if (!h) return 0;
+  const r = await prisma.stores.findFirst({ where: { handle: h }, select: { id: true } }).catch(() => null);
+  return r ? toInt(r.id) : 0;
+}
+
+export async function getStoreHandle(storeId: number): Promise<string | null> {
+  await ensure();
+  const r = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { handle: true } }).catch(() => null);
+  return r?.handle ?? null;
 }
 
 /* ---- store identity helpers ---- */
@@ -390,6 +438,68 @@ async function loadHomeFeaturedAds() {
     for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, views: 0, sellerName: null, sellerTrusted: false, storeName: label, storeId: st.storeId });
   }
   return out.slice(0, 12);
+}
+
+/* ---- merchant-initiated platform request (show products on Trbhh) ----
+ * The store's own promo card shows on Trbhh automatically once approved; but
+ * showing the store's PRODUCTS in the Trbhh feed needs the merchant to request
+ * it and store-management to approve (kind='platform', from_store=self). */
+
+/** Merchant requests to feature their products on the Trbhh platform. */
+export async function requestPlatform(userId: number): Promise<boolean> {
+  await ensure();
+  const storeId = await storeIdOfUser(userId);
+  if (!storeId) return false;
+  await prisma.store_offers.upsert({
+    where: { from_store_to_store_kind: { from_store: storeId, to_store: 0, kind: 'platform' } },
+    create: { from_store: storeId, to_store: 0, kind: 'platform', status: 0 },
+    update: { status: 0, created_at: new Date() },
+  }).catch(() => {});
+  return true;
+}
+
+/** Current platform-request state for the merchant's store: none|pending|approved. */
+export async function platformRequestState(storeId: number): Promise<'none' | 'pending' | 'approved'> {
+  await ensure();
+  const s = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { show_on_platform: true } }).catch(() => null);
+  if (s?.show_on_platform === 1) return 'approved';
+  const off = await prisma.store_offers.findUnique({ where: { from_store_to_store_kind: { from_store: storeId, to_store: 0, kind: 'platform' } }, select: { status: true } }).catch(() => null);
+  return off && off.status === 0 ? 'pending' : 'none';
+}
+
+export type PlatformRequest = { storeId: number; storeName: string | null; ownerName: string; at: string | null };
+
+/** Pending merchant requests to feature products on Trbhh (admin queue). */
+export async function platformRequests(): Promise<PlatformRequest[]> {
+  await ensure();
+  const rows = await prisma.store_offers.findMany({ where: { kind: 'platform', status: 0 }, orderBy: { id: 'desc' }, take: 100 }).catch(() => []);
+  if (!rows.length) return [];
+  const ids = rows.map((r) => r.from_store);
+  const stores = await prisma.stores.findMany({ where: { id: { in: ids.map((n) => BigInt(n)) } }, select: { id: true, store_name: true, user_id: true } }).catch(() => []);
+  const sById = new Map(stores.map((s) => [toInt(s.id), s]));
+  const uids = [...new Set(stores.map((s) => s.user_id))].map((n) => BigInt(n));
+  const users = uids.length ? await prisma.users.findMany({ where: { id: { in: uids } }, select: { id: true, name: true, userName: true } }) : [];
+  const nameOf = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || 'تاجر']));
+  return rows.map((r) => {
+    const s = sById.get(r.from_store);
+    return { storeId: r.from_store, storeName: s?.store_name ?? null, ownerName: s ? nameOf.get(s.user_id) || 'تاجر' : 'تاجر', at: r.created_at ? r.created_at.toISOString() : null };
+  });
+}
+
+/** Admin approves (or rejects) a merchant's platform request. */
+export async function decidePlatformRequest(storeId: number, approve: boolean) {
+  await ensure();
+  await prisma.store_offers.updateMany({ where: { from_store: storeId, to_store: 0, kind: 'platform' }, data: { status: approve ? 1 : 2 } }).catch(() => {});
+  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { show_on_platform: approve ? 1 : 0 } }).catch(() => {});
+}
+
+/** Approved stores shown automatically as promo cards on Trbhh (the store ad —
+ *  independent of the products feed, which needs a separate approval). */
+export async function homeStoreCards(limit = 12) {
+  await ensure();
+  const rows = await prisma.stores.findMany({ where: { status: 1 }, orderBy: [{ home_featured: 'desc' }, { id: 'desc' }], take: limit, select: { id: true } }).catch(() => []);
+  const cards = await Promise.all(rows.map((r) => storeCard(toInt(r.id))));
+  return cards.filter(Boolean);
 }
 
 /** Admin asks a store to feature its products on the home page. */

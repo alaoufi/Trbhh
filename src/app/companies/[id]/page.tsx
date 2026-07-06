@@ -8,7 +8,7 @@ import { getStore } from '@/lib/stores';
 import { getMyAds } from '@/lib/account';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
-import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle } from '@/lib/merchant';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { StoreBottomNav } from '@/components/store-bottomnav';
@@ -22,7 +22,8 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const s = await getStore(Number(id));
+  const sid = /^\d+$/.test(id) ? Number(id) : await storeIdByHandle(id);
+  const s = sid ? await getStore(sid) : null;
   const meta = s ? await getStoreMeta(s.id) : null;
   return { title: meta?.storeName || s?.name || 'متجر' };
 }
@@ -41,7 +42,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const { id } = await params;
   const { q, t } = await searchParams;
   const query = (q || '').trim();
-  const storeId = Number(id);
+  // id may be a numeric store id OR a handle (from a subdomain rewrite / clean URL)
+  const storeId = /^\d+$/.test(id) ? Number(id) : await storeIdByHandle(id);
   if (!Number.isInteger(storeId) || storeId <= 0) notFound();
   const s = await getStore(storeId);
   if (!s) notFound();

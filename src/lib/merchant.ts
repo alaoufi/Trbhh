@@ -494,8 +494,12 @@ export async function decidePlatformRequest(storeId: number, approve: boolean) {
 }
 
 /** Approved stores shown automatically as promo cards on Trbhh (the store ad —
- *  independent of the products feed, which needs a separate approval). */
+ *  independent of the products feed, which needs a separate approval).
+ *  Cached briefly: each card is several queries and the home page is dynamic. */
 export async function homeStoreCards(limit = 12) {
+  return cached(`stores:cards:${limit}`, 120, () => loadHomeStoreCards(limit));
+}
+async function loadHomeStoreCards(limit: number) {
   await ensure();
   const rows = await prisma.stores.findMany({ where: { status: 1 }, orderBy: [{ home_featured: 'desc' }, { id: 'desc' }], take: limit, select: { id: true } }).catch(() => []);
   const cards = await Promise.all(rows.map((r) => storeCard(toInt(r.id))));

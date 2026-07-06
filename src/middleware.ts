@@ -19,7 +19,11 @@ export function middleware(req: NextRequest) {
   if (sub && (req.nextUrl.pathname === '/' || req.nextUrl.pathname === '')) {
     const url = req.nextUrl.clone();
     url.pathname = `/companies/${sub}`;
-    return NextResponse.rewrite(url);
+    const rw = NextResponse.rewrite(url);
+    if (!req.cookies.get('trbhh_vid')) {
+      rw.cookies.set('trbhh_vid', crypto.randomUUID(), { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
+    }
+    return rw;
   }
 
   // expose the current path so server guards can send the user back after login

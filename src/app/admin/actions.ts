@@ -6,7 +6,7 @@ import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
-import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore } from '@/lib/merchant';
+import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore, completeStoreTransfer } from '@/lib/merchant';
 import { banUserFor, unbanUser } from '@/lib/moderation';
 import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAccountNow } from '@/lib/account-delete';
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
@@ -215,6 +215,14 @@ export async function deleteStoreAction(formData: FormData) {
   await requireAction('stores', 'delete');
   const id = Number(formData.get('storeId'));
   if (id && formData.get('confirm')) await deleteStore(id);
+  revalidatePath('/admin/stores');
+}
+
+/** Admin executes a mutually-consented ownership transfer (step 3). */
+export async function completeStoreTransferAction(formData: FormData) {
+  await requireAction('stores', 'edit');
+  const id = Number(formData.get('storeId'));
+  if (id && formData.get('confirm')) await completeStoreTransfer(id);
   revalidatePath('/admin/stores');
 }
 

@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
-import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner } from '@/lib/merchant';
+import { getMyAds } from '@/lib/account';
 import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
-import { respondOfferAction } from '@/app/companies/actions';
-import { Palette, Handshake, Home } from 'lucide-react';
+import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
+import { setStoreProductsAction } from './actions';
+import { Palette, Handshake, Home, PackageOpen, UserCog } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
@@ -31,6 +33,10 @@ export default async function ManageCompanyPage({ searchParams }: { searchParams
   const collabIds = store ? await collaboratorStoreIds(store.id) : [];
   const collabs = store ? (await Promise.all(collabIds.map((id) => storeCard(id)))).filter(Boolean) : [];
   const warnings = store ? await getStoreWarnings(store.id) : [];
+  // independent catalog: the owner picks which of their ads appear in the store
+  const myActiveAds = store ? (await getMyAds(session.uid)).filter((a) => a.status === 1) : [];
+  const inStore = new Set(store ? await storeProductAdIds(store.id) : []);
+  const pendingTransfer = store ? await pendingTransferForOwner(session.uid) : null;
   const fmtDate = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d); };
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';
@@ -82,6 +88,45 @@ export default async function ManageCompanyPage({ searchParams }: { searchParams
       )}
 
       {store && <CopyLink url={`https://${SITE.domain}/companies/${store.id}`} />}
+
+      {/* طلب نقل ملكية وارد — يحتاج موافقة الصاحب الأول قبل تنفيذ الإدارة */}
+      {store && pendingTransfer && (
+        <div className="card-3d space-y-2 rounded-2xl border-2 border-amber-300 bg-amber-50/50 p-4">
+          <div className="flex items-center gap-2 font-bold text-amber-700"><UserCog className="h-5 w-5" /> طلب نقل ملكية المتجر</div>
+          <p className="text-sm text-foreground/80">
+            العضو <b>{pendingTransfer.toName}</b>{pendingTransfer.toPhone ? <> (<span dir="ltr">{pendingTransfer.toPhone}</span>)</> : null} يطلب نقل ملكية متجرك إليه.
+            بموافقتك ينتقل المتجر بكامل معلوماته (الاسم والجوال والبريد) بعد تنفيذ الإدارة، وتعود أنت عضواً عادياً.
+          </p>
+          <div className="flex gap-2">
+            <form action={respondTransferAction}><input type="hidden" name="storeId" value={store.id} /><input type="hidden" name="action" value="accept" /><button className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white">أوافق على النقل</button></form>
+            <form action={respondTransferAction}><input type="hidden" name="storeId" value={store.id} /><input type="hidden" name="action" value="reject" /><button className="rounded-lg border border-destructive/40 px-4 py-1.5 text-xs font-bold text-destructive">رفض</button></form>
+          </div>
+        </div>
+      )}
+
+      {/* منتجات المتجر — المتجر مستقل: يعرض فقط ما تختاره هنا، لا كل إعلاناتك */}
+      {store && (
+        <form action={setStoreProductsAction} className="card-3d space-y-3 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary"><PackageOpen className="h-5 w-5" /> منتجات المتجر</div>
+          <p className="text-xs text-muted-foreground">المتجر مستقل تماماً: اختر الإعلانات التي تريد عرضها في متجرك. الإعلانات غير المحدّدة لا تظهر في المتجر.</p>
+          {myActiveAds.length === 0 ? (
+            <p className="rounded-xl bg-secondary/30 p-3 text-sm text-muted-foreground">لا توجد لديك إعلانات نشطة لعرضها. أضف إعلاناً أولاً ثم اختره هنا.</p>
+          ) : (
+            <>
+              <div className="grid max-h-80 gap-1.5 overflow-y-auto">
+                {myActiveAds.map((a) => (
+                  <label key={a.id} className="flex items-center gap-2 rounded-lg border p-2 text-sm">
+                    <input type="checkbox" name="productIds" value={a.id} defaultChecked={inStore.has(a.id)} className="h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
+                    <span className="truncate">{a.title || `إعلان #${a.id}`}</span>
+                    <span className="mr-auto shrink-0 text-xs text-muted-foreground">{a.adsType === 'request' ? 'طلب' : 'عرض'}</span>
+                  </label>
+                ))}
+              </div>
+              <Button size="sm">حفظ منتجات المتجر</Button>
+            </>
+          )}
+        </form>
+      )}
 
       {store && offers.length > 0 && (
         <div className="card-3d space-y-3 rounded-2xl p-4">

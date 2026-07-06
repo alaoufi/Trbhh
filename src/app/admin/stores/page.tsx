@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone, Phone, Mail, Link2, IdCard, CalendarDays, FileCheck2, AlertTriangle, Trash2 } from 'lucide-react';
+import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone, Phone, Mail, Link2, IdCard, CalendarDays, FileCheck2, AlertTriangle, Trash2, UserCog } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getPendingStores, adminStoreList, type AdminStore } from '@/lib/merchant';
+import { getPendingStores, adminStoreList, approvedTransfers, type AdminStore } from '@/lib/merchant';
 import { timeAgo } from '@/lib/utils';
-import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction } from '../actions';
+import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتاجر' };
@@ -120,11 +120,35 @@ function StoreCard({ s }: { s: AdminStore }) {
 
 export default async function AdminStores() {
   await requireAction('stores', 'view');
-  const [pending, stores] = await Promise.all([getPendingStores(), adminStoreList()]);
+  const [pending, stores, transfers] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers()]);
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold text-primary">إدارة المتاجر</h1></div>
       <p className="text-sm text-muted-foreground">معلومات كاملة عن كل متجر ونشاطه، مع الاعتماد والإيقاف والإنذار من المنتجات المخالفة. عند تكرار الإنذارات ٣ مرات يُوقف المتجر تلقائياً وتبقى الإنذارات موثّقة.</p>
+
+      {/* نقل الملكية — بعد طلب المنقول له وموافقة الصاحب الأول، تنفّذ الإدارة النقل */}
+      {transfers.length > 0 && (
+        <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-3">
+          <div className="mb-2 flex items-center gap-2 font-bold text-primary"><UserCog className="h-5 w-5" /> طلبات نقل ملكية بموافقة الطرفين ({en(transfers.length)})</div>
+          <div className="space-y-2">
+            {transfers.map((tr) => (
+              <div key={tr.storeId} className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 text-sm shadow-sm">
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-primary">{tr.storeName || `متجر #${tr.storeId}`}</div>
+                  <div className="text-xs text-muted-foreground">
+                    من <b>{tr.fromName}</b> ← إلى <b>{tr.toName}</b>{tr.toPhone ? <> (<span dir="ltr">{tr.toPhone}</span>)</> : null} · وافق المالك {timeAgo(tr.at)}
+                  </div>
+                </div>
+                <form action={completeStoreTransferAction} className="flex items-center gap-2">
+                  <input type="hidden" name="storeId" value={tr.storeId} />
+                  <label className="flex items-center gap-1 text-[11px] font-bold text-primary"><input type="checkbox" name="confirm" required className="h-3.5 w-3.5 accent-[hsl(var(--primary))]" /> أؤكّد</label>
+                  <button className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white"><UserCog className="h-3.5 w-3.5" /> تنفيذ النقل</button>
+                </form>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {pending.length > 0 && (
         <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/40 p-3">

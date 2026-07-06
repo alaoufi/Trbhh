@@ -68,6 +68,24 @@ const STATEMENTS: string[] = [
     store_id INT NOT NULL, reason VARCHAR(300) NULL,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* products the merchant explicitly showcases in the store (independent
+     catalog — nothing from the owner's platform ads appears automatically) */
+  `CREATE TABLE IF NOT EXISTS store_products (
+    store_id INT NOT NULL, ad_id INT NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (store_id, ad_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* two-party ownership transfer: transferee requests, owner approves, admin
+     executes. status 0=requested 1=owner-approved 2=completed */
+  `CREATE TABLE IF NOT EXISTS store_transfers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    store_id INT NOT NULL,
+    from_user INT NOT NULL, to_user INT NOT NULL,
+    status TINYINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    approved_at TIMESTAMP NULL, completed_at TIMESTAMP NULL,
+    UNIQUE KEY uniq_store_transfer (store_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   /* ---- moderation ---- */
   `ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`,

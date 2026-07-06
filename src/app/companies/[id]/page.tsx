@@ -8,7 +8,7 @@ import { getStore } from '@/lib/stores';
 import { getMyAds } from '@/lib/account';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
-import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds } from '@/lib/merchant';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { StoreBottomNav } from '@/components/store-bottomnav';
@@ -16,7 +16,7 @@ import { StoreCatalog } from '@/components/store-catalog';
 import { waLink } from '@/lib/classified-theme';
 import { bannerBackground, storeTier, isLightColor, layoutTokens, isCatalogStyle, DEFAULT_CATALOG_FIELDS } from '@/lib/store-style';
 import { timeAgo } from '@/lib/utils';
-import { followStoreAction, rateStoreAction, sendCollabAction } from '../actions';
+import { followStoreAction, rateStoreAction, sendCollabAction, requestTransferAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,9 +37,9 @@ function Stars({ value }: { value: number }) {
   );
 }
 
-export default async function CompanyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ q?: string }> }) {
+export default async function CompanyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ q?: string; t?: string }> }) {
   const { id } = await params;
-  const { q } = await searchParams;
+  const { q, t } = await searchParams;
   const query = (q || '').trim();
   const storeId = Number(id);
   if (!Number.isInteger(storeId) || storeId <= 0) notFound();
@@ -64,14 +64,18 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
     );
   }
 
-  const [myAds, followers, rating, reviews, following] = await Promise.all([
+  const [myAds, productIds, followers, rating, reviews, following] = await Promise.all([
     getMyAds(s.userId),
+    storeProductAdIds(storeId),
     followersCount(storeId),
     getStoreRating(storeId),
     getStoreReviews(storeId),
     session && !isOwner ? isFollowing(session.uid, storeId) : Promise.resolve(false),
   ]);
-  const allActive = myAds.filter((a) => a.status === 1).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
+  // independent catalog: ONLY the ads the merchant added to the store — never
+  // all their platform ads. Empty until the owner showcases products.
+  const inStore = new Set(productIds);
+  const allActive = myAds.filter((a) => a.status === 1 && inStore.has(a.id)).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
   const active = query ? allActive.filter((a) => (a.title || '').includes(query)) : allActive;
   const wa = waLink(s.whatsapp);
   // collaboration: can this viewer (a merchant) invite this store?
@@ -220,6 +224,26 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             </div>
           )}
           <CopyLink url={`https://${SITE.domain}/companies/${storeId}`} label="رابط المتجر المباشر" />
+
+          {/* نقل ملكية المتجر — يبدأ بطلب من المنقول له، ثم موافقة الصاحب الأول، ثم تنفيذ الإدارة */}
+          {session && !isOwner && (
+            <details className="rounded-xl border border-primary/20 bg-primary/5">
+              <summary className="cursor-pointer list-none px-3 py-2 text-sm font-bold text-primary">طلب نقل ملكية هذا المتجر إليّ…</summary>
+              <div className="border-t border-primary/15 p-3">
+                {t === 'ok' && <p className="mb-2 rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">أُرسل طلبك. يظهر لصاحب المتجر للموافقة، ثم تنفّذه الإدارة.</p>}
+                {t === 'err' && <p className="mb-2 rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">تعذّر إرسال الطلب (قد تملك متجراً بالفعل أو المتجر غير متاح).</p>}
+                <p className="mb-2 text-[11px] leading-5 text-muted-foreground">
+                  يُرسل طلب رسمي لصاحب المتجر الحالي. لا تنتقل الملكية إلا بعد موافقته وتنفيذ إدارة المتاجر. عند الانتقال تنتقل معلومات المتجر (الاسم والجوال والبريد) كاملة.
+                </p>
+                <form action={requestTransferAction}>
+                  <input type="hidden" name="storeId" value={storeId} />
+                  <button className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold text-white" style={{ background: brand }}>
+                    <Handshake className="h-4 w-4" /> إرسال طلب النقل
+                  </button>
+                </form>
+              </div>
+            </details>
+          )}
         </div>
 
         {s.branches.length > 0 && (

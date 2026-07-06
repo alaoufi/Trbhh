@@ -885,6 +885,25 @@ model store_warnings {
   created_at DateTime? @default(now()) @db.Timestamp(0)
 }
 
+model store_products {
+  store_id   Int
+  ad_id      Int
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@id([store_id, ad_id])
+}
+
+model store_transfers {
+  id           Int       @id @default(autoincrement())
+  store_id     Int       @unique(map: "uniq_store_transfer")
+  from_user    Int
+  to_user      Int
+  status       Int       @default(0) @db.TinyInt
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+  approved_at  DateTime? @db.Timestamp(0)
+  completed_at DateTime? @db.Timestamp(0)
+}
+
 model dup_attempts {
   user_id    BigInt    @id @db.UnsignedBigInt
   count      Int       @default(0)

@@ -134,6 +134,39 @@ export async function agreeStoreTerms(userId: number) {
   await prisma.stores.updateMany({ where: { user_id: userId }, data: { terms_agreed: 1, terms_agreed_at: new Date() } }).catch(() => {});
 }
 
+/* ---- store catalog (independent products) ----
+ * A store is fully independent: it shows ONLY the ads the merchant explicitly
+ * added to it — nothing from their platform ads leaks in automatically. */
+
+/** Ad ids the merchant chose to showcase in the store. */
+export async function storeProductAdIds(storeId: number): Promise<number[]> {
+  await ensure();
+  const rows = await prisma.store_products.findMany({ where: { store_id: storeId }, select: { ad_id: true } }).catch(() => []);
+  return rows.map((r) => r.ad_id);
+}
+
+/** Replace the store's showcased products (only the owner's own ads qualify). */
+export async function setStoreProducts(userId: number, adIds: number[]) {
+  await ensure();
+  const storeId = await storeIdOfUser(userId);
+  if (!storeId) return;
+  const uniq = [...new Set(adIds.filter((n) => Number.isInteger(n) && n > 0))].slice(0, 500);
+  const owned = uniq.length
+    ? await prisma.ads.findMany({ where: { user_id: BigInt(userId), id: { in: uniq.map((n) => BigInt(n)) } }, select: { id: true } }).catch(() => [])
+    : [];
+  const valid = owned.map((a) => toInt(a.id));
+  await prisma.store_products.deleteMany({ where: { store_id: storeId } }).catch(() => {});
+  if (valid.length) await prisma.store_products.createMany({ data: valid.map((ad_id) => ({ store_id: storeId, ad_id })), skipDuplicates: true }).catch(() => {});
+}
+
+/** Active showcased ads of a store (its independent catalog). */
+export async function storeCatalogAds(storeId: number, ownerUserId: number) {
+  const ids = new Set(await storeProductAdIds(storeId));
+  if (!ids.size) return [];
+  const { getMyAds } = await import('./account');
+  return (await getMyAds(ownerUserId)).filter((a) => a.status === 1 && ids.has(a.id));
+}
+
 /** Does this user own an admin-approved store? (its ads publish directly). */
 export async function isApprovedStoreOwner(userId: number): Promise<boolean> {
   await ensure();
@@ -309,11 +342,10 @@ export async function isCollaborator(aStore: number, bStore: number): Promise<bo
 export async function collaboratorAds(storeId: number) {
   const ids = await collaboratorStoreIds(storeId);
   if (!ids.length) return [];
-  const stores = await prisma.stores.findMany({ where: { id: { in: ids.map((n) => BigInt(n)) } }, select: { user_id: true } });
-  const { getMyAds } = await import('./account');
+  const stores = await prisma.stores.findMany({ where: { id: { in: ids.map((n) => BigInt(n)) } }, select: { id: true, user_id: true } });
   const out: { id: number; title: string; price: number; adsType: string; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; views: number; sellerName: null; sellerTrusted: boolean }[] = [];
   for (const s of stores) {
-    const a = (await getMyAds(Number(s.user_id))).filter((x) => x.status === 1).slice(0, 4);
+    const a = (await storeCatalogAds(toInt(s.id), Number(s.user_id))).slice(0, 4);
     for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, views: 0, sellerName: null, sellerTrusted: false });
   }
   return out.slice(0, 12);
@@ -351,11 +383,10 @@ export async function homeFeaturedAds() {
 async function loadHomeFeaturedAds() {
   const stores = await homeFeaturedStores(6);
   if (!stores.length) return [];
-  const { getMyAds } = await import('./account');
   const out: { id: number; title: string; price: number; adsType: string; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; views: number; sellerName: null; sellerTrusted: boolean; storeName: string | null; storeId: number }[] = [];
   for (const st of stores) {
     const label = st.storeName || (await getStoreMeta(st.storeId)).storeName;
-    const a = (await getMyAds(st.userId)).filter((x) => x.status === 1).slice(0, 4);
+    const a = (await storeCatalogAds(st.storeId, st.userId)).slice(0, 4);
     for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, views: 0, sellerName: null, sellerTrusted: false, storeName: label, storeId: st.storeId });
   }
   return out.slice(0, 12);
@@ -369,6 +400,78 @@ export async function adminRequestHome(storeId: number) {
     create: { from_store: 0, to_store: storeId, kind: 'home', status: 0 },
     update: { status: 0, created_at: new Date() },
   }).catch(() => {});
+}
+
+/* ---- ownership transfer (two-party consent + admin execution) ----
+ * Flow: the transferee requests (status 0) → the current owner approves
+ * (status 1) → an admin executes the move (status 2). The store and all its
+ * data (name, phone, email, followers, reviews, products) move with it. */
+
+/** Step 1 — the transferee requests to receive a store. */
+export async function requestStoreTransfer(transfereeUserId: number, storeId: number): Promise<{ ok: boolean; msg: string }> {
+  await ensure();
+  const owner = await ownerOfStore(storeId);
+  if (!owner) return { ok: false, msg: 'المتجر غير موجود.' };
+  if (owner === transfereeUserId) return { ok: false, msg: 'أنت مالك هذا المتجر بالفعل.' };
+  if (await storeIdOfUser(transfereeUserId)) return { ok: false, msg: 'لا يمكنك استلام متجر وأنت تملك متجراً — احذف متجرك أولاً.' };
+  await prisma.store_transfers.upsert({
+    where: { store_id: storeId },
+    create: { store_id: storeId, from_user: owner, to_user: transfereeUserId, status: 0 },
+    update: { from_user: owner, to_user: transfereeUserId, status: 0, created_at: new Date(), approved_at: null, completed_at: null },
+  }).catch(() => {});
+  return { ok: true, msg: 'أُرسل طلب النقل. بانتظار موافقة صاحب المتجر ثم تنفيذ الإدارة.' };
+}
+
+/** Step 2 — the current owner approves (or rejects) the pending request. */
+export async function respondStoreTransfer(ownerUserId: number, storeId: number, accept: boolean) {
+  await ensure();
+  const t = await prisma.store_transfers.findUnique({ where: { store_id: storeId } }).catch(() => null);
+  if (!t || t.from_user !== ownerUserId || t.status !== 0) return;
+  if (accept) await prisma.store_transfers.update({ where: { store_id: storeId }, data: { status: 1, approved_at: new Date() } }).catch(() => {});
+  else await prisma.store_transfers.delete({ where: { store_id: storeId } }).catch(() => {});
+}
+
+/** Pending request awaiting THIS owner's approval (for their store page). */
+export async function pendingTransferForOwner(ownerUserId: number) {
+  await ensure();
+  const t = await prisma.store_transfers.findFirst({ where: { from_user: ownerUserId, status: 0 } }).catch(() => null);
+  if (!t) return null;
+  const to = await prisma.users.findUnique({ where: { id: BigInt(t.to_user) }, select: { name: true, userName: true, phoneNumber: true } }).catch(() => null);
+  return { storeId: t.store_id, toName: to?.name || to?.userName || 'عضو', toPhone: to?.phoneNumber || null };
+}
+
+export type PendingTransfer = { storeId: number; storeName: string | null; fromName: string; toName: string; toPhone: string | null; at: string | null };
+
+/** Owner-approved transfers waiting for admin execution. */
+export async function approvedTransfers(): Promise<PendingTransfer[]> {
+  await ensure();
+  const rows = await prisma.store_transfers.findMany({ where: { status: 1 }, orderBy: { id: 'desc' } }).catch(() => []);
+  if (!rows.length) return [];
+  const uids = [...new Set(rows.flatMap((r) => [r.from_user, r.to_user]))].map((n) => BigInt(n));
+  const users = uids.length ? await prisma.users.findMany({ where: { id: { in: uids } }, select: { id: true, name: true, userName: true, phoneNumber: true } }) : [];
+  const uById = new Map(users.map((u) => [toInt(u.id), u]));
+  const stores = await prisma.stores.findMany({ where: { id: { in: rows.map((r) => BigInt(r.store_id)) } }, select: { id: true, store_name: true } }).catch(() => []);
+  const sById = new Map(stores.map((s) => [toInt(s.id), s.store_name]));
+  return rows.map((r) => {
+    const from = uById.get(r.from_user); const to = uById.get(r.to_user);
+    return {
+      storeId: r.store_id, storeName: sById.get(r.store_id) ?? null,
+      fromName: from?.name || from?.userName || 'المالك الأول',
+      toName: to?.name || to?.userName || 'المنقول له', toPhone: to?.phoneNumber || null,
+      at: r.approved_at ? r.approved_at.toISOString() : null,
+    };
+  });
+}
+
+/** Step 3 — admin executes: the store (with its identity + data) moves to the
+ *  new owner. The old owner reverts to a normal member. */
+export async function completeStoreTransfer(storeId: number): Promise<boolean> {
+  await ensure();
+  const t = await prisma.store_transfers.findUnique({ where: { store_id: storeId } }).catch(() => null);
+  if (!t || t.status !== 1) return false;
+  await prisma.stores.update({ where: { id: BigInt(storeId) }, data: { user_id: t.to_user } }).catch(() => {});
+  await prisma.store_transfers.update({ where: { store_id: storeId }, data: { status: 2, completed_at: new Date() } }).catch(() => {});
+  return true;
 }
 
 /** Pending stores for the admin approval queue. */

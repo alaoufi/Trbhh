@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
-import { saveStoreMeta, markStorePending, agreeStoreTerms } from '@/lib/merchant';
+import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts } from '@/lib/merchant';
 import { toInt } from '@/lib/utils';
 
 export async function saveCompanyAction(formData: FormData) {
@@ -54,6 +54,14 @@ export async function saveCompanyAction(formData: FormData) {
   // land the merchant on their own (independent) store page
   const mine = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true } });
   redirect(mine ? `/companies/${toInt(mine.id)}` : '/account/company');
+}
+
+/** Owner picks which of their ads are showcased in the (independent) store. */
+export async function setStoreProductsAction(formData: FormData) {
+  const session = await requireUser();
+  const ids = formData.getAll('productIds').map((v) => Number(v)).filter((n) => Number.isInteger(n) && n > 0);
+  await setStoreProducts(session.uid, ids);
+  revalidatePath('/account/company');
 }
 
 export async function addBranchAction(formData: FormData) {

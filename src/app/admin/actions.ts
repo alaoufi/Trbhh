@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requireAction, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
+import { requireAction, requireUserBan, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
 import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
@@ -270,7 +270,7 @@ export async function adminArchiveAdAction(formData: FormData) {
 /** Ban/unban the seller from the ad detail page (admin). Asks for duration:
  *  `permanent` flag → permanent, else `days` (temporary). If already banned → unban. */
 export async function adminBanSellerAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireUserBan();
   const uid = Number(formData.get('userId'));
   const u = await prisma.users.findUnique({ where: { id: BigInt(uid) } });
   if (u) {
@@ -322,7 +322,7 @@ export async function dismissDeletionRequestAction(formData: FormData) {
 
 /** Ban a member for a chosen duration (days) or permanently. */
 export async function banUserAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireUserBan();
   const id = Number(formData.get('userId'));
   const permanent = !!formData.get('permanent');
   const days = Math.max(0, parseInt(String(formData.get('days') || '0')) || 0);
@@ -332,7 +332,7 @@ export async function banUserAction(formData: FormData) {
 
 /** Lift a member's ban. */
 export async function unbanUserAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireUserBan();
   const id = Number(formData.get('userId'));
   await unbanUser(id);
   revalidatePath('/admin/users');

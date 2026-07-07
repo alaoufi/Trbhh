@@ -8,7 +8,7 @@ import { ensureSchema } from '@/data/schema-sync';
 export type Service =
   | 'users' | 'ads' | 'duplicates' | 'classified' | 'categories'
   | 'words' | 'reports' | 'verifications' | 'debates' | 'comments' | 'packages' | 'promos' | 'backup' | 'messages' | 'stores';
-export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive' | 'suspend';
+export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive' | 'suspend' | 'ban';
 
 /** Backward-compat alias: a "Perm" is a service (page-level access). */
 export type Perm = Service;
@@ -19,7 +19,7 @@ export type Perm = Service;
  * delete an ad but must never edit a member's ad content (privacy).
  */
 export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
-  { key: 'users',         label: 'المستخدمون',         actions: ['view', 'edit', 'delete'] },
+  { key: 'users',         label: 'المستخدمون',         actions: ['view', 'edit', 'ban', 'delete'] },
   { key: 'ads',           label: 'الإعلانات',          actions: ['view', 'archive', 'delete'] },
   { key: 'duplicates',    label: 'الإعلانات المكررة',   actions: ['view', 'delete'] },
   { key: 'classified',    label: 'الإعلانات المبوّبة',   actions: ['view', 'edit', 'suspend', 'delete'] },
@@ -37,7 +37,7 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
 ];
 
 export const ACTION_LABELS: Record<Action, string> = {
-  view: 'عرض', add: 'إضافة', edit: 'تعديل', delete: 'حذف', archive: 'أرشفة', suspend: 'تعطيل',
+  view: 'عرض', add: 'إضافة', edit: 'تعديل', delete: 'حذف', archive: 'أرشفة', suspend: 'تعطيل', ban: 'حظر',
 };
 
 export const ALL_KEYS: string[] = SERVICES.flatMap((s) => s.actions.map((a) => `${s.key}:${a}`));
@@ -262,6 +262,16 @@ export async function requireAction(service: Service, action: Action) {
   const session = await getSession();
   if (!session) redirect('/login');
   if (!(await hasAction(session.uid, service, action))) redirect('/');
+  return session;
+}
+
+/** Ban/unban a member. Requires the distinct «حظر» permission (users:ban);
+ *  full users:edit also satisfies it (backward-compat with existing admins). */
+export async function requireUserBan() {
+  const session = await getSession();
+  if (!session) redirect('/login');
+  const keys = await getUserPermKeys(session.uid);
+  if (!keys.has('users:ban') && !keys.has('users:edit')) redirect('/');
   return session;
 }
 

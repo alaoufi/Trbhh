@@ -18,8 +18,9 @@ const timeShort = (iso: string | null) => timeAgo(iso).replace('قبل ', 'من�
  * and toggle which FIELDS appear (price, city, views, time, badges). Fully
  * independent of the site-wide design cookie.
  */
-export function StoreCatalog({ ads, style, fields, brand }: { ads: CatalogAd[]; style: CatalogStyle; fields: Set<string>; brand: string }) {
+export function StoreCatalog({ ads, style, fields, brand, linkBase = '/ads' }: { ads: CatalogAd[]; style: CatalogStyle; fields: Set<string>; brand: string; linkBase?: string }) {
   const has = (f: string) => fields.has(f);
+  const href = (id: number) => `${linkBase}/${id}`;
   const priceEl = (ad: CatalogAd, size = 'text-[15px]') =>
     ad.price > 0
       ? <span className={cn('font-extrabold text-red-600', size)}>{en(ad.price)} <span className="text-[11px] font-bold">ر.س</span></span>
@@ -43,7 +44,7 @@ export function StoreCatalog({ ads, style, fields, brand }: { ads: CatalogAd[]; 
     return (
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         {ads.map((ad) => (
-          <Link key={ad.id} href={`/ads/${ad.id}`} className="card-3d group flex flex-col overflow-hidden rounded-2xl">
+          <Link key={ad.id} href={href(ad.id)} className="card-3d group flex flex-col overflow-hidden rounded-2xl">
             <div className="relative aspect-square w-full overflow-hidden bg-white">
               <Image src={ad.image} alt={ad.title} fill sizes="(max-width:640px) 50vw, 33vw" className="object-cover transition group-hover:scale-105" />
               {has('type') && <span className="absolute right-0 top-2">{typeBadge(ad)}</span>}
@@ -74,7 +75,7 @@ export function StoreCatalog({ ads, style, fields, brand }: { ads: CatalogAd[]; 
     return (
       <div className="space-y-3">
         {ads.map((ad) => (
-          <Link key={ad.id} href={`/ads/${ad.id}`} className="card-3d block overflow-hidden rounded-2xl">
+          <Link key={ad.id} href={href(ad.id)} className="card-3d block overflow-hidden rounded-2xl">
             <div className="relative aspect-[16/10] w-full overflow-hidden bg-white">
               <Image src={ad.image} alt={ad.title} fill sizes="(max-width:768px) 100vw, 640px" className="object-cover" />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 text-white">
@@ -102,7 +103,7 @@ export function StoreCatalog({ ads, style, fields, brand }: { ads: CatalogAd[]; 
     return (
       <div className="space-y-3">
         {ads.map((ad) => (
-          <Link key={ad.id} href={`/ads/${ad.id}`} className="card-3d relative block overflow-hidden rounded-2xl ring-2 ring-primary/15">
+          <Link key={ad.id} href={href(ad.id)} className="card-3d relative block overflow-hidden rounded-2xl ring-2 ring-primary/15">
             <span className="absolute inset-y-0 right-0 w-1.5" style={{ background: brand }} />
             <div className="flex items-stretch gap-3 p-3">
               <div className="flex-1">
@@ -138,7 +139,7 @@ export function StoreCatalog({ ads, style, fields, brand }: { ads: CatalogAd[]; 
   return (
     <div className="space-y-3">
       {ads.map((ad) => (
-        <Link key={ad.id} href={`/ads/${ad.id}`} className="card-3d flex items-stretch gap-3 overflow-hidden rounded-2xl p-3">
+        <Link key={ad.id} href={href(ad.id)} className="card-3d flex items-stretch gap-3 overflow-hidden rounded-2xl p-3">
           <div className="flex min-w-0 flex-1 flex-col pl-3">
             <div className="mb-1 flex items-center gap-1.5">
               {has('type') && typeBadge(ad)}

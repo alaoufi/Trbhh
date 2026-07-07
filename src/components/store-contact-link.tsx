@@ -6,7 +6,7 @@
  * Beacon is fire-and-forget so it never blocks opening WhatsApp/the dialer.
  */
 export function StoreContactLink({
-  storeId, kind, href, className, target, children,
+  storeId, kind, href, className, target, children, style,
 }: {
   storeId: number;
   kind: 'whatsapp' | 'call';
@@ -14,6 +14,7 @@ export function StoreContactLink({
   className?: string;
   target?: string;
   children: React.ReactNode;
+  style?: React.CSSProperties;
 }) {
   function track() {
     try {
@@ -28,7 +29,7 @@ export function StoreContactLink({
     }
   }
   return (
-    <a href={href} onClick={track} className={className} {...(target ? { target, rel: 'noopener noreferrer' } : {})}>
+    <a href={href} onClick={track} className={className} style={style} {...(target ? { target, rel: 'noopener noreferrer' } : {})}>
       {children}
     </a>
   );

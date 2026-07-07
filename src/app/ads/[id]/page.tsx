@@ -342,8 +342,8 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         </div>
       )}
 
-      {/* Related */}
-      {similar.length > 0 && (
+      {/* Related — إعلانات تربح المشابهة تُخفى لإعلان المتجر (استقلال تام) */}
+      {!inStore && similar.length > 0 && (
         <section>
           <h2 className="mb-3 text-lg font-bold text-primary">إعلانات ذات صلة</h2>
           <AdGrid ads={similar} />

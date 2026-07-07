@@ -228,13 +228,13 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           <h2 className="mb-2 text-lg font-bold" style={{ color: brand }}>
             {query ? `نتائج البحث «${query}» (${en(active.length)})` : `كتالوج المتجر (${en(active.length)})`}
           </h2>
-          {active.length > 0 ? <StoreCatalog ads={active} style={catalogStyle} fields={catalogFields} brand={brand} /> : <p className="rounded-xl bg-white p-6 text-center text-sm text-muted-foreground shadow-sm">{query ? 'لا توجد إعلانات مطابقة لبحثك.' : 'لا توجد إعلانات معروضة بعد.'}</p>}
+          {active.length > 0 ? <StoreCatalog ads={active} style={catalogStyle} fields={catalogFields} brand={brand} linkBase={`/companies/${storeId}/p`} /> : <p className="rounded-xl bg-white p-6 text-center text-sm text-muted-foreground shadow-sm">{query ? 'لا توجد إعلانات مطابقة لبحثك.' : 'لا توجد إعلانات معروضة بعد.'}</p>}
         </div>
 
         {partnerAds.length > 0 && (
           <div className="scroll-mt-28">
             <h2 className="mb-2 flex items-center gap-2 text-lg font-bold" style={{ color: brand }}><Handshake className="h-5 w-5" /> إعلانات شركائنا</h2>
-            <StoreCatalog ads={partnerAds} style={catalogStyle} fields={catalogFields} brand={brand} />
+            <StoreCatalog ads={partnerAds} style={catalogStyle} fields={catalogFields} brand={brand} linkBase={`/companies/${storeId}/p`} />
           </div>
         )}
 

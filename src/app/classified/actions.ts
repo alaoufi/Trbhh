@@ -6,7 +6,7 @@ import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
-import { createClassified, getClassifiedById, updateClassified, deleteClassified } from '@/lib/classified';
+import { createClassified, getClassifiedById, updateClassified, deleteClassified, reactivateClassified } from '@/lib/classified';
 import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS } from '@/lib/settings';
 import { charge, consumeDupCredit } from '@/lib/wallet';
 import { scanContent } from '@/lib/content-guard';
@@ -268,6 +268,31 @@ export async function updateClassifiedAction(formData: FormData) {
   revalidatePath('/classified');
   revalidatePath('/account/classified');
   redirect('/account/classified?updated=1');
+}
+
+/** Re-activate an expired classified from the archive — charges classified[duration] and republishes. */
+export async function reactivateClassifiedAction(formData: FormData) {
+  const session = await requireUser();
+  const id = Number(formData.get('id'));
+  if (!id) redirect('/account/classified');
+  const pricing = await getServicePricing();
+  let days = 0;
+  if (serviceHasPrice(pricing.classified)) {
+    const raw = String(formData.get('duration') || '');
+    if (!isDur(raw)) redirect('/account/classified?error=duration');
+    const fee = pricing.classified[raw];
+    if (fee > 0) {
+      const { charge } = await import('@/lib/wallet');
+      const paid = await charge(session.uid, fee, 'classified', `إعادة تفعيل مبوّب #${id} (${DUR_DAYS[raw]} يوم)`);
+      if (!paid.ok) redirect(`/account/classified?error=needcredit&price=${fee}&bal=${paid.balance}`);
+    }
+    days = DUR_DAYS[raw];
+  }
+  await reactivateClassified(id, session.uid, days);
+  revalidatePath('/');
+  revalidatePath('/classified');
+  revalidatePath('/account/classified');
+  redirect('/account/classified?reactivated=1');
 }
 
 export async function deleteMyClassifiedAction(formData: FormData) {

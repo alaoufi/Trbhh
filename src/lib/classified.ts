@@ -101,13 +101,28 @@ export async function setClassifiedLifetime(id: number, days: number) {
 }
 
 /** A member's own classified ads (for editing/deleting). */
-export async function getMyClassifieds(userId: number): Promise<Classified[]> {
+export type MyClassified = Classified & { expiresAt: string | null };
+export async function getMyClassifieds(userId: number): Promise<MyClassified[]> {
   await ensureClassifiedTable();
   await loadBanned();
   const rows = await prisma.$queryRawUnsafe<Row[]>(
     `SELECT * FROM classified_ads WHERE user_id = ? ORDER BY id DESC LIMIT 100`, userId,
   ).catch(() => []);
-  return rows.map(toClassified);
+  return rows.map((r) => {
+    const ex = (r as Row & { expires_at?: Date | string | null }).expires_at;
+    const iso = ex ? new Date(ex).toISOString() : null;
+    return { ...toClassified(r), expiresAt: iso && !isNaN(Date.parse(iso)) ? iso : null };
+  });
+}
+
+/** Re-activate/renew a classified for a fresh period (owner-owned only). */
+export async function reactivateClassified(id: number, userId: number, days: number): Promise<boolean> {
+  await ensureClassifiedTable();
+  const own = await prisma.classified_ads.findFirst({ where: { id: BigInt(id), user_id: BigInt(userId) }, select: { id: true } }).catch(() => null);
+  if (!own) return false;
+  const expires_at = days > 0 ? new Date(Date.now() + Math.min(days, 3650) * 86_400_000) : null;
+  await prisma.classified_ads.updateMany({ where: { id: BigInt(id) }, data: { expires_at, status: 1 } }).catch(() => {});
+  return true;
 }
 
 export async function getClassifiedById(id: number): Promise<Classified | null> {

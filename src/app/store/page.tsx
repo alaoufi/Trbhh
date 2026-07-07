@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
-import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, platformRequestState } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, platformRequestState, hasStorePassword } from '@/lib/merchant';
 import { getMyAds } from '@/lib/account';
 import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction } from '@/app/account/company/actions';
-import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal } from 'lucide-react';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, setStorePasswordAction } from '@/app/account/company/actions';
+import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
@@ -36,6 +36,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const inStore = new Set(store ? await storeProductAdIds(store.id) : []);
   const pendingTransfer = store ? await pendingTransferForOwner(session.uid) : null;
   const platformState = store ? await platformRequestState(store.id) : 'none';
+  const storePwSet = store ? await hasStorePassword(session.uid) : false;
   const fmtDate = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d); };
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';
@@ -80,6 +81,25 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             <span><b className="flex items-center gap-1"><MessageSquare className="h-4 w-4" /> فتح التعليقات والتقييم</b><span className="block text-xs text-muted-foreground">عند الإيقاف تُقفل تقييمات وتعليقات العملاء في صفحة المتجر.</span></span>
           </label>
           <Button size="sm">حفظ الإعدادات</Button>
+        </form>
+      )}
+
+      {/* دخول مستقل للمتجر — كلمة مرور خاصة تدخل لوحة المتجر مباشرة */}
+      {store && (
+        <form action={setStorePasswordAction} className="card-3d space-y-3 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary"><KeyRound className="h-5 w-5" /> دخول مستقل للمتجر</div>
+          <p className="text-xs text-muted-foreground">
+            عيّن كلمة مرور خاصة بالمتجر (منفصلة عن حساب تربح). تدخل بها لوحة متجرك مباشرة من صفحة
+            <b> دخول المتاجر</b> باستخدام <b>معرّف المتجر</b>{meta?.handle ? <> (<span dir="ltr">{meta.handle}</span>)</> : ' (عيّن المعرّف أولاً في المصمّم)'} وكلمة المرور هذه.
+          </p>
+          <div className={`rounded-lg p-2 text-xs font-bold ${storePwSet ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+            {storePwSet ? '✓ كلمة مرور المتجر مُفعّلة — يمكنك تغييرها أدناه.' : '⚠️ لم تُفعّل بعد. عيّنها لتفعيل الدخول المستقل.'}
+          </div>
+          <input name="storePassword" type="password" minLength={6} required placeholder="كلمة مرور المتجر (٦ أحرف فأكثر)" className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+          <div className="flex items-center gap-2">
+            <Button size="sm">{storePwSet ? 'تغيير كلمة المرور' : 'تفعيل الدخول المستقل'}</Button>
+            <a href="/store-login" target="_blank" className="text-xs font-bold text-primary underline">صفحة دخول المتاجر</a>
+          </div>
         </form>
       )}
 

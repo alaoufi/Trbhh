@@ -847,6 +847,7 @@ model stores {
   handle           String?   @unique(map: "uniq_store_handle") @db.VarChar(32)
   allow_ads        Int       @default(1) @db.TinyInt
   allow_reviews    Int       @default(1) @db.TinyInt
+  store_password   String?   @db.VarChar(255)
 }
 
 // ---- self-provisioned tables (source of truth: src/data/schema-sync.ts) ----

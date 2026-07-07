@@ -8,7 +8,7 @@ const secret = new TextEncoder().encode(
   process.env.AUTH_SECRET || 'dev-insecure-secret-change-me-in-production-please',
 );
 
-export type SessionPayload = { uid: number; name: string; type: string };
+export type SessionPayload = { uid: number; name: string; type: string; scope?: string };
 
 /**
  * Verify a plaintext password against the stored bcrypt hash.

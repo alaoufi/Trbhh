@@ -278,6 +278,39 @@ export function normalizeHandle(raw: string): string {
   return h;
 }
 
+/* ---- independent store login (separate credentials → store dashboard) ---- */
+
+/** Owner sets/changes a dedicated password for logging into the store directly. */
+export async function setStorePassword(userId: number, plain: string): Promise<boolean> {
+  await ensure();
+  const storeId = await storeIdOfUser(userId);
+  if (!storeId || !plain || plain.length < 6) return false;
+  const { hashPassword } = await import('./auth');
+  const hash = await hashPassword(plain);
+  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { store_password: hash } }).catch(() => {});
+  return true;
+}
+
+/** Does the caller's store have a dedicated login password set? */
+export async function hasStorePassword(userId: number): Promise<boolean> {
+  await ensure();
+  const s = await prisma.stores.findFirst({ where: { user_id: userId }, select: { store_password: true } }).catch(() => null);
+  return !!s?.store_password;
+}
+
+/** Verify store-login credentials (handle + store password) → the owner to sign in as. */
+export async function storeLogin(handle: string, plain: string): Promise<{ uid: number; name: string } | null> {
+  await ensure();
+  const h = normalizeHandle(handle);
+  if (!h || !plain) return null;
+  const s = await prisma.stores.findFirst({ where: { handle: h }, select: { user_id: true, store_password: true } }).catch(() => null);
+  if (!s?.store_password) return null;
+  const { verifyPassword } = await import('./auth');
+  if (!(await verifyPassword(plain, s.store_password))) return null;
+  const u = await prisma.users.findUnique({ where: { id: BigInt(s.user_id) }, select: { name: true, userName: true } }).catch(() => null);
+  return { uid: s.user_id, name: u?.name || u?.userName || 'متجر' };
+}
+
 /** Set the caller store's handle. Returns the outcome for UI feedback. */
 export async function setStoreHandle(userId: number, raw: string): Promise<{ ok: boolean; handle?: string; msg: string }> {
   await ensure();

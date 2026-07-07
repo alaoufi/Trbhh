@@ -4,8 +4,16 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
-import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform, saveStoreSettings } from '@/lib/merchant';
+import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform, saveStoreSettings, setStorePassword } from '@/lib/merchant';
 import { toInt } from '@/lib/utils';
+
+/** Owner sets/changes the dedicated store-login password. */
+export async function setStorePasswordAction(formData: FormData) {
+  const session = await requireUser();
+  const pw = String(formData.get('storePassword') || '');
+  await setStorePassword(session.uid, pw);
+  revalidatePath('/store');
+}
 
 /** Store toggles: allow publishing ads + lock/unlock reviews & comments. */
 export async function saveStoreSettingsAction(formData: FormData) {

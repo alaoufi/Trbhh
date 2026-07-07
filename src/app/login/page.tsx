@@ -37,6 +37,9 @@ function LoginInner() {
         <p className="mt-4 text-center text-sm text-muted-foreground">
           ليس لديك حساب؟ <Link href="/register" className="text-primary hover:underline">أنشئ حساباً</Link>
         </p>
+        <div className="mt-3 border-t pt-3 text-center text-sm">
+          <Link href="/store-login" className="font-bold text-primary hover:underline">🏪 دخول أصحاب المتاجر (دخول مستقل للمتجر)</Link>
+        </div>
       </div>
     </div>
   );

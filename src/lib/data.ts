@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from './prisma';
-import { cached } from './redis';
+import { cached, cacheDel, cacheDelPattern } from './redis';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { loadBanned, censorSync } from './censor';
 import { sweepExpiredFeatured, getFeaturedTierMap, getUsersAdMeta } from './packages';
@@ -182,6 +182,16 @@ export async function sweepExpiredArchived() {
     await prisma.photos.deleteMany({ where: { other_id: { in: expired } } }).catch(() => {});
     await prisma.ads.deleteMany({ where: { id: { in: expired } } }).catch(() => {});
   }
+}
+
+/** Invalidate listing caches so a new/changed ad appears immediately
+ *  everywhere (home, search, categories, and store showcases). */
+export async function bustAdCaches(): Promise<void> {
+  await Promise.all([
+    cacheDelPattern('ads:*'),
+    cacheDelPattern('stores:*'),
+    cacheDel('stats:home'),
+  ]);
 }
 
 export async function getLatestAds(take = 12) {

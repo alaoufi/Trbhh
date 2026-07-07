@@ -9,6 +9,7 @@ import { watermarkImage } from '@/lib/watermark';
 import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
 import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
+import { bustAdCaches } from '@/lib/data';
 import { setAdMedia } from '@/lib/ad-media';
 import { setUserArea } from '@/lib/user-location';
 import { scanContent } from '@/lib/content-guard';
@@ -254,6 +255,7 @@ export async function createAdAction(formData: FormData) {
   if (audio) await setAdMedia(ad.id, 'audio', audio).catch(() => {});
   await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
   await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز: تثبيت بالأعلى
+  await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
   // ينشر مباشرة، إلا إذا كان مقيّداً بالموافقة
   if (requireApproval) redirect('/account/ads?pending=1');
   redirect(`/ads/${toInt(ad.id)}`);
@@ -331,6 +333,7 @@ export async function updateAdAction(formData: FormData) {
   const newAudio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);
   if (newAudio) await setAdMedia(adId, 'audio', newAudio).catch(() => {});
 
+  await bustAdCaches().catch(() => {});
   revalidatePath(`/ads/${toInt(adId)}`);
   redirect(`/ads/${toInt(adId)}`);
 }

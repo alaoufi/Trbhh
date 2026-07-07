@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title: ad.title,
     description: ad.detail?.slice(0, 160),
-    openGraph: { images: ad.images.slice(0, 1), title: ad.title },
+    openGraph: { images: (ad.images || []).slice(0, 1), title: ad.title },
   };
 }
 
@@ -247,7 +247,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
           <ul className="space-y-3">
             {comments.map((c) => (
               <li key={c.id} className="flex gap-2">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">{c.author.charAt(0)}</span>
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">{(c.author || 'ع').charAt(0)}</span>
                 <div className="rounded-lg bg-white/70 p-2 ring-1 ring-primary/10">
                   <div className="flex items-center gap-2"><span className="text-sm font-semibold text-primary">{c.author}</span><span className="text-xs text-muted-foreground">{timeAgo(c.createdAt)}</span></div>
                   <p className="text-sm">{c.comment}</p>

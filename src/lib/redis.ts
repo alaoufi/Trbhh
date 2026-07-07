@@ -39,6 +39,17 @@ export async function cacheDel(...keys: string[]): Promise<void> {
   }
 }
 
+/** Delete every cache key matching a glob pattern (e.g. "ads:*"). */
+export async function cacheDelPattern(pattern: string): Promise<void> {
+  if (!redis) return;
+  try {
+    const keys = await redis.keys(pattern);
+    if (keys.length) await redis.del(...keys);
+  } catch {
+    /* ignore cache delete errors */
+  }
+}
+
 /** Simple cache-aside helper. Falls back to the loader when Redis is unavailable. */
 export async function cached<T>(key: string, ttlSeconds: number, loader: () => Promise<T>): Promise<T> {
   if (!redis) return loader();

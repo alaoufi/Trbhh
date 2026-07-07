@@ -26,9 +26,14 @@ const nextConfig = {
   typescript: { ignoreBuildErrors: true },
   images: {
     formats: ['image/avif', 'image/webp'],
+    // Allow any host: legacy ad photos may reference old external media hosts.
+    // An unlisted host made next/image throw a CLIENT-side exception that blanked
+    // the whole page (ad detail, home, store cards) even though the ad was saved.
     remotePatterns: [
       { protocol: 'https', hostname: mediaHost },
       { protocol: 'https', hostname: 'trbhh.com' },
+      { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: '**' },
     ],
   },
   experimental: {

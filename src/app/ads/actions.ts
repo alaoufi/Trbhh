@@ -8,7 +8,7 @@ import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
-import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds } from '@/lib/settings';
 import { bustAdCaches } from '@/lib/data';
 import { setAdMedia } from '@/lib/ad-media';
 import { setUserArea } from '@/lib/user-location';
@@ -96,21 +96,12 @@ async function storeImages(images: PreparedImage[], userId: number, adId: bigint
  *   • an uploaded image is byte-identical to an existing ad image.
  */
 /** Duplicate against the SAME user's own ads (reposting the same ad).
- *  Returns the matched ad (id + title) so we can tell the member/admin exactly
- *  which ad it duplicates — or null when it is not a duplicate. */
-async function ownDuplicateOf(userId: number, title: string, detail: string, images: PreparedImage[]): Promise<{ id: number; title: string } | null> {
-  if (images.length) {
-    const found = await prisma.uploads.findFirst({
-      where: { user_id: userId, OR: images.map((i) => ({ file_name: { contains: i.hash } })) },
-      select: { id: true },
-    });
-    if (found) {
-      // resolve which ad that identical image belongs to
-      const ph = await prisma.photos.findFirst({ where: { photo_path: String(toInt(found.id)) }, select: { other_id: true } }).catch(() => null);
-      const a = ph ? await prisma.ads.findUnique({ where: { id: BigInt(ph.other_id) }, select: { id: true, title: true } }).catch(() => null) : null;
-      return a ? { id: toInt(a.id), title: a.title } : { id: 0, title: 'إعلان بصورة مطابقة' };
-    }
-  }
+ *  Comparison is ONLY on the AD TITLE and AD DETAILS — each with its own
+ *  admin-configurable threshold (no image/price matching). Returns the matched
+ *  ad (id + title) so we can tell the member/admin exactly which ad it
+ *  duplicates — or null when it is not a duplicate. */
+async function ownDuplicateOf(userId: number, title: string, detail: string): Promise<{ id: number; title: string } | null> {
+  const { title: titlePct, detail: detailPct } = await getDupThresholds();
   const mine = await prisma.ads.findMany({
     where: { user_id: BigInt(userId) },
     select: { id: true, title: true, detail: true },
@@ -120,9 +111,9 @@ async function ownDuplicateOf(userId: number, title: string, detail: string, ima
   const nTitle = normalizeAr(title);
   const nDetail = normalizeAr(detail);
   for (const r of mine) {
-    if (similarity(nTitle, normalizeAr(r.title)) >= 0.9 || similarity(nDetail, normalizeAr(r.detail)) >= 0.9) {
-      return { id: toInt(r.id), title: r.title };
-    }
+    const titleMatch = similarity(nTitle, normalizeAr(r.title)) * 100 >= titlePct;
+    const detailMatch = similarity(nDetail, normalizeAr(r.detail)) * 100 >= detailPct;
+    if (titleMatch || detailMatch) return { id: toInt(r.id), title: r.title };
   }
   return null;
 }
@@ -221,7 +212,7 @@ export async function createAdAction(formData: FormData) {
   }
 
   // منع تكرار الإعلان: تحذير ٣ محاولات ثم حظر الحساب
-  const dup = await ownDuplicateOf(session.uid, title, detail, images);
+  const dup = await ownDuplicateOf(session.uid, title, detail);
   if (dup) {
     const n = await bumpDupAttempts(session.uid);
     // يُسجَّل للإدارة: أي إعلان تطابق معه بالضبط (السجل الرقابي)

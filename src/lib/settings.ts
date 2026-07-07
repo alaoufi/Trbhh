@@ -100,6 +100,19 @@ export async function getClassifiedSplashSeconds(): Promise<number> {
   return Math.min(60, Math.max(2, n || 5));
 }
 
+/** Duplicate-detection thresholds (percent) — separate for title and details,
+ *  editable by the admin. Comparison is ONLY on title + details (no images). */
+export const SETTING_DUP_TITLE_PCT = 'dup_title_percent';
+export const SETTING_DUP_DETAIL_PCT = 'dup_detail_percent';
+export async function getDupThresholds(): Promise<{ title: number; detail: number }> {
+  const clamp = (n: number) => Math.min(100, Math.max(50, Math.round(n) || 90));
+  const [t, d] = await Promise.all([
+    getSettingNum(SETTING_DUP_TITLE_PCT, 90),
+    getSettingNum(SETTING_DUP_DETAIL_PCT, 90),
+  ]);
+  return { title: clamp(t), detail: clamp(d) };
+}
+
 /* ---- native app shells (Android TWA / iOS wrapper): versions & stores ---- */
 export const APP_KEYS = {
   androidPackage: 'app_android_package',

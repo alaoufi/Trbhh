@@ -12,7 +12,7 @@ import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAcco
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, APP_KEYS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -372,7 +372,11 @@ export async function saveSettingsAction(formData: FormData) {
   const classifiedDays = Math.max(0, parseInt(String(formData.get('classifiedDays') || '0')) || 0);
   const splashSeconds = Math.min(60, Math.max(2, parseInt(String(formData.get('splashSeconds') || '5')) || 5));
   const adsApproval = formData.get('adsApproval') !== null ? '1' : '0';
+  const dupTitle = Math.min(100, Math.max(50, parseInt(String(formData.get('dupTitlePct') || '90')) || 90));
+  const dupDetail = Math.min(100, Math.max(50, parseInt(String(formData.get('dupDetailPct') || '90')) || 90));
   await setSetting(SETTING_ADS_APPROVAL, adsApproval);
+  await setSetting(SETTING_DUP_TITLE_PCT, String(dupTitle));
+  await setSetting(SETTING_DUP_DETAIL_PCT, String(dupDetail));
   await setSetting(SETTING_AD_EDIT_HOURS, String(editH));
   await setSetting(SETTING_AD_DELETE_HOURS, String(delH));
   await setSetting(SETTING_MSG_DELETE_MINUTES, String(msgDelMin));

@@ -1,6 +1,6 @@
 import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL } from '@/lib/settings';
+import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -9,7 +9,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig()]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds()]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -56,6 +56,19 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             مراجعة الإعلانات قبل النشر (إذا فُعّلت، لا يُنشر الإعلان إلا بموافقة الإدارة)
           </label>
           <p className="mt-1 text-xs text-muted-foreground">افتراضياً يُنشر الإعلان مباشرة ما لم يكن مكرّراً.</p>
+
+          {/* حساسية كشف التكرار — تُقارن فقط على العنوان والتفاصيل، لكل حقل نسبته */}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <label className="block space-y-1">
+              <span className="text-xs font-bold">نسبة تطابق العنوان %</span>
+              <input name="dupTitlePct" type="number" min={50} max={100} defaultValue={dupThresholds.title} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs font-bold">نسبة تطابق التفاصيل %</span>
+              <input name="dupDetailPct" type="number" min={50} max={100} defaultValue={dupThresholds.detail} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+            </label>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">يُعدّ الإعلان مكرّراً إذا تطابق <b>العنوان</b> أو <b>التفاصيل</b> مع إعلان سابق للعضو نفسه بالنسبة المحددة (المقارنة على هذين الحقلين فقط). كلما زادت النسبة قلّت الحساسية.</p>
         </div>
 
         <div className="border-t border-primary/15 pt-3">

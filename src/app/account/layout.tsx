@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { LayoutDashboard, Megaphone, Heart, User, LogOut, UserX, PlusCircle, Building2, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Megaphone, Heart, User, LogOut, UserX, PlusCircle, Building2, ShieldCheck, Wallet } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 
 const nav = [
   { href: '/account', label: 'لوحة التحكم', icon: LayoutDashboard },
   { href: '/account/ads', label: 'إعلاناتي', icon: Megaphone },
+  { href: '/account/wallet', label: 'محفظتي', icon: Wallet },
   { href: '/account/favorites', label: 'المفضلة', icon: Heart },
   { href: '/store', label: 'متجري', icon: Building2 },
   { href: '/account/verify', label: 'توثيق الحساب', icon: ShieldCheck },

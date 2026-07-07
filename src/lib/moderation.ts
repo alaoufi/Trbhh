@@ -106,7 +106,7 @@ export async function getBanMap(ids: number[]): Promise<Map<number, Date | null>
 /** Write one moderation event to the audit log (best-effort). */
 export async function logMod(
   userId: number,
-  e: { kind: string; category?: string | null; term?: string | null; snippet?: string | null; action: 'blocked' | 'banned' },
+  e: { kind: string; category?: string | null; term?: string | null; snippet?: string | null; action: 'blocked' | 'banned' | 'charged' },
 ) {
   await ensureTables();
   await prisma.mod_log.create({

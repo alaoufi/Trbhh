@@ -97,6 +97,20 @@ const STATEMENTS: string[] = [
 
   /* ---- moderation ---- */
   `ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`,
+  /* ---- wallet / credit (رصيد) ---- */
+  `ALTER TABLE users ADD COLUMN balance INT NOT NULL DEFAULT 0`,
+  `CREATE TABLE IF NOT EXISTS wallet_txns (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    amount INT NOT NULL,
+    balance_after INT NOT NULL,
+    reason VARCHAR(40) NOT NULL,
+    note VARCHAR(200) NULL,
+    admin_id BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX wallet_txns_user (user_id),
+    INDEX wallet_txns_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS dup_attempts (
     user_id BIGINT UNSIGNED NOT NULL,
     count INT NOT NULL DEFAULT 0,

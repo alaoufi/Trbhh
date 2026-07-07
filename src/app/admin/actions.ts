@@ -12,7 +12,7 @@ import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAcco
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, APP_KEYS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_PRICE_FEATURED, SETTING_PRICE_CLASSIFIED, SETTING_PRICE_DUP, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -391,6 +391,10 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));
   await setSetting(SETTING_CDUP_IMAGE_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupImagePct') || '95')) || 95))));
   await setSetting(SETTING_CDUP_BG_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupBgPct') || '100')) || 100))));
+  // wallet pricing (SAR, 0 = free)
+  await setSetting(SETTING_PRICE_FEATURED, String(Math.max(0, parseInt(String(formData.get('priceFeatured') || '0')) || 0)));
+  await setSetting(SETTING_PRICE_CLASSIFIED, String(Math.max(0, parseInt(String(formData.get('priceClassified') || '0')) || 0)));
+  await setSetting(SETTING_PRICE_DUP, String(Math.max(0, parseInt(String(formData.get('priceDuplicate') || '0')) || 0)));
   // native app shells: store links + minimum versions (raising min = forced update)
   await setSetting(APP_KEYS.androidPackage, String(formData.get('appAndroidPackage') || 'com.trbhh.app').trim());
   await setSetting(APP_KEYS.androidSha256, String(formData.get('appAndroidSha256') || '').trim());
@@ -623,6 +627,21 @@ export async function moveCategoryAction(formData: FormData) {
 }
 
 /* ---- User view / edit / send-password ---- */
+/** Admin credits or debits a member's wallet (رصيد). action=credit|debit. */
+export async function adjustUserBalanceAction(formData: FormData) {
+  const admin = await requireAction('users', 'edit');
+  const uid = toInt(BigInt(String(formData.get('userId'))));
+  const amount = Math.abs(parseInt(String(formData.get('amount') || '0')) || 0);
+  const note = String(formData.get('note') || '').trim() || undefined;
+  const kind = String(formData.get('kind') || 'credit');
+  if (!uid || amount <= 0) redirect(`/admin/users/${uid}?error=${encodeURIComponent('أدخل مبلغاً صحيحاً')}`);
+  const { creditUser, debitUser } = await import('@/lib/wallet');
+  const r = kind === 'debit' ? await debitUser(uid, amount, admin.uid, note) : await creditUser(uid, amount, admin.uid, note);
+  revalidatePath(`/admin/users/${uid}`);
+  if (!r.ok) redirect(`/admin/users/${uid}?error=${encodeURIComponent('تعذّر التنفيذ (قد يكون الرصيد غير كافٍ للخصم)')}`);
+  redirect(`/admin/users/${uid}?bal=1`);
+}
+
 export async function updateUserAction(formData: FormData) {
   await requireAction('users', 'edit');
   const id = BigInt(String(formData.get('userId')));

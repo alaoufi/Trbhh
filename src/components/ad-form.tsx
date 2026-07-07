@@ -44,11 +44,12 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, limitMax, gapHours, gapWait, blockCat, banned,
+  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, limitMax, gapHours, gapWait, blockCat, banned,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string; dupId?: string;
+  needPrice?: string; needBal?: string;
   limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean;
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
@@ -162,6 +163,14 @@ export function AdForm({
           {dupLeft && Number(dupLeft) > 0
             ? ` تبقّى لك ${dupLeft} ${Number(dupLeft) === 1 ? 'محاولة' : 'محاولات'} قبل حظر حسابك.`
             : ' هذه محاولتك الأخيرة قبل الحظر.'}
+        </div>
+      )}
+      {error === 'needcredit' && (
+        <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          💳 هذا الإعلان مكرّر، والتكرار مدفوع. <b>اشحن رصيدك</b> لنشره.
+          {needPrice && <span> رسوم التكرار: <b>{needPrice} ر.س</b>.</span>}
+          {needBal !== undefined && <span> رصيدك الحالي: <b>{needBal} ر.س</b>.</span>}
+          <span> راجع <a href="/account/wallet" className="font-bold underline">محفظتي</a> أو تواصل مع الإدارة للشحن.</span>
         </div>
       )}
       {error === 'banned' && (

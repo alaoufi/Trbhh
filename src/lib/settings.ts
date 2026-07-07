@@ -132,6 +132,21 @@ export async function getClassifiedDupConfig(): Promise<{ enabled: boolean; cont
   return { enabled: on, content: clamp(c, 90), image: clamp(im, 95), background: clamp(bg, 100) };
 }
 
+/** Wallet pricing (SAR). 0 = free/off. `duplicate` is the fee to publish a
+ *  duplicate ad (regular or classified) — paying it bypasses duplicate blocking. */
+export const SETTING_PRICE_FEATURED = 'price_featured';
+export const SETTING_PRICE_CLASSIFIED = 'price_classified';
+export const SETTING_PRICE_DUP = 'price_duplicate';
+export async function getPricing(): Promise<{ featured: number; classified: number; duplicate: number }> {
+  const nn = (n: number) => Math.max(0, Math.round(n) || 0);
+  const [f, c, d] = await Promise.all([
+    getSettingNum(SETTING_PRICE_FEATURED, 0),
+    getSettingNum(SETTING_PRICE_CLASSIFIED, 0),
+    getSettingNum(SETTING_PRICE_DUP, 0),
+  ]);
+  return { featured: nn(f), classified: nn(c), duplicate: nn(d) };
+}
+
 /* ---- native app shells (Android TWA / iOS wrapper): versions & stores ---- */
 export const APP_KEYS = {
   androidPackage: 'app_android_package',

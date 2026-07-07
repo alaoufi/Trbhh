@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
-import { getMemberWindows, withinWindow } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getPricing } from '@/lib/settings';
+import { charge } from '@/lib/wallet';
 import { setUserArea } from '@/lib/user-location';
 import { toLocalSaudi } from '@/lib/sms';
 import { respondToReport } from '@/lib/alerts';
@@ -52,6 +53,25 @@ export async function toggleAdStatusAction(formData: FormData) {
   }
   revalidatePath('/account/ads');
   revalidatePath('/');
+}
+
+/** Pay from wallet to promote one of the member's own ads to «مميّز» (featured). */
+export async function featureAdAction(formData: FormData) {
+  const session = await requireUser();
+  const adId = BigInt(String(formData.get('adId')));
+  const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { id: true, user_id: true, adsSpecial: true } });
+  if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
+  if (ad!.adsSpecial === 'checked') redirect('/account/ads?featured=already');
+  const fee = (await getPricing()).featured;
+  if (fee <= 0) redirect('/account/ads?featured=off'); // الميزة غير مُسعّرة/مفعّلة
+  const paid = await charge(session.uid, fee, 'featured', `ترقية الإعلان #${toInt(adId)} لمميّز`);
+  if (!paid.ok) redirect(`/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
+  await prisma.ads.update({ where: { id: adId }, data: { adsSpecial: 'checked' } });
+  const { bustAdCaches } = await import('@/lib/data');
+  await bustAdCaches().catch(() => {});
+  revalidatePath('/account/ads');
+  revalidatePath('/');
+  redirect('/account/ads?featured=1');
 }
 
 export async function updateProfileAction(_prev: unknown, formData: FormData) {

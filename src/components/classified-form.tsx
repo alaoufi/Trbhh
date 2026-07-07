@@ -23,8 +23,8 @@ export type ClassifiedInitial = {
   layout?: 'auto' | 'manual';
 };
 
-export function ClassifiedForm({ action, error, initial, submitLabel }: {
-  action: (fd: FormData) => void | Promise<void>; error?: string; initial?: ClassifiedInitial; submitLabel?: string;
+export function ClassifiedForm({ action, error, initial, submitLabel, needPrice, needBal }: {
+  action: (fd: FormData) => void | Promise<void>; error?: string; initial?: ClassifiedInitial; submitLabel?: string; needPrice?: string; needBal?: string;
 }) {
   const [title, setTitle] = useState(initial?.title ?? '');
   const [body, setBody] = useState(initial?.body ?? '');
@@ -190,6 +190,7 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
         {error === 'image' && <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">🚫 رُفضت الصورة لاشتباه المحتوى بأنه غير لائق. الرجاء رفع صورة مناسبة فقط.</div>}
         {error === 'window' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">انتهت المدة المسموح بها لتعديل هذا الإعلان حسب إعدادات الموقع. للتعديل بعدها تواصل مع الإدارة.</div>}
         {error === 'duplicate' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">⚠️ هذا الإعلان المبوّب مطابق لإعلان سابق لك (في المحتوى أو الصورة أو الخلفية). لا يُسمح بتكرار نفس الإعلان — عدّل المحتوى أو الصورة لنشره.</div>}
+        {error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 <b>اشحن رصيدك</b> لإتمام النشر{needPrice ? <> — التكلفة <b>{needPrice} ر.س</b></> : ''}{needBal !== undefined ? <> ورصيدك <b>{needBal} ر.س</b></> : ''}. راجع <a href="/account/wallet" className="underline">محفظتي</a> أو تواصل مع الإدارة للشحن.</div>}
 
         {/* hidden style fields */}
         <input type="hidden" name="theme" value={theme} />

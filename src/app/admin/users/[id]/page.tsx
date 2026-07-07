@@ -1,27 +1,31 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowRight, User, Phone, Mail, Save, KeyRound, ShieldCheck, Check, AlertTriangle, Megaphone, Calendar } from 'lucide-react';
+import { ArrowRight, User, Phone, Mail, Save, KeyRound, ShieldCheck, Check, AlertTriangle, Megaphone, Calendar, Wallet, Plus, Minus } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { requireAction } from '@/lib/roles';
+import { getBalance, listTxns } from '@/lib/wallet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { updateUserAction, sendUserPasswordAction, setUserPasswordAction } from '../../actions';
+import { updateUserAction, sendUserPasswordAction, setUserPasswordAction, adjustUserBalanceAction } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'بيانات العضو' };
 
-export default async function AdminUserDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; sent?: string; error?: string; setpass?: string }> }) {
+export default async function AdminUserDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; sent?: string; error?: string; setpass?: string; bal?: string }> }) {
   await requireAction('users', 'view');
   const { id } = await params;
-  const { saved, sent, error, setpass } = await searchParams;
+  const { saved, sent, error, setpass, bal } = await searchParams;
   const uid = Number(id);
-  const [u, adsCount] = await Promise.all([
+  const [u, adsCount, balance, txns] = await Promise.all([
     prisma.users.findUnique({ where: { id: BigInt(uid) } }).catch(() => null),
     prisma.ads.count({ where: { user_id: BigInt(uid) } }).catch(() => 0),
+    getBalance(uid),
+    listTxns(uid, 15),
   ]);
   if (!u) notFound();
   const field = 'h-10 w-full rounded-lg border bg-background px-3 text-sm';
+  const fmtDate = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'short', timeStyle: 'short' }).format(d); };
 
   return (
     <div className="max-w-lg space-y-4">
@@ -33,6 +37,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
       {saved === '1' && <Banner ok>تم حفظ التعديلات.</Banner>}
       {sent === '1' && <Banner ok>تم إرسال كلمة مرور جديدة للعضو عبر رسالة نصية.</Banner>}
       {setpass === '1' && <Banner ok>تم تعيين كلمة المرور. أبلغ العضو بها ليدخل.</Banner>}
+      {bal === '1' && <Banner ok>تم تحديث رصيد العضو.</Banner>}
       {error && <Banner>{decodeURIComponent(error)}</Banner>}
 
       {/* quick facts */}
@@ -72,6 +77,39 @@ export default async function AdminUserDetail({ params, searchParams }: { params
         <p className="text-xs font-bold text-amber-800">يُنشئ كلمة مرور جديدة للعضو ويرسلها إلى جواله عبر رسالة نصية (يتطلّب ضبط بوابة الرسائل).</p>
         <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-amber-600 px-4 text-sm font-extrabold text-white hover:bg-amber-700"><KeyRound className="h-4 w-4" /> إرسال كلمة المرور</button>
       </form>
+
+      {/* المحفظة / الرصيد */}
+      <div className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><Wallet className="h-4 w-4" /> رصيد العضو</div>
+          <div className="text-lg font-extrabold text-primary">{balance} ر.س</div>
+        </div>
+        <form action={adjustUserBalanceAction} className="space-y-2">
+          <input type="hidden" name="userId" value={uid} />
+          <div className="flex gap-2">
+            <input name="amount" type="number" min={1} required placeholder="المبلغ (ر.س)" className={`${field} flex-1`} />
+            <input name="note" placeholder="ملاحظة (اختياري)" className={`${field} flex-1`} />
+          </div>
+          <div className="flex gap-2">
+            <button name="kind" value="credit" className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700"><Plus className="h-4 w-4" /> شحن رصيد</button>
+            <button name="kind" value="debit" className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-500 px-3 py-2 text-sm font-bold text-white hover:bg-red-600"><Minus className="h-4 w-4" /> خصم</button>
+          </div>
+        </form>
+        {txns.length > 0 && (
+          <div className="border-t border-primary/10 pt-2">
+            <div className="mb-1 text-xs font-bold text-muted-foreground">آخر العمليات</div>
+            <ul className="space-y-1">
+              {txns.map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="min-w-0 flex-1 truncate">{t.label}{t.note ? ` — ${t.note}` : ''}</span>
+                  <span className={`shrink-0 font-bold ${t.amount > 0 ? 'text-emerald-600' : 'text-red-500'}`}>{t.amount > 0 ? '+' : ''}{t.amount}</span>
+                  <span className="shrink-0 text-muted-foreground">{fmtDate(t.at)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       <Link href={`/admin/users/${uid}/permissions`} className="inline-flex items-center gap-1 rounded-lg border border-primary/30 px-3 py-2 text-sm font-bold text-primary hover:bg-accent">
         <ShieldCheck className="h-4 w-4" /> إدارة الصلاحيات

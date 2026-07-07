@@ -240,9 +240,9 @@ export async function createAdAction(formData: FormData) {
     }
   }
 
-  // منع تكرار الإعلان. من اشترى «باقة تكرار» يُسمح له بنشر المكرّر بخصم نشرة واحدة من رصيد
-  // الباقة (تجاوز التكرار فقط — لا يتجاوز فحص المحتوى السياسي/الأخلاقي أعلاه).
-  const dup = await ownDuplicateOf(session.uid, title, detail, images);
+  // المتجر مستقل تماماً: إعلانات المتجر لا تخضع لسياسة تكرار تربح ولا تسعيراتها (سياسة
+  // المتجر مختلفة). أمّا إعلانات تربح فتخضع لكشف التكرار وباقاته. (فحص المحتوى يبقى للجميع.)
+  const dup = dest === 'store' ? null : await ownDuplicateOf(session.uid, title, detail, images);
   if (dup) {
     const consumed = await consumeDupCredit(session.uid);
     if (consumed) {

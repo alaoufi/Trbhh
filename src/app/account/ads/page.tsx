@@ -47,6 +47,11 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
               </div>
               <span className="text-sm font-bold text-primary">{formatPrice(ad.price, 'ر.س', ad.adsType)}</span>
               <span className="text-xs text-muted-foreground">{timeAgo(ad.createdAt)}</span>
+              {ad.status !== 1 && (
+                <span className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold leading-4 text-amber-700">
+                  سبب عدم الظهور: الإعلان <b>موقوف/بانتظار الموافقة</b> — غالباً لتشابهه مع إعلان قائم (٩٠٪+) أو تفعيل مراجعة الإعلانات. اضغط <b>«تفعيل»</b> لعرضه فوراً، أو احذف النسخة المكرّرة.
+                </span>
+              )}
               <div className="mt-auto flex gap-2 pt-2">
                 <Link href={`/ads/${ad.id}/edit`} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Pencil className="h-3 w-3" /> تعديل</Link>
                 <form action={toggleAdStatusAction}>

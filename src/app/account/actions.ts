@@ -47,8 +47,11 @@ export async function toggleAdStatusAction(formData: FormData) {
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (ad && toInt(ad.user_id) === session.uid) {
     await prisma.ads.update({ where: { id: adId }, data: { status: ad.status === 1 ? 0 : 1 } });
+    const { bustAdCaches } = await import('@/lib/data');
+    await bustAdCaches().catch(() => {}); // يظهر/يختفي فوراً في القوائم
   }
   revalidatePath('/account/ads');
+  revalidatePath('/');
 }
 
 export async function updateProfileAction(_prev: unknown, formData: FormData) {

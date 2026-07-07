@@ -18,6 +18,7 @@ import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
 import { hashPassword } from '@/lib/auth';
 import { cacheDel } from '@/lib/redis';
+import { bustAdCaches } from '@/lib/data';
 import { toInt } from '@/lib/utils';
 
 function readPromoPkgForm(formData: FormData) {
@@ -514,7 +515,9 @@ export async function adminToggleAdStatusAction(formData: FormData) {
       data: { status: archiving ? 0 : 1, data_archive: archiving ? new Date().toISOString() : null },
     });
   }
+  await bustAdCaches().catch(() => {}); // approved/hidden ad reflects immediately
   revalidatePath('/admin/ads');
+  revalidatePath('/');
 }
 
 /** Delete ALL ads that are waiting for approval (status 0, not archived). */

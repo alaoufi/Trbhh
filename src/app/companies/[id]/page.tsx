@@ -9,7 +9,7 @@ import { getMyAds } from '@/lib/account';
 import { cookies, headers } from 'next/headers';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
-import { recordStoreVisit, classifySource, getAdViewsFor } from '@/lib/store-analytics';
+import { recordStoreVisit, classifySource, bumpStoreView, getStoreViews } from '@/lib/store-analytics';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle } from '@/lib/merchant';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -86,8 +86,9 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
     );
   }
 
-  // سجّل زيارة المتجر (زائر واحد/يوم) مع مصدرها — لا تُحتسب زيارة المالك نفسه
+  // مشاهدة متجر = كل دخول/تحديث (لا تُحتسب مشاهدة المالك). أمّا الزوّار فمُزال تكرارهم يومياً.
   if (!isOwner) {
+    await bumpStoreView(storeId);
     const vid = (await cookies()).get('trbhh_vid')?.value;
     const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
     if (viewerKey) {
@@ -110,8 +111,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const allActive = myAds.filter((a) => a.status === 1 && inStore.has(a.id)).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
   const active = query ? allActive.filter((a) => (a.title || '').includes(query)) : allActive;
   const wa = waLink(s.whatsapp);
-  // مشاهدات إعلانات المتجر = مشاهدات الإعلانات المعروضة في المتجر فقط (لا كامل تاريخ العضو)
-  const storeViews = await getAdViewsFor(allActive.map((a) => a.id)).catch(() => 0);
+  // مشاهدات المتجر = عدد مرّات دخول/تحديث صفحة المتجر (مشاهدة واحدة لكل زيارة)
+  const storeViews = await getStoreViews(storeId).catch(() => 0);
   // collaboration: can this viewer (a merchant) invite this store?
   const viewerStoreId = session && !isOwner ? await storeIdOfUser(session.uid) : 0;
   const alreadyPartner = viewerStoreId ? await isCollaborator(viewerStoreId, storeId) : false;

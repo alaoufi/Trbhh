@@ -3,7 +3,7 @@ import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
 import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, platformRequestState, getStoreLogin } from '@/lib/merchant';
 import { getMyAds } from '@/lib/account';
-import { getStoreVisitorStats, getAdViewsFor } from '@/lib/store-analytics';
+import { getStoreVisitorStats, getStoreViews } from '@/lib/store-analytics';
 import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
@@ -36,9 +36,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const warnings = store ? await getStoreWarnings(store.id) : [];
   const myActiveAds = store ? (await getMyAds(session.uid)).filter((a) => a.status === 1) : [];
   const inStore = new Set(store ? await storeProductAdIds(store.id) : []);
-  // مشاهدات المتجر = مشاهدات الإعلانات المعروضة في المتجر فقط (لا كامل تاريخ العضو)
-  const shownAdIds = myActiveAds.filter((a) => inStore.has(a.id)).map((a) => a.id);
-  const totalAdViews = store ? await getAdViewsFor(shownAdIds) : 0;
+  // مشاهدات المتجر = عدد مرّات دخول/تحديث صفحة المتجر (مشاهدة واحدة لكل زيارة)
+  const totalAdViews = store ? await getStoreViews(store.id) : 0;
   const pendingTransfer = store ? await pendingTransferForOwner(session.uid) : null;
   const platformState = store ? await platformRequestState(store.id) : 'none';
   const storeLoginInfo = store ? await getStoreLogin(session.uid) : { username: null, hasPassword: false };
@@ -138,7 +137,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
           {[
             { l: 'زوّار المتجر', v: en(visitorStats?.uniqueVisitors ?? 0) },
-            { l: 'مشاهدات الإعلانات', v: en(totalAdViews) },
+            { l: 'مشاهدات المتجر', v: en(totalAdViews) },
             { l: 'المتابعون', v: en(stats.followers) },
             { l: 'التقييم', v: stats.rating.count ? `${stats.rating.avg}★` : '—' },
             { l: 'إعلانات نشطة', v: en(stats.ads) },

@@ -5,7 +5,7 @@ import { Eye, Megaphone, TrendingUp, CalendarDays, ArrowRight, BarChart3, Users,
 import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
 import { getSellerAnalytics } from '@/lib/analytics';
-import { getStoreVisitorStats } from '@/lib/store-analytics';
+import { getStoreVisitorStats, getStoreViews } from '@/lib/store-analytics';
 import { followersCount } from '@/lib/merchant';
 import { ViewsChart } from '@/components/views-chart';
 
@@ -28,10 +28,11 @@ export default async function StoreAnalyticsPage() {
   const session = await requireUser();
   const store = await getStoreByUser(session.uid);
   if (!store) redirect('/store');
-  const [visitors, ads, followers] = await Promise.all([
+  const [visitors, ads, followers, storeViews] = await Promise.all([
     getStoreVisitorStats(store.id),
     getSellerAnalytics(session.uid),
     followersCount(store.id),
+    getStoreViews(store.id),
   ]);
 
   return (
@@ -45,8 +46,8 @@ export default async function StoreAnalyticsPage() {
       <section className="space-y-2">
         <div className="flex items-center gap-2 text-sm font-bold text-primary"><Store className="h-4 w-4" /> زوّار المتجر</div>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          <Tile icon={Eye} value={storeViews} label="مشاهدات المتجر" />
           <Tile icon={Users} value={visitors.uniqueVisitors} label="زوّار مختلفون" />
-          <Tile icon={Eye} value={visitors.totalVisits} label="إجمالي الزيارات" />
           <Tile icon={CalendarDays} value={visitors.visits7} label="زيارات 7 أيام" />
           <Tile icon={TrendingUp} value={visitors.visits30} label="زيارات 30 يوم" />
           <Tile icon={UserCheck} value={followers} label="المتابعون" />

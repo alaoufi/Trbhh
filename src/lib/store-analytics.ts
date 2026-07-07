@@ -34,6 +34,24 @@ export function classifySource(referer: string | null | undefined, selfHost: str
   return 'external';
 }
 
+/** Increment the store's page-view counter — one per store entry/refresh
+ *  (NOT deduped; a store view ≠ an ad view). */
+export async function bumpStoreView(storeId: number) {
+  try {
+    await ensure();
+    await prisma.stores.update({ where: { id: BigInt(storeId) }, data: { views: { increment: 1 } } });
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** Total store page views (entries/refreshes). */
+export async function getStoreViews(storeId: number): Promise<number> {
+  await ensure();
+  const s = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { views: true } }).catch(() => null);
+  return s?.views ?? 0;
+}
+
 /** Total ad views for a specific set of ads (e.g. the ads displayed in a store). */
 export async function getAdViewsFor(adIds: number[]): Promise<number> {
   await ensure();

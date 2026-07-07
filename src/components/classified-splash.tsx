@@ -77,6 +77,14 @@ export function ClassifiedSplash({ ads, seconds }: { ads: Classified[]; seconds?
 
   useEffect(() => {
     if (!total) return;
+    // تظهر مرة واحدة فقط عند دخول الموقع — لا تتكرر مع التحديث أو التنقل داخل الموقع
+    // (تُعاد فقط في زيارة جديدة/تبويب جديد). sessionStorage يبقى طوال الجلسة.
+    try {
+      if (sessionStorage.getItem('trbhh_splash_seen') === '1') return;
+      sessionStorage.setItem('trbhh_splash_seen', '1');
+    } catch {
+      /* storage unavailable → اعرضها كالمعتاد */
+    }
     setShow(true);
     let last = performance.now();
     const iv = setInterval(() => {

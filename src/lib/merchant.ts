@@ -322,8 +322,11 @@ export async function setStoreUsername(userId: number, raw: string): Promise<{ o
   }
   const username = normalizeStoreUsername(raw);
   if (!username) return { ok: false, msg: 'اسم الدخول غير صالح (أحرف إنجليزية وأرقام و«. _ -» فقط، ٣ خانات فأكثر، وغير محجوز).' };
-  const taken = await prisma.stores.findFirst({ where: { store_username: username, id: { not: BigInt(storeId) } }, select: { id: true } }).catch(() => null);
-  if (taken) return { ok: false, msg: 'اسم الدخول مستخدم من متجر آخر — اختر غيره.' };
+  // فريد عالمياً: لا يطابق اسم دخول متجر آخر، ولا اسم مستخدم أي عضو آخر في تربح
+  const takenByStore = await prisma.stores.findFirst({ where: { store_username: username, id: { not: BigInt(storeId) } }, select: { id: true } }).catch(() => null);
+  if (takenByStore) return { ok: false, msg: 'اسم الدخول مستخدم من متجر آخر — اختر غيره.' };
+  const takenByUser = await prisma.users.findFirst({ where: { userName: username, id: { not: BigInt(userId) } }, select: { id: true } }).catch(() => null);
+  if (takenByUser) return { ok: false, msg: 'اسم الدخول مستخدم من عضو آخر — اختر غيره.' };
   await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { store_username: username } }).catch(() => {});
   return { ok: true, username, msg: 'تم حفظ اسم دخول المتجر.' };
 }

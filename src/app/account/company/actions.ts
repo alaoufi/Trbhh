@@ -25,10 +25,13 @@ export async function subscribeStoreAction(formData: FormData) {
  *  Username must be unique across stores; password (optional) must meet the minimum length. */
 export async function setStoreCredentialsAction(formData: FormData) {
   const session = await requireUser();
-  const username = String(formData.get('storeUsername') || '');
+  const username = String(formData.get('storeUsername') || '').trim();
   const pw = String(formData.get('storePassword') || '');
-  const u = await setStoreUsername(session.uid, username);
-  if (!u.ok) redirect(`/store?crederr=${encodeURIComponent(u.msg)}`);
+  // اسم فارغ = إبقاء الاسم الحالي كما هو (لا يُمسح عند تعديل كلمة المرور فقط)
+  if (username) {
+    const u = await setStoreUsername(session.uid, username);
+    if (!u.ok) redirect(`/store?crederr=${encodeURIComponent(u.msg)}`);
+  }
   if (pw) {
     const okPw = await setStorePassword(session.uid, pw); // blank = keep current password
     if (!okPw) redirect(`/store?crederr=${encodeURIComponent('كلمة المرور قصيرة جداً (4 خانات فأكثر).')}`);

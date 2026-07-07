@@ -299,11 +299,13 @@ export async function createAdAction(formData: FormData) {
   await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
   await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز: تثبيت بالأعلى
   await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
-  // نشر من المتجر: أدرِج الإعلان في واجهة المتجر تلقائياً وارجع للمتجر برسالة نجاح
+  // نشر من المتجر: أدرِج الإعلان في واجهة المتجر، ثم انتقل إلى إعلانات المتجر (لا للرجوع لصفحة الإضافة)
   if (dest === 'store') {
-    const { addStoreProduct } = await import('@/lib/merchant');
+    const { addStoreProduct, storeIdOfUser } = await import('@/lib/merchant');
     await addStoreProduct(session.uid, toInt(ad.id)).catch(() => {});
-    redirect(requireApproval ? '/store?added=pending' : '/store?added=1');
+    if (requireApproval) redirect('/store?added=pending'); // بانتظار الموافقة → لا يظهر بعد
+    const sid = await storeIdOfUser(session.uid).catch(() => 0);
+    redirect(sid ? `/companies/${sid}?added=1` : '/store?added=1');
   }
   // ينشر مباشرة، إلا إذا كان مقيّداً بالموافقة
   if (requireApproval) redirect('/account/ads?pending=1');

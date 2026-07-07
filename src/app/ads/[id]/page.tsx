@@ -99,8 +99,10 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
 
   const shareUrl = `https://${SITE.domain}/ads/${ad.id}`;
   const waNumber = waLink(ad.seller?.whatsapp);
-  // "مراسلة" is always available; WhatsApp/call only when the seller provides them
-  const contactCols = 1 + (waNumber ? 1 : 0) + (ad.seller?.phone ? 1 : 0);
+  // صاحب الإعلان لا يرى المراسلة/البلاغ/التقييم على إعلانه (لا يراسل/يبلّغ/يقيّم نفسه)
+  const isAdOwner = !!(session && ad.seller && session.uid === ad.seller.id);
+  // "مراسلة" available to non-owners; WhatsApp/call only when the seller provides them
+  const contactCols = (isAdOwner ? 0 : 1) + (waNumber ? 1 : 0) + (ad.seller?.phone ? 1 : 0);
 
   // Distance between the visitor (from the trbhh_geo cookie) and the ad location
   const viewerLoc = await getViewerLocation();
@@ -198,14 +200,16 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
             <Phone className="h-6 w-6" /> اتصال
           </a>
         )}
-        {ad.seller && session && session.uid !== ad.seller.id ? (
-          <Link href={`/messages/${ad.seller.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
-            <Send className="h-6 w-6" /> مراسلة
-          </Link>
-        ) : (
-          <Link href="/login" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
-            <Send className="h-6 w-6" /> مراسلة
-          </Link>
+        {!isAdOwner && (
+          ad.seller && session ? (
+            <Link href={`/messages/${ad.seller.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+              <Send className="h-6 w-6" /> مراسلة
+            </Link>
+          ) : (
+            <Link href="/login" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+              <Send className="h-6 w-6" /> مراسلة
+            </Link>
+          )
         )}
       </div>
 
@@ -214,14 +218,18 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         التعامل والدفع يتم خارج المنصة مباشرة بين الطرفين. المنصة وسيلة عرض وربط فقط.
       </p>
 
-      {/* Action tiles: report / rate / share / favorite */}
-      <div className="grid grid-cols-4 gap-3">
-        <Link href={`/report?type=ad&id=${ad.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
-          <Flag className="h-5 w-5" /> بلاغ
-        </Link>
-        <Link href={`/users/${ad.seller?.id}#review`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
-          <Star className="h-5 w-5" /> تقييم
-        </Link>
+      {/* Action tiles: (report + rate تظهر لغير صاحب الإعلان) / share / favorite */}
+      <div className={`grid gap-3 ${isAdOwner ? 'grid-cols-2' : 'grid-cols-4'}`}>
+        {!isAdOwner && (
+          <Link href={`/report?type=ad&id=${ad.id}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+            <Flag className="h-5 w-5" /> بلاغ
+          </Link>
+        )}
+        {!isAdOwner && (
+          <Link href={`/users/${ad.seller?.id}#review`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+            <Star className="h-5 w-5" /> تقييم
+          </Link>
+        )}
         <div className="card-3d flex items-center justify-center rounded-2xl py-3 text-primary">
           <ShareButtons url={shareUrl} title={ad.title} compact />
         </div>

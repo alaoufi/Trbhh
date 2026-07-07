@@ -59,9 +59,9 @@ function Stars({ value }: { value: number }) {
   );
 }
 
-export default async function CompanyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ q?: string; t?: string }> }) {
+export default async function CompanyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ q?: string; t?: string; added?: string }> }) {
   const { id } = await params;
-  const { q, t } = await searchParams;
+  const { q, t, added } = await searchParams;
   const query = (q || '').trim();
   // id may be a numeric store id OR a handle (from a subdomain rewrite / clean URL)
   const storeId = /^\d+$/.test(id) ? Number(id) : await storeIdByHandle(id);
@@ -155,6 +155,9 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
       </div>
 
       <div className="mx-auto max-w-2xl space-y-4 px-3 py-3">
+        {isOwner && added === '1' && (
+          <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800 shadow-sm">✓ تم نشر الإعلان وإضافته لمتجرك — تجده ضمن الإعلانات أدناه.</div>
+        )}
         {meta.status !== 1 && (isOwner || admin) && (
           <div className="rounded-xl border bg-white p-3 text-sm font-bold text-amber-700 shadow-sm">⏳ هذا المتجر {meta.status === 0 ? 'بانتظار موافقة الإدارة' : 'موقوف'} — يظهر لك فقط حالياً.</div>
         )}

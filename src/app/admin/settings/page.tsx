@@ -57,18 +57,22 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
           </label>
           <p className="mt-1 text-xs text-muted-foreground">افتراضياً يُنشر الإعلان مباشرة ما لم يكن مكرّراً.</p>
 
-          {/* حساسية كشف التكرار — تُقارن فقط على العنوان والتفاصيل، لكل حقل نسبته */}
-          <div className="mt-3 grid grid-cols-2 gap-2">
+          {/* حساسية كشف التكرار — لكل حقل نسبته (العنوان/التفاصيل/الصور) */}
+          <div className="mt-3 grid grid-cols-3 gap-2">
             <label className="block space-y-1">
-              <span className="text-xs font-bold">نسبة تطابق العنوان %</span>
+              <span className="text-xs font-bold">تطابق العنوان %</span>
               <input name="dupTitlePct" type="number" min={50} max={100} defaultValue={dupThresholds.title} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
             </label>
             <label className="block space-y-1">
-              <span className="text-xs font-bold">نسبة تطابق التفاصيل %</span>
+              <span className="text-xs font-bold">تطابق التفاصيل %</span>
               <input name="dupDetailPct" type="number" min={50} max={100} defaultValue={dupThresholds.detail} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
             </label>
+            <label className="block space-y-1">
+              <span className="text-xs font-bold">تطابق الصور %</span>
+              <input name="dupImagePct" type="number" min={50} max={100} defaultValue={dupThresholds.image} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+            </label>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">يُعدّ الإعلان مكرّراً إذا تطابق <b>العنوان</b> أو <b>التفاصيل</b> مع إعلان سابق للعضو نفسه بالنسبة المحددة (المقارنة على هذين الحقلين فقط). كلما زادت النسبة قلّت الحساسية.</p>
+          <p className="mt-1 text-xs text-muted-foreground">يُعدّ الإعلان مكرّراً إذا تطابق <b>العنوان</b> أو <b>التفاصيل</b> أو <b>الصور</b> مع إعلان سابق للعضو نفسه بالنسبة المحددة. مطابقة الصور إدراكية (تكشف نفس الصورة ولو صُغّرت أو أُعيد حفظها). كلما زادت النسبة قلّت الحساسية.</p>
         </div>
 
         <div className="border-t border-primary/15 pt-3">

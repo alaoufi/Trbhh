@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
+import { aHash, hashSimilarity } from '@/lib/phash';
 import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
 import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds } from '@/lib/settings';
@@ -78,8 +79,9 @@ async function storeImages(images: PreparedImage[], userId: number, adId: bigint
       const safe = `${img.hash}.${img.ext}`;
       const stamped = await watermarkImage(img.buf, img.ext); // burn "تربح" watermark (also downscales)
       const rel = await saveUpload(stamped, safe);
+      const phash = await aHash(img.buf); // بصمة إدراكية للصورة (لكشف التكرار بالنسبة)
       const up = await prisma.uploads.create({
-        data: { file_name: rel, file_original_name: img.name, extension: img.ext, type: 'ad', file_size: img.buf.length, user_id: userId },
+        data: { file_name: rel, file_original_name: img.name, extension: img.ext, type: 'ad', file_size: img.buf.length, user_id: userId, phash: phash || null },
       });
       await prisma.photos.create({ data: { photo_path: String(toInt(up.id)), other_id: adId } });
     } catch {
@@ -100,8 +102,10 @@ async function storeImages(images: PreparedImage[], userId: number, adId: bigint
  *  admin-configurable threshold (no image/price matching). Returns the matched
  *  ad (id + title) so we can tell the member/admin exactly which ad it
  *  duplicates — or null when it is not a duplicate. */
-async function ownDuplicateOf(userId: number, title: string, detail: string): Promise<{ id: number; title: string } | null> {
-  const { title: titlePct, detail: detailPct } = await getDupThresholds();
+async function ownDuplicateOf(userId: number, title: string, detail: string, images: PreparedImage[]): Promise<{ id: number; title: string } | null> {
+  const { title: titlePct, detail: detailPct, image: imagePct } = await getDupThresholds();
+
+  // 1) text: title / details vs the user's own ads, each with its own threshold
   const mine = await prisma.ads.findMany({
     where: { user_id: BigInt(userId) },
     select: { id: true, title: true, detail: true },
@@ -114,6 +118,26 @@ async function ownDuplicateOf(userId: number, title: string, detail: string): Pr
     const titleMatch = similarity(nTitle, normalizeAr(r.title)) * 100 >= titlePct;
     const detailMatch = similarity(nDetail, normalizeAr(r.detail)) * 100 >= detailPct;
     if (titleMatch || detailMatch) return { id: toInt(r.id), title: r.title };
+  }
+
+  // 2) images: perceptual similarity (aHash) vs the user's own ad images
+  if (images.length) {
+    const newHashes = (await Promise.all(images.map((i) => aHash(i.buf)))).filter(Boolean);
+    if (newHashes.length) {
+      const ups = await prisma.uploads.findMany({
+        where: { user_id: userId, type: 'ad', phash: { not: null } },
+        select: { id: true, phash: true },
+        orderBy: { id: 'desc' },
+        take: 800,
+      }).catch(() => []);
+      for (const up of ups) {
+        if (newHashes.some((h) => hashSimilarity(h, up.phash || '') >= imagePct)) {
+          const ph = await prisma.photos.findFirst({ where: { photo_path: String(toInt(up.id)) }, select: { other_id: true } }).catch(() => null);
+          const a = ph ? await prisma.ads.findUnique({ where: { id: BigInt(ph.other_id) }, select: { id: true, title: true } }).catch(() => null) : null;
+          if (a) return { id: toInt(a.id), title: a.title };
+        }
+      }
+    }
   }
   return null;
 }
@@ -212,7 +236,7 @@ export async function createAdAction(formData: FormData) {
   }
 
   // منع تكرار الإعلان: تحذير ٣ محاولات ثم حظر الحساب
-  const dup = await ownDuplicateOf(session.uid, title, detail);
+  const dup = await ownDuplicateOf(session.uid, title, detail, images);
   if (dup) {
     const n = await bumpDupAttempts(session.uid);
     // يُسجَّل للإدارة: أي إعلان تطابق معه بالضبط (السجل الرقابي)

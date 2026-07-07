@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { getMemberWindows, withinWindow, getPricing, getAdPricing, adDurationPrice, AD_DURATION_DAYS, type AdDuration } from '@/lib/settings';
-import { charge } from '@/lib/wallet';
+import { charge, buyDupPack } from '@/lib/wallet';
 import { setUserArea } from '@/lib/user-location';
 import { toLocalSaudi } from '@/lib/sms';
 import { respondToReport } from '@/lib/alerts';
@@ -53,6 +53,20 @@ export async function toggleAdStatusAction(formData: FormData) {
   }
   revalidatePath('/account/ads');
   revalidatePath('/');
+}
+
+/** Buy a duplicate-publish package («مكرّر 3» / «مكرّر 5») — pay from wallet, add allowances. */
+export async function buyDupPackAction(formData: FormData) {
+  const session = await requireUser();
+  const tier = String(formData.get('tier') || '');
+  const pricing = await getAdPricing();
+  const count = tier === '5' ? 5 : tier === '3' ? 3 : 0;
+  const price = tier === '5' ? pricing.dup5 : tier === '3' ? pricing.dup3 : 0;
+  if (!count || price <= 0) redirect('/account/wallet');
+  const r = await buyDupPack(session.uid, count, price);
+  revalidatePath('/account/wallet');
+  if (!r.ok) redirect(`/account/wallet?error=needcredit&price=${price}&bal=${r.balance}`);
+  redirect('/account/wallet?dup=1');
 }
 
 /** Renew a paid ad for another duration — charges the wallet, extends expiry, republishes. */

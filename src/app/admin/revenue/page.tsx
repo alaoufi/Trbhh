@@ -79,12 +79,12 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
           <label className="space-y-1"><span className="text-xs font-bold">ثلاثة أشهر (ر.س)</span><input name="adM3" type="number" min={0} defaultValue={ad.m3} className={num} /></label>
         </div>
 
-        <div className="font-bold text-primary">رسوم التكرار (بالمدّة نفسها)</div>
+        <div className="font-bold text-primary">باقات التكرار (نشر الإعلان المكرّر عدداً من المرّات)</div>
         <div className="grid grid-cols-2 gap-2">
-          <label className="space-y-1"><span className="text-xs font-bold">مكرّر 3 (ر.س)</span><input name="dup3" type="number" min={0} defaultValue={ad.dup3} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">مكرّر 5 (ر.س)</span><input name="dup5" type="number" min={0} defaultValue={ad.dup5} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">مكرّر 3 — سعر 3 نشرات (ر.س)</span><input name="dup3" type="number" min={0} defaultValue={ad.dup3} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">مكرّر 5 — سعر 5 نشرات (ر.س)</span><input name="dup5" type="number" min={0} defaultValue={ad.dup5} className={num} /></label>
         </div>
-        <p className="text-[11px] text-muted-foreground">رسوم «إعلان مميّز» و«إعلان مبوّب» و«رسوم التكرار الأساسية» تُضبط من صفحة <Link href="/admin/settings" className="font-bold text-primary underline">الإعدادات</Link>. شحن رصيد الأعضاء من صفحة <Link href="/admin/users" className="font-bold text-primary underline">الأعضاء</Link>.</p>
+        <p className="text-[11px] text-muted-foreground">باقة التكرار تمنح العضو عدد نشرات لإعلان مكرّر (تُخصم نشرة عند كل نشر مكرّر). عند نفادها يُطلب منه شراء باقة. رسوم «إعلان مميّز» و«إعلان مبوّب» تُضبط من صفحة <Link href="/admin/settings" className="font-bold text-primary underline">الإعدادات</Link>. شحن الأرصدة من <Link href="/admin/users" className="font-bold text-primary underline">الأعضاء</Link>.</p>
         <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"><Save className="h-4 w-4" /> حفظ التسعيرات</button>
       </form>
 

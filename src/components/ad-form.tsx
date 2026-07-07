@@ -166,9 +166,14 @@ export function AdForm({
             : ' هذه محاولتك الأخيرة قبل الحظر.'}
         </div>
       )}
+      {error === 'needdup' && (
+        <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          🔁 هذا الإعلان مكرّر. لنشره عدّة مرّات اشترِ <b>باقة تكرار</b> (مكرّر 3 أو مكرّر 5) من <a href="/account/wallet" className="underline">محفظتي</a>، ثم أعد النشر.
+        </div>
+      )}
       {error === 'needcredit' && (
         <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
-          💳 هذا الإعلان مكرّر، والتكرار مدفوع. <b>اشحن رصيدك</b> لنشره.
+          💳 رصيدك لا يكفي لإتمام العملية. <b>اشحن رصيدك</b>.
           {needPrice && <span> رسوم التكرار: <b>{needPrice} ر.س</b>.</span>}
           {needBal !== undefined && <span> رصيدك الحالي: <b>{needBal} ر.س</b>.</span>}
           <span> راجع <a href="/account/wallet" className="font-bold underline">محفظتي</a> أو تواصل مع الإدارة للشحن.</span>

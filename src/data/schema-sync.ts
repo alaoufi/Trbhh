@@ -121,6 +121,7 @@ const STATEMENTS: string[] = [
   `ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`,
   /* ---- wallet / credit (رصيد) ---- */
   `ALTER TABLE users ADD COLUMN balance INT NOT NULL DEFAULT 0`,
+  `ALTER TABLE users ADD COLUMN dup_credit INT NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS wallet_txns (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT UNSIGNED NOT NULL,

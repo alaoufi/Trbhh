@@ -7,8 +7,8 @@ import { prisma } from '@/lib/prisma';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified } from '@/lib/classified';
-import { getMemberWindows, withinWindow, getClassifiedDupConfig, getPricing } from '@/lib/settings';
-import { charge, getBalance } from '@/lib/wallet';
+import { getMemberWindows, withinWindow, getClassifiedDupConfig, getPricing, getAdPricing } from '@/lib/settings';
+import { charge, consumeDupCredit } from '@/lib/wallet';
 import { scanContent } from '@/lib/content-guard';
 import { handleProhibited, logMod } from '@/lib/moderation';
 import { checkImageBuffer, imageModerationEnabled } from '@/lib/nsfw';
@@ -154,24 +154,24 @@ export async function createClassifiedAction(formData: FormData) {
   const accent = String(formData.get('accent') || 'none');
   const layout = String(formData.get('layout') || 'auto');
 
-  // التسعير: رسوم نشر المبوّب + رسوم التكرار (إن وُجد ودفعها العضو يتجاوز التكرار)
-  const price = await getPricing();
+  // التكرار: من اشترى «باقة تكرار» تُخصم نشرة واحدة ويُسمح؛ وإلا يُطلب شراء باقة أو يُمنع
   const dup = await classifiedDuplicateOf(session.uid, title, body, img, { theme: Number.isFinite(theme) ? theme : 0, pattern, accent });
-  if (dup && price.duplicate <= 0) {
-    // التكرار غير مسعّر → يُمنع كما هو (لا يمكن الدفع لتجاوزه)
-    await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: 'blocked' });
-    redirect(`/classified/new?error=duplicate&dup=${dup.id}`);
-  }
-  const dupFee = dup ? price.duplicate : 0;
-  const total = price.classified + dupFee;
-  if (total > 0) {
-    const bal = await getBalance(session.uid);
-    if (bal < total) redirect(`/classified/new?error=needcredit&price=${total}&bal=${bal}${dup ? `&dup=${dup.id}` : ''}`);
-    if (price.classified > 0) await charge(session.uid, price.classified, 'classified', 'نشر إعلان مبوّب');
-    if (dupFee > 0) {
-      await charge(session.uid, dupFee, 'duplicate', `تكرار مبوّب مع #${dup!.id}`);
-      await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مبوّب مدفوع ${dupFee} ر.س مع #${dup!.id} «${dup!.title}»` });
+  if (dup) {
+    const consumed = await consumeDupCredit(session.uid);
+    if (!consumed) {
+      const adp = await getAdPricing();
+      if (adp.dup3 > 0 || adp.dup5 > 0) redirect(`/classified/new?error=needdup&dup=${dup.id}`);
+      await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: 'blocked' });
+      redirect(`/classified/new?error=duplicate&dup=${dup.id}`);
     }
+    await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مبوّب مسموح (باقة) مع #${dup.id} «${dup.title}»` });
+  }
+
+  // رسوم نشر المبوّب (إن وُجدت) — تُخصم من الرصيد
+  const price = await getPricing();
+  if (price.classified > 0) {
+    const paid = await charge(session.uid, price.classified, 'classified', 'نشر إعلان مبوّب');
+    if (!paid.ok) redirect(`/classified/new?error=needcredit&price=${price.classified}&bal=${paid.balance}`);
   }
 
   const image = await saveOneImage(img, session.uid);
@@ -234,17 +234,17 @@ export async function updateClassifiedAction(formData: FormData) {
   const accent = String(formData.get('accent') || 'none');
   const layout = String(formData.get('layout') || 'auto');
 
-  // منع التكرار عند التعديل (باستثناء الإعلان نفسه) — يمكن تجاوزه بدفع رسوم التكرار
+  // منع التكرار عند التعديل (باستثناء الإعلان نفسه) — يُتجاوز بخصم نشرة من «باقة التكرار»
   const dup = await classifiedDuplicateOf(session.uid, title, body, img, { theme: Number.isFinite(theme) ? theme : 0, pattern, accent }, id);
   if (dup) {
-    const dupFee = (await getPricing()).duplicate;
-    if (dupFee <= 0) {
+    const consumed = await consumeDupCredit(session.uid);
+    if (!consumed) {
+      const adp = await getAdPricing();
+      if (adp.dup3 > 0 || adp.dup5 > 0) redirect(`/classified/${id}/edit?error=needdup&dup=${dup.id}`);
       await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: 'blocked' });
       redirect(`/classified/${id}/edit?error=duplicate&dup=${dup.id}`);
     }
-    const paid = await charge(session.uid, dupFee, 'duplicate', `تعديل مبوّب مكرّر مع #${dup.id}`);
-    if (!paid.ok) redirect(`/classified/${id}/edit?error=needcredit&price=${dupFee}&bal=${paid.balance}&dup=${dup.id}`);
-    await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مبوّب مدفوع (تعديل) ${dupFee} ر.س مع #${dup.id}` });
+    await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مبوّب مسموح (باقة، تعديل) مع #${dup.id}` });
   }
 
   const newImage = await saveOneImage(img, session.uid);

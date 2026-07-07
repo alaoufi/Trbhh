@@ -17,6 +17,39 @@ export const REASON_LABELS: Record<TxnReason, string> = {
   refund: 'استرداد',
 };
 
+/** Remaining duplicate-publish allowances (from bought «مكرّر» packages). */
+export async function getDupCredit(userId: number): Promise<number> {
+  await ensure();
+  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { dup_credit: true } }).catch(() => null);
+  return u?.dup_credit ?? 0;
+}
+
+/** Add N duplicate allowances (after buying a package). */
+export async function addDupCredit(userId: number, n: number): Promise<void> {
+  await ensure();
+  if (n <= 0) return;
+  await prisma.users.update({ where: { id: BigInt(userId) }, data: { dup_credit: { increment: Math.round(n) } } }).catch(() => {});
+}
+
+/** Consume one duplicate allowance if available. Returns true when consumed. */
+export async function consumeDupCredit(userId: number): Promise<boolean> {
+  await ensure();
+  try {
+    const r = await prisma.users.updateMany({ where: { id: BigInt(userId), dup_credit: { gt: 0 } }, data: { dup_credit: { decrement: 1 } } });
+    return r.count > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Buy a duplicate-publish package: pay `price`, add `count` allowances. */
+export async function buyDupPack(userId: number, count: number, price: number): Promise<{ ok: boolean; balance: number }> {
+  const paid = await charge(userId, price, 'duplicate', `باقة تكرار (${count} نشرات)`);
+  if (!paid.ok) return { ok: false, balance: paid.balance };
+  await addDupCredit(userId, count);
+  return { ok: true, balance: paid.balance };
+}
+
 /** Current balance (SAR) for a member. */
 export async function getBalance(userId: number): Promise<number> {
   await ensure();

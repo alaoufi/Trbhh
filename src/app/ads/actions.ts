@@ -9,8 +9,8 @@ import { watermarkImage } from '@/lib/watermark';
 import { aHash, hashSimilarity } from '@/lib/phash';
 import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
-import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getPricing, getAdPricing, adDurationPrice, AD_DURATION_DAYS, type AdDuration } from '@/lib/settings';
-import { charge } from '@/lib/wallet';
+import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getAdPricing, adDurationPrice, AD_DURATION_DAYS, type AdDuration } from '@/lib/settings';
+import { charge, consumeDupCredit } from '@/lib/wallet';
 import { bustAdCaches } from '@/lib/data';
 import { setAdMedia } from '@/lib/ad-media';
 import { setUserArea } from '@/lib/user-location';
@@ -236,17 +236,21 @@ export async function createAdAction(formData: FormData) {
     }
   }
 
-  // منع تكرار الإعلان. إذا حدّدت الإدارة «رسوم تكرار» ومعه رصيد كافٍ: يُخصم ويُسمح
-  // بالنشر (تجاوز التكرار فقط — لا يتجاوز فحص المحتوى السياسي/الأخلاقي أعلاه).
+  // منع تكرار الإعلان. من اشترى «باقة تكرار» يُسمح له بنشر المكرّر بخصم نشرة واحدة من رصيد
+  // الباقة (تجاوز التكرار فقط — لا يتجاوز فحص المحتوى السياسي/الأخلاقي أعلاه).
   const dup = await ownDuplicateOf(session.uid, title, detail, images);
   if (dup) {
-    const dupFee = (await getPricing()).duplicate;
-    if (dupFee > 0) {
-      const paid = await charge(session.uid, dupFee, 'duplicate', `تكرار مع #${dup.id} «${dup.title}»`);
-      if (!paid.ok) redirect(`/ads/new?error=needcredit&price=${dupFee}&bal=${paid.balance}&dup=${dup.id}`);
-      await resetDupAttempts(session.uid); // دفع الرسوم يلغي عدّاد المحاولات
-      await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مدفوع ${dupFee} ر.س مع #${dup.id} «${dup.title}» — المتبقّي ${paid.balance}` });
+    const consumed = await consumeDupCredit(session.uid);
+    if (consumed) {
+      await resetDupAttempts(session.uid);
+      await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مسموح (باقة) مع #${dup.id} «${dup.title}»` });
     } else {
+      const adp = await getAdPricing();
+      if (adp.dup3 > 0 || adp.dup5 > 0) {
+        // باقات التكرار مُفعّلة والرصيد نفد → يُطلب شراء باقة (لا حظر)
+        await logMod(session.uid, { kind: 'duplicate', action: 'blocked', snippet: `تكرار مع #${dup.id} «${dup.title}» — يلزم باقة تكرار` });
+        redirect(`/ads/new?error=needdup&dup=${dup.id}`);
+      }
       const n = await bumpDupAttempts(session.uid);
       // يُسجَّل للإدارة: أي إعلان تطابق معه بالضبط (السجل الرقابي)
       await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مكرّر مع #${dup.id} «${dup.title}» — الجديد: ${title.slice(0, 60)}` });

@@ -44,11 +44,11 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, limitMax, gapHours, gapWait, blockCat, banned,
+  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, limitMax, gapHours, gapWait, blockCat, banned,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[]; areas?: Area[];
-  initial?: Initial; submitLabel: string; error?: string; dupLeft?: string;
+  initial?: Initial; submitLabel: string; error?: string; dupLeft?: string; dupId?: string;
   limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean;
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
@@ -156,6 +156,9 @@ export function AdForm({
       {error === 'duplicate' && (
         <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-medium text-red-800">
           ⚠️ لا تُكرّر نفس الإعلان. هذا الإعلان مطابق لإعلان سابق لك ولم يُنشر.
+          {dupId && Number(dupId) > 0 && (
+            <span> الإعلان المطابق: <a href={`/ads/${dupId}`} target="_blank" rel="noopener noreferrer" className="font-bold underline">افتح الإعلان رقم {dupId}</a>.</span>
+          )}
           {dupLeft && Number(dupLeft) > 0
             ? ` تبقّى لك ${dupLeft} ${Number(dupLeft) === 1 ? 'محاولة' : 'محاولات'} قبل حظر حسابك.`
             : ' هذه محاولتك الأخيرة قبل الحظر.'}

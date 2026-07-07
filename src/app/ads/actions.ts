@@ -95,28 +95,36 @@ async function storeImages(images: PreparedImage[], userId: number, adId: bigint
  *   • detail similarity ≥ 90%, OR
  *   • an uploaded image is byte-identical to an existing ad image.
  */
-/** Duplicate against the SAME user's own ads (reposting the same ad). */
-async function isOwnDuplicate(userId: number, title: string, detail: string, images: PreparedImage[]): Promise<boolean> {
+/** Duplicate against the SAME user's own ads (reposting the same ad).
+ *  Returns the matched ad (id + title) so we can tell the member/admin exactly
+ *  which ad it duplicates — or null when it is not a duplicate. */
+async function ownDuplicateOf(userId: number, title: string, detail: string, images: PreparedImage[]): Promise<{ id: number; title: string } | null> {
   if (images.length) {
     const found = await prisma.uploads.findFirst({
       where: { user_id: userId, OR: images.map((i) => ({ file_name: { contains: i.hash } })) },
       select: { id: true },
     });
-    if (found) return true;
+    if (found) {
+      // resolve which ad that identical image belongs to
+      const ph = await prisma.photos.findFirst({ where: { photo_path: String(toInt(found.id)) }, select: { other_id: true } }).catch(() => null);
+      const a = ph ? await prisma.ads.findUnique({ where: { id: BigInt(ph.other_id) }, select: { id: true, title: true } }).catch(() => null) : null;
+      return a ? { id: toInt(a.id), title: a.title } : { id: 0, title: 'إعلان بصورة مطابقة' };
+    }
   }
   const mine = await prisma.ads.findMany({
     where: { user_id: BigInt(userId) },
-    select: { title: true, detail: true },
+    select: { id: true, title: true, detail: true },
     orderBy: { id: 'desc' },
     take: 300,
   });
   const nTitle = normalizeAr(title);
   const nDetail = normalizeAr(detail);
   for (const r of mine) {
-    if (similarity(nTitle, normalizeAr(r.title)) >= 0.9) return true;
-    if (similarity(nDetail, normalizeAr(r.detail)) >= 0.9) return true;
+    if (similarity(nTitle, normalizeAr(r.title)) >= 0.9 || similarity(nDetail, normalizeAr(r.detail)) >= 0.9) {
+      return { id: toInt(r.id), title: r.title };
+    }
   }
-  return false;
+  return null;
 }
 
 export async function createAdAction(formData: FormData) {
@@ -213,14 +221,16 @@ export async function createAdAction(formData: FormData) {
   }
 
   // منع تكرار الإعلان: تحذير ٣ محاولات ثم حظر الحساب
-  if (await isOwnDuplicate(session.uid, title, detail, images)) {
+  const dup = await ownDuplicateOf(session.uid, title, detail, images);
+  if (dup) {
     const n = await bumpDupAttempts(session.uid);
-    await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: title.slice(0, 120) });
+    // يُسجَّل للإدارة: أي إعلان تطابق معه بالضبط (السجل الرقابي)
+    await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مكرّر مع #${dup.id} «${dup.title}» — الجديد: ${title.slice(0, 60)}` });
     if (n >= DUP_LIMIT) {
       await banUser(session.uid);
       redirect('/ads/new?error=banned');
     }
-    redirect(`/ads/new?error=duplicate&left=${Math.max(0, DUP_LIMIT - n)}`);
+    redirect(`/ads/new?error=duplicate&left=${Math.max(0, DUP_LIMIT - n)}&dup=${dup.id}`);
   }
 
   // النشر الفوري ما لم تُفعّل الإدارة «مراجعة الإعلانات قبل النشر».

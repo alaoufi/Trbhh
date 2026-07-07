@@ -12,7 +12,7 @@ import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAcco
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, APP_KEYS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -386,6 +386,11 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_CLASSIFIED_STATS, classifiedStats);
   await setSetting(SETTING_CLASSIFIED_DAYS, String(classifiedDays));
   await setSetting(SETTING_CLASSIFIED_SECONDS, String(splashSeconds));
+  // classified duplicate prevention: toggle + content/image/background thresholds
+  await setSetting(SETTING_CDUP_ON, formData.get('cdupOn') !== null ? '1' : '0');
+  await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));
+  await setSetting(SETTING_CDUP_IMAGE_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupImagePct') || '95')) || 95))));
+  await setSetting(SETTING_CDUP_BG_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupBgPct') || '100')) || 100))));
   // native app shells: store links + minimum versions (raising min = forced update)
   await setSetting(APP_KEYS.androidPackage, String(formData.get('appAndroidPackage') || 'com.trbhh.app').trim());
   await setSetting(APP_KEYS.androidSha256, String(formData.get('appAndroidSha256') || '').trim());

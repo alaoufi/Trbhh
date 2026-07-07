@@ -189,6 +189,7 @@ export function ClassifiedForm({ action, error, initial, submitLabel }: {
         {error === 'blocked' && <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">🚫 رُفض هذا الإعلان لاحتوائه على محتوى مخالف (غير أخلاقي / مخدرات / أمني / سياسي). النشر ممنوع، وقد يُحظر الحساب فوراً عند المحتوى غير الأخلاقي.</div>}
         {error === 'image' && <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">🚫 رُفضت الصورة لاشتباه المحتوى بأنه غير لائق. الرجاء رفع صورة مناسبة فقط.</div>}
         {error === 'window' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">انتهت المدة المسموح بها لتعديل هذا الإعلان حسب إعدادات الموقع. للتعديل بعدها تواصل مع الإدارة.</div>}
+        {error === 'duplicate' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">⚠️ هذا الإعلان المبوّب مطابق لإعلان سابق لك (في المحتوى أو الصورة أو الخلفية). لا يُسمح بتكرار نفس الإعلان — عدّل المحتوى أو الصورة لنشره.</div>}
 
         {/* hidden style fields */}
         <input type="hidden" name="theme" value={theme} />

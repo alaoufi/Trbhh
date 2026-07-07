@@ -7,32 +7,101 @@ import { prisma } from '@/lib/prisma';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified } from '@/lib/classified';
-import { getMemberWindows, withinWindow } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getClassifiedDupConfig } from '@/lib/settings';
 import { scanContent } from '@/lib/content-guard';
 import { handleProhibited, logMod } from '@/lib/moderation';
 import { checkImageBuffer, imageModerationEnabled } from '@/lib/nsfw';
+import { aHash, hashSimilarity } from '@/lib/phash';
+import { normalizeAr, similarity } from '@/domain/text';
 import { toInt } from '@/lib/utils';
 
-async function saveOneImage(formData: FormData): Promise<string | null> {
+/** Read the uploaded classified image into a buffer (or null), enforcing size/type. */
+async function readImageBuffer(formData: FormData): Promise<{ buf: Buffer; name: string } | null> {
+  const file = formData.get('image');
+  if (!(file instanceof File) || file.size === 0 || file.size > 12 * 1024 * 1024) return null;
+  const buf = Buffer.from(await file.arrayBuffer());
+  if (!buf.length) return null;
+  return { buf, name: file.name };
+}
+
+/** Watermark + persist a classified image, recording a perceptual hash (phash) for duplicate detection. */
+async function saveOneImage(img: { buf: Buffer; name: string } | null, userId: number): Promise<string | null> {
   try {
-    const file = formData.get('image');
-    if (!(file instanceof File) || file.size === 0) return null;
-    if (file.size > 12 * 1024 * 1024) return null;
-    const buf = Buffer.from(await file.arrayBuffer());
-    if (!buf.length) return null;
-    let ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    if (!img?.buf.length) return null;
+    let ext = (img.name.split('.').pop() || 'jpg').toLowerCase();
     if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) ext = 'jpg'; // normalize odd formats
-    const hash = createHash('sha256').update(new Uint8Array(buf)).digest('hex');
-    const stamped = await watermarkImage(buf, ext); // burn "تربح" watermark (also downscales)
+    const hash = createHash('sha256').update(new Uint8Array(img.buf)).digest('hex');
+    const phash = await aHash(img.buf).catch(() => ''); // بصمة إدراكية لكشف تكرار الصورة
+    const stamped = await watermarkImage(img.buf, ext); // burn "تربح" watermark (also downscales)
     const rel = await saveUpload(stamped, `${hash}.${ext}`);
-    // register in uploads for consistency (best-effort)
+    // register in uploads (with owner + phash) so duplicate detection can match by image
     await prisma.uploads
-      .create({ data: { file_name: rel, file_original_name: file.name, extension: ext, type: 'classified', file_size: buf.length, user_id: 0 } })
+      .create({ data: { file_name: rel, file_original_name: img.name, extension: ext, type: 'classified', file_size: img.buf.length, user_id: userId, phash: phash || null } })
       .catch(() => {});
     return rel;
   } catch {
     return null; // never crash the publish flow because of an image
   }
+}
+
+type Bg = { theme: number; pattern: string; accent: string };
+
+/** Background-design similarity (%) — how many of theme/pattern/accent match. */
+function bgSimilarity(a: Bg, b: Bg): number {
+  let m = 0;
+  if (a.theme === b.theme) m++;
+  if ((a.pattern || 'none') === (b.pattern || 'none')) m++;
+  if ((a.accent || 'none') === (b.accent || 'none')) m++;
+  return (m / 3) * 100;
+}
+
+/** Detect a duplicate classified among the SAME user's own classifieds.
+ *  Flags when (per admin thresholds): content matches, OR image matches, OR the
+ *  background design matches AND the text is at least half-similar (so a shared
+ *  default background alone never blocks an otherwise different ad).
+ *  Returns the matched ad (id + title) or null. */
+async function classifiedDuplicateOf(
+  userId: number,
+  title: string | null,
+  body: string | null,
+  img: { buf: Buffer } | null,
+  bg: Bg,
+  excludeId = 0,
+): Promise<{ id: number; title: string } | null> {
+  const cfg = await getClassifiedDupConfig();
+  if (!cfg.enabled) return null;
+  const mine = await prisma.classified_ads.findMany({
+    where: { user_id: BigInt(userId), ...(excludeId ? { id: { not: BigInt(excludeId) } } : {}) },
+    select: { id: true, title: true, body: true, image: true, theme: true, pattern: true, accent: true },
+    orderBy: { id: 'desc' },
+    take: 300,
+  });
+  if (!mine.length) return null;
+
+  const nNew = normalizeAr(`${title || ''} ${body || ''}`);
+  const newHash = img ? await aHash(img.buf).catch(() => '') : '';
+  // map each own classified image path → its stored phash
+  const phashByPath = new Map<string, string>();
+  if (newHash) {
+    const paths = mine.map((m) => m.image).filter((p): p is string => !!p);
+    if (paths.length) {
+      const ups = await prisma.uploads.findMany({ where: { file_name: { in: paths }, phash: { not: null } }, select: { file_name: true, phash: true } }).catch(() => []);
+      for (const u of ups) if (u.file_name && u.phash) phashByPath.set(u.file_name, u.phash);
+    }
+  }
+
+  for (const r of mine) {
+    const textSim = nNew.length ? similarity(nNew, normalizeAr(`${r.title || ''} ${r.body || ''}`)) * 100 : 0;
+    const contentMatch = textSim >= cfg.content;
+    const bgMatch = bgSimilarity(bg, { theme: r.theme, pattern: r.pattern, accent: r.accent }) >= cfg.background;
+    let imageMatch = false;
+    if (newHash && r.image) {
+      const ph = phashByPath.get(r.image);
+      if (ph) imageMatch = hashSimilarity(newHash, ph) >= cfg.image;
+    }
+    if (contentMatch || imageMatch || (bgMatch && textSim >= 50)) return { id: toInt(r.id), title: r.title || 'إعلان مبوّب' };
+  }
+  return null;
 }
 
 function cleanLink(v: string): string | null {
@@ -51,9 +120,9 @@ export async function createClassifiedAction(formData: FormData) {
   const link = cleanLink(String(formData.get('link') || ''));
 
   // فحص بصري للصورة قبل الحفظ: الصور الإباحية = حظر فوري صارم
-  const rawImg = formData.get('image');
-  if (imageModerationEnabled() && rawImg instanceof File && rawImg.size > 0 && rawImg.size <= 12 * 1024 * 1024) {
-    const v = await checkImageBuffer(Buffer.from(await rawImg.arrayBuffer()));
+  const img = await readImageBuffer(formData);
+  if (imageModerationEnabled() && img) {
+    const v = await checkImageBuffer(img.buf);
     if (v.explicit) {
       await handleProhibited(session.uid, 'immoral', 'nsfw-image', `صورة مبوّب إباحية (${v.hardcore.toFixed(2)})`);
       redirect('/classified/new?error=blocked&cat=immoral&banned=1');
@@ -63,10 +132,9 @@ export async function createClassifiedAction(formData: FormData) {
       redirect('/classified/new?error=image');
     }
   }
-  const image = await saveOneImage(formData);
 
   // صورة أو نص إجباري (أحدهما)
-  if (!image && !body && !title) redirect('/classified/new?error=content');
+  if (!img && !body && !title) redirect('/classified/new?error=content');
   // جوال أو واتساب إجباري (أحدهما)
   if (!phone && !whatsapp) redirect('/classified/new?error=contact');
   // فحص ذكي للمحتوى — الأخلاقي يحظر فوراً، والأمني/السياسي/المخدرات يُحظر عند التكرار
@@ -84,6 +152,15 @@ export async function createClassifiedAction(formData: FormData) {
   const pattern = String(formData.get('pattern') || 'none');
   const accent = String(formData.get('accent') || 'none');
   const layout = String(formData.get('layout') || 'auto');
+
+  // منع تكرار الإعلانات المبوّبة (محتوى/صورة/خلفية) — قابل للضبط من الإدارة
+  const dup = await classifiedDuplicateOf(session.uid, title, body, img, { theme: Number.isFinite(theme) ? theme : 0, pattern, accent });
+  if (dup) {
+    await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: 'blocked' });
+    redirect(`/classified/new?error=duplicate&dup=${dup.id}`);
+  }
+
+  const image = await saveOneImage(img, session.uid);
 
   try {
     await createClassified({
@@ -112,9 +189,9 @@ export async function updateClassifiedAction(formData: FormData) {
   const phone = String(formData.get('phone') || '').trim().slice(0, 40) || null;
   const whatsapp = String(formData.get('whatsapp') || '').trim().slice(0, 40) || null;
   const link = cleanLink(String(formData.get('link') || ''));
-  const rawNew = formData.get('image');
-  if (imageModerationEnabled() && rawNew instanceof File && rawNew.size > 0 && rawNew.size <= 12 * 1024 * 1024) {
-    const v = await checkImageBuffer(Buffer.from(await rawNew.arrayBuffer()));
+  const img = await readImageBuffer(formData); // null when no new file (keep current)
+  if (imageModerationEnabled() && img) {
+    const v = await checkImageBuffer(img.buf);
     if (v.explicit) {
       await handleProhibited(session.uid, 'immoral', 'nsfw-image', `صورة مبوّب إباحية (تعديل ${v.hardcore.toFixed(2)})`);
       redirect('/classified/new?error=blocked&cat=immoral&banned=1');
@@ -124,9 +201,8 @@ export async function updateClassifiedAction(formData: FormData) {
       redirect(`/classified/${id}/edit?error=image`);
     }
   }
-  const newImage = await saveOneImage(formData); // null when no new file (keep current)
 
-  if (!newImage && !existing!.image && !body && !title) redirect(`/classified/${id}/edit?error=content`);
+  if (!img && !existing!.image && !body && !title) redirect(`/classified/${id}/edit?error=content`);
   if (!phone && !whatsapp) redirect(`/classified/${id}/edit?error=contact`);
   // امنع إدخال محتوى ممنوع عبر التعديل بعد نشر نظيف
   const eBad = await scanContent(title, body);
@@ -143,6 +219,15 @@ export async function updateClassifiedAction(formData: FormData) {
   const pattern = String(formData.get('pattern') || 'none');
   const accent = String(formData.get('accent') || 'none');
   const layout = String(formData.get('layout') || 'auto');
+
+  // منع التكرار عند التعديل (باستثناء الإعلان نفسه)
+  const dup = await classifiedDuplicateOf(session.uid, title, body, img, { theme: Number.isFinite(theme) ? theme : 0, pattern, accent }, id);
+  if (dup) {
+    await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: 'blocked' });
+    redirect(`/classified/${id}/edit?error=duplicate&dup=${dup.id}`);
+  }
+
+  const newImage = await saveOneImage(img, session.uid);
 
   try {
     await updateClassified(id, {

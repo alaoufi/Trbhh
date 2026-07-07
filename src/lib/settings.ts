@@ -115,6 +115,23 @@ export async function getDupThresholds(): Promise<{ title: number; detail: numbe
   return { title: clamp(t), detail: clamp(d), image: clamp(im) };
 }
 
+/** Classified-ad duplicate prevention — a toggle plus three thresholds (percent):
+ *  content (title+body text), image (perceptual), and background (theme+pattern+accent design). */
+export const SETTING_CDUP_ON = 'cdup_enabled';
+export const SETTING_CDUP_CONTENT_PCT = 'cdup_content_percent';
+export const SETTING_CDUP_IMAGE_PCT = 'cdup_image_percent';
+export const SETTING_CDUP_BG_PCT = 'cdup_bg_percent';
+export async function getClassifiedDupConfig(): Promise<{ enabled: boolean; content: number; image: number; background: number }> {
+  const clamp = (n: number, d: number) => Math.min(100, Math.max(50, Math.round(n) || d));
+  const [on, c, im, bg] = await Promise.all([
+    getSettingBool(SETTING_CDUP_ON, false),
+    getSettingNum(SETTING_CDUP_CONTENT_PCT, 90),
+    getSettingNum(SETTING_CDUP_IMAGE_PCT, 95),
+    getSettingNum(SETTING_CDUP_BG_PCT, 100),
+  ]);
+  return { enabled: on, content: clamp(c, 90), image: clamp(im, 95), background: clamp(bg, 100) };
+}
+
 /* ---- native app shells (Android TWA / iOS wrapper): versions & stores ---- */
 export const APP_KEYS = {
   androidPackage: 'app_android_package',

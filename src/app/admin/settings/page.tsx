@@ -1,6 +1,6 @@
 import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds } from '@/lib/settings';
+import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -9,7 +9,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds()]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig()]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -83,6 +83,27 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <span className="text-sm">مدة تشغيل شاشة الدخول (بالثواني) — الافتراضي 5</span>
             <input name="splashSeconds" type="number" min={2} max={60} defaultValue={splashSeconds} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </label>
+
+          {/* منع تكرار الإعلانات المبوّبة — تفعيل + نِسب التطابق (محتوى/صورة/خلفية) */}
+          <label className="mt-3 flex items-center gap-2 text-sm font-bold">
+            <input type="checkbox" name="cdupOn" defaultChecked={cdup.enabled} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+            منع تكرار الإعلانات المبوّبة (يمنع إعادة نشر نفس الإعلان)
+          </label>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <label className="block space-y-1">
+              <span className="text-xs font-bold">تطابق المحتوى %</span>
+              <input name="cdupContentPct" type="number" min={50} max={100} defaultValue={cdup.content} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs font-bold">تطابق الصورة %</span>
+              <input name="cdupImagePct" type="number" min={50} max={100} defaultValue={cdup.image} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-xs font-bold">تطابق الخلفية %</span>
+              <input name="cdupBgPct" type="number" min={50} max={100} defaultValue={cdup.background} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+            </label>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">يُعدّ المبوّب مكرّراً إذا تطابق <b>المحتوى</b> (العنوان+النص) أو <b>الصورة</b> (مطابقة إدراكية) مع مبوّب سابق للعضو نفسه بالنسبة المحددة. <b>الخلفية</b> (الثيم+النقشة+الزخرفة) تُحتسب مع تشابه المحتوى ٥٠٪+ فقط، حتى لا تُحجب إعلانات مختلفة تشترك في نفس التصميم. الخلفية ١٠٠٪ = تصميم مطابق تماماً.</p>
         </div>
 
         {/* التطبيقات (أندرويد/آيفون): المتاجر والتحديث الإجباري */}

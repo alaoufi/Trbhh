@@ -16,16 +16,16 @@ export default async function AccountLayout({ children }: { children: React.Reac
   const session = await getSession();
   if (!session) redirect('/login');
   return (
-    <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-      <aside className="h-fit card-3d rounded-xl p-3">
+    <div className="grid min-w-0 gap-4 md:grid-cols-[220px_1fr]">
+      <aside className="h-fit min-w-0 card-3d rounded-xl p-3">
         <div className="mb-3 hidden items-center gap-2 border-b pb-3 md:flex">
           <span className="grid h-9 w-9 place-items-center rounded-full bg-accent font-bold text-accent-foreground">
             {session.name?.charAt(0) ?? 'ع'}
           </span>
           <span className="text-sm font-semibold">{session.name}</span>
         </div>
-        {/* على الجوال: شريط تنقّل أفقي مضغوط (صف واحد) لا يغطّي المحتوى؛ على الشاشات الكبيرة: قائمة جانبية عمودية */}
-        <nav className="flex gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
+        {/* على الجوال: شريط تنقّل أفقي مضغوط (صف واحد) لا يغطّي المحتوى ولا يتجاوز عرض الشاشة؛ على الشاشات الكبيرة: قائمة جانبية عمودية */}
+        <nav className="flex min-w-0 max-w-full gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
           <Link href="/ads/new" className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             <PlusCircle className="h-4 w-4" /> أضف إعلان
           </Link>

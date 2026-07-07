@@ -9,7 +9,7 @@ import { getMyAds } from '@/lib/account';
 import { cookies, headers } from 'next/headers';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
-import { recordStoreVisit, classifySource, getStoreAdViews } from '@/lib/store-analytics';
+import { recordStoreVisit, classifySource, getAdViewsFor } from '@/lib/store-analytics';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle } from '@/lib/merchant';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -110,7 +110,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const allActive = myAds.filter((a) => a.status === 1 && inStore.has(a.id)).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
   const active = query ? allActive.filter((a) => (a.title || '').includes(query)) : allActive;
   const wa = waLink(s.whatsapp);
-  const storeViews = await getStoreAdViews(s.userId).catch(() => 0); // مشاهدات إعلانات المتجر (عام)
+  // مشاهدات إعلانات المتجر = مشاهدات الإعلانات المعروضة في المتجر فقط (لا كامل تاريخ العضو)
+  const storeViews = await getAdViewsFor(allActive.map((a) => a.id)).catch(() => 0);
   // collaboration: can this viewer (a merchant) invite this store?
   const viewerStoreId = session && !isOwner ? await storeIdOfUser(session.uid) : 0;
   const alreadyPartner = viewerStoreId ? await isCollaborator(viewerStoreId, storeId) : false;

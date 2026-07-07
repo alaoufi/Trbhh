@@ -3,7 +3,7 @@ import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
 import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, platformRequestState, getStoreLogin } from '@/lib/merchant';
 import { getMyAds } from '@/lib/account';
-import { getStoreVisitorStats } from '@/lib/store-analytics';
+import { getStoreVisitorStats, getAdViewsFor } from '@/lib/store-analytics';
 import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
@@ -27,8 +27,6 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const logoUrl = store?.logo ? mediaUrl((await prisma.uploads.findUnique({ where: { id: BigInt(store.logo) } }))?.file_name) : null;
   const meta = store ? await getStoreMeta(store.id) : null;
   const visitorStats = store ? await getStoreVisitorStats(store.id) : null;
-  const myAdIds = store ? (await prisma.ads.findMany({ where: { user_id: BigInt(session.uid) }, select: { id: true } })).map((a) => a.id) : [];
-  const totalAdViews = myAdIds.length ? await prisma.ads_views.count({ where: { ads_id: { in: myAdIds } } }).catch(() => 0) : 0;
   const stats = store
     ? { followers: await followersCount(store.id), rating: await getStoreRating(store.id), ads: await prisma.ads.count({ where: { user_id: BigInt(session.uid), status: 1 } }) }
     : null;
@@ -38,6 +36,9 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const warnings = store ? await getStoreWarnings(store.id) : [];
   const myActiveAds = store ? (await getMyAds(session.uid)).filter((a) => a.status === 1) : [];
   const inStore = new Set(store ? await storeProductAdIds(store.id) : []);
+  // مشاهدات المتجر = مشاهدات الإعلانات المعروضة في المتجر فقط (لا كامل تاريخ العضو)
+  const shownAdIds = myActiveAds.filter((a) => inStore.has(a.id)).map((a) => a.id);
+  const totalAdViews = store ? await getAdViewsFor(shownAdIds) : 0;
   const pendingTransfer = store ? await pendingTransferForOwner(session.uid) : null;
   const platformState = store ? await platformRequestState(store.id) : 'none';
   const storeLoginInfo = store ? await getStoreLogin(session.uid) : { username: null, hasPassword: false };

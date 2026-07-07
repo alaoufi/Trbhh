@@ -34,12 +34,11 @@ export function classifySource(referer: string | null | undefined, selfHost: str
   return 'external';
 }
 
-/** Total ad views across all of a store owner's ads (public store reach). */
-export async function getStoreAdViews(ownerUserId: number): Promise<number> {
+/** Total ad views for a specific set of ads (e.g. the ads displayed in a store). */
+export async function getAdViewsFor(adIds: number[]): Promise<number> {
   await ensure();
-  const ids = (await prisma.ads.findMany({ where: { user_id: BigInt(ownerUserId) }, select: { id: true } }).catch(() => [] as { id: bigint }[])).map((a) => a.id);
-  if (!ids.length) return 0;
-  return prisma.ads_views.count({ where: { ads_id: { in: ids } } }).catch(() => 0);
+  if (!adIds.length) return 0;
+  return prisma.ads_views.count({ where: { ads_id: { in: adIds.map((n) => BigInt(n)) } } }).catch(() => 0);
 }
 
 /** Record a store storefront visit — deduped to one row per viewer per day. */

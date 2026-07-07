@@ -21,8 +21,8 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string }> }) {
-  const { error, sub } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string }> }) {
+  const { error, sub, added, settings } = await searchParams;
   const session = await requireUser();
   const store = await getStoreByUser(session.uid);
   const subState = store ? await getStoreSub(store.id) : null;
@@ -94,9 +94,13 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </div>
       )}
 
+      {store && added === '1' && <div className="card-3d rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم نشر الإعلان وإضافته لواجهة متجرك.</div>}
+      {store && added === 'pending' && <div className="card-3d rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-800">✓ تم استلام الإعلان، وسيظهر في متجرك بعد موافقة الإدارة.</div>}
+      {store && settings === '1' && <div className="card-3d rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم حفظ إعدادات المتجر.</div>}
+
       {/* أضف إعلان — يظهر عند تفعيل «السماح بنشر الإعلانات» في إعدادات المتجر */}
       {store && meta?.allowAds && (
-        <Link href="/ads/new" className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-extrabold text-white shadow-md transition hover:-translate-y-0.5">
+        <Link href="/ads/new?dest=store" className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-extrabold text-white shadow-md transition hover:-translate-y-0.5">
           <PlusCircle className="h-5 w-5" /> أضف إعلان جديد لمتجرك
         </Link>
       )}

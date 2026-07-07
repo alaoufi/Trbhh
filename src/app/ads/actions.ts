@@ -166,11 +166,15 @@ export async function createAdAction(formData: FormData) {
     const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
     if (ll) { lat = String(ll.lat); lng = String(ll.lng); }
   }
-  if (!title || !detail || !category_id) return;
+  // نشر من داخل المتجر: للرجوع للمتجر وإدراج الإعلان في واجهته تلقائياً
+  const dest = String(formData.get('dest') || '') === 'store' ? 'store' : '';
+  const q = dest ? '&dest=store' : '';
+  // حقول إجبارية — أظهِر السبب بدل الرجوع الصامت
+  if (!title || !detail || category_id <= 0n) redirect(`/ads/new?error=missing${q}`);
   // تعهّد صحة الإعلان وتحمّل المسؤولية إجباري
-  if (!formData.get('pledge')) redirect('/ads/new?error=pledge');
+  if (!formData.get('pledge')) redirect(`/ads/new?error=pledge${q}`);
   // جوال أو واتساب إجباري حتى يستطيع العملاء التواصل مع صاحب الإعلان
-  if (!phone && !whatsapp) redirect('/ads/new?error=contact');
+  if (!phone && !whatsapp) redirect(`/ads/new?error=contact${q}`);
   // منع حشو الكلمات (تكرار العبارات لخداع محرك البحث)
   if (isKeywordStuffing(title, detail)) redirect('/ads/new?error=repeat');
 
@@ -295,6 +299,12 @@ export async function createAdAction(formData: FormData) {
   await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
   await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز: تثبيت بالأعلى
   await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
+  // نشر من المتجر: أدرِج الإعلان في واجهة المتجر تلقائياً وارجع للمتجر برسالة نجاح
+  if (dest === 'store') {
+    const { addStoreProduct } = await import('@/lib/merchant');
+    await addStoreProduct(session.uid, toInt(ad.id)).catch(() => {});
+    redirect(requireApproval ? '/store?added=pending' : '/store?added=1');
+  }
   // ينشر مباشرة، إلا إذا كان مقيّداً بالموافقة
   if (requireApproval) redirect('/account/ads?pending=1');
   redirect(`/ads/${toInt(ad.id)}`);

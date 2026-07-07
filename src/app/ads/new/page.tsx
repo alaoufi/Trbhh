@@ -8,10 +8,10 @@ import { createAdAction } from '../actions';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'أضف إعلان' };
 
-export default async function NewAdPage({ searchParams }: { searchParams: Promise<{ error?: string; left?: string; max?: string; hours?: string; wait?: string; cat?: string; banned?: string; dup?: string; price?: string; bal?: string }> }) {
+export default async function NewAdPage({ searchParams }: { searchParams: Promise<{ error?: string; left?: string; max?: string; hours?: string; wait?: string; cat?: string; banned?: string; dup?: string; price?: string; bal?: string; dest?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
-  const { error, left, max, hours, wait, cat, banned, dup, price, bal } = await searchParams;
+  const { error, left, max, hours, wait, cat, banned, dup, price, bal, dest } = await searchParams;
   const [categories, subcategories, countries, cities, areas, user] = await Promise.all([
     getCategories(), getSubCategories(), getCountries(), getCities(), getAreas(),
     prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true, phone_whatsapp: true } }),
@@ -33,6 +33,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
         dupId={dup}
         needPrice={price}
         needBal={bal}
+        dest={dest === 'store' ? 'store' : undefined}
         limitMax={max}
         gapHours={hours}
         gapWait={wait}

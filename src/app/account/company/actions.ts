@@ -40,6 +40,7 @@ export async function saveStoreSettingsAction(formData: FormData) {
   });
   revalidatePath('/store');
   revalidatePath('/');
+  redirect('/store?settings=1');
 }
 
 export async function saveCompanyAction(formData: FormData) {

@@ -165,6 +165,16 @@ export async function setStoreProducts(userId: number, adIds: number[]) {
   if (valid.length) await prisma.store_products.createMany({ data: valid.map((ad_id) => ({ store_id: storeId, ad_id })), skipDuplicates: true }).catch(() => {});
 }
 
+/** Append a single owned ad to the store's showcase (used when publishing from the store). */
+export async function addStoreProduct(userId: number, adId: number) {
+  await ensure();
+  const storeId = await storeIdOfUser(userId);
+  if (!storeId || !adId) return;
+  const owns = await prisma.ads.findFirst({ where: { id: BigInt(adId), user_id: BigInt(userId) }, select: { id: true } }).catch(() => null);
+  if (!owns) return;
+  await prisma.store_products.createMany({ data: [{ store_id: storeId, ad_id: adId }], skipDuplicates: true }).catch(() => {});
+}
+
 /** Active showcased ads of a store (its independent catalog). */
 export async function storeCatalogAds(storeId: number, ownerUserId: number) {
   const ids = new Set(await storeProductAdIds(storeId));

@@ -44,12 +44,12 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, limitMax, gapHours, gapWait, blockCat, banned,
+  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string; dupId?: string;
-  needPrice?: string; needBal?: string;
+  needPrice?: string; needBal?: string; dest?: string;
   limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean;
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
@@ -118,7 +118,13 @@ export function AdForm({
     <form action={action} className="max-w-2xl space-y-4">
       <SubmitOverlay label="جارٍ رفع الإعلان…" />
       {initial?.id && <input type="hidden" name="adId" value={initial.id} />}
+      {dest && <input type="hidden" name="dest" value={dest} />}
 
+      {error === 'missing' && (
+        <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">
+          أكمل الحقول الإجبارية: <b>العنوان</b> و<b>التفاصيل</b> و<b>القسم</b> قبل النشر.
+        </div>
+      )}
       {error === 'contact' && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           يجب إدخال رقم الجوال أو الواتساب قبل نشر الإعلان.

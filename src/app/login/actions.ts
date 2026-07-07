@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { verifyPassword, hashPassword, createSession } from '@/lib/auth';
 import { toLocalSaudi, userExistsByPhone } from '@/lib/sms';
-import { storeIdOfUser } from '@/lib/merchant';
 import { isUserBanned } from '@/lib/moderation';
 import { toInt } from '@/lib/utils';
 
@@ -44,9 +43,8 @@ export async function loginAction(_prev: unknown, formData: FormData) {
   await createSession({ uid, name: user.name || user.userName || 'عضو', type: user.type });
   const next = String(formData.get('next') || '');
   if (next.startsWith('/') && !next.startsWith('//')) redirect(next);
-  // No explicit destination: a store owner lands straight in their own store.
-  const myStore = await storeIdOfUser(uid).catch(() => 0);
-  redirect(myStore > 0 ? `/companies/${myStore}` : '/');
+  // دخول تربح العادي يبقى في تربح ولا يحوّل إلى المتجر — لوحة المتجر تُدخل من صفحة «دخول المتاجر» (/store-login).
+  redirect('/');
 }
 
 export async function registerAction(_prev: unknown, formData: FormData) {

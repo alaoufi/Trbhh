@@ -11,7 +11,19 @@ export const metadata = { title: 'طلبات التوثيق' };
 
 export default async function AdminVerifications() {
   await requirePerm('verifications');
-  const users = await prisma.users.findMany({ where: { step: { gt: 0 }, trusted: 0 }, orderBy: { id: 'desc' }, take: 100 });
+  // مصدر الحقيقة لطلب التوثيق = رفع وثائق (uploads.type = verify_*). أدقّ من الاعتماد على
+  // step/trusted (قيمها قد تكون NULL في الصفوف القديمة فلا يطابقها شرط trusted=0).
+  const verifyUploads = await prisma.uploads.findMany({
+    where: { type: { in: ['verify_nid', 'verify_cr', 'verify_wp'] } },
+    select: { user_id: true }, orderBy: { id: 'desc' }, take: 1000,
+  }).catch(() => [] as { user_id: number | null }[]);
+  const reqUids = [...new Set(verifyUploads.map((u) => Number(u.user_id)).filter((n) => Number.isInteger(n) && n > 0))];
+  const users = reqUids.length
+    ? await prisma.users.findMany({
+        where: { id: { in: reqUids.map((n) => BigInt(n)) }, NOT: { trusted: 1 } },
+        orderBy: { id: 'desc' }, take: 200,
+      })
+    : [];
 
   // resolve every uploaded document id → file url so the admin can actually
   // review the documents before approving (previously only a ✓ was shown).

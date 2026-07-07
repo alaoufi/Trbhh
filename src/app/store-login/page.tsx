@@ -29,6 +29,8 @@ export default async function StoreLoginPage({ searchParams }: { searchParams: P
         <Button className="w-full gap-2"><LogIn className="h-4 w-4" /> دخول المتجر</Button>
       </form>
 
+      <Link href="/store-forgot" className="text-sm font-bold text-primary underline">نسيت اسم الدخول أو كلمة المرور؟</Link>
+
       <div className="text-center text-xs text-muted-foreground">
         لست صاحب متجر؟ <Link href="/login" className="font-bold text-primary underline">دخول تربح كعضو</Link>
         <div className="mt-1">لم تُفعّل الدخول المستقل بعد؟ ادخل كعضو ثم فعّله من «متجري ← دخول مستقل للمتجر».</div>

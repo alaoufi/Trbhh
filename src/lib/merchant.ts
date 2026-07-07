@@ -328,6 +328,32 @@ export async function setStoreUsername(userId: number, raw: string): Promise<{ o
   return { ok: true, username, msg: 'تم حفظ اسم دخول المتجر.' };
 }
 
+/** Forgot store credentials: verify the owner by their Trbhh phone, then RESET the
+ *  store password (we can't reveal the hashed one) and return the login identifier +
+ *  the new password to show once. Ensures a login username exists. */
+export async function resetStoreCredentialsByPhone(phone: string): Promise<{ username: string; password: string } | null> {
+  await ensure();
+  const last9 = (phone || '').replace(/\D/g, '').slice(-9);
+  if (last9.length < 9) return null;
+  const user = await prisma.users.findFirst({ where: { phoneNumber: { contains: last9 } }, select: { id: true, userName: true } }).catch(() => null);
+  if (!user) return null;
+  const store = await prisma.stores.findFirst({ where: { user_id: Number(user.id) }, select: { id: true, handle: true, store_username: true } }).catch(() => null);
+  if (!store) return null;
+  // ensure a login identifier exists (username → handle → generated)
+  let username = store.store_username || store.handle || '';
+  if (!username) {
+    username = `store${toInt(store.id)}`;
+    await prisma.stores.updateMany({ where: { id: store.id }, data: { store_username: username } }).catch(() => {});
+  }
+  // generate a fresh 4-digit password and store it hashed
+  const { randomInt } = await import('crypto');
+  const password = String(randomInt(1000, 10000));
+  const { hashPassword } = await import('./auth');
+  const hash = await hashPassword(password);
+  await prisma.stores.updateMany({ where: { id: store.id }, data: { store_password: hash } }).catch(() => {});
+  return { username, password };
+}
+
 /** Current store-login credentials state for the owner dashboard. */
 export async function getStoreLogin(userId: number): Promise<{ username: string | null; hasPassword: boolean }> {
   await ensure();

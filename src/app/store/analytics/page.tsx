@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
-import { Eye, Megaphone, TrendingUp, CalendarDays, ArrowRight, BarChart3, Users, UserCheck, Store } from 'lucide-react';
+import { Eye, Megaphone, TrendingUp, CalendarDays, ArrowRight, BarChart3, Users, UserCheck, Store, MessageCircle, Phone, Target, PieChart } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
 import { getSellerAnalytics } from '@/lib/analytics';
@@ -55,6 +55,45 @@ export default async function StoreAnalyticsPage() {
           <div className="mb-3 flex items-center gap-2 text-sm font-bold text-primary"><TrendingUp className="h-4 w-4" /> الزيارات اليومية — آخر 30 يوماً</div>
           <ViewsChart daily={visitors.daily.map((p) => ({ date: p.date, views: p.visits }))} />
         </div>
+      </section>
+
+      {/* مصادر الزيارات */}
+      <section className="space-y-2">
+        <div className="flex items-center gap-2 text-sm font-bold text-primary"><PieChart className="h-4 w-4" /> مصادر الزيارات (من أين أتى الزائر)</div>
+        <div className="card-3d rounded-2xl p-4">
+          {visitors.sources.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">لا توجد بيانات مصادر بعد.</p>
+          ) : (
+            <div className="space-y-2">
+              {visitors.sources.map((s) => {
+                const pct = visitors.totalVisits > 0 ? Math.round((s.count / visitors.totalVisits) * 100) : 0;
+                return (
+                  <div key={s.source} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span>{s.label}</span>
+                      <span className="text-muted-foreground">{en(s.count)} ({pct}%)</span>
+                    </div>
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* نِسب التحويل — زيارة ← تواصل */}
+      <section className="space-y-2">
+        <div className="flex items-center gap-2 text-sm font-bold text-primary"><Target className="h-4 w-4" /> نِسب التحويل (زيارة ← تواصل)</div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Tile icon={Target} value={visitors.conversions.rate} label="نسبة التحويل %" />
+          <Tile icon={Users} value={visitors.conversions.uniqueContacts} label="زوّار تواصلوا" />
+          <Tile icon={MessageCircle} value={visitors.conversions.whatsapp} label="ضغطات واتساب" />
+          <Tile icon={Phone} value={visitors.conversions.call} label="ضغطات اتصال" />
+        </div>
+        <p className="text-center text-[11px] text-muted-foreground">نسبة التحويل = الزوّار الذين ضغطوا واتساب أو اتصال ÷ إجمالي الزوّار المختلفين.</p>
       </section>
 
       {/* مشاهدات الإعلانات */}

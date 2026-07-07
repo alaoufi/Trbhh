@@ -9,8 +9,33 @@ function isoDay(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+export type VisitSource = 'direct' | 'internal' | 'search' | 'whatsapp' | 'social' | 'external';
+export const SOURCE_LABELS: Record<VisitSource, string> = {
+  direct: 'مباشر',
+  internal: 'من داخل تربح',
+  search: 'محركات البحث',
+  whatsapp: 'واتساب',
+  social: 'تواصل اجتماعي',
+  external: 'مواقع خارجية',
+};
+
+/** Classify a visit source from the HTTP Referer (and our own host). */
+export function classifySource(referer: string | null | undefined, selfHost: string): VisitSource {
+  const r = (referer || '').trim().toLowerCase();
+  if (!r) return 'direct';
+  let host = '';
+  try { host = new URL(r).hostname; } catch { host = ''; }
+  if (!host) return 'direct';
+  const base = selfHost.replace(/^www\./, '').toLowerCase();
+  if (host === base || host.endsWith(`.${base}`)) return 'internal'; // trbhh.com or *.trbhh.com
+  if (/(google|bing|yahoo|duckduckgo|yandex|baidu)\./.test(host)) return 'search';
+  if (/(whatsapp|wa\.me)/.test(host)) return 'whatsapp';
+  if (/(facebook|fb\.|instagram|twitter|x\.com|t\.co|snapchat|tiktok|telegram|t\.me|youtube|linkedin)/.test(host)) return 'social';
+  return 'external';
+}
+
 /** Record a store storefront visit — deduped to one row per viewer per day. */
-export async function recordStoreVisit(storeId: number, viewerKey: string) {
+export async function recordStoreVisit(storeId: number, viewerKey: string, source: VisitSource = 'direct') {
   try {
     await ensure();
     const start = new Date();
@@ -20,20 +45,42 @@ export async function recordStoreVisit(storeId: number, viewerKey: string) {
       select: { id: true },
     });
     if (!existing) {
-      await prisma.store_visits.create({ data: { store_id: BigInt(storeId), viewer: viewerKey, created_at: new Date() } });
+      await prisma.store_visits.create({ data: { store_id: BigInt(storeId), viewer: viewerKey, source, created_at: new Date() } });
     }
   } catch {
     /* visits are best-effort */
   }
 }
 
+/** Record a contact conversion (WhatsApp/call) — deduped per viewer/kind/day. */
+export async function recordStoreContact(storeId: number, viewerKey: string, kind: 'whatsapp' | 'call') {
+  try {
+    await ensure();
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const existing = await prisma.store_contacts.findFirst({
+      where: { store_id: BigInt(storeId), viewer: viewerKey, kind, created_at: { gte: start } },
+      select: { id: true },
+    });
+    if (!existing) {
+      await prisma.store_contacts.create({ data: { store_id: BigInt(storeId), viewer: viewerKey, kind, created_at: new Date() } });
+    }
+  } catch {
+    /* best-effort */
+  }
+}
+
 export type VisitPoint = { date: string; visits: number };
+export type SourceSlice = { source: VisitSource; label: string; count: number };
+export type StoreConversions = { whatsapp: number; call: number; uniqueContacts: number; rate: number };
 export type StoreVisitorStats = {
   totalVisits: number;    // كل الزيارات (زائر واحد/يوم)
   uniqueVisitors: number; // زوّار مختلفون
   visits7: number;
   visits30: number;
   daily: VisitPoint[];    // آخر 30 يوماً
+  sources: SourceSlice[]; // مصادر الزيارات
+  conversions: StoreConversions; // نِسب التحويل (تواصل)
 };
 
 /** Visitor statistics for a store's storefront. */
@@ -75,5 +122,34 @@ export async function getStoreVisitorStats(storeId: number): Promise<StoreVisito
   const visits30 = daily.reduce((s, p) => s + p.visits, 0);
   const visits7 = daily.slice(-7).reduce((s, p) => s + p.visits, 0);
 
-  return { totalVisits: total, uniqueVisitors: uniqRows.length, visits7, visits30, daily: daily.length ? daily : empty() };
+  // مصادر الزيارات
+  const srcGroups = await prisma.store_visits.groupBy({ by: ['source'], where: { store_id: sid }, _count: true }).catch(() => [] as { source: string | null; _count: number }[]);
+  const srcMap = new Map<VisitSource, number>();
+  for (const g of srcGroups) {
+    const key = (g.source || 'direct') as VisitSource;
+    srcMap.set(key, (srcMap.get(key) || 0) + num(g._count as unknown as number));
+  }
+  const sources: SourceSlice[] = (Object.keys(SOURCE_LABELS) as VisitSource[])
+    .map((s) => ({ source: s, label: SOURCE_LABELS[s], count: srcMap.get(s) || 0 }))
+    .filter((s) => s.count > 0)
+    .sort((a, b) => b.count - a.count);
+
+  // نِسب التحويل (تواصل)
+  const [waCount, callCount, uniqContacts] = await Promise.all([
+    prisma.store_contacts.count({ where: { store_id: sid, kind: 'whatsapp' } }).catch(() => 0),
+    prisma.store_contacts.count({ where: { store_id: sid, kind: 'call' } }).catch(() => 0),
+    prisma.store_contacts.findMany({ where: { store_id: sid }, distinct: ['viewer'], select: { id: true } }).catch(() => [] as { id: bigint }[]),
+  ]);
+  const uniqueContacts = uniqContacts.length;
+  const rate = uniqRows.length > 0 ? Math.round((uniqueContacts / uniqRows.length) * 100) : 0;
+
+  return {
+    totalVisits: total,
+    uniqueVisitors: uniqRows.length,
+    visits7,
+    visits30,
+    daily: daily.length ? daily : empty(),
+    sources,
+    conversions: { whatsapp: waCount, call: callCount, uniqueContacts, rate },
+  };
 }

@@ -6,14 +6,15 @@ import { SITE } from '@/lib/constants';
 import { CopyLink } from '@/components/copy-link';
 import { getStore } from '@/lib/stores';
 import { getMyAds } from '@/lib/account';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
-import { recordStoreVisit } from '@/lib/store-analytics';
+import { recordStoreVisit, classifySource } from '@/lib/store-analytics';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle } from '@/lib/merchant';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { StoreBottomNav } from '@/components/store-bottomnav';
+import { StoreContactLink } from '@/components/store-contact-link';
 import { StoreCatalog } from '@/components/store-catalog';
 import { waLink } from '@/lib/classified-theme';
 import { bannerBackground, storeTier, isLightColor, layoutTokens, isCatalogStyle, DEFAULT_CATALOG_FIELDS } from '@/lib/store-style';
@@ -85,11 +86,14 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
     );
   }
 
-  // سجّل زيارة المتجر (زائر واحد/يوم) — لا تُحتسب زيارة المالك نفسه
+  // سجّل زيارة المتجر (زائر واحد/يوم) مع مصدرها — لا تُحتسب زيارة المالك نفسه
   if (!isOwner) {
     const vid = (await cookies()).get('trbhh_vid')?.value;
     const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
-    if (viewerKey) await recordStoreVisit(storeId, viewerKey);
+    if (viewerKey) {
+      const ref = (await headers()).get('referer');
+      await recordStoreVisit(storeId, viewerKey, classifySource(ref, SITE.domain));
+    }
   }
 
   const [myAds, productIds, followers, rating, reviews, following] = await Promise.all([
@@ -185,8 +189,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
                   </button>
                 </form>
               )}
-              {wa && <a href={wa} target="_blank" rel="noopener noreferrer"><Button variant="whatsapp"><MessageCircle className="h-4 w-4" /> واتساب</Button></a>}
-              {s.phone && <a href={`tel:${s.phone}`}><Button variant="outline"><Phone className="h-4 w-4" /> اتصال</Button></a>}
+              {wa && <StoreContactLink storeId={storeId} kind="whatsapp" href={wa} target="_blank"><Button variant="whatsapp"><MessageCircle className="h-4 w-4" /> واتساب</Button></StoreContactLink>}
+              {s.phone && <StoreContactLink storeId={storeId} kind="call" href={`tel:${s.phone}`}><Button variant="outline"><Phone className="h-4 w-4" /> اتصال</Button></StoreContactLink>}
               {canInvite && (
                 <form action={sendCollabAction}>
                   <input type="hidden" name="toStore" value={storeId} />
@@ -249,7 +253,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           <h2 className="font-bold" style={{ color: brand }}>التواصل مع المتجر</h2>
           {(meta.phone || meta.email || meta.contacts) && (
             <div className="grid gap-2 sm:grid-cols-2">
-              {meta.phone && <a href={`tel:${meta.phone}`} className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90"><Phone className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr">{meta.phone}</span></a>}
+              {meta.phone && <StoreContactLink storeId={storeId} kind="call" href={`tel:${meta.phone}`} className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90"><Phone className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr">{meta.phone}</span></StoreContactLink>}
               {meta.email && <a href={`mailto:${meta.email}`} className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90"><Mail className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr" className="truncate">{meta.email}</span></a>}
               {meta.contacts && <div className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90 sm:col-span-2"><Link2 className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr" className="truncate">{meta.contacts}</span></div>}
             </div>
@@ -319,7 +323,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         <DisclaimerBar />
       </div>
 
-      <StoreBottomNav brand={brand} wa={wa} isOwner={isOwner} />
+      <StoreBottomNav brand={brand} wa={wa} isOwner={isOwner} storeId={storeId} />
     </div>
   );
 }

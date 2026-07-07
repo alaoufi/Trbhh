@@ -56,6 +56,16 @@ const STATEMENTS: string[] = [
     INDEX store_visits_store (store_id),
     INDEX store_visits_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `ALTER TABLE store_visits ADD COLUMN source VARCHAR(20) NULL`,
+  `CREATE TABLE IF NOT EXISTS store_contacts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    store_id BIGINT UNSIGNED NOT NULL,
+    viewer VARCHAR(64) NOT NULL,
+    kind VARCHAR(12) NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX store_contacts_store (store_id),
+    INDEX store_contacts_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   /* ---- store relations ---- */
   `CREATE TABLE IF NOT EXISTS store_offers (

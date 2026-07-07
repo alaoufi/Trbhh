@@ -147,6 +147,59 @@ export async function getPricing(): Promise<{ featured: number; classified: numb
   return { featured: nn(f), classified: nn(c), duplicate: nn(d) };
 }
 
+/* ================= Revenue: store subscriptions + ad service pricing ================= */
+
+/** Store subscription plans (SAR) + grace period (days) + enforcement toggle. */
+export const SETTING_SUB_ENABLED = 'sub_store_enabled';
+export const SETTING_SUB_MONTHLY = 'sub_store_monthly';
+export const SETTING_SUB_6MO = 'sub_store_6mo';
+export const SETTING_SUB_YEARLY = 'sub_store_yearly';
+export const SETTING_SUB_GRACE_DAYS = 'sub_grace_days';
+
+export type SubPlan = 'monthly' | 'sixmo' | 'yearly';
+export const SUB_PLAN_MONTHS: Record<SubPlan, number> = { monthly: 1, sixmo: 6, yearly: 12 };
+export const SUB_PLAN_LABELS: Record<SubPlan, string> = { monthly: 'شهري', sixmo: '6 أشهر', yearly: 'سنوي' };
+
+export type StoreSubPricing = { enabled: boolean; monthly: number; sixmo: number; yearly: number; graceDays: number };
+export async function getStoreSubPricing(): Promise<StoreSubPricing> {
+  const nn = (n: number) => Math.max(0, Math.round(n) || 0);
+  const [en, m, s, y, g] = await Promise.all([
+    getSettingBool(SETTING_SUB_ENABLED, false),
+    getSettingNum(SETTING_SUB_MONTHLY, 0),
+    getSettingNum(SETTING_SUB_6MO, 0),
+    getSettingNum(SETTING_SUB_YEARLY, 0),
+    getSettingNum(SETTING_SUB_GRACE_DAYS, 10),
+  ]);
+  return { enabled: en, monthly: nn(m), sixmo: nn(s), yearly: nn(y), graceDays: Math.max(0, Math.round(g) || 10) };
+}
+export function subPlanPrice(p: StoreSubPricing, plan: SubPlan): number {
+  return plan === 'monthly' ? p.monthly : plan === 'sixmo' ? p.sixmo : p.yearly;
+}
+
+/** Ad service pricing (SAR) by duration + duplicate tiers. */
+export const SETTING_AD_2W = 'price_ad_2w';
+export const SETTING_AD_1M = 'price_ad_1m';
+export const SETTING_AD_3M = 'price_ad_3m';
+export const SETTING_DUP_T3 = 'price_dup_3';
+export const SETTING_DUP_T5 = 'price_dup_5';
+
+export type AdDuration = 'w2' | 'm1' | 'm3';
+export const AD_DURATION_DAYS: Record<AdDuration, number> = { w2: 14, m1: 30, m3: 90 };
+export const AD_DURATION_LABELS: Record<AdDuration, string> = { w2: 'أسبوعان', m1: 'شهر', m3: 'ثلاثة أشهر' };
+
+export type AdPricing = { w2: number; m1: number; m3: number; dup3: number; dup5: number };
+export async function getAdPricing(): Promise<AdPricing> {
+  const nn = (n: number) => Math.max(0, Math.round(n) || 0);
+  const [w2, m1, m3, d3, d5] = await Promise.all([
+    getSettingNum(SETTING_AD_2W, 0),
+    getSettingNum(SETTING_AD_1M, 0),
+    getSettingNum(SETTING_AD_3M, 0),
+    getSettingNum(SETTING_DUP_T3, 0),
+    getSettingNum(SETTING_DUP_T5, 0),
+  ]);
+  return { w2: nn(w2), m1: nn(m1), m3: nn(m3), dup3: nn(d3), dup5: nn(d5) };
+}
+
 /* ---- native app shells (Android TWA / iOS wrapper): versions & stores ---- */
 export const APP_KEYS = {
   androidPackage: 'app_android_package',

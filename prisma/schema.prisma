@@ -850,6 +850,7 @@ model stores {
   store_password   String?   @db.VarChar(255)
   store_username   String?   @unique(map: "uniq_store_username") @db.VarChar(60)
   views            Int       @default(0)
+  sub_until        DateTime? @db.DateTime(0)
 }
 
 // ---- self-provisioned tables (source of truth: src/data/schema-sync.ts) ----

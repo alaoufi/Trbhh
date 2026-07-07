@@ -7,6 +7,20 @@ import { saveUpload } from '@/lib/storage';
 import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform, saveStoreSettings, setStorePassword, setStoreUsername } from '@/lib/merchant';
 import { toInt } from '@/lib/utils';
 
+/** Owner subscribes/renews the store to a plan (monthly/6mo/yearly), charged from wallet. */
+export async function subscribeStoreAction(formData: FormData) {
+  const session = await requireUser();
+  const raw = String(formData.get('plan') || '');
+  const plan = raw === 'monthly' || raw === 'sixmo' || raw === 'yearly' ? raw : null;
+  if (!plan) redirect('/store?sub=error');
+  const { subscribeStore } = await import('@/lib/subscription');
+  const r = await subscribeStore(session.uid, plan);
+  revalidatePath('/store');
+  revalidatePath('/');
+  if (!r.ok) redirect('/store?sub=nocredit');
+  redirect('/store?sub=ok');
+}
+
 /** Owner sets/changes the dedicated store-login credentials (username + password), separate from Trbhh. */
 export async function setStoreCredentialsAction(formData: FormData) {
   const session = await requireUser();

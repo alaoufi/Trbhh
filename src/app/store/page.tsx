@@ -8,8 +8,10 @@ import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, setStoreCredentialsAction } from '@/app/account/company/actions';
-import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3 } from 'lucide-react';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, setStoreCredentialsAction, subscribeStoreAction } from '@/app/account/company/actions';
+import { getStoreSub } from '@/lib/subscription';
+import { getStoreSubPricing } from '@/lib/settings';
+import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
@@ -19,10 +21,12 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string }> }) {
+  const { error, sub } = await searchParams;
   const session = await requireUser();
   const store = await getStoreByUser(session.uid);
+  const subState = store ? await getStoreSub(store.id) : null;
+  const subPricing = await getStoreSubPricing();
   const branches = store ? await prisma.store_branches.findMany({ where: { store_id: store.id } }) : [];
   const logoUrl = store?.logo ? mediaUrl((await prisma.uploads.findUnique({ where: { id: BigInt(store.logo) } }))?.file_name) : null;
   const meta = store ? await getStoreMeta(store.id) : null;
@@ -63,6 +67,30 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
       {store && meta && (
         <div className={`card-3d rounded-xl p-3 text-sm font-bold ${meta.status === 1 ? 'text-emerald-700' : meta.status === 0 ? 'text-amber-700' : 'text-red-700'}`}>
           {meta.status === 1 ? '✓ متجرك مُعتمَد وظاهر للجميع.' : meta.status === 0 ? '⏳ متجرك بانتظار موافقة الإدارة قبل الظهور.' : '⛔ متجرك موقوف. تواصل مع الإدارة.'}
+        </div>
+      )}
+
+      {/* اشتراك المتجر — حالة + تذكيرات + خطط الدفع (يظهر عند تفعيل الاشتراكات) */}
+      {store && subState && subState.enabled && (
+        <div className="card-3d space-y-3 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> اشتراك المتجر</div>
+          {sub === 'ok' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ تم تجديد الاشتراك وخُصمت الرسوم من رصيدك.</div>}
+          {sub === 'nocredit' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-700">الرصيد غير كافٍ — اشحن رصيدك من «محفظتي» ثم أعد المحاولة.</div>}
+          {subState.state === 'active' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ اشتراكك فعّال حتى {fmtDate(subState.until?.toISOString() ?? null)} (متبقٍ {en(Math.max(0, subState.daysLeft))} يوم).{subState.daysLeft <= 7 && ' يُستحسن التجديد قريباً.'}</div>}
+          {subState.state === 'grace' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">⚠️ انتهى اشتراكك. متجرك في <b>مهلة {en(subState.graceDays)} أيام</b> ({en(Math.max(0, subState.graceDaysLeft))} يوم متبقٍ) ثم يُخفى من العرض. جدّد الآن لتفادي الإيقاف — لن يُحذف شيء.</div>}
+          {subState.state === 'suspended' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">⛔ اشتراكك منتهٍ ومتجرك <b>مخفيّ من العرض</b> (بياناتك وإعلاناتك محفوظة). جدّد لإعادة الظهور فوراً.</div>}
+          {subState.state === 'none' && <div className="rounded-lg bg-sky-50 p-2 text-xs font-bold text-sky-700">لم تشترك بعد. اشترك ليظهر متجرك للعملاء.</div>}
+          <div className="grid grid-cols-3 gap-2">
+            {([['monthly', subPricing.monthly, 'شهري'], ['sixmo', subPricing.sixmo, '6 أشهر'], ['yearly', subPricing.yearly, 'سنوي']] as const).map(([plan, price, label]) => (
+              <form key={plan} action={subscribeStoreAction} className="flex flex-col items-center gap-1 rounded-xl border p-3 text-center">
+                <input type="hidden" name="plan" value={plan} />
+                <div className="text-xs font-bold text-muted-foreground">{label}</div>
+                <div className="text-lg font-extrabold text-primary">{en(price)} <span className="text-[10px]">ر.س</span></div>
+                <Button size="sm" className="w-full">{subState.state === 'active' || subState.state === 'grace' ? 'تجديد' : 'اشتراك'}</Button>
+              </form>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground">تُخصم الرسوم من رصيدك. التجديد المبكر يضيف المدة إلى ما تبقّى. عند انتهاء الاشتراك تُمنح مهلة {en(subState.graceDays)} أيام قبل الإخفاء، ولا يُحذف المتجر أو إعلاناته.</p>
         </div>
       )}
 

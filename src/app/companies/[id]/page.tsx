@@ -10,6 +10,7 @@ import { cookies, headers } from 'next/headers';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { recordStoreVisit, classifySource, bumpStoreView, getStoreViews } from '@/lib/store-analytics';
+import { isStoreSubBlocked } from '@/lib/subscription';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle } from '@/lib/merchant';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -74,13 +75,16 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const meta = await getStoreMeta(storeId);
   // approval gate: pending/suspended stores aren't public. Instead of a bare 404,
   // show a friendly status page (e.g. when a merchant previews a store still under review).
-  if (meta.status !== 1 && !isOwner && !admin) {
+  // اشتراك المتجر: عند انتهائه بعد المهلة يُخفى المتجر من العرض (دون حذف). المالك والإدارة يريانه.
+  const subBlocked = await isStoreSubBlocked(storeId).catch(() => false);
+  if ((meta.status !== 1 || subBlocked) && !isOwner && !admin) {
     const pending = meta.status === 0;
+    const subOnly = meta.status === 1 && subBlocked;
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 px-6 text-center">
         <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary text-3xl">{pending ? '⏳' : '🚫'}</div>
         <h1 className="text-lg font-extrabold text-primary">{pending ? 'هذا المتجر قيد المراجعة' : 'هذا المتجر غير متاح حالياً'}</h1>
-        <p className="text-sm text-muted-foreground">{pending ? 'يخضع المتجر لموافقة الإدارة وسيظهر للعملاء بعد اعتماده.' : 'تم إيقاف هذا المتجر مؤقتاً من قبل الإدارة.'}</p>
+        <p className="text-sm text-muted-foreground">{pending ? 'يخضع المتجر لموافقة الإدارة وسيظهر للعملاء بعد اعتماده.' : subOnly ? 'المتجر غير متاح مؤقتاً. سيعود للظهور قريباً.' : 'تم إيقاف هذا المتجر مؤقتاً من قبل الإدارة.'}</p>
         <Link href="/" className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">الصفحة الرئيسية</Link>
       </div>
     );

@@ -12,7 +12,7 @@ import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAcco
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_PRICE_FEATURED, SETTING_PRICE_CLASSIFIED, SETTING_PRICE_DUP, APP_KEYS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_PRICE_FEATURED, SETTING_PRICE_CLASSIFIED, SETTING_PRICE_DUP, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_AD_2W, SETTING_AD_1M, SETTING_AD_3M, SETTING_DUP_T3, SETTING_DUP_T5, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -406,6 +406,37 @@ export async function saveSettingsAction(formData: FormData) {
   revalidatePath('/');
   revalidatePath('/classified');
   redirect('/admin/settings?saved=1');
+}
+
+/** Revenue hub: store-subscription plans + grace, and ad-service/duplicate pricing. */
+export async function saveRevenueAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const nn = (k: string, d = 0) => String(Math.max(0, parseInt(String(formData.get(k) || d)) || d));
+  await setSetting(SETTING_SUB_ENABLED, formData.get('subEnabled') !== null ? '1' : '0');
+  await setSetting(SETTING_SUB_MONTHLY, nn('subMonthly'));
+  await setSetting(SETTING_SUB_6MO, nn('sub6mo'));
+  await setSetting(SETTING_SUB_YEARLY, nn('subYearly'));
+  await setSetting(SETTING_SUB_GRACE_DAYS, String(Math.max(0, parseInt(String(formData.get('subGraceDays') || '10')) || 10)));
+  await setSetting(SETTING_AD_2W, nn('adW2'));
+  await setSetting(SETTING_AD_1M, nn('adM1'));
+  await setSetting(SETTING_AD_3M, nn('adM3'));
+  await setSetting(SETTING_DUP_T3, nn('dup3'));
+  await setSetting(SETTING_DUP_T5, nn('dup5'));
+  revalidatePath('/admin/revenue');
+  revalidatePath('/store');
+  redirect('/admin/revenue?saved=1');
+}
+
+/** Admin grants/extends/clears a store's subscription (days from now; 0 = clear). */
+export async function adminSetStoreSubAction(formData: FormData) {
+  await requireAction('stores', 'edit');
+  const storeId = toInt(BigInt(String(formData.get('storeId') || '0')));
+  const days = parseInt(String(formData.get('days') || '0')) || 0;
+  const { adminSetStoreSub } = await import('@/lib/subscription');
+  const until = days > 0 ? new Date(Date.now() + days * 86400000) : null;
+  await adminSetStoreSub(storeId, until);
+  revalidatePath(`/admin/stores`);
+  redirect('/admin/revenue?saved=1');
 }
 
 /** Save the permission matrix for one role (checkbox keys named "k"). */

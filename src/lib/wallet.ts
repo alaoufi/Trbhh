@@ -6,13 +6,14 @@ import { toInt } from './utils';
 const ensure = ensureSchema;
 
 /** Reasons recorded on each wallet transaction (for member + admin history). */
-export type TxnReason = 'admin_credit' | 'admin_debit' | 'featured' | 'classified' | 'duplicate' | 'refund';
+export type TxnReason = 'admin_credit' | 'admin_debit' | 'featured' | 'classified' | 'duplicate' | 'subscription' | 'refund';
 export const REASON_LABELS: Record<TxnReason, string> = {
   admin_credit: 'شحن رصيد من الإدارة',
   admin_debit: 'خصم من الإدارة',
   featured: 'إعلان مميّز',
   classified: 'إعلان مبوّب',
   duplicate: 'رسوم تكرار إعلان',
+  subscription: 'اشتراك متجر',
   refund: 'استرداد',
 };
 
@@ -80,6 +81,41 @@ export async function debitUser(userId: number, amount: number, adminId: number,
 }
 
 export type WalletTxn = { id: number; amount: number; balanceAfter: number; reason: TxnReason; label: string; note: string | null; at: string | null; byAdmin: boolean };
+
+export type RevenueSummary = {
+  credited: number;   // إجمالي الشحن (موجب)
+  spent: number;      // إجمالي المصروف (سالب، بالقيمة المطلقة) = الإيراد الفعلي
+  outstanding: number; // مجموع أرصدة الأعضاء الحالية
+  byReason: { reason: TxnReason; label: string; total: number }[]; // مصروف حسب النوع
+  recent: (WalletTxn & { userId: number; userName: string })[];
+};
+
+/** Site-wide revenue summary for the admin (money in/out + breakdown + recent activity). */
+export async function getRevenueSummary(recentLimit = 30): Promise<RevenueSummary> {
+  await ensure();
+  const [credited, spentRows, balSum, byReasonRows, recentRows] = await Promise.all([
+    prisma.wallet_txns.aggregate({ _sum: { amount: true }, where: { amount: { gt: 0 } } }).catch(() => ({ _sum: { amount: 0 } })),
+    prisma.wallet_txns.aggregate({ _sum: { amount: true }, where: { amount: { lt: 0 } } }).catch(() => ({ _sum: { amount: 0 } })),
+    prisma.users.aggregate({ _sum: { balance: true } }).catch(() => ({ _sum: { balance: 0 } })),
+    prisma.wallet_txns.groupBy({ by: ['reason'], where: { amount: { lt: 0 } }, _sum: { amount: true } }).catch(() => [] as { reason: string; _sum: { amount: number | null } }[]),
+    prisma.wallet_txns.findMany({ orderBy: { id: 'desc' }, take: Math.min(100, Math.max(1, recentLimit)) }).catch(() => []),
+  ]);
+  const spent = Math.abs(spentRows._sum.amount ?? 0);
+  const byReason = byReasonRows
+    .map((r) => ({ reason: r.reason as TxnReason, label: REASON_LABELS[r.reason as TxnReason] || r.reason, total: Math.abs(r._sum.amount ?? 0) }))
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.total - a.total);
+  // names for recent rows
+  const uids = [...new Set(recentRows.map((r) => Number(r.user_id)))];
+  const users = uids.length ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }).catch(() => []) : [];
+  const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
+  const recent = recentRows.map((r) => ({
+    id: toInt(r.id), amount: r.amount, balanceAfter: r.balance_after, reason: r.reason as TxnReason,
+    label: REASON_LABELS[r.reason as TxnReason] || r.reason, note: r.note, at: r.created_at ? r.created_at.toISOString() : null,
+    byAdmin: !!r.admin_id, userId: toInt(r.user_id), userName: nameById.get(toInt(r.user_id)) || `#${toInt(r.user_id)}`,
+  }));
+  return { credited: credited._sum.amount ?? 0, spent, outstanding: balSum._sum.balance ?? 0, byReason, recent };
+}
 
 /** Transaction history for a member (newest first). */
 export async function listTxns(userId: number, limit = 50): Promise<WalletTxn[]> {

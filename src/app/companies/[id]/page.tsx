@@ -326,7 +326,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         <DisclaimerBar />
       </div>
 
-      <StoreBottomNav brand={brand} wa={wa} isOwner={isOwner} storeId={storeId} />
+      <StoreBottomNav brand={brand} wa={wa} isOwner={isOwner} storeId={storeId} home={meta.handle ? `https://${meta.handle}.${SITE.domain}` : `/companies/${storeId}`} />
     </div>
   );
 }

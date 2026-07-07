@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
 import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, platformRequestState, getStoreLogin } from '@/lib/merchant';
 import { getMyAds } from '@/lib/account';
+import { getStoreVisitorStats } from '@/lib/store-analytics';
 import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
@@ -25,6 +26,9 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const branches = store ? await prisma.store_branches.findMany({ where: { store_id: store.id } }) : [];
   const logoUrl = store?.logo ? mediaUrl((await prisma.uploads.findUnique({ where: { id: BigInt(store.logo) } }))?.file_name) : null;
   const meta = store ? await getStoreMeta(store.id) : null;
+  const visitorStats = store ? await getStoreVisitorStats(store.id) : null;
+  const myAdIds = store ? (await prisma.ads.findMany({ where: { user_id: BigInt(session.uid) }, select: { id: true } })).map((a) => a.id) : [];
+  const totalAdViews = myAdIds.length ? await prisma.ads_views.count({ where: { ads_id: { in: myAdIds } } }).catch(() => 0) : 0;
   const stats = store
     ? { followers: await followersCount(store.id), rating: await getStoreRating(store.id), ads: await prisma.ads.count({ where: { user_id: BigInt(session.uid), status: 1 } }) }
     : null;
@@ -130,10 +134,17 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
       )}
 
       {store && stats && (
-        <div className="grid grid-cols-3 gap-2">
-          {[{ l: 'متابعون', v: en(stats.followers) }, { l: 'التقييم', v: stats.rating.count ? `${stats.rating.avg}★` : '—' }, { l: 'إعلانات نشطة', v: en(stats.ads) }].map((s) => (
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {[
+            { l: 'زوّار المتجر', v: en(visitorStats?.uniqueVisitors ?? 0) },
+            { l: 'مشاهدات الإعلانات', v: en(totalAdViews) },
+            { l: 'المتابعون', v: en(stats.followers) },
+            { l: 'التقييم', v: stats.rating.count ? `${stats.rating.avg}★` : '—' },
+            { l: 'إعلانات نشطة', v: en(stats.ads) },
+            { l: 'زيارات ٧ أيام', v: en(visitorStats?.visits7 ?? 0) },
+          ].map((s) => (
             <div key={s.l} className="card-3d flex flex-col items-center gap-0.5 rounded-xl p-3 text-center">
-              <div className="text-lg font-bold text-primary">{s.v}</div><div className="text-[11px] text-muted-foreground">{s.l}</div>
+              <div className="text-lg font-bold text-primary">{s.v}</div><div className="text-[11px] leading-tight text-muted-foreground">{s.l}</div>
             </div>
           ))}
         </div>

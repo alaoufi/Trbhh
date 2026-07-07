@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Phone, MessageCircle, ExternalLink, Pause, Play, Home, Sparkles, ArrowRight } from 'lucide-react';
 import { type Classified, CLASSIFIED_THEMES, POS_CLASS, SIZE_TITLE, SIZE_BODY, SIZE_TITLE_POSTER, SIZE_BODY_POSTER, waLink } from '@/lib/classified-theme';
 import { ClassifiedDecor } from '@/components/classified-decor';
@@ -66,6 +66,9 @@ function Contact({ ad, big }: { ad: Classified; big?: boolean }) {
 
 export function ClassifiedSplash({ ads, seconds }: { ads: Classified[]; seconds?: number }) {
   const router = useRouter();
+  const pathname = usePathname() || '';
+  // لا تظهر مبوّبات تربح ضمن سياق المتجر المستقل (احتياطاً)
+  const inStoreCtx = /^\/companies\//.test(pathname) || /^\/store(\/|$|-)/.test(pathname);
   const [show, setShow] = useState(false);
   const durationMs = (seconds && seconds > 0 ? seconds : DEFAULT_SECONDS) * 1000; // مدة التشغيل — من إعدادات الإدارة
   const [remaining, setRemaining] = useState(durationMs);
@@ -76,7 +79,7 @@ export function ClassifiedSplash({ ads, seconds }: { ads: Classified[]; seconds?
   const total = ads.length;
 
   useEffect(() => {
-    if (!total) return;
+    if (!total || inStoreCtx) return;
     // تظهر مرة واحدة فقط عند دخول الموقع — لا تتكرر مع التحديث أو التنقل داخل الموقع
     // (تُعاد فقط في زيارة جديدة/تبويب جديد). sessionStorage يبقى طوال الجلسة.
     try {
@@ -103,7 +106,7 @@ export function ClassifiedSplash({ ads, seconds }: { ads: Classified[]; seconds?
       });
     }, 50);
     return () => clearInterval(iv);
-  }, [total]);
+  }, [total, inStoreCtx]);
 
   function togglePause() {
     pausedRef.current = !pausedRef.current;

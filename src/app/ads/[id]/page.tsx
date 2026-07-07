@@ -4,8 +4,9 @@ import { notFound } from 'next/navigation';
 import {
   MapPin, Eye, Phone, MessageCircle, Timer, Tag, Flag, Send,
   User, BadgeCheck, Hash, ArrowLeftRight, Star, Share2, Heart, Navigation,
-  ShieldAlert, Trash2, Archive, Ban,
+  ShieldAlert, Trash2, Archive, Ban, Store,
 } from 'lucide-react';
+import { SplashSuppress } from '@/components/splash-suppress';
 import { getAd, getSimilarAds, recordView } from '@/lib/data';
 import { hasAction } from '@/lib/roles';
 import { adminArchiveAdAction, adminBanSellerAction, adminDeleteAdRedirectAction } from '@/app/admin/actions';
@@ -97,7 +98,15 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
     ad.seller ? getSellerRating(ad.seller.id) : Promise.resolve({ avg: 0, count: 0 }),
   ]);
 
-  const shareUrl = `https://${SITE.domain}/ads/${ad.id}`;
+  // هل هذا إعلان متجر (معروض في واجهة متجر مستقل)؟ إن كان، فالمتجر مستقل:
+  // نمنع ظهور مبوّبات تربح ونعرض رابطاً واضحاً «زيارة المتجر».
+  const { storeIdOfUser, storeProductAdIds, getStoreMeta } = await import('@/lib/merchant');
+  const sellerStoreId = ad.seller ? await storeIdOfUser(ad.seller.id).catch(() => 0) : 0;
+  const inStore = sellerStoreId ? (await storeProductAdIds(sellerStoreId).catch(() => [] as number[])).includes(ad.id) : false;
+  const storeMeta = inStore ? await getStoreMeta(sellerStoreId).catch(() => null) : null;
+  const storeUrl = inStore ? (storeMeta?.handle ? `https://${storeMeta.handle}.${SITE.domain}` : `/companies/${sellerStoreId}`) : '';
+
+  const shareUrl = inStore ? (storeUrl.startsWith('http') ? storeUrl : `https://${SITE.domain}/companies/${sellerStoreId}`) : `https://${SITE.domain}/ads/${ad.id}`;
   const waNumber = waLink(ad.seller?.whatsapp);
   // صاحب الإعلان لا يرى المراسلة/البلاغ/التقييم على إعلانه (لا يراسل/يبلّغ/يقيّم نفسه)
   const isAdOwner = !!(session && ad.seller && session.uid === ad.seller.id);
@@ -122,6 +131,15 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   return (
     <div className="space-y-4 pb-16 md:pb-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
+      {/* إعلان متجر مستقل: امنع مبوّبات تربح واعرض رابط زيارة المتجر */}
+      {inStore && <SplashSuppress />}
+      {inStore && storeUrl && (
+        <a href={storeUrl} className="flex items-center justify-between gap-2 rounded-xl border-2 border-primary/25 bg-primary/5 p-3 text-sm font-bold text-primary">
+          <span className="flex items-center gap-2"><Store className="h-5 w-5" /> هذا الإعلان ضمن متجر {storeMeta?.storeName || ''}</span>
+          <span className="text-xs">زيارة المتجر ←</span>
+        </a>
+      )}
 
       {/* Gallery with tap-to-zoom lightbox */}
       <AdGallery images={ad.images} title={ad.title} special={ad.special} adsType={ad.adsType} />

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2, Plus, BarChart3 } from 'lucide-react';
+import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2, Plus, BarChart3, Megaphone, Eye } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { CopyLink } from '@/components/copy-link';
 import { getStore } from '@/lib/stores';
@@ -9,7 +9,7 @@ import { getMyAds } from '@/lib/account';
 import { cookies, headers } from 'next/headers';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
-import { recordStoreVisit, classifySource } from '@/lib/store-analytics';
+import { recordStoreVisit, classifySource, getStoreAdViews } from '@/lib/store-analytics';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle } from '@/lib/merchant';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -110,6 +110,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const allActive = myAds.filter((a) => a.status === 1 && inStore.has(a.id)).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
   const active = query ? allActive.filter((a) => (a.title || '').includes(query)) : allActive;
   const wa = waLink(s.whatsapp);
+  const storeViews = await getStoreAdViews(s.userId).catch(() => 0); // مشاهدات إعلانات المتجر (عام)
   // collaboration: can this viewer (a merchant) invite this store?
   const viewerStoreId = session && !isOwner ? await storeIdOfUser(session.uid) : 0;
   const alreadyPartner = viewerStoreId ? await isCollaborator(viewerStoreId, storeId) : false;
@@ -175,11 +176,12 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
 
             {s.address && <div className="mt-2 flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{s.address}</div>}
 
-            {/* إحصائيات */}
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            {/* إحصائيات المتجر — بارزة للجميع (زوّار وعملاء) */}
+            <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+              <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Megaphone className="h-4 w-4" /> {en(allActive.length)}</div><div className="text-[11px] text-muted-foreground">إعلان</div></div>
+              <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Eye className="h-4 w-4" /> {en(storeViews)}</div><div className="text-[11px] text-muted-foreground">مشاهدة</div></div>
               <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Users className="h-4 w-4" /> {en(followers)}</div><div className="text-[11px] text-muted-foreground">متابع</div></div>
               <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Star className="h-4 w-4 fill-amber-400 text-amber-400" /> {rating.count ? rating.avg : '—'}</div><div className="text-[11px] text-muted-foreground">تقييم ({en(rating.count)})</div></div>
-              <div className="rounded-xl bg-secondary/40 p-2"><div className="font-bold" style={{ color: brand }}>{en(allActive.length)}</div><div className="text-[11px] text-muted-foreground">إعلان</div></div>
             </div>
 
             {/* أزرار: متابعة + تواصل */}

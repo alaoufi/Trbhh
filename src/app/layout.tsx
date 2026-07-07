@@ -85,7 +85,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             the shared header/menu/footer, even across client-side navigation. */}
         <ChromeGate
           header={<><TopBar /><Header /></>}
-          footer={<><Footer /><MobileNav unread={unread} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
+          footer={<><Footer /><MobileNav unread={unread} isAuthed={!!session} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
         >
           {children}
         </ChromeGate>

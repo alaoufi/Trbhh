@@ -1,19 +1,30 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, MessagesSquare, PlusCircle, Bell, Mail } from 'lucide-react';
+import { Home, MessagesSquare, PlusCircle, Bell, Mail, Building2, Search, LogIn, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const items = [
+type NavItem = { href: string; label: string; icon: LucideIcon; primary?: boolean; badge?: boolean };
+
+// بنود تتطلّب تسجيل الدخول → تظهر فقط للمسجّل. للزائر بنود عامة فقط.
+const authedItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },
   { href: '/debates', label: 'مناقشات', icon: MessagesSquare },
   { href: '/ads/new', label: 'أضف إعلان', icon: PlusCircle, primary: true },
   { href: '/notifications', label: 'الاشعارات', icon: Bell, badge: true },
   { href: '/messages', label: 'الرسائل', icon: Mail },
 ];
+const guestItems: NavItem[] = [
+  { href: '/', label: 'الرئيسية', icon: Home },
+  { href: '/companies', label: 'المتاجر', icon: Building2 },
+  { href: '/login', label: 'تسجيل الدخول', icon: LogIn, primary: true },
+  { href: '/debates', label: 'مناقشات', icon: MessagesSquare },
+  { href: '/search', label: 'بحث', icon: Search },
+];
 
-export function MobileNav({ unread = 0 }: { unread?: number }) {
+export function MobileNav({ unread = 0, isAuthed = false }: { unread?: number; isAuthed?: boolean }) {
   const path = usePathname();
+  const items = isAuthed ? authedItems : guestItems;
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-primary/15 bg-accent/95 backdrop-blur md:hidden">
       <ul className="flex items-stretch justify-around">

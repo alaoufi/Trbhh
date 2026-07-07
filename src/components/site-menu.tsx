@@ -65,16 +65,22 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
             <BookOpen className="h-5 w-5 shrink-0" /> <span>دليل المستخدم</span>
           </Link>
 
-          <Group label="حسابي" />
-          <Item href={isAuthed ? '/account' : '/login'} icon={User} onClick={close}>حسابي</Item>
-          <Item href="/account/ads" icon={Megaphone} onClick={close}>إعلاناتي</Item>
-          <Item href="/account/favorites" icon={Heart} onClick={close}>المفضلة</Item>
-          {isAuthed && <Item href="/account/classified" icon={Sparkles} onClick={close}>إعلاناتي المبوّبة</Item>}
-          {isAuthed && <Item href="/account/promos" icon={Megaphone} onClick={close}>إعلاناتي الترويجية</Item>}
+          {/* حسابي — بنود تتطلّب تسجيل الدخول، لا تظهر إلا للمصرّح له */}
+          {isAuthed && (
+            <>
+              <Group label="حسابي" />
+              <Item href="/account" icon={User} onClick={close}>حسابي</Item>
+              <Item href="/account/ads" icon={Megaphone} onClick={close}>إعلاناتي</Item>
+              <Item href="/account/favorites" icon={Heart} onClick={close}>المفضلة</Item>
+              <Item href="/account/classified" icon={Sparkles} onClick={close}>إعلاناتي المبوّبة</Item>
+              <Item href="/account/promos" icon={Megaphone} onClick={close}>إعلاناتي الترويجية</Item>
+            </>
+          )}
 
           <Group label="النشر والإعلان" />
-          <Item href="/ads/new" icon={PlusCircle} onClick={close}>أضف إعلان</Item>
-          <Item href="/classified/new" icon={Sparkles} onClick={close}>المصمم الذكي (إعلان مبوّب)</Item>
+          {/* النشر يتطلّب تسجيل الدخول */}
+          {isAuthed && <Item href="/ads/new" icon={PlusCircle} onClick={close}>أضف إعلان</Item>}
+          {isAuthed && <Item href="/classified/new" icon={Sparkles} onClick={close}>المصمم الذكي (إعلان مبوّب)</Item>}
           <Item href="/promote" icon={Megaphone} onClick={close}>أعلن معنا</Item>
           <Item href="/packages" icon={Crown} onClick={close}>الباقات</Item>
 
@@ -109,9 +115,14 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
             <Share2 className="h-5 w-5 shrink-0" /> مشاركة الموقع
           </button>
 
-          <div className="my-2 border-t border-primary/10" />
-          <DesignPicker />
-          <ThemePicker />
+          {/* هوية الموقع وألوانه — تحكّم إداري لا يظهر إلا للإدارة */}
+          {isAdmin && (
+            <>
+              <div className="my-2 border-t border-primary/10" />
+              <DesignPicker />
+              <ThemePicker />
+            </>
+          )}
           <div className="my-2 border-t border-primary/10" />
 
           <Group label="معلومات" />

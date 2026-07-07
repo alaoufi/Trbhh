@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2, Plus } from 'lucide-react';
+import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2, Plus, BarChart3 } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { CopyLink } from '@/components/copy-link';
 import { getStore } from '@/lib/stores';
@@ -139,6 +139,9 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <Link href="/ads/new" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="أضف إعلان"><Plus className="h-5 w-5" /></Link>
           )}
           {isOwner && (
+            <a href="/store/analytics" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إحصائيات المتجر"><BarChart3 className="h-4 w-4" /></a>
+          )}
+          {isOwner && (
             <a href="/store" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إدارة المتجر"><Building2 className="h-4 w-4" /></a>
           )}
         </div>
@@ -176,7 +179,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
               <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Users className="h-4 w-4" /> {en(followers)}</div><div className="text-[11px] text-muted-foreground">متابع</div></div>
               <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Star className="h-4 w-4 fill-amber-400 text-amber-400" /> {rating.count ? rating.avg : '—'}</div><div className="text-[11px] text-muted-foreground">تقييم ({en(rating.count)})</div></div>
-              <div className="rounded-xl bg-secondary/40 p-2"><div className="font-bold" style={{ color: brand }}>{en(allActive.length)}</div><div className="text-[11px] text-muted-foreground">منتج</div></div>
+              <div className="rounded-xl bg-secondary/40 p-2"><div className="font-bold" style={{ color: brand }}>{en(allActive.length)}</div><div className="text-[11px] text-muted-foreground">إعلان</div></div>
             </div>
 
             {/* أزرار: متابعة + تواصل */}
@@ -204,7 +207,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
 
         {/* ===== تبويبات (روابط قفز) ===== */}
         <nav className="sticky top-[52px] z-20 flex gap-1 rounded-xl bg-white p-1 text-sm font-bold shadow-sm ring-1 ring-black/5">
-          <a href="#catalog" className="flex-1 rounded-lg py-2 text-center text-white" style={{ background: brand }}>المنتجات</a>
+          <a href="#catalog" className="flex-1 rounded-lg py-2 text-center text-white" style={{ background: brand }}>الإعلانات</a>
           <a href="#about" className="flex-1 rounded-lg py-2 text-center text-muted-foreground hover:bg-muted/50">نبذة</a>
           {meta.allowReviews && <a href="#reviews" className="flex-1 rounded-lg py-2 text-center text-muted-foreground hover:bg-muted/50">التقييمات</a>}
         </nav>
@@ -214,12 +217,12 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           <h2 className="mb-2 text-lg font-bold" style={{ color: brand }}>
             {query ? `نتائج البحث «${query}» (${en(active.length)})` : `كتالوج المتجر (${en(active.length)})`}
           </h2>
-          {active.length > 0 ? <StoreCatalog ads={active} style={catalogStyle} fields={catalogFields} brand={brand} /> : <p className="rounded-xl bg-white p-6 text-center text-sm text-muted-foreground shadow-sm">{query ? 'لا توجد منتجات مطابقة لبحثك.' : 'لا توجد منتجات معروضة بعد.'}</p>}
+          {active.length > 0 ? <StoreCatalog ads={active} style={catalogStyle} fields={catalogFields} brand={brand} /> : <p className="rounded-xl bg-white p-6 text-center text-sm text-muted-foreground shadow-sm">{query ? 'لا توجد إعلانات مطابقة لبحثك.' : 'لا توجد إعلانات معروضة بعد.'}</p>}
         </div>
 
         {partnerAds.length > 0 && (
           <div className="scroll-mt-28">
-            <h2 className="mb-2 flex items-center gap-2 text-lg font-bold" style={{ color: brand }}><Handshake className="h-5 w-5" /> منتجات شركائنا</h2>
+            <h2 className="mb-2 flex items-center gap-2 text-lg font-bold" style={{ color: brand }}><Handshake className="h-5 w-5" /> إعلانات شركائنا</h2>
             <StoreCatalog ads={partnerAds} style={catalogStyle} fields={catalogFields} brand={brand} />
           </div>
         )}

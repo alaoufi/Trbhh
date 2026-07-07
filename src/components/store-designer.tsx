@@ -7,8 +7,8 @@ import { StoreCatalog, type CatalogAd } from '@/components/store-catalog';
 type Initial = { storeName?: string | null; color?: string | null; banner?: string | null; tagline?: string | null; about?: string | null; layout?: string | null; catalog?: string | null; fields?: string | null; handle?: string | null; logoUrl?: string | null };
 
 const SAMPLE_ADS: CatalogAd[] = [
-  { id: 0, title: 'منتج تجريبي مميّز بجودة عالية', price: 349, adsType: 'offer', image: '/placeholder-ad.svg', cityName: 'الرياض', createdAt: null, special: true, views: 128, tier: null },
-  { id: 0, title: 'منتج آخر للمعاينة على السوم', price: 0, adsType: 'offer', image: '/placeholder-ad.svg', cityName: 'جدة', createdAt: null, special: false, views: 54, tier: null },
+  { id: 0, title: 'إعلان تجريبي مميّز بجودة عالية', price: 349, adsType: 'offer', image: '/placeholder-ad.svg', cityName: 'الرياض', createdAt: null, special: true, views: 128, tier: null },
+  { id: 0, title: 'إعلان آخر للمعاينة على السوم', price: 0, adsType: 'offer', image: '/placeholder-ad.svg', cityName: 'جدة', createdAt: null, special: false, views: 54, tier: null },
 ];
 
 /**
@@ -104,7 +104,7 @@ export function StoreDesigner({ initial }: { initial: Initial }) {
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2 bg-white p-2 text-center">
-          {[{ i: Users, l: 'متابع' }, { i: Star, l: 'تقييم' }, { i: LayoutGrid, l: 'منتج' }].map((s, k) => (
+          {[{ i: Users, l: 'متابع' }, { i: Star, l: 'تقييم' }, { i: LayoutGrid, l: 'إعلان' }].map((s, k) => (
             <div key={k} className="rounded-lg bg-secondary/40 py-1.5"><s.i className="mx-auto h-4 w-4" style={{ color }} /><div className="text-[10px] text-muted-foreground">{s.l}</div></div>
           ))}
         </div>
@@ -156,7 +156,7 @@ export function StoreDesigner({ initial }: { initial: Initial }) {
         <div className="mb-2 flex items-center gap-1.5 text-sm font-extrabold text-primary"><SlidersHorizontal className="h-4 w-4" /> خيارات عرض الإعلانات</div>
 
         {/* شكل العرض */}
-        <label className="mb-1 block text-xs font-bold text-muted-foreground">شكل عرض المنتجات</label>
+        <label className="mb-1 block text-xs font-bold text-muted-foreground">شكل عرض الإعلانات</label>
         <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {CATALOG_STYLES.map((c) => (
             <button type="button" key={c.id} onClick={() => setCatalog(c.id)}

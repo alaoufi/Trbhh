@@ -13,7 +13,7 @@ export function StoreBottomNav({ brand, wa, isOwner, storeId }: { brand: string;
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-white/95 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur">
       <div className="mx-auto flex max-w-2xl">
         <Link href="/" className={item}><Home className="h-5 w-5" /> الرئيسية</Link>
-        <a href="#catalog" className={item} style={{ color: brand }}><LayoutGrid className="h-5 w-5" /> المنتجات</a>
+        <a href="#catalog" className={item} style={{ color: brand }}><LayoutGrid className="h-5 w-5" /> الإعلانات</a>
         {wa
           ? <StoreContactLink storeId={storeId} kind="whatsapp" href={wa} target="_blank" className={item}><MessageCircle className="h-5 w-5" /> تواصل</StoreContactLink>
           : <a href="#about" className={item}><MessageCircle className="h-5 w-5" /> نبذة</a>}

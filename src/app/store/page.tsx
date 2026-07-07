@@ -46,13 +46,13 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
       {!store && (
         <div className="card-3d rounded-xl p-4">
           <h1 className="text-lg font-extrabold text-primary">افتح متجرك المستقل</h1>
-          <p className="mt-1 text-sm text-muted-foreground">صمّم متجرك، اختر معرّفه (رابطه المستقل)، وابدأ عرض منتجاتك. يخضع المتجر لموافقة إدارة المتاجر قبل الظهور.</p>
+          <p className="mt-1 text-sm text-muted-foreground">صمّم متجرك، اختر معرّفه (رابطه المستقل)، وابدأ عرض إعلاناتك. يخضع المتجر لموافقة إدارة المتاجر قبل الظهور.</p>
         </div>
       )}
 
       {error === 'terms' && (
         <div className="card-3d rounded-xl border-2 border-destructive/40 p-3 text-sm font-bold text-destructive">
-          يجب الموافقة على شروط المتجر وتحمّل مسؤولية المنتجات قبل فتح المتجر.
+          يجب الموافقة على شروط المتجر وتحمّل مسؤولية الإعلانات قبل فتح المتجر.
         </div>
       )}
 
@@ -115,7 +115,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
       {store && meta?.termsAgreed && (
         <div className="card-3d rounded-xl p-3 text-sm">
           <div className="font-bold text-emerald-700">📄 تعهّدك موثّق</div>
-          <p className="mt-1 text-muted-foreground">وافقت على <Link href="/store-terms" target="_blank" className="font-bold text-primary underline">الشروط والأحكام وسياسة الخصوصية</Link> وتحمّل مسؤولية منتجاتك{meta.termsAgreedAt ? ` بتاريخ ${fmtDate(meta.termsAgreedAt)}` : ''}. (صفحة مقروءة غير قابلة للتعديل، نسخة محفوظة لديك ونسخة لدى إدارة متاجر تربّح).</p>
+          <p className="mt-1 text-muted-foreground">وافقت على <Link href="/store-terms" target="_blank" className="font-bold text-primary underline">الشروط والأحكام وسياسة الخصوصية</Link> وتحمّل مسؤولية إعلاناتك{meta.termsAgreedAt ? ` بتاريخ ${fmtDate(meta.termsAgreedAt)}` : ''}. (صفحة مقروءة غير قابلة للتعديل، نسخة محفوظة لديك ونسخة لدى إدارة متاجر تربّح).</p>
         </div>
       )}
 
@@ -158,18 +158,18 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </div>
       )}
 
-      {/* طلب عرض المنتجات في منصة تربح — يعتمده مراقب المتاجر (إعلان المتجر يظهر تلقائياً) */}
+      {/* طلب عرض الإعلانات في منصة تربح — يعتمده مراقب المتاجر (إعلان المتجر يظهر تلقائياً) */}
       {store && (
         <div className="card-3d space-y-2 rounded-2xl p-4">
-          <div className="flex items-center gap-2 font-bold text-primary"><Megaphone className="h-5 w-5" /> عرض منتجاتي في منصة تربح</div>
-          <p className="text-xs text-muted-foreground">إعلان متجرك يظهر في تربح تلقائياً بعد الاعتماد. أمّا عرض <b>منتجاتك</b> في صفحة تربح فيحتاج طلباً تعتمده إدارة المتاجر.</p>
+          <div className="flex items-center gap-2 font-bold text-primary"><Megaphone className="h-5 w-5" /> عرض إعلاناتي في منصة تربح</div>
+          <p className="text-xs text-muted-foreground">إعلان متجرك يظهر في تربح تلقائياً بعد الاعتماد. أمّا عرض <b>إعلاناتك</b> في صفحة تربح فيحتاج طلباً تعتمده إدارة المتاجر.</p>
           {platformState === 'approved' ? (
-            <div className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">✓ منتجاتك معتمدة للعرض في منصة تربح.</div>
+            <div className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">✓ إعلاناتك معتمدة للعرض في منصة تربح.</div>
           ) : platformState === 'pending' ? (
             <div className="rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-700">⏳ طلبك قيد المراجعة لدى إدارة المتاجر.</div>
           ) : (
             <form action={requestPlatformAction}>
-              <Button size="sm"><Megaphone className="h-4 w-4" /> إرسال طلب عرض المنتجات</Button>
+              <Button size="sm"><Megaphone className="h-4 w-4" /> إرسال طلب عرض الإعلانات</Button>
             </form>
           )}
         </div>
@@ -190,10 +190,10 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </div>
       )}
 
-      {/* منتجات المتجر — المتجر مستقل: يعرض فقط ما تختاره هنا، لا كل إعلاناتك */}
+      {/* إعلانات المتجر — المتجر مستقل: يعرض فقط ما تختاره هنا، لا كل إعلاناتك */}
       {store && (
         <form action={setStoreProductsAction} className="card-3d space-y-3 rounded-2xl p-4">
-          <div className="flex items-center gap-2 font-bold text-primary"><PackageOpen className="h-5 w-5" /> منتجات المتجر</div>
+          <div className="flex items-center gap-2 font-bold text-primary"><PackageOpen className="h-5 w-5" /> إعلانات المتجر</div>
           <p className="text-xs text-muted-foreground">المتجر مستقل تماماً: اختر الإعلانات التي تريد عرضها في متجرك. الإعلانات غير المحدّدة لا تظهر في المتجر.</p>
           {myActiveAds.length === 0 ? (
             <p className="rounded-xl bg-secondary/30 p-3 text-sm text-muted-foreground">لا توجد لديك إعلانات نشطة لعرضها. أضف إعلاناً أولاً ثم اختره هنا.</p>
@@ -208,7 +208,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                   </label>
                 ))}
               </div>
-              <Button size="sm">حفظ منتجات المتجر</Button>
+              <Button size="sm">حفظ إعلانات المتجر</Button>
             </>
           )}
         </form>
@@ -220,7 +220,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           {offers.map((o) => (
             <div key={o.id} className="space-y-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
               <div className="flex items-center gap-1.5 text-sm font-bold text-primary">
-                {o.kind === 'home' ? <><Home className="h-4 w-4" /> طلب من الإدارة بعرض منتجاتك في الصفحة الرئيسية</> : <><Handshake className="h-4 w-4" /> دعوة تعاون لعرض المنتجات المتبادل</>}
+                {o.kind === 'home' ? <><Home className="h-4 w-4" /> طلب من الإدارة بعرض إعلاناتك في الصفحة الرئيسية</> : <><Handshake className="h-4 w-4" /> دعوة تعاون لعرض الإعلانات المتبادل</>}
               </div>
               {o.from && <StoreMiniCard s={o.from} />}
               <div className="flex gap-2">
@@ -289,7 +289,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         {!store && (
           <label className="flex items-start gap-2 rounded-xl border-2 border-primary/25 bg-primary/5 p-3 text-sm">
             <input type="checkbox" name="agreeTerms" required className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
-            <span>أتعهّد بالموافقة على <Link href="/store-terms" target="_blank" className="font-bold text-primary underline">الشروط والأحكام وسياسة الخصوصية</Link> وأتحمّل كامل مسؤولية منتجاتي وصحّة بياناتي.</span>
+            <span>أتعهّد بالموافقة على <Link href="/store-terms" target="_blank" className="font-bold text-primary underline">الشروط والأحكام وسياسة الخصوصية</Link> وأتحمّل كامل مسؤولية إعلاناتي وصحّة بياناتي.</span>
           </label>
         )}
 
@@ -314,7 +314,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
       {/* علاقة المتجر بتربح: عبر إدارة المتاجر فقط */}
       <div className="rounded-xl border border-primary/15 bg-primary/5 p-3 text-[11px] leading-5 text-muted-foreground">
         <span className="flex items-center gap-1.5 font-bold text-primary"><ShieldCheck className="h-3.5 w-3.5" /> علاقة المتجر بمنصة تربح</span>
-        متجرك مستقل بصفحته وإدارته. علاقته بتربح عبر «إدارة المتاجر» فقط: الاعتماد والإيقاف/الحذف، الاشتراكات، نقل الملكية، واعتماد عرض المنتجات في المنصة.
+        متجرك مستقل بصفحته وإدارته. علاقته بتربح عبر «إدارة المتاجر» فقط: الاعتماد والإيقاف/الحذف، الاشتراكات، نقل الملكية، واعتماد عرض الإعلانات في المنصة.
       </div>
     </div>
   );

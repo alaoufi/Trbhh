@@ -167,15 +167,15 @@ export async function getCategories() {
 let lastArchiveSweep = 0;
 let lastExpirySweep = 0;
 
-/** Hide ads whose paid duration has ended (status 1 → 0). Cheap, throttled.
- *  Nothing is deleted — the owner can renew to republish. */
+/** Remove the «مميّز» badge from ads whose paid featuring period ended (expires_at = featured-until).
+ *  The ad stays published — only the featuring lapses. Cheap, throttled. */
 export async function sweepExpiredPaidAds() {
   const now = Date.now();
   if (now - lastExpirySweep < 600_000) return; // at most once/10 min per container
   lastExpirySweep = now;
   await prisma.ads.updateMany({
-    where: { status: 1, expires_at: { not: null, lt: new Date() } },
-    data: { status: 0 },
+    where: { adsSpecial: 'checked', expires_at: { not: null, lt: new Date() } },
+    data: { adsSpecial: 'no', expires_at: null },
   }).catch(() => {});
 }
 export async function sweepExpiredArchived() {

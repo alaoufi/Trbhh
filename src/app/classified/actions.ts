@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified } from '@/lib/classified';
-import { getMemberWindows, withinWindow, getClassifiedDupConfig, getPricing, getAdPricing } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS } from '@/lib/settings';
 import { charge, consumeDupCredit } from '@/lib/wallet';
 import { scanContent } from '@/lib/content-guard';
 import { handleProhibited, logMod } from '@/lib/moderation';
@@ -155,32 +155,39 @@ export async function createClassifiedAction(formData: FormData) {
   const layout = String(formData.get('layout') || 'auto');
 
   // التكرار: من اشترى «باقة تكرار» تُخصم نشرة واحدة ويُسمح؛ وإلا يُطلب شراء باقة أو يُمنع
+  const pricing = await getServicePricing();
   const dup = await classifiedDuplicateOf(session.uid, title, body, img, { theme: Number.isFinite(theme) ? theme : 0, pattern, accent });
   if (dup) {
     const consumed = await consumeDupCredit(session.uid);
     if (!consumed) {
-      const adp = await getAdPricing();
-      if (adp.dup3 > 0 || adp.dup5 > 0) redirect(`/classified/new?error=needdup&dup=${dup.id}`);
+      if (serviceHasPrice(pricing.dup3) || serviceHasPrice(pricing.dup5)) redirect(`/classified/new?error=needdup&dup=${dup.id}`);
       await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: 'blocked' });
       redirect(`/classified/new?error=duplicate&dup=${dup.id}`);
     }
     await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مبوّب مسموح (باقة) مع #${dup.id} «${dup.title}»` });
   }
 
-  // رسوم نشر المبوّب (إن وُجدت) — تُخصم من الرصيد
-  const price = await getPricing();
-  if (price.classified > 0) {
-    const paid = await charge(session.uid, price.classified, 'classified', 'نشر إعلان مبوّب');
-    if (!paid.ok) redirect(`/classified/new?error=needcredit&price=${price.classified}&bal=${paid.balance}`);
+  // رسوم نشر المبوّب حسب المدّة (إن سُعّرت) — تُخصم من الرصيد ويُضبط انتهاء المبوّب
+  let cExpires: Date | null = null;
+  if (serviceHasPrice(pricing.classified)) {
+    const raw = String(formData.get('duration') || '');
+    if (!isDur(raw)) redirect('/classified/new?error=duration');
+    const fee = pricing.classified[raw];
+    if (fee > 0) {
+      const paid = await charge(session.uid, fee, 'classified', `نشر إعلان مبوّب (${DUR_DAYS[raw]} يوم)`);
+      if (!paid.ok) redirect(`/classified/new?error=needcredit&price=${fee}&bal=${paid.balance}`);
+    }
+    cExpires = new Date(Date.now() + DUR_DAYS[raw] * 86400000);
   }
 
   const image = await saveOneImage(img, session.uid);
 
   try {
-    await createClassified({
+    const newId = await createClassified({
       userId: session.uid, title, body, image, phone, whatsapp, link,
       theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent, layout,
     });
+    if (cExpires && newId) await prisma.classified_ads.updateMany({ where: { id: BigInt(newId) }, data: { expires_at: cExpires } }).catch(() => {});
   } catch {
     redirect('/classified/new?error=save');
   }
@@ -239,8 +246,8 @@ export async function updateClassifiedAction(formData: FormData) {
   if (dup) {
     const consumed = await consumeDupCredit(session.uid);
     if (!consumed) {
-      const adp = await getAdPricing();
-      if (adp.dup3 > 0 || adp.dup5 > 0) redirect(`/classified/${id}/edit?error=needdup&dup=${dup.id}`);
+      const svc = await getServicePricing();
+      if (serviceHasPrice(svc.dup3) || serviceHasPrice(svc.dup5)) redirect(`/classified/${id}/edit?error=needdup&dup=${dup.id}`);
       await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: 'blocked' });
       redirect(`/classified/${id}/edit?error=duplicate&dup=${dup.id}`);
     }

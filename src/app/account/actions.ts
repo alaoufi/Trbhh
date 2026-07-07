@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
-import { getMemberWindows, withinWindow, getPricing, getAdPricing, adDurationPrice, AD_DURATION_DAYS, type AdDuration } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getServicePricing, DUR_DAYS, DUR_LABEL, DUP_PACK_COUNT, isDur } from '@/lib/settings';
 import { charge, buyDupPack } from '@/lib/wallet';
 import { setUserArea } from '@/lib/user-location';
 import { toLocalSaudi } from '@/lib/sms';
@@ -55,56 +55,38 @@ export async function toggleAdStatusAction(formData: FormData) {
   revalidatePath('/');
 }
 
-/** Buy a duplicate-publish package («مكرّر 3» / «مكرّر 5») — pay from wallet, add allowances. */
+/** Buy a duplicate-publish package («مكرّر 3» / «مكرّر 5») for a chosen duration. */
 export async function buyDupPackAction(formData: FormData) {
   const session = await requireUser();
   const tier = String(formData.get('tier') || '');
-  const pricing = await getAdPricing();
-  const count = tier === '5' ? 5 : tier === '3' ? 3 : 0;
-  const price = tier === '5' ? pricing.dup5 : tier === '3' ? pricing.dup3 : 0;
-  if (!count || price <= 0) redirect('/account/wallet');
-  const r = await buyDupPack(session.uid, count, price);
+  const raw = String(formData.get('duration') || '');
+  if (!isDur(raw)) redirect('/account/wallet?error=duration');
+  const svc = tier === '5' ? 'dup5' : tier === '3' ? 'dup3' : null;
+  if (!svc) redirect('/account/wallet');
+  const price = (await getServicePricing())[svc][raw];
+  if (price <= 0) redirect('/account/wallet');
+  const r = await buyDupPack(session.uid, DUP_PACK_COUNT[svc], price);
   revalidatePath('/account/wallet');
   if (!r.ok) redirect(`/account/wallet?error=needcredit&price=${price}&bal=${r.balance}`);
   redirect('/account/wallet?dup=1');
 }
 
-/** Renew a paid ad for another duration — charges the wallet, extends expiry, republishes. */
-export async function renewAdAction(formData: FormData) {
+/** Pay from wallet to feature («تمييز») one of the member's own ads for a chosen duration. */
+export async function featureAdAction(formData: FormData) {
   const session = await requireUser();
   const adId = BigInt(String(formData.get('adId')));
   const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { id: true, user_id: true, expires_at: true } });
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
-  const pricing = await getAdPricing();
-  if (!pricing.enabled) redirect('/account/ads');
   const raw = String(formData.get('duration') || '');
-  const dur = (raw === 'w2' || raw === 'm1' || raw === 'm3' ? raw : null) as AdDuration | null;
-  if (!dur) redirect('/account/ads?error=duration');
-  const fee = adDurationPrice(pricing, dur);
-  const paid = await charge(session.uid, fee, 'featured', `تجديد إعلان #${toInt(adId)} (${AD_DURATION_DAYS[dur]} يوم)`);
+  if (!isDur(raw)) redirect('/account/ads?error=duration');
+  const fee = (await getServicePricing()).featured[raw];
+  if (fee <= 0) redirect('/account/ads?featured=off'); // التمييز غير مُسعّر لهذه المدّة
+  const paid = await charge(session.uid, fee, 'featured', `تمييز الإعلان #${toInt(adId)} (${DUR_LABEL[raw]})`);
   if (!paid.ok) redirect(`/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
+  // مدّة التمييز تُضاف إلى ما تبقّى من تمييز سابق (expires_at = نهاية التمييز)
   const base = ad.expires_at && new Date(ad.expires_at).getTime() > Date.now() ? new Date(ad.expires_at) : new Date();
-  const until = new Date(base.getTime() + AD_DURATION_DAYS[dur] * 86400000);
-  await prisma.ads.update({ where: { id: adId }, data: { expires_at: until, status: 1 } });
-  const { bustAdCaches } = await import('@/lib/data');
-  await bustAdCaches().catch(() => {});
-  revalidatePath('/account/ads');
-  revalidatePath('/');
-  redirect('/account/ads?renewed=1');
-}
-
-/** Pay from wallet to promote one of the member's own ads to «مميّز» (featured). */
-export async function featureAdAction(formData: FormData) {
-  const session = await requireUser();
-  const adId = BigInt(String(formData.get('adId')));
-  const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { id: true, user_id: true, adsSpecial: true } });
-  if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
-  if (ad!.adsSpecial === 'checked') redirect('/account/ads?featured=already');
-  const fee = (await getPricing()).featured;
-  if (fee <= 0) redirect('/account/ads?featured=off'); // الميزة غير مُسعّرة/مفعّلة
-  const paid = await charge(session.uid, fee, 'featured', `ترقية الإعلان #${toInt(adId)} لمميّز`);
-  if (!paid.ok) redirect(`/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
-  await prisma.ads.update({ where: { id: adId }, data: { adsSpecial: 'checked' } });
+  const until = new Date(base.getTime() + DUR_DAYS[raw] * 86400000);
+  await prisma.ads.update({ where: { id: adId }, data: { adsSpecial: 'checked', expires_at: until } });
   const { bustAdCaches } = await import('@/lib/data');
   await bustAdCaches().catch(() => {});
   revalidatePath('/account/ads');

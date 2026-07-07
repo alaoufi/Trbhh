@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getRevenueSummary } from '@/lib/wallet';
-import { getStoreSubPricing, getAdPricing } from '@/lib/settings';
+import { getRevenueSummary, getMemberLedger } from '@/lib/wallet';
+import { getStoreSubPricing, getServicePricing, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { saveRevenueAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -25,23 +25,48 @@ function Tile({ icon: Icon, value, label, tone }: { icon: React.ElementType; val
   );
 }
 
-const num = 'h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40';
+const num = 'h-10 w-full rounded-lg border border-primary/30 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-primary/40';
+const TABS = [
+  { key: 'overview', label: 'الميزانية', icon: Coins },
+  { key: 'balances', label: 'أرصدة الأعضاء', icon: Users },
+  { key: 'pricing', label: 'التسعيرات', icon: ListChecks },
+] as const;
+type TabKey = typeof TABS[number]['key'];
 
-export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string }> }) {
   await requireAction('users', 'view');
-  const { saved } = await searchParams;
-  const [rev, sub, ad] = await Promise.all([getRevenueSummary(40), getStoreSubPricing(), getAdPricing()]);
+  const { saved, tab } = await searchParams;
+  const active: TabKey = tab === 'balances' || tab === 'pricing' ? tab : 'overview';
 
   return (
-    <div className="max-w-2xl space-y-5">
-      <h1 className="flex items-center gap-2 text-xl font-extrabold text-primary"><Coins className="h-6 w-6" /> الإيرادات</h1>
-      {saved === '1' && <div className="flex items-center gap-2 rounded-lg border-2 border-green-300 bg-green-50 p-3 text-sm font-bold text-green-800"><Check className="h-4 w-4" /> تم حفظ التسعيرات.</div>}
+    <div className="max-w-3xl space-y-4">
+      <h1 className="flex items-center gap-2 text-xl font-extrabold text-primary"><Coins className="h-6 w-6" /> الإيرادات والتسعير</h1>
+      {saved === '1' && <div className="flex items-center gap-2 rounded-lg border-2 border-green-300 bg-green-50 p-3 text-sm font-bold text-green-800"><Check className="h-4 w-4" /> تم الحفظ.</div>}
 
-      {/* ملخّص الإيرادات */}
+      {/* التبويبات */}
+      <div className="flex gap-1 overflow-x-auto rounded-xl bg-secondary/40 p-1">
+        {TABS.map((t) => (
+          <Link key={t.key} href={`/admin/revenue?tab=${t.key}`} className={`flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-bold ${active === t.key ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-white/60'}`}>
+            <t.icon className="h-4 w-4" /> {t.label}
+          </Link>
+        ))}
+      </div>
+
+      {active === 'overview' && <OverviewTab />}
+      {active === 'balances' && <BalancesTab />}
+      {active === 'pricing' && <PricingTab />}
+    </div>
+  );
+}
+
+async function OverviewTab() {
+  const rev = await getRevenueSummary(40);
+  return (
+    <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2">
-        <Tile icon={TrendingDown} value={`${en(rev.spent)} ر.س`} label="إجمالي الإيراد (مصروف الأعضاء)" tone="text-emerald-600" />
-        <Tile icon={TrendingUp} value={`${en(rev.credited)} ر.س`} label="إجمالي الشحن" tone="text-sky-600" />
-        <Tile icon={Wallet} value={`${en(rev.outstanding)} ر.س`} label="أرصدة الأعضاء الحالية" />
+        <Tile icon={TrendingDown} value={`${en(rev.spent)}`} label="الإيراد الفعلي (المستهلك)" tone="text-emerald-600" />
+        <Tile icon={TrendingUp} value={`${en(rev.credited)}`} label="إجمالي الشحن" tone="text-sky-600" />
+        <Tile icon={Wallet} value={`${en(rev.outstanding)}`} label="الرصيد الكلي المتبقّي" />
       </div>
       {rev.byReason.length > 0 && (
         <div className="card-3d rounded-xl p-3">
@@ -53,42 +78,6 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
           </ul>
         </div>
       )}
-
-      {/* التسعيرات */}
-      <form action={saveRevenueAction} className="card-3d space-y-4 rounded-2xl p-4">
-        <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> اشتراك المتاجر</div>
-        <label className="flex items-center gap-2 text-sm font-bold">
-          <input type="checkbox" name="subEnabled" defaultChecked={sub.enabled} className="h-4 w-4 accent-[hsl(var(--primary))]" />
-          تفعيل اشتراكات المتاجر (عند التفعيل يُشترط اشتراك ساري لظهور المتجر)
-        </label>
-        <div className="grid grid-cols-3 gap-2">
-          <label className="space-y-1"><span className="text-xs font-bold">شهري (ر.س)</span><input name="subMonthly" type="number" min={0} defaultValue={sub.monthly} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">6 أشهر (ر.س)</span><input name="sub6mo" type="number" min={0} defaultValue={sub.sixmo} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">سنوي (ر.س)</span><input name="subYearly" type="number" min={0} defaultValue={sub.yearly} className={num} /></label>
-        </div>
-        <label className="space-y-1 block"><span className="text-xs font-bold">مهلة السماح بعد الانتهاء (أيام) — يبقى المتجر محفوظاً ويُمنع من العرض فقط</span><input name="subGraceDays" type="number" min={0} defaultValue={sub.graceDays} className={num} /></label>
-
-        <div className="flex items-center gap-2 border-t border-primary/15 pt-3 font-bold text-primary"><Megaphone className="h-5 w-5" /> تسعيرات الإعلانات (حسب المدة)</div>
-        <label className="flex items-center gap-2 text-sm font-bold">
-          <input type="checkbox" name="adsPaidEnabled" defaultChecked={ad.enabled} className="h-4 w-4 accent-[hsl(var(--primary))]" />
-          تفعيل النشر المدفوع بالمدّة (عند التفعيل يختار العضو مدّة ويُدفع ثمنها، ويُخفى الإعلان بعد انتهائها)
-        </label>
-        <div className="grid grid-cols-3 gap-2">
-          <label className="space-y-1"><span className="text-xs font-bold">أسبوعان (ر.س)</span><input name="adW2" type="number" min={0} defaultValue={ad.w2} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">شهر (ر.س)</span><input name="adM1" type="number" min={0} defaultValue={ad.m1} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">ثلاثة أشهر (ر.س)</span><input name="adM3" type="number" min={0} defaultValue={ad.m3} className={num} /></label>
-        </div>
-
-        <div className="font-bold text-primary">باقات التكرار (نشر الإعلان المكرّر عدداً من المرّات)</div>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="space-y-1"><span className="text-xs font-bold">مكرّر 3 — سعر 3 نشرات (ر.س)</span><input name="dup3" type="number" min={0} defaultValue={ad.dup3} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">مكرّر 5 — سعر 5 نشرات (ر.س)</span><input name="dup5" type="number" min={0} defaultValue={ad.dup5} className={num} /></label>
-        </div>
-        <p className="text-[11px] text-muted-foreground">باقة التكرار تمنح العضو عدد نشرات لإعلان مكرّر (تُخصم نشرة عند كل نشر مكرّر). عند نفادها يُطلب منه شراء باقة. رسوم «إعلان مميّز» و«إعلان مبوّب» تُضبط من صفحة <Link href="/admin/settings" className="font-bold text-primary underline">الإعدادات</Link>. شحن الأرصدة من <Link href="/admin/users" className="font-bold text-primary underline">الأعضاء</Link>.</p>
-        <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"><Save className="h-4 w-4" /> حفظ التسعيرات</button>
-      </form>
-
-      {/* آخر العمليات */}
       <div className="card-3d rounded-2xl p-4">
         <div className="mb-2 text-sm font-bold text-primary">آخر العمليات ({rev.recent.length})</div>
         {rev.recent.length === 0 ? (
@@ -107,5 +96,97 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
         )}
       </div>
     </div>
+  );
+}
+
+async function BalancesTab() {
+  const rows = await getMemberLedger(300);
+  const totals = rows.reduce((a, r) => ({ credited: a.credited + r.credited, consumed: a.consumed + r.consumed, balance: a.balance + r.balance }), { credited: 0, consumed: 0, balance: 0 });
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-2">
+        <Tile icon={TrendingUp} value={`${en(totals.credited)}`} label="إجمالي المشحون" tone="text-sky-600" />
+        <Tile icon={TrendingDown} value={`${en(totals.consumed)}`} label="إجمالي المستهلك" tone="text-emerald-600" />
+        <Tile icon={Wallet} value={`${en(totals.balance)}`} label="إجمالي المتبقّي" />
+      </div>
+      <div className="card-3d overflow-x-auto rounded-2xl p-2">
+        <table className="w-full min-w-[520px] text-sm">
+          <thead>
+            <tr className="border-b text-xs text-muted-foreground">
+              <th className="p-2 text-right">العضو</th>
+              <th className="p-2">المشحون</th>
+              <th className="p-2">المستهلك</th>
+              <th className="p-2">المتبقّي</th>
+              <th className="p-2">نشرات تكرار</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">لا توجد حركات مالية بعد.</td></tr>}
+            {rows.map((r) => (
+              <tr key={r.userId} className="border-b border-border/40 text-center last:border-0">
+                <td className="p-2 text-right"><Link href={`/admin/users/${r.userId}`} className="font-bold text-primary hover:underline">{r.name}</Link></td>
+                <td className="p-2 text-sky-600">{en(r.credited)}</td>
+                <td className="p-2 text-emerald-600">{en(r.consumed)}</td>
+                <td className="p-2 font-bold">{en(r.balance)}</td>
+                <td className="p-2">{en(r.dupCredit)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[11px] text-muted-foreground">شحن/خصم رصيد أي عضو من صفحته في <Link href="/admin/users" className="font-bold text-primary underline">الأعضاء</Link>.</p>
+    </div>
+  );
+}
+
+async function PricingTab() {
+  const [sub, prices] = await Promise.all([getStoreSubPricing(), getServicePricing()]);
+  const services: { key: PaidService; note?: string }[] = [
+    { key: 'featured' },
+    { key: 'classified', note: 'إعلان واحد حسب المدّة' },
+    { key: 'dup3', note: 'يرفع حظر التكرار لـ 3 إعلانات' },
+    { key: 'dup5', note: 'يرفع حظر التكرار لـ 5 إعلانات' },
+  ];
+  return (
+    <form action={saveRevenueAction} className="card-3d space-y-4 rounded-2xl p-4">
+      <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> اشتراك المتاجر</div>
+      <label className="flex items-center gap-2 text-sm font-bold">
+        <input type="checkbox" name="subEnabled" defaultChecked={sub.enabled} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+        تفعيل اشتراكات المتاجر (يُشترط اشتراك ساري لظهور المتجر)
+      </label>
+      <div className="grid grid-cols-3 gap-2">
+        <label className="space-y-1"><span className="text-xs font-bold">شهري</span><input name="subMonthly" type="number" min={0} defaultValue={sub.monthly} className={num} /></label>
+        <label className="space-y-1"><span className="text-xs font-bold">6 أشهر</span><input name="sub6mo" type="number" min={0} defaultValue={sub.sixmo} className={num} /></label>
+        <label className="space-y-1"><span className="text-xs font-bold">سنوي</span><input name="subYearly" type="number" min={0} defaultValue={sub.yearly} className={num} /></label>
+      </div>
+      <label className="block space-y-1"><span className="text-xs font-bold">مهلة السماح بعد الانتهاء (أيام) — يبقى المتجر محفوظاً ويُمنع من العرض فقط</span><input name="subGraceDays" type="number" min={0} defaultValue={sub.graceDays} className={num} /></label>
+
+      <div className="flex items-center gap-2 border-t border-primary/15 pt-3 font-bold text-primary"><Megaphone className="h-5 w-5" /> تسعيرات الخدمات (السعر لكل مدّة)</div>
+      <p className="text-[11px] text-muted-foreground">المدّة اختيار فقط بلا سعر مستقل؛ كل خدمة لها سعر لكل مدّة. اترك 0 لتعطيل الخدمة/المدّة.</p>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[420px] text-sm">
+          <thead>
+            <tr className="text-xs text-muted-foreground">
+              <th className="p-1 text-right">الخدمة</th>
+              {DURATIONS.map((d) => <th key={d.key} className="p-1">{d.label}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {services.map((s) => (
+              <tr key={s.key}>
+                <td className="p-1 text-right align-top">
+                  <div className="text-sm font-bold">{SERVICE_LABELS[s.key]}</div>
+                  {s.note && <div className="text-[10px] text-muted-foreground">{s.note}</div>}
+                </td>
+                {DURATIONS.map((d) => (
+                  <td key={d.key} className="p-1"><input name={servicePriceKey(s.key, d.key)} type="number" min={0} defaultValue={prices[s.key][d.key]} className={num} /></td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"><Save className="h-4 w-4" /> حفظ التسعيرات</button>
+    </form>
   );
 }

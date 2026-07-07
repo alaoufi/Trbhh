@@ -150,6 +150,39 @@ export async function getRevenueSummary(recentLimit = 30): Promise<RevenueSummar
   return { credited: credited._sum.amount ?? 0, spent, outstanding: balSum._sum.balance ?? 0, byReason, recent };
 }
 
+export type MemberLedgerRow = { userId: number; name: string; credited: number; consumed: number; balance: number; dupCredit: number };
+
+/** Per-member budget: total credited (paid-in), consumed (spent), current balance, dup allowances. */
+export async function getMemberLedger(limit = 300): Promise<MemberLedgerRow[]> {
+  await ensure();
+  const [credits, debits] = await Promise.all([
+    prisma.wallet_txns.groupBy({ by: ['user_id'], where: { amount: { gt: 0 } }, _sum: { amount: true } }).catch(() => [] as { user_id: bigint; _sum: { amount: number | null } }[]),
+    prisma.wallet_txns.groupBy({ by: ['user_id'], where: { amount: { lt: 0 } }, _sum: { amount: true } }).catch(() => [] as { user_id: bigint; _sum: { amount: number | null } }[]),
+  ]);
+  const creditBy = new Map(credits.map((c) => [toInt(c.user_id), c._sum.amount ?? 0]));
+  const debitBy = new Map(debits.map((d) => [toInt(d.user_id), Math.abs(d._sum.amount ?? 0)]));
+  const uids = [...new Set([...creditBy.keys(), ...debitBy.keys()])];
+  if (!uids.length) return [];
+  const users = await prisma.users.findMany({
+    where: { id: { in: uids.map((u) => BigInt(u)) } },
+    select: { id: true, name: true, userName: true, balance: true, dup_credit: true },
+  }).catch(() => []);
+  return users
+    .map((u) => {
+      const id = toInt(u.id);
+      return {
+        userId: id,
+        name: u.name || u.userName || `#${id}`,
+        credited: creditBy.get(id) ?? 0,
+        consumed: debitBy.get(id) ?? 0,
+        balance: u.balance ?? 0,
+        dupCredit: u.dup_credit ?? 0,
+      };
+    })
+    .sort((a, b) => b.consumed - a.consumed)
+    .slice(0, limit);
+}
+
 /** Transaction history for a member (newest first). */
 export async function listTxns(userId: number, limit = 50): Promise<WalletTxn[]> {
   await ensure();

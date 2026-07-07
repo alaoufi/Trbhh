@@ -1,6 +1,7 @@
+import Link from 'next/link';
 import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig, getPricing } from '@/lib/settings';
+import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -9,7 +10,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pricing] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getPricing()]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig()]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -106,24 +107,12 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
           <p className="mt-1 text-xs text-muted-foreground">يُعدّ المبوّب مكرّراً إذا تطابق <b>المحتوى</b> (العنوان+النص) أو <b>الصورة</b> (مطابقة إدراكية) مع مبوّب سابق للعضو نفسه بالنسبة المحددة. <b>الخلفية</b> (الثيم+النقشة+الزخرفة) تُحتسب مع تشابه المحتوى ٥٠٪+ فقط، حتى لا تُحجب إعلانات مختلفة تشترك في نفس التصميم. الخلفية ١٠٠٪ = تصميم مطابق تماماً.</p>
         </div>
 
-        {/* التسعير والرصيد — رسوم تُخصم من رصيد العضو (0 = مجاني/معطّل) */}
+        {/* التسعير والاشتراكات وأرصدة الأعضاء تُدار من صفحة مستقلة */}
         <div className="border-t border-primary/15 pt-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary">💳 التسعير والرصيد (بالريال — اكتب 0 للمجاني)</div>
-          <div className="grid grid-cols-3 gap-2">
-            <label className="block space-y-1">
-              <span className="text-xs font-bold">إعلان مميّز</span>
-              <input name="priceFeatured" type="number" min={0} defaultValue={pricing.featured} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs font-bold">إعلان مبوّب</span>
-              <input name="priceClassified" type="number" min={0} defaultValue={pricing.classified} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs font-bold">رسوم التكرار</span>
-              <input name="priceDuplicate" type="number" min={0} defaultValue={pricing.duplicate} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
-            </label>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">تُخصم الرسوم من رصيد العضو. <b>رسوم التكرار</b>: عند تحديد قيمة أكبر من صفر يُسمح للعضو بنشر إعلان مكرّر (عادي أو مبوّب) بدفع الرسوم بدل الحجب — أما إن كانت صفراً فيُحجب التكرار كالمعتاد. الدفع <b>لا يتجاوز</b> فحص المحتوى السياسي/الأخلاقي (يبقى الحجب صارماً). شحن رصيد الأعضاء من صفحة <b>الأعضاء</b>.</p>
+          <Link href="/admin/revenue" className="flex items-center justify-between gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
+            <span>💳 التسعيرات والاشتراكات وأرصدة الأعضاء</span>
+            <span className="text-xs text-muted-foreground">إدارة الإيرادات ←</span>
+          </Link>
         </div>
 
         {/* التطبيقات (أندرويد/آيفون): المتاجر والتحديث الإجباري */}

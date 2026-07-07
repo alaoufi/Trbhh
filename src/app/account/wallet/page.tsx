@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Wallet, ArrowDownCircle, ArrowUpCircle, Info, Copy } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getBalance, listTxns, getDupCredit } from '@/lib/wallet';
-import { getPricing, getAdPricing } from '@/lib/settings';
+import { getServicePricing, serviceHasPrice, DURATIONS } from '@/lib/settings';
 import { buyDupPackAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +17,9 @@ function fmt(iso: string | null) {
 export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; error?: string; price?: string; bal?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [balance, txns, pricing, adPricing, dupCredit] = await Promise.all([getBalance(session.uid), listTxns(session.uid, 100), getPricing(), getAdPricing(), getDupCredit(session.uid)]);
+  const [balance, txns, pricing, dupCredit] = await Promise.all([getBalance(session.uid), listTxns(session.uid, 100), getServicePricing(), getDupCredit(session.uid)]);
+  const range = (p: Record<'w2' | 'm1' | 'y1', number>) => DURATIONS.filter((d) => p[d.key] > 0).map((d) => p[d.key]);
+  const priceRange = (p: Record<'w2' | 'm1' | 'y1', number>) => { const r = range(p); return r.length ? `${Math.min(...r)}–${Math.max(...r)} ر.س` : ''; };
   return (
     <div className="space-y-4">
       <h1 className="flex items-center gap-2 text-xl font-bold text-primary"><Wallet className="h-6 w-6" /> محفظتي</h1>
@@ -31,20 +33,22 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       {sp.dup === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تمت إضافة باقة التكرار وخُصمت الرسوم من رصيدك.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? ` (المطلوب ${sp.price} ر.س)` : ''}. تواصل مع الإدارة لشحن الرصيد.</div>}
 
-      {/* باقات التكرار — نشر الإعلان المكرّر عدداً من المرّات */}
-      {(adPricing.dup3 > 0 || adPricing.dup5 > 0) && (
+      {/* باقات التكرار — نشر الإعلان المكرّر عدداً من المرّات (السعر حسب المدّة) */}
+      {(serviceHasPrice(pricing.dup3) || serviceHasPrice(pricing.dup5)) && (
         <div className="card-3d space-y-2 rounded-2xl p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 font-bold text-primary"><Copy className="h-5 w-5" /> باقات التكرار</div>
             <div className="text-sm font-bold">المتبقّي: <b className="text-primary">{dupCredit}</b> نشرة</div>
           </div>
-          <p className="text-xs text-muted-foreground">تتيح لك نشر إعلان مكرّر عدداً من المرّات. تُخصم نشرة واحدة من الباقة عند كل نشر مكرّر.</p>
+          <p className="text-xs text-muted-foreground">تتيح نشر إعلان مكرّر عدداً من المرّات (تُخصم نشرة عند كل نشر مكرّر). اختر المدّة ثم اشترِ.</p>
           <div className="grid grid-cols-2 gap-2">
-            {([['3', adPricing.dup3], ['5', adPricing.dup5]] as const).filter(([, p]) => p > 0).map(([tier, price]) => (
+            {([['3', pricing.dup3], ['5', pricing.dup5]] as const).filter(([, p]) => serviceHasPrice(p)).map(([tier, p]) => (
               <form key={tier} action={buyDupPackAction} className="flex flex-col items-center gap-1 rounded-xl border p-3 text-center">
                 <input type="hidden" name="tier" value={tier} />
                 <div className="text-sm font-bold">مكرّر {tier} <span className="text-[11px] text-muted-foreground">({tier} نشرات)</span></div>
-                <div className="text-lg font-extrabold text-primary">{price} <span className="text-[10px]">ر.س</span></div>
+                <select name="duration" className="h-9 w-full rounded-lg border bg-background px-2 text-xs">
+                  {DURATIONS.filter((d) => p[d.key] > 0).map((d) => <option key={d.key} value={d.key}>{d.label} — {p[d.key]} ر.س</option>)}
+                </select>
                 <button className="w-full rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">شراء</button>
               </form>
             ))}
@@ -52,15 +56,14 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         </div>
       )}
 
-      {(pricing.featured > 0 || pricing.classified > 0 || adPricing.enabled || adPricing.dup3 > 0 || adPricing.dup5 > 0) && (
+      {(serviceHasPrice(pricing.featured) || serviceHasPrice(pricing.classified) || serviceHasPrice(pricing.dup3) || serviceHasPrice(pricing.dup5)) && (
         <div className="card-3d rounded-xl p-3 text-sm">
-          <div className="mb-1 flex items-center gap-1 font-bold text-primary"><Info className="h-4 w-4" /> التسعير الحالي</div>
+          <div className="mb-1 flex items-center gap-1 font-bold text-primary"><Info className="h-4 w-4" /> التسعير الحالي (حسب المدّة)</div>
           <ul className="space-y-0.5 text-muted-foreground">
-            {pricing.featured > 0 && <li>• ترقية إعلان إلى مميّز: <b className="text-foreground">{pricing.featured} ر.س</b></li>}
-            {pricing.classified > 0 && <li>• نشر إعلان مبوّب: <b className="text-foreground">{pricing.classified} ر.س</b></li>}
-            {adPricing.enabled && <li>• نشر إعلان بالمدّة: <b className="text-foreground">{adPricing.w2}/{adPricing.m1}/{adPricing.m3} ر.س</b> (أسبوعان/شهر/3 أشهر)</li>}
-            {adPricing.dup3 > 0 && <li>• باقة تكرار «مكرّر 3»: <b className="text-foreground">{adPricing.dup3} ر.س</b></li>}
-            {adPricing.dup5 > 0 && <li>• باقة تكرار «مكرّر 5»: <b className="text-foreground">{adPricing.dup5} ر.س</b></li>}
+            {serviceHasPrice(pricing.featured) && <li>• تمييز الإعلان: <b className="text-foreground">{priceRange(pricing.featured)}</b></li>}
+            {serviceHasPrice(pricing.classified) && <li>• نشر إعلان مبوّب: <b className="text-foreground">{priceRange(pricing.classified)}</b></li>}
+            {serviceHasPrice(pricing.dup3) && <li>• باقة «مكرّر 3»: <b className="text-foreground">{priceRange(pricing.dup3)}</b></li>}
+            {serviceHasPrice(pricing.dup5) && <li>• باقة «مكرّر 5»: <b className="text-foreground">{priceRange(pricing.dup5)}</b></li>}
           </ul>
         </div>
       )}

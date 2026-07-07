@@ -177,32 +177,45 @@ export function subPlanPrice(p: StoreSubPricing, plan: SubPlan): number {
 }
 
 /** Ad service pricing (SAR) by duration + duplicate tiers. */
-export const SETTING_ADS_PAID_ENABLED = 'ads_paid_enabled';
-export const SETTING_AD_2W = 'price_ad_2w';
-export const SETTING_AD_1M = 'price_ad_1m';
-export const SETTING_AD_3M = 'price_ad_3m';
-export const SETTING_DUP_T3 = 'price_dup_3';
-export const SETTING_DUP_T5 = 'price_dup_5';
+/** Durations are a shared CHOICE (not priced by themselves). Each paid service has a price per duration. */
+export type Dur = 'w2' | 'm1' | 'y1';
+export const DURATIONS: { key: Dur; label: string; days: number }[] = [
+  { key: 'w2', label: 'أسبوعان', days: 14 },
+  { key: 'm1', label: 'شهر', days: 30 },
+  { key: 'y1', label: 'سنة', days: 365 },
+];
+export const DUR_DAYS: Record<Dur, number> = { w2: 14, m1: 30, y1: 365 };
+export const DUR_LABEL: Record<Dur, string> = { w2: 'أسبوعان', m1: 'شهر', y1: 'سنة' };
+export function isDur(v: string): v is Dur { return v === 'w2' || v === 'm1' || v === 'y1'; }
 
-export type AdDuration = 'w2' | 'm1' | 'm3';
-export const AD_DURATION_DAYS: Record<AdDuration, number> = { w2: 14, m1: 30, m3: 90 };
-export const AD_DURATION_LABELS: Record<AdDuration, string> = { w2: 'أسبوعان', m1: 'شهر', m3: 'ثلاثة أشهر' };
+/** Paid services, each priced per duration. dup3/dup5 grant 3/5 duplicate-publish allowances. */
+export type PaidService = 'featured' | 'classified' | 'dup3' | 'dup5';
+export const SERVICE_LABELS: Record<PaidService, string> = {
+  featured: 'تمييز الإعلان',
+  classified: 'إعلان مبوّب',
+  dup3: 'باقة مكرّر 3',
+  dup5: 'باقة مكرّر 5',
+};
+export const DUP_PACK_COUNT: Record<'dup3' | 'dup5', number> = { dup3: 3, dup5: 5 };
+export const servicePriceKey = (s: PaidService, d: Dur) => `price_${s}_${d}`;
 
-export type AdPricing = { enabled: boolean; w2: number; m1: number; m3: number; dup3: number; dup5: number };
-export async function getAdPricing(): Promise<AdPricing> {
-  const nn = (n: number) => Math.max(0, Math.round(n) || 0);
-  const [en, w2, m1, m3, d3, d5] = await Promise.all([
-    getSettingBool(SETTING_ADS_PAID_ENABLED, false),
-    getSettingNum(SETTING_AD_2W, 0),
-    getSettingNum(SETTING_AD_1M, 0),
-    getSettingNum(SETTING_AD_3M, 0),
-    getSettingNum(SETTING_DUP_T3, 0),
-    getSettingNum(SETTING_DUP_T5, 0),
-  ]);
-  return { enabled: en, w2: nn(w2), m1: nn(m1), m3: nn(m3), dup3: nn(d3), dup5: nn(d5) };
+export type ServicePricing = Record<PaidService, Record<Dur, number>>;
+export async function getServicePricing(): Promise<ServicePricing> {
+  const services: PaidService[] = ['featured', 'classified', 'dup3', 'dup5'];
+  const out = { featured: {}, classified: {}, dup3: {}, dup5: {} } as ServicePricing;
+  await Promise.all(
+    services.flatMap((s) =>
+      DURATIONS.map(async ({ key }) => {
+        const v = await getSettingNum(servicePriceKey(s, key), 0);
+        out[s][key] = Math.max(0, Math.round(v) || 0);
+      }),
+    ),
+  );
+  return out;
 }
-export function adDurationPrice(p: AdPricing, d: AdDuration): number {
-  return d === 'w2' ? p.w2 : d === 'm1' ? p.m1 : p.m3;
+/** Is any duration priced for a service (i.e. the service is sold)? */
+export function serviceHasPrice(p: Record<Dur, number>): boolean {
+  return DURATIONS.some(({ key }) => p[key] > 0);
 }
 
 /* ---- native app shells (Android TWA / iOS wrapper): versions & stores ---- */

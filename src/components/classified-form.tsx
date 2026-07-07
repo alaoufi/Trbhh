@@ -23,8 +23,9 @@ export type ClassifiedInitial = {
   layout?: 'auto' | 'manual';
 };
 
-export function ClassifiedForm({ action, error, initial, submitLabel, needPrice, needBal }: {
+export function ClassifiedForm({ action, error, initial, submitLabel, needPrice, needBal, durations }: {
   action: (fd: FormData) => void | Promise<void>; error?: string; initial?: ClassifiedInitial; submitLabel?: string; needPrice?: string; needBal?: string;
+  durations?: { w2: number; m1: number; y1: number } | null;
 }) {
   const [title, setTitle] = useState(initial?.title ?? '');
   const [body, setBody] = useState(initial?.body ?? '');
@@ -192,6 +193,22 @@ export function ClassifiedForm({ action, error, initial, submitLabel, needPrice,
         {error === 'duplicate' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">⚠️ هذا الإعلان المبوّب مطابق لإعلان سابق لك (في المحتوى أو الصورة أو الخلفية). لا يُسمح بتكرار نفس الإعلان — عدّل المحتوى أو الصورة لنشره.</div>}
         {error === 'needdup' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">🔁 هذا المبوّب مكرّر. لنشره عدّة مرّات اشترِ <b>باقة تكرار</b> (مكرّر 3/5) من <a href="/account/wallet" className="underline">محفظتي</a> ثم أعد النشر.</div>}
         {error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 <b>اشحن رصيدك</b> لإتمام النشر{needPrice ? <> — التكلفة <b>{needPrice} ر.س</b></> : ''}{needBal !== undefined ? <> ورصيدك <b>{needBal} ر.س</b></> : ''}. راجع <a href="/account/wallet" className="underline">محفظتي</a> أو تواصل مع الإدارة للشحن.</div>}
+
+        {durations && (
+          <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
+            {error === 'duration' && <div className="mb-2 text-sm font-bold text-red-700">اختر مدّة النشر.</div>}
+            <div className="mb-2 text-sm font-bold text-primary">مدّة نشر الإعلان المبوّب</div>
+            <div className="grid grid-cols-3 gap-2">
+              {([['w2', 'أسبوعان', durations.w2], ['m1', 'شهر', durations.m1], ['y1', 'سنة', durations.y1]] as const).map(([val, label, price], i) => (
+                <label key={val} className="flex cursor-pointer flex-col items-center gap-0.5 rounded-lg border-2 border-border bg-white p-2 text-center text-xs has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                  <input type="radio" name="duration" value={val} defaultChecked={i === 0} required className="accent-primary" />
+                  <span className="font-bold">{label}</span>
+                  <span className="font-extrabold text-primary">{price} ر.س</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* hidden style fields */}
         <input type="hidden" name="theme" value={theme} />

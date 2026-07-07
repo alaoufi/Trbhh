@@ -44,13 +44,12 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, durations, balance, limitMax, gapHours, gapWait, blockCat, banned,
+  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, limitMax, gapHours, gapWait, blockCat, banned,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string; dupId?: string;
   needPrice?: string; needBal?: string;
-  durations?: { w2: number; m1: number; m3: number } | null; balance?: number;
   limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean;
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
@@ -307,22 +306,6 @@ export function AdForm({
           <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="commentAllow" defaultChecked={initial?.commentAllow ?? true} className="accent-primary" /> السماح بالتعليقات</label>
         </div>
       </Section>
-
-      {durations && (
-        <Section icon={ShieldCheck} title="مدة نشر الإعلان">
-          {error === 'duration' && <div className="mb-2 rounded-lg border border-red-300 bg-red-50 p-2 text-sm font-bold text-red-800">اختر مدة النشر للمتابعة.</div>}
-          <p className="mb-2 text-xs text-muted-foreground">يُخصم ثمن المدة من رصيدك، ويُنشر الإعلان طوالها ثم يُخفى تلقائياً (يمكنك تجديده لاحقاً). {balance !== undefined && <>رصيدك: <b>{balance} ر.س</b>.</>}</p>
-          <div className="grid grid-cols-3 gap-2">
-            {([['w2', 'أسبوعان', durations.w2], ['m1', 'شهر', durations.m1], ['m3', 'ثلاثة أشهر', durations.m3]] as const).map(([val, label, price], i) => (
-              <label key={val} className="flex cursor-pointer flex-col items-center gap-1 rounded-xl border-2 border-border p-3 text-center text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                <input type="radio" name="duration" value={val} defaultChecked={i === 0} required className="accent-primary" />
-                <span className="font-bold">{label}</span>
-                <span className="text-primary font-extrabold">{price} <span className="text-[10px]">ر.س</span></span>
-              </label>
-            ))}
-          </div>
-        </Section>
-      )}
 
       <Section icon={ShieldCheck} title="التعهّد">
         <label className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm font-medium text-amber-900">

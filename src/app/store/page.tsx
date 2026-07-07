@@ -21,8 +21,8 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string }> }) {
-  const { error, sub, added, settings } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; cred?: string; crederr?: string }> }) {
+  const { error, sub, added, settings, cred, crederr } = await searchParams;
   const session = await requireUser();
   const store = await getStoreByUser(session.uid);
   const subState = store ? await getStoreSub(store.id) : null;
@@ -125,6 +125,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
       {store && (
         <form action={setStoreCredentialsAction} className="card-3d space-y-3 rounded-2xl p-4">
           <div className="flex items-center gap-2 font-bold text-primary"><KeyRound className="h-5 w-5" /> دخول مستقل للمتجر</div>
+          {cred === 'ok' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ تم حفظ بيانات الدخول.</div>}
+          {crederr && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">⚠️ {decodeURIComponent(crederr)}</div>}
           <p className="text-xs text-muted-foreground">
             عيّن <b>اسم دخول</b> و<b>كلمة مرور</b> خاصّين بالمتجر ومختلفين تماماً عن بيانات دخولك في تربح.
             تدخل بهما لوحة متجرك مباشرة من صفحة <b>دخول المتاجر</b>. إن تركت اسم الدخول فارغاً يمكنك الدخول بمعرّف المتجر{meta?.handle ? <> (<span dir="ltr">{meta.handle}</span>)</> : ''}.

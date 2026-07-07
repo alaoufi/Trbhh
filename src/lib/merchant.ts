@@ -280,15 +280,49 @@ export function normalizeHandle(raw: string): string {
 
 /* ---- independent store login (separate credentials → store dashboard) ---- */
 
+/** Minimum length for the dedicated store password (kept short by request). */
+export const STORE_PW_MIN = 4;
+
+/** Normalize a store login username (separate from the subdomain handle). */
+export function normalizeStoreUsername(raw: string): string {
+  const u = (raw || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[._-]+|[._-]+$/g, '').slice(0, 60);
+  if (u.length < 3 || RESERVED_HANDLES.has(u)) return '';
+  return u;
+}
+
 /** Owner sets/changes a dedicated password for logging into the store directly. */
 export async function setStorePassword(userId: number, plain: string): Promise<boolean> {
   await ensure();
   const storeId = await storeIdOfUser(userId);
-  if (!storeId || !plain || plain.length < 6) return false;
+  if (!storeId || !plain || plain.length < STORE_PW_MIN) return false;
   const { hashPassword } = await import('./auth');
   const hash = await hashPassword(plain);
   await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { store_password: hash } }).catch(() => {});
   return true;
+}
+
+/** Owner sets/changes a dedicated login username (independent of the subdomain handle). */
+export async function setStoreUsername(userId: number, raw: string): Promise<{ ok: boolean; username?: string; msg: string }> {
+  await ensure();
+  const storeId = await storeIdOfUser(userId);
+  if (!storeId) return { ok: false, msg: 'لا يوجد متجر.' };
+  if (!raw.trim()) { // clearing the username → fall back to logging in by the subdomain handle
+    await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { store_username: null } }).catch(() => {});
+    return { ok: true, username: '', msg: 'أُزيل اسم دخول المتجر.' };
+  }
+  const username = normalizeStoreUsername(raw);
+  if (!username) return { ok: false, msg: 'اسم الدخول غير صالح (أحرف إنجليزية وأرقام و«. _ -» فقط، ٣ خانات فأكثر، وغير محجوز).' };
+  const taken = await prisma.stores.findFirst({ where: { store_username: username, id: { not: BigInt(storeId) } }, select: { id: true } }).catch(() => null);
+  if (taken) return { ok: false, msg: 'اسم الدخول مستخدم من متجر آخر — اختر غيره.' };
+  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { store_username: username } }).catch(() => {});
+  return { ok: true, username, msg: 'تم حفظ اسم دخول المتجر.' };
+}
+
+/** Current store-login credentials state for the owner dashboard. */
+export async function getStoreLogin(userId: number): Promise<{ username: string | null; hasPassword: boolean }> {
+  await ensure();
+  const s = await prisma.stores.findFirst({ where: { user_id: userId }, select: { store_username: true, store_password: true } }).catch(() => null);
+  return { username: s?.store_username ?? null, hasPassword: !!s?.store_password };
 }
 
 /** Does the caller's store have a dedicated login password set? */
@@ -298,12 +332,16 @@ export async function hasStorePassword(userId: number): Promise<boolean> {
   return !!s?.store_password;
 }
 
-/** Verify store-login credentials (handle + store password) → the owner to sign in as. */
-export async function storeLogin(handle: string, plain: string): Promise<{ uid: number; name: string } | null> {
+/** Verify store-login credentials (store username OR subdomain handle + store password). */
+export async function storeLogin(login: string, plain: string): Promise<{ uid: number; name: string } | null> {
   await ensure();
-  const h = normalizeHandle(handle);
-  if (!h || !plain) return null;
-  const s = await prisma.stores.findFirst({ where: { handle: h }, select: { user_id: true, store_password: true } }).catch(() => null);
+  const raw = (login || '').trim();
+  if (!raw || !plain) return null;
+  const uname = normalizeStoreUsername(raw);
+  const handle = normalizeHandle(raw);
+  // prefer the dedicated login username; fall back to the subdomain handle
+  let s = uname ? await prisma.stores.findFirst({ where: { store_username: uname }, select: { user_id: true, store_password: true } }).catch(() => null) : null;
+  if (!s && handle) s = await prisma.stores.findFirst({ where: { handle }, select: { user_id: true, store_password: true } }).catch(() => null);
   if (!s?.store_password) return null;
   const { verifyPassword } = await import('./auth');
   if (!(await verifyPassword(plain, s.store_password))) return null;

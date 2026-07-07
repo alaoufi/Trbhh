@@ -4,14 +4,16 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
-import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform, saveStoreSettings, setStorePassword } from '@/lib/merchant';
+import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform, saveStoreSettings, setStorePassword, setStoreUsername } from '@/lib/merchant';
 import { toInt } from '@/lib/utils';
 
-/** Owner sets/changes the dedicated store-login password. */
-export async function setStorePasswordAction(formData: FormData) {
+/** Owner sets/changes the dedicated store-login credentials (username + password), separate from Trbhh. */
+export async function setStoreCredentialsAction(formData: FormData) {
   const session = await requireUser();
+  const username = String(formData.get('storeUsername') || '');
   const pw = String(formData.get('storePassword') || '');
-  await setStorePassword(session.uid, pw);
+  await setStoreUsername(session.uid, username);
+  if (pw) await setStorePassword(session.uid, pw); // leave the existing password untouched when the field is blank
   revalidatePath('/store');
 }
 

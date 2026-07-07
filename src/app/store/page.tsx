@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
-import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, platformRequestState, hasStorePassword } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, platformRequestState, getStoreLogin } from '@/lib/merchant';
 import { getMyAds } from '@/lib/account';
 import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, setStorePasswordAction } from '@/app/account/company/actions';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, setStoreCredentialsAction } from '@/app/account/company/actions';
 import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
@@ -36,7 +36,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const inStore = new Set(store ? await storeProductAdIds(store.id) : []);
   const pendingTransfer = store ? await pendingTransferForOwner(session.uid) : null;
   const platformState = store ? await platformRequestState(store.id) : 'none';
-  const storePwSet = store ? await hasStorePassword(session.uid) : false;
+  const storeLoginInfo = store ? await getStoreLogin(session.uid) : { username: null, hasPassword: false };
+  const storePwSet = storeLoginInfo.hasPassword;
   const fmtDate = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d); };
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';
@@ -84,20 +85,27 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </form>
       )}
 
-      {/* دخول مستقل للمتجر — كلمة مرور خاصة تدخل لوحة المتجر مباشرة */}
+      {/* دخول مستقل للمتجر — اسم دخول وكلمة مرور خاصّان بالمتجر (منفصلان تماماً عن تربح) */}
       {store && (
-        <form action={setStorePasswordAction} className="card-3d space-y-3 rounded-2xl p-4">
+        <form action={setStoreCredentialsAction} className="card-3d space-y-3 rounded-2xl p-4">
           <div className="flex items-center gap-2 font-bold text-primary"><KeyRound className="h-5 w-5" /> دخول مستقل للمتجر</div>
           <p className="text-xs text-muted-foreground">
-            عيّن كلمة مرور خاصة بالمتجر (منفصلة عن حساب تربح). تدخل بها لوحة متجرك مباشرة من صفحة
-            <b> دخول المتاجر</b> باستخدام <b>معرّف المتجر</b>{meta?.handle ? <> (<span dir="ltr">{meta.handle}</span>)</> : ' (عيّن المعرّف أولاً في المصمّم)'} وكلمة المرور هذه.
+            عيّن <b>اسم دخول</b> و<b>كلمة مرور</b> خاصّين بالمتجر ومختلفين تماماً عن بيانات دخولك في تربح.
+            تدخل بهما لوحة متجرك مباشرة من صفحة <b>دخول المتاجر</b>. إن تركت اسم الدخول فارغاً يمكنك الدخول بمعرّف المتجر{meta?.handle ? <> (<span dir="ltr">{meta.handle}</span>)</> : ''}.
           </p>
           <div className={`rounded-lg p-2 text-xs font-bold ${storePwSet ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-            {storePwSet ? '✓ كلمة مرور المتجر مُفعّلة — يمكنك تغييرها أدناه.' : '⚠️ لم تُفعّل بعد. عيّنها لتفعيل الدخول المستقل.'}
+            {storePwSet ? '✓ الدخول المستقل مُفعّل — يمكنك تعديل الاسم أو كلمة المرور أدناه.' : '⚠️ لم يُفعّل بعد. عيّن اسم دخول وكلمة مرور لتفعيله.'}
           </div>
-          <input name="storePassword" type="password" minLength={6} required placeholder="كلمة مرور المتجر (٦ أحرف فأكثر)" className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+          <div>
+            <label className="mb-1 block text-xs font-bold text-muted-foreground">اسم دخول المتجر</label>
+            <input name="storeUsername" dir="ltr" defaultValue={storeLoginInfo.username ?? ''} placeholder="mystore" className="h-11 w-full rounded-lg border bg-background px-3 text-left text-sm outline-none focus:ring-2 focus:ring-ring" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-muted-foreground">كلمة مرور المتجر</label>
+            <input name="storePassword" type="password" minLength={4} required={!storePwSet} placeholder={storePwSet ? 'اتركها فارغة للإبقاء على كلمة المرور الحالية' : 'كلمة مرور المتجر (٤ خانات فأكثر)'} className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+          </div>
           <div className="flex items-center gap-2">
-            <Button size="sm">{storePwSet ? 'تغيير كلمة المرور' : 'تفعيل الدخول المستقل'}</Button>
+            <Button size="sm">{storePwSet ? 'حفظ التعديلات' : 'تفعيل الدخول المستقل'}</Button>
             <a href="/store-login" target="_blank" className="text-xs font-bold text-primary underline">صفحة دخول المتاجر</a>
           </div>
         </form>

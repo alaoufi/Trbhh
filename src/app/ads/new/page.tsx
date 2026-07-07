@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { getCategories, getSubCategories, getCountries, getCities, getAreas } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
 import { createAdAction } from '../actions';
+import { getAdPricing } from '@/lib/settings';
+import { getBalance } from '@/lib/wallet';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'أضف إعلان' };
@@ -12,9 +14,10 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   const session = await getSession();
   if (!session) redirect('/login');
   const { error, left, max, hours, wait, cat, banned, dup, price, bal } = await searchParams;
-  const [categories, subcategories, countries, cities, areas, user] = await Promise.all([
+  const [categories, subcategories, countries, cities, areas, user, adPricing, balance] = await Promise.all([
     getCategories(), getSubCategories(), getCountries(), getCities(), getAreas(),
     prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true, phone_whatsapp: true } }),
+    getAdPricing(), getBalance(session.uid),
   ]);
   return (
     <div className="space-y-4">
@@ -33,6 +36,8 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
         dupId={dup}
         needPrice={price}
         needBal={bal}
+        durations={adPricing.enabled ? { w2: adPricing.w2, m1: adPricing.m1, m3: adPricing.m3 } : null}
+        balance={balance}
         limitMax={max}
         gapHours={hours}
         gapWait={wait}

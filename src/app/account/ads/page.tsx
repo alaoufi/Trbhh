@@ -3,19 +3,22 @@ import Image from 'next/image';
 import { Pencil, Trash2, Eye, EyeOff, Star, Wallet } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyAds } from '@/lib/account';
-import { getPricing } from '@/lib/settings';
+import { getPricing, getAdPricing } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { deleteAdAction, toggleAdStatusAction, featureAdAction } from '../actions';
+import { deleteAdAction, toggleAdStatusAction, featureAdAction, renewAdAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
 
-export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string }> }) {
+export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; renewed?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [ads, pricing, balance] = await Promise.all([getMyAds(session.uid), getPricing(), getBalance(session.uid)]);
+  const [ads, pricing, adPricing, balance] = await Promise.all([getMyAds(session.uid), getPricing(), getAdPricing(), getBalance(session.uid)]);
+  const now = Date.now();
+  const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
+  const daysLeft = (iso: string | null) => (iso ? Math.ceil((new Date(iso).getTime() - now) / 86400000) : null);
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
@@ -26,6 +29,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
         </div>
       </div>
       {sp.featured === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">⭐ تمت ترقية الإعلان إلى «مميّز» وخُصمت الرسوم من رصيدك.</div>}
+      {sp.renewed === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم تجديد مدة نشر الإعلان وخُصمت الرسوم من رصيدك.</div>}
       {sp.featured === 'already' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">هذا الإعلان مميّز بالفعل.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? <> (المطلوب {sp.price} ر.س</> : ''}{sp.bal !== undefined ? <>، ورصيدك {sp.bal} ر.س)</> : ')'}. تواصل مع الإدارة لشحن الرصيد.</div>}
       {sp.pending === '1' && (
@@ -59,6 +63,29 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 <span className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold leading-4 text-amber-700">
                   سبب عدم الظهور: الإعلان <b>موقوف/بانتظار الموافقة</b> — غالباً لتشابهه مع إعلان قائم (٩٠٪+) أو تفعيل مراجعة الإعلانات. اضغط <b>«تفعيل»</b> لعرضه فوراً، أو احذف النسخة المكرّرة.
                 </span>
+              )}
+              {adPricing.enabled && ad.expiresAt && (() => {
+                const dl = daysLeft(ad.expiresAt);
+                const expired = dl !== null && dl <= 0;
+                return (
+                  <span className={`mt-1 rounded-md px-2 py-1 text-[11px] font-bold leading-4 ${expired ? 'bg-red-50 text-red-700' : 'bg-sky-50 text-sky-700'}`}>
+                    {expired ? '⛔ انتهت مدة النشر — جدّد لإعادة العرض.' : `⏳ ينتهي النشر خلال ${en(Math.max(0, dl ?? 0))} يوم.`}
+                  </span>
+                );
+              })()}
+              {adPricing.enabled && (
+                <details className="mt-1">
+                  <summary className="cursor-pointer list-none text-[11px] font-bold text-primary">تجديد مدة النشر…</summary>
+                  <form action={renewAdAction} className="mt-1 flex flex-wrap items-center gap-1">
+                    <input type="hidden" name="adId" value={ad.id} />
+                    <select name="duration" className="h-8 rounded-md border bg-background px-2 text-xs">
+                      <option value="w2">أسبوعان — {en(adPricing.w2)} ر.س</option>
+                      <option value="m1">شهر — {en(adPricing.m1)} ر.س</option>
+                      <option value="m3">ثلاثة أشهر — {en(adPricing.m3)} ر.س</option>
+                    </select>
+                    <button className="rounded-md bg-primary px-3 py-1.5 text-xs font-bold text-white">تجديد</button>
+                  </form>
+                </details>
               )}
               <div className="mt-auto flex gap-2 pt-2">
                 <Link href={`/ads/${ad.id}/edit`} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Pencil className="h-3 w-3" /> تعديل</Link>

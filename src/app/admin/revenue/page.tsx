@@ -69,6 +69,10 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
         <label className="space-y-1 block"><span className="text-xs font-bold">مهلة السماح بعد الانتهاء (أيام) — يبقى المتجر محفوظاً ويُمنع من العرض فقط</span><input name="subGraceDays" type="number" min={0} defaultValue={sub.graceDays} className={num} /></label>
 
         <div className="flex items-center gap-2 border-t border-primary/15 pt-3 font-bold text-primary"><Megaphone className="h-5 w-5" /> تسعيرات الإعلانات (حسب المدة)</div>
+        <label className="flex items-center gap-2 text-sm font-bold">
+          <input type="checkbox" name="adsPaidEnabled" defaultChecked={ad.enabled} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+          تفعيل النشر المدفوع بالمدّة (عند التفعيل يختار العضو مدّة ويُدفع ثمنها، ويُخفى الإعلان بعد انتهائها)
+        </label>
         <div className="grid grid-cols-3 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">أسبوعان (ر.س)</span><input name="adW2" type="number" min={0} defaultValue={ad.w2} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">شهر (ر.س)</span><input name="adM1" type="number" min={0} defaultValue={ad.m1} className={num} /></label>

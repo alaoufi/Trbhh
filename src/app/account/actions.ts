@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
-import { getMemberWindows, withinWindow, getPricing } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getPricing, getAdPricing, adDurationPrice, AD_DURATION_DAYS, type AdDuration } from '@/lib/settings';
 import { charge } from '@/lib/wallet';
 import { setUserArea } from '@/lib/user-location';
 import { toLocalSaudi } from '@/lib/sms';
@@ -53,6 +53,30 @@ export async function toggleAdStatusAction(formData: FormData) {
   }
   revalidatePath('/account/ads');
   revalidatePath('/');
+}
+
+/** Renew a paid ad for another duration — charges the wallet, extends expiry, republishes. */
+export async function renewAdAction(formData: FormData) {
+  const session = await requireUser();
+  const adId = BigInt(String(formData.get('adId')));
+  const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { id: true, user_id: true, expires_at: true } });
+  if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
+  const pricing = await getAdPricing();
+  if (!pricing.enabled) redirect('/account/ads');
+  const raw = String(formData.get('duration') || '');
+  const dur = (raw === 'w2' || raw === 'm1' || raw === 'm3' ? raw : null) as AdDuration | null;
+  if (!dur) redirect('/account/ads?error=duration');
+  const fee = adDurationPrice(pricing, dur);
+  const paid = await charge(session.uid, fee, 'featured', `تجديد إعلان #${toInt(adId)} (${AD_DURATION_DAYS[dur]} يوم)`);
+  if (!paid.ok) redirect(`/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
+  const base = ad.expires_at && new Date(ad.expires_at).getTime() > Date.now() ? new Date(ad.expires_at) : new Date();
+  const until = new Date(base.getTime() + AD_DURATION_DAYS[dur] * 86400000);
+  await prisma.ads.update({ where: { id: adId }, data: { expires_at: until, status: 1 } });
+  const { bustAdCaches } = await import('@/lib/data');
+  await bustAdCaches().catch(() => {});
+  revalidatePath('/account/ads');
+  revalidatePath('/');
+  redirect('/account/ads?renewed=1');
 }
 
 /** Pay from wallet to promote one of the member's own ads to «مميّز» (featured). */

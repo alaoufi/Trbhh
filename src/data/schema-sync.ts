@@ -50,6 +50,8 @@ const STATEMENTS: string[] = [
   `CREATE UNIQUE INDEX uniq_store_username ON stores (store_username)`,
   `ALTER TABLE stores ADD COLUMN views INT NOT NULL DEFAULT 0`,
   `ALTER TABLE stores ADD COLUMN sub_until DATETIME NULL`,
+  `ALTER TABLE ads ADD COLUMN expires_at DATETIME NULL`,
+  `CREATE INDEX ads_expires_at ON ads (expires_at)`,
   `CREATE TABLE IF NOT EXISTS store_visits (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     store_id BIGINT UNSIGNED NOT NULL,

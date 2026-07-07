@@ -177,6 +177,7 @@ export function subPlanPrice(p: StoreSubPricing, plan: SubPlan): number {
 }
 
 /** Ad service pricing (SAR) by duration + duplicate tiers. */
+export const SETTING_ADS_PAID_ENABLED = 'ads_paid_enabled';
 export const SETTING_AD_2W = 'price_ad_2w';
 export const SETTING_AD_1M = 'price_ad_1m';
 export const SETTING_AD_3M = 'price_ad_3m';
@@ -187,17 +188,21 @@ export type AdDuration = 'w2' | 'm1' | 'm3';
 export const AD_DURATION_DAYS: Record<AdDuration, number> = { w2: 14, m1: 30, m3: 90 };
 export const AD_DURATION_LABELS: Record<AdDuration, string> = { w2: 'أسبوعان', m1: 'شهر', m3: 'ثلاثة أشهر' };
 
-export type AdPricing = { w2: number; m1: number; m3: number; dup3: number; dup5: number };
+export type AdPricing = { enabled: boolean; w2: number; m1: number; m3: number; dup3: number; dup5: number };
 export async function getAdPricing(): Promise<AdPricing> {
   const nn = (n: number) => Math.max(0, Math.round(n) || 0);
-  const [w2, m1, m3, d3, d5] = await Promise.all([
+  const [en, w2, m1, m3, d3, d5] = await Promise.all([
+    getSettingBool(SETTING_ADS_PAID_ENABLED, false),
     getSettingNum(SETTING_AD_2W, 0),
     getSettingNum(SETTING_AD_1M, 0),
     getSettingNum(SETTING_AD_3M, 0),
     getSettingNum(SETTING_DUP_T3, 0),
     getSettingNum(SETTING_DUP_T5, 0),
   ]);
-  return { w2: nn(w2), m1: nn(m1), m3: nn(m3), dup3: nn(d3), dup5: nn(d5) };
+  return { enabled: en, w2: nn(w2), m1: nn(m1), m3: nn(m3), dup3: nn(d3), dup5: nn(d5) };
+}
+export function adDurationPrice(p: AdPricing, d: AdDuration): number {
+  return d === 'w2' ? p.w2 : d === 'm1' ? p.m1 : p.m3;
 }
 
 /* ---- native app shells (Android TWA / iOS wrapper): versions & stores ---- */

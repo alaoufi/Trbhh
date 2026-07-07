@@ -165,6 +165,19 @@ export async function getCategories() {
 
 /** Auto-delete ads that have been archived for more than 30 days. Throttled. */
 let lastArchiveSweep = 0;
+let lastExpirySweep = 0;
+
+/** Hide ads whose paid duration has ended (status 1 → 0). Cheap, throttled.
+ *  Nothing is deleted — the owner can renew to republish. */
+export async function sweepExpiredPaidAds() {
+  const now = Date.now();
+  if (now - lastExpirySweep < 600_000) return; // at most once/10 min per container
+  lastExpirySweep = now;
+  await prisma.ads.updateMany({
+    where: { status: 1, expires_at: { not: null, lt: new Date() } },
+    data: { status: 0 },
+  }).catch(() => {});
+}
 export async function sweepExpiredArchived() {
   const now = Date.now();
   if (now - lastArchiveSweep < 3600_000) return; // at most once/hour
@@ -197,6 +210,7 @@ export async function bustAdCaches(): Promise<void> {
 export async function getLatestAds(take = 12) {
   return cached(`ads:latest:${take}`, 60, async () => {
     sweepExpiredArchived().catch(() => {});
+    sweepExpiredPaidAds().catch(() => {});
     const rows = await prisma.ads.findMany({ where: activeAdWhere, orderBy: { id: 'desc' }, take, select: adSelect });
     return toCards(rows);
   });

@@ -9,7 +9,7 @@ import { watermarkImage } from '@/lib/watermark';
 import { aHash, hashSimilarity } from '@/lib/phash';
 import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
-import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getPricing } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getPricing, getAdPricing, adDurationPrice, AD_DURATION_DAYS, type AdDuration } from '@/lib/settings';
 import { charge } from '@/lib/wallet';
 import { bustAdCaches } from '@/lib/data';
 import { setAdMedia } from '@/lib/ad-media';
@@ -262,6 +262,20 @@ export async function createAdAction(formData: FormData) {
   // صاحب متجر معتمد: إعلاناته تُنشر مباشرة (الموافقة على المتجر تُغني عن مراجعة كل إعلان).
   const approvedStoreOwner = await isApprovedStoreOwner(session.uid).catch(() => false);
   const requireApproval = approvedStoreOwner ? false : await getSettingBool(SETTING_ADS_APPROVAL, false).catch(() => false);
+
+  // تسعير النشر بالمدّة (عند تفعيله من الإدارة): يختار العضو مدّة ويُخصم ثمنها ويُضبط انتهاء الإعلان
+  let expiresAt: Date | null = null;
+  const adPricing = await getAdPricing();
+  if (adPricing.enabled) {
+    const raw = String(formData.get('duration') || '');
+    const dur = (raw === 'w2' || raw === 'm1' || raw === 'm3' ? raw : null) as AdDuration | null;
+    if (!dur) redirect('/ads/new?error=duration');
+    const fee = adDurationPrice(adPricing, dur);
+    const paid = await charge(session.uid, fee, 'featured', `نشر إعلان (${AD_DURATION_DAYS[dur]} يوم)`);
+    if (!paid.ok) redirect(`/ads/new?error=needcredit&price=${fee}&bal=${paid.balance}`);
+    expiresAt = new Date(Date.now() + AD_DURATION_DAYS[dur] * 86400000);
+  }
+
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
   const ad = await prisma.ads.create({
@@ -282,6 +296,7 @@ export async function createAdAction(formData: FormData) {
       state: 'active',
       status: requireApproval ? 0 : 1,
       created_at: new Date(),
+      expires_at: expiresAt,
     },
   });
 

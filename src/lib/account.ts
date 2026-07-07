@@ -23,6 +23,7 @@ export async function getMyAds(userId: number) {
       special: r.adsSpecial === 'checked',
       image: await primaryImage(r.id),
       createdAt: r.created_at ? r.created_at.toISOString() : null,
+      expiresAt: r.expires_at ? r.expires_at.toISOString() : null,
     })),
   );
 }

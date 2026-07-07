@@ -199,7 +199,7 @@ export async function userExistsByPhone(phone: string): Promise<boolean> {
   return !!u;
 }
 
-/** Generate a 6-digit code, store it, and send via the active channel(s).
+/** Generate a 4-digit code, store it, and send via the active channel(s).
  *  ok    = the code was created and the gateway is configured (advance to entry)
  *  delivered = the send call reported success (best-effort; detection can vary) */
 export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; delivered: boolean; error?: string }> {
@@ -216,7 +216,7 @@ export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; de
   const secs = otp ? Math.floor((Date.now() - otp.last_sent.getTime()) / 1000) : 999;
   if (secs < 60) return { ok: false, delivered: false, error: `انتظر ${60 - secs} ثانية قبل إعادة إرسال الرمز` };
 
-  const code = String(randomInt(100000, 1000000));
+  const code = String(randomInt(1000, 10000)); // 4-digit verification code (1000–9999)
   const fresh = { code, expires_at: new Date(Date.now() + 10 * 60_000), attempts: 0, last_sent: new Date() };
   await prisma.password_otps.upsert({ where: { phone: norm }, create: { phone: norm, ...fresh }, update: fresh });
   const delivered = await sendVerification(norm, `رمز استعادة كلمة المرور في تربح: ${code}`);

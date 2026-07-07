@@ -845,6 +845,8 @@ model stores {
   terms_agreed     Int       @default(0) @db.TinyInt
   terms_agreed_at  DateTime? @db.Timestamp(0)
   handle           String?   @unique(map: "uniq_store_handle") @db.VarChar(32)
+  allow_ads        Int       @default(1) @db.TinyInt
+  allow_reviews    Int       @default(1) @db.TinyInt
 }
 
 // ---- self-provisioned tables (source of truth: src/data/schema-sync.ts) ----

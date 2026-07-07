@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2 } from 'lucide-react';
+import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2, Plus } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { CopyLink } from '@/components/copy-link';
 import { getStore } from '@/lib/stores';
@@ -122,6 +122,9 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input name="q" defaultValue={query} placeholder="ابحث في المتجر" className="h-10 w-full rounded-full border bg-muted/40 pr-9 pl-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </form>
+          {isOwner && meta.allowAds && (
+            <Link href="/ads/new" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="أضف إعلان"><Plus className="h-5 w-5" /></Link>
+          )}
           {isOwner && (
             <a href="/store" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إدارة المتجر"><Building2 className="h-4 w-4" /></a>
           )}
@@ -190,7 +193,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         <nav className="sticky top-[52px] z-20 flex gap-1 rounded-xl bg-white p-1 text-sm font-bold shadow-sm ring-1 ring-black/5">
           <a href="#catalog" className="flex-1 rounded-lg py-2 text-center text-white" style={{ background: brand }}>المنتجات</a>
           <a href="#about" className="flex-1 rounded-lg py-2 text-center text-muted-foreground hover:bg-muted/50">نبذة</a>
-          <a href="#reviews" className="flex-1 rounded-lg py-2 text-center text-muted-foreground hover:bg-muted/50">التقييمات</a>
+          {meta.allowReviews && <a href="#reviews" className="flex-1 rounded-lg py-2 text-center text-muted-foreground hover:bg-muted/50">التقييمات</a>}
         </nav>
 
         {/* ===== الكتالوج ===== */}
@@ -274,7 +277,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           </div>
         )}
 
-        {/* ===== التقييمات ===== */}
+        {/* ===== التقييمات والتعليقات (يمكن للمالك قفلها من إعدادات المتجر) ===== */}
+        {meta.allowReviews && (
         <div id="reviews" className="scroll-mt-28 space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
           <h2 className="flex items-center gap-2 font-bold" style={{ color: brand }}><Star className="h-5 w-5" /> تقييمات العملاء ({en(rating.count)})</h2>
           {session && !isOwner && (
@@ -301,6 +305,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             </div>
           ))}
         </div>
+        )}
 
         <DisclaimerBar />
       </div>

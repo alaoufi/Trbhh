@@ -42,6 +42,8 @@ const STATEMENTS: string[] = [
   `ALTER TABLE stores ADD COLUMN terms_agreed_at TIMESTAMP NULL`,
   `ALTER TABLE stores ADD COLUMN handle VARCHAR(32) NULL`,
   `CREATE UNIQUE INDEX uniq_store_handle ON stores (handle)`,
+  `ALTER TABLE stores ADD COLUMN allow_ads TINYINT NOT NULL DEFAULT 1`,
+  `ALTER TABLE stores ADD COLUMN allow_reviews TINYINT NOT NULL DEFAULT 1`,
 
   /* ---- store relations ---- */
   `CREATE TABLE IF NOT EXISTS store_offers (

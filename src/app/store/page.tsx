@@ -7,8 +7,8 @@ import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction } from '@/app/account/company/actions';
-import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck } from 'lucide-react';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction } from '@/app/account/company/actions';
+import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
@@ -58,6 +58,29 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         <div className={`card-3d rounded-xl p-3 text-sm font-bold ${meta.status === 1 ? 'text-emerald-700' : meta.status === 0 ? 'text-amber-700' : 'text-red-700'}`}>
           {meta.status === 1 ? '✓ متجرك مُعتمَد وظاهر للجميع.' : meta.status === 0 ? '⏳ متجرك بانتظار موافقة الإدارة قبل الظهور.' : '⛔ متجرك موقوف. تواصل مع الإدارة.'}
         </div>
+      )}
+
+      {/* أضف إعلان — يظهر عند تفعيل «السماح بنشر الإعلانات» في إعدادات المتجر */}
+      {store && meta?.allowAds && (
+        <Link href="/ads/new" className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-extrabold text-white shadow-md transition hover:-translate-y-0.5">
+          <PlusCircle className="h-5 w-5" /> أضف إعلان جديد لمتجرك
+        </Link>
+      )}
+
+      {/* إعدادات المتجر — السماح بنشر الإعلانات + قفل/فتح التعليقات والتقييم */}
+      {store && (
+        <form action={saveStoreSettingsAction} className="card-3d space-y-3 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary"><SlidersHorizontal className="h-5 w-5" /> إعدادات المتجر</div>
+          <label className="flex items-start gap-2 rounded-xl border p-3 text-sm">
+            <input type="checkbox" name="allowAds" defaultChecked={meta?.allowAds ?? true} className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
+            <span><b className="flex items-center gap-1"><Megaphone className="h-4 w-4" /> السماح بنشر الإعلانات</b><span className="block text-xs text-muted-foreground">يظهر زر «أضف إعلان» ويسمح لمتجرك بالمشاركة في نشر الإعلانات.</span></span>
+          </label>
+          <label className="flex items-start gap-2 rounded-xl border p-3 text-sm">
+            <input type="checkbox" name="allowReviews" defaultChecked={meta?.allowReviews ?? true} className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
+            <span><b className="flex items-center gap-1"><MessageSquare className="h-4 w-4" /> فتح التعليقات والتقييم</b><span className="block text-xs text-muted-foreground">عند الإيقاف تُقفل تقييمات وتعليقات العملاء في صفحة المتجر.</span></span>
+          </label>
+          <Button size="sm">حفظ الإعدادات</Button>
+        </form>
       )}
 
       {/* تعهّد الشروط الموثّق (نسخة لدى العضو ونسخة لدى الإدارة) */}

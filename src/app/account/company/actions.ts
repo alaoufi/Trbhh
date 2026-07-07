@@ -4,8 +4,19 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
-import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform } from '@/lib/merchant';
+import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform, saveStoreSettings } from '@/lib/merchant';
 import { toInt } from '@/lib/utils';
+
+/** Store toggles: allow publishing ads + lock/unlock reviews & comments. */
+export async function saveStoreSettingsAction(formData: FormData) {
+  const session = await requireUser();
+  await saveStoreSettings(session.uid, {
+    allowAds: formData.get('allowAds') !== null,
+    allowReviews: formData.get('allowReviews') !== null,
+  });
+  revalidatePath('/store');
+  revalidatePath('/');
+}
 
 export async function saveCompanyAction(formData: FormData) {
   const session = await requireUser();

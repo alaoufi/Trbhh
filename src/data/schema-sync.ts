@@ -48,6 +48,14 @@ const STATEMENTS: string[] = [
   `ALTER TABLE stores ADD COLUMN store_password VARCHAR(255) NULL`,
   `ALTER TABLE stores ADD COLUMN store_username VARCHAR(60) NULL`,
   `CREATE UNIQUE INDEX uniq_store_username ON stores (store_username)`,
+  `CREATE TABLE IF NOT EXISTS store_visits (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    store_id BIGINT UNSIGNED NOT NULL,
+    viewer VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX store_visits_store (store_id),
+    INDEX store_visits_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   /* ---- store relations ---- */
   `CREATE TABLE IF NOT EXISTS store_offers (

@@ -8,7 +8,7 @@ import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
 import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, setStoreCredentialsAction } from '@/app/account/company/actions';
-import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound } from 'lucide-react';
+import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3 } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
@@ -137,6 +137,14 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             </div>
           ))}
         </div>
+      )}
+
+      {/* إحصائيات المتجر: زوّار + مشاهدات إعلانات + تحليل الإعلانات */}
+      {store && (
+        <Link href="/store/analytics" className="flex items-center justify-between gap-2 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4 transition hover:bg-primary/10">
+          <span className="flex items-center gap-2 font-bold text-primary"><BarChart3 className="h-5 w-5" /> إحصائيات المتجر</span>
+          <span className="text-xs text-muted-foreground">زوّار المتجر • مشاهدات الإعلانات • تحليل الإعلانات ←</span>
+        </Link>
       )}
 
       {store && <CopyLink url={`https://${SITE.domain}/companies/${store.id}`} />}

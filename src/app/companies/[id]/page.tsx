@@ -6,8 +6,10 @@ import { SITE } from '@/lib/constants';
 import { CopyLink } from '@/components/copy-link';
 import { getStore } from '@/lib/stores';
 import { getMyAds } from '@/lib/account';
+import { cookies } from 'next/headers';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
+import { recordStoreVisit } from '@/lib/store-analytics';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle } from '@/lib/merchant';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -81,6 +83,13 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         <Link href="/" className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">الصفحة الرئيسية</Link>
       </div>
     );
+  }
+
+  // سجّل زيارة المتجر (زائر واحد/يوم) — لا تُحتسب زيارة المالك نفسه
+  if (!isOwner) {
+    const vid = (await cookies()).get('trbhh_vid')?.value;
+    const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
+    if (viewerKey) await recordStoreVisit(storeId, viewerKey);
   }
 
   const [myAds, productIds, followers, rating, reviews, following] = await Promise.all([

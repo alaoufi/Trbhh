@@ -13,7 +13,8 @@ export function ChromeGate({ header, footer, children }: { header: React.ReactNo
   const pathname = usePathname() || '';
   // storefront by numeric id OR by handle (subdomain rewrite → /companies/<handle>),
   // and the store owner's independent admin dashboard (/store) — both hide Trbhh chrome.
-  const isStorefront = /^\/companies\/[^/]+/.test(pathname) || /^\/store(\/|$)/.test(pathname) || pathname.startsWith('/store-login') || pathname.startsWith('/store-forgot');
+  // صفحة الدخول أيضاً بلا واجهة تربح (لا هيدر ولا قائمة سفلية) — تركيز على الدخول فقط
+  const isStorefront = /^\/companies\/[^/]+/.test(pathname) || /^\/store(\/|$)/.test(pathname) || pathname.startsWith('/store-login') || pathname.startsWith('/store-forgot') || pathname.startsWith('/login');
   if (isStorefront) {
     return <main className="min-h-screen">{children}</main>;
   }

@@ -3,7 +3,7 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useFormState, useFormStatus } from 'react-dom';
-import { LogIn } from 'lucide-react';
+import { LogIn, Home } from 'lucide-react';
 import { loginAction } from './actions';
 import { storeLoginAction } from '../store-login/actions';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,13 @@ function LoginInner() {
   };
 
   return (
-    <div className="mx-auto max-w-sm py-8">
+    <div className="mx-auto max-w-sm px-4 py-6">
+      {/* رجوع للموقع فقط — بلا هيدر أو قائمة سفلية */}
+      <div className="mb-4">
+        <Link href="/" className="btn-3d inline-flex items-center gap-1.5 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 py-2 text-sm font-bold text-white">
+          <Home className="h-4 w-4" /> الرجوع للموقع
+        </Link>
+      </div>
       <div className="card-3d rounded-xl p-6">
         {/* اختيار وجهة الدخول بدوائر واضحة — يبدّل النموذج فوراً بلا انتقال */}
         <div className="mb-4">

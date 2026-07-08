@@ -57,6 +57,26 @@ export function parseTemplates(raw: string | null | undefined): string[] {
     .slice(0, 12);
 }
 
+/**
+ * Fill a message template's variables: `{link}` (URL) and `{name}` (ad/product/
+ * store/recipient name — whatever fits the context).
+ * - `{name}`: replaced when provided, else the token is dropped.
+ * - `{link}`: replaced when provided; if absent from the text and `appendLink` is
+ *   true, the URL is appended on a new line (so WhatsApp inquiries always carry
+ *   the ad/product link). When no link is provided the token is dropped.
+ */
+export function fillTemplate(tpl: string, vars: { link?: string | null; name?: string | null; appendLink?: boolean } = {}): string {
+  let t = (tpl || '').trim();
+  t = vars.name ? t.replace(/\{name\}/g, vars.name) : t.replace(/\s*\{name\}\s*/g, ' ');
+  if (vars.link) {
+    if (t.includes('{link}')) t = t.replace(/\{link\}/g, vars.link);
+    else if (vars.appendLink) t = `${t}\n${vars.link}`;
+  } else {
+    t = t.replace(/\s*\{link\}\s*/g, ' ');
+  }
+  return t.trim();
+}
+
 /** Templates shown when a member messages an ad owner (unset => a sensible default). */
 export async function getAdMsgTemplates(): Promise<string[]> {
   const v = await getSetting(SETTING_MSG_TPL_AD, '__default__');

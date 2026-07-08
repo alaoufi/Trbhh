@@ -3,7 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getThread } from '@/lib/messages';
-import { getMsgDeleteMinutes, getAdMsgTemplates, getAdminMsgTemplates, parseTemplates } from '@/lib/settings';
+import { getMsgDeleteMinutes, getAdMsgTemplates, getAdminMsgTemplates, parseTemplates, fillTemplate } from '@/lib/settings';
 import { getPrimaryAdminId } from '@/lib/admin-inbox';
 import { storeIdOfUser, getStoreMeta } from '@/lib/merchant';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -34,6 +34,8 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
     }
     if (!templates.length) templates = await getAdMsgTemplates().catch(() => []);
   }
+  // لا رابط في المحادثة الداخلية → أزل {link}؛ {name} = اسم الطرف الآخر
+  templates = templates.map((t) => fillTemplate(t, { name: thread.other?.name })).filter(Boolean);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col">

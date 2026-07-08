@@ -93,8 +93,8 @@ export async function sendDueSubReminders(): Promise<void> {
   const now = new Date();
   const horizon = new Date(now.getTime() + days * 86400000);
   const rows = await prisma.stores
-    .findMany({ where: { sub_until: { gt: now, lte: horizon }, status: 1 }, select: { id: true, user_id: true, sub_until: true } })
-    .catch(() => [] as { id: bigint; user_id: number; sub_until: Date | null }[]);
+    .findMany({ where: { sub_until: { gt: now, lte: horizon }, status: 1 }, select: { id: true, user_id: true, sub_until: true, store_name: true } })
+    .catch(() => [] as { id: bigint; user_id: number; sub_until: Date | null; store_name: string | null }[]);
   if (!rows.length) return;
 
   const { getPrimaryAdminId } = await import('./admin-inbox');
@@ -118,7 +118,10 @@ export async function sendDueSubReminders(): Promise<void> {
     if (sent >= count) continue;                                   // بلغ الحد الأقصى للتنبيهات
     if (samePeriod && mark?.last_sent && ymd(mark.last_sent) === today) continue; // مرة واحدة يومياً
 
-    const body = rawMsg.replace(/\{days\}/g, String(daysLeft)).replace(/\{date\}/g, ymd(r.sub_until));
+    const body = rawMsg
+      .replace(/\{days\}/g, String(daysLeft))
+      .replace(/\{date\}/g, ymd(r.sub_until))
+      .replace(/\{name\}/g, r.store_name || 'متجرك');
     await sendChat(adminId, ownerId, body).catch(() => {});
     await prisma.store_sub_reminders
       .upsert({

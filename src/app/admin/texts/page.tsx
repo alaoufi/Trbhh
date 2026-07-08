@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox } from 'lucide-react';
+import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox, Braces } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import {
   getSetting, getHomeHeadings, getEmptyTexts,
@@ -18,6 +18,7 @@ const box = 'w-full rounded-lg border border-primary/30 bg-white p-2 text-sm out
 const field = 'h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40';
 
 const SECTIONS = [
+  { key: 'vars', label: 'المتغيّرات', icon: Braces },
   { key: 'general', label: 'عام', icon: Megaphone },
   { key: 'home', label: 'الرئيسية', icon: Home },
   { key: 'ad', label: 'صفحة الإعلان', icon: Sparkles },
@@ -26,6 +27,14 @@ const SECTIONS = [
   { key: 'sub', label: 'الاشتراك', icon: BellRing },
 ] as const;
 type Sec = typeof SECTIONS[number]['key'];
+
+// المتغيّرات المتاحة — تُكتب داخل أي نص وتُستبدل بالقيمة الفعلية عند العرض/الإرسال.
+const VARIABLES = [
+  { token: '{link}', meaning: 'رابط الإعلان أو المنتج أو المتجر', where: 'نصوص المراسلة — ويُضاف تلقائياً في رسائل واتساب من صفحة الإعلان/المنتج حتى لو لم تكتبه.' },
+  { token: '{name}', meaning: 'اسم الإعلان/المنتج، أو اسم المتجر، أو اسم الطرف الآخر في المحادثة', where: 'نصوص المراسلة، ورسالة تنبيه الاشتراك (اسم المتجر).' },
+  { token: '{days}', meaning: 'عدد الأيام المتبقية قبل انتهاء الاشتراك', where: 'رسالة تنبيه الاشتراك.' },
+  { token: '{date}', meaning: 'تاريخ انتهاء الاشتراك', where: 'رسالة تنبيه الاشتراك.' },
+];
 
 export default async function AdminTexts({ searchParams }: { searchParams: Promise<{ saved?: string; sec?: string }> }) {
   await requireAction('users', 'edit');
@@ -62,6 +71,26 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
 
       {saved === '1' && <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800"><Check className="h-4 w-4" /> تم الحفظ.</div>}
 
+      {sec === 'vars' && (
+        <div className="space-y-3 rounded-xl border border-primary/20 bg-card p-4">
+          <div className="flex items-center gap-2 text-sm font-bold text-primary"><Braces className="h-4 w-4" /> المتغيّرات المتاحة</div>
+          <p className="text-xs text-muted-foreground">اكتب المتغيّر داخل أي نص (كما هو، بالأقواس) وسيُستبدل تلقائياً بالقيمة الفعلية عند العرض أو الإرسال. مثال: «هل يتوفّر {'{name}'}؟ {'{link}'}».</p>
+          <ul className="space-y-2">
+            {VARIABLES.map((v) => (
+              <li key={v.token} className="rounded-lg border border-primary/15 bg-primary/5 p-3">
+                <div className="flex items-center gap-2">
+                  <code dir="ltr" className="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">{v.token}</code>
+                  <span className="text-sm font-bold text-foreground/90">{v.meaning}</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">يعمل في: {v.where}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="rounded-lg bg-amber-50 p-2 text-[11px] font-medium text-amber-800">ملاحظة: إن لم يتوفّر المتغيّر في سياق معيّن (مثل {'{link}'} داخل محادثة عامة) فإنه يُحذف تلقائياً دون إظهار الأقواس.</p>
+        </div>
+      )}
+
+      {sec !== 'vars' && (
       <form action={saveTextsAction} className="space-y-4 rounded-xl border border-primary/20 bg-card p-4">
         <input type="hidden" name="sec" value={sec} />
 
@@ -114,7 +143,7 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
 
         {sec === 'msg' && (
           <>
-            <p className="text-xs text-muted-foreground">نصوص تُعبّأ داخل مربّع المحادثة ليعدّلها المُرسِل ويرسلها. كل سطر = نص مستقل. اتركها فارغة لإخفائها.</p>
+            <p className="text-xs text-muted-foreground">نصوص تُعبّأ داخل مربّع المحادثة ليعدّلها المُرسِل ويرسلها. كل سطر = نص مستقل. المتغيّرات: <b dir="ltr">{'{link}'}</b> رابط الإعلان (يُضاف تلقائياً في واتساب)، <b dir="ltr">{'{name}'}</b> اسم الإعلان/الطرف.</p>
             <label className="block space-y-1">
               <span className="text-sm font-medium">عند مراسلة صاحب الإعلان</span>
               <textarea name="msgTplAd" rows={3} defaultValue={tplAd} className={box} />
@@ -129,13 +158,14 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
         {sec === 'sub' && (
           <label className="block space-y-1">
             <span className="flex items-center gap-2 text-sm font-bold text-primary"><BellRing className="h-4 w-4" /> رسالة تنبيه قرب انتهاء الاشتراك</span>
-            <span className="block text-xs text-muted-foreground">تُرسَل لصاحب المتجر قبل انتهاء اشتراكه (عدد الأيام والمرّات من الإعدادات ← الإيرادات والتسعير). استخدم <b dir="ltr">{'{days}'}</b> لعدد الأيام و<b dir="ltr">{'{date}'}</b> لتاريخ الانتهاء.</span>
+            <span className="block text-xs text-muted-foreground">تُرسَل لصاحب المتجر قبل انتهاء اشتراكه (عدد الأيام والمرّات من الإعدادات ← الإيرادات والتسعير). المتغيّرات: <b dir="ltr">{'{days}'}</b> الأيام المتبقية، <b dir="ltr">{'{date}'}</b> تاريخ الانتهاء، <b dir="ltr">{'{name}'}</b> اسم المتجر.</span>
             <textarea name="subReminderMsg" rows={3} defaultValue={subMsg} className={box} />
           </label>
         )}
 
         <Button>حفظ</Button>
       </form>
+      )}
     </div>
   );
 }

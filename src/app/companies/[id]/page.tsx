@@ -115,9 +115,10 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const allActive = myAds.filter((a) => a.status === 1 && inStore.has(a.id)).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
   const active = query ? allActive.filter((a) => (a.title || '').includes(query)) : allActive;
   // نص واتساب للمتجر: نص المتجر إن وُجد، وإلا نصّ افتراضي (لا يظهر فارغاً)
-  const { parseTemplates } = await import('@/lib/settings');
-  const waMsg = parseTemplates(meta.msgTemplates)[0] || `السلام عليكم، لديّ استفسار عن متجر ${meta.storeName || s.name}`;
-  const wa = waLink(s.whatsapp, waMsg);
+  const { parseTemplates, fillTemplate } = await import('@/lib/settings');
+  const storeUrl = meta.handle ? `https://${meta.handle}.${SITE.domain}` : `https://${SITE.domain}/companies/${storeId}`;
+  const baseTpl = parseTemplates(meta.msgTemplates)[0] || 'السلام عليكم، لديّ استفسار عن متجر {name}';
+  const wa = waLink(s.whatsapp, fillTemplate(baseTpl, { link: storeUrl, name: meta.storeName || s.name }));
   // مشاهدات المتجر = عدد مرّات دخول/تحديث صفحة المتجر (مشاهدة واحدة لكل زيارة)
   const storeViews = await getStoreViews(storeId).catch(() => 0);
   // collaboration: can this viewer (a merchant) invite this store?

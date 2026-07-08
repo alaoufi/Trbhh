@@ -15,7 +15,7 @@ import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { waLink } from '@/lib/classified-theme';
-import { getAdNotice, getAdMsgTemplates, parseTemplates } from '@/lib/settings';
+import { getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -111,7 +111,9 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   // نص واتساب مُعبّأ مسبقاً: نص المتجر إن كان إعلان متجر، وإلا نص تربح لمراسلة صاحب الإعلان
   const [adNotice, adTpls] = await Promise.all([getAdNotice(), getAdMsgTemplates()]);
   const storeTpls = parseTemplates(storeMeta?.msgTemplates);
-  const waMsg = (inStore && storeTpls.length ? storeTpls[0] : adTpls[0]) || '';
+  const baseTpl = (inStore && storeTpls.length ? storeTpls[0] : adTpls[0]) || '';
+  // {link} = رابط الإعلان (يُضاف تلقائياً في واتساب)، {name} = عنوان الإعلان
+  const waMsg = fillTemplate(baseTpl, { link: shareUrl, name: ad.title, appendLink: true });
   const waNumber = waLink(ad.seller?.whatsapp, waMsg);
   // صاحب الإعلان لا يرى المراسلة/البلاغ/التقييم على إعلانه (لا يراسل/يبلّغ/يقيّم نفسه)
   const isAdOwner = !!(session && ad.seller && session.uid === ad.seller.id);

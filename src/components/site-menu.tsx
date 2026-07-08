@@ -44,10 +44,19 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
 
   async function share() {
     const url = typeof window !== 'undefined' ? window.location.origin : '';
-    try {
-      if (navigator.share) await navigator.share({ title: 'تربح', url });
-      else { await navigator.clipboard.writeText(url); alert('تم نسخ الرابط'); }
-    } catch { /* cancelled */ }
+    if (navigator.share) { try { await navigator.share({ title: 'تربح', url }); } catch { /* cancelled */ } return; }
+    let ok = false;
+    try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(url); ok = true; } } catch { /* fall through */ }
+    if (!ok) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch { /* ignore */ }
+    }
+    if (ok) alert('تم نسخ الرابط');
   }
 
   const drawer = open ? (

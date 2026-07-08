@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Store, LogIn } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { getCategories } from '@/lib/data';
 import { storeIdOfUser } from '@/lib/merchant';
 import { SiteMenu } from '@/components/site-menu';
 import { HeaderSearch } from '@/components/header-search';
+import { HeaderCta } from '@/components/header-cta';
 
 export async function Header() {
   const session = await getSession();
@@ -19,24 +19,8 @@ export async function Header() {
         {/* hamburger on the right (RTL: first child) */}
         <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} />
 
-        {/* الأساسي: تسجيل الدخول للزائر — ولصاحب المتجر رابط متجره */}
-        {!session ? (
-          <Link
-            href="/login"
-            className="btn-3d flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white"
-          >
-            <LogIn className="h-5 w-5" /> تسجيل الدخول
-          </Link>
-        ) : myStoreId > 0 ? (
-          <Link
-            href={`/companies/${myStoreId}`}
-            className="btn-3d flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white"
-          >
-            <Store className="h-5 w-5" /> رابط المتجر
-          </Link>
-        ) : (
-          <div className="flex-1" />
-        )}
+        {/* الزر الرئيسي — يتغيّر حسب الصفحة (دخول/رابط المتجر/الصفحة الرئيسية في صفحة الدخول) */}
+        <HeaderCta isAuthed={!!session} myStoreId={myStoreId} />
 
         {/* بحث مصغّر: عدسة تفتح حقل البحث */}
         <HeaderSearch />

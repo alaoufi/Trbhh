@@ -11,7 +11,7 @@ import { respondOfferAction, respondTransferAction } from '@/app/companies/actio
 import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, setStoreCredentialsAction, subscribeStoreAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
 import { getStoreSubPricing } from '@/lib/settings';
-import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown } from 'lucide-react';
+import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
@@ -228,6 +228,12 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           <span className="text-xs text-muted-foreground">زوّار المتجر • مشاهدات الإعلانات • تحليل الإعلانات ←</span>
         </Link>
       )}
+
+      {/* دليل المتجر — كل ما يخصّ إدارة المتجر */}
+      <Link href="/guide/store" className="flex items-center justify-between gap-2 rounded-2xl border-2 border-teal-200 bg-teal-50/60 p-4 transition hover:bg-teal-100/60">
+        <span className="flex items-center gap-2 font-bold text-teal-800"><BookOpen className="h-5 w-5" /> دليل المتجر</span>
+        <span className="text-xs text-muted-foreground">شرح كل ما يخصّ إدارة متجرك ←</span>
+      </Link>
 
       {store && <CopyLink url={`https://${SITE.domain}/companies/${store.id}`} />}
 

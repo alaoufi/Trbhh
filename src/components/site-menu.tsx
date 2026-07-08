@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Store,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
@@ -72,6 +72,9 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
           <Item href="/" icon={Home} onClick={close}>الرئيسية</Item>
           <Link href="/guide" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-3 text-[15px] font-extrabold text-primary hover:bg-primary/15">
             <BookOpen className="h-5 w-5 shrink-0" /> <span>دليل المستخدم</span>
+          </Link>
+          <Link href="/guide/store" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-teal-500/10 px-3 py-3 text-[15px] font-extrabold text-teal-700 hover:bg-teal-500/15">
+            <Store className="h-5 w-5 shrink-0" /> <span>دليل المتجر</span>
           </Link>
 
           {/* حسابي — بنود تتطلّب تسجيل الدخول، لا تظهر إلا للمصرّح له */}

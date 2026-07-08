@@ -66,6 +66,16 @@ const STATEMENTS: string[] = [
     INDEX store_visits_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `ALTER TABLE store_visits ADD COLUMN source VARCHAR(20) NULL`,
+  /* per-store backups (JSON snapshots) — auto (periodic) + manual, owner can restore */
+  `CREATE TABLE IF NOT EXISTS store_backups (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    store_id INT NOT NULL,
+    kind VARCHAR(10) NOT NULL DEFAULT 'auto',
+    data LONGTEXT NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX store_backups_store (store_id),
+    INDEX store_backups_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* subscription-expiry reminders: dedupe how many times we've reminded a store
      in the CURRENT sub period (sub_until), at most once per day. */
   `CREATE TABLE IF NOT EXISTS store_sub_reminders (

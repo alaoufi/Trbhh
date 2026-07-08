@@ -8,10 +8,10 @@ import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, setStoreCredentialsAction, subscribeStoreAction } from '@/app/account/company/actions';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, setStoreCredentialsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
 import { getStoreSubPricing } from '@/lib/settings';
-import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen } from 'lucide-react';
+import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen, DatabaseBackup } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
@@ -21,12 +21,15 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; cred?: string; crederr?: string }> }) {
-  const { error, sub, added, settings, cred, crederr } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; cred?: string; crederr?: string; backup?: string }> }) {
+  const { error, sub, added, settings, cred, crederr, backup } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
+  // نسخة احتياطية دورية تلقائية للمتجر (مرة يومياً كحدّ أقصى)
+  import('@/lib/store-backup').then((m) => m.maybeAutoBackup(session.uid)).catch(() => {});
   const store = await getStoreByUser(session.uid);
+  const backups = store ? await (await import('@/lib/store-backup')).listStoreBackups(store.id).catch(() => []) : [];
   const subState = store ? await getStoreSub(store.id) : null;
   const subPricing = await getStoreSubPricing();
   const branches = store ? await prisma.store_branches.findMany({ where: { store_id: store.id } }) : [];
@@ -234,6 +237,51 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         <span className="flex items-center gap-2 font-bold text-teal-800"><BookOpen className="h-5 w-5" /> دليل المتجر</span>
         <span className="text-xs text-muted-foreground">شرح كل ما يخصّ إدارة متجرك ←</span>
       </Link>
+
+      {/* النسخ الاحتياطي للمتجر — تلقائي دوري + يدوي مع الاستعادة والتحذيرات */}
+      {store && (
+        <div className="card-3d space-y-3 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary"><DatabaseBackup className="h-5 w-5" /> النسخ الاحتياطي للمتجر</div>
+          {backup === 'done' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ تم أخذ نسخة احتياطية جديدة.</div>}
+          {backup === 'restored' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ تمت استعادة المتجر من النسخة.</div>}
+          {backup === 'error' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">⚠️ تعذّرت الاستعادة — تأكّد من صحة الملف/النسخة.</div>}
+          <p className="text-xs text-muted-foreground">تُؤخذ نسخة تلقائية دورية لإعدادات متجرك ومنتجاته وفروعه (مرة يومياً)، ويمكنك أخذ نسخة الآن أو الاستعادة. <b className="text-amber-700">تنبيه: الاستعادة تستبدل إعدادات متجرك الحالية ولا يمكن التراجع.</b></p>
+
+          <form action={storeBackupNowAction}>
+            <Button size="sm" className="gap-1.5"><DatabaseBackup className="h-4 w-4" /> أخذ نسخة الآن</Button>
+          </form>
+
+          {backups.length > 0 ? (
+            <ul className="space-y-2">
+              {backups.map((b) => (
+                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-2.5 text-sm">
+                  <span className="flex items-center gap-2">
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${b.kind === 'manual' ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>{b.kind === 'manual' ? 'يدوية' : 'تلقائية'}</span>
+                    <span className="text-xs text-muted-foreground">{b.at ? fmtDate(b.at) : ''}</span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <a href={`/store/backup/download/${b.id}`} className="rounded-lg border px-2.5 py-1 text-xs font-bold text-primary hover:bg-secondary">تنزيل</a>
+                    <form action={storeRestoreAction}>
+                      <input type="hidden" name="id" value={b.id} />
+                      <button className="rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-amber-700">استعادة</button>
+                    </form>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-muted-foreground">لا توجد نسخ محفوظة بعد.</p>
+          )}
+
+          <div className="border-t pt-3">
+            <div className="mb-1 text-xs font-bold text-muted-foreground">استعادة من ملف نسخة احتياطية</div>
+            <form action={storeRestoreFileAction} className="flex flex-wrap items-center gap-2">
+              <input type="file" name="file" accept="application/json,.json" required className="min-w-0 flex-1 text-xs" />
+              <button className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700">استعادة من الملف</button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {store && <CopyLink url={`https://${SITE.domain}/companies/${store.id}`} />}
 

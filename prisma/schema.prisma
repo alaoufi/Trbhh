@@ -1103,6 +1103,17 @@ model store_contacts {
   @@index([created_at], map: "store_contacts_created")
 }
 
+model store_backups {
+  id         BigInt    @id @default(autoincrement())
+  store_id   Int
+  kind       String    @default("auto") @db.VarChar(10)
+  data       String    @db.LongText
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([store_id], map: "store_backups_store")
+  @@index([created_at], map: "store_backups_created")
+}
+
 model store_sub_reminders {
   store_id  Int       @id
   sub_until DateTime? @db.DateTime(0)

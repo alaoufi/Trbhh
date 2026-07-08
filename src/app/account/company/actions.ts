@@ -126,6 +126,39 @@ export async function setStoreProductsAction(formData: FormData) {
   revalidatePath('/store');
 }
 
+/** أخذ نسخة احتياطية يدوية لبيانات المتجر. */
+export async function storeBackupNowAction() {
+  const session = await requireUser();
+  const { createSnapshot } = await import('@/lib/store-backup');
+  await createSnapshot(session.uid, 'manual');
+  revalidatePath('/store');
+  redirect('/store?backup=done');
+}
+
+/** استعادة المتجر من نسخة محفوظة (بمعرّفها) — تستبدل الإعدادات الحالية. */
+export async function storeRestoreAction(formData: FormData) {
+  const session = await requireUser();
+  const id = Number(formData.get('id') || 0);
+  const { restoreFromId } = await import('@/lib/store-backup');
+  const ok = id ? await restoreFromId(session.uid, id) : false;
+  revalidatePath('/store');
+  revalidatePath('/');
+  redirect(ok ? '/store?backup=restored' : '/store?backup=error');
+}
+
+/** استعادة المتجر من ملف نسخة احتياطية مرفوع. */
+export async function storeRestoreFileAction(formData: FormData) {
+  const session = await requireUser();
+  const file = formData.get('file');
+  let text = '';
+  if (file instanceof File && file.size > 0 && file.size < 5_000_000) text = await file.text();
+  const { restoreFromJson } = await import('@/lib/store-backup');
+  const ok = text ? await restoreFromJson(session.uid, text) : false;
+  revalidatePath('/store');
+  revalidatePath('/');
+  redirect(ok ? '/store?backup=restored' : '/store?backup=error');
+}
+
 export async function addBranchAction(formData: FormData) {
   const session = await requireUser();
   const store = await prisma.stores.findFirst({ where: { user_id: session.uid } });

@@ -46,14 +46,14 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
       )}
       {/* title (right) + image (left) — matches the original layout */}
       <div className="flex items-stretch gap-3 p-3">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <span className={cn('mb-1 inline-block rounded px-2 py-0.5 text-[10px] font-extrabold text-white', isReq ? 'bg-amber-500' : 'bg-primary')}>
             {isReq ? 'طلب' : 'عرض'}
           </span>
-          <h3 className="line-clamp-3 text-right text-base font-bold leading-7 text-primary">
+          <h3 className="line-clamp-3 break-words text-right text-base font-bold leading-7 text-primary">
             {ad.title}
           </h3>
-          {ad.storeName && <div className="mt-1"><StoreTag name={ad.storeName} /></div>}
+          {ad.storeName && <div className="mt-1 min-w-0"><StoreTag name={ad.storeName} /></div>}
         </div>
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-white">
           <Image src={ad.image} alt={ad.title} fill sizes="96px" className="object-cover" />
@@ -110,8 +110,8 @@ function Cell({ children }: { children: React.ReactNode }) {
 function StoreTag({ name }: { name?: string | null }) {
   if (!name) return null;
   return (
-    <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-      <Store className="h-3 w-3 shrink-0" /> <span className="truncate">من متجر {name}</span>
+    <span className="inline-flex max-w-full min-w-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+      <Store className="h-3 w-3 shrink-0" /> <span className="min-w-0 truncate">من متجر {name}</span>
     </span>
   );
 }

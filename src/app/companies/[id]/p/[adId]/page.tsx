@@ -87,8 +87,9 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
   const name = meta.storeName || s.name;
   const storeHome = meta.handle ? `https://${meta.handle}.${SITE.domain}` : `/companies/${storeId}`;
   const shareUrl = `https://${SITE.domain}/companies/${storeId}/p/${ad.id}`;
+  // نص واتساب: نص المتجر إن وُجد، وإلا نصّ افتراضي يذكر المنتج (لا يظهر فارغاً)
   const { parseTemplates } = await import('@/lib/settings');
-  const waMsg = parseTemplates(meta.msgTemplates)[0] || '';
+  const waMsg = parseTemplates(meta.msgTemplates)[0] || `السلام عليكم، لديّ استفسار حول: ${ad.title}`;
   const wa = waLink(ad.seller?.whatsapp, waMsg);
   const audioPath = await getAdAudio(ad.id).catch(() => null);
 

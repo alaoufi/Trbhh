@@ -37,7 +37,13 @@ export function InstallPrompt({
       if (sessionStorage.getItem(sessionKey) === '1') return;   // أغلقها هذه الزيارة
     } catch { /* ignore */ }
 
-    const onPrompt = (e: Event) => { e.preventDefault(); setDeferred(e as BeforeInstallPromptEvent); setShow(true); };
+    const w = window as unknown as { __bipEvent?: BeforeInstallPromptEvent | null };
+    // حدث التقطه سكربت الـ layout قبل تحميل React
+    const pick = () => { const ev = w.__bipEvent; if (ev) { setDeferred(ev); setShow(true); } };
+    pick();
+    window.addEventListener('bipready', pick);
+
+    const onPrompt = (e: Event) => { e.preventDefault(); w.__bipEvent = e as BeforeInstallPromptEvent; setDeferred(e as BeforeInstallPromptEvent); setShow(true); };
     window.addEventListener('beforeinstallprompt', onPrompt);
 
     const ua = window.navigator.userAgent.toLowerCase();
@@ -47,7 +53,7 @@ export function InstallPrompt({
 
     const onInstalled = () => setShow(false);
     window.addEventListener('appinstalled', onInstalled);
-    return () => { window.removeEventListener('beforeinstallprompt', onPrompt); window.removeEventListener('appinstalled', onInstalled); if (t) clearTimeout(t); };
+    return () => { window.removeEventListener('bipready', pick); window.removeEventListener('beforeinstallprompt', onPrompt); window.removeEventListener('appinstalled', onInstalled); if (t) clearTimeout(t); };
   }, [inStoreCtx, scope, storageKey, neverKey, sessionKey]);
 
   // إغلاق مؤقّت: يختفي الآن ويعود في الزيارة القادمة حتى يُثبَّت الموقع.
@@ -57,6 +63,7 @@ export function InstallPrompt({
   const install = async () => {
     if (!deferred) return;
     try { await deferred.prompt(); await deferred.userChoice; } catch { /* ignore */ }
+    try { (window as unknown as { __bipEvent?: unknown }).__bipEvent = null; } catch { /* ignore */ }
     setDeferred(null);
     setShow(false);
     try { localStorage.setItem(neverKey, '1'); } catch { /* ignore */ }

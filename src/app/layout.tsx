@@ -90,6 +90,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           {children}
         </ChromeGate>
+        {/* التقاط حدث التثبيت مبكراً (قد يُطلق قبل تحميل React) وحفظه على window */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__bipEvent=e;try{window.dispatchEvent(new Event('bipready'))}catch(_){}});window.addEventListener('appinstalled',function(){window.__bipEvent=null;});",
+          }}
+        />
         <GeoPrompt />
         <ForceUpdateGate />
         <InstallPrompt />

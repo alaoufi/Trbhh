@@ -33,7 +33,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const isSub = host.endsWith('.' + SITE.domain) && host !== SITE.domain && !host.startsWith('www.');
   const start = isSub ? '/' : `/companies/${storeId}`;
 
-  const logo = s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '/icon-512.png';
+  const rawLogo = s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '';
+  const base = `https://${SITE.domain}`;
+  const logoAbs = rawLogo ? (rawLogo.startsWith('http') ? rawLogo : `${base}${rawLogo.startsWith('/') ? '' : '/'}${rawLogo}`) : '';
+  // نضمن دائماً أيقونات PNG صالحة (ٱلمنصّة) لتكتمل قابلية التثبيت، ونضع شعار المتجر أولاً كأيقونة مُفضّلة.
+  const icons: { src: string; sizes: string; type: string; purpose: string }[] = [];
+  if (logoAbs) icons.push({ src: logoAbs, sizes: '512x512', type: iconType(logoAbs), purpose: 'any' });
+  icons.push(
+    { src: `${base}/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: `${base}/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+    { src: `${base}/icon-maskable-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+  );
   const manifest = {
     id: start,
     name,
@@ -46,11 +56,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     theme_color: brand,
     lang: 'ar',
     dir: 'rtl',
-    icons: [
-      { src: logo, sizes: '192x192', type: iconType(logo), purpose: 'any' },
-      { src: logo, sizes: '512x512', type: iconType(logo), purpose: 'any' },
-      { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-    ],
+    icons,
   };
   return NextResponse.json(manifest, {
     headers: { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=300' },

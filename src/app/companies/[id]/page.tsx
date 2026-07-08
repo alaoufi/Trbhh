@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2, Plus, BarChart3, Megaphone, Eye } from 'lucide-react';
+import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2, Plus, BarChart3, Megaphone, Eye, LogIn } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { CopyLink } from '@/components/copy-link';
 import { getStore } from '@/lib/stores';
@@ -164,6 +164,11 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input name="q" defaultValue={query} placeholder="ابحث في المتجر" className="h-10 w-full rounded-full border bg-muted/40 pr-9 pl-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </form>
+          {!session && (
+            <Link href="/login" className="flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-bold text-white shadow-sm" style={{ background: brand }}>
+              <LogIn className="h-4 w-4" /> دخول
+            </Link>
+          )}
           {isOwner && meta.allowAds && (
             <Link href="/ads/new?dest=store" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="أضف إعلان"><Plus className="h-5 w-5" /></Link>
           )}

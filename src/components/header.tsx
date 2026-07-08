@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Store } from 'lucide-react';
+import { Store, LogIn } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { getCategories } from '@/lib/data';
@@ -29,6 +29,13 @@ export async function Header() {
 
         {/* بحث مصغّر: عدسة تفتح حقل البحث */}
         <HeaderSearch />
+
+        {/* تسجيل الدخول للزوّار غير المسجّلين */}
+        {!session && (
+          <Link href="/login" className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-primary/90">
+            <LogIn className="h-4 w-4" /> دخول
+          </Link>
+        )}
 
         {/* logo on the left (RTL: last child) */}
         <Link href="/" className="shrink-0">

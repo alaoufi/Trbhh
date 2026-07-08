@@ -19,8 +19,8 @@ function LoginInner() {
   return (
     <div className="mx-auto max-w-sm py-8">
       <div className="card-3d rounded-xl p-6">
-        <h1 className="mb-1 text-xl font-bold">تسجيل الدخول</h1>
-        <p className="mb-5 text-sm text-muted-foreground">ادخل بنفس بياناتك المسجّلة سابقاً.</p>
+        <h1 className="mb-1 text-xl font-bold">الدخول على تربح</h1>
+        <p className="mb-5 text-sm text-muted-foreground">دخول عضو منصّة تربح بنفس بياناتك المسجّلة سابقاً.</p>
         {reset && <p className="mb-3 rounded-lg border border-green-300 bg-green-50 p-2 text-sm font-bold text-green-800">تم تغيير كلمة المرور بنجاح، سجّل الدخول بها الآن.</p>}
         <form action={action} className="space-y-3">
           <input type="hidden" name="next" value={next} />
@@ -37,9 +37,6 @@ function LoginInner() {
         <p className="mt-4 text-center text-sm text-muted-foreground">
           ليس لديك حساب؟ <Link href="/register" className="text-primary hover:underline">أنشئ حساباً</Link>
         </p>
-        <div className="mt-3 border-t pt-3 text-center text-sm">
-          <Link href="/store-login" className="font-bold text-primary hover:underline">🏪 دخول أصحاب المتاجر (دخول مستقل للمتجر)</Link>
-        </div>
       </div>
     </div>
   );

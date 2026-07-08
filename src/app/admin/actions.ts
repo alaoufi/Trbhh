@@ -12,7 +12,7 @@ import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAcco
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_TRIAL_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -447,6 +447,7 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting(SETTING_SUB_6MO, nn('sub6mo'));
   await setSetting(SETTING_SUB_YEARLY, nn('subYearly'));
   await setSetting(SETTING_SUB_GRACE_DAYS, String(Math.max(0, parseInt(String(formData.get('subGraceDays') || '10')) || 10)));
+  await setSetting(SETTING_SUB_TRIAL_DAYS, nn('subTrialDays'));
   // تنبيهات قرب انتهاء الاشتراك: قبل كم يوم + كم مرة
   await setSetting(SETTING_SUB_REMIND_DAYS, nn('subRemindDays'));
   await setSetting(SETTING_SUB_REMIND_COUNT, nn('subRemindCount'));
@@ -473,6 +474,19 @@ export async function adminSetStoreSubAction(formData: FormData) {
   await adminSetStoreSub(storeId, until);
   revalidatePath(`/admin/stores`);
   redirect('/admin/revenue?saved=1');
+}
+
+/** Admin grants extra free days to a store (extend trial / comp time). */
+export async function grantStoreDaysAction(formData: FormData) {
+  await requireAction('stores', 'edit');
+  const storeId = toInt(BigInt(String(formData.get('storeId') || '0')));
+  const days = Math.max(1, parseInt(String(formData.get('days') || '0')) || 0);
+  if (storeId && days) {
+    const { adminGrantStoreDays } = await import('@/lib/subscription');
+    await adminGrantStoreDays(storeId, days);
+  }
+  revalidatePath('/admin/stores');
+  redirect('/admin/stores?granted=1');
 }
 
 /** Save the permission matrix for one role (checkbox keys named "k"). */

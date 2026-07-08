@@ -3,7 +3,7 @@ import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone
 import { requireAction } from '@/lib/roles';
 import { getPendingStores, adminStoreList, approvedTransfers, platformRequests, type AdminStore } from '@/lib/merchant';
 import { timeAgo } from '@/lib/utils';
-import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction } from '../actions';
+import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتاجر' };
@@ -94,6 +94,14 @@ function StoreCard({ s }: { s: AdminStore }) {
           <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="activate" /><button className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Play className="h-3.5 w-3.5" /> إعادة تفعيل</button></form>
         )}
       </div>
+
+      {/* منح أيام مجانية (تمديد التجربة أو تعويض) */}
+      <form action={grantStoreDaysAction} className="flex items-center gap-2 rounded-xl border-2 border-indigo-200 bg-indigo-50/40 p-2">
+        <input type="hidden" name="storeId" value={s.id} />
+        <span className="shrink-0 text-xs font-bold text-indigo-700">🎁 منح أيام:</span>
+        <input name="days" type="number" min={1} required placeholder="عدد الأيام" className="h-9 w-28 min-w-0 rounded-lg border bg-white px-2 text-xs outline-none" />
+        <button className="flex shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white">منح / تمديد التجربة</button>
+      </form>
 
       {/* إنذار مخالفة منتجات */}
       <form action={warnStoreAction} className="flex items-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50/40 p-2">

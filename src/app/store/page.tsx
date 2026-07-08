@@ -78,8 +78,16 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> اشتراك المتجر</div>
           {sub === 'ok' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ تم تجديد الاشتراك وخُصمت الرسوم من رصيدك.</div>}
           {sub === 'nocredit' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-700">الرصيد غير كافٍ — اشحن رصيدك من «محفظتي» ثم أعد المحاولة.</div>}
-          {subState.state === 'active' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ اشتراكك فعّال حتى {fmtDate(subState.until?.toISOString() ?? null)} (متبقٍ {en(Math.max(0, subState.daysLeft))} يوم).{subState.daysLeft <= 7 && ' يُستحسن التجديد قريباً.'}</div>}
-          {subState.state === 'grace' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">⚠️ انتهى اشتراكك. متجرك في <b>مهلة {en(subState.graceDays)} أيام</b> ({en(Math.max(0, subState.graceDaysLeft))} يوم متبقٍ) ثم يُخفى من العرض. جدّد الآن لتفادي الإيقاف — لن يُحذف شيء.</div>}
+          {subState.trial && subState.state === 'active' && (
+            <div className="rounded-lg bg-indigo-50 p-2 text-xs font-bold text-indigo-700">
+              🎁 فترة تجريبية مجانية — متبقٍ {en(Math.max(0, subState.daysLeft))} يوم حتى {fmtDate(subState.until?.toISOString() ?? null)}، ثم يبدأ الاشتراك. لتمديد التجربة <Link href="/messages/admin" className="underline">راسل الإدارة</Link>.
+            </div>
+          )}
+          {subState.trial && subState.state === 'grace' && (
+            <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">⚠️ انتهت فترتك التجريبية. متجرك في <b>مهلة {en(subState.graceDays)} أيام</b> ({en(Math.max(0, subState.graceDaysLeft))} يوم متبقٍ) ثم يُخفى. اشترك الآن أو <Link href="/messages/admin" className="underline">راسل الإدارة</Link> لتمديد التجربة.</div>
+          )}
+          {!subState.trial && subState.state === 'active' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ اشتراكك فعّال حتى {fmtDate(subState.until?.toISOString() ?? null)} (متبقٍ {en(Math.max(0, subState.daysLeft))} يوم).{subState.daysLeft <= 7 && ' يُستحسن التجديد قريباً.'}</div>}
+          {!subState.trial && subState.state === 'grace' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">⚠️ انتهى اشتراكك. متجرك في <b>مهلة {en(subState.graceDays)} أيام</b> ({en(Math.max(0, subState.graceDaysLeft))} يوم متبقٍ) ثم يُخفى من العرض. جدّد الآن لتفادي الإيقاف — لن يُحذف شيء.</div>}
           {subState.state === 'suspended' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">⛔ اشتراكك منتهٍ ومتجرك <b>مخفيّ من العرض</b> (بياناتك وإعلاناتك محفوظة). جدّد لإعادة الظهور فوراً.</div>}
           {subState.state === 'none' && <div className="rounded-lg bg-sky-50 p-2 text-xs font-bold text-sky-700">لم تشترك بعد. اشترك ليظهر متجرك للعملاء.</div>}
           <div className="grid grid-cols-3 gap-2">

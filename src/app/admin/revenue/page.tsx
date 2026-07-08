@@ -159,7 +159,11 @@ async function PricingTab() {
         <label className="space-y-1"><span className="text-xs font-bold">6 أشهر</span><input name="sub6mo" type="number" min={0} defaultValue={sub.sixmo} className={num} /></label>
         <label className="space-y-1"><span className="text-xs font-bold">سنوي</span><input name="subYearly" type="number" min={0} defaultValue={sub.yearly} className={num} /></label>
       </div>
-      <label className="block space-y-1"><span className="text-xs font-bold">مهلة السماح بعد الانتهاء (أيام) — يبقى المتجر محفوظاً ويُمنع من العرض فقط</span><input name="subGraceDays" type="number" min={0} defaultValue={sub.graceDays} className={num} /></label>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="space-y-1"><span className="text-xs font-bold">أيام التجربة المجانية عند فتح المتجر</span><input name="subTrialDays" type="number" min={0} defaultValue={sub.trialDays} className={num} /></label>
+        <label className="space-y-1"><span className="text-xs font-bold">مهلة السماح بعد الانتهاء (أيام)</span><input name="subGraceDays" type="number" min={0} defaultValue={sub.graceDays} className={num} /></label>
+      </div>
+      <p className="text-[11px] text-muted-foreground">التجربة تبدأ فور فتح المتجر ثم يبدأ الاشتراك. المهلة: يبقى المتجر محفوظاً ويُمنع من العرض فقط. (اكتب 0 لتعطيل التجربة).</p>
 
       <div className="rounded-xl border border-primary/15 bg-primary/5 p-3">
         <div className="mb-1 text-xs font-bold text-primary">تنبيهات قرب انتهاء الاشتراك</div>

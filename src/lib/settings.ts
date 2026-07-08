@@ -270,22 +270,24 @@ export const SETTING_SUB_MONTHLY = 'sub_store_monthly';
 export const SETTING_SUB_6MO = 'sub_store_6mo';
 export const SETTING_SUB_YEARLY = 'sub_store_yearly';
 export const SETTING_SUB_GRACE_DAYS = 'sub_grace_days';
+export const SETTING_SUB_TRIAL_DAYS = 'sub_trial_days'; // أيام التجربة المجانية عند فتح المتجر
 
 export type SubPlan = 'monthly' | 'sixmo' | 'yearly';
 export const SUB_PLAN_MONTHS: Record<SubPlan, number> = { monthly: 1, sixmo: 6, yearly: 12 };
 export const SUB_PLAN_LABELS: Record<SubPlan, string> = { monthly: 'شهري', sixmo: '6 أشهر', yearly: 'سنوي' };
 
-export type StoreSubPricing = { enabled: boolean; monthly: number; sixmo: number; yearly: number; graceDays: number };
+export type StoreSubPricing = { enabled: boolean; monthly: number; sixmo: number; yearly: number; graceDays: number; trialDays: number };
 export async function getStoreSubPricing(): Promise<StoreSubPricing> {
   const nn = (n: number) => Math.max(0, Math.round(n) || 0);
-  const [en, m, s, y, g] = await Promise.all([
+  const [en, m, s, y, g, t] = await Promise.all([
     getSettingBool(SETTING_SUB_ENABLED, false),
     getSettingNum(SETTING_SUB_MONTHLY, 0),
     getSettingNum(SETTING_SUB_6MO, 0),
     getSettingNum(SETTING_SUB_YEARLY, 0),
     getSettingNum(SETTING_SUB_GRACE_DAYS, 10),
+    getSettingNum(SETTING_SUB_TRIAL_DAYS, 10),
   ]);
-  return { enabled: en, monthly: nn(m), sixmo: nn(s), yearly: nn(y), graceDays: Math.max(0, Math.round(g) || 10) };
+  return { enabled: en, monthly: nn(m), sixmo: nn(s), yearly: nn(y), graceDays: Math.max(0, Math.round(g) || 10), trialDays: Math.max(0, Math.round(t)) };
 }
 export function subPlanPrice(p: StoreSubPricing, plan: SubPlan): number {
   return plan === 'monthly' ? p.monthly : plan === 'sixmo' ? p.sixmo : p.yearly;

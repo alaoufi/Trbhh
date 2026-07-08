@@ -16,13 +16,14 @@ export type StoreSub = {
   graceDaysLeft: number; // days left in grace before suspension
   enabled: boolean;
   graceDays: number;
+  trial: boolean;        // still within the free trial (never paid yet)
 };
 
 /** Compute a store's subscription state (enforcement respects the admin toggle). */
 export async function getStoreSub(storeId: number): Promise<StoreSub> {
   await ensure();
   const pricing = await getStoreSubPricing();
-  const row = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { sub_until: true } }).catch(() => null);
+  const row = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { sub_until: true, on_trial: true } }).catch(() => null);
   const until = row?.sub_until ? new Date(row.sub_until) : null;
   const now = Date.now();
   const graceMs = pricing.graceDays * 86400000;
@@ -37,7 +38,29 @@ export async function getStoreSub(storeId: number): Promise<StoreSub> {
   else if (graceUntil && graceUntil.getTime() >= now) state = 'grace';
   else state = 'suspended';
 
-  return { state, until, graceUntil, daysLeft, graceDaysLeft, enabled: pricing.enabled, graceDays: pricing.graceDays };
+  // "على تجربة" = ما زال ضمن الفترة المجانية ولم يدفع بعد
+  const trial = (row?.on_trial ?? 0) === 1 && (state === 'active' || state === 'grace');
+  return { state, until, graceUntil, daysLeft, graceDaysLeft, enabled: pricing.enabled, graceDays: pricing.graceDays, trial };
+}
+
+/** Start a store's free trial (called on store creation). No-op if trialDays<=0. */
+export async function startStoreTrial(userId: number): Promise<void> {
+  await ensure();
+  const { trialDays } = await getStoreSubPricing();
+  if (trialDays <= 0) return;
+  const until = new Date(Date.now() + trialDays * 86400000);
+  await prisma.stores.updateMany({ where: { user_id: userId }, data: { sub_until: until, on_trial: 1 } }).catch(() => {});
+}
+
+/** Admin grants extra free days (extends the trial / comps time). Keeps the trial flag. */
+export async function adminGrantStoreDays(storeId: number, days: number): Promise<void> {
+  await ensure();
+  const n = Math.max(1, Math.round(days) || 0);
+  if (!n) return;
+  const cur = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { sub_until: true } }).catch(() => null);
+  const base = cur?.sub_until && new Date(cur.sub_until).getTime() > Date.now() ? new Date(cur.sub_until) : new Date();
+  const until = new Date(base.getTime() + n * 86400000);
+  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { sub_until: until } }).catch(() => {});
 }
 
 /** Is the store hidden from public display due to an expired subscription? Owner/admin still see it. */
@@ -61,7 +84,8 @@ export async function subscribeStore(userId: number, plan: SubPlan): Promise<{ o
   const base = cur?.sub_until && new Date(cur.sub_until).getTime() > Date.now() ? new Date(cur.sub_until) : new Date();
   const until = new Date(base);
   until.setMonth(until.getMonth() + months);
-  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { sub_until: until } }).catch(() => {});
+  // أول دفعة تُنهي وضع التجربة المجانية
+  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { sub_until: until, on_trial: 0 } }).catch(() => {});
   return { ok: true, until };
 }
 

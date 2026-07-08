@@ -99,6 +99,9 @@ export async function saveCompanyAction(formData: FormData) {
     await prisma.stores.create({ data: { user_id: session.uid, description, address, logo: logoId ?? 0 } });
     await markStorePending(session.uid); // new store waits for admin approval
     await agreeStoreTerms(session.uid);
+    // منح فترة تجربة مجانية عند فتح المتجر (تبدأ فور الإنشاء)
+    const { startStoreTrial } = await import('@/lib/subscription');
+    await startStoreTrial(session.uid);
   }
   await saveStoreMeta(session.uid, { storeName, color, about, banner, tagline, layout, catalog, fields, since, specialty, audience, nationalId, phone, email, contacts });
   if (handle || existing) await setStoreHandle(session.uid, handle);

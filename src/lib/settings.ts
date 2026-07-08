@@ -38,6 +38,36 @@ export async function getMsgDeleteMinutes(): Promise<number> {
   return getSettingNum(SETTING_MSG_DELETE_MINUTES, 0);
 }
 
+/* Quick-reply message templates (نصوص جاهزة) shown above the chat compose box so
+   the sender can pick a ready phrase. Stored one-per-line; blank => hidden.
+   Trbhh (platform) owns two sets — messaging an ad owner, and messaging the
+   administration. Stores keep their OWN templates in store settings (merchant.ts). */
+export const SETTING_MSG_TPL_AD = 'msg_tpl_ad';
+export const SETTING_MSG_TPL_ADMIN = 'msg_tpl_admin';
+export const DEFAULT_MSG_TPL_AD = 'السلام عليكم، هل يمكنني الحصول على مزيد من المعلومات حول هذا الإعلان؟';
+export const DEFAULT_MSG_TPL_ADMIN = 'السلام عليكم، لديّ استفسار حول ...';
+
+/** Parse a newline-separated templates blob into a clean list (≤12, ≤300 chars each). */
+export function parseTemplates(raw: string | null | undefined): string[] {
+  return (raw || '')
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => s.slice(0, 300))
+    .slice(0, 12);
+}
+
+/** Templates shown when a member messages an ad owner (unset => a sensible default). */
+export async function getAdMsgTemplates(): Promise<string[]> {
+  const v = await getSetting(SETTING_MSG_TPL_AD, '__default__');
+  return v === '__default__' ? [DEFAULT_MSG_TPL_AD] : parseTemplates(v);
+}
+/** Templates shown when a member messages the administration (unset => a default). */
+export async function getAdminMsgTemplates(): Promise<string[]> {
+  const v = await getSetting(SETTING_MSG_TPL_ADMIN, '__default__');
+  return v === '__default__' ? [DEFAULT_MSG_TPL_ADMIN] : parseTemplates(v);
+}
+
 /* Which stat cards show on the home page (CSV of keys; unset => all). */
 export const SETTING_SHOW_STATS = 'show_home_stats'; // legacy on/off (kept for compat)
 export const SETTING_HOME_STATS = 'home_stats';

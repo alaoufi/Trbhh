@@ -117,6 +117,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             <input type="checkbox" name="allowReviews" defaultChecked={meta?.allowReviews ?? true} className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
             <span><b className="flex items-center gap-1"><MessageSquare className="h-4 w-4" /> فتح التعليقات والتقييم</b><span className="block text-xs text-muted-foreground">عند الإيقاف تُقفل تقييمات وتعليقات العملاء في صفحة المتجر.</span></span>
           </label>
+          <div className="rounded-xl border p-3">
+            <b className="flex items-center gap-1 text-sm"><MessageSquare className="h-4 w-4" /> نصوص مراسلة المتجر الجاهزة</b>
+            <span className="mt-0.5 block text-xs text-muted-foreground">نصوص تظهر لعملاء متجرك فوق مربّع المحادثة ليختاروا منها بسرعة. كل سطر = نص مستقل. اتركها فارغة لإخفائها. (خاصّة بمتجرك — مستقلّة عن نصوص تربح).</span>
+            <textarea name="msgTemplates" rows={3} defaultValue={meta?.msgTemplates ?? ''} placeholder={'السلام عليكم، هل هذا المنتج متوفّر؟\nما هي طرق التوصيل والدفع؟'} className="mt-2 w-full rounded-lg border bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </div>
           <Button size="sm">حفظ الإعدادات</Button>
         </form>
       )}

@@ -13,7 +13,7 @@ function fmtTime(at: string | null): string {
   }
 }
 
-export function ChatRoom({ peerId, initial, deleteWindowMin = 0 }: { peerId: number; initial: Msg[]; deleteWindowMin?: number }) {
+export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] }: { peerId: number; initial: Msg[]; deleteWindowMin?: number; templates?: string[] }) {
   const canDelete = (m: Msg) => {
     if (!m.fromMe) return false;
     if (!deleteWindowMin) return true; // unlimited
@@ -25,7 +25,14 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0 }: { peerId: num
   const [text, setText] = useState('');
   const lastIdRef = useRef<number>(initial.reduce((m, x) => Math.max(m, x.id), 0));
   const boxRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const typingSentRef = useRef<number>(0);
+
+  // نص جاهز → يملأ مربّع الكتابة ليعدّله المُرسِل قبل الإرسال
+  const applyTemplate = (t: string) => {
+    setText(t);
+    inputRef.current?.focus();
+  };
 
   useEffect(() => {
     const el = boxRef.current;
@@ -163,8 +170,25 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0 }: { peerId: num
         )}
       </div>
 
+      {/* نصوص جاهزة — تظهر ما دام مربّع الكتابة فارغاً؛ الضغط يملؤه للتعديل */}
+      {templates.length > 0 && !text.trim() && (
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {templates.map((t, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => applyTemplate(t)}
+              className="shrink-0 whitespace-nowrap rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+            >
+              {t.length > 42 ? t.slice(0, 42) + '…' : t}
+            </button>
+          ))}
+        </div>
+      )}
+
       <form onSubmit={send} className="mt-3 flex gap-2">
         <input
+          ref={inputRef}
           value={text}
           onChange={(e) => onType(e.target.value)}
           autoComplete="off"

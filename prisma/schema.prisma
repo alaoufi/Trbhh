@@ -849,6 +849,7 @@ model stores {
   handle           String?   @unique(map: "uniq_store_handle") @db.VarChar(32)
   allow_ads        Int       @default(1) @db.TinyInt
   allow_reviews    Int       @default(1) @db.TinyInt
+  msg_templates    String?   @db.Text
   store_password   String?   @db.VarChar(255)
   store_username   String?   @unique(map: "uniq_store_username") @db.VarChar(60)
   views            Int       @default(0)

@@ -46,6 +46,7 @@ export async function saveStoreSettingsAction(formData: FormData) {
   await saveStoreSettings(session.uid, {
     allowAds: formData.get('allowAds') !== null,
     allowReviews: formData.get('allowReviews') !== null,
+    msgTemplates: String(formData.get('msgTemplates') || ''),
   });
   revalidatePath('/store');
   revalidatePath('/');

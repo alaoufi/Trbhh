@@ -18,14 +18,14 @@ async function logoUrl(logoId: number | null): Promise<string> {
  */
 const ensure = ensureSchema;
 
-export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; onPlatform: boolean; handle: string | null; nationalId: string | null; phone: string | null; email: string | null; contacts: string | null; termsAgreed: boolean; termsAgreedAt: string | null; allowAds: boolean; allowReviews: boolean; status: number };
+export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; onPlatform: boolean; handle: string | null; nationalId: string | null; phone: string | null; email: string | null; contacts: string | null; termsAgreed: boolean; termsAgreedAt: string | null; allowAds: boolean; allowReviews: boolean; msgTemplates: string | null; status: number };
 
 export async function getStoreMeta(storeId: number): Promise<StoreMeta> {
   await ensure();
   const r = Number.isInteger(storeId) && storeId > 0
     ? await prisma.stores.findUnique({ where: { id: BigInt(storeId) } }).catch(() => null)
     : null;
-  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, since: r?.activity_since ?? null, specialty: r?.specialty ?? null, audience: r?.audience ?? null, onPlatform: (r?.show_on_platform ?? 0) === 1, handle: r?.handle ?? null, nationalId: r?.national_id ?? null, phone: r?.store_phone ?? null, email: r?.store_email ?? null, contacts: r?.contacts ?? null, termsAgreed: (r?.terms_agreed ?? 0) === 1, termsAgreedAt: r?.terms_agreed_at ? r.terms_agreed_at.toISOString() : null, allowAds: (r?.allow_ads ?? 1) === 1, allowReviews: (r?.allow_reviews ?? 1) === 1, status: r?.status ?? 1 };
+  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, since: r?.activity_since ?? null, specialty: r?.specialty ?? null, audience: r?.audience ?? null, onPlatform: (r?.show_on_platform ?? 0) === 1, handle: r?.handle ?? null, nationalId: r?.national_id ?? null, phone: r?.store_phone ?? null, email: r?.store_email ?? null, contacts: r?.contacts ?? null, termsAgreed: (r?.terms_agreed ?? 0) === 1, termsAgreedAt: r?.terms_agreed_at ? r.terms_agreed_at.toISOString() : null, allowAds: (r?.allow_ads ?? 1) === 1, allowReviews: (r?.allow_reviews ?? 1) === 1, msgTemplates: r?.msg_templates ?? null, status: r?.status ?? 1 };
 }
 
 /* ---- Warnings & admin store oversight ---- */
@@ -128,10 +128,13 @@ export async function saveStoreMeta(userId: number, data: { storeName: string; c
   }).catch(() => {});
 }
 
-/** Store owner toggles: allow publishing ads, and lock/unlock reviews+comments. */
-export async function saveStoreSettings(userId: number, data: { allowAds: boolean; allowReviews: boolean }) {
+/** Store owner toggles: allow publishing ads, lock/unlock reviews+comments, and
+ *  the store's OWN quick-reply message templates (shown only to its customers). */
+export async function saveStoreSettings(userId: number, data: { allowAds: boolean; allowReviews: boolean; msgTemplates: string }) {
   await ensure();
-  await prisma.stores.updateMany({ where: { user_id: userId }, data: { allow_ads: data.allowAds ? 1 : 0, allow_reviews: data.allowReviews ? 1 : 0 } }).catch(() => {});
+  const { parseTemplates } = await import('./settings');
+  const tpl = parseTemplates(data.msgTemplates).join('\n');
+  await prisma.stores.updateMany({ where: { user_id: userId }, data: { allow_ads: data.allowAds ? 1 : 0, allow_reviews: data.allowReviews ? 1 : 0, msg_templates: tpl || null } }).catch(() => {});
 }
 
 /** Record that the owner agreed to the store terms (accountability). */

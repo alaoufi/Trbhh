@@ -19,6 +19,14 @@ function LoginInner() {
   return (
     <div className="mx-auto max-w-sm py-8">
       <div className="card-3d rounded-xl p-6">
+        {/* مبدّل واضح: الدخول على تربح أو على المتجر */}
+        <div className="mb-4">
+          <div className="mb-1.5 text-center text-xs font-bold text-muted-foreground">الدخول على</div>
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-secondary/50 p-1 text-sm font-bold">
+            <span className="rounded-lg bg-primary py-2 text-center text-white shadow">تربح</span>
+            <Link href="/store-login" className="rounded-lg py-2 text-center text-muted-foreground transition hover:bg-white/70">المتجر</Link>
+          </div>
+        </div>
         <h1 className="mb-1 text-xl font-bold">الدخول على تربح</h1>
         <p className="mb-5 text-sm text-muted-foreground">دخول عضو منصّة تربح بنفس بياناتك المسجّلة سابقاً.</p>
         {reset && <p className="mb-3 rounded-lg border border-green-300 bg-green-50 p-2 text-sm font-bold text-green-800">تم تغيير كلمة المرور بنجاح، سجّل الدخول بها الآن.</p>}

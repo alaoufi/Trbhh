@@ -23,14 +23,14 @@ export async function Header() {
         {!session ? (
           <Link
             href="/login"
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95"
+            className="btn-3d flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white"
           >
             <LogIn className="h-5 w-5" /> تسجيل الدخول
           </Link>
         ) : myStoreId > 0 ? (
           <Link
             href={`/companies/${myStoreId}`}
-            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95"
+            className="btn-3d flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white"
           >
             <Store className="h-5 w-5" /> رابط المتجر
           </Link>

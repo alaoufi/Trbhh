@@ -17,6 +17,7 @@ import { DisclaimerBar } from '@/components/disclaimer';
 import { StoreBottomNav } from '@/components/store-bottomnav';
 import { StoreContactLink } from '@/components/store-contact-link';
 import { StoreCatalog } from '@/components/store-catalog';
+import { InstallPrompt } from '@/components/install-prompt';
 import { waLink } from '@/lib/classified-theme';
 import { bannerBackground, storeTier, isLightColor, layoutTokens, isCatalogStyle, DEFAULT_CATALOG_FIELDS } from '@/lib/store-style';
 import { timeAgo } from '@/lib/utils';
@@ -41,6 +42,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title: { absolute: name },
     description: desc,
     alternates: { canonical: url },
+    // manifest خاص بالمتجر → يُثبَّت كتطبيق مستقل باسمه وشعاره ولونه
+    manifest: `/api/store-manifest/${s.id}`,
     openGraph: {
       type: 'website', locale: 'ar_SA', siteName: name, title: name, description: desc, url,
       images: [{ url: logoAbs, width: 512, height: 512, alt: name }],
@@ -149,6 +152,9 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
 
   return (
     <div className="min-h-screen bg-muted/20 pb-24">
+      {/* تثبيت المتجر كتطبيق مستقل (لغير المالك) */}
+      {!isOwner && <InstallPrompt scope="store" name={name} brand={brand} storageKey={`trbhh_install_store_${storeId}`} />}
+
       {/* ===== شريط علوي: بحث داخل المتجر (مستقل) ===== */}
       <div className="sticky top-0 z-30 border-b bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-3 py-2">

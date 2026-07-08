@@ -144,7 +144,6 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
           <Item href="/pages/privacy" icon={Shield} onClick={close}>سياسة الخصوصية</Item>
           <Item href="/pages/terms" icon={FileText} onClick={close}>الشروط والأحكام</Item>
           {isAdmin && <Item href="/admin" icon={Shield} onClick={close}>لوحة الإدارة</Item>}
-          {isAdmin && <Item href="/admin/guide" icon={BookOpen} onClick={close}>دليل الإدارة</Item>}
         </div>
 
         <div className="border-t border-primary/15 p-3">

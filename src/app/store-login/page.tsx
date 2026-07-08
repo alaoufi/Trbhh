@@ -39,16 +39,6 @@ export default async function StoreLoginPage({ searchParams }: { searchParams: P
 
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center gap-4 px-6" style={{ background: `linear-gradient(160deg, ${brand}14, transparent 60%)` }}>
-      {/* مبدّل واضح (يظهر في الدخول العام غير المرتبط بمتجر محدّد) */}
-      {!store && (
-        <div className="w-full">
-          <div className="mb-1.5 text-center text-xs font-bold text-muted-foreground">الدخول على</div>
-          <div className="grid grid-cols-2 gap-1 rounded-xl bg-secondary/50 p-1 text-sm font-bold">
-            <Link href="/login" className="rounded-lg py-2 text-center text-muted-foreground transition hover:bg-white/70">تربح</Link>
-            <span className="rounded-lg bg-primary py-2 text-center text-white shadow">المتجر</span>
-          </div>
-        </div>
-      )}
       {store ? (
         <span className="relative grid h-16 w-16 place-items-center overflow-hidden rounded-2xl border-4 border-white shadow-lg" style={{ background: brand }}>
           <Image src={store.logo} alt={store.name} fill sizes="64px" className="object-cover" />

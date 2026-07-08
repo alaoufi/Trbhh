@@ -275,6 +275,22 @@ button:active { }
   .float-3d { animation: none; }
 }
 
+/* animated «open your store» banner: shifting vivid gradient + shimmer sweep */
+.store-cta-anim { background-size: 220% 220%; animation: store-cta-shift 6s ease-in-out infinite; }
+@keyframes store-cta-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.shimmer-sweep { animation: shimmer-sweep 2.8s ease-in-out infinite; }
+@keyframes shimmer-sweep {
+  0%   { transform: translateX(-160%) skewX(-20deg); }
+  60%, 100% { transform: translateX(320%) skewX(-20deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .store-cta-anim, .shimmer-sweep { animation: none; }
+}
+
 /* indeterminate upload progress bar */
 .progress-indeterminate { position: relative; overflow: hidden; }
 .progress-indeterminate::after {

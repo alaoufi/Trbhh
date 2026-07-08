@@ -120,6 +120,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             <span><b className="flex items-center gap-1"><MessageSquare className="h-4 w-4" /> فتح التعليقات والتقييم</b><span className="block text-xs text-muted-foreground">عند الإيقاف تُقفل تقييمات وتعليقات العملاء في صفحة المتجر.</span></span>
           </label>
           <div className="rounded-xl border p-3">
+            <b className="flex items-center gap-1 text-sm"><Megaphone className="h-4 w-4" /> إعلان/تنويه أعلى المتجر</b>
+            <span className="mt-0.5 block text-xs text-muted-foreground">نص يظهر بارزاً أعلى واجهة متجرك (عرض، ساعات العمل، ملاحظة...). اتركه فارغاً لإخفائه.</span>
+            <textarea name="announce" rows={2} maxLength={300} defaultValue={meta?.announce ?? ''} placeholder="مثال: خصم ٢٠٪ هذا الأسبوع • التوصيل خلال ٢٤ ساعة" className="mt-2 w-full rounded-lg border bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </div>
+          <div className="rounded-xl border p-3">
             <b className="flex items-center gap-1 text-sm"><MessageSquare className="h-4 w-4" /> نصوص مراسلة المتجر الجاهزة</b>
             <span className="mt-0.5 block text-xs text-muted-foreground">نصوص تظهر لعملاء متجرك داخل مربّع المحادثة ليعدّلوها ويرسلوها، وتُعبَّأ في واتساب عند التواصل. كل سطر = نص مستقل. اتركها فارغة لإخفائها. (خاصّة بمتجرك — مستقلّة عن نصوص تربح).</span>
             <textarea name="msgTemplates" rows={3} defaultValue={meta?.msgTemplates ?? ''} placeholder={'السلام عليكم، هل هذا المنتج متوفّر؟\nما هي طرق التوصيل والدفع؟'} className="mt-2 w-full rounded-lg border bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />

@@ -175,6 +175,14 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           <div className="rounded-xl border bg-white p-3 text-sm font-bold text-amber-700 shadow-sm">⏳ هذا المتجر {meta.status === 0 ? 'بانتظار موافقة الإدارة' : 'موقوف'} — يظهر لك فقط حالياً.</div>
         )}
 
+        {/* إعلان/تنويه المتجر — نص يتحكّم به صاحب المتجر (استقلالية تامة) */}
+        {meta.announce && (
+          <div className="flex items-start gap-2 rounded-xl border-2 p-3 text-sm font-bold shadow-sm" style={{ borderColor: `${brand}40`, background: `${brand}0d`, color: brand }}>
+            <Megaphone className="mt-0.5 h-5 w-5 shrink-0" />
+            <span className="whitespace-pre-line leading-6">{meta.announce}</span>
+          </div>
+        )}
+
         {/* ===== رأس المتجر بهويته البصرية (حسب القالب) ===== */}
         <div className={`overflow-hidden bg-white shadow-md ring-1 ring-black/5 ${tk.card}`}>
           <div className={`relative w-full ${tk.hero}`} style={{ background: bannerBackground(meta.banner, brand) }}>

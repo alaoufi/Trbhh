@@ -75,6 +75,24 @@ export async function getAdNotice(): Promise<string> {
   return getSetting(SETTING_AD_NOTICE, DEFAULT_AD_NOTICE);
 }
 
+/* Site-wide + home-page editable texts (تبويب النصوص → عام / الرئيسية). */
+export const SETTING_TICKER = 'ticker_note';
+export const DEFAULT_TICKER = 'منصة تربح وسيلة عرض وربط فقط، والتعامل والدفع يتمّ خارج المنصة مباشرة بين الطرفين';
+export const SETTING_HOME_CLS_TITLE = 'home_cls_title';
+export const DEFAULT_HOME_CLS_TITLE = 'الإعلانات المبوّبة';
+export const SETTING_HOME_CLS_SUB = 'home_cls_sub';
+export const DEFAULT_HOME_CLS_SUB = 'تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي';
+export async function getTickerNote(): Promise<string> {
+  return getSetting(SETTING_TICKER, DEFAULT_TICKER);
+}
+export async function getHomeClassifiedText(): Promise<{ title: string; sub: string }> {
+  const [title, sub] = await Promise.all([
+    getSetting(SETTING_HOME_CLS_TITLE, DEFAULT_HOME_CLS_TITLE),
+    getSetting(SETTING_HOME_CLS_SUB, DEFAULT_HOME_CLS_SUB),
+  ]);
+  return { title, sub };
+}
+
 /* Which stat cards show on the home page (CSV of keys; unset => all). */
 export const SETTING_SHOW_STATS = 'show_home_stats'; // legacy on/off (kept for compat)
 export const SETTING_HOME_STATS = 'home_stats';

@@ -13,7 +13,7 @@ import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { PromoSlot } from '@/components/promo-slot';
 import { DisclaimerBar } from '@/components/disclaimer';
-import { getHomeStats } from '@/lib/settings';
+import { getHomeStats, getHomeClassifiedText } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
 import { getInterests } from '@/lib/interests';
 import { homeFeaturedAds, homeStoreCards } from '@/lib/merchant';
@@ -39,13 +39,14 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ cats?: string }> }) {
   const { cats } = await searchParams;
-  const [categories, featured, latest, mostViewed, stats, homeStats] = await Promise.all([
+  const [categories, featured, latest, mostViewed, stats, homeStats, clsText] = await Promise.all([
     getCategories(),
     getFeaturedAds(8),
     getLatestAds(12),
     getMostViewedAds(8),
     getStats(),
     getHomeStats().catch(() => new Set(['ads', 'users', 'views', 'cats'])),
+    getHomeClassifiedText().catch(() => ({ title: 'الإعلانات المبوّبة', sub: 'تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي' })),
   ]);
   const catsParam = (cats || '').split(',').map((n) => parseInt(n, 10)).filter((n) => Number.isFinite(n) && n > 0);
   const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
@@ -109,8 +110,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <span className="flex items-center gap-3">
           <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary"><Sparkles className="h-6 w-6" /></span>
           <span>
-            <span className="block font-bold text-primary">الإعلانات المبوّبة</span>
-            <span className="block text-xs text-muted-foreground">تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي</span>
+            <span className="block font-bold text-primary">{clsText.title}</span>
+            <span className="block text-xs text-muted-foreground">{clsText.sub}</span>
           </span>
         </span>
         <ChevronLeft className="h-5 w-5 shrink-0 text-primary" />

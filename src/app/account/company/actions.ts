@@ -50,6 +50,7 @@ export async function saveStoreSettingsAction(formData: FormData) {
     allowReviews: formData.get('allowReviews') !== null,
     msgTemplates: String(formData.get('msgTemplates') || ''),
     hidden,
+    announce: String(formData.get('announce') || ''),
   });
   revalidatePath('/store');
   revalidatePath('/');

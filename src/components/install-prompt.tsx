@@ -24,12 +24,18 @@ export function InstallPrompt({
   const [show, setShow] = useState(false);
   const [ios, setIos] = useState(false);
 
+  const neverKey = storageKey;              // «لا تظهر لاحقاً» دائم
+  const sessionKey = `${storageKey}_s`;      // إغلاق مؤقّت لهذه الزيارة فقط
+
   useEffect(() => {
     if (scope === 'site' && inStoreCtx) return; // لافتة تربح لا تظهر داخل المتاجر
     const standalone = window.matchMedia?.('(display-mode: standalone)').matches
       || (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-    if (standalone) return;
-    try { if (localStorage.getItem(storageKey) === '1') return; } catch { /* ignore */ }
+    if (standalone) return; // مثبّت بالفعل
+    try {
+      if (localStorage.getItem(neverKey) === '1') return;       // رفضها نهائياً
+      if (sessionStorage.getItem(sessionKey) === '1') return;   // أغلقها هذه الزيارة
+    } catch { /* ignore */ }
 
     const onPrompt = (e: Event) => { e.preventDefault(); setDeferred(e as BeforeInstallPromptEvent); setShow(true); };
     window.addEventListener('beforeinstallprompt', onPrompt);
@@ -42,14 +48,18 @@ export function InstallPrompt({
     const onInstalled = () => setShow(false);
     window.addEventListener('appinstalled', onInstalled);
     return () => { window.removeEventListener('beforeinstallprompt', onPrompt); window.removeEventListener('appinstalled', onInstalled); if (t) clearTimeout(t); };
-  }, [inStoreCtx, scope, storageKey]);
+  }, [inStoreCtx, scope, storageKey, neverKey, sessionKey]);
 
-  const close = () => { setShow(false); try { localStorage.setItem(storageKey, '1'); } catch { /* ignore */ } };
+  // إغلاق مؤقّت: يختفي الآن ويعود في الزيارة القادمة حتى يُثبَّت الموقع.
+  const close = () => { setShow(false); try { sessionStorage.setItem(sessionKey, '1'); } catch { /* ignore */ } };
+  // «لا تظهر لاحقاً»: إخفاء دائم.
+  const never = () => { setShow(false); try { localStorage.setItem(neverKey, '1'); } catch { /* ignore */ } };
   const install = async () => {
     if (!deferred) return;
     try { await deferred.prompt(); await deferred.userChoice; } catch { /* ignore */ }
     setDeferred(null);
-    close();
+    setShow(false);
+    try { localStorage.setItem(neverKey, '1'); } catch { /* ignore */ }
   };
 
   if (!show) return null;
@@ -66,6 +76,7 @@ export function InstallPrompt({
           ) : (
             <p className="truncate text-[11px] opacity-90">وصول أسرع من سطح المكتب/الشاشة الرئيسية.</p>
           )}
+          <button onClick={never} className="mt-0.5 text-[10px] font-medium text-white/75 underline underline-offset-2 hover:text-white">لا تظهر لاحقاً</button>
         </div>
         {!ios && (
           <button onClick={install} className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-extrabold shadow" style={{ color: bg }}>

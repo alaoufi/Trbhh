@@ -203,6 +203,16 @@ export async function storeCatalogAds(storeId: number, ownerUserId: number) {
   return (await getMyAds(ownerUserId)).filter((a) => a.status === 1 && ids.has(a.id));
 }
 
+/** Real view counts (from ads_views) for a set of ad ids → Map(adId → count). */
+export async function adViewCounts(ids: number[]): Promise<Map<number, number>> {
+  const uniq = [...new Set(ids.filter((n) => Number.isInteger(n) && n > 0))];
+  if (!uniq.length) return new Map();
+  const rows = await prisma.ads_views
+    .groupBy({ by: ['ads_id'], where: { ads_id: { in: uniq.map((n) => BigInt(n)) } }, _count: { _all: true } })
+    .catch(() => [] as { ads_id: bigint; _count: { _all: number } }[]);
+  return new Map(rows.map((r) => [Number(r.ads_id), r._count._all]));
+}
+
 /** Does this user own an admin-approved store? (its ads publish directly). */
 export async function isApprovedStoreOwner(userId: number): Promise<boolean> {
   await ensure();
@@ -535,6 +545,8 @@ export async function collaboratorAds(storeId: number) {
     const a = (await storeCatalogAds(toInt(s.id), Number(s.user_id))).slice(0, 4);
     for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, views: 0, sellerName: null, sellerTrusted: false });
   }
+  const vc = await adViewCounts(out.map((o) => o.id));
+  for (const o of out) o.views = vc.get(o.id) ?? 0;
   return out.slice(0, 12);
 }
 
@@ -576,6 +588,8 @@ async function loadHomeFeaturedAds() {
     const a = (await storeCatalogAds(st.storeId, st.userId)).slice(0, 4);
     for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, views: 0, sellerName: null, sellerTrusted: false, storeName: label, storeId: st.storeId });
   }
+  const vc = await adViewCounts(out.map((o) => o.id));
+  for (const o of out) o.views = vc.get(o.id) ?? 0;
   return out.slice(0, 12);
 }
 

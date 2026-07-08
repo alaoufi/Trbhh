@@ -11,7 +11,7 @@ import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { recordStoreVisit, classifySource, bumpStoreView, getStoreViews } from '@/lib/store-analytics';
 import { isStoreSubBlocked } from '@/lib/subscription';
-import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle, parseHiddenFields } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle, parseHiddenFields, adViewCounts } from '@/lib/merchant';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { StoreBottomNav } from '@/components/store-bottomnav';
@@ -115,7 +115,9 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   // independent catalog: ONLY the ads the merchant added to the store — never
   // all their platform ads. Empty until the owner showcases products.
   const inStore = new Set(productIds);
-  const allActive = myAds.filter((a) => a.status === 1 && inStore.has(a.id)).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
+  const inStoreAds = myAds.filter((a) => a.status === 1 && inStore.has(a.id));
+  const viewsById = await adViewCounts(inStoreAds.map((a) => a.id)).catch(() => new Map<number, number>());
+  const allActive = inStoreAds.map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: viewsById.get(a.id) ?? 0, sellerName: null, sellerTrusted: false }));
   const active = query ? allActive.filter((a) => (a.title || '').includes(query)) : allActive;
   // نص واتساب للمتجر: نص المتجر إن وُجد، وإلا نصّ افتراضي (لا يظهر فارغاً)
   const { parseTemplates, fillTemplate } = await import('@/lib/settings');

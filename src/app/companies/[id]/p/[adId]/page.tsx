@@ -171,8 +171,8 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
           <ShareButtons url={shareUrl} title={`${ad.title} — ${name}`} />
         </div>
 
-        <p className="rounded-xl border p-3 text-center text-xs font-medium text-muted-foreground" style={{ borderColor: `${brand}33` }}>
-          التعامل والدفع يتم مباشرة بين الطرفين. المتجر مسؤول عن عرضه.
+        <p className="whitespace-pre-line rounded-xl border p-3 text-center text-xs font-medium text-muted-foreground" style={{ borderColor: `${brand}33` }}>
+          {meta.productNote?.trim() || 'التعامل والدفع يتم مباشرة بين الطرفين. المتجر مسؤول عن عرضه.'}
         </p>
       </div>
 

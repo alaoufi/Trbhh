@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { timeAgo } from '@/lib/utils';
 import { getMyAds } from '@/lib/account';
 import { getSellerRating, getUserReviews, canReview } from '@/lib/reviews';
+import { getEmptyText } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
 import { AdGrid } from '@/components/ad-card';
 import { Stars } from '@/components/stars';
@@ -93,7 +94,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
               <span className="text-xs text-muted-foreground">{timeAgo(r.createdAt)}</span>
             </li>
           ))}
-          {reviews.length === 0 && <p className="text-sm text-muted-foreground">لا توجد تقييمات بعد.</p>}
+          {reviews.length === 0 && <p className="text-sm text-muted-foreground">{await getEmptyText('reviews').catch(() => 'لا توجد تقييمات بعد.')}</p>}
         </ul>
       </section>
     </div>

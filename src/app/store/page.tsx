@@ -130,6 +130,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             <textarea name="msgTemplates" rows={3} defaultValue={meta?.msgTemplates ?? ''} placeholder={'السلام عليكم، هل هذا المنتج متوفّر؟\nما هي طرق التوصيل والدفع؟'} className="mt-2 w-full rounded-lg border bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </div>
           <div className="rounded-xl border p-3">
+            <b className="flex items-center gap-1 text-sm"><ShieldCheck className="h-4 w-4" /> تنويه صفحة المنتج</b>
+            <span className="mt-0.5 block text-xs text-muted-foreground">نص يظهر أسفل صفحة منتج متجرك (سياسة التوصيل/الإرجاع، مسؤولية المتجر...). اتركه فارغاً لاستخدام النص الافتراضي.</span>
+            <textarea name="productNote" rows={2} maxLength={300} defaultValue={meta?.productNote ?? ''} placeholder="مثال: التوصيل خلال ٢٤ ساعة • الاستبدال خلال ٣ أيام" className="mt-2 w-full rounded-lg border bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </div>
+          <div className="rounded-xl border p-3">
             <b className="flex items-center gap-1 text-sm"><SlidersHorizontal className="h-4 w-4" /> إظهار / إخفاء عناصر المتجر</b>
             <span className="mt-0.5 mb-2 block text-xs text-muted-foreground">اختر ما يظهر لزوّار متجرك. متجرك مستقل — تتحكم بعناصره كما تريد.</span>
             <div className="grid grid-cols-2 gap-2">

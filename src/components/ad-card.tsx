@@ -206,7 +206,9 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
 
 export async function AdGrid({ ads, className }: { ads: AdCardType[]; className?: string }) {
   if (!ads.length) {
-    return <p className="py-12 text-center text-muted-foreground">لا توجد إعلانات لعرضها حالياً.</p>;
+    const { getEmptyText } = await import('@/lib/settings');
+    const msg = await getEmptyText('ads').catch(() => 'لا توجد إعلانات لعرضها حالياً.');
+    return <p className="py-12 text-center text-muted-foreground">{msg}</p>;
   }
   const design = (await cookies()).get('design')?.value || '';
   if (design === 'shop') {

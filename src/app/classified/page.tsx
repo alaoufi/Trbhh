@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Sparkles, Plus, Check } from 'lucide-react';
 import { getClassifieds } from '@/lib/classified';
+import { getEmptyText } from '@/lib/settings';
 import { ClassifiedGrid } from '@/components/classified-card';
 import { DisclaimerBar } from '@/components/disclaimer';
 
@@ -9,6 +10,7 @@ export const metadata = { title: 'الإعلانات المبوّبة' };
 
 export default async function ClassifiedPage({ searchParams }: { searchParams: Promise<{ created?: string }> }) {
   const [items, sp] = await Promise.all([getClassifieds(60), searchParams]);
+  const emptyClassified = await getEmptyText('classified').catch(() => 'لا توجد إعلانات مبوّبة بعد.');
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -29,7 +31,7 @@ export default async function ClassifiedPage({ searchParams }: { searchParams: P
 
       {items.length === 0 ? (
         <div className="card-3d rounded-2xl p-8 text-center">
-          <p className="text-muted-foreground">لا توجد إعلانات مبوّبة بعد.</p>
+          <p className="text-muted-foreground">{emptyClassified}</p>
           <Link href="/classified/new" className="mt-3 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white">صمّم أول إعلان</Link>
         </div>
       ) : (

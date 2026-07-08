@@ -12,7 +12,7 @@ import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAcco
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -371,11 +371,22 @@ export async function saveTextsAction(formData: FormData) {
   } else if (sec === 'home') {
     await put(SETTING_HOME_CLS_TITLE, 'homeClsTitle');
     await put(SETTING_HOME_CLS_SUB, 'homeClsSub');
+    await put(SETTING_HOME_H_STORES, 'homeHStores');
+    await put(SETTING_HOME_H_PRODUCTS, 'homeHProducts');
+    await put(SETTING_HOME_H_FEATURED, 'homeHFeatured');
+    await put(SETTING_HOME_H_LATEST, 'homeHLatest');
+    await put(SETTING_HOME_H_MOSTVIEWED, 'homeHMostviewed');
   } else if (sec === 'ad') {
     await put(SETTING_AD_NOTICE, 'adNotice');
   } else if (sec === 'msg') {
     await put(SETTING_MSG_TPL_AD, 'msgTplAd');
     await put(SETTING_MSG_TPL_ADMIN, 'msgTplAdmin');
+  } else if (sec === 'empty') {
+    await put(SETTING_EMPTY_ADS, 'emptyAds');
+    await put(SETTING_EMPTY_CHATS, 'emptyChats');
+    await put(SETTING_EMPTY_STORES, 'emptyStores');
+    await put(SETTING_EMPTY_REVIEWS, 'emptyReviews');
+    await put(SETTING_EMPTY_CLASSIFIED, 'emptyClassified');
   } else if (sec === 'sub') {
     await put(SETTING_SUB_REMINDER_MSG, 'subReminderMsg');
   }

@@ -51,6 +51,7 @@ export async function saveStoreSettingsAction(formData: FormData) {
     msgTemplates: String(formData.get('msgTemplates') || ''),
     hidden,
     announce: String(formData.get('announce') || ''),
+    productNote: String(formData.get('productNote') || ''),
   });
   revalidatePath('/store');
   revalidatePath('/');

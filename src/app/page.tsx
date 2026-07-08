@@ -13,7 +13,7 @@ import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { PromoSlot } from '@/components/promo-slot';
 import { DisclaimerBar } from '@/components/disclaimer';
-import { getHomeStats, getHomeClassifiedText } from '@/lib/settings';
+import { getHomeStats, getHomeClassifiedText, getHomeHeadings } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
 import { getInterests } from '@/lib/interests';
 import { homeFeaturedAds, homeStoreCards } from '@/lib/merchant';
@@ -48,6 +48,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     getHomeStats().catch(() => new Set(['ads', 'users', 'views', 'cats'])),
     getHomeClassifiedText().catch(() => ({ title: 'الإعلانات المبوّبة', sub: 'تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي' })),
   ]);
+  const H = await getHomeHeadings().catch(() => ({ stores: 'متاجر تربح', products: 'منتجات المتاجر', featured: 'إعلانات مميّزة', latest: 'أحدث الإعلانات', mostViewed: 'الأكثر مشاهدة' }));
   const catsParam = (cats || '').split(',').map((n) => parseInt(n, 10)).filter((n) => Number.isFinite(n) && n > 0);
   const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
     { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
@@ -119,7 +120,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       {/* إعلان المتاجر — يظهر تلقائياً لكل متجر معتمد (بطاقة المتجر) */}
       {storeCards.length > 0 && (
-        <Section title="متاجر تربح" href="/companies">
+        <Section title={H.stores} href="/companies">
           <div className="grid gap-2 sm:grid-cols-2">
             {storeCards.map((c) => <StoreMiniCard key={c.id} s={c} href={`/companies/${c.id}`} />)}
           </div>
@@ -128,18 +129,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       {/* منتجات المتاجر — تظهر فقط للمتاجر التي اعتمدت الإدارة عرض منتجاتها */}
       {storeAds.length > 0 && (
-        <Section title="منتجات المتاجر" href="/companies">
+        <Section title={H.products} href="/companies">
           <AdGrid ads={storeAds} />
         </Section>
       )}
 
       {featured.length > 0 && (
-        <Section title="إعلانات مميّزة" href="/search?special=1">
+        <Section title={H.featured} href="/search?special=1">
           <AdGrid ads={featured} />
         </Section>
       )}
 
-      <Section title="أحدث الإعلانات" href="/search">
+      <Section title={H.latest} href="/search">
         <div className="space-y-4">
           <AdGrid ads={latest.slice(0, 4)} />
           {/* Paid banner — in-feed after 4 ads */}
@@ -149,7 +150,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       </Section>
 
       {mostViewed.length > 0 && (
-        <Section title="الأكثر مشاهدة">
+        <Section title={H.mostViewed}>
           <AdGrid ads={mostViewed} />
         </Section>
       )}

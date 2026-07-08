@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles } from 'lucide-react';
+import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import {
-  getSetting,
+  getSetting, getHomeHeadings, getEmptyTexts,
   SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_SUB_REMINDER_MSG,
   SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB,
   DEFAULT_MSG_TPL_AD, DEFAULT_MSG_TPL_ADMIN, DEFAULT_AD_NOTICE, DEFAULT_SUB_REMINDER_MSG,
@@ -22,6 +22,7 @@ const SECTIONS = [
   { key: 'home', label: 'الرئيسية', icon: Home },
   { key: 'ad', label: 'صفحة الإعلان', icon: Sparkles },
   { key: 'msg', label: 'المراسلة', icon: MessageSquare },
+  { key: 'empty', label: 'رسائل فارغة', icon: Inbox },
   { key: 'sub', label: 'الاشتراك', icon: BellRing },
 ] as const;
 type Sec = typeof SECTIONS[number]['key'];
@@ -30,7 +31,7 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
   await requireAction('users', 'edit');
   const { saved, sec: secRaw } = await searchParams;
   const sec: Sec = (SECTIONS.some((s) => s.key === secRaw) ? secRaw : 'general') as Sec;
-  const [tplAd, tplAdmin, adNotice, subMsg, ticker, clsTitle, clsSub] = await Promise.all([
+  const [tplAd, tplAdmin, adNotice, subMsg, ticker, clsTitle, clsSub, headings, empty] = await Promise.all([
     getSetting(SETTING_MSG_TPL_AD, DEFAULT_MSG_TPL_AD),
     getSetting(SETTING_MSG_TPL_ADMIN, DEFAULT_MSG_TPL_ADMIN),
     getSetting(SETTING_AD_NOTICE, DEFAULT_AD_NOTICE),
@@ -38,6 +39,8 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
     getSetting(SETTING_TICKER, DEFAULT_TICKER),
     getSetting(SETTING_HOME_CLS_TITLE, DEFAULT_HOME_CLS_TITLE),
     getSetting(SETTING_HOME_CLS_SUB, DEFAULT_HOME_CLS_SUB),
+    getHomeHeadings(),
+    getEmptyTexts(),
   ]);
 
   return (
@@ -72,7 +75,7 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
 
         {sec === 'home' && (
           <>
-            <div className="text-sm font-bold text-primary">بطاقة «الإعلانات المبوّبة» في الرئيسية</div>
+            <div className="text-sm font-bold text-primary">بطاقة «الإعلانات المبوّبة»</div>
             <label className="block space-y-1">
               <span className="text-sm font-medium">العنوان</span>
               <input name="homeClsTitle" defaultValue={clsTitle} className={field} />
@@ -81,6 +84,23 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
               <span className="text-sm font-medium">الوصف</span>
               <input name="homeClsSub" defaultValue={clsSub} className={field} />
             </label>
+            <div className="border-t border-primary/15 pt-3 text-sm font-bold text-primary">عناوين أقسام الرئيسية</div>
+            <label className="block space-y-1"><span className="text-sm font-medium">قسم المتاجر</span><input name="homeHStores" defaultValue={headings.stores} className={field} /></label>
+            <label className="block space-y-1"><span className="text-sm font-medium">قسم منتجات المتاجر</span><input name="homeHProducts" defaultValue={headings.products} className={field} /></label>
+            <label className="block space-y-1"><span className="text-sm font-medium">قسم الإعلانات المميّزة</span><input name="homeHFeatured" defaultValue={headings.featured} className={field} /></label>
+            <label className="block space-y-1"><span className="text-sm font-medium">قسم أحدث الإعلانات</span><input name="homeHLatest" defaultValue={headings.latest} className={field} /></label>
+            <label className="block space-y-1"><span className="text-sm font-medium">قسم الأكثر مشاهدة</span><input name="homeHMostviewed" defaultValue={headings.mostViewed} className={field} /></label>
+          </>
+        )}
+
+        {sec === 'empty' && (
+          <>
+            <p className="text-xs text-muted-foreground">الرسائل التي تظهر للزائر عند عدم وجود عناصر.</p>
+            <label className="block space-y-1"><span className="text-sm font-medium">لا توجد إعلانات</span><input name="emptyAds" defaultValue={empty.ads} className={field} /></label>
+            <label className="block space-y-1"><span className="text-sm font-medium">لا توجد محادثات</span><input name="emptyChats" defaultValue={empty.chats} className={field} /></label>
+            <label className="block space-y-1"><span className="text-sm font-medium">لا توجد متاجر</span><input name="emptyStores" defaultValue={empty.stores} className={field} /></label>
+            <label className="block space-y-1"><span className="text-sm font-medium">لا توجد تقييمات</span><input name="emptyReviews" defaultValue={empty.reviews} className={field} /></label>
+            <label className="block space-y-1"><span className="text-sm font-medium">لا توجد إعلانات مبوّبة</span><input name="emptyClassified" defaultValue={empty.classified} className={field} /></label>
           </>
         )}
 

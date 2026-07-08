@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { MessageCircle, Send } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getConversations } from '@/lib/messages';
+import { getEmptyText } from '@/lib/settings';
 import { timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
@@ -13,6 +14,7 @@ export default async function MessagesPage() {
  const session = await getSession();
  if (!session) redirect('/login');
  const convos = await getConversations(session.uid);
+ const emptyMsg = await getEmptyText('chats').catch(() => 'لا توجد محادثات بعد.');
  return (
  <div className="mx-auto max-w-2xl space-y-4">
  <div className="flex items-center justify-between gap-2">
@@ -24,7 +26,7 @@ export default async function MessagesPage() {
  {convos.length === 0 && (
  <div className="card-3d rounded-2xl p-8 text-center text-muted-foreground">
  <MessageCircle className="mx-auto mb-2 h-8 w-8" />
- لا توجد محادثات بعد.
+ {emptyMsg}
  </div>
  )}
  <ul className="divide-y card-3d rounded-xl ">

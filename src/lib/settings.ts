@@ -93,6 +93,46 @@ export async function getHomeClassifiedText(): Promise<{ title: string; sub: str
   return { title, sub };
 }
 
+/* عناوين أقسام الصفحة الرئيسية (قابلة للتعديل). */
+export const SETTING_HOME_H_STORES = 'home_h_stores';
+export const SETTING_HOME_H_PRODUCTS = 'home_h_products';
+export const SETTING_HOME_H_FEATURED = 'home_h_featured';
+export const SETTING_HOME_H_LATEST = 'home_h_latest';
+export const SETTING_HOME_H_MOSTVIEWED = 'home_h_mostviewed';
+export const HOME_HEADING_DEFAULTS = { stores: 'متاجر تربح', products: 'منتجات المتاجر', featured: 'إعلانات مميّزة', latest: 'أحدث الإعلانات', mostViewed: 'الأكثر مشاهدة' };
+export async function getHomeHeadings(): Promise<{ stores: string; products: string; featured: string; latest: string; mostViewed: string }> {
+  const [stores, products, featured, latest, mostViewed] = await Promise.all([
+    getSetting(SETTING_HOME_H_STORES, HOME_HEADING_DEFAULTS.stores),
+    getSetting(SETTING_HOME_H_PRODUCTS, HOME_HEADING_DEFAULTS.products),
+    getSetting(SETTING_HOME_H_FEATURED, HOME_HEADING_DEFAULTS.featured),
+    getSetting(SETTING_HOME_H_LATEST, HOME_HEADING_DEFAULTS.latest),
+    getSetting(SETTING_HOME_H_MOSTVIEWED, HOME_HEADING_DEFAULTS.mostViewed),
+  ]);
+  return { stores, products, featured, latest, mostViewed };
+}
+
+/* رسائل «لا يوجد» الظاهرة للزوّار (قابلة للتعديل). */
+export const SETTING_EMPTY_ADS = 'empty_ads';
+export const SETTING_EMPTY_CHATS = 'empty_chats';
+export const SETTING_EMPTY_STORES = 'empty_stores';
+export const SETTING_EMPTY_REVIEWS = 'empty_reviews';
+export const SETTING_EMPTY_CLASSIFIED = 'empty_classified';
+export const EMPTY_DEFAULTS = { ads: 'لا توجد إعلانات لعرضها حالياً.', chats: 'لا توجد محادثات بعد.', stores: 'لا توجد متاجر معتمدة بعد.', reviews: 'لا توجد تقييمات بعد.', classified: 'لا توجد إعلانات مبوّبة بعد.' };
+export async function getEmptyText(key: keyof typeof EMPTY_DEFAULTS): Promise<string> {
+  const map = { ads: SETTING_EMPTY_ADS, chats: SETTING_EMPTY_CHATS, stores: SETTING_EMPTY_STORES, reviews: SETTING_EMPTY_REVIEWS, classified: SETTING_EMPTY_CLASSIFIED };
+  return getSetting(map[key], EMPTY_DEFAULTS[key]);
+}
+export async function getEmptyTexts(): Promise<typeof EMPTY_DEFAULTS> {
+  const [ads, chats, stores, reviews, classified] = await Promise.all([
+    getSetting(SETTING_EMPTY_ADS, EMPTY_DEFAULTS.ads),
+    getSetting(SETTING_EMPTY_CHATS, EMPTY_DEFAULTS.chats),
+    getSetting(SETTING_EMPTY_STORES, EMPTY_DEFAULTS.stores),
+    getSetting(SETTING_EMPTY_REVIEWS, EMPTY_DEFAULTS.reviews),
+    getSetting(SETTING_EMPTY_CLASSIFIED, EMPTY_DEFAULTS.classified),
+  ]);
+  return { ads, chats, stores, reviews, classified };
+}
+
 /* Which stat cards show on the home page (CSV of keys; unset => all). */
 export const SETTING_SHOW_STATS = 'show_home_stats'; // legacy on/off (kept for compat)
 export const SETTING_HOME_STATS = 'home_stats';

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import { getRevenueSummary, getMemberLedger } from '@/lib/wallet';
-import { getStoreSubPricing, getServicePricing, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { saveRevenueAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -140,7 +140,7 @@ async function BalancesTab() {
 }
 
 async function PricingTab() {
-  const [sub, prices] = await Promise.all([getStoreSubPricing(), getServicePricing()]);
+  const [sub, prices, remind] = await Promise.all([getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig()]);
   const services: { key: PaidService; note?: string }[] = [
     { key: 'featured' },
     { key: 'classified', note: 'إعلان واحد حسب المدّة' },
@@ -160,6 +160,15 @@ async function PricingTab() {
         <label className="space-y-1"><span className="text-xs font-bold">سنوي</span><input name="subYearly" type="number" min={0} defaultValue={sub.yearly} className={num} /></label>
       </div>
       <label className="block space-y-1"><span className="text-xs font-bold">مهلة السماح بعد الانتهاء (أيام) — يبقى المتجر محفوظاً ويُمنع من العرض فقط</span><input name="subGraceDays" type="number" min={0} defaultValue={sub.graceDays} className={num} /></label>
+
+      <div className="rounded-xl border border-primary/15 bg-primary/5 p-3">
+        <div className="mb-1 text-xs font-bold text-primary">تنبيهات قرب انتهاء الاشتراك</div>
+        <p className="mb-2 text-[11px] text-muted-foreground">تُرسل رسالة تنبيه لصاحب المتجر قبل انتهاء اشتراكه. يُعدَّل نصّها من تبويب «النصوص الظاهرة». اكتب 0 للتعطيل.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">قبل كم يوم يبدأ التنبيه</span><input name="subRemindDays" type="number" min={0} defaultValue={remind.days} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">كم مرة (مرة/يوم كحدّ أقصى)</span><input name="subRemindCount" type="number" min={0} defaultValue={remind.count} className={num} /></label>
+        </div>
+      </div>
 
       <div className="flex items-center gap-2 border-t border-primary/15 pt-3 font-bold text-primary"><Megaphone className="h-5 w-5" /> تسعيرات الخدمات (السعر لكل مدّة)</div>
       <p className="text-[11px] text-muted-foreground">المدّة اختيار فقط بلا سعر مستقل؛ كل خدمة لها سعر لكل مدّة. اترك 0 لتعطيل الخدمة/المدّة.</p>

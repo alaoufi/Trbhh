@@ -12,7 +12,7 @@ import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAcco
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -367,6 +367,7 @@ export async function saveTextsAction(formData: FormData) {
   await setSetting(SETTING_MSG_TPL_AD, String(formData.get('msgTplAd') ?? '').trim());
   await setSetting(SETTING_MSG_TPL_ADMIN, String(formData.get('msgTplAdmin') ?? '').trim());
   await setSetting(SETTING_AD_NOTICE, String(formData.get('adNotice') ?? '').trim());
+  await setSetting(SETTING_SUB_REMINDER_MSG, String(formData.get('subReminderMsg') ?? '').trim());
   revalidatePath('/admin/texts');
   revalidatePath('/ads', 'layout');
   redirect('/admin/texts?saved=1');
@@ -424,6 +425,9 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting(SETTING_SUB_6MO, nn('sub6mo'));
   await setSetting(SETTING_SUB_YEARLY, nn('subYearly'));
   await setSetting(SETTING_SUB_GRACE_DAYS, String(Math.max(0, parseInt(String(formData.get('subGraceDays') || '10')) || 10)));
+  // تنبيهات قرب انتهاء الاشتراك: قبل كم يوم + كم مرة
+  await setSetting(SETTING_SUB_REMIND_DAYS, nn('subRemindDays'));
+  await setSetting(SETTING_SUB_REMIND_COUNT, nn('subRemindCount'));
   // مصفوفة تسعيرات الخدمات (خدمة × مدّة)
   const services: PaidService[] = ['featured', 'classified', 'dup3', 'dup5'];
   for (const s of services) {

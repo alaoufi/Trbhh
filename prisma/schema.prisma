@@ -1100,6 +1100,13 @@ model store_contacts {
   @@index([created_at], map: "store_contacts_created")
 }
 
+model store_sub_reminders {
+  store_id  Int       @id
+  sub_until DateTime? @db.DateTime(0)
+  sent      Int       @default(0)
+  last_sent DateTime? @db.DateTime(0)
+}
+
 model wallet_txns {
   id            BigInt    @id @default(autoincrement())
   user_id       BigInt    @db.UnsignedBigInt

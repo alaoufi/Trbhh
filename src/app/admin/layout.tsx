@@ -27,6 +27,8 @@ const nav: { href: string; label: string; icon: React.ElementType; perm: Perm | 
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAnyAdmin();
+  // تذكيرات قرب انتهاء الاشتراك — تشغيل كسول (لا جدولة خلفية)؛ ذاتي الخنق كل ٣٠ دقيقة
+  import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
   const [perms, role] = await Promise.all([getUserPerms(session.uid), getUserRole(session.uid)]);
   const items = nav.filter((n) => n.perm === null || perms.has(n.perm));
   return (

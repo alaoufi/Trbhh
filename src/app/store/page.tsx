@@ -24,6 +24,8 @@ export const metadata = { title: 'إدارة المتجر' };
 export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; cred?: string; crederr?: string }> }) {
   const { error, sub, added, settings, cred, crederr } = await searchParams;
   const session = await requireUser();
+  // تذكيرات قرب انتهاء الاشتراك — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
+  import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
   const store = await getStoreByUser(session.uid);
   const subState = store ? await getStoreSub(store.id) : null;
   const subPricing = await getStoreSubPricing();

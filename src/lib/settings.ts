@@ -213,6 +213,20 @@ export function subPlanPrice(p: StoreSubPricing, plan: SubPlan): number {
   return plan === 'monthly' ? p.monthly : plan === 'sixmo' ? p.sixmo : p.yearly;
 }
 
+/* تنبيهات قرب انتهاء الاشتراك: قبل كم يوم يبدأ التنبيه، وكم مرة (مرة واحدة يومياً
+   كحدّ أقصى). 0 = تعطيل. نص الرسالة يُعدَّل من تبويب «النصوص» ويدعم {days} و{date}. */
+export const SETTING_SUB_REMIND_DAYS = 'sub_remind_days';
+export const SETTING_SUB_REMIND_COUNT = 'sub_remind_count';
+export const SETTING_SUB_REMINDER_MSG = 'sub_reminder_msg';
+export const DEFAULT_SUB_REMINDER_MSG = 'تنبيه من تربح: يقترب انتهاء اشتراك متجرك خلال {days} يوم (بتاريخ {date}). جدّد الاشتراك من لوحة متجرك لتفادي إخفاء المتجر. — الإدارة';
+export async function getStoreSubReminderConfig(): Promise<{ days: number; count: number }> {
+  const [d, c] = await Promise.all([
+    getSettingNum(SETTING_SUB_REMIND_DAYS, 7),
+    getSettingNum(SETTING_SUB_REMIND_COUNT, 3),
+  ]);
+  return { days: Math.max(0, Math.round(d) || 0), count: Math.max(0, Math.round(c) || 0) };
+}
+
 /** Ad service pricing (SAR) by duration + duplicate tiers. */
 /** Durations are a shared CHOICE (not priced by themselves). Each paid service has a price per duration. */
 export type Dur = 'w2' | 'm1' | 'y1';

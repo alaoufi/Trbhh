@@ -293,9 +293,49 @@ const STATEMENTS: string[] = [
 let syncPromise: Promise<void> | null = null;
 
 async function run(): Promise<void> {
+  // Snapshot the existing columns & indexes up front so we NEVER issue an
+  // `ADD COLUMN`/`CREATE INDEX` that already exists. Prisma logs `prisma:error`
+  // to stdout for a failing raw query even when we `.catch()` it — so the only
+  // way to keep boot logs clean is to not run the doomed statement at all.
+  const colRows = await prisma
+    .$queryRawUnsafe<{ t: string; c: string }[]>(
+      `SELECT TABLE_NAME AS t, COLUMN_NAME AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()`,
+    )
+    .catch(() => [] as { t: string; c: string }[]);
+  const idxRows = await prisma
+    .$queryRawUnsafe<{ t: string; i: string }[]>(
+      `SELECT TABLE_NAME AS t, INDEX_NAME AS i FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE()`,
+    )
+    .catch(() => [] as { t: string; i: string }[]);
+  const colSet = new Set(colRows.map((r) => `${r.t.toLowerCase()}.${r.c.toLowerCase()}`));
+  const idxSet = new Set(idxRows.map((r) => `${r.t.toLowerCase()}.${r.i.toLowerCase()}`));
+  const tableSet = new Set([...colSet].map((k) => k.split('.')[0]));
+
   for (const sql of STATEMENTS) {
-    // Best-effort: "duplicate column" on re-run is expected and harmless.
+    const addCol = sql.match(/^ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+(\w+)/i);
+    if (addCol && colSet.has(`${addCol[1].toLowerCase()}.${addCol[2].toLowerCase()}`)) continue;
+    const addIdx = sql.match(/^CREATE\s+(?:UNIQUE\s+)?INDEX\s+(\w+)\s+ON\s+(\w+)/i);
+    if (addIdx && idxSet.has(`${addIdx[2].toLowerCase()}.${addIdx[1].toLowerCase()}`)) continue;
+    const createTbl = sql.match(/^CREATE TABLE IF NOT EXISTS\s+(\w+)/i);
+
+    // Best-effort: anything still failing (e.g. a legacy table truly absent) stays silent.
     await prisma.$executeRawUnsafe(sql).catch(() => {});
+
+    // Keep the local sets in sync so later statements see what we just created.
+    if (addCol) colSet.add(`${addCol[1].toLowerCase()}.${addCol[2].toLowerCase()}`);
+    if (addIdx) idxSet.add(`${addIdx[2].toLowerCase()}.${addIdx[1].toLowerCase()}`);
+    // A freshly created table: learn its columns so its follow-up (legacy) ADD
+    // COLUMN migrations are skipped instead of erroring on a clean install.
+    if (createTbl && !tableSet.has(createTbl[1].toLowerCase())) {
+      tableSet.add(createTbl[1].toLowerCase());
+      const rows = await prisma
+        .$queryRawUnsafe<{ c: string }[]>(
+          `SELECT COLUMN_NAME AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+          createTbl[1],
+        )
+        .catch(() => [] as { c: string }[]);
+      for (const r of rows) colSet.add(`${createTbl[1].toLowerCase()}.${r.c.toLowerCase()}`);
+    }
   }
 }
 

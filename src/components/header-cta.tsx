@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Store, LogIn, Home } from 'lucide-react';
 
-const cls = 'btn-3d flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white';
+const cls = 'btn-3d flex h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-gradient-to-l from-primary to-primary/80 px-3 text-sm font-bold text-white';
 
 /**
  * زر الهيدر الرئيسي — يتغيّر حسب الصفحة (عميل، ليتفاعل مع التنقّل الفوري):
@@ -13,7 +13,7 @@ const cls = 'btn-3d flex h-11 flex-1 items-center justify-center gap-2 rounded-f
 export function HeaderCta({ isAuthed, myStoreId }: { isAuthed: boolean; myStoreId: number }) {
   const pathname = usePathname() || '';
   if (pathname.startsWith('/login')) {
-    return <Link href="/" className={cls}><Home className="h-5 w-5" /> الصفحة الرئيسية</Link>;
+    return <Link href="/" className={`${cls} !text-xs`}><Home className="h-4 w-4 shrink-0" /> الصفحة الرئيسية</Link>;
   }
   if (!isAuthed) {
     return <Link href="/login" className={cls}><LogIn className="h-5 w-5" /> تسجيل الدخول</Link>;

@@ -40,7 +40,7 @@ function LoginInner() {
           <div className="mb-2 text-center text-xs font-bold text-muted-foreground">اختر وجهة الدخول</div>
           <div className="grid grid-cols-2 gap-2">
             <Option value="trbhh" label="الدخول على تربح" />
-            <Option value="store" label="الدخول على متجر" />
+            <Option value="store" label="الدخول على متجرك" />
           </div>
         </div>
 
@@ -65,7 +65,7 @@ function LoginInner() {
           </>
         ) : (
           <>
-            <h1 className="mb-1 text-xl font-bold">الدخول على متجر</h1>
+            <h1 className="mb-1 text-xl font-bold">الدخول على متجرك</h1>
             <p className="mb-5 text-sm text-muted-foreground">ادخل لوحة متجرك باسم دخول المتجر (أو معرّفه) وكلمة مروره الخاصة، المنفصلة تماماً عن حساب تربح.</p>
             <form action={storeLoginAction} className="space-y-3">
               <input name="handle" required dir="ltr" placeholder="اسم دخول المتجر أو معرّفه" className={`${fieldCls} text-left`} />

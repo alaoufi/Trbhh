@@ -16,8 +16,9 @@ import { DisclaimerBar } from '@/components/disclaimer';
 import { getHomeStats, getHomeClassifiedText, getHomeHeadings } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
 import { getInterests } from '@/lib/interests';
-import { homeFeaturedAds, homeStoreCards } from '@/lib/merchant';
+import { homeFeaturedAds, homeStoreCards, storeIdOfUser } from '@/lib/merchant';
 import { StoreMiniCard, type StoreCardData } from '@/components/store-mini-card';
+import { OpenStoreBanner } from '@/components/open-store-banner';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +72,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const pinnedLabel = catsParam.length ? 'الأقسام المختارة' : '⭐ أقسام تهمّك';
   const storeAds = await homeFeaturedAds().catch(() => []);
   const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
+  const myStore = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
 
   return (
     <div className="space-y-4">
@@ -105,6 +107,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           ))}
         </div>
       )}
+
+      {/* بانر مستقل: افتح متجرك — لغير أصحاب المتاجر */}
+      {!myStore && <OpenStoreBanner />}
 
       {/* Classified ads entry link */}
       <Link href="/classified" className="card-3d flex items-center justify-between gap-3 rounded-2xl p-4">

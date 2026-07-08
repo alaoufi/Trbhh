@@ -19,23 +19,27 @@ export async function Header() {
         {/* hamburger on the right (RTL: first child) */}
         <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} />
 
-        {/* دعوة فتح المتجر تشغل مساحة البحث بعد تصغيره لعدسة */}
-        <Link
-          href={myStoreId > 0 ? `/companies/${myStoreId}` : '/store'}
-          className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95"
-        >
-          <Store className="h-5 w-5" /> {myStoreId > 0 ? 'رابط المتجر' : 'افتح متجرك'}
-        </Link>
+        {/* الأساسي: تسجيل الدخول للزائر — ولصاحب المتجر رابط متجره */}
+        {!session ? (
+          <Link
+            href="/login"
+            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95"
+          >
+            <LogIn className="h-5 w-5" /> تسجيل الدخول
+          </Link>
+        ) : myStoreId > 0 ? (
+          <Link
+            href={`/companies/${myStoreId}`}
+            className="flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-gradient-to-l from-primary to-primary/80 px-4 text-sm font-bold text-white shadow-sm transition hover:opacity-95"
+          >
+            <Store className="h-5 w-5" /> رابط المتجر
+          </Link>
+        ) : (
+          <div className="flex-1" />
+        )}
 
         {/* بحث مصغّر: عدسة تفتح حقل البحث */}
         <HeaderSearch />
-
-        {/* تسجيل الدخول للزوّار غير المسجّلين */}
-        {!session && (
-          <Link href="/login" className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-primary/90">
-            <LogIn className="h-4 w-4" /> دخول
-          </Link>
-        )}
 
         {/* logo on the left (RTL: last child) */}
         <Link href="/" className="shrink-0">

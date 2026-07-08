@@ -20,6 +20,7 @@ const nav: { href: string; label: string; icon: React.ElementType; perm: Perm | 
   { href: '/admin/packages', label: 'الباقات', icon: Crown, perm: 'packages' },
   { href: '/admin/promos', label: 'الإعلانات الترويجية', icon: MonitorPlay, perm: 'promos' },
   { href: '/admin/verification', label: 'بوابات التحقق (SMS/واتساب)', icon: MessageSquare, perm: 'users' },
+  { href: '/admin/texts', label: 'النصوص الظاهرة', icon: MessageSquare, perm: 'users' },
   { href: '/admin/settings', label: 'الإعدادات', icon: Settings, perm: 'users' },
   { href: '/admin/backup', label: 'نسخ احتياطي واستعادة', icon: DatabaseBackup, perm: 'backup' },
 ];

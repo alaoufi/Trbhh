@@ -11,7 +11,7 @@ import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { recordStoreVisit, classifySource, bumpStoreView, getStoreViews } from '@/lib/store-analytics';
 import { isStoreSubBlocked } from '@/lib/subscription';
-import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle, parseHiddenFields } from '@/lib/merchant';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { StoreBottomNav } from '@/components/store-bottomnav';
@@ -114,7 +114,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const inStore = new Set(productIds);
   const allActive = myAds.filter((a) => a.status === 1 && inStore.has(a.id)).map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: 0, sellerName: null, sellerTrusted: false }));
   const active = query ? allActive.filter((a) => (a.title || '').includes(query)) : allActive;
-  const wa = waLink(s.whatsapp);
+  const { parseTemplates } = await import('@/lib/settings');
+  const wa = waLink(s.whatsapp, parseTemplates(meta.msgTemplates)[0] || '');
   // مشاهدات المتجر = عدد مرّات دخول/تحديث صفحة المتجر (مشاهدة واحدة لكل زيارة)
   const storeViews = await getStoreViews(storeId).catch(() => 0);
   // collaboration: can this viewer (a merchant) invite this store?
@@ -132,6 +133,16 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const catalogStyle = isCatalogStyle(meta.catalog) ? meta.catalog : 'tiles';
   const catalogFields = new Set((meta.fields || DEFAULT_CATALOG_FIELDS).split(',').filter(Boolean));
   const tierStyle: Record<string, string> = { gold: 'bg-amber-100 text-amber-800', silver: 'bg-slate-200 text-slate-700', active: 'bg-emerald-100 text-emerald-700', new: 'bg-sky-100 text-sky-700' };
+  // عناصر يتحكّم كل متجر بإظهارها/إخفائها بشكل مستقل
+  const hidden = parseHiddenFields(meta.hiddenFields);
+  const statCards = [
+    { key: 'ads', icon: Megaphone, val: en(allActive.length), label: 'إعلان', star: false },
+    { key: 'views', icon: Eye, val: en(storeViews), label: 'مشاهدة', star: false },
+    { key: 'followers', icon: Users, val: en(followers), label: 'متابع', star: false },
+    { key: 'rating', icon: Star, val: rating.count ? String(rating.avg) : '—', label: `تقييم (${en(rating.count)})`, star: true },
+  ].filter((c) => !hidden.has(c.key));
+  const gridCols: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4' };
+  const showReviews = meta.allowReviews && !hidden.has('rating');
 
   return (
     <div className="min-h-screen bg-muted/20 pb-24">
@@ -185,13 +196,19 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
 
             {s.address && <div className="mt-2 flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-4 w-4" />{s.address}</div>}
 
-            {/* إحصائيات المتجر — بارزة للجميع (زوّار وعملاء) */}
-            <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-              <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Megaphone className="h-4 w-4" /> {en(allActive.length)}</div><div className="text-[11px] text-muted-foreground">إعلان</div></div>
-              <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Eye className="h-4 w-4" /> {en(storeViews)}</div><div className="text-[11px] text-muted-foreground">مشاهدة</div></div>
-              <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Users className="h-4 w-4" /> {en(followers)}</div><div className="text-[11px] text-muted-foreground">متابع</div></div>
-              <div className="rounded-xl bg-secondary/40 p-2"><div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}><Star className="h-4 w-4 fill-amber-400 text-amber-400" /> {rating.count ? rating.avg : '—'}</div><div className="text-[11px] text-muted-foreground">تقييم ({en(rating.count)})</div></div>
-            </div>
+            {/* إحصائيات المتجر — كل متجر يتحكّم بإظهار عناصره */}
+            {statCards.length > 0 && (
+              <div className={`mt-3 grid ${gridCols[statCards.length]} gap-2 text-center`}>
+                {statCards.map((c) => (
+                  <div key={c.key} className="rounded-xl bg-secondary/40 p-2">
+                    <div className="flex items-center justify-center gap-1 font-bold" style={{ color: brand }}>
+                      <c.icon className={`h-4 w-4 ${c.star ? 'fill-amber-400 text-amber-400' : ''}`} /> {c.val}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">{c.label}</div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* أزرار: متابعة + تواصل */}
             <div className="mt-3 flex flex-wrap gap-2">
@@ -219,8 +236,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         {/* ===== تبويبات (روابط قفز) ===== */}
         <nav className="sticky top-[52px] z-20 flex gap-1 rounded-xl bg-white p-1 text-sm font-bold shadow-sm ring-1 ring-black/5">
           <a href="#catalog" className="flex-1 rounded-lg py-2 text-center text-white" style={{ background: brand }}>الإعلانات</a>
-          <a href="#about" className="flex-1 rounded-lg py-2 text-center text-muted-foreground hover:bg-muted/50">نبذة</a>
-          {meta.allowReviews && <a href="#reviews" className="flex-1 rounded-lg py-2 text-center text-muted-foreground hover:bg-muted/50">التقييمات</a>}
+          {!hidden.has('about') && <a href="#about" className="flex-1 rounded-lg py-2 text-center text-muted-foreground hover:bg-muted/50">نبذة</a>}
+          {showReviews && <a href="#reviews" className="flex-1 rounded-lg py-2 text-center text-muted-foreground hover:bg-muted/50">التقييمات</a>}
         </nav>
 
         {/* ===== الكتالوج ===== */}
@@ -239,7 +256,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         )}
 
         {/* ===== نبذة ===== */}
-        {(meta.about || s.description || meta.specialty || meta.audience) && (
+        {!hidden.has('about') && (meta.about || s.description || meta.specialty || meta.audience) && (
           <div id="about" className="scroll-mt-28 space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
             <h2 className="font-bold" style={{ color: brand }}>عن المتجر</h2>
             {(meta.about || s.description) && <p className="whitespace-pre-line leading-7 text-foreground/90">{meta.about || s.description}</p>}
@@ -304,8 +321,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           </div>
         )}
 
-        {/* ===== التقييمات والتعليقات (يمكن للمالك قفلها من إعدادات المتجر) ===== */}
-        {meta.allowReviews && (
+        {/* ===== التقييمات والتعليقات (يمكن للمالك قفلها أو إخفاؤها من إعدادات المتجر) ===== */}
+        {showReviews && (
         <div id="reviews" className="scroll-mt-28 space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
           <h2 className="flex items-center gap-2 font-bold" style={{ color: brand }}><Star className="h-5 w-5" /> تقييمات العملاء ({en(rating.count)})</h2>
           {session && !isOwner && (

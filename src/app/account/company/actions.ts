@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
-import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform, saveStoreSettings, setStorePassword, setStoreUsername } from '@/lib/merchant';
+import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform, saveStoreSettings, setStorePassword, setStoreUsername, STORE_HIDE_KEYS } from '@/lib/merchant';
 import { toInt } from '@/lib/utils';
 
 /** Owner subscribes/renews the store to a plan (monthly/6mo/yearly), charged from wallet. */
@@ -43,10 +43,13 @@ export async function setStoreCredentialsAction(formData: FormData) {
 /** Store toggles: allow publishing ads + lock/unlock reviews & comments. */
 export async function saveStoreSettingsAction(formData: FormData) {
   const session = await requireUser();
+  // كل حقل «إظهار» غير مُحدَّد => مُخفى (كل متجر يتحكم بحقوله بشكل مستقل)
+  const hidden = STORE_HIDE_KEYS.filter((k) => formData.get(`show_${k}`) === null);
   await saveStoreSettings(session.uid, {
     allowAds: formData.get('allowAds') !== null,
     allowReviews: formData.get('allowReviews') !== null,
     msgTemplates: String(formData.get('msgTemplates') || ''),
+    hidden,
   });
   revalidatePath('/store');
   revalidatePath('/');

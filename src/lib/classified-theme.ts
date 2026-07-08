@@ -37,7 +37,7 @@ export type Classified = {
  * converted to 9665XXXXXXXX; numbers already carrying 966/00966/+966 are kept.
  * Returns null when there is no usable number.
  */
-export function waLink(raw: string | null | undefined): string | null {
+export function waLink(raw: string | null | undefined, text?: string | null): string | null {
   let p = (raw || '').replace(/\D/g, '');
   if (!p) return null;
   if (p.startsWith('00')) p = p.slice(2); // 00966… → 966…
@@ -50,7 +50,8 @@ export function waLink(raw: string | null | undefined): string | null {
   } else if (p.startsWith('0')) {
     p = '966' + p.slice(1); // other local → assume Saudi
   }
-  return `https://wa.me/${p}`;
+  const msg = (text || '').trim();
+  return msg ? `https://wa.me/${p}?text=${encodeURIComponent(msg)}` : `https://wa.me/${p}`;
 }
 
 /** Gradient color themes. `text` = readable text color on this background. */

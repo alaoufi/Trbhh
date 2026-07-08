@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
-import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, platformRequestState, getStoreLogin } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, platformRequestState, getStoreLogin, STORE_HIDE_FIELDS, parseHiddenFields } from '@/lib/merchant';
 import { getMyAds } from '@/lib/account';
 import { getStoreVisitorStats, getStoreViews } from '@/lib/store-analytics';
 import { StoreDesigner } from '@/components/store-designer';
@@ -119,8 +119,20 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           </label>
           <div className="rounded-xl border p-3">
             <b className="flex items-center gap-1 text-sm"><MessageSquare className="h-4 w-4" /> نصوص مراسلة المتجر الجاهزة</b>
-            <span className="mt-0.5 block text-xs text-muted-foreground">نصوص تظهر لعملاء متجرك فوق مربّع المحادثة ليختاروا منها بسرعة. كل سطر = نص مستقل. اتركها فارغة لإخفائها. (خاصّة بمتجرك — مستقلّة عن نصوص تربح).</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">نصوص تظهر لعملاء متجرك داخل مربّع المحادثة ليعدّلوها ويرسلوها، وتُعبَّأ في واتساب عند التواصل. كل سطر = نص مستقل. اتركها فارغة لإخفائها. (خاصّة بمتجرك — مستقلّة عن نصوص تربح).</span>
             <textarea name="msgTemplates" rows={3} defaultValue={meta?.msgTemplates ?? ''} placeholder={'السلام عليكم، هل هذا المنتج متوفّر؟\nما هي طرق التوصيل والدفع؟'} className="mt-2 w-full rounded-lg border bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </div>
+          <div className="rounded-xl border p-3">
+            <b className="flex items-center gap-1 text-sm"><SlidersHorizontal className="h-4 w-4" /> إظهار / إخفاء عناصر المتجر</b>
+            <span className="mt-0.5 mb-2 block text-xs text-muted-foreground">اختر ما يظهر لزوّار متجرك. متجرك مستقل — تتحكم بعناصره كما تريد.</span>
+            <div className="grid grid-cols-2 gap-2">
+              {STORE_HIDE_FIELDS.map((f) => (
+                <label key={f.key} className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm">
+                  <input type="checkbox" name={`show_${f.key}`} defaultChecked={!parseHiddenFields(meta?.hiddenFields).has(f.key)} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+                  {f.label}
+                </label>
+              ))}
+            </div>
           </div>
           <Button size="sm">حفظ الإعدادات</Button>
         </form>

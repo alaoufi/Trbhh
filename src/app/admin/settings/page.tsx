@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { Settings, Check, BarChart3, Eye, MessageSquare } from 'lucide-react';
+import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig, getSetting, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, DEFAULT_MSG_TPL_AD, DEFAULT_MSG_TPL_ADMIN } from '@/lib/settings';
+import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -10,7 +10,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, tplAd, tplAdmin] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSetting(SETTING_MSG_TPL_AD, DEFAULT_MSG_TPL_AD), getSetting(SETTING_MSG_TPL_ADMIN, DEFAULT_MSG_TPL_ADMIN)]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig()]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -155,19 +155,6 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
               <option value="owner">صاحب الإعلان والإدارة فقط</option>
               <option value="admin">الإدارة فقط</option>
             </select>
-          </label>
-        </div>
-
-        <div className="border-t border-primary/15 pt-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><MessageSquare className="h-4 w-4" /> نصوص المراسلة الجاهزة (تربح)</div>
-          <p className="mb-2 text-xs text-muted-foreground">نصوص تظهر فوق مربّع المحادثة ليختار منها المُرسِل بسرعة. كل سطر = نص مستقل. اتركها فارغة لإخفائها. (نصوص المتاجر مستقلّة ويحرّرها أصحابها من إعدادات المتجر).</p>
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">عند مراسلة صاحب الإعلان</span>
-            <textarea name="msgTplAd" rows={3} defaultValue={tplAd} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
-          </label>
-          <label className="mt-2 block space-y-1">
-            <span className="text-sm font-medium">عند مراسلة الإدارة</span>
-            <textarea name="msgTplAdmin" rows={3} defaultValue={tplAdmin} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </label>
         </div>
 

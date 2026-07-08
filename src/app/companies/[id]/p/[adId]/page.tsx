@@ -87,7 +87,9 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
   const name = meta.storeName || s.name;
   const storeHome = meta.handle ? `https://${meta.handle}.${SITE.domain}` : `/companies/${storeId}`;
   const shareUrl = `https://${SITE.domain}/companies/${storeId}/p/${ad.id}`;
-  const wa = waLink(ad.seller?.whatsapp);
+  const { parseTemplates } = await import('@/lib/settings');
+  const waMsg = parseTemplates(meta.msgTemplates)[0] || '';
+  const wa = waLink(ad.seller?.whatsapp, waMsg);
   const audioPath = await getAdAudio(ad.id).catch(() => null);
 
   return (

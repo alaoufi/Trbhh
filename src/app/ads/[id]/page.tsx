@@ -15,6 +15,7 @@ import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { waLink } from '@/lib/classified-theme';
+import { getAdNotice, getAdMsgTemplates, parseTemplates } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -107,7 +108,11 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   const storeUrl = inStore ? (storeMeta?.handle ? `https://${storeMeta.handle}.${SITE.domain}` : `/companies/${sellerStoreId}`) : '';
 
   const shareUrl = inStore ? (storeUrl.startsWith('http') ? storeUrl : `https://${SITE.domain}/companies/${sellerStoreId}`) : `https://${SITE.domain}/ads/${ad.id}`;
-  const waNumber = waLink(ad.seller?.whatsapp);
+  // نص واتساب مُعبّأ مسبقاً: نص المتجر إن كان إعلان متجر، وإلا نص تربح لمراسلة صاحب الإعلان
+  const [adNotice, adTpls] = await Promise.all([getAdNotice(), getAdMsgTemplates()]);
+  const storeTpls = parseTemplates(storeMeta?.msgTemplates);
+  const waMsg = (inStore && storeTpls.length ? storeTpls[0] : adTpls[0]) || '';
+  const waNumber = waLink(ad.seller?.whatsapp, waMsg);
   // صاحب الإعلان لا يرى المراسلة/البلاغ/التقييم على إعلانه (لا يراسل/يبلّغ/يقيّم نفسه)
   const isAdOwner = !!(session && ad.seller && session.uid === ad.seller.id);
   // "مراسلة" available to non-owners; WhatsApp/call only when the seller provides them
@@ -232,9 +237,11 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
       </div>
 
       {/* تنويه يظهر في تفاصيل الإعلان فقط */}
-      <p className="rounded-xl border border-amber-300/70 bg-amber-50 p-3 text-center text-xs font-medium text-amber-900">
-        التعامل والدفع يتم خارج المنصة مباشرة بين الطرفين. المنصة وسيلة عرض وربط فقط.
-      </p>
+      {adNotice && (
+        <p className="rounded-xl border border-amber-300/70 bg-amber-50 p-3 text-center text-xs font-medium text-amber-900">
+          {adNotice}
+        </p>
+      )}
 
       {/* Action tiles: (report + rate تظهر لغير صاحب الإعلان) / share / favorite */}
       <div className={`grid gap-3 ${isAdOwner ? 'grid-cols-2' : 'grid-cols-4'}`}>

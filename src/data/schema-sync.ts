@@ -45,6 +45,7 @@ const STATEMENTS: string[] = [
   `ALTER TABLE stores ADD COLUMN allow_ads TINYINT NOT NULL DEFAULT 1`,
   `ALTER TABLE stores ADD COLUMN allow_reviews TINYINT NOT NULL DEFAULT 1`,
   `ALTER TABLE stores ADD COLUMN msg_templates TEXT NULL`,
+  `ALTER TABLE stores ADD COLUMN hidden_fields VARCHAR(200) NULL`,
   `ALTER TABLE uploads ADD COLUMN phash VARCHAR(20) NULL`,
   `ALTER TABLE stores ADD COLUMN store_password VARCHAR(255) NULL`,
   `ALTER TABLE stores ADD COLUMN store_username VARCHAR(60) NULL`,

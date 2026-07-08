@@ -22,7 +22,8 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
   };
   const [messages, setMessages] = useState<Msg[]>(initial);
   const [typing, setTyping] = useState(false);
-  const [text, setText] = useState('');
+  // نص جاهز مُعبّأ داخل مربّع الكتابة مباشرةً (لمحادثة جديدة) ليعدّله ويرسله
+  const [text, setText] = useState(() => (initial.length === 0 ? (templates[0] || '') : ''));
   const lastIdRef = useRef<number>(initial.reduce((m, x) => Math.max(m, x.id), 0));
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -170,15 +171,15 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
         )}
       </div>
 
-      {/* نصوص جاهزة — تظهر ما دام مربّع الكتابة فارغاً؛ الضغط يملؤه للتعديل */}
-      {templates.length > 0 && !text.trim() && (
+      {/* نصوص جاهزة إضافية — الضغط يستبدل نص مربّع الكتابة ليعدّله ويرسله */}
+      {templates.length > 1 && (
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
           {templates.map((t, i) => (
             <button
               key={i}
               type="button"
               onClick={() => applyTemplate(t)}
-              className="shrink-0 whitespace-nowrap rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium ${text.trim() === t ? 'border-primary bg-primary text-white' : 'border-primary/30 bg-primary/5 text-primary hover:bg-primary/10'}`}
             >
               {t.length > 42 ? t.slice(0, 42) + '…' : t}
             </button>

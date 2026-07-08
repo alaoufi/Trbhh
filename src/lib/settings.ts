@@ -68,6 +68,13 @@ export async function getAdminMsgTemplates(): Promise<string[]> {
   return v === '__default__' ? [DEFAULT_MSG_TPL_ADMIN] : parseTemplates(v);
 }
 
+/* Visitor-facing safety notice shown on the ad detail page (editable). */
+export const SETTING_AD_NOTICE = 'ad_notice';
+export const DEFAULT_AD_NOTICE = 'التعامل والدفع يتم خارج المنصة مباشرة بين الطرفين. المنصة وسيلة عرض وربط فقط.';
+export async function getAdNotice(): Promise<string> {
+  return getSetting(SETTING_AD_NOTICE, DEFAULT_AD_NOTICE);
+}
+
 /* Which stat cards show on the home page (CSV of keys; unset => all). */
 export const SETTING_SHOW_STATS = 'show_home_stats'; // legacy on/off (kept for compat)
 export const SETTING_HOME_STATS = 'home_stats';

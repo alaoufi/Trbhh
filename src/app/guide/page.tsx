@@ -161,7 +161,7 @@ export default async function GuidePage() {
       headerIcon={BookOpen}
       title="دليل المستخدم"
       subtitle="كل ما تحتاجه لتنشر وتبيع وتتواصل باحتراف — بالهدف والخطوات."
-      grad="from-primary to-[#1b4f8a]"
+      fromColor="#3287da" toColor="#1b4f8a"
       sections={SECTIONS}
     >
       {/* بدء سريع */}

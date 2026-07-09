@@ -27,7 +27,7 @@ export default async function DeleteAccountPage({ searchParams }: { searchParams
 
   return (
     <div className="mx-auto max-w-xl space-y-4 py-4">
-      <div className="card-3d relative overflow-hidden rounded-2xl bg-gradient-to-l from-red-600 to-red-800 p-6 text-white">
+      <div className="card-3d relative overflow-hidden rounded-2xl p-6 text-white" style={{ backgroundImage: 'linear-gradient(135deg, #dc2626, #991b1b)' }}>
         <div className="relative z-10 flex items-center gap-4">
           <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/20 backdrop-blur"><UserX className="h-7 w-7" /></span>
           <div>

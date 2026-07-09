@@ -116,7 +116,7 @@ export default async function StoreGuidePage() {
       headerIcon={Store}
       title="دليل المتجر"
       subtitle="كل ما يخصّ إدارة متجرك المستقل — بالهدف والخطوات."
-      grad="from-teal-600 to-teal-800"
+      fromColor="#0d9488" toColor="#115e59"
       sections={SECTIONS}
     >
       <div className="flex flex-wrap gap-2">

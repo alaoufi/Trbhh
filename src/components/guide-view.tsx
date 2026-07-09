@@ -8,9 +8,9 @@ export type GuideSection = {
 
 /** Shared rich guide renderer: gradient header, index, and per-section goal + numbered steps. */
 export function GuideView({
-  topId, headerIcon: HeaderIcon, title, subtitle, grad = 'from-primary to-[#1b4f8a]', sections, children,
+  topId, headerIcon: HeaderIcon, title, subtitle, fromColor = '#3287da', toColor = '#1b4f8a', sections, children,
 }: {
-  topId: string; headerIcon: React.ElementType; title: string; subtitle: string; grad?: string;
+  topId: string; headerIcon: React.ElementType; title: string; subtitle: string; fromColor?: string; toColor?: string;
   sections: GuideSection[]; children?: React.ReactNode;
 }) {
   return (
@@ -18,7 +18,8 @@ export function GuideView({
       <ScrollTop targetId={topId} />
 
       {/* header */}
-      <div className={`card-3d overflow-hidden rounded-2xl bg-gradient-to-l ${grad} p-5 text-white shadow-lg`}>
+      {/* تدرّج بأسلوب inline لأن card-3d تفرض خلفية فاتحة تطمس تدرّجات Tailwind */}
+      <div className="card-3d overflow-hidden rounded-2xl p-5 text-white shadow-lg" style={{ backgroundImage: `linear-gradient(135deg, ${fromColor}, ${toColor})` }}>
         <div className="flex items-center gap-3">
           <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/20"><HeaderIcon className="h-7 w-7" /></span>
           <div>

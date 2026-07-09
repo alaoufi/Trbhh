@@ -13,12 +13,12 @@ const telPhone = '+' + waPhone;
 
 type Section = { icon: React.ElementType; title: string; text: string };
 
-const HERO: Record<string, { icon: React.ElementType; title: string; subtitle: string; grad: string }> = {
-  about: { icon: Building2, title: 'من نحن', subtitle: `تعرّف على منصة ${SITE.name}`, grad: 'from-primary to-[#1b4f8a]' },
-  faq: { icon: HelpCircle, title: 'الأسئلة الشائعة', subtitle: 'إجابات سريعة لأكثر ما يُسأل', grad: 'from-sky-600 to-indigo-700' },
-  privacy: { icon: ShieldCheck, title: 'سياسة الخصوصية', subtitle: 'كيف نحمي بياناتك ونحترم خصوصيتك', grad: 'from-emerald-600 to-teal-700' },
-  terms: { icon: FileText, title: 'الشروط والأحكام', subtitle: 'قواعد استخدام المنصة', grad: 'from-amber-600 to-orange-700' },
-  contact: { icon: Phone, title: 'تواصل معنا', subtitle: 'نحن هنا لخدمتك في أي وقت', grad: 'from-fuchsia-600 to-primary' },
+const HERO: Record<string, { icon: React.ElementType; title: string; subtitle: string; grad: [string, string] }> = {
+  about: { icon: Building2, title: 'من نحن', subtitle: `تعرّف على منصة ${SITE.name}`, grad: ['#3287da', '#1b4f8a'] },
+  faq: { icon: HelpCircle, title: 'الأسئلة الشائعة', subtitle: 'إجابات سريعة لأكثر ما يُسأل', grad: ['#0284c7', '#4338ca'] },
+  privacy: { icon: ShieldCheck, title: 'سياسة الخصوصية', subtitle: 'كيف نحمي بياناتك ونحترم خصوصيتك', grad: ['#059669', '#0f766e'] },
+  terms: { icon: FileText, title: 'الشروط والأحكام', subtitle: 'قواعد استخدام المنصة', grad: ['#d97706', '#c2410c'] },
+  contact: { icon: Phone, title: 'تواصل معنا', subtitle: 'نحن هنا لخدمتك في أي وقت', grad: ['#c026d3', '#1b4f8a'] },
 };
 
 const FAQ: QA[] = [
@@ -72,7 +72,7 @@ export function generateStaticParams() {
 function Hero({ slug }: { slug: string }) {
   const h = HERO[slug];
   return (
-    <div className={`card-3d relative overflow-hidden rounded-2xl bg-gradient-to-l ${h.grad} p-6 text-white`}>
+    <div className="card-3d relative overflow-hidden rounded-2xl p-6 text-white" style={{ backgroundImage: `linear-gradient(135deg, ${h.grad[0]}, ${h.grad[1]})` }}>
       <div className="relative z-10 flex items-center gap-4">
         <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/20 backdrop-blur"><h.icon className="h-7 w-7" /></span>
         <div>

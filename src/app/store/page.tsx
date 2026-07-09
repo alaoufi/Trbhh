@@ -8,7 +8,7 @@ import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction } from '@/app/account/company/actions';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
 import { getStoreSubPricing } from '@/lib/settings';
 import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen, DatabaseBackup } from 'lucide-react';
@@ -21,8 +21,8 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string }> }) {
-  const { error, sub, added, settings, backup, bulk, show, adshow, price } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string }> }) {
+  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
@@ -42,6 +42,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const fmtD = (d: Date | null) => (d ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d) : '');
   const storeShowActive = !!(storeShowRow?.show_until && storeShowRow.show_until > new Date());
   const shownAds = showProducts.filter((a) => a.trbhh_until && a.trbhh_until > new Date());
+  // ميزات المتجر الإضافية (تفعيلها العام من التحكم): كوبونات + دوام
+  const xtr = await import('@/lib/store-extras');
+  const [couponsOn, hoursOn] = store ? await Promise.all([xtr.couponsEnabled(), xtr.hoursEnabled()]) : [false, false];
+  const coupons = store && couponsOn ? await xtr.listStoreCoupons(store.id).catch(() => []) : [];
+  const storeHours = store && hoursOn ? await xtr.getStoreHours(store.id).catch(() => ({ from: null, to: null, days: [] as number[] })) : { from: null, to: null, days: [] as number[] };
   const subState = store ? await getStoreSub(store.id) : null;
   const subPricing = await getStoreSubPricing();
   const branches = store ? await prisma.store_branches.findMany({ where: { store_id: store.id } }) : [];
@@ -160,6 +165,24 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             <span className="mt-0.5 block text-xs text-muted-foreground">نص يظهر أسفل صفحة منتج متجرك (سياسة التوصيل/الإرجاع، مسؤولية المتجر...). اتركه فارغاً لاستخدام النص الافتراضي.</span>
             <textarea name="productNote" rows={2} maxLength={300} defaultValue={meta?.productNote ?? ''} placeholder="مثال: التوصيل خلال ٢٤ ساعة • الاستبدال خلال ٣ أيام" className="mt-2 w-full rounded-lg border bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </div>
+          {hoursOn && (
+            <div className="rounded-xl border p-3">
+              <input type="hidden" name="hoursPresent" value="1" />
+              <b className="flex items-center gap-1 text-sm">🕒 دوام المتجر</b>
+              <span className="mt-0.5 block text-xs text-muted-foreground">حدد ساعات وأيام العمل ليظهر لعملائك «مفتوح الآن» أو «مغلق الآن» على واجهة متجرك (بتوقيت السعودية). اترك الوقتين فارغين لإخفاء الدوام.</span>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <label className="space-y-1"><span className="text-xs font-bold">من الساعة</span><input name="hoursFrom" type="time" defaultValue={storeHours.from ?? ''} className="h-10 w-full rounded-lg border bg-white px-2 text-sm" /></label>
+                <label className="space-y-1"><span className="text-xs font-bold">إلى الساعة</span><input name="hoursTo" type="time" defaultValue={storeHours.to ?? ''} className="h-10 w-full rounded-lg border bg-white px-2 text-sm" /></label>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].map((d, i) => (
+                  <label key={d} className="flex items-center gap-1 rounded-lg border bg-white px-2 py-1 text-xs font-bold">
+                    <input type="checkbox" name="hoursDay" value={i} defaultChecked={storeHours.days.length === 0 || storeHours.days.includes(i)} className="h-3.5 w-3.5 accent-[hsl(var(--primary))]" /> {d}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="rounded-xl border p-3">
             <b className="flex items-center gap-1 text-sm"><SlidersHorizontal className="h-4 w-4" /> إظهار / إخفاء عناصر المتجر</b>
             <span className="mt-0.5 mb-2 block text-xs text-muted-foreground">اختر ما يظهر لزوّار متجرك. متجرك مستقل — تتحكم بعناصره كما تريد.</span>
@@ -174,6 +197,38 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           </div>
           <Button size="sm">حفظ الإعدادات</Button>
         </form>
+      )}
+
+      {/* كوبونات المتجر — رموز خصم تظهر لعملائك على واجهة المتجر (التفعيل العام من التحكم) */}
+      {store && couponsOn && (
+        <div className="card-3d space-y-3 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary">🎟️ كوبونات الخصم</div>
+          {coupon === '1' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ أُضيف الكوبون وسيظهر لعملائك على واجهة متجرك.</div>}
+          {coupon === 'err' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">تعذّرت الإضافة — تأكد من الرمز ووصف الخصم (الحد ٢٠ كوبوناً).</div>}
+          <p className="text-xs text-muted-foreground">أنشئ رمز خصم (مثال: SALE10 — خصم ١٠٪) يظهر بارزاً على واجهة متجرك مع زر نسخ. العميل يرسله لك عند الطلب وتطبّق الخصم بنفسك.</p>
+          <form action={addStoreCouponAction} className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+            <input name="code" required maxLength={30} placeholder="الرمز (SALE10)" dir="ltr" className="h-10 rounded-lg border bg-white px-2 text-sm" />
+            <input name="discount" required maxLength={80} placeholder="وصف الخصم (خصم ١٠٪ على الكل)" className="h-10 rounded-lg border bg-white px-2 text-sm sm:col-span-2" />
+            <div className="flex gap-2">
+              <input name="expires" type="date" className="h-10 min-w-0 flex-1 rounded-lg border bg-white px-2 text-sm" title="تاريخ الانتهاء (اختياري)" />
+              <button className="btn-3d shrink-0 rounded-lg bg-primary px-3 text-sm font-bold text-white">إضافة</button>
+            </div>
+          </form>
+          {coupons.length > 0 && (
+            <ul className="space-y-1.5">
+              {coupons.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-center gap-2 rounded-xl border p-2 text-sm">
+                  <b dir="ltr" className="rounded bg-primary/10 px-2 py-0.5 text-primary">{c.code}</b>
+                  <span className="min-w-0 flex-1 truncate">{c.discount}</span>
+                  {c.expiresAt && <span className="text-[11px] text-muted-foreground">حتى {c.expiresAt}</span>}
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${c.active ? 'bg-emerald-100 text-emerald-700' : 'bg-secondary text-muted-foreground'}`}>{c.active ? 'فعّال' : 'موقوف'}</span>
+                  <form action={toggleStoreCouponAction}><input type="hidden" name="id" value={c.id} /><button className="rounded-lg border px-2 py-1 text-[11px] font-bold text-amber-700">{c.active ? 'إيقاف' : 'تفعيل'}</button></form>
+                  <form action={deleteStoreCouponAction}><input type="hidden" name="id" value={c.id} /><button className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">حذف</button></form>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {/* بيانات الدخول موحّدة: دخولك في تربح (الجوال + كلمة المرور) يفتح إدارة متجرك تلقائياً */}

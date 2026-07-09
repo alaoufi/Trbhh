@@ -8,6 +8,15 @@ import type { CatalogStyle } from '@/lib/store-style';
 export type CatalogAd = {
   id: number; title: string; price: number; adsType: string | null; image: string;
   cityName: string | null; createdAt: string | null; special?: boolean | number; views: number; tier?: string | null;
+  /** عروض اليوم: السعر قبل الخصم — يظهر مشطوباً مع نسبة الخصم إن كان أعلى من السعر */
+  oldPrice?: number;
+  /** حالة التوفر: 0 متوفر، 1 نفدت الكمية، 2 طلب مسبق (تظهر شارة لغير المتوفر) */
+  stockState?: number;
+};
+
+const STOCK: Record<number, { label: string; cls: string } | undefined> = {
+  1: { label: 'نفدت الكمية', cls: 'bg-red-600' },
+  2: { label: 'طلب مسبق', cls: 'bg-indigo-600' },
 };
 
 const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
@@ -21,12 +30,23 @@ const timeShort = (iso: string | null) => timeAgo(iso).replace('قبل ', 'من�
 export function StoreCatalog({ ads, style, fields, brand, linkBase = '/ads' }: { ads: CatalogAd[]; style: CatalogStyle; fields: Set<string>; brand: string; linkBase?: string }) {
   const has = (f: string) => fields.has(f);
   const href = (id: number) => `${linkBase}/${id}`;
+  const pct = (ad: CatalogAd) => (ad.oldPrice && ad.price > 0 && ad.oldPrice > ad.price ? Math.round((1 - ad.price / ad.oldPrice) * 100) : 0);
   const priceEl = (ad: CatalogAd, size = 'text-[15px]') =>
     ad.price > 0
-      ? <span className={cn('font-extrabold text-red-600', size)}>{en(ad.price)} <span className="text-[11px] font-bold">ر.س</span></span>
+      ? (
+        <span className="inline-flex items-baseline gap-1">
+          <span className={cn('font-extrabold text-red-600', size)}>{en(ad.price)} <span className="text-[11px] font-bold">ر.س</span></span>
+          {pct(ad) > 0 && <span className="text-[10px] text-muted-foreground line-through" dir="ltr">{en(ad.oldPrice!)}</span>}
+          {pct(ad) > 0 && <span className="rounded bg-rose-600 px-1 py-0.5 text-[9px] font-extrabold text-white">-{pct(ad)}٪</span>}
+        </span>
+      )
       : ad.adsType === 'request'
         ? <span className="rounded bg-secondary/60 px-1.5 py-0.5 text-[11px] font-bold text-muted-foreground">مطلوب</span>
         : <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-700">على السوم</span>;
+  const stockBadge = (ad: CatalogAd) => {
+    const s = STOCK[ad.stockState ?? 0];
+    return s ? <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-extrabold text-white', s.cls)}>{s.label}</span> : null;
+  };
   const typeBadge = (ad: CatalogAd) => {
     const isReq = ad.adsType === 'request';
     return <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-extrabold text-white', isReq ? 'bg-amber-500' : 'bg-primary')}>{isReq ? 'طلب' : 'عرض'}</span>;
@@ -50,6 +70,7 @@ export function StoreCatalog({ ads, style, fields, brand, linkBase = '/ads' }: {
               {has('type') && <span className="absolute right-0 top-2">{typeBadge(ad)}</span>}
               {has('special') && ad.special ? <span className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow">مميّز</span> : null}
               <span className="absolute bottom-2 left-2">{tierBadge(ad)}</span>
+              <span className="absolute bottom-2 right-2">{stockBadge(ad)}</span>
             </div>
             <div className="flex flex-1 flex-col gap-0.5 p-2">
               <h3 className="line-clamp-2 min-h-[2.2rem] text-[13px] font-bold leading-snug text-foreground/90">{ad.title}</h3>
@@ -82,6 +103,7 @@ export function StoreCatalog({ ads, style, fields, brand, linkBase = '/ads' }: {
                 <div className="mb-1 flex items-center gap-1.5">
                   {has('type') && typeBadge(ad)}
                   {has('special') && ad.special ? <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold">مميّز</span> : null}
+                  {stockBadge(ad)}
                 </div>
                 <h3 className="line-clamp-1 text-base font-bold drop-shadow">{ad.title}</h3>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] opacity-95">
@@ -110,6 +132,7 @@ export function StoreCatalog({ ads, style, fields, brand, linkBase = '/ads' }: {
                 <div className="mb-1 flex items-center gap-1.5">
                   {has('type') && typeBadge(ad)}
                   {has('special') && ad.special ? <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">مميّز</span> : null}
+                  {stockBadge(ad)}
                 </div>
                 <h3 className="line-clamp-3 text-right text-base font-bold leading-7 text-primary">{ad.title}</h3>
                 {has('price') && <div className="mt-1">{priceEl(ad)}</div>}
@@ -144,6 +167,7 @@ export function StoreCatalog({ ads, style, fields, brand, linkBase = '/ads' }: {
             <div className="mb-1 flex items-center gap-1.5">
               {has('type') && typeBadge(ad)}
               {has('special') && ad.special ? <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">مميّز</span> : null}
+              {stockBadge(ad)}
             </div>
             <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground/90">{ad.title}</h3>
             {has('price') && <div className="mt-1">{priceEl(ad, 'text-base')}</div>}

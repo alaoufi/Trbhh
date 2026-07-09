@@ -36,6 +36,7 @@ type Initial = Partial<{
   categoryId: number; subcategoryId: number | null; countryId: number | null; cityId: number; areaId: number | null;
   phoneAllow: boolean; commentAllow: boolean; phone: string; whatsapp: string;
   lat: string | null; lng: string | null;
+  oldPrice: number; stockState: number;
 }>;
 
 function Submit({ label }: { label: string }) {
@@ -44,13 +45,14 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule,
+  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, allowOldPrice, allowStock,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string; dupId?: string;
   needPrice?: string; needBal?: string; dest?: string;
   limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean; allowSchedule?: boolean;
+  allowOldPrice?: boolean; allowStock?: boolean;
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
@@ -242,6 +244,22 @@ export function AdForm({
           <label className={lbl}>{isReq ? 'الميزانية المتوقّعة' : 'السعر'}</label>
           <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="اتركه فارغاً إذا ترغب «على السوم»" />
         </div>
+        {allowOldPrice && !isReq && (
+          <div>
+            <label className={lbl}>السعر قبل الخصم <span className="font-normal text-muted-foreground">(اختياري — لعروض اليوم)</span></label>
+            <input name="old_price" type="number" min="0" step="any" defaultValue={initial?.oldPrice || ''} className={field} placeholder="إن كان أعلى من السعر يظهر الخصم ويدخل إعلانك «عروض اليوم»" />
+          </div>
+        )}
+        {allowStock && !isReq && (
+          <div>
+            <label className={lbl}>حالة التوفر</label>
+            <select name="stock_state" defaultValue={String(initial?.stockState ?? 0)} className={field}>
+              <option value="0">متوفر</option>
+              <option value="1">نفدت الكمية</option>
+              <option value="2">طلب مسبق</option>
+            </select>
+          </div>
+        )}
         <div>
           <label className={lbl}>{isReq ? 'تفاصيل الطلب' : 'التفاصيل'}</label>
           <textarea name="detail" required defaultValue={initial?.detail} rows={6} className="w-full rounded-lg border-2 border-primary/25 bg-white p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40" placeholder={isReq ? 'اكتب تفاصيل ما تبحث عنه بدقّة...' : 'اكتب وصفاً واضحاً للخدمة أو المنتج...'} />

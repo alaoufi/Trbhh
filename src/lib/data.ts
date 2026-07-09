@@ -25,6 +25,8 @@ export type AdCard = {
   tier?: 'gold' | 'silver' | '';
   storeName?: string | null;
   storeId?: number | null;
+  /** عروض اليوم: السعر قبل الخصم (يظهر مشطوباً مع نسبة الخصم إن كان أعلى من السعر) */
+  oldPrice?: number;
 };
 
 async function sellerInfo(ids: bigint[]): Promise<Map<number, { name: string; trusted: boolean }>> {
@@ -97,6 +99,7 @@ type AdRow = {
   category_id: bigint;
   created_at: Date | null;
   urgent_until?: Date | null;
+  old_price?: number;
 };
 
 async function toCards(rows: AdRow[]): Promise<AdCard[]> {
@@ -135,6 +138,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         sellerName: s?.name ?? null,
         sellerTrusted: s?.trusted ?? false,
         tier: adMeta.get(toInt(r.user_id))?.tier ?? '',
+        oldPrice: r.old_price && r.old_price > r.price ? r.old_price : 0,
       };
     });
 }
@@ -157,6 +161,7 @@ const adSelect = {
   category_id: true,
   created_at: true,
   urgent_until: true,
+  old_price: true,
 } as const;
 
 export async function getCategories() {
@@ -228,6 +233,31 @@ export async function getLatestAds(take = 12) {
 
 export async function getFeaturedAds(take = 8) {
   return cached(`ads:featured:${take}`, 60, () => loadFeaturedAds(take));
+}
+
+/** عروض اليوم: إعلانات بسعر مخفّض (old_price أعلى من السعر) — إعلانات تربح، ومنتجات
+ *  المتاجر المعتمدة لعرض إعلاناتها في المنصة فقط (لا يكسر عزل بقية المتاجر). */
+export async function getDealAds(take = 60) {
+  return cached(`ads:deals:${take}`, 60, async () => {
+    const approvedStores = await prisma.stores.findMany({
+      where: { status: 1, show_on_platform: 1 },
+      select: { user_id: true },
+    }).catch(() => []);
+    const approvedUserIds = approvedStores.map((s) => BigInt(s.user_id));
+    const rows = await prisma.ads.findMany({
+      where: {
+        status: 1,
+        state: 'active',
+        old_price: { gt: 0 },
+        AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }, ...(approvedUserIds.length ? [{ user_id: { in: approvedUserIds } }] : [])] }],
+      },
+      orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+      take: take * 2,
+      select: adSelect,
+    });
+    const cards = await toCards(rows.filter((r) => (r.old_price ?? 0) > r.price && r.price > 0));
+    return cards.slice(0, take);
+  });
 }
 
 async function loadFeaturedAds(take: number) {
@@ -389,6 +419,8 @@ async function getAdImpl(id: number) {
     storeOnly: ad.store_only === 1,
     trbhhUntil: ad.trbhh_until ? ad.trbhh_until.toISOString() : null,
     urgentUntil: ad.urgent_until ? ad.urgent_until.toISOString() : null,
+    oldPrice: ad.old_price ?? 0,
+    stockState: ad.stock_state ?? 0,
     special: ad.adsSpecial === 'checked',
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,
@@ -461,6 +493,8 @@ export async function getAdForEdit(id: number, userId: number) {
     whatsapp: owner?.phone_whatsapp ?? '',
     lat: ad.lat ?? null,
     lng: ad.lng ?? null,
+    oldPrice: ad.old_price ?? 0,
+    stockState: ad.stock_state ?? 0,
   };
 }
 

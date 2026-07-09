@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
@@ -40,7 +40,7 @@ function Section({ title, icon: Icon, children }: { title: string; icon: React.E
   );
 }
 
-export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [] }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[]; adminHrefs?: string[] }) {
+export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], dealsOn = false }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[]; adminHrefs?: string[]; dealsOn?: boolean }) {
   const [open, setOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -162,6 +162,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [] }: { i
 
             <Section title="تصفّح" icon={Search}>
               <Item href="/search" icon={Search} onClick={close}>بحث متقدم</Item>
+              {dealsOn && <Item href="/deals" icon={Flame} onClick={close}>🔥 عروض اليوم</Item>}
               <Item href="/nearby" icon={MapPin} onClick={close}>قريب منك</Item>
               <Item href="/classified" icon={Sparkles} onClick={close}>الإعلانات المبوّبة</Item>
               <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>

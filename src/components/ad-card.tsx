@@ -10,6 +10,24 @@ function timeShort(iso: string | null) {
   return s.replace('قبل ', 'منذ ');
 }
 
+/** نسبة الخصم عندما يحدد المعلن سعراً قبل الخصم أعلى من السعر الحالي (عروض اليوم). */
+function discountPct(ad: AdCardType): number {
+  if (!ad.oldPrice || ad.price <= 0 || ad.oldPrice <= ad.price) return 0;
+  return Math.round((1 - ad.price / ad.oldPrice) * 100);
+}
+
+function DiscountChip({ ad }: { ad: AdCardType }) {
+  const pct = discountPct(ad);
+  if (!pct) return null;
+  return <span className="rounded bg-rose-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">خصم {pct}٪</span>;
+}
+
+function OldPrice({ ad }: { ad: AdCardType }) {
+  const pct = discountPct(ad);
+  if (!pct) return null;
+  return <span className="text-[11px] text-muted-foreground line-through" dir="ltr">{new Intl.NumberFormat('en-US').format(ad.oldPrice!)}</span>;
+}
+
 // Premium (paid) look per tier — attention-grabbing frame, glow, accent + ribbon.
 const PREMIUM = {
   gold: { border: '!border-amber-400', ring: 'ring-2 ring-amber-400/70', glow: 'shadow-[0_14px_36px_-8px_rgba(245,158,11,0.55)]', tint: '!bg-gradient-to-b !from-amber-50 !to-white', bar: 'from-amber-400 to-amber-600', chip: 'bg-gradient-to-l from-amber-500 to-amber-600', label: 'إعلان ذهبي مميّز' },
@@ -51,8 +69,11 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
       {/* title (right) + image (left) — matches the original layout */}
       <div className="flex items-stretch gap-3 p-3">
         <div className="min-w-0 flex-1">
-          <span className={cn('mb-1 inline-block rounded px-2 py-0.5 text-[10px] font-extrabold text-white', isReq ? 'bg-amber-500' : 'bg-primary')}>
-            {isReq ? 'طلب' : 'عرض'}
+          <span className="mb-1 inline-flex items-center gap-1">
+            <span className={cn('rounded px-2 py-0.5 text-[10px] font-extrabold text-white', isReq ? 'bg-amber-500' : 'bg-primary')}>
+              {isReq ? 'طلب' : 'عرض'}
+            </span>
+            <DiscountChip ad={ad} />
           </span>
           <h3 className="line-clamp-3 break-words text-right text-base font-bold leading-7 text-primary">
             {ad.title}
@@ -151,7 +172,7 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
         </div>
         <div className="mt-auto flex items-end justify-between gap-1 pt-0.5">
           {ad.price > 0
-            ? <span className="truncate text-[15px] font-extrabold text-red-600">{new Intl.NumberFormat('en-US').format(ad.price)} <span className="text-[11px] font-bold">ر.س</span></span>
+            ? <span className="flex min-w-0 items-baseline gap-1"><span className="truncate text-[15px] font-extrabold text-red-600">{new Intl.NumberFormat('en-US').format(ad.price)} <span className="text-[11px] font-bold">ر.س</span></span><OldPrice ad={ad} /><DiscountChip ad={ad} /></span>
             : isReq
               ? <span />
               : <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-700">على السوم</span>}
@@ -179,8 +200,8 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
           {ad.storeName && <StoreTag name={ad.storeName} />}
         </div>
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground/90">{ad.title}</h3>
-        <div className="mt-1 text-base font-extrabold text-red-600">
-          {ad.price > 0 ? <>{new Intl.NumberFormat('en-US').format(ad.price)} <span className="text-[11px] font-bold">ر.س</span></> : isReq ? <span className="text-sm font-bold text-muted-foreground">مطلوب</span> : <span className="text-amber-600">على السوم</span>}
+        <div className="mt-1 flex items-baseline gap-1.5 text-base font-extrabold text-red-600">
+          {ad.price > 0 ? <>{new Intl.NumberFormat('en-US').format(ad.price)} <span className="text-[11px] font-bold">ر.س</span> <OldPrice ad={ad} /> <DiscountChip ad={ad} /></> : isReq ? <span className="text-sm font-bold text-muted-foreground">مطلوب</span> : <span className="text-amber-600">على السوم</span>}
         </div>
         <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-0.5 pt-1.5 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" /> {new Intl.NumberFormat('en-US').format(ad.views)}</span>

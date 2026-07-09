@@ -46,6 +46,8 @@ model ads {
   urgent_until     DateTime?      @db.DateTime(0)
   bumped_at        DateTime?      @db.DateTime(0)
   publish_at       DateTime?      @db.DateTime(0)
+  stock_state      Int            @default(0) @db.TinyInt
+  old_price        Float          @default(0)
   data_archive     String?
   data_delete      String?
   price            Float          @default(0)
@@ -865,6 +867,21 @@ model stores {
   views            Int       @default(0)
   sub_until        DateTime? @db.DateTime(0)
   on_trial         Int       @default(0) @db.TinyInt
+  hours_from       String?   @db.VarChar(5)
+  hours_to         String?   @db.VarChar(5)
+  hours_days       String?   @db.VarChar(30)
+}
+
+model store_coupons {
+  id         Int       @id @default(autoincrement())
+  store_id   Int
+  code       String    @db.VarChar(30)
+  discount   String    @db.VarChar(80)
+  active     Int       @default(1) @db.TinyInt
+  expires_at DateTime? @db.Date
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([store_id], map: "store_coupons_store")
 }
 
 // ---- self-provisioned tables (source of truth: src/data/schema-sync.ts) ----

@@ -300,6 +300,9 @@ export async function createAdAction(formData: FormData) {
       adsSpecial: 'no',
       state: 'active',
       status: requireApproval ? 0 : 1,
+      // عروض اليوم + حالة التوفر (يظهر الحقلان عند تفعيلهما من التحكم)
+      old_price: Math.max(0, parseFloat(String(formData.get('old_price') || '0')) || 0),
+      stock_state: [0, 1, 2].includes(Number(formData.get('stock_state'))) ? Number(formData.get('stock_state')) : 0,
       store_only: dest === 'store' ? 1 : 0, // عزل تام: إعلان المتجر لا يظهر في تربح
       bumped_at: new Date(), // ترتيب «الأحدث» يعتمد آخر تحديث (Bump)
       ...(scheduledAt ? { status: 0, publish_at: scheduledAt } : {}),
@@ -394,6 +397,9 @@ export async function updateAdAction(formData: FormData) {
       lng: eLng || null,
       phoneAllow: formData.get('phoneAllow') ? 1 : 0,
       commentAllow: formData.get('commentAllow') ? 1 : 0,
+      // لا تُصفَّر القيم إذا كانت الميزة موقوفة من التحكم (الحقل غير معروض أصلاً)
+      ...(formData.get('old_price') !== null ? { old_price: Math.max(0, parseFloat(String(formData.get('old_price') || '0')) || 0) } : {}),
+      ...(formData.get('stock_state') !== null ? { stock_state: [0, 1, 2].includes(Number(formData.get('stock_state'))) ? Number(formData.get('stock_state')) : 0 } : {}),
     },
   });
 

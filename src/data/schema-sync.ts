@@ -140,6 +140,25 @@ const STATEMENTS: string[] = [
     UNIQUE KEY uniq_store_transfer (store_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  /* كوبونات المتجر: رموز خصم يعرضها المتجر لعملائه (التفعيل العام من التحكم). */
+  `CREATE TABLE IF NOT EXISTS store_coupons (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    store_id INT NOT NULL,
+    code VARCHAR(30) NOT NULL,
+    discount VARCHAR(80) NOT NULL,
+    active TINYINT NOT NULL DEFAULT 1,
+    expires_at DATE NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX store_coupons_store (store_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* حالة توفر المنتج: 0 متوفر، 1 نفدت الكمية، 2 طلب مسبق. */
+  `ALTER TABLE ads ADD COLUMN stock_state TINYINT NOT NULL DEFAULT 0`,
+  /* عروض اليوم: السعر قبل الخصم — إن كان أعلى من السعر يظهر الخصم ويدخل صفحة العروض. */
+  `ALTER TABLE ads ADD COLUMN old_price DOUBLE NOT NULL DEFAULT 0`,
+  /* دوام المتجر: من/إلى (HH:MM) وأيام العمل (أرقام أيام الأسبوع 0=الأحد، مفصولة بفواصل). */
+  `ALTER TABLE stores ADD COLUMN hours_from VARCHAR(5) NULL`,
+  `ALTER TABLE stores ADD COLUMN hours_to VARCHAR(5) NULL`,
+  `ALTER TABLE stores ADD COLUMN hours_days VARCHAR(30) NULL`,
   /* ---- moderation ---- */
   `ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`,
   `CREATE INDEX users_ban ON users (ban, ban_until)`,

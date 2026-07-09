@@ -16,10 +16,16 @@ export default async function EditAdPage({ params, searchParams }: { params: Pro
     getCategories(), getSubCategories(), getCountries(), getCities(), getAreas(),
   ]);
   if (!initial) notFound();
+  const [dealsOn, stockOn] = await Promise.all([
+    import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false),
+    import('@/lib/store-extras').then((m) => m.stockEnabled()).catch(() => false),
+  ]);
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold">تعديل الإعلان</h1>
       <AdForm
+        allowOldPrice={dealsOn}
+        allowStock={stockOn}
         action={updateAdAction}
         categories={categories}
         subcategories={subcategories}

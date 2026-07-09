@@ -117,7 +117,12 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const inStore = new Set(productIds);
   const inStoreAds = myAds.filter((a) => a.status === 1 && inStore.has(a.id));
   const viewsById = await adViewCounts(inStoreAds.map((a) => a.id)).catch(() => new Map<number, number>());
-  const allActive = inStoreAds.map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: viewsById.get(a.id) ?? 0, sellerName: null, sellerTrusted: false }));
+  // ميزات المتجر الإضافية (تفعيلها العام من التحكم): كوبونات + دوام + حالة التوفر + خصومات
+  const xtr = await import('@/lib/store-extras');
+  const [couponsOn, hoursOn, stockOn, dealsOn] = await Promise.all([xtr.couponsEnabled(), xtr.hoursEnabled(), xtr.stockEnabled(), xtr.dealsEnabled()]);
+  const coupons = couponsOn ? await xtr.listStoreCoupons(storeId, true).catch(() => []) : [];
+  const openNow = hoursOn ? xtr.isOpenNow(await xtr.getStoreHours(storeId).catch(() => ({ from: null, to: null, days: [] }))) : null;
+  const allActive = inStoreAds.map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: viewsById.get(a.id) ?? 0, sellerName: null, sellerTrusted: false, oldPrice: dealsOn ? a.oldPrice : 0, stockState: stockOn ? a.stockState : 0 }));
   const active = query ? allActive.filter((a) => (a.title || '').includes(query)) : allActive;
   // نص واتساب للمتجر: نص المتجر إن وُجد، وإلا نصّ افتراضي (لا يظهر فارغاً)
   const { parseTemplates, fillTemplate } = await import('@/lib/settings');
@@ -197,6 +202,23 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           </div>
         )}
 
+        {/* كوبونات الخصم — يضيفها صاحب المتجر من لوحته، والعميل ينسخ الرمز ويرسله عند الطلب */}
+        {coupons.length > 0 && (
+          <div className="space-y-2 rounded-xl border-2 border-dashed p-3 shadow-sm" style={{ borderColor: `${brand}66`, background: `${brand}0d` }}>
+            <div className="text-sm font-extrabold" style={{ color: brand }}>🎟️ كوبونات خصم من المتجر</div>
+            <div className="flex flex-wrap gap-2">
+              {coupons.map((c) => (
+                <span key={c.id} className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-bold shadow-sm ring-1 ring-black/10">
+                  <b dir="ltr" className="select-all" style={{ color: brand }}>{c.code}</b>
+                  <span className="text-foreground/80">{c.discount}</span>
+                  {c.expiresAt && <span className="text-[10px] text-muted-foreground">حتى {c.expiresAt}</span>}
+                </span>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground">انسخ الرمز وأرسله للمتجر عند الطلب ليطبّق الخصم.</p>
+          </div>
+        )}
+
         {/* ===== رأس المتجر بهويته البصرية (حسب القالب) ===== */}
         <div className={`overflow-hidden bg-white shadow-md ring-1 ring-black/5 ${tk.card}`}>
           <div className={`relative w-full ${tk.hero}`} style={{ background: bannerBackground(meta.banner, brand) }}>
@@ -214,6 +236,11 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <div className="flex flex-wrap items-center gap-1.5">
               {meta.status === 1 && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white"><ShieldCheck className="h-3.5 w-3.5" /> متجر موثّق</span>}
               <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${tierStyle[tier.key]}`}>{tier.key === 'gold' && <Crown className="h-3.5 w-3.5" />}{tier.label}</span>
+              {openNow !== null && (
+                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold text-white ${openNow ? 'bg-emerald-600' : 'bg-slate-500'}`}>
+                  🕒 {openNow ? 'مفتوح الآن' : 'مغلق الآن'}
+                </span>
+              )}
               {meta.specialty && <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold text-white" style={{ background: brand }}><Tag className="h-3.5 w-3.5" /> {meta.specialty}</span>}
               {year && <span className="inline-flex items-center gap-1 rounded-full bg-secondary/60 px-2.5 py-1 text-[11px] font-bold text-muted-foreground"><CalendarDays className="h-3.5 w-3.5" /> متجر منذ {year}</span>}
             </div>

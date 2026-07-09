@@ -145,14 +145,21 @@ export async function saveStoreMeta(userId: number, data: { storeName: string; c
 
 /** Store owner toggles: allow publishing ads, lock/unlock reviews+comments, and
  *  the store's OWN quick-reply message templates (shown only to its customers). */
-export async function saveStoreSettings(userId: number, data: { allowAds: boolean; allowReviews: boolean; msgTemplates: string; hidden: string[]; announce: string; productNote: string }) {
+export async function saveStoreSettings(userId: number, data: { allowAds: boolean; allowReviews: boolean; msgTemplates: string; hidden: string[]; announce: string; productNote: string; hours?: { from: string; to: string; days: number[] } | null }) {
   await ensure();
   const { parseTemplates } = await import('./settings');
   const tpl = parseTemplates(data.msgTemplates).join('\n');
   const hidden = [...new Set(data.hidden.filter((k) => STORE_HIDE_KEYS.includes(k)))].join(',');
   const announce = data.announce.trim().slice(0, 300);
   const productNote = data.productNote.trim().slice(0, 300);
-  await prisma.stores.updateMany({ where: { user_id: userId }, data: { allow_ads: data.allowAds ? 1 : 0, allow_reviews: data.allowReviews ? 1 : 0, msg_templates: tpl || null, hidden_fields: hidden || null, announce: announce || null, product_note: productNote || null } }).catch(() => {});
+  // دوام المتجر: undefined = لا تغيير (الميزة موقوفة)، null = مسح الدوام، وإلا HH:MM + أرقام الأيام
+  const hhmm = /^\d{1,2}:\d{2}$/;
+  const hoursData = data.hours === undefined
+    ? {}
+    : data.hours && hhmm.test(data.hours.from) && hhmm.test(data.hours.to)
+      ? { hours_from: data.hours.from, hours_to: data.hours.to, hours_days: data.hours.days.filter((d) => d >= 0 && d <= 6).join(',') || null }
+      : { hours_from: null, hours_to: null, hours_days: null };
+  await prisma.stores.updateMany({ where: { user_id: userId }, data: { allow_ads: data.allowAds ? 1 : 0, allow_reviews: data.allowReviews ? 1 : 0, msg_templates: tpl || null, hidden_fields: hidden || null, announce: announce || null, product_note: productNote || null, ...hoursData } }).catch(() => {});
 }
 
 /** Record that the owner agreed to the store terms (accountability). */

@@ -28,11 +28,13 @@ export async function Header() {
       ])
     : [0, 0];
   const bellCount = unreadMsgs + newNotifs;
+  // «عروض اليوم» في القائمة — يظهر فقط عند تفعيل الميزة من التحكم
+  const dealsOn = await import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false);
   return (
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
-        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} />
+        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} dealsOn={dealsOn} />
 
         {/* الزر الرئيسي — يتغيّر حسب الصفحة (دخول/رابط المتجر/الصفحة الرئيسية في صفحة الدخول) */}
         <HeaderCta isAuthed={!!session} myStoreId={myStoreId} />

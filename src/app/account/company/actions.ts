@@ -45,6 +45,11 @@ export async function saveStoreSettingsAction(formData: FormData) {
   const session = await requireUser();
   // كل حقل «إظهار» غير مُحدَّد => مُخفى (كل متجر يتحكم بحقوله بشكل مستقل)
   const hidden = STORE_HIDE_KEYS.filter((k) => formData.get(`show_${k}`) === null);
+  // دوام المتجر: تُحفظ القيم فقط عندما تكون الميزة مفعّلة (حقولها ظاهرة في النموذج)
+  const hoursPresent = formData.get('hoursPresent') !== null;
+  const hFrom = String(formData.get('hoursFrom') || '').trim();
+  const hTo = String(formData.get('hoursTo') || '').trim();
+  const hDays = formData.getAll('hoursDay').map((v) => Number(v)).filter((n) => Number.isFinite(n));
   await saveStoreSettings(session.uid, {
     allowAds: formData.get('allowAds') !== null,
     allowReviews: formData.get('allowReviews') !== null,
@@ -52,6 +57,7 @@ export async function saveStoreSettingsAction(formData: FormData) {
     hidden,
     announce: String(formData.get('announce') || ''),
     productNote: String(formData.get('productNote') || ''),
+    ...(hoursPresent ? { hours: hFrom && hTo ? { from: hFrom, to: hTo, days: hDays } : null } : {}),
   });
   revalidatePath('/store');
   revalidatePath('/');
@@ -300,4 +306,43 @@ export async function buyAdShowAction(formData: FormData) {
   await bustAdCaches().catch(() => {});
   revalidatePath('/store');
   redirect('/store?adshow=1');
+}
+
+/** كوبونات المتجر: إضافة كوبون (رمز + وصف الخصم + انتهاء اختياري) — حتى ٢٠ كوبوناً. */
+export async function addStoreCouponAction(formData: FormData) {
+  const session = await requireUser();
+  const { storeIdOfUser } = await import('@/lib/merchant');
+  const storeId = await storeIdOfUser(session.uid).catch(() => 0);
+  if (!storeId) redirect('/store');
+  const { couponsEnabled, addStoreCoupon } = await import('@/lib/store-extras');
+  if (!(await couponsEnabled())) redirect('/store');
+  const code = String(formData.get('code') || '');
+  const discount = String(formData.get('discount') || '');
+  const expRaw = String(formData.get('expires') || '').trim();
+  const exp = expRaw ? new Date(expRaw) : null;
+  const ok = await addStoreCoupon(storeId, code, discount, exp && !isNaN(exp.getTime()) ? exp : null);
+  revalidatePath('/store');
+  redirect(ok ? '/store?coupon=1' : '/store?coupon=err');
+}
+
+export async function deleteStoreCouponAction(formData: FormData) {
+  const session = await requireUser();
+  const { storeIdOfUser } = await import('@/lib/merchant');
+  const storeId = await storeIdOfUser(session.uid).catch(() => 0);
+  if (!storeId) redirect('/store');
+  const { deleteStoreCoupon } = await import('@/lib/store-extras');
+  await deleteStoreCoupon(storeId, Number(formData.get('id') || 0));
+  revalidatePath('/store');
+  redirect('/store?coupon=del');
+}
+
+export async function toggleStoreCouponAction(formData: FormData) {
+  const session = await requireUser();
+  const { storeIdOfUser } = await import('@/lib/merchant');
+  const storeId = await storeIdOfUser(session.uid).catch(() => 0);
+  if (!storeId) redirect('/store');
+  const { toggleStoreCoupon } = await import('@/lib/store-extras');
+  await toggleStoreCoupon(storeId, Number(formData.get('id') || 0));
+  revalidatePath('/store');
+  redirect('/store?coupon=tog');
 }

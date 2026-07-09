@@ -43,6 +43,8 @@ export async function getMyAds(userId: number) {
     image: images.get(toInt(r.id)) ?? PLACEHOLDER,
     createdAt: r.created_at ? r.created_at.toISOString() : null,
     expiresAt: r.expires_at ? r.expires_at.toISOString() : null,
+    oldPrice: r.old_price ?? 0,
+    stockState: r.stock_state ?? 0,
   }));
 }
 

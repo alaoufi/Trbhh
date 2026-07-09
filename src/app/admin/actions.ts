@@ -456,6 +456,11 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('schedule_on', formData.get('scheduleOn') !== null ? '1' : '0');
   await setSetting('bump_on', formData.get('bumpOn') !== null ? '1' : '0');
   await setSetting('ad_contact_stats_on', formData.get('adContactStatsOn') !== null ? '1' : '0');
+  // ميزات المتاجر: كوبونات + حالة التوفر + الدوام + عروض اليوم
+  await setSetting('coupons_on', formData.get('couponsOn') !== null ? '1' : '0');
+  await setSetting('stock_on', formData.get('stockOn') !== null ? '1' : '0');
+  await setSetting('hours_on', formData.get('hoursOn') !== null ? '1' : '0');
+  await setSetting('deals_on', formData.get('dealsOn') !== null ? '1' : '0');
   // classified duplicate prevention: toggle + content/image/background thresholds
   await setSetting(SETTING_CDUP_ON, formData.get('cdupOn') !== null ? '1' : '0');
   await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));

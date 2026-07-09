@@ -280,9 +280,10 @@ async function AccountsTab() {
       <p className="text-sm text-muted-foreground">هذه الحسابات تظهر للأعضاء في «محفظتي» ضمن «شحن رصيدك» — كل حقل بزر نسخ، وتحت الاسم عبارة تنبيه (تُعدَّل من «النصوص» ← المحفظة). يمكنك إضافة أكثر من حساب.</p>
       <form action={addTopupAccountAction} className="card-3d space-y-2 rounded-2xl p-4">
         <div className="flex items-center gap-2 text-sm font-bold text-primary"><Landmark className="h-4 w-4" /> إضافة حساب</div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label className="space-y-1"><span className="text-xs font-bold">البنك</span><input name="bank" placeholder="مثال: الراجحي" className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">رقم الحساب / الآيبان</span><input name="number" dir="ltr" placeholder="SA…" className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">رقم الحساب</span><input name="number" dir="ltr" className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">الآيبان (IBAN)</span><input name="iban" dir="ltr" placeholder="SA…" className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">اسم صاحب الحساب</span><input name="name" className={num} /></label>
         </div>
         <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة الحساب</button>
@@ -294,6 +295,7 @@ async function AccountsTab() {
             <div className="min-w-0 flex-1 space-y-0.5">
               {a.bank && <div><span className="text-xs font-bold text-muted-foreground">البنك: </span><b>{a.bank}</b></div>}
               {a.number && <div><span className="text-xs font-bold text-muted-foreground">رقم الحساب: </span><b dir="ltr" className="break-all text-primary">{a.number}</b></div>}
+              {a.iban && <div><span className="text-xs font-bold text-muted-foreground">الآيبان: </span><b dir="ltr" className="break-all text-primary">{a.iban}</b></div>}
               {a.name && <div><span className="text-xs font-bold text-muted-foreground">الاسم: </span><b>{a.name}</b></div>}
             </div>
             <form action={deleteTopupAccountAction}>

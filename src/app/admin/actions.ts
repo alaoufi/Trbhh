@@ -641,10 +641,11 @@ export async function addTopupAccountAction(formData: FormData) {
   await requireAction('users', 'edit');
   const bank = String(formData.get('bank') || '').trim().slice(0, 80);
   const number = String(formData.get('number') || '').trim().slice(0, 80);
+  const iban = String(formData.get('iban') || '').trim().slice(0, 80);
   const name = String(formData.get('name') || '').trim().slice(0, 120);
-  if (bank || number || name) {
+  if (bank || number || iban || name) {
     const accounts = await getTopupAccounts();
-    await setTopupAccounts([...accounts, { bank, number, name }]);
+    await setTopupAccounts([...accounts, { bank, number, iban, name }]);
   }
   revalidatePath('/admin/revenue');
   revalidatePath('/account/wallet');

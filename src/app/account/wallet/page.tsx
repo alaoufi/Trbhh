@@ -78,6 +78,15 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
                     <CopyChip text={a.number} />
                   </div>
                 )}
+                {a.iban && (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 text-sm">
+                      <span className="font-bold text-muted-foreground">الآيبان: </span>
+                      <b dir="ltr" className="select-all break-all text-base font-extrabold text-primary">{a.iban}</b>
+                    </div>
+                    <CopyChip text={a.iban} />
+                  </div>
+                )}
                 {a.name && (
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 text-sm">

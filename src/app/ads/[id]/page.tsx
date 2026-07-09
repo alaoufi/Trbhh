@@ -107,8 +107,9 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   const { storeIdOfUser, storeProductAdIds, getStoreMeta } = await import('@/lib/merchant');
   const sellerStoreId = ad.seller ? await storeIdOfUser(ad.seller.id).catch(() => 0) : 0;
   const inStore = sellerStoreId ? (await storeProductAdIds(sellerStoreId).catch(() => [] as number[])).includes(ad.id) : false;
-  // عزل تام: منتج المتجر يُعرض داخل متجره فقط (بواجهة المتجر وبواباته)
-  if (inStore && ad.storeOnly) redirect(`/companies/${sellerStoreId}/p/${ad.id}`);
+  // عزل تام: منتج المتجر يُعرض داخل متجره فقط — إلا بعرض مدفوع ساري («الظهور في تربح»)
+  const shownInTrbhh = !!(ad.trbhhUntil && new Date(ad.trbhhUntil) > new Date());
+  if (inStore && ad.storeOnly && !shownInTrbhh) redirect(`/companies/${sellerStoreId}/p/${ad.id}`);
   const storeMeta = inStore ? await getStoreMeta(sellerStoreId).catch(() => null) : null;
   const storeUrl = inStore ? (storeMeta?.handle ? `https://${storeMeta.handle}.${SITE.domain}` : `/companies/${sellerStoreId}`) : '';
 

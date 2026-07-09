@@ -491,6 +491,14 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting(SETTING_TOPUP_BONUS_MIN, nn('topupBonusMin'));
   await setSetting(SETTING_TOPUP_FIRST_BONUS, nn('topupFirstBonus'));
   await setSetting(SETTING_VERIFY_GIFT, nn('verifyGift'));
+  // الظهور المدفوع في تربح: عرض المتجر (بالمدد) + باقات عرض الإعلان (السعر والمدة لكل باقة)
+  await setSetting('show_store_w2', nn('showStoreW2'));
+  await setSetting('show_store_m1', nn('showStoreM1'));
+  await setSetting('show_store_y1', nn('showStoreY1'));
+  for (const k of ['gold', 'silver', 'regular']) {
+    await setSetting(`show_ad_${k}`, nn(`showAd_${k}`));
+    await setSetting(`show_ad_${k}_days`, String(Math.max(1, parseInt(String(formData.get(`showAdDays_${k}`) || '1')) || 1)));
+  }
   // مصفوفة تسعيرات الخدمات (خدمة × مدّة)
   const services: PaidService[] = ['featured', 'classified', 'dup3', 'dup5'];
   for (const s of services) {

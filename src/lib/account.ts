@@ -35,6 +35,7 @@ export async function getMyAds(userId: number) {
     status: r.status,
     state: r.state,
     storeOnly: r.store_only === 1,
+    trbhhUntil: r.trbhh_until ? r.trbhh_until.toISOString() : null,
     special: r.adsSpecial === 'checked',
     image: images.get(toInt(r.id)) ?? PLACEHOLDER,
     createdAt: r.created_at ? r.created_at.toISOString() : null,

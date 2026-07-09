@@ -34,9 +34,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ peerId: st
   const message = String(body.message || '').trim();
   if (!message) return Response.json({ ok: false });
   const id = await sendChat(session.uid, other, message);
-  await prisma.notfications
-    .create({ data: { title: `رسالة جديدة من ${session.name || 'عضو'}`, route: `/messages/${session.uid}`, user_id: String(other), type: 'message' } })
-    .catch(() => {});
+  {
+    // منع تكرار نفس التنبيه بنفس اليوم
+    const nDup = await prisma.notfications.findFirst({ where: { user_id: String(other), title: `رسالة جديدة من ${session.name || 'عضو'}`, created_at: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } }, select: { id: true } }).catch(() => null);
+    if (!nDup) await prisma.notfications.create({ data: { title: `رسالة جديدة من ${session.name || 'عضو'}`, route: `/messages/${session.uid}`, user_id: String(other), type: 'message' } }).catch(() => {});
+  }
 
   // Smart automatic acknowledgement when a member messages the administration
   try {

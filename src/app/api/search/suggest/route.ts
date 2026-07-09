@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (q.length < 2 || !(await searchSuggestEnabled())) return NextResponse.json({ items: [] });
   const items = await cached(`suggest:${q}`, 60, async () => {
     const rows = await prisma.ads.findMany({
-      where: { title: { contains: q }, status: 1, state: 'active', store_only: 0 },
+      where: { title: { contains: q }, status: 1, state: 'active', AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }] }] },
       select: { title: true },
       orderBy: { id: 'desc' },
       take: 30,

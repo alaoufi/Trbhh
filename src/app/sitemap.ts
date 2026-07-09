@@ -17,7 +17,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const [cats, ads] = await Promise.all([
       prisma.categories.findMany({ where: { is_active: 'yes' }, select: { id: true } }),
-      prisma.ads.findMany({ where: { status: 1, state: 'active', store_only: 0 }, select: { id: true, updated_at: true }, orderBy: { id: 'desc' }, take: 5000 }),
+      prisma.ads.findMany({ where: { status: 1, state: 'active', AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }] }] }, select: { id: true, updated_at: true }, orderBy: { id: 'desc' }, take: 5000 }),
     ]);
     for (const c of cats) entries.push({ url: `${base}/categories/${Number(c.id)}`, changeFrequency: 'daily', priority: 0.7 });
     for (const a of ads) entries.push({ url: `${base}/ads/${Number(a.id)}`, lastModified: a.updated_at ?? undefined, changeFrequency: 'weekly', priority: 0.5 });

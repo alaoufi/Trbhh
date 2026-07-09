@@ -556,7 +556,7 @@ export async function collaboratorAds(storeId: number) {
 export async function homeFeaturedOwnerIds(limit = 12): Promise<number[]> {
   await ensure();
   const rows = await prisma.stores.findMany({
-    where: { status: 1, OR: [{ home_featured: 1 }, { show_on_platform: 1 }] },
+    where: { status: 1, OR: [{ home_featured: 1 }, { AND: [{ show_on_platform: 1 }, { OR: [{ show_until: null }, { show_until: { gt: new Date() } }] }] }] },
     orderBy: [{ home_featured: 'desc' }, { id: 'desc' }], take: limit,
     select: { user_id: true },
   }).catch(() => []);
@@ -567,7 +567,7 @@ export async function homeFeaturedOwnerIds(limit = 12): Promise<number[]> {
 export async function homeFeaturedStores(limit = 6): Promise<{ userId: number; storeId: number; storeName: string | null }[]> {
   await ensure();
   const rows = await prisma.stores.findMany({
-    where: { status: 1, OR: [{ home_featured: 1 }, { show_on_platform: 1 }] },
+    where: { status: 1, OR: [{ home_featured: 1 }, { AND: [{ show_on_platform: 1 }, { OR: [{ show_until: null }, { show_until: { gt: new Date() } }] }] }] },
     orderBy: [{ home_featured: 'desc' }, { id: 'desc' }], take: limit,
     select: { user_id: true, id: true, store_name: true },
   }).catch(() => []);

@@ -4,7 +4,7 @@ import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -338,7 +338,7 @@ async function AccountsTab() {
 }
 
 async function PricingTab() {
-  const [sub, prices, remind, promo, verifyGift] = await Promise.all([getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift()]);
+  const [sub, prices, remind, promo, verifyGift, show] = await Promise.all([getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing()]);
   const services: { key: PaidService; note?: string }[] = [
     { key: 'featured' },
     { key: 'classified', note: 'إعلان واحد حسب المدّة' },
@@ -369,6 +369,28 @@ async function PricingTab() {
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">قبل كم يوم يبدأ التنبيه</span><input name="subRemindDays" type="number" min={0} defaultValue={remind.days} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">كم مرة (مرة/يوم كحدّ أقصى)</span><input name="subRemindCount" type="number" min={0} defaultValue={remind.count} className={num} /></label>
+        </div>
+      </div>
+
+      {/* الظهور المدفوع في تربح — عرض المتجر بالمدد + باقات عرض الإعلان (سعر ومدة لكل باقة) */}
+      <div className="rounded-xl border border-sky-300 bg-sky-50/60 p-3">
+        <div className="mb-1 text-xs font-bold text-sky-800">🏪 الظهور في تربح (للمتاجر) — اكتب 0 في السعر لتعطيل الخيار</div>
+        <p className="mb-2 text-[11px] text-muted-foreground">يشتريها التاجر من لوحة متجره وتُخصم من رصيده. عرض المتجر يُظهر المتجر ومنتجاته بقسم المتاجر في الرئيسية، وباقة الإعلان تُظهر إعلاناً محدداً في كل قوائم تربح للمدة المحددة.</p>
+        <div className="mb-1 text-xs font-bold">عرض المتجر في تربح (السعر لكل مدة)</div>
+        <div className="grid grid-cols-3 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">أسبوعان</span><input name="showStoreW2" type="number" min={0} defaultValue={show.store.w2} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">شهر</span><input name="showStoreM1" type="number" min={0} defaultValue={show.store.m1} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">سنة</span><input name="showStoreY1" type="number" min={0} defaultValue={show.store.y1} className={num} /></label>
+        </div>
+        <div className="mb-1 mt-3 text-xs font-bold">باقات عرض إعلان المتجر في تربح (السعر والمدة لكل باقة)</div>
+        <div className="space-y-2">
+          {show.ads.map((p0) => (
+            <div key={p0.key} className="grid grid-cols-3 items-end gap-2">
+              <div className="text-sm font-bold">{p0.key === 'gold' ? '🥇' : p0.key === 'silver' ? '🥈' : '⭐'} {p0.label}</div>
+              <label className="space-y-1"><span className="text-xs font-bold">السعر (ر.س)</span><input name={`showAd_${p0.key}`} type="number" min={0} defaultValue={p0.price} className={num} /></label>
+              <label className="space-y-1"><span className="text-xs font-bold">المدة (أيام)</span><input name={`showAdDays_${p0.key}`} type="number" min={1} defaultValue={p0.days} className={num} /></label>
+            </div>
+          ))}
         </div>
       </div>
 

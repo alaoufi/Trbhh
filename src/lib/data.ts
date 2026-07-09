@@ -136,8 +136,12 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
     });
 }
 
-// store_only: 0 — إعلانات المتاجر لا تدخل قوائم تربح إطلاقاً (تُعرض داخل متجرها فقط)
-const activeAdWhere = { status: 1, state: 'active' as const, store_only: 0 };
+// عزل المتاجر: إعلان المتجر لا يدخل قوائم تربح إلا بعرض مدفوع ساري المفعول (trbhh_until)
+const activeAdWhere = () => ({
+  status: 1,
+  state: 'active' as const,
+  AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }] }],
+});
 
 const adSelect = {
   id: true,
@@ -213,7 +217,7 @@ export async function getLatestAds(take = 12) {
   return cached(`ads:latest:${take}`, 60, async () => {
     sweepExpiredArchived().catch(() => {});
     sweepExpiredPaidAds().catch(() => {});
-    const rows = await prisma.ads.findMany({ where: activeAdWhere, orderBy: { id: 'desc' }, take, select: adSelect });
+    const rows = await prisma.ads.findMany({ where: activeAdWhere(), orderBy: { id: 'desc' }, take, select: adSelect });
     return toCards(rows);
   });
 }
@@ -225,7 +229,7 @@ export async function getFeaturedAds(take = 8) {
 async function loadFeaturedAds(take: number) {
   await sweepExpiredFeatured().catch(() => {});
   const rows = await prisma.ads.findMany({
-    where: { ...activeAdWhere, adsSpecial: 'checked' },
+    where: { ...activeAdWhere(), adsSpecial: 'checked' },
     orderBy: { id: 'desc' },
     take: take * 3,
     select: adSelect,
@@ -250,7 +254,7 @@ async function loadMostViewedAds(take: number) {
   });
   const ids = groups.map((g) => g.ads_id).filter(Boolean) as bigint[];
   if (!ids.length) return [];
-  const rows = await prisma.ads.findMany({ where: { id: { in: ids }, ...activeAdWhere }, select: adSelect });
+  const rows = await prisma.ads.findMany({ where: { id: { in: ids }, ...activeAdWhere() }, select: adSelect });
   const cards = await toCards(rows);
   const order = new Map(ids.map((id, i) => [toInt(id), i]));
   return cards.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9)).slice(0, take);
@@ -260,7 +264,7 @@ export async function getStats() {
   return cached('stats:home', 120, async () => {
     const [users, ads, cats, views] = await Promise.all([
       prisma.users.count(),
-      prisma.ads.count({ where: activeAdWhere }),
+      prisma.ads.count({ where: activeAdWhere() }),
       prisma.categories.count({ where: { is_active: 'yes' } }),
       prisma.ads_views.count(),
     ]);
@@ -280,7 +284,7 @@ export async function getAdsByCategory(categoryId: number, take = 24, skip = 0) 
   // الرئيسية كانت تعيد بناء بطاقات حتى ٦ أقسام من القاعدة مع كل تنقّل.
   return cached(`ads:cat:${categoryId}:${take}:${skip}`, 60, async () => {
     const rows = await prisma.ads.findMany({
-      where: { ...activeAdWhere, category_id: BigInt(categoryId) },
+      where: { ...activeAdWhere(), category_id: BigInt(categoryId) },
       orderBy: [{ adsSpecial: 'desc' }, { id: 'desc' }],
       take,
       skip,
@@ -307,7 +311,7 @@ export async function searchAds(params: {
     [{ adsSpecial: 'desc' as const }, { id: 'desc' as const }];
   const rows = await prisma.ads.findMany({
     where: {
-      ...activeAdWhere,
+      ...activeAdWhere(),
       ...(categoryId ? { category_id: BigInt(categoryId) } : {}),
       ...(countryId ? { country_id: countryId } : {}),
       ...(cityId ? { city_id: BigInt(cityId) } : {}),
@@ -366,6 +370,7 @@ async function getAdImpl(id: number) {
     status: ad.status,
     state: ad.state,
     storeOnly: ad.store_only === 1,
+    trbhhUntil: ad.trbhh_until ? ad.trbhh_until.toISOString() : null,
     special: ad.adsSpecial === 'checked',
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,
@@ -458,7 +463,7 @@ export async function recordView(adId: number, viewerKey: string) {
 /** Similar ads from the same category (excluding the current ad). */
 export async function getSimilarAds(adId: number, categoryId: number, take = 6) {
   const rows = await prisma.ads.findMany({
-    where: { ...activeAdWhere, category_id: BigInt(categoryId), id: { not: BigInt(adId) } },
+    where: { ...activeAdWhere(), category_id: BigInt(categoryId), id: { not: BigInt(adId) } },
     orderBy: [{ adsSpecial: 'desc' }, { id: 'desc' }],
     take,
     select: adSelect,

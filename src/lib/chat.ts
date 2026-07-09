@@ -10,6 +10,13 @@ export async function sendChat(fromId: number, toId: number, message: string): P
   await ensureChatExtras();
   const text = message.slice(0, 2000);
   const now = new Date();
+  // منع التكرار المطابق بنفس اليوم: نفس المرسل والمستلم والنص خلال ٢٤ ساعة → لا تُنشأ نسخة ثانية
+  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const dup = await prisma.chats.findFirst({
+    where: { sender_id: fromId, reciver_id: toId, message: text, created_at: { gt: dayAgo } },
+    select: { id: true },
+  }).catch(() => null);
+  if (dup) return toInt(dup.id);
   const row = await prisma.chats.create({
     data: {
       sender_id: fromId, reciver_id: toId, message: text, is_read: 0, chat_id: 0,

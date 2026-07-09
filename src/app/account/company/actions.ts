@@ -247,3 +247,56 @@ export async function bulkUploadProductsAction(formData: FormData) {
   revalidatePath('/store');
   redirect(`/store?bulk=${created}`);
 }
+
+
+/** شراء «عرض المتجر في تربح» لمدة محددة — يُخصم من الرصيد ويمدَّد التاريخ الحالي. */
+export async function buyStoreShowAction(formData: FormData) {
+  const session = await requireUser();
+  const { storeIdOfUser } = await import('@/lib/merchant');
+  const storeId = await storeIdOfUser(session.uid).catch(() => 0);
+  if (!storeId) redirect('/store');
+  const { getTrbhhShowPricing, isDur, DUR_DAYS, DUR_LABEL } = await import('@/lib/settings');
+  const dur = String(formData.get('duration') || '');
+  if (!isDur(dur)) redirect('/store?show=err');
+  const pricing = await getTrbhhShowPricing();
+  const price = pricing.store[dur];
+  if (price <= 0) redirect('/store?show=err');
+  const { charge } = await import('@/lib/wallet');
+  const paid = await charge(session.uid, price, 'store_show', `عرض المتجر في تربح — ${DUR_LABEL[dur]}`);
+  if (!paid.ok) redirect(`/store?show=needcredit&price=${price}`);
+  const st = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { show_until: true } }).catch(() => null);
+  const base = st?.show_until && st.show_until > new Date() ? st.show_until : new Date();
+  const until = new Date(base.getTime() + DUR_DAYS[dur] * 24 * 60 * 60 * 1000);
+  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { show_on_platform: 1, show_until: until } }).catch(() => {});
+  revalidatePath('/store');
+  revalidatePath('/');
+  redirect('/store?show=1');
+}
+
+/** شراء «عرض إعلان المتجر في تربح» بباقة (المدة والسعر من التحكم) — يُخصم من الرصيد. */
+export async function buyAdShowAction(formData: FormData) {
+  const session = await requireUser();
+  const { storeIdOfUser, storeProductAdIds } = await import('@/lib/merchant');
+  const storeId = await storeIdOfUser(session.uid).catch(() => 0);
+  if (!storeId) redirect('/store');
+  const adId = Number(formData.get('adId') || 0);
+  const pkgKey = String(formData.get('pkg') || '');
+  const { getTrbhhShowPricing } = await import('@/lib/settings');
+  const pricing = await getTrbhhShowPricing();
+  const pkg = pricing.ads.find((x) => x.key === pkgKey && x.price > 0);
+  if (!adId || !pkg) redirect('/store?adshow=err');
+  // الإعلان لصاحب المتجر ومن منتجات متجره
+  const ad = await prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { user_id: true, trbhh_until: true, title: true } }).catch(() => null);
+  const productIds = await storeProductAdIds(storeId).catch(() => [] as number[]);
+  if (!ad || toInt(ad.user_id) !== session.uid || !productIds.includes(adId)) redirect('/store?adshow=err');
+  const { charge } = await import('@/lib/wallet');
+  const paid = await charge(session.uid, pkg.price, 'ad_show', `${pkg.label} (${pkg.days} يوماً) — ${String(ad.title || '').slice(0, 40)}`);
+  if (!paid.ok) redirect(`/store?adshow=needcredit&price=${pkg.price}`);
+  const base = ad.trbhh_until && ad.trbhh_until > new Date() ? ad.trbhh_until : new Date();
+  const until = new Date(base.getTime() + pkg.days * 24 * 60 * 60 * 1000);
+  await prisma.ads.updateMany({ where: { id: BigInt(adId) }, data: { trbhh_until: until } }).catch(() => {});
+  const { bustAdCaches } = await import('@/lib/data');
+  await bustAdCaches().catch(() => {});
+  revalidatePath('/store');
+  redirect('/store?adshow=1');
+}

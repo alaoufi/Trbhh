@@ -147,6 +147,12 @@ const STATEMENTS: string[] = [
   /* ---- wallet / credit (رصيد) ---- */
   /* عزل إعلانات المتاجر: علامة store_only تُنشأ مع إعلان المتجر فلا يظهر في قوائم تربح إطلاقاً. */
   `ALTER TABLE ads ADD COLUMN store_only TINYINT NOT NULL DEFAULT 0`,
+  /* عرض مدفوع في تربح: إعلان متجر يظهر في قوائم تربح حتى هذا التاريخ. */
+  `ALTER TABLE ads ADD COLUMN trbhh_until DATETIME NULL`,
+  /* عرض المتجر (واجهته ومنتجاته) في رئيسية تربح حتى هذا التاريخ (NULL = بقرار إداري دائم). */
+  `ALTER TABLE stores ADD COLUMN show_until DATETIME NULL`,
+  /* التنبيهات: تاريخ القراءة — الجديد ملوّن والمقروء يُؤرشف. */
+  `ALTER TABLE notfications ADD COLUMN read_at DATETIME NULL`,
   `ALTER TABLE users ADD COLUMN balance INT NOT NULL DEFAULT 0`,
   `ALTER TABLE users ADD COLUMN dup_credit INT NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS wallet_txns (

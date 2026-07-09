@@ -144,6 +144,28 @@ export async function getTopupAccounts(): Promise<TopupAccount[]> {
 export async function setTopupAccounts(accounts: TopupAccount[]): Promise<void> {
   await setSetting(SETTING_TOPUP_ACCOUNTS, JSON.stringify(accounts.slice(0, 20)));
 }
+/* الظهور المدفوع في تربح (للمتاجر) — المدة والسعر لكل باقة من التحكم؛ سعر 0 = تعطيل الباقة. */
+export const AD_SHOW_PKG_DEFS = [
+  { key: 'gold', label: 'الباقة الذهبية', defDays: 90 },
+  { key: 'silver', label: 'الباقة الفضية', defDays: 30 },
+  { key: 'regular', label: 'الباقة العادية', defDays: 14 },
+] as const;
+export type AdShowPkg = typeof AD_SHOW_PKG_DEFS[number]['key'];
+export type AdShowPkgFull = { key: AdShowPkg; label: string; days: number; price: number };
+export type TrbhhShowPricing = { store: Record<Dur, number>; ads: AdShowPkgFull[] };
+export async function getTrbhhShowPricing(): Promise<TrbhhShowPricing> {
+  const [sw2, sm1, sy1] = await Promise.all([
+    getSettingNum('show_store_w2', 0), getSettingNum('show_store_m1', 0), getSettingNum('show_store_y1', 0),
+  ]);
+  const ads = await Promise.all(AD_SHOW_PKG_DEFS.map(async (d) => ({
+    key: d.key,
+    label: d.label,
+    days: Math.max(1, await getSettingNum(`show_ad_${d.key}_days`, d.defDays)),
+    price: Math.max(0, await getSettingNum(`show_ad_${d.key}`, 0)),
+  })));
+  return { store: { w2: Math.max(0, sw2), m1: Math.max(0, sm1), y1: Math.max(0, sy1) }, ads };
+}
+
 /* عروض الشحن والمكافآت — 0 = معطّل (تُضبط من الإيرادات والتسعير). */
 export const SETTING_TOPUP_BONUS_PCT = 'topup_bonus_pct';
 export const SETTING_TOPUP_BONUS_MIN = 'topup_bonus_min';

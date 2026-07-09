@@ -42,6 +42,7 @@ model ads {
   updated_at       DateTime?      @db.Timestamp(0)
   status           Int            @default(1) @db.TinyInt
   store_only       Int            @default(0) @db.TinyInt
+  trbhh_until      DateTime?      @db.DateTime(0)
   data_archive     String?
   data_delete      String?
   price            Float          @default(0)
@@ -416,6 +417,7 @@ model notfications {
   updated_at DateTime? @db.Timestamp(0)
   type       String?
   model_id   Int       @default(0)
+  read_at    DateTime? @db.DateTime(0)
 }
 
 model notifications {
@@ -841,6 +843,7 @@ model stores {
   specialty        String?   @db.VarChar(120)
   audience         String?   @db.VarChar(160)
   show_on_platform Int       @default(0) @db.TinyInt
+  show_until                DateTime?  @db.DateTime(0)
   national_id      String?   @db.VarChar(30)
   store_phone      String?   @db.VarChar(24)
   store_email      String?   @db.VarChar(120)

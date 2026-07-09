@@ -36,7 +36,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
     canReview(uid, session?.uid),
   ]);
   // الملف العام يعرض إعلانات تربح النشطة فقط — منتجات المتاجر تبقى داخل متجرها
-  const myAds = myAdsAll.filter((a) => !a.storeOnly && a.status === 1 && a.state === 'active');
+  const myAds = myAdsAll.filter((a) => (!a.storeOnly || (a.trbhhUntil && new Date(a.trbhhUntil) > new Date())) && a.status === 1 && a.state === 'active');
   // viewing your OWN profile clears the "new reviews" alert
   if (session && session.uid === uid) {
     const { markSeen } = await import('@/lib/alerts');

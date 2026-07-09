@@ -8,7 +8,7 @@ import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction } from '@/app/account/company/actions';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
 import { getStoreSubPricing } from '@/lib/settings';
 import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen, DatabaseBackup } from 'lucide-react';
@@ -21,8 +21,8 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string }> }) {
-  const { error, sub, added, settings, backup, bulk } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string }> }) {
+  const { error, sub, added, settings, backup, bulk, show, adshow, price } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
@@ -31,6 +31,17 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const store = await getStoreByUser(session.uid);
   const backups = store ? await (await import('@/lib/store-backup')).listStoreBackups(store.id).catch(() => []) : [];
   const bulkCats = store ? await (await import('@/lib/data')).getCategories().catch(() => []) : [];
+  // الظهور المدفوع في تربح: التسعيرات + حالة المتجر + منتجاته وحالات عرضها
+  const showPricing = store ? await (await import('@/lib/settings')).getTrbhhShowPricing().catch(() => null) : null;
+  const { prisma: db } = await import('@/lib/prisma');
+  const storeShowRow = store ? await db.stores.findUnique({ where: { id: BigInt(store.id) }, select: { show_until: true, show_on_platform: true } }).catch(() => null) : null;
+  const productAdIds = store ? await (await import('@/lib/merchant')).storeProductAdIds(store.id).catch(() => [] as number[]) : [];
+  const showProducts = productAdIds.length
+    ? await db.ads.findMany({ where: { id: { in: productAdIds.map((i) => BigInt(i)) } }, select: { id: true, title: true, trbhh_until: true }, orderBy: { id: 'desc' }, take: 100 }).catch(() => [])
+    : [];
+  const fmtD = (d: Date | null) => (d ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d) : '');
+  const storeShowActive = !!(storeShowRow?.show_until && storeShowRow.show_until > new Date());
+  const shownAds = showProducts.filter((a) => a.trbhh_until && a.trbhh_until > new Date());
   const subState = store ? await getStoreSub(store.id) : null;
   const subPricing = await getStoreSubPricing();
   const branches = store ? await prisma.store_branches.findMany({ where: { store_id: store.id } }) : [];
@@ -221,6 +232,59 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         <span className="flex items-center gap-2 font-bold text-teal-800"><BookOpen className="h-5 w-5" /> دليل المتجر</span>
         <span className="text-xs text-muted-foreground">شرح كل ما يخصّ إدارة متجرك ←</span>
       </Link>
+
+      {/* الظهور المدفوع في تربح: عرض المتجر بالمدد + عرض إعلان بباقة — يُخصم من الرصيد */}
+      {store && showPricing && (showPricing.store.w2 > 0 || showPricing.store.m1 > 0 || showPricing.store.y1 > 0 || showPricing.ads.some((a) => a.price > 0)) && (
+        <div className="card-3d space-y-3 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary">📣 الظهور في تربح (مدفوع)</div>
+          {show === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض متجرك في تربح وخُصم المبلغ من رصيدك.</div>}
+          {adshow === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض إعلانك في تربح وخُصم المبلغ من رصيدك.</div>}
+          {(show === 'needcredit' || adshow === 'needcredit') && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي{price ? ` (المطلوب ${price} ر.س)` : ''} — اشحن رصيدك من «محفظتي» ثم أعد المحاولة.</div>}
+          {(show === 'err' || adshow === 'err') && <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs font-bold text-red-700">تعذّر التنفيذ — تأكد من الاختيار وحاول مجدداً.</div>}
+
+          {(showPricing.store.w2 > 0 || showPricing.store.m1 > 0 || showPricing.store.y1 > 0) && (
+            <div className="space-y-2 rounded-xl border border-primary/15 bg-primary/5 p-3">
+              <div className="text-sm font-bold">🏪 عرض متجرك في رئيسية تربح</div>
+              <p className="text-[11px] text-muted-foreground">يظهر متجرك (ومنتجاته) في قسم المتاجر بالصفحة الرئيسية طوال المدة.</p>
+              {storeShowActive && <div className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">مفعّل حتى: {fmtD(storeShowRow!.show_until)}</div>}
+              <div className="grid grid-cols-3 gap-2">
+                {([['w2', 'أسبوعان'], ['m1', 'شهر'], ['y1', 'سنة']] as const).filter(([k]) => showPricing.store[k] > 0).map(([k, label]) => (
+                  <form key={k} action={buyStoreShowAction} className="text-center">
+                    <input type="hidden" name="duration" value={k} />
+                    <button className="btn-3d w-full rounded-lg bg-primary px-2 py-2 text-xs font-bold text-white">{label}<br /><span className="text-[10px] opacity-90">{showPricing.store[k]} ر.س</span></button>
+                  </form>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showPricing.ads.some((a) => a.price > 0) && showProducts.length > 0 && (
+            <div className="space-y-2 rounded-xl border border-amber-300 bg-amber-50/50 p-3">
+              <div className="text-sm font-bold">📢 عرض إعلان من متجرك في تربح</div>
+              <p className="text-[11px] text-muted-foreground">يظهر الإعلان المحدد في كل قوائم تربح (الرئيسية/البحث/الأقسام) طوال مدة الباقة، ويُخصم سعرها من رصيدك.</p>
+              <form action={buyAdShowAction} className="space-y-2">
+                <select name="adId" required className="h-10 w-full rounded-lg border border-primary/30 bg-background px-2 text-sm">
+                  {showProducts.map((a) => (
+                    <option key={String(a.id)} value={String(a.id)}>{a.title}{a.trbhh_until && a.trbhh_until > new Date() ? ` — معروض حتى ${fmtD(a.trbhh_until)}` : ''}</option>
+                  ))}
+                </select>
+                <select name="pkg" required className="h-10 w-full rounded-lg border border-primary/30 bg-background px-2 text-sm">
+                  {showPricing.ads.filter((a) => a.price > 0).map((a) => (
+                    <option key={a.key} value={a.key}>{a.key === 'gold' ? '🥇' : a.key === 'silver' ? '🥈' : '⭐'} {a.label} — {a.days} يوماً — {a.price} ر.س</option>
+                  ))}
+                </select>
+                <button className="btn-3d w-full rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white">شراء وعرض الإعلان في تربح</button>
+              </form>
+              {shownAds.length > 0 && (
+                <div className="space-y-1 border-t border-amber-200 pt-2 text-[11px] font-bold">
+                  <div className="text-muted-foreground">المعروض حالياً في تربح:</div>
+                  {shownAds.map((a) => <div key={String(a.id)}>✅ {a.title} — حتى {fmtD(a.trbhh_until)}</div>)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* رفع منتجات دفعة واحدة من ملف Excel/CSV */}
       {store && (

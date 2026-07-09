@@ -19,8 +19,10 @@ export async function sendMessageAction(formData: FormData) {
       type_to_user: 'user',
     },
   });
-  await prisma.notfications
-    .create({ data: { title: `رسالة جديدة من ${session.name}`, route: `/messages/${session.uid}`, user_id: String(reciverId), type: 'message' } })
-    .catch(() => {});
+  {
+    // منع تكرار نفس التنبيه بنفس اليوم
+    const nDup = await prisma.notfications.findFirst({ where: { user_id: String(reciverId), title: `رسالة جديدة من ${session.name}`, created_at: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } }, select: { id: true } }).catch(() => null);
+    if (!nDup) await prisma.notfications.create({ data: { title: `رسالة جديدة من ${session.name}`, route: `/messages/${session.uid}`, user_id: String(reciverId), type: 'message' } }).catch(() => {});
+  }
   revalidatePath(`/messages/${reciverId}`);
 }

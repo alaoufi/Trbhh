@@ -12,7 +12,7 @@ import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAcco
 import { addBannedWord, deleteBannedWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_TRIAL_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_TRIAL_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -389,6 +389,9 @@ export async function saveTextsAction(formData: FormData) {
     await put(SETTING_EMPTY_CLASSIFIED, 'emptyClassified');
   } else if (sec === 'sub') {
     await put(SETTING_SUB_REMINDER_MSG, 'subReminderMsg');
+  } else if (sec === 'verify') {
+    await put(SETTING_MSG_VERIFY_OK, 'msgVerifyOk');
+    await put(SETTING_MSG_VERIFY_REJECT, 'msgVerifyReject');
   }
   revalidatePath('/admin/texts');
   revalidatePath('/', 'layout');
@@ -581,6 +584,57 @@ export async function trustUserAction(formData: FormData) {
   const u = await prisma.users.findUnique({ where: { id } });
   if (u) await prisma.users.update({ where: { id }, data: { trusted: u.trusted === 1 ? 0 : 1, step: 0 } });
   revalidatePath('/admin/users');
+  revalidatePath('/admin/verifications');
+}
+
+/** رسالة إدارية للعضو بقرار التوثيق — النص من تبويب «النصوص» ({name}/{reason}). */
+async function sendVerifyMessage(userId: number, key: string, fallback: string, reason = '') {
+  const [{ getSetting }, { getPrimaryAdminId }, { sendChat }] = await Promise.all([
+    import('@/lib/settings'), import('@/lib/admin-inbox'), import('@/lib/chat'),
+  ]);
+  const adminId = await getPrimaryAdminId().catch(() => 0);
+  if (!adminId || adminId === userId) return;
+  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { name: true, userName: true } }).catch(() => null);
+  const tpl = await getSetting(key, fallback);
+  if (!tpl.trim()) return; // نص فارغ = تعطيل الرسالة
+  const body = tpl.replace(/\{name\}/g, u?.name || u?.userName || 'عضو').replace(/\{reason\}/g, reason || '—');
+  await sendChat(adminId, userId, body).catch(() => {});
+}
+
+/** الموافقة على التوثيق: تفعيل فوري + رسالة للعضو. */
+export async function approveVerificationAction(formData: FormData) {
+  await requireAction('verifications', 'edit');
+  const id = Number(formData.get('userId') || 0);
+  if (!id) return;
+  await prisma.users.update({ where: { id: BigInt(id) }, data: { trusted: 1, step: 0, verify_note: null } }).catch(() => {});
+  const { SETTING_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_OK } = await import('@/lib/settings');
+  await sendVerifyMessage(id, SETTING_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_OK);
+  revalidatePath('/admin/verifications');
+  revalidatePath('/admin/users');
+}
+
+/** رفض التوثيق مع سبب يبقى محفوظاً + رسالة للعضو بالسبب. */
+export async function rejectVerificationAction(formData: FormData) {
+  await requireAction('verifications', 'edit');
+  const id = Number(formData.get('userId') || 0);
+  const reason = String(formData.get('reason') || '').trim().slice(0, 300);
+  if (!id || !reason) return;
+  await prisma.users.update({ where: { id: BigInt(id) }, data: { trusted: 0, step: 2, verify_note: reason } }).catch(() => {});
+  const { SETTING_MSG_VERIFY_REJECT, DEFAULT_MSG_VERIFY_REJECT } = await import('@/lib/settings');
+  await sendVerifyMessage(id, SETTING_MSG_VERIFY_REJECT, DEFAULT_MSG_VERIFY_REJECT, reason);
+  revalidatePath('/admin/verifications');
+}
+
+/** حذف وثائق التوثيق (بعد تأكيد): يمسح المرفوعات وأعمدة الوثائق ويعيد الحالة. */
+export async function deleteVerificationDocsAction(formData: FormData) {
+  await requireAction('verifications', 'edit');
+  const id = Number(formData.get('userId') || 0);
+  if (!id) return;
+  await prisma.uploads.deleteMany({ where: { user_id: id, type: { in: ['verify_nid', 'verify_cr', 'verify_wp'] } } }).catch(() => {});
+  await prisma.users.update({
+    where: { id: BigInt(id) },
+    data: { national_identity: null, commercial_register: null, work_permit: null, step: 0 },
+  }).catch(() => {});
   revalidatePath('/admin/verifications');
 }
 

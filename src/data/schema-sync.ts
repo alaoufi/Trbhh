@@ -143,6 +143,7 @@ const STATEMENTS: string[] = [
   /* ---- moderation ---- */
   `ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`,
   `CREATE INDEX users_ban ON users (ban, ban_until)`,
+  `ALTER TABLE users ADD COLUMN verify_note VARCHAR(300) NULL`,
   /* ---- wallet / credit (رصيد) ---- */
   `ALTER TABLE users ADD COLUMN balance INT NOT NULL DEFAULT 0`,
   `ALTER TABLE users ADD COLUMN dup_credit INT NOT NULL DEFAULT 0`,

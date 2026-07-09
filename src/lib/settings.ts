@@ -105,6 +105,12 @@ export async function getAdminMsgTemplates(): Promise<string[]> {
   return v === '__default__' ? [DEFAULT_MSG_TPL_ADMIN] : parseTemplates(v);
 }
 
+/* رسائل قرارات التوثيق — تُرسل للعضو من الإدارة وتُعدَّل من تبويب النصوص. */
+export const SETTING_MSG_VERIFY_OK = 'msg_verify_ok';
+export const SETTING_MSG_VERIFY_REJECT = 'msg_verify_reject';
+export const DEFAULT_MSG_VERIFY_OK = 'تهانينا {name} 🎉 تم توثيق حسابك في تربح — تظهر الآن شارة «موثّق» على ملفك وإعلاناتك. — الإدارة';
+export const DEFAULT_MSG_VERIFY_REJECT = 'نعتذر {name}، لم يُقبل طلب توثيق حسابك. السبب: {reason}. يمكنك معالجة السبب وإعادة رفع الوثائق من «توثيق الحساب». — الإدارة';
+
 /* Visitor-facing safety notice shown on the ad detail page (editable). */
 export const SETTING_AD_NOTICE = 'ad_notice';
 export const DEFAULT_AD_NOTICE = 'التعامل والدفع يتم خارج المنصة مباشرة بين الطرفين. المنصة وسيلة عرض وربط فقط.';

@@ -1,12 +1,14 @@
 import Link from 'next/link';
-import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox, Braces } from 'lucide-react';
+import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox, Braces, ShieldCheck } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import {
   getSetting, getHomeHeadings, getEmptyTexts,
   SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_SUB_REMINDER_MSG,
   SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB,
+  SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT,
   DEFAULT_MSG_TPL_AD, DEFAULT_MSG_TPL_ADMIN, DEFAULT_AD_NOTICE, DEFAULT_SUB_REMINDER_MSG,
   DEFAULT_TICKER, DEFAULT_HOME_CLS_TITLE, DEFAULT_HOME_CLS_SUB,
+  DEFAULT_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_REJECT,
 } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveTextsAction } from '../actions';
@@ -25,6 +27,7 @@ const SECTIONS = [
   { key: 'msg', label: 'المراسلة', icon: MessageSquare },
   { key: 'empty', label: 'رسائل فارغة', icon: Inbox },
   { key: 'sub', label: 'الاشتراك', icon: BellRing },
+  { key: 'verify', label: 'التوثيق', icon: ShieldCheck },
 ] as const;
 type Sec = typeof SECTIONS[number]['key'];
 
@@ -34,13 +37,14 @@ const VARIABLES = [
   { token: '{name}', meaning: 'اسم الإعلان/المنتج، أو اسم المتجر، أو اسم الطرف الآخر في المحادثة', where: 'نصوص المراسلة، ورسالة تنبيه الاشتراك (اسم المتجر).' },
   { token: '{days}', meaning: 'عدد الأيام المتبقية قبل انتهاء الاشتراك', where: 'رسالة تنبيه الاشتراك.' },
   { token: '{date}', meaning: 'تاريخ انتهاء الاشتراك', where: 'رسالة تنبيه الاشتراك.' },
+  { token: '{reason}', meaning: 'سبب رفض طلب التوثيق', where: 'رسالة رفض التوثيق (تبويب «التوثيق»).' },
 ];
 
 export default async function AdminTexts({ searchParams }: { searchParams: Promise<{ saved?: string; sec?: string }> }) {
   await requireAction('users', 'edit');
   const { saved, sec: secRaw } = await searchParams;
   const sec: Sec = (SECTIONS.some((s) => s.key === secRaw) ? secRaw : 'general') as Sec;
-  const [tplAd, tplAdmin, adNotice, subMsg, ticker, clsTitle, clsSub, headings, empty] = await Promise.all([
+  const [tplAd, tplAdmin, adNotice, subMsg, ticker, clsTitle, clsSub, headings, empty, verifyOk, verifyReject] = await Promise.all([
     getSetting(SETTING_MSG_TPL_AD, DEFAULT_MSG_TPL_AD),
     getSetting(SETTING_MSG_TPL_ADMIN, DEFAULT_MSG_TPL_ADMIN),
     getSetting(SETTING_AD_NOTICE, DEFAULT_AD_NOTICE),
@@ -50,6 +54,8 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
     getSetting(SETTING_HOME_CLS_SUB, DEFAULT_HOME_CLS_SUB),
     getHomeHeadings(),
     getEmptyTexts(),
+    getSetting(SETTING_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_OK),
+    getSetting(SETTING_MSG_VERIFY_REJECT, DEFAULT_MSG_VERIFY_REJECT),
   ]);
 
   return (
@@ -161,6 +167,20 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
             <span className="block text-xs text-muted-foreground">تُرسَل لصاحب المتجر قبل انتهاء اشتراكه (عدد الأيام والمرّات من الإعدادات ← الإيرادات والتسعير). المتغيّرات: <b dir="ltr">{'{days}'}</b> الأيام المتبقية، <b dir="ltr">{'{date}'}</b> تاريخ الانتهاء، <b dir="ltr">{'{name}'}</b> اسم المتجر.</span>
             <textarea name="subReminderMsg" rows={3} defaultValue={subMsg} className={box} />
           </label>
+        )}
+
+        {sec === 'verify' && (
+          <>
+            <p className="text-xs text-muted-foreground">رسائل تُرسَل للعضو من الإدارة عند البتّ في طلب توثيقه. المتغيّرات: <b dir="ltr">{'{name}'}</b> اسم العضو، <b dir="ltr">{'{reason}'}</b> سبب الرفض. اترك النص فارغاً لتعطيل الرسالة.</p>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">رسالة قبول التوثيق</span>
+              <textarea name="msgVerifyOk" rows={3} defaultValue={verifyOk} className={box} />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">رسالة رفض التوثيق</span>
+              <textarea name="msgVerifyReject" rows={3} defaultValue={verifyReject} className={box} />
+            </label>
+          </>
         )}
 
         <Button>حفظ</Button>

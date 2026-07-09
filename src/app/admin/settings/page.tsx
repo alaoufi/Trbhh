@@ -10,7 +10,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false)]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn, scheduleOn, bumpOn, adContactStatsOn] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false), getSettingBool('schedule_on', false), getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true)]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -73,6 +73,18 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" name="storeReportOn" defaultChecked={storeReportOn} className="mt-0.5 h-4 w-4 accent-primary" />
               <span><b>التقرير الشهري للمتاجر</b> — رسالة تلقائية لكل صاحب متجر أول كل شهر بزيارات متجره وتواصلاته الشهر الماضي (المتاجر بلا نشاط لا تُراسَل).</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="scheduleOn" defaultChecked={scheduleOn} className="mt-0.5 h-4 w-4 accent-primary" />
+              <span><b>جدولة النشر</b> — يحدد المعلن موعداً مستقبلياً (حتى ٣٠ يوماً) ويُنشر إعلانه تلقائياً وقتها. (لا تعمل مع وضع مراجعة الإعلانات).</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="bumpOn" defaultChecked={bumpOn} className="mt-0.5 h-4 w-4 accent-primary" />
+              <span><b>تحديث الإعلان (رفع للأعلى)</b> — زر «⬆ تحديث» في إعلانات العضو: مجاني كل عدة أيام ثم مدفوع (الأيام والسعر من الإيرادات ← التسعيرات).</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="adContactStatsOn" defaultChecked={adContactStatsOn} className="mt-0.5 h-4 w-4 accent-primary" />
+              <span><b>إحصاءات تواصل الإعلان</b> — عدّ ضغطات واتساب/الاتصال لكل إعلان وعرضها لصاحبه في «إعلاناتي».</span>
             </label>
           </div>
         </div>

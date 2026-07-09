@@ -235,6 +235,7 @@ export async function bulkUploadProductsAction(formData: FormData) {
           state: 'active',
           status: requireApproval ? 0 : 1,
           store_only: 1, // عزل تام: منتجات المتجر لا تظهر في تربح
+          bumped_at: now,
           created_at: now,
         },
       });

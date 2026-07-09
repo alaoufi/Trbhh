@@ -36,6 +36,9 @@ export async function getMyAds(userId: number) {
     state: r.state,
     storeOnly: r.store_only === 1,
     trbhhUntil: r.trbhh_until ? r.trbhh_until.toISOString() : null,
+    urgentUntil: r.urgent_until ? r.urgent_until.toISOString() : null,
+    bumpedAt: r.bumped_at ? r.bumped_at.toISOString() : null,
+    publishAt: r.publish_at ? r.publish_at.toISOString() : null,
     special: r.adsSpecial === 'checked',
     image: images.get(toInt(r.id)) ?? PLACEHOLDER,
     createdAt: r.created_at ? r.created_at.toISOString() : null,
@@ -78,4 +81,23 @@ export async function getMyFavorites(userId: number) {
 export async function isFavorited(userId: number, adId: number) {
   const f = await prisma.favorites.findFirst({ where: { user_id: BigInt(userId), ads_id: BigInt(adId) } });
   return !!f;
+}
+
+/** ضغطات التواصل (واتساب/اتصال) لكل إعلان — دفعة واحدة. */
+export async function adContactCounts(adIds: number[]): Promise<Map<number, { whatsapp: number; call: number }>> {
+  const out = new Map<number, { whatsapp: number; call: number }>();
+  if (!adIds.length) return out;
+  const rows = await prisma.ad_contacts.groupBy({
+    by: ['ad_id', 'kind'],
+    where: { ad_id: { in: adIds.map((i) => BigInt(i)) } },
+    _count: { _all: true },
+  }).catch(() => []);
+  for (const r of rows) {
+    const id = toInt(r.ad_id);
+    const cur = out.get(id) || { whatsapp: 0, call: 0 };
+    if (r.kind === 'whatsapp') cur.whatsapp = r._count._all;
+    if (r.kind === 'call') cur.call = r._count._all;
+    out.set(id, cur);
+  }
+  return out;
 }

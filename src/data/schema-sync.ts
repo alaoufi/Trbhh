@@ -149,6 +149,12 @@ const STATEMENTS: string[] = [
   `ALTER TABLE ads ADD COLUMN store_only TINYINT NOT NULL DEFAULT 0`,
   /* عرض مدفوع في تربح: إعلان متجر يظهر في قوائم تربح حتى هذا التاريخ. */
   `ALTER TABLE ads ADD COLUMN trbhh_until DATETIME NULL`,
+  /* شارة عاجل المدفوعة حتى هذا التاريخ. */
+  `ALTER TABLE ads ADD COLUMN urgent_until DATETIME NULL`,
+  /* تحديث الإعلان (Bump): آخر رفع للأعلى — الترتيب يعتمده عند وجوده. */
+  `ALTER TABLE ads ADD COLUMN bumped_at DATETIME NULL`,
+  /* جدولة النشر: يبقى مخفياً حتى هذا الموعد ثم يُنشر تلقائياً. */
+  `ALTER TABLE ads ADD COLUMN publish_at DATETIME NULL`,
   /* عرض المتجر (واجهته ومنتجاته) في رئيسية تربح حتى هذا التاريخ (NULL = بقرار إداري دائم). */
   `ALTER TABLE stores ADD COLUMN show_until DATETIME NULL`,
   /* التنبيهات: تاريخ القراءة — الجديد ملوّن والمقروء يُؤرشف. */
@@ -211,6 +217,15 @@ const STATEMENTS: string[] = [
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     notified_at DATETIME NULL,
     INDEX saved_searches_user (user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* عدّاد تواصل الإعلان: ضغطات واتساب/اتصال لكل إعلان (مرة لكل زائر/نوع). */
+  `CREATE TABLE IF NOT EXISTS ad_contacts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    ad_id BIGINT UNSIGNED NOT NULL,
+    viewer VARCHAR(64) NOT NULL,
+    kind VARCHAR(12) NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX ad_contacts_ad (ad_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* admin activity audit log — who did what and when. */
   `CREATE TABLE IF NOT EXISTS admin_log (

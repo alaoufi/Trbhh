@@ -4,7 +4,7 @@ import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -338,7 +338,7 @@ async function AccountsTab() {
 }
 
 async function PricingTab() {
-  const [sub, prices, remind, promo, verifyGift, show] = await Promise.all([getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing()]);
+  const [sub, prices, remind, promo, verifyGift, show, extras] = await Promise.all([getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras()]);
   const services: { key: PaidService; note?: string }[] = [
     { key: 'featured' },
     { key: 'classified', note: 'إعلان واحد حسب المدّة' },
@@ -392,6 +392,18 @@ async function PricingTab() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* خدمات الإعلان الإضافية: عاجل + تحديث (Bump) */}
+      <div className="rounded-xl border border-red-300 bg-red-50/50 p-3">
+        <div className="mb-1 text-xs font-bold text-red-700">🔥 شارة «عاجل» و«تحديث الإعلان» (سعر 0 = تعطيل)</div>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">سعر شارة عاجل (ر.س)</span><input name="urgentPrice" type="number" min={0} defaultValue={extras.urgentPrice} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">مدة العاجل (ساعات)</span><input name="urgentHours" type="number" min={1} defaultValue={extras.urgentHours} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">التحديث المجاني كل (أيام)</span><input name="bumpFreeDays" type="number" min={0} defaultValue={extras.bumpFreeDays} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">سعر التحديث قبل الموعد (ر.س)</span><input name="bumpPrice" type="number" min={0} defaultValue={extras.bumpPrice} className={num} /></label>
+        </div>
+        <p className="mt-1 text-[11px] text-muted-foreground">«تحديث» يرفع الإعلان لأعلى القوائم — مجاني كل عدد الأيام المحدد، وقبله يُخصم السعر من الرصيد (تفعيل زر التحديث نفسه من الإعدادات ← الميزات).</p>
       </div>
 
       {/* عروض الشحن والمكافآت — 0 = معطّل */}

@@ -541,10 +541,11 @@ export async function collaboratorAds(storeId: number) {
   const ids = await collaboratorStoreIds(storeId);
   if (!ids.length) return [];
   const stores = await prisma.stores.findMany({ where: { id: { in: ids.map((n) => BigInt(n)) } }, select: { id: true, user_id: true } });
-  const out: { id: number; title: string; price: number; adsType: string; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; views: number; sellerName: null; sellerTrusted: boolean }[] = [];
+  const out: { id: number; title: string; price: number; adsType: string; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; urgent: boolean; views: number; sellerName: null; sellerTrusted: boolean }[] = [];
   for (const s of stores) {
     const a = (await storeCatalogAds(toInt(s.id), Number(s.user_id))).slice(0, 4);
-    for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, views: 0, sellerName: null, sellerTrusted: false });
+    for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special,
+      urgent: false, views: 0, sellerName: null, sellerTrusted: false });
   }
   const vc = await adViewCounts(out.map((o) => o.id));
   for (const o of out) o.views = vc.get(o.id) ?? 0;
@@ -583,11 +584,11 @@ export async function homeFeaturedAds() {
 async function loadHomeFeaturedAds() {
   const stores = await homeFeaturedStores(6);
   if (!stores.length) return [];
-  const out: { id: number; title: string; price: number; adsType: string; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; views: number; sellerName: null; sellerTrusted: boolean; storeName: string | null; storeId: number }[] = [];
+  const out: { id: number; title: string; price: number; adsType: string; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; urgent: boolean; views: number; sellerName: null; sellerTrusted: boolean; storeName: string | null; storeId: number }[] = [];
   for (const st of stores) {
     const label = st.storeName || (await getStoreMeta(st.storeId)).storeName;
     const a = (await storeCatalogAds(st.storeId, st.userId)).slice(0, 4);
-    for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, views: 0, sellerName: null, sellerTrusted: false, storeName: label, storeId: st.storeId });
+    for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, urgent: false, views: 0, sellerName: null, sellerTrusted: false, storeName: label, storeId: st.storeId });
   }
   const vc = await adViewCounts(out.map((o) => o.id));
   for (const o of out) o.views = vc.get(o.id) ?? 0;

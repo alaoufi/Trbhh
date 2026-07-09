@@ -44,13 +44,13 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned,
+  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string; dupId?: string;
   needPrice?: string; needBal?: string; dest?: string;
-  limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean;
+  limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean; allowSchedule?: boolean;
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
@@ -320,6 +320,13 @@ export function AdForm({
         </label>
       </Section>
 
+      {allowSchedule && (
+        <label className="block space-y-1 rounded-xl border border-sky-200 bg-sky-50/60 p-3">
+          <span className="text-sm font-bold text-sky-800">🕒 جدولة النشر (اختياري)</span>
+          <span className="block text-xs text-muted-foreground">اترك الحقل فارغاً للنشر فوراً، أو اختر موعداً (حتى ٣٠ يوماً) ليُنشر إعلانك تلقائياً وقتها.</span>
+          <input type="datetime-local" name="publishAt" className="h-11 w-full rounded-lg border border-sky-300 bg-background px-3 text-sm" dir="ltr" />
+        </label>
+      )}
       <Submit label={submitLabel} />
     </form>
   );

@@ -18,6 +18,7 @@ export type AdCard = {
   categoryName: string | null;
   createdAt: string | null;
   special: boolean;
+  urgent: boolean;
   views: number;
   sellerName: string | null;
   sellerTrusted: boolean;
@@ -95,6 +96,7 @@ type AdRow = {
   city_id: bigint;
   category_id: bigint;
   created_at: Date | null;
+  urgent_until?: Date | null;
 };
 
 async function toCards(rows: AdRow[]): Promise<AdCard[]> {
@@ -128,6 +130,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         categoryName: cats.get(toInt(r.category_id)) ?? null,
         createdAt: r.created_at ? r.created_at.toISOString() : null,
         special: r.adsSpecial === 'checked',
+        urgent: !!(r.urgent_until && r.urgent_until.getTime() > now),
         views: views.get(toInt(r.id)) ?? 0,
         sellerName: s?.name ?? null,
         sellerTrusted: s?.trusted ?? false,
@@ -153,6 +156,7 @@ const adSelect = {
   city_id: true,
   category_id: true,
   created_at: true,
+  urgent_until: true,
 } as const;
 
 export async function getCategories() {
@@ -217,7 +221,7 @@ export async function getLatestAds(take = 12) {
   return cached(`ads:latest:${take}`, 60, async () => {
     sweepExpiredArchived().catch(() => {});
     sweepExpiredPaidAds().catch(() => {});
-    const rows = await prisma.ads.findMany({ where: activeAdWhere(), orderBy: { id: 'desc' }, take, select: adSelect });
+    const rows = await prisma.ads.findMany({ where: activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take, select: adSelect });
     return toCards(rows);
   });
 }
@@ -285,7 +289,7 @@ export async function getAdsByCategory(categoryId: number, take = 24, skip = 0) 
   return cached(`ads:cat:${categoryId}:${take}:${skip}`, 60, async () => {
     const rows = await prisma.ads.findMany({
       where: { ...activeAdWhere(), category_id: BigInt(categoryId) },
-      orderBy: [{ adsSpecial: 'desc' }, { id: 'desc' }],
+      orderBy: [{ adsSpecial: 'desc' }, { bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
       take,
       skip,
       select: adSelect,
@@ -328,7 +332,7 @@ export async function searchAds(params: SearchParamsT) {
   const orderBy =
     sort === 'price_asc' ? [{ price: 'asc' as const }] :
     sort === 'price_desc' ? [{ price: 'desc' as const }] :
-    [{ adsSpecial: 'desc' as const }, { id: 'desc' as const }];
+    [{ adsSpecial: 'desc' as const }, { bumped_at: { sort: 'desc' as const, nulls: 'last' as const } }, { id: 'desc' as const }];
   const rows = await prisma.ads.findMany({
     where: buildSearchWhere(params),
     skip: Math.max(0, skip),
@@ -384,6 +388,7 @@ async function getAdImpl(id: number) {
     state: ad.state,
     storeOnly: ad.store_only === 1,
     trbhhUntil: ad.trbhh_until ? ad.trbhh_until.toISOString() : null,
+    urgentUntil: ad.urgent_until ? ad.urgent_until.toISOString() : null,
     special: ad.adsSpecial === 'checked',
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,
@@ -486,3 +491,18 @@ export async function getSimilarAds(adId: number, categoryId: number, take = 6) 
 
 /* memoized per-request (React cache): tames repeated hot reads within one navigation */
 export const getAd = cache(getAdImpl);
+
+/* ناشر الجدولة الكسول: يرقّي الإعلانات المجدولة التي حان موعدها — يعمل مع التصفح بخنق ٦٠ث. */
+let schedLastRun = 0;
+export async function promoteScheduledAds(): Promise<void> {
+  const now = Date.now();
+  if (now - schedLastRun < 60_000) return;
+  schedLastRun = now;
+  try {
+    const r = await prisma.ads.updateMany({
+      where: { status: 0, publish_at: { not: null, lte: new Date() } },
+      data: { status: 1, publish_at: null },
+    });
+    if (r.count > 0) await bustAdCaches().catch(() => {});
+  } catch { /* لا يعطّل الصفحة */ }
+}

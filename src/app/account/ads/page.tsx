@@ -2,20 +2,25 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Pencil, Trash2, Eye, EyeOff, Wallet } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
-import { getMyAds } from '@/lib/account';
-import { getServicePricing, serviceHasPrice, DURATIONS } from '@/lib/settings';
+import { getMyAds, adContactCounts } from '@/lib/account';
+import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingBool } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { deleteAdAction, toggleAdStatusAction, featureAdAction } from '../actions';
+import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction, bumpAdAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
 
-export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string }> }) {
+export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; bumped?: string; bumpwait?: string; scheduled?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [ads, servicePricing, balance] = await Promise.all([getMyAds(session.uid), getServicePricing(), getBalance(session.uid)]);
+  const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn] = await Promise.all([
+    getMyAds(session.uid), getServicePricing(), getBalance(session.uid), getAdExtras(),
+    getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true),
+  ]);
+  const contacts = contactStatsOn ? await adContactCounts(ads.map((a) => a.id)) : new Map<number, { whatsapp: number; call: number }>();
+  const now = Date.now();
   const featuredSold = serviceHasPrice(servicePricing.featured);
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const fmtDay = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d); };
@@ -29,6 +34,10 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
         </div>
       </div>
       {sp.featured === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">⭐ تم تمييز الإعلان وخُصمت الرسوم من رصيدك.</div>}
+      {sp.urgent === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🔥 فُعّلت شارة «عاجل» وخُصمت الرسوم من رصيدك.</div>}
+      {sp.bumped === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">⬆ تم تحديث إعلانك — أصبح في مقدمة القوائم.</div>}
+      {sp.bumpwait && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ التحديث المجاني متاح بعد {sp.bumpwait} يوم — أو فعّل التحديث المدفوع إن وُفّر.</div>}
+      {sp.scheduled === '1' && <div className="rounded-lg border border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🕒 حُفظ إعلانك وسيُنشر تلقائياً في الموعد الذي حددته.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? <> (المطلوب {sp.price} ر.س</> : ''}{sp.bal !== undefined ? <>، ورصيدك {sp.bal} ر.س)</> : ')'}. تواصل مع الإدارة لشحن الرصيد.</div>}
       {sp.pending === '1' && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -52,11 +61,15 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 <Link href={`/ads/${ad.id}`} className="line-clamp-1 font-semibold hover:text-primary">{ad.title}</Link>
                 <div className="flex shrink-0 gap-1">
                   {ad.special && <Badge variant="special">مميّز</Badge>}
-                  <Badge variant={ad.status === 1 ? 'trusted' : 'special'}>{ad.status === 1 ? 'نشط' : 'بانتظار الموافقة'}</Badge>
+                  {ad.urgentUntil && new Date(ad.urgentUntil).getTime() > now && <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>}
+                  <Badge variant={ad.status === 1 ? 'trusted' : 'special'}>{ad.status === 1 ? 'نشط' : ad.publishAt ? `مجدول: ${fmtDay(ad.publishAt)}` : 'بانتظار الموافقة'}</Badge>
                 </div>
               </div>
               <span className="text-sm font-bold text-primary">{formatPrice(ad.price, 'ر.س', ad.adsType)}</span>
-              <span className="text-xs text-muted-foreground">{timeAgo(ad.createdAt)}</span>
+              <span className="text-xs text-muted-foreground">
+                {timeAgo(ad.createdAt)}
+                {contactStatsOn && (() => { const c = contacts.get(ad.id); return c && (c.whatsapp + c.call) > 0 ? <> • 💬 {c.whatsapp} واتساب • 📞 {c.call} اتصال</> : null; })()}
+              </span>
               {ad.status !== 1 && (
                 <span className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold leading-4 text-amber-700">
                   سبب عدم الظهور: الإعلان <b>موقوف/بانتظار الموافقة</b> — غالباً لتشابهه مع إعلان قائم (٩٠٪+) أو تفعيل مراجعة الإعلانات. اضغط <b>«تفعيل»</b> لعرضه فوراً، أو احذف النسخة المكرّرة.
@@ -79,8 +92,20 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                   </form>
                 </details>
               )}
-              <div className="mt-auto flex gap-2 pt-2">
+              <div className="mt-auto flex flex-wrap gap-2 pt-2">
                 <Link href={`/ads/${ad.id}/edit`} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Pencil className="h-3 w-3" /> تعديل</Link>
+                {bumpOn && ad.status === 1 && !ad.storeOnly && (
+                  <form action={bumpAdAction}>
+                    <input type="hidden" name="adId" value={ad.id} />
+                    <button className="flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100" title="رفع الإعلان لأعلى القوائم">⬆ تحديث</button>
+                  </form>
+                )}
+                {extras.urgentPrice > 0 && ad.status === 1 && !ad.storeOnly && (
+                  <form action={buyUrgentAction}>
+                    <input type="hidden" name="adId" value={ad.id} />
+                    <button className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100">🔥 عاجل ({extras.urgentPrice} ر.س)</button>
+                  </form>
+                )}
                 <form action={toggleAdStatusAction}>
                   <input type="hidden" name="adId" value={ad.id} />
                   <button className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary">

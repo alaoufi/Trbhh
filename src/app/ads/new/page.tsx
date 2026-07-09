@@ -3,12 +3,14 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCategories, getSubCategories, getCountries, getCities, getAreas } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
+import { getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { createAdAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'أضف إعلان' };
 
 export default async function NewAdPage({ searchParams }: { searchParams: Promise<{ error?: string; left?: string; max?: string; hours?: string; wait?: string; cat?: string; banned?: string; dup?: string; price?: string; bal?: string; dest?: string }> }) {
+  const allowSchedule = (await getSettingBool('schedule_on', false).catch(() => false)) && !(await getSettingBool(SETTING_ADS_APPROVAL, false).catch(() => false));
   const session = await getSession();
   if (!session) redirect('/login');
   const { error, left, max, hours, wait, cat, banned, dup, price, bal, dest } = await searchParams;
@@ -20,6 +22,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">أضف إعلاناً جديداً</h1>
       <AdForm
+        allowSchedule={allowSchedule}
         action={createAdAction}
         categories={categories}
         subcategories={subcategories}

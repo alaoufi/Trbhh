@@ -270,6 +270,17 @@ export async function createAdAction(formData: FormData) {
   // صاحب متجر معتمد: إعلاناته تُنشر مباشرة (الموافقة على المتجر تُغني عن مراجعة كل إعلان).
   const approvedStoreOwner = await isApprovedStoreOwner(session.uid).catch(() => false);
   const requireApproval = approvedStoreOwner ? false : await getSettingBool(SETTING_ADS_APPROVAL, false).catch(() => false);
+  // جدولة النشر (مفتاح من الإعدادات): موعد مستقبلي = يبقى مخفياً حتى ينشره الناشر التلقائي.
+  // غير متاحة مع وضع مراجعة الإعلانات أو النشر داخل المتجر.
+  let scheduledAt: Date | null = null;
+  if (dest !== 'store' && !requireApproval) {
+    const schedOn = await getSettingBool('schedule_on', false).catch(() => false);
+    const rawSched = String(formData.get('publishAt') || '').trim();
+    if (schedOn && rawSched) {
+      const d = new Date(rawSched);
+      if (!isNaN(d.getTime()) && d.getTime() > Date.now() + 60_000 && d.getTime() < Date.now() + 30 * 86400_000) scheduledAt = d;
+    }
+  }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
   const ad = await prisma.ads.create({
@@ -290,6 +301,8 @@ export async function createAdAction(formData: FormData) {
       state: 'active',
       status: requireApproval ? 0 : 1,
       store_only: dest === 'store' ? 1 : 0, // عزل تام: إعلان المتجر لا يظهر في تربح
+      bumped_at: new Date(), // ترتيب «الأحدث» يعتمد آخر تحديث (Bump)
+      ...(scheduledAt ? { status: 0, publish_at: scheduledAt } : {}),
       created_at: new Date(),
     },
   });
@@ -300,7 +313,7 @@ export async function createAdAction(formData: FormData) {
   await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
   if (dest !== 'store') await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز خاصة بإعلانات تربح
   await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
-  if (!requireApproval && dest !== 'store') {
+  if (!requireApproval && dest !== 'store' && !scheduledAt) {
     // تنبيهات البحث المحفوظ + مطابقة عرض/طلب — لإعلانات تربح فقط (عزل المتاجر)
     import('@/lib/saved-search').then((m) => {
       m.notifySavedSearches(toInt(ad.id), title, detail, session.uid).catch(() => {});
@@ -315,7 +328,8 @@ export async function createAdAction(formData: FormData) {
     const sid = await storeIdOfUser(session.uid).catch(() => 0);
     redirect(sid ? `/companies/${sid}?added=1` : '/store?added=1');
   }
-  // ينشر مباشرة، إلا إذا كان مقيّداً بالموافقة
+  // ينشر مباشرة، إلا إذا كان مقيّداً بالموافقة أو مجدولاً
+  if (scheduledAt) redirect('/account/ads?scheduled=1');
   if (requireApproval) redirect('/account/ads?pending=1');
   redirect(`/ads/${toInt(ad.id)}`);
 }

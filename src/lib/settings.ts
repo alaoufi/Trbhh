@@ -166,6 +166,18 @@ export async function getTrbhhShowPricing(): Promise<TrbhhShowPricing> {
   return { store: { w2: Math.max(0, sw2), m1: Math.max(0, sm1), y1: Math.max(0, sy1) }, ads };
 }
 
+/* خدمات الإعلان الإضافية — من الإيرادات والتسعير (0 = تعطيل الخدمة). */
+export type AdExtras = { urgentPrice: number; urgentHours: number; bumpFreeDays: number; bumpPrice: number };
+export async function getAdExtras(): Promise<AdExtras> {
+  const [up, uh, bf, bp] = await Promise.all([
+    getSettingNum('urgent_price', 0),
+    getSettingNum('urgent_hours', 48),
+    getSettingNum('bump_free_days', 3),
+    getSettingNum('bump_price', 0),
+  ]);
+  return { urgentPrice: Math.max(0, up), urgentHours: Math.max(1, uh), bumpFreeDays: Math.max(0, bf), bumpPrice: Math.max(0, bp) };
+}
+
 /* عروض الشحن والمكافآت — 0 = معطّل (تُضبط من الإيرادات والتسعير). */
 export const SETTING_TOPUP_BONUS_PCT = 'topup_bonus_pct';
 export const SETTING_TOPUP_BONUS_MIN = 'topup_bonus_min';

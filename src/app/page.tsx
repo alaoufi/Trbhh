@@ -39,6 +39,8 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
 }
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ cats?: string }> }) {
+  // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
+  import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
   const { cats } = await searchParams;
   const [categories, featured, latest, mostViewed, stats, homeStats, clsText] = await Promise.all([
     getCategories(),

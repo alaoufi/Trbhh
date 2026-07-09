@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { FavoriteButton } from '@/components/favorite-button';
 import { ShareButtons } from '@/components/share-buttons';
+import { TrackedContact } from '@/components/ad-contact-track';
 import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
@@ -190,6 +191,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
 
       {/* Price + description */}
       <div className="card-3d rounded-2xl p-4">
+        {ad.urgentUntil && new Date(ad.urgentUntil) > new Date() && (
+          <span className="mb-2 inline-block animate-pulse rounded-full bg-red-600 px-3 py-1 text-xs font-extrabold text-white shadow">🔥 عاجل</span>
+        )}
         <div className="mb-3 text-2xl font-bold text-primary">{ad.price > 0 ? formatPrice(ad.price) : ad.adsType === 'request' ? 'مطلوب' : 'على السوم'}</div>
         <p className="whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
       </div>
@@ -223,14 +227,14 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       {/* Contact tiles — only show channels the seller actually offers */}
       <div className={`grid gap-3 ${contactCols === 3 ? 'grid-cols-3' : contactCols === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
         {waNumber && (
-          <a href={waNumber} target="_blank" rel="noopener noreferrer" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-[#25D366]">
+          <TrackedContact adId={ad.id} kind="whatsapp" href={waNumber} target="_blank" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-[#25D366]">
             <MessageCircle className="h-6 w-6" /> واتساب
-          </a>
+          </TrackedContact>
         )}
         {ad.seller?.phone && (
-          <a href={`tel:${ad.seller.phone}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+          <TrackedContact adId={ad.id} kind="call" href={`tel:${ad.seller.phone}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
             <Phone className="h-6 w-6" /> اتصال
-          </a>
+          </TrackedContact>
         )}
         {!isAdOwner && (
           ad.seller && session ? (

@@ -453,6 +453,9 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('saved_search_on', formData.get('savedSearchOn') !== null ? '1' : '0');
   await setSetting('match_notify_on', formData.get('matchNotifyOn') !== null ? '1' : '0');
   await setSetting('store_report_on', formData.get('storeReportOn') !== null ? '1' : '0');
+  await setSetting('schedule_on', formData.get('scheduleOn') !== null ? '1' : '0');
+  await setSetting('bump_on', formData.get('bumpOn') !== null ? '1' : '0');
+  await setSetting('ad_contact_stats_on', formData.get('adContactStatsOn') !== null ? '1' : '0');
   // classified duplicate prevention: toggle + content/image/background thresholds
   await setSetting(SETTING_CDUP_ON, formData.get('cdupOn') !== null ? '1' : '0');
   await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));
@@ -491,6 +494,11 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting(SETTING_TOPUP_BONUS_MIN, nn('topupBonusMin'));
   await setSetting(SETTING_TOPUP_FIRST_BONUS, nn('topupFirstBonus'));
   await setSetting(SETTING_VERIFY_GIFT, nn('verifyGift'));
+  // خدمات الإعلان: عاجل + تحديث
+  await setSetting('urgent_price', nn('urgentPrice'));
+  await setSetting('urgent_hours', String(Math.max(1, parseInt(String(formData.get('urgentHours') || '48')) || 48)));
+  await setSetting('bump_free_days', nn('bumpFreeDays'));
+  await setSetting('bump_price', nn('bumpPrice'));
   // الظهور المدفوع في تربح: عرض المتجر (بالمدد) + باقات عرض الإعلان (السعر والمدة لكل باقة)
   await setSetting('show_store_w2', nn('showStoreW2'));
   await setSetting('show_store_m1', nn('showStoreM1'));

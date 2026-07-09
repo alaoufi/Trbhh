@@ -31,12 +31,12 @@ function LoginInner() {
 
       <div className="card-3d rounded-xl p-6">
         <h1 className="mb-1 text-xl font-bold">تسجيل الدخول</h1>
-        <p className="mb-5 text-sm text-muted-foreground">ادخل بنفس بياناتك المسجّلة سابقاً.</p>
+        <p className="mb-5 text-sm text-muted-foreground">بيانات دخول موحّدة لتربح ومتجرك: رقم الجوال وكلمة المرور.</p>
         {reset && <p className="mb-3 rounded-lg border border-green-300 bg-green-50 p-2 text-sm font-bold text-green-800">تم تغيير كلمة المرور بنجاح، سجّل الدخول بها الآن.</p>}
         <form action={action} className="space-y-3">
           <input type="hidden" name="next" value={next} />
-          <input name="identifier" placeholder="الجوال أو اسم المستخدم أو البريد" className={fieldCls} />
-          <input name="password" type="password" placeholder="كلمة المرور" className={fieldCls} />
+          <input name="identifier" type="tel" dir="ltr" inputMode="tel" autoComplete="tel" placeholder="رقم الجوال (05xxxxxxxx)" className={`${fieldCls} text-left`} />
+          <input name="password" type="password" autoComplete="current-password" placeholder="كلمة المرور" className={fieldCls} />
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
           <Submit />
         </form>
@@ -46,9 +46,9 @@ function LoginInner() {
         <p className="mt-4 text-center text-sm text-muted-foreground">
           ليس لديك حساب؟ <Link href="/register" className="text-primary hover:underline">أنشئ حساباً</Link>
         </p>
-        {/* صاحب متجر؟ الدخول لإدارة المتجر يكون من صفحة المتجر نفسها */}
+        {/* بيانات موحّدة: نفس الدخول يفتح إدارة متجرك تلقائياً */}
         <p className="mt-4 rounded-lg bg-secondary/50 p-2.5 text-center text-xs text-muted-foreground">
-          صاحب متجر؟ افتح <Link href="/companies" className="font-bold text-primary hover:underline">متاجر تربح</Link> ثم ادخل متجرك ومنه «دخول المتجر».
+          صاحب متجر؟ دخولك هذا يفتح إدارة متجرك تلقائياً — افتح متجرك وستجد أزرار الإدارة، ولا حاجة لدخول آخر.
         </p>
       </div>
     </div>

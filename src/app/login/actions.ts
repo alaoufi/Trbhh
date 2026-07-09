@@ -43,7 +43,7 @@ export async function loginAction(_prev: unknown, formData: FormData) {
   await createSession({ uid, name: user.name || user.userName || 'عضو', type: user.type });
   const next = String(formData.get('next') || '');
   if (next.startsWith('/') && !next.startsWith('//')) redirect(next);
-  // دخول تربح العادي يبقى في تربح ولا يحوّل إلى المتجر — لوحة المتجر تُدخل من صفحة «دخول المتاجر» (/store-login).
+  // بيانات الدخول موحّدة: نفس الجلسة تفتح تربح وإدارة متجر العضو (إن كان له متجر).
   redirect('/');
 }
 

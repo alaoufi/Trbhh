@@ -99,6 +99,7 @@ const SECTIONS: GuideSection[] = [
 
 export default async function StoreGuidePage() {
   return (
+    <div className="container max-w-3xl py-4 pb-16">
     <GuideView
       topId="store-guide-top"
       headerIcon={Store}
@@ -116,5 +117,6 @@ export default async function StoreGuidePage() {
         </Link>
       </div>
     </GuideView>
+    </div>
   );
 }

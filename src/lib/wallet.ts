@@ -6,8 +6,9 @@ import { toInt } from './utils';
 const ensure = ensureSchema;
 
 /** Reasons recorded on each wallet transaction (for member + admin history). */
-export type TxnReason = 'admin_credit' | 'admin_debit' | 'featured' | 'classified' | 'duplicate' | 'subscription' | 'refund';
+export type TxnReason = 'admin_credit' | 'admin_debit' | 'featured' | 'classified' | 'duplicate' | 'subscription' | 'refund' | 'topup';
 export const REASON_LABELS: Record<TxnReason, string> = {
+  topup: 'شحن رصيد (تحويل)',
   admin_credit: 'شحن رصيد من الإدارة',
   admin_debit: 'خصم من الإدارة',
   featured: 'إعلان مميّز',
@@ -120,24 +121,28 @@ export type RevenueSummary = {
   spent: number;      // إجمالي المصروف (سالب، بالقيمة المطلقة) = الإيراد الفعلي
   outstanding: number; // مجموع أرصدة الأعضاء الحالية
   byReason: { reason: TxnReason; label: string; total: number }[]; // مصروف حسب النوع
+  creditByReason: { reason: TxnReason; label: string; total: number }[]; // دخل (شحن) حسب النوع
   recent: (WalletTxn & { userId: number; userName: string })[];
 };
 
 /** Site-wide revenue summary for the admin (money in/out + breakdown + recent activity). */
 export async function getRevenueSummary(recentLimit = 30): Promise<RevenueSummary> {
   await ensure();
-  const [credited, spentRows, balSum, byReasonRows, recentRows] = await Promise.all([
+  const [credited, spentRows, balSum, byReasonRows, creditReasonRows, recentRows] = await Promise.all([
     prisma.wallet_txns.aggregate({ _sum: { amount: true }, where: { amount: { gt: 0 } } }).catch(() => ({ _sum: { amount: 0 } })),
     prisma.wallet_txns.aggregate({ _sum: { amount: true }, where: { amount: { lt: 0 } } }).catch(() => ({ _sum: { amount: 0 } })),
     prisma.users.aggregate({ _sum: { balance: true } }).catch(() => ({ _sum: { balance: 0 } })),
     prisma.wallet_txns.groupBy({ by: ['reason'], where: { amount: { lt: 0 } }, _sum: { amount: true } }).catch(() => [] as { reason: string; _sum: { amount: number | null } }[]),
+    prisma.wallet_txns.groupBy({ by: ['reason'], where: { amount: { gt: 0 } }, _sum: { amount: true } }).catch(() => [] as { reason: string; _sum: { amount: number | null } }[]),
     prisma.wallet_txns.findMany({ orderBy: { id: 'desc' }, take: Math.min(100, Math.max(1, recentLimit)) }).catch(() => []),
   ]);
   const spent = Math.abs(spentRows._sum.amount ?? 0);
-  const byReason = byReasonRows
+  const asReasonRows = (rows: { reason: string; _sum: { amount: number | null } }[]) => rows
     .map((r) => ({ reason: r.reason as TxnReason, label: REASON_LABELS[r.reason as TxnReason] || r.reason, total: Math.abs(r._sum.amount ?? 0) }))
     .filter((r) => r.total > 0)
     .sort((a, b) => b.total - a.total);
+  const byReason = asReasonRows(byReasonRows);
+  const creditByReason = asReasonRows(creditReasonRows);
   // names for recent rows
   const uids = [...new Set(recentRows.map((r) => Number(r.user_id)))];
   const users = uids.length ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }).catch(() => []) : [];
@@ -147,7 +152,7 @@ export async function getRevenueSummary(recentLimit = 30): Promise<RevenueSummar
     label: REASON_LABELS[r.reason as TxnReason] || r.reason, note: r.note, at: r.created_at ? r.created_at.toISOString() : null,
     byAdmin: !!r.admin_id, userId: toInt(r.user_id), userName: nameById.get(toInt(r.user_id)) || `#${toInt(r.user_id)}`,
   }));
-  return { credited: credited._sum.amount ?? 0, spent, outstanding: balSum._sum.balance ?? 0, byReason, recent };
+  return { credited: credited._sum.amount ?? 0, spent, outstanding: balSum._sum.balance ?? 0, byReason, creditByReason, recent };
 }
 
 export type MemberLedgerRow = { userId: number; name: string; credited: number; consumed: number; balance: number; dupCredit: number };
@@ -183,6 +188,90 @@ export async function getMemberLedger(limit = 300): Promise<MemberLedgerRow[]> {
     .slice(0, limit);
 }
 
+/* ===================== طلبات شحن الرصيد (تحويل + إيصال) ===================== */
+
+export type TopupStatus = 0 | 1 | 2; // 0 pending, 1 approved, 2 rejected
+export type TopupRow = {
+  id: number; userId: number; amount: number; receipt: string | null;
+  status: TopupStatus; note: string | null; at: string | null; decidedAt: string | null;
+};
+
+const topupRow = (r: { id: bigint; user_id: bigint; amount: number; receipt: string | null; status: number; note: string | null; created_at: Date | null; decided_at: Date | null }): TopupRow => ({
+  id: toInt(r.id), userId: toInt(r.user_id), amount: r.amount, receipt: r.receipt,
+  status: (r.status === 1 || r.status === 2 ? r.status : 0) as TopupStatus, note: r.note,
+  at: r.created_at ? r.created_at.toISOString() : null,
+  decidedAt: r.decided_at ? r.decided_at.toISOString() : null,
+});
+
+/** Member files a top-up request (amount + uploaded receipt path). */
+export async function requestTopup(userId: number, amount: number, receiptRel: string | null): Promise<boolean> {
+  await ensure();
+  const amt = Math.round(amount || 0);
+  if (amt <= 0) return false;
+  try {
+    await prisma.wallet_topups.create({ data: { user_id: BigInt(userId), amount: amt, receipt: receiptRel } });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Member's own top-up requests (newest first). */
+export async function listMyTopups(userId: number, limit = 20): Promise<TopupRow[]> {
+  await ensure();
+  const rows = await prisma.wallet_topups.findMany({ where: { user_id: BigInt(userId) }, orderBy: { id: 'desc' }, take: limit }).catch(() => []);
+  return rows.map(topupRow);
+}
+
+/** Admin listing with per-status counts. */
+export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 200): Promise<{ rows: (TopupRow & { userName: string })[]; counts: { all: number; pending: number; approved: number; rejected: number } }> {
+  await ensure();
+  const [all, pending, approved, rejected, rows] = await Promise.all([
+    prisma.wallet_topups.count().catch(() => 0),
+    prisma.wallet_topups.count({ where: { status: 0 } }).catch(() => 0),
+    prisma.wallet_topups.count({ where: { status: 1 } }).catch(() => 0),
+    prisma.wallet_topups.count({ where: { status: 2 } }).catch(() => 0),
+    prisma.wallet_topups.findMany({ where: status === 'all' ? {} : { status }, orderBy: { id: 'desc' }, take: limit }).catch(() => []),
+  ]);
+  const uids = [...new Set(rows.map((r) => toInt(r.user_id)))];
+  const users = uids.length ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }).catch(() => []) : [];
+  const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
+  return {
+    rows: rows.map((r) => ({ ...topupRow(r), userName: nameById.get(toInt(r.user_id)) || `#${toInt(r.user_id)}` })),
+    counts: { all, pending, approved, rejected },
+  };
+}
+
+/** Admin confirms money arrived: flips the request to approved (once) then credits the balance.
+ *  Returns the request when credited, null when already decided / not found / credit failed. */
+export async function approveTopup(id: number, adminId: number): Promise<TopupRow | null> {
+  await ensure();
+  const req = await prisma.wallet_topups.findUnique({ where: { id: BigInt(id) } }).catch(() => null);
+  if (!req || req.status !== 0) return null;
+  // atomic status flip so a double-click can't credit twice
+  const flipped = await prisma.wallet_topups.updateMany({ where: { id: BigInt(id), status: 0 }, data: { status: 1, admin_id: BigInt(adminId), decided_at: new Date() } }).catch(() => ({ count: 0 }));
+  if (flipped.count === 0) return null;
+  const credited = await adjustBalance(toInt(req.user_id), req.amount, 'topup', { adminId, note: `طلب شحن #${toInt(req.id)}` });
+  if (!credited.ok) {
+    // roll the request back so it can be retried
+    await prisma.wallet_topups.updateMany({ where: { id: BigInt(id), status: 1 }, data: { status: 0, admin_id: null, decided_at: null } }).catch(() => {});
+    return null;
+  }
+  return topupRow({ ...req, status: 1 });
+}
+
+/** Admin rejects a pending request with a saved reason. */
+export async function rejectTopup(id: number, adminId: number, reason: string): Promise<TopupRow | null> {
+  await ensure();
+  const req = await prisma.wallet_topups.findUnique({ where: { id: BigInt(id) } }).catch(() => null);
+  if (!req || req.status !== 0) return null;
+  const flipped = await prisma.wallet_topups.updateMany({
+    where: { id: BigInt(id), status: 0 },
+    data: { status: 2, note: reason.slice(0, 300), admin_id: BigInt(adminId), decided_at: new Date() },
+  }).catch(() => ({ count: 0 }));
+  return flipped.count > 0 ? topupRow({ ...req, status: 2, note: reason.slice(0, 300) }) : null;
+}
+
 /** Transaction history for a member (newest first). */
 export async function listTxns(userId: number, limit = 50): Promise<WalletTxn[]> {
   await ensure();
@@ -201,4 +290,46 @@ export async function listTxns(userId: number, limit = 50): Promise<WalletTxn[]>
     at: r.created_at ? r.created_at.toISOString() : null,
     byAdmin: !!r.admin_id,
   }));
+}
+
+/* ===================== مصروفات الموقع (تُدخلها الإدارة) ===================== */
+
+export type ExpenseRow = { id: number; label: string; amount: number; note: string | null; spentAt: string | null; at: string | null };
+
+export async function addSiteExpense(label: string, amount: number, adminId: number, opts: { note?: string; spentAt?: string } = {}): Promise<boolean> {
+  await ensure();
+  const amt = Math.round(amount || 0);
+  const lbl = label.trim().slice(0, 120);
+  if (amt <= 0 || !lbl) return false;
+  const spent = opts.spentAt ? new Date(opts.spentAt) : new Date();
+  try {
+    await prisma.site_expenses.create({
+      data: { label: lbl, amount: amt, note: opts.note ? opts.note.slice(0, 300) : null, spent_at: isNaN(spent.getTime()) ? new Date() : spent, admin_id: BigInt(adminId) },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteSiteExpense(id: number): Promise<void> {
+  await ensure();
+  await prisma.site_expenses.delete({ where: { id: BigInt(id) } }).catch(() => {});
+}
+
+/** Expense list (newest first) + grand total. */
+export async function listSiteExpenses(limit = 300): Promise<{ rows: ExpenseRow[]; total: number }> {
+  await ensure();
+  const [rows, sum] = await Promise.all([
+    prisma.site_expenses.findMany({ orderBy: [{ spent_at: 'desc' }, { id: 'desc' }], take: limit }).catch(() => []),
+    prisma.site_expenses.aggregate({ _sum: { amount: true } }).catch(() => ({ _sum: { amount: 0 } })),
+  ]);
+  return {
+    rows: rows.map((r) => ({
+      id: toInt(r.id), label: r.label, amount: r.amount, note: r.note,
+      spentAt: r.spent_at ? r.spent_at.toISOString() : null,
+      at: r.created_at ? r.created_at.toISOString() : null,
+    })),
+    total: sum._sum.amount ?? 0,
+  };
 }

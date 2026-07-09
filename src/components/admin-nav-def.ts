@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Copy, Sparkles, Ban,
   Crown, Settings, MonitorPlay, BookOpen, ShieldAlert, DatabaseBackup, KeyRound, MessageSquare, Coins,
-  Store, MessagesSquare, FileText, Shield,
+  Store, MessagesSquare, FileText, Shield, HandCoins,
 } from 'lucide-react';
 import type { Perm } from '@/lib/roles';
 
@@ -56,6 +56,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
     key: 'money', title: 'المال والاشتراكات', icon: Coins, color: '#16a34a',
     items: [
       { href: '/admin/revenue', label: 'الإيرادات والتسعير', icon: Coins, perm: 'users' },
+      { href: '/admin/topups', label: 'طلبات شحن الرصيد', icon: HandCoins, perm: 'users' },
       { href: '/admin/packages', label: 'الباقات', icon: Crown, perm: 'packages' },
       { href: '/admin/promos', label: 'الإعلانات الترويجية', icon: MonitorPlay, perm: 'promos' },
     ],

@@ -159,6 +159,31 @@ const STATEMENTS: string[] = [
     INDEX wallet_txns_user (user_id),
     INDEX wallet_txns_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* member top-up requests: amount + transfer receipt, admin confirms then credits. */
+  `CREATE TABLE IF NOT EXISTS wallet_topups (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    amount INT NOT NULL,
+    receipt VARCHAR(255) NULL,
+    status TINYINT NOT NULL DEFAULT 0,
+    note VARCHAR(300) NULL,
+    admin_id BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    decided_at DATETIME NULL,
+    INDEX wallet_topups_user (user_id),
+    INDEX wallet_topups_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* site running expenses (admin-entered) — feeds the detailed budget view. */
+  `CREATE TABLE IF NOT EXISTS site_expenses (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    label VARCHAR(120) NOT NULL,
+    amount INT NOT NULL,
+    note VARCHAR(300) NULL,
+    spent_at DATE NULL,
+    admin_id BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX site_expenses_date (spent_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS dup_attempts (
     user_id BIGINT UNSIGNED NOT NULL,
     count INT NOT NULL DEFAULT 0,

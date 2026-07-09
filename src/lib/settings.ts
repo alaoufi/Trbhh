@@ -111,6 +111,14 @@ export const SETTING_MSG_VERIFY_REJECT = 'msg_verify_reject';
 export const DEFAULT_MSG_VERIFY_OK = 'تهانينا {name} 🎉 تم توثيق حسابك في تربح — تظهر الآن شارة «موثّق» على ملفك وإعلاناتك. — الإدارة';
 export const DEFAULT_MSG_VERIFY_REJECT = 'نعتذر {name}، لم يُقبل طلب توثيق حسابك. السبب: {reason}. يمكنك معالجة السبب وإعادة رفع الوثائق من «توثيق الحساب». — الإدارة';
 
+/* شحن الرصيد — تعليمات التحويل الظاهرة للعضو + رسائل قرار الإدارة (تُعدَّل من تبويب النصوص). */
+export const SETTING_TOPUP_INFO = 'topup_info';
+export const DEFAULT_TOPUP_INFO = 'حوّل المبلغ إلى حساب المنصة ثم أرفق صورة الإيصال هنا. بعد تأكيد الإدارة وصول المبلغ يُضاف لرصيدك مباشرة.';
+export const SETTING_MSG_TOPUP_OK = 'msg_topup_ok';
+export const SETTING_MSG_TOPUP_REJECT = 'msg_topup_reject';
+export const DEFAULT_MSG_TOPUP_OK = 'شكراً {name} 🎉 تم تأكيد وصول مبلغ {amount} ر.س وإضافته لرصيدك. يمكنك متابعة رصيدك من «محفظتي». — الإدارة';
+export const DEFAULT_MSG_TOPUP_REJECT = 'نعتذر {name}، لم يُقبل طلب شحن رصيدك بمبلغ {amount} ر.س. السبب: {reason}. يمكنك إعادة إرسال الطلب من «محفظتي» بعد معالجة السبب. — الإدارة';
+
 /* Visitor-facing safety notice shown on the ad detail page (editable). */
 export const SETTING_AD_NOTICE = 'ad_notice';
 export const DEFAULT_AD_NOTICE = 'التعامل والدفع يتم خارج المنصة مباشرة بين الطرفين. المنصة وسيلة عرض وربط فقط.';

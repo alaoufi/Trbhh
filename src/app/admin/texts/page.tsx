@@ -1,14 +1,16 @@
 import Link from 'next/link';
-import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox, Braces, ShieldCheck } from 'lucide-react';
+import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox, Braces, ShieldCheck, HandCoins } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import {
   getSetting, getHomeHeadings, getEmptyTexts,
   SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_SUB_REMINDER_MSG,
   SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB,
   SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT,
+  SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT,
   DEFAULT_MSG_TPL_AD, DEFAULT_MSG_TPL_ADMIN, DEFAULT_AD_NOTICE, DEFAULT_SUB_REMINDER_MSG,
   DEFAULT_TICKER, DEFAULT_HOME_CLS_TITLE, DEFAULT_HOME_CLS_SUB,
   DEFAULT_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_REJECT,
+  DEFAULT_TOPUP_INFO, DEFAULT_MSG_TOPUP_OK, DEFAULT_MSG_TOPUP_REJECT,
 } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveTextsAction } from '../actions';
@@ -28,6 +30,7 @@ const SECTIONS = [
   { key: 'empty', label: 'رسائل فارغة', icon: Inbox },
   { key: 'sub', label: 'الاشتراك', icon: BellRing },
   { key: 'verify', label: 'التوثيق', icon: ShieldCheck },
+  { key: 'wallet', label: 'المحفظة', icon: HandCoins },
 ] as const;
 type Sec = typeof SECTIONS[number]['key'];
 
@@ -37,14 +40,15 @@ const VARIABLES = [
   { token: '{name}', meaning: 'اسم الإعلان/المنتج، أو اسم المتجر، أو اسم الطرف الآخر في المحادثة', where: 'نصوص المراسلة، ورسالة تنبيه الاشتراك (اسم المتجر).' },
   { token: '{days}', meaning: 'عدد الأيام المتبقية قبل انتهاء الاشتراك', where: 'رسالة تنبيه الاشتراك.' },
   { token: '{date}', meaning: 'تاريخ انتهاء الاشتراك', where: 'رسالة تنبيه الاشتراك.' },
-  { token: '{reason}', meaning: 'سبب رفض طلب التوثيق', where: 'رسالة رفض التوثيق (تبويب «التوثيق»).' },
+  { token: '{reason}', meaning: 'سبب رفض الطلب (توثيق أو شحن رصيد)', where: 'رسالة رفض التوثيق (تبويب «التوثيق») ورسالة رفض شحن الرصيد (تبويب «المحفظة»).' },
+  { token: '{amount}', meaning: 'مبلغ طلب شحن الرصيد بالريال', where: 'رسالتا تأكيد ورفض شحن الرصيد (تبويب «المحفظة»).' },
 ];
 
 export default async function AdminTexts({ searchParams }: { searchParams: Promise<{ saved?: string; sec?: string }> }) {
   await requireAction('users', 'edit');
   const { saved, sec: secRaw } = await searchParams;
   const sec: Sec = (SECTIONS.some((s) => s.key === secRaw) ? secRaw : 'general') as Sec;
-  const [tplAd, tplAdmin, adNotice, subMsg, ticker, clsTitle, clsSub, headings, empty, verifyOk, verifyReject] = await Promise.all([
+  const [tplAd, tplAdmin, adNotice, subMsg, ticker, clsTitle, clsSub, headings, empty, verifyOk, verifyReject, topupInfo, topupOk, topupReject] = await Promise.all([
     getSetting(SETTING_MSG_TPL_AD, DEFAULT_MSG_TPL_AD),
     getSetting(SETTING_MSG_TPL_ADMIN, DEFAULT_MSG_TPL_ADMIN),
     getSetting(SETTING_AD_NOTICE, DEFAULT_AD_NOTICE),
@@ -56,6 +60,9 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
     getEmptyTexts(),
     getSetting(SETTING_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_OK),
     getSetting(SETTING_MSG_VERIFY_REJECT, DEFAULT_MSG_VERIFY_REJECT),
+    getSetting(SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO),
+    getSetting(SETTING_MSG_TOPUP_OK, DEFAULT_MSG_TOPUP_OK),
+    getSetting(SETTING_MSG_TOPUP_REJECT, DEFAULT_MSG_TOPUP_REJECT),
   ]);
 
   return (
@@ -179,6 +186,24 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
             <label className="block space-y-1">
               <span className="text-sm font-medium">رسالة رفض التوثيق</span>
               <textarea name="msgVerifyReject" rows={3} defaultValue={verifyReject} className={box} />
+            </label>
+          </>
+        )}
+
+        {sec === 'wallet' && (
+          <>
+            <p className="text-xs text-muted-foreground">نصوص شحن الرصيد: التعليمات الظاهرة للعضو فوق نموذج «شحن رصيدك»، ورسالتا قرار الإدارة. المتغيّرات: <b dir="ltr">{'{name}'}</b> اسم العضو، <b dir="ltr">{'{amount}'}</b> المبلغ، <b dir="ltr">{'{reason}'}</b> سبب الرفض. اترك نص الرسالة فارغاً لتعطيلها.</p>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">تعليمات التحويل (تظهر في «محفظتي»)</span>
+              <textarea name="topupInfo" rows={3} defaultValue={topupInfo} className={box} />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">رسالة تأكيد وصول المبلغ</span>
+              <textarea name="msgTopupOk" rows={3} defaultValue={topupOk} className={box} />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">رسالة رفض طلب الشحن</span>
+              <textarea name="msgTopupReject" rows={3} defaultValue={topupReject} className={box} />
             </label>
           </>
         )}

@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, ListFilter, LayoutTemplate } from 'lucide-react';
+import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, ListFilter, LayoutTemplate, Wallet } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
+import { getBalance } from '@/lib/wallet';
 import { getMemberAlerts } from '@/lib/alerts';
 import { getCategories } from '@/lib/data';
 import { getInterests } from '@/lib/interests';
@@ -16,8 +17,8 @@ const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
 
 export default async function AccountHome() {
   const session = await requireUser();
-  const [stats, alerts, categories, interests, rating] = await Promise.all([
-    getMyStats(session.uid), getMemberAlerts(session.uid), getCategories(), getInterests(session.uid), getSellerRating(session.uid),
+  const [stats, alerts, categories, interests, rating, balance] = await Promise.all([
+    getMyStats(session.uid), getMemberAlerts(session.uid), getCategories(), getInterests(session.uid), getSellerRating(session.uid), getBalance(session.uid),
   ]);
   const cards = [
     { href: '/account/ads', label: 'إعلاناتي', value: stats.ads, icon: Megaphone },
@@ -52,6 +53,12 @@ export default async function AccountHome() {
           </Link>
         ))}
       </div>
+      {/* المحفظة وشحن الرصيد — المبلغ + إيصال التحويل ثم تأكيد الإدارة */}
+      <Link href="/account/wallet#topup" className="flex items-center gap-3 card-3d rounded-xl border-2 border-emerald-500/30 bg-emerald-50/50 p-4 hover:border-emerald-500">
+        <span className="grid h-11 w-11 place-items-center rounded-lg bg-emerald-100 text-emerald-700"><Wallet className="h-5 w-5" /></span>
+        <div className="flex-1"><div className="font-bold text-emerald-800">شحن رصيدك</div><div className="text-xs text-muted-foreground">أرسل المبلغ وأرفق الإيصال — يُضاف لرصيدك بعد تأكيد الإدارة</div></div>
+        <div className="text-left"><div className="text-lg font-extrabold text-emerald-700">{en(balance)}</div><div className="text-[11px] text-muted-foreground">رصيدك (ر.س)</div></div>
+      </Link>
       <Link href="/account/analytics" className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><BarChart3 className="h-5 w-5" /></span>
         <div><div className="font-bold">تحليلات إعلاناتي</div><div className="text-xs text-muted-foreground">مشاهدات إعلاناتك يومياً وأفضلها أداءً</div></div>

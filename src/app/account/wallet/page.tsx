@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { Wallet, ArrowDownCircle, ArrowUpCircle, Info, Copy } from 'lucide-react';
+import { Wallet, ArrowDownCircle, ArrowUpCircle, Info, Copy, HandCoins, Receipt, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
-import { getBalance, listTxns, getDupCredit } from '@/lib/wallet';
-import { getServicePricing, serviceHasPrice, DURATIONS } from '@/lib/settings';
-import { buyDupPackAction } from '../actions';
+import { getBalance, listTxns, getDupCredit, listMyTopups } from '@/lib/wallet';
+import { getServicePricing, serviceHasPrice, DURATIONS, getSetting, SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO } from '@/lib/settings';
+import { mediaUrl } from '@/lib/media';
+import { buyDupPackAction, requestTopupAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'محفظتي' };
@@ -14,10 +15,19 @@ function fmt(iso: string | null) {
   return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
 }
 
-export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; error?: string; price?: string; bal?: string }> }) {
+const TOPUP_STATUS = {
+  0: { label: 'بانتظار تأكيد الإدارة', cls: 'bg-amber-100 text-amber-800', icon: Clock },
+  1: { label: 'تم التأكيد وأُضيف للرصيد', cls: 'bg-emerald-100 text-emerald-800', icon: CheckCircle2 },
+  2: { label: 'مرفوض', cls: 'bg-red-100 text-red-700', icon: XCircle },
+} as const;
+
+export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [balance, txns, pricing, dupCredit] = await Promise.all([getBalance(session.uid), listTxns(session.uid, 100), getServicePricing(), getDupCredit(session.uid)]);
+  const [balance, txns, pricing, dupCredit, topups, topupInfo] = await Promise.all([
+    getBalance(session.uid), listTxns(session.uid, 100), getServicePricing(), getDupCredit(session.uid),
+    listMyTopups(session.uid), getSetting(SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO),
+  ]);
   const range = (p: Record<'w2' | 'm1' | 'y1', number>) => DURATIONS.filter((d) => p[d.key] > 0).map((d) => p[d.key]);
   const priceRange = (p: Record<'w2' | 'm1' | 'y1', number>) => { const r = range(p); return r.length ? `${Math.min(...r)}–${Math.max(...r)} ر.س` : ''; };
   return (
@@ -27,11 +37,52 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       <div className="card-3d rounded-2xl bg-gradient-to-l from-primary to-primary/80 p-5 text-white">
         <div className="text-sm opacity-90">الرصيد المتاح</div>
         <div className="mt-1 text-3xl font-extrabold">{balance} <span className="text-lg">ر.س</span></div>
-        <p className="mt-2 text-xs opacity-90">لشحن الرصيد تواصل مع إدارة الموقع. يُخصم الرصيد تلقائياً عند الإعلانات المميّزة والمبوّبة وباقات التكرار.</p>
+        <p className="mt-2 text-xs opacity-90">اشحن رصيدك من نموذج «شحن رصيدك» بالأسفل. يُخصم الرصيد تلقائياً عند الإعلانات المميّزة والمبوّبة وباقات التكرار.</p>
       </div>
 
       {sp.dup === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تمت إضافة باقة التكرار وخُصمت الرسوم من رصيدك.</div>}
-      {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? ` (المطلوب ${sp.price} ر.س)` : ''}. تواصل مع الإدارة لشحن الرصيد.</div>}
+      {sp.topup === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ أُرسل طلب الشحن للإدارة — بعد تأكيد وصول المبلغ يُضاف لرصيدك وستصلك رسالة.</div>}
+      {sp.error === 'topupamount' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">أدخل مبلغاً صحيحاً لطلب الشحن.</div>}
+      {sp.error === 'topupreceipt' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">أرفق صورة إيصال التحويل (حتى 8MB).</div>}
+      {sp.error === 'topup' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-900">تعذّر إرسال طلب الشحن — حاول مجدداً.</div>}
+      {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? ` (المطلوب ${sp.price} ر.س)` : ''}. اشحن رصيدك من النموذج بالأسفل.</div>}
+
+      {/* شحن الرصيد: المبلغ + إيصال التحويل — يُضاف بعد تأكيد الإدارة */}
+      <div id="topup" className="card-3d space-y-3 rounded-2xl p-4">
+        <div className="flex items-center gap-2 font-bold text-primary"><HandCoins className="h-5 w-5" /> شحن رصيدك</div>
+        {topupInfo && <p className="rounded-lg bg-primary/5 p-2.5 text-xs font-medium text-foreground/80">{topupInfo}</p>}
+        <form action={requestTopupAction} className="space-y-2">
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">المبلغ (ر.س)</span>
+            <input type="number" name="amount" min={1} step={1} required inputMode="numeric" placeholder="مثال: 100" className="h-11 w-full rounded-lg border border-primary/30 bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">إيصال التحويل (صورة)</span>
+            <input type="file" name="receipt" accept="image/*,.pdf" required className="w-full rounded-lg border border-primary/30 bg-background p-2 text-sm file:ml-2 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white" />
+          </label>
+          <button className="btn-3d w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white">إرسال طلب الشحن</button>
+        </form>
+        {topups.length > 0 && (
+          <div className="space-y-2 border-t border-primary/10 pt-3">
+            <div className="text-xs font-bold text-muted-foreground">طلباتي السابقة</div>
+            {topups.map((t) => {
+              const st = TOPUP_STATUS[t.status];
+              return (
+                <div key={t.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/15 p-2.5 text-sm">
+                  <st.icon className={`h-5 w-5 shrink-0 ${t.status === 1 ? 'text-emerald-600' : t.status === 2 ? 'text-red-500' : 'text-amber-500'}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold">{t.amount} ر.س</div>
+                    <div className="text-[11px] text-muted-foreground">{fmt(t.at)}</div>
+                    {t.status === 2 && t.note && <div className="mt-0.5 text-xs font-bold text-red-600">السبب: {t.note}</div>}
+                  </div>
+                  {t.receipt && <a href={mediaUrl(t.receipt)} target="_blank" className="flex items-center gap-1 rounded-full border border-primary/25 px-2.5 py-1 text-[11px] font-bold text-primary"><Receipt className="h-3.5 w-3.5" /> الإيصال</a>}
+                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${st.cls}`}>{st.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* باقات التكرار — نشر الإعلان المكرّر عدداً من المرّات (السعر حسب المدّة) */}
       {(serviceHasPrice(pricing.dup3) || serviceHasPrice(pricing.dup5)) && (

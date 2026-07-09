@@ -71,6 +71,24 @@ export async function buyDupPackAction(formData: FormData) {
   redirect('/account/wallet?dup=1');
 }
 
+/** طلب شحن رصيد: المبلغ + إيصال التحويل — يُضاف للرصيد بعد تأكيد الإدارة وصول المبلغ. */
+export async function requestTopupAction(formData: FormData) {
+  const session = await requireUser();
+  const amount = Math.round(Number(formData.get('amount') || 0));
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) redirect('/account/wallet?error=topupamount');
+  const file = formData.get('receipt');
+  if (!(file instanceof File) || file.size === 0) redirect('/account/wallet?error=topupreceipt');
+  if (file.size > 8 * 1024 * 1024) redirect('/account/wallet?error=topupreceipt');
+  const { saveUpload } = await import('@/lib/storage');
+  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
+  const buf = Buffer.from(await file.arrayBuffer());
+  const rel = await saveUpload(buf, `topup_${session.uid}_${Date.now()}.${ext}`);
+  const { requestTopup } = await import('@/lib/wallet');
+  const ok = await requestTopup(session.uid, amount, rel);
+  revalidatePath('/account/wallet');
+  redirect(ok ? '/account/wallet?topup=1' : '/account/wallet?error=topup');
+}
+
 /** Pay from wallet to feature («تمييز») one of the member's own ads for a chosen duration. */
 export async function featureAdAction(formData: FormData) {
   const session = await requireUser();

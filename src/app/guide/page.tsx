@@ -1,6 +1,6 @@
 import {
   BookOpen, UserPlus, PlusCircle, Pencil, Sparkles, Heart, MessageCircle, Star,
-  Flag, ShieldCheck, Crown, MonitorPlay, BarChart3, ShieldAlert, Rocket, Store,
+  Flag, ShieldCheck, Crown, MonitorPlay, BarChart3, ShieldAlert, Rocket, Store, Wallet,
 } from 'lucide-react';
 import { GuideView, type GuideSection } from '@/components/guide-view';
 
@@ -103,6 +103,17 @@ const SECTIONS: GuideSection[] = [
     id: 'verify', title: 'توثيق الحساب', icon: ShieldCheck, from: '#10b981', to: '#047857',
     goal: 'الحصول على شارة «موثّق» التي تزيد ثقة العملاء.',
     steps: ['من «حسابي» اختر «توثيق الحساب».', 'ارفع وثائقك الرسمية (السجل/الهوية) لمراجعتها.', 'بعد الاعتماد تظهر شارة موثّق على إعلاناتك وملفك.'],
+  },
+  {
+    id: 'wallet', title: 'محفظتك وشحن الرصيد', icon: Wallet, from: '#16a34a', to: '#166534',
+    goal: 'شحن رصيدك بنفسك واستخدامه في الخدمات المدفوعة.',
+    steps: [
+      'من «حسابي» ← «شحن رصيدك» (أو «محفظتي»): حوّل المبلغ حسب التعليمات الظاهرة.',
+      'أدخل المبلغ وأرفق صورة إيصال التحويل ثم أرسل الطلب.',
+      'بعد تأكيد الإدارة وصول المبلغ يُضاف لرصيدك تلقائياً وتصلك رسالة بذلك — وإن رُفض الطلب تصلك رسالة بالسبب.',
+      'تابع حالة طلباتك (بانتظار التأكيد/تم/مرفوض) وسجلّ عملياتك كاملاً داخل «محفظتي».',
+      'يُخصم الرصيد تلقائياً عند شراء الخدمات: التمييز، الإعلان المبوّب، وباقات التكرار.',
+    ],
   },
   {
     id: 'packages', title: 'الباقات والتمييز', icon: Crown, from: '#f59e0b', to: '#b45309',

@@ -12,7 +12,7 @@ import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAcco
 import { addBannedWord, deleteBannedWord, addNameWord, deleteNameWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_TRIAL_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT, SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_TRIAL_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -406,6 +406,10 @@ export async function saveTextsAction(formData: FormData) {
   } else if (sec === 'verify') {
     await put(SETTING_MSG_VERIFY_OK, 'msgVerifyOk');
     await put(SETTING_MSG_VERIFY_REJECT, 'msgVerifyReject');
+  } else if (sec === 'wallet') {
+    await put(SETTING_TOPUP_INFO, 'topupInfo');
+    await put(SETTING_MSG_TOPUP_OK, 'msgTopupOk');
+    await put(SETTING_MSG_TOPUP_REJECT, 'msgTopupReject');
   }
   revalidatePath('/admin/texts');
   revalidatePath('/', 'layout');
@@ -602,7 +606,7 @@ export async function trustUserAction(formData: FormData) {
 }
 
 /** رسالة إدارية للعضو بقرار التوثيق — النص من تبويب «النصوص» ({name}/{reason}). */
-async function sendVerifyMessage(userId: number, key: string, fallback: string, reason = '') {
+async function sendVerifyMessage(userId: number, key: string, fallback: string, reason = '', extra: Record<string, string> = {}) {
   const [{ getSetting }, { getPrimaryAdminId }, { sendChat }] = await Promise.all([
     import('@/lib/settings'), import('@/lib/admin-inbox'), import('@/lib/chat'),
   ]);
@@ -611,8 +615,63 @@ async function sendVerifyMessage(userId: number, key: string, fallback: string, 
   const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { name: true, userName: true } }).catch(() => null);
   const tpl = await getSetting(key, fallback);
   if (!tpl.trim()) return; // نص فارغ = تعطيل الرسالة
-  const body = tpl.replace(/\{name\}/g, u?.name || u?.userName || 'عضو').replace(/\{reason\}/g, reason || '—');
+  let body = tpl.replace(/\{name\}/g, u?.name || u?.userName || 'عضو').replace(/\{reason\}/g, reason || '—');
+  for (const [k, v] of Object.entries(extra)) body = body.split(`{${k}}`).join(v);
   await sendChat(adminId, userId, body).catch(() => {});
+}
+
+/** تأكيد وصول مبلغ طلب الشحن: إضافة المبلغ للرصيد + رسالة للعضو. */
+export async function approveTopupAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const id = Number(formData.get('id') || 0);
+  if (!id) return;
+  const { approveTopup } = await import('@/lib/wallet');
+  const req = await approveTopup(id, session.uid);
+  if (req) {
+    const { SETTING_MSG_TOPUP_OK: k, DEFAULT_MSG_TOPUP_OK } = await import('@/lib/settings');
+    await sendVerifyMessage(req.userId, k, DEFAULT_MSG_TOPUP_OK, '', { amount: String(req.amount) });
+  }
+  revalidatePath('/admin/topups');
+  revalidatePath('/account/wallet');
+}
+
+/** إضافة مصروف للموقع (يظهر في الميزانية المفصلة). */
+export async function addSiteExpenseAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const label = String(formData.get('label') || '').trim();
+  const amount = Math.round(Number(formData.get('amount') || 0));
+  const note = String(formData.get('note') || '').trim();
+  const spentAt = String(formData.get('spentAt') || '').trim();
+  const { addSiteExpense } = await import('@/lib/wallet');
+  await addSiteExpense(label, amount, session.uid, { note, spentAt });
+  revalidatePath('/admin/revenue');
+  redirect('/admin/revenue?tab=expenses&saved=1');
+}
+
+/** حذف مصروف. */
+export async function deleteSiteExpenseAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const id = Number(formData.get('id') || 0);
+  if (!id) return;
+  const { deleteSiteExpense } = await import('@/lib/wallet');
+  await deleteSiteExpense(id);
+  revalidatePath('/admin/revenue');
+}
+
+/** رفض طلب الشحن مع سبب يبقى محفوظاً + رسالة للعضو بالسبب. */
+export async function rejectTopupAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const id = Number(formData.get('id') || 0);
+  const reason = String(formData.get('reason') || '').trim().slice(0, 300);
+  if (!id || !reason) return;
+  const { rejectTopup } = await import('@/lib/wallet');
+  const req = await rejectTopup(id, session.uid, reason);
+  if (req) {
+    const { SETTING_MSG_TOPUP_REJECT: k, DEFAULT_MSG_TOPUP_REJECT } = await import('@/lib/settings');
+    await sendVerifyMessage(req.userId, k, DEFAULT_MSG_TOPUP_REJECT, reason, { amount: String(req.amount) });
+  }
+  revalidatePath('/admin/topups');
+  revalidatePath('/account/wallet');
 }
 
 /** الموافقة على التوثيق: تفعيل فوري + رسالة للعضو. */

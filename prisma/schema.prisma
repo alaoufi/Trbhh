@@ -1144,6 +1144,33 @@ model wallet_txns {
   @@index([created_at], map: "wallet_txns_created")
 }
 
+model wallet_topups {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt    @db.UnsignedBigInt
+  amount     Int
+  receipt    String?   @db.VarChar(255)
+  status     Int       @default(0) @db.TinyInt
+  note       String?   @db.VarChar(300)
+  admin_id   BigInt?   @db.UnsignedBigInt
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  decided_at DateTime? @db.DateTime(0)
+
+  @@index([user_id], map: "wallet_topups_user")
+  @@index([status], map: "wallet_topups_status")
+}
+
+model site_expenses {
+  id         BigInt    @id @default(autoincrement())
+  label      String    @db.VarChar(120)
+  amount     Int
+  note       String?   @db.VarChar(300)
+  spent_at   DateTime? @db.Date
+  admin_id   BigInt?   @db.UnsignedBigInt
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([spent_at], map: "site_expenses_date")
+}
+
 model users_notif {
   id       Int @id @default(autoincrement()) @db.UnsignedInt
   user_id  Int @db.UnsignedInt

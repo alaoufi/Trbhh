@@ -1,9 +1,11 @@
 import Link from 'next/link';
-import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks, ReceiptText, Trash2, ArrowRight, Scale } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getRevenueSummary, getMemberLedger } from '@/lib/wallet';
+import { prisma } from '@/lib/prisma';
+import { toInt } from '@/lib/utils';
+import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance } from '@/lib/wallet';
 import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
-import { saveRevenueAction } from '../actions';
+import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الإيرادات' };
@@ -29,14 +31,16 @@ const num = 'h-10 w-full rounded-lg border border-primary/30 bg-white px-2 text-
 const TABS = [
   { key: 'overview', label: 'الميزانية', icon: Coins },
   { key: 'balances', label: 'أرصدة الأعضاء', icon: Users },
+  { key: 'expenses', label: 'المصروفات', icon: ReceiptText },
   { key: 'pricing', label: 'التسعيرات', icon: ListChecks },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
-export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string }> }) {
+export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string; user?: string }> }) {
   await requireAction('users', 'view');
-  const { saved, tab } = await searchParams;
-  const active: TabKey = tab === 'balances' || tab === 'pricing' ? tab : 'overview';
+  const { saved, tab, user } = await searchParams;
+  const active: TabKey = tab === 'balances' || tab === 'pricing' || tab === 'expenses' ? tab : 'overview';
+  const userId = Number(user || 0) || 0;
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -53,21 +57,37 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
       </div>
 
       {active === 'overview' && <OverviewTab />}
-      {active === 'balances' && <BalancesTab />}
+      {active === 'balances' && (userId ? <MemberDetailTab userId={userId} /> : <BalancesTab />)}
+      {active === 'expenses' && <ExpensesTab />}
       {active === 'pricing' && <PricingTab />}
     </div>
   );
 }
 
 async function OverviewTab() {
-  const rev = await getRevenueSummary(40);
+  const [rev, expenses] = await Promise.all([getRevenueSummary(40), listSiteExpenses(1)]);
+  const net = rev.spent - expenses.total;
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Tile icon={TrendingUp} value={`${en(rev.credited)}`} label="إجمالي الشحن (الدخل)" tone="text-sky-600" />
         <Tile icon={TrendingDown} value={`${en(rev.spent)}`} label="الإيراد الفعلي (المستهلك)" tone="text-emerald-600" />
-        <Tile icon={TrendingUp} value={`${en(rev.credited)}`} label="إجمالي الشحن" tone="text-sky-600" />
-        <Tile icon={Wallet} value={`${en(rev.outstanding)}`} label="الرصيد الكلي المتبقّي" />
+        <Tile icon={ReceiptText} value={`${en(expenses.total)}`} label="مصروفات الموقع" tone="text-red-500" />
+        <Tile icon={Scale} value={`${net >= 0 ? '' : '−'}${en(Math.abs(net))}`} label="صافي الميزانية (الإيراد − المصروفات)" tone={net >= 0 ? 'text-emerald-600' : 'text-red-500'} />
       </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-1">
+        <Tile icon={Wallet} value={`${en(rev.outstanding)}`} label="أرصدة الأعضاء المتبقّية (التزامات قائمة)" />
+      </div>
+      {rev.creditByReason.length > 0 && (
+        <div className="card-3d rounded-xl p-3">
+          <div className="mb-2 text-sm font-bold text-sky-700">الدخل (الشحن) حسب النوع</div>
+          <ul className="space-y-1 text-sm">
+            {rev.creditByReason.map((r) => (
+              <li key={r.reason} className="flex items-center justify-between"><span className="text-muted-foreground">{r.label}</span><b className="text-sky-700">{en(r.total)} ر.س</b></li>
+            ))}
+          </ul>
+        </div>
+      )}
       {rev.byReason.length > 0 && (
         <div className="card-3d rounded-xl p-3">
           <div className="mb-2 text-sm font-bold text-primary">الإيراد حسب النوع</div>
@@ -124,7 +144,7 @@ async function BalancesTab() {
             {rows.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">لا توجد حركات مالية بعد.</td></tr>}
             {rows.map((r) => (
               <tr key={r.userId} className="border-b border-border/40 text-center last:border-0">
-                <td className="p-2 text-right"><Link href={`/admin/users/${r.userId}`} className="font-bold text-primary hover:underline">{r.name}</Link></td>
+                <td className="p-2 text-right"><Link href={`/admin/revenue?tab=balances&user=${r.userId}`} className="font-bold text-primary hover:underline">{r.name}</Link></td>
                 <td className="p-2 text-sky-600">{en(r.credited)}</td>
                 <td className="p-2 text-emerald-600">{en(r.consumed)}</td>
                 <td className="p-2 font-bold">{en(r.balance)}</td>
@@ -134,7 +154,118 @@ async function BalancesTab() {
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-muted-foreground">شحن/خصم رصيد أي عضو من صفحته في <Link href="/admin/users" className="font-bold text-primary underline">الأعضاء</Link>.</p>
+      <p className="text-[11px] text-muted-foreground">اضغط اسم العضو لكشف حساب مفصّل (من أول شحن حتى آخر حركة). شحن/خصم رصيد أي عضو من صفحته في <Link href="/admin/users" className="font-bold text-primary underline">الأعضاء</Link>.</p>
+    </div>
+  );
+}
+
+/** كشف حساب مفصّل لعضو: كل حركة برصيدها الجاري — من بداية الشحن حتى انتهاء الرصيد. */
+async function MemberDetailTab({ userId }: { userId: number }) {
+  const [u, txns, balance] = await Promise.all([
+    prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { id: true, name: true, userName: true } }).catch(() => null),
+    listTxns(userId, 200),
+    getBalance(userId),
+  ]);
+  const name = u ? (u.name || u.userName || `#${toInt(u.id)}`) : `#${userId}`;
+  const ordered = [...txns].reverse(); // من الأقدم (أول شحن) إلى الأحدث
+  const credited = txns.filter((t) => t.amount > 0).reduce((a, t) => a + t.amount, 0);
+  const consumed = txns.filter((t) => t.amount < 0).reduce((a, t) => a + Math.abs(t.amount), 0);
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Link href="/admin/revenue?tab=balances" className="flex items-center gap-1 rounded-full border-2 border-primary/25 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5"><ArrowRight className="h-3.5 w-3.5" /> كل الأرصدة</Link>
+        <h2 className="text-lg font-extrabold text-primary">كشف حساب: <Link href={`/admin/users/${userId}`} className="underline">{name}</Link></h2>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <Tile icon={TrendingUp} value={`${en(credited)}`} label="إجمالي المشحون" tone="text-sky-600" />
+        <Tile icon={TrendingDown} value={`${en(consumed)}`} label="إجمالي المستهلك" tone="text-emerald-600" />
+        <Tile icon={Wallet} value={`${en(balance)}`} label="الرصيد الحالي" />
+      </div>
+      <div className="card-3d overflow-x-auto rounded-2xl p-2">
+        <table className="w-full min-w-[560px] text-sm">
+          <thead>
+            <tr className="border-b text-xs text-muted-foreground">
+              <th className="p-2 text-right">التاريخ</th>
+              <th className="p-2 text-right">العملية</th>
+              <th className="p-2">المبلغ</th>
+              <th className="p-2">الرصيد بعدها</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ordered.length === 0 && <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">لا توجد حركات لهذا العضو.</td></tr>}
+            {ordered.map((t) => (
+              <tr key={t.id} className="border-b border-border/40 text-center last:border-0">
+                <td className="p-2 text-right text-xs text-muted-foreground">{fmt(t.at)}</td>
+                <td className="p-2 text-right">
+                  <div className="font-bold">{t.label}{t.byAdmin ? ' • بواسطة الإدارة' : ''}</div>
+                  {t.note && <div className="text-[11px] text-muted-foreground">{t.note}</div>}
+                </td>
+                <td className={`p-2 font-bold ${t.amount > 0 ? 'text-sky-600' : 'text-emerald-600'}`}>{t.amount > 0 ? '+' : ''}{en(t.amount)}</td>
+                <td className="p-2 font-extrabold">{en(t.balanceAfter)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[11px] text-muted-foreground">الكشف مرتّب من أول شحن إلى آخر حركة، وعمود «الرصيد بعدها» يبيّن الرصيد الجاري بعد كل عملية حتى انتهائه.</p>
+    </div>
+  );
+}
+
+/** مصروفات الموقع — إضافة/حذف بنود تدخل في الميزانية المفصلة. */
+async function ExpensesTab() {
+  const { rows, total } = await listSiteExpenses(300);
+  const day = (iso: string | null) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d);
+  };
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-2">
+        <Tile icon={ReceiptText} value={`${en(total)}`} label="إجمالي مصروفات الموقع (ر.س)" tone="text-red-500" />
+      </div>
+      <form action={addSiteExpenseAction} className="card-3d space-y-2 rounded-2xl p-4">
+        <div className="text-sm font-bold text-primary">إضافة مصروف</div>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">البند</span><input name="label" required placeholder="مثال: استضافة، رسائل SMS، تسويق…" className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">المبلغ (ر.س)</span><input name="amount" type="number" min={1} step={1} required className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">التاريخ</span><input name="spentAt" type="date" className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">ملاحظة (اختياري)</span><input name="note" className={num} /></label>
+        </div>
+        <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة المصروف</button>
+      </form>
+      <div className="card-3d overflow-x-auto rounded-2xl p-2">
+        <table className="w-full min-w-[520px] text-sm">
+          <thead>
+            <tr className="border-b text-xs text-muted-foreground">
+              <th className="p-2 text-right">البند</th>
+              <th className="p-2">المبلغ</th>
+              <th className="p-2">التاريخ</th>
+              <th className="p-2 text-right">ملاحظة</th>
+              <th className="p-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">لا توجد مصروفات مسجّلة بعد.</td></tr>}
+            {rows.map((r) => (
+              <tr key={r.id} className="border-b border-border/40 text-center last:border-0">
+                <td className="p-2 text-right font-bold">{r.label}</td>
+                <td className="p-2 font-bold text-red-500">{en(r.amount)}</td>
+                <td className="p-2 text-xs text-muted-foreground">{day(r.spentAt)}</td>
+                <td className="p-2 text-right text-xs text-muted-foreground">{r.note || '—'}</td>
+                <td className="p-2">
+                  <form action={deleteSiteExpenseAction}>
+                    <input type="hidden" name="id" value={r.id} />
+                    <button aria-label="حذف" className="text-red-500 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
+                  </form>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[11px] text-muted-foreground">المصروفات تدخل في «الميزانية»: صافي الميزانية = الإيراد الفعلي − المصروفات.</p>
     </div>
   );
 }

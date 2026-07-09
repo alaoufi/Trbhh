@@ -8,7 +8,7 @@ import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction } from '@/app/account/company/actions';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
 import { getStoreSubPricing } from '@/lib/settings';
 import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen, DatabaseBackup } from 'lucide-react';
@@ -21,11 +21,12 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string }> }) {
-  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string }> }) {
+  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus } = await searchParams;
   const session = await requireUser();
-  // تذكيرات قرب انتهاء الاشتراك — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
+  // تذكيرات قرب انتهاء الاشتراك + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
+  import('@/lib/subscription').then((m) => m.runAutoRenewals()).catch(() => {});
   // نسخة احتياطية دورية تلقائية للمتجر (مرة يومياً كحدّ أقصى)
   import('@/lib/store-backup').then((m) => m.maybeAutoBackup(session.uid)).catch(() => {});
   const store = await getStoreByUser(session.uid);
@@ -49,6 +50,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const storeHours = store && hoursOn ? await xtr.getStoreHours(store.id).catch(() => ({ from: null, to: null, days: [] as number[] })) : { from: null, to: null, days: [] as number[] };
   const subState = store ? await getStoreSub(store.id) : null;
   const subPricing = await getStoreSubPricing();
+  // التجديد التلقائي + باقة Plus (تفعيلهما العام من التحكم)
+  const autoRenewOn = store ? await (await import('@/lib/settings')).autoRenewEnabled().catch(() => false) : false;
+  const plusPricing = store ? await (await import('@/lib/settings')).getStorePlusPricing().catch(() => null) : null;
+  const storeXRow = store ? await db.stores.findUnique({ where: { id: BigInt(store.id) }, select: { auto_renew: true, sub_plan: true, plus_until: true } }).catch(() => null) : null;
+  const plusActive = !!(storeXRow?.plus_until && storeXRow.plus_until > new Date());
   const branches = store ? await prisma.store_branches.findMany({ where: { store_id: store.id } }) : [];
   const logoUrl = store?.logo ? mediaUrl((await prisma.uploads.findUnique({ where: { id: BigInt(store.logo) } }))?.file_name) : null;
   const meta = store ? await getStoreMeta(store.id) : null;
@@ -124,6 +130,46 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             ))}
           </div>
           <p className="text-[11px] text-muted-foreground">تُخصم الرسوم من رصيدك. التجديد المبكر يضيف المدة إلى ما تبقّى. عند انتهاء الاشتراك تُمنح مهلة {en(subState.graceDays)} أيام قبل الإخفاء، ولا يُحذف المتجر أو إعلاناته.</p>
+
+          {/* التجديد التلقائي — يتجدد بآخر خطة دفعتها ويُخصم من رصيدك قبل الانتهاء بيوم */}
+          {autoRenewOn && (
+            <div className="rounded-xl border border-primary/15 bg-primary/5 p-3">
+              {renew === 'saved' && <div className="mb-2 rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ تم حفظ خيار التجديد التلقائي.</div>}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-bold">🔄 التجديد التلقائي {storeXRow?.auto_renew === 1 ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-700">مفعّل</span> : <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-extrabold text-muted-foreground">موقوف</span>}</div>
+                  <div className="text-[11px] text-muted-foreground">يتجدد اشتراكك تلقائياً بآخر خطة دفعتها{storeXRow?.sub_plan ? ` (${storeXRow.sub_plan === 'monthly' ? 'شهري' : storeXRow.sub_plan === 'sixmo' ? '6 أشهر' : 'سنوي'})` : ''} ويُخصم من رصيدك قبل الانتهاء بيوم — وتصلك رسالة بالنتيجة. أوقفه متى شئت.</div>
+                </div>
+                <form action={toggleAutoRenewAction}>
+                  <input type="hidden" name="on" value={storeXRow?.auto_renew === 1 ? '0' : '1'} />
+                  <button className={`btn-3d rounded-lg px-3 py-1.5 text-xs font-bold text-white ${storeXRow?.auto_renew === 1 ? 'bg-slate-500' : 'bg-emerald-600'}`}>{storeXRow?.auto_renew === 1 ? 'إيقاف التجديد التلقائي' : 'تفعيل التجديد التلقائي'}</button>
+                </form>
+              </div>
+              {storeXRow?.auto_renew === 1 && !storeXRow?.sub_plan && <p className="mt-1 text-[11px] font-bold text-amber-700">⚠ يعمل التجديد التلقائي بعد أول دفعة اشتراك (لتحديد الخطة).</p>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* باقة متجر Plus ⭐ — اشتراك + عرض في تربح + شارة مميزة، دفعة واحدة */}
+      {store && plusPricing && plusPricing.enabled && (plusPricing.monthly > 0 || plusPricing.sixmo > 0 || plusPricing.yearly > 0) && (
+        <div className="card-3d space-y-3 rounded-2xl border-2 border-amber-300 bg-amber-50/40 p-4">
+          <div className="flex items-center gap-2 font-bold text-amber-800">⭐ باقة متجر Plus</div>
+          {plus === '1' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ فُعّلت باقة Plus وخُصم المبلغ من رصيدك — اشتراكك وعرضك في تربح وشارتك ⭐ سارية الآن.</div>}
+          {plus === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي — اشحن رصيدك من «محفظتي» ثم أعد المحاولة.</div>}
+          {plus === 'err' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">تعذّر التنفيذ — حاول مجدداً.</div>}
+          {plusActive && <div className="rounded-lg bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">⭐ باقة Plus مفعّلة حتى: {fmtD(storeXRow!.plus_until)}</div>}
+          <p className="text-xs text-muted-foreground">صفقة واحدة تجمع: <b>اشتراك المتجر</b> + <b>عرض متجرك ومنتجاته في رئيسية تربح</b> + <b>شارة ⭐ Plus</b> على واجهة متجرك طوال المدة — تُخصم من رصيدك.</p>
+          <div className="grid grid-cols-3 gap-2">
+            {([['monthly', plusPricing.monthly, 'شهري'], ['sixmo', plusPricing.sixmo, '6 أشهر'], ['yearly', plusPricing.yearly, 'سنوي']] as const).filter(([, p0]) => p0 > 0).map(([plan, p0, label]) => (
+              <form key={plan} action={buyStorePlusAction} className="flex flex-col items-center gap-1 rounded-xl border border-amber-300 bg-white p-3 text-center">
+                <input type="hidden" name="plan" value={plan} />
+                <div className="text-xs font-bold text-muted-foreground">{label}</div>
+                <div className="text-lg font-extrabold text-amber-700">{en(p0)} <span className="text-[10px]">ر.س</span></div>
+                <button className="btn-3d w-full rounded-lg bg-amber-500 px-2 py-1.5 text-xs font-bold text-white">{plusActive ? 'تمديد' : 'اشتراك Plus'}</button>
+              </form>
+            ))}
+          </div>
         </div>
       )}
 

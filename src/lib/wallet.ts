@@ -6,7 +6,7 @@ import { toInt } from './utils';
 const ensure = ensureSchema;
 
 /** Reasons recorded on each wallet transaction (for member + admin history). */
-export type TxnReason = 'admin_credit' | 'admin_debit' | 'featured' | 'classified' | 'duplicate' | 'subscription' | 'refund' | 'topup' | 'bonus' | 'verify_gift' | 'store_show' | 'ad_show' | 'urgent' | 'bump' | 'points_convert' | 'referral' | 'welcome';
+export type TxnReason = 'admin_credit' | 'admin_debit' | 'featured' | 'classified' | 'duplicate' | 'subscription' | 'refund' | 'topup' | 'bonus' | 'verify_gift' | 'store_show' | 'ad_show' | 'urgent' | 'bump' | 'points_convert' | 'referral' | 'welcome' | 'store_plus' | 'lead';
 export const REASON_LABELS: Record<TxnReason, string> = {
   topup: 'شحن رصيد (تحويل)',
   bonus: 'مكافأة شحن',
@@ -24,6 +24,8 @@ export const REASON_LABELS: Record<TxnReason, string> = {
   points_convert: 'تحويل نقاط لرصيد',
   referral: 'مكافأة دعوة صديق',
   welcome: 'رصيد ترحيبي',
+  store_plus: 'باقة متجر Plus',
+  lead: 'عمولة توصيل عميل',
   refund: 'استرداد',
 };
 

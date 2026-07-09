@@ -122,6 +122,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const [couponsOn, hoursOn, stockOn, dealsOn] = await Promise.all([xtr.couponsEnabled(), xtr.hoursEnabled(), xtr.stockEnabled(), xtr.dealsEnabled()]);
   const coupons = couponsOn ? await xtr.listStoreCoupons(storeId, true).catch(() => []) : [];
   const openNow = hoursOn ? xtr.isOpenNow(await xtr.getStoreHours(storeId).catch(() => ({ from: null, to: null, days: [] }))) : null;
+  // شارة باقة Plus ⭐ (تظهر ما دامت الباقة سارية)
+  const storePlus = await import('@/lib/subscription').then((m) => m.isStorePlus(storeId)).catch(() => false);
   const allActive = inStoreAds.map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: viewsById.get(a.id) ?? 0, sellerName: null, sellerTrusted: false, oldPrice: dealsOn ? a.oldPrice : 0, stockState: stockOn ? a.stockState : 0 }));
   const active = query ? allActive.filter((a) => (a.title || '').includes(query)) : allActive;
   // نص واتساب للمتجر: نص المتجر إن وُجد، وإلا نصّ افتراضي (لا يظهر فارغاً)
@@ -235,6 +237,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             {/* شارات الثقة: معتمد · المستوى · التخصص · عمر المتجر */}
             <div className="flex flex-wrap items-center gap-1.5">
               {meta.status === 1 && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white"><ShieldCheck className="h-3.5 w-3.5" /> متجر موثّق</span>}
+              {storePlus && <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-l from-amber-400 to-amber-600 px-2.5 py-1 text-[11px] font-extrabold text-white shadow">⭐ متجر Plus</span>}
               <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${tierStyle[tier.key]}`}>{tier.key === 'gold' && <Crown className="h-3.5 w-3.5" />}{tier.label}</span>
               {openNow !== null && (
                 <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold text-white ${openNow ? 'bg-emerald-600' : 'bg-slate-500'}`}>

@@ -346,3 +346,28 @@ export async function toggleStoreCouponAction(formData: FormData) {
   revalidatePath('/store');
   redirect('/store?coupon=tog');
 }
+
+/** التاجر يفعّل/يوقف التجديد التلقائي لاشتراك متجره (يتجدد بآخر خطة مدفوعة). */
+export async function toggleAutoRenewAction(formData: FormData) {
+  const session = await requireUser();
+  const { setAutoRenew } = await import('@/lib/subscription');
+  await setAutoRenew(session.uid, formData.get('on') === '1');
+  revalidatePath('/store');
+  redirect('/store?renew=saved');
+}
+
+/** شراء باقة متجر Plus: اشتراك + عرض في تربح + شارة ⭐ — دفعة واحدة من الرصيد. */
+export async function buyStorePlusAction(formData: FormData) {
+  const session = await requireUser();
+  const raw = String(formData.get('plan') || '');
+  const plan = raw === 'monthly' || raw === 'sixmo' || raw === 'yearly' ? raw : null;
+  if (!plan) redirect('/store?plus=err');
+  const { buyStorePlus } = await import('@/lib/subscription');
+  const r = await buyStorePlus(session.uid, plan);
+  const { bustAdCaches } = await import('@/lib/data');
+  await bustAdCaches().catch(() => {});
+  revalidatePath('/store');
+  revalidatePath('/');
+  if (!r.ok) redirect(r.error === 'الرصيد غير كافٍ.' ? '/store?plus=needcredit' : '/store?plus=err');
+  redirect('/store?plus=1');
+}

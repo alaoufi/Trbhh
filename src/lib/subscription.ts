@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
-import { getStoreSubPricing, subPlanPrice, SUB_PLAN_MONTHS, SUB_PLAN_LABELS, getStoreSubReminderConfig, getSetting, setSetting, SETTING_SUB_REMINDER_MSG, DEFAULT_SUB_REMINDER_MSG, type SubPlan } from './settings';
+import { getStoreSubPricing, subPlanPrice, SUB_PLAN_MONTHS, SUB_PLAN_LABELS, getStoreSubReminderConfig, getSetting, setSetting, SETTING_SUB_REMINDER_MSG, DEFAULT_SUB_REMINDER_MSG, getStorePlusPricing, plusPlanPrice, autoRenewEnabled, type SubPlan } from './settings';
 import { charge } from './wallet';
 import { storeIdOfUser } from './merchant';
 import { toInt } from './utils';
@@ -85,9 +85,98 @@ export async function subscribeStore(userId: number, plan: SubPlan): Promise<{ o
   const base = cur?.sub_until && new Date(cur.sub_until).getTime() > Date.now() ? new Date(cur.sub_until) : new Date();
   const until = new Date(base);
   until.setMonth(until.getMonth() + months);
-  // أول دفعة تُنهي وضع التجربة المجانية
-  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { sub_until: until, on_trial: 0 } }).catch(() => {});
+  // أول دفعة تُنهي وضع التجربة المجانية — وتُحفظ الخطة ليتجدد بها تلقائياً إن فعّل التاجر ذلك
+  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { sub_until: until, on_trial: 0, sub_plan: plan } }).catch(() => {});
   return { ok: true, until };
+}
+
+/** التاجر يفعّل/يوقف التجديد التلقائي لاشتراكه (يتجدد بآخر خطة مدفوعة). */
+export async function setAutoRenew(userId: number, on: boolean): Promise<void> {
+  await ensure();
+  await prisma.stores.updateMany({ where: { user_id: userId }, data: { auto_renew: on ? 1 : 0 } }).catch(() => {});
+}
+
+/**
+ * التجديد التلقائي الكسول (مفتاح autorenew_on): يمسح المتاجر المفعّلة له التي
+ * ينتهي اشتراكها خلال يوم أو انتهى (وما زالت في المهلة)، ويجدد بآخر خطة مدفوعة
+ * خصماً من رصيد المالك مع رسالة نجاح/تعذّر. يعمل عند تحميل الصفحات (خانق ٦ ساعات)،
+ * ورسائل التعذّر لا تتكرر بنفس اليوم (منع التكرار المطابق في sendChat).
+ */
+export async function runAutoRenewals(): Promise<void> {
+  try {
+    if (!(await autoRenewEnabled())) return;
+    await ensure();
+    const pricing = await getStoreSubPricing();
+    if (!pricing.enabled) return;
+    const last = await getSetting('autorenew_lastrun', '');
+    if (last && Date.now() - Date.parse(last) < 6 * 60 * 60 * 1000) return;
+    await setSetting('autorenew_lastrun', new Date().toISOString());
+
+    const now = new Date();
+    const soon = new Date(now.getTime() + 86400000); // يجدد قبل الانتهاء بيوم
+    const graceMs = pricing.graceDays * 86400000;
+    const oldest = new Date(now.getTime() - graceMs); // لا يجدد ما تجاوز المهلة (يُترك قراره للمالك)
+    const rows = await prisma.stores
+      .findMany({ where: { auto_renew: 1, status: 1, on_trial: 0, sub_plan: { not: null }, sub_until: { gt: oldest, lte: soon } }, select: { id: true, user_id: true, sub_until: true, sub_plan: true, store_name: true }, take: 100 })
+      .catch(() => []);
+    if (!rows.length) return;
+    const [{ getPrimaryAdminId }, { sendChat }] = await Promise.all([import('./admin-inbox'), import('./chat')]);
+    const adminId = await getPrimaryAdminId().catch(() => 0);
+    for (const r of rows) {
+      const plan = (r.sub_plan === 'monthly' || r.sub_plan === 'sixmo' || r.sub_plan === 'yearly' ? r.sub_plan : null) as SubPlan | null;
+      const ownerId = Number(r.user_id);
+      if (!plan || !ownerId) continue;
+      const price = subPlanPrice(pricing, plan);
+      if (price <= 0) continue;
+      const paid = await charge(ownerId, price, 'subscription', `تجديد تلقائي لاشتراك المتجر (${SUB_PLAN_LABELS[plan]})`);
+      const name = r.store_name || 'متجرك';
+      if (paid.ok) {
+        const base = r.sub_until && r.sub_until.getTime() > now.getTime() ? new Date(r.sub_until) : new Date();
+        const until = new Date(base);
+        until.setMonth(until.getMonth() + SUB_PLAN_MONTHS[plan]);
+        await prisma.stores.updateMany({ where: { id: r.id }, data: { sub_until: until } }).catch(() => {});
+        if (adminId && adminId !== ownerId) await sendChat(adminId, ownerId, `✅ تم التجديد التلقائي لاشتراك «${name}» (${SUB_PLAN_LABELS[plan]}) وخُصم ${price} ر.س من رصيدك. الاشتراك ساري حتى ${until.toISOString().slice(0, 10)}.`).catch(() => {});
+      } else if (adminId && adminId !== ownerId) {
+        await sendChat(adminId, ownerId, `⚠️ تعذّر التجديد التلقائي لاشتراك «${name}» — رصيدك غير كافٍ (المطلوب ${price} ر.س). اشحن رصيدك من «محفظتي» وسيُعاد التجديد تلقائياً.`).catch(() => {});
+      }
+    }
+  } catch { /* لا يعطّل شيئاً */ }
+}
+
+/* ===================== باقة متجر Plus ===================== */
+
+/** شراء باقة Plus: اشتراك + عرض المتجر في تربح + شارة ⭐ — دفعة واحدة من الرصيد. */
+export async function buyStorePlus(userId: number, plan: SubPlan): Promise<{ ok: boolean; error?: string }> {
+  await ensure();
+  const storeId = await storeIdOfUser(userId);
+  if (!storeId) return { ok: false, error: 'لا يوجد متجر.' };
+  const pricing = await getStorePlusPricing();
+  if (!pricing.enabled) return { ok: false, error: 'الباقة غير متاحة حالياً.' };
+  const price = plusPlanPrice(pricing, plan);
+  if (price <= 0) return { ok: false, error: 'الباقة غير مسعّرة لهذه المدة.' };
+  const paid = await charge(userId, price, 'store_plus', `باقة متجر Plus (${SUB_PLAN_LABELS[plan]})`);
+  if (!paid.ok) return { ok: false, error: 'الرصيد غير كافٍ.' };
+  const months = SUB_PLAN_MONTHS[plan];
+  const now = Date.now();
+  const st = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { sub_until: true, show_until: true, plus_until: true } }).catch(() => null);
+  const ext = (cur: Date | null | undefined) => {
+    const base = cur && cur.getTime() > now ? new Date(cur) : new Date();
+    const d = new Date(base);
+    d.setMonth(d.getMonth() + months);
+    return d;
+  };
+  await prisma.stores.updateMany({
+    where: { id: BigInt(storeId) },
+    data: { sub_until: ext(st?.sub_until), on_trial: 0, sub_plan: plan, show_on_platform: 1, show_until: ext(st?.show_until), plus_until: ext(st?.plus_until) },
+  }).catch(() => {});
+  return { ok: true };
+}
+
+/** هل المتجر على باقة Plus سارية؟ (لشارة ⭐). */
+export async function isStorePlus(storeId: number): Promise<boolean> {
+  await ensure();
+  const r = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { plus_until: true } }).catch(() => null);
+  return !!(r?.plus_until && r.plus_until > new Date());
 }
 
 /** Admin sets a store's subscription expiry directly (grant/extend/clear). */

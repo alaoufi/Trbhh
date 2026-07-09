@@ -4,7 +4,7 @@ import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { pointsEnabled, getPointsConfig, referralEnabled, getReferralReward, getWelcomeCredit } from '@/lib/points';
 import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction } from '../actions';
 
@@ -339,9 +339,10 @@ async function AccountsTab() {
 }
 
 async function PricingTab() {
-  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome] = await Promise.all([
+  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead] = await Promise.all([
     getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
     pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
+    getStorePlusPricing(), getLeadConfig(),
   ]);
   const services: { key: PaidService; note?: string }[] = [
     { key: 'featured' },
@@ -419,6 +420,29 @@ async function PricingTab() {
           <label className="space-y-1"><span className="text-xs font-bold">الحد الأدنى للمبلغ (ر.س)</span><input name="topupBonusMin" type="number" min={0} defaultValue={promo.min} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">مكافأة أول شحن (ر.س)</span><input name="topupFirstBonus" type="number" min={0} defaultValue={promo.first} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">هدية التوثيق (ر.س — مرة واحدة)</span><input name="verifyGift" type="number" min={0} defaultValue={verifyGift} className={num} /></label>
+        </div>
+      </div>
+
+      {/* باقة متجر Plus + عمولة توصيل عميل */}
+      <div className="rounded-xl border border-amber-400 bg-amber-50/60 p-3">
+        <div className="mb-1 text-xs font-bold text-amber-800">⭐ باقة متجر Plus + عمولة توصيل عميل</div>
+        <p className="mb-2 text-[11px] text-muted-foreground">باقة Plus صفقة واحدة للتاجر: اشتراك المتجر + عرضه في رئيسية تربح + شارة ⭐ طوال المدة. العمولة رسم صغير يُخصم من رصيد المتجر عن كل عميل جديد يضغط واتساب/اتصال (بسقف يومي) — ولا تمنع التواصل أبداً حتى مع رصيد غير كافٍ.</p>
+        <label className="flex items-center gap-2 text-sm font-bold">
+          <input type="checkbox" name="plusOn" defaultChecked={plus.enabled} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+          تفعيل باقة متجر Plus (السعر 0 يخفي المدة)
+        </label>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">Plus شهري</span><input name="plusMonthly" type="number" min={0} defaultValue={plus.monthly} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">Plus ‏6 أشهر</span><input name="plus6mo" type="number" min={0} defaultValue={plus.sixmo} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">Plus سنوي</span><input name="plusYearly" type="number" min={0} defaultValue={plus.yearly} className={num} /></label>
+        </div>
+        <label className="mt-3 flex items-center gap-2 text-sm font-bold">
+          <input type="checkbox" name="leadOn" defaultChecked={lead.enabled} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+          تفعيل عمولة توصيل العميل
+        </label>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">العمولة عن كل عميل جديد (ر.س)</span><input name="leadPrice" type="number" min={0} defaultValue={lead.price} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">السقف اليومي (عملاء يُحاسَب عنهم/متجر)</span><input name="leadDailyCap" type="number" min={1} defaultValue={lead.dailyCap} className={num} /></label>
         </div>
       </div>
 

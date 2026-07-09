@@ -461,6 +461,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('stock_on', formData.get('stockOn') !== null ? '1' : '0');
   await setSetting('hours_on', formData.get('hoursOn') !== null ? '1' : '0');
   await setSetting('deals_on', formData.get('dealsOn') !== null ? '1' : '0');
+  await setSetting('autorenew_on', formData.get('autoRenewOn') !== null ? '1' : '0');
   // classified duplicate prevention: toggle + content/image/background thresholds
   await setSetting(SETTING_CDUP_ON, formData.get('cdupOn') !== null ? '1' : '0');
   await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));
@@ -499,6 +500,14 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting(SETTING_TOPUP_BONUS_MIN, nn('topupBonusMin'));
   await setSetting(SETTING_TOPUP_FIRST_BONUS, nn('topupFirstBonus'));
   await setSetting(SETTING_VERIFY_GIFT, nn('verifyGift'));
+  // باقة متجر Plus + عمولة توصيل عميل
+  await setSetting('plus_on', formData.get('plusOn') !== null ? '1' : '0');
+  await setSetting('plus_monthly', nn('plusMonthly'));
+  await setSetting('plus_6mo', nn('plus6mo'));
+  await setSetting('plus_yearly', nn('plusYearly'));
+  await setSetting('lead_on', formData.get('leadOn') !== null ? '1' : '0');
+  await setSetting('lead_price', nn('leadPrice'));
+  await setSetting('lead_daily_cap', String(Math.max(1, parseInt(String(formData.get('leadDailyCap') || '10')) || 10)));
   // النمو والمكافآت: رصيد ترحيبي + دعوة صديق + نظام النقاط
   await setSetting('welcome_credit', nn('welcomeCredit'));
   await setSetting('referral_on', formData.get('referralOn') !== null ? '1' : '0');

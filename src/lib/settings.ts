@@ -410,6 +410,38 @@ export function subPlanPrice(p: StoreSubPricing, plan: SubPlan): number {
   return plan === 'monthly' ? p.monthly : plan === 'sixmo' ? p.sixmo : p.yearly;
 }
 
+/* ================= باقة متجر Plus: اشتراك + عرض في تربح + شارة ⭐ ================= */
+
+export type StorePlusPricing = { enabled: boolean; monthly: number; sixmo: number; yearly: number };
+export async function getStorePlusPricing(): Promise<StorePlusPricing> {
+  const nn = (n: number) => Math.max(0, Math.round(n) || 0);
+  const [en, m, s, y] = await Promise.all([
+    getSettingBool('plus_on', false),
+    getSettingNum('plus_monthly', 0),
+    getSettingNum('plus_6mo', 0),
+    getSettingNum('plus_yearly', 0),
+  ]);
+  return { enabled: en, monthly: nn(m), sixmo: nn(s), yearly: nn(y) };
+}
+export const plusPlanPrice = (p: StorePlusPricing, plan: SubPlan): number =>
+  plan === 'monthly' ? p.monthly : plan === 'sixmo' ? p.sixmo : p.yearly;
+
+/* ================= عمولة توصيل عميل (Lead): رسم على كل تواصل عميل جديد ================= */
+
+export type LeadConfig = { enabled: boolean; price: number; dailyCap: number };
+export async function getLeadConfig(): Promise<LeadConfig> {
+  const [en, price, cap] = await Promise.all([
+    getSettingBool('lead_on', false),
+    getSettingNum('lead_price', 0),
+    getSettingNum('lead_daily_cap', 10),
+  ]);
+  return { enabled: en, price: Math.max(0, Math.round(price) || 0), dailyCap: Math.max(1, Math.round(cap) || 10) };
+}
+
+/* ================= التجديد التلقائي لاشتراك المتجر ================= */
+
+export const autoRenewEnabled = () => getSettingBool('autorenew_on', false);
+
 /* تنبيهات قرب انتهاء الاشتراك: قبل كم يوم يبدأ التنبيه، وكم مرة (مرة واحدة يومياً
    كحدّ أقصى). 0 = تعطيل. نص الرسالة يُعدَّل من تبويب «النصوص» ويدعم {days} و{date}. */
 export const SETTING_SUB_REMIND_DAYS = 'sub_remind_days';

@@ -159,6 +159,11 @@ const STATEMENTS: string[] = [
   `ALTER TABLE stores ADD COLUMN hours_from VARCHAR(5) NULL`,
   `ALTER TABLE stores ADD COLUMN hours_to VARCHAR(5) NULL`,
   `ALTER TABLE stores ADD COLUMN hours_days VARCHAR(30) NULL`,
+  /* التجديد التلقائي للاشتراك: مفعّل؟ + آخر خطة مدفوعة (monthly/sixmo/yearly) للتجديد بها. */
+  `ALTER TABLE stores ADD COLUMN auto_renew TINYINT NOT NULL DEFAULT 0`,
+  `ALTER TABLE stores ADD COLUMN sub_plan VARCHAR(10) NULL`,
+  /* باقة متجر Plus: اشتراك + عرض في تربح + شارة ⭐ حتى هذا التاريخ. */
+  `ALTER TABLE stores ADD COLUMN plus_until DATETIME NULL`,
   /* ---- moderation ---- */
   `ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`,
   `CREATE INDEX users_ban ON users (ban, ban_until)`,

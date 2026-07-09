@@ -77,8 +77,9 @@ export async function recordStoreVisit(storeId: number, viewerKey: string, sourc
   }
 }
 
-/** Record a contact conversion (WhatsApp/call) — deduped per viewer/kind/day. */
-export async function recordStoreContact(storeId: number, viewerKey: string, kind: 'whatsapp' | 'call') {
+/** Record a contact conversion (WhatsApp/call) — deduped per viewer/kind/day.
+ *  Returns true when this is a NEW contact (first of its kind today from this viewer). */
+export async function recordStoreContact(storeId: number, viewerKey: string, kind: 'whatsapp' | 'call'): Promise<boolean> {
   try {
     await ensure();
     const start = new Date();
@@ -87,12 +88,35 @@ export async function recordStoreContact(storeId: number, viewerKey: string, kin
       where: { store_id: BigInt(storeId), viewer: viewerKey, kind, created_at: { gte: start } },
       select: { id: true },
     });
-    if (!existing) {
-      await prisma.store_contacts.create({ data: { store_id: BigInt(storeId), viewer: viewerKey, kind, created_at: new Date() } });
-    }
+    if (existing) return false;
+    await prisma.store_contacts.create({ data: { store_id: BigInt(storeId), viewer: viewerKey, kind, created_at: new Date() } });
+    return true;
   } catch {
-    /* best-effort */
+    return false; /* best-effort */
   }
+}
+
+/**
+ * عمولة توصيل عميل (مفتاح lead_on): رسم على كل تواصل عميل جديد بواتساب/اتصال
+ * — بالسعر والسقف اليومي من التحكم. لا يمنع التواصل أبداً: إن كان الرصيد غير
+ * كافٍ أو بلغ السقف اليومي يُتجاهل الرسم بصمت. لا يُحتسب ضغط المالك نفسه.
+ */
+export async function chargeLeadFee(storeId: number, viewerKey: string): Promise<void> {
+  try {
+    const { getLeadConfig } = await import('./settings');
+    const cfg = await getLeadConfig();
+    if (!cfg.enabled || cfg.price <= 0) return;
+    const st = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { user_id: true } }).catch(() => null);
+    const ownerId = Number(st?.user_id || 0);
+    if (!ownerId || viewerKey === `u${ownerId}`) return; // ضغطات المالك لا تُحتسب
+    // السقف اليومي: عدد رسوم اليوم لهذا المالك
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const today = await prisma.wallet_txns.count({ where: { user_id: BigInt(ownerId), reason: 'lead', created_at: { gte: start } } }).catch(() => cfg.dailyCap);
+    if (today >= cfg.dailyCap) return;
+    const { charge } = await import('./wallet');
+    await charge(ownerId, cfg.price, 'lead', `عميل جديد تواصل مع متجرك`); // فشل الخصم لا يمنع التواصل
+  } catch { /* لا يعطّل التواصل */ }
 }
 
 export type VisitPoint = { date: string; visits: number };

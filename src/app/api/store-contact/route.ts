@@ -17,7 +17,14 @@ export async function POST(req: Request) {
     // تحقّق أن المتجر موجود ومعتمد قبل التسجيل — يمنع تلويث إحصاءات متجر آخر بمعرّفات عشوائية
     const { prisma } = await import('@/lib/prisma');
     const exists = await prisma.stores.count({ where: { id: BigInt(storeId), status: 1 } }).catch(() => 0);
-    if (viewerKey && exists) await recordStoreContact(storeId, viewerKey, kind);
+    if (viewerKey && exists) {
+      const isNew = await recordStoreContact(storeId, viewerKey, kind);
+      // عمولة توصيل عميل (إن فُعّلت): على التواصل الجديد فقط — لا تمنع التواصل أبداً
+      if (isNew) {
+        const { chargeLeadFee } = await import('@/lib/store-analytics');
+        await chargeLeadFee(storeId, viewerKey).catch(() => {});
+      }
+    }
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false });

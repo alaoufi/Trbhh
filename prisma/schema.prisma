@@ -870,6 +870,9 @@ model stores {
   hours_from       String?   @db.VarChar(5)
   hours_to         String?   @db.VarChar(5)
   hours_days       String?   @db.VarChar(30)
+  auto_renew       Int       @default(0) @db.TinyInt
+  sub_plan         String?   @db.VarChar(10)
+  plus_until       DateTime? @db.DateTime(0)
 }
 
 model store_coupons {

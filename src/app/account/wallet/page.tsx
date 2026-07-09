@@ -59,7 +59,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       <div id="topup" className="card-3d space-y-3 rounded-2xl p-4">
         <div className="flex flex-wrap items-center gap-2 font-bold text-primary">
           <HandCoins className="h-5 w-5" /> شحن رصيدك
-          <Link href="/guide/topup" className="mr-auto inline-flex items-center gap-1 rounded-full border-2 border-primary/25 px-3 py-1 text-[11px] font-bold text-primary hover:bg-primary/5">🎬 شاهد طريقة الشحن</Link>
+          <Link href="/guide/how/topup" className="btn-3d mr-auto inline-flex items-center gap-1 rounded-full bg-red-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md hover:bg-red-700">🎬 شاهد طريقة الشحن</Link>
         </div>
         {topupAccounts.length > 0 && (
           <div className="space-y-2">

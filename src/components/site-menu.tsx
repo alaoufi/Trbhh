@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
 import { ADMIN_GROUPS } from '@/components/admin-nav-def';
+import { TUTORIALS } from '@/components/tutorials-def';
 
 type Cat = { id: number; name: string };
 
@@ -128,6 +129,14 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [] }: { i
             <Link href="/guide" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-3 text-[15px] font-extrabold text-primary hover:bg-primary/15">
               <BookOpen className="h-5 w-5 shrink-0" /> <span>دليل المستخدم</span>
             </Link>
+
+            {/* الشروحات المتحركة — مقاطع تشرح كل خطوة بالصور */}
+            <Section title="شروحات متحركة" icon={Clapperboard}>
+              <Item href="/guide/how" icon={Clapperboard} onClick={close}>كل الشروحات</Item>
+              {TUTORIALS.map((t) => (
+                <Item key={t.slug} href={`/guide/how/${t.slug}`} icon={t.icon} onClick={close}>{t.title}</Item>
+              ))}
+            </Section>
 
             {/* المتشابهات في قوائم فرعية */}
             {isAuthed && (

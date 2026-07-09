@@ -1,6 +1,6 @@
 import {
   BookOpen, UserPlus, PlusCircle, Pencil, Sparkles, Heart, MessageCircle, Star,
-  Flag, ShieldCheck, Crown, MonitorPlay, BarChart3, ShieldAlert, Rocket, Store, Wallet,
+  Flag, ShieldCheck, Crown, MonitorPlay, BarChart3, ShieldAlert, Rocket, Wallet,
 } from 'lucide-react';
 import { GuideView, type GuideSection } from '@/components/guide-view';
 
@@ -25,7 +25,7 @@ const SECTIONS: GuideSection[] = [
     steps: [
       'اضغط «تسجيل الدخول ← إنشاء حساب»، وأدخل الاسم ورقم الجوال وكلمة مرور (6 أحرف على الأقل).',
       'يُقبل رقم جوالك بأي صيغة (05 / 5 / 966) ويُحفظ بالصيغة الصحيحة تلقائياً.',
-      'دخولك موحّد: رقم الجوال وكلمة المرور نفسها لتربح ولمتجرك (إن كان لك متجر) — جلسة واحدة تبقى محفوظة حتى تسجّل الخروج، والخروج يخرجك من الاثنين.',
+      'دخولك موحّد وبسيط: رقم الجوال وكلمة المرور فقط — جلستك تبقى محفوظة ولا تحتاج تكرار الدخول حتى تسجّل الخروج.',
       'الاسم يخضع لقائمة الكلمات المسموحة — الأسماء المخالفة تُرفض ولا تُقبل إلا بموافقة الإدارة.',
       'نسيت كلمة المرور؟ اضغط «نسيت كلمة المرور» ليصلك رمز عبر رسالة نصية لإعادة تعيينها.',
       'من «حسابي ← الملف الشخصي» عدّل بياناتك ووسائل تواصلك وموقعك في أي وقت.',
@@ -58,15 +58,6 @@ const SECTIONS: GuideSection[] = [
       'اضغط «المصمم الذكي»، واكتب النص واختر الثيم والألوان والتنسيق.',
       'أضف صورة أو اجعلها نصية، وحدّد وسيلة تواصل ورابطاً إن رغبت.',
       'انشر — تظهر بطاقتك ضمن «الإعلانات المبوّبة»، وتتابع مشاهداتها ونقراتها.',
-    ],
-  },
-  {
-    id: 'store', title: 'متجرك الخاص (للتجار)', icon: Store, from: '#0d9488', to: '#0f766e',
-    goal: 'افتح متجراً مستقلاً بهويتك البصرية واعرض منتجاتك باحتراف.',
-    steps: [
-      'اضغط «افتح متجرك» من الصفحة الرئيسية، ووافق على شروط المتجر — ويبدأ متجرك بفترة تجريبية مجانية.',
-      'متجرك مستقل تماماً بواجهته ودخوله ونصوصه، وله لوحة إدارة خاصة.',
-      'للتفاصيل الكاملة (الهوية، الدخول المستقل، النصوص، الاشتراك، الإحصائيات…) طالع «دليل المتجر».',
     ],
   },
   {
@@ -161,13 +152,13 @@ export default async function GuidePage() {
       topId="guide-top"
       headerIcon={BookOpen}
       title="دليل المستخدم"
-      subtitle="كل ما تحتاجه لتنشر وتبيع وتتواصل باحتراف — بالهدف والخطوات."
+      subtitle="للزوّار والأعضاء فقط: كل ما تحتاجه لتنشر وتبيع وتتواصل — بالهدف والخطوات."
       fromColor="#3287da" toColor="#1b4f8a"
       sections={SECTIONS}
     >
       {/* بدء سريع */}
       <section className="card-3d overflow-hidden rounded-2xl">
-        <div className="flex items-center gap-3 bg-gradient-to-l from-emerald-600 to-teal-700 p-4 text-white">
+        <div className="flex items-center gap-3 p-4 text-white" style={{ backgroundImage: 'linear-gradient(135deg, #059669, #0f766e)' }}>
           <span className="grid h-11 w-11 place-items-center rounded-xl bg-white/20 ring-1 ring-white/30"><Rocket className="h-6 w-6" /></span>
           <div><h2 className="text-lg font-extrabold drop-shadow">ابدأ في 7 خطوات</h2><p className="text-xs font-bold text-white/85">نظرة سريعة، والتفصيل الكامل بالأسفل.</p></div>
         </div>

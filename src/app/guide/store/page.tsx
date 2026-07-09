@@ -115,7 +115,7 @@ export default async function StoreGuidePage() {
       topId="store-guide-top"
       headerIcon={Store}
       title="دليل المتجر"
-      subtitle="كل ما يخصّ إدارة متجرك المستقل — بالهدف والخطوات."
+      subtitle="لأصحاب المتاجر فقط: كل ما يخصّ إدارة متجرك المستقل — بالهدف والخطوات."
       fromColor="#0d9488" toColor="#115e59"
       sections={SECTIONS}
     >

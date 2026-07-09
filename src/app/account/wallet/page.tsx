@@ -57,7 +57,10 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
 
       {/* شحن الرصيد: المبلغ + إيصال التحويل — يُضاف بعد تأكيد الإدارة */}
       <div id="topup" className="card-3d space-y-3 rounded-2xl p-4">
-        <div className="flex items-center gap-2 font-bold text-primary"><HandCoins className="h-5 w-5" /> شحن رصيدك</div>
+        <div className="flex flex-wrap items-center gap-2 font-bold text-primary">
+          <HandCoins className="h-5 w-5" /> شحن رصيدك
+          <Link href="/guide/topup" className="mr-auto inline-flex items-center gap-1 rounded-full border-2 border-primary/25 px-3 py-1 text-[11px] font-bold text-primary hover:bg-primary/5">🎬 شاهد طريقة الشحن</Link>
+        </div>
         {topupAccounts.length > 0 && (
           <div className="space-y-2">
             <div className="text-sm font-bold text-foreground">حسابات التحويل:</div>

@@ -311,6 +311,15 @@ export async function createAdAction(formData: FormData) {
   const audio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);
   if (audio) await setAdMedia(ad.id, 'audio', audio).catch(() => {});
   await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
+  // نقاط أول إعلان + مكافأة الإحالة — لا تعطّل النشر
+  import('@/lib/points').then(async (m) => {
+    const count = await prisma.ads.count({ where: { user_id: BigInt(session.uid) } }).catch(() => 99);
+    if (count === 1) {
+      const cfg = await m.getPointsConfig();
+      await m.grantPoints(session.uid, cfg.firstAd, 'first_ad', true);
+      await m.rewardReferral(session.uid);
+    }
+  }).catch(() => {});
   if (dest !== 'store') await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز خاصة بإعلانات تربح
   await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
   if (!requireApproval && dest !== 'store' && !scheduledAt) {

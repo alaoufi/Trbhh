@@ -19,6 +19,7 @@ import { getInterests } from '@/lib/interests';
 import { homeFeaturedAds, homeStoreCards, storeIdOfUser } from '@/lib/merchant';
 import { StoreMiniCard, type StoreCardData } from '@/components/store-mini-card';
 import { OpenStoreBanner } from '@/components/open-store-banner';
+import { WelcomeBanner } from '@/components/welcome-banner';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,11 +76,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const storeAds = await homeFeaturedAds().catch(() => []);
   const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
   const myStore = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
+  // الرصيد الترحيبي — بانر للزوار فقط عندما يحدد التحكم مبلغاً أكبر من صفر
+  const welcomeCredit = session ? 0 : await import('@/lib/points').then((m) => m.getWelcomeCredit()).catch(() => 0);
 
   return (
     <div className="space-y-4">
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
+
+      {/* سجّل واحصل على رصيد ترحيبي — للزوار فقط وقابل للإغلاق */}
+      {!session && welcomeCredit > 0 && <WelcomeBanner amount={welcomeCredit} />}
 
       {/* Category dropdown — pick one or more categories to show */}
       <CategorySelect categories={categories} initial={catsParam} />

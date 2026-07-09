@@ -10,8 +10,9 @@ import {
   getTopupAccounts, getTopupPromo,
 } from '@/lib/settings';
 import { CopyChip } from '@/components/copy-chip';
+import { pointsEnabled, getPoints, getPointsConfig } from '@/lib/points';
 import { mediaUrl } from '@/lib/media';
-import { buyDupPackAction, requestTopupAction } from '../actions';
+import { buyDupPackAction, requestTopupAction, convertPointsAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'محفظتي' };
@@ -30,19 +31,21 @@ const TOPUP_STATUS = {
 
 const TXN_PAGE = 25;
 
-export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string }> }) {
+export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string; pts?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page || '1') || 1);
-  const [balance, txns, pricing, dupCredit, topups, topupInfo, topupAccounts, topupNameNote, promo, txnTotal] = await Promise.all([
+  const [balance, txns, pricing, dupCredit, topups, topupInfo, topupAccounts, topupNameNote, promo, txnTotal, ptsOn] = await Promise.all([
     getBalance(session.uid), listTxns(session.uid, TXN_PAGE, (page - 1) * TXN_PAGE), getServicePricing(), getDupCredit(session.uid),
     listMyTopups(session.uid), getSetting(SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO),
     getTopupAccounts(),
     getSetting(SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE),
     getTopupPromo(),
     countTxns(session.uid),
+    pointsEnabled(),
   ]);
   const txnPages = Math.max(1, Math.ceil(txnTotal / TXN_PAGE));
+  const [pts, ptsCfg] = ptsOn ? await Promise.all([getPoints(session.uid), getPointsConfig()]) : [0, null];
   const hadTopup = topups.some((t) => t.status === 1);
   const range = (p: Record<'w2' | 'm1' | 'y1', number>) => DURATIONS.filter((d) => p[d.key] > 0).map((d) => p[d.key]);
   const priceRange = (p: Record<'w2' | 'm1' | 'y1', number>) => { const r = range(p); return r.length ? `${Math.min(...r)}–${Math.max(...r)} ر.س` : ''; };
@@ -57,11 +60,30 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       </div>
 
       {sp.dup === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تمت إضافة باقة التكرار وخُصمت الرسوم من رصيدك.</div>}
+      {sp.pts && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🎯 حُوّلت نقاطك — أُضيف {sp.pts} ر.س لرصيدك.</div>}
       {sp.topup === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ أُرسل طلب الشحن للإدارة — بعد تأكيد وصول المبلغ يُضاف لرصيدك وستصلك رسالة.</div>}
       {sp.error === 'topupamount' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">أدخل مبلغاً صحيحاً لطلب الشحن.</div>}
       {sp.error === 'topupreceipt' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">أرفق صورة إيصال التحويل (حتى 8MB).</div>}
       {sp.error === 'topup' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-900">تعذّر إرسال طلب الشحن — حاول مجدداً.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? ` (المطلوب ${sp.price} ر.س)` : ''}. اشحن رصيدك من النموذج بالأسفل.</div>}
+
+      {sp.error === 'pts' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">نقاطك لا تكفي للتحويل بعد — واصل جمعها.</div>}
+
+      {/* نقاطك — تُجمع من نشاطك وتتحول رصيداً */}
+      {ptsOn && ptsCfg && (
+        <div className="card-3d flex flex-wrap items-center gap-3 rounded-2xl border-2 border-violet-300 bg-violet-50/50 p-4">
+          <span className="grid h-11 w-11 place-items-center rounded-lg bg-violet-100 text-2xl">🎯</span>
+          <div className="min-w-0 flex-1">
+            <div className="font-bold text-violet-800">نقاطك: {pts}</div>
+            <div className="text-xs text-muted-foreground">اجمع النقاط من زيارتك اليومية وأول إعلان والتوثيق — كل {ptsCfg.rate} نقطة = ١ ر.س (الحد الأدنى للتحويل {ptsCfg.minConvert}).</div>
+          </div>
+          {pts >= ptsCfg.minConvert && (
+            <form action={convertPointsAction}>
+              <button className="btn-3d rounded-full bg-violet-600 px-4 py-2 text-sm font-bold text-white">حوّل نقاطك لرصيد</button>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* شحن الرصيد: المبلغ + إيصال التحويل — يُضاف بعد تأكيد الإدارة */}
       <div id="topup" className="card-3d space-y-3 rounded-2xl p-4">

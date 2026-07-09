@@ -37,6 +37,11 @@ export async function registerAction(_prev: unknown, formData: FormData) {
   const phoneLocal = toLocalSaudi(phone); // store canonical 05XXXXXXXX
   if (await userExistsByPhone(phone)) return { error: 'رقم الجوال مسجّل مسبقاً' };
 
+  // الإحالة: كوكي ref يوضع من رابط الدعوة /r/<id>
+  const { cookies } = await import('next/headers');
+  const refRaw = (await cookies()).get('trbhh_ref')?.value || '';
+  const refBy = Number(refRaw) || 0;
+
   const user = await prisma.users.create({
     data: {
       name,
@@ -51,8 +56,11 @@ export async function registerAction(_prev: unknown, formData: FormData) {
       step: 0,
       forget: 0,
       is_admin: 0,
+      ...(refBy > 0 ? { ref_by: refBy } : {}),
     },
   });
+  // رصيد ترحيبي (إن فُعّل) — لا يعطّل التسجيل بأي حال
+  import('@/lib/points').then((m) => m.grantWelcome(toInt(user.id))).catch(() => {});
   await createSession({ uid: toInt(user.id), name, type: 'user' });
   redirect('/');
 }

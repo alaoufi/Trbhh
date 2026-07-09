@@ -494,6 +494,16 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting(SETTING_TOPUP_BONUS_MIN, nn('topupBonusMin'));
   await setSetting(SETTING_TOPUP_FIRST_BONUS, nn('topupFirstBonus'));
   await setSetting(SETTING_VERIFY_GIFT, nn('verifyGift'));
+  // النمو والمكافآت: رصيد ترحيبي + دعوة صديق + نظام النقاط
+  await setSetting('welcome_credit', nn('welcomeCredit'));
+  await setSetting('referral_on', formData.get('referralOn') !== null ? '1' : '0');
+  await setSetting('referral_reward', nn('referralReward'));
+  await setSetting('points_on', formData.get('pointsOn') !== null ? '1' : '0');
+  await setSetting('pts_daily', nn('ptsDaily'));
+  await setSetting('pts_first_ad', nn('ptsFirstAd'));
+  await setSetting('pts_verify', nn('ptsVerify'));
+  await setSetting('pts_rate', String(Math.max(1, parseInt(String(formData.get('ptsRate') || '100')) || 100)));
+  await setSetting('pts_min_convert', String(Math.max(1, parseInt(String(formData.get('ptsMinConvert') || '500')) || 500)));
   // خدمات الإعلان: عاجل + تحديث
   await setSetting('urgent_price', nn('urgentPrice'));
   await setSetting('urgent_hours', String(Math.max(1, parseInt(String(formData.get('urgentHours') || '48')) || 48)));
@@ -773,6 +783,12 @@ export async function approveVerificationAction(formData: FormData) {
   // هدية التوثيق (إن فُعّلت من الإيرادات) — مرة واحدة لكل عضو
   const { grantVerifyGift } = await import('@/lib/wallet');
   const gift = await grantVerifyGift(id, session.uid);
+  // نقاط التوثيق + مكافأة الإحالة عند توثيق المدعو
+  import('@/lib/points').then(async (m) => {
+    const cfg = await m.getPointsConfig();
+    await m.grantPoints(id, cfg.verify, 'verify', true);
+    await m.rewardReferral(id);
+  }).catch(() => {});
   if (gift > 0) await sendVerifyMessage(id, '__none__', `🎁 أُضيفت هدية التوثيق: ${gift} ر.س إلى رصيدك — استمتع بها في خدمات تربح.`);
   await logAdmin(session.uid, 'قبول توثيق', `العضو #${id}`);
   revalidatePath('/admin/verifications');

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
 import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { pointsEnabled, getPointsConfig, referralEnabled, getReferralReward, getWelcomeCredit } from '@/lib/points';
 import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -338,7 +339,10 @@ async function AccountsTab() {
 }
 
 async function PricingTab() {
-  const [sub, prices, remind, promo, verifyGift, show, extras] = await Promise.all([getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras()]);
+  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome] = await Promise.all([
+    getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
+    pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
+  ]);
   const services: { key: PaidService; note?: string }[] = [
     { key: 'featured' },
     { key: 'classified', note: 'إعلان واحد حسب المدّة' },
@@ -415,6 +419,31 @@ async function PricingTab() {
           <label className="space-y-1"><span className="text-xs font-bold">الحد الأدنى للمبلغ (ر.س)</span><input name="topupBonusMin" type="number" min={0} defaultValue={promo.min} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">مكافأة أول شحن (ر.س)</span><input name="topupFirstBonus" type="number" min={0} defaultValue={promo.first} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">هدية التوثيق (ر.س — مرة واحدة)</span><input name="verifyGift" type="number" min={0} defaultValue={verifyGift} className={num} /></label>
+        </div>
+      </div>
+
+      {/* النمو والمكافآت: رصيد ترحيبي + دعوة صديق + نظام النقاط */}
+      <div className="rounded-xl border border-lime-400 bg-lime-50/60 p-3">
+        <div className="mb-1 text-xs font-bold text-lime-800">🌱 النمو والمكافآت (اكتب 0 للتعطيل)</div>
+        <p className="mb-2 text-[11px] text-muted-foreground">رصيد ترحيبي يُضاف تلقائياً لكل عضو جديد فور تسجيله. دعوة صديق: يشارك العضو رابطه، وعند أول إعلان أو توثيق للمدعو يحصل الطرفان على المكافأة. النقاط تُمنح على الزيارة اليومية وأول إعلان والتوثيق، ويحوّلها العضو لرصيد بالمعدّل المحدد.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">الرصيد الترحيبي عند التسجيل (ر.س)</span><input name="welcomeCredit" type="number" min={0} defaultValue={welcome} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">مكافأة دعوة صديق (ر.س — لكل طرف)</span><input name="referralReward" type="number" min={0} defaultValue={refReward} className={num} /></label>
+        </div>
+        <label className="mt-2 flex items-center gap-2 text-sm font-bold">
+          <input type="checkbox" name="referralOn" defaultChecked={refOn} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+          تفعيل دعوة صديق (رابط الإحالة في لوحة العضو)
+        </label>
+        <label className="mt-2 flex items-center gap-2 text-sm font-bold">
+          <input type="checkbox" name="pointsOn" defaultChecked={ptsOn} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+          تفعيل نظام النقاط (زيارة يومية + أول إعلان + توثيق ← تُحوَّل لرصيد)
+        </label>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <label className="space-y-1"><span className="text-xs font-bold">نقاط الزيارة اليومية</span><input name="ptsDaily" type="number" min={0} defaultValue={ptsCfg.daily} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">نقاط أول إعلان</span><input name="ptsFirstAd" type="number" min={0} defaultValue={ptsCfg.firstAd} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">نقاط التوثيق</span><input name="ptsVerify" type="number" min={0} defaultValue={ptsCfg.verify} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">كم نقطة = 1 ر.س</span><input name="ptsRate" type="number" min={1} defaultValue={ptsCfg.rate} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">أدنى نقاط للتحويل</span><input name="ptsMinConvert" type="number" min={1} defaultValue={ptsCfg.minConvert} className={num} /></label>
         </div>
       </div>
 

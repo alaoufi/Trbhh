@@ -193,3 +193,13 @@ export async function bumpAdAction(formData: FormData) {
   revalidatePath('/account/ads');
   redirect('/account/ads?bumped=1');
 }
+
+
+/** تحويل نقاط العضو إلى رصيد — بالمعدل والحد الأدنى المحددين من التحكم. */
+export async function convertPointsAction() {
+  const session = await requireUser();
+  const { convertPoints } = await import('@/lib/points');
+  const r = await convertPoints(session.uid);
+  revalidatePath('/account/wallet');
+  redirect(r.ok ? `/account/wallet?pts=${r.sar}` : '/account/wallet?error=pts');
+}

@@ -10,6 +10,9 @@ import { getInterests } from '@/lib/interests';
 import { getSellerRating } from '@/lib/reviews';
 import { InterestsPicker } from '@/components/interests-picker';
 import { PushToggle } from '@/components/push-toggle';
+import { CopyChip } from '@/components/copy-chip';
+import { referralEnabled, getReferralReward } from '@/lib/points';
+import { SITE } from '@/lib/constants';
 import { setInterestsAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -19,10 +22,14 @@ const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
 
 export default async function AccountHome() {
   const session = await requireUser();
-  const [stats, alerts, categories, interests, rating, balance, newNotifs] = await Promise.all([
+  // نقطة الزيارة اليومية (إن فُعّلت) — لا تؤخر الصفحة
+  import('@/lib/points').then((m) => m.grantDailyVisit(session.uid)).catch(() => {});
+  const [stats, alerts, categories, interests, rating, balance, newNotifs, refOn] = await Promise.all([
     getMyStats(session.uid), getMemberAlerts(session.uid), getCategories(), getInterests(session.uid), getSellerRating(session.uid), getBalance(session.uid),
     prisma.notfications.count({ where: { user_id: String(session.uid), read_at: null } }).catch(() => 0),
+    referralEnabled(),
   ]);
+  const refReward = refOn ? await getReferralReward() : 0;
   const cards = [
     { href: '/account/ads', label: 'إعلاناتي', value: stats.ads, icon: Megaphone },
     { href: '/account/favorites', label: 'المفضلة', value: stats.favorites, icon: Heart },
@@ -57,6 +64,19 @@ export default async function AccountHome() {
           </Link>
         ))}
       </div>
+      {/* دعوة صديق — رابط إحالة بمكافأة للطرفين */}
+      {refOn && refReward > 0 && (
+        <div className="card-3d flex flex-wrap items-center gap-3 rounded-xl border-2 border-sky-300 bg-sky-50/50 p-4">
+          <span className="grid h-11 w-11 place-items-center rounded-lg bg-sky-100 text-2xl">🤝</span>
+          <div className="min-w-0 flex-1">
+            <div className="font-bold text-sky-800">ادعُ صديقاً واربحا معاً</div>
+            <div className="text-xs text-muted-foreground">شارك رابطك — إذا سجّل صديقك ونشر أول إعلان أو وثّق حسابه يحصل كلاكما على {refReward} ر.س رصيداً.</div>
+            <div dir="ltr" className="mt-1 select-all break-all text-xs font-bold text-sky-700">https://{SITE.domain}/r/{session.uid}</div>
+          </div>
+          <CopyChip text={`https://${SITE.domain}/r/${session.uid}`} />
+        </div>
+      )}
+
       {/* التنبيهات الفورية — تظهر فقط عند تفعيلها من الإدارة */}
       <PushToggle />
 

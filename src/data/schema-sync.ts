@@ -160,6 +160,17 @@ const STATEMENTS: string[] = [
   /* التنبيهات: تاريخ القراءة — الجديد ملوّن والمقروء يُؤرشف. */
   `ALTER TABLE notfications ADD COLUMN read_at DATETIME NULL`,
   `ALTER TABLE users ADD COLUMN balance INT NOT NULL DEFAULT 0`,
+  /* نظام النقاط: رصيد النقاط + سجلها، والإحالة: من دعا هذا العضو. */
+  `ALTER TABLE users ADD COLUMN points INT NOT NULL DEFAULT 0`,
+  `ALTER TABLE users ADD COLUMN ref_by INT NULL`,
+  `CREATE TABLE IF NOT EXISTS point_txns (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    points INT NOT NULL,
+    reason VARCHAR(40) NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX point_txns_user (user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `ALTER TABLE users ADD COLUMN dup_credit INT NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS wallet_txns (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

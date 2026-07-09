@@ -116,8 +116,8 @@ export const SETTING_TOPUP_INFO = 'topup_info';
 export const DEFAULT_TOPUP_INFO = 'حوّل المبلغ إلى حساب المنصة ثم أرفق صورة الإيصال هنا. بعد تأكيد الإدارة وصول المبلغ يُضاف لرصيدك مباشرة.';
 export const SETTING_MSG_TOPUP_OK = 'msg_topup_ok';
 export const SETTING_MSG_TOPUP_REJECT = 'msg_topup_reject';
-export const DEFAULT_MSG_TOPUP_OK = 'شكراً {name} 🎉 تم تأكيد وصول مبلغ {amount} ر.س وإضافته لرصيدك. يمكنك متابعة رصيدك من «محفظتي». — الإدارة';
-export const DEFAULT_MSG_TOPUP_REJECT = 'نعتذر {name}، لم يُقبل طلب شحن رصيدك بمبلغ {amount} ر.س. السبب: {reason}. يمكنك إعادة إرسال الطلب من «محفظتي» بعد معالجة السبب. — الإدارة';
+export const DEFAULT_MSG_TOPUP_OK = 'شكراً لثقتك في منصة تربح {name} 🎉 تم إضافة رصيد بمبلغ {amount} ر.س — يمكنك استخدامه في المدفوعات المختلفة. — الإدارة';
+export const DEFAULT_MSG_TOPUP_REJECT = 'نعتذر {name}، تم رفض طلب شحن الرصيد بمبلغ {amount} ر.س لعدم وصول المبلغ في الحساب — نأمل التأكد من رقم الحساب والاسم قبل الإرسال. السبب: {reason} — الإدارة';
 
 /* Visitor-facing safety notice shown on the ad detail page (editable). */
 export const SETTING_AD_NOTICE = 'ad_notice';

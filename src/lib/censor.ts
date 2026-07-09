@@ -46,6 +46,60 @@ export async function censor(text: string | null | undefined): Promise<string> {
   return censorSync(text);
 }
 
+/* ---- قائمة الأسماء الممنوعة (كلمات وجمل) — مستقلة عن حجب المحتوى ----
+   الجملة تُمنع مجتمعةً فقط: «الملك سلمان» ممنوعة بينما «سلمان» وحدها مقبولة
+   (المطابقة كلمة/جملة كاملة عبر نفس آلية بناء التعبير). */
+let nameCache: { list: string[]; re: RegExp | null; exp: number } = { list: [], re: null, exp: 0 };
+
+async function loadNameBanned(): Promise<void> {
+  if (Date.now() < nameCache.exp) return;
+  try {
+    await ensureTable();
+    const rows = await prisma.name_words.findMany({ select: { word: true } });
+    const list = rows.map((r) => r.word).filter(Boolean);
+    nameCache = { list, re: buildRegex(list), exp: Date.now() + 60_000 };
+  } catch {
+    nameCache = { list: [], re: null, exp: Date.now() + 60_000 };
+  }
+}
+
+/**
+ * فحص اسم عضو/متجر: يرفض إن طابق قائمة الأسماء الممنوعة أو قائمة الكلمات
+ * المرفوضة العامة (المسيئة). تُعيد أول مطابقة أو null.
+ */
+export async function containsBannedName(text: string | null | undefined): Promise<string | null> {
+  if (!text) return null;
+  await Promise.all([loadBanned(), loadNameBanned()]);
+  for (const re of [nameCache.re, cache.re]) {
+    if (!re) continue;
+    re.lastIndex = 0;
+    const m = re.exec(text);
+    re.lastIndex = 0;
+    if (m) return m[0];
+  }
+  return null;
+}
+
+export async function getNameWords(): Promise<{ id: number; word: string }[]> {
+  await ensureTable();
+  const rows = await prisma.name_words.findMany({ orderBy: { id: 'desc' } }).catch(() => []);
+  return rows.map((r) => ({ id: r.id, word: r.word }));
+}
+
+export async function addNameWord(word: string) {
+  await ensureTable();
+  const w = word.trim().slice(0, 120);
+  if (!w) return;
+  await prisma.name_words.create({ data: { word: w } }).catch(() => {});
+  nameCache.exp = 0;
+}
+
+export async function deleteNameWord(id: number) {
+  await ensureTable();
+  await prisma.name_words.delete({ where: { id } }).catch(() => {});
+  nameCache.exp = 0;
+}
+
 /**
  * هل يحتوي النص كلمة/جملة من قائمة المرفوضات؟ تُعيد أول مطابقة أو null.
  * تُستخدم لرفض أسماء الأعضاء والمتاجر المخالفة (الفحص على مسارات الأعضاء فقط،

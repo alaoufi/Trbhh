@@ -213,6 +213,13 @@ const STATEMENTS: string[] = [
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* كلمات/جمل ممنوعة في أسماء الأعضاء والمتاجر (قائمة مستقلة عن حجب المحتوى):
+     الجملة تُمنع مجتمعةً فقط — «الملك سلمان» ممنوعة بينما «سلمان» وحدها مقبولة. */
+  `CREATE TABLE IF NOT EXISTS name_words (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    word VARCHAR(120) NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS guard_words (
     id INT AUTO_INCREMENT PRIMARY KEY,
     category VARCHAR(12) NOT NULL,

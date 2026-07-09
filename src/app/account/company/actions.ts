@@ -81,8 +81,8 @@ export async function saveCompanyAction(formData: FormData) {
   const agreeTerms = !!formData.get('agreeTerms');
 
   // أسماء المتاجر المخالفة (كلمات/جمل مرفوضة) لا تُقبل إلا من الإدارة
-  const { containsBanned } = await import('@/lib/censor');
-  if ((await containsBanned(storeName)) || (await containsBanned(tagline))) {
+  const { containsBannedName } = await import('@/lib/censor');
+  if ((await containsBannedName(storeName)) || (await containsBannedName(tagline))) {
     redirect('/store?error=badname');
   }
 

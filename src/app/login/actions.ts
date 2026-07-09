@@ -30,8 +30,8 @@ export async function registerAction(_prev: unknown, formData: FormData) {
     return { error: 'يجب الموافقة على الشروط والأحكام وسياسة الخصوصية.' };
   }
   // الأسماء المخالفة (كلمات/جمل مرفوضة) لا تُقبل إلا من الإدارة
-  const { containsBanned } = await import('@/lib/censor');
-  if (await containsBanned(name)) {
+  const { containsBannedName } = await import('@/lib/censor');
+  if (await containsBannedName(name)) {
     return { error: 'الاسم يحتوي كلمة غير مسموحة — اختر اسماً آخر.' };
   }
   const phoneLocal = toLocalSaudi(phone); // store canonical 05XXXXXXXX

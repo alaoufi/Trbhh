@@ -1117,6 +1117,12 @@ model store_backups {
   @@index([created_at], map: "store_backups_created")
 }
 
+model name_words {
+  id         Int       @id @default(autoincrement())
+  word       String    @db.VarChar(120)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+}
+
 model store_sub_reminders {
   store_id  Int       @id
   sub_until DateTime? @db.DateTime(0)

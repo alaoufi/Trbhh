@@ -98,8 +98,8 @@ export async function updateProfileAction(_prev: unknown, formData: FormData) {
   const session = await requireUser();
   const name = String(formData.get('name') || '').trim();
   // الأسماء المخالفة (كلمات/جمل مرفوضة) لا تُقبل إلا من الإدارة
-  const { containsBanned } = await import('@/lib/censor');
-  if (await containsBanned(name)) {
+  const { containsBannedName } = await import('@/lib/censor');
+  if (await containsBannedName(name)) {
     return { error: 'الاسم يحتوي كلمة غير مسموحة — اختر اسماً آخر.' };
   }
   const phoneRaw = String(formData.get('phoneNumber') || '').trim();

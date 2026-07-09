@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
-import { ADMIN_NAV } from '@/components/admin-nav-def';
+import { ADMIN_GROUPS } from '@/components/admin-nav-def';
 
 type Cat = { id: number; name: string };
 
@@ -60,7 +60,9 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [] }: { i
 
   // داخل لوحة الإدارة: القائمة = قائمة الإدارة (المصرّح بها فقط) بدل قائمة الموقع
   const adminMode = isAdmin && pathname.startsWith('/admin');
-  const adminItems = adminMode ? ADMIN_NAV.filter((n) => adminHrefs.includes(n.href)) : [];
+  const adminGroups = adminMode
+    ? ADMIN_GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => adminHrefs.includes(n.href)) })).filter((g) => g.items.length > 0)
+    : [];
 
   async function share() {
     const url = typeof window !== 'undefined' ? window.location.origin : '';
@@ -89,11 +91,27 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [] }: { i
         </div>
 
         {adminMode ? (
-          /* ===== قائمة الإدارة داخل اللوحة ===== */
-          <div className="flex-1 p-2">
-            {adminItems.map((n) => (
-              <Item key={n.href} href={n.href} icon={n.icon} onClick={close}>{n.label}</Item>
-            ))}
+          /* ===== قائمة الإدارة داخل اللوحة — مجموعات ملوّنة قابلة للطي ===== */
+          <div className="flex-1 space-y-1.5 p-2">
+            {adminGroups.map((g) =>
+              g.key === 'top' ? (
+                g.items.map((n) => <Item key={n.href} href={n.href} icon={n.icon} onClick={close}>{n.label}</Item>)
+              ) : (
+                <details key={g.key} open={g.items.some((n) => pathname === n.href || pathname.startsWith(n.href + '/'))} className="overflow-hidden rounded-lg border" style={{ borderColor: `${g.color}40` }}>
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-[15px] font-extrabold text-white" style={{ background: g.color }}>
+                    <span className="flex items-center gap-3"><g.icon className="h-5 w-5" /> {g.title}</span>
+                    <ChevronDown className="h-5 w-5 opacity-80" />
+                  </summary>
+                  <div className="space-y-0.5 p-1" style={{ background: `${g.color}0d` }}>
+                    {g.items.map((n) => (
+                      <Link key={n.href} href={n.href} onClick={close} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium hover:bg-white/70" style={{ color: g.color }}>
+                        <n.icon className="h-5 w-5 shrink-0" /> <span>{n.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </details>
+              ),
+            )}
             <div className="my-2 border-t border-primary/10" />
             <Item href="/" icon={Home} onClick={close}>العودة للموقع</Item>
           </div>

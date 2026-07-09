@@ -1,62 +1,80 @@
 import Link from 'next/link';
-import type { Prisma } from '@prisma/client';
 import { BadgeCheck, Ban, Check, ShieldCheck } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { requirePerm, getUserRole, ROLE_LABELS } from '@/lib/roles';
+import { requirePerm, getUserRolesMap, ROLE_LABELS } from '@/lib/roles';
 import { getPackages, getUserPackageMap } from '@/lib/packages';
 import { liftExpiredBans, getBanMap } from '@/lib/moderation';
 import { AdminSearch } from '@/components/admin-search';
+import { AdminPager } from '@/components/admin-pager';
 import { banUserAction, unbanUserAction, trustUserAction, assignUserPackageAction, executeDeletionRequestAction, dismissDeletionRequestAction } from '../actions';
 import { listDeletionRequests } from '@/lib/account-delete';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المستخدمين' };
 
-const FILTERS = [{ k: 'all', l: 'الكل' }, { k: 'active', l: 'نشط' }, { k: 'banned', l: 'محظور' }] as const;
+const FILTERS = [
+  { k: 'all', l: 'الكل' },
+  { k: 'active', l: 'نشط' },
+  { k: 'idle', l: 'خامل' },
+  { k: 'banned', l: 'محظور' },
+] as const;
+type Filter = typeof FILTERS[number]['k'];
 const fmtDate = (d: Date | null) => (d ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d) : '');
+const PAGE_SIZE = 30;
 
-export default async function AdminUsers({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string }> }) {
+// خامل = غير محظور، حسابه أقدم من سنة، ولم يضف أي إعلان خلال آخر سنة
+const IDLE_COND = `(ban IS NULL OR ban <> 'checked')
+  AND users.created_at < (NOW() - INTERVAL 1 YEAR)
+  AND NOT EXISTS (SELECT 1 FROM ads a WHERE a.user_id = users.id AND a.created_at > (NOW() - INTERVAL 1 YEAR))`;
+
+export default async function AdminUsers({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string; page?: string }> }) {
   await requirePerm('users');
-  const { q, filter: filterRaw } = await searchParams;
+  const { q, filter: filterRaw, page: pageRaw } = await searchParams;
   const term = (q || '').trim();
-  const filter = filterRaw === 'active' || filterRaw === 'banned' ? filterRaw : 'all';
+  const filter: Filter = (FILTERS.some((f) => f.k === filterRaw) ? filterRaw : 'all') as Filter;
+  const page = Math.max(1, parseInt(pageRaw || '1', 10) || 1);
   await liftExpiredBans(); // so ban='checked' reflects only still-active bans
   const deletionRequests = await listDeletionRequests().catch(() => []);
 
   type Row = { id: bigint; name: string | null; userName: string | null; phoneNumber: string | null; trusted: number | null; ban: string | null; is_admin: number | null; created_at: Date | null };
-  let users: Row[];
+
+  // بحث + تصنيف + ترقيم صفحات — استعلام موحّد
+  const conds: string[] = [];
+  const args: unknown[] = [];
   if (term) {
     const like = `%${term}%`;
     const digits = term.replace(/\D/g, '');
     let sig = digits.startsWith('966') ? digits.slice(3) : digits;
     sig = sig.replace(/^0+/, '');
     const phoneLike = `%${sig || digits || term}%`;
-    const banCond = filter === 'banned' ? `AND ban = 'checked'` : filter === 'active' ? `AND (ban IS NULL OR ban <> 'checked')` : '';
-    users = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT id, name, userName, phoneNumber, trusted, ban, is_admin, created_at
-       FROM users
-       WHERE (name LIKE ? OR userName LIKE ? OR email LIKE ?
-          OR REPLACE(REPLACE(REPLACE(IFNULL(phoneNumber,''),'+',''),' ',''),'-','') LIKE ?) ${banCond}
-       ORDER BY id DESC LIMIT 50`,
-      like, like, like, phoneLike,
-    ).catch(() => [] as Row[]);
-  } else {
-    const where: Prisma.usersWhereInput = filter === 'banned' ? { ban: 'checked' } : filter === 'active' ? { ban: { not: 'checked' } } : {};
-    users = (await prisma.users.findMany({
-      where, orderBy: { id: 'desc' }, take: 50,
-      select: { id: true, name: true, userName: true, phoneNumber: true, trusted: true, ban: true, is_admin: true, created_at: true },
-    })) as unknown as Row[];
+    conds.push(`(name LIKE ? OR userName LIKE ? OR email LIKE ?
+      OR REPLACE(REPLACE(REPLACE(IFNULL(phoneNumber,''),'+',''),' ',''),'-','') LIKE ?)`);
+    args.push(like, like, like, phoneLike);
   }
+  if (filter === 'banned') conds.push(`ban = 'checked'`);
+  else if (filter === 'idle') conds.push(IDLE_COND);
+  else if (filter === 'active') conds.push(`(ban IS NULL OR ban <> 'checked') AND NOT (${IDLE_COND})`);
+  const whereSql = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+
+  const countRows = await prisma.$queryRawUnsafe<{ c: bigint }[]>(`SELECT COUNT(*) AS c FROM users ${whereSql}`, ...args).catch(() => [{ c: 0n }]);
+  const total = Number(countRows[0]?.c ?? 0);
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const cur = Math.min(page, pages);
+  const users = await prisma.$queryRawUnsafe<Row[]>(
+    `SELECT id, name, userName, phoneNumber, trusted, ban, is_admin, created_at
+     FROM users ${whereSql}
+     ORDER BY id DESC LIMIT ${PAGE_SIZE} OFFSET ${(cur - 1) * PAGE_SIZE}`,
+    ...args,
+  ).catch(() => [] as Row[]);
   const ids = users.map((u) => toInt(u.id));
-  const [packages, pkgMap, roleLabels, banMap] = await Promise.all([
+  const [packages, pkgMap, roleById, banMap] = await Promise.all([
     getPackages(),
     getUserPackageMap(ids),
-    Promise.all(ids.map((id) => getUserRole(id))),
+    getUserRolesMap(ids),
     getBanMap(ids),
   ]);
-  const roleById = new Map(ids.map((id, i) => [id, roleLabels[i]]));
 
   return (
     <div className="space-y-4">
@@ -166,6 +184,8 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
           </tbody>
         </table>
       </div>
+
+      <AdminPager basePath="/admin/users" page={cur} pages={pages} total={total} params={{ q: term || undefined, filter: filter !== 'all' ? filter : undefined }} />
     </div>
   );
 }

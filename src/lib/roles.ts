@@ -257,6 +257,29 @@ export async function getUserRole(userId: number): Promise<Role | null> {
   return null; // custom set
 }
 
+/**
+ * Batched role labels for a page of users — TWO queries total instead of
+ * 3-4 per user (the per-user loop was saturating the DB pool and hanging
+ * the admin panel). is_admin=1 → manager; else the assigned role if any.
+ */
+export async function getUserRolesMap(ids: number[]): Promise<Map<number, Role | null>> {
+  await ensureTables();
+  const map = new Map<number, Role | null>();
+  if (!ids.length) return map;
+  const big = ids.filter((n) => Number.isFinite(n) && n > 0).map((n) => BigInt(n));
+  const [admins, roleRows] = await Promise.all([
+    prisma.users.findMany({ where: { id: { in: big }, is_admin: 1 }, select: { id: true } }).catch(() => []),
+    prisma.admin_roles.findMany({ where: { user_id: { in: big } } }).catch(() => []),
+  ]);
+  for (const id of ids) map.set(id, null);
+  for (const r of roleRows) {
+    const role = r.role as Role;
+    if (role in ROLE_PRESET) map.set(Number(r.user_id), role);
+  }
+  for (const a of admins) map.set(Number(a.id), 'manager');
+  return map;
+}
+
 /* ---- gates ---- */
 export async function requireAction(service: Service, action: Action) {
   const session = await getSession();

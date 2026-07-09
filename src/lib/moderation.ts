@@ -57,8 +57,13 @@ export async function banUser(userId: number) {
 /* ---- ban duration (temporary N days / permanent) ---- */
 const ensureBanCol = ensureSchema;
 
-/** Auto-lift any temporary bans whose end date has passed. */
-export async function liftExpiredBans() {
+/** Auto-lift any temporary bans whose end date has passed.
+ *  خانق ٦٠ ثانية: كانت تُنفَّذ مع كل عرض صفحة (ومرتين في صفحة المستخدمين)
+ *  فتزاحم حوض الاتصالات وتساهم في تعليق لوحة الإدارة. */
+let lastLift = 0;
+export async function liftExpiredBans(force = false) {
+  if (!force && Date.now() - lastLift < 60_000) return;
+  lastLift = Date.now();
   await ensureBanCol();
   await prisma.users.updateMany({
     where: { ban: 'checked', ban_until: { not: null, lt: new Date() } },

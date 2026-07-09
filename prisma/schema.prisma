@@ -1079,6 +1079,8 @@ model users {
   adds_build                Int?
   balance                   Int        @default(0)
   dup_credit                Int        @default(0)
+
+  @@index([ban, ban_until], map: "users_ban")
 }
 
 model store_visits {

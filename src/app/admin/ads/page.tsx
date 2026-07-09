@@ -1,11 +1,14 @@
 import Link from 'next/link';
-import { Star, Trash2, Eye, EyeOff, Check } from 'lucide-react';
+import type { Prisma } from '@prisma/client';
+import { Star, Trash2, EyeOff, Check } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { requirePerm } from '@/lib/roles';
 import { adminDeleteAdAction, adminToggleSpecialAction, adminToggleAdStatusAction, deleteAllPendingAdsAction, deleteAllArchivedAdsAction } from '../actions';
 import { sweepExpiredArchived } from '@/lib/data';
+import { AdminSearch } from '@/components/admin-search';
+import { AdminPager } from '@/components/admin-pager';
 import { Button } from '@/components/ui/button';
 
 export const dynamic = 'force-dynamic';
@@ -13,40 +16,82 @@ export const metadata = { title: 'إدارة الإعلانات' };
 
 const notArchived = { OR: [{ data_archive: null }, { data_archive: '' }] };
 const archived = { NOT: { OR: [{ data_archive: null }, { data_archive: '' }] } };
+const PAGE_SIZE = 30;
 
-export default async function AdminAds({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+const TABS = [
+  { k: 'all', l: 'الكل' },
+  { k: 'special', l: 'المميزة' },
+  { k: 'normal', l: 'العادية' },
+  { k: 'pending', l: 'بانتظار الموافقة' },
+  { k: 'archived', l: 'المؤرشفة' },
+  { k: 'banned', l: 'المحظورة' },
+] as const;
+type Tab = typeof TABS[number]['k'];
+
+export default async function AdminAds({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; page?: string }> }) {
   await requirePerm('ads');
+  const { view, q, page: pageRaw } = await searchParams;
+  const tab: Tab = (TABS.some((t) => t.k === view) ? view : 'all') as Tab;
+  const term = (q || '').trim();
+  const page = Math.max(1, parseInt(pageRaw || '1', 10) || 1);
   // لا نُشغّل كنس الأرشيف عند عرض تبويب المؤرشفة حتى لا يبدو فارغاً بعد حذف القديم
-  const { view } = await searchParams;
-  const tab = view === 'active' || view === 'pending' || view === 'archived' ? view : 'all';
   if (tab !== 'archived') await sweepExpiredArchived().catch(() => {});
-  const where = tab === 'active' ? { status: 1, ...notArchived }
-    : tab === 'pending' ? { status: 0, ...notArchived }
-      : tab === 'archived' ? archived : {};
-  const [ads, activeCount, pendingCount, archivedCount] = await Promise.all([
-    prisma.ads.findMany({ where, orderBy: { id: 'desc' }, take: 60 }),
-    prisma.ads.count({ where: { status: 1, ...notArchived } }),
+
+  // «المحظورة» = إعلانات الأعضاء المحظورين
+  const bannedUserIds = tab === 'banned'
+    ? (await prisma.users.findMany({ where: { ban: 'checked' }, select: { id: true } }).catch(() => [])).map((u) => u.id)
+    : [];
+
+  const tabWhere: Prisma.adsWhereInput =
+    tab === 'special' ? { status: 1, adsSpecial: 'checked', ...notArchived }
+      : tab === 'normal' ? { status: 1, NOT: { adsSpecial: 'checked' }, ...notArchived }
+        : tab === 'pending' ? { status: 0, ...notArchived }
+          : tab === 'archived' ? archived
+            : tab === 'banned' ? { user_id: { in: bannedUserIds.length ? bannedUserIds : [BigInt(-1)] } }
+              : {};
+
+  // البحث: بالعنوان أو التفاصيل أو رقم الإعلان
+  const digits = term.replace(/\D/g, '');
+  const searchWhere: Prisma.adsWhereInput = term
+    ? { OR: [{ title: { contains: term } }, { detail: { contains: term } }, ...(digits ? [{ id: BigInt(digits) } as Prisma.adsWhereInput] : [])] }
+    : {};
+  const where: Prisma.adsWhereInput = { AND: [tabWhere, searchWhere] };
+
+  const [total, specialCount, pendingCount, archivedCount] = await Promise.all([
+    prisma.ads.count({ where }),
+    prisma.ads.count({ where: { status: 1, adsSpecial: 'checked', ...notArchived } }),
     prisma.ads.count({ where: { status: 0, ...notArchived } }),
     prisma.ads.count({ where: archived }),
   ]);
-  const tabCls = (t: string) => `rounded-lg border px-3 py-1.5 ${tab === t ? 'bg-primary text-white' : 'text-primary'}`;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const cur = Math.min(page, pages);
+  const ads = await prisma.ads.findMany({ where, orderBy: { id: 'desc' }, skip: (cur - 1) * PAGE_SIZE, take: PAGE_SIZE });
+
+  const tabHref = (t: Tab) => {
+    const sp = new URLSearchParams();
+    if (t !== 'all') sp.set('view', t);
+    if (term) sp.set('q', term);
+    const qs = sp.toString();
+    return `/admin/ads${qs ? `?${qs}` : ''}`;
+  };
+  const tabCls = (t: Tab) => `rounded-lg border px-3 py-1.5 ${tab === t ? 'bg-primary text-white' : 'text-primary'}`;
+  const badge = (n: number, color: string) => n > 0 && <span className={`mr-1 rounded-full px-1.5 text-xs text-white ${color}`}>{n}</span>;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-bold text-primary">الإعلانات</h1>
         <div className="flex flex-wrap gap-2 text-sm">
-          <Link href="/admin/ads" className={tabCls('all')}>الكل</Link>
-          <Link href="/admin/ads?view=active" className={tabCls('active')}>
-            النشطة {activeCount > 0 && <span className="mr-1 rounded-full bg-emerald-500 px-1.5 text-xs text-white">{activeCount}</span>}
-          </Link>
-          <Link href="/admin/ads?view=pending" className={tabCls('pending')}>
-            بانتظار الموافقة {pendingCount > 0 && <span className="mr-1 rounded-full bg-red-500 px-1.5 text-xs text-white">{pendingCount}</span>}
-          </Link>
-          <Link href="/admin/ads?view=archived" className={tabCls('archived')}>
-            المحجوبة/المؤرشفة {archivedCount > 0 && <span className="mr-1 rounded-full bg-amber-500 px-1.5 text-xs text-white">{archivedCount}</span>}
-          </Link>
+          <Link href={tabHref('all')} className={tabCls('all')}>الكل</Link>
+          <Link href={tabHref('special')} className={tabCls('special')}>المميزة {badge(specialCount, 'bg-amber-500')}</Link>
+          <Link href={tabHref('normal')} className={tabCls('normal')}>العادية</Link>
+          <Link href={tabHref('pending')} className={tabCls('pending')}>بانتظار الموافقة {badge(pendingCount, 'bg-red-500')}</Link>
+          <Link href={tabHref('archived')} className={tabCls('archived')}>المؤرشفة {badge(archivedCount, 'bg-amber-600')}</Link>
+          <Link href={tabHref('banned')} className={tabCls('banned')}>المحظورة</Link>
         </div>
       </div>
+
+      <AdminSearch basePath={`/admin/ads${tab !== 'all' ? `?view=${tab}` : ''}`} defaultValue={q} placeholder="بحث بالعنوان أو التفاصيل أو رقم الإعلان…" />
 
       {tab === 'pending' && pendingCount > 0 && (
         <form action={deleteAllPendingAdsAction} className="flex items-center justify-between gap-2 rounded-xl border-2 border-destructive/30 bg-destructive/5 p-3">
@@ -65,6 +110,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
           <p className="text-xs font-bold text-amber-700">الإعلانات المؤرشفة تُحذف تلقائياً بعد 30 يوماً من أرشفتها.</p>
         </>
       )}
+      {tab === 'banned' && <p className="text-xs font-bold text-amber-700">إعلانات الأعضاء المحظورين حالياً — لا تظهر للزوّار ما دام صاحبها محظوراً.</p>}
 
       {ads.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد إعلانات هنا.</p>}
       <div className="space-y-2">
@@ -96,6 +142,8 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
           </div>
         ))}
       </div>
+
+      <AdminPager basePath="/admin/ads" page={cur} pages={pages} total={total} params={{ view: tab !== 'all' ? tab : undefined, q: term || undefined }} />
     </div>
   );
 }

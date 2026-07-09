@@ -1,7 +1,8 @@
 import { ScrollText, User } from 'lucide-react';
 import Link from 'next/link';
 import { requireAction } from '@/lib/roles';
-import { listAdminLog } from '@/lib/audit';
+import { listAdminLog, countAdminLog } from '@/lib/audit';
+import { AdminPager } from '@/components/admin-pager';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'سجل نشاط الإدارة' };
@@ -12,9 +13,14 @@ function fmt(iso: string | null) {
   return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
 }
 
-export default async function AdminAuditPage() {
+const PAGE_SIZE = 30;
+
+export default async function AdminAuditPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   await requireAction('users', 'view');
-  const rows = await listAdminLog(300);
+  const { page: pageRaw } = await searchParams;
+  const page = Math.max(1, parseInt(pageRaw || '1') || 1);
+  const [rows, total] = await Promise.all([listAdminLog(PAGE_SIZE, (page - 1) * PAGE_SIZE), countAdminLog()]);
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -35,6 +41,8 @@ export default async function AdminAuditPage() {
           </div>
         ))}
       </div>
+
+      <AdminPager basePath="/admin/audit" page={page} pages={pages} total={total} params={{}} />
     </div>
   );
 }

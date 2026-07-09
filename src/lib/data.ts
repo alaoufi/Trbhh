@@ -294,7 +294,7 @@ export async function getAdsByCategory(categoryId: number, take = 24, skip = 0) 
   });
 }
 
-export async function searchAds(params: {
+type SearchParamsT = {
   q?: string;
   categoryId?: number;
   countryId?: number;
@@ -303,22 +303,35 @@ export async function searchAds(params: {
   sort?: 'newest' | 'price_asc' | 'price_desc';
   special?: boolean;
   take?: number;
-}) {
-  const { q, categoryId, countryId, cityId, type, sort = 'newest', special, take = 48 } = params;
+  skip?: number;
+};
+
+function buildSearchWhere({ q, categoryId, countryId, cityId, type, special }: SearchParamsT) {
+  return {
+    ...activeAdWhere(),
+    ...(categoryId ? { category_id: BigInt(categoryId) } : {}),
+    ...(countryId ? { country_id: countryId } : {}),
+    ...(cityId ? { city_id: BigInt(cityId) } : {}),
+    ...(type ? { adsType: type } : {}),
+    ...(special ? { adsSpecial: 'checked' as const } : {}),
+    ...(q ? { OR: [{ title: { contains: q } }, { detail: { contains: q } }] } : {}),
+  };
+}
+
+/** إجمالي نتائج البحث — للترقيم المرقّم. */
+export async function countSearchAds(params: SearchParamsT): Promise<number> {
+  return prisma.ads.count({ where: buildSearchWhere(params) }).catch(() => 0);
+}
+
+export async function searchAds(params: SearchParamsT) {
+  const { sort = 'newest', take = 48, skip = 0 } = params;
   const orderBy =
     sort === 'price_asc' ? [{ price: 'asc' as const }] :
     sort === 'price_desc' ? [{ price: 'desc' as const }] :
     [{ adsSpecial: 'desc' as const }, { id: 'desc' as const }];
   const rows = await prisma.ads.findMany({
-    where: {
-      ...activeAdWhere(),
-      ...(categoryId ? { category_id: BigInt(categoryId) } : {}),
-      ...(countryId ? { country_id: countryId } : {}),
-      ...(cityId ? { city_id: BigInt(cityId) } : {}),
-      ...(type ? { adsType: type } : {}),
-      ...(special ? { adsSpecial: 'checked' as const } : {}),
-      ...(q ? { OR: [{ title: { contains: q } }, { detail: { contains: q } }] } : {}),
-    },
+    where: buildSearchWhere(params),
+    skip: Math.max(0, skip),
     orderBy,
     take,
     select: adSelect,

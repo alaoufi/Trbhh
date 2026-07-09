@@ -4,6 +4,7 @@ import { requireAction } from '@/lib/roles';
 import { listTopupsAdmin } from '@/lib/wallet';
 import { mediaUrl } from '@/lib/media';
 import { approveTopupAction, rejectTopupAction } from '../actions';
+import { AdminPager } from '@/components/admin-pager';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'طلبات شحن الرصيد' };
@@ -23,12 +24,16 @@ function fmt(iso: string | null) {
   return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
 }
 
-export default async function AdminTopups({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+const PAGE_SIZE = 20;
+
+export default async function AdminTopups({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string }> }) {
   await requireAction('users', 'edit');
-  const { tab: tabRaw } = await searchParams;
+  const { tab: tabRaw, page: pageRaw } = await searchParams;
   const tab: Tab = (TABS.some((t) => t.key === tabRaw) ? tabRaw : 'pending') as Tab;
-  const { rows, counts } = await listTopupsAdmin(STATUS_OF[tab]);
+  const page = Math.max(1, parseInt(pageRaw || '1') || 1);
+  const { rows, counts } = await listTopupsAdmin(STATUS_OF[tab], PAGE_SIZE, (page - 1) * PAGE_SIZE);
   const countOf: Record<Tab, number> = { all: counts.all, pending: counts.pending, approved: counts.approved, rejected: counts.rejected };
+  const pages = Math.max(1, Math.ceil(countOf[tab] / PAGE_SIZE));
 
   return (
     <div className="space-y-4">
@@ -95,6 +100,8 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
           </div>
         ))}
       </div>
+
+      <AdminPager basePath="/admin/topups" page={page} pages={pages} total={countOf[tab]} params={{ tab }} />
     </div>
   );
 }

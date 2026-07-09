@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { Wallet, ArrowDownCircle, ArrowUpCircle, Info, Copy, HandCoins, Receipt, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
-import { getBalance, listTxns, getDupCredit, listMyTopups } from '@/lib/wallet';
+import { getBalance, listTxns, countTxns, getDupCredit, listMyTopups } from '@/lib/wallet';
+import { AdminPager } from '@/components/admin-pager';
 import {
   getServicePricing, serviceHasPrice, DURATIONS, getSetting,
   SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO,
@@ -27,17 +28,22 @@ const TOPUP_STATUS = {
   2: { label: 'مرفوض', cls: 'bg-red-100 text-red-700', icon: XCircle },
 } as const;
 
-export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string }> }) {
+const TXN_PAGE = 25;
+
+export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [balance, txns, pricing, dupCredit, topups, topupInfo, topupAccounts, topupNameNote, promo] = await Promise.all([
-    getBalance(session.uid), listTxns(session.uid, 100), getServicePricing(), getDupCredit(session.uid),
+  const page = Math.max(1, parseInt(sp.page || '1') || 1);
+  const [balance, txns, pricing, dupCredit, topups, topupInfo, topupAccounts, topupNameNote, promo, txnTotal] = await Promise.all([
+    getBalance(session.uid), listTxns(session.uid, TXN_PAGE, (page - 1) * TXN_PAGE), getServicePricing(), getDupCredit(session.uid),
     listMyTopups(session.uid), getSetting(SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO),
     getTopupAccounts(),
     getSetting(SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE),
     getTopupPromo(),
+    countTxns(session.uid),
   ]);
-  const hadTopup = txns.some((t) => t.reason === 'topup');
+  const txnPages = Math.max(1, Math.ceil(txnTotal / TXN_PAGE));
+  const hadTopup = topups.some((t) => t.status === 1);
   const range = (p: Record<'w2' | 'm1' | 'y1', number>) => DURATIONS.filter((d) => p[d.key] > 0).map((d) => p[d.key]);
   const priceRange = (p: Record<'w2' | 'm1' | 'y1', number>) => { const r = range(p); return r.length ? `${Math.min(...r)}–${Math.max(...r)} ر.س` : ''; };
   return (
@@ -182,7 +188,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       )}
 
       <div>
-        <div className="mb-2 text-sm font-bold text-muted-foreground">سجلّ العمليات ({txns.length})</div>
+        <div className="mb-2 text-sm font-bold text-muted-foreground">سجلّ العمليات ({txnTotal})</div>
         {txns.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد عمليات بعد.</p>}
         <div className="space-y-2">
           {txns.map((t) => {
@@ -203,6 +209,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
             );
           })}
         </div>
+        <AdminPager basePath="/account/wallet" page={page} pages={txnPages} total={txnTotal} params={{}} />
       </div>
 
       <Link href="/account" className="block text-center text-sm text-muted-foreground hover:text-primary">← لوحة التحكم</Link>

@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { timeAgo } from '@/lib/utils';
 import { openNotifAction, archiveAllNotifsAction } from './actions';
+import { AdminPager } from '@/components/admin-pager';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'التنبيهات' };
@@ -19,15 +20,18 @@ const KINDS = [
 type Kind = typeof KINDS[number];
 const kindOf = (t: string | null): Kind => KINDS.find((k) => k.key === t) || KINDS[3];
 
-export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+const PAGE_SIZE = 30;
+
+export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
-  const { tab: tabRaw } = await searchParams;
+  const { tab: tabRaw, page: pageRaw } = await searchParams;
+  const page = Math.max(1, parseInt(pageRaw || '1') || 1);
 
   const all = await prisma.notfications.findMany({
     where: { user_id: String(session.uid) },
     orderBy: { id: 'desc' },
-    take: 200,
+    take: 500,
   }).catch(() => []);
 
   const fresh = all.filter((n) => !n.read_at);
@@ -40,7 +44,9 @@ export default async function NotificationsPage({ searchParams }: { searchParams
     { key: 'archive', label: 'الأرشيف', count: archived.length, cls: 'bg-slate-500' },
   ];
   const tab = TABS.some((t) => t.key === tabRaw) ? (tabRaw as string) : 'all';
-  const rows = tab === 'archive' ? archived : tab === 'all' ? fresh : fresh.filter((n) => kindOf(n.type).key === tab);
+  const filtered = tab === 'archive' ? archived : tab === 'all' ? fresh : fresh.filter((n) => kindOf(n.type).key === tab);
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -98,6 +104,8 @@ export default async function NotificationsPage({ searchParams }: { searchParams
           );
         })}
       </div>
+
+      <AdminPager basePath="/notifications" page={page} pages={pages} total={filtered.length} params={{ tab }} />
     </div>
   );
 }

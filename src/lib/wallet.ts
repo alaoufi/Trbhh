@@ -228,14 +228,14 @@ export async function listMyTopups(userId: number, limit = 20): Promise<TopupRow
 }
 
 /** Admin listing with per-status counts. */
-export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 200): Promise<{ rows: (TopupRow & { userName: string })[]; counts: { all: number; pending: number; approved: number; rejected: number } }> {
+export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 200, offset = 0): Promise<{ rows: (TopupRow & { userName: string })[]; counts: { all: number; pending: number; approved: number; rejected: number } }> {
   await ensure();
   const [all, pending, approved, rejected, rows] = await Promise.all([
     prisma.wallet_topups.count().catch(() => 0),
     prisma.wallet_topups.count({ where: { status: 0 } }).catch(() => 0),
     prisma.wallet_topups.count({ where: { status: 1 } }).catch(() => 0),
     prisma.wallet_topups.count({ where: { status: 2 } }).catch(() => 0),
-    prisma.wallet_topups.findMany({ where: status === 'all' ? {} : { status }, orderBy: { id: 'desc' }, take: limit }).catch(() => []),
+    prisma.wallet_topups.findMany({ where: status === 'all' ? {} : { status }, orderBy: { id: 'desc' }, skip: Math.max(0, offset), take: limit }).catch(() => []),
   ]);
   const uids = [...new Set(rows.map((r) => toInt(r.user_id)))];
   const users = uids.length ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }).catch(() => []) : [];
@@ -305,12 +305,19 @@ export async function rejectTopup(id: number, adminId: number, reason: string): 
   return flipped.count > 0 ? topupRow({ ...req, status: 2, note: reason.slice(0, 300) }) : null;
 }
 
+/** إجمالي حركات محفظة العضو (للترقيم). */
+export async function countTxns(userId: number): Promise<number> {
+  await ensure();
+  return prisma.wallet_txns.count({ where: { user_id: BigInt(userId) } }).catch(() => 0);
+}
+
 /** Transaction history for a member (newest first). */
-export async function listTxns(userId: number, limit = 50): Promise<WalletTxn[]> {
+export async function listTxns(userId: number, limit = 50, offset = 0): Promise<WalletTxn[]> {
   await ensure();
   const rows = await prisma.wallet_txns.findMany({
     where: { user_id: BigInt(userId) },
     orderBy: { id: 'desc' },
+    skip: Math.max(0, offset),
     take: Math.min(200, Math.max(1, limit)),
   }).catch(() => []);
   return rows.map((r) => ({

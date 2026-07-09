@@ -17,10 +17,16 @@ export async function logAdmin(adminId: number, action: string, target = '', not
 
 export type AdminLogRow = { id: number; adminId: number; adminName: string; action: string; target: string | null; note: string | null; at: string | null };
 
-/** قراءة سجل النشاط (الأحدث أولاً) مع أسماء المشرفين. */
-export async function listAdminLog(limit = 200): Promise<AdminLogRow[]> {
+/** إجمالي أسطر سجل النشاط. */
+export async function countAdminLog(): Promise<number> {
   await ensure();
-  const rows = await prisma.admin_log.findMany({ orderBy: { id: 'desc' }, take: Math.min(500, limit) }).catch(() => []);
+  return prisma.admin_log.count().catch(() => 0);
+}
+
+/** قراءة سجل النشاط (الأحدث أولاً) مع أسماء المشرفين. */
+export async function listAdminLog(limit = 200, offset = 0): Promise<AdminLogRow[]> {
+  await ensure();
+  const rows = await prisma.admin_log.findMany({ orderBy: { id: 'desc' }, skip: Math.max(0, offset), take: Math.min(500, limit) }).catch(() => []);
   const ids = [...new Set(rows.map((r) => toInt(r.admin_id)))];
   const users = ids.length ? await prisma.users.findMany({ where: { id: { in: ids.map((i) => BigInt(i)) } }, select: { id: true, name: true, userName: true } }).catch(() => []) : [];
   const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));

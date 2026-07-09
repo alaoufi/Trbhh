@@ -1,5 +1,6 @@
 import { Bell, Trash2 } from 'lucide-react';
-import { searchAds, getCategories, getCountries, getCities } from '@/lib/data';
+import { searchAds, countSearchAds, getCategories, getCountries, getCities } from '@/lib/data';
+import { AdminPager } from '@/components/admin-pager';
 import { AdGrid } from '@/components/ad-card';
 import { SearchSuggestInput } from '@/components/search-suggest';
 import { getSession } from '@/lib/auth';
@@ -22,16 +23,21 @@ export default async function SearchPage({
   const visibleCities = countryId ? cities.filter((c) => c.countryId === countryId) : cities;
   const sort = (sp.sort as 'newest' | 'price_asc' | 'price_desc') || 'newest';
 
-  const ads = await searchAds({
+  const page = Math.max(1, parseInt(sp.page || '1') || 1);
+  const PAGE_SIZE = 48;
+  const sq = {
     q: sp.q,
     categoryId: sp.category ? Number(sp.category) : undefined,
     countryId,
     cityId: sp.city ? Number(sp.city) : undefined,
-    type: sp.type === 'offer' || sp.type === 'request' ? sp.type : undefined,
+    type: sp.type === 'offer' || sp.type === 'request' ? (sp.type as 'offer' | 'request') : undefined,
     special: sp.special === '1',
-    sort,
-    take: 60,
-  });
+  };
+  const [ads, total] = await Promise.all([
+    searchAds({ ...sq, sort, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }),
+    countSearchAds(sq),
+  ]);
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const sel = 'h-10 rounded-lg border bg-background px-3 text-sm';
 
@@ -97,8 +103,10 @@ export default async function SearchPage({
         </div>
       )}
 
-      <p className="text-sm text-muted-foreground">النتائج: {ads.length}</p>
+      <p className="text-sm text-muted-foreground">النتائج: {total}</p>
       <AdGrid ads={ads} />
+
+      <AdminPager basePath="/search" page={page} pages={pages} total={total} params={{ q: sp.q, category: sp.category, country: sp.country, city: sp.city, type: sp.type, sort: sp.sort, special: sp.special }} />
     </div>
   );
 }

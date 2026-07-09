@@ -4,23 +4,28 @@ import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { timeAgo, toInt } from '@/lib/utils';
 import { adminDeleteNotifAction, adminClearReadNotifsAction } from '../actions';
+import { AdminPager } from '@/components/admin-pager';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'تنبيهات الأعضاء' };
 
 const TYPE_LABEL: Record<string, string> = { message: 'رسالة', comment: 'تعليق', review: 'تقييم' };
 
-export default async function AdminNotifsPage({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string }> }) {
+const PAGE_SIZE = 30;
+
+export default async function AdminNotifsPage({ searchParams }: { searchParams: Promise<{ tab?: string; q?: string; page?: string }> }) {
   await requireAction('messages', 'view');
-  const { tab: tabRaw, q } = await searchParams;
+  const { tab: tabRaw, q, page: pageRaw } = await searchParams;
   const tab = tabRaw === 'new' || tabRaw === 'read' ? tabRaw : 'all';
+  const page = Math.max(1, parseInt(pageRaw || '1') || 1);
 
   const where = {
     ...(tab === 'new' ? { read_at: null } : tab === 'read' ? { NOT: { read_at: null } } : {}),
     ...(q?.trim() ? { OR: [{ title: { contains: q.trim() } }, { user_id: q.trim() }] } : {}),
   };
-  const [rows, counts] = await Promise.all([
-    prisma.notfications.findMany({ where, orderBy: { id: 'desc' }, take: 150 }).catch(() => []),
+  const [rows, filteredTotal, counts] = await Promise.all([
+    prisma.notfications.findMany({ where, orderBy: { id: 'desc' }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }).catch(() => []),
+    prisma.notfications.count({ where }).catch(() => 0),
     Promise.all([
       prisma.notfications.count().catch(() => 0),
       prisma.notfications.count({ where: { read_at: null } }).catch(() => 0),
@@ -28,6 +33,7 @@ export default async function AdminNotifsPage({ searchParams }: { searchParams: 
     ]),
   ]);
   const [allC, newC, readC] = counts;
+  const pages = Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE));
 
   // أسماء الأعضاء لعرضها بجانب كل تنبيه
   const uids = [...new Set(rows.map((r) => Number(r.user_id)).filter(Boolean))];
@@ -85,6 +91,8 @@ export default async function AdminNotifsPage({ searchParams }: { searchParams: 
           </div>
         ))}
       </div>
+
+      <AdminPager basePath="/admin/notifs" page={page} pages={pages} total={filteredTotal} params={{ tab, q }} />
     </div>
   );
 }

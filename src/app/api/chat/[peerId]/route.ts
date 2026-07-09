@@ -33,7 +33,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ peerId: st
   }
   const message = String(body.message || '').trim();
   if (!message) return Response.json({ ok: false });
-  const id = await sendChat(session.uid, other, message);
+  // حماية المراسلات: حارس المحتوى (منع + عقوبات) والكلمات المرفوضة (حجب)
+  const { screenChatMessage } = await import('@/lib/chat');
+  const screened = await screenChatMessage(session.uid, message);
+  if (!screened.ok) return Response.json({ ok: false, blocked: true, banned: screened.banned });
+  const id = await sendChat(session.uid, other, screened.text);
   {
     // منع تكرار نفس التنبيه بنفس اليوم
     const nDup = await prisma.notfications.findFirst({ where: { user_id: String(other), title: `رسالة جديدة من ${session.name || 'عضو'}`, created_at: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } }, select: { id: true } }).catch(() => null);

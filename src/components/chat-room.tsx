@@ -116,6 +116,12 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
         body: JSON.stringify({ message: msg }),
       });
       const d = await r.json();
+      if (d?.blocked) {
+        // رفضها حارس المحتوى: أزل الفقاعة وأخبر المرسل
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        alert(d.banned ? 'رسالتك تخالف سياسة المحتوى وتم حظر الحساب.' : 'رسالتك تحتوي محتوى ممنوعاً ولم تُرسل — كرّر المخالفة يُحظر حسابك.');
+        return;
+      }
       if (d?.id) {
         setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, id: d.id } : m)));
         lastIdRef.current = Math.max(lastIdRef.current, d.id);

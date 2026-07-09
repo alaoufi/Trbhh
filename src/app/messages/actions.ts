@@ -6,8 +6,13 @@ import { requireUser } from '@/lib/auth';
 export async function sendMessageAction(formData: FormData) {
   const session = await requireUser();
   const reciverId = Number(formData.get('reciverId'));
-  const message = String(formData.get('message') || '').trim();
-  if (!reciverId || !message || reciverId === session.uid) return;
+  const rawMessage = String(formData.get('message') || '').trim();
+  if (!reciverId || !rawMessage || reciverId === session.uid) return;
+  // حماية المراسلات: حارس المحتوى والكلمات المرفوضة
+  const { screenChatMessage } = await import('@/lib/chat');
+  const screened = await screenChatMessage(session.uid, rawMessage);
+  if (!screened.ok) return;
+  const message = screened.text;
   await prisma.chats.create({
     data: {
       sender_id: session.uid,

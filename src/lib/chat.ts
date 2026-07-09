@@ -6,6 +6,21 @@ import { toInt } from './utils';
 const ensureChatExtras = ensureSchema;
 
 /** Persist a chat message; clears the sender's "typing" flag. Returns new id. */
+/** فحص رسالة عضو قبل الإرسال: حارس المحتوى يمنع (بنفس تدرّج عقوبات الإعلانات)،
+ *  والكلمات المرفوضة تُحجب من النص. للنقاط التي يرسل فيها الأعضاء فقط (لا رسائل النظام). */
+export async function screenChatMessage(userId: number, text: string): Promise<{ ok: true; text: string } | { ok: false; banned: boolean }> {
+  const { scanContent } = await import('./content-guard');
+  const hit = await scanContent(text).catch(() => null);
+  if (hit) {
+    const { handleProhibited } = await import('./moderation');
+    const o = await handleProhibited(userId, hit.category, hit.term, text.slice(0, 200)).catch(() => ({ banned: false }));
+    return { ok: false, banned: !!(o as { banned?: boolean }).banned };
+  }
+  const { loadBanned, censorSync } = await import('./censor');
+  await loadBanned().catch(() => {});
+  return { ok: true, text: censorSync(text) };
+}
+
 export async function sendChat(fromId: number, toId: number, message: string): Promise<number> {
   await ensureChatExtras();
   const text = message.slice(0, 2000);

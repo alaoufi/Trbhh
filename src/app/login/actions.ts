@@ -29,6 +29,11 @@ export async function registerAction(_prev: unknown, formData: FormData) {
   if (!formData.get('agree')) {
     return { error: 'يجب الموافقة على الشروط والأحكام وسياسة الخصوصية.' };
   }
+  // الأسماء المخالفة (كلمات/جمل مرفوضة) لا تُقبل إلا من الإدارة
+  const { containsBanned } = await import('@/lib/censor');
+  if (await containsBanned(name)) {
+    return { error: 'الاسم يحتوي كلمة غير مسموحة — اختر اسماً آخر.' };
+  }
   const phoneLocal = toLocalSaudi(phone); // store canonical 05XXXXXXXX
   if (await userExistsByPhone(phone)) return { error: 'رقم الجوال مسجّل مسبقاً' };
 

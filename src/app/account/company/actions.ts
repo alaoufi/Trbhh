@@ -80,6 +80,12 @@ export async function saveCompanyAction(formData: FormData) {
   const contacts = String(formData.get('contacts') || '').trim();
   const agreeTerms = !!formData.get('agreeTerms');
 
+  // أسماء المتاجر المخالفة (كلمات/جمل مرفوضة) لا تُقبل إلا من الإدارة
+  const { containsBanned } = await import('@/lib/censor');
+  if ((await containsBanned(storeName)) || (await containsBanned(tagline))) {
+    redirect('/store?error=badname');
+  }
+
   let logoId: number | undefined;
   const logo = formData.get('logo');
   if (logo instanceof File && logo.size > 0) {

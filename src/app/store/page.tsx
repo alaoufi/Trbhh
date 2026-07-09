@@ -66,6 +66,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           يجب الموافقة على شروط المتجر وتحمّل مسؤولية الإعلانات قبل فتح المتجر.
         </div>
       )}
+      {error === 'badname' && (
+        <div className="card-3d rounded-xl border-2 border-destructive/40 p-3 text-sm font-bold text-destructive">
+          اسم المتجر (أو وصفه المختصر) يحتوي كلمة غير مسموحة — اختر اسماً آخر أو راسل الإدارة.
+        </div>
+      )}
 
       {store && meta && (
         <div className={`card-3d rounded-xl p-3 text-sm font-bold ${meta.status === 1 ? 'text-emerald-700' : meta.status === 0 ? 'text-amber-700' : 'text-red-700'}`}>

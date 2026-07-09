@@ -21,7 +21,7 @@ const field = 'h-11 w-full rounded-lg border-2 border-primary/25 bg-white px-3 t
 const lbl = 'mb-1 block text-sm font-bold text-foreground';
 
 export function ProfileForm({ initial, regions, areas }: { initial: Initial; regions: Region[]; areas: Area[] }) {
-  const [state, action] = useFormState(updateProfileAction, null as { ok?: boolean } | null);
+  const [state, action] = useFormState(updateProfileAction, null as { ok?: boolean; error?: string } | null);
   return (
     <form action={action} className="max-w-lg space-y-4 card-3d rounded-xl p-5">
       {initial.trusted && (
@@ -49,6 +49,7 @@ export function ProfileForm({ initial, regions, areas }: { initial: Initial; reg
       <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="allow_phone" defaultChecked={initial.allow_phone} className="accent-primary" /> إظهار رقم الجوال في إعلاناتي</label>
       <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="whatsapp" defaultChecked={initial.whatsapp} className="accent-primary" /> تفعيل زر الواتساب</label>
       {state?.ok && <p className="text-sm font-bold text-green-600">تم حفظ التغييرات ✓</p>}
+      {state?.error && <p className="text-sm font-bold text-destructive">{state.error}</p>}
       <Save />
     </form>
   );

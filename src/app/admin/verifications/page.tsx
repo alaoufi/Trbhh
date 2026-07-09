@@ -11,19 +11,26 @@ export const metadata = { title: 'طلبات التوثيق' };
 
 export default async function AdminVerifications() {
   await requirePerm('verifications');
-  // مصدر الحقيقة لطلب التوثيق = رفع وثائق (uploads.type = verify_*). أدقّ من الاعتماد على
-  // step/trusted (قيمها قد تكون NULL في الصفوف القديمة فلا يطابقها شرط trusted=0).
+  // نجمع كل مسارات الطلب حتى لا يضيع أي طلب: رفع وثائق (uploads.type=verify_*)
+  // أو step=1 (بانتظار المراجعة) أو أي عمود وثيقة معبّأ على حساب العضو.
   const verifyUploads = await prisma.uploads.findMany({
     where: { type: { in: ['verify_nid', 'verify_cr', 'verify_wp'] } },
     select: { user_id: true }, orderBy: { id: 'desc' }, take: 1000,
   }).catch(() => [] as { user_id: number | null }[]);
   const reqUids = [...new Set(verifyUploads.map((u) => Number(u.user_id)).filter((n) => Number.isInteger(n) && n > 0))];
-  const users = reqUids.length
-    ? await prisma.users.findMany({
-        where: { id: { in: reqUids.map((n) => BigInt(n)) }, NOT: { trusted: 1 } },
-        orderBy: { id: 'desc' }, take: 200,
-      })
-    : [];
+  const users = await prisma.users.findMany({
+    where: {
+      NOT: { trusted: 1 },
+      OR: [
+        ...(reqUids.length ? [{ id: { in: reqUids.map((n) => BigInt(n)) } }] : []),
+        { step: 1 },
+        { national_identity: { gt: 0 } },
+        { commercial_register: { gt: 0 } },
+        { work_permit: { gt: 0 } },
+      ],
+    },
+    orderBy: { id: 'desc' }, take: 200,
+  }).catch(() => []);
 
   // resolve every uploaded document id → file url so the admin can actually
   // review the documents before approving (previously only a ✓ was shown).

@@ -97,6 +97,11 @@ export async function featureAdAction(formData: FormData) {
 export async function updateProfileAction(_prev: unknown, formData: FormData) {
   const session = await requireUser();
   const name = String(formData.get('name') || '').trim();
+  // الأسماء المخالفة (كلمات/جمل مرفوضة) لا تُقبل إلا من الإدارة
+  const { containsBanned } = await import('@/lib/censor');
+  if (await containsBanned(name)) {
+    return { error: 'الاسم يحتوي كلمة غير مسموحة — اختر اسماً آخر.' };
+  }
   const phoneRaw = String(formData.get('phoneNumber') || '').trim();
   const waRaw = String(formData.get('phone_whatsapp') || '').trim();
   const phoneNumber = phoneRaw ? toLocalSaudi(phoneRaw) : phoneRaw; // canonical 05XXXXXXXX

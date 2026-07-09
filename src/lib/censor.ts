@@ -46,6 +46,21 @@ export async function censor(text: string | null | undefined): Promise<string> {
   return censorSync(text);
 }
 
+/**
+ * هل يحتوي النص كلمة/جملة من قائمة المرفوضات؟ تُعيد أول مطابقة أو null.
+ * تُستخدم لرفض أسماء الأعضاء والمتاجر المخالفة (الفحص على مسارات الأعضاء فقط،
+ * فالإدارة وحدها تستطيع اعتماد اسم مخالف من لوحتها إن أرادت).
+ */
+export async function containsBanned(text: string | null | undefined): Promise<string | null> {
+  if (!text) return null;
+  await loadBanned();
+  if (!cache.re) return null;
+  cache.re.lastIndex = 0;
+  const m = cache.re.exec(text);
+  cache.re.lastIndex = 0;
+  return m ? m[0] : null;
+}
+
 export async function getBannedWords(): Promise<{ id: number; word: string }[]> {
   await ensureTable();
   const rows = await prisma.banned_words.findMany({ orderBy: { id: 'desc' } });

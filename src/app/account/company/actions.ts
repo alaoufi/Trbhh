@@ -175,3 +175,67 @@ export async function addBranchAction(formData: FormData) {
   await prisma.store_branches.create({ data: { store_id: toInt(store.id), name, address } });
   revalidatePath('/store');
 }
+
+
+/** رفع منتجات دفعة واحدة من ملف CSV (يُصدَّر من Excel): العنوان،التفاصيل،السعر — حتى ٥٠ صفاً. */
+export async function bulkUploadProductsAction(formData: FormData) {
+  const session = await requireUser();
+  const { storeIdOfUser, addStoreProduct } = await import('@/lib/merchant');
+  const storeId = await storeIdOfUser(session.uid).catch(() => 0);
+  if (!storeId) redirect('/store');
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0 || file.size > 2 * 1024 * 1024) redirect('/store?bulk=err');
+
+  // فك الترميز: UTF-8 (مع BOM) ثم Windows-1256 لملفات Excel العربية القديمة
+  const buf = Buffer.from(await file.arrayBuffer());
+  let text = '';
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch { try { text = new TextDecoder('windows-1256').decode(buf); } catch { text = buf.toString('utf8'); } }
+  text = text.replace(/^\uFEFF/, '');
+
+  const rows = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 60);
+  const user = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { city_id: true, country_id: true } }).catch(() => null);
+  const { getCategories } = await import('@/lib/data');
+  const cats = await getCategories();
+  const categoryId = Number(formData.get('category') || 0) || cats[0]?.id || 0;
+  if (!categoryId) redirect('/store?bulk=err');
+
+  let created = 0;
+  const now = new Date();
+  for (const line of rows) {
+    // فاصلة أو فاصلة منقوطة (إعدادات Excel الإقليمية)
+    const cols = line.split(/[;,\t]/).map((c) => c.trim().replace(/^"|"$/g, ''));
+    const [title, detail = '', priceRaw = ''] = cols;
+    if (!title || title.length < 3) continue;
+    if (/^(العنوان|title)$/i.test(title)) continue; // صف العناوين
+    if (created >= 50) break;
+    const price = Math.max(0, parseInt(priceRaw.replace(/[^0-9]/g, ''), 10) || 0);
+    try {
+      const ad = await prisma.ads.create({
+        data: {
+          title: title.slice(0, 120),
+          detail: (detail || title).slice(0, 3000),
+          price,
+          adsType: 'offer',
+          category_id: BigInt(categoryId),
+          city_id: user?.city_id ?? BigInt(0),
+          country_id: user?.country_id ?? null,
+          user_id: BigInt(session.uid),
+          video_path: '',
+          phoneAllow: 1,
+          commentAllow: 1,
+          adsSpecial: 'no',
+          state: 'active',
+          status: 1, // متجر معتمد: تُنشر مباشرة داخل المتجر
+          created_at: now,
+        },
+      });
+      await addStoreProduct(session.uid, toInt(ad.id)).catch(() => {});
+      created++;
+    } catch { /* صف تالف — تخطَّ */ }
+  }
+  const { bustAdCaches } = await import('@/lib/data');
+  await bustAdCaches().catch(() => {});
+  revalidatePath('/store');
+  redirect(`/store?bulk=${created}`);
+}

@@ -1,8 +1,9 @@
 'use client';
 import { useState } from 'react';
 import { Share2, Link2, QrCode, Check, X, MessageCircle } from 'lucide-react';
+import { ShareCardButton, type ShareCardData } from '@/components/share-card';
 
-export function ShareButtons({ url, title, compact }: { url: string; title: string; compact?: boolean }) {
+export function ShareButtons({ url, title, compact, card }: { url: string; title: string; compact?: boolean; card?: ShareCardData }) {
   const [copied, setCopied] = useState(false);
   const [qr, setQr] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -33,7 +34,7 @@ export function ShareButtons({ url, title, compact }: { url: string; title: stri
 
   // المشاركة: مشاركة النظام إن توفّرت، وإلا قائمة بدائل تعمل دائماً.
   const share = async () => {
-    if (typeof navigator !== 'undefined' && navigator.share) {
+    if (!card && typeof navigator !== 'undefined' && navigator.share) {
       try { await navigator.share({ title, url }); } catch { /* أُلغيت */ }
       return;
     }
@@ -61,11 +62,15 @@ export function ShareButtons({ url, title, compact }: { url: string; title: stri
         {menu && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
-            <div className="absolute bottom-full left-1/2 z-50 mb-2 w-44 -translate-x-1/2 rounded-xl border bg-card p-1.5 shadow-xl">
+            <div className="absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-xl border bg-card p-1.5 shadow-xl">
+              {card && typeof navigator !== 'undefined' && 'share' in navigator && (
+                <button type="button" onClick={() => { navigator.share({ title, url }).catch(() => {}); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Share2 className="h-4 w-4 text-primary" /> مشاركة الرابط</button>
+              )}
               <a href={wa} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><MessageCircle className="h-4 w-4 text-[#25D366]" /> واتساب</a>
               <a href={tw} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Share2 className="h-4 w-4" /> تويتر / X</a>
               <button type="button" onClick={() => { copy(); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary">{copied ? <Check className="h-4 w-4 text-primary" /> : <Link2 className="h-4 w-4" />} نسخ الرابط</button>
               <button type="button" onClick={() => { setQr(true); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><QrCode className="h-4 w-4" /> رمز QR</button>
+              {card && <ShareCardButton data={card} />}
             </div>
           </>
         )}
@@ -83,6 +88,7 @@ export function ShareButtons({ url, title, compact }: { url: string; title: stri
       <a href={wa} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary">واتساب</a>
       <a href={tw} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary">تويتر</a>
       <button type="button" onClick={() => setQr(true)} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary"><QrCode className="h-4 w-4" /> QR</button>
+      {card && <ShareCardButton data={card} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary" />}
       {qrModal}
     </div>
   );

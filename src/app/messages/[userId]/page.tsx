@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Star } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getThread } from '@/lib/messages';
 import { getMsgDeleteMinutes, getAdMsgTemplates, getAdminMsgTemplates, getSupportTemplates, parseTemplates, fillTemplate } from '@/lib/settings';
@@ -48,6 +48,13 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
       </div>
 
       <DisclaimerBar className="mb-3" />
+
+      {/* بعد محادثة نشطة: دعوة لتقييم التجربة (ليست للإدارة) */}
+      {adminId !== otherId && session.uid !== adminId && thread.messages.length >= 4 && (
+        <Link href={`/users/${otherId}#review`} className="mb-3 flex items-center gap-2 rounded-xl border-2 border-amber-300 bg-amber-50 p-2.5 text-sm font-bold text-amber-900 hover:border-amber-400">
+          <Star className="h-4 w-4 shrink-0 text-amber-500" /> هل تمت الصفقة؟ قيّم تجربتك مع {thread.other.name} — تقييمك يساعد بقية الأعضاء
+        </Link>
+      )}
 
       <ChatRoom peerId={otherId} initial={thread.messages} deleteWindowMin={delWindow} templates={templates} />
     </div>

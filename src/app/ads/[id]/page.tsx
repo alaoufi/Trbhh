@@ -258,7 +258,18 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
           </Link>
         )}
         <div className="card-3d flex items-center justify-center rounded-2xl py-3 text-primary">
-          <ShareButtons url={shareUrl} title={ad.title} compact />
+          <ShareButtons
+            url={shareUrl}
+            title={ad.title}
+            compact
+            card={{
+              url: shareUrl,
+              title: ad.title,
+              price: ad.price > 0 ? formatPrice(ad.price) : (ad.adsType === 'request' ? 'مطلوب' : 'على السوم'),
+              city: ad.area ? `${ad.area} - ${ad.city}` : (ad.city || ''),
+              image: ad.images?.[0],
+            }}
+          />
         </div>
         <div className="card-3d flex items-center justify-center rounded-2xl py-1">
           <FavoriteButton adId={ad.id} active={favorited} disabled={!session} compact />

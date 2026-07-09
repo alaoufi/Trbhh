@@ -452,6 +452,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('search_suggest_on', formData.get('searchSuggestOn') !== null ? '1' : '0');
   await setSetting('saved_search_on', formData.get('savedSearchOn') !== null ? '1' : '0');
   await setSetting('match_notify_on', formData.get('matchNotifyOn') !== null ? '1' : '0');
+  await setSetting('store_report_on', formData.get('storeReportOn') !== null ? '1' : '0');
   // classified duplicate prevention: toggle + content/image/background thresholds
   await setSetting(SETTING_CDUP_ON, formData.get('cdupOn') !== null ? '1' : '0');
   await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));

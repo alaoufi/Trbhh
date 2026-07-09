@@ -168,7 +168,7 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
 
         {/* مشاركة الإعلان — يشارك رابط المتجر المباشر */}
         <div className="flex items-center justify-center rounded-2xl bg-white py-3 shadow-sm ring-1 ring-black/5" style={{ color: brand }}>
-          <ShareButtons url={shareUrl} title={`${ad.title} — ${name}`} />
+          <ShareButtons url={shareUrl} title={`${ad.title} — ${name}`} card={{ url: shareUrl, title: ad.title, city: name, image: ad.images?.[0] }} />
         </div>
 
         <p className="whitespace-pre-line rounded-xl border p-3 text-center text-xs font-medium text-muted-foreground" style={{ borderColor: `${brand}33` }}>

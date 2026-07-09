@@ -59,3 +59,42 @@ export async function findDuplicateAds(): Promise<{ groups: DupGroup[]; dupCount
   groups.sort((a, b) => b.dups.length - a.dups.length);
   return { groups, dupCount };
 }
+
+
+/* ===================== صور مستخدمة من أكثر من عضو (سرقة صور محتملة) ===================== */
+
+export type StolenImageGroup = { phash: string; files: { file: string; userId: number; userName: string }[] };
+
+/** مجموعات الصور المتطابقة (phash) المرفوعة من أعضاء مختلفين — مؤشر سرقة صور. */
+export async function findCrossUserImages(limit = 20): Promise<StolenImageGroup[]> {
+  const { prisma } = await import('./prisma');
+  const { toInt } = await import('./utils');
+  type Row = { phash: string; uc: unknown };
+  const groups = await prisma.$queryRawUnsafe<Row[]>(
+    `SELECT phash, COUNT(DISTINCT user_id) uc FROM uploads
+     WHERE phash IS NOT NULL AND phash <> '' AND user_id IS NOT NULL
+     GROUP BY phash HAVING uc > 1
+     ORDER BY uc DESC LIMIT ${Math.max(1, limit)}`,
+  ).catch(() => [] as Row[]);
+  if (!groups.length) return [];
+  const phashes = groups.map((g) => g.phash);
+  const rows = await prisma.uploads.findMany({
+    where: { phash: { in: phashes } },
+    select: { phash: true, file_name: true, user_id: true },
+    orderBy: { id: 'desc' },
+    take: 200,
+  }).catch(() => []);
+  const uids = [...new Set(rows.map((r) => r.user_id).filter((u): u is number => !!u))];
+  const users = uids.length ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }).catch(() => []) : [];
+  const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
+  const byHash = new Map<string, StolenImageGroup>();
+  for (const r of rows) {
+    if (!r.phash || !r.user_id || !r.file_name) continue;
+    let g = byHash.get(r.phash);
+    if (!g) { g = { phash: r.phash, files: [] }; byHash.set(r.phash, g); }
+    if (g.files.length < 6 && !g.files.some((f) => f.userId === r.user_id)) {
+      g.files.push({ file: r.file_name, userId: r.user_id, userName: nameById.get(r.user_id) || `#${r.user_id}` });
+    }
+  }
+  return [...byHash.values()].filter((g) => g.files.length > 1);
+}

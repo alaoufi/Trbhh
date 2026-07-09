@@ -8,7 +8,7 @@ import { ADMIN_GROUPS } from '@/components/admin-nav-def';
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAnyAdmin();
   // تذكيرات قرب انتهاء الاشتراك — تشغيل كسول (لا جدولة خلفية)؛ ذاتي الخنق كل ٣٠ دقيقة
-  import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
+  import('@/lib/subscription').then((m) => { m.sendDueSubReminders().catch(() => {}); m.sendMonthlyStoreReports().catch(() => {}); }).catch(() => {});
   const [perms, role] = await Promise.all([getUserPerms(session.uid), getUserRole(session.uid)]);
   const pathname = ((await headers()).get('x-pathname') || '').split('?')[0];
 

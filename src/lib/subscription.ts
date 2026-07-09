@@ -4,6 +4,7 @@ import { ensureSchema } from '@/data/schema-sync';
 import { getStoreSubPricing, subPlanPrice, SUB_PLAN_MONTHS, SUB_PLAN_LABELS, getStoreSubReminderConfig, getSetting, setSetting, SETTING_SUB_REMINDER_MSG, DEFAULT_SUB_REMINDER_MSG, type SubPlan } from './settings';
 import { charge } from './wallet';
 import { storeIdOfUser } from './merchant';
+import { toInt } from './utils';
 
 const ensure = ensureSchema;
 
@@ -155,4 +156,41 @@ export async function sendDueSubReminders(): Promise<void> {
       })
       .catch(() => {});
   }
+}
+
+/* ===================== التقرير الشهري للمتاجر ===================== */
+
+/** تقرير شهري تلقائي لكل متجر نشط (مفتاح store_report_on): زيارات الشهر الماضي
+ *  وتواصلاته وعدد المنتجات — رسالة من الإدارة أول دخول إداري بعد بداية الشهر. */
+export async function sendMonthlyStoreReports(): Promise<void> {
+  try {
+    const { getSettingBool, getSetting, setSetting } = await import('./settings');
+    if (!(await getSettingBool('store_report_on', false))) return;
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const last = await getSetting('store_report_lastmonth', '');
+    if (last === monthKey) return; // أُرسل هذا الشهر
+    await setSetting('store_report_lastmonth', monthKey); // احجز مبكراً ضد التوازي
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), 1);
+    const label = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+    const stores = await prisma.stores.findMany({ where: { status: 1 }, select: { id: true, user_id: true, store_name: true }, take: 300 }).catch(() => []);
+    if (!stores.length) return;
+    const [{ getPrimaryAdminId }, { sendChat }] = await Promise.all([import('./admin-inbox'), import('./chat')]);
+    const adminId = await getPrimaryAdminId().catch(() => 0);
+    if (!adminId) return;
+    for (const st of stores) {
+      const sid = st.id;
+      const uid = toInt(st.user_id);
+      if (!uid || uid === adminId) continue;
+      const [visits, contacts, products] = await Promise.all([
+        prisma.store_visits.count({ where: { store_id: BigInt(toInt(sid)), created_at: { gte: start, lt: end } } }).catch(() => 0),
+        prisma.store_contacts.count({ where: { store_id: BigInt(toInt(sid)), created_at: { gte: start, lt: end } } }).catch(() => 0),
+        prisma.store_products.count({ where: { store_id: toInt(sid) } }).catch(() => 0),
+      ]);
+      if (visits === 0 && contacts === 0) continue; // لا يُزعج متجراً بلا نشاط
+      const body = `📊 تقرير متجرك «${st.store_name || ''}» لشهر ${label}:\n👀 الزيارات: ${visits}\n📞 التواصل (واتساب/اتصال): ${contacts}\n🛍️ منتجاتك المعروضة: ${products}\nواصل تحديث منتجاتك ليستمر النمو — تربح`;
+      await sendChat(adminId, uid, body).catch(() => {});
+    }
+  } catch { /* لا يعطّل شيئاً */ }
 }

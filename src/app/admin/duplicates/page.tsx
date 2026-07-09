@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { Copy, Trash2, Check } from 'lucide-react';
 import { requirePerm } from '@/lib/roles';
-import { findDuplicateAds } from '@/lib/duplicates';
+import { findDuplicateAds, findCrossUserImages } from '@/lib/duplicates';
+import { mediaUrl } from '@/lib/media';
 import { timeAgo } from '@/lib/utils';
 import { adminDeleteDuplicatesAction } from '../actions';
 
@@ -11,7 +12,7 @@ export const metadata = { title: 'الإعلانات المكررة' };
 export default async function AdminDuplicates({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
   await requirePerm('duplicates');
   const sp = await searchParams;
-  const { groups, dupCount } = await findDuplicateAds();
+  const [{ groups, dupCount }, stolen] = await Promise.all([findDuplicateAds(), findCrossUserImages(20)]);
 
   return (
     <div className="space-y-4">
@@ -58,6 +59,28 @@ export default async function AdminDuplicates({ searchParams }: { searchParams: 
                 </li>
               ))}
             </ul>
+          </div>
+        ))}
+      </div>
+    
+
+      {/* نفس الصورة من أكثر من عضو — مؤشر سرقة صور إعلانات */}
+      <div className="space-y-3">
+        <h2 className="flex items-center gap-2 text-lg font-extrabold text-red-600">🕵️ صور مستخدمة من أكثر من عضو</h2>
+        <p className="text-sm text-muted-foreground">مطابقة بالبصمة البصرية (pHash): نفس الصورة مرفوعة من أعضاء مختلفين — غالباً سرقة صور إعلانات. راجع الأعضاء واتخذ الإجراء.</p>
+        {stolen.length === 0 && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ لا توجد صور متطابقة بين أعضاء مختلفين.</p>}
+        {stolen.map((g) => (
+          <div key={g.phash} className="card-3d flex flex-wrap items-center gap-3 rounded-xl p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={mediaUrl(g.files[0].file)} alt="صورة مكررة" className="h-20 w-20 rounded-lg object-cover" />
+            <div className="min-w-0 flex-1 space-y-1 text-sm">
+              <div className="font-bold text-red-600">نفس الصورة لدى {g.files.length} أعضاء:</div>
+              <div className="flex flex-wrap gap-1.5">
+                {g.files.map((f) => (
+                  <Link key={f.userId} href={`/admin/users/${f.userId}`} className="rounded-full border border-primary/25 bg-primary/5 px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary/10">{f.userName}</Link>
+                ))}
+              </div>
+            </div>
           </div>
         ))}
       </div>

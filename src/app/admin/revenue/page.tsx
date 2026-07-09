@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks, ReceiptText, Trash2, ArrowRight, Scale } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks, ReceiptText, Trash2, ArrowRight, Scale, Landmark } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
-import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction } from '../actions';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الإيرادات' };
@@ -32,6 +32,7 @@ const TABS = [
   { key: 'overview', label: 'الميزانية', icon: Coins },
   { key: 'balances', label: 'أرصدة الأعضاء', icon: Users },
   { key: 'expenses', label: 'المصروفات', icon: ReceiptText },
+  { key: 'accounts', label: 'حسابات الشحن', icon: Landmark },
   { key: 'pricing', label: 'التسعيرات', icon: ListChecks },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
@@ -39,7 +40,7 @@ type TabKey = typeof TABS[number]['key'];
 export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string; user?: string }> }) {
   await requireAction('users', 'view');
   const { saved, tab, user } = await searchParams;
-  const active: TabKey = tab === 'balances' || tab === 'pricing' || tab === 'expenses' ? tab : 'overview';
+  const active: TabKey = tab === 'balances' || tab === 'pricing' || tab === 'expenses' || tab === 'accounts' ? tab : 'overview';
   const userId = Number(user || 0) || 0;
 
   return (
@@ -59,6 +60,7 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
       {active === 'overview' && <OverviewTab />}
       {active === 'balances' && (userId ? <MemberDetailTab userId={userId} /> : <BalancesTab />)}
       {active === 'expenses' && <ExpensesTab />}
+      {active === 'accounts' && <AccountsTab />}
       {active === 'pricing' && <PricingTab />}
     </div>
   );
@@ -266,6 +268,41 @@ async function ExpensesTab() {
         </table>
       </div>
       <p className="text-[11px] text-muted-foreground">المصروفات تدخل في «الميزانية»: صافي الميزانية = الإيراد الفعلي − المصروفات.</p>
+    </div>
+  );
+}
+
+/** حسابات الشحن — تظهر للأعضاء في «محفظتي» (البنك/رقم الحساب/الاسم) مع أزرار نسخ. */
+async function AccountsTab() {
+  const accounts = await getTopupAccounts();
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">هذه الحسابات تظهر للأعضاء في «محفظتي» ضمن «شحن رصيدك» — كل حقل بزر نسخ، وتحت الاسم عبارة تنبيه (تُعدَّل من «النصوص» ← المحفظة). يمكنك إضافة أكثر من حساب.</p>
+      <form action={addTopupAccountAction} className="card-3d space-y-2 rounded-2xl p-4">
+        <div className="flex items-center gap-2 text-sm font-bold text-primary"><Landmark className="h-4 w-4" /> إضافة حساب</div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <label className="space-y-1"><span className="text-xs font-bold">البنك</span><input name="bank" placeholder="مثال: الراجحي" className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">رقم الحساب / الآيبان</span><input name="number" dir="ltr" placeholder="SA…" className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">اسم صاحب الحساب</span><input name="name" className={num} /></label>
+        </div>
+        <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة الحساب</button>
+      </form>
+      <div className="space-y-2">
+        {accounts.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">لا توجد حسابات بعد — أضف حساباً ليظهر للأعضاء في «محفظتي».</p>}
+        {accounts.map((a, i) => (
+          <div key={i} className="card-3d flex flex-wrap items-center gap-3 rounded-xl p-3 text-sm">
+            <div className="min-w-0 flex-1 space-y-0.5">
+              {a.bank && <div><span className="text-xs font-bold text-muted-foreground">البنك: </span><b>{a.bank}</b></div>}
+              {a.number && <div><span className="text-xs font-bold text-muted-foreground">رقم الحساب: </span><b dir="ltr" className="break-all text-primary">{a.number}</b></div>}
+              {a.name && <div><span className="text-xs font-bold text-muted-foreground">الاسم: </span><b>{a.name}</b></div>}
+            </div>
+            <form action={deleteTopupAccountAction}>
+              <input type="hidden" name="idx" value={i} />
+              <button aria-label="حذف الحساب" className="flex items-center gap-1 rounded-lg border border-red-300 px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /> حذف</button>
+            </form>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

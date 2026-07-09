@@ -111,11 +111,26 @@ export const SETTING_MSG_VERIFY_REJECT = 'msg_verify_reject';
 export const DEFAULT_MSG_VERIFY_OK = 'تهانينا {name} 🎉 تم توثيق حسابك في تربح — تظهر الآن شارة «موثّق» على ملفك وإعلاناتك. — الإدارة';
 export const DEFAULT_MSG_VERIFY_REJECT = 'نعتذر {name}، لم يُقبل طلب توثيق حسابك. السبب: {reason}. يمكنك معالجة السبب وإعادة رفع الوثائق من «توثيق الحساب». — الإدارة';
 
-/* شحن الرصيد — بيانات حساب التحويل والتعليمات الظاهرة للعضو + رسائل قرار الإدارة (تُعدَّل من تبويب النصوص). */
-export const SETTING_TOPUP_ACCOUNT = 'topup_account';
-export const DEFAULT_TOPUP_ACCOUNT = '';
-export const SETTING_TOPUP_ACCOUNT_NAME = 'topup_account_name';
-export const DEFAULT_TOPUP_ACCOUNT_NAME = '';
+/* شحن الرصيد — حسابات التحويل (تُدار من الإيرادات) والتعليمات + رسائل قرار الإدارة (من تبويب النصوص). */
+export type TopupAccount = { bank: string; number: string; name: string };
+export const SETTING_TOPUP_ACCOUNTS = 'topup_accounts';
+export async function getTopupAccounts(): Promise<TopupAccount[]> {
+  const raw = await getSetting(SETTING_TOPUP_ACCOUNTS, '');
+  if (raw) {
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        return arr
+          .map((a) => ({ bank: String(a?.bank || '').slice(0, 80), number: String(a?.number || '').slice(0, 80), name: String(a?.name || '').slice(0, 120) }))
+          .filter((a) => a.bank || a.number || a.name);
+      }
+    } catch { /* ignore bad JSON */ }
+  }
+  return [];
+}
+export async function setTopupAccounts(accounts: TopupAccount[]): Promise<void> {
+  await setSetting(SETTING_TOPUP_ACCOUNTS, JSON.stringify(accounts.slice(0, 20)));
+}
 export const SETTING_TOPUP_NAME_NOTE = 'topup_name_note';
 export const DEFAULT_TOPUP_NAME_NOTE = 'تأكد من الاسم قبل التحويل';
 export const SETTING_TOPUP_INFO = 'topup_info';

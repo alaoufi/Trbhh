@@ -5,10 +5,10 @@ import { getBalance, listTxns, getDupCredit, listMyTopups } from '@/lib/wallet';
 import {
   getServicePricing, serviceHasPrice, DURATIONS, getSetting,
   SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO,
-  SETTING_TOPUP_ACCOUNT, DEFAULT_TOPUP_ACCOUNT,
-  SETTING_TOPUP_ACCOUNT_NAME, DEFAULT_TOPUP_ACCOUNT_NAME,
   SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE,
+  getTopupAccounts,
 } from '@/lib/settings';
+import { CopyChip } from '@/components/copy-chip';
 import { mediaUrl } from '@/lib/media';
 import { buyDupPackAction, requestTopupAction } from '../actions';
 
@@ -30,11 +30,10 @@ const TOPUP_STATUS = {
 export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [balance, txns, pricing, dupCredit, topups, topupInfo, topupAccount, topupAccountName, topupNameNote] = await Promise.all([
+  const [balance, txns, pricing, dupCredit, topups, topupInfo, topupAccounts, topupNameNote] = await Promise.all([
     getBalance(session.uid), listTxns(session.uid, 100), getServicePricing(), getDupCredit(session.uid),
     listMyTopups(session.uid), getSetting(SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO),
-    getSetting(SETTING_TOPUP_ACCOUNT, DEFAULT_TOPUP_ACCOUNT),
-    getSetting(SETTING_TOPUP_ACCOUNT_NAME, DEFAULT_TOPUP_ACCOUNT_NAME),
+    getTopupAccounts(),
     getSetting(SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE),
   ]);
   const range = (p: Record<'w2' | 'm1' | 'y1', number>) => DURATIONS.filter((d) => p[d.key] > 0).map((d) => p[d.key]);
@@ -43,10 +42,10 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     <div className="space-y-4">
       <h1 className="flex items-center gap-2 text-xl font-bold text-primary"><Wallet className="h-6 w-6" /> محفظتي</h1>
 
-      <div className="card-3d rounded-2xl bg-gradient-to-l from-primary to-primary/80 p-5 text-white">
-        <div className="text-sm opacity-90">الرصيد المتاح</div>
-        <div className="mt-1 text-3xl font-extrabold">{balance} <span className="text-lg">ر.س</span></div>
-        <p className="mt-2 text-xs opacity-90">اشحن رصيدك من نموذج «شحن رصيدك» بالأسفل. يُخصم الرصيد تلقائياً عند الإعلانات المميّزة والمبوّبة وباقات التكرار.</p>
+      <div className="card-3d rounded-2xl border-2 border-primary/30 bg-card p-5">
+        <div className="text-sm font-bold text-muted-foreground">الرصيد المتاح</div>
+        <div className="mt-1 text-4xl font-extrabold text-primary">{balance} <span className="text-lg">ر.س</span></div>
+        <p className="mt-2 text-xs font-medium text-muted-foreground">اشحن رصيدك من نموذج «شحن رصيدك» بالأسفل. يُخصم الرصيد تلقائياً عند الإعلانات المميّزة والمبوّبة وباقات التكرار.</p>
       </div>
 
       {sp.dup === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تمت إضافة باقة التكرار وخُصمت الرسوم من رصيدك.</div>}
@@ -59,20 +58,37 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       {/* شحن الرصيد: المبلغ + إيصال التحويل — يُضاف بعد تأكيد الإدارة */}
       <div id="topup" className="card-3d space-y-3 rounded-2xl p-4">
         <div className="flex items-center gap-2 font-bold text-primary"><HandCoins className="h-5 w-5" /> شحن رصيدك</div>
-        {(topupAccount || topupAccountName) && (
-          <div className="space-y-1.5 rounded-xl border-2 border-primary/25 bg-primary/5 p-3">
-            {topupAccount && (
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-bold text-muted-foreground">رقم الحساب:</span>
-                <b dir="ltr" className="select-all break-all rounded bg-white px-2 py-0.5 font-extrabold text-primary">{topupAccount}</b>
+        {topupAccounts.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-sm font-bold text-foreground">حسابات التحويل:</div>
+            {topupAccounts.map((a, i) => (
+              <div key={i} className="space-y-2 rounded-xl border-2 border-primary/25 bg-primary/5 p-3">
+                {a.bank && (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 text-sm"><span className="font-bold text-muted-foreground">البنك: </span><b className="text-base text-foreground">{a.bank}</b></div>
+                    <CopyChip text={a.bank} />
+                  </div>
+                )}
+                {a.number && (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 text-sm">
+                      <span className="font-bold text-muted-foreground">رقم الحساب: </span>
+                      <b dir="ltr" className="select-all break-all text-base font-extrabold text-primary">{a.number}</b>
+                    </div>
+                    <CopyChip text={a.number} />
+                  </div>
+                )}
+                {a.name && (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 text-sm">
+                      <span className="font-bold text-muted-foreground">اسم صاحب الحساب: </span><b className="text-base text-foreground">{a.name}</b>
+                      {topupNameNote && <div className="mt-0.5 text-xs font-bold text-amber-700">⚠ {topupNameNote}</div>}
+                    </div>
+                    <CopyChip text={a.name} />
+                  </div>
+                )}
               </div>
-            )}
-            {topupAccountName && (
-              <div className="text-sm">
-                <span className="font-bold text-muted-foreground">الاسم:</span> <b className="text-foreground">{topupAccountName}</b>
-                {topupNameNote && <div className="mt-0.5 text-xs font-bold text-amber-700">⚠ {topupNameNote}</div>}
-              </div>
-            )}
+            ))}
           </div>
         )}
         {topupInfo && <p className="rounded-lg bg-primary/5 p-2.5 text-xs font-medium text-foreground/80">{topupInfo}</p>}

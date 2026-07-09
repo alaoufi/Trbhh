@@ -165,7 +165,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <input name="q" defaultValue={query} placeholder="ابحث في المتجر" className="h-10 w-full rounded-full border bg-muted/40 pr-9 pl-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </form>
           {!session && (
-            <Link href={`/login?next=${encodeURIComponent(`/companies/${storeId}`)}`} className="btn-3d flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-bold text-white" style={{ background: brand }}>
+            <Link href={`/store-login?s=${encodeURIComponent(meta.handle || String(storeId))}`} className="btn-3d flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-bold text-white" style={{ background: brand }}>
               <LogIn className="h-4 w-4" /> دخول
             </Link>
           )}

@@ -37,17 +37,16 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
   // لا نُشغّل كنس الأرشيف عند عرض تبويب المؤرشفة حتى لا يبدو فارغاً بعد حذف القديم
   if (tab !== 'archived') await sweepExpiredArchived().catch(() => {});
 
-  // «المحظورة» = إعلانات الأعضاء المحظورين
-  const bannedUserIds = tab === 'banned'
-    ? (await prisma.users.findMany({ where: { ban: 'checked' }, select: { id: true } }).catch(() => [])).map((u) => u.id)
-    : [];
+  // «المحظورة» = إعلانات الأعضاء المحظورين (نحتاج القائمة دائماً للعدّاد)
+  const bannedUserIds = (await prisma.users.findMany({ where: { ban: 'checked' }, select: { id: true } }).catch(() => [])).map((u) => u.id);
+  const bannedWhere: Prisma.adsWhereInput = { user_id: { in: bannedUserIds.length ? bannedUserIds : [BigInt(-1)] } };
 
   const tabWhere: Prisma.adsWhereInput =
     tab === 'special' ? { status: 1, adsSpecial: 'checked', ...notArchived }
       : tab === 'normal' ? { status: 1, NOT: { adsSpecial: 'checked' }, ...notArchived }
         : tab === 'pending' ? { status: 0, ...notArchived }
           : tab === 'archived' ? archived
-            : tab === 'banned' ? { user_id: { in: bannedUserIds.length ? bannedUserIds : [BigInt(-1)] } }
+            : tab === 'banned' ? bannedWhere
               : {};
 
   // البحث: بالعنوان أو التفاصيل أو رقم الإعلان
@@ -57,11 +56,14 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
     : {};
   const where: Prisma.adsWhereInput = { AND: [tabWhere, searchWhere] };
 
-  const [total, specialCount, pendingCount, archivedCount] = await Promise.all([
+  const [total, allCount, specialCount, normalCount, pendingCount, archivedCount, bannedCount] = await Promise.all([
     prisma.ads.count({ where }),
+    prisma.ads.count(),
     prisma.ads.count({ where: { status: 1, adsSpecial: 'checked', ...notArchived } }),
+    prisma.ads.count({ where: { status: 1, NOT: { adsSpecial: 'checked' }, ...notArchived } }),
     prisma.ads.count({ where: { status: 0, ...notArchived } }),
     prisma.ads.count({ where: archived }),
+    prisma.ads.count({ where: bannedWhere }),
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const cur = Math.min(page, pages);
@@ -82,12 +84,12 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-bold text-primary">الإعلانات</h1>
         <div className="flex flex-wrap gap-2 text-sm">
-          <Link href={tabHref('all')} className={tabCls('all')}>الكل</Link>
+          <Link href={tabHref('all')} className={tabCls('all')}>الكل {badge(allCount, 'bg-primary/80')}</Link>
           <Link href={tabHref('special')} className={tabCls('special')}>المميزة {badge(specialCount, 'bg-amber-500')}</Link>
-          <Link href={tabHref('normal')} className={tabCls('normal')}>العادية</Link>
+          <Link href={tabHref('normal')} className={tabCls('normal')}>العادية {badge(normalCount, 'bg-emerald-600')}</Link>
           <Link href={tabHref('pending')} className={tabCls('pending')}>بانتظار الموافقة {badge(pendingCount, 'bg-red-500')}</Link>
           <Link href={tabHref('archived')} className={tabCls('archived')}>المؤرشفة {badge(archivedCount, 'bg-amber-600')}</Link>
-          <Link href={tabHref('banned')} className={tabCls('banned')}>المحظورة</Link>
+          <Link href={tabHref('banned')} className={tabCls('banned')}>المحظورة {badge(bannedCount, 'bg-slate-600')}</Link>
         </div>
       </div>
 

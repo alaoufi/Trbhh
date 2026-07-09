@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { Bell } from 'lucide-react';
+import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin, getUserPerms } from '@/lib/roles';
 import { getCategories } from '@/lib/data';
@@ -18,6 +20,14 @@ export async function Header() {
   const adminHrefs = admin
     ? await getUserPerms(session!.uid).then((perms) => ADMIN_NAV.filter((n) => n.perm === null || perms.has(n.perm)).map((n) => n.href)).catch(() => [] as string[])
     : [];
+  // جرس الهيدر: مجموع الرسائل غير المقروءة + التنبيهات الجديدة
+  const [unreadMsgs, newNotifs] = session
+    ? await Promise.all([
+        prisma.chats.count({ where: { reciver_id: session.uid, is_read: 0 } }).catch(() => 0),
+        prisma.notfications.count({ where: { user_id: String(session.uid), read_at: null } }).catch(() => 0),
+      ])
+    : [0, 0];
+  const bellCount = unreadMsgs + newNotifs;
   return (
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
       <div className="container relative flex h-16 items-center gap-2">
@@ -29,6 +39,18 @@ export async function Header() {
 
         {/* بحث مصغّر: عدسة تفتح حقل البحث */}
         <HeaderSearch />
+
+        {/* جرس الرسائل والتنبيهات — العدد الأحمر = رسائل غير مقروءة + تنبيهات جديدة */}
+        {session && (
+          <Link href="/notifications" aria-label="التنبيهات والرسائل" className="relative shrink-0 text-primary">
+            <Bell className="h-6 w-6" />
+            {bellCount > 0 && (
+              <span className="absolute -left-2 -top-1.5 grid min-w-[18px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-extrabold leading-[18px] text-white shadow">
+                {bellCount > 99 ? '99+' : bellCount}
+              </span>
+            )}
+          </Link>
+        )}
 
         {/* logo on the left (RTL: last child) */}
         <Link href="/" className="shrink-0">

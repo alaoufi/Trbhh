@@ -648,6 +648,23 @@ async function sendVerifyMessage(userId: number, key: string, fallback: string, 
   await sendChat(adminId, userId, body).catch(() => {});
 }
 
+/** حذف تنبيه عضو (اطّلاع الإدارة). */
+export async function adminDeleteNotifAction(formData: FormData) {
+  const session = await requireAction('messages', 'delete');
+  const id = BigInt(String(formData.get('id') || '0'));
+  await prisma.notfications.delete({ where: { id } }).catch(() => {});
+  await logAdmin(session.uid, 'حذف تنبيه', `تنبيه #${toInt(id)}`);
+  revalidatePath('/admin/notifs');
+}
+
+/** حذف كل التنبيهات المقروءة (تنظيف الأرشيف). */
+export async function adminClearReadNotifsAction() {
+  const session = await requireAction('messages', 'delete');
+  const r = await prisma.notfications.deleteMany({ where: { NOT: { read_at: null } } }).catch(() => ({ count: 0 }));
+  await logAdmin(session.uid, 'حذف التنبيهات المقروءة', `${r.count} تنبيه`);
+  revalidatePath('/admin/notifs');
+}
+
 /** تأكيد وصول مبلغ طلب الشحن: إضافة المبلغ للرصيد + رسالة للعضو. */
 export async function approveTopupAction(formData: FormData) {
   const session = await requireAction('users', 'edit');

@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Copy, Sparkles, Ban,
   Crown, Settings, MonitorPlay, BookOpen, ShieldAlert, DatabaseBackup, KeyRound, MessageSquare, Coins,
-  Store, MessagesSquare, FileText, Shield, HandCoins, ScrollText,
+  Store, MessagesSquare, FileText, Shield, HandCoins, ScrollText, BellRing,
 } from 'lucide-react';
 import type { Perm } from '@/lib/roles';
 
@@ -50,6 +50,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
       { href: '/admin/guard-words', label: 'كلمات حارس المحتوى', icon: ShieldAlert, perm: 'words' },
       { href: '/admin/reports', label: 'البلاغات', icon: Flag, perm: 'reports' },
       { href: '/admin/messages', label: 'مراقبة المراسلات', icon: MessagesSquare, perm: 'messages' },
+      { href: '/admin/notifs', label: 'تنبيهات الأعضاء', icon: BellRing, perm: 'messages' },
     ],
   },
   {

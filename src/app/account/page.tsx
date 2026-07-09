@@ -3,6 +3,7 @@ import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, ListFilt
 import { requireUser } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
 import { getBalance } from '@/lib/wallet';
+import { prisma } from '@/lib/prisma';
 import { getMemberAlerts } from '@/lib/alerts';
 import { getCategories } from '@/lib/data';
 import { getInterests } from '@/lib/interests';
@@ -18,13 +19,15 @@ const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
 
 export default async function AccountHome() {
   const session = await requireUser();
-  const [stats, alerts, categories, interests, rating, balance] = await Promise.all([
+  const [stats, alerts, categories, interests, rating, balance, newNotifs] = await Promise.all([
     getMyStats(session.uid), getMemberAlerts(session.uid), getCategories(), getInterests(session.uid), getSellerRating(session.uid), getBalance(session.uid),
+    prisma.notfications.count({ where: { user_id: String(session.uid), read_at: null } }).catch(() => 0),
   ]);
   const cards = [
     { href: '/account/ads', label: 'إعلاناتي', value: stats.ads, icon: Megaphone },
     { href: '/account/favorites', label: 'المفضلة', value: stats.favorites, icon: Heart },
     { href: '/messages', label: 'رسائل غير مقروءة', value: stats.unread, icon: Mail },
+    { href: '/notifications', label: 'تنبيهات جديدة', value: newNotifs, icon: Bell },
   ];
   const notices: { href: string; icon: React.ElementType; text: string }[] = [];
   if (alerts.messages > 0) notices.push({ href: '/messages', icon: Mail, text: `لديك ${en(alerts.messages)} رسالة جديدة غير مقروءة` });
@@ -46,7 +49,7 @@ export default async function AccountHome() {
           ))}
         </div>
       )}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {cards.map(({ href, label, value, icon: Icon }) => (
           <Link key={href} href={href} className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
             <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><Icon className="h-5 w-5" /></span>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
@@ -142,6 +142,8 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [] }: { i
             {isAuthed && (
               <Section title="حسابي" icon={User}>
                 <Item href="/account" icon={User} onClick={close}>لوحة حسابي</Item>
+                <Item href="/messages" icon={Mail} onClick={close}>رسائلي</Item>
+                <Item href="/notifications" icon={Bell} onClick={close}>التنبيهات</Item>
                 <Item href="/account/wallet" icon={Wallet} onClick={close}>محفظتي</Item>
                 <Item href="/account/ads" icon={Megaphone} onClick={close}>إعلاناتي</Item>
                 <Item href="/account/favorites" icon={Heart} onClick={close}>المفضلة</Item>

@@ -8,6 +8,7 @@ import { getCategories } from '@/lib/data';
 import { getInterests } from '@/lib/interests';
 import { getSellerRating } from '@/lib/reviews';
 import { InterestsPicker } from '@/components/interests-picker';
+import { PushToggle } from '@/components/push-toggle';
 import { setInterestsAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -53,6 +54,9 @@ export default async function AccountHome() {
           </Link>
         ))}
       </div>
+      {/* التنبيهات الفورية — تظهر فقط عند تفعيلها من الإدارة */}
+      <PushToggle />
+
       {/* المحفظة وشحن الرصيد — المبلغ + إيصال التحويل ثم تأكيد الإدارة */}
       <Link href="/account/wallet#topup" className="flex items-center gap-3 card-3d rounded-xl border-2 border-emerald-500/30 bg-emerald-50/50 p-4 hover:border-emerald-500">
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-emerald-100 text-emerald-700"><Wallet className="h-5 w-5" /></span>

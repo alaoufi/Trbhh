@@ -17,6 +17,15 @@ export async function sendChat(fromId: number, toId: number, message: string): P
     },
   });
   await prisma.chat_typing.deleteMany({ where: { user_id: fromId, peer_id: toId } }).catch(() => {});
+  // تنبيه فوري للمستلم (إن فعّلته الإدارة واشترك جهازه) — لا يعطّل الإرسال بأي حال
+  import('./push').then(async ({ sendPushToUser }) => {
+    const sender = await prisma.users.findUnique({ where: { id: BigInt(fromId) }, select: { name: true, userName: true } }).catch(() => null);
+    await sendPushToUser(toId, {
+      title: `رسالة جديدة من ${sender?.name || sender?.userName || 'عضو'}`,
+      body: text.slice(0, 120),
+      url: '/messages',
+    });
+  }).catch(() => {});
   return toInt(row.id);
 }
 

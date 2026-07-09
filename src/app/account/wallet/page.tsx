@@ -6,7 +6,7 @@ import {
   getServicePricing, serviceHasPrice, DURATIONS, getSetting,
   SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO,
   SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE,
-  getTopupAccounts,
+  getTopupAccounts, getTopupPromo,
 } from '@/lib/settings';
 import { CopyChip } from '@/components/copy-chip';
 import { mediaUrl } from '@/lib/media';
@@ -30,12 +30,14 @@ const TOPUP_STATUS = {
 export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [balance, txns, pricing, dupCredit, topups, topupInfo, topupAccounts, topupNameNote] = await Promise.all([
+  const [balance, txns, pricing, dupCredit, topups, topupInfo, topupAccounts, topupNameNote, promo] = await Promise.all([
     getBalance(session.uid), listTxns(session.uid, 100), getServicePricing(), getDupCredit(session.uid),
     listMyTopups(session.uid), getSetting(SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO),
     getTopupAccounts(),
     getSetting(SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE),
+    getTopupPromo(),
   ]);
+  const hadTopup = txns.some((t) => t.reason === 'topup');
   const range = (p: Record<'w2' | 'm1' | 'y1', number>) => DURATIONS.filter((d) => p[d.key] > 0).map((d) => p[d.key]);
   const priceRange = (p: Record<'w2' | 'm1' | 'y1', number>) => { const r = range(p); return r.length ? `${Math.min(...r)}–${Math.max(...r)} ر.س` : ''; };
   return (
@@ -61,6 +63,13 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           <HandCoins className="h-5 w-5" /> شحن رصيدك
           <Link href="/guide/how/topup" className="btn-3d mr-auto inline-flex items-center gap-1 rounded-full bg-red-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md hover:bg-red-700">🎬 شاهد طريقة الشحن</Link>
         </div>
+        {/* عروض الشحن الحالية — تظهر فقط عند تفعيلها من الإدارة */}
+        {(promo.pct > 0 || (promo.first > 0 && !hadTopup)) && (
+          <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-2.5 text-sm font-extrabold text-emerald-800">
+            {promo.pct > 0 && <div>🎁 اشحن {promo.min > 0 ? `${promo.min} ر.س أو أكثر` : 'الآن'} واحصل على +{promo.pct}% رصيداً إضافياً!</div>}
+            {promo.first > 0 && !hadTopup && <div>⭐ مكافأة أول شحن: +{promo.first} ر.س تُضاف لرصيدك مع أول شحن مؤكَّد.</div>}
+          </div>
+        )}
         {topupAccounts.length > 0 && (
           <div className="space-y-2">
             <div className="text-sm font-bold text-foreground">حسابات التحويل:</div>

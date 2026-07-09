@@ -299,6 +299,10 @@ export async function createAdAction(formData: FormData) {
   await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
   await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز: تثبيت بالأعلى
   await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
+  if (!requireApproval) {
+    // تنبيهات البحث المحفوظ — لا تعطّل النشر بأي حال
+    import('@/lib/saved-search').then((m) => m.notifySavedSearches(toInt(ad.id), title, detail, session.uid)).catch(() => {});
+  }
   // نشر من المتجر: أدرِج الإعلان في واجهة المتجر، ثم انتقل إلى إعلانات المتجر (لا للرجوع لصفحة الإضافة)
   if (dest === 'store') {
     const { addStoreProduct, storeIdOfUser } = await import('@/lib/merchant');

@@ -10,7 +10,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig()]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true)]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -47,6 +47,25 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
                 {HOME_STAT_LABELS[k]}
               </label>
             ))}
+          </div>
+        </div>
+
+        {/* مفاتيح الميزات الحديثة — تفعيل/تعطيل من هنا مباشرة */}
+        <div className="border-t border-primary/15 pt-3">
+          <div className="mb-2 text-sm font-bold text-primary">الميزات التفاعلية</div>
+          <div className="space-y-2">
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="pushOn" defaultChecked={pushOn} className="mt-0.5 h-4 w-4 accent-primary" />
+              <span><b>التنبيهات الفورية (Push)</b> — تصل الأعضاء على أجهزتهم فور وصول رسالة أو قرار توثيق/شحن. عند التفعيل تظهر بطاقة «التنبيهات الفورية» في لوحة كل عضو ليفعّلها على جهازه.</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="searchSuggestOn" defaultChecked={suggestOn} className="mt-0.5 h-4 w-4 accent-primary" />
+              <span><b>اقتراحات البحث</b> — عناوين مطابقة تظهر أثناء كتابة الزائر في صفحة البحث.</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="savedSearchOn" defaultChecked={savedSearchOn} className="mt-0.5 h-4 w-4 accent-primary" />
+              <span><b>تنبيهات البحث المحفوظ</b> — العضو يحفظ بحثه (حتى ١٠) وتصله رسالة تلقائية عند نشر إعلان مطابق.</span>
+            </label>
           </div>
         </div>
 

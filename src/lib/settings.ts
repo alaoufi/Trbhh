@@ -131,6 +131,24 @@ export async function getTopupAccounts(): Promise<TopupAccount[]> {
 export async function setTopupAccounts(accounts: TopupAccount[]): Promise<void> {
   await setSetting(SETTING_TOPUP_ACCOUNTS, JSON.stringify(accounts.slice(0, 20)));
 }
+/* عروض الشحن والمكافآت — 0 = معطّل (تُضبط من الإيرادات والتسعير). */
+export const SETTING_TOPUP_BONUS_PCT = 'topup_bonus_pct';
+export const SETTING_TOPUP_BONUS_MIN = 'topup_bonus_min';
+export const SETTING_TOPUP_FIRST_BONUS = 'topup_first_bonus';
+export const SETTING_VERIFY_GIFT = 'verify_gift';
+export type TopupPromo = { pct: number; min: number; first: number };
+export async function getTopupPromo(): Promise<TopupPromo> {
+  const [pct, min, first] = await Promise.all([
+    getSettingNum(SETTING_TOPUP_BONUS_PCT, 0),
+    getSettingNum(SETTING_TOPUP_BONUS_MIN, 0),
+    getSettingNum(SETTING_TOPUP_FIRST_BONUS, 0),
+  ]);
+  return { pct: Math.max(0, pct), min: Math.max(0, min), first: Math.max(0, first) };
+}
+export async function getVerifyGift(): Promise<number> {
+  return Math.max(0, await getSettingNum(SETTING_VERIFY_GIFT, 0));
+}
+
 export const SETTING_TOPUP_NAME_NOTE = 'topup_name_note';
 export const DEFAULT_TOPUP_NAME_NOTE = 'تأكد من الاسم قبل التحويل';
 export const SETTING_TOPUP_INFO = 'topup_info';

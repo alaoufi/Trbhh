@@ -4,7 +4,7 @@ import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -310,7 +310,7 @@ async function AccountsTab() {
 }
 
 async function PricingTab() {
-  const [sub, prices, remind] = await Promise.all([getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig()]);
+  const [sub, prices, remind, promo, verifyGift] = await Promise.all([getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift()]);
   const services: { key: PaidService; note?: string }[] = [
     { key: 'featured' },
     { key: 'classified', note: 'إعلان واحد حسب المدّة' },
@@ -341,6 +341,18 @@ async function PricingTab() {
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">قبل كم يوم يبدأ التنبيه</span><input name="subRemindDays" type="number" min={0} defaultValue={remind.days} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">كم مرة (مرة/يوم كحدّ أقصى)</span><input name="subRemindCount" type="number" min={0} defaultValue={remind.count} className={num} /></label>
+        </div>
+      </div>
+
+      {/* عروض الشحن والمكافآت — 0 = معطّل */}
+      <div className="rounded-xl border border-emerald-300 bg-emerald-50/60 p-3">
+        <div className="mb-1 text-xs font-bold text-emerald-800">🎁 عروض الشحن والمكافآت (اكتب 0 للتعطيل)</div>
+        <p className="mb-2 text-[11px] text-muted-foreground">تُضاف المكافآت تلقائياً فور تأكيد الشحن أو التوثيق، وتظهر في محفظة العضو والميزانية.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">نسبة مكافأة الشحن %</span><input name="topupBonusPct" type="number" min={0} max={100} defaultValue={promo.pct} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">الحد الأدنى للمبلغ (ر.س)</span><input name="topupBonusMin" type="number" min={0} defaultValue={promo.min} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">مكافأة أول شحن (ر.س)</span><input name="topupFirstBonus" type="number" min={0} defaultValue={promo.first} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">هدية التوثيق (ر.س — مرة واحدة)</span><input name="verifyGift" type="number" min={0} defaultValue={verifyGift} className={num} /></label>
         </div>
       </div>
 

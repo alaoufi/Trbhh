@@ -442,6 +442,10 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_CLASSIFIED_STATS, classifiedStats);
   await setSetting(SETTING_CLASSIFIED_DAYS, String(classifiedDays));
   await setSetting(SETTING_CLASSIFIED_SECONDS, String(splashSeconds));
+  // مفاتيح الميزات: التنبيهات الفورية، اقتراحات البحث، تنبيهات البحث المحفوظ
+  await setSetting('push_on', formData.get('pushOn') !== null ? '1' : '0');
+  await setSetting('search_suggest_on', formData.get('searchSuggestOn') !== null ? '1' : '0');
+  await setSetting('saved_search_on', formData.get('savedSearchOn') !== null ? '1' : '0');
   // classified duplicate prevention: toggle + content/image/background thresholds
   await setSetting(SETTING_CDUP_ON, formData.get('cdupOn') !== null ? '1' : '0');
   await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));
@@ -473,6 +477,12 @@ export async function saveRevenueAction(formData: FormData) {
   // تنبيهات قرب انتهاء الاشتراك: قبل كم يوم + كم مرة
   await setSetting(SETTING_SUB_REMIND_DAYS, nn('subRemindDays'));
   await setSetting(SETTING_SUB_REMIND_COUNT, nn('subRemindCount'));
+  // عروض الشحن والمكافآت (0 = معطّل)
+  const { SETTING_TOPUP_BONUS_PCT, SETTING_TOPUP_BONUS_MIN, SETTING_TOPUP_FIRST_BONUS, SETTING_VERIFY_GIFT } = await import('@/lib/settings');
+  await setSetting(SETTING_TOPUP_BONUS_PCT, nn('topupBonusPct'));
+  await setSetting(SETTING_TOPUP_BONUS_MIN, nn('topupBonusMin'));
+  await setSetting(SETTING_TOPUP_FIRST_BONUS, nn('topupFirstBonus'));
+  await setSetting(SETTING_VERIFY_GIFT, nn('verifyGift'));
   // مصفوفة تسعيرات الخدمات (خدمة × مدّة)
   const services: PaidService[] = ['featured', 'classified', 'dup3', 'dup5'];
   for (const s of services) {
@@ -707,12 +717,16 @@ export async function rejectTopupAction(formData: FormData) {
 
 /** الموافقة على التوثيق: تفعيل فوري + رسالة للعضو. */
 export async function approveVerificationAction(formData: FormData) {
-  await requireAction('verifications', 'edit');
+  const session = await requireAction('verifications', 'edit');
   const id = Number(formData.get('userId') || 0);
   if (!id) return;
   await prisma.users.update({ where: { id: BigInt(id) }, data: { trusted: 1, step: 0, verify_note: null } }).catch(() => {});
   const { SETTING_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_OK } = await import('@/lib/settings');
   await sendVerifyMessage(id, SETTING_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_OK);
+  // هدية التوثيق (إن فُعّلت من الإيرادات) — مرة واحدة لكل عضو
+  const { grantVerifyGift } = await import('@/lib/wallet');
+  const gift = await grantVerifyGift(id, session.uid);
+  if (gift > 0) await sendVerifyMessage(id, '__none__', `🎁 أُضيفت هدية التوثيق: ${gift} ر.س إلى رصيدك — استمتع بها في خدمات تربح.`);
   revalidatePath('/admin/verifications');
   revalidatePath('/admin/users');
 }

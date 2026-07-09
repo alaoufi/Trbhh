@@ -184,6 +184,26 @@ const STATEMENTS: string[] = [
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX site_expenses_date (spent_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* web-push subscriptions (per device) — sent when admin enables push. */
+  `CREATE TABLE IF NOT EXISTS push_subs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    endpoint VARCHAR(500) NOT NULL,
+    p256dh VARCHAR(255) NOT NULL,
+    auth VARCHAR(120) NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX push_subs_user (user_id),
+    INDEX push_subs_endpoint (endpoint(191))
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* saved searches — member gets notified when a matching ad is published. */
+  `CREATE TABLE IF NOT EXISTS saved_searches (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    query VARCHAR(120) NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    notified_at DATETIME NULL,
+    INDEX saved_searches_user (user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS dup_attempts (
     user_id BIGINT UNSIGNED NOT NULL,
     count INT NOT NULL DEFAULT 0,

@@ -6,9 +6,11 @@ import { toInt } from './utils';
 const ensure = ensureSchema;
 
 /** Reasons recorded on each wallet transaction (for member + admin history). */
-export type TxnReason = 'admin_credit' | 'admin_debit' | 'featured' | 'classified' | 'duplicate' | 'subscription' | 'refund' | 'topup';
+export type TxnReason = 'admin_credit' | 'admin_debit' | 'featured' | 'classified' | 'duplicate' | 'subscription' | 'refund' | 'topup' | 'bonus' | 'verify_gift';
 export const REASON_LABELS: Record<TxnReason, string> = {
   topup: 'شحن رصيد (تحويل)',
+  bonus: 'مكافأة شحن',
+  verify_gift: 'هدية التوثيق',
   admin_credit: 'شحن رصيد من الإدارة',
   admin_debit: 'خصم من الإدارة',
   featured: 'إعلان مميّز',
@@ -257,7 +259,36 @@ export async function approveTopup(id: number, adminId: number): Promise<TopupRo
     await prisma.wallet_topups.updateMany({ where: { id: BigInt(id), status: 1 }, data: { status: 0, admin_id: null, decided_at: null } }).catch(() => {});
     return null;
   }
+  await applyTopupBonuses(toInt(req.user_id), req.amount, adminId).catch(() => {});
   return topupRow({ ...req, status: 1 });
+}
+
+/** مكافآت الشحن (من الإعدادات): نسبة إضافية فوق حدّ أدنى + مكافأة أول شحن — 0 = معطّلة. */
+async function applyTopupBonuses(userId: number, amount: number, adminId: number): Promise<void> {
+  const { getTopupPromo } = await import('./settings');
+  const promo = await getTopupPromo();
+  if (promo.pct > 0 && amount >= promo.min) {
+    const bonus = Math.round((amount * promo.pct) / 100);
+    if (bonus > 0) await adjustBalance(userId, bonus, 'bonus', { adminId, note: `+${promo.pct}% على شحن ${amount} ر.س` });
+  }
+  if (promo.first > 0) {
+    const prior = await prisma.wallet_txns.count({ where: { user_id: BigInt(userId), reason: 'topup' } }).catch(() => 99);
+    if (prior === 1) { // شحنته المؤكدة الأولى فقط
+      await adjustBalance(userId, promo.first, 'bonus', { adminId, note: 'مكافأة أول شحن' });
+    }
+  }
+}
+
+/** هدية التوثيق (مرة واحدة لكل عضو) — 0 = معطّلة. */
+export async function grantVerifyGift(userId: number, adminId: number): Promise<number> {
+  const { getVerifyGift } = await import('./settings');
+  const gift = await getVerifyGift();
+  if (gift <= 0) return 0;
+  await ensure();
+  const prior = await prisma.wallet_txns.count({ where: { user_id: BigInt(userId), reason: 'verify_gift' } }).catch(() => 1);
+  if (prior > 0) return 0;
+  const r = await adjustBalance(userId, gift, 'verify_gift', { adminId, note: 'هدية توثيق الحساب' });
+  return r.ok ? gift : 0;
 }
 
 /** Admin rejects a pending request with a saved reason. */

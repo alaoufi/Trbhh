@@ -15,9 +15,9 @@ export const metadata = { title: 'إعلاناتي' };
 export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; bumped?: string; bumpwait?: string; scheduled?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn] = await Promise.all([
+  const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn] = await Promise.all([
     getMyAds(session.uid), getServicePricing(), getBalance(session.uid), getAdExtras(),
-    getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true),
+    getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('auction_on', false),
   ]);
   const contacts = contactStatsOn ? await adContactCounts(ads.map((a) => a.id)) : new Map<number, { whatsapp: number; call: number }>();
   const now = Date.now();
@@ -99,6 +99,9 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                     <input type="hidden" name="adId" value={ad.id} />
                     <button className="flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100" title="رفع الإعلان لأعلى القوائم">⬆ تحديث</button>
                   </form>
+                )}
+                {auctionOn && ad.status === 1 && !ad.storeOnly && (
+                  <Link href={`/auctions/new?ad=${ad.id}`} className="flex items-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700 hover:bg-violet-100" title="افتح مزاداً على هذا الإعلان">🔨 مزاد</Link>
                 )}
                 {extras.urgentPrice > 0 && ad.status === 1 && !ad.storeOnly && (
                   <form action={buyUrgentAction}>

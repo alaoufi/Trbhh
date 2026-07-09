@@ -462,6 +462,8 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('hours_on', formData.get('hoursOn') !== null ? '1' : '0');
   await setSetting('deals_on', formData.get('dealsOn') !== null ? '1' : '0');
   await setSetting('autorenew_on', formData.get('autoRenewOn') !== null ? '1' : '0');
+  await setSetting('auction_on', formData.get('auctionOn') !== null ? '1' : '0');
+  await setSetting('staff_on', formData.get('staffOn') !== null ? '1' : '0');
   // classified duplicate prevention: toggle + content/image/background thresholds
   await setSetting(SETTING_CDUP_ON, formData.get('cdupOn') !== null ? '1' : '0');
   await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));
@@ -500,6 +502,9 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting(SETTING_TOPUP_BONUS_MIN, nn('topupBonusMin'));
   await setSetting(SETTING_TOPUP_FIRST_BONUS, nn('topupFirstBonus'));
   await setSetting(SETTING_VERIFY_GIFT, nn('verifyGift'));
+  // المزادات: رسم الفتح + أقصى مدة
+  await setSetting('auction_fee', nn('auctionFee'));
+  await setSetting('auction_max_days', String(Math.min(30, Math.max(1, parseInt(String(formData.get('auctionMaxDays') || '7')) || 7))));
   // باقة متجر Plus + عمولة توصيل عميل
   await setSetting('plus_on', formData.get('plusOn') !== null ? '1' : '0');
   await setSetting('plus_monthly', nn('plusMonthly'));

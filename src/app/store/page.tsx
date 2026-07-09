@@ -8,7 +8,7 @@ import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction } from '@/app/account/company/actions';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction, addStoreStaffAction, removeStoreStaffAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
 import { getStoreSubPricing } from '@/lib/settings';
 import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen, DatabaseBackup } from 'lucide-react';
@@ -21,8 +21,8 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string }> }) {
-  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string }> }) {
+  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus, staff } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
@@ -30,6 +30,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   // نسخة احتياطية دورية تلقائية للمتجر (مرة يومياً كحدّ أقصى)
   import('@/lib/store-backup').then((m) => m.maybeAutoBackup(session.uid)).catch(() => {});
   const store = await getStoreByUser(session.uid);
+  // موظفو المتجر (staff_on): بطاقة إدارة للمالك + لوحة مصغّرة للموظف
+  const staffOn = await (await import('@/lib/settings')).staffEnabled().catch(() => false);
+  const staffList = store && staffOn ? await (await import('@/lib/merchant')).listStoreStaff(store.id).catch(() => []) : [];
+  const myStaffStoreId = !store && staffOn ? await (await import('@/lib/merchant')).staffStoreId(session.uid).catch(() => 0) : 0;
+  const staffStore = myStaffStoreId ? await (await import('@/lib/merchant')).storeCard(myStaffStoreId).catch(() => null) : null;
   const backups = store ? await (await import('@/lib/store-backup')).listStoreBackups(store.id).catch(() => []) : [];
   const bulkCats = store ? await (await import('@/lib/data')).getCategories().catch(() => []) : [];
   // الظهور المدفوع في تربح: التسعيرات + حالة المتجر + منتجاته وحالات عرضها
@@ -77,10 +82,24 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';
   return (
     <div className="space-y-4">
-      {!store && (
+      {!store && !staffStore && (
         <div className="card-3d rounded-xl p-4">
           <h1 className="text-lg font-extrabold text-primary">افتح متجرك المستقل</h1>
           <p className="mt-1 text-sm text-muted-foreground">صمّم متجرك، اختر معرّفه (رابطه المستقل)، وابدأ عرض إعلاناتك. يخضع المتجر لموافقة إدارة المتاجر قبل الظهور.</p>
+        </div>
+      )}
+
+      {/* لوحة الموظف المصغّرة: يضيف منتجات باسم المتجر الذي يعمل فيه */}
+      {!store && staffStore && (
+        <div className="card-3d space-y-3 rounded-2xl border-2 border-teal-300 bg-teal-50/40 p-4">
+          {added === '1' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ نُشر المنتج وأُضيف لواجهة المتجر.</div>}
+          {added === 'pending' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-700">✓ استُلم المنتج وسيظهر بعد موافقة الإدارة.</div>}
+          <div className="flex items-center gap-2 font-bold text-teal-800">👤 أنت موظف في متجر «{staffStore.name}»</div>
+          <p className="text-xs text-muted-foreground">يمكنك إضافة منتجات تظهر باسم المتجر في واجهته — يديرها صاحب المتجر ويستطيع إزالتك في أي وقت.</p>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/ads/new?dest=store" className="btn-3d flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2 text-sm font-extrabold text-white"><PlusCircle className="h-4 w-4" /> أضف منتجاً للمتجر</Link>
+            <Link href={`/companies/${myStaffStoreId}`} className="flex items-center gap-1.5 rounded-lg border border-teal-300 bg-white px-4 py-2 text-sm font-bold text-teal-700">عرض واجهة المتجر ←</Link>
+          </div>
         </div>
       )}
 
@@ -270,6 +289,37 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                   <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${c.active ? 'bg-emerald-100 text-emerald-700' : 'bg-secondary text-muted-foreground'}`}>{c.active ? 'فعّال' : 'موقوف'}</span>
                   <form action={toggleStoreCouponAction}><input type="hidden" name="id" value={c.id} /><button className="rounded-lg border px-2 py-1 text-[11px] font-bold text-amber-700">{c.active ? 'إيقاف' : 'تفعيل'}</button></form>
                   <form action={deleteStoreCouponAction}><input type="hidden" name="id" value={c.id} /><button className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">حذف</button></form>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* موظفو المتجر — يضيفهم المالك برقم الجوال ليضيفوا منتجات باسم المتجر */}
+      {store && staffOn && (
+        <div className="card-3d space-y-3 rounded-2xl p-4">
+          <div className="flex items-center gap-2 font-bold text-primary">👥 موظفو المتجر ({en(staffList.length)}/5)</div>
+          {staff === '1' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ أُضيف الموظف — يمكنه الآن إضافة منتجات باسم متجرك من «متجري».</div>}
+          {staff === 'removed' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ أُزيل الموظف.</div>}
+          {staff === 'notfound' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">لا يوجد عضو مسجّل بهذا الرقم — تأكد أن الموظف سجّل في تربح أولاً.</div>}
+          {staff === 'cap' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">بلغت الحد الأقصى (5 موظفين) — أزل موظفاً لإضافة آخر.</div>}
+          {staff === 'self' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">هذا رقمك أنت — أدخل رقم جوال الموظف.</div>}
+          <p className="text-xs text-muted-foreground">أضف موظفاً برقم جواله (يجب أن يكون عضواً مسجّلاً في تربح) — يظهر له في «متجري» لوحة مصغّرة يضيف منها منتجات تظهر باسم متجرك، ولا يملك أي صلاحية أخرى.</p>
+          <form action={addStoreStaffAction} className="flex gap-2">
+            <input name="phone" required inputMode="tel" dir="ltr" placeholder="05xxxxxxxx" className="h-10 min-w-0 flex-1 rounded-lg border bg-white px-3 text-sm" />
+            <button className="btn-3d shrink-0 rounded-lg bg-primary px-4 text-sm font-bold text-white">إضافة موظف</button>
+          </form>
+          {staffList.length > 0 && (
+            <ul className="space-y-1.5">
+              {staffList.map((m) => (
+                <li key={m.userId} className="flex flex-wrap items-center gap-2 rounded-xl border p-2 text-sm">
+                  <span className="font-bold">{m.name}</span>
+                  {m.phone && <span dir="ltr" className="text-xs text-muted-foreground">{m.phone}</span>}
+                  <form action={removeStoreStaffAction} className="mr-auto">
+                    <input type="hidden" name="userId" value={m.userId} />
+                    <button className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">إزالة</button>
+                  </form>
                 </li>
               ))}
             </ul>

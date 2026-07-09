@@ -4,7 +4,7 @@ import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { pointsEnabled, getPointsConfig, referralEnabled, getReferralReward, getWelcomeCredit } from '@/lib/points';
 import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction } from '../actions';
 
@@ -339,10 +339,10 @@ async function AccountsTab() {
 }
 
 async function PricingTab() {
-  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead] = await Promise.all([
+  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction] = await Promise.all([
     getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
     pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
-    getStorePlusPricing(), getLeadConfig(),
+    getStorePlusPricing(), getLeadConfig(), getAuctionConfig(),
   ]);
   const services: { key: PaidService; note?: string }[] = [
     { key: 'featured' },
@@ -443,6 +443,16 @@ async function PricingTab() {
         <div className="mt-2 grid grid-cols-2 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">العمولة عن كل عميل جديد (ر.س)</span><input name="leadPrice" type="number" min={0} defaultValue={lead.price} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">السقف اليومي (عملاء يُحاسَب عنهم/متجر)</span><input name="leadDailyCap" type="number" min={1} defaultValue={lead.dailyCap} className={num} /></label>
+        </div>
+      </div>
+
+      {/* المزادات: رسم الفتح + أقصى مدة (التفعيل من الإعدادات ← الميزات) */}
+      <div className="rounded-xl border border-violet-300 bg-violet-50/60 p-3">
+        <div className="mb-1 text-xs font-bold text-violet-800">🔨 المزادات (التفعيل من الإعدادات ← الميزات التفاعلية)</div>
+        <p className="mb-2 text-[11px] text-muted-foreground">رسم يُخصم من رصيد العضو عند فتح مزاد على إعلانه (0 = فتح مجاني). المزايدات نفسها مجانية، والصفقة تُتم بين الفائز والبائع مباشرة.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">رسم فتح المزاد (ر.س)</span><input name="auctionFee" type="number" min={0} defaultValue={auction.fee} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">أقصى مدة للمزاد (أيام)</span><input name="auctionMaxDays" type="number" min={1} max={30} defaultValue={auction.maxDays} className={num} /></label>
         </div>
       </div>
 

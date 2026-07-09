@@ -48,6 +48,25 @@ export async function getMyAds(userId: number) {
   }));
 }
 
+/** إعلانات بمعرّفاتها بنفس شكل getMyAds — لكتالوج المتجر (منتجات المالك وموظفيه معاً). */
+export async function getAdsByIds(ids: number[]) {
+  if (!ids.length) return [];
+  const rows = await prisma.ads.findMany({ where: { id: { in: ids.map((n) => BigInt(n)) } }, orderBy: { id: 'desc' } }).catch(() => []);
+  const images = await primaryImages(rows.map((r) => r.id));
+  return rows.map((r) => ({
+    id: toInt(r.id),
+    title: r.title,
+    price: r.price,
+    adsType: r.adsType,
+    status: r.status,
+    special: r.adsSpecial === 'checked',
+    image: images.get(toInt(r.id)) ?? PLACEHOLDER,
+    createdAt: r.created_at ? r.created_at.toISOString() : null,
+    oldPrice: r.old_price ?? 0,
+    stockState: r.stock_state ?? 0,
+  }));
+}
+
 export async function getMyStats(userId: number) {
   const [ads, favorites, unread] = await Promise.all([
     prisma.ads.count({ where: { user_id: BigInt(userId) } }),

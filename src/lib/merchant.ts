@@ -196,11 +196,65 @@ export async function setStoreProducts(userId: number, adIds: number[]) {
 /** Append a single owned ad to the store's showcase (used when publishing from the store). */
 export async function addStoreProduct(userId: number, adId: number) {
   await ensure();
-  const storeId = await storeIdOfUser(userId);
+  // مالك المتجر، وإلا موظف متجر (عند تفعيل ميزة الموظفين) — يضيف منتجات باسم المتجر
+  const storeId = (await storeIdOfUser(userId)) || (await staffStoreId(userId));
   if (!storeId || !adId) return;
   const owns = await prisma.ads.findFirst({ where: { id: BigInt(adId), user_id: BigInt(userId) }, select: { id: true } }).catch(() => null);
   if (!owns) return;
   await prisma.store_products.createMany({ data: [{ store_id: storeId, ad_id: adId }], skipDuplicates: true }).catch(() => {});
+}
+
+/* ---- موظفو المتجر (staff_on): يضيفهم المالك برقم الجوال ليضيفوا منتجات باسم المتجر ---- */
+
+/** متجر يعمل فيه هذا العضو موظفاً (0 إن لم يوجد أو الميزة موقوفة). */
+export async function staffStoreId(userId: number): Promise<number> {
+  try {
+    const { staffEnabled } = await import('./settings');
+    if (!(await staffEnabled())) return 0;
+    await ensure();
+    const r = await prisma.store_staff.findFirst({ where: { user_id: BigInt(userId) }, select: { store_id: true } }).catch(() => null);
+    return r?.store_id ?? 0;
+  } catch { return 0; }
+}
+
+export type StaffMember = { userId: number; name: string; phone: string | null; at: string | null };
+
+export async function listStoreStaff(storeId: number): Promise<StaffMember[]> {
+  await ensure();
+  const rows = await prisma.store_staff.findMany({ where: { store_id: storeId }, orderBy: { created_at: 'asc' } }).catch(() => []);
+  if (!rows.length) return [];
+  const users = await prisma.users.findMany({ where: { id: { in: rows.map((r) => r.user_id) } }, select: { id: true, name: true, userName: true, phoneNumber: true } }).catch(() => []);
+  const by = new Map(users.map((u) => [toInt(u.id), u]));
+  return rows.map((r) => {
+    const u = by.get(toInt(r.user_id));
+    return { userId: toInt(r.user_id), name: u?.name || u?.userName || `عضو #${toInt(r.user_id)}`, phone: u?.phoneNumber ?? null, at: r.created_at ? r.created_at.toISOString() : null };
+  });
+}
+
+/** إضافة موظف برقم جواله — عضو مسجّل، ليس المالك، وبحدّ أقصى من الإعدادات. */
+export async function addStoreStaffByPhone(ownerId: number, phone: string): Promise<{ ok: boolean; error?: string }> {
+  await ensure();
+  const storeId = await storeIdOfUser(ownerId);
+  if (!storeId) return { ok: false, error: 'notfound' };
+  const { toLocalSaudi } = await import('./sms');
+  const { STORE_STAFF_MAX } = await import('./settings');
+  const local = toLocalSaudi(phone.trim());
+  if (!local) return { ok: false, error: 'notfound' };
+  const user = await prisma.users.findFirst({ where: { phoneNumber: local }, select: { id: true } }).catch(() => null);
+  if (!user) return { ok: false, error: 'notfound' };
+  const uid = toInt(user.id);
+  if (uid === ownerId) return { ok: false, error: 'self' };
+  const count = await prisma.store_staff.count({ where: { store_id: storeId } }).catch(() => STORE_STAFF_MAX);
+  if (count >= STORE_STAFF_MAX) return { ok: false, error: 'cap' };
+  await prisma.store_staff.createMany({ data: [{ store_id: storeId, user_id: BigInt(uid) }], skipDuplicates: true }).catch(() => {});
+  return { ok: true };
+}
+
+export async function removeStoreStaff(ownerId: number, staffUserId: number): Promise<void> {
+  await ensure();
+  const storeId = await storeIdOfUser(ownerId);
+  if (!storeId) return;
+  await prisma.store_staff.deleteMany({ where: { store_id: storeId, user_id: BigInt(staffUserId) } }).catch(() => {});
 }
 
 /** Active showcased ads of a store (its independent catalog). */

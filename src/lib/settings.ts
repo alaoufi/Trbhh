@@ -442,6 +442,18 @@ export async function getLeadConfig(): Promise<LeadConfig> {
 
 export const autoRenewEnabled = () => getSettingBool('autorenew_on', false);
 
+/* ================= المزادات + موظفو المتجر ================= */
+
+export const auctionsEnabled = () => getSettingBool('auction_on', false);
+export type AuctionConfig = { fee: number; maxDays: number };
+export async function getAuctionConfig(): Promise<AuctionConfig> {
+  const [fee, maxDays] = await Promise.all([getSettingNum('auction_fee', 0), getSettingNum('auction_max_days', 7)]);
+  return { fee: Math.max(0, Math.round(fee) || 0), maxDays: Math.min(30, Math.max(1, Math.round(maxDays) || 7)) };
+}
+
+export const staffEnabled = () => getSettingBool('staff_on', false);
+export const STORE_STAFF_MAX = 5;
+
 /* تنبيهات قرب انتهاء الاشتراك: قبل كم يوم يبدأ التنبيه، وكم مرة (مرة واحدة يومياً
    كحدّ أقصى). 0 = تعطيل. نص الرسالة يُعدَّل من تبويب «النصوص» ويدعم {days} و{date}. */
 export const SETTING_SUB_REMIND_DAYS = 'sub_remind_days';

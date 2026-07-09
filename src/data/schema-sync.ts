@@ -159,6 +159,36 @@ const STATEMENTS: string[] = [
   `ALTER TABLE stores ADD COLUMN hours_from VARCHAR(5) NULL`,
   `ALTER TABLE stores ADD COLUMN hours_to VARCHAR(5) NULL`,
   `ALTER TABLE stores ADD COLUMN hours_days VARCHAR(30) NULL`,
+  /* المزادات: مزاد على إعلان (رسم فتح من التحكم) + مزايدات الأعضاء. status 0=مفتوح 1=مغلق */
+  `CREATE TABLE IF NOT EXISTS auctions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    ad_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    start_price INT NOT NULL DEFAULT 0,
+    min_step INT NOT NULL DEFAULT 1,
+    ends_at DATETIME NOT NULL,
+    status TINYINT NOT NULL DEFAULT 0,
+    winner_id BIGINT UNSIGNED NULL,
+    winner_bid INT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX auctions_open (status, ends_at),
+    INDEX auctions_ad (ad_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS bids (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    auction_id BIGINT NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    amount INT NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX bids_auction (auction_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* موظفو المتجر: أعضاء يضيفهم صاحب المتجر برقم الجوال ليضيفوا منتجات باسم المتجر. */
+  `CREATE TABLE IF NOT EXISTS store_staff (
+    store_id INT NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (store_id, user_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* التجديد التلقائي للاشتراك: مفعّل؟ + آخر خطة مدفوعة (monthly/sixmo/yearly) للتجديد بها. */
   `ALTER TABLE stores ADD COLUMN auto_renew TINYINT NOT NULL DEFAULT 0`,
   `ALTER TABLE stores ADD COLUMN sub_plan VARCHAR(10) NULL`,

@@ -28,13 +28,14 @@ export async function Header() {
       ])
     : [0, 0];
   const bellCount = unreadMsgs + newNotifs;
-  // «عروض اليوم» في القائمة — يظهر فقط عند تفعيل الميزة من التحكم
+  // «عروض اليوم» و«المزادات» في القائمة — تظهر فقط عند تفعيلها من التحكم
   const dealsOn = await import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false);
+  const auctionsOn = await import('@/lib/settings').then((m) => m.auctionsEnabled()).catch(() => false);
   return (
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
-        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} dealsOn={dealsOn} />
+        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} />
 
         {/* الزر الرئيسي — يتغيّر حسب الصفحة (دخول/رابط المتجر/الصفحة الرئيسية في صفحة الدخول) */}
         <HeaderCta isAuthed={!!session} myStoreId={myStoreId} />

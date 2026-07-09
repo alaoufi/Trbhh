@@ -5,7 +5,6 @@ import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Searc
 import { SITE } from '@/lib/constants';
 import { CopyLink } from '@/components/copy-link';
 import { getStore } from '@/lib/stores';
-import { getMyAds } from '@/lib/account';
 import { cookies, headers } from 'next/headers';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
@@ -104,18 +103,18 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
     }
   }
 
-  const [myAds, productIds, followers, rating, reviews, following] = await Promise.all([
-    getMyAds(s.userId),
+  const [productIds, followers, rating, reviews, following] = await Promise.all([
     storeProductAdIds(storeId),
     followersCount(storeId),
     getStoreRating(storeId),
     getStoreReviews(storeId),
     session && !isOwner ? isFollowing(session.uid, storeId) : Promise.resolve(false),
   ]);
-  // independent catalog: ONLY the ads the merchant added to the store — never
-  // all their platform ads. Empty until the owner showcases products.
-  const inStore = new Set(productIds);
-  const inStoreAds = myAds.filter((a) => a.status === 1 && inStore.has(a.id));
+  // independent catalog: ONLY the ads added to the store (owner or staff) — never
+  // all the owner's platform ads. Empty until products are showcased.
+  const { getAdsByIds } = await import('@/lib/account');
+  const productAds = await getAdsByIds(productIds).catch(() => []);
+  const inStoreAds = productAds.filter((a) => a.status === 1);
   const viewsById = await adViewCounts(inStoreAds.map((a) => a.id)).catch(() => new Map<number, number>());
   // ميزات المتجر الإضافية (تفعيلها العام من التحكم): كوبونات + دوام + حالة التوفر + خصومات
   const xtr = await import('@/lib/store-extras');

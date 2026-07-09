@@ -371,3 +371,23 @@ export async function buyStorePlusAction(formData: FormData) {
   if (!r.ok) redirect(r.error === 'الرصيد غير كافٍ.' ? '/store?plus=needcredit' : '/store?plus=err');
   redirect('/store?plus=1');
 }
+
+/** إضافة موظف للمتجر برقم جواله (عضو مسجّل) — بحد أقصى من الإعدادات. */
+export async function addStoreStaffAction(formData: FormData) {
+  const session = await requireUser();
+  const { staffEnabled } = await import('@/lib/settings');
+  if (!(await staffEnabled())) redirect('/store');
+  const { addStoreStaffByPhone } = await import('@/lib/merchant');
+  const r = await addStoreStaffByPhone(session.uid, String(formData.get('phone') || ''));
+  revalidatePath('/store');
+  redirect(r.ok ? '/store?staff=1' : `/store?staff=${r.error || 'err'}`);
+}
+
+/** إزالة موظف من المتجر. */
+export async function removeStoreStaffAction(formData: FormData) {
+  const session = await requireUser();
+  const { removeStoreStaff } = await import('@/lib/merchant');
+  await removeStoreStaff(session.uid, Number(formData.get('userId') || 0));
+  revalidatePath('/store');
+  redirect('/store?staff=removed');
+}

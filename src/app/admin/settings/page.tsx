@@ -10,7 +10,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true)]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false)]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -65,6 +65,10 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" name="savedSearchOn" defaultChecked={savedSearchOn} className="mt-0.5 h-4 w-4 accent-primary" />
               <span><b>تنبيهات البحث المحفوظ</b> — العضو يحفظ بحثه (حتى ١٠) وتصله رسالة تلقائية عند نشر إعلان مطابق.</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="matchNotifyOn" defaultChecked={matchNotifyOn} className="mt-0.5 h-4 w-4 accent-primary" />
+              <span><b>مطابقة عرض/طلب</b> — عند نشر «طلب» يصل تنبيه لأصحاب «العروض» في نفس القسم والمدينة (والعكس) — حتى ١٥ عضواً لكل إعلان.</span>
             </label>
           </div>
         </div>

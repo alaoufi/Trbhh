@@ -20,6 +20,7 @@ import { hashPassword } from '@/lib/auth';
 import { cacheDel } from '@/lib/redis';
 import { bustAdCaches } from '@/lib/data';
 import { toInt } from '@/lib/utils';
+import { logAdmin } from '@/lib/audit';
 
 function readPromoPkgForm(formData: FormData) {
   return {
@@ -337,19 +338,21 @@ export async function dismissDeletionRequestAction(formData: FormData) {
 
 /** Ban a member for a chosen duration (days) or permanently. */
 export async function banUserAction(formData: FormData) {
-  await requireUserBan();
+  const session = await requireUserBan();
   const id = Number(formData.get('userId'));
   const permanent = !!formData.get('permanent');
   const days = Math.max(0, parseInt(String(formData.get('days') || '0')) || 0);
   await banUserFor(id, permanent ? 0 : days);
+  await logAdmin(session.uid, 'حظر عضو', `العضو #${String(formData.get('userId') || '')}`);
   revalidatePath('/admin/users');
 }
 
 /** Lift a member's ban. */
 export async function unbanUserAction(formData: FormData) {
-  await requireUserBan();
+  const session = await requireUserBan();
   const id = Number(formData.get('userId'));
   await unbanUser(id);
+  await logAdmin(session.uid, 'رفع حظر', `العضو #${String(formData.get('userId') || '')}`);
   revalidatePath('/admin/users');
 }
 
@@ -377,7 +380,7 @@ export async function applyPresetAction(formData: FormData) {
 /** Save the member self-service windows (edit/delete allowed period, hours). */
 /** النصوص الظاهرة للزائر (تبويب مقسّم لأقسام) — يُحفَظ قسم واحد فقط في كل مرة. */
 export async function saveTextsAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  const session = await requireAction('users', 'edit');
   const sec = String(formData.get('sec') || 'general');
   const put = async (key: string, name: string) => setSetting(key, String(formData.get(name) ?? '').trim());
   if (sec === 'general') {
@@ -395,6 +398,7 @@ export async function saveTextsAction(formData: FormData) {
   } else if (sec === 'msg') {
     await put(SETTING_MSG_TPL_AD, 'msgTplAd');
     await put(SETTING_MSG_TPL_ADMIN, 'msgTplAdmin');
+    await put('msg_tpl_support', 'msgTplSupport');
   } else if (sec === 'empty') {
     await put(SETTING_EMPTY_ADS, 'emptyAds');
     await put(SETTING_EMPTY_CHATS, 'emptyChats');
@@ -412,13 +416,14 @@ export async function saveTextsAction(formData: FormData) {
     await put(SETTING_MSG_TOPUP_OK, 'msgTopupOk');
     await put(SETTING_MSG_TOPUP_REJECT, 'msgTopupReject');
   }
+  await logAdmin(session.uid, 'تعديل النصوص', `تبويب ${sec}`);
   revalidatePath('/admin/texts');
   revalidatePath('/', 'layout');
   redirect(`/admin/texts?sec=${sec}&saved=1`);
 }
 
 export async function saveSettingsAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  const session = await requireAction('users', 'edit');
   const editH = Math.max(0, parseInt(String(formData.get('editHours') || '0')) || 0);
   const delH = Math.max(0, parseInt(String(formData.get('deleteHours') || '0')) || 0);
   const msgDelMin = Math.max(0, parseInt(String(formData.get('msgDeleteMinutes') || '0')) || 0);
@@ -446,6 +451,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('push_on', formData.get('pushOn') !== null ? '1' : '0');
   await setSetting('search_suggest_on', formData.get('searchSuggestOn') !== null ? '1' : '0');
   await setSetting('saved_search_on', formData.get('savedSearchOn') !== null ? '1' : '0');
+  await setSetting('match_notify_on', formData.get('matchNotifyOn') !== null ? '1' : '0');
   // classified duplicate prevention: toggle + content/image/background thresholds
   await setSetting(SETTING_CDUP_ON, formData.get('cdupOn') !== null ? '1' : '0');
   await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));
@@ -458,6 +464,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(APP_KEYS.androidMinCode, String(Math.max(1, parseInt(String(formData.get('appAndroidMinCode') || '2')) || 2)));
   await setSetting(APP_KEYS.iosStoreUrl, String(formData.get('appIosStoreUrl') || '').trim());
   await setSetting(APP_KEYS.iosMinBuild, String(Math.max(1, parseInt(String(formData.get('appIosMinBuild') || '2')) || 2)));
+  await logAdmin(session.uid, 'تعديل الإعدادات');
   revalidatePath('/admin/settings');
   revalidatePath('/');
   revalidatePath('/classified');
@@ -466,7 +473,7 @@ export async function saveSettingsAction(formData: FormData) {
 
 /** Revenue hub: store-subscription plans + grace, and ad-service/duplicate pricing. */
 export async function saveRevenueAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  const session = await requireAction('users', 'edit');
   const nn = (k: string, d = 0) => String(Math.max(0, parseInt(String(formData.get(k) || d)) || d));
   await setSetting(SETTING_SUB_ENABLED, formData.get('subEnabled') !== null ? '1' : '0');
   await setSetting(SETTING_SUB_MONTHLY, nn('subMonthly'));
@@ -491,6 +498,7 @@ export async function saveRevenueAction(formData: FormData) {
       await setSetting(key, nn(key));
     }
   }
+  await logAdmin(session.uid, 'تعديل التسعيرات والعروض');
   revalidatePath('/admin/revenue');
   revalidatePath('/store');
   redirect('/admin/revenue?saved=1');
@@ -641,6 +649,7 @@ export async function approveTopupAction(formData: FormData) {
   if (req) {
     const { SETTING_MSG_TOPUP_OK: k, DEFAULT_MSG_TOPUP_OK } = await import('@/lib/settings');
     await sendVerifyMessage(req.userId, k, DEFAULT_MSG_TOPUP_OK, '', { amount: String(req.amount) });
+    await logAdmin(session.uid, 'تأكيد شحن رصيد', `طلب #${id}`, `${req.amount} ر.س للعضو #${req.userId}`);
   }
   revalidatePath('/admin/topups');
   revalidatePath('/account/wallet');
@@ -648,7 +657,7 @@ export async function approveTopupAction(formData: FormData) {
 
 /** إضافة حساب تحويل (بنك/رقم/اسم) يظهر للأعضاء في «محفظتي». */
 export async function addTopupAccountAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  const session = await requireAction('users', 'edit');
   const bank = String(formData.get('bank') || '').trim().slice(0, 80);
   const number = String(formData.get('number') || '').trim().slice(0, 80);
   const iban = String(formData.get('iban') || '').trim().slice(0, 80);
@@ -656,6 +665,7 @@ export async function addTopupAccountAction(formData: FormData) {
   if (bank || number || iban || name) {
     const accounts = await getTopupAccounts();
     await setTopupAccounts([...accounts, { bank, number, iban, name }]);
+    await logAdmin(session.uid, 'إضافة حساب شحن', bank || number);
   }
   revalidatePath('/admin/revenue');
   revalidatePath('/account/wallet');
@@ -685,17 +695,19 @@ export async function addSiteExpenseAction(formData: FormData) {
   const spentAt = String(formData.get('spentAt') || '').trim();
   const { addSiteExpense } = await import('@/lib/wallet');
   await addSiteExpense(label, amount, session.uid, { note, spentAt });
+  await logAdmin(session.uid, 'إضافة مصروف', label, `${amount} ر.س`);
   revalidatePath('/admin/revenue');
   redirect('/admin/revenue?tab=expenses&saved=1');
 }
 
 /** حذف مصروف. */
 export async function deleteSiteExpenseAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  const session = await requireAction('users', 'edit');
   const id = Number(formData.get('id') || 0);
   if (!id) return;
   const { deleteSiteExpense } = await import('@/lib/wallet');
   await deleteSiteExpense(id);
+  await logAdmin(session.uid, 'حذف مصروف', `مصروف #${id}`);
   revalidatePath('/admin/revenue');
 }
 
@@ -710,6 +722,7 @@ export async function rejectTopupAction(formData: FormData) {
   if (req) {
     const { SETTING_MSG_TOPUP_REJECT: k, DEFAULT_MSG_TOPUP_REJECT } = await import('@/lib/settings');
     await sendVerifyMessage(req.userId, k, DEFAULT_MSG_TOPUP_REJECT, reason, { amount: String(req.amount) });
+    await logAdmin(session.uid, 'رفض شحن رصيد', `طلب #${id}`, reason);
   }
   revalidatePath('/admin/topups');
   revalidatePath('/account/wallet');
@@ -727,19 +740,21 @@ export async function approveVerificationAction(formData: FormData) {
   const { grantVerifyGift } = await import('@/lib/wallet');
   const gift = await grantVerifyGift(id, session.uid);
   if (gift > 0) await sendVerifyMessage(id, '__none__', `🎁 أُضيفت هدية التوثيق: ${gift} ر.س إلى رصيدك — استمتع بها في خدمات تربح.`);
+  await logAdmin(session.uid, 'قبول توثيق', `العضو #${id}`);
   revalidatePath('/admin/verifications');
   revalidatePath('/admin/users');
 }
 
 /** رفض التوثيق مع سبب يبقى محفوظاً + رسالة للعضو بالسبب. */
 export async function rejectVerificationAction(formData: FormData) {
-  await requireAction('verifications', 'edit');
+  const session = await requireAction('verifications', 'edit');
   const id = Number(formData.get('userId') || 0);
   const reason = String(formData.get('reason') || '').trim().slice(0, 300);
   if (!id || !reason) return;
   await prisma.users.update({ where: { id: BigInt(id) }, data: { trusted: 0, step: 2, verify_note: reason } }).catch(() => {});
   const { SETTING_MSG_VERIFY_REJECT, DEFAULT_MSG_VERIFY_REJECT } = await import('@/lib/settings');
   await sendVerifyMessage(id, SETTING_MSG_VERIFY_REJECT, DEFAULT_MSG_VERIFY_REJECT, reason);
+  await logAdmin(session.uid, 'رفض توثيق', `العضو #${id}`, reason);
   revalidatePath('/admin/verifications');
 }
 
@@ -757,10 +772,11 @@ export async function deleteVerificationDocsAction(formData: FormData) {
 }
 
 export async function adminDeleteAdAction(formData: FormData) {
-  await requireAction('ads', 'delete');
+  const session = await requireAction('ads', 'delete');
   const id = BigInt(String(formData.get('adId')));
   await prisma.photos.deleteMany({ where: { other_id: id } });
   await prisma.ads.delete({ where: { id } }).catch(() => {});
+  await logAdmin(session.uid, 'حذف إعلان', `إعلان #${toInt(id)}`);
   revalidatePath('/admin/ads');
 }
 
@@ -890,6 +906,7 @@ export async function adjustUserBalanceAction(formData: FormData) {
   if (!uid || amount <= 0) redirect(`/admin/users/${uid}?error=${encodeURIComponent('أدخل مبلغاً صحيحاً')}`);
   const { creditUser, debitUser } = await import('@/lib/wallet');
   const r = kind === 'debit' ? await debitUser(uid, amount, admin.uid, note) : await creditUser(uid, amount, admin.uid, note);
+  if (r.ok) await logAdmin(admin.uid, kind === 'debit' ? 'خصم رصيد' : 'إضافة رصيد', `العضو #${uid}`, `${amount} ر.س${note ? ` — ${note}` : ''}`);
   revalidatePath(`/admin/users/${uid}`);
   if (!r.ok) redirect(`/admin/users/${uid}?error=${encodeURIComponent('تعذّر التنفيذ (قد يكون الرصيد غير كافٍ للخصم)')}`);
   redirect(`/admin/users/${uid}?bal=1`);

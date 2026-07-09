@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
@@ -160,6 +160,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [] }: { i
 
             <Section title="تصفّح" icon={Search}>
               <Item href="/search" icon={Search} onClick={close}>بحث متقدم</Item>
+              <Item href="/nearby" icon={MapPin} onClick={close}>قريب منك</Item>
               <Item href="/classified" icon={Sparkles} onClick={close}>الإعلانات المبوّبة</Item>
               <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>
               {/* الأقسام (تصفّح حسب القسم) */}

@@ -3,7 +3,7 @@ import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check,
 import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
-import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance } from '@/lib/wallet';
+import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
 import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction } from '../actions';
 
@@ -67,7 +67,7 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
 }
 
 async function OverviewTab() {
-  const [rev, expenses] = await Promise.all([getRevenueSummary(40), listSiteExpenses(1)]);
+  const [rev, expenses, monthly] = await Promise.all([getRevenueSummary(40), listSiteExpenses(1), getMonthlyBudget(12)]);
   const net = rev.spent - expenses.total;
   return (
     <div className="space-y-4">
@@ -80,6 +80,34 @@ async function OverviewTab() {
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-1">
         <Tile icon={Wallet} value={`${en(rev.outstanding)}`} label="أرصدة الأعضاء المتبقّية (التزامات قائمة)" />
       </div>
+      {/* الميزانية بالشهور — أعمدة مقارنة: دخل / إيراد / مصروفات */}
+      {monthly.length > 0 && (() => {
+        const maxV = Math.max(1, ...monthly.map((m) => Math.max(m.income, m.revenue, m.expenses)));
+        return (
+          <div className="card-3d rounded-xl p-3">
+            <div className="mb-2 text-sm font-bold text-primary">الميزانية بالشهور (آخر ١٢ شهراً)</div>
+            <div className="mb-2 flex flex-wrap gap-3 text-[11px] font-bold">
+              <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-sky-500" /> الدخل (شحن)</span>
+              <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> الإيراد (المستهلك)</span>
+              <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-red-400" /> المصروفات</span>
+            </div>
+            <div className="space-y-2">
+              {monthly.map((m) => (
+                <div key={m.month} className="space-y-0.5">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+                    <span dir="ltr">{m.month}</span>
+                    <span>دخل {en(m.income)} • إيراد {en(m.revenue)} • مصروف {en(m.expenses)}</span>
+                  </div>
+                  <div className="flex h-2 overflow-hidden rounded-full bg-secondary/60"><div className="bg-sky-500" style={{ width: `${(m.income / maxV) * 100}%` }} /></div>
+                  <div className="flex h-2 overflow-hidden rounded-full bg-secondary/60"><div className="bg-emerald-500" style={{ width: `${(m.revenue / maxV) * 100}%` }} /></div>
+                  <div className="flex h-2 overflow-hidden rounded-full bg-secondary/60"><div className="bg-red-400" style={{ width: `${(m.expenses / maxV) * 100}%` }} /></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {rev.creditByReason.length > 0 && (
         <div className="card-3d rounded-xl p-3">
           <div className="mb-2 text-sm font-bold text-sky-700">الدخل (الشحن) حسب النوع</div>

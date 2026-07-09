@@ -3,12 +3,12 @@ import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles,
 import { requireAction } from '@/lib/roles';
 import {
   getSetting, getHomeHeadings, getEmptyTexts,
-  SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_SUB_REMINDER_MSG,
+  SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_MSG_TPL_SUPPORT, SETTING_AD_NOTICE, SETTING_SUB_REMINDER_MSG,
   SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB,
   SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT,
   SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT,
   SETTING_TOPUP_NAME_NOTE,
-  DEFAULT_MSG_TPL_AD, DEFAULT_MSG_TPL_ADMIN, DEFAULT_AD_NOTICE, DEFAULT_SUB_REMINDER_MSG,
+  DEFAULT_MSG_TPL_AD, DEFAULT_MSG_TPL_ADMIN, DEFAULT_MSG_TPL_SUPPORT, DEFAULT_AD_NOTICE, DEFAULT_SUB_REMINDER_MSG,
   DEFAULT_TICKER, DEFAULT_HOME_CLS_TITLE, DEFAULT_HOME_CLS_SUB,
   DEFAULT_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_REJECT,
   DEFAULT_TOPUP_INFO, DEFAULT_MSG_TOPUP_OK, DEFAULT_MSG_TOPUP_REJECT,
@@ -50,9 +50,10 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
   await requireAction('users', 'edit');
   const { saved, sec: secRaw } = await searchParams;
   const sec: Sec = (SECTIONS.some((s) => s.key === secRaw) ? secRaw : 'general') as Sec;
-  const [tplAd, tplAdmin, adNotice, subMsg, ticker, clsTitle, clsSub, headings, empty, verifyOk, verifyReject, topupInfo, topupOk, topupReject, topupNameNote] = await Promise.all([
+  const [tplAd, tplAdmin, tplSupport, adNotice, subMsg, ticker, clsTitle, clsSub, headings, empty, verifyOk, verifyReject, topupInfo, topupOk, topupReject, topupNameNote] = await Promise.all([
     getSetting(SETTING_MSG_TPL_AD, DEFAULT_MSG_TPL_AD),
     getSetting(SETTING_MSG_TPL_ADMIN, DEFAULT_MSG_TPL_ADMIN),
+    getSetting(SETTING_MSG_TPL_SUPPORT, DEFAULT_MSG_TPL_SUPPORT),
     getSetting(SETTING_AD_NOTICE, DEFAULT_AD_NOTICE),
     getSetting(SETTING_SUB_REMINDER_MSG, DEFAULT_SUB_REMINDER_MSG),
     getSetting(SETTING_TICKER, DEFAULT_TICKER),
@@ -167,6 +168,10 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
             <label className="block space-y-1">
               <span className="text-sm font-medium">عند مراسلة الإدارة</span>
               <textarea name="msgTplAdmin" rows={3} defaultValue={tplAdmin} className={box} />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">ردود الدعم الجاهزة (تظهر للإدارة عند الرد على الأعضاء)</span>
+              <textarea name="msgTplSupport" rows={4} defaultValue={tplSupport} className={box} />
             </label>
           </>
         )}

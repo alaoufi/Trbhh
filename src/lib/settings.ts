@@ -105,6 +105,19 @@ export async function getAdminMsgTemplates(): Promise<string[]> {
   return v === '__default__' ? [DEFAULT_MSG_TPL_ADMIN] : parseTemplates(v);
 }
 
+/* ردود الدعم الجاهزة — تظهر للإدارة داخل مربّع المحادثة عند الرد على الأعضاء (سطر = ردّ). */
+export const SETTING_MSG_TPL_SUPPORT = 'msg_tpl_support';
+export const DEFAULT_MSG_TPL_SUPPORT = [
+  'أهلاً بك {name} 👋 وصلنا استفسارك وسنرد عليك بالتفصيل خلال وقت قصير.',
+  'تم تنفيذ طلبك بنجاح ✓ لا تتردد في مراسلتنا لأي استفسار آخر.',
+  'نعتذر عن التأخير — طلبك قيد المعالجة الآن وسنوافيك فور الانتهاء.',
+  'شكراً لتواصلك مع تربح 🌟 سعدنا بخدمتك.',
+].join('\n');
+export async function getSupportTemplates(): Promise<string[]> {
+  const v = await getSetting(SETTING_MSG_TPL_SUPPORT, '__default__');
+  return v === '__default__' ? parseTemplates(DEFAULT_MSG_TPL_SUPPORT) : parseTemplates(v);
+}
+
 /* رسائل قرارات التوثيق — تُرسل للعضو من الإدارة وتُعدَّل من تبويب النصوص. */
 export const SETTING_MSG_VERIFY_OK = 'msg_verify_ok';
 export const SETTING_MSG_VERIFY_REJECT = 'msg_verify_reject';

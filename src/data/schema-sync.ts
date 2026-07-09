@@ -204,6 +204,17 @@ const STATEMENTS: string[] = [
     notified_at DATETIME NULL,
     INDEX saved_searches_user (user_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* admin activity audit log — who did what and when. */
+  `CREATE TABLE IF NOT EXISTS admin_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    admin_id BIGINT UNSIGNED NOT NULL,
+    action VARCHAR(60) NOT NULL,
+    target VARCHAR(160) NULL,
+    note VARCHAR(300) NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX admin_log_admin (admin_id),
+    INDEX admin_log_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS dup_attempts (
     user_id BIGINT UNSIGNED NOT NULL,
     count INT NOT NULL DEFAULT 0,

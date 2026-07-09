@@ -9,6 +9,9 @@ const ensure = ensureSchema;
 /* مفاتيح التفعيل — من لوحة التحكم ← الإعدادات. */
 export const SETTING_SEARCH_SUGGEST_ON = 'search_suggest_on';
 export const SETTING_SAVED_SEARCH_ON = 'saved_search_on';
+export const SETTING_MATCH_NOTIFY_ON = 'match_notify_on';
+
+export const matchNotifyEnabled = () => getSettingBool(SETTING_MATCH_NOTIFY_ON, false);
 
 export const searchSuggestEnabled = () => getSettingBool(SETTING_SEARCH_SUGGEST_ON, true);
 export const savedSearchEnabled = () => getSettingBool(SETTING_SAVED_SEARCH_ON, true);
@@ -81,4 +84,39 @@ export async function notifySavedSearches(adId: number, title: string, detail: s
       await prisma.saved_searches.update({ where: { id: r.id }, data: { notified_at: now } }).catch(() => {});
     }
   } catch { /* لا يعطّل نشر الإعلان */ }
+}
+
+/** «مطلوب يبحث عنك»: عند نشر طلب، نبّه أصحاب العروض النشطة في نفس القسم والمدينة (والعكس).
+ *  حدود ضد الإزعاج: نفس القسم + نفس المدينة، حتى ١٥ عضواً لكل إعلان، ويستثني صاحب الإعلان. */
+export async function notifyOppositeType(adId: number, title: string, categoryId: number, cityId: number, type: 'offer' | 'request', authorId: number): Promise<void> {
+  try {
+    if (!(await matchNotifyEnabled())) return;
+    if (!categoryId) return;
+    await ensure();
+    const opposite = type === 'request' ? 'offer' : 'request';
+    const rows = await prisma.ads.findMany({
+      where: {
+        status: 1, state: 'active', adsType: opposite,
+        category_id: BigInt(categoryId),
+        ...(cityId ? { city_id: BigInt(cityId) } : {}),
+        user_id: { not: BigInt(authorId) },
+      },
+      select: { user_id: true },
+      orderBy: { id: 'desc' },
+      take: 60,
+    }).catch(() => []);
+    const owners = [...new Set(rows.map((r) => toInt(r.user_id)))].slice(0, 15);
+    if (!owners.length) return;
+    const [{ getPrimaryAdminId }, { sendChat }, { SITE }] = await Promise.all([
+      import('./admin-inbox'), import('./chat'), import('./constants'),
+    ]);
+    const adminId = await getPrimaryAdminId().catch(() => 0);
+    if (!adminId) return;
+    const link = `https://${SITE.domain}/ads/${adId}`;
+    const kindTxt = type === 'request' ? 'طلب جديد قد يبحث عن ما تعرضه' : 'عرض جديد قد يناسب طلبك';
+    for (const uid of owners) {
+      if (uid === adminId) continue;
+      await sendChat(adminId, uid, `🤝 ${kindTxt} في قسمك:\n${title.slice(0, 80)}\n${link}`).catch(() => {});
+    }
+  } catch { /* لا يعطّل النشر */ }
 }

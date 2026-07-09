@@ -4,6 +4,7 @@ import { Check, Palette } from 'lucide-react';
 
 export const THEMES: { id: string; name: string; color: string }[] = [
   { id: '', name: 'أزرق', color: '#3287da' },
+  { id: 'auto', name: 'تلقائي (حسب الجهاز)', color: '#111827' },
   { id: 'desert', name: 'الصحراوي', color: '#b5893f' },
   { id: 'spring', name: 'الربيعي', color: '#d56fa0' },
   { id: 'agri', name: 'الزراعي', color: '#3f9d5b' },
@@ -18,7 +19,12 @@ export const THEMES: { id: string; name: string; color: string }[] = [
 
 function applyTheme(id: string) {
   const el = document.documentElement;
-  if (id) el.setAttribute('data-theme', id);
+  if (id === 'auto') {
+    // يتبع وضع الجهاز: داكن → الثيم الليلي، فاتح → الافتراضي
+    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (dark) el.setAttribute('data-theme', 'night');
+    else el.removeAttribute('data-theme');
+  } else if (id) el.setAttribute('data-theme', id);
   else el.removeAttribute('data-theme');
   // persist for one year so SSR renders the same theme (no flash)
   document.cookie = `theme=${id}; path=/; max-age=31536000; samesite=lax`;
@@ -27,7 +33,8 @@ function applyTheme(id: string) {
 export function ThemePicker() {
   const [current, setCurrent] = useState('');
   useEffect(() => {
-    setCurrent(document.documentElement.getAttribute('data-theme') || '');
+    const m = document.cookie.match(/(?:^|; )theme=([^;]*)/);
+    setCurrent(m && m[1] === 'auto' ? 'auto' : document.documentElement.getAttribute('data-theme') || '');
   }, []);
 
   return (

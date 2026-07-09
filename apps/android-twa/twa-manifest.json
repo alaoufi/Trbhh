@@ -12,7 +12,7 @@
   "navigationDividerColorDark": "#16213b",
   "backgroundColor": "#ffffff",
   "enableNotifications": true,
-  "startUrl": "/?app=android&v=2",
+  "startUrl": "/?app=android&v=3",
   "iconUrl": "https://trbhh.com/play/store-icon-1024.png",
   "maskableIconUrl": "https://trbhh.com/icon-maskable-512.png",
   "splashScreenFadeOutDuration": 300,
@@ -20,14 +20,16 @@
     "path": "./android.keystore",
     "alias": "trbhh"
   },
-  "appVersionName": "2.0.0",
-  "appVersionCode": 2,
+  "appVersionName": "3.0.0",
+  "appVersionCode": 3,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://trbhh.com/manifest.webmanifest",
   "fallbackType": "customtabs",
   "features": {},
-  "alphaDependencies": { "enabled": false },
+  "alphaDependencies": {
+    "enabled": false
+  },
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,

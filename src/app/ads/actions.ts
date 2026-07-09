@@ -300,8 +300,11 @@ export async function createAdAction(formData: FormData) {
   await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز: تثبيت بالأعلى
   await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
   if (!requireApproval) {
-    // تنبيهات البحث المحفوظ — لا تعطّل النشر بأي حال
-    import('@/lib/saved-search').then((m) => m.notifySavedSearches(toInt(ad.id), title, detail, session.uid)).catch(() => {});
+    // تنبيهات البحث المحفوظ + مطابقة عرض/طلب — لا تعطّل النشر بأي حال
+    import('@/lib/saved-search').then((m) => {
+      m.notifySavedSearches(toInt(ad.id), title, detail, session.uid).catch(() => {});
+      m.notifyOppositeType(toInt(ad.id), title, Number(category_id), Number(cityId || '0'), adsType as 'offer' | 'request', session.uid).catch(() => {});
+    }).catch(() => {});
   }
   // نشر من المتجر: أدرِج الإعلان في واجهة المتجر، ثم انتقل إلى إعلانات المتجر (لا للرجوع لصفحة الإضافة)
   if (dest === 'store') {

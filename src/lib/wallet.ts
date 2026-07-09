@@ -323,6 +323,36 @@ export async function listTxns(userId: number, limit = 50): Promise<WalletTxn[]>
   }));
 }
 
+export type MonthBudget = { month: string; income: number; revenue: number; expenses: number };
+
+/** ميزانية شهرية (آخر ١٢ شهراً): الدخل (شحن)، الإيراد (المستهلك)، والمصروفات. */
+export async function getMonthlyBudget(months = 12): Promise<MonthBudget[]> {
+  await ensure();
+  type Row = { m: string; inc: unknown; outc: unknown };
+  const [txns, exps] = await Promise.all([
+    prisma.$queryRawUnsafe<Row[]>(
+      `SELECT DATE_FORMAT(created_at,'%Y-%m') m,
+              SUM(IF(amount>0,amount,0)) inc,
+              SUM(IF(amount<0,-amount,0)) outc
+       FROM wallet_txns WHERE created_at IS NOT NULL
+       GROUP BY m ORDER BY m DESC LIMIT ${Math.max(1, months)}`,
+    ).catch(() => [] as Row[]),
+    prisma.$queryRawUnsafe<{ m: string; total: unknown }[]>(
+      `SELECT DATE_FORMAT(COALESCE(spent_at, created_at),'%Y-%m') m, SUM(amount) total
+       FROM site_expenses GROUP BY m ORDER BY m DESC LIMIT ${Math.max(1, months)}`,
+    ).catch(() => [] as { m: string; total: unknown }[]),
+  ]);
+  const expBy = new Map(exps.map((e) => [e.m, Number(e.total) || 0]));
+  const map = new Map<string, MonthBudget>();
+  for (const t of txns) map.set(t.m, { month: t.m, income: Number(t.inc) || 0, revenue: Number(t.outc) || 0, expenses: 0 });
+  for (const [m, total] of expBy) {
+    const row = map.get(m);
+    if (row) row.expenses = total;
+    else map.set(m, { month: m, income: 0, revenue: 0, expenses: total });
+  }
+  return [...map.values()].sort((a, b) => (a.month < b.month ? 1 : -1)).slice(0, months);
+}
+
 /* ===================== مصروفات الموقع (تُدخلها الإدارة) ===================== */
 
 export type ExpenseRow = { id: number; label: string; amount: number; note: string | null; spentAt: string | null; at: string | null };

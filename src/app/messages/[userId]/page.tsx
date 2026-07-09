@@ -3,7 +3,7 @@ import { redirect, notFound } from 'next/navigation';
 import { ArrowRight } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getThread } from '@/lib/messages';
-import { getMsgDeleteMinutes, getAdMsgTemplates, getAdminMsgTemplates, parseTemplates, fillTemplate } from '@/lib/settings';
+import { getMsgDeleteMinutes, getAdMsgTemplates, getAdminMsgTemplates, getSupportTemplates, parseTemplates, fillTemplate } from '@/lib/settings';
 import { getPrimaryAdminId } from '@/lib/admin-inbox';
 import { storeIdOfUser, getStoreMeta } from '@/lib/merchant';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -24,7 +24,10 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
   // (تظهر لعملائه فقط)، وللمعلن العادي نصوص تربح لمراسلة صاحب الإعلان.
   const adminId = await getPrimaryAdminId().catch(() => 0);
   let templates: string[] = [];
-  if (adminId && otherId === adminId) {
+  if (adminId && session.uid === adminId) {
+    // الإدارة تردّ على عضو: ردود الدعم الجاهزة (تُعدَّل من النصوص ← المراسلة)
+    templates = await getSupportTemplates().catch(() => []);
+  } else if (adminId && otherId === adminId) {
     templates = await getAdminMsgTemplates().catch(() => []);
   } else {
     const peerStoreId = await storeIdOfUser(otherId).catch(() => 0);

@@ -90,6 +90,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           {children}
         </ChromeGate>
+        {/* الثيم التلقائي: يتبع وضع الجهاز قبل الرسم الأول (بلا وميض) ويتابع تغيّره */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var m=document.cookie.match(/(?:^|; )theme=([^;]*)/);if(m&&m[1]==='auto'){var mq=window.matchMedia('(prefers-color-scheme: dark)');var ap=function(){if(mq.matches)document.documentElement.setAttribute('data-theme','night');else document.documentElement.removeAttribute('data-theme');};ap();if(mq.addEventListener)mq.addEventListener('change',ap);}}catch(e){}})();`,
+          }}
+        />
         {/* التقاط حدث التثبيت مبكراً (قد يُطلق قبل تحميل React) وحفظه على window */}
         <script
           dangerouslySetInnerHTML={{

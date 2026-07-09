@@ -2,7 +2,13 @@ import Link from 'next/link';
 import { Wallet, ArrowDownCircle, ArrowUpCircle, Info, Copy, HandCoins, Receipt, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getBalance, listTxns, getDupCredit, listMyTopups } from '@/lib/wallet';
-import { getServicePricing, serviceHasPrice, DURATIONS, getSetting, SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO } from '@/lib/settings';
+import {
+  getServicePricing, serviceHasPrice, DURATIONS, getSetting,
+  SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO,
+  SETTING_TOPUP_ACCOUNT, DEFAULT_TOPUP_ACCOUNT,
+  SETTING_TOPUP_ACCOUNT_NAME, DEFAULT_TOPUP_ACCOUNT_NAME,
+  SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE,
+} from '@/lib/settings';
 import { mediaUrl } from '@/lib/media';
 import { buyDupPackAction, requestTopupAction } from '../actions';
 
@@ -24,9 +30,12 @@ const TOPUP_STATUS = {
 export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [balance, txns, pricing, dupCredit, topups, topupInfo] = await Promise.all([
+  const [balance, txns, pricing, dupCredit, topups, topupInfo, topupAccount, topupAccountName, topupNameNote] = await Promise.all([
     getBalance(session.uid), listTxns(session.uid, 100), getServicePricing(), getDupCredit(session.uid),
     listMyTopups(session.uid), getSetting(SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO),
+    getSetting(SETTING_TOPUP_ACCOUNT, DEFAULT_TOPUP_ACCOUNT),
+    getSetting(SETTING_TOPUP_ACCOUNT_NAME, DEFAULT_TOPUP_ACCOUNT_NAME),
+    getSetting(SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE),
   ]);
   const range = (p: Record<'w2' | 'm1' | 'y1', number>) => DURATIONS.filter((d) => p[d.key] > 0).map((d) => p[d.key]);
   const priceRange = (p: Record<'w2' | 'm1' | 'y1', number>) => { const r = range(p); return r.length ? `${Math.min(...r)}–${Math.max(...r)} ر.س` : ''; };
@@ -50,6 +59,22 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       {/* شحن الرصيد: المبلغ + إيصال التحويل — يُضاف بعد تأكيد الإدارة */}
       <div id="topup" className="card-3d space-y-3 rounded-2xl p-4">
         <div className="flex items-center gap-2 font-bold text-primary"><HandCoins className="h-5 w-5" /> شحن رصيدك</div>
+        {(topupAccount || topupAccountName) && (
+          <div className="space-y-1.5 rounded-xl border-2 border-primary/25 bg-primary/5 p-3">
+            {topupAccount && (
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="font-bold text-muted-foreground">رقم الحساب:</span>
+                <b dir="ltr" className="select-all break-all rounded bg-white px-2 py-0.5 font-extrabold text-primary">{topupAccount}</b>
+              </div>
+            )}
+            {topupAccountName && (
+              <div className="text-sm">
+                <span className="font-bold text-muted-foreground">الاسم:</span> <b className="text-foreground">{topupAccountName}</b>
+                {topupNameNote && <div className="mt-0.5 text-xs font-bold text-amber-700">⚠ {topupNameNote}</div>}
+              </div>
+            )}
+          </div>
+        )}
         {topupInfo && <p className="rounded-lg bg-primary/5 p-2.5 text-xs font-medium text-foreground/80">{topupInfo}</p>}
         <form action={requestTopupAction} className="space-y-2">
           <label className="block space-y-1">

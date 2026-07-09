@@ -7,10 +7,12 @@ import {
   SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB,
   SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT,
   SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT,
+  SETTING_TOPUP_ACCOUNT, SETTING_TOPUP_ACCOUNT_NAME, SETTING_TOPUP_NAME_NOTE,
   DEFAULT_MSG_TPL_AD, DEFAULT_MSG_TPL_ADMIN, DEFAULT_AD_NOTICE, DEFAULT_SUB_REMINDER_MSG,
   DEFAULT_TICKER, DEFAULT_HOME_CLS_TITLE, DEFAULT_HOME_CLS_SUB,
   DEFAULT_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_REJECT,
   DEFAULT_TOPUP_INFO, DEFAULT_MSG_TOPUP_OK, DEFAULT_MSG_TOPUP_REJECT,
+  DEFAULT_TOPUP_ACCOUNT, DEFAULT_TOPUP_ACCOUNT_NAME, DEFAULT_TOPUP_NAME_NOTE,
 } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveTextsAction } from '../actions';
@@ -48,7 +50,7 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
   await requireAction('users', 'edit');
   const { saved, sec: secRaw } = await searchParams;
   const sec: Sec = (SECTIONS.some((s) => s.key === secRaw) ? secRaw : 'general') as Sec;
-  const [tplAd, tplAdmin, adNotice, subMsg, ticker, clsTitle, clsSub, headings, empty, verifyOk, verifyReject, topupInfo, topupOk, topupReject] = await Promise.all([
+  const [tplAd, tplAdmin, adNotice, subMsg, ticker, clsTitle, clsSub, headings, empty, verifyOk, verifyReject, topupInfo, topupOk, topupReject, topupAccount, topupAccountName, topupNameNote] = await Promise.all([
     getSetting(SETTING_MSG_TPL_AD, DEFAULT_MSG_TPL_AD),
     getSetting(SETTING_MSG_TPL_ADMIN, DEFAULT_MSG_TPL_ADMIN),
     getSetting(SETTING_AD_NOTICE, DEFAULT_AD_NOTICE),
@@ -63,6 +65,9 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
     getSetting(SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO),
     getSetting(SETTING_MSG_TOPUP_OK, DEFAULT_MSG_TOPUP_OK),
     getSetting(SETTING_MSG_TOPUP_REJECT, DEFAULT_MSG_TOPUP_REJECT),
+    getSetting(SETTING_TOPUP_ACCOUNT, DEFAULT_TOPUP_ACCOUNT),
+    getSetting(SETTING_TOPUP_ACCOUNT_NAME, DEFAULT_TOPUP_ACCOUNT_NAME),
+    getSetting(SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE),
   ]);
 
   return (
@@ -193,6 +198,18 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
         {sec === 'wallet' && (
           <>
             <p className="text-xs text-muted-foreground">نصوص شحن الرصيد: التعليمات الظاهرة للعضو فوق نموذج «شحن رصيدك»، ورسالتا قرار الإدارة. المتغيّرات: <b dir="ltr">{'{name}'}</b> اسم العضو، <b dir="ltr">{'{amount}'}</b> المبلغ، <b dir="ltr">{'{reason}'}</b> سبب الرفض. اترك نص الرسالة فارغاً لتعطيلها.</p>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">رقم الحساب (يظهر في «محفظتي» — اتركه فارغاً لإخفائه)</span>
+              <input name="topupAccount" dir="ltr" defaultValue={topupAccount} className={field} />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">اسم صاحب الحساب</span>
+              <input name="topupAccountName" defaultValue={topupAccountName} className={field} />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">عبارة تحت الاسم</span>
+              <input name="topupNameNote" defaultValue={topupNameNote} className={field} />
+            </label>
             <label className="block space-y-1">
               <span className="text-sm font-medium">تعليمات التحويل (تظهر في «محفظتي»)</span>
               <textarea name="topupInfo" rows={3} defaultValue={topupInfo} className={box} />

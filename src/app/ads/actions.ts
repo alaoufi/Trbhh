@@ -289,6 +289,7 @@ export async function createAdAction(formData: FormData) {
       adsSpecial: 'no',
       state: 'active',
       status: requireApproval ? 0 : 1,
+      store_only: dest === 'store' ? 1 : 0, // عزل تام: إعلان المتجر لا يظهر في تربح
       created_at: new Date(),
     },
   });
@@ -297,10 +298,10 @@ export async function createAdAction(formData: FormData) {
   const audio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);
   if (audio) await setAdMedia(ad.id, 'audio', audio).catch(() => {});
   await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
-  await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز: تثبيت بالأعلى
+  if (dest !== 'store') await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز خاصة بإعلانات تربح
   await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
-  if (!requireApproval) {
-    // تنبيهات البحث المحفوظ + مطابقة عرض/طلب — لا تعطّل النشر بأي حال
+  if (!requireApproval && dest !== 'store') {
+    // تنبيهات البحث المحفوظ + مطابقة عرض/طلب — لإعلانات تربح فقط (عزل المتاجر)
     import('@/lib/saved-search').then((m) => {
       m.notifySavedSearches(toInt(ad.id), title, detail, session.uid).catch(() => {});
       m.notifyOppositeType(toInt(ad.id), title, Number(category_id), Number(cityId || '0'), adsType as 'offer' | 'request', session.uid).catch(() => {});

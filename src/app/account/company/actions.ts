@@ -199,6 +199,12 @@ export async function bulkUploadProductsAction(formData: FormData) {
   const cats = await getCategories();
   const categoryId = Number(formData.get('category') || 0) || cats[0]?.id || 0;
   if (!categoryId) redirect('/store?bulk=err');
+  // نفس بوابات النشر العادية: متجر معتمد يُنشر مباشرة، وإلا حسب إعداد المراجعة
+  const [{ isApprovedStoreOwner }, { getSettingBool, SETTING_ADS_APPROVAL }, { scanContent }] = await Promise.all([
+    import('@/lib/merchant'), import('@/lib/settings'), import('@/lib/content-guard'),
+  ]);
+  const approvedOwner = await isApprovedStoreOwner(session.uid).catch(() => false);
+  const requireApproval = approvedOwner ? false : await getSettingBool(SETTING_ADS_APPROVAL, false).catch(() => false);
 
   let created = 0;
   const now = new Date();
@@ -209,6 +215,7 @@ export async function bulkUploadProductsAction(formData: FormData) {
     if (!title || title.length < 3) continue;
     if (/^(العنوان|title)$/i.test(title)) continue; // صف العناوين
     if (created >= 50) break;
+    if (await scanContent(title, detail).catch(() => null)) continue; // حارس المحتوى: تخطَّ الصف المخالف
     const price = Math.max(0, parseInt(priceRaw.replace(/[^0-9]/g, ''), 10) || 0);
     try {
       const ad = await prisma.ads.create({
@@ -226,7 +233,8 @@ export async function bulkUploadProductsAction(formData: FormData) {
           commentAllow: 1,
           adsSpecial: 'no',
           state: 'active',
-          status: 1, // متجر معتمد: تُنشر مباشرة داخل المتجر
+          status: requireApproval ? 0 : 1,
+          store_only: 1, // عزل تام: منتجات المتجر لا تظهر في تربح
           created_at: now,
         },
       });

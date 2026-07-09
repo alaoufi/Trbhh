@@ -14,7 +14,10 @@ export async function POST(req: Request) {
     const session = await getSession().catch(() => null);
     const vid = (await cookies()).get('trbhh_vid')?.value;
     const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
-    if (viewerKey) await recordStoreContact(storeId, viewerKey, kind);
+    // تحقّق أن المتجر موجود ومعتمد قبل التسجيل — يمنع تلويث إحصاءات متجر آخر بمعرّفات عشوائية
+    const { prisma } = await import('@/lib/prisma');
+    const exists = await prisma.stores.count({ where: { id: BigInt(storeId), status: 1 } }).catch(() => 0);
+    if (viewerKey && exists) await recordStoreContact(storeId, viewerKey, kind);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false });

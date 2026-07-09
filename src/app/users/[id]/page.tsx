@@ -29,12 +29,14 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
   if (!user) notFound();
 
   const session = await getSession();
-  const [myAds, rating, reviews, allowReview] = await Promise.all([
+  const [myAdsAll, rating, reviews, allowReview] = await Promise.all([
     getMyAds(uid),
     getSellerRating(uid),
     getUserReviews(uid),
     canReview(uid, session?.uid),
   ]);
+  // الملف العام يعرض إعلانات تربح النشطة فقط — منتجات المتاجر تبقى داخل متجرها
+  const myAds = myAdsAll.filter((a) => !a.storeOnly && a.status === 1 && a.state === 'active');
   // viewing your OWN profile clears the "new reviews" alert
   if (session && session.uid === uid) {
     const { markSeen } = await import('@/lib/alerts');

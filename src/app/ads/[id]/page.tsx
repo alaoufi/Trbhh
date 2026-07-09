@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import {
   MapPin, Eye, Phone, MessageCircle, Timer, Tag, Flag, Send,
   User, BadgeCheck, Hash, ArrowLeftRight, Star, Share2, Heart, Navigation,
@@ -86,6 +86,9 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
       ])
     : [false, false, false];
   const admin = canArchive || canDeleteAd || canBanSeller;
+  // إعلان غير نشط (بانتظار الموافقة/مؤرشف/موقوف): لا يراه إلا صاحبه أو الإدارة
+  const ownerViewing = !!(session && ad.seller && session.uid === ad.seller.id);
+  if ((ad.status !== 1 || ad.state !== 'active') && !ownerViewing && !admin) notFound();
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
   if (viewerKey && (!session || session.uid !== ad.seller?.id)) {
@@ -104,6 +107,8 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   const { storeIdOfUser, storeProductAdIds, getStoreMeta } = await import('@/lib/merchant');
   const sellerStoreId = ad.seller ? await storeIdOfUser(ad.seller.id).catch(() => 0) : 0;
   const inStore = sellerStoreId ? (await storeProductAdIds(sellerStoreId).catch(() => [] as number[])).includes(ad.id) : false;
+  // عزل تام: منتج المتجر يُعرض داخل متجره فقط (بواجهة المتجر وبواباته)
+  if (inStore && ad.storeOnly) redirect(`/companies/${sellerStoreId}/p/${ad.id}`);
   const storeMeta = inStore ? await getStoreMeta(sellerStoreId).catch(() => null) : null;
   const storeUrl = inStore ? (storeMeta?.handle ? `https://${storeMeta.handle}.${SITE.domain}` : `/companies/${sellerStoreId}`) : '';
 

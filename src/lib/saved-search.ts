@@ -96,7 +96,7 @@ export async function notifyOppositeType(adId: number, title: string, categoryId
     const opposite = type === 'request' ? 'offer' : 'request';
     const rows = await prisma.ads.findMany({
       where: {
-        status: 1, state: 'active', adsType: opposite,
+        status: 1, state: 'active', store_only: 0, adsType: opposite,
         category_id: BigInt(categoryId),
         ...(cityId ? { city_id: BigInt(cityId) } : {}),
         user_id: { not: BigInt(authorId) },

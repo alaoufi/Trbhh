@@ -136,7 +136,8 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
     });
 }
 
-const activeAdWhere = { status: 1, state: 'active' as const };
+// store_only: 0 — إعلانات المتاجر لا تدخل قوائم تربح إطلاقاً (تُعرض داخل متجرها فقط)
+const activeAdWhere = { status: 1, state: 'active' as const, store_only: 0 };
 
 const adSelect = {
   id: true,
@@ -362,6 +363,9 @@ async function getAdImpl(id: number) {
     detail: censorSync(ad.detail),
     price: ad.price,
     adsType: ad.adsType,
+    status: ad.status,
+    state: ad.state,
+    storeOnly: ad.store_only === 1,
     special: ad.adsSpecial === 'checked',
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,

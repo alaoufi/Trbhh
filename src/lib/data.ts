@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { prisma } from './prisma';
 import { cached, cacheDel, cacheDelPattern } from './redis';
 import { mediaUrl, PLACEHOLDER } from './media';
@@ -274,14 +275,18 @@ export async function getCategory(id: number) {
 }
 
 export async function getAdsByCategory(categoryId: number, take = 24, skip = 0) {
-  const rows = await prisma.ads.findMany({
-    where: { ...activeAdWhere, category_id: BigInt(categoryId) },
-    orderBy: [{ adsSpecial: 'desc' }, { id: 'desc' }],
-    take,
-    skip,
-    select: adSelect,
+  // مُخبّأ ٦٠ث (يُبطل عبر bustAdCaches بنمط ads:*) — حلقة «أقسام تهمّك» في
+  // الرئيسية كانت تعيد بناء بطاقات حتى ٦ أقسام من القاعدة مع كل تنقّل.
+  return cached(`ads:cat:${categoryId}:${take}:${skip}`, 60, async () => {
+    const rows = await prisma.ads.findMany({
+      where: { ...activeAdWhere, category_id: BigInt(categoryId) },
+      orderBy: [{ adsSpecial: 'desc' }, { id: 'desc' }],
+      take,
+      skip,
+      select: adSelect,
+    });
+    return toCards(rows);
   });
-  return toCards(rows);
 }
 
 export async function searchAds(params: {
@@ -316,7 +321,7 @@ export async function searchAds(params: {
   return toCards(rows);
 }
 
-export async function getAd(id: number) {
+async function getAdImpl(id: number) {
   if (!Number.isInteger(id) || id <= 0) return null;
   const ad = await prisma.ads.findFirst({ where: { id: BigInt(id) } }).catch(() => null);
   if (!ad) return null;
@@ -456,3 +461,6 @@ export async function getSimilarAds(adId: number, categoryId: number, take = 6) 
   });
   return toCards(rows);
 }
+
+/* memoized per-request (React cache): tames repeated hot reads within one navigation */
+export const getAd = cache(getAdImpl);

@@ -2,12 +2,14 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
+import { ADMIN_NAV } from '@/components/admin-nav-def';
 
 type Cat = { id: number; name: string };
 
@@ -20,14 +22,28 @@ function Item({ href, icon: Icon, children, onClick }: { href: string; icon: Rea
   );
 }
 
-function Group({ label }: { label: string }) {
-  return <div className="mb-1 mt-3 px-3 text-xs font-extrabold uppercase tracking-wide text-muted-foreground">{label}</div>;
+/** قسم قابل للطي — المتشابهات في قائمة فرعية واحدة */
+function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-1 overflow-hidden rounded-lg border border-primary/15">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 bg-secondary/40 px-3 py-2.5 text-[15px] font-bold text-primary"
+      >
+        <span className="flex items-center gap-3"><Icon className="h-5 w-5 shrink-0" /> {title}</span>
+        <ChevronDown className={`h-5 w-5 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="p-1">{children}</div>}
+    </div>
+  );
 }
 
-export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[] }) {
+export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [] }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[]; adminHrefs?: string[] }) {
   const [open, setOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname() || '';
   useEffect(() => setMounted(true), []);
 
   // lock body scroll while the drawer is open
@@ -41,6 +57,10 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
 
   const cats = categories ?? [];
   const close = () => setOpen(false);
+
+  // داخل لوحة الإدارة: القائمة = قائمة الإدارة (المصرّح بها فقط) بدل قائمة الموقع
+  const adminMode = isAdmin && pathname.startsWith('/admin');
+  const adminItems = adminMode ? ADMIN_NAV.filter((n) => adminHrefs.includes(n.href)) : [];
 
   async function share() {
     const url = typeof window !== 'undefined' ? window.location.origin : '';
@@ -64,84 +84,101 @@ export function SiteMenu({ isAuthed, isAdmin, categories }: { isAuthed: boolean;
       <div className="absolute inset-0 bg-black/40" onClick={close} />
       <nav className="absolute inset-y-0 right-0 flex w-80 max-w-[85%] flex-col overflow-y-auto bg-card text-card-foreground shadow-2xl">
         <div className="flex items-center justify-between border-b border-primary/15 bg-accent/60 p-4">
-          <span className="text-lg font-bold text-primary">القائمة</span>
+          <span className="text-lg font-bold text-primary">{adminMode ? 'قائمة الإدارة' : 'القائمة'}</span>
           <button onClick={close} aria-label="إغلاق" className="text-primary"><X className="h-6 w-6" /></button>
         </div>
 
-        <div className="flex-1 p-2">
-          <Item href="/" icon={Home} onClick={close}>الرئيسية</Item>
-          <Link href="/guide" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-3 text-[15px] font-extrabold text-primary hover:bg-primary/15">
-            <BookOpen className="h-5 w-5 shrink-0" /> <span>دليل المستخدم</span>
-          </Link>
+        {adminMode ? (
+          /* ===== قائمة الإدارة داخل اللوحة ===== */
+          <div className="flex-1 p-2">
+            {adminItems.map((n) => (
+              <Item key={n.href} href={n.href} icon={n.icon} onClick={close}>{n.label}</Item>
+            ))}
+            <div className="my-2 border-t border-primary/10" />
+            <Item href="/" icon={Home} onClick={close}>العودة للموقع</Item>
+          </div>
+        ) : (
+          <div className="flex-1 p-2">
+            {/* أهم الروابط أولاً */}
+            <Item href="/" icon={Home} onClick={close}>الرئيسية</Item>
+            <Item href="/companies" icon={Store} onClick={close}>المتاجر</Item>
+            {isAdmin && (
+              <Link href="/admin" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-amber-500/15 px-3 py-3 text-[15px] font-extrabold text-amber-700 hover:bg-amber-500/25">
+                <Shield className="h-5 w-5 shrink-0" /> <span>لوحة الإدارة</span>
+              </Link>
+            )}
+            <Link href="/guide" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-3 text-[15px] font-extrabold text-primary hover:bg-primary/15">
+              <BookOpen className="h-5 w-5 shrink-0" /> <span>دليل المستخدم</span>
+            </Link>
 
-          {/* حسابي — بنود تتطلّب تسجيل الدخول، لا تظهر إلا للمصرّح له */}
-          {isAuthed && (
-            <>
-              <Group label="حسابي" />
-              <Item href="/account" icon={User} onClick={close}>حسابي</Item>
-              <Item href="/account/wallet" icon={Wallet} onClick={close}>محفظتي</Item>
-              <Item href="/account/ads" icon={Megaphone} onClick={close}>إعلاناتي</Item>
-              <Item href="/account/favorites" icon={Heart} onClick={close}>المفضلة</Item>
-              <Item href="/account/classified" icon={Sparkles} onClick={close}>إعلاناتي المبوّبة</Item>
-              <Item href="/account/promos" icon={Megaphone} onClick={close}>إعلاناتي الترويجية</Item>
-            </>
-          )}
+            {/* المتشابهات في قوائم فرعية */}
+            {isAuthed && (
+              <Section title="حسابي" icon={User}>
+                <Item href="/account" icon={User} onClick={close}>لوحة حسابي</Item>
+                <Item href="/account/wallet" icon={Wallet} onClick={close}>محفظتي</Item>
+                <Item href="/account/ads" icon={Megaphone} onClick={close}>إعلاناتي</Item>
+                <Item href="/account/favorites" icon={Heart} onClick={close}>المفضلة</Item>
+                <Item href="/account/classified" icon={Sparkles} onClick={close}>إعلاناتي المبوّبة</Item>
+                <Item href="/account/promos" icon={Megaphone} onClick={close}>إعلاناتي الترويجية</Item>
+                <Item href="/account/company" icon={Building2} onClick={close}>متجري</Item>
+              </Section>
+            )}
 
-          <Group label="النشر والإعلان" />
-          {/* النشر يتطلّب تسجيل الدخول */}
-          {isAuthed && <Item href="/ads/new" icon={PlusCircle} onClick={close}>أضف إعلان</Item>}
-          {isAuthed && <Item href="/classified/new" icon={Sparkles} onClick={close}>المصمم الذكي (إعلان مبوّب)</Item>}
-          <Item href="/promote" icon={Megaphone} onClick={close}>أعلن معنا</Item>
-          <Item href="/packages" icon={Crown} onClick={close}>الباقات</Item>
+            <Section title="النشر والإعلان" icon={PlusCircle}>
+              {isAuthed && <Item href="/ads/new" icon={PlusCircle} onClick={close}>أضف إعلان</Item>}
+              {isAuthed && <Item href="/classified/new" icon={Sparkles} onClick={close}>المصمم الذكي (إعلان مبوّب)</Item>}
+              <Item href="/promote" icon={Megaphone} onClick={close}>أعلن معنا</Item>
+              <Item href="/packages" icon={Crown} onClick={close}>الباقات</Item>
+            </Section>
 
-          <Group label="تصفّح" />
-          <Item href="/search" icon={Search} onClick={close}>بحث متقدم</Item>
-          <Item href="/classified" icon={Sparkles} onClick={close}>الإعلانات المبوّبة</Item>
-          <Item href="/companies" icon={Building2} onClick={close}>المتاجر</Item>
-          {isAuthed && <Item href="/account/company" icon={Building2} onClick={close}>متجري</Item>}
-          <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>
-          {/* الأقسام (تصفّح حسب القسم) */}
-          <button
-            onClick={() => setCatOpen((v) => !v)}
-            className="mt-1 flex w-full items-center justify-between rounded-lg bg-primary px-3 py-3 text-[15px] font-bold text-white"
-          >
-            <span>الأقسام</span>
-            <ChevronDown className={`h-5 w-5 transition-transform ${catOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {catOpen && cats.length > 0 && (
-            <div className="mb-1 mt-1 max-h-64 overflow-y-auto rounded-lg border border-primary/15">
-              {cats.map((c) => (
-                <Link key={c.id} href={`/categories/${c.id}`} onClick={close} className="block px-4 py-2.5 text-sm hover:bg-accent">
-                  {c.name}
-                </Link>
-              ))}
-            </div>
-          )}
+            <Section title="تصفّح" icon={Search}>
+              <Item href="/search" icon={Search} onClick={close}>بحث متقدم</Item>
+              <Item href="/classified" icon={Sparkles} onClick={close}>الإعلانات المبوّبة</Item>
+              <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>
+              {/* الأقسام (تصفّح حسب القسم) */}
+              <button
+                onClick={() => setCatOpen((v) => !v)}
+                className="mt-1 flex w-full items-center justify-between rounded-lg bg-primary px-3 py-2.5 text-[15px] font-bold text-white"
+              >
+                <span>الأقسام</span>
+                <ChevronDown className={`h-5 w-5 transition-transform ${catOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {catOpen && cats.length > 0 && (
+                <div className="mb-1 mt-1 max-h-64 overflow-y-auto rounded-lg border border-primary/15">
+                  {cats.map((c) => (
+                    <Link key={c.id} href={`/categories/${c.id}`} onClick={close} className="block px-4 py-2.5 text-sm hover:bg-accent">
+                      {c.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </Section>
 
-          <Group label="التواصل" />
-          {isAuthed && <Item href="/messages" icon={Mail} onClick={close}>مراسلات الإدارة</Item>}
-          <Item href="/pages/contact" icon={Phone} onClick={close}>تواصل معنا</Item>
-          <button onClick={share} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-primary hover:bg-accent">
-            <Share2 className="h-5 w-5 shrink-0" /> مشاركة الموقع
-          </button>
+            <Section title="التواصل" icon={Mail}>
+              {isAuthed && <Item href="/messages" icon={Mail} onClick={close}>مراسلات الإدارة</Item>}
+              <Item href="/pages/contact" icon={Phone} onClick={close}>تواصل معنا</Item>
+              <button onClick={share} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium text-primary hover:bg-accent">
+                <Share2 className="h-5 w-5 shrink-0" /> مشاركة الموقع
+              </button>
+            </Section>
 
-          {/* هوية الموقع وألوانه — تحكّم إداري لا يظهر إلا للإدارة */}
-          {isAdmin && (
-            <>
-              <div className="my-2 border-t border-primary/10" />
-              <DesignPicker />
-              <ThemePicker />
-            </>
-          )}
-          <div className="my-2 border-t border-primary/10" />
+            <Section title="معلومات" icon={Info}>
+              <Item href="/pages/about" icon={Building2} onClick={close}>من نحن</Item>
+              <Item href="/pages/faq" icon={HelpCircle} onClick={close}>الأسئلة الشائعة</Item>
+              <Item href="/pages/privacy" icon={Shield} onClick={close}>سياسة الخصوصية</Item>
+              <Item href="/pages/terms" icon={FileText} onClick={close}>الشروط والأحكام</Item>
+            </Section>
 
-          <Group label="معلومات" />
-          <Item href="/pages/about" icon={Building2} onClick={close}>من نحن</Item>
-          <Item href="/pages/faq" icon={HelpCircle} onClick={close}>الأسئلة الشائعة</Item>
-          <Item href="/pages/privacy" icon={Shield} onClick={close}>سياسة الخصوصية</Item>
-          <Item href="/pages/terms" icon={FileText} onClick={close}>الشروط والأحكام</Item>
-          {isAdmin && <Item href="/admin" icon={Shield} onClick={close}>لوحة الإدارة</Item>}
-        </div>
+            {/* هوية الموقع وألوانه — تحكّم إداري لا يظهر إلا للإدارة */}
+            {isAdmin && (
+              <>
+                <div className="my-2 border-t border-primary/10" />
+                <DesignPicker />
+                <ThemePicker />
+              </>
+            )}
+          </div>
+        )}
 
         <div className="border-t border-primary/15 p-3">
           {isAuthed ? (

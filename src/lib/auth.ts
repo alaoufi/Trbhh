@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
@@ -47,7 +48,7 @@ export async function createSession(payload: SessionPayload): Promise<void> {
   });
 }
 
-export async function getSession(): Promise<SessionPayload | null> {
+async function getSessionImpl(): Promise<SessionPayload | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   try {
@@ -82,3 +83,6 @@ export async function requireUser() {
   }
   return session!;
 }
+
+/* memoized per-request (React cache): tames repeated hot reads within one navigation */
+export const getSession = cache(getSessionImpl);

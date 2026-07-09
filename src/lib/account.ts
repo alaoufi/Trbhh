@@ -3,29 +3,42 @@ import { prisma } from './prisma';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { toInt } from './utils';
 
-async function primaryImage(adId: bigint): Promise<string> {
-  const ph = await prisma.photos.findFirst({ where: { other_id: adId }, orderBy: { id: 'asc' } });
-  if (!ph) return PLACEHOLDER;
-  const up = await prisma.uploads.findUnique({ where: { id: BigInt(parseInt(ph.photo_path, 10) || 0) } });
-  return up?.file_name ? mediaUrl(up.file_name) : PLACEHOLDER;
+/** الصور الأساسية دفعةً واحدة (استعلامان للكل) — كانت ٢ لكل إعلان (N+1)
+ *  فتستهلك حوض الاتصالات وتبطّئ لوحة العضو والمتجر ومنتجات الرئيسية. */
+async function primaryImages(adIds: bigint[]): Promise<Map<number, string>> {
+  const out = new Map<number, string>();
+  if (!adIds.length) return out;
+  const photos = await prisma.photos.findMany({ where: { other_id: { in: adIds } }, orderBy: { id: 'asc' } }).catch(() => []);
+  const firstByAd = new Map<number, string>();
+  for (const p of photos) {
+    const key = toInt(p.other_id);
+    if (!firstByAd.has(key)) firstByAd.set(key, p.photo_path);
+  }
+  const upIds = [...new Set([...firstByAd.values()].map((v) => parseInt(v, 10) || 0).filter((n) => n > 0))];
+  const ups = upIds.length ? await prisma.uploads.findMany({ where: { id: { in: upIds.map((n) => BigInt(n)) } } }).catch(() => []) : [];
+  const fileById = new Map(ups.map((u) => [toInt(u.id), u.file_name]));
+  for (const [adId, path] of firstByAd) {
+    const f = fileById.get(parseInt(path, 10) || 0);
+    out.set(adId, f ? mediaUrl(f) : PLACEHOLDER);
+  }
+  return out;
 }
 
 export async function getMyAds(userId: number) {
   const rows = await prisma.ads.findMany({ where: { user_id: BigInt(userId) }, orderBy: { id: 'desc' } });
-  return Promise.all(
-    rows.map(async (r) => ({
-      id: toInt(r.id),
-      title: r.title,
-      price: r.price,
-      adsType: r.adsType,
-      status: r.status,
-      state: r.state,
-      special: r.adsSpecial === 'checked',
-      image: await primaryImage(r.id),
-      createdAt: r.created_at ? r.created_at.toISOString() : null,
-      expiresAt: r.expires_at ? r.expires_at.toISOString() : null,
-    })),
-  );
+  const images = await primaryImages(rows.map((r) => r.id));
+  return rows.map((r) => ({
+    id: toInt(r.id),
+    title: r.title,
+    price: r.price,
+    adsType: r.adsType,
+    status: r.status,
+    state: r.state,
+    special: r.adsSpecial === 'checked',
+    image: images.get(toInt(r.id)) ?? PLACEHOLDER,
+    createdAt: r.created_at ? r.created_at.toISOString() : null,
+    expiresAt: r.expires_at ? r.expires_at.toISOString() : null,
+  }));
 }
 
 export async function getMyStats(userId: number) {
@@ -43,6 +56,7 @@ export async function getMyFavorites(userId: number) {
   if (!adIds.length) return [];
   const ads = await prisma.ads.findMany({ where: { id: { in: adIds } } });
   const byId = new Map(ads.map((a) => [toInt(a.id), a]));
+  const images = await primaryImages(ads.map((a) => a.id));
   const out = [];
   for (const f of favs) {
     const a = byId.get(toInt(f.ads_id));
@@ -52,7 +66,7 @@ export async function getMyFavorites(userId: number) {
       title: a.title,
       price: a.price,
       adsType: a.adsType,
-      image: await primaryImage(a.id),
+      image: images.get(toInt(a.id)) ?? PLACEHOLDER,
       createdAt: a.created_at ? a.created_at.toISOString() : null,
     });
   }

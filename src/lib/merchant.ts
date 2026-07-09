@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { prisma } from './prisma';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { toInt } from './utils';
@@ -34,7 +35,7 @@ export function parseHiddenFields(raw: string | null | undefined): Set<string> {
   return new Set((raw || '').split(',').map((s) => s.trim()).filter((s) => STORE_HIDE_KEYS.includes(s)));
 }
 
-export async function getStoreMeta(storeId: number): Promise<StoreMeta> {
+async function getStoreMetaImpl(storeId: number): Promise<StoreMeta> {
   await ensure();
   const r = Number.isInteger(storeId) && storeId > 0
     ? await prisma.stores.findUnique({ where: { id: BigInt(storeId) } }).catch(() => null)
@@ -451,7 +452,7 @@ export async function getStoreHandle(storeId: number): Promise<string | null> {
 }
 
 /* ---- store identity helpers ---- */
-export async function storeIdOfUser(userId: number): Promise<number> {
+async function storeIdOfUserImpl(userId: number): Promise<number> {
   const r = await prisma.stores.findFirst({ where: { user_id: userId }, select: { id: true } });
   return r ? toInt(r.id) : 0;
 }
@@ -753,3 +754,7 @@ export async function getPendingStores() {
   const nameOf = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || 'تاجر']));
   return rows.map((r) => ({ id: toInt(r.id), owner: nameOf.get(r.user_id) || 'تاجر', storeName: r.store_name, at: r.created_at ? r.created_at.toISOString() : null }));
 }
+
+/* memoized per-request (React cache): tames repeated hot reads within one navigation */
+export const getStoreMeta = cache(getStoreMetaImpl);
+export const storeIdOfUser = cache(storeIdOfUserImpl);

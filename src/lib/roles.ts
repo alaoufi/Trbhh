@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { prisma } from './prisma';
 import { getSession } from './auth';
@@ -169,7 +170,7 @@ export async function viewerRole(): Promise<Role> {
 const ensureTables = ensureSchema;
 
 /** The full set of granular permission keys granted to a user. */
-export async function getUserPermKeys(userId: number): Promise<Set<string>> {
+async function getUserPermKeysImpl(userId: number): Promise<Set<string>> {
   await ensureTables();
   // is_admin = 1 is a full manager (back-compat)
   const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { is_admin: true } }).catch(() => null);
@@ -309,3 +310,6 @@ export async function requireAnyAdmin() {
   if (!(await hasAnyAdmin(session.uid))) redirect('/');
   return session;
 }
+
+/* memoized per-request (React cache): tames repeated hot reads within one navigation */
+export const getUserPermKeys = cache(getUserPermKeysImpl);

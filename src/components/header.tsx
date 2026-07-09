@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { getSession } from '@/lib/auth';
-import { hasAnyAdmin } from '@/lib/roles';
+import { hasAnyAdmin, getUserPerms } from '@/lib/roles';
 import { getCategories } from '@/lib/data';
 import { storeIdOfUser } from '@/lib/merchant';
 import { SiteMenu } from '@/components/site-menu';
+import { ADMIN_NAV } from '@/components/admin-nav-def';
 import { HeaderSearch } from '@/components/header-search';
 import { HeaderCta } from '@/components/header-cta';
 
@@ -13,11 +14,15 @@ export async function Header() {
   const admin = session ? await hasAnyAdmin(session.uid) : false;
   const categories = await getCategories();
   const myStoreId = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
+  // روابط الإدارة المصرّح بها — تُعرض في قائمة الهيدر داخل لوحة الإدارة
+  const adminHrefs = admin
+    ? await getUserPerms(session!.uid).then((perms) => ADMIN_NAV.filter((n) => n.perm === null || perms.has(n.perm)).map((n) => n.href)).catch(() => [] as string[])
+    : [];
   return (
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
-        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} />
+        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} />
 
         {/* الزر الرئيسي — يتغيّر حسب الصفحة (دخول/رابط المتجر/الصفحة الرئيسية في صفحة الدخول) */}
         <HeaderCta isAuthed={!!session} myStoreId={myStoreId} />

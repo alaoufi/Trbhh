@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { prisma } from './prisma';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { toInt } from './utils';
@@ -26,7 +27,7 @@ export async function getStores() {
   );
 }
 
-export async function getStore(id: number) {
+async function getStoreImpl(id: number) {
   if (!Number.isInteger(id) || id <= 0) return null;
   const s = await prisma.stores.findUnique({ where: { id: BigInt(id) } }).catch(() => null);
   if (!s) return null;
@@ -53,3 +54,6 @@ export async function getStoreByUser(userId: number) {
   const s = await prisma.stores.findFirst({ where: { user_id: userId } });
   return s ? { id: toInt(s.id), description: s.description, address: s.address, logo: s.logo } : null;
 }
+
+/* memoized per-request (React cache): tames repeated hot reads within one navigation */
+export const getStore = cache(getStoreImpl);

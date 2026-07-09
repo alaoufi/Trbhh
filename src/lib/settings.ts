@@ -4,10 +4,26 @@ import { ensureSchema } from '@/data/schema-sync';
 
 const ensure = ensureSchema;
 
-export async function getSetting(k: string, fallback = ''): Promise<string> {
+/* كاش داخلي قصير لجدول site_settings (صغير جداً): كانت كل صفحة تقرأ ١٠+ مفاتيح
+   من القاعدة في كل تنقّل، ما يزاحم حوض الاتصالات ويبطّئ التصفح. تحميل واحد
+   للجدول كله كل ٣٠ ثانية، ويُفرَّغ فور أي حفظ من الإدارة. */
+let settingsCache: Map<string, string | null> | null = null;
+let settingsCacheAt = 0;
+const SETTINGS_TTL_MS = 30_000;
+
+async function loadSettings(): Promise<Map<string, string | null>> {
+  const now = Date.now();
+  if (settingsCache && now - settingsCacheAt < SETTINGS_TTL_MS) return settingsCache;
   await ensure();
-  const row = await prisma.site_settings.findUnique({ where: { k } }).catch(() => null);
-  return row?.v ?? fallback;
+  const rows = await prisma.site_settings.findMany().catch(() => []);
+  settingsCache = new Map(rows.map((r) => [r.k, r.v]));
+  settingsCacheAt = now;
+  return settingsCache;
+}
+
+export async function getSetting(k: string, fallback = ''): Promise<string> {
+  const map = await loadSettings();
+  return map.get(k) ?? fallback; // نفس دلالة القراءة المباشرة السابقة
 }
 
 export async function getSettingNum(k: string, fallback = 0): Promise<number> {
@@ -19,6 +35,7 @@ export async function getSettingNum(k: string, fallback = 0): Promise<number> {
 export async function setSetting(k: string, v: string) {
   await ensure();
   await prisma.site_settings.upsert({ where: { k }, create: { k, v }, update: { v } });
+  settingsCache = null; // الحفظ يُفرّغ الكاش فيظهر التعديل فوراً
 }
 
 export async function getSettingBool(k: string, fallback = true): Promise<boolean> {

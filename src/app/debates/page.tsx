@@ -9,10 +9,12 @@ import { createDebateAction } from './actions';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'النقاشات' };
 
-export default async function DebatesPage() {
+export default async function DebatesPage({ searchParams }: { searchParams?: Promise<{ error?: string }> }) {
   const [debates, session] = await Promise.all([getDebates(), getSession()]);
+  const sp = searchParams ? await searchParams : {};
   return (
     <div className="mx-auto max-w-2xl space-y-4">
+      {sp.error === 'blocked' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2.5 text-sm font-bold text-red-800">نقاشك يحتوي محتوى ممنوعاً ولم يُنشر — تكرار المخالفة يعرّض حسابك للحظر.</div>}
       <div className="flex items-center gap-2">
         <MessagesSquare className="h-6 w-6 text-primary" />
         <h1 className="text-xl font-bold text-primary">النقاشات</h1>

@@ -2,13 +2,19 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export async function addCommentAction(formData: FormData) {
   const session = await requireUser();
   const adId = BigInt(String(formData.get('adId')));
-  const comment = String(formData.get('comment') || '').trim();
+  const rawComment = String(formData.get('comment') || '').trim();
   const parentId = Number(formData.get('parentId') || 0);
-  if (!comment) return;
+  if (!rawComment) return;
+  // حماية المحتوى: حارس المحتوى يمنع (بعقوباته) والكلمات المرفوضة تُحجب
+  const { screenChatMessage } = await import('@/lib/chat');
+  const st = await screenChatMessage(session.uid, rawComment);
+  if (!st.ok) redirect(`/ads/${Number(adId)}?cblocked=1`);
+  const comment = st.text;
   await prisma.comments.create({
     data: {
       ads_id: adId,

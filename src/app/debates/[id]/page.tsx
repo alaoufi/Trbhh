@@ -9,13 +9,15 @@ import { addDebateCommentAction, toggleDebateLikeAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DebatePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DebatePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ error?: string }> }) {
   const { id } = await params;
   const session = await getSession();
   const d = await getDebate(Number(id), session?.uid);
   if (!d) notFound();
+  const sp = searchParams ? await searchParams : {};
   return (
     <div className="mx-auto max-w-2xl space-y-4">
+      {sp.error === 'blocked' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2.5 text-sm font-bold text-red-800">مشاركتك تحتوي محتوى ممنوعاً ولم تُنشر — تكرار المخالفة يعرّض حسابك للحظر.</div>}
       <div className="flex items-center gap-2">
         <Link href="/debates" className="rounded-lg p-2 hover:bg-secondary"><ArrowRight className="h-5 w-5" /></Link>
         <h1 className="text-xl font-bold text-primary">{d.title}</h1>

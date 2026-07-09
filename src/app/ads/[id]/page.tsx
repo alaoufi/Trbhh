@@ -72,8 +72,9 @@ function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath
   );
 }
 
-export default async function AdPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string }> }) {
   const { id } = await params;
+  const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
   if (!ad) notFound();
 
@@ -286,6 +287,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
       {ad.commentAllow && (
         <div className="card-3d rounded-2xl p-4">
           <h2 className="mb-3 font-bold text-primary">التعليقات ({comments.length})</h2>
+          {spx.cblocked === '1' && <div className="mb-3 rounded-lg border-2 border-red-400 bg-red-50 p-2.5 text-sm font-bold text-red-800">تعليقك يحتوي محتوى ممنوعاً ولم يُنشر — تكرار المخالفة يعرّض حسابك للحظر.</div>}
           {session ? (
             <form action={addCommentAction} className="mb-4 flex gap-2">
               <input type="hidden" name="adId" value={ad.id} />

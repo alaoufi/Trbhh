@@ -6,11 +6,17 @@ import { requireUser } from '@/lib/auth';
 import { toInt } from '@/lib/utils';
 
 export async function createDebateAction(formData: FormData) {
-  await requireUser();
-  const title = String(formData.get('title') || '').trim();
-  const description = String(formData.get('description') || '').trim();
-  if (!title) redirect('/debates');
-  const d = await prisma.debates.create({ data: { title, description: description || null, hide: 0 } });
+  const session = await requireUser();
+  const rawTitle = String(formData.get('title') || '').trim();
+  const rawDesc = String(formData.get('description') || '').trim();
+  if (!rawTitle) redirect('/debates');
+  // حماية المحتوى: حارس المحتوى يمنع (بعقوباته) والكلمات المرفوضة تُحجب
+  const { screenChatMessage } = await import('@/lib/chat');
+  const st = await screenChatMessage(session.uid, `${rawTitle} ${rawDesc}`.trim());
+  if (!st.ok) redirect('/debates?error=blocked');
+  const { loadBanned, censorSync } = await import('@/lib/censor');
+  await loadBanned().catch(() => {});
+  const d = await prisma.debates.create({ data: { title: censorSync(rawTitle), description: rawDesc ? censorSync(rawDesc) : null, hide: 0 } });
   revalidatePath('/debates');
   redirect(`/debates/${toInt(d.id)}`);
 }
@@ -18,9 +24,13 @@ export async function createDebateAction(formData: FormData) {
 export async function addDebateCommentAction(formData: FormData) {
   const session = await requireUser();
   const debateId = Number(formData.get('debateId'));
-  const comment = String(formData.get('comment') || '').trim();
-  if (!debateId || !comment) return;
-  await prisma.debate_comments.create({ data: { debate_id: debateId, user_id: session.uid, comment, parent: 0 } });
+  const raw = String(formData.get('comment') || '').trim();
+  if (!debateId || !raw) return;
+  // حماية المحتوى: منع المخالف وحجب الكلمات المرفوضة
+  const { screenChatMessage } = await import('@/lib/chat');
+  const st = await screenChatMessage(session.uid, raw);
+  if (!st.ok) redirect(`/debates/${debateId}?error=blocked`);
+  await prisma.debate_comments.create({ data: { debate_id: debateId, user_id: session.uid, comment: st.text, parent: 0 } });
   revalidatePath(`/debates/${debateId}`);
 }
 

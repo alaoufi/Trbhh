@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { ImageDown, Loader2 } from 'lucide-react';
 
-export type ShareCardData = { url: string; title: string; price?: string; city?: string; image?: string };
+export type ShareCardData = { url: string; title: string; desc?: string; price?: string; city?: string; image?: string };
 
 function loadImg(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -75,7 +75,7 @@ export function ShareCardButton({ data, className }: { data: ShareCardData; clas
 
       // لوح المحتوى
       ctx.fillStyle = '#ffffff';
-      ctx.beginPath(); ctx.roundRect(40, imgTop + imgH - 40, W - 80, 420, 28); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(40, imgTop + imgH - 40, W - 80, 460, 28); ctx.fill();
       ctx.textAlign = 'right'; ctx.direction = 'rtl';
       ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 52px Cairo, Tahoma, sans-serif';
@@ -91,6 +91,12 @@ export function ShareCardButton({ data, className }: { data: ShareCardData; clas
         ctx.fillStyle = '#64748b';
         ctx.font = 'bold 36px Cairo, Tahoma, sans-serif';
         ctx.fillText(`📍 ${data.city}`, W - 88, imgTop + imgH + 275);
+      }
+      // أول الإعلان (تحت QR حتى لا يتداخلا)
+      if (data.desc) {
+        ctx.fillStyle = '#475569';
+        ctx.font = '32px Cairo, Tahoma, sans-serif';
+        drawWrapped(ctx, data.desc, W - 88, imgTop + imgH + 340, W - 176, 44, 2);
       }
       // QR (اختياري — يُتجاهل إن تعذّر تحميله)
       const qr = await loadImg(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data.url)}`);
@@ -108,7 +114,8 @@ export function ShareCardButton({ data, className }: { data: ShareCardData; clas
       if (!blob) return;
       const file = new File([blob], 'trbhh-ad.png', { type: 'image/png' });
       if (navigator.canShare?.({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: data.title }); return; } catch { /* cancelled → fallback */ }
+        // الرابط يُرفق في نص الرسالة حتى يفتح الإعلان مباشرة
+        try { await navigator.share({ files: [file], title: data.title, text: `${data.title}\n${data.url}` }); return; } catch { /* cancelled → fallback */ }
       }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);

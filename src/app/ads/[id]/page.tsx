@@ -392,6 +392,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             card={{
               url: shareUrl,
               title: ad.title,
+              desc: (ad.detail || '').replace(/\s+/g, ' ').trim().slice(0, 120),
               price: ad.price > 0 ? formatPrice(ad.price) : (ad.adsType === 'request' ? 'مطلوب' : ''),
               city: ad.area ? `${ad.area} - ${ad.city}` : (ad.city || ''),
               image: ad.images?.[0],

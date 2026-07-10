@@ -216,6 +216,7 @@ export type TopupTier = { amount: number; bonus: number };
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 const toEnDigits = (s: string) => s.replace(/[٠-٩]/g, (d) => String(AR_DIGITS.indexOf(d)));
 export function parseTopupTiers(raw: string): TopupTier[] {
+  // تُحفظ وتُعرض بنفس ترتيب الإدخال في لوحة التحكم (لا إعادة ترتيب)
   return toEnDigits(raw)
     .split(/\n+/)
     .map((line) => {
@@ -223,15 +224,29 @@ export function parseTopupTiers(raw: string): TopupTier[] {
       return { amount: nums[0] || 0, bonus: nums[1] || 0 };
     })
     .filter((t) => t.amount > 0 && t.bonus > 0)
-    .sort((a, b) => a.amount - b.amount)
     .slice(0, 20);
 }
 export async function getTopupTiers(): Promise<TopupTier[]> {
   return parseTopupTiers(await getSetting('topup_tiers', ''));
 }
-/** أعلى شريحة يبلغها المبلغ (أو null إن لم يبلغ أي شريحة). */
+/** أعلى شريحة يبلغها المبلغ (بغضّ النظر عن ترتيب الإدخال). */
 export const matchTopupTier = (tiers: TopupTier[], amount: number): TopupTier | null =>
-  [...tiers].reverse().find((t) => amount >= t.amount) ?? null;
+  tiers.filter((t) => amount >= t.amount).sort((a, b) => b.amount - a.amount)[0] ?? null;
+
+/** نهاية عرض حملة الشحن (عداد تنازلي) — null = بلا نهاية محددة. */
+export async function getTopupCampaignUntil(): Promise<Date | null> {
+  const raw = await getSetting('topup_campaign_until', '');
+  if (!raw) return null;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+}
+/** هل حملة الشحن سارية؟ (شرائح موجودة + لم ينتهِ عدّادها إن وُجد). */
+export async function isTopupCampaignActive(): Promise<boolean> {
+  const tiers = await getTopupTiers();
+  if (!tiers.length) return false;
+  const until = await getTopupCampaignUntil();
+  return !until || until.getTime() > Date.now();
+}
 
 export const SETTING_TOPUP_NAME_NOTE = 'topup_name_note';
 export const DEFAULT_TOPUP_NAME_NOTE = 'تأكد من الاسم قبل التحويل';

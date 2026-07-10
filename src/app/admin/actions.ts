@@ -503,6 +503,12 @@ export async function saveRevenueAction(formData: FormData) {
   // تصفير مفاتيح النسبة القديمة — الحملة تعمل بالشرائح فقط كما تظهر في اللوحة
   await setSetting(SETTING_TOPUP_BONUS_PCT, '0');
   await setSetting(SETTING_TOPUP_BONUS_MIN, '0');
+  // عداد العرض التنازلي: رقم = أيام من الآن، 0 = إلغاء العداد، فارغ = بلا تغيير
+  const rawDays = String(formData.get('campaignDays') ?? '').trim();
+  if (rawDays !== '') {
+    const days = Math.max(0, parseInt(rawDays) || 0);
+    await setSetting('topup_campaign_until', days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : '');
+  }
   await setSetting(SETTING_TOPUP_FIRST_BONUS, nn('topupFirstBonus'));
   await setSetting(SETTING_VERIFY_GIFT, nn('verifyGift'));
   // المزادات: رسم الفتح + أقصى مدة

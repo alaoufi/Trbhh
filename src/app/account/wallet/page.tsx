@@ -10,6 +10,7 @@ import {
   getTopupAccounts, getTopupPromo,
 } from '@/lib/settings';
 import { CopyChip } from '@/components/copy-chip';
+import { Countdown } from '@/components/countdown';
 import { pointsEnabled, getPoints, getPointsConfig } from '@/lib/points';
 import { mediaUrl } from '@/lib/media';
 import { buyDupPackAction, requestTopupAction, convertPointsAction } from '../actions';
@@ -44,7 +45,10 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     countTxns(session.uid),
     pointsEnabled(),
   ]);
-  const topupTiers = await (await import('@/lib/settings')).getTopupTiers().catch(() => []);
+  const { getTopupTiers: _gtt, getTopupCampaignUntil: _gcu } = await import('@/lib/settings');
+  const campaignUntil = await _gcu().catch(() => null);
+  const campaignLive = !campaignUntil || campaignUntil.getTime() > Date.now();
+  const topupTiers = campaignLive ? await _gtt().catch(() => []) : [];
   const txnPages = Math.max(1, Math.ceil(txnTotal / TXN_PAGE));
   const [pts, ptsCfg] = ptsOn ? await Promise.all([getPoints(session.uid), getPointsConfig()]) : [0, null];
   const hadTopup = topups.some((t) => t.status === 1);
@@ -97,7 +101,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-2.5 text-sm font-extrabold text-emerald-800">
             {topupTiers.length > 0 && (
               <div className="space-y-1">
-                <div>🎁 حملة زيادة الشحن — كلما زاد شحنك زادت مكافأتك:</div>
+                <div className="flex flex-wrap items-center gap-2">🎁 عرض حملة زيادة الشحن — كلما زاد شحنك زادت مكافأتك:{campaignUntil && <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-black text-white">⏳ ينتهي خلال <Countdown until={campaignUntil.toISOString()} /></span>}</div>
                 <div className="flex flex-wrap gap-1.5">
                   {topupTiers.map((t) => <span key={t.amount} className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-extrabold text-white">اشحن {t.amount} → +{t.bonus} ر.س ⭐</span>)}
                 </div>

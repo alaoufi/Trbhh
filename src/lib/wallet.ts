@@ -276,10 +276,12 @@ export async function approveTopup(id: number, adminId: number): Promise<TopupRo
 /** مكافآت الشحن (من التسعيرات): شرائح حملة الشحن كما هي في لوحة التحكم حرفياً —
  *  تُطبَّق أعلى شريحة يبلغها المبلغ + مكافأة أول شحن. */
 async function applyTopupBonuses(userId: number, amount: number, adminId: number): Promise<void> {
-  const { getTopupPromo, getTopupTiers, matchTopupTier } = await import('./settings');
+  const { getTopupPromo, getTopupTiers, matchTopupTier, getTopupCampaignUntil } = await import('./settings');
   const promo = await getTopupPromo();
   const tiers = await getTopupTiers();
-  if (tiers.length > 0) {
+  const campUntil = await getTopupCampaignUntil();
+  const campaignLive = tiers.length > 0 && (!campUntil || campUntil.getTime() > Date.now());
+  if (campaignLive) {
     const tier = matchTopupTier(tiers, amount);
     if (tier) await adjustBalance(userId, tier.bonus, 'bonus', { adminId, note: `مكافأة حملة الشحن: +${tier.bonus} على شحن ${amount} ر.س` });
   }

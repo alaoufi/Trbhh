@@ -4,7 +4,7 @@ import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupTiers, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupTiers, getTopupCampaignUntil, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { pointsEnabled, getPointsConfig, referralEnabled, getReferralReward, getWelcomeCredit } from '@/lib/points';
 import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction } from '../actions';
 
@@ -346,6 +346,7 @@ async function PricingTab() {
   ]);
   const urgentPrices = await getUrgentPrices();
   const topupTiers = await getTopupTiers();
+  const campaignUntil = await getTopupCampaignUntil();
   const services: { key: PaidService; note?: string }[] = [
     { key: 'featured' },
     { key: 'classified', note: 'إعلان واحد حسب المدّة' },
@@ -416,7 +417,7 @@ async function PricingTab() {
       {/* حملة زيادة الشحن (شرائح متغيرة) + مكافآت الشحن */}
       <div className="rounded-xl border border-emerald-300 bg-emerald-50/60 p-3">
         <div className="mb-1 text-xs font-bold text-emerald-800">🎁 حملة زيادة الشحن والمكافآت</div>
-        <p className="mb-2 text-[11px] text-muted-foreground">شرائح الحملة: سطر لكل شريحة «مبلغ الشحن ثم المكافأة» — مثال: <b dir="ltr">100 10</b> تعني اشحن 100 ر.س وخذ 10 ر.س. تُطبَّق أعلى شريحة يبلغها المبلغ تلقائياً فور تأكيد الشحن، وأضف ما تشاء من الشرائح (اتركها فارغة لإيقاف الحملة).</p>
+        <p className="mb-2 text-[11px] text-muted-foreground">شرائح الحملة: سطر لكل شريحة «مبلغ الشحن ثم المكافأة» — مثال: <b dir="ltr">100 10</b> تعني اشحن 100 ر.س وخذ 10 ر.س. تُطبَّق أعلى شريحة يبلغها المبلغ تلقائياً فور تأكيد الشحن، <b>وتُعرض في البانر بنفس ترتيب إدخالك هنا</b>. اتركها فارغة لإيقاف الحملة وإخفاء البانر.</p>
         <label className="block space-y-1">
           <span className="text-xs font-bold">شرائح الحملة (مبلغ الشحن ← المكافأة — سطر لكل شريحة)</span>
           <textarea name="topupTiers" rows={4} dir="ltr" defaultValue={topupTiers.map((t) => `${t.amount} ${t.bonus}`).join('\n')} placeholder={'100 10\n200 25\n300 40'} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/40" />
@@ -426,6 +427,14 @@ async function PricingTab() {
             {topupTiers.map((t) => <span key={t.amount} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">اشحن {t.amount} → +{t.bonus} ر.س</span>)}
           </div>
         )}
+        {/* عداد العرض التنازلي: أدخل عدد الأيام ليبدأ العد من لحظة الحفظ */}
+        <div className="mt-2 rounded-lg border border-emerald-200 bg-white p-2">
+          <label className="block space-y-1">
+            <span className="text-xs font-bold">⏳ مدة العرض بالأيام (عداد تنازلي في البانر)</span>
+            <input name="campaignDays" type="number" min={0} placeholder={campaignUntil && campaignUntil > new Date() ? `ساري حتى ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(campaignUntil)}` : 'اتركه فارغاً = بلا تغيير'} className={num} />
+          </label>
+          <p className="mt-1 text-[10px] text-muted-foreground">أدخل رقماً (مثل 3) ليظهر عداد تنازلي 3 أيام من لحظة الحفظ ويختفي البانر تلقائياً عند انتهائه. أدخل 0 لإلغاء العداد (عرض دائم)، واتركه فارغاً للإبقاء على الوضع الحالي.</p>
+        </div>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">مكافأة أول شحن (ر.س — 0 تعطيل)</span><input name="topupFirstBonus" type="number" min={0} defaultValue={promo.first} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">هدية التوثيق (ر.س — مرة واحدة)</span><input name="verifyGift" type="number" min={0} defaultValue={verifyGift} className={num} /></label>

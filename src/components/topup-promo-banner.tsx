@@ -1,21 +1,24 @@
 import Link from 'next/link';
 import { HandCoins, ChevronLeft } from 'lucide-react';
-import { getTopupPromo, getTopupTiers } from '@/lib/settings';
+import { getTopupPromo, getTopupTiers, getTopupCampaignUntil } from '@/lib/settings';
+import { Countdown } from '@/components/countdown';
 
 /**
- * بانر تسويقي لحملة زيادة الشحن: «اشحن بـ100 ر.س ونضيف لك 10 ر.س — يصبح رصيدك 110».
- * الشرائح من التسعيرات (مبلغ ← مكافأة، متغيرة)، مع مكافأة أول شحن — ولا يظهر
- * البانر إلا عند وجود شرائح أو نسبة قديمة أو مكافأة أول شحن.
+ * بانر «عرض» حملة زيادة الشحن: الشرائح من التسعيرات وبنفس ترتيب إدخالها حرفياً،
+ * مع عداد تنازلي حتى نهاية العرض (إن حُددت مدته). لا باقات = لا بانر إطلاقاً،
+ * وينتهي العداد = يختفي البانر تلقائياً.
  */
 export async function TopupPromoBanner() {
-  const [promo, tiers] = await Promise.all([
+  const [promo, tiers, until] = await Promise.all([
     getTopupPromo().catch(() => ({ pct: 0, min: 0, first: 0 })),
     getTopupTiers().catch(() => []),
+    getTopupCampaignUntil().catch(() => null),
   ]);
-  if (tiers.length === 0 && promo.first <= 0) return null;
-  // الأرقام من شرائح لوحة التحكم حرفياً — أول شريحة هي المثال الرئيسي
-  const amount = tiers.length ? tiers[0].amount : 0;
-  const bonus = tiers.length ? tiers[0].bonus : 0;
+  if (tiers.length === 0) return null; // لا باقات = لا يظهر العرض
+  if (until && until.getTime() <= Date.now()) return null; // انتهى العرض
+  // الأرقام من شرائح لوحة التحكم حرفياً — أول شريحة كما أدخلتها هي المثال الرئيسي
+  const amount = tiers[0].amount;
+  const bonus = tiers[0].bonus;
   return (
     <Link
       href="/account/wallet#topup"
@@ -33,41 +36,33 @@ export async function TopupPromoBanner() {
       <span className="relative flex min-w-0 items-center gap-3">
         <span className="float-3d grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/25 shadow-inner ring-1 ring-white/30"><HandCoins className="h-6 w-6" /></span>
         <span className="min-w-0">
-          {bonus > 0 ? (
-            <>
-              {/* الأرقام بارزة وغامقة داخل حبوب بيضاء عالية التباين */}
-              <span className="flex flex-wrap items-center gap-1.5 text-base font-extrabold drop-shadow">
-                💰 اشحن بـ
-                <span className="rounded-lg bg-white px-2 py-0.5 text-xl font-black leading-6 text-emerald-900 shadow" dir="ltr">{amount}</span>
-                ر.س ونضيف لك
-                <span className="rounded-lg bg-amber-300 px-2 py-0.5 text-xl font-black leading-6 text-amber-950 shadow" dir="ltr">+{bonus}</span>
-                فوراً
-                <span className="animate-pulse rounded-full bg-white px-2.5 py-1 text-sm font-black text-emerald-800 shadow">يصبح رصيدك {amount + bonus} ر.س</span>
-              </span>
-              {tiers.length > 1 ? (
-                <span className="mt-1.5 flex flex-wrap gap-1.5">
-                  {tiers.slice(0, 4).map((t) => (
-                    <span key={t.amount} className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-emerald-900 shadow ring-1 ring-emerald-200">
-                      اشحن <span dir="ltr">{t.amount}</span> ← <span className="text-amber-600" dir="ltr">+{t.bonus}</span> ⭐
-                    </span>
-                  ))}
+          {/* شارة «عرض» + الأرقام بارزة وغامقة داخل حبوب بيضاء عالية التباين */}
+          <span className="flex flex-wrap items-center gap-1.5 text-base font-extrabold drop-shadow">
+            <span className="animate-pulse rounded-full bg-red-600 px-2.5 py-0.5 text-sm font-black text-white shadow ring-1 ring-white/50">عرض 🔥</span>
+            💰 اشحن بـ
+            <span className="rounded-lg bg-white px-2 py-0.5 text-xl font-black leading-6 text-emerald-900 shadow" dir="ltr">{amount}</span>
+            ر.س ونضيف لك
+            <span className="rounded-lg bg-amber-300 px-2 py-0.5 text-xl font-black leading-6 text-amber-950 shadow" dir="ltr">+{bonus}</span>
+            فوراً
+            <span className="rounded-full bg-white px-2.5 py-1 text-sm font-black text-emerald-800 shadow">يصبح رصيدك {amount + bonus} ر.س</span>
+          </span>
+          {tiers.length > 1 && (
+            <span className="mt-1.5 flex flex-wrap gap-1.5">
+              {tiers.slice(0, 4).map((t, i) => (
+                <span key={`${t.amount}-${i}`} className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-emerald-900 shadow ring-1 ring-emerald-200">
+                  اشحن <span dir="ltr">{t.amount}</span> ← <span className="text-amber-600" dir="ltr">+{t.bonus}</span> ⭐
                 </span>
-              ) : (
-                <span className="block text-xs font-bold text-white drop-shadow">
-                  حملة زيادة الشحن — تُضاف المكافأة تلقائياً فور تأكيد الشحن{promo.first > 0 ? `، ومكافأة أول شحن +${promo.first} ر.س إضافية` : ''}.
-                </span>
-              )}
-            </>
-          ) : (
-            <>
-              <span className="flex flex-wrap items-center gap-1.5 text-base font-extrabold drop-shadow">
-                🎁 مكافأة أول شحن:
-                <span className="rounded-lg bg-white px-2 py-0.5 text-xl font-black leading-6 text-emerald-900 shadow" dir="ltr">+{promo.first}</span>
-                ر.س تُضاف لرصيدك
-              </span>
-              <span className="block text-xs font-bold text-white drop-shadow">اشحن رصيدك لأول مرة واحصل على المكافأة تلقائياً فور تأكيد الشحن.</span>
-            </>
+              ))}
+            </span>
           )}
+          <span className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-white drop-shadow">
+            {until && (
+              <span className="flex items-center gap-1 rounded-full bg-black/30 px-2.5 py-1 font-black ring-1 ring-white/30">
+                ⏳ ينتهي العرض خلال: <Countdown until={until.toISOString()} className="text-amber-300" />
+              </span>
+            )}
+            <span>تُضاف المكافأة تلقائياً فور تأكيد الشحن{promo.first > 0 ? `، ومكافأة أول شحن +${promo.first} ر.س إضافية` : ''}.</span>
+          </span>
         </span>
       </span>
       <ChevronLeft className="relative h-5 w-5 shrink-0 drop-shadow" />

@@ -496,10 +496,10 @@ export async function saveRevenueAction(formData: FormData) {
   // تنبيهات قرب انتهاء الاشتراك: قبل كم يوم + كم مرة
   await setSetting(SETTING_SUB_REMIND_DAYS, nn('subRemindDays'));
   await setSetting(SETTING_SUB_REMIND_COUNT, nn('subRemindCount'));
-  // عروض الشحن والمكافآت (0 = معطّل)
-  const { SETTING_TOPUP_BONUS_PCT, SETTING_TOPUP_BONUS_MIN, SETTING_TOPUP_FIRST_BONUS, SETTING_VERIFY_GIFT } = await import('@/lib/settings');
-  await setSetting(SETTING_TOPUP_BONUS_PCT, nn('topupBonusPct'));
-  await setSetting(SETTING_TOPUP_BONUS_MIN, nn('topupBonusMin'));
+  // حملة زيادة الشحن (شرائح: مبلغ ← مكافأة) + مكافأة أول شحن + هدية التوثيق
+  const { SETTING_TOPUP_FIRST_BONUS, SETTING_VERIFY_GIFT, parseTopupTiers } = await import('@/lib/settings');
+  const tiers = parseTopupTiers(String(formData.get('topupTiers') || ''));
+  await setSetting('topup_tiers', tiers.map((t) => `${t.amount} ${t.bonus}`).join('\n'));
   await setSetting(SETTING_TOPUP_FIRST_BONUS, nn('topupFirstBonus'));
   await setSetting(SETTING_VERIFY_GIFT, nn('verifyGift'));
   // المزادات: رسم الفتح + أقصى مدة
@@ -523,9 +523,9 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting('pts_verify', nn('ptsVerify'));
   await setSetting('pts_rate', String(Math.max(1, parseInt(String(formData.get('ptsRate') || '100')) || 100)));
   await setSetting('pts_min_convert', String(Math.max(1, parseInt(String(formData.get('ptsMinConvert') || '500')) || 500)));
-  // خدمات الإعلان: عاجل + تحديث
-  await setSetting('urgent_price', nn('urgentPrice'));
-  await setSetting('urgent_hours', String(Math.max(1, parseInt(String(formData.get('urgentHours') || '48')) || 48)));
+  // خدمات الإعلان: عاجل (باقتا 24/48 ساعة) + تحديث
+  await setSetting('urgent_price_24', nn('urgentPrice24'));
+  await setSetting('urgent_price_48', nn('urgentPrice48'));
   await setSetting('bump_free_days', nn('bumpFreeDays'));
   await setSetting('bump_price', nn('bumpPrice'));
   // الظهور المدفوع في تربح: عرض المتجر (بالمدد) + باقات عرض الإعلان (السعر والمدة لكل باقة)

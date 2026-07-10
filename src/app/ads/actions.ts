@@ -344,17 +344,19 @@ export async function createAdAction(formData: FormData) {
       }
     }
   }
-  // شارة عاجل المطلوبة من نموذج النشر: يغطي الرصيد → خصم وتفعيل فوري، لا يغطي → يُنشر الإعلان وتُطلب إعادة الشحن
+  // شارة عاجل المطلوبة من نموذج النشر (باقة 24 أو 48 ساعة): يغطي الرصيد → خصم وتفعيل فوري، لا يغطي → يُنشر الإعلان وتُطلب إعادة الشحن
   let urgentState: '' | 'ok' | 'need' = '';
-  if (formData.get('urgent') && dest !== 'store') {
+  const urgentHoursReq = Number(formData.get('urgent') || 0);
+  if (urgentHoursReq > 0 && dest !== 'store') {
     const { getAdExtras } = await import('@/lib/settings');
     const x = await getAdExtras();
-    if (x.urgentPrice > 0) {
+    const upack = x.urgentPacks.find((pk) => pk.hours === urgentHoursReq);
+    if (upack) {
       const { charge } = await import('@/lib/wallet');
-      const paid = await charge(session.uid, x.urgentPrice, 'urgent', `شارة عاجل (${x.urgentHours} ساعة)`);
+      const paid = await charge(session.uid, upack.price, 'urgent', `شارة عاجل (${upack.hours} ساعة)`);
       if (paid.ok) {
         const base = scheduledAt ?? new Date();
-        await prisma.ads.update({ where: { id: ad.id }, data: { urgent_until: new Date(base.getTime() + x.urgentHours * 3600_000) } }).catch(() => {});
+        await prisma.ads.update({ where: { id: ad.id }, data: { urgent_until: new Date(base.getTime() + upack.hours * 3600_000) } }).catch(() => {});
         urgentState = 'ok';
       } else {
         urgentState = 'need';

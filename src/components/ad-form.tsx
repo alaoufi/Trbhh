@@ -53,8 +53,8 @@ export function AdForm({
   needPrice?: string; needBal?: string; dest?: string;
   limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean; allowSchedule?: boolean;
   allowOldPrice?: boolean; allowStock?: boolean;
-  /** عرض تسويقي لشارة «عاجل» عند النشر: السعر والمدة ورصيد العضو الحالي */
-  urgentOffer?: { price: number; hours: number; balance: number };
+  /** عرض تسويقي لشارة «عاجل» عند النشر: باقتا 24/48 ساعة بأسعارهما ورصيد العضو */
+  urgentOffer?: { packs: { hours: number; price: number }[]; balance: number };
   /** عرض تسويقي للتمييز ⭐ عند النشر: المدد المسعّرة ورصيد العضو الحالي */
   featuredOffer?: { options: { key: string; label: string; price: number }[]; balance: number };
 }) {
@@ -384,32 +384,31 @@ export function AdForm({
         </div>
       )}
 
-      {/* شارة عاجل — عرض تسويقي بارز عند النشر: يغطي الرصيد → خصم فوري، لا يغطي → دعوة لشحن الرصيد */}
-      {urgentOffer && urgentOffer.price > 0 && (
-        <label className="block cursor-pointer rounded-xl border-2 border-red-300 bg-red-50/70 p-3 shadow-sm">
-          <span className="flex items-start gap-2">
-            <input type="checkbox" name="urgent" value="1" className="mt-1 h-4 w-4 shrink-0 accent-red-600" />
-            <span className="min-w-0">
-              <span className="flex flex-wrap items-center gap-2 text-sm font-extrabold text-red-700">
-                <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>
-                أضف شارة «عاجل» لإعلانك — {urgentOffer.price} ر.س لمدة {urgentOffer.hours} ساعة
-              </span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">
-                تجعل إعلانك يلفت الأنظار بشارة حمراء نابضة في كل القوائم وصفحة الإعلان — تُخصم من رصيدك عند النشر.
-                {' '}رصيدك الحالي: <b className={urgentOffer.balance >= urgentOffer.price ? 'text-emerald-700' : 'text-red-700'}>{urgentOffer.balance} ر.س</b>
-                {urgentOffer.balance < urgentOffer.price && <> — لا يغطي الشارة، <a href="/account/wallet#topup" target="_blank" className="font-bold text-primary underline">اشحن رصيدك من هنا</a> (سيُنشر إعلانك على كل حال).</>}
-              </span>
-              {/* معاينة: هكذا سيظهر إعلانك بشارة عاجل */}
-              <span className="relative mt-2 block overflow-hidden rounded-xl border-2 border-red-200 bg-white p-2 shadow">
-                <span className="absolute left-2 top-2 animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-extrabold text-white">🔥 عاجل</span>
-                <span className="flex items-center gap-2">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-red-50 text-lg">📦</span>
-                  <span className="min-w-0"><span className="block truncate text-xs font-extrabold text-slate-800">عنوان إعلانك هنا</span><span className="block text-[10px] text-muted-foreground">هكذا سيظهر إعلانك — بشارة حمراء نابضة تلفت العين</span></span>
-                </span>
-              </span>
+      {/* شارة عاجل — باقتا 24/48 ساعة: يغطي الرصيد → خصم فوري، لا يغطي → دعوة لشحن الرصيد */}
+      {urgentOffer && urgentOffer.packs.length > 0 && (
+        <div className="rounded-xl border-2 border-red-300 bg-red-50/70 p-3 shadow-sm">
+          <span className="flex flex-wrap items-center gap-2 text-sm font-extrabold text-red-700">
+            <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>
+            أضف شارة «عاجل» لإعلانك — اختر الباقة
+          </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            تجعل إعلانك يلفت الأنظار بشارة حمراء نابضة في كل القوائم وصفحة الإعلان — تُخصم من رصيدك عند النشر.
+            {' '}رصيدك الحالي: <b className="text-red-700">{urgentOffer.balance} ر.س</b>
+            {' '}(<a href="/account/wallet#topup" target="_blank" className="font-bold text-primary underline">اشحن رصيدك</a> إن احتجت — سيُنشر إعلانك على كل حال).
+          </span>
+          {/* معاينة: هكذا سيظهر إعلانك بشارة عاجل */}
+          <span className="relative mt-2 block overflow-hidden rounded-xl border-2 border-red-200 bg-white p-2 shadow">
+            <span className="absolute left-2 top-2 animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-extrabold text-white">🔥 عاجل</span>
+            <span className="flex items-center gap-2">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-red-50 text-lg">📦</span>
+              <span className="min-w-0"><span className="block truncate text-xs font-extrabold text-slate-800">عنوان إعلانك هنا</span><span className="block text-[10px] text-muted-foreground">هكذا سيظهر إعلانك — بشارة حمراء نابضة تلفت العين</span></span>
             </span>
           </span>
-        </label>
+          <select name="urgent" defaultValue="" className="mt-2 h-11 w-full rounded-lg border-2 border-red-300 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-red-400/50">
+            <option value="">بدون شارة عاجل</option>
+            {urgentOffer.packs.map((p0) => <option key={p0.hours} value={p0.hours}>🔥 باقة {p0.hours} ساعة — {p0.price} ر.س</option>)}
+          </select>
+        </div>
       )}
       <Submit label={submitLabel} />
     </form>

@@ -141,7 +141,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         return m.DURATIONS.map((d) => ({ key: d.key, label: d.label, price: svc.featured[d.key] })).filter((o) => o.price > 0);
       }).catch(() => [])
     : [];
-  const ownerBalance = (urgentExtras && urgentExtras.urgentPrice > 0) || featuredOpts.length
+  const ownerBalance = (urgentExtras && urgentExtras.urgentPacks.length > 0) || featuredOpts.length
     ? await import('@/lib/wallet').then((m) => m.getBalance(session!.uid)).catch(() => 0)
     : 0;
   const urgentBalance = ownerBalance;
@@ -176,7 +176,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       {spx.urgent === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🔥 فُعّلت شارة «عاجل» على إعلانك وخُصمت الرسوم من رصيدك.</div>}
       {spx.urgentneed === '1' && (
         <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
-          💳 نُشر إعلانك، لكن رصيدك لا يغطي شارة «عاجل»{urgentExtras ? ` (${urgentExtras.urgentPrice} ر.س)` : ''} —{' '}
+          💳 نُشر إعلانك، لكن رصيدك لا يغطي شارة «عاجل» —{' '}
           <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم فعّلها بالزر أدناه.
         </div>
       )}
@@ -209,17 +209,22 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         </form>
       )}
 
-      {/* شارة عاجل — عرض تسويقي دائم لصاحب الإعلان النشط */}
-      {urgentExtras && urgentExtras.urgentPrice > 0 && !urgentActive && (
+      {/* شارة عاجل — باقتا 24/48 ساعة: عرض تسويقي دائم لصاحب الإعلان النشط */}
+      {urgentExtras && urgentExtras.urgentPacks.length > 0 && !urgentActive && (
         <form action={buyUrgentAction} className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-red-300 bg-red-50/70 p-3 shadow-sm">
           <input type="hidden" name="adId" value={ad.id} />
           <input type="hidden" name="back" value="ad" />
           <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>
           <span className="min-w-0 flex-1 text-xs font-bold text-red-700">
-            اجعل إعلانك يلفت الأنظار بشارة «عاجل» النابضة في كل القوائم — {urgentExtras.urgentPrice} ر.س لمدة {urgentExtras.urgentHours} ساعة.
-            <span className="block font-medium text-muted-foreground">رصيدك: {urgentBalance} ر.س{urgentBalance < urgentExtras.urgentPrice && <> — لا يغطي، <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link></>}</span>
+            اجعل إعلانك يلفت الأنظار بشارة «عاجل» النابضة في كل القوائم — اختر الباقة.
+            <span className="block font-medium text-muted-foreground">رصيدك: {urgentBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</span>
           </span>
-          <button className="btn-3d shrink-0 rounded-lg bg-red-600 px-4 py-2 text-sm font-extrabold text-white">تفعيل الآن</button>
+          <span className="flex shrink-0 items-center gap-1.5">
+            <select name="hours" className="h-9 rounded-lg border border-red-300 bg-white px-2 text-xs font-bold">
+              {urgentExtras.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours}>{p0.hours} ساعة — {p0.price} ر.س</option>)}
+            </select>
+            <button className="btn-3d rounded-lg bg-red-600 px-3 py-2 text-sm font-extrabold text-white">تفعيل الآن</button>
+          </span>
         </form>
       )}
 

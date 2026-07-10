@@ -105,10 +105,13 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 {auctionOn && ad.status === 1 && !ad.storeOnly && (
                   <Link href={`/auctions/new?ad=${ad.id}`} className="flex items-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700 hover:bg-violet-100" title="افتح مزاداً على هذا الإعلان">🔨 مزاد</Link>
                 )}
-                {extras.urgentPrice > 0 && ad.status === 1 && !ad.storeOnly && (
-                  <form action={buyUrgentAction}>
+                {extras.urgentPacks.length > 0 && ad.status === 1 && !ad.storeOnly && (
+                  <form action={buyUrgentAction} className="flex items-center gap-1">
                     <input type="hidden" name="adId" value={ad.id} />
-                    <button className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100">🔥 عاجل ({extras.urgentPrice} ر.س)</button>
+                    <select name="hours" className="h-7 rounded-md border border-red-300 bg-red-50 px-1 text-[11px] font-bold text-red-600">
+                      {extras.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours}>{p0.hours} ساعة — {p0.price} ر.س</option>)}
+                    </select>
+                    <button className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100">🔥 عاجل</button>
                   </form>
                 )}
                 <form action={toggleAdStatusAction}>

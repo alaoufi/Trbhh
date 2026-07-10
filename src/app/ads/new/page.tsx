@@ -25,8 +25,8 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true, phone_whatsapp: true } }),
   ]);
   const balance = await import('@/lib/wallet').then((m) => m.getBalance(session.uid)).catch(() => 0);
-  const urgentOffer = extras && extras.urgentPrice > 0 && dest !== 'store'
-    ? { price: extras.urgentPrice, hours: extras.urgentHours, balance }
+  const urgentOffer = extras && extras.urgentPacks.length > 0 && dest !== 'store'
+    ? { packs: extras.urgentPacks, balance }
     : undefined;
   // التمييز ⭐ — عرض المدد المسعّرة داخل نموذج النشر (لإعلانات تربح فقط)
   const { getServicePricing, DURATIONS } = await import('@/lib/settings');

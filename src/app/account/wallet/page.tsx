@@ -44,6 +44,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     countTxns(session.uid),
     pointsEnabled(),
   ]);
+  const topupTiers = await (await import('@/lib/settings')).getTopupTiers().catch(() => []);
   const txnPages = Math.max(1, Math.ceil(txnTotal / TXN_PAGE));
   const [pts, ptsCfg] = ptsOn ? await Promise.all([getPoints(session.uid), getPointsConfig()]) : [0, null];
   const hadTopup = topups.some((t) => t.status === 1);
@@ -91,10 +92,18 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           <HandCoins className="h-5 w-5" /> شحن رصيدك
           <Link href="/guide/how/topup" className="btn-3d mr-auto inline-flex items-center gap-1 rounded-full bg-red-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md hover:bg-red-700">🎬 شاهد طريقة الشحن</Link>
         </div>
-        {/* عروض الشحن الحالية — تظهر فقط عند تفعيلها من الإدارة */}
-        {(promo.pct > 0 || (promo.first > 0 && !hadTopup)) && (
+        {/* حملة زيادة الشحن الحالية — تظهر فقط عند تفعيلها من الإدارة */}
+        {(topupTiers.length > 0 || promo.pct > 0 || (promo.first > 0 && !hadTopup)) && (
           <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-2.5 text-sm font-extrabold text-emerald-800">
-            {promo.pct > 0 && <div>🎁 اشحن {promo.min > 0 ? `${promo.min} ر.س أو أكثر` : 'الآن'} واحصل على +{promo.pct}% رصيداً إضافياً!</div>}
+            {topupTiers.length > 0 && (
+              <div className="space-y-1">
+                <div>🎁 حملة زيادة الشحن — كلما زاد شحنك زادت مكافأتك:</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {topupTiers.map((t) => <span key={t.amount} className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-extrabold text-white">اشحن {t.amount} → +{t.bonus} ر.س ⭐</span>)}
+                </div>
+              </div>
+            )}
+            {topupTiers.length === 0 && promo.pct > 0 && <div>🎁 اشحن {promo.min > 0 ? `${promo.min} ر.س أو أكثر` : 'الآن'} واحصل على +{promo.pct}% رصيداً إضافياً!</div>}
             {promo.first > 0 && !hadTopup && <div>⭐ مكافأة أول شحن: +{promo.first} ر.س تُضاف لرصيدك مع أول شحن مؤكَّد.</div>}
           </div>
         )}

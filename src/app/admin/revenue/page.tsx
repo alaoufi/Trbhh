@@ -4,7 +4,7 @@ import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupTiers, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { pointsEnabled, getPointsConfig, referralEnabled, getReferralReward, getWelcomeCredit } from '@/lib/points';
 import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction } from '../actions';
 
@@ -344,6 +344,8 @@ async function PricingTab() {
     pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
     getStorePlusPricing(), getLeadConfig(), getAuctionConfig(),
   ]);
+  const urgentPrices = await getUrgentPrices();
+  const topupTiers = await getTopupTiers();
   const services: { key: PaidService; note?: string }[] = [
     { key: 'featured' },
     { key: 'classified', note: 'إعلان واحد حسب المدّة' },
@@ -399,26 +401,33 @@ async function PricingTab() {
         </div>
       </div>
 
-      {/* خدمات الإعلان الإضافية: عاجل + تحديث (Bump) */}
+      {/* خدمات الإعلان الإضافية: عاجل (باقتان) + تحديث (Bump) */}
       <div className="rounded-xl border border-red-300 bg-red-50/50 p-3">
-        <div className="mb-1 text-xs font-bold text-red-700">🔥 شارة «عاجل» و«تحديث الإعلان» (سعر 0 = تعطيل)</div>
+        <div className="mb-1 text-xs font-bold text-red-700">🔥 شارة «عاجل» — باقتان (سعر 0 = تعطيل الباقة) — و«تحديث الإعلان»</div>
         <div className="grid grid-cols-2 gap-2">
-          <label className="space-y-1"><span className="text-xs font-bold">سعر شارة عاجل (ر.س)</span><input name="urgentPrice" type="number" min={0} defaultValue={extras.urgentPrice} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">مدة العاجل (ساعات)</span><input name="urgentHours" type="number" min={1} defaultValue={extras.urgentHours} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">باقة عاجل 24 ساعة (ر.س)</span><input name="urgentPrice24" type="number" min={0} defaultValue={urgentPrices.p24} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">باقة عاجل 48 ساعة (ر.س)</span><input name="urgentPrice48" type="number" min={0} defaultValue={urgentPrices.p48} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">التحديث المجاني كل (أيام)</span><input name="bumpFreeDays" type="number" min={0} defaultValue={extras.bumpFreeDays} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">سعر التحديث قبل الموعد (ر.س)</span><input name="bumpPrice" type="number" min={0} defaultValue={extras.bumpPrice} className={num} /></label>
         </div>
-        <p className="mt-1 text-[11px] text-muted-foreground">«تحديث» يرفع الإعلان لأعلى القوائم — مجاني كل عدد الأيام المحدد، وقبله يُخصم السعر من الرصيد (تفعيل زر التحديث نفسه من الإعدادات ← الميزات).</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">يختار المعلن باقة 24 أو 48 ساعة عند النشر أو من صفحة إعلانه. «تحديث» يرفع الإعلان لأعلى القوائم — مجاني كل عدد الأيام المحدد، وقبله يُخصم السعر من الرصيد (تفعيل زر التحديث نفسه من الإعدادات ← الميزات).</p>
       </div>
 
-      {/* عروض الشحن والمكافآت — 0 = معطّل */}
+      {/* حملة زيادة الشحن (شرائح متغيرة) + مكافآت الشحن */}
       <div className="rounded-xl border border-emerald-300 bg-emerald-50/60 p-3">
-        <div className="mb-1 text-xs font-bold text-emerald-800">🎁 عروض الشحن والمكافآت (اكتب 0 للتعطيل)</div>
-        <p className="mb-2 text-[11px] text-muted-foreground">تُضاف المكافآت تلقائياً فور تأكيد الشحن أو التوثيق، وتظهر في محفظة العضو والميزانية.</p>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="space-y-1"><span className="text-xs font-bold">نسبة مكافأة الشحن %</span><input name="topupBonusPct" type="number" min={0} max={100} defaultValue={promo.pct} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">الحد الأدنى للمبلغ (ر.س)</span><input name="topupBonusMin" type="number" min={0} defaultValue={promo.min} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">مكافأة أول شحن (ر.س)</span><input name="topupFirstBonus" type="number" min={0} defaultValue={promo.first} className={num} /></label>
+        <div className="mb-1 text-xs font-bold text-emerald-800">🎁 حملة زيادة الشحن والمكافآت</div>
+        <p className="mb-2 text-[11px] text-muted-foreground">شرائح الحملة: سطر لكل شريحة «مبلغ الشحن ثم المكافأة» — مثال: <b dir="ltr">100 10</b> تعني اشحن 100 ر.س وخذ 10 ر.س. تُطبَّق أعلى شريحة يبلغها المبلغ تلقائياً فور تأكيد الشحن، وأضف ما تشاء من الشرائح (اتركها فارغة لإيقاف الحملة).</p>
+        <label className="block space-y-1">
+          <span className="text-xs font-bold">شرائح الحملة (مبلغ الشحن ← المكافأة — سطر لكل شريحة)</span>
+          <textarea name="topupTiers" rows={4} dir="ltr" defaultValue={topupTiers.map((t) => `${t.amount} ${t.bonus}`).join('\n')} placeholder={'100 10\n200 25\n300 40'} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/40" />
+        </label>
+        {topupTiers.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {topupTiers.map((t) => <span key={t.amount} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">اشحن {t.amount} → +{t.bonus} ر.س</span>)}
+          </div>
+        )}
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">مكافأة أول شحن (ر.س — 0 تعطيل)</span><input name="topupFirstBonus" type="number" min={0} defaultValue={promo.first} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">هدية التوثيق (ر.س — مرة واحدة)</span><input name="verifyGift" type="number" min={0} defaultValue={verifyGift} className={num} /></label>
         </div>
       </div>

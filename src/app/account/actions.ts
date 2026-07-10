@@ -161,11 +161,14 @@ export async function buyUrgentAction(formData: FormData) {
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
   const { getAdExtras } = await import('@/lib/settings');
   const x = await getAdExtras();
-  if (x.urgentPrice <= 0) redirect(back || '/account/ads');
-  const paid = await charge(session.uid, x.urgentPrice, 'urgent', `شارة عاجل (${x.urgentHours} ساعة)`);
-  if (!paid.ok) redirect(back ? `${back}?urgentneed=1` : `/account/ads?error=needcredit&price=${x.urgentPrice}&bal=${paid.balance}`);
+  // باقتا عاجل: 24 أو 48 ساعة — لكل باقة سعرها من التحكم
+  const hours = Number(formData.get('hours') || 0);
+  const pack = x.urgentPacks.find((pk) => pk.hours === hours) ?? x.urgentPacks[0];
+  if (!pack) redirect(back || '/account/ads');
+  const paid = await charge(session.uid, pack.price, 'urgent', `شارة عاجل (${pack.hours} ساعة)`);
+  if (!paid.ok) redirect(back ? `${back}?urgentneed=1` : `/account/ads?error=needcredit&price=${pack.price}&bal=${paid.balance}`);
   const base = ad.urgent_until && ad.urgent_until > new Date() ? ad.urgent_until : new Date();
-  await prisma.ads.update({ where: { id: adId }, data: { urgent_until: new Date(base.getTime() + x.urgentHours * 3600_000) } }).catch(() => {});
+  await prisma.ads.update({ where: { id: adId }, data: { urgent_until: new Date(base.getTime() + pack.hours * 3600_000) } }).catch(() => {});
   const { bustAdCaches } = await import('@/lib/data');
   await bustAdCaches().catch(() => {});
   revalidatePath('/account/ads');

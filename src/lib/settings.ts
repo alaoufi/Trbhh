@@ -167,15 +167,29 @@ export async function getTrbhhShowPricing(): Promise<TrbhhShowPricing> {
 }
 
 /* خدمات الإعلان الإضافية — من الإيرادات والتسعير (0 = تعطيل الخدمة). */
-export type AdExtras = { urgentPrice: number; urgentHours: number; bumpFreeDays: number; bumpPrice: number };
-export async function getAdExtras(): Promise<AdExtras> {
-  const [up, uh, bf, bp] = await Promise.all([
+export type UrgentPack = { hours: 24 | 48; price: number };
+export type AdExtras = { urgentPacks: UrgentPack[]; bumpFreeDays: number; bumpPrice: number };
+/** أسعار باقتي «عاجل» الخام (تشمل الصفر) — لنموذج الإدارة. */
+export async function getUrgentPrices(): Promise<{ p24: number; p48: number }> {
+  const [legacy, u24, u48] = await Promise.all([
     getSettingNum('urgent_price', 0),
-    getSettingNum('urgent_hours', 48),
+    getSettingNum('urgent_price_24', -1),
+    getSettingNum('urgent_price_48', -1),
+  ]);
+  // توافق رجعي: السعر القديم الموحّد يُعتمد لباقة 48 ساعة حتى تُحفظ الأسعار الجديدة
+  return { p24: Math.max(0, u24 >= 0 ? u24 : 0), p48: Math.max(0, u48 >= 0 ? u48 : legacy) };
+}
+export async function getAdExtras(): Promise<AdExtras> {
+  const [{ p24, p48 }, bf, bp] = await Promise.all([
+    getUrgentPrices(),
     getSettingNum('bump_free_days', 3),
     getSettingNum('bump_price', 0),
   ]);
-  return { urgentPrice: Math.max(0, up), urgentHours: Math.max(1, uh), bumpFreeDays: Math.max(0, bf), bumpPrice: Math.max(0, bp) };
+  const urgentPacks: UrgentPack[] = [
+    { hours: 24, price: p24 },
+    { hours: 48, price: p48 },
+  ].filter((p) => p.price > 0) as UrgentPack[];
+  return { urgentPacks, bumpFreeDays: Math.max(0, bf), bumpPrice: Math.max(0, bp) };
 }
 
 /* عروض الشحن والمكافآت — 0 = معطّل (تُضبط من الإيرادات والتسعير). */
@@ -195,6 +209,29 @@ export async function getTopupPromo(): Promise<TopupPromo> {
 export async function getVerifyGift(): Promise<number> {
   return Math.max(0, await getSettingNum(SETTING_VERIFY_GIFT, 0));
 }
+
+/* حملة زيادة الشحن: شرائح متغيرة (مبلغ الشحن → المكافأة) تُضبط من التسعيرات —
+ * سطر لكل شريحة، وتُطبَّق أعلى شريحة يبلغها مبلغ الشحن. */
+export type TopupTier = { amount: number; bonus: number };
+const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+const toEnDigits = (s: string) => s.replace(/[٠-٩]/g, (d) => String(AR_DIGITS.indexOf(d)));
+export function parseTopupTiers(raw: string): TopupTier[] {
+  return toEnDigits(raw)
+    .split(/\n+/)
+    .map((line) => {
+      const nums = line.trim().split(/[^0-9]+/).filter(Boolean).map((n) => parseInt(n, 10));
+      return { amount: nums[0] || 0, bonus: nums[1] || 0 };
+    })
+    .filter((t) => t.amount > 0 && t.bonus > 0)
+    .sort((a, b) => a.amount - b.amount)
+    .slice(0, 20);
+}
+export async function getTopupTiers(): Promise<TopupTier[]> {
+  return parseTopupTiers(await getSetting('topup_tiers', ''));
+}
+/** أعلى شريحة يبلغها المبلغ (أو null إن لم يبلغ أي شريحة). */
+export const matchTopupTier = (tiers: TopupTier[], amount: number): TopupTier | null =>
+  [...tiers].reverse().find((t) => amount >= t.amount) ?? null;
 
 export const SETTING_TOPUP_NAME_NOTE = 'topup_name_note';
 export const DEFAULT_TOPUP_NAME_NOTE = 'تأكد من الاسم قبل التحويل';

@@ -1,17 +1,21 @@
 import Link from 'next/link';
 import { HandCoins, ChevronLeft } from 'lucide-react';
-import { getTopupPromo } from '@/lib/settings';
+import { getTopupPromo, getTopupTiers } from '@/lib/settings';
 
 /**
- * بانر تسويقي لعرض الشحن: «اشحن بـ100 ر.س ونضيف لك 10 ر.س — يصبح رصيدك 110».
- * الأرقام محسوبة من إعدادات التحكم (نسبة المكافأة + الحد الأدنى + مكافأة أول شحن)،
- * ولا يظهر البانر إلا عند تفعيل أي منهما (نسبة > 0 أو مكافأة أول شحن > 0).
+ * بانر تسويقي لحملة زيادة الشحن: «اشحن بـ100 ر.س ونضيف لك 10 ر.س — يصبح رصيدك 110».
+ * الشرائح من التسعيرات (مبلغ ← مكافأة، متغيرة)، مع مكافأة أول شحن — ولا يظهر
+ * البانر إلا عند وجود شرائح أو نسبة قديمة أو مكافأة أول شحن.
  */
 export async function TopupPromoBanner() {
-  const promo = await getTopupPromo().catch(() => ({ pct: 0, min: 0, first: 0 }));
-  if (promo.pct <= 0 && promo.first <= 0) return null;
-  const amount = Math.max(promo.min, 100); // مثال حي بالحد الأدنى (أو 100 ر.س)
-  const bonus = Math.round((amount * promo.pct) / 100);
+  const [promo, tiers] = await Promise.all([
+    getTopupPromo().catch(() => ({ pct: 0, min: 0, first: 0 })),
+    getTopupTiers().catch(() => []),
+  ]);
+  if (tiers.length === 0 && promo.pct <= 0 && promo.first <= 0) return null;
+  // المثال الرئيسي: أول شريحة من الحملة، وإلا النسبة القديمة
+  const amount = tiers.length ? tiers[0].amount : Math.max(promo.min, 100);
+  const bonus = tiers.length ? tiers[0].bonus : Math.round((amount * promo.pct) / 100);
   return (
     <Link
       href="/account/wallet#topup"
@@ -29,20 +33,39 @@ export async function TopupPromoBanner() {
       <span className="relative flex min-w-0 items-center gap-3">
         <span className="float-3d grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/25 shadow-inner ring-1 ring-white/30"><HandCoins className="h-6 w-6" /></span>
         <span className="min-w-0">
-          {promo.pct > 0 ? (
+          {bonus > 0 ? (
             <>
-              <span className="flex flex-wrap items-center gap-2 text-base font-extrabold drop-shadow">
-                💰 اشحن بـ{amount} ر.س ونضيف لك {bonus} ر.س فوراً
-                <span className="animate-pulse rounded-full bg-white px-2 py-0.5 text-[11px] font-extrabold text-emerald-700 shadow">يصبح رصيدك {amount + bonus} ر.س</span>
+              {/* الأرقام بارزة وغامقة داخل حبوب بيضاء عالية التباين */}
+              <span className="flex flex-wrap items-center gap-1.5 text-base font-extrabold drop-shadow">
+                💰 اشحن بـ
+                <span className="rounded-lg bg-white px-2 py-0.5 text-xl font-black leading-6 text-emerald-900 shadow" dir="ltr">{amount}</span>
+                ر.س ونضيف لك
+                <span className="rounded-lg bg-amber-300 px-2 py-0.5 text-xl font-black leading-6 text-amber-950 shadow" dir="ltr">+{bonus}</span>
+                فوراً
+                <span className="animate-pulse rounded-full bg-white px-2.5 py-1 text-sm font-black text-emerald-800 shadow">يصبح رصيدك {amount + bonus} ر.س</span>
               </span>
-              <span className="block text-xs font-medium text-white/95 drop-shadow">
-                مكافأة {promo.pct}٪ على كل شحن{promo.min > 0 ? ` من ${promo.min} ر.س فأكثر` : ''} — تُضاف تلقائياً فور تأكيد الشحن{promo.first > 0 ? `، ومكافأة أول شحن +${promo.first} ر.س إضافية` : ''}.
-              </span>
+              {tiers.length > 1 ? (
+                <span className="mt-1.5 flex flex-wrap gap-1.5">
+                  {tiers.slice(0, 4).map((t) => (
+                    <span key={t.amount} className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-emerald-900 shadow ring-1 ring-emerald-200">
+                      اشحن <span dir="ltr">{t.amount}</span> ← <span className="text-amber-600" dir="ltr">+{t.bonus}</span> ⭐
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                <span className="block text-xs font-bold text-white drop-shadow">
+                  {tiers.length ? 'حملة زيادة الشحن — كلما زاد شحنك زادت مكافأتك، تُضاف تلقائياً فور التأكيد' : `مكافأة ${promo.pct}٪ على كل شحن${promo.min > 0 ? ` من ${promo.min} ر.س فأكثر` : ''}`}{promo.first > 0 ? `، ومكافأة أول شحن +${promo.first} ر.س إضافية` : ''}.
+                </span>
+              )}
             </>
           ) : (
             <>
-              <span className="block text-base font-extrabold drop-shadow">🎁 مكافأة أول شحن: +{promo.first} ر.س تُضاف لرصيدك</span>
-              <span className="block text-xs font-medium text-white/95 drop-shadow">اشحن رصيدك لأول مرة واحصل على المكافأة تلقائياً فور تأكيد الشحن.</span>
+              <span className="flex flex-wrap items-center gap-1.5 text-base font-extrabold drop-shadow">
+                🎁 مكافأة أول شحن:
+                <span className="rounded-lg bg-white px-2 py-0.5 text-xl font-black leading-6 text-emerald-900 shadow" dir="ltr">+{promo.first}</span>
+                ر.س تُضاف لرصيدك
+              </span>
+              <span className="block text-xs font-bold text-white drop-shadow">اشحن رصيدك لأول مرة واحصل على المكافأة تلقائياً فور تأكيد الشحن.</span>
             </>
           )}
         </span>

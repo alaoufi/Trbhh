@@ -273,11 +273,16 @@ export async function approveTopup(id: number, adminId: number): Promise<TopupRo
   return topupRow({ ...req, status: 1 });
 }
 
-/** مكافآت الشحن (من الإعدادات): نسبة إضافية فوق حدّ أدنى + مكافأة أول شحن — 0 = معطّلة. */
+/** مكافآت الشحن (من التسعيرات): شرائح حملة الشحن (المبلغ → المكافأة، وتُطبَّق أعلى
+ *  شريحة يبلغها المبلغ) + مكافأة أول شحن — وعند غياب الشرائح تُطبَّق النسبة القديمة. */
 async function applyTopupBonuses(userId: number, amount: number, adminId: number): Promise<void> {
-  const { getTopupPromo } = await import('./settings');
+  const { getTopupPromo, getTopupTiers, matchTopupTier } = await import('./settings');
   const promo = await getTopupPromo();
-  if (promo.pct > 0 && amount >= promo.min) {
+  const tiers = await getTopupTiers();
+  if (tiers.length > 0) {
+    const tier = matchTopupTier(tiers, amount);
+    if (tier) await adjustBalance(userId, tier.bonus, 'bonus', { adminId, note: `مكافأة حملة الشحن: +${tier.bonus} على شحن ${amount} ر.س` });
+  } else if (promo.pct > 0 && amount >= promo.min) {
     const bonus = Math.round((amount * promo.pct) / 100);
     if (bonus > 0) await adjustBalance(userId, bonus, 'bonus', { adminId, note: `+${promo.pct}% على شحن ${amount} ر.س` });
   }

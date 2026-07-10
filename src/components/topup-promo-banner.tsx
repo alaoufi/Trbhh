@@ -53,14 +53,14 @@ export async function TopupPromoBanner() {
               ))}
             </span>
           )}
-          <span className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-white drop-shadow">
-            {until && (
-              <span className="animate-pulse flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1 text-sm font-black ring-1 ring-amber-300/60">
-                ⏳ عرض — باقي <Countdown until={until.toISOString()} className="text-amber-300" />
-              </span>
-            )}
-            <span>تُضاف المكافأة تلقائياً فور تأكيد الشحن{promo.first > 0 ? `، ومكافأة أول شحن ${promo.first} ر.س إضافية` : ''}.</span>
-          </span>
+          {/* العداد التنازلي — بارز وكبير */}
+          {until && (
+            <span className="mt-2 flex w-fit max-w-full flex-wrap items-center gap-2 rounded-xl bg-black/50 px-3 py-1.5 shadow-lg ring-2 ring-amber-300">
+              <span className="animate-pulse text-sm font-black text-white">⏳ عرض — باقي</span>
+              <Countdown until={until.toISOString()} className="text-2xl font-black leading-7 text-amber-300 drop-shadow" />
+            </span>
+          )}
+          <span className="mt-1 block text-xs font-bold text-white drop-shadow">تُضاف المكافأة تلقائياً فور تأكيد الشحن{promo.first > 0 ? `، ومكافأة أول شحن ${promo.first} ر.س إضافية` : ''}.</span>
         </span>
       </span>
       <ChevronLeft className="relative h-5 w-5 shrink-0 drop-shadow" />

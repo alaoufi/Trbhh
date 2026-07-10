@@ -45,10 +45,10 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     countTxns(session.uid),
     pointsEnabled(),
   ]);
-  const { getTopupTiers: _gtt, getTopupCampaignUntil: _gcu } = await import('@/lib/settings');
-  const campaignUntil = await _gcu().catch(() => null);
-  const campaignLive = !campaignUntil || campaignUntil.getTime() > Date.now();
-  const topupTiers = campaignLive ? await _gtt().catch(() => []) : [];
+  const { getActiveTopupCampaign } = await import('@/lib/settings');
+  const activeCampaign = await getActiveTopupCampaign().catch(() => null);
+  const topupTiers = activeCampaign?.tiers ?? [];
+  const campaignUntil = activeCampaign?.until ?? null;
   const txnPages = Math.max(1, Math.ceil(txnTotal / TXN_PAGE));
   const [pts, ptsCfg] = ptsOn ? await Promise.all([getPoints(session.uid), getPointsConfig()]) : [0, null];
   const hadTopup = topups.some((t) => t.status === 1);

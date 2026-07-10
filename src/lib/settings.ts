@@ -240,12 +240,56 @@ export async function getTopupCampaignUntil(): Promise<Date | null> {
   const d = new Date(raw);
   return isNaN(d.getTime()) ? null : d;
 }
-/** هل حملة الشحن سارية؟ (شرائح موجودة + لم ينتهِ عدّادها إن وُجد). */
-export async function isTopupCampaignActive(): Promise<boolean> {
+
+/* جدول حملات الشحن المجدولة: عدة حملات بتواريخ مختلفة (بداية → نهاية + شرائحها).
+ * تبدأ الحملة تلقائياً في تاريخها وتختفي بانتهائها حتى تُضاف/تحين حملة أخرى. */
+export type TopupCampaign = { id: number; from: string; to: string; tiers: TopupTier[] };
+export async function getTopupCampaigns(): Promise<TopupCampaign[]> {
+  try {
+    const raw = await getSetting('topup_campaigns', '');
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((c) => c && c.from && c.to && Array.isArray(c.tiers))
+      .map((c) => ({
+        id: Number(c.id) || 0,
+        from: String(c.from),
+        to: String(c.to),
+        tiers: (c.tiers as TopupTier[]).filter((t) => t && t.amount > 0 && t.bonus > 0).slice(0, 20),
+      }))
+      .filter((c) => c.tiers.length > 0)
+      .slice(0, 30);
+  } catch { return []; }
+}
+export async function setTopupCampaigns(list: TopupCampaign[]): Promise<void> {
+  await setSetting('topup_campaigns', JSON.stringify(list));
+}
+export type CampaignState = 'upcoming' | 'active' | 'ended';
+export function campaignState(c: TopupCampaign, nowMs = Date.now()): CampaignState {
+  const from = new Date(c.from).getTime();
+  const to = new Date(c.to).getTime();
+  if (nowMs < from) return 'upcoming';
+  if (nowMs >= to) return 'ended';
+  return 'active';
+}
+/**
+ * الحملة السارية الآن (تبدأ من تاريخها وتنتهي بتاريخها) — null = لا عرض.
+ * توافق رجعي: إن لم يُعرَّف جدول حملات تُعتمد الشرائح القديمة (مع عدّادها إن وُجد).
+ */
+export async function getActiveTopupCampaign(): Promise<{ tiers: TopupTier[]; until: Date | null } | null> {
+  const now = Date.now();
+  const list = await getTopupCampaigns();
+  if (list.length > 0) {
+    const active = list.find((c) => campaignState(c, now) === 'active');
+    return active ? { tiers: active.tiers, until: new Date(active.to) } : null;
+  }
+  // توافق: الطريقة القديمة (شرائح + عداد اختياري)
   const tiers = await getTopupTiers();
-  if (!tiers.length) return false;
+  if (!tiers.length) return null;
   const until = await getTopupCampaignUntil();
-  return !until || until.getTime() > Date.now();
+  if (until && until.getTime() <= now) return null;
+  return { tiers, until };
 }
 
 export const SETTING_TOPUP_NAME_NOTE = 'topup_name_note';

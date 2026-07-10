@@ -1,21 +1,20 @@
 import Link from 'next/link';
 import { HandCoins, ChevronLeft } from 'lucide-react';
-import { getTopupPromo, getTopupTiers, getTopupCampaignUntil } from '@/lib/settings';
+import { getTopupPromo, getActiveTopupCampaign } from '@/lib/settings';
 import { Countdown } from '@/components/countdown';
 
 /**
- * بانر «عرض» حملة زيادة الشحن: الشرائح من التسعيرات وبنفس ترتيب إدخالها حرفياً،
- * مع عداد تنازلي حتى نهاية العرض (إن حُددت مدته). لا باقات = لا بانر إطلاقاً،
- * وينتهي العداد = يختفي البانر تلقائياً.
+ * بانر «عرض» حملة زيادة الشحن المجدولة: يظهر فقط عندما تكون هناك حملة تاريخُها
+ * يشمل الآن (تبدأ من تاريخها وتنتهي بتاريخها فيختفي حتى تحين حملة أخرى)،
+ * والشرائح بنفس ترتيب إدخالها في التحكم مع عداد تنازلي حتى نهاية الحملة.
  */
 export async function TopupPromoBanner() {
-  const [promo, tiers, until] = await Promise.all([
+  const [promo, campaign] = await Promise.all([
     getTopupPromo().catch(() => ({ pct: 0, min: 0, first: 0 })),
-    getTopupTiers().catch(() => []),
-    getTopupCampaignUntil().catch(() => null),
+    getActiveTopupCampaign().catch(() => null),
   ]);
-  if (tiers.length === 0) return null; // لا باقات = لا يظهر العرض
-  if (until && until.getTime() <= Date.now()) return null; // انتهى العرض
+  if (!campaign) return null; // لا حملة سارية الآن = لا يظهر العرض
+  const { tiers, until } = campaign;
   // الأرقام من شرائح لوحة التحكم حرفياً — أول شريحة كما أدخلتها هي المثال الرئيسي
   const amount = tiers[0].amount;
   const bonus = tiers[0].bonus;

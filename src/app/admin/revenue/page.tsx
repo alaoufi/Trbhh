@@ -4,9 +4,9 @@ import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupTiers, getTopupCampaignUntil, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupCampaigns, campaignState, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { pointsEnabled, getPointsConfig, referralEnabled, getReferralReward, getWelcomeCredit } from '@/lib/points';
-import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction } from '../actions';
+import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction, addTopupCampaignAction, deleteTopupCampaignAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الإيرادات' };
@@ -345,15 +345,63 @@ async function PricingTab() {
     getStorePlusPricing(), getLeadConfig(), getAuctionConfig(),
   ]);
   const urgentPrices = await getUrgentPrices();
-  const topupTiers = await getTopupTiers();
-  const campaignUntil = await getTopupCampaignUntil();
+  const campaigns = await getTopupCampaigns();
   const services: { key: PaidService; note?: string }[] = [
     { key: 'featured' },
     { key: 'classified', note: 'إعلان واحد حسب المدّة' },
     { key: 'dup3', note: 'يرفع حظر التكرار لـ 3 إعلانات' },
     { key: 'dup5', note: 'يرفع حظر التكرار لـ 5 إعلانات' },
   ];
+  const fmtCamp = (iso: string) => new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(new Date(iso));
+  const stateChip = (st: 'upcoming' | 'active' | 'ended') =>
+    st === 'active' ? <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold text-white">✅ فعّالة الآن</span>
+    : st === 'upcoming' ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-extrabold text-sky-700">⏳ قادمة</span>
+    : <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-extrabold text-muted-foreground">⛔ منتهية</span>;
   return (
+    <>
+    {/* 🎁 حملات زيادة الشحن المجدولة — تبدأ من تاريخها وتختفي بانتهائها حتى تحين حملة أخرى */}
+    <div className="card-3d mb-4 space-y-3 rounded-2xl border-2 border-emerald-300 p-4">
+      <div className="flex items-center gap-2 font-bold text-emerald-800">🎁 حملات زيادة الشحن (بتواريخ)</div>
+      <p className="text-[11px] text-muted-foreground">
+        جدولة عدة حملات بتواريخ مختلفة: كل حملة تبدأ تلقائياً <b>من تاريخها ولمدة الأيام المحددة</b> (مثال: من 2026/6/7 لمدة 3 أيام) ثم يختفي البانر
+        وتتوقف المكافآت حتى تحين الحملة التالية أو تضيف غيرها. الشرائح: سطر لكل شريحة «مبلغ الشحن ثم المكافأة»
+        وتُعرض في البانر بنفس ترتيب إدخالك، والعداد التنازلي (يوم وساعة ودقيقة وثانية) يظهر تلقائياً حتى نهاية الحملة الفعّالة.
+      </p>
+      {campaigns.length > 0 ? (
+        <ul className="space-y-2">
+          {campaigns.map((c) => (
+            <li key={c.id} className="space-y-1.5 rounded-xl border p-2.5">
+              <div className="flex flex-wrap items-center gap-2 text-sm font-bold">
+                {stateChip(campaignState(c))}
+                <span>من {fmtCamp(c.from)} لمدة {Math.max(1, Math.round((new Date(c.to).getTime() - new Date(c.from).getTime()) / 86400000))} يوم (حتى {fmtCamp(c.to)})</span>
+                <form action={deleteTopupCampaignAction} className="mr-auto">
+                  <input type="hidden" name="id" value={c.id} />
+                  <button className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">حذف</button>
+                </form>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {c.tiers.map((t, i) => <span key={`${t.amount}-${i}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">اشحن {t.amount} تحصل على {t.bonus} ريال</span>)}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] font-extrabold text-amber-800">⚠ لا توجد حملات — البانر مخفي حتى تضيف حملة يشمل تاريخُها اليوم.</div>
+      )}
+      <form action={addTopupCampaignAction} className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
+        <div className="text-xs font-bold text-emerald-800">➕ إضافة حملة جديدة</div>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">تبدأ من تاريخ</span><input name="from" type="date" required className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">المدة (أيام) — مثال: 3</span><input name="days" type="number" min={1} max={365} required placeholder="3" className={num} /></label>
+        </div>
+        <label className="block space-y-1">
+          <span className="text-xs font-bold">شرائح الحملة (سطر لكل شريحة: المبلغ ثم المكافأة)</span>
+          <textarea name="tiers" rows={4} dir="ltr" required placeholder={'100 10\n200 25\n300 40'} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/40" />
+        </label>
+        <button className="btn-3d rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">💾 إضافة الحملة</button>
+      </form>
+    </div>
+
     <form action={saveRevenueAction} className="card-3d space-y-4 rounded-2xl p-4">
       <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> اشتراك المتاجر</div>
       <label className="flex items-center gap-2 text-sm font-bold">
@@ -414,36 +462,11 @@ async function PricingTab() {
         <p className="mt-1 text-[11px] text-muted-foreground">يختار المعلن باقة 24 أو 48 ساعة عند النشر أو من صفحة إعلانه. «تحديث» يرفع الإعلان لأعلى القوائم — مجاني كل عدد الأيام المحدد، وقبله يُخصم السعر من الرصيد (تفعيل زر التحديث نفسه من الإعدادات ← الميزات).</p>
       </div>
 
-      {/* حملة زيادة الشحن (شرائح متغيرة) + مكافآت الشحن */}
+      {/* مكافآت الشحن الثابتة — حملات الشحن المجدولة لها جدول مستقل أعلى هذا النموذج */}
       <div className="rounded-xl border border-emerald-300 bg-emerald-50/60 p-3">
-        <div className="mb-1 text-xs font-bold text-emerald-800">🎁 حملة زيادة الشحن والمكافآت</div>
-        <p className="mb-2 text-[11px] text-muted-foreground">شرائح الحملة: سطر لكل شريحة «مبلغ الشحن ثم المكافأة» — مثال: <b dir="ltr">100 10</b> تعني اشحن 100 ر.س وخذ 10 ر.س. تُطبَّق أعلى شريحة يبلغها المبلغ تلقائياً فور تأكيد الشحن، <b>وتُعرض في البانر بنفس ترتيب إدخالك هنا</b>. اتركها فارغة لإيقاف الحملة وإخفاء البانر.</p>
-        <label className="block space-y-1">
-          <span className="text-xs font-bold">شرائح الحملة (مبلغ الشحن ← المكافأة — سطر لكل شريحة)</span>
-          <textarea name="topupTiers" rows={4} dir="ltr" defaultValue={topupTiers.map((t) => `${t.amount} ${t.bonus}`).join('\n')} placeholder={'100 10\n200 25\n300 40'} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/40" />
-        </label>
-        {/* حالة الحملة الآن — تُحدَّث بعد الحفظ */}
-        {topupTiers.length > 0 ? (
-          <div className="mt-1 space-y-1">
-            <div className="text-[11px] font-extrabold text-emerald-700">✅ الحملة فعّالة ({topupTiers.length} شرائح) — البانر ظاهر في الرئيسية ولوحة العضو والمحفظة{campaignUntil && campaignUntil > new Date() ? `، وينتهي ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(campaignUntil)}` : ''}.</div>
-            <div className="flex flex-wrap gap-1.5">
-              {topupTiers.map((t, i) => <span key={`${t.amount}-${i}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">اشحن {t.amount} تحصل على {t.bonus} ريال</span>)}
-            </div>
-          </div>
-        ) : (
-          <div className="mt-1 rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] font-extrabold text-amber-800">⚠ لا توجد شرائح محفوظة حالياً — البانر مخفي. اكتب الشرائح بالأعلى ثم اضغط «💾 حفظ الحملة الآن».</div>
-        )}
-        <button className="btn-3d mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">💾 حفظ الحملة الآن</button>
-        {/* عداد العرض التنازلي: أدخل عدد الأيام ليبدأ العد من لحظة الحفظ */}
-        <div className="mt-2 rounded-lg border border-emerald-200 bg-white p-2">
-          <label className="block space-y-1">
-            <span className="text-xs font-bold">⏳ مدة العرض بالأيام (عداد تنازلي في البانر)</span>
-            <input name="campaignDays" type="number" min={0} placeholder={campaignUntil && campaignUntil > new Date() ? `ساري حتى ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(campaignUntil)}` : 'اتركه فارغاً = بلا تغيير'} className={num} />
-          </label>
-          <p className="mt-1 text-[10px] text-muted-foreground">أدخل رقماً (مثل 3) ليظهر عداد تنازلي 3 أيام من لحظة الحفظ ويختفي البانر تلقائياً عند انتهائه. أدخل 0 لإلغاء العداد (عرض دائم)، واتركه فارغاً للإبقاء على الوضع الحالي.</p>
-        </div>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <label className="space-y-1"><span className="text-xs font-bold">مكافأة أول شحن (ر.س — 0 تعطيل)</span><input name="topupFirstBonus" type="number" min={0} defaultValue={promo.first} className={num} /></label>
+        <div className="mb-1 text-xs font-bold text-emerald-800">🎁 مكافآت الشحن الثابتة (اكتب 0 للتعطيل)</div>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">مكافأة أول شحن (ر.س)</span><input name="topupFirstBonus" type="number" min={0} defaultValue={promo.first} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">هدية التوثيق (ر.س — مرة واحدة)</span><input name="verifyGift" type="number" min={0} defaultValue={verifyGift} className={num} /></label>
         </div>
       </div>
@@ -533,5 +556,6 @@ async function PricingTab() {
       </div>
       <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"><Save className="h-4 w-4" /> حفظ التسعيرات</button>
     </form>
+    </>
   );
 }

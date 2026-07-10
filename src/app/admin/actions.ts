@@ -496,19 +496,10 @@ export async function saveRevenueAction(formData: FormData) {
   // تنبيهات قرب انتهاء الاشتراك: قبل كم يوم + كم مرة
   await setSetting(SETTING_SUB_REMIND_DAYS, nn('subRemindDays'));
   await setSetting(SETTING_SUB_REMIND_COUNT, nn('subRemindCount'));
-  // حملة زيادة الشحن (شرائح: مبلغ ← مكافأة) + مكافأة أول شحن + هدية التوثيق
-  const { SETTING_TOPUP_FIRST_BONUS, SETTING_VERIFY_GIFT, SETTING_TOPUP_BONUS_PCT, SETTING_TOPUP_BONUS_MIN, parseTopupTiers } = await import('@/lib/settings');
-  const tiers = parseTopupTiers(String(formData.get('topupTiers') || ''));
-  await setSetting('topup_tiers', tiers.map((t) => `${t.amount} ${t.bonus}`).join('\n'));
-  // تصفير مفاتيح النسبة القديمة — الحملة تعمل بالشرائح فقط كما تظهر في اللوحة
+  // مكافأة أول شحن + هدية التوثيق (حملات الشحن لها جدول مستقل بإجراءاته)
+  const { SETTING_TOPUP_FIRST_BONUS, SETTING_VERIFY_GIFT, SETTING_TOPUP_BONUS_PCT, SETTING_TOPUP_BONUS_MIN } = await import('@/lib/settings');
   await setSetting(SETTING_TOPUP_BONUS_PCT, '0');
   await setSetting(SETTING_TOPUP_BONUS_MIN, '0');
-  // عداد العرض التنازلي: رقم = أيام من الآن، 0 = إلغاء العداد، فارغ = بلا تغيير
-  const rawDays = String(formData.get('campaignDays') ?? '').trim();
-  if (rawDays !== '') {
-    const days = Math.max(0, parseInt(rawDays) || 0);
-    await setSetting('topup_campaign_until', days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : '');
-  }
   await setSetting(SETTING_TOPUP_FIRST_BONUS, nn('topupFirstBonus'));
   await setSetting(SETTING_VERIFY_GIFT, nn('verifyGift'));
   // المزادات: رسم الفتح + أقصى مدة
@@ -1021,4 +1012,41 @@ export async function setUserPasswordAction(formData: FormData) {
   if (pass.length < 6) redirect(`/admin/users/${uid}?error=${encodeURIComponent('كلمة المرور 6 أحرف على الأقل')}`);
   await prisma.users.update({ where: { id: BigInt(uid) }, data: { password: await hashPassword(pass) } }).catch(() => {});
   redirect(`/admin/users/${uid}?setpass=1`);
+}
+
+
+/** إضافة حملة شحن مجدولة: تبدأ من تاريخ محدد وتستمر لمدة أيام محددة (بتوقيت السعودية). */
+export async function addTopupCampaignAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const { parseTopupTiers, getTopupCampaigns, setTopupCampaigns } = await import('@/lib/settings');
+  const fromRaw = String(formData.get('from') || '').trim();
+  const days = Math.max(1, Math.min(365, parseInt(String(formData.get('days') || '0')) || 0));
+  const tiers = parseTopupTiers(String(formData.get('tiers') || ''));
+  // تبدأ من منتصف ليل تاريخ البداية بتوقيت السعودية وتستمر «مدة» أيام كاملة
+  const from = new Date(`${fromRaw}T00:00:00+03:00`);
+  if (!fromRaw || isNaN(from.getTime()) || days <= 0 || tiers.length === 0) {
+    redirect('/admin/revenue?tab=pricing&camp=err');
+  }
+  const to = new Date(from.getTime() + days * 86400000);
+  const list = await getTopupCampaigns();
+  const id = list.reduce((m, c) => Math.max(m, c.id), 0) + 1;
+  list.push({ id, from: from.toISOString(), to: to.toISOString(), tiers });
+  await setTopupCampaigns(list.slice(-30));
+  await logAdmin(session.uid, `إضافة حملة شحن (من ${fromRaw} لمدة ${days} يوم)`);
+  revalidatePath('/admin/revenue');
+  revalidatePath('/');
+  redirect('/admin/revenue?tab=pricing&camp=1');
+}
+
+/** حذف حملة شحن مجدولة. */
+export async function deleteTopupCampaignAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const { getTopupCampaigns, setTopupCampaigns } = await import('@/lib/settings');
+  const id = Number(formData.get('id') || 0);
+  const list = (await getTopupCampaigns()).filter((c) => c.id !== id);
+  await setTopupCampaigns(list);
+  await logAdmin(session.uid, `حذف حملة شحن #${id}`);
+  revalidatePath('/admin/revenue');
+  revalidatePath('/');
+  redirect('/admin/revenue?tab=pricing&camp=del');
 }

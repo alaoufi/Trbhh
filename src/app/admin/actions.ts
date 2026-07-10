@@ -1034,6 +1034,11 @@ export async function addTopupCampaignAction(formData: FormData) {
   // فشل التخزين (مثلاً عمود قديم ضيق قبل الترقية) يظهر رسالة واضحة بدل صفحة خطأ
   let saved = true;
   try { await setTopupCampaigns(list.slice(-30)); } catch { saved = false; }
+  // تحقق فعلي بعد الحفظ: هل الحملة الجديدة موجودة عند القراءة؟ (يكشف البتر الصامت)
+  if (saved) {
+    const check = await getTopupCampaigns();
+    if (!check.some((c) => c.id === id)) saved = false;
+  }
   if (!saved) redirect('/admin/revenue?tab=pricing&camp=dberr');
   await logAdmin(session.uid, `إضافة حملة شحن (من ${fromRaw} لمدة ${days} يوم)`);
   revalidatePath('/admin/revenue');

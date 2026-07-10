@@ -263,7 +263,26 @@ export async function getTopupCampaigns(): Promise<TopupCampaign[]> {
   } catch { return []; }
 }
 export async function setTopupCampaigns(list: TopupCampaign[]): Promise<void> {
-  await setSetting('topup_campaigns', JSON.stringify(list));
+  const v = JSON.stringify(list);
+  try {
+    await setSetting('topup_campaigns', v);
+  } catch {
+    // عمود قديم ضيق (VARCHAR 255) يرفض القيمة الطويلة — وسّعه ثم أعد المحاولة
+    const { prisma } = await import('./prisma');
+    await prisma.$executeRawUnsafe(`ALTER TABLE site_settings MODIFY v TEXT NULL`).catch(() => {});
+    await setSetting('topup_campaigns', v);
+  }
+}
+/** تشخيص تخزين الحملات: نوع العمود + هل القيمة المخزنة سليمة (غير مبتورة). */
+export async function topupCampaignsHealth(): Promise<{ columnType: string; storedOk: boolean; storedLen: number }> {
+  const { prisma } = await import('./prisma');
+  const rows = await prisma.$queryRawUnsafe<{ dt: string }[]>(
+    `SELECT DATA_TYPE dt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'site_settings' AND COLUMN_NAME = 'v'`,
+  ).catch(() => [] as { dt: string }[]);
+  const raw = await getSetting('topup_campaigns', '');
+  let storedOk = true;
+  if (raw) { try { JSON.parse(raw); } catch { storedOk = false; } }
+  return { columnType: rows[0]?.dt ?? 'غير معروف', storedOk, storedLen: raw.length };
 }
 export type CampaignState = 'upcoming' | 'active' | 'ended';
 export function campaignState(c: TopupCampaign, nowMs = Date.now()): CampaignState {

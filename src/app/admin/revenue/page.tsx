@@ -4,7 +4,7 @@ import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupCampaigns, campaignState, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupCampaigns, getActiveTopupCampaign, topupCampaignsHealth, campaignState, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { pointsEnabled, getPointsConfig, referralEnabled, getReferralReward, getWelcomeCredit } from '@/lib/points';
 import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction, addTopupCampaignAction, deleteTopupCampaignAction } from '../actions';
 
@@ -349,6 +349,8 @@ async function PricingTab({ camp }: { camp?: string }) {
   ]);
   const urgentPrices = await getUrgentPrices();
   const campaigns = await getTopupCampaigns();
+  const activeCamp = await getActiveTopupCampaign().catch(() => null);
+  const campHealth = await topupCampaignsHealth().catch(() => null);
   const services: { key: PaidService; note?: string }[] = [
     { key: 'featured' },
     { key: 'classified', note: 'إعلان واحد حسب المدّة' },
@@ -365,7 +367,18 @@ async function PricingTab({ camp }: { camp?: string }) {
     {/* 🎁 حملات زيادة الشحن المجدولة — تبدأ من تاريخها وتختفي بانتهائها حتى تحين حملة أخرى */}
     <div className="card-3d mb-4 space-y-3 rounded-2xl border-2 border-emerald-300 p-4">
       <div className="flex items-center gap-2 font-bold text-emerald-800">🎁 حملات زيادة الشحن (بتواريخ)</div>
-      {camp === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ أُضيفت الحملة — إن كان تاريخها يشمل اليوم فالبانر ظاهر الآن بالرئيسية.</div>}
+      {/* حالة البانر الحقيقية الآن — بنفس الدالة التي يقرأ منها البانر */}
+      {activeCamp ? (
+        <div className="rounded-lg border-2 border-emerald-400 bg-emerald-50 p-2 text-xs font-extrabold text-emerald-800">🟢 البانر ظاهر الآن في الرئيسية ولوحة العضو والمحفظة — حملة سارية{activeCamp.until ? ` حتى ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(activeCamp.until)}` : ''} ({activeCamp.tiers.length} شرائح).</div>
+      ) : (
+        <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-extrabold text-amber-800">🔴 البانر مخفي الآن — لا توجد حملة تاريخها يشمل هذه اللحظة. أضف حملة تبدأ من تاريخ اليوم (أو تشمل اليوم) ليظهر فوراً.</div>
+      )}
+      {campHealth && (!campHealth.storedOk || (campHealth.columnType !== 'text' && campHealth.columnType !== 'mediumtext' && campHealth.columnType !== 'longtext')) && (
+        <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-extrabold text-red-700">
+          ⚠ مشكلة تخزين: نوع عمود الإعدادات «{campHealth.columnType}»{!campHealth.storedOk ? ' والقيمة المخزنة مبتورة/تالفة' : ''} — أعد إضافة الحملة (الحفظ يصلّح العمود تلقائياً)، وإن تكررت فأعد تشغيل التطبيق بعد آخر تحديث.
+        </div>
+      )}
+      {camp === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ أُضيفت الحملة وتم التحقق من حفظها فعلياً.</div>}
       {camp === 'del' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ حُذفت الحملة.</div>}
       {camp === 'err' && <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs font-bold text-red-700">تعذّرت الإضافة — تأكد من التاريخ والمدة والشرائح (سطر لكل شريحة: المبلغ ثم المكافأة).</div>}
       {camp === 'dberr' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-bold text-red-700">⚠ تعذّر الحفظ في قاعدة البيانات — أعد تشغيل التطبيق بعد آخر تحديث (يوسّع عمود الإعدادات تلقائياً) ثم أعد المحاولة.</div>}

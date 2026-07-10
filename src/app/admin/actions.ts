@@ -497,9 +497,12 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting(SETTING_SUB_REMIND_DAYS, nn('subRemindDays'));
   await setSetting(SETTING_SUB_REMIND_COUNT, nn('subRemindCount'));
   // حملة زيادة الشحن (شرائح: مبلغ ← مكافأة) + مكافأة أول شحن + هدية التوثيق
-  const { SETTING_TOPUP_FIRST_BONUS, SETTING_VERIFY_GIFT, parseTopupTiers } = await import('@/lib/settings');
+  const { SETTING_TOPUP_FIRST_BONUS, SETTING_VERIFY_GIFT, SETTING_TOPUP_BONUS_PCT, SETTING_TOPUP_BONUS_MIN, parseTopupTiers } = await import('@/lib/settings');
   const tiers = parseTopupTiers(String(formData.get('topupTiers') || ''));
   await setSetting('topup_tiers', tiers.map((t) => `${t.amount} ${t.bonus}`).join('\n'));
+  // تصفير مفاتيح النسبة القديمة — الحملة تعمل بالشرائح فقط كما تظهر في اللوحة
+  await setSetting(SETTING_TOPUP_BONUS_PCT, '0');
+  await setSetting(SETTING_TOPUP_BONUS_MIN, '0');
   await setSetting(SETTING_TOPUP_FIRST_BONUS, nn('topupFirstBonus'));
   await setSetting(SETTING_VERIFY_GIFT, nn('verifyGift'));
   // المزادات: رسم الفتح + أقصى مدة

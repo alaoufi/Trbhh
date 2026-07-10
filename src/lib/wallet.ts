@@ -273,8 +273,8 @@ export async function approveTopup(id: number, adminId: number): Promise<TopupRo
   return topupRow({ ...req, status: 1 });
 }
 
-/** مكافآت الشحن (من التسعيرات): شرائح حملة الشحن (المبلغ → المكافأة، وتُطبَّق أعلى
- *  شريحة يبلغها المبلغ) + مكافأة أول شحن — وعند غياب الشرائح تُطبَّق النسبة القديمة. */
+/** مكافآت الشحن (من التسعيرات): شرائح حملة الشحن كما هي في لوحة التحكم حرفياً —
+ *  تُطبَّق أعلى شريحة يبلغها المبلغ + مكافأة أول شحن. */
 async function applyTopupBonuses(userId: number, amount: number, adminId: number): Promise<void> {
   const { getTopupPromo, getTopupTiers, matchTopupTier } = await import('./settings');
   const promo = await getTopupPromo();
@@ -282,9 +282,6 @@ async function applyTopupBonuses(userId: number, amount: number, adminId: number
   if (tiers.length > 0) {
     const tier = matchTopupTier(tiers, amount);
     if (tier) await adjustBalance(userId, tier.bonus, 'bonus', { adminId, note: `مكافأة حملة الشحن: +${tier.bonus} على شحن ${amount} ر.س` });
-  } else if (promo.pct > 0 && amount >= promo.min) {
-    const bonus = Math.round((amount * promo.pct) / 100);
-    if (bonus > 0) await adjustBalance(userId, bonus, 'bonus', { adminId, note: `+${promo.pct}% على شحن ${amount} ر.س` });
   }
   if (promo.first > 0) {
     const prior = await prisma.wallet_txns.count({ where: { user_id: BigInt(userId), reason: 'topup' } }).catch(() => 99);

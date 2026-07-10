@@ -93,7 +93,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           <Link href="/guide/how/topup" className="btn-3d mr-auto inline-flex items-center gap-1 rounded-full bg-red-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md hover:bg-red-700">🎬 شاهد طريقة الشحن</Link>
         </div>
         {/* حملة زيادة الشحن الحالية — تظهر فقط عند تفعيلها من الإدارة */}
-        {(topupTiers.length > 0 || promo.pct > 0 || (promo.first > 0 && !hadTopup)) && (
+        {(topupTiers.length > 0 || (promo.first > 0 && !hadTopup)) && (
           <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-2.5 text-sm font-extrabold text-emerald-800">
             {topupTiers.length > 0 && (
               <div className="space-y-1">
@@ -103,7 +103,6 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
                 </div>
               </div>
             )}
-            {topupTiers.length === 0 && promo.pct > 0 && <div>🎁 اشحن {promo.min > 0 ? `${promo.min} ر.س أو أكثر` : 'الآن'} واحصل على +{promo.pct}% رصيداً إضافياً!</div>}
             {promo.first > 0 && !hadTopup && <div>⭐ مكافأة أول شحن: +{promo.first} ر.س تُضاف لرصيدك مع أول شحن مؤكَّد.</div>}
           </div>
         )}

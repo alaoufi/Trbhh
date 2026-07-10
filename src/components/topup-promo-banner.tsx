@@ -12,10 +12,10 @@ export async function TopupPromoBanner() {
     getTopupPromo().catch(() => ({ pct: 0, min: 0, first: 0 })),
     getTopupTiers().catch(() => []),
   ]);
-  if (tiers.length === 0 && promo.pct <= 0 && promo.first <= 0) return null;
-  // المثال الرئيسي: أول شريحة من الحملة، وإلا النسبة القديمة
-  const amount = tiers.length ? tiers[0].amount : Math.max(promo.min, 100);
-  const bonus = tiers.length ? tiers[0].bonus : Math.round((amount * promo.pct) / 100);
+  if (tiers.length === 0 && promo.first <= 0) return null;
+  // الأرقام من شرائح لوحة التحكم حرفياً — أول شريحة هي المثال الرئيسي
+  const amount = tiers.length ? tiers[0].amount : 0;
+  const bonus = tiers.length ? tiers[0].bonus : 0;
   return (
     <Link
       href="/account/wallet#topup"
@@ -54,7 +54,7 @@ export async function TopupPromoBanner() {
                 </span>
               ) : (
                 <span className="block text-xs font-bold text-white drop-shadow">
-                  {tiers.length ? 'حملة زيادة الشحن — كلما زاد شحنك زادت مكافأتك، تُضاف تلقائياً فور التأكيد' : `مكافأة ${promo.pct}٪ على كل شحن${promo.min > 0 ? ` من ${promo.min} ر.س فأكثر` : ''}`}{promo.first > 0 ? `، ومكافأة أول شحن +${promo.first} ر.س إضافية` : ''}.
+                  حملة زيادة الشحن — تُضاف المكافأة تلقائياً فور تأكيد الشحن{promo.first > 0 ? `، ومكافأة أول شحن +${promo.first} ر.س إضافية` : ''}.
                 </span>
               )}
             </>

@@ -26,6 +26,7 @@ import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
+import { buyUrgentAction } from '@/app/account/actions';
 import { PromoSlot } from '@/components/promo-slot';
 import { getAdAudio } from '@/lib/ad-media';
 import { mediaUrl } from '@/lib/media';
@@ -73,7 +74,7 @@ function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath
   );
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; urgent?: string; urgentneed?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -128,6 +129,15 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   // "مراسلة" available to non-owners; WhatsApp/call only when the seller provides them
   const contactCols = (isAdOwner ? 0 : 1) + (waNumber ? 1 : 0) + (ad.seller?.phone ? 1 : 0);
 
+  // شارة عاجل لصاحب الإعلان: زر تفعيل مباشر — يغطي الرصيد → خصم، لا يغطي → دعوة لشحن الرصيد
+  const urgentActive = !!(ad.urgentUntil && new Date(ad.urgentUntil) > new Date());
+  const urgentExtras = isAdOwner && !ad.storeOnly && ad.status === 1
+    ? await import('@/lib/settings').then((m) => m.getAdExtras()).catch(() => null)
+    : null;
+  const urgentBalance = urgentExtras && urgentExtras.urgentPrice > 0
+    ? await import('@/lib/wallet').then((m) => m.getBalance(session!.uid)).catch(() => 0)
+    : 0;
+
   // Distance between the visitor (from the trbhh_geo cookie) and the ad location
   const viewerLoc = await getViewerLocation();
   const adLoc = parseLatLng(ad.lat && ad.lng ? `${ad.lat},${ad.lng}` : null);
@@ -146,6 +156,29 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   return (
     <div className="space-y-4 pb-16 md:pb-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
+      {/* نتيجة طلب شارة عاجل (من نموذج النشر أو زر التفعيل هنا) */}
+      {spx.urgent === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🔥 فُعّلت شارة «عاجل» على إعلانك وخُصمت الرسوم من رصيدك.</div>}
+      {spx.urgentneed === '1' && (
+        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          💳 نُشر إعلانك، لكن رصيدك لا يغطي شارة «عاجل»{urgentExtras ? ` (${urgentExtras.urgentPrice} ر.س)` : ''} —{' '}
+          <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم فعّلها بالزر أدناه.
+        </div>
+      )}
+
+      {/* شارة عاجل — عرض تسويقي دائم لصاحب الإعلان النشط */}
+      {urgentExtras && urgentExtras.urgentPrice > 0 && !urgentActive && (
+        <form action={buyUrgentAction} className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-red-300 bg-red-50/70 p-3 shadow-sm">
+          <input type="hidden" name="adId" value={ad.id} />
+          <input type="hidden" name="back" value="ad" />
+          <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>
+          <span className="min-w-0 flex-1 text-xs font-bold text-red-700">
+            اجعل إعلانك يلفت الأنظار بشارة «عاجل» النابضة في كل القوائم — {urgentExtras.urgentPrice} ر.س لمدة {urgentExtras.urgentHours} ساعة.
+            <span className="block font-medium text-muted-foreground">رصيدك: {urgentBalance} ر.س{urgentBalance < urgentExtras.urgentPrice && <> — لا يغطي، <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link></>}</span>
+          </span>
+          <button className="btn-3d shrink-0 rounded-lg bg-red-600 px-4 py-2 text-sm font-extrabold text-white">تفعيل الآن</button>
+        </form>
+      )}
 
       {/* إعلان متجر مستقل: امنع مبوّبات تربح واعرض رابط زيارة المتجر */}
       {inStore && <SplashSuppress />}

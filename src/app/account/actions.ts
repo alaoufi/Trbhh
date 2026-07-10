@@ -148,23 +148,26 @@ export async function toggleFavoriteAction(formData: FormData) {
 }
 
 
-/** شراء شارة «عاجل» 🔥 لإعلان العضو — السعر والمدة من التحكم، يُخصم من الرصيد. */
+/** شراء شارة «عاجل» 🔥 لإعلان العضو — السعر والمدة من التحكم، يُخصم من الرصيد.
+ *  back=ad: الزر من صفحة الإعلان نفسها فيعود إليها بنتيجة الشراء. */
 export async function buyUrgentAction(formData: FormData) {
   const session = await requireUser();
   const adId = BigInt(String(formData.get('adId') || '0'));
+  const back = String(formData.get('back') || '') === 'ad' ? `/ads/${toInt(adId)}` : '';
   const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { user_id: true, urgent_until: true } });
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
   const { getAdExtras } = await import('@/lib/settings');
   const x = await getAdExtras();
-  if (x.urgentPrice <= 0) redirect('/account/ads');
+  if (x.urgentPrice <= 0) redirect(back || '/account/ads');
   const paid = await charge(session.uid, x.urgentPrice, 'urgent', `شارة عاجل (${x.urgentHours} ساعة)`);
-  if (!paid.ok) redirect(`/account/ads?error=needcredit&price=${x.urgentPrice}&bal=${paid.balance}`);
+  if (!paid.ok) redirect(back ? `${back}?urgentneed=1` : `/account/ads?error=needcredit&price=${x.urgentPrice}&bal=${paid.balance}`);
   const base = ad.urgent_until && ad.urgent_until > new Date() ? ad.urgent_until : new Date();
   await prisma.ads.update({ where: { id: adId }, data: { urgent_until: new Date(base.getTime() + x.urgentHours * 3600_000) } }).catch(() => {});
   const { bustAdCaches } = await import('@/lib/data');
   await bustAdCaches().catch(() => {});
   revalidatePath('/account/ads');
-  redirect('/account/ads?urgent=1');
+  if (back) revalidatePath(back);
+  redirect(back ? `${back}?urgent=1` : '/account/ads?urgent=1');
 }
 
 /** «تحديث إعلاني»: رفع الإعلان لأعلى القوائم — مجاني كل X أيام، وما زاد يُخصم من الرصيد. */

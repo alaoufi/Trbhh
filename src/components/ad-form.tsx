@@ -45,7 +45,7 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, allowOldPrice, allowStock,
+  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, allowOldPrice, allowStock, urgentOffer,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[]; areas?: Area[];
@@ -53,6 +53,8 @@ export function AdForm({
   needPrice?: string; needBal?: string; dest?: string;
   limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean; allowSchedule?: boolean;
   allowOldPrice?: boolean; allowStock?: boolean;
+  /** عرض تسويقي لشارة «عاجل» عند النشر: السعر والمدة ورصيد العضو الحالي */
+  urgentOffer?: { price: number; hours: number; balance: number };
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
@@ -180,10 +182,10 @@ export function AdForm({
       )}
       {error === 'needcredit' && (
         <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
-          💳 رصيدك لا يكفي لإتمام العملية. <b>اشحن رصيدك</b>.
-          {needPrice && <span> رسوم التكرار: <b>{needPrice} ر.س</b>.</span>}
+          💳 رصيدك لا يكفي لإتمام العملية.
+          {needPrice && <span> المطلوب: <b>{needPrice} ر.س</b>.</span>}
           {needBal !== undefined && <span> رصيدك الحالي: <b>{needBal} ر.س</b>.</span>}
-          <span> راجع <a href="/account/wallet" className="font-bold underline">محفظتي</a> أو تواصل مع الإدارة للشحن.</span>
+          <span> <a href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك من هنا</a> ثم أعد المحاولة.</span>
         </div>
       )}
       {error === 'banned' && (
@@ -343,6 +345,26 @@ export function AdForm({
           <span className="text-sm font-bold text-sky-800">🕒 جدولة النشر (اختياري)</span>
           <span className="block text-xs text-muted-foreground">اترك الحقل فارغاً للنشر فوراً، أو اختر موعداً (حتى ٣٠ يوماً) ليُنشر إعلانك تلقائياً وقتها.</span>
           <input type="datetime-local" name="publishAt" className="h-11 w-full rounded-lg border border-sky-300 bg-background px-3 text-sm" dir="ltr" />
+        </label>
+      )}
+
+      {/* شارة عاجل — عرض تسويقي بارز عند النشر: يغطي الرصيد → خصم فوري، لا يغطي → دعوة لشحن الرصيد */}
+      {urgentOffer && urgentOffer.price > 0 && (
+        <label className="block cursor-pointer rounded-xl border-2 border-red-300 bg-red-50/70 p-3 shadow-sm">
+          <span className="flex items-start gap-2">
+            <input type="checkbox" name="urgent" value="1" className="mt-1 h-4 w-4 shrink-0 accent-red-600" />
+            <span className="min-w-0">
+              <span className="flex flex-wrap items-center gap-2 text-sm font-extrabold text-red-700">
+                <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>
+                أضف شارة «عاجل» لإعلانك — {urgentOffer.price} ر.س لمدة {urgentOffer.hours} ساعة
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                تجعل إعلانك يلفت الأنظار بشارة حمراء نابضة في كل القوائم وصفحة الإعلان — تُخصم من رصيدك عند النشر.
+                {' '}رصيدك الحالي: <b className={urgentOffer.balance >= urgentOffer.price ? 'text-emerald-700' : 'text-red-700'}>{urgentOffer.balance} ر.س</b>
+                {urgentOffer.balance < urgentOffer.price && <> — لا يغطي الشارة، <a href="/account/wallet#topup" target="_blank" className="font-bold text-primary underline">اشحن رصيدك من هنا</a> (سيُنشر إعلانك على كل حال).</>}
+              </span>
+            </span>
+          </span>
         </label>
       )}
       <Submit label={submitLabel} />

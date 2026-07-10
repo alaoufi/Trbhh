@@ -24,7 +24,7 @@ export default async function NewAuctionPage({ searchParams }: { searchParams: P
   return (
     <div className="mx-auto max-w-lg space-y-4">
       <h1 className="flex items-center gap-2 text-xl font-bold text-primary"><Gavel className="h-6 w-6" /> افتح مزاداً على إعلانك</h1>
-      {error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي لرسم فتح المزاد ({cfg.fee} ر.س، ورصيدك {balance} ر.س) — اشحن رصيدك من «محفظتي».</div>}
+      {error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي لرسم فتح المزاد ({cfg.fee} ر.س، ورصيدك {balance} ر.س) — <a href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</a> ثم أعد المحاولة.</div>}
       {error && error !== 'needcredit' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-700">{decodeURIComponent(error)}</div>}
       <p className="rounded-xl bg-secondary/30 p-3 text-xs leading-5 text-muted-foreground">
         حدد سعر البداية وأدنى زيادة ومدة المزاد (حتى {cfg.maxDays} أيام). عند الانتهاء يُغلق تلقائياً ويُعلن صاحب أعلى مزايدة فائزاً وتصلكما رسالة لإتمام الصفقة بينكما.

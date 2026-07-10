@@ -324,6 +324,23 @@ export async function createAdAction(formData: FormData) {
     }
   }).catch(() => {});
   if (dest !== 'store') await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز خاصة بإعلانات تربح
+  // شارة عاجل المطلوبة من نموذج النشر: يغطي الرصيد → خصم وتفعيل فوري، لا يغطي → يُنشر الإعلان وتُطلب إعادة الشحن
+  let urgentState: '' | 'ok' | 'need' = '';
+  if (formData.get('urgent') && dest !== 'store') {
+    const { getAdExtras } = await import('@/lib/settings');
+    const x = await getAdExtras();
+    if (x.urgentPrice > 0) {
+      const { charge } = await import('@/lib/wallet');
+      const paid = await charge(session.uid, x.urgentPrice, 'urgent', `شارة عاجل (${x.urgentHours} ساعة)`);
+      if (paid.ok) {
+        const base = scheduledAt ?? new Date();
+        await prisma.ads.update({ where: { id: ad.id }, data: { urgent_until: new Date(base.getTime() + x.urgentHours * 3600_000) } }).catch(() => {});
+        urgentState = 'ok';
+      } else {
+        urgentState = 'need';
+      }
+    }
+  }
   await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
   if (!requireApproval && dest !== 'store' && !scheduledAt) {
     // تنبيهات البحث المحفوظ + مطابقة عرض/طلب — لإعلانات تربح فقط (عزل المتاجر)
@@ -342,8 +359,10 @@ export async function createAdAction(formData: FormData) {
     redirect(sid ? `/companies/${sid}?added=1` : '/store?added=1');
   }
   // ينشر مباشرة، إلا إذا كان مقيّداً بالموافقة أو مجدولاً
-  if (scheduledAt) redirect('/account/ads?scheduled=1');
-  if (requireApproval) redirect('/account/ads?pending=1');
+  if (scheduledAt) redirect(`/account/ads?scheduled=1${urgentState === 'need' ? '&urgentneed=1' : ''}`);
+  if (requireApproval) redirect(`/account/ads?pending=1${urgentState === 'need' ? '&urgentneed=1' : ''}`);
+  if (urgentState === 'ok') redirect(`/ads/${toInt(ad.id)}?urgent=1`);
+  if (urgentState === 'need') redirect(`/ads/${toInt(ad.id)}?urgentneed=1`);
   redirect(`/ads/${toInt(ad.id)}`);
 }
 

@@ -15,6 +15,8 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false),
     import('@/lib/store-extras').then((m) => m.stockEnabled()).catch(() => false),
   ]);
+  // شارة عاجل — عرض تسويقي داخل نموذج النشر (لإعلانات تربح فقط)
+  const extras = await import('@/lib/settings').then((m) => m.getAdExtras()).catch(() => null);
   const session = await getSession();
   if (!session) redirect('/login');
   const { error, left, max, hours, wait, cat, banned, dup, price, bal, dest } = await searchParams;
@@ -22,6 +24,10 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     getCategories(), getSubCategories(), getCountries(), getCities(), getAreas(),
     prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true, phone_whatsapp: true } }),
   ]);
+  const balance = await import('@/lib/wallet').then((m) => m.getBalance(session.uid)).catch(() => 0);
+  const urgentOffer = extras && extras.urgentPrice > 0 && dest !== 'store'
+    ? { price: extras.urgentPrice, hours: extras.urgentHours, balance }
+    : undefined;
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">أضف إعلاناً جديداً</h1>
@@ -29,6 +35,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
         allowSchedule={allowSchedule}
         allowOldPrice={dealsOn}
         allowStock={stockOn && dest === 'store'}
+        urgentOffer={urgentOffer}
         action={createAdAction}
         categories={categories}
         subcategories={subcategories}

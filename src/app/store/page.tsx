@@ -125,7 +125,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         <div className="card-3d space-y-3 rounded-2xl p-4">
           <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> اشتراك المتجر</div>
           {sub === 'ok' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ تم تجديد الاشتراك وخُصمت الرسوم من رصيدك.</div>}
-          {sub === 'nocredit' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-700">الرصيد غير كافٍ — اشحن رصيدك من «محفظتي» ثم أعد المحاولة.</div>}
+          {sub === 'nocredit' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-700">الرصيد غير كافٍ — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
           {subState.trial && subState.state === 'active' && (
             <div className="rounded-lg bg-indigo-50 p-2 text-xs font-bold text-indigo-700">
               🎁 فترة تجريبية مجانية — متبقٍ {en(Math.max(0, subState.daysLeft))} يوم حتى {fmtDate(subState.until?.toISOString() ?? null)}، ثم يبدأ الاشتراك. لتمديد التجربة <Link href="/messages/admin" className="underline">راسل الإدارة</Link>.
@@ -175,7 +175,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         <div className="card-3d space-y-3 rounded-2xl border-2 border-amber-300 bg-amber-50/40 p-4">
           <div className="flex items-center gap-2 font-bold text-amber-800">⭐ باقة متجر Plus</div>
           {plus === '1' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ فُعّلت باقة Plus وخُصم المبلغ من رصيدك — اشتراكك وعرضك في تربح وشارتك ⭐ سارية الآن.</div>}
-          {plus === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي — اشحن رصيدك من «محفظتي» ثم أعد المحاولة.</div>}
+          {plus === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
           {plus === 'err' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">تعذّر التنفيذ — حاول مجدداً.</div>}
           {plusActive && <div className="rounded-lg bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">⭐ باقة Plus مفعّلة حتى: {fmtD(storeXRow!.plus_until)}</div>}
           <p className="text-xs text-muted-foreground">صفقة واحدة تجمع: <b>اشتراك المتجر</b> + <b>عرض متجرك ومنتجاته في رئيسية تربح</b> + <b>شارة ⭐ Plus</b> على واجهة متجرك طوال المدة — تُخصم من رصيدك.</p>
@@ -390,7 +390,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           <div className="flex items-center gap-2 font-bold text-primary">📣 الظهور في تربح (مدفوع)</div>
           {show === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض متجرك في تربح وخُصم المبلغ من رصيدك.</div>}
           {adshow === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض إعلانك في تربح وخُصم المبلغ من رصيدك.</div>}
-          {(show === 'needcredit' || adshow === 'needcredit') && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي{price ? ` (المطلوب ${price} ر.س)` : ''} — اشحن رصيدك من «محفظتي» ثم أعد المحاولة.</div>}
+          {(show === 'needcredit' || adshow === 'needcredit') && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي{price ? ` (المطلوب ${price} ر.س)` : ''} — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
           {(show === 'err' || adshow === 'err') && <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs font-bold text-red-700">تعذّر التنفيذ — تأكد من الاختيار وحاول مجدداً.</div>}
 
           {(showPricing.store.w2 > 0 || showPricing.store.m1 > 0 || showPricing.store.y1 > 0) && (

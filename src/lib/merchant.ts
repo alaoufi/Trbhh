@@ -530,9 +530,13 @@ export async function storeCard(storeId: number) {
   const meta = await getStoreMeta(storeId);
   const owner = await prisma.users.findUnique({ where: { id: BigInt(s.user_id) }, select: { name: true, userName: true } });
   const logo = await logoUrl(s.logo);
-  const ads = await prisma.ads.findMany({ where: { user_id: BigInt(s.user_id) }, select: { id: true, status: true } });
-  const activeAds = ads.filter((a) => a.status === 1).length;
-  const views = ads.length ? (await prisma.ads_views.count({ where: { ads_id: { in: ads.map((a) => a.id) } } }).catch(() => 0)) : 0;
+  // نفس أرقام صفحة المتجر تماماً: عدد منتجات الكتالوج النشطة + زيارات صفحة المتجر
+  // (كانت تعدّ كل إعلانات العضو في المنصة ومشاهداتها فتظهر أرقام لا تطابق ما يراه الزائر)
+  const productIds = await storeProductAdIds(storeId);
+  const activeAds = productIds.length
+    ? await prisma.ads.count({ where: { id: { in: productIds.map((n) => BigInt(n)) }, status: 1 } }).catch(() => 0)
+    : 0;
+  const views = s.views ?? 0;
   const [followers, rating] = await Promise.all([followersCount(storeId), getStoreRating(storeId)]);
   return {
     id: storeId,

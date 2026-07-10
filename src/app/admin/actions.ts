@@ -1029,6 +1029,9 @@ export async function addTopupCampaignAction(formData: FormData) {
   }
   const to = new Date(from.getTime() + days * 86400000);
   const list = await getTopupCampaigns();
+  // منع تداخل أوقات الحملات: الجديدة تُرفض إن تقاطعت مدتها مع أي حملة قائمة
+  const clash = list.find((c) => from.getTime() < new Date(c.to).getTime() && to.getTime() > new Date(c.from).getTime());
+  if (clash) redirect('/admin/revenue?tab=pricing&camp=overlap');
   const id = list.reduce((m, c) => Math.max(m, c.id), 0) + 1;
   list.push({ id, from: from.toISOString(), to: to.toISOString(), tiers });
   // فشل التخزين (مثلاً عمود قديم ضيق قبل الترقية) يظهر رسالة واضحة بدل صفحة خطأ

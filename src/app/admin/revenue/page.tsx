@@ -381,10 +381,11 @@ async function PricingTab({ camp }: { camp?: string }) {
       {camp === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ أُضيفت الحملة وتم التحقق من حفظها فعلياً.</div>}
       {camp === 'del' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ حُذفت الحملة.</div>}
       {camp === 'err' && <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs font-bold text-red-700">تعذّرت الإضافة — تأكد من التاريخ والمدة والشرائح (سطر لكل شريحة: المبلغ ثم المكافأة).</div>}
+      {camp === 'overlap' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-bold text-red-700">⚠ الوقت يتداخل مع حملة قائمة في الجدول — لا يُسمح بتداخل أوقات الحملات. عدّل تاريخ البداية أو المدة، أو احذف الحملة المتداخلة أولاً.</div>}
       {camp === 'dberr' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-bold text-red-700">⚠ تعذّر الحفظ في قاعدة البيانات — أعد تشغيل التطبيق بعد آخر تحديث (يوسّع عمود الإعدادات تلقائياً) ثم أعد المحاولة.</div>}
       <p className="text-[11px] text-muted-foreground">
         جدولة عدة حملات بتواريخ مختلفة: كل حملة تبدأ تلقائياً <b>من تاريخها ولمدة الأيام المحددة</b> (مثال: من 2026/6/7 لمدة 3 أيام) ثم يختفي البانر
-        وتتوقف المكافآت حتى تحين الحملة التالية أو تضيف غيرها. الشرائح: سطر لكل شريحة «مبلغ الشحن ثم المكافأة»
+        وتتوقف المكافآت حتى تحين الحملة التالية أو تضيف غيرها. <b>لا يُسمح بتداخل أوقات الحملات</b> — أي حملة جديدة تتقاطع مع حملة قائمة تُرفض. الشرائح: سطر لكل شريحة «مبلغ الشحن ثم المكافأة»
         وتُعرض في البانر بنفس ترتيب إدخالك، والعداد التنازلي (يوم وساعة ودقيقة وثانية) يظهر تلقائياً حتى نهاية الحملة الفعّالة.
       </p>
       {campaigns.length > 0 ? (

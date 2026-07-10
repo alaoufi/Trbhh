@@ -1020,10 +1020,12 @@ export async function addTopupCampaignAction(formData: FormData) {
   const session = await requireAction('users', 'edit');
   const { parseTopupTiers, getTopupCampaigns, setTopupCampaigns } = await import('@/lib/settings');
   const fromRaw = String(formData.get('from') || '').trim();
+  const timeRaw = String(formData.get('fromTime') || '').trim();
+  const fromTime = /^\d{2}:\d{2}$/.test(timeRaw) ? timeRaw : '00:00';
   const days = Math.max(1, Math.min(365, parseInt(String(formData.get('days') || '0')) || 0));
   const tiers = parseTopupTiers(String(formData.get('tiers') || ''));
-  // تبدأ من منتصف ليل تاريخ البداية بتوقيت السعودية وتستمر «مدة» أيام كاملة
-  const from = new Date(`${fromRaw}T00:00:00+03:00`);
+  // تبدأ من التاريخ والوقت المحددين بتوقيت السعودية وتستمر «مدة» أيام كاملة بالدقيقة
+  const from = new Date(`${fromRaw}T${fromTime}:00+03:00`);
   if (!fromRaw || isNaN(from.getTime()) || days <= 0 || tiers.length === 0) {
     redirect('/admin/revenue?tab=pricing&camp=err');
   }
@@ -1043,7 +1045,7 @@ export async function addTopupCampaignAction(formData: FormData) {
     if (!check.some((c) => c.id === id)) saved = false;
   }
   if (!saved) redirect('/admin/revenue?tab=pricing&camp=dberr');
-  await logAdmin(session.uid, `إضافة حملة شحن (من ${fromRaw} لمدة ${days} يوم)`);
+  await logAdmin(session.uid, `إضافة حملة شحن (من ${fromRaw} ${fromTime} لمدة ${days} يوم)`);
   revalidatePath('/admin/revenue');
   revalidatePath('/');
   redirect('/admin/revenue?tab=pricing&camp=1');

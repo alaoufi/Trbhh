@@ -357,7 +357,7 @@ async function PricingTab({ camp }: { camp?: string }) {
     { key: 'dup3', note: 'يرفع حظر التكرار لـ 3 إعلانات' },
     { key: 'dup5', note: 'يرفع حظر التكرار لـ 5 إعلانات' },
   ];
-  const fmtCamp = (iso: string) => new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(new Date(iso));
+  const fmtCamp = (iso: string) => new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Riyadh' }).format(new Date(iso));
   const stateChip = (st: 'upcoming' | 'active' | 'ended') =>
     st === 'active' ? <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold text-white">✅ فعّالة الآن</span>
     : st === 'upcoming' ? <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-extrabold text-sky-700">⏳ قادمة</span>
@@ -381,11 +381,11 @@ async function PricingTab({ camp }: { camp?: string }) {
       {camp === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ أُضيفت الحملة وتم التحقق من حفظها فعلياً.</div>}
       {camp === 'del' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ حُذفت الحملة.</div>}
       {camp === 'err' && <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs font-bold text-red-700">تعذّرت الإضافة — تأكد من التاريخ والمدة والشرائح (سطر لكل شريحة: المبلغ ثم المكافأة).</div>}
-      {camp === 'overlap' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-bold text-red-700">⚠ الوقت يتداخل مع حملة قائمة في الجدول — لا يُسمح بتداخل أوقات الحملات. عدّل تاريخ البداية أو المدة، أو احذف الحملة المتداخلة أولاً.</div>}
+      {camp === 'overlap' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-bold text-red-700">⚠ الوقت يتداخل مع حملة قائمة في الجدول — لا يُسمح بأي تداخل ولو بدقيقة واحدة. عدّل التاريخ/الوقت/المدة، أو احذف الحملة المتداخلة أولاً.</div>}
       {camp === 'dberr' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-bold text-red-700">⚠ تعذّر الحفظ في قاعدة البيانات — أعد تشغيل التطبيق بعد آخر تحديث (يوسّع عمود الإعدادات تلقائياً) ثم أعد المحاولة.</div>}
       <p className="text-[11px] text-muted-foreground">
         جدولة عدة حملات بتواريخ مختلفة: كل حملة تبدأ تلقائياً <b>من تاريخها ولمدة الأيام المحددة</b> (مثال: من 2026/6/7 لمدة 3 أيام) ثم يختفي البانر
-        وتتوقف المكافآت حتى تحين الحملة التالية أو تضيف غيرها. <b>لا يُسمح بتداخل أوقات الحملات</b> — أي حملة جديدة تتقاطع مع حملة قائمة تُرفض. الشرائح: سطر لكل شريحة «مبلغ الشحن ثم المكافأة»
+        وتتوقف المكافآت حتى تحين الحملة التالية أو تضيف غيرها. <b>لا يُسمح بأي تداخل في أوقات الحملات ولو بدقيقة واحدة</b> — الفحص بالدقيقة والثانية، وأي حملة جديدة تتقاطع مع قائمة تُرفض (يجوز أن تبدأ لحظة انتهاء السابقة تماماً). الشرائح: سطر لكل شريحة «مبلغ الشحن ثم المكافأة»
         وتُعرض في البانر بنفس ترتيب إدخالك، والعداد التنازلي (يوم وساعة ودقيقة وثانية) يظهر تلقائياً حتى نهاية الحملة الفعّالة.
       </p>
       {campaigns.length > 0 ? (
@@ -411,8 +411,9 @@ async function PricingTab({ camp }: { camp?: string }) {
       )}
       <form action={addTopupCampaignAction} className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
         <div className="text-xs font-bold text-emerald-800">➕ إضافة حملة جديدة</div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">تبدأ من تاريخ</span><input name="from" type="date" required className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">وقت البداية (اختياري)</span><input name="fromTime" type="time" defaultValue="00:00" className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">المدة (أيام) — مثال: 3</span><input name="days" type="number" min={1} max={365} required placeholder="3" className={num} /></label>
         </div>
         <label className="block space-y-1">

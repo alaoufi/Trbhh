@@ -55,9 +55,9 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       <div className="space-y-3">
         {ads.map((ad) => (
           <div key={ad.id} className="flex gap-3 card-3d rounded-xl p-3">
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
+            <Link href={`/ads/${ad.id}`} className="relative block h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
               <Image src={ad.image} alt={ad.title} fill sizes="80px" className="object-cover" />
-            </div>
+            </Link>
             <div className="flex min-w-0 flex-1 flex-col">
               <div className="flex items-start justify-between gap-2">
                 <Link href={`/ads/${ad.id}`} className="line-clamp-1 font-semibold hover:text-primary">{ad.title}</Link>

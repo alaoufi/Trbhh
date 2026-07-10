@@ -3,12 +3,14 @@ import { useState } from 'react';
 import { Share2, Link2, QrCode, Check, X, MessageCircle } from 'lucide-react';
 import { ShareCardButton, type ShareCardData } from '@/components/share-card';
 
-export function ShareButtons({ url, title, compact, card }: { url: string; title: string; compact?: boolean; card?: ShareCardData }) {
+export function ShareButtons({ url, title, text, compact, card }: { url: string; title: string; text?: string; compact?: boolean; card?: ShareCardData }) {
   const [copied, setCopied] = useState(false);
   const [qr, setQr] = useState(false);
   const [menu, setMenu] = useState(false);
-  const wa = `https://wa.me/?text=${encodeURIComponent(title + ' - ' + url)}`;
-  const tw = `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`;
+  // نص المشاركة: العنوان + أول الإعلان (إن مُرّر) — والرابط يُلحق دائماً في النهاية
+  const msg = (text || title).trim();
+  const wa = `https://wa.me/?text=${encodeURIComponent(msg + '\n' + url)}`;
+  const tw = `https://twitter.com/intent/tweet?text=${encodeURIComponent(msg)}&url=${encodeURIComponent(url)}`;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}`;
 
   // نسخ الرابط مع بديل يعمل على المتصفحات/الأجهزة التي لا تدعم Clipboard API
@@ -35,7 +37,7 @@ export function ShareButtons({ url, title, compact, card }: { url: string; title
   // المشاركة: مشاركة النظام إن توفّرت، وإلا قائمة بدائل تعمل دائماً.
   const share = async () => {
     if (!card && typeof navigator !== 'undefined' && navigator.share) {
-      try { await navigator.share({ title, url }); } catch { /* أُلغيت */ }
+      try { await navigator.share({ title, text: msg, url }); } catch { /* أُلغيت */ }
       return;
     }
     setMenu((m) => !m);
@@ -64,7 +66,7 @@ export function ShareButtons({ url, title, compact, card }: { url: string; title
             <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
             <div className="absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-xl border bg-card p-1.5 shadow-xl">
               {card && typeof navigator !== 'undefined' && 'share' in navigator && (
-                <button type="button" onClick={() => { navigator.share({ title, url }).catch(() => {}); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Share2 className="h-4 w-4 text-primary" /> مشاركة الرابط</button>
+                <button type="button" onClick={() => { navigator.share({ title, text: msg, url }).catch(() => {}); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Share2 className="h-4 w-4 text-primary" /> مشاركة الرابط</button>
               )}
               <a href={wa} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><MessageCircle className="h-4 w-4 text-[#25D366]" /> واتساب</a>
               <a href={tw} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Share2 className="h-4 w-4" /> تويتر / X</a>

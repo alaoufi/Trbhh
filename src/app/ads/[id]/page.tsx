@@ -38,10 +38,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const ad = await getAd(Number(id));
   if (!ad) return { title: 'إعلان غير موجود' };
+  // معاينة الرابط (واتساب/تويتر…): العنوان + أول الإعلان
+  const desc = (ad.detail || '').replace(/\s+/g, ' ').trim().slice(0, 160);
   return {
     title: ad.title,
-    description: ad.detail?.slice(0, 160),
-    openGraph: { images: (ad.images || []).slice(0, 1), title: ad.title },
+    description: desc,
+    openGraph: { images: (ad.images || []).slice(0, 1), title: ad.title, description: desc },
   };
 }
 
@@ -385,6 +387,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           <ShareButtons
             url={shareUrl}
             title={ad.title}
+            text={[ad.title, (ad.detail || '').replace(/\s+/g, ' ').trim().slice(0, 150)].filter(Boolean).join('\n')}
             compact
             card={{
               url: shareUrl,

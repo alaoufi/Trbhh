@@ -422,11 +422,18 @@ async function PricingTab() {
           <span className="text-xs font-bold">شرائح الحملة (مبلغ الشحن ← المكافأة — سطر لكل شريحة)</span>
           <textarea name="topupTiers" rows={4} dir="ltr" defaultValue={topupTiers.map((t) => `${t.amount} ${t.bonus}`).join('\n')} placeholder={'100 10\n200 25\n300 40'} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/40" />
         </label>
-        {topupTiers.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {topupTiers.map((t) => <span key={t.amount} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">اشحن {t.amount} → +{t.bonus} ر.س</span>)}
+        {/* حالة الحملة الآن — تُحدَّث بعد الحفظ */}
+        {topupTiers.length > 0 ? (
+          <div className="mt-1 space-y-1">
+            <div className="text-[11px] font-extrabold text-emerald-700">✅ الحملة فعّالة ({topupTiers.length} شرائح) — البانر ظاهر في الرئيسية ولوحة العضو والمحفظة{campaignUntil && campaignUntil > new Date() ? `، وينتهي ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(campaignUntil)}` : ''}.</div>
+            <div className="flex flex-wrap gap-1.5">
+              {topupTiers.map((t, i) => <span key={`${t.amount}-${i}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">اشحن {t.amount} تحصل على {t.bonus} ريال</span>)}
+            </div>
           </div>
+        ) : (
+          <div className="mt-1 rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] font-extrabold text-amber-800">⚠ لا توجد شرائح محفوظة حالياً — البانر مخفي. اكتب الشرائح بالأعلى ثم اضغط «💾 حفظ الحملة الآن».</div>
         )}
+        <button className="btn-3d mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">💾 حفظ الحملة الآن</button>
         {/* عداد العرض التنازلي: أدخل عدد الأيام ليبدأ العد من لحظة الحفظ */}
         <div className="mt-2 rounded-lg border border-emerald-200 bg-white p-2">
           <label className="block space-y-1">

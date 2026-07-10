@@ -68,7 +68,8 @@ export function ShareCardButton({ data, className }: { data: ShareCardData; clas
           const scale = Math.max(W / img.width, imgH / img.height);
           const dw = img.width * scale, dh = img.height * scale;
           ctx.save(); ctx.beginPath(); ctx.rect(0, imgTop, W, imgH); ctx.clip();
-          ctx.drawImage(img, (W - dw) / 2, imgTop + (imgH - dh) / 2, dw, dh);
+          // القصّ من أعلى الصورة (وليس وسطها): الصور الطويلة/النصية يُؤخذ أولها فتبقى مفهومة
+          ctx.drawImage(img, (W - dw) / 2, imgTop, dw, dh);
           ctx.restore();
         } else { ctx.fillStyle = '#e2e8f0'; ctx.fillRect(0, imgTop, W, imgH); }
       } else { ctx.fillStyle = '#e2e8f0'; ctx.fillRect(0, imgTop, W, imgH); }

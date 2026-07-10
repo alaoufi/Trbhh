@@ -73,14 +73,16 @@ async function OverviewTab() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Tile icon={TrendingUp} value={`${en(rev.credited)}`} label="إجمالي الشحن (الدخل)" tone="text-sky-600" />
+        <Tile icon={TrendingUp} value={`${en(rev.credited)}`} label="الدخل الحقيقي (شحن + إضافة إدارية)" tone="text-sky-600" />
         <Tile icon={TrendingDown} value={`${en(rev.spent)}`} label="الإيراد الفعلي (المستهلك)" tone="text-emerald-600" />
         <Tile icon={ReceiptText} value={`${en(expenses.total)}`} label="مصروفات الموقع" tone="text-red-500" />
         <Tile icon={Scale} value={`${net >= 0 ? '' : '−'}${en(Math.abs(net))}`} label="صافي الميزانية (الإيراد − المصروفات)" tone={net >= 0 ? 'text-emerald-600' : 'text-red-500'} />
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-1">
+      <div className="grid grid-cols-2 gap-2">
         <Tile icon={Wallet} value={`${en(rev.outstanding)}`} label="أرصدة الأعضاء المتبقّية (التزامات قائمة)" />
+        <Tile icon={Coins} value={`${en(rev.bonuses)}`} label="مكافآت ممنوحة (خارج الميزانية)" tone="text-amber-600" />
       </div>
+      <p className="text-[11px] text-muted-foreground">المكافآت (حملة الشحن، أول شحن، هدية التوثيق، الترحيبي، الإحالة، تحويل النقاط) أرصدة ممنوحة لا تدخل الميزانية: من حوّل 100 وحصل على 10 مكافأة — يدخل الميزانية 100 فقط.</p>
       {/* الميزانية بالشهور — أعمدة مقارنة: دخل / إيراد / مصروفات */}
       {monthly.length > 0 && (() => {
         const maxV = Math.max(1, ...monthly.map((m) => Math.max(m.income, m.revenue, m.expenses)));
@@ -88,7 +90,7 @@ async function OverviewTab() {
           <div className="card-3d rounded-xl p-3">
             <div className="mb-2 text-sm font-bold text-primary">الميزانية بالشهور (آخر ١٢ شهراً)</div>
             <div className="mb-2 flex flex-wrap gap-3 text-[11px] font-bold">
-              <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-sky-500" /> الدخل (شحن)</span>
+              <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-sky-500" /> الدخل الحقيقي (بلا مكافآت)</span>
               <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> الإيراد (المستهلك)</span>
               <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-red-400" /> المصروفات</span>
             </div>
@@ -111,7 +113,7 @@ async function OverviewTab() {
 
       {rev.creditByReason.length > 0 && (
         <div className="card-3d rounded-xl p-3">
-          <div className="mb-2 text-sm font-bold text-sky-700">الدخل (الشحن) حسب النوع</div>
+          <div className="mb-2 text-sm font-bold text-sky-700">الوارد حسب النوع (الشحن والإضافات دخلٌ حقيقي — والبقية مكافآت خارج الميزانية)</div>
           <ul className="space-y-1 text-sm">
             {rev.creditByReason.map((r) => (
               <li key={r.reason} className="flex items-center justify-between"><span className="text-muted-foreground">{r.label}</span><b className="text-sky-700">{en(r.total)} ر.س</b></li>
@@ -206,6 +208,7 @@ async function MemberDetailTab({ userId }: { userId: number }) {
       <div className="flex flex-wrap items-center gap-2">
         <Link href="/admin/revenue?tab=balances" className="flex items-center gap-1 rounded-full border-2 border-primary/25 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5"><ArrowRight className="h-3.5 w-3.5" /> كل الأرصدة</Link>
         <h2 className="text-lg font-extrabold text-primary">كشف حساب: <Link href={`/admin/users/${userId}`} className="underline">{name}</Link></h2>
+        <Link href={`/admin/users/${userId}`} className="btn-3d rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">＋ إضافة / خصم رصيد</Link>
       </div>
       <div className="grid grid-cols-3 gap-2">
         <Tile icon={TrendingUp} value={`${en(credited)}`} label="إجمالي المشحون" tone="text-sky-600" />

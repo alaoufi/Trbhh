@@ -30,6 +30,11 @@ export const REASON_LABELS: Record<TxnReason, string> = {
   refund: 'استرداد',
 };
 
+/** الدخل الحقيقي للميزانية = مال دخل فعلاً (تحويل شحن أو إضافة إدارية).
+ *  المكافآت (حملة الشحن/أول شحن/التوثيق/الترحيبي/الإحالة/تحويل النقاط/الاسترداد)
+ *  أرصدة ممنوحة لا تدخل الميزانية — تُعرض منفصلة. */
+export const REAL_INCOME_REASONS: TxnReason[] = ['topup', 'admin_credit'];
+
 /** Remaining duplicate-publish allowances (from bought «مكرّر» packages). */
 export async function getDupCredit(userId: number): Promise<number> {
   await ensure();
@@ -129,7 +134,8 @@ export async function debitUser(userId: number, amount: number, adminId: number,
 export type WalletTxn = { id: number; amount: number; balanceAfter: number; reason: TxnReason; label: string; note: string | null; at: string | null; byAdmin: boolean };
 
 export type RevenueSummary = {
-  credited: number;   // إجمالي الشحن (موجب)
+  credited: number;   // الدخل الحقيقي فقط (شحن + إضافة إدارية) — المكافآت لا تدخل الميزانية
+  bonuses: number;    // إجمالي المكافآت الممنوحة (خارج الميزانية)
   spent: number;      // إجمالي المصروف (سالب، بالقيمة المطلقة) = الإيراد الفعلي
   outstanding: number; // مجموع أرصدة الأعضاء الحالية
   byReason: { reason: TxnReason; label: string; total: number }[]; // مصروف حسب النوع
@@ -140,8 +146,9 @@ export type RevenueSummary = {
 /** Site-wide revenue summary for the admin (money in/out + breakdown + recent activity). */
 export async function getRevenueSummary(recentLimit = 30): Promise<RevenueSummary> {
   await ensure();
-  const [credited, spentRows, balSum, byReasonRows, creditReasonRows, recentRows] = await Promise.all([
-    prisma.wallet_txns.aggregate({ _sum: { amount: true }, where: { amount: { gt: 0 } } }).catch(() => ({ _sum: { amount: 0 } })),
+  const [credited, bonusRows, spentRows, balSum, byReasonRows, creditReasonRows, recentRows] = await Promise.all([
+    prisma.wallet_txns.aggregate({ _sum: { amount: true }, where: { amount: { gt: 0 }, reason: { in: REAL_INCOME_REASONS } } }).catch(() => ({ _sum: { amount: 0 } })),
+    prisma.wallet_txns.aggregate({ _sum: { amount: true }, where: { amount: { gt: 0 }, reason: { notIn: REAL_INCOME_REASONS } } }).catch(() => ({ _sum: { amount: 0 } })),
     prisma.wallet_txns.aggregate({ _sum: { amount: true }, where: { amount: { lt: 0 } } }).catch(() => ({ _sum: { amount: 0 } })),
     prisma.users.aggregate({ _sum: { balance: true } }).catch(() => ({ _sum: { balance: 0 } })),
     prisma.wallet_txns.groupBy({ by: ['reason'], where: { amount: { lt: 0 } }, _sum: { amount: true } }).catch(() => [] as { reason: string; _sum: { amount: number | null } }[]),
@@ -164,7 +171,7 @@ export async function getRevenueSummary(recentLimit = 30): Promise<RevenueSummar
     label: REASON_LABELS[r.reason as TxnReason] || r.reason, note: r.note, at: r.created_at ? r.created_at.toISOString() : null,
     byAdmin: !!r.admin_id, userId: toInt(r.user_id), userName: nameById.get(toInt(r.user_id)) || `#${toInt(r.user_id)}`,
   }));
-  return { credited: credited._sum.amount ?? 0, spent, outstanding: balSum._sum.balance ?? 0, byReason, creditByReason, recent };
+  return { credited: credited._sum.amount ?? 0, bonuses: bonusRows._sum.amount ?? 0, spent, outstanding: balSum._sum.balance ?? 0, byReason, creditByReason, recent };
 }
 
 export type MemberLedgerRow = { userId: number; name: string; credited: number; consumed: number; balance: number; dupCredit: number };
@@ -351,7 +358,7 @@ export async function getMonthlyBudget(months = 12): Promise<MonthBudget[]> {
   const [txns, exps] = await Promise.all([
     prisma.$queryRawUnsafe<Row[]>(
       `SELECT DATE_FORMAT(created_at,'%Y-%m') m,
-              SUM(IF(amount>0,amount,0)) inc,
+              SUM(IF(amount>0 AND reason IN ('topup','admin_credit'),amount,0)) inc,
               SUM(IF(amount<0,-amount,0)) outc
        FROM wallet_txns WHERE created_at IS NOT NULL
        GROUP BY m ORDER BY m DESC LIMIT ${Math.max(1, months)}`,

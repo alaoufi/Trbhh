@@ -20,6 +20,7 @@ import { homeFeaturedAds, homeStoreCards, storeIdOfUser } from '@/lib/merchant';
 import { StoreMiniCard, type StoreCardData } from '@/components/store-mini-card';
 import { OpenStoreBanner } from '@/components/open-store-banner';
 import { WelcomeBanner } from '@/components/welcome-banner';
+import { TopupPromoBanner } from '@/components/topup-promo-banner';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,6 +87,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       {/* سجّل واحصل على رصيد ترحيبي — للزوار فقط وقابل للإغلاق */}
       {!session && welcomeCredit > 0 && <WelcomeBanner amount={welcomeCredit} />}
+
+      {/* بانر عرض الشحن: اشحن بـ100 ونضيف لك 10 — يظهر عند تفعيل مكافآت الشحن من التحكم */}
+      <TopupPromoBanner />
 
       {/* Category dropdown — pick one or more categories to show */}
       <CategorySelect categories={categories} initial={catsParam} />

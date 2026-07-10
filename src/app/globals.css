@@ -315,6 +315,21 @@ button:active { }
   .store-cta-anim, .shimmer-sweep { animation: none; }
 }
 
+/* نجوم متلألئة فوق البانرات التسويقية (بانر عرض الشحن وغيره) */
+.star-twinkle {
+  position: absolute;
+  pointer-events: none;
+  animation: star-twinkle 2s ease-in-out infinite;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+}
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.5) rotate(0deg); }
+  50%      { opacity: 1;    transform: scale(1.25) rotate(25deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .star-twinkle { animation: none; opacity: 0.8; }
+}
+
 /* indeterminate upload progress bar */
 .progress-indeterminate { position: relative; overflow: hidden; }
 .progress-indeterminate::after {

@@ -11,6 +11,7 @@ import { getSellerRating } from '@/lib/reviews';
 import { InterestsPicker } from '@/components/interests-picker';
 import { PushToggle } from '@/components/push-toggle';
 import { CopyChip } from '@/components/copy-chip';
+import { TopupPromoBanner } from '@/components/topup-promo-banner';
 import { referralEnabled, getReferralReward } from '@/lib/points';
 import { SITE } from '@/lib/constants';
 import { setInterestsAction } from './actions';
@@ -79,6 +80,9 @@ export default async function AccountHome() {
 
       {/* التنبيهات الفورية — تظهر فقط عند تفعيلها من الإدارة */}
       <PushToggle />
+
+      {/* بانر عرض الشحن — الأرقام من التحكم */}
+      <TopupPromoBanner />
 
       {/* المحفظة وشحن الرصيد — المبلغ + إيصال التحويل ثم تأكيد الإدارة */}
       <Link href="/account/wallet#topup" className="flex items-center gap-3 card-3d rounded-xl border-2 border-emerald-500/30 bg-emerald-50/50 p-4 hover:border-emerald-500">

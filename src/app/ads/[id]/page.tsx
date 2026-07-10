@@ -26,7 +26,7 @@ import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
-import { buyUrgentAction, featureAdAction } from '@/app/account/actions';
+import { buyUrgentAction, featureAdAction, bumpAdAction } from '@/app/account/actions';
 import { PromoSlot } from '@/components/promo-slot';
 import { getAdAudio } from '@/lib/ad-media';
 import { mediaUrl } from '@/lib/media';
@@ -74,7 +74,7 @@ function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath
   );
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -145,6 +145,13 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     ? await import('@/lib/wallet').then((m) => m.getBalance(session!.uid)).catch(() => 0)
     : 0;
   const urgentBalance = ownerBalance;
+  // خدمات تسويق إضافية لصاحب الإعلان: التحديث ⬆ والمزاد 🔨 (كل منها بمفتاحه من التحكم)
+  const [bumpOn, auctionOn] = isAdOwner && !ad.storeOnly && ad.status === 1
+    ? await Promise.all([
+        import('@/lib/settings').then((m) => m.getSettingBool('bump_on', false)).catch(() => false),
+        import('@/lib/settings').then((m) => m.auctionsEnabled()).catch(() => false),
+      ])
+    : [false, false];
 
   // Distance between the visitor (from the trbhh_geo cookie) and the ad location
   const viewerLoc = await getViewerLocation();
@@ -214,6 +221,29 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           </span>
           <button className="btn-3d shrink-0 rounded-lg bg-red-600 px-4 py-2 text-sm font-extrabold text-white">تفعيل الآن</button>
         </form>
+      )}
+
+      {/* نتيجة تحديث الإعلان ⬆ */}
+      {spx.bumped === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">⬆ تم تحديث إعلانك — أصبح في مقدمة القوائم الآن.</div>}
+      {spx.bumpwait && <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ التحديث المجاني متاح بعد {spx.bumpwait} يوم.</div>}
+      {spx.bumpneed === '1' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يغطي رسوم التحديث المبكر — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
+
+      {/* خدمات تسويق إضافية لصاحب الإعلان: تحديث ⬆ + مزاد 🔨 + الشرح المتحرك */}
+      {(bumpOn || auctionOn) && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
+          <span className="text-xs font-extrabold text-primary">🚀 سوّق إعلانك أكثر:</span>
+          {bumpOn && (
+            <form action={bumpAdAction}>
+              <input type="hidden" name="adId" value={ad.id} />
+              <input type="hidden" name="back" value="ad" />
+              <button className="btn-3d rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100" title="ارفع إعلانك لأعلى القوائم">⬆ حدّث إعلانك للأعلى</button>
+            </form>
+          )}
+          {auctionOn && (
+            <Link href={`/auctions/new?ad=${ad.id}`} className="btn-3d rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100" title="دع المشترين يتنافسون على السعر">🔨 افتح مزاداً عليه</Link>
+          )}
+          <a href="/guide/how/ad-boost" target="_blank" className="mr-auto text-xs font-extrabold text-red-600 underline">🎬 مميزات تزيد في تسويق إعلانك</a>
+        </div>
       )}
 
       {/* إعلان متجر مستقل: امنع مبوّبات تربح واعرض رابط زيارة المتجر */}

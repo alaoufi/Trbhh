@@ -177,10 +177,12 @@ export async function buyUrgentAction(formData: FormData) {
 export async function bumpAdAction(formData: FormData) {
   const session = await requireUser();
   const adId = BigInt(String(formData.get('adId') || '0'));
+  // back=ad: الزر من صفحة الإعلان نفسها فيعود إليها بنتيجة التحديث
+  const back = String(formData.get('back') || '') === 'ad' ? `/ads/${toInt(adId)}` : '';
   const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { user_id: true, status: true, bumped_at: true, created_at: true } });
   if (!ad || toInt(ad.user_id) !== session.uid || ad.status !== 1) redirect('/account/ads');
   const [{ getAdExtras, getSettingBool }] = await Promise.all([import('@/lib/settings')]);
-  if (!(await getSettingBool('bump_on', false))) redirect('/account/ads');
+  if (!(await getSettingBool('bump_on', false))) redirect(back || '/account/ads');
   const x = await getAdExtras();
   const last = ad.bumped_at || ad.created_at || new Date(0);
   const daysSince = (Date.now() - last.getTime()) / 86400_000;
@@ -188,15 +190,16 @@ export async function bumpAdAction(formData: FormData) {
   if (!freeOk) {
     if (x.bumpPrice <= 0) {
       const left = Math.max(1, Math.ceil(x.bumpFreeDays - daysSince));
-      redirect(`/account/ads?bumpwait=${left}`);
+      redirect(back ? `${back}?bumpwait=${left}` : `/account/ads?bumpwait=${left}`);
     }
     const paid = await charge(session.uid, x.bumpPrice, 'bump', 'تحديث إعلان (رفع للأعلى)');
-    if (!paid.ok) redirect(`/account/ads?error=needcredit&price=${x.bumpPrice}&bal=${paid.balance}`);
+    if (!paid.ok) redirect(back ? `${back}?bumpneed=1` : `/account/ads?error=needcredit&price=${x.bumpPrice}&bal=${paid.balance}`);
   }
   await prisma.ads.update({ where: { id: adId }, data: { bumped_at: new Date() } }).catch(() => {});
   const { bustAdCaches } = await import('@/lib/data');
   await bustAdCaches().catch(() => {});
   revalidatePath('/account/ads');
+  if (back) { revalidatePath(back); redirect(`${back}?bumped=1`); }
   redirect('/account/ads?bumped=1');
 }
 

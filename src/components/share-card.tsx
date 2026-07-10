@@ -35,10 +35,18 @@ function drawWrapped(ctx: CanvasRenderingContext2D, text: string, x: number, y: 
 /** توليد بطاقة صورة جاهزة للمشاركة (واتساب/سناب/تويتر) من بيانات الإعلان — كلها على جهاز الزائر. */
 export function ShareCardButton({ data, className }: { data: ShareCardData; className?: string }) {
   const [busy, setBusy] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   async function generate() {
     if (busy) return;
     setBusy(true);
+    // ننسخ رابط الإعلان مسبقاً: بعض التطبيقات (واتساب أندرويد) تتجاهل النص
+    // المرفق مع الصورة — فيلصقه المستخدم مع الصورة بضغطة واحدة
+    try {
+      await navigator.clipboard?.writeText(data.url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 8000);
+    } catch { /* ignore */ }
     try {
       const W = 1080, H = 1350;
       const canvas = document.createElement('canvas');
@@ -129,8 +137,15 @@ export function ShareCardButton({ data, className }: { data: ShareCardData; clas
   }
 
   return (
-    <button type="button" onClick={generate} disabled={busy} className={className || 'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary'}>
-      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageDown className="h-4 w-4 text-primary" />} بطاقة صورة للمشاركة
-    </button>
+    <>
+      <button type="button" onClick={generate} disabled={busy} className={className || 'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary'}>
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageDown className="h-4 w-4 text-primary" />} بطاقة صورة للمشاركة
+      </button>
+      {linkCopied && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-1.5 text-[11px] font-bold leading-relaxed text-emerald-800">
+          ✓ نُسخ رابط الإعلان — إن لم يظهر مع الصورة الصقه في نفس الرسالة ليصبح ضغطة تفتح الإعلان.
+        </p>
+      )}
+    </>
   );
 }

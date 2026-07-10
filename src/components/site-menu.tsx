@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel, Palette,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
@@ -201,14 +201,11 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
               <Item href="/pages/terms" icon={FileText} onClick={close}>الشروط والأحكام</Item>
             </Section>
 
-            {/* هوية الموقع وألوانه — تحكّم إداري لا يظهر إلا للإدارة */}
-            {isAdmin && (
-              <>
-                <div className="my-2 border-t border-primary/10" />
-                <DesignPicker />
-                <ThemePicker />
-              </>
-            )}
+            {/* الألوان والقوالب — تفضيل شخصي يُحفظ على جهاز المستخدم (متاح للجميع) */}
+            <Section title="الألوان والقوالب 🎨" icon={Palette}>
+              <ThemePicker />
+              <DesignPicker />
+            </Section>
           </div>
         )}
 

@@ -213,7 +213,7 @@ export function AdForm({
 
       <input type="hidden" name="adsType" value={adsType} />
       <div className="grid grid-cols-2 gap-2">
-        {([{ v: 'offer', l: 'عرض (لديّ)', cls: 'border-primary bg-primary text-white' }, { v: 'request', l: 'طلب (أبحث عن)', cls: 'border-amber-500 bg-amber-500 text-white' }] as const).map((t) => (
+        {([{ v: 'offer', l: 'عرض', cls: 'border-primary bg-primary text-white' }, { v: 'request', l: 'طلب', cls: 'border-amber-500 bg-amber-500 text-white' }] as const).map((t) => (
           <button type="button" key={t.v} onClick={() => setAdsType(t.v)}
             className={`rounded-lg border-2 p-2.5 text-sm font-extrabold transition ${adsType === t.v ? t.cls : 'border-primary/25 bg-white text-foreground'}`}>
             {t.l}

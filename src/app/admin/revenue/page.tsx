@@ -416,10 +416,20 @@ async function PricingTab({ camp }: { camp?: string }) {
           <label className="space-y-1"><span className="text-xs font-bold">وقت البداية (اختياري)</span><input name="fromTime" type="time" defaultValue="00:00" className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">المدة (أيام) — مثال: 3</span><input name="days" type="number" min={1} max={365} required placeholder="3" className={num} /></label>
         </div>
-        <label className="block space-y-1">
-          <span className="text-xs font-bold">شرائح الحملة (سطر لكل شريحة: المبلغ ثم المكافأة)</span>
-          <textarea name="tiers" rows={4} dir="ltr" required placeholder={'100 10\n200 25\n300 40'} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/40" />
-        </label>
+        {/* شرائح الحملة — حقلان مفصولان وواضحان لكل شريحة: مبلغ الشحن والمكافأة */}
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-2 gap-2 text-center text-xs font-extrabold text-emerald-800">
+            <span>💳 مبلغ الشحن (ر.س)</span>
+            <span>🎁 المكافأة (ر.س)</span>
+          </div>
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="grid grid-cols-2 gap-2">
+              <input name="tierAmount" type="number" min={1} required={i === 0} placeholder={i === 0 ? '100' : i === 1 ? '200' : i === 2 ? '300' : ''} className={`${num} text-center font-bold`} />
+              <input name="tierBonus" type="number" min={1} required={i === 0} placeholder={i === 0 ? '10' : i === 1 ? '25' : i === 2 ? '40' : ''} className={`${num} text-center font-bold`} />
+            </div>
+          ))}
+          <p className="text-[10px] text-muted-foreground">كل سطر شريحة مستقلة (الأسطر الفارغة تُتجاهل) — تُعرض في البانر بنفس هذا الترتيب، وتُطبَّق أعلى شريحة يبلغها مبلغ الشحن.</p>
+        </div>
         <button className="btn-3d rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">💾 إضافة الحملة</button>
       </form>
     </div>

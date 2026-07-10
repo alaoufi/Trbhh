@@ -1018,12 +1018,18 @@ export async function setUserPasswordAction(formData: FormData) {
 /** إضافة حملة شحن مجدولة: تبدأ من تاريخ محدد وتستمر لمدة أيام محددة (بتوقيت السعودية). */
 export async function addTopupCampaignAction(formData: FormData) {
   const session = await requireAction('users', 'edit');
-  const { parseTopupTiers, getTopupCampaigns, setTopupCampaigns } = await import('@/lib/settings');
+  const { getTopupCampaigns, setTopupCampaigns } = await import('@/lib/settings');
   const fromRaw = String(formData.get('from') || '').trim();
   const timeRaw = String(formData.get('fromTime') || '').trim();
   const fromTime = /^\d{2}:\d{2}$/.test(timeRaw) ? timeRaw : '00:00';
   const days = Math.max(1, Math.min(365, parseInt(String(formData.get('days') || '0')) || 0));
-  const tiers = parseTopupTiers(String(formData.get('tiers') || ''));
+  // شرائح بحقول مفصولة: مبلغ الشحن + المكافأة (زوج لكل سطر، والفارغ يُتجاهل)
+  const amounts = formData.getAll('tierAmount').map((v) => parseInt(String(v)) || 0);
+  const bonuses = formData.getAll('tierBonus').map((v) => parseInt(String(v)) || 0);
+  const tiers = amounts
+    .map((amount, i) => ({ amount, bonus: bonuses[i] || 0 }))
+    .filter((t) => t.amount > 0 && t.bonus > 0)
+    .slice(0, 20);
   // تبدأ من التاريخ والوقت المحددين بتوقيت السعودية وتستمر «مدة» أيام كاملة بالدقيقة
   const from = new Date(`${fromRaw}T${fromTime}:00+03:00`);
   if (!fromRaw || isNaN(from.getTime()) || days <= 0 || tiers.length === 0) {

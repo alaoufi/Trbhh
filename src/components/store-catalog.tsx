@@ -42,7 +42,7 @@ export function StoreCatalog({ ads, style, fields, brand, linkBase = '/ads' }: {
       )
       : ad.adsType === 'request'
         ? <span className="rounded bg-secondary/60 px-1.5 py-0.5 text-[11px] font-bold text-muted-foreground">مطلوب</span>
-        : <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-700">على السوم</span>;
+        : null; // بلا سعر = معروض — لا تُكتب «على السوم»
   const stockBadge = (ad: CatalogAd) => {
     const s = STOCK[ad.stockState ?? 0];
     return s ? <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-extrabold text-white', s.cls)}>{s.label}</span> : null;

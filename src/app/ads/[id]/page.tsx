@@ -195,7 +195,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           <span className="mb-2 inline-block animate-pulse rounded-full bg-red-600 px-3 py-1 text-xs font-extrabold text-white shadow">🔥 عاجل</span>
         )}
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          <span className="text-2xl font-bold text-primary">{ad.price > 0 ? formatPrice(ad.price) : ad.adsType === 'request' ? 'مطلوب' : 'على السوم'}</span>
+          {(ad.price > 0 || ad.adsType === 'request') && <span className="text-2xl font-bold text-primary">{ad.price > 0 ? formatPrice(ad.price) : 'مطلوب'}</span>}
           {/* عروض اليوم: السعر قبل الخصم مشطوب + نسبة الخصم */}
           {ad.oldPrice > ad.price && ad.price > 0 && (
             <>
@@ -285,7 +285,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             card={{
               url: shareUrl,
               title: ad.title,
-              price: ad.price > 0 ? formatPrice(ad.price) : (ad.adsType === 'request' ? 'مطلوب' : 'على السوم'),
+              price: ad.price > 0 ? formatPrice(ad.price) : (ad.adsType === 'request' ? 'مطلوب' : ''),
               city: ad.area ? `${ad.area} - ${ad.city}` : (ad.city || ''),
               image: ad.images?.[0],
             }}

@@ -8,7 +8,7 @@ type Initial = { storeName?: string | null; color?: string | null; banner?: stri
 
 const SAMPLE_ADS: CatalogAd[] = [
   { id: 0, title: 'إعلان تجريبي مميّز بجودة عالية', price: 349, adsType: 'offer', image: '/placeholder-ad.svg', cityName: 'الرياض', createdAt: null, special: true, views: 128, tier: null },
-  { id: 0, title: 'إعلان آخر للمعاينة على السوم', price: 0, adsType: 'offer', image: '/placeholder-ad.svg', cityName: 'جدة', createdAt: null, special: false, views: 54, tier: null },
+  { id: 0, title: 'إعلان آخر للمعاينة بدون سعر', price: 0, adsType: 'offer', image: '/placeholder-ad.svg', cityName: 'جدة', createdAt: null, special: false, views: 54, tier: null },
 ];
 
 /**

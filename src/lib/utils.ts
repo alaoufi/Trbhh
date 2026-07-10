@@ -23,10 +23,10 @@ export function timeAgo(date: Date | string | null | undefined): string {
 }
 
 /** Format a price with Arabic thousands separators. When there's no price:
- *  "على السوم" for an offer (open to bargaining), but "مطلوب" for a request
- *  (طلب) — a request must never read "على السوم". */
+ *  a request (طلب) reads "مطلوب", while an offer shows NOTHING — leaving the
+ *  price empty means it's simply on offer, never labeled "على السوم". */
 export function formatPrice(price: number | null | undefined, currency = 'ر.س', adsType?: string | null): string {
-  if (!price || price <= 0) return adsType === 'request' ? 'مطلوب' : 'على السوم';
+  if (!price || price <= 0) return adsType === 'request' ? 'مطلوب' : '';
   return `${new Intl.NumberFormat('en-US').format(price)} ${currency}`;
 }
 

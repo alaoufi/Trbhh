@@ -1,8 +1,10 @@
 import 'server-only';
 import { prisma } from './prisma';
 
-/** Saudi regions (matched by the region name in `cities`) → their cities/governorates/centers. */
-const DATA: Record<string, string[]> = {
+/** Saudi regions (matched by the region name in `cities`) → their cities/governorates/centers.
+ *  ترتيب المناطق هنا هو الترتيب الرسمي (الرياض ثم مكة ثم المدينة …)، وترتيب المدن داخل
+ *  كل منطقة هو الترتيب الرسمي أيضاً — تعتمد عليه قوائم الاختيار كما هو. */
+export const SAUDI_AREAS: Record<string, string[]> = {
   'الرياض': ['الرياض', 'الدرعية', 'الخرج', 'الدلم', 'السيح', 'الدوادمي', 'المجمعة', 'الزلفي', 'الغاط', 'شقراء', 'أشيقر', 'مرات', 'القويعية', 'الرين', 'عفيف', 'ظلم', 'الأفلاج', 'ليلى', 'السليل', 'وادي الدواسر', 'حوطة بني تميم', 'الحريق', 'المزاحمية', 'ضرما', 'رماح', 'ثادق', 'حريملاء', 'تمير', 'الأرطاوية', 'روضة سدير', 'جلاجل', 'المويه', 'نفي', 'ساجر', 'البجادية'],
   'مكة المكرمة': ['مكة المكرمة', 'جدة', 'الطائف', 'رابغ', 'خليص', 'الجموم', 'بحرة', 'الكامل', 'القنفذة', 'الليث', 'أضم', 'تربة', 'الخرمة', 'رنية', 'المويه', 'ظلم', 'ثول', 'ذهبان', 'الشعيبة', 'المظيلف', 'سبت الجارة', 'بني يزيد'],
   'المدينة المنورة': ['المدينة المنورة', 'ينبع', 'ينبع الصناعية', 'العلا', 'بدر', 'خيبر', 'الحناكية', 'المهد', 'العيص', 'وادي الفرع', 'الصويدرة', 'الفريش', 'الرايس', 'المليليح', 'أبو ضباع', 'السويرقية'],
@@ -18,6 +20,9 @@ const DATA: Record<string, string[]> = {
   'الجوف': ['سكاكا', 'دومة الجندل', 'القريات', 'طبرجل', 'صوير', 'زلوم', 'ميقوع', 'أبو عجرم', 'الحديثة'],
 };
 
+/** الترتيب الرسمي للمناطق (مفاتيح SAUDI_AREAS بترتيبها). */
+export const REGION_ORDER: string[] = Object.keys(SAUDI_AREAS);
+
 let seeded = false;
 /** Idempotently ensure every listed city exists under its region (Saudi = country_id 1). */
 export async function ensureSaudiAreas() {
@@ -25,7 +30,7 @@ export async function ensureSaudiAreas() {
   try {
     const regions = await prisma.cities.findMany({ where: { country_id: 1 }, select: { id: true, name: true } });
     const byName = new Map(regions.map((r) => [r.name.trim(), Number(r.id)]));
-    for (const [regionName, cityNames] of Object.entries(DATA)) {
+    for (const [regionName, cityNames] of Object.entries(SAUDI_AREAS)) {
       const cityId = byName.get(regionName);
       if (!cityId) continue;
       const existing = await prisma.areas.findMany({ where: { city_id: cityId }, select: { name: true } });

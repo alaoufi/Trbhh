@@ -461,15 +461,36 @@ export async function getSubCategories() {
 }
 
 export async function getCities() {
+  const { REGION_ORDER } = await import('./seed-areas');
   const rows = await prisma.cities.findMany({ orderBy: { ordered: 'desc' } });
-  return rows.map((c) => ({ id: toInt(c.id), name: c.name, countryId: c.country_id }));
+  // ترتيب المناطق الرسمي: الرياض ثم مكة ثم المدينة … — وغير المدرج يبقى بعدها بترتيبه القديم
+  const rank = (name: string) => {
+    const i = REGION_ORDER.indexOf(name.trim());
+    return i === -1 ? REGION_ORDER.length : i;
+  };
+  return rows
+    .map((c) => ({ id: toInt(c.id), name: c.name, countryId: c.country_id }))
+    .sort((a, b) => rank(a.name) - rank(b.name));
 }
 
 /** Governorates / centers (المحافظات والمراكز) grouped under a region (city_id). */
 export async function getAreas() {
   await ensureSaudiAreas().catch(() => {});
-  const rows = await prisma.areas.findMany({ orderBy: { name: 'asc' } });
-  return rows.map((a) => ({ id: toInt(a.id), name: a.name, cityId: a.city_id }));
+  const { SAUDI_AREAS } = await import('./seed-areas');
+  const [rows, regions] = await Promise.all([
+    prisma.areas.findMany(),
+    prisma.cities.findMany({ select: { id: true, name: true } }),
+  ]);
+  const regionName = new Map(regions.map((r) => [toInt(r.id), r.name.trim()]));
+  // ترتيب المدن داخل كل منطقة حسب القائمة الرسمية — وغير المدرج يأتي آخرها أبجدياً
+  const rank = (a: { name: string; cityId: number }) => {
+    const list = SAUDI_AREAS[regionName.get(a.cityId) ?? ''] || [];
+    const i = list.indexOf(a.name.trim());
+    return i === -1 ? 9_999 : i;
+  };
+  return rows
+    .map((a) => ({ id: toInt(a.id), name: a.name, cityId: a.city_id }))
+    .sort((a, b) => a.cityId - b.cityId || rank(a) - rank(b) || a.name.localeCompare(b.name, 'ar'));
 }
 
 export async function getAdForEdit(id: number, userId: number) {

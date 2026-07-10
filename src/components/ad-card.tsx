@@ -173,9 +173,7 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
         <div className="mt-auto flex items-end justify-between gap-1 pt-0.5">
           {ad.price > 0
             ? <span className="flex min-w-0 items-baseline gap-1"><span className="truncate text-[15px] font-extrabold text-red-600">{new Intl.NumberFormat('en-US').format(ad.price)} <span className="text-[11px] font-bold">ر.س</span></span><OldPrice ad={ad} /><DiscountChip ad={ad} /></span>
-            : isReq
-              ? <span />
-              : <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold text-amber-700">على السوم</span>}
+            : <span />}
           <span className="shrink-0 text-[9px] text-muted-foreground">{timeShort(ad.createdAt)}</span>
         </div>
       </div>
@@ -200,9 +198,11 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
           {ad.storeName && <StoreTag name={ad.storeName} />}
         </div>
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground/90">{ad.title}</h3>
-        <div className="mt-1 flex items-baseline gap-1.5 text-base font-extrabold text-red-600">
-          {ad.price > 0 ? <>{new Intl.NumberFormat('en-US').format(ad.price)} <span className="text-[11px] font-bold">ر.س</span> <OldPrice ad={ad} /> <DiscountChip ad={ad} /></> : isReq ? <span className="text-sm font-bold text-muted-foreground">مطلوب</span> : <span className="text-amber-600">على السوم</span>}
-        </div>
+        {(ad.price > 0 || isReq) && (
+          <div className="mt-1 flex items-baseline gap-1.5 text-base font-extrabold text-red-600">
+            {ad.price > 0 ? <>{new Intl.NumberFormat('en-US').format(ad.price)} <span className="text-[11px] font-bold">ر.س</span> <OldPrice ad={ad} /> <DiscountChip ad={ad} /></> : <span className="text-sm font-bold text-muted-foreground">مطلوب</span>}
+          </div>
+        )}
         <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-0.5 pt-1.5 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" /> {new Intl.NumberFormat('en-US').format(ad.views)}</span>
           {ad.cityName && <span className="flex min-w-0 items-center gap-0.5"><MapPin className="h-3 w-3 shrink-0" /> <span className="truncate">{ad.cityName}</span></span>}

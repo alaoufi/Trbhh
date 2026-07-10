@@ -140,7 +140,7 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
         {/* السعر والوصف */}
         <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
           <div className="mb-3 flex flex-wrap items-baseline gap-2">
-            <span className="text-2xl font-bold" style={{ color: brand }}>{ad.price > 0 ? formatPrice(ad.price) : ad.adsType === 'request' ? 'مطلوب' : 'على السوم'}</span>
+            {(ad.price > 0 || ad.adsType === 'request') && <span className="text-2xl font-bold" style={{ color: brand }}>{ad.price > 0 ? formatPrice(ad.price) : 'مطلوب'}</span>}
             {showOld && <span className="text-sm text-muted-foreground line-through" dir="ltr">{formatPrice(ad.oldPrice)}</span>}
             {dealPct > 0 && <span className="rounded bg-rose-600 px-2 py-0.5 text-xs font-extrabold text-white">خصم {dealPct}٪</span>}
             {stockBadge && <span className={`rounded px-2 py-0.5 text-xs font-extrabold ${stockBadge.cls}`}>{stockBadge.label}</span>}

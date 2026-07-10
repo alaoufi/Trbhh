@@ -28,6 +28,13 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   const urgentOffer = extras && extras.urgentPrice > 0 && dest !== 'store'
     ? { price: extras.urgentPrice, hours: extras.urgentHours, balance }
     : undefined;
+  // التمييز ⭐ — عرض المدد المسعّرة داخل نموذج النشر (لإعلانات تربح فقط)
+  const { getServicePricing, DURATIONS } = await import('@/lib/settings');
+  const svc = await getServicePricing().catch(() => null);
+  const featuredOpts = svc && dest !== 'store'
+    ? DURATIONS.map((d) => ({ key: d.key, label: d.label, price: svc.featured[d.key] })).filter((o) => o.price > 0)
+    : [];
+  const featuredOffer = featuredOpts.length ? { options: featuredOpts, balance } : undefined;
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">أضف إعلاناً جديداً</h1>
@@ -36,6 +43,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
         allowOldPrice={dealsOn}
         allowStock={stockOn && dest === 'store'}
         urgentOffer={urgentOffer}
+        featuredOffer={featuredOffer}
         action={createAdAction}
         categories={categories}
         subcategories={subcategories}

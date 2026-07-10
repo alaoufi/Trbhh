@@ -45,7 +45,7 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, allowOldPrice, allowStock, urgentOffer,
+  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, allowOldPrice, allowStock, urgentOffer, featuredOffer,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[]; areas?: Area[];
@@ -55,6 +55,8 @@ export function AdForm({
   allowOldPrice?: boolean; allowStock?: boolean;
   /** عرض تسويقي لشارة «عاجل» عند النشر: السعر والمدة ورصيد العضو الحالي */
   urgentOffer?: { price: number; hours: number; balance: number };
+  /** عرض تسويقي للتمييز ⭐ عند النشر: المدد المسعّرة ورصيد العضو الحالي */
+  featuredOffer?: { options: { key: string; label: string; price: number }[]; balance: number };
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
@@ -348,6 +350,40 @@ export function AdForm({
         </label>
       )}
 
+      {/* شرح متحرك: كيف تزيد المميزات تسويق إعلانك */}
+      {(featuredOffer || urgentOffer) && (
+        <a href="/guide/how/ad-boost" target="_blank" className="block rounded-xl bg-red-600 p-3 text-center text-sm font-extrabold text-white shadow hover:bg-red-700">
+          🎬 شاهد: مميزات تزيد في تسويق إعلانك (شرح متحرك)
+        </a>
+      )}
+
+      {/* التمييز ⭐ — عرض تسويقي بارز عند النشر: إطار ذهبي ومقدمة القوائم طوال المدة */}
+      {featuredOffer && featuredOffer.options.length > 0 && (
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50/70 p-3 shadow-sm">
+          <span className="flex flex-wrap items-center gap-2 text-sm font-extrabold text-amber-800">
+            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-white">⭐ مميّز</span>
+            ميّز إعلانك — إطار ذهبي بارز ومقدمة القوائم طوال المدة
+          </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            الإعلانات المميّزة تحصد مشاهدات وتواصلاً أعلى بكثير — اختر المدة وتُخصم من رصيدك عند النشر.
+            {' '}رصيدك الحالي: <b className="text-amber-800">{featuredOffer.balance} ر.س</b>
+            {' '}(<a href="/account/wallet#topup" target="_blank" className="font-bold text-primary underline">اشحن رصيدك</a> إن احتجت — سيُنشر إعلانك على كل حال).
+          </span>
+          {/* معاينة: هكذا سيظهر إعلانك مميزاً */}
+          <div className="mt-2 overflow-hidden rounded-xl border-2 border-amber-400 bg-gradient-to-b from-amber-50 to-white shadow ring-2 ring-amber-400/60">
+            <div className="flex items-center justify-center gap-1 bg-gradient-to-l from-amber-500 to-amber-600 py-0.5 text-[10px] font-extrabold text-white">👑 إعلان ذهبي مميّز</div>
+            <div className="flex items-center gap-2 p-2">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-100 text-lg">📦</span>
+              <span className="min-w-0"><span className="block truncate text-xs font-extrabold text-slate-800">عنوان إعلانك هنا</span><span className="block text-[10px] text-muted-foreground">هكذا سيظهر إعلانك — بإطار ذهبي وفي مقدمة القوائم</span></span>
+            </div>
+          </div>
+          <select name="featuredDur" defaultValue="" className="mt-2 h-11 w-full rounded-lg border-2 border-amber-300 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-400/50">
+            <option value="">بدون تمييز</option>
+            {featuredOffer.options.map((o) => <option key={o.key} value={o.key}>⭐ تمييز {o.label} — {o.price} ر.س</option>)}
+          </select>
+        </div>
+      )}
+
       {/* شارة عاجل — عرض تسويقي بارز عند النشر: يغطي الرصيد → خصم فوري، لا يغطي → دعوة لشحن الرصيد */}
       {urgentOffer && urgentOffer.price > 0 && (
         <label className="block cursor-pointer rounded-xl border-2 border-red-300 bg-red-50/70 p-3 shadow-sm">
@@ -362,6 +398,14 @@ export function AdForm({
                 تجعل إعلانك يلفت الأنظار بشارة حمراء نابضة في كل القوائم وصفحة الإعلان — تُخصم من رصيدك عند النشر.
                 {' '}رصيدك الحالي: <b className={urgentOffer.balance >= urgentOffer.price ? 'text-emerald-700' : 'text-red-700'}>{urgentOffer.balance} ر.س</b>
                 {urgentOffer.balance < urgentOffer.price && <> — لا يغطي الشارة، <a href="/account/wallet#topup" target="_blank" className="font-bold text-primary underline">اشحن رصيدك من هنا</a> (سيُنشر إعلانك على كل حال).</>}
+              </span>
+              {/* معاينة: هكذا سيظهر إعلانك بشارة عاجل */}
+              <span className="relative mt-2 block overflow-hidden rounded-xl border-2 border-red-200 bg-white p-2 shadow">
+                <span className="absolute left-2 top-2 animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-extrabold text-white">🔥 عاجل</span>
+                <span className="flex items-center gap-2">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-red-50 text-lg">📦</span>
+                  <span className="min-w-0"><span className="block truncate text-xs font-extrabold text-slate-800">عنوان إعلانك هنا</span><span className="block text-[10px] text-muted-foreground">هكذا سيظهر إعلانك — بشارة حمراء نابضة تلفت العين</span></span>
+                </span>
               </span>
             </span>
           </span>

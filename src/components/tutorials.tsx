@@ -527,3 +527,94 @@ const FEATURE_AD_SLIDES: TutorialSlide[] = [
 export function FeatureAdTutorial() {
   return <TutorialPlayer slides={FEATURE_AD_SLIDES} shareTitle="شرح تمييز الإعلان — تربح" ctaHref="/account/ads" ctaLabel="👑 ميّز إعلانك الآن" />;
 }
+
+/* ============== مميزات تزيد في تسويق إعلانك ============== */
+/** بطاقة إعلان مصغّرة للمعاينة داخل الشرائح. */
+function MiniAd({ frame, badge, note, delay = 0 }: { frame?: 'gold' | 'plain'; badge?: React.ReactNode; note?: string; delay?: number }) {
+  return (
+    <div className={`tut-rise relative overflow-hidden rounded-xl bg-white shadow ${frame === 'gold' ? 'border-2 border-amber-400 ring-2 ring-amber-400/60' : 'border border-slate-200'}`} style={{ animationDelay: `${delay}s` }}>
+      {frame === 'gold' && <div className="flex items-center justify-center gap-1 bg-gradient-to-l from-amber-500 to-amber-600 py-0.5 text-[9px] font-extrabold text-white">👑 إعلان ذهبي مميّز</div>}
+      {badge}
+      <div className="flex items-center gap-2 p-2">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-base">📦</span>
+        <span className="min-w-0">
+          <span className="block truncate text-[11px] font-extrabold text-slate-800">عنوان إعلانك هنا</span>
+          {note && <span className="block text-[9px] text-slate-400">{note}</span>}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const AD_BOOST_SLIDES: TutorialSlide[] = [
+  {
+    caption: 'إعلانك العادي يظهر بين عشرات الإعلانات — المميزات تجعله يتصدّر ويلفت العين',
+    body: () => (
+      <div className="space-y-2">
+        <MiniAd note="إعلان عادي" />
+        <MiniAd note="إعلان عادي" delay={0.25} />
+        <MiniAd note="إعلانك… وسط الزحام 😐" delay={0.5} />
+      </div>
+    ),
+  },
+  {
+    caption: 'التمييز ⭐: إطار ذهبي بارز ومقدمة القوائم طوال المدة — هكذا يصبح شكل إعلانك',
+    body: () => (
+      <div className="space-y-2">
+        <MiniAd frame="gold" note="إعلانك المميّز — في المقدمة دائماً" />
+        <MiniAd note="إعلان عادي" delay={0.35} />
+        <div className="tut-rise rounded-lg bg-amber-50 p-2 text-[10px] font-bold text-amber-800" style={{ animationDelay: '0.6s' }}>اختر مدة التمييز من نموذج النشر أو من صفحة إعلانك — مشاهدات وتواصل أعلى بكثير.</div>
+      </div>
+    ),
+  },
+  {
+    caption: 'شارة عاجل 🔥: شارة حمراء نابضة تلفت العين في كل القوائم لساعات محددة',
+    body: () => (
+      <div className="space-y-2">
+        <MiniAd badge={<span className="absolute left-2 top-2 animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-extrabold text-white">🔥 عاجل</span>} note="إعلانك بشارة عاجل — يقفز للعين فوراً" />
+        <div className="tut-rise rounded-lg bg-red-50 p-2 text-[10px] font-bold text-red-700" style={{ animationDelay: '0.4s' }}>مثالية للعروض المستعجلة والتصفيات — علّم خيارها عند النشر أو فعّلها من صفحة إعلانك.</div>
+      </div>
+    ),
+  },
+  {
+    caption: 'التحديث ⬆: بضغطة واحدة يرتفع إعلانك لأعلى القوائم من جديد',
+    body: () => (
+      <div className="space-y-2">
+        <div className="tut-rise flex items-center justify-center rounded-lg bg-sky-50 p-1.5 text-lg">⬆️</div>
+        <MiniAd note="إعلانك — عاد للصدارة الآن" />
+        <div className="tut-rise rounded-lg bg-sky-50 p-2 text-[10px] font-bold text-sky-800" style={{ animationDelay: '0.4s' }}>زر «⬆ تحديث» في «إعلاناتي»: مجاني كل عدة أيام، وقبل موعده برسوم رمزية.</div>
+      </div>
+    ),
+  },
+  {
+    caption: 'وأكثر: جدولة النشر 🕒، عروض اليوم 🔥 بخصم ظاهر، وفتح مزاد 🔨 على إعلانك',
+    body: () => (
+      <div className="flex h-full flex-col items-center justify-center gap-2.5">
+        {[
+          { e: '🕒', t: 'جدولة النشر — يُنشر تلقائياً في الوقت الأنسب' },
+          { e: '🔥', t: 'عروض اليوم — سعر قبل الخصم ونسبة خصم تجذب المشترين' },
+          { e: '🔨', t: 'المزاد — دع المشترين يتنافسون على سعر إعلانك' },
+        ].map((x, k) => (
+          <div key={k} className="tut-rise flex w-full items-center gap-2 rounded-xl bg-white p-2.5 text-[11px] font-extrabold shadow" style={{ animationDelay: `${k * 0.35}s` }}>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-slate-100 text-base">{x.e}</span> {x.t}
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  {
+    caption: 'القاعدة بسيطة: رصيدك يغطي → خصم وتفعيل فوري، لا يغطي → اشحن من «محفظتي» وأعد المحاولة',
+    body: () => (
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+        <span className="grid h-16 w-16 place-items-center rounded-full bg-emerald-100 text-3xl">💳</span>
+        <div className="rounded-xl bg-white p-3 text-[11px] font-bold leading-relaxed text-slate-700 shadow">
+          كل ميزة تُخصم من رصيدك لحظة التفعيل وتظهر في سجل محفظتك.
+          <span className="mt-1 block text-emerald-700">وإن لم يكفِ رصيدك تظهر لك رسالة برابط «اشحن رصيدك من هنا» — وإعلانك يُنشر على كل حال.</span>
+        </div>
+      </div>
+    ),
+  },
+];
+export function AdBoostTutorial() {
+  return <TutorialPlayer slides={AD_BOOST_SLIDES} shareTitle="مميزات تزيد في تسويق إعلانك — تربح" ctaHref="/ads/new" ctaLabel="🚀 أضف إعلانك وميّزه الآن" />;
+}

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Clapperboard } from 'lucide-react';
 import { TUTORIALS } from '@/components/tutorials-def';
-import { TopupTutorial, AddAdTutorial, OpenStoreTutorial, VerifyTutorial, FeatureAdTutorial } from '@/components/tutorials';
+import { TopupTutorial, AddAdTutorial, OpenStoreTutorial, VerifyTutorial, FeatureAdTutorial, AdBoostTutorial } from '@/components/tutorials';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +12,7 @@ const PLAYERS: Record<string, React.ComponentType> = {
   topup: TopupTutorial,
   verify: VerifyTutorial,
   'feature-ad': FeatureAdTutorial,
+  'ad-boost': AdBoostTutorial,
 };
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {

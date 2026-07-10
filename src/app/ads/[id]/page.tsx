@@ -26,7 +26,7 @@ import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
-import { buyUrgentAction } from '@/app/account/actions';
+import { buyUrgentAction, featureAdAction } from '@/app/account/actions';
 import { PromoSlot } from '@/components/promo-slot';
 import { getAdAudio } from '@/lib/ad-media';
 import { mediaUrl } from '@/lib/media';
@@ -74,7 +74,7 @@ function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath
   );
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; urgent?: string; urgentneed?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -134,9 +134,17 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const urgentExtras = isAdOwner && !ad.storeOnly && ad.status === 1
     ? await import('@/lib/settings').then((m) => m.getAdExtras()).catch(() => null)
     : null;
-  const urgentBalance = urgentExtras && urgentExtras.urgentPrice > 0
+  // التمييز ⭐ لصاحب الإعلان: مدد مسعّرة + زر شراء مباشر
+  const featuredOpts = isAdOwner && !ad.storeOnly && ad.status === 1 && !ad.special
+    ? await import('@/lib/settings').then(async (m) => {
+        const svc = await m.getServicePricing();
+        return m.DURATIONS.map((d) => ({ key: d.key, label: d.label, price: svc.featured[d.key] })).filter((o) => o.price > 0);
+      }).catch(() => [])
+    : [];
+  const ownerBalance = (urgentExtras && urgentExtras.urgentPrice > 0) || featuredOpts.length
     ? await import('@/lib/wallet').then((m) => m.getBalance(session!.uid)).catch(() => 0)
     : 0;
+  const urgentBalance = ownerBalance;
 
   // Distance between the visitor (from the trbhh_geo cookie) and the ad location
   const viewerLoc = await getViewerLocation();
@@ -164,6 +172,34 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           💳 نُشر إعلانك، لكن رصيدك لا يغطي شارة «عاجل»{urgentExtras ? ` (${urgentExtras.urgentPrice} ر.س)` : ''} —{' '}
           <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم فعّلها بالزر أدناه.
         </div>
+      )}
+
+      {/* نتيجة طلب التمييز ⭐ */}
+      {spx.featured === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">⭐ تم تمييز إعلانك وخُصمت الرسوم من رصيدك — أصبح بإطار ذهبي وفي مقدمة القوائم.</div>}
+      {spx.featuredneed === '1' && (
+        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          💳 نُشر إعلانك، لكن رصيدك لا يغطي رسوم التمييز —{' '}
+          <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم ميّزه بالزر أدناه.
+        </div>
+      )}
+
+      {/* التمييز ⭐ — عرض تسويقي دائم لصاحب الإعلان النشط غير المميّز */}
+      {featuredOpts.length > 0 && (
+        <form action={featureAdAction} className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-amber-300 bg-amber-50/70 p-3 shadow-sm">
+          <input type="hidden" name="adId" value={ad.id} />
+          <input type="hidden" name="back" value="ad" />
+          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-white">⭐ مميّز</span>
+          <span className="min-w-0 flex-1 text-xs font-bold text-amber-800">
+            ميّز إعلانك بإطار ذهبي بارز ومقدمة القوائم — مشاهدات وتواصل أعلى بكثير.
+            <span className="block font-medium text-muted-foreground">رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5">
+            <select name="duration" className="h-9 rounded-lg border border-amber-300 bg-white px-2 text-xs font-bold">
+              {featuredOpts.map((o) => <option key={o.key} value={o.key}>{o.label} — {o.price} ر.س</option>)}
+            </select>
+            <button className="btn-3d rounded-lg bg-amber-500 px-3 py-2 text-sm font-extrabold text-white">تمييز الآن</button>
+          </span>
+        </form>
       )}
 
       {/* شارة عاجل — عرض تسويقي دائم لصاحب الإعلان النشط */}

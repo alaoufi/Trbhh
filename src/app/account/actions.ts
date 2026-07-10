@@ -89,18 +89,20 @@ export async function requestTopupAction(formData: FormData) {
   redirect(ok ? '/account/wallet?topup=1' : '/account/wallet?error=topup');
 }
 
-/** Pay from wallet to feature («تمييز») one of the member's own ads for a chosen duration. */
+/** Pay from wallet to feature («تمييز») one of the member's own ads for a chosen duration.
+ *  back=ad: الزر من صفحة الإعلان نفسها فيعود إليها بنتيجة الشراء. */
 export async function featureAdAction(formData: FormData) {
   const session = await requireUser();
   const adId = BigInt(String(formData.get('adId')));
+  const back = String(formData.get('back') || '') === 'ad' ? `/ads/${toInt(adId)}` : '';
   const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { id: true, user_id: true, expires_at: true } });
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
   const raw = String(formData.get('duration') || '');
-  if (!isDur(raw)) redirect('/account/ads?error=duration');
+  if (!isDur(raw)) redirect(back || '/account/ads?error=duration');
   const fee = (await getServicePricing()).featured[raw];
-  if (fee <= 0) redirect('/account/ads?featured=off'); // التمييز غير مُسعّر لهذه المدّة
+  if (fee <= 0) redirect(back || '/account/ads?featured=off'); // التمييز غير مُسعّر لهذه المدّة
   const paid = await charge(session.uid, fee, 'featured', `تمييز الإعلان #${toInt(adId)} (${DUR_LABEL[raw]})`);
-  if (!paid.ok) redirect(`/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
+  if (!paid.ok) redirect(back ? `${back}?featuredneed=1` : `/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
   // مدّة التمييز تُضاف إلى ما تبقّى من تمييز سابق (expires_at = نهاية التمييز)
   const base = ad.expires_at && new Date(ad.expires_at).getTime() > Date.now() ? new Date(ad.expires_at) : new Date();
   const until = new Date(base.getTime() + DUR_DAYS[raw] * 86400000);
@@ -109,6 +111,7 @@ export async function featureAdAction(formData: FormData) {
   await bustAdCaches().catch(() => {});
   revalidatePath('/account/ads');
   revalidatePath('/');
+  if (back) { revalidatePath(back); redirect(`${back}?featured=1`); }
   redirect('/account/ads?featured=1');
 }
 

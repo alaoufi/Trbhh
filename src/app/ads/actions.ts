@@ -324,6 +324,26 @@ export async function createAdAction(formData: FormData) {
     }
   }).catch(() => {});
   if (dest !== 'store') await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز خاصة بإعلانات تربح
+  // التمييز ⭐ المطلوب من نموذج النشر: يغطي الرصيد → خصم وتمييز فوري، لا يغطي → يُنشر الإعلان وتُطلب إعادة الشحن
+  let featuredState: '' | 'ok' | 'need' = '';
+  const fdur = String(formData.get('featuredDur') || '');
+  if (fdur && dest !== 'store') {
+    const { getServicePricing, isDur, DUR_DAYS, DUR_LABEL } = await import('@/lib/settings');
+    if (isDur(fdur)) {
+      const fprice = (await getServicePricing()).featured[fdur];
+      if (fprice > 0) {
+        const { charge } = await import('@/lib/wallet');
+        const paid = await charge(session.uid, fprice, 'featured', `تمييز الإعلان (${DUR_LABEL[fdur]})`);
+        if (paid.ok) {
+          const base = scheduledAt ?? new Date();
+          await prisma.ads.update({ where: { id: ad.id }, data: { adsSpecial: 'checked', expires_at: new Date(base.getTime() + DUR_DAYS[fdur] * 86400000) } }).catch(() => {});
+          featuredState = 'ok';
+        } else {
+          featuredState = 'need';
+        }
+      }
+    }
+  }
   // شارة عاجل المطلوبة من نموذج النشر: يغطي الرصيد → خصم وتفعيل فوري، لا يغطي → يُنشر الإعلان وتُطلب إعادة الشحن
   let urgentState: '' | 'ok' | 'need' = '';
   if (formData.get('urgent') && dest !== 'store') {
@@ -359,11 +379,15 @@ export async function createAdAction(formData: FormData) {
     redirect(sid ? `/companies/${sid}?added=1` : '/store?added=1');
   }
   // ينشر مباشرة، إلا إذا كان مقيّداً بالموافقة أو مجدولاً
-  if (scheduledAt) redirect(`/account/ads?scheduled=1${urgentState === 'need' ? '&urgentneed=1' : ''}`);
-  if (requireApproval) redirect(`/account/ads?pending=1${urgentState === 'need' ? '&urgentneed=1' : ''}`);
-  if (urgentState === 'ok') redirect(`/ads/${toInt(ad.id)}?urgent=1`);
-  if (urgentState === 'need') redirect(`/ads/${toInt(ad.id)}?urgentneed=1`);
-  redirect(`/ads/${toInt(ad.id)}`);
+  const extraFlags: string[] = [];
+  if (urgentState === 'ok') extraFlags.push('urgent=1');
+  if (urgentState === 'need') extraFlags.push('urgentneed=1');
+  if (featuredState === 'ok') extraFlags.push('featured=1');
+  if (featuredState === 'need') extraFlags.push('featuredneed=1');
+  const needFlags = extraFlags.filter((f) => f.includes('need')).map((f) => `&${f}`).join('');
+  if (scheduledAt) redirect(`/account/ads?scheduled=1${needFlags}`);
+  if (requireApproval) redirect(`/account/ads?pending=1${needFlags}`);
+  redirect(`/ads/${toInt(ad.id)}${extraFlags.length ? `?${extraFlags.join('&')}` : ''}`);
 }
 
 export async function updateAdAction(formData: FormData) {

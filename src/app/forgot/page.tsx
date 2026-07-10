@@ -49,7 +49,7 @@ export default async function ForgotPage({ searchParams }: { searchParams: Promi
           </label>
           <label className="block space-y-1">
             <span className="text-sm font-bold">كلمة المرور الجديدة</span>
-            <input name="password" type="password" required minLength={6} placeholder="6 أحرف على الأقل" className={field} />
+            <input name="password" type="password" required minLength={4} placeholder="4 خانات على الأقل" className={field} />
           </label>
           <Button className="w-full">تعيين كلمة المرور</Button>
           <div className="text-center">

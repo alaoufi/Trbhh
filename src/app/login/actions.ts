@@ -23,8 +23,8 @@ export async function registerAction(_prev: unknown, formData: FormData) {
   const name = String(formData.get('name') || '').trim();
   const phone = String(formData.get('phone') || '').trim();
   const password = String(formData.get('password') || '');
-  if (!name || !phone || password.length < 6) {
-    return { error: 'أكمل البيانات (كلمة المرور 6 أحرف على الأقل)' };
+  if (!name || !phone || password.length < 4) {
+    return { error: 'أكمل البيانات (كلمة المرور 4 خانات على الأقل)' };
   }
   if (!formData.get('agree')) {
     return { error: 'يجب الموافقة على الشروط والأحكام وسياسة الخصوصية.' };

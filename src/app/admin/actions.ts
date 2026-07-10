@@ -1009,7 +1009,7 @@ export async function setUserPasswordAction(formData: FormData) {
   await requireAction('users', 'edit');
   const uid = Number(formData.get('userId'));
   const pass = String(formData.get('password') || '');
-  if (pass.length < 6) redirect(`/admin/users/${uid}?error=${encodeURIComponent('كلمة المرور 6 أحرف على الأقل')}`);
+  if (pass.length < 4) redirect(`/admin/users/${uid}?error=${encodeURIComponent('كلمة المرور 4 خانات على الأقل')}`);
   await prisma.users.update({ where: { id: BigInt(uid) }, data: { password: await hashPassword(pass) } }).catch(() => {});
   redirect(`/admin/users/${uid}?setpass=1`);
 }

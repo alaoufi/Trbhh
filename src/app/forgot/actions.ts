@@ -24,7 +24,7 @@ export async function resetAction(formData: FormData) {
   const base = `/forgot?phone=${enc(phone)}&sent=1`;
 
   if (!phone || !code) redirect(`${base}&error=${enc('أدخل الرمز')}`);
-  if (password.length < 6) redirect(`${base}&error=${enc('كلمة المرور 6 أحرف على الأقل')}`);
+  if (password.length < 4) redirect(`${base}&error=${enc('كلمة المرور 4 خانات على الأقل')}`);
 
   if (!(await verifyOtp(phone, code))) {
     redirect(`${base}&error=${enc('الرمز غير صحيح أو منتهي الصلاحية')}`);

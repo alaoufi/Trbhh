@@ -32,38 +32,43 @@ export async function TopupPromoBanner() {
       <span className="star-twinkle left-[30%] bottom-0.5 text-base" style={{ animationDelay: '1.3s' }}>🌟</span>
       <span className="star-twinkle left-[12%] top-1 text-xs" style={{ animationDelay: '0.6s' }}>⭐</span>
       <span className="star-twinkle left-[45%] top-2 text-sm" style={{ animationDelay: '1.7s' }}>✨</span>
-      <span className="relative flex min-w-0 items-center gap-3">
-        <span className="float-3d grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/25 shadow-inner ring-1 ring-white/30"><HandCoins className="h-6 w-6" /></span>
-        <span className="min-w-0">
-          {/* «اشحن بـ100 تحصل على 10 ريال» — الأرقام كما في التحكم حرفياً وبحبوب غامقة بارزة */}
-          <span className="flex flex-wrap items-center gap-1.5 text-base font-extrabold drop-shadow">
-            <span className="animate-pulse rounded-full bg-red-600 px-2.5 py-0.5 text-sm font-black text-white shadow ring-1 ring-white/50">عرض 🔥</span>
-            اشحن بـ
-            <span className="rounded-lg bg-white px-2 py-0.5 text-xl font-black leading-6 text-emerald-900 shadow" dir="ltr">{amount}</span>
-            ريال تحصل على
-            <span className="rounded-lg bg-amber-300 px-2 py-0.5 text-xl font-black leading-6 text-amber-950 shadow" dir="ltr">{bonus}</span>
-            ريال
+      {/* تنسيق تسويقي موسّط: العنوان ← الشرائح ← عداد بمربعات ← الدعوة للفعل */}
+      <span className="relative flex w-full flex-col items-center gap-2 text-center">
+        {/* الشارة والعنوان */}
+        <span className="flex flex-wrap items-center justify-center gap-1.5 text-base font-extrabold drop-shadow">
+          <span className="animate-pulse rounded-full bg-red-600 px-3 py-0.5 text-sm font-black text-white shadow ring-1 ring-white/50">عرض 🔥</span>
+          <HandCoins className="h-5 w-5" />
+          اشحن بـ
+          <span className="rounded-lg bg-white px-2 py-0.5 text-xl font-black leading-6 text-emerald-900 shadow" dir="ltr">{amount}</span>
+          ريال تحصل على
+          <span className="rounded-lg bg-amber-300 px-2 py-0.5 text-xl font-black leading-6 text-amber-950 shadow" dir="ltr">{bonus}</span>
+          ريال
+        </span>
+
+        {/* بقية الشرائح — موسطة */}
+        {tiers.length > 1 && (
+          <span className="flex flex-wrap justify-center gap-1.5">
+            {tiers.slice(1, 6).map((t, i) => (
+              <span key={`${t.amount}-${i}`} className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-emerald-900 shadow ring-1 ring-emerald-200">
+                اشحن <span dir="ltr">{t.amount}</span> تحصل على <span className="text-amber-600" dir="ltr">{t.bonus}</span> ريال ⭐
+              </span>
+            ))}
           </span>
-          {tiers.length > 1 && (
-            <span className="mt-1.5 flex flex-wrap gap-1.5">
-              {tiers.slice(1, 6).map((t, i) => (
-                <span key={`${t.amount}-${i}`} className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-emerald-900 shadow ring-1 ring-emerald-200">
-                  اشحن <span dir="ltr">{t.amount}</span> تحصل على <span className="text-amber-600" dir="ltr">{t.bonus}</span> ريال ⭐
-                </span>
-              ))}
-            </span>
-          )}
-          {/* العداد التنازلي — بارز وكبير */}
-          {until && (
-            <span className="mt-2 flex w-fit max-w-full flex-wrap items-center gap-2 rounded-xl bg-black/50 px-3 py-1.5 shadow-lg ring-2 ring-amber-300">
-              <span className="animate-pulse text-sm font-black text-white">⏳ عرض — باقي</span>
-              <Countdown until={until.toISOString()} className="text-2xl font-black leading-7 text-amber-300 drop-shadow" />
-            </span>
-          )}
-          <span className="mt-1 block text-xs font-bold text-white drop-shadow">تُضاف المكافأة تلقائياً فور تأكيد الشحن{promo.first > 0 ? `، ومكافأة أول شحن ${promo.first} ر.س إضافية` : ''}.</span>
+        )}
+
+        {/* العداد التنازلي — مربعات موسطة داخل صندوق أنيق */}
+        {until && (
+          <span className="flex flex-col items-center gap-1.5 rounded-2xl bg-black/45 px-5 py-2.5 shadow-lg ring-2 ring-amber-300/80">
+            <span className="animate-pulse text-xs font-black tracking-wide text-amber-200">⏳ ينتهي العرض خلال</span>
+            <Countdown until={until.toISOString()} boxes />
+          </span>
+        )}
+
+        <span className="flex flex-wrap items-center justify-center gap-1.5 text-xs font-bold text-white drop-shadow">
+          تُضاف المكافأة تلقائياً فور تأكيد الشحن{promo.first > 0 ? ` — ومكافأة أول شحن ${promo.first} ر.س إضافية` : ''}
+          <span className="rounded-full bg-white/25 px-2.5 py-0.5 font-black ring-1 ring-white/40">اشحن الآن <ChevronLeft className="inline h-3.5 w-3.5" /></span>
         </span>
       </span>
-      <ChevronLeft className="relative h-5 w-5 shrink-0 drop-shadow" />
     </Link>
   );
 }

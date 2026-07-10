@@ -101,9 +101,9 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-2.5 text-sm font-extrabold text-emerald-800">
             {topupTiers.length > 0 && (
               <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">🎁 عرض حملة زيادة الشحن — كلما زاد شحنك زادت مكافأتك:{campaignUntil && <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-black text-white">⏳ ينتهي خلال <Countdown until={campaignUntil.toISOString()} /></span>}</div>
+                <div className="flex flex-wrap items-center gap-2">🎁 عرض حملة زيادة الشحن — كلما زاد شحنك زادت مكافأتك:{campaignUntil && <span className="flex items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-black text-white">⏳ عرض — باقي <Countdown until={campaignUntil.toISOString()} /></span>}</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {topupTiers.map((t) => <span key={t.amount} className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-extrabold text-white">اشحن {t.amount} → +{t.bonus} ر.س ⭐</span>)}
+                  {topupTiers.map((t, i) => <span key={`${t.amount}-${i}`} className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-extrabold text-white">اشحن {t.amount} تحصل على {t.bonus} ريال ⭐</span>)}
                 </div>
               </div>
             )}

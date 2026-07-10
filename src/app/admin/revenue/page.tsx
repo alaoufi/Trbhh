@@ -38,9 +38,9 @@ const TABS = [
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
-export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string; user?: string }> }) {
+export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string; user?: string; camp?: string }> }) {
   await requireAction('users', 'view');
-  const { saved, tab, user } = await searchParams;
+  const { saved, tab, user, camp } = await searchParams;
   const active: TabKey = tab === 'balances' || tab === 'pricing' || tab === 'expenses' || tab === 'accounts' ? tab : 'overview';
   const userId = Number(user || 0) || 0;
 
@@ -62,7 +62,7 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
       {active === 'balances' && (userId ? <MemberDetailTab userId={userId} /> : <BalancesTab />)}
       {active === 'expenses' && <ExpensesTab />}
       {active === 'accounts' && <AccountsTab />}
-      {active === 'pricing' && <PricingTab />}
+      {active === 'pricing' && <PricingTab camp={camp} />}
     </div>
   );
 }
@@ -341,7 +341,7 @@ async function AccountsTab() {
   );
 }
 
-async function PricingTab() {
+async function PricingTab({ camp }: { camp?: string }) {
   const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction] = await Promise.all([
     getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
     pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
@@ -365,6 +365,10 @@ async function PricingTab() {
     {/* 🎁 حملات زيادة الشحن المجدولة — تبدأ من تاريخها وتختفي بانتهائها حتى تحين حملة أخرى */}
     <div className="card-3d mb-4 space-y-3 rounded-2xl border-2 border-emerald-300 p-4">
       <div className="flex items-center gap-2 font-bold text-emerald-800">🎁 حملات زيادة الشحن (بتواريخ)</div>
+      {camp === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ أُضيفت الحملة — إن كان تاريخها يشمل اليوم فالبانر ظاهر الآن بالرئيسية.</div>}
+      {camp === 'del' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ حُذفت الحملة.</div>}
+      {camp === 'err' && <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs font-bold text-red-700">تعذّرت الإضافة — تأكد من التاريخ والمدة والشرائح (سطر لكل شريحة: المبلغ ثم المكافأة).</div>}
+      {camp === 'dberr' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-bold text-red-700">⚠ تعذّر الحفظ في قاعدة البيانات — أعد تشغيل التطبيق بعد آخر تحديث (يوسّع عمود الإعدادات تلقائياً) ثم أعد المحاولة.</div>}
       <p className="text-[11px] text-muted-foreground">
         جدولة عدة حملات بتواريخ مختلفة: كل حملة تبدأ تلقائياً <b>من تاريخها ولمدة الأيام المحددة</b> (مثال: من 2026/6/7 لمدة 3 أيام) ثم يختفي البانر
         وتتوقف المكافآت حتى تحين الحملة التالية أو تضيف غيرها. الشرائح: سطر لكل شريحة «مبلغ الشحن ثم المكافأة»

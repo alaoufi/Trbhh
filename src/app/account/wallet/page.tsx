@@ -52,8 +52,6 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
   const txnPages = Math.max(1, Math.ceil(txnTotal / TXN_PAGE));
   const [pts, ptsCfg] = ptsOn ? await Promise.all([getPoints(session.uid), getPointsConfig()]) : [0, null];
   const hadTopup = topups.some((t) => t.status === 1);
-  const range = (p: Record<'w2' | 'm1' | 'y1', number>) => DURATIONS.filter((d) => p[d.key] > 0).map((d) => p[d.key]);
-  const priceRange = (p: Record<'w2' | 'm1' | 'y1', number>) => { const r = range(p); return r.length ? `${Math.min(...r)}–${Math.max(...r)} ر.س` : ''; };
   return (
     <div className="space-y-4">
       <h1 className="flex items-center gap-2 text-xl font-bold text-primary"><Wallet className="h-6 w-6" /> محفظتي</h1>
@@ -209,15 +207,36 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         </div>
       )}
 
+      {/* أسعار الخدمات — جدول واضح (خدمة × مدّة) مفصول تماماً عن شحن الرصيد */}
       {(serviceHasPrice(pricing.featured) || serviceHasPrice(pricing.classified) || serviceHasPrice(pricing.dup3) || serviceHasPrice(pricing.dup5)) && (
-        <div className="card-3d rounded-xl p-3 text-sm">
-          <div className="mb-1 flex items-center gap-1 font-bold text-primary"><Info className="h-4 w-4" /> التسعير الحالي (حسب المدّة)</div>
-          <ul className="space-y-0.5 text-muted-foreground">
-            {serviceHasPrice(pricing.featured) && <li>• تمييز الإعلان: <b className="text-foreground">{priceRange(pricing.featured)}</b></li>}
-            {serviceHasPrice(pricing.classified) && <li>• نشر إعلان مبوّب: <b className="text-foreground">{priceRange(pricing.classified)}</b></li>}
-            {serviceHasPrice(pricing.dup3) && <li>• باقة «مكرّر 3»: <b className="text-foreground">{priceRange(pricing.dup3)}</b></li>}
-            {serviceHasPrice(pricing.dup5) && <li>• باقة «مكرّر 5»: <b className="text-foreground">{priceRange(pricing.dup5)}</b></li>}
-          </ul>
+        <div className="card-3d rounded-xl border-2 border-primary/20 p-3 text-sm">
+          <div className="mb-1 flex items-center gap-1 font-bold text-primary"><Info className="h-4 w-4" /> أسعار الخدمات المدفوعة (تُخصم من رصيدك)</div>
+          <p className="mb-2 text-[11px] text-muted-foreground">للاطلاع فقط — كل خدمة بسعرها الدقيق لكل مدّة، والشراء من أماكنه (إعلاناتي / المصمم الذكي / باقات التكرار بالأعلى).</p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[300px] text-xs">
+              <thead>
+                <tr className="border-b border-primary/15 text-muted-foreground">
+                  <th className="p-1.5 text-right font-bold">الخدمة</th>
+                  {DURATIONS.map((d) => <th key={d.key} className="p-1.5 font-bold">{d.label}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {([
+                  ['⭐ تمييز الإعلان', pricing.featured],
+                  ['🎨 نشر إعلان مبوّب', pricing.classified],
+                  ['🔁 باقة «مكرّر 3»', pricing.dup3],
+                  ['🔁 باقة «مكرّر 5»', pricing.dup5],
+                ] as const).filter(([, p]) => serviceHasPrice(p)).map(([label, p]) => (
+                  <tr key={label} className="border-b border-primary/10 last:border-0">
+                    <td className="p-1.5 text-right font-bold text-foreground">{label}</td>
+                    {DURATIONS.map((d) => (
+                      <td key={d.key} className="p-1.5 text-center font-extrabold text-primary">{p[d.key] > 0 ? `${p[d.key]} ر.س` : '—'}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

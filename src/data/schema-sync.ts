@@ -349,8 +349,11 @@ const STATEMENTS: string[] = [
   /* ---- settings / word filters ---- */
   `CREATE TABLE IF NOT EXISTS site_settings (
     k VARCHAR(60) NOT NULL PRIMARY KEY,
-    v VARCHAR(255) NULL
+    v TEXT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* القيم الطويلة (جدول حملات الشحن JSON، حسابات البنوك المتعددة، النصوص) كانت
+     تُبتر أو يفشل حفظها في VARCHAR(255) — توسعة العمود إلى TEXT. */
+  `ALTER TABLE site_settings MODIFY v TEXT NULL`,
   `CREATE TABLE IF NOT EXISTS banned_words (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     word VARCHAR(100) NOT NULL,

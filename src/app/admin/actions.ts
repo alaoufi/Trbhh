@@ -1031,7 +1031,10 @@ export async function addTopupCampaignAction(formData: FormData) {
   const list = await getTopupCampaigns();
   const id = list.reduce((m, c) => Math.max(m, c.id), 0) + 1;
   list.push({ id, from: from.toISOString(), to: to.toISOString(), tiers });
-  await setTopupCampaigns(list.slice(-30));
+  // فشل التخزين (مثلاً عمود قديم ضيق قبل الترقية) يظهر رسالة واضحة بدل صفحة خطأ
+  let saved = true;
+  try { await setTopupCampaigns(list.slice(-30)); } catch { saved = false; }
+  if (!saved) redirect('/admin/revenue?tab=pricing&camp=dberr');
   await logAdmin(session.uid, `إضافة حملة شحن (من ${fromRaw} لمدة ${days} يوم)`);
   revalidatePath('/admin/revenue');
   revalidatePath('/');

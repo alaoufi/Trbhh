@@ -1338,7 +1338,7 @@ enum ads_state {
 
 model site_settings {
   k String  @id @db.VarChar(60)
-  v String? @db.VarChar(255)
+  v String? @db.Text
 }
 
 model banned_words {

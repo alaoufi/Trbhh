@@ -243,6 +243,7 @@ export async function getTopupCampaignUntil(): Promise<Date | null> {
 
 /* جدول حملات الشحن المجدولة: عدة حملات بتواريخ مختلفة (بداية → نهاية + شرائحها).
  * تبدأ الحملة تلقائياً في تاريخها وتختفي بانتهائها حتى تُضاف/تحين حملة أخرى. */
+/** to = '' تعني حملة مفتوحة (بلا نهاية) تستمر حتى تُحذف. */
 export type TopupCampaign = { id: number; from: string; to: string; tiers: TopupTier[] };
 export async function getTopupCampaigns(): Promise<TopupCampaign[]> {
   try {
@@ -251,11 +252,11 @@ export async function getTopupCampaigns(): Promise<TopupCampaign[]> {
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return [];
     return arr
-      .filter((c) => c && c.from && c.to && Array.isArray(c.tiers))
+      .filter((c) => c && c.from && Array.isArray(c.tiers))
       .map((c) => ({
         id: Number(c.id) || 0,
         from: String(c.from),
-        to: String(c.to),
+        to: c.to ? String(c.to) : '',
         tiers: (c.tiers as TopupTier[]).filter((t) => t && t.amount > 0 && t.bonus > 0).slice(0, 20),
       }))
       .filter((c) => c.tiers.length > 0)
@@ -287,9 +288,9 @@ export async function topupCampaignsHealth(): Promise<{ columnType: string; stor
 export type CampaignState = 'upcoming' | 'active' | 'ended';
 export function campaignState(c: TopupCampaign, nowMs = Date.now()): CampaignState {
   const from = new Date(c.from).getTime();
-  const to = new Date(c.to).getTime();
   if (nowMs < from) return 'upcoming';
-  if (nowMs >= to) return 'ended';
+  if (!c.to) return 'active'; // حملة مفتوحة — لا تنتهي حتى تُحذف
+  if (nowMs >= new Date(c.to).getTime()) return 'ended';
   return 'active';
 }
 /**
@@ -301,7 +302,7 @@ export async function getActiveTopupCampaign(): Promise<{ tiers: TopupTier[]; un
   const list = await getTopupCampaigns();
   if (list.length > 0) {
     const active = list.find((c) => campaignState(c, now) === 'active');
-    return active ? { tiers: active.tiers, until: new Date(active.to) } : null;
+    return active ? { tiers: active.tiers, until: active.to ? new Date(active.to) : null } : null;
   }
   // توافق: الطريقة القديمة (شرائح + عداد اختياري)
   const tiers = await getTopupTiers();

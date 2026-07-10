@@ -1022,7 +1022,9 @@ export async function addTopupCampaignAction(formData: FormData) {
   const fromRaw = String(formData.get('from') || '').trim();
   const timeRaw = String(formData.get('fromTime') || '').trim();
   const fromTime = /^\d{2}:\d{2}$/.test(timeRaw) ? timeRaw : '00:00';
-  const days = Math.max(1, Math.min(365, parseInt(String(formData.get('days') || '0')) || 0));
+  // المدة فارغة أو 0 = حملة مفتوحة (بلا نهاية) تستمر حتى تُحذف
+  const daysRaw = String(formData.get('days') ?? '').trim();
+  const days = daysRaw === '' ? 0 : Math.max(0, Math.min(365, parseInt(daysRaw) || 0));
   // شرائح بحقول مفصولة: مبلغ الشحن + المكافأة (زوج لكل سطر، والفارغ يُتجاهل)
   const amounts = formData.getAll('tierAmount').map((v) => parseInt(String(v)) || 0);
   const bonuses = formData.getAll('tierBonus').map((v) => parseInt(String(v)) || 0);
@@ -1032,16 +1034,20 @@ export async function addTopupCampaignAction(formData: FormData) {
     .slice(0, 20);
   // تبدأ من التاريخ والوقت المحددين بتوقيت السعودية وتستمر «مدة» أيام كاملة بالدقيقة
   const from = new Date(`${fromRaw}T${fromTime}:00+03:00`);
-  if (!fromRaw || isNaN(from.getTime()) || days <= 0 || tiers.length === 0) {
-    redirect('/admin/revenue?tab=pricing&camp=err');
+  if (!fromRaw || isNaN(from.getTime()) || tiers.length === 0) {
+    redirect('/admin/revenue?tab=campaigns&camp=err');
   }
-  const to = new Date(from.getTime() + days * 86400000);
+  const toMs = days > 0 ? from.getTime() + days * 86400000 : Infinity; // مفتوحة = بلا نهاية
   const list = await getTopupCampaigns();
-  // منع تداخل أوقات الحملات: الجديدة تُرفض إن تقاطعت مدتها مع أي حملة قائمة
-  const clash = list.find((c) => from.getTime() < new Date(c.to).getTime() && to.getTime() > new Date(c.from).getTime());
-  if (clash) redirect('/admin/revenue?tab=pricing&camp=overlap');
+  // منع تداخل أوقات الحملات ولو بدقيقة: المفتوحة تشغل من بدايتها إلى ما لا نهاية
+  const clash = list.find((c) => {
+    const cFrom = new Date(c.from).getTime();
+    const cTo = c.to ? new Date(c.to).getTime() : Infinity;
+    return from.getTime() < cTo && toMs > cFrom;
+  });
+  if (clash) redirect('/admin/revenue?tab=campaigns&camp=overlap');
   const id = list.reduce((m, c) => Math.max(m, c.id), 0) + 1;
-  list.push({ id, from: from.toISOString(), to: to.toISOString(), tiers });
+  list.push({ id, from: from.toISOString(), to: days > 0 ? new Date(toMs).toISOString() : '', tiers });
   // فشل التخزين (مثلاً عمود قديم ضيق قبل الترقية) يظهر رسالة واضحة بدل صفحة خطأ
   let saved = true;
   try { await setTopupCampaigns(list.slice(-30)); } catch { saved = false; }
@@ -1050,11 +1056,11 @@ export async function addTopupCampaignAction(formData: FormData) {
     const check = await getTopupCampaigns();
     if (!check.some((c) => c.id === id)) saved = false;
   }
-  if (!saved) redirect('/admin/revenue?tab=pricing&camp=dberr');
-  await logAdmin(session.uid, `إضافة حملة شحن (من ${fromRaw} ${fromTime} لمدة ${days} يوم)`);
+  if (!saved) redirect('/admin/revenue?tab=campaigns&camp=dberr');
+  await logAdmin(session.uid, `إضافة حملة شحن (من ${fromRaw} ${fromTime} ${days > 0 ? `لمدة ${days} يوم` : 'مفتوحة'})`);
   revalidatePath('/admin/revenue');
   revalidatePath('/');
-  redirect('/admin/revenue?tab=pricing&camp=1');
+  redirect('/admin/revenue?tab=campaigns&camp=1');
 }
 
 /** حذف حملة شحن مجدولة. */
@@ -1067,5 +1073,5 @@ export async function deleteTopupCampaignAction(formData: FormData) {
   await logAdmin(session.uid, `حذف حملة شحن #${id}`);
   revalidatePath('/admin/revenue');
   revalidatePath('/');
-  redirect('/admin/revenue?tab=pricing&camp=del');
+  redirect('/admin/revenue?tab=campaigns&camp=del');
 }

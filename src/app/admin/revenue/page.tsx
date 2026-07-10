@@ -34,6 +34,7 @@ const TABS = [
   { key: 'balances', label: 'أرصدة الأعضاء', icon: Users },
   { key: 'expenses', label: 'المصروفات', icon: ReceiptText },
   { key: 'accounts', label: 'حسابات الشحن', icon: Landmark },
+  { key: 'campaigns', label: 'الحملات', icon: Megaphone },
   { key: 'pricing', label: 'التسعيرات', icon: ListChecks },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
@@ -41,7 +42,7 @@ type TabKey = typeof TABS[number]['key'];
 export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string; user?: string; camp?: string }> }) {
   await requireAction('users', 'view');
   const { saved, tab, user, camp } = await searchParams;
-  const active: TabKey = tab === 'balances' || tab === 'pricing' || tab === 'expenses' || tab === 'accounts' ? tab : 'overview';
+  const active: TabKey = tab === 'balances' || tab === 'pricing' || tab === 'expenses' || tab === 'accounts' || tab === 'campaigns' ? tab : 'overview';
   const userId = Number(user || 0) || 0;
 
   return (
@@ -62,7 +63,8 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
       {active === 'balances' && (userId ? <MemberDetailTab userId={userId} /> : <BalancesTab />)}
       {active === 'expenses' && <ExpensesTab />}
       {active === 'accounts' && <AccountsTab />}
-      {active === 'pricing' && <PricingTab camp={camp} />}
+      {active === 'campaigns' && <CampaignsTab camp={camp} />}
+      {active === 'pricing' && <PricingTab />}
     </div>
   );
 }
@@ -341,22 +343,10 @@ async function AccountsTab() {
   );
 }
 
-async function PricingTab({ camp }: { camp?: string }) {
-  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction] = await Promise.all([
-    getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
-    pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
-    getStorePlusPricing(), getLeadConfig(), getAuctionConfig(),
-  ]);
-  const urgentPrices = await getUrgentPrices();
+async function CampaignsTab({ camp }: { camp?: string }) {
   const campaigns = await getTopupCampaigns();
   const activeCamp = await getActiveTopupCampaign().catch(() => null);
   const campHealth = await topupCampaignsHealth().catch(() => null);
-  const services: { key: PaidService; note?: string }[] = [
-    { key: 'featured' },
-    { key: 'classified', note: 'إعلان واحد حسب المدّة' },
-    { key: 'dup3', note: 'يرفع حظر التكرار لـ 3 إعلانات' },
-    { key: 'dup5', note: 'يرفع حظر التكرار لـ 5 إعلانات' },
-  ];
   const fmtCamp = (iso: string) => new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Riyadh' }).format(new Date(iso));
   const stateChip = (st: 'upcoming' | 'active' | 'ended') =>
     st === 'active' ? <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold text-white">✅ فعّالة الآن</span>
@@ -384,7 +374,7 @@ async function PricingTab({ camp }: { camp?: string }) {
       {camp === 'overlap' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-bold text-red-700">⚠ الوقت يتداخل مع حملة قائمة في الجدول — لا يُسمح بأي تداخل ولو بدقيقة واحدة. عدّل التاريخ/الوقت/المدة، أو احذف الحملة المتداخلة أولاً.</div>}
       {camp === 'dberr' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-bold text-red-700">⚠ تعذّر الحفظ في قاعدة البيانات — أعد تشغيل التطبيق بعد آخر تحديث (يوسّع عمود الإعدادات تلقائياً) ثم أعد المحاولة.</div>}
       <p className="text-[11px] text-muted-foreground">
-        جدولة عدة حملات بتواريخ مختلفة: كل حملة تبدأ تلقائياً <b>من تاريخها ولمدة الأيام المحددة</b> (مثال: من 2026/6/7 لمدة 3 أيام) ثم يختفي البانر
+        جدولة عدة حملات بتواريخ مختلفة: كل حملة تبدأ تلقائياً <b>من تاريخها ولمدة الأيام المحددة</b> (مثال: من 2026/6/7 لمدة 3 أيام)، واترك المدة فارغة لحملة <b>مفتوحة بلا نهاية</b> تستمر حتى تحذفها. بانتهاء المدة يختفي البانر
         وتتوقف المكافآت حتى تحين الحملة التالية أو تضيف غيرها. <b>لا يُسمح بأي تداخل في أوقات الحملات ولو بدقيقة واحدة</b> — الفحص بالدقيقة والثانية، وأي حملة جديدة تتقاطع مع قائمة تُرفض (يجوز أن تبدأ لحظة انتهاء السابقة تماماً). الشرائح: سطر لكل شريحة «مبلغ الشحن ثم المكافأة»
         وتُعرض في البانر بنفس ترتيب إدخالك، والعداد التنازلي (يوم وساعة ودقيقة وثانية) يظهر تلقائياً حتى نهاية الحملة الفعّالة.
       </p>
@@ -394,7 +384,7 @@ async function PricingTab({ camp }: { camp?: string }) {
             <li key={c.id} className="space-y-1.5 rounded-xl border p-2.5">
               <div className="flex flex-wrap items-center gap-2 text-sm font-bold">
                 {stateChip(campaignState(c))}
-                <span>من {fmtCamp(c.from)} لمدة {Math.max(1, Math.round((new Date(c.to).getTime() - new Date(c.from).getTime()) / 86400000))} يوم (حتى {fmtCamp(c.to)})</span>
+                <span>{c.to ? <>من {fmtCamp(c.from)} لمدة {Math.max(1, Math.round((new Date(c.to).getTime() - new Date(c.from).getTime()) / 86400000))} يوم (حتى {fmtCamp(c.to)})</> : <>من {fmtCamp(c.from)} — <b className="text-emerald-700">مفتوحة (تستمر حتى تحذفها)</b></>}</span>
                 <form action={deleteTopupCampaignAction} className="mr-auto">
                   <input type="hidden" name="id" value={c.id} />
                   <button className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">حذف</button>
@@ -414,7 +404,7 @@ async function PricingTab({ camp }: { camp?: string }) {
         <div className="grid grid-cols-3 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">تبدأ من تاريخ</span><input name="from" type="date" required className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">وقت البداية (اختياري)</span><input name="fromTime" type="time" defaultValue="00:00" className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">المدة (أيام) — مثال: 3</span><input name="days" type="number" min={1} max={365} required placeholder="3" className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">المدة (أيام) — فارغة = مفتوحة</span><input name="days" type="number" min={0} max={365} placeholder="3 أو اتركها فارغة" className={num} /></label>
         </div>
         {/* شرائح الحملة — حقلان مفصولان وواضحان لكل شريحة: مبلغ الشحن والمكافأة */}
         <div className="space-y-1.5">
@@ -433,6 +423,25 @@ async function PricingTab({ camp }: { camp?: string }) {
         <button className="btn-3d rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">💾 إضافة الحملة</button>
       </form>
     </div>
+    </>
+  );
+}
+
+async function PricingTab() {
+  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction] = await Promise.all([
+    getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
+    pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
+    getStorePlusPricing(), getLeadConfig(), getAuctionConfig(),
+  ]);
+  const urgentPrices = await getUrgentPrices();
+  const services: { key: PaidService; note?: string }[] = [
+    { key: 'featured' },
+    { key: 'classified', note: 'إعلان واحد حسب المدّة' },
+    { key: 'dup3', note: 'يرفع حظر التكرار لـ 3 إعلانات' },
+    { key: 'dup5', note: 'يرفع حظر التكرار لـ 5 إعلانات' },
+  ];
+  return (
+    <>
 
     <form action={saveRevenueAction} className="card-3d space-y-4 rounded-2xl p-4">
       <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> اشتراك المتاجر</div>

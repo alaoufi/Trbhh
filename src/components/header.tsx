@@ -10,6 +10,7 @@ import { SiteMenu } from '@/components/site-menu';
 import { ADMIN_NAV } from '@/components/admin-nav-def';
 import { HeaderSearch } from '@/components/header-search';
 import { HeaderCta } from '@/components/header-cta';
+import { LiveClock } from '@/components/live-clock';
 
 export async function Header() {
   const session = await getSession();
@@ -43,17 +44,20 @@ export async function Header() {
         {/* بحث مصغّر: عدسة تفتح حقل البحث */}
         <HeaderSearch />
 
-        {/* جرس الرسائل والتنبيهات — العدد الأحمر = رسائل غير مقروءة + تنبيهات جديدة */}
-        {session && (
-          <Link href="/notifications" aria-label="التنبيهات والرسائل" className="relative shrink-0 text-primary">
-            <Bell className="h-6 w-6" />
-            {bellCount > 0 && (
-              <span className="absolute -left-2 -top-1.5 grid min-w-[18px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-extrabold leading-[18px] text-white shadow">
-                {bellCount > 99 ? '99+' : bellCount}
-              </span>
-            )}
-          </Link>
-        )}
+        {/* جرس الرسائل والتنبيهات + ساعة حية بتوقيت الرياض تحته */}
+        <div className="flex shrink-0 flex-col items-center gap-0.5">
+          {session && (
+            <Link href="/notifications" aria-label="التنبيهات والرسائل" className="relative text-primary">
+              <Bell className="h-5 w-5" />
+              {bellCount > 0 && (
+                <span className="absolute -left-2 -top-1.5 grid min-w-[18px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-extrabold leading-[18px] text-white shadow">
+                  {bellCount > 99 ? '99+' : bellCount}
+                </span>
+              )}
+            </Link>
+          )}
+          <LiveClock />
+        </div>
 
         {/* logo on the left (RTL: last child) */}
         <Link href="/" className="shrink-0">

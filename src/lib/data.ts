@@ -29,14 +29,14 @@ export type AdCard = {
   oldPrice?: number;
 };
 
-async function sellerInfo(ids: bigint[]): Promise<Map<number, { name: string; trusted: boolean }>> {
+async function sellerInfo(ids: bigint[]): Promise<Map<number, { name: string; trusted: boolean; banned: boolean }>> {
   const uniq = [...new Set(ids.map(toInt))].filter(Boolean).map((n) => BigInt(n));
   if (!uniq.length) return new Map();
   const rows = await prisma.users.findMany({
     where: { id: { in: uniq } },
-    select: { id: true, name: true, userName: true, trusted: true },
+    select: { id: true, name: true, userName: true, trusted: true, ban: true },
   });
-  return new Map(rows.map((r) => [toInt(r.id), { name: r.name || r.userName || 'مستخدم', trusted: r.trusted === 1 }]));
+  return new Map(rows.map((r) => [toInt(r.id), { name: r.name || r.userName || 'مستخدم', trusted: r.trusted === 1, banned: r.ban === 'checked' }]));
 }
 
 // ---- batched manual joins (the legacy DB has no foreign keys) ----
@@ -116,6 +116,8 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
   const now = Date.now();
   return rows
     .filter((r) => {
+      // إعلانات الأعضاء المحظورين لا تظهر للزوّار في أي قائمة
+      if (sellers.get(toInt(r.user_id))?.banned) return false;
       // ad lifetime by the owner's package (0 => unlimited)
       const days = adMeta.get(toInt(r.user_id))?.adDays ?? 0;
       if (!days || !r.created_at) return true;

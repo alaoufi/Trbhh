@@ -94,6 +94,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   // إعلان غير نشط (بانتظار الموافقة/مؤرشف/موقوف): لا يراه إلا صاحبه أو الإدارة
   const ownerViewing = !!(session && ad.seller && session.uid === ad.seller.id);
   if ((ad.status !== 1 || ad.state !== 'active') && !ownerViewing && !admin) notFound();
+  // إعلان عضو محظور: لا يراه الزوّار — يبقى لصاحبه وللإدارة (لرفع الحظر/الحذف)
+  if (ad.seller?.banned && !ownerViewing && !admin) notFound();
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
   if (viewerKey && (!session || session.uid !== ad.seller?.id)) {

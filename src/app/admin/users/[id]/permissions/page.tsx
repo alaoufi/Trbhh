@@ -31,7 +31,7 @@ export default async function UserPermissionsPage({
   return (
     <div className="space-y-4">
       <Link href="/admin/users" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-primary">
-        <ArrowRight className="h-4 w-4" /> المستخدمون
+        <ArrowRight className="h-4 w-4" /> الأعضاء
       </Link>
       <div className="flex items-center gap-2">
         <ShieldCheck className="h-6 w-6 text-primary" />

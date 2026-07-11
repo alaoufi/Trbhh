@@ -20,7 +20,7 @@ export type Perm = Service;
  * delete an ad but must never edit a member's ad content (privacy).
  */
 export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
-  { key: 'users',         label: 'المستخدمون',         actions: ['view', 'edit', 'ban', 'delete'] },
+  { key: 'users',         label: 'الأعضاء',         actions: ['view', 'edit', 'ban', 'delete'] },
   { key: 'ads',           label: 'الإعلانات',          actions: ['view', 'archive', 'delete'] },
   { key: 'duplicates',    label: 'الإعلانات المكررة',   actions: ['view', 'delete'] },
   { key: 'classified',    label: 'الإعلانات المبوّبة',   actions: ['view', 'edit', 'suspend', 'delete'] },

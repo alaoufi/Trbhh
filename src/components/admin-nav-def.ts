@@ -23,7 +23,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
   {
     key: 'members', title: 'الأعضاء والصلاحيات', icon: Users, color: '#6366f1',
     items: [
-      { href: '/admin/users', label: 'المستخدمون', icon: Users, perm: 'users' },
+      { href: '/admin/users', label: 'الأعضاء', icon: Users, perm: 'users' },
       { href: '/admin/roles', label: 'الأدوار والصلاحيات', icon: KeyRound, perm: 'users' },
       { href: '/admin/verifications', label: 'طلبات التوثيق', icon: ShieldCheck, perm: 'verifications' },
     ],

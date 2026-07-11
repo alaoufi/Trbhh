@@ -37,7 +37,11 @@ type Initial = Partial<{
   phoneAllow: boolean; commentAllow: boolean; phone: string; whatsapp: string;
   lat: string | null; lng: string | null;
   oldPrice: number; stockState: number;
+  priceType: string | null; rentPeriod: string | null;
 }>;
+
+// مدد التأجير المتاحة عند اختيار «سعر تأجير»
+const RENT_PERIODS = ['بالساعة', 'يومي', 'أسبوعي', 'شهري', 'سنوي'];
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -61,6 +65,12 @@ export function AdForm({
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
   const isReq = adsType === 'request';
+  // نوع السعر للمعروض: تأجير (سعر + مدة) / بيع (سعر) / على السوم (بلا سعر)
+  const [priceMode, setPriceMode] = useState<'rent' | 'sale' | 'som'>(
+    initial?.priceType === 'rent' || initial?.priceType === 'som' ? initial.priceType
+      : initial?.priceType === 'sale' || (initial?.price ?? 0) > 0 ? 'sale'
+      : initial?.id ? 'som' : 'sale',
+  );
   const [category, setCategory] = useState(initial?.categoryId ?? categories[0]?.id ?? 0);
   // الموقع موجّه للسعودية فقط
   const saudiId = useMemo(() => countries.find((c) => /سعود/.test(c.name))?.id ?? countries[0]?.id ?? 1, [countries]);
@@ -244,12 +254,47 @@ export function AdForm({
             </select>
           </div>
         </div>
-        <div>
-          <label className={lbl}>{isReq ? 'الميزانية المتوقّعة' : 'السعر'}</label>
-          <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="اختياري — إن تركته فارغاً لا يظهر سعر للإعلان" />
-          {!isReq && <p className="mt-1 text-[11px] font-bold text-muted-foreground">إن كتبت سعراً وضّح في التفاصيل مقابل ماذا (تأجير أو بيع، لليوم أو للقطعة…).</p>}
-        </div>
-        {allowOldPrice && !isReq && (
+        {isReq ? (
+          <div>
+            <label className={lbl}>الميزانية المتوقّعة</label>
+            <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="اختياري — إن تركته فارغاً يظهر «مطلوب» فقط" />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label className={lbl}>السعر</label>
+            <input type="hidden" name="priceType" value={priceMode} />
+            {/* اختيار نوع السعر — والحقول تظهر حسب الاختيار */}
+            <div className="grid grid-cols-3 gap-2">
+              {([['rent', '🔑 سعر تأجير'], ['sale', '💰 سعر بيع'], ['som', '🤝 على السوم']] as const).map(([k, l]) => (
+                <button key={k} type="button" onClick={() => setPriceMode(k)}
+                  className={`rounded-lg border-2 px-2 py-2.5 text-sm font-bold transition ${priceMode === k ? 'border-primary bg-primary text-white shadow' : 'border-primary/25 bg-white text-foreground/80 hover:border-primary/50'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            {priceMode === 'rent' && (
+              <div className="space-y-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-3">
+                <span className="block text-xs font-extrabold text-primary">حدد السعر ومدة التأجير</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input name="price" type="number" min="0" step="any" required defaultValue={initial?.price || ''} className={field} placeholder="السعر (ر.س)" />
+                  <select name="rentPeriod" defaultValue={initial?.rentPeriod || 'شهري'} className={field}>
+                    {RENT_PERIODS.map((p0) => <option key={p0} value={p0}>{p0}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+            {priceMode === 'sale' && (
+              <div className="space-y-1 rounded-lg border-2 border-primary/15 bg-primary/5 p-3">
+                <span className="block text-xs font-extrabold text-primary">حدد سعر البيع</span>
+                <input name="price" type="number" min="0" step="any" required defaultValue={initial?.price || ''} className={field} placeholder="السعر (ر.س)" />
+              </div>
+            )}
+            {priceMode === 'som' && (
+              <p className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-800">🤝 على السوم: لا يظهر سعر على إعلانك — يتفاوض معك المهتمّون مباشرة.</p>
+            )}
+          </div>
+        )}
+        {allowOldPrice && !isReq && priceMode !== 'som' && (
           <div>
             <label className={lbl}>السعر قبل الخصم <span className="font-normal text-muted-foreground">(اختياري — لعروض اليوم)</span></label>
             <input name="old_price" type="number" min="0" step="any" defaultValue={initial?.oldPrice || ''} className={field} placeholder="إن كان أعلى من السعر يظهر الخصم ويدخل إعلانك «عروض اليوم»" />

@@ -451,6 +451,8 @@ async function getAdImpl(id: number) {
     urgentUntil: ad.urgent_until ? ad.urgent_until.toISOString() : null,
     oldPrice: ad.old_price ?? 0,
     stockState: ad.stock_state ?? 0,
+    priceType: ad.price_type ?? null,
+    rentPeriod: ad.rent_period ?? null,
     special: ad.adsSpecial === 'checked',
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,
@@ -546,6 +548,8 @@ export async function getAdForEdit(id: number, userId: number) {
     lng: ad.lng ?? null,
     oldPrice: ad.old_price ?? 0,
     stockState: ad.stock_state ?? 0,
+    priceType: ad.price_type ?? null,
+    rentPeriod: ad.rent_period ?? null,
   };
 }
 

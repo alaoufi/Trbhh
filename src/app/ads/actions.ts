@@ -150,8 +150,12 @@ export async function createAdAction(formData: FormData) {
 
   const title = String(formData.get('title') || '').trim();
   const detail = String(formData.get('detail') || '').trim();
-  const price = parseFloat(String(formData.get('price') || '0')) || 0;
   const adsType = String(formData.get('adsType')) === 'request' ? 'request' : 'offer';
+  // نوع السعر (للمعروض): rent سعر + مدة تأجير / sale سعر بيع / som على السوم بلا سعر
+  const ptRaw = String(formData.get('priceType') || '');
+  const priceType = adsType === 'offer' && ['rent', 'sale', 'som'].includes(ptRaw) ? ptRaw : null;
+  const rentPeriod = priceType === 'rent' ? String(formData.get('rentPeriod') || '').trim().slice(0, 20) || 'شهري' : null;
+  const price = priceType === 'som' ? 0 : parseFloat(String(formData.get('price') || '0')) || 0;
   const category_id = BigInt(String(formData.get('category_id') || '0'));
   const subRaw = String(formData.get('subcategory_id') || '');
   const cityId = String(formData.get('city_id') || '0');
@@ -300,8 +304,10 @@ export async function createAdAction(formData: FormData) {
       adsSpecial: 'no',
       state: 'active',
       status: requireApproval ? 0 : 1,
+      price_type: priceType,
+      rent_period: rentPeriod,
       // عروض اليوم + حالة التوفر (يظهر الحقلان عند تفعيلهما من التحكم)
-      old_price: Math.max(0, parseFloat(String(formData.get('old_price') || '0')) || 0),
+      old_price: priceType === 'som' ? 0 : Math.max(0, parseFloat(String(formData.get('old_price') || '0')) || 0),
       stock_state: [0, 1, 2].includes(Number(formData.get('stock_state'))) ? Number(formData.get('stock_state')) : 0,
       store_only: dest === 'store' ? 1 : 0, // عزل تام: إعلان المتجر لا يظهر في تربح
       bumped_at: new Date(), // ترتيب «الأحدث» يعتمد آخر تحديث (Bump)
@@ -428,13 +434,21 @@ export async function updateAdAction(formData: FormData) {
     const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
     if (ll) { eLat = String(ll.lat); eLng = String(ll.lng); }
   }
+  // نوع السعر عند التعديل: نفس منطق الإضافة (على السوم = صفر بلا سعر)
+  const eType = String(formData.get('adsType')) === 'request' ? 'request' : 'offer';
+  const ePtRaw = String(formData.get('priceType') || '');
+  const ePriceType = eType === 'offer' && ['rent', 'sale', 'som'].includes(ePtRaw) ? ePtRaw : null;
+  const eRentPeriod = ePriceType === 'rent' ? String(formData.get('rentPeriod') || '').trim().slice(0, 20) || 'شهري' : null;
   await prisma.ads.update({
     where: { id: adId },
     data: {
       title: String(formData.get('title') || '').trim(),
       detail: String(formData.get('detail') || '').trim(),
-      price: parseFloat(String(formData.get('price') || '0')) || 0,
-      adsType: String(formData.get('adsType')) === 'request' ? 'request' : 'offer',
+      price: ePriceType === 'som' ? 0 : parseFloat(String(formData.get('price') || '0')) || 0,
+      adsType: eType,
+      price_type: ePriceType,
+      rent_period: eRentPeriod,
+      ...(ePriceType === 'som' ? { old_price: 0 } : {}),
       category_id: BigInt(String(formData.get('category_id') || '0')),
       subcategory_id: formData.get('subcategory_id') ? Number(formData.get('subcategory_id')) : null,
       city_id: BigInt(String(formData.get('city_id') || '0')),

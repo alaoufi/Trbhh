@@ -225,6 +225,8 @@ const STATEMENTS: string[] = [
   `ALTER TABLE ads ADD COLUMN trbhh_until DATETIME NULL`,
   /* شارة عاجل المدفوعة حتى هذا التاريخ. */
   `ALTER TABLE ads ADD COLUMN urgent_until DATETIME NULL`,
+  /* نوع السعر يستخدم عمود price_type القديم (rent/sale/som) — ومدة التأجير عمود جديد. */
+  `ALTER TABLE ads ADD COLUMN rent_period VARCHAR(20) NULL`,
   /* تحديث الإعلان (Bump): آخر رفع للأعلى — الترتيب يعتمده عند وجوده. */
   `ALTER TABLE ads ADD COLUMN bumped_at DATETIME NULL`,
   /* جدولة النشر: يبقى مخفياً حتى هذا الموعد ثم يُنشر تلقائياً. */

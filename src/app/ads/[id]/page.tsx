@@ -306,6 +306,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         )}
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
           {(ad.price > 0 || ad.adsType === 'request') && <span className="text-2xl font-bold text-primary">{ad.price > 0 ? formatPrice(ad.price) : 'مطلوب'}</span>}
+          {/* نوع السعر: تأجير بمدته أو بيع */}
+          {ad.price > 0 && ad.priceType === 'rent' && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">🔑 تأجير {ad.rentPeriod || ''}</span>}
+          {ad.price > 0 && ad.priceType === 'sale' && <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800">💰 بيع</span>}
           {/* عروض اليوم: السعر قبل الخصم مشطوب + نسبة الخصم */}
           {ad.oldPrice > ad.price && ad.price > 0 && (
             <>

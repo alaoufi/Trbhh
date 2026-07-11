@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 
-const fmtDate = new Intl.DateTimeFormat('ar-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Riyadh' });
-const fmtTime = new Intl.DateTimeFormat('ar-u-nu-latn', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Riyadh' });
+// en-GB يعطي ترتيباً ثابتاً DD/MM/YYYY بلا علامات اتجاه تبعثر العرض
+const fmtDate = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Riyadh' });
+const fmtTime = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Riyadh' });
 
 /** ساعة حية صغيرة بتوقيت الرياض: التاريخ وفوقه الوقت بالثواني — تظهر تحت الجرس. */
 export function LiveClock() {

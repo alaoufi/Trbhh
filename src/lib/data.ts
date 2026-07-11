@@ -231,6 +231,36 @@ export async function getLatestAds(take = 12) {
   });
 }
 
+/** أحدث الإعلانات للرئيسية: كل إعلانات آخر ٣٠ يوماً — الأقدم يبقى في البحث والأقسام.
+ *  عند خلوّ الشهر من إعلانات نعرض أحدث ١٢ حتى لا تبدو الرئيسية فارغة. */
+export async function getHomeLatestAds() {
+  return cached('ads:home-latest:30d', 60, async () => {
+    sweepExpiredArchived().catch(() => {});
+    sweepExpiredPaidAds().catch(() => {});
+    const since = new Date(Date.now() - 30 * 86400000);
+    const rows = await prisma.ads.findMany({
+      where: { ...activeAdWhere(), created_at: { gte: since } },
+      orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+      take: 400,
+      select: adSelect,
+    });
+    if (rows.length > 0) return toCards(rows);
+    const fallback = await prisma.ads.findMany({ where: activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: 12, select: adSelect });
+    return toCards(fallback);
+  });
+}
+
+/** إعلانات نفس المعلن (ذات صلة): بقية إعلاناته النشطة في تربح عدا الإعلان المفتوح. */
+export async function getSellerAds(sellerId: number, excludeAdId: number, take = 6) {
+  const rows = await prisma.ads.findMany({
+    where: { ...activeAdWhere(), user_id: BigInt(sellerId), id: { not: BigInt(excludeAdId) } },
+    orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+    take,
+    select: adSelect,
+  });
+  return toCards(rows);
+}
+
 export async function getFeaturedAds(take = 8) {
   return cached(`ads:featured:${take}`, 60, () => loadFeaturedAds(take));
 }

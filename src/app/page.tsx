@@ -3,7 +3,7 @@ import { Users, Megaphone, LayoutGrid, Eye, Sparkles, ChevronLeft } from 'lucide
 import {
   getCategories,
   getFeaturedAds,
-  getLatestAds,
+  getHomeLatestAds,
   getMostViewedAds,
   getStats,
   getAdsByCategory,
@@ -47,7 +47,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const [categories, featured, latest, mostViewed, stats, homeStats, clsText] = await Promise.all([
     getCategories(),
     getFeaturedAds(8),
-    getLatestAds(12),
+    getHomeLatestAds(),
     getMostViewedAds(8),
     getStats(),
     getHomeStats().catch(() => new Set(['ads', 'users', 'views', 'cats'])),
@@ -163,6 +163,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           {/* Paid banner — in-feed after 4 ads */}
           <PromoSlot placement="feed" />
           {latest.length > 4 && <AdGrid ads={latest.slice(4)} />}
+          {/* الرئيسية تعرض كل إعلانات آخر شهر — والأقدم عبر البحث والأقسام */}
+          <Link href="/search" className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
+            الإعلانات الأقدم من شهر تجدها في البحث والأقسام — عرض الكل ←
+          </Link>
         </div>
       </Section>
 

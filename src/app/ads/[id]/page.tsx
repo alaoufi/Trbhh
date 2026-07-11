@@ -7,7 +7,7 @@ import {
   ShieldAlert, Trash2, Archive, Ban, Store,
 } from 'lucide-react';
 import { SplashSuppress } from '@/components/splash-suppress';
-import { getAd, getSimilarAds, recordView } from '@/lib/data';
+import { getAd, getSimilarAds, getSellerAds, recordView } from '@/lib/data';
 import { hasAction } from '@/lib/roles';
 import { adminArchiveAdAction, adminBanSellerAction, adminDeleteAdRedirectAction } from '@/app/admin/actions';
 import { getComments } from '@/lib/comments';
@@ -100,12 +100,16 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     await recordView(ad.id, viewerKey);
   }
 
-  const [comments, favorited, similar, sellerRating] = await Promise.all([
+  const [comments, favorited, similarRaw, sellerAds, sellerRating] = await Promise.all([
     getComments(ad.id),
     session ? isFavorited(session.uid, ad.id) : Promise.resolve(false),
     ad.category ? getSimilarAds(ad.id, ad.category.id, 6) : Promise.resolve([]),
+    ad.seller ? getSellerAds(ad.seller.id, ad.id, 6).catch(() => []) : Promise.resolve([]),
     ad.seller ? getSellerRating(ad.seller.id) : Promise.resolve({ avg: 0, count: 0 }),
   ]);
+  // «ذات صلة» لنفس المعلن — و«المشابهة» بلا تكرار لما ظهر في إعلانات المعلن
+  const sellerAdIds = new Set(sellerAds.map((a) => a.id));
+  const similar = similarRaw.filter((a) => !sellerAdIds.has(a.id));
 
   // هل هذا إعلان متجر (معروض في واجهة متجر مستقل)؟ إن كان، فالمتجر مستقل:
   // نمنع ظهور مبوّبات تربح ونعرض رابطاً واضحاً «زيارة المتجر».
@@ -495,10 +499,16 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         </div>
       )}
 
-      {/* Related — إعلانات تربح المشابهة تُخفى لإعلان المتجر (استقلال تام) */}
+      {/* ذات صلة (لنفس المعلن) + المشابهة — تُخفى لإعلان المتجر (استقلال تام) */}
+      {!inStore && sellerAds.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-lg font-bold text-primary">إعلانات ذات صلة — لنفس المعلن</h2>
+          <AdGrid ads={sellerAds} />
+        </section>
+      )}
       {!inStore && similar.length > 0 && (
         <section>
-          <h2 className="mb-3 text-lg font-bold text-primary">إعلانات ذات صلة</h2>
+          <h2 className="mb-3 text-lg font-bold text-primary">إعلانات مشابهة</h2>
           <AdGrid ads={similar} />
         </section>
       )}

@@ -304,7 +304,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         {ad.urgentUntil && new Date(ad.urgentUntil) > new Date() && (
           <span className="mb-2 inline-block animate-pulse rounded-full bg-red-600 px-3 py-1 text-xs font-extrabold text-white shadow">🔥 عاجل</span>
         )}
-        <div className="mb-1 flex flex-wrap items-baseline gap-2">
+        <div className="mb-3 flex flex-wrap items-baseline gap-2">
           {(ad.price > 0 || ad.adsType === 'request') && <span className="text-2xl font-bold text-primary">{ad.price > 0 ? formatPrice(ad.price) : 'مطلوب'}</span>}
           {/* عروض اليوم: السعر قبل الخصم مشطوب + نسبة الخصم */}
           {ad.oldPrice > ad.price && ad.price > 0 && (
@@ -314,10 +314,6 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             </>
           )}
         </div>
-        {/* تنويه تحت السعر: مقابل ماذا؟ (تأجير/بيع…) — التفاصيل توضّحه */}
-        {ad.price > 0 && (
-          <p className="mb-3 text-[11px] font-bold text-muted-foreground">السعر مقابل ماذا؟ (تأجير أو بيع…) — يوضَّح في التفاصيل.</p>
-        )}
         <p className="whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
       </div>
 

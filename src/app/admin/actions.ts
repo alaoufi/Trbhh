@@ -464,6 +464,8 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('autorenew_on', formData.get('autoRenewOn') !== null ? '1' : '0');
   await setSetting('auction_on', formData.get('auctionOn') !== null ? '1' : '0');
   await setSetting('staff_on', formData.get('staffOn') !== null ? '1' : '0');
+  // قفل اسم العضو: التغيير عبر طلب بموافقة الإدارة (مستند + سبب)
+  await setSetting('namelock_on', formData.get('nameLockOn') !== null ? '1' : '0');
   // classified duplicate prevention: toggle + content/image/background thresholds
   await setSetting(SETTING_CDUP_ON, formData.get('cdupOn') !== null ? '1' : '0');
   await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));
@@ -1003,6 +1005,34 @@ export async function sendUserPasswordAction(formData: FormData) {
   const uid = Number(formData.get('userId'));
   const r = await sendNewPasswordToUser(uid);
   redirect(`/admin/users/${uid}?${r.ok ? 'sent=1' : 'error=' + encodeURIComponent(r.error || 'فشل الإرسال')}`);
+}
+
+/** موافقة الإدارة على طلب تغيير اسم العضو: يُطبَّق الاسم الجديد فوراً وتصل العضو رسالة. */
+export async function approveNameRequestAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const id = BigInt(String(formData.get('id') || '0'));
+  const r = await prisma.name_requests.findUnique({ where: { id } }).catch(() => null);
+  if (!r || r.status !== 0) redirect('/admin/name-requests');
+  await prisma.users.update({ where: { id: BigInt(r.user_id) }, data: { name: r.new_name } }).catch(() => {});
+  await prisma.name_requests.update({ where: { id }, data: { status: 1, decided_at: new Date() } }).catch(() => {});
+  await sendVerifyMessage(toInt(r.user_id), '__none__', `✅ تمت الموافقة على تغيير اسمك إلى «${r.new_name}» — الاسم الجديد أصبح فعّالاً.`);
+  await logAdmin(session.uid, 'قبول تغيير اسم', `العضو #${toInt(r.user_id)}: «${r.old_name}» ← «${r.new_name}»`);
+  revalidatePath('/admin/name-requests');
+  redirect('/admin/name-requests?done=ok');
+}
+
+/** رفض طلب تغيير الاسم مع سبب يُحفظ ويصل العضو برسالة. */
+export async function rejectNameRequestAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const id = BigInt(String(formData.get('id') || '0'));
+  const note = String(formData.get('note') || '').trim().slice(0, 250);
+  const r = await prisma.name_requests.findUnique({ where: { id } }).catch(() => null);
+  if (!r || r.status !== 0) redirect('/admin/name-requests');
+  await prisma.name_requests.update({ where: { id }, data: { status: 2, note: note || null, decided_at: new Date() } }).catch(() => {});
+  await sendVerifyMessage(toInt(r.user_id), '__none__', `❌ اعتذرت الإدارة عن تغيير اسمك إلى «${r.new_name}»${note ? ` — السبب: ${note}` : ''}. يمكنك إرسال طلب جديد بمستند أوضح.`);
+  await logAdmin(session.uid, 'رفض تغيير اسم', `العضو #${toInt(r.user_id)}: «${r.new_name}»${note ? ` — ${note}` : ''}`);
+  revalidatePath('/admin/name-requests');
+  redirect('/admin/name-requests?done=rej');
 }
 
 export async function setUserPasswordAction(formData: FormData) {

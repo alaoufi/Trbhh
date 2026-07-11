@@ -570,6 +570,9 @@ export async function getAuctionConfig(): Promise<AuctionConfig> {
 export const staffEnabled = () => getSettingBool('staff_on', false);
 export const STORE_STAFF_MAX = 5;
 
+/** قفل اسم العضو: التعديل عبر طلب بموافقة الإدارة فقط (سبب + مستند) — مفعّل افتراضياً. */
+export const nameLockEnabled = () => getSettingBool('namelock_on', true);
+
 /* تنبيهات قرب انتهاء الاشتراك: قبل كم يوم يبدأ التنبيه، وكم مرة (مرة واحدة يومياً
    كحدّ أقصى). 0 = تعطيل. نص الرسالة يُعدَّل من تبويب «النصوص» ويدعم {days} و{date}. */
 export const SETTING_SUB_REMIND_DAYS = 'sub_remind_days';

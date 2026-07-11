@@ -20,7 +20,7 @@ type Initial = {
 const field = 'h-11 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40';
 const lbl = 'mb-1 block text-sm font-bold text-foreground';
 
-export function ProfileForm({ initial, regions, areas }: { initial: Initial; regions: Region[]; areas: Area[] }) {
+export function ProfileForm({ initial, regions, areas, nameLocked }: { initial: Initial; regions: Region[]; areas: Area[]; nameLocked?: boolean }) {
   const [state, action] = useFormState(updateProfileAction, null as { ok?: boolean; error?: string } | null);
   return (
     <form action={action} className="max-w-lg space-y-4 card-3d rounded-xl p-5">
@@ -31,7 +31,14 @@ export function ProfileForm({ initial, regions, areas }: { initial: Initial; reg
       )}
       <div>
         <label className={lbl}>الاسم</label>
-        <input name="name" defaultValue={initial.name} className={field} />
+        {nameLocked ? (
+          <>
+            <input value={initial.name} disabled className={`${field} bg-muted/40 text-muted-foreground`} />
+            <p className="mt-1 text-xs font-bold text-amber-700">🔒 تغيير الاسم يتم بطلب لموافقة الإدارة — من صندوق «طلب تغيير الاسم» بالأسفل.</p>
+          </>
+        ) : (
+          <input name="name" defaultValue={initial.name} className={field} />
+        )}
       </div>
       <div>
         <label className={lbl}>رقم الجوال</label>

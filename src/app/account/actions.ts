@@ -117,11 +117,16 @@ export async function featureAdAction(formData: FormData) {
 
 export async function updateProfileAction(_prev: unknown, formData: FormData) {
   const session = await requireUser();
+  // قفل الاسم: عند تفعيله لا يتغيّر الاسم من هنا إطلاقاً — عبر «طلب تغيير الاسم» فقط
+  const { nameLockEnabled } = await import('@/lib/settings');
+  const nameLocked = await nameLockEnabled();
   const name = String(formData.get('name') || '').trim();
-  // الأسماء المخالفة (كلمات/جمل مرفوضة) لا تُقبل إلا من الإدارة
-  const { containsBannedName } = await import('@/lib/censor');
-  if (await containsBannedName(name)) {
-    return { error: 'الاسم يحتوي كلمة غير مسموحة — اختر اسماً آخر.' };
+  if (!nameLocked) {
+    // الأسماء المخالفة (كلمات/جمل مرفوضة) لا تُقبل إلا من الإدارة
+    const { containsBannedName } = await import('@/lib/censor');
+    if (await containsBannedName(name)) {
+      return { error: 'الاسم يحتوي كلمة غير مسموحة — اختر اسماً آخر.' };
+    }
   }
   const phoneRaw = String(formData.get('phoneNumber') || '').trim();
   const waRaw = String(formData.get('phone_whatsapp') || '').trim();
@@ -133,11 +138,44 @@ export async function updateProfileAction(_prev: unknown, formData: FormData) {
   const areaId = Number(formData.get('area_id')) || 0; // المدينة / المحافظة
   await prisma.users.update({
     where: { id: BigInt(session.uid) },
-    data: { name, phoneNumber, phone_whatsapp, allow_phone, whatsapp, ...(cityId ? { city_id: BigInt(cityId) } : {}) },
+    data: { ...(nameLocked ? {} : { name }), phoneNumber, phone_whatsapp, allow_phone, whatsapp, ...(cityId ? { city_id: BigInt(cityId) } : {}) },
   });
   await setUserArea(session.uid, areaId || null);
   revalidatePath('/account/profile');
   return { ok: true };
+}
+
+/** طلب تغيير اسم العضو: لا يتغيّر الاسم إلا بموافقة الإدارة — مع السبب ومستند إثبات. */
+export async function requestNameChangeAction(formData: FormData) {
+  const session = await requireUser();
+  const { nameLockEnabled } = await import('@/lib/settings');
+  if (!(await nameLockEnabled())) redirect('/account/profile');
+  const newName = String(formData.get('newName') || '').trim().slice(0, 100);
+  const reason = String(formData.get('reason') || '').trim().slice(0, 1000);
+  const u = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { name: true, userName: true } });
+  const oldName = u?.name || u?.userName || '';
+  if (!newName || newName === oldName) redirect('/account/profile?namereq=err');
+  const { containsBannedName } = await import('@/lib/censor');
+  if (await containsBannedName(newName)) redirect('/account/profile?namereq=banned');
+  if (!reason) redirect('/account/profile?namereq=reason');
+  // طلب واحد معلّق لكل عضو
+  const pending = await prisma.name_requests.findFirst({ where: { user_id: BigInt(session.uid), status: 0 } }).catch(() => null);
+  if (pending) redirect('/account/profile?namereq=dup');
+  // المستند إلزامي: صورة أو PDF يثبت الاسم الجديد
+  const file = formData.get('doc');
+  let docId = 0;
+  if (file instanceof File && file.size > 0) {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const buf = Buffer.from(await file.arrayBuffer());
+    const { saveUpload } = await import('@/lib/storage');
+    const rel = await saveUpload(buf, `namechg_${session.uid}_${Date.now()}.${ext}`);
+    const up = await prisma.uploads.create({ data: { file_name: rel, extension: ext, type: 'name_change', file_size: file.size, user_id: session.uid } });
+    docId = toInt(up.id);
+  }
+  if (!docId) redirect('/account/profile?namereq=doc');
+  await prisma.name_requests.create({ data: { user_id: BigInt(session.uid), old_name: oldName, new_name: newName, reason, doc: docId } });
+  revalidatePath('/account/profile');
+  redirect('/account/profile?namereq=1');
 }
 
 export async function toggleFavoriteAction(formData: FormData) {

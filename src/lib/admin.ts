@@ -20,7 +20,7 @@ export async function isAdmin(userId: number) {
 }
 
 export async function adminStats() {
-  const [users, ads, activeAds, pendingAds, pendingVerify, reports, debates, dup, classified] = await Promise.all([
+  const [users, ads, activeAds, pendingAds, pendingVerify, reports, debates, dup, classified, pendingNames] = await Promise.all([
     prisma.users.count(),
     prisma.ads.count(),
     prisma.ads.count({ where: { status: 1, state: 'active' } }),
@@ -31,6 +31,7 @@ export async function adminStats() {
     prisma.debates.count(),
     findDuplicateAds().then((r) => r.dupCount).catch(() => 0),
     countClassifieds().catch(() => 0),
+    prisma.name_requests.count({ where: { status: 0 } }).catch(() => 0),
   ]);
-  return { users, ads, activeAds, pendingAds, pendingVerify, reports, debates, duplicateAds: dup, classified };
+  return { users, ads, activeAds, pendingAds, pendingVerify, reports, debates, duplicateAds: dup, classified, pendingNames };
 }

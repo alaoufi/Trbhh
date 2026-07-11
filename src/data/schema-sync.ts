@@ -189,6 +189,22 @@ const STATEMENTS: string[] = [
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (store_id, user_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* طلبات تغيير اسم العضو: الاسم يتغيّر بموافقة الإدارة فقط (سبب + مستند إثبات).
+     status: 0 معلّق، 1 موافَق، 2 مرفوض — doc = معرف صف uploads للمستند. */
+  `CREATE TABLE IF NOT EXISTS name_requests (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    old_name VARCHAR(255) NOT NULL DEFAULT '',
+    new_name VARCHAR(255) NOT NULL DEFAULT '',
+    reason TEXT NULL,
+    doc INT NOT NULL DEFAULT 0,
+    status TINYINT NOT NULL DEFAULT 0,
+    note VARCHAR(255) NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    decided_at DATETIME NULL,
+    INDEX name_requests_user (user_id),
+    INDEX name_requests_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* التجديد التلقائي للاشتراك: مفعّل؟ + آخر خطة مدفوعة (monthly/sixmo/yearly) للتجديد بها. */
   `ALTER TABLE stores ADD COLUMN auto_renew TINYINT NOT NULL DEFAULT 0`,
   `ALTER TABLE stores ADD COLUMN sub_plan VARCHAR(10) NULL`,

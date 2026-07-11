@@ -189,6 +189,10 @@ const STATEMENTS: string[] = [
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (store_id, user_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* ترقية نص رسالة تأكيد الشحن للصيغة الجديدة — فقط إن كان المحفوظ هو النص
+     الافتراضي القديم (تعديلات المدير اليدوية من «النصوص» لا تُمَسّ). */
+  `UPDATE site_settings SET v = 'تم تأكيد الشحن وإضافة {amount} ر.س إلى رصيدك ✅ شكراً لاختياركم تربح {name}، نتمنى لكم التوفيق 🎉 بإمكانكم استخدام الرصيد بكافة الوسائل لدعم إعلاناتكم. — الإدارة'
+   WHERE k = 'msg_topup_ok' AND v = 'شكراً لثقتك في منصة تربح {name} 🎉 تم إضافة رصيد بمبلغ {amount} ر.س — يمكنك استخدامه في المدفوعات المختلفة. — الإدارة'`,
   /* طلبات تغيير اسم العضو: الاسم يتغيّر بموافقة الإدارة فقط (سبب + مستند إثبات).
      status: 0 معلّق، 1 موافَق، 2 مرفوض — doc = معرف صف uploads للمستند. */
   `CREATE TABLE IF NOT EXISTS name_requests (

@@ -247,6 +247,7 @@ export function AdForm({
         <div>
           <label className={lbl}>{isReq ? 'الميزانية المتوقّعة' : 'السعر'}</label>
           <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="اختياري — إن تركته فارغاً لا يظهر سعر للإعلان" />
+          {!isReq && <p className="mt-1 text-[11px] font-bold text-muted-foreground">إن كتبت سعراً وضّح في التفاصيل مقابل ماذا (تأجير أو بيع، لليوم أو للقطعة…).</p>}
         </div>
         {allowOldPrice && !isReq && (
           <div>

@@ -13,6 +13,7 @@ import {
   DEFAULT_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_REJECT,
   DEFAULT_TOPUP_INFO, DEFAULT_MSG_TOPUP_OK, DEFAULT_MSG_TOPUP_REJECT,
   DEFAULT_TOPUP_NAME_NOTE,
+  DEFAULT_FEED_TEXTS_PROMO, DEFAULT_FEED_TEXTS_AWARE,
 } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveTextsAction } from '../actions';
@@ -33,6 +34,7 @@ const SECTIONS = [
   { key: 'sub', label: 'الاشتراك', icon: BellRing },
   { key: 'verify', label: 'التوثيق', icon: ShieldCheck },
   { key: 'wallet', label: 'المحفظة', icon: HandCoins },
+  { key: 'feedbanner', label: 'بانر الرئيسية 📢', icon: Megaphone },
 ] as const;
 type Sec = typeof SECTIONS[number]['key'];
 
@@ -67,6 +69,10 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
     getSetting(SETTING_MSG_TOPUP_OK, DEFAULT_MSG_TOPUP_OK),
     getSetting(SETTING_MSG_TOPUP_REJECT, DEFAULT_MSG_TOPUP_REJECT),
     getSetting(SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE),
+  ]);
+  const [feedPromo, feedAware] = await Promise.all([
+    getSetting('feed_texts_promo', DEFAULT_FEED_TEXTS_PROMO),
+    getSetting('feed_texts_aware', DEFAULT_FEED_TEXTS_AWARE),
   ]);
 
   return (
@@ -217,6 +223,24 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
             <label className="block space-y-1">
               <span className="text-sm font-medium">رسالة رفض طلب الشحن</span>
               <textarea name="msgTopupReject" rows={3} defaultValue={topupReject} className={box} />
+            </label>
+          </>
+        )}
+
+        {sec === 'feedbanner' && (
+          <>
+            <p className="text-xs text-muted-foreground">
+              بانر يظهر بين كل ~10 أسطر إعلانات في «أحدث الإعلانات» بالرئيسية، بنص يتبدل عشوائياً كل ثوانٍ.
+              اكتب <b>سطراً لكل نص</b> في تصنيفه — شكل البانر يتبع التصنيف:
+              التسويقي أزرق بأيقونة 📢 والتوعوي أخضر بأيقونة 💡. مسح كل الأسطر في التصنيفين يوقف البانر نهائياً.
+            </p>
+            <label className="block space-y-1">
+              <span className="flex items-center gap-1.5 text-sm font-extrabold text-sky-700">📢 نصوص تسويقية <span className="font-normal text-muted-foreground">(الخدمات المدفوعة، المتاجر، الحملات…)</span></span>
+              <textarea name="feedPromo" rows={7} defaultValue={feedPromo} className={box} placeholder="سطر لكل نص…" />
+            </label>
+            <label className="block space-y-1">
+              <span className="flex items-center gap-1.5 text-sm font-extrabold text-emerald-700">💡 نصوص توعوية <span className="font-normal text-muted-foreground">(السلامة، نصائح النشر، التوثيق…)</span></span>
+              <textarea name="feedAware" rows={7} defaultValue={feedAware} className={box} placeholder="سطر لكل نص…" />
             </label>
           </>
         )}

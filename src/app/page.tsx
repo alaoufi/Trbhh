@@ -22,7 +22,7 @@ import { OpenStoreBanner } from '@/components/open-store-banner';
 import { WelcomeBanner } from '@/components/welcome-banner';
 import { TopupPromoBanner } from '@/components/topup-promo-banner';
 import { FeedTextBanner } from '@/components/feed-text-banner';
-import { getFeedBannerTexts } from '@/lib/settings';
+import { getFeedBannerItems } from '@/lib/settings';
 import { Fragment } from 'react';
 
 export const dynamic = 'force-dynamic';
@@ -78,7 +78,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   ).filter((p) => p.ads.length > 0);
   const pinnedLabel = catsParam.length ? 'الأقسام المختارة' : '⭐ أقسام تهمّك';
   const storeAds = await homeFeaturedAds().catch(() => []);
-  const feedTexts = await getFeedBannerTexts().catch(() => []);
+  const feedTexts = await getFeedBannerItems().catch(() => []);
   const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
   const myStore = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // الرصيد الترحيبي — بانر للزوار فقط عندما يحدد التحكم مبلغاً أكبر من صفر
@@ -176,7 +176,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             return chunks.map((c, i) => (
               <Fragment key={i}>
                 <AdGrid ads={c} />
-                {feedTexts.length > 0 && i < chunks.length - 1 && <FeedTextBanner texts={feedTexts} />}
+                {feedTexts.length > 0 && i < chunks.length - 1 && <FeedTextBanner items={feedTexts} />}
               </Fragment>
             ));
           })()}

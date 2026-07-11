@@ -36,6 +36,20 @@ export function ShareButtons({ url, title, text, compact, card }: { url: string;
     if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1500); }
   };
 
+  // تيك توك لا يقبل روابط مشاركة من الويب: ننسخ الرابط ثم نفتح التطبيق
+  // (يُلصق في وصف الفيديو أو التعليق). إن كان التطبيق مثبتاً يفتح مباشرة.
+  const tiktok = async () => {
+    await copy();
+    window.open('https://www.tiktok.com/', '_blank', 'noopener');
+  };
+
+  // أيقونة تيك توك (لا توجد في lucide)
+  const TikTokIcon = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M19.32 5.56a5.1 5.1 0 0 1-3.05-2.61 5 5 0 0 1-.44-1.45h-3.1v12.62a2.94 2.94 0 1 1-2.94-2.94c.3 0 .58.05.85.13V8.14a6.1 6.1 0 0 0-.85-.06 6.09 6.09 0 1 0 6.09 6.09V9.5a8.1 8.1 0 0 0 4.44 1.32V7.71a5.06 5.06 0 0 1-1-.15z" />
+    </svg>
+  );
+
   // المشاركة: مشاركة النظام إن توفّرت، وإلا قائمة بدائل تعمل دائماً.
   const share = async () => {
     if (!card && typeof navigator !== 'undefined' && navigator.share) {
@@ -74,6 +88,7 @@ export function ShareButtons({ url, title, text, compact, card }: { url: string;
               <a href={tg} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Send className="h-4 w-4 text-[#229ED9]" /> تيليجرام</a>
               <a href={fb} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Facebook className="h-4 w-4 text-[#1877F2]" /> فيسبوك</a>
               <a href={tw} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Share2 className="h-4 w-4" /> تويتر / X</a>
+              <button type="button" onClick={() => { tiktok(); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><TikTokIcon className="h-4 w-4" /> تيك توك <span className="text-[10px] text-muted-foreground">(يُنسخ الرابط)</span></button>
               <button type="button" onClick={() => { copy(); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary">{copied ? <Check className="h-4 w-4 text-primary" /> : <Link2 className="h-4 w-4" />} نسخ الرابط</button>
               <button type="button" onClick={() => { setQr(true); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><QrCode className="h-4 w-4" /> رمز QR</button>
               {card && <ShareCardButton data={card} />}
@@ -95,6 +110,7 @@ export function ShareButtons({ url, title, text, compact, card }: { url: string;
       <a href={tg} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary">تيليجرام</a>
       <a href={fb} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary">فيسبوك</a>
       <a href={tw} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary">تويتر</a>
+      <button type="button" onClick={tiktok} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary" title="يُنسخ الرابط ويُفتح تيك توك — الصقه في وصف فيديوك"><TikTokIcon className="h-4 w-4" /> تيك توك</button>
       <button type="button" onClick={() => setQr(true)} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary"><QrCode className="h-4 w-4" /> QR</button>
       {card && <ShareCardButton data={card} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary" />}
       {qrModal}

@@ -118,7 +118,10 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
       <div className="space-y-2">
         {ads.map((a) => (
           <div key={toInt(a.id)} className="flex flex-wrap items-center gap-2 card-3d rounded-xl p-3">
-            <Link href={`/ads/${toInt(a.id)}`} className="min-w-0 flex-1 truncate font-medium hover:text-primary">{a.title}</Link>
+            {/* عنوان فارغ؟ نعرض رقم الإعلان كرابط حتى يبقى قابلاً للفتح دائماً */}
+            <Link href={`/ads/${toInt(a.id)}`} className="min-w-0 flex-1 truncate font-medium text-primary hover:underline">
+              {a.title?.trim() || <span className="text-amber-700">⚠ بلا عنوان — إعلان #{toInt(a.id)}</span>}
+            </Link>
             <span className="text-sm text-primary">{formatPrice(a.price, 'ر.س', a.adsType)}</span>
             {a.adsSpecial === 'checked' && <Badge variant="special">مميّز</Badge>}
             <Badge variant={a.status === 1 ? 'trusted' : a.data_archive ? 'muted' : 'special'}>{a.status === 1 ? 'نشط' : a.data_archive ? 'مؤرشف' : 'بانتظار الموافقة'}</Badge>

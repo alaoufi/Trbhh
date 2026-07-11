@@ -434,6 +434,8 @@ export async function updateAdAction(formData: FormData) {
     const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
     if (ll) { eLat = String(ll.lat); eLng = String(ll.lng); }
   }
+  // العنوان والتفاصيل إجباريان في التعديل أيضاً (كالإضافة)
+  if (!eTitle || !eDetail) redirect(`/ads/${toInt(adId)}/edit?error=missing`);
   // نوع السعر عند التعديل: نفس منطق الإضافة (على السوم = صفر بلا سعر)
   const eType = String(formData.get('adsType')) === 'request' ? 'request' : 'offer';
   const ePtRaw = String(formData.get('priceType') || '');
@@ -442,8 +444,8 @@ export async function updateAdAction(formData: FormData) {
   await prisma.ads.update({
     where: { id: adId },
     data: {
-      title: String(formData.get('title') || '').trim(),
-      detail: String(formData.get('detail') || '').trim(),
+      title: eTitle,
+      detail: eDetail,
       price: ePriceType === 'som' ? 0 : parseFloat(String(formData.get('price') || '0')) || 0,
       adsType: eType,
       price_type: ePriceType,

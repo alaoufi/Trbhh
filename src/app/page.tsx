@@ -21,6 +21,9 @@ import { StoreMiniCard, type StoreCardData } from '@/components/store-mini-card'
 import { OpenStoreBanner } from '@/components/open-store-banner';
 import { WelcomeBanner } from '@/components/welcome-banner';
 import { TopupPromoBanner } from '@/components/topup-promo-banner';
+import { FeedTextBanner } from '@/components/feed-text-banner';
+import { getFeedBannerTexts } from '@/lib/settings';
+import { Fragment } from 'react';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,6 +78,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   ).filter((p) => p.ads.length > 0);
   const pinnedLabel = catsParam.length ? 'الأقسام المختارة' : '⭐ أقسام تهمّك';
   const storeAds = await homeFeaturedAds().catch(() => []);
+  const feedTexts = await getFeedBannerTexts().catch(() => []);
   const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
   const myStore = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // الرصيد الترحيبي — بانر للزوار فقط عندما يحدد التحكم مبلغاً أكبر من صفر
@@ -162,7 +166,20 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <AdGrid ads={latest.slice(0, 4)} />
           {/* Paid banner — in-feed after 4 ads */}
           <PromoSlot placement="feed" />
-          {latest.length > 4 && <AdGrid ads={latest.slice(4)} />}
+          {/* بقية الإعلانات على دفعات: بانر نصي (تسويقي/توعوي متبدل) كل ~10 أسطر
+              (20 إعلاناً على شبكة عمودين — أول بانر بعد 20 إعلاناً من أعلى القائمة) */}
+          {(() => {
+            const rest = latest.slice(4);
+            if (!rest.length) return null;
+            const chunks: typeof rest[] = [rest.slice(0, 16)];
+            for (let i = 16; i < rest.length; i += 20) chunks.push(rest.slice(i, i + 20));
+            return chunks.map((c, i) => (
+              <Fragment key={i}>
+                <AdGrid ads={c} />
+                {feedTexts.length > 0 && i < chunks.length - 1 && <FeedTextBanner texts={feedTexts} />}
+              </Fragment>
+            ));
+          })()}
           {/* الرئيسية تعرض كل إعلانات آخر شهر — والأقدم عبر البحث والأقسام */}
           <Link href="/search" className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
             الإعلانات الأقدم من شهر تجدها في البحث والأقسام — عرض الكل ←

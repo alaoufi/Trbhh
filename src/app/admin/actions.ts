@@ -466,6 +466,8 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('staff_on', formData.get('staffOn') !== null ? '1' : '0');
   // قفل اسم العضو: التغيير عبر طلب بموافقة الإدارة (مستند + سبب)
   await setSetting('namelock_on', formData.get('nameLockOn') !== null ? '1' : '0');
+  // بانر النصوص بين إعلانات الرئيسية: سطر لكل نص — فارغ = إيقاف
+  await setSetting('feed_banner_texts', String(formData.get('feedBannerTexts') ?? '').slice(0, 4000));
   // classified duplicate prevention: toggle + content/image/background thresholds
   await setSetting(SETTING_CDUP_ON, formData.get('cdupOn') !== null ? '1' : '0');
   await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { BadgeCheck, Ban, Check, ShieldCheck } from 'lucide-react';
+import { BadgeCheck, Ban, Check, ShieldCheck, UserPen } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,7 @@ import { banUserAction, unbanUserAction, trustUserAction, assignUserPackageActio
 import { listDeletionRequests } from '@/lib/account-delete';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'إدارة المستخدمين' };
+export const metadata = { title: 'إدارة الأعضاء' };
 
 const FILTERS = [
   { k: 'all', l: 'الكل' },
@@ -69,16 +69,31 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
     ...args,
   ).catch(() => [] as Row[]);
   const ids = users.map((u) => toInt(u.id));
-  const [packages, pkgMap, roleById, banMap] = await Promise.all([
+  const [packages, pkgMap, roleById, banMap, pendingVerify, pendingNames] = await Promise.all([
     getPackages(),
     getUserPackageMap(ids),
     getUserRolesMap(ids),
     getBanMap(ids),
+    prisma.users.count({ where: { step: { gt: 0 }, trusted: 0 } }).catch(() => 0),
+    prisma.name_requests.count({ where: { status: 0 } }).catch(() => 0),
   ]);
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold text-primary">المستخدمون</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-bold text-primary">الأعضاء</h1>
+        {/* طلبات الأعضاء المعلّقة — وصول مباشر من نفس الصفحة */}
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin/verifications" className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm font-bold ${pendingVerify > 0 ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-primary/25 text-primary hover:bg-secondary'}`}>
+            <ShieldCheck className="h-4 w-4" /> طلبات التوثيق
+            {pendingVerify > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-xs text-white">{pendingVerify}</span>}
+          </Link>
+          <Link href="/admin/name-requests" className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm font-bold ${pendingNames > 0 ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-primary/25 text-primary hover:bg-secondary'}`}>
+            <UserPen className="h-4 w-4" /> طلبات تغيير الاسم
+            {pendingNames > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-xs text-white">{pendingNames}</span>}
+          </Link>
+        </div>
+      </div>
 
       {/* طلبات حذف الحسابات (متطلب Google Play) */}
       {deletionRequests.length > 0 && (
@@ -105,7 +120,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
           ))}
         </div>
       )}
-      <AdminSearch basePath="/admin/users" defaultValue={q} placeholder="بحث فوري بالاسم أو اسم المستخدم أو الجوال…" />
+      <AdminSearch basePath="/admin/users" defaultValue={q} placeholder="بحث فوري بالاسم أو اسم الدخول أو الجوال…" />
 
       {/* تصنيف: الكل / نشط / محظور */}
       <div className="flex flex-wrap gap-2">

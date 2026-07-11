@@ -42,7 +42,7 @@ export default async function AdminHome() {
     { group: 'ads', label: 'الإعلانات المبوّبة', value: s.classified, icon: Sparkles, href: '/admin/classified', perm: 'classified' },
     { group: 'ads', label: 'الأقسام', icon: LayoutGrid, href: '/admin/categories', perm: 'categories', nav: true },
     // الأعضاء والصلاحيات
-    { group: 'members', label: 'المستخدمون', value: s.users, icon: Users, href: '/admin/users', perm: 'users' },
+    { group: 'members', label: 'الأعضاء', value: s.users, icon: Users, href: '/admin/users', perm: 'users' },
     { group: 'members', label: 'طلبات توثيق معلّقة', value: s.pendingVerify, icon: ShieldCheck, href: '/admin/verifications', highlight: true, perm: 'verifications' },
     { group: 'members', label: 'طلبات تغيير الاسم', value: s.pendingNames, icon: Users, href: '/admin/name-requests', highlight: true, perm: 'users' },
     { group: 'members', label: 'الأدوار والصلاحيات', icon: KeyRound, href: '/admin/roles', perm: 'users', nav: true },

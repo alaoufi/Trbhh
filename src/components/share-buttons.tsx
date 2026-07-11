@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Share2, Link2, QrCode, Check, X, MessageCircle } from 'lucide-react';
+import { Share2, Link2, QrCode, Check, X, MessageCircle, Facebook, Send } from 'lucide-react';
 import { ShareCardButton, type ShareCardData } from '@/components/share-card';
 
 export function ShareButtons({ url, title, text, compact, card }: { url: string; title: string; text?: string; compact?: boolean; card?: ShareCardData }) {
@@ -11,6 +11,8 @@ export function ShareButtons({ url, title, text, compact, card }: { url: string;
   const msg = (text || title).trim();
   const wa = `https://wa.me/?text=${encodeURIComponent(msg + '\n' + url)}`;
   const tw = `https://twitter.com/intent/tweet?text=${encodeURIComponent(msg)}&url=${encodeURIComponent(url)}`;
+  const tg = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(msg)}`;
+  const fb = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}`;
 
   // نسخ الرابط مع بديل يعمل على المتصفحات/الأجهزة التي لا تدعم Clipboard API
@@ -69,6 +71,8 @@ export function ShareButtons({ url, title, text, compact, card }: { url: string;
                 <button type="button" onClick={() => { navigator.share({ title, text: msg, url }).catch(() => {}); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Share2 className="h-4 w-4 text-primary" /> مشاركة الرابط</button>
               )}
               <a href={wa} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><MessageCircle className="h-4 w-4 text-[#25D366]" /> واتساب</a>
+              <a href={tg} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Send className="h-4 w-4 text-[#229ED9]" /> تيليجرام</a>
+              <a href={fb} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Facebook className="h-4 w-4 text-[#1877F2]" /> فيسبوك</a>
               <a href={tw} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Share2 className="h-4 w-4" /> تويتر / X</a>
               <button type="button" onClick={() => { copy(); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary">{copied ? <Check className="h-4 w-4 text-primary" /> : <Link2 className="h-4 w-4" />} نسخ الرابط</button>
               <button type="button" onClick={() => { setQr(true); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><QrCode className="h-4 w-4" /> رمز QR</button>
@@ -88,6 +92,8 @@ export function ShareButtons({ url, title, text, compact, card }: { url: string;
       )}
       <button type="button" onClick={copy} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary">{copied ? <Check className="h-4 w-4 text-primary" /> : <Link2 className="h-4 w-4" />} {copied ? 'تم النسخ' : 'نسخ الرابط'}</button>
       <a href={wa} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary">واتساب</a>
+      <a href={tg} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary">تيليجرام</a>
+      <a href={fb} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary">فيسبوك</a>
       <a href={tw} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary">تويتر</a>
       <button type="button" onClick={() => setQr(true)} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary"><QrCode className="h-4 w-4" /> QR</button>
       {card && <ShareCardButton data={card} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary" />}

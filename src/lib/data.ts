@@ -534,13 +534,84 @@ export async function recordView(adId: number, viewerKey: string) {
 }
 
 /** Similar ads from the same category (excluding the current ad). */
+/* ---- الإعلانات المشابهة: تشابه حقيقي بالكلمات (العنوان + التفاصيل) ---- */
+
+// كلمات عامة لا تدل على التشابه (تُستبعد من المطابقة)
+const SIMILAR_STOP = new Set([
+  'على', 'من', 'في', 'الى', 'إلى', 'عن', 'مع', 'او', 'أو', 'هذا', 'هذه', 'ذلك',
+  'التي', 'الذي', 'كل', 'بعد', 'قبل', 'عند', 'حتى', 'اذا', 'إذا', 'ثم', 'لكن',
+  'قد', 'يوجد', 'متوفر', 'متوفره', 'للبيع', 'مطلوب', 'جديد', 'جديده', 'مستعمل',
+  'مستعمله', 'بيع', 'شراء', 'سعر', 'ريال', 'رس', 'بسعر', 'اسعار', 'خصم', 'عرض',
+  'خدمه', 'خدمات', 'جميع', 'وجميع', 'لدينا', 'لدي', 'الان', 'فقط', 'the', 'and', 'for',
+]);
+
+/** توحيد الكلمة العربية: إزالة التشكيل والتطويل وتوحيد الألف/الهاء/الياء وحذف «ال». */
+function simToken(w: string): string {
+  const t = w
+    .replace(/[ـً-ْ]/g, '')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .toLowerCase();
+  return t.startsWith('ال') && t.length > 4 ? t.slice(2) : t;
+}
+
+function simTokens(text: string): string[] {
+  return (text || '')
+    .split(/[^\p{L}\p{N}]+/u)
+    .map(simToken)
+    .filter((t) => t.length >= 3 && !SIMILAR_STOP.has(t) && !/^\d+$/.test(t));
+}
+
+/**
+ * إعلانات مشابهة بدلالة النص: تُستخرج كلمات العنوان والتفاصيل ويُرتَّب
+ * المرشحون بعدد الكلمات المشتركة (كلمات العنوان بوزن مضاعف). المرشحون من
+ * نفس القسم + إعلانات من أقسام أخرى تحمل أهم كلمات العنوان. عند غياب
+ * تشابه نصي كافٍ نكمل بأحدث إعلانات القسم كما سبق.
+ */
 export async function getSimilarAds(adId: number, categoryId: number, take = 6) {
-  const rows = await prisma.ads.findMany({
-    where: { ...activeAdWhere(), category_id: BigInt(categoryId), id: { not: BigInt(adId) } },
-    orderBy: [{ adsSpecial: 'desc' }, { id: 'desc' }],
-    take,
-    select: adSelect,
-  });
+  const src = await prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { title: true, detail: true } }).catch(() => null);
+  const titleTokens = new Set(simTokens(src?.title || ''));
+  const detailTokens = new Set(simTokens((src?.detail || '').slice(0, 400)));
+
+  // مرشحون: أحدث إعلانات نفس القسم + إعلانات تحمل أهم كلمات العنوان من أي قسم
+  const topWords = [...titleTokens].sort((a, b) => b.length - a.length).slice(0, 3);
+  const [sameCat, byTitle] = await Promise.all([
+    prisma.ads.findMany({
+      where: { ...activeAdWhere(), category_id: BigInt(categoryId), id: { not: BigInt(adId) } },
+      orderBy: { id: 'desc' },
+      take: 200,
+      select: { ...adSelect },
+    }),
+    topWords.length
+      ? prisma.ads.findMany({
+          where: { ...activeAdWhere(), id: { not: BigInt(adId) }, OR: topWords.map((w) => ({ title: { contains: w } })) },
+          orderBy: { id: 'desc' },
+          take: 100,
+          select: { ...adSelect },
+        }).catch(() => [])
+      : Promise.resolve([]),
+  ]);
+  const seen = new Set<number>();
+  const candidates = [...sameCat, ...byTitle].filter((r) => (seen.has(toInt(r.id)) ? false : (seen.add(toInt(r.id)), true)));
+
+  // الترتيب: كلمة عنوان مشتركة = نقطتان، كلمة تفاصيل = نقطة — ثم الأحدث
+  const scored = candidates
+    .map((r) => {
+      const ct = simTokens(r.title || '');
+      let score = 0;
+      for (const t of new Set(ct)) {
+        if (titleTokens.has(t)) score += 2;
+        else if (detailTokens.has(t)) score += 1;
+      }
+      return { r, score };
+    })
+    .sort((a, b) => b.score - a.score || toInt(b.r.id) - toInt(a.r.id));
+
+  const withSim = scored.filter((s) => s.score > 0).slice(0, take).map((s) => s.r);
+  // إكمال العدد بأحدث إعلانات القسم عند قلة المتشابهات
+  const fill = scored.filter((s) => s.score === 0 && toInt(s.r.category_id) === categoryId).map((s) => s.r);
+  const rows = [...withSim, ...fill].slice(0, take);
   return toCards(rows);
 }
 

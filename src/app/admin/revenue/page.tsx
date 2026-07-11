@@ -347,6 +347,14 @@ async function CampaignsTab({ camp }: { camp?: string }) {
   const campaigns = await getTopupCampaigns();
   const activeCamp = await getActiveTopupCampaign().catch(() => null);
   const campHealth = await topupCampaignsHealth().catch(() => null);
+  // 📊 سجل كل حملة: الشحن المؤكد خلال فترتها ومكافآتها وتفصيل الأعضاء — للمقارنة بين الحملات
+  const { campaignTopupReport } = await import('@/lib/wallet');
+  type CampReport = Awaited<ReturnType<typeof campaignTopupReport>>;
+  const reports = new Map<number, CampReport>();
+  await Promise.all(campaigns.map(async (c) => {
+    if (campaignState(c) === 'upcoming') return;
+    reports.set(c.id, await campaignTopupReport(c.from, c.to).catch(() => ({ total: 0, count: 0, bonuses: 0, members: [] })));
+  }));
   const fmtCamp = (iso: string) => new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Riyadh' }).format(new Date(iso));
   const stateChip = (st: 'upcoming' | 'active' | 'ended') =>
     st === 'active' ? <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold text-white">✅ فعّالة الآن</span>
@@ -393,6 +401,32 @@ async function CampaignsTab({ camp }: { camp?: string }) {
               <div className="flex flex-wrap gap-1.5">
                 {c.tiers.map((t, i) => <span key={`${t.amount}-${i}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">اشحن {t.amount} تحصل على {t.bonus} ريال</span>)}
               </div>
+              {/* 📊 سجل الحملة ونتائجها — لمقارنة الحملات ببعضها */}
+              {(() => {
+                const r = reports.get(c.id);
+                if (!r) return <p className="text-[11px] font-bold text-sky-700">⏳ لم تبدأ بعد — سجلها يظهر مع أول شحن خلالها.</p>;
+                return (
+                  <details className="rounded-lg border border-emerald-200 bg-emerald-50/40">
+                    <summary className="cursor-pointer list-none px-2.5 py-1.5 text-xs font-extrabold text-emerald-800">
+                      📊 سجل الحملة: شحن مؤكد <b className="text-sky-700">{en(r.total)} ر.س</b> ({en(r.count)} عملية) · مكافآت ممنوحة <b className="text-amber-700">{en(r.bonuses)} ر.س</b> — اضغط للتفصيل
+                    </summary>
+                    <div className="border-t border-emerald-200 p-2.5">
+                      {r.members.length === 0 ? (
+                        <p className="text-center text-xs text-muted-foreground">لا يوجد شحن مؤكد خلال فترة هذه الحملة{campaignState(c) === 'active' ? ' بعد' : ''}.</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {r.members.map((m) => (
+                            <li key={m.userId} className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1 text-xs shadow-sm ring-1 ring-black/5">
+                              <Link href={`/admin/users/${m.userId}`} className="min-w-0 flex-1 truncate font-bold text-primary hover:underline">{m.name}</Link>
+                              <b className="shrink-0 text-sky-700">{en(m.amount)} ر.س</b>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </details>
+                );
+              })()}
             </li>
           ))}
         </ul>

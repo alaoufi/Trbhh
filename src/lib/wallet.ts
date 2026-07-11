@@ -298,6 +298,39 @@ async function applyTopupBonuses(userId: number, amount: number, adminId: number
   }
 }
 
+/* ---- سجل الحملة: نتائج كل حملة شحن لمقارنتها ---- */
+export type CampaignReport = {
+  total: number; // مجموع الشحن المؤكد خلال فترة الحملة
+  count: number; // عدد عمليات الشحن المؤكدة
+  bonuses: number; // مكافآت الحملة الممنوحة خلالها
+  members: { userId: number; name: string; amount: number }[]; // مجموع شحن كل عضو (الأعلى أولاً)
+};
+
+/** نتائج حملة شحن خلال فترتها (المفتوحة/الجارية تُحسب حتى الآن). */
+export async function campaignTopupReport(fromIso: string, toIso: string | ''): Promise<CampaignReport> {
+  await ensure();
+  const from = new Date(fromIso);
+  const toRaw = toIso ? new Date(toIso) : new Date();
+  const to = toRaw.getTime() > Date.now() ? new Date() : toRaw; // الجارية: حتى الآن
+  const empty: CampaignReport = { total: 0, count: 0, bonuses: 0, members: [] };
+  if (isNaN(from.getTime()) || from > to) return empty;
+  const range = { gte: from, lte: to };
+  const [groups, count, bonusAgg] = await Promise.all([
+    prisma.wallet_txns.groupBy({ by: ['user_id'], where: { reason: 'topup', amount: { gt: 0 }, created_at: range }, _sum: { amount: true } }).catch(() => [] as { user_id: bigint; _sum: { amount: number | null } }[]),
+    prisma.wallet_txns.count({ where: { reason: 'topup', amount: { gt: 0 }, created_at: range } }).catch(() => 0),
+    prisma.wallet_txns.aggregate({ _sum: { amount: true }, where: { reason: 'bonus', amount: { gt: 0 }, created_at: range, note: { startsWith: 'مكافأة حملة الشحن' } } }).catch(() => ({ _sum: { amount: 0 } })),
+  ]);
+  const ids = groups.map((g) => toInt(g.user_id));
+  const users = ids.length
+    ? await prisma.users.findMany({ where: { id: { in: ids.map((n) => BigInt(n)) } }, select: { id: true, name: true, userName: true } }).catch(() => [])
+    : [];
+  const nameOf = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || '']));
+  const members = groups
+    .map((g) => ({ userId: toInt(g.user_id), name: nameOf.get(toInt(g.user_id)) || `عضو #${toInt(g.user_id)}`, amount: g._sum.amount ?? 0 }))
+    .sort((a, b) => b.amount - a.amount);
+  return { total: members.reduce((s, m) => s + m.amount, 0), count, bonuses: bonusAgg._sum.amount ?? 0, members };
+}
+
 /** هدية التوثيق (مرة واحدة لكل عضو) — 0 = معطّلة. */
 export async function grantVerifyGift(userId: number, adminId: number): Promise<number> {
   const { getVerifyGift } = await import('./settings');

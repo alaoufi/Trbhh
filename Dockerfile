@@ -31,10 +31,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # openssl for Prisma; fonts-kacst provides Arabic glyphs for the image watermark
 # openssl for Prisma; fonts-kacst for Arabic watermark glyphs;
 # default-mysql-client provides mysqldump/mysql for DB backup & restore.
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates fonts-kacst fontconfig default-mysql-client \
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates fonts-kacst fontconfig default-mysql-client tzdata \
     && rm -rf /var/lib/apt/lists/* \
     && addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
+# كل الأوقات والتواريخ المعروضة بتوقيت الرياض (+3)
+ENV TZ=Asia/Riyadh
 
 # Standalone output already bundles the traced node_modules (including the
 # Prisma client + native query engine), so we only copy public/ and static/.

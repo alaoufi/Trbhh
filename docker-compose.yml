@@ -69,6 +69,8 @@ services:
       SMS_SENDER: ${SMS_SENDER:-SouqAlhafta}
       SMS_UNICODE: ${SMS_UNICODE:-e}
       NODE_ENV: production
+      # كل الأوقات والتواريخ بتوقيت الرياض (+3)
+      TZ: Asia/Riyadh
     volumes:
       # Named volume (not a host bind mount) so it inherits the image's
       # nextjs-owned /app/storage — the non-root app user can write uploads,

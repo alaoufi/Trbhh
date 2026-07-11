@@ -5,12 +5,12 @@ import { getSession } from '@/lib/auth';
 
 const nav = [
   { href: '/account', label: 'لوحة التحكم', icon: LayoutDashboard },
+  { href: '/account/profile', label: 'الملف الشخصي', icon: User },
   { href: '/account/ads', label: 'إعلاناتي', icon: Megaphone },
   { href: '/account/wallet', label: 'محفظتي', icon: Wallet },
   { href: '/account/favorites', label: 'المفضلة', icon: Heart },
   { href: '/store', label: 'متجري', icon: Building2 },
   { href: '/account/verify', label: 'توثيق الحساب', icon: ShieldCheck },
-  { href: '/account/profile', label: 'الملف الشخصي', icon: User },
 ];
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {

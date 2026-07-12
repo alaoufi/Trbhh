@@ -85,8 +85,10 @@ export async function requestTopupAction(formData: FormData) {
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
   const buf = Buffer.from(await file.arrayBuffer());
   const rel = await saveUpload(buf, `topup_${session.uid}_${Date.now()}.${ext}`);
+  // بصمة الإيصال (aHash) — لكشف السند المكرر عند الإدارة قبل التأكيد
+  const receiptHash = await import('@/lib/phash').then((m) => m.aHash(buf)).catch(() => '');
   const { requestTopup } = await import('@/lib/wallet');
-  const ok = await requestTopup(session.uid, amount, rel);
+  const ok = await requestTopup(session.uid, amount, rel, receiptHash);
   revalidatePath('/account/wallet');
   redirect(ok ? '/account/wallet?topup=1' : '/account/wallet?error=topup');
 }

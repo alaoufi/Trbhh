@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { HandCoins, Receipt, Clock, CheckCircle2, XCircle, User } from 'lucide-react';
+import { HandCoins, Receipt, Clock, CheckCircle2, XCircle, User, ShieldAlert, Undo2 } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { listTopupsAdmin } from '@/lib/wallet';
+import { listTopupsAdmin, findReceiptMatches } from '@/lib/wallet';
 import { mediaUrl } from '@/lib/media';
-import { approveTopupAction, rejectTopupAction } from '../actions';
+import { approveTopupAction, rejectTopupAction, cancelTopupAction } from '../actions';
 import { AdminPager } from '@/components/admin-pager';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
@@ -14,10 +14,11 @@ const TABS = [
   { key: 'pending', label: 'بانتظار التأكيد', cls: 'bg-amber-500' },
   { key: 'approved', label: 'تم التأكيد', cls: 'bg-emerald-600' },
   { key: 'rejected', label: 'مرفوض', cls: 'bg-red-500' },
+  { key: 'cancelled', label: 'ملغى بعد التأكيد', cls: 'bg-slate-700' },
   { key: 'all', label: 'الكل', cls: 'bg-slate-500' },
 ] as const;
 type Tab = typeof TABS[number]['key'];
-const STATUS_OF: Record<Tab, 'all' | 0 | 1 | 2> = { all: 'all', pending: 0, approved: 1, rejected: 2 };
+const STATUS_OF: Record<Tab, 'all' | 0 | 1 | 2 | 3> = { all: 'all', pending: 0, approved: 1, rejected: 2, cancelled: 3 };
 
 function fmt(iso: string | null) {
   if (!iso) return '';
@@ -33,7 +34,9 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
   const tab: Tab = (TABS.some((t) => t.key === tabRaw) ? tabRaw : 'pending') as Tab;
   const page = Math.max(1, parseInt(pageRaw || '1') || 1);
   const { rows, counts } = await listTopupsAdmin(STATUS_OF[tab], PAGE_SIZE, (page - 1) * PAGE_SIZE);
-  const countOf: Record<Tab, number> = { all: counts.all, pending: counts.pending, approved: counts.approved, rejected: counts.rejected };
+  const countOf: Record<Tab, number> = { all: counts.all, pending: counts.pending, approved: counts.approved, rejected: counts.rejected, cancelled: counts.cancelled };
+  // ⚠️ كشف السند المكرر: مقارنة بصمة إيصال كل طلب معلق مع كل الإيصالات السابقة
+  const dupMatches = await findReceiptMatches(rows.filter((r) => r.status === 0 && r.receipt).map((r) => r.id)).catch(() => new Map());
   const pages = Math.max(1, Math.ceil(countOf[tab] / PAGE_SIZE));
 
   return (
@@ -66,6 +69,7 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
               {r.status === 0 && <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800"><Clock className="h-3.5 w-3.5" /> بانتظار التأكيد</span>}
               {r.status === 1 && <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800"><CheckCircle2 className="h-3.5 w-3.5" /> تم التأكيد{r.decidedAt ? ` • ${fmt(r.decidedAt)}` : ''}</span>}
               {r.status === 2 && <span className="flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700"><XCircle className="h-3.5 w-3.5" /> مرفوض{r.decidedAt ? ` • ${fmt(r.decidedAt)}` : ''}</span>}
+              {r.status === 3 && <span className="flex items-center gap-1 rounded-full bg-slate-700 px-2.5 py-1 text-[11px] font-bold text-white"><Undo2 className="h-3.5 w-3.5" /> ملغى بعد التأكيد{r.decidedAt ? ` • ${fmt(r.decidedAt)}` : ''}</span>}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -80,6 +84,43 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
 
             {r.status === 2 && r.note && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm font-bold text-red-700">سبب الرفض: {r.note}</div>
+            )}
+            {r.status === 3 && r.note && (
+              <div className="rounded-lg border border-slate-300 bg-slate-100 p-2.5 text-sm font-bold text-slate-700">سبب الإلغاء (خُصم {r.amount} ر.س من رصيد العضو): {r.note}</div>
+            )}
+
+            {/* ⚠️ إنذار السند المكرر: يظهر قبل التأكيد مع عرض السند المشابه */}
+            {r.status === 0 && dupMatches.has(r.id) && (() => { const m = dupMatches.get(r.id)!; return (
+              <div className="space-y-2 rounded-xl border-2 border-red-400 bg-red-50 p-3">
+                <div className="flex items-center gap-1.5 text-sm font-extrabold text-red-700">
+                  <ShieldAlert className="h-4 w-4" /> إنذار: هذا السند يطابق سند طلب سابق بنسبة {m.pct}٪ — تحقق قبل التأكيد!
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-red-800">
+                  <span>الطلب المطابق: #{m.id}</span>
+                  <Link href={`/users/${m.userId}`} className="underline">{m.userName}</Link>
+                  <span>{m.amount} ر.س</span>
+                  <span>{fmt(m.at)}</span>
+                  <span className="rounded-full bg-white px-2 py-0.5">{m.status === 1 ? '✅ سبق تأكيده' : m.status === 0 ? '⏳ معلق أيضاً' : m.status === 3 ? '↩ ملغى' : '❌ مرفوض'}</span>
+                </div>
+                {m.receipt && (
+                  <a href={mediaUrl(m.receipt)} target="_blank" className="block w-fit">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={mediaUrl(m.receipt)} alt="السند المشابه" className="max-h-48 rounded-lg border-2 border-red-300 object-contain" />
+                    <span className="mt-1 block text-center text-[11px] font-bold text-red-700 underline">فتح السند المشابه بالحجم الكامل</span>
+                  </a>
+                )}
+              </div>
+            ); })()}
+
+            {r.status === 1 && (
+              <details className="rounded-lg border border-slate-300">
+                <summary className="cursor-pointer list-none px-3 py-2 text-sm font-bold text-slate-700">↩ إلغاء التأكيد (سند مكرر/خطأ) — مع سبب…</summary>
+                <form action={cancelTopupAction} className="space-y-2 p-3">
+                  <input type="hidden" name="id" value={r.id} />
+                  <textarea name="reason" rows={2} required placeholder="سبب الإلغاء (إلزامي) — يُحفظ ويُرسل للعضو، مثال: إيصال مكرر سبق اعتماده في طلب #…" className="w-full rounded-lg border border-slate-300 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-slate-400" />
+                  <ConfirmSubmit msg={`تأكيد إلغاء هذا الشحن؟ سيُخصم ${r.amount} ر.س من رصيد العضو فوراً (قد يصبح رصيده سالباً) ويصله سبب الإلغاء.`} className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">إلغاء التأكيد وخصم المبلغ</ConfirmSubmit>
+                </form>
+              </details>
             )}
 
             {r.status === 0 && (

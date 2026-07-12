@@ -318,7 +318,9 @@ export const SETTING_TOPUP_INFO = 'topup_info';
 export const DEFAULT_TOPUP_INFO = 'حوّل المبلغ إلى حساب المنصة ثم أرفق صورة الإيصال هنا. بعد تأكيد الإدارة وصول المبلغ يُضاف لرصيدك مباشرة.';
 export const SETTING_MSG_TOPUP_OK = 'msg_topup_ok';
 export const SETTING_MSG_TOPUP_REJECT = 'msg_topup_reject';
+export const SETTING_MSG_TOPUP_CANCEL = 'msg_topup_cancel';
 export const DEFAULT_MSG_TOPUP_OK = 'تم تأكيد الشحن وإضافة {amount} ر.س إلى رصيدك ✅ شكراً لاختياركم تربح {name}، نتمنى لكم التوفيق 🎉 بإمكانكم استخدام الرصيد بكافة الوسائل لدعم إعلاناتكم. — الإدارة';
+export const DEFAULT_MSG_TOPUP_CANCEL = 'عذراً {name}، تم إلغاء تأكيد شحن مبلغ {amount} ر.س وخُصم من رصيدك. السبب: {reason} — للاستفسار راسل الإدارة من «الرسائل».';
 export const DEFAULT_MSG_TOPUP_REJECT = 'نعتذر {name}، تم رفض طلب شحن الرصيد بمبلغ {amount} ر.س لعدم وصول المبلغ في الحساب — نأمل التأكد من رقم الحساب والاسم قبل الإرسال. السبب: {reason} — الإدارة';
 
 /* Visitor-facing safety notice shown on the ad detail page (editable). */

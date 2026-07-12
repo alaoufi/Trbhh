@@ -29,6 +29,7 @@ const TOPUP_STATUS = {
   0: { label: 'بانتظار تأكيد الإدارة', cls: 'bg-amber-100 text-amber-800', icon: Clock },
   1: { label: 'تم التأكيد وأُضيف للرصيد', cls: 'bg-emerald-100 text-emerald-800', icon: CheckCircle2 },
   2: { label: 'مرفوض', cls: 'bg-red-100 text-red-700', icon: XCircle },
+  3: { label: 'ملغى بعد التأكيد وخُصم المبلغ', cls: 'bg-slate-200 text-slate-700', icon: XCircle },
 } as const;
 
 const TXN_PAGE = 25;

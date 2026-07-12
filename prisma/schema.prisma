@@ -1232,6 +1232,7 @@ model wallet_topups {
   user_id    BigInt    @db.UnsignedBigInt
   amount     Int
   receipt    String?   @db.VarChar(255)
+  receipt_hash String? @db.VarChar(16)
   status     Int       @default(0) @db.TinyInt
   note       String?   @db.VarChar(300)
   admin_id   BigInt?   @db.UnsignedBigInt

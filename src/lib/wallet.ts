@@ -209,7 +209,7 @@ export async function getMemberLedger(limit = 300): Promise<MemberLedgerRow[]> {
 
 /* ===================== طلبات شحن الرصيد (تحويل + إيصال) ===================== */
 
-export type TopupStatus = 0 | 1 | 2; // 0 pending, 1 approved, 2 rejected
+export type TopupStatus = 0 | 1 | 2 | 3; // 0 pending, 1 approved, 2 rejected, 3 cancelled-after-approve
 export type TopupRow = {
   id: number; userId: number; amount: number; receipt: string | null;
   status: TopupStatus; note: string | null; at: string | null; decidedAt: string | null;
@@ -217,18 +217,18 @@ export type TopupRow = {
 
 const topupRow = (r: { id: bigint; user_id: bigint; amount: number; receipt: string | null; status: number; note: string | null; created_at: Date | null; decided_at: Date | null }): TopupRow => ({
   id: toInt(r.id), userId: toInt(r.user_id), amount: r.amount, receipt: r.receipt,
-  status: (r.status === 1 || r.status === 2 ? r.status : 0) as TopupStatus, note: r.note,
+  status: (r.status === 1 || r.status === 2 || r.status === 3 ? r.status : 0) as TopupStatus, note: r.note,
   at: r.created_at ? r.created_at.toISOString() : null,
   decidedAt: r.decided_at ? r.decided_at.toISOString() : null,
 });
 
 /** Member files a top-up request (amount + uploaded receipt path). */
-export async function requestTopup(userId: number, amount: number, receiptRel: string | null): Promise<boolean> {
+export async function requestTopup(userId: number, amount: number, receiptRel: string | null, receiptHash = ''): Promise<boolean> {
   await ensure();
   const amt = Math.round(amount || 0);
   if (amt <= 0) return false;
   try {
-    await prisma.wallet_topups.create({ data: { user_id: BigInt(userId), amount: amt, receipt: receiptRel } });
+    await prisma.wallet_topups.create({ data: { user_id: BigInt(userId), amount: amt, receipt: receiptRel, receipt_hash: receiptHash || null } });
     return true;
   } catch {
     return false;
@@ -243,13 +243,14 @@ export async function listMyTopups(userId: number, limit = 20): Promise<TopupRow
 }
 
 /** Admin listing with per-status counts. */
-export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 200, offset = 0): Promise<{ rows: (TopupRow & { userName: string })[]; counts: { all: number; pending: number; approved: number; rejected: number } }> {
+export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 200, offset = 0): Promise<{ rows: (TopupRow & { userName: string })[]; counts: { all: number; pending: number; approved: number; rejected: number; cancelled: number } }> {
   await ensure();
-  const [all, pending, approved, rejected, rows] = await Promise.all([
+  const [all, pending, approved, rejected, cancelled, rows] = await Promise.all([
     prisma.wallet_topups.count().catch(() => 0),
     prisma.wallet_topups.count({ where: { status: 0 } }).catch(() => 0),
     prisma.wallet_topups.count({ where: { status: 1 } }).catch(() => 0),
     prisma.wallet_topups.count({ where: { status: 2 } }).catch(() => 0),
+    prisma.wallet_topups.count({ where: { status: 3 } }).catch(() => 0),
     prisma.wallet_topups.findMany({ where: status === 'all' ? {} : { status }, orderBy: { id: 'desc' }, skip: Math.max(0, offset), take: limit }).catch(() => []),
   ]);
   const uids = [...new Set(rows.map((r) => toInt(r.user_id)))];
@@ -257,7 +258,7 @@ export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 2
   const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
   return {
     rows: rows.map((r) => ({ ...topupRow(r), userName: nameById.get(toInt(r.user_id)) || `#${toInt(r.user_id)}` })),
-    counts: { all, pending, approved, rejected },
+    counts: { all, pending, approved, rejected, cancelled },
   };
 }
 
@@ -278,6 +279,93 @@ export async function approveTopup(id: number, adminId: number): Promise<TopupRo
   }
   await applyTopupBonuses(toInt(req.user_id), req.amount, adminId).catch(() => {});
   return topupRow({ ...req, status: 1 });
+}
+
+/** إلغاء تأكيد شحن سبق اعتماده (سند مكرر/خطأ): يخصم المبلغ من رصيد العضو
+ *  (ولو أصبح الرصيد سالباً — لأن المبلغ أُضيف بغير حق) ويحفظ سبب الإلغاء. */
+export async function cancelTopup(id: number, adminId: number, reason: string): Promise<TopupRow | null> {
+  await ensure();
+  const req = await prisma.wallet_topups.findUnique({ where: { id: BigInt(id) } }).catch(() => null);
+  if (!req || req.status !== 1) return null;
+  // atomic flip so a double-click can't debit twice
+  const flipped = await prisma.wallet_topups.updateMany({
+    where: { id: BigInt(id), status: 1 },
+    data: { status: 3, note: reason.slice(0, 300), admin_id: BigInt(adminId), decided_at: new Date() },
+  }).catch(() => ({ count: 0 }));
+  if (flipped.count === 0) return null;
+  try {
+    await prisma.$transaction(async (tx) => {
+      const u = await tx.users.findUnique({ where: { id: req.user_id }, select: { balance: true } });
+      const next = (u?.balance ?? 0) - req.amount;
+      await tx.users.update({ where: { id: req.user_id }, data: { balance: next } });
+      await tx.wallet_txns.create({
+        data: {
+          user_id: req.user_id, amount: -req.amount, balance_after: next, reason: 'admin_debit',
+          note: `إلغاء تأكيد شحن #${toInt(req.id)}: ${reason}`.slice(0, 200), admin_id: BigInt(adminId),
+        },
+      });
+    });
+  } catch {
+    // roll the request back so the cancellation can be retried
+    await prisma.wallet_topups.updateMany({ where: { id: BigInt(id), status: 3 }, data: { status: 1, note: null } }).catch(() => {});
+    return null;
+  }
+  return topupRow({ ...req, status: 3, note: reason });
+}
+
+/** كشف تطابق السند: يضمن بصمة (aHash) لكل إيصال ثم يقارن إيصالات القائمة
+ *  المعروضة مع كل الإيصالات السابقة — يعيد أفضل تطابق ≥ العتبة لكل طلب. */
+export type ReceiptMatch = { pct: number; id: number; userId: number; userName: string; amount: number; receipt: string | null; at: string | null; status: TopupStatus };
+export async function findReceiptMatches(rowIds: number[], threshold = 90): Promise<Map<number, ReceiptMatch>> {
+  const out = new Map<number, ReceiptMatch>();
+  if (!rowIds.length) return out;
+  await ensure();
+  const pool = await prisma.wallet_topups.findMany({
+    where: { NOT: { receipt: null } },
+    orderBy: { id: 'desc' }, take: 600,
+    select: { id: true, user_id: true, amount: true, receipt: true, receipt_hash: true, status: true, created_at: true },
+  }).catch(() => []);
+  if (!pool.length) return out;
+  // بصمات ناقصة (طلبات قديمة قبل الميزة): تُحسب مرة واحدة وتُحفظ — بحد أقصى دفعة معقولة
+  const missing = pool.filter((r) => !r.receipt_hash && r.receipt).slice(0, 120);
+  if (missing.length) {
+    const [{ readLocal }, { aHash }] = await Promise.all([import('./storage'), import('./phash')]);
+    for (const r of missing) {
+      const buf = await readLocal(r.receipt!).catch(() => null);
+      const h = buf ? await aHash(buf).catch(() => '') : '';
+      r.receipt_hash = h || '-'; // '-' = تعذّر الحساب فلا نعيد المحاولة كل مرة
+      await prisma.wallet_topups.update({ where: { id: r.id }, data: { receipt_hash: r.receipt_hash } }).catch(() => {});
+    }
+  }
+  const { hashSimilarity } = await import('./phash');
+  const byId = new Map(pool.map((r) => [toInt(r.id), r]));
+  const uids = new Set<number>();
+  for (const rid of rowIds) {
+    const me = byId.get(rid);
+    if (!me?.receipt_hash || me.receipt_hash === '-') continue;
+    let best: { pct: number; row: (typeof pool)[number] } | null = null;
+    for (const other of pool) {
+      if (toInt(other.id) === rid) continue;
+      if (!other.receipt_hash || other.receipt_hash === '-') continue;
+      const pct = hashSimilarity(me.receipt_hash, other.receipt_hash);
+      if (pct >= threshold && (!best || pct > best.pct)) best = { pct, row: other };
+    }
+    if (best) {
+      uids.add(toInt(best.row.user_id));
+      out.set(rid, {
+        pct: best.pct, id: toInt(best.row.id), userId: toInt(best.row.user_id), userName: '',
+        amount: best.row.amount, receipt: best.row.receipt,
+        at: best.row.created_at ? best.row.created_at.toISOString() : null,
+        status: (best.row.status === 1 || best.row.status === 2 || best.row.status === 3 ? best.row.status : 0) as TopupStatus,
+      });
+    }
+  }
+  if (uids.size) {
+    const users = await prisma.users.findMany({ where: { id: { in: [...uids].map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }).catch(() => []);
+    const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
+    for (const m of out.values()) m.userName = nameById.get(m.userId) || `#${m.userId}`;
+  }
+  return out;
 }
 
 /** مكافآت الشحن (من التسعيرات): شرائح حملة الشحن كما هي في لوحة التحكم حرفياً —

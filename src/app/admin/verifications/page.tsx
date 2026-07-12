@@ -4,7 +4,7 @@ import { ShieldCheck, Check, FileText, ExternalLink, XCircle, Trash2, BadgeCheck
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { mediaUrl } from '@/lib/media';
-import { approveVerificationAction, rejectVerificationAction, deleteVerificationDocsAction, trustUserAction } from '../actions';
+import { approveVerificationAction, rejectVerificationAction, deleteVerificationDocsAction, untrustUserAction } from '../actions';
 import { requirePerm } from '@/lib/roles';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
@@ -151,9 +151,11 @@ export default async function AdminVerifications({ searchParams }: { searchParam
                       </ConfirmSubmit>
                     </form>
                   ) : (
-                    <form action={trustUserAction}>
+                    <form action={untrustUserAction} className="space-y-2 rounded-xl border-2 border-slate-300 bg-slate-50 p-3">
+                      <label className="block text-sm font-extrabold text-slate-700">إلغاء التوثيق — سبب الإلغاء إلزامي (يُحفظ ويصل العضو، وإن كان توثيقاً مدفوعاً يُعاد له قيمة الأيام غير المستخدمة)</label>
                       <input type="hidden" name="userId" value={id} />
-                      <ConfirmSubmit msg="تأكيد إلغاء توثيق هذا العضو؟ تُسحب شارة التوثيق فوراً." className="flex items-center gap-1.5 rounded-lg border border-destructive/40 px-4 py-2 text-sm font-bold text-destructive hover:bg-destructive/10">
+                      <textarea name="reason" required rows={2} maxLength={300} placeholder="اكتب سبب إلغاء التوثيق بوضوح…" className="w-full rounded-lg border-2 border-slate-300 bg-white p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-slate-400" />
+                      <ConfirmSubmit msg="تأكيد إلغاء التوثيق؟ تُسحب الشارة فوراً ويصل العضو السبب — والمدفوع يُسترد له غير المستخدم تلقائياً." className="flex items-center gap-1.5 rounded-lg bg-slate-700 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
                         <XCircle className="h-4 w-4" /> إلغاء التوثيق
                       </ConfirmSubmit>
                     </form>

@@ -171,13 +171,16 @@ export async function requestStoreNameExceptionAction(formData: FormData) {
 /** مراسلة عضو من داخل لوحة المتجر: التاجر يدخل جوال العضو ورسالته —
  *  تصل العضو باسم المتجر في «الرسائل» ويستمر الحوار هناك. */
 /** طلب توثيق مدفوع من صاحب المتجر — يبقى معلقاً حتى موافقة إدارة المتاجر (الخصم عند الموافقة فقط). */
-export async function requestVerifyPaidAction() {
+export async function requestVerifyPaidAction(formData: FormData) {
   const session = await requireUser();
   const { storeIdOfUser } = await import('@/lib/merchant');
   const storeId = await storeIdOfUser(session.uid).catch(() => 0);
   if (!storeId) redirect('/store');
+  // التعهد بالالتزام بلوائح الموقع إلزامي قبل إرسال الطلب
+  if (!formData.get('pledge')) redirect('/store?vreq=pledge');
+  const pkgIdx = Math.max(1, Math.min(3, parseInt(String(formData.get('pkg') || '1')) || 1));
   const { requestPaidVerification } = await import('@/lib/verify-paid');
-  const r = await requestPaidVerification(session.uid, storeId);
+  const r = await requestPaidVerification(session.uid, storeId, pkgIdx);
   revalidatePath('/store');
   redirect(`/store?vreq=${r}`);
 }

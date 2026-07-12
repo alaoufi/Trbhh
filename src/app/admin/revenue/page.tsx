@@ -463,11 +463,18 @@ async function CampaignsTab({ camp }: { camp?: string }) {
 }
 
 async function PricingTab() {
-  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction, verifyFeeCfg] = await Promise.all([
+  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction, verifyPkgsAll] = await Promise.all([
     getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
     pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
     getStorePlusPricing(), getLeadConfig(), getAuctionConfig(),
-    import('@/lib/settings').then((m) => m.getVerifyFeeConfig()),
+    import('@/lib/settings').then(async (m) => {
+      const [f1, d1, f2, d2, f3, d3] = await Promise.all([
+        m.getSettingNum('verify_fee', 0), m.getSettingNum('verify_fee_days', 30),
+        m.getSettingNum('verify_fee_2', 0), m.getSettingNum('verify_fee_days_2', 90),
+        m.getSettingNum('verify_fee_3', 0), m.getSettingNum('verify_fee_days_3', 365),
+      ]);
+      return [{ fee: f1, days: d1 }, { fee: f2, days: d2 }, { fee: f3, days: d3 }];
+    }),
   ]);
   const urgentPrices = await getUrgentPrices();
   const services: { key: PaidService; note?: string }[] = [
@@ -548,13 +555,17 @@ async function PricingTab() {
         </div>
       </div>
 
-      {/* ⭐ التوثيق المدفوع: رسوم + مدة — يطلبها صاحب المتجر وتُخصم عند موافقة إدارة المتاجر */}
+      {/* ⭐ التوثيق المدفوع: ثلاث باقات (سعر + مدة) — يطلبها صاحب المتجر وتُخصم عند موافقة إدارة المتاجر */}
       <div className="rounded-xl border border-sky-300 bg-sky-50/60 p-3">
-        <div className="mb-1 text-xs font-bold text-sky-800">⭐ توثيق المتجر المدفوع (اكتب 0 في الرسوم للتعطيل)</div>
-        <p className="mb-2 text-[11px] text-muted-foreground">يطلبه صاحب المتجر من لوحة متجره، وتُخصم الرسوم من رصيده عند موافقة إدارة المتاجر فقط — والإلغاء يعيد له قيمة الأيام غير المستخدمة.</p>
+        <div className="mb-1 text-xs font-bold text-sky-800">⭐ توثيق المتجر المدفوع — ثلاث باقات (رسوم الباقة 0 = لا تظهر؛ الكل 0 = الخدمة معطلة)</div>
+        <p className="mb-2 text-[11px] text-muted-foreground">يختار صاحب المتجر باقة ويتعهد بالالتزام بلوائح الموقع، وتُخصم الرسوم من رصيده عند موافقة إدارة المتاجر فقط — وأي إلغاء يعيد لرصيده قيمة الأيام غير المستخدمة تلقائياً.</p>
         <div className="grid grid-cols-2 gap-2">
-          <label className="space-y-1"><span className="text-xs font-bold">رسوم التوثيق (ر.س)</span><input name="verifyFee" type="number" min={0} defaultValue={verifyFeeCfg.fee} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">مدة التوثيق (أيام)</span><input name="verifyFeeDays" type="number" min={1} defaultValue={verifyFeeCfg.days} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">باقة 1 — الرسوم (ر.س)</span><input name="verifyFee" type="number" min={0} defaultValue={verifyPkgsAll[0].fee} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">باقة 1 — المدة (أيام)</span><input name="verifyFeeDays" type="number" min={1} defaultValue={verifyPkgsAll[0].days} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">باقة 2 — الرسوم (ر.س)</span><input name="verifyFee2" type="number" min={0} defaultValue={verifyPkgsAll[1].fee} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">باقة 2 — المدة (أيام)</span><input name="verifyFeeDays2" type="number" min={1} defaultValue={verifyPkgsAll[1].days} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">باقة 3 — الرسوم (ر.س)</span><input name="verifyFee3" type="number" min={0} defaultValue={verifyPkgsAll[2].fee} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">باقة 3 — المدة (أيام)</span><input name="verifyFeeDays3" type="number" min={1} defaultValue={verifyPkgsAll[2].days} className={num} /></label>
         </div>
       </div>
 

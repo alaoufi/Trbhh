@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { toInt } from './utils';
-import { getVerifyFeeConfig } from './settings';
+import { getVerifyPackages } from './settings';
 import { charge, adjustBalance } from './wallet';
 
 const ensure = ensureSchema;
@@ -22,19 +22,19 @@ const row = (r: { id: bigint; user_id: bigint; store_id: number; fee: number; da
   expiresAt: r.expires_at ? r.expires_at.toISOString() : null,
 });
 
-/** طلب صاحب المتجر توثيقاً مدفوعاً — يُحفظ معلقاً حتى موافقة إدارة المتاجر (لا خصم الآن). */
-export async function requestPaidVerification(userId: number, storeId: number): Promise<'ok' | 'dup' | 'off' | 'trusted'> {
+/** طلب صاحب المتجر توثيقاً مدفوعاً بباقة محددة — يُحفظ معلقاً حتى موافقة إدارة المتاجر (لا خصم الآن). */
+export async function requestPaidVerification(userId: number, storeId: number, pkgIdx = 1): Promise<'ok' | 'dup' | 'off' | 'trusted'> {
   await ensure();
-  const { fee } = await getVerifyFeeConfig();
-  if (fee <= 0) return 'off';
+  const packages = await getVerifyPackages();
+  const pkg = packages.find((x) => x.idx === pkgIdx) || packages[0];
+  if (!pkg) return 'off';
   const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { trusted: true } }).catch(() => null);
   const active = await prisma.verify_orders.findFirst({ where: { user_id: BigInt(userId), status: 1, expires_at: { gt: new Date() } } }).catch(() => null);
   if (u?.trusted === 1 && !active) return 'trusted'; // موثّق أصلاً (بالمستندات) — لا حاجة للدفع
   if (active) return 'trusted';
   const pending = await prisma.verify_orders.findFirst({ where: { user_id: BigInt(userId), status: 0 } }).catch(() => null);
   if (pending) return 'dup';
-  const { days } = await getVerifyFeeConfig();
-  await prisma.verify_orders.create({ data: { user_id: BigInt(userId), store_id: storeId, fee, days } });
+  await prisma.verify_orders.create({ data: { user_id: BigInt(userId), store_id: storeId, fee: pkg.fee, days: pkg.days } });
   return 'ok';
 }
 

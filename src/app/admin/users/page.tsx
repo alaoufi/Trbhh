@@ -8,7 +8,7 @@ import { getPackages, getUserPackageMap } from '@/lib/packages';
 import { liftExpiredBans, getBanMap } from '@/lib/moderation';
 import { AdminSearch } from '@/components/admin-search';
 import { AdminPager } from '@/components/admin-pager';
-import { banUserAction, unbanUserAction, trustUserAction, assignUserPackageAction, executeDeletionRequestAction, dismissDeletionRequestAction } from '../actions';
+import { banUserAction, unbanUserAction, trustUserAction, untrustUserAction, assignUserPackageAction, executeDeletionRequestAction, dismissDeletionRequestAction } from '../actions';
 import { listDeletionRequests } from '@/lib/account-delete';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
@@ -180,7 +180,15 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                 </td>
                 <td className="p-3">
                   <div className="flex flex-wrap items-center gap-1">
-                    <form action={trustUserAction}><input type="hidden" name="userId" value={id} /><ConfirmSubmit msg={u.trusted === 1 ? 'إلغاء توثيق هذا العضو؟ تُسحب الشارة فوراً.' : 'توثيق هذا العضو؟ تظهر شارة موثّق فوراً.'} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Check className="h-3 w-3" />{u.trusted === 1 ? 'إلغاء التوثيق' : 'توثيق'}</ConfirmSubmit></form>
+                    {u.trusted === 1 ? (
+                      <form action={untrustUserAction} className="flex items-center gap-1 rounded-md border border-slate-300 p-0.5">
+                        <input type="hidden" name="userId" value={id} />
+                        <input name="reason" required maxLength={300} placeholder="سبب الإلغاء" title="سبب إلغاء التوثيق — إلزامي، يُحفظ ويصل العضو" className="w-24 rounded bg-background px-1.5 py-1 text-xs" />
+                        <ConfirmSubmit msg="تأكيد إلغاء التوثيق بالسبب المكتوب؟ تُسحب الشارة فوراً ويصل العضو السبب — والمدفوع يُسترد له غير المستخدم." className="flex items-center gap-1 rounded bg-slate-200 px-2 py-1 text-xs font-bold text-slate-700">إلغاء التوثيق</ConfirmSubmit>
+                      </form>
+                    ) : (
+                      <form action={trustUserAction}><input type="hidden" name="userId" value={id} /><ConfirmSubmit msg="توثيق هذا العضو؟ تظهر شارة موثّق فوراً." className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Check className="h-3 w-3" /> توثيق</ConfirmSubmit></form>
+                    )}
                     {banned ? (
                       <form action={unbanUserAction}><input type="hidden" name="userId" value={id} /><ConfirmSubmit msg="رفع الحظر عن هذا العضو؟ تعود إعلاناته للظهور فوراً." className="flex items-center gap-1 rounded-md border border-emerald-400 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50"><Ban className="h-3 w-3" /> رفع الحظر</ConfirmSubmit></form>
                     ) : (

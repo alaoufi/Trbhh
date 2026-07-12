@@ -536,6 +536,10 @@ export async function saveRevenueAction(formData: FormData) {
   const { SETTING_VERIFY_FEE, SETTING_VERIFY_FEE_DAYS } = await import('@/lib/settings');
   await setSetting(SETTING_VERIFY_FEE, nn('verifyFee'));
   await setSetting(SETTING_VERIFY_FEE_DAYS, String(Math.max(1, parseInt(String(formData.get('verifyFeeDays') || '30')) || 30)));
+  await setSetting('verify_fee_2', nn('verifyFee2'));
+  await setSetting('verify_fee_days_2', String(Math.max(1, parseInt(String(formData.get('verifyFeeDays2') || '90')) || 90)));
+  await setSetting('verify_fee_3', nn('verifyFee3'));
+  await setSetting('verify_fee_days_3', String(Math.max(1, parseInt(String(formData.get('verifyFeeDays3') || '365')) || 365)));
   // المزادات: رسم الفتح + أقصى مدة
   await setSetting('auction_fee', nn('auctionFee'));
   await setSetting('auction_max_days', String(Math.min(30, Math.max(1, parseInt(String(formData.get('auctionMaxDays') || '7')) || 7))));
@@ -700,14 +704,38 @@ export async function trustUserAction(formData: FormData) {
   const session = await requireAction('verifications', 'edit');
   const id = BigInt(String(formData.get('userId')));
   const u = await prisma.users.findUnique({ where: { id } });
-  if (u) {
-    const granting = u.trusted !== 1;
-    // تاريخ التوثيق + تسجيل من وثّق/ألغى في سجل النشاط (للتدقيق)
-    await prisma.users.update({ where: { id }, data: { trusted: granting ? 1 : 0, step: 0, verified_at: granting ? new Date() : null } });
-    await logAdmin(session.uid, granting ? 'توثيق عضو (زر سريع)' : 'إلغاء توثيق عضو', `العضو #${toInt(id)}`);
+  if (u && u.trusted !== 1) {
+    // المنح فقط — الإلغاء له إجراء مستقل بسبب إلزامي (untrustUserAction)
+    await prisma.users.update({ where: { id }, data: { trusted: 1, step: 0, verified_at: new Date() } });
+    await logAdmin(session.uid, 'توثيق عضو (زر سريع)', `العضو #${toInt(id)}`);
   }
   revalidatePath('/admin/users');
   revalidatePath('/admin/verifications');
+}
+
+/** إلغاء التوثيق بسبب إلزامي يُحفظ ويصل العضو — وإن كان توثيقاً مدفوعاً نشطاً
+ *  يمر عبر مسار الإلغاء المدفوع فيُعاد للرصيد قيمة الأيام غير المستخدمة تلقائياً. */
+export async function untrustUserAction(formData: FormData) {
+  const session = await requireAction('verifications', 'edit');
+  const id = Number(formData.get('userId') || 0);
+  const reason = String(formData.get('reason') || '').trim().slice(0, 300);
+  if (!id || !reason) return;
+  const { cancelPaidVerification } = await import('@/lib/verify-paid');
+  const activeOrder = await prisma.verify_orders.findFirst({ where: { user_id: BigInt(id), status: 1 } }).catch(() => null);
+  if (activeOrder) {
+    const r = await cancelPaidVerification(toInt(activeOrder.id), session.uid, reason);
+    if (r) {
+      await sendVerifyMessage(id, 'msg_verify_paid_cancel', 'عذراً {name}، أُلغي توثيق متجرك. السبب: {reason} — أُعيد لرصيدك {amount} ر.س قيمة الأيام غير المستخدمة.', reason, { amount: String(r.refund) });
+      await logAdmin(session.uid, 'إلغاء توثيق مدفوع', `العضو #${id}`, `${reason} — استرداد ${r.refund} ر.س`);
+    }
+  } else {
+    await prisma.users.update({ where: { id: BigInt(id) }, data: { trusted: 0, verified_at: null } }).catch(() => {});
+    await sendVerifyMessage(id, 'msg_verify_cancel', 'عذراً {name}، أُلغي توثيق حسابك. السبب: {reason} — للاستفسار راسل الإدارة من «الرسائل».', reason);
+    await logAdmin(session.uid, 'إلغاء توثيق عضو', `العضو #${id}`, reason);
+  }
+  revalidatePath('/admin/users');
+  revalidatePath('/admin/verifications');
+  revalidatePath('/account/wallet');
 }
 
 /** موافقة إدارة المتاجر على التوثيق المدفوع: خصم الرسوم أولاً — لا توثيق بلا رصيد كافٍ. */

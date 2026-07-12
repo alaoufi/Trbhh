@@ -213,6 +213,18 @@ export async function getVerifyFeeConfig(): Promise<{ fee: number; days: number 
   const [fee, days] = await Promise.all([getSettingNum(SETTING_VERIFY_FEE, 0), getSettingNum(SETTING_VERIFY_FEE_DAYS, 30)]);
   return { fee: Math.max(0, Math.round(fee) || 0), days: Math.max(1, Math.round(days) || 30) };
 }
+/* ثلاث باقات توثيق (سعر + مدة) — الباقة برسوم 0 لا تُعرض؛ كل الباقات 0 = الخدمة معطلة. */
+export type VerifyPackage = { idx: number; fee: number; days: number };
+export async function getVerifyPackages(): Promise<VerifyPackage[]> {
+  const raw = await Promise.all([
+    Promise.all([getSettingNum(SETTING_VERIFY_FEE, 0), getSettingNum(SETTING_VERIFY_FEE_DAYS, 30)]),
+    Promise.all([getSettingNum('verify_fee_2', 0), getSettingNum('verify_fee_days_2', 90)]),
+    Promise.all([getSettingNum('verify_fee_3', 0), getSettingNum('verify_fee_days_3', 365)]),
+  ]);
+  return raw
+    .map(([fee, days], i) => ({ idx: i + 1, fee: Math.max(0, Math.round(fee) || 0), days: Math.max(1, Math.round(days) || 30) }))
+    .filter((pkg) => pkg.fee > 0);
+}
 export async function getVerifyGift(): Promise<number> {
   return Math.max(0, await getSettingNum(SETTING_VERIFY_GIFT, 0));
 }

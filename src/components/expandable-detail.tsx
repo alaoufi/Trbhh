@@ -55,7 +55,7 @@ export function ExpandableDetail({ text }: { text: string }) {
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-sm shadow-inner">📄</span>
           <span className="text-sm font-extrabold text-primary">التفاصيل</span>
         </span>
-        <span className="relative block px-4 py-3">
+        <span className="relative block max-h-48 overflow-hidden px-4 py-3">
           <p ref={pRef} className="line-clamp-6 whitespace-pre-line leading-7 text-foreground/90">{text}</p>
           {/* تلاشٍ سفلي يوحي بوجود بقية النص + «اضغط للمزيد» تحت يسار */}
           {clamped && <span className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-card to-transparent" />}
@@ -70,7 +70,7 @@ export function ExpandableDetail({ text }: { text: string }) {
       {open && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/55 backdrop-blur-[2px]" onClick={() => setOpen(false)} role="dialog" aria-modal="true">
           <div
-            className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border-2 border-primary/20 bg-card shadow-[0_-12px_40px_rgba(0,0,0,0.35)]"
+            className="flex max-h-[82dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border-2 border-primary/20 bg-card shadow-[0_-12px_40px_rgba(0,0,0,0.35)]"
             style={{ transform: `translateY(${dragY}px)`, transition: startY.current === null ? 'transform 200ms ease' : 'none' }}
           >
             {/* مقبض السحب: اسحبه للأسفل لإغلاق اللوحة */}
@@ -91,7 +91,7 @@ export function ExpandableDetail({ text }: { text: string }) {
               </div>
             </div>
             {/* النص كاملاً — تمرير حر بالسحب لأعلى ولأسفل */}
-            <div className="overflow-y-auto overscroll-contain px-5 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
               <p className="whitespace-pre-line text-base leading-8 text-foreground/90">{text}</p>
             </div>
           </div>

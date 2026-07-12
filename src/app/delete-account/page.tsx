@@ -3,6 +3,7 @@ import { UserX, ShieldCheck, Trash2, LogIn, CheckCircle2 } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { SITE } from '@/lib/constants';
 import { deleteMyAccountAction, requestDeletionAction } from './actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = {
@@ -68,9 +69,9 @@ export default async function DeleteAccountPage({ searchParams }: { searchParams
             <input type="checkbox" name="confirm" required className="mt-0.5 h-4 w-4 shrink-0 accent-red-600" />
             <span>أُقرّ بأنني أرغب في حذف حسابي وجميع بياناتي نهائياً وأتحمل مسؤولية ذلك.</span>
           </label>
-          <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-destructive px-4 py-2.5 text-sm font-bold text-white hover:bg-destructive/90">
+          <ConfirmSubmit msg="تأكيد أخير: حذف حسابك وجميع بياناتك نهائياً؟ لا يمكن التراجع إطلاقاً." className="flex w-full items-center justify-center gap-2 rounded-lg bg-destructive px-4 py-2.5 text-sm font-bold text-white hover:bg-destructive/90">
             <UserX className="h-4 w-4" /> احذف حسابي نهائياً
-          </button>
+          </ConfirmSubmit>
         </form>
       ) : done ? null : (
         <>

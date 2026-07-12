@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { FavoriteButton } from '@/components/favorite-button';
 import { ShareButtons } from '@/components/share-buttons';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 import { TrackedContact } from '@/components/ad-contact-track';
 import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
@@ -477,13 +478,13 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                       <input type="hidden" name="userId" value={ad.seller.id} />
                       <input type="hidden" name="adId" value={ad.id} />
                       <input name="days" type="number" min={1} placeholder="عدد الأيام" className="h-9 w-full min-w-0 rounded-md border bg-white px-2 text-sm" />
-                      <button className="h-9 shrink-0 rounded-md bg-amber-600 px-3 text-xs font-bold text-white">حظر مؤقت</button>
+                      <ConfirmSubmit msg="تأكيد الحظر المؤقت لهذا المعلن؟ ستختفي كل إعلاناته من الموقع طوال مدة الحظر." className="h-9 shrink-0 rounded-md bg-amber-600 px-3 text-xs font-bold text-white">حظر مؤقت</ConfirmSubmit>
                     </form>
                     <form action={adminBanSellerAction}>
                       <input type="hidden" name="userId" value={ad.seller.id} />
                       <input type="hidden" name="adId" value={ad.id} />
                       <input type="hidden" name="permanent" value="1" />
-                      <button className="h-9 shrink-0 rounded-md bg-destructive px-3 text-xs font-bold text-white">حظر دائم</button>
+                      <ConfirmSubmit msg="تأكيد الحظر الدائم لهذا المعلن؟ ستختفي كل إعلاناته من الموقع حتى رفع الحظر." className="h-9 shrink-0 rounded-md bg-destructive px-3 text-xs font-bold text-white">حظر دائم</ConfirmSubmit>
                     </form>
                   </div>
                 </div>
@@ -492,9 +493,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             {canDeleteAd && (
               <form action={adminDeleteAdRedirectAction}>
                 <input type="hidden" name="adId" value={ad.id} />
-                <button className="flex w-full items-center justify-center gap-1 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90">
+                <ConfirmSubmit msg="حذف هذا الإعلان نهائياً؟ لا يمكن التراجع." className="flex w-full items-center justify-center gap-1 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90">
                   <Trash2 className="h-4 w-4" /> حذف الإعلان
-                </button>
+                </ConfirmSubmit>
               </form>
             )}
           </div>

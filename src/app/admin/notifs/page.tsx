@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 import { BellRing, Trash2, User } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
@@ -86,7 +87,7 @@ export default async function AdminNotifsPage({ searchParams }: { searchParams: 
             <form action={adminDeleteNotifAction}>
               <input type="hidden" name="id" value={String(n.id)} />
               <input type="hidden" name="tab" value={tab} />
-              <button aria-label="حذف" className="text-red-500 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
+              <ConfirmSubmit msg="حذف هذا التنبيه نهائياً؟" title="حذف" className="text-red-500 hover:text-red-700"><Trash2 className="h-4 w-4" /></ConfirmSubmit>
             </form>
           </div>
         ))}

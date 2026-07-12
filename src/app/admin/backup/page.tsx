@@ -2,6 +2,7 @@ import { DatabaseBackup, Download, Trash2, AlertTriangle, ShieldAlert, Check, Ha
 import { requireAction, hasAction } from '@/lib/roles';
 import { listBackups } from '@/lib/backup';
 import { Button } from '@/components/ui/button';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 import { createBackupAction, deleteBackupAction, restoreBackupAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -85,9 +86,9 @@ export default async function BackupPage({ searchParams }: { searchParams: Promi
                 {canDelete && (
                   <form action={deleteBackupAction}>
                     <input type="hidden" name="name" value={b.name} />
-                    <button className="inline-flex h-9 items-center gap-1 rounded-lg border-2 border-destructive/30 px-3 text-sm font-bold text-destructive hover:bg-destructive/5" title="حذف">
+                    <ConfirmSubmit msg={`حذف النسخة الاحتياطية «${b.name}» نهائياً؟ لا يمكن التراجع.`} title="حذف" className="inline-flex h-9 items-center gap-1 rounded-lg border-2 border-destructive/30 px-3 text-sm font-bold text-destructive hover:bg-destructive/5">
                       <Trash2 className="h-4 w-4" /> حذف
-                    </button>
+                    </ConfirmSubmit>
                   </form>
                 )}
               </div>

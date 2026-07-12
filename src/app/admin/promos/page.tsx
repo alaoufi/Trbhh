@@ -3,6 +3,7 @@ import { Megaphone, Check, X, Trash2, Settings2, ExternalLink } from 'lucide-rea
 import { requirePerm } from '@/lib/roles';
 import { listPromos } from '@/lib/promos';
 import { PLACEMENT_LABEL, STATUS_LABEL } from '@/lib/promo-placements';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 import { approvePromoAction, rejectPromoAction, deletePromoAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -64,7 +65,7 @@ function Card({ p }: { p: import('@/lib/promos').Promo }) {
           {p.status === 'pending' && (
             <form action={rejectPromoAction}><input type="hidden" name="id" value={p.id} /><button className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs"><X className="h-3.5 w-3.5" /> رفض</button></form>
           )}
-          <form action={deletePromoAction}><input type="hidden" name="id" value={p.id} /><button className="flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1 text-xs text-destructive"><Trash2 className="h-3.5 w-3.5" /> حذف</button></form>
+          <form action={deletePromoAction}><input type="hidden" name="id" value={p.id} /><ConfirmSubmit msg="حذف هذا الإعلان الترويجي نهائياً؟ لا يمكن التراجع." className="flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1 text-xs text-destructive"><Trash2 className="h-3.5 w-3.5" /> حذف</ConfirmSubmit></form>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { requireAction } from '@/lib/roles';
 import { getPendingStores, adminStoreList, approvedTransfers, platformRequests, type AdminStore } from '@/lib/merchant';
 import { timeAgo } from '@/lib/utils';
 import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction, adminMessageStoreOwnerAction } from '../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتاجر' };
@@ -125,7 +126,7 @@ function StoreCard({ s }: { s: AdminStore }) {
           <form action={deleteStoreAction} className="flex items-center gap-2">
             <input type="hidden" name="storeId" value={s.id} />
             <label className="flex items-center gap-1 text-[11px] font-bold text-destructive"><input type="checkbox" name="confirm" required className="h-3.5 w-3.5 accent-red-600" /> أؤكّد الحذف</label>
-            <button className="flex items-center gap-1 rounded-lg bg-destructive px-3 py-1.5 text-xs font-bold text-white"><Trash2 className="h-3.5 w-3.5" /> حذف نهائي</button>
+            <ConfirmSubmit msg={`حذف متجر «${s.storeName || `#${s.id}`}» نهائياً بكل بياناته (متابعون/تقييمات/فروع)؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-lg bg-destructive px-3 py-1.5 text-xs font-bold text-white"><Trash2 className="h-3.5 w-3.5" /> حذف نهائي</ConfirmSubmit>
           </form>
         </div>
       </details>

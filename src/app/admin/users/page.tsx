@@ -10,6 +10,7 @@ import { AdminSearch } from '@/components/admin-search';
 import { AdminPager } from '@/components/admin-pager';
 import { banUserAction, unbanUserAction, trustUserAction, assignUserPackageAction, executeDeletionRequestAction, dismissDeletionRequestAction } from '../actions';
 import { listDeletionRequests } from '@/lib/account-delete';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الأعضاء' };
@@ -110,7 +111,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                 <form action={executeDeletionRequestAction}>
                   <input type="hidden" name="id" value={r.id} />
                   <input type="hidden" name="phone" value={r.phone} />
-                  <button className="rounded-md bg-destructive px-3 py-1 text-xs font-bold text-white">تنفيذ الحذف</button>
+                  <ConfirmSubmit msg={`تأكيد: حذف حساب صاحب الرقم ${r.phone} وجميع بياناته نهائياً؟ لا يمكن التراجع.`} className="rounded-md bg-destructive px-3 py-1 text-xs font-bold text-white">تنفيذ الحذف</ConfirmSubmit>
                 </form>
                 <form action={dismissDeletionRequestAction}>
                   <input type="hidden" name="id" value={r.id} />
@@ -187,9 +188,9 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                         <form action={banUserAction} className="flex items-center gap-1 rounded-md border border-destructive/30 p-0.5">
                           <input type="hidden" name="userId" value={id} />
                           <input name="days" type="number" min={1} placeholder="أيام" title="مدة الحظر بالأيام" className="w-14 rounded bg-background px-1.5 py-1 text-xs" />
-                          <button className="flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive"><Ban className="h-3 w-3" /> حظر</button>
+                          <ConfirmSubmit msg="تأكيد حظر هذا العضو للمدة المدخلة؟ ستختفي كل إعلاناته طوال الحظر." className="flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive"><Ban className="h-3 w-3" /> حظر</ConfirmSubmit>
                         </form>
-                        <form action={banUserAction}><input type="hidden" name="userId" value={id} /><input type="hidden" name="permanent" value="1" /><button className="rounded-md border border-destructive/40 px-2 py-1 text-xs font-bold text-destructive hover:bg-destructive/10">دائم</button></form>
+                        <form action={banUserAction}><input type="hidden" name="userId" value={id} /><input type="hidden" name="permanent" value="1" /><ConfirmSubmit msg="تأكيد الحظر الدائم لهذا العضو؟ ستختفي كل إعلاناته حتى رفع الحظر." className="rounded-md border border-destructive/40 px-2 py-1 text-xs font-bold text-destructive hover:bg-destructive/10">دائم</ConfirmSubmit></form>
                       </>
                     )}
                   </div>

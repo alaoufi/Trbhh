@@ -17,6 +17,7 @@ import { SITE } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
@@ -373,7 +374,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                   {c.expiresAt && <span className="text-[11px] text-muted-foreground">حتى {c.expiresAt}</span>}
                   <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${c.active ? 'bg-emerald-100 text-emerald-700' : 'bg-secondary text-muted-foreground'}`}>{c.active ? 'فعّال' : 'موقوف'}</span>
                   <form action={toggleStoreCouponAction}><input type="hidden" name="id" value={c.id} /><button className="rounded-lg border px-2 py-1 text-[11px] font-bold text-amber-700">{c.active ? 'إيقاف' : 'تفعيل'}</button></form>
-                  <form action={deleteStoreCouponAction}><input type="hidden" name="id" value={c.id} /><button className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">حذف</button></form>
+                  <form action={deleteStoreCouponAction}><input type="hidden" name="id" value={c.id} /><ConfirmSubmit msg={`حذف الكوبون «${c.code}» نهائياً؟`} className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">حذف</ConfirmSubmit></form>
                 </li>
               ))}
             </ul>

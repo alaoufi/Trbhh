@@ -7,6 +7,7 @@ import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBala
 import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupCampaigns, getActiveTopupCampaign, topupCampaignsHealth, campaignState, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
 import { pointsEnabled, getPointsConfig, referralEnabled, getReferralReward, getWelcomeCredit } from '@/lib/points';
 import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction, addTopupCampaignAction, deleteTopupCampaignAction } from '../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الإيرادات' };
@@ -293,7 +294,7 @@ async function ExpensesTab() {
                 <td className="p-2">
                   <form action={deleteSiteExpenseAction}>
                     <input type="hidden" name="id" value={r.id} />
-                    <button aria-label="حذف" className="text-red-500 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
+                    <ConfirmSubmit msg={`حذف مصروف «${r.label}» نهائياً؟`} title="حذف" className="text-red-500 hover:text-red-700"><Trash2 className="h-4 w-4" /></ConfirmSubmit>
                   </form>
                 </td>
               </tr>
@@ -334,7 +335,7 @@ async function AccountsTab() {
             </div>
             <form action={deleteTopupAccountAction}>
               <input type="hidden" name="idx" value={i} />
-              <button aria-label="حذف الحساب" className="flex items-center gap-1 rounded-lg border border-red-300 px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /> حذف</button>
+              <ConfirmSubmit msg="حذف حساب الشحن هذا؟ لن يظهر للأعضاء في صفحة شحن الرصيد." title="حذف الحساب" className="flex items-center gap-1 rounded-lg border border-red-300 px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /> حذف</ConfirmSubmit>
             </form>
           </div>
         ))}
@@ -395,7 +396,7 @@ async function CampaignsTab({ camp }: { camp?: string }) {
                 <span>{c.to ? <>من {fmtCamp(c.from)} لمدة {Math.max(1, Math.round((new Date(c.to).getTime() - new Date(c.from).getTime()) / 86400000))} يوم (حتى {fmtCamp(c.to)})</> : <>من {fmtCamp(c.from)} — <b className="text-emerald-700">مفتوحة (تستمر حتى تحذفها)</b></>}</span>
                 <form action={deleteTopupCampaignAction} className="mr-auto">
                   <input type="hidden" name="id" value={c.id} />
-                  <button className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">حذف</button>
+                  <ConfirmSubmit msg="حذف هذه الحملة نهائياً؟ سيتوقف عرضها وسجلها من التقارير." className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">حذف</ConfirmSubmit>
                 </form>
               </div>
               <div className="flex flex-wrap gap-1.5">

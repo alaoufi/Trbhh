@@ -6,6 +6,7 @@ import { SearchSuggestInput } from '@/components/search-suggest';
 import { getSession } from '@/lib/auth';
 import { listSavedSearches, savedSearchEnabled } from '@/lib/saved-search';
 import { saveSearchAction, deleteSavedSearchAction } from './actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const metadata = { title: 'البحث' };
 
@@ -94,7 +95,7 @@ export default async function SearchPage({
                 <form action={deleteSavedSearchAction}>
                   <input type="hidden" name="id" value={s0.id} />
                   <input type="hidden" name="q" value={sp.q || ''} />
-                  <button aria-label="حذف" className="text-red-500 hover:text-red-700"><Trash2 className="h-3.5 w-3.5" /></button>
+                  <ConfirmSubmit msg={`إلغاء تنبيه البحث «${s0.query}»؟`} title="حذف" className="text-red-500 hover:text-red-700"><Trash2 className="h-3.5 w-3.5" /></ConfirmSubmit>
                 </form>
               </span>
             ))}

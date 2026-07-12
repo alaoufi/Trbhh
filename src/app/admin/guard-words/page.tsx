@@ -3,6 +3,7 @@ import { requirePerm } from '@/lib/roles';
 import { getGuardWords, BUILTIN, CATEGORY_LABEL, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { Button } from '@/components/ui/button';
 import { addGuardWordAction, deleteGuardWordAction } from '../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'كلمات حارس المحتوى' };
@@ -51,7 +52,7 @@ export default async function GuardWordsPage() {
                         {w.word}
                         <form action={deleteGuardWordAction}>
                           <input type="hidden" name="id" value={w.id} />
-                          <button className="text-destructive hover:opacity-70" title="حذف"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <ConfirmSubmit msg={`حذف كلمة «${w.word}» من كلمات الحماية؟`} title="حذف" className="text-destructive hover:opacity-70"><Trash2 className="h-3.5 w-3.5" /></ConfirmSubmit>
                         </form>
                       </span>
                     ))}

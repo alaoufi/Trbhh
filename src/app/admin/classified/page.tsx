@@ -6,6 +6,7 @@ import { getClassifiedLifetimeDays } from '@/lib/settings';
 import { timeAgo } from '@/lib/utils';
 import { requirePerm } from '@/lib/roles';
 import { adminDeleteClassifiedAction, toggleClassifiedAction, classifiedLifetimeAction } from '../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الإعلانات المبوّبة' };
@@ -90,7 +91,7 @@ export default async function AdminClassified() {
 
                 <form action={adminDeleteClassifiedAction}>
                   <input type="hidden" name="id" value={c.id} />
-                  <button className="flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف</button>
+                  <ConfirmSubmit msg="حذف هذا الإعلان المبوّب نهائياً؟ لا يمكن التراجع." className="flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف</ConfirmSubmit>
                 </form>
               </div>
             </div>

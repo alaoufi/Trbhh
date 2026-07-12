@@ -4,6 +4,7 @@ import { requirePerm, hasAction } from '@/lib/roles';
 import { listAllConversations, getAdminThread } from '@/lib/chat';
 import { timeAgo } from '@/lib/utils';
 import { adminDeleteMessageAction } from '../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'مراقبة المراسلات' };
@@ -42,9 +43,9 @@ export default async function AdminMessages({ searchParams }: { searchParams: Pr
                 {canDelete && (
                   <form action={adminDeleteMessageAction}>
                     <input type="hidden" name="messageId" value={m.id} />
-                    <button className="flex items-center gap-1 text-red-500 hover:text-red-700" title="حذف الرسالة">
+                    <ConfirmSubmit msg="حذف هذه الرسالة نهائياً؟ لا يمكن التراجع." title="حذف الرسالة" className="flex items-center gap-1 text-red-500 hover:text-red-700">
                       <Trash2 className="h-3.5 w-3.5" /> حذف
-                    </button>
+                    </ConfirmSubmit>
                   </form>
                 )}
               </div>

@@ -5,6 +5,7 @@ import { getMyClassifieds } from '@/lib/classified';
 import { getClassifiedLifetimeDays, getServicePricing, serviceHasPrice, DURATIONS } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
 import { ClassifiedCard } from '@/components/classified-card';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 import { deleteMyClassifiedAction, reactivateClassifiedAction } from '@/app/classified/actions';
 
 export const dynamic = 'force-dynamic';
@@ -71,9 +72,9 @@ export default async function MyClassifiedPage({ searchParams }: { searchParams:
                 </Link>
                 <form action={deleteMyClassifiedAction} className="flex-1">
                   <input type="hidden" name="id" value={c.id} />
-                  <button className="flex w-full items-center justify-center gap-1 rounded-lg border border-destructive/30 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10">
+                  <ConfirmSubmit msg="حذف هذا الإعلان المبوّب نهائياً؟ لا يمكن التراجع." className="flex w-full items-center justify-center gap-1 rounded-lg border border-destructive/30 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10">
                     <Trash2 className="h-3.5 w-3.5" /> حذف
-                  </button>
+                  </ConfirmSubmit>
                 </form>
               </div>
               {c.link && (

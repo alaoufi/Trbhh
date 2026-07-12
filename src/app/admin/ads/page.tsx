@@ -9,8 +9,8 @@ import { adminDeleteAdAction, adminToggleSpecialAction, adminToggleAdStatusActio
 import { getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { sweepExpiredArchived } from '@/lib/data';
 import { AdminSearch } from '@/components/admin-search';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 import { AdminPager } from '@/components/admin-pager';
-import { Button } from '@/components/ui/button';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الإعلانات' };
@@ -105,7 +105,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
       {tab === 'pending' && pendingCount > 0 && (
         <form action={deleteAllPendingAdsAction} className="flex items-center justify-between gap-2 rounded-xl border-2 border-destructive/30 bg-destructive/5 p-3">
           <span className="text-sm font-bold text-destructive">حذف كل الإعلانات المنتظِرة للموافقة ({pendingCount})؟ لا يمكن التراجع.</span>
-          <Button size="sm" className="bg-destructive hover:bg-destructive/90"><Trash2 className="h-4 w-4" /> حذف الكل</Button>
+          <ConfirmSubmit msg={`تأكيد: حذف كل الإعلانات المنتظِرة للموافقة (${pendingCount} إعلان) نهائياً؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-md bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90"><Trash2 className="h-4 w-4" /> حذف الكل</ConfirmSubmit>
         </form>
       )}
       {tab === 'archived' && (
@@ -113,7 +113,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
           {archivedCount > 0 && (
             <form action={deleteAllArchivedAdsAction} className="flex items-center justify-between gap-2 rounded-xl border-2 border-destructive/30 bg-destructive/5 p-3">
               <span className="text-sm font-bold text-destructive">حذف كل الإعلانات المؤرشفة ({archivedCount})؟ لا يمكن التراجع.</span>
-              <Button size="sm" className="bg-destructive hover:bg-destructive/90"><Trash2 className="h-4 w-4" /> حذف الكل</Button>
+              <ConfirmSubmit msg={`تأكيد: حذف كل الإعلانات المؤرشفة (${archivedCount} إعلان) نهائياً؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-md bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90"><Trash2 className="h-4 w-4" /> حذف الكل</ConfirmSubmit>
             </form>
           )}
           <p className="text-xs font-bold text-amber-700">الإعلانات المؤرشفة تُحذف تلقائياً بعد 30 يوماً من أرشفتها.</p>
@@ -164,7 +164,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
                   <form action={banUserAction} className="flex items-center gap-1">
                     <input type="hidden" name="userId" value={toInt(a.user_id)} />
                     <input name="days" type="number" min={0} placeholder="أيام" className="h-7 w-16 rounded-md border border-destructive/30 px-2 text-xs" />
-                    <button className="rounded-md bg-destructive px-2.5 py-1 text-xs font-bold text-white hover:bg-destructive/90">⛔ حظر المعلن (فارغ = دائم)</button>
+                    <ConfirmSubmit msg="تأكيد حظر هذا المعلن؟ ستختفي كل إعلاناته من الموقع طوال مدة الحظر." className="rounded-md bg-destructive px-2.5 py-1 text-xs font-bold text-white hover:bg-destructive/90">⛔ حظر المعلن (فارغ = دائم)</ConfirmSubmit>
                   </form>
                 </div>
               </div>
@@ -186,7 +186,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
               {a.status === 1 && (
                 <form action={adminToggleAdStatusAction}><input type="hidden" name="adId" value={toInt(a.id)} /><button className="flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold hover:bg-secondary" title="إيقاف/حجب"><EyeOff className="h-3.5 w-3.5" /> إيقاف</button></form>
               )}
-              <form action={adminDeleteAdAction}><input type="hidden" name="adId" value={toInt(a.id)} /><button className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10" title="حذف نهائي"><Trash2 className="h-3.5 w-3.5" /> حذف</button></form>
+              <form action={adminDeleteAdAction}><input type="hidden" name="adId" value={toInt(a.id)} /><ConfirmSubmit msg={`حذف الإعلان «${a.title?.trim() || `#${toInt(a.id)}`}» نهائياً؟ لا يمكن التراجع.`} title="حذف نهائي" className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف</ConfirmSubmit></form>
             </div>
           </div>
           );

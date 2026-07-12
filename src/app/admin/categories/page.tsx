@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { requirePerm } from '@/lib/roles';
 import { addCategoryAction, toggleCategoryAction, updateCategoryAction, deleteCategoryAction, moveCategoryAction } from '../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الأقسام' };
@@ -55,9 +56,9 @@ export default async function AdminCategories() {
             </form>
             <form action={deleteCategoryAction}>
               <input type="hidden" name="catId" value={toInt(c.id)} />
-              <button className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10" title="حذف القسم">
+              <ConfirmSubmit msg={`حذف قسم «${c.name}» نهائياً؟ لا يمكن التراجع.`} title="حذف القسم" className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10">
                 <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              </ConfirmSubmit>
             </form>
           </div>
         ))}

@@ -3,6 +3,7 @@ import { requirePerm } from '@/lib/roles';
 import { getBannedWords, getNameWords } from '@/lib/censor';
 import { Button } from '@/components/ui/button';
 import { addBannedWordAction, deleteBannedWordAction, addNameWordAction, deleteNameWordAction } from '../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الكلمات المرفوضة' };
@@ -32,7 +33,7 @@ export default async function AdminWords() {
             <span className="font-medium">{w.word}</span>
             <form action={deleteBannedWordAction}>
               <input type="hidden" name="id" value={w.id} />
-              <button className="text-destructive hover:opacity-70" title="حذف"><Trash2 className="h-4 w-4" /></button>
+              <ConfirmSubmit msg={`حذف كلمة «${w.word}» من القائمة؟`} title="حذف" className="text-destructive hover:opacity-70"><Trash2 className="h-4 w-4" /></ConfirmSubmit>
             </form>
           </div>
         ))}
@@ -60,7 +61,7 @@ export default async function AdminWords() {
               <span className="font-medium">{w.word}</span>
               <form action={deleteNameWordAction}>
                 <input type="hidden" name="id" value={w.id} />
-                <button className="text-destructive hover:opacity-70" title="حذف"><Trash2 className="h-4 w-4" /></button>
+                <ConfirmSubmit msg={`حذف «${w.word}» من قائمة أسماء المتاجر الممنوعة؟`} title="حذف" className="text-destructive hover:opacity-70"><Trash2 className="h-4 w-4" /></ConfirmSubmit>
               </form>
             </div>
           ))}

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 import { Copy, Trash2, Check } from 'lucide-react';
 import { requirePerm } from '@/lib/roles';
 import { findDuplicateAds, findCrossUserImages } from '@/lib/duplicates';
@@ -34,9 +35,9 @@ export default async function AdminDuplicates({ searchParams }: { searchParams: 
 
       {dupCount > 0 && (
         <form action={adminDeleteDuplicatesAction}>
-          <button className="flex items-center gap-2 rounded-lg bg-destructive px-4 py-2.5 text-sm font-bold text-white">
+          <ConfirmSubmit msg={`تأكيد: حذف كل النسخ المكررة (${dupCount} إعلان) نهائياً؟ يُحتفظ بأقدم إعلان في كل مجموعة ولا يمكن التراجع.`} className="flex items-center gap-2 rounded-lg bg-destructive px-4 py-2.5 text-sm font-bold text-white">
             <Trash2 className="h-4 w-4" /> حذف كل المكرر ({dupCount})
-          </button>
+          </ConfirmSubmit>
         </form>
       )}
 

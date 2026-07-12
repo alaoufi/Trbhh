@@ -7,6 +7,7 @@ import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingB
 import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction, bumpAdAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -124,7 +125,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 </form>
                 <form action={deleteAdAction}>
                   <input type="hidden" name="adId" value={ad.id} />
-                  <button className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"><Trash2 className="h-3 w-3" /> حذف</button>
+                  <ConfirmSubmit msg={`حذف إعلانك «${ad.title || `#${ad.id}`}» نهائياً؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"><Trash2 className="h-3 w-3" /> حذف</ConfirmSubmit>
                 </form>
               </div>
             </div>

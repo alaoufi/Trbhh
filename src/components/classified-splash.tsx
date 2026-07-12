@@ -67,8 +67,8 @@ function Contact({ ad, big }: { ad: Classified; big?: boolean }) {
 export function ClassifiedSplash({ ads, seconds }: { ads: Classified[]; seconds?: number }) {
   const router = useRouter();
   const pathname = usePathname() || '';
-  // لا تظهر مبوّبات تربح ضمن سياق المتجر المستقل (احتياطاً)
-  const inStoreCtx = /^\/companies\//.test(pathname) || /^\/store(\/|$|-)/.test(pathname);
+  // لا تظهر مبوّبات تربح ضمن سياق المتجر المستقل (احتياطاً) — ولا داخل لوحة الإدارة إطلاقاً
+  const inStoreCtx = /^\/companies\//.test(pathname) || /^\/store(\/|$|-)/.test(pathname) || /^\/admin(\/|$)/.test(pathname);
   const [show, setShow] = useState(false);
   const durationMs = (seconds && seconds > 0 ? seconds : DEFAULT_SECONDS) * 1000; // مدة التشغيل — من إعدادات الإدارة
   const [remaining, setRemaining] = useState(durationMs);

@@ -62,11 +62,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       /* ignore */
     }
   }
+  // شاشة المبوّبات الافتتاحية تُحجب كلياً عن أعضاء الإدارة (لا تعيقهم عن عملهم)
+  const isAdminUser = session ? await import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false) : false;
   let splashAds: Awaited<ReturnType<typeof getSplashClassifieds>> = [];
-  try {
-    splashAds = await getSplashClassifieds(12);
-  } catch {
-    /* classified table may not be ready yet */
+  if (!isAdminUser) {
+    try {
+      splashAds = await getSplashClassifieds(12);
+    } catch {
+      /* classified table may not be ready yet */
+    }
   }
   const splashSeconds = await getClassifiedSplashSeconds().catch(() => 5);
   const theme = (await cookies()).get('theme')?.value || '';

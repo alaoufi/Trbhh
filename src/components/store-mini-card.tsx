@@ -9,8 +9,27 @@ export type StoreCardData = {
 
 const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
 
-/** Compact store card with key stats — used in collaboration invitations & partners. */
-export function StoreMiniCard({ s, href }: { s: StoreCardData; href?: string }) {
+/** Compact store card with key stats — used in collaboration invitations & partners.
+ *  compact: نسخة شبكية مضغوطة بارتفاع قليل (لرئيسية تربح) — شعار أصغر وسطر إحصاءات مختصر. */
+export function StoreMiniCard({ s, href, compact }: { s: StoreCardData; href?: string; compact?: boolean }) {
+  if (compact) {
+    return (
+      <Link href={href || `/companies/${s.id}`} className="block rounded-lg border border-border/60 bg-white/60 p-2 hover:border-primary/40">
+        <div className="flex items-center gap-2">
+          <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg border-2 bg-muted" style={{ borderColor: s.color }}>
+            <Image src={s.logo} alt={s.name} fill sizes="36px" className="object-cover" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-bold leading-5" style={{ color: s.color }}>{s.name}</div>
+            <div className="flex items-center gap-2 text-[10px] leading-4 text-muted-foreground">
+              <span className="flex items-center gap-0.5"><Megaphone className="h-2.5 w-2.5" /> {en(s.ads)}</span>
+              <span className="flex items-center gap-0.5"><Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" /> {s.ratingCount ? s.rating : '—'}</span>
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
   const inner = (
     <>
       <div className="flex items-center gap-3">

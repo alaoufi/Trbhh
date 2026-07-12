@@ -142,8 +142,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {/* إعلان المتاجر — يظهر تلقائياً لكل متجر معتمد (بطاقة المتجر) */}
       {storeCards.length > 0 && (
         <Section title={H.stores} href="/companies">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {storeCards.map((c) => <StoreMiniCard key={c.id} s={c} href={`/companies/${c.id}`} />)}
+          {/* شبكة مضغوطة بارتفاع قليل — عمودان على الجوال وحتى أربعة على الشاشات الكبيرة */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {storeCards.map((c) => <StoreMiniCard key={c.id} s={c} href={`/companies/${c.id}`} compact />)}
           </div>
         </Section>
       )}

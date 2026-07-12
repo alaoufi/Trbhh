@@ -22,6 +22,7 @@ import { DisclaimerBar } from '@/components/disclaimer';
 import { FavoriteButton } from '@/components/favorite-button';
 import { ShareButtons } from '@/components/share-buttons';
 import { ConfirmSubmit } from '@/components/confirm-submit';
+import { ExpandableDetail } from '@/components/expandable-detail';
 import { TrackedContact } from '@/components/ad-contact-track';
 import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
@@ -321,7 +322,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             </>
           )}
         </div>
-        <p className="whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
+        <ExpandableDetail text={ad.detail || ""} />
       </div>
 
       {/* الموقع على الخريطة — يظهر عند تحديد المعلن لموقع الإعلان */}

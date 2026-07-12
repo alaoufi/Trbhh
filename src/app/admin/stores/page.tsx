@@ -166,6 +166,7 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
   const [pending, stores, transfers, platformReqs] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers(), platformRequests()]);
   const { listVerifyOrdersAdmin, refundOf } = await import('@/lib/verify-paid');
   const verifyOrders = await listVerifyOrdersAdmin().catch(() => ({ pending: [], active: [] }));
+  const verifyPkgs = await import('@/lib/settings').then((m) => m.getVerifyPackages()).catch(() => []);
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold text-primary">إدارة المتاجر</h1></div>
@@ -174,10 +175,21 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
 
       {vbal === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 وافقت لكن رصيد العضو لا يغطي رسوم التوثيق — بقي الطلب معلقاً ووصلت العضو رسالة بشحن رصيده؛ أعد الموافقة بعد الشحن.</div>}
 
-      {/* ⭐ طلبات التوثيق المدفوع: الخصم عند الموافقة فقط — لا توثيق بلا رصيد كافٍ */}
-      {(verifyOrders.pending.length > 0 || verifyOrders.active.length > 0) && (
-        <div className="rounded-2xl border-2 border-sky-300 bg-sky-50/40 p-3">
-          <div className="mb-2 flex items-center gap-2 font-bold text-sky-700">⭐ التوثيق المدفوع — طلبات معلقة ({en(verifyOrders.pending.length)}) ونشطة ({en(verifyOrders.active.length)})</div>
+      {/* ⭐ التوثيق المدفوع: ظاهر دائماً — حالة الباقات + الطلبات المعلقة والنشطة */}
+      <div className="rounded-2xl border-2 border-sky-300 bg-sky-50/40 p-3">
+        <div className="mb-2 flex flex-wrap items-center gap-2 font-bold text-sky-700">
+          ⭐ التوثيق المدفوع — طلبات معلقة ({en(verifyOrders.pending.length)}) ونشطة ({en(verifyOrders.active.length)})
+          <span className="mr-auto flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+            {verifyPkgs.length > 0
+              ? verifyPkgs.map((pkg) => <span key={pkg.idx} className="rounded-full bg-white px-2 py-0.5 text-sky-800 shadow-sm">باقة {pkg.idx}: {en(pkg.fee)} ر.س / {en(pkg.days)} يوم</span>)
+              : <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">⚠ الخدمة معطلة — كل الباقات برسوم 0</span>}
+            <Link href="/admin/revenue?tab=pricing" className="rounded-full border border-sky-400 bg-white px-2 py-0.5 text-sky-700 underline">تعديل الباقات ←</Link>
+          </span>
+        </div>
+        {verifyOrders.pending.length === 0 && verifyOrders.active.length === 0 && (
+          <p className="text-xs font-bold text-muted-foreground">لا توجد طلبات توثيق حالياً — يطلبها صاحب المتجر من لوحة متجره (قسم «الظهور في تربح» ← بطاقة «⭐ توثيق المتجر») باختيار باقة والموافقة على التعهد، فتظهر هنا للموافقة (خصم وتفعيل) أو الرفض بسبب.</p>
+        )}
+        {(verifyOrders.pending.length > 0 || verifyOrders.active.length > 0) && (
           <div className="space-y-2">
             {verifyOrders.pending.map((o) => (
               <div key={o.id} className="space-y-2 rounded-xl bg-white p-3 text-sm shadow-sm">
@@ -219,8 +231,8 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
               </div>
             ); })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* طلبات عرض المنتجات في منصة تربح — إعلان المتجر يظهر تلقائياً، والمنتجات بموافقة */}
       {platformReqs.length > 0 && (

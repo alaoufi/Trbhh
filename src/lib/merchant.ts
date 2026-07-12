@@ -648,8 +648,10 @@ export async function homeFeaturedOwnerIds(limit = 12): Promise<number[]> {
 /** Stores shown on the Trbhh platform, with their id/name for labelling. */
 export async function homeFeaturedStores(limit = 6): Promise<{ userId: number; storeId: number; storeName: string | null }[]> {
   await ensure();
+  // مدفوعات صارمة: المنتجات تظهر فقط لمتجر معتمد المحتوى (show_on_platform)
+  // ودفَع «عرض المتجر» ساري المفعول (show_until > الآن) أو منحته الإدارة (home_featured)
   const rows = await prisma.stores.findMany({
-    where: { status: 1, OR: [{ home_featured: 1 }, { AND: [{ show_on_platform: 1 }, { OR: [{ show_until: null }, { show_until: { gt: new Date() } }] }] }] },
+    where: { status: 1, OR: [{ home_featured: 1 }, { AND: [{ show_on_platform: 1 }, { show_until: { gt: new Date() } }] }] },
     orderBy: [{ home_featured: 'desc' }, { id: 'desc' }], take: limit,
     select: { user_id: true, id: true, store_name: true },
   }).catch(() => []);
@@ -737,7 +739,12 @@ export async function homeStoreCards(limit = 12) {
 }
 async function loadHomeStoreCards(limit: number) {
   await ensure();
-  const rows = await prisma.stores.findMany({ where: { status: 1 }, orderBy: [{ home_featured: 'desc' }, { id: 'desc' }], take: limit, select: { id: true } }).catch(() => []);
+  // مدفوعات صارمة: بطاقة المتجر بالرئيسية لمن دفع «عرض المتجر» (show_until ساري)
+  // أو منحته الإدارة (home_featured) فقط — لا عرض مجاني إطلاقاً
+  const rows = await prisma.stores.findMany({
+    where: { status: 1, OR: [{ home_featured: 1 }, { show_until: { gt: new Date() } }] },
+    orderBy: [{ home_featured: 'desc' }, { id: 'desc' }], take: limit, select: { id: true },
+  }).catch(() => []);
   const cards = await Promise.all(rows.map((r) => storeCard(toInt(r.id))));
   return cards.filter(Boolean);
 }

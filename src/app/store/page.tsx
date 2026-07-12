@@ -116,6 +116,26 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </Link>
       )}
 
+      {/* 🚀 تذكير تسويقي دائم: عرض المتجر والإعلانات في تربح مدفوع — يظهر فور دخول التاجر */}
+      {store && showPricing && (showPricing.store.w2 > 0 || showPricing.store.m1 > 0 || showPricing.store.y1 > 0 || showPricing.ads.some((a) => a.price > 0)) && (
+        storeShowActive ? (
+          <a href="#trbhh-show" className="card-3d flex items-center gap-3 rounded-2xl !border-emerald-400 bg-emerald-50 p-3 hover:bg-emerald-100">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-500 text-lg text-white">✨</span>
+            <span className="flex-1 text-sm font-bold text-emerald-900">متجرك معروض الآن في رئيسية تربح حتى {fmtD(storeShowRow!.show_until)} — جدّد قبل الانتهاء ليستمر تدفق العملاء، وميّز إعلاناتك بباقات العرض ←</span>
+          </a>
+        ) : (
+          <a href="#trbhh-show" className="card-3d block overflow-hidden rounded-2xl !border-amber-400 p-0 hover:opacity-95">
+            <div className="flex items-center gap-3 p-3.5 text-white" style={{ backgroundImage: 'linear-gradient(135deg, #f59e0b, #d97706, #b45309)' }}>
+              <span className="grid h-11 w-11 shrink-0 animate-pulse place-items-center rounded-xl bg-white/20 text-xl ring-1 ring-white/30">🚀</span>
+              <span className="flex-1">
+                <span className="block text-sm font-extrabold drop-shadow">متجرك غير ظاهر في رئيسية تربح الآن!</span>
+                <span className="block text-xs font-bold text-white/90">آلاف الزوار يتصفحون تربح يومياً — اعرض متجرك ومنتجاتك أمامهم، أو أبرز إعلاناً بعينه بباقة (ذهبية/فضية/عادية) حسب المدة. اضغط للتفعيل ←</span>
+              </span>
+            </div>
+          </a>
+        )
+      )}
+
       {/* ✉️ مراسلة عضو من داخل المتجر — برقم جواله، تصله باسم المتجر */}
       {store && (
         <details className="card-3d rounded-xl">
@@ -448,7 +468,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
 
       {/* الظهور المدفوع في تربح: عرض المتجر بالمدد + عرض إعلان بباقة — يُخصم من الرصيد */}
       {store && showPricing && (showPricing.store.w2 > 0 || showPricing.store.m1 > 0 || showPricing.store.y1 > 0 || showPricing.ads.some((a) => a.price > 0)) && (
-        <div className="card-3d space-y-3 rounded-2xl p-4">
+        <div id="trbhh-show" className="card-3d scroll-mt-20 space-y-3 rounded-2xl p-4">
           <div className="flex items-center gap-2 font-bold text-primary">📣 الظهور في تربح (مدفوع)</div>
           {show === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض متجرك في تربح وخُصم المبلغ من رصيدك.</div>}
           {adshow === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض إعلانك في تربح وخُصم المبلغ من رصيدك.</div>}

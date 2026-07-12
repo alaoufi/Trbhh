@@ -277,7 +277,8 @@ export async function adminArchiveAdAction(formData: FormData) {
     const archiving = a.status === 1;
     await prisma.ads.update({
       where: { id },
-      data: { status: archiving ? 0 : 1, data_archive: archiving ? new Date().toISOString() : null },
+      // النشر من الإدارة يمسح علامة «أوقفه صاحبه» أيضاً
+      data: { status: archiving ? 0 : 1, data_archive: archiving ? new Date().toISOString() : null, ...(archiving ? {} : { paused_by_owner: 0 }) },
     }).catch(() => {});
   }
   revalidatePath(`/ads/${toInt(id)}`);
@@ -871,7 +872,8 @@ export async function adminToggleAdStatusAction(formData: FormData) {
     const archiving = a.status === 1; // hiding => archive (stamp date); showing => clear
     await prisma.ads.update({
       where: { id },
-      data: { status: archiving ? 0 : 1, data_archive: archiving ? new Date().toISOString() : null },
+      // النشر من الإدارة يمسح علامة «أوقفه صاحبه» أيضاً
+      data: { status: archiving ? 0 : 1, data_archive: archiving ? new Date().toISOString() : null, ...(archiving ? {} : { paused_by_owner: 0 }) },
     });
   }
   await bustAdCaches().catch(() => {}); // approved/hidden ad reflects immediately
@@ -883,7 +885,8 @@ export async function adminToggleAdStatusAction(formData: FormData) {
 export async function deleteAllPendingAdsAction() {
   await requireAction('ads', 'delete');
   const pend = await prisma.ads.findMany({
-    where: { status: 0, OR: [{ data_archive: null }, { data_archive: '' }] },
+    // لا يشمل الموقوفة من أصحابها — تلك ليست بانتظار موافقة ولا تُحذف جماعياً
+    where: { status: 0, paused_by_owner: 0, OR: [{ data_archive: null }, { data_archive: '' }] },
     select: { id: true },
   });
   const ids = pend.map((p) => p.id);

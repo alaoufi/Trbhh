@@ -24,6 +24,7 @@ const TABS = [
   { k: 'special', l: 'المميزة' },
   { k: 'normal', l: 'العادية' },
   { k: 'pending', l: 'بانتظار الموافقة' },
+  { k: 'paused', l: 'موقوفة من أصحابها' },
   { k: 'archived', l: 'المؤرشفة' },
   { k: 'banned', l: 'المحظورة' },
 ] as const;
@@ -45,10 +46,11 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
   const tabWhere: Prisma.adsWhereInput =
     tab === 'special' ? { status: 1, adsSpecial: 'checked', ...notArchived }
       : tab === 'normal' ? { status: 1, NOT: { adsSpecial: 'checked' }, ...notArchived }
-        : tab === 'pending' ? { status: 0, ...notArchived }
-          : tab === 'archived' ? archived
-            : tab === 'banned' ? bannedWhere
-              : {};
+        : tab === 'pending' ? { status: 0, paused_by_owner: 0, ...notArchived }
+          : tab === 'paused' ? { status: 0, paused_by_owner: 1, ...notArchived }
+            : tab === 'archived' ? archived
+              : tab === 'banned' ? bannedWhere
+                : {};
 
   // البحث: بالعنوان أو التفاصيل أو رقم الإعلان
   const digits = term.replace(/\D/g, '');
@@ -57,12 +59,13 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
     : {};
   const where: Prisma.adsWhereInput = { AND: [tabWhere, searchWhere] };
 
-  const [total, allCount, specialCount, normalCount, pendingCount, archivedCount, bannedCount] = await Promise.all([
+  const [total, allCount, specialCount, normalCount, pendingCount, pausedCount, archivedCount, bannedCount] = await Promise.all([
     prisma.ads.count({ where }),
     prisma.ads.count(),
     prisma.ads.count({ where: { status: 1, adsSpecial: 'checked', ...notArchived } }),
     prisma.ads.count({ where: { status: 1, NOT: { adsSpecial: 'checked' }, ...notArchived } }),
-    prisma.ads.count({ where: { status: 0, ...notArchived } }),
+    prisma.ads.count({ where: { status: 0, paused_by_owner: 0, ...notArchived } }),
+    prisma.ads.count({ where: { status: 0, paused_by_owner: 1, ...notArchived } }),
     prisma.ads.count({ where: archived }),
     prisma.ads.count({ where: bannedWhere }),
   ]);
@@ -91,6 +94,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
           <Link href={tabHref('special')} className={tabCls('special')}>المميزة {badge(specialCount, 'bg-amber-500')}</Link>
           <Link href={tabHref('normal')} className={tabCls('normal')}>العادية {badge(normalCount, 'bg-emerald-600')}</Link>
           <Link href={tabHref('pending')} className={tabCls('pending')}>بانتظار الموافقة {badge(pendingCount, 'bg-red-500')}</Link>
+          <Link href={tabHref('paused')} className={tabCls('paused')}>موقوفة من أصحابها {badge(pausedCount, 'bg-slate-500')}</Link>
           <Link href={tabHref('archived')} className={tabCls('archived')}>المؤرشفة {badge(archivedCount, 'bg-amber-600')}</Link>
           <Link href={tabHref('banned')} className={tabCls('banned')}>المحظورة {badge(bannedCount, 'bg-slate-600')}</Link>
         </div>
@@ -116,6 +120,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
         </>
       )}
       {tab === 'banned' && <p className="text-xs font-bold text-amber-700">إعلانات الأعضاء المحظورين حالياً — لا تظهر للزوّار ما دام صاحبها محظوراً.</p>}
+      {tab === 'paused' && <p className="text-xs font-bold text-slate-600">إعلانات أوقفها أصحابها بأنفسهم (زر «إيقاف» في إعلاناتي) — لا تحتاج موافقة؛ تعود للنشر متى فعّلها صاحبها، ويمكنكم نشرها فوراً بزر الموافقة.</p>}
 
       {ads.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد إعلانات هنا.</p>}
       <div className="space-y-2">
@@ -130,18 +135,20 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
               </Link>
               <span className="text-sm text-primary">{formatPrice(a.price, 'ر.س', a.adsType)}</span>
               {a.adsSpecial === 'checked' && <Badge variant="special">مميّز</Badge>}
-              <Badge variant={a.status === 1 ? 'trusted' : a.data_archive ? 'muted' : 'special'}>{a.status === 1 ? 'نشط' : a.data_archive ? 'مؤرشف' : 'بانتظار الموافقة'}</Badge>
+              <Badge variant={a.status === 1 ? 'trusted' : a.data_archive ? 'muted' : 'special'}>{a.status === 1 ? 'نشط' : a.data_archive ? 'مؤرشف' : a.paused_by_owner ? 'موقوف من صاحبه' : 'بانتظار الموافقة'}</Badge>
               <span className="text-xs text-muted-foreground">{timeAgo(a.created_at)}</span>
             </div>
 
             {/* سبب الانتظار — يظهر على كل إعلان منتظر */}
             {pending && (
               <p className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold leading-5 text-amber-800">
-                سبب الانتظار: {a.publish_at
-                  ? `مجدول — سينشر تلقائياً في موعده الذي حدده صاحبه`
-                  : adsApproval
-                    ? '«مراجعة الإعلانات قبل النشر» مفعّلة من الإعدادات — كل إعلان جديد ينتظر موافقتكم'
-                    : 'اشتباه تكرار (تشابه ٩٠٪+ مع إعلان قائم) أو أوقفه صاحبه بنفسه'}
+                سبب الانتظار: {a.paused_by_owner
+                  ? 'أوقفه صاحبه بنفسه — لا يحتاج موافقتكم؛ التاريخ المعروض هو تاريخ إنشاء الإعلان الأصلي'
+                  : a.publish_at
+                    ? `مجدول — سينشر تلقائياً في موعده الذي حدده صاحبه`
+                    : adsApproval
+                      ? '«مراجعة الإعلانات قبل النشر» مفعّلة من الإعدادات — كل إعلان جديد ينتظر موافقتكم'
+                      : 'اشتباه تكرار (تشابه ٩٠٪+ مع إعلان قائم)'}
               </p>
             )}
 

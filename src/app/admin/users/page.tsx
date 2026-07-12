@@ -74,7 +74,8 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
     getUserPackageMap(ids),
     getUserRolesMap(ids),
     getBanMap(ids),
-    prisma.users.count({ where: { step: { gt: 0 }, trusted: 0 } }).catch(() => 0),
+    // نفس تعريف «بانتظار الموافقة» في صفحة التوثيق — المرفوض (step=2) لا يُعدّ معلقاً
+    prisma.users.count({ where: { trusted: { not: 1 }, step: { not: 2 }, OR: [{ step: 1 }, { national_identity: { gt: 0 } }, { commercial_register: { gt: 0 } }, { work_permit: { gt: 0 } }] } }).catch(() => 0),
     prisma.name_requests.count({ where: { status: 0 } }).catch(() => 0),
   ]);
 

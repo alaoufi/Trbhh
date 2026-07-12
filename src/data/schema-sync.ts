@@ -231,6 +231,8 @@ const STATEMENTS: string[] = [
   `ALTER TABLE ads ADD COLUMN rent_period VARCHAR(20) NULL`,
   /* تحديث الإعلان (Bump): آخر رفع للأعلى — الترتيب يعتمده عند وجوده. */
   `ALTER TABLE ads ADD COLUMN bumped_at DATETIME NULL`,
+  /* إيقاف من صاحب الإعلان: يميّز الموقوف بإرادته عن المنتظر موافقة الإدارة. */
+  `ALTER TABLE ads ADD COLUMN paused_by_owner TINYINT NOT NULL DEFAULT 0`,
   /* جدولة النشر: يبقى مخفياً حتى هذا الموعد ثم يُنشر تلقائياً. */
   `ALTER TABLE ads ADD COLUMN publish_at DATETIME NULL`,
   /* عرض المتجر (واجهته ومنتجاته) في رئيسية تربح حتى هذا التاريخ (NULL = بقرار إداري دائم). */

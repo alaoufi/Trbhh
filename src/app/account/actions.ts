@@ -47,7 +47,9 @@ export async function toggleAdStatusAction(formData: FormData) {
   const adId = BigInt(String(formData.get('adId')));
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (ad && toInt(ad.user_id) === session.uid) {
-    await prisma.ads.update({ where: { id: adId }, data: { status: ad.status === 1 ? 0 : 1 } });
+    // الإيقاف من العضو يُعلَّم paused_by_owner حتى لا يختلط بطلبات الموافقة عند الإدارة
+    const pausing = ad.status === 1;
+    await prisma.ads.update({ where: { id: adId }, data: { status: pausing ? 0 : 1, paused_by_owner: pausing ? 1 : 0 } });
     const { bustAdCaches } = await import('@/lib/data');
     await bustAdCaches().catch(() => {}); // يظهر/يختفي فوراً في القوائم
   }

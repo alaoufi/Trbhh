@@ -64,7 +64,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 <div className="flex shrink-0 gap-1">
                   {ad.special && <Badge variant="special">مميّز</Badge>}
                   {ad.urgentUntil && new Date(ad.urgentUntil).getTime() > now && <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>}
-                  <Badge variant={ad.status === 1 ? 'trusted' : 'special'}>{ad.status === 1 ? 'نشط' : ad.publishAt ? `مجدول: ${fmtDay(ad.publishAt)}` : 'بانتظار الموافقة'}</Badge>
+                  <Badge variant={ad.status === 1 ? 'trusted' : 'special'}>{ad.status === 1 ? 'نشط' : ad.pausedByOwner ? 'موقوف (أوقفته أنت)' : ad.publishAt ? `مجدول: ${fmtDay(ad.publishAt)}` : 'بانتظار الموافقة'}</Badge>
                 </div>
               </div>
               <span className="text-sm font-bold text-primary">{formatPrice(ad.price, 'ر.س', ad.adsType)}</span>
@@ -74,7 +74,9 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
               </span>
               {ad.status !== 1 && (
                 <span className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold leading-4 text-amber-700">
-                  سبب عدم الظهور: الإعلان <b>موقوف/بانتظار الموافقة</b> — غالباً لتشابهه مع إعلان قائم (٩٠٪+) أو تفعيل مراجعة الإعلانات. اضغط <b>«تفعيل»</b> لعرضه فوراً، أو احذف النسخة المكرّرة.
+                  {ad.pausedByOwner
+                    ? <>سبب عدم الظهور: <b>أوقفته أنت</b> — اضغط <b>«تفعيل»</b> ليعود للعرض فوراً.</>
+                    : <>سبب عدم الظهور: الإعلان <b>بانتظار الموافقة</b> — غالباً لتشابهه مع إعلان قائم (٩٠٪+) أو تفعيل مراجعة الإعلانات. اضغط <b>«تفعيل»</b> لعرضه فوراً، أو احذف النسخة المكرّرة.</>}
                 </span>
               )}
               {ad.special && ad.expiresAt && (

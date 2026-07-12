@@ -24,9 +24,10 @@ export async function adminStats() {
     prisma.users.count(),
     prisma.ads.count(),
     prisma.ads.count({ where: { status: 1, state: 'active' } }),
-    // "بانتظار الموافقة" = غير منشور (status 0) وغير مؤرشف — نفس تعريف تبويب الإعلانات
-    prisma.ads.count({ where: { status: 0, OR: [{ data_archive: null }, { data_archive: '' }] } }),
-    prisma.users.count({ where: { step: { gt: 0 }, trusted: 0 } }),
+    // "بانتظار الموافقة" = غير منشور (status 0) وغير مؤرشف وليس موقوفاً من صاحبه — نفس تعريف تبويب الإعلانات
+    prisma.ads.count({ where: { status: 0, paused_by_owner: 0, OR: [{ data_archive: null }, { data_archive: '' }] } }),
+    // توثيق معلّق = نفس تعريف تبويب «بانتظار الموافقة» في صفحة التوثيق: ليس موثقاً وليس مرفوضاً (step=2 يعني مرفوضاً)
+    prisma.users.count({ where: { trusted: { not: 1 }, step: { not: 2 }, OR: [{ step: 1 }, { national_identity: { gt: 0 } }, { commercial_register: { gt: 0 } }, { work_permit: { gt: 0 } }] } }),
     prisma.repord_ads.count(),
     prisma.debates.count(),
     findDuplicateAds().then((r) => r.dupCount).catch(() => 0),

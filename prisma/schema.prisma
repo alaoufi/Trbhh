@@ -46,6 +46,7 @@ model ads {
   urgent_until     DateTime?      @db.DateTime(0)
   bumped_at        DateTime?      @db.DateTime(0)
   publish_at       DateTime?      @db.DateTime(0)
+  paused_by_owner  Int            @default(0) @db.TinyInt
   stock_state      Int            @default(0) @db.TinyInt
   old_price        Float          @default(0)
   rent_period      String?        @db.VarChar(20)

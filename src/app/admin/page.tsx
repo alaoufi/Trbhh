@@ -2,6 +2,7 @@ import Link from 'next/link';
 import {
   Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles, Crown,
   MonitorPlay, ShieldAlert, Mail, BookOpen, LayoutGrid, KeyRound, Ban, Settings, Database, Smartphone, Store,
+  HandCoins, Coins, ScrollText, Zap,
 } from 'lucide-react';
 import { adminStats } from '@/lib/admin';
 import { getPackages } from '@/lib/packages';
@@ -20,6 +21,7 @@ const GROUPS: { key: string; label: string }[] = [
   { key: 'ads', label: 'الإعلانات والمحتوى' },
   { key: 'members', label: 'الأعضاء والصلاحيات' },
   { key: 'stores', label: 'إدارة المتاجر' },
+  { key: 'money', label: 'المال والمدفوعات' },
   { key: 'safety', label: 'الحماية والرقابة' },
   { key: 'marketing', label: 'التسويق والباقات' },
   { key: 'system', label: 'النظام والإعدادات' },
@@ -27,9 +29,11 @@ const GROUPS: { key: string; label: string }[] = [
 
 export default async function AdminHome() {
   const session = await requireAnyAdmin();
-  const [s, perms, role, packages, pendingPromos, adminUnread, primaryAdminId] = await Promise.all([
+  const [s, perms, role, packages, pendingPromos, adminUnread, primaryAdminId, pendingTopups, pendingVerifyOrders] = await Promise.all([
     adminStats(), getUserPerms(session.uid), getUserRole(session.uid), getPackages().catch(() => []),
     countPendingPromos().catch(() => 0), countAdminUnread().catch(() => 0), getPrimaryAdminId().catch(() => 0),
+    import('@/lib/prisma').then(({ prisma }) => prisma.wallet_topups.count({ where: { status: 0 } })).catch(() => 0),
+    import('@/lib/verify-paid').then((m) => m.countPendingVerifyOrders().then((r) => r.n)).catch(() => 0),
   ]);
   const isPrimaryAdmin = primaryAdminId === session.uid;
 
@@ -49,6 +53,12 @@ export default async function AdminHome() {
     { group: 'members', label: 'بوّابات التوثيق (SMS/واتساب)', icon: Smartphone, href: '/admin/verification', perm: 'users', nav: true },
     // إدارة المتاجر
     { group: 'stores', label: 'إدارة المتاجر', icon: Store, href: '/admin/stores', perm: 'stores', nav: true },
+    { group: 'stores', label: 'طلبات توثيق متجر (مدفوع)', value: pendingVerifyOrders, icon: ShieldCheck, href: '/admin/stores', highlight: true, perm: 'stores' },
+    // المال والمدفوعات
+    { group: 'money', label: 'طلبات شحن معلقة', value: pendingTopups, icon: HandCoins, href: '/admin/topups', highlight: true, perm: 'users' },
+    { group: 'money', label: 'الإيرادات والتسعير', icon: Coins, href: '/admin/revenue', perm: 'users', nav: true },
+    { group: 'money', label: 'المدفوعات مصنفة', icon: HandCoins, href: '/admin/revenue?tab=payments', perm: 'users', nav: true },
+    { group: 'money', label: 'سجل النشاط', icon: ScrollText, href: '/admin/audit', perm: 'users', nav: true },
     // الحماية والرقابة
     { group: 'safety', label: 'البلاغات', value: s.reports, icon: Flag, href: '/admin/reports', perm: 'reports' },
     { group: 'safety', label: 'سجل الحماية', icon: ShieldAlert, href: '/admin/moderation', perm: 'reports', nav: true },
@@ -64,6 +74,9 @@ export default async function AdminHome() {
     { group: 'system', label: 'دليل الإدارة', icon: BookOpen, href: '/admin/guide', perm: null, nav: true },
   ];
   const visible = allCards.filter((c) => c.perm === null || perms.has(c.perm));
+  // ⚡ ما يحتاج إجراء الآن: كل البنود المعلقة (بعدد > 0) في صف واحد بارز أعلى اللوحة
+  const urgent = visible.filter((c) => c.highlight && (c.value ?? 0) > 0);
+  const urgentLabels = new Set(urgent.map((c) => c.label));
 
   return (
     <div className="space-y-5">
@@ -84,8 +97,26 @@ export default async function AdminHome() {
         </Link>
       )}
 
+      {/* ⚡ يحتاج إجراء الآن — كل الطلبات المعلقة مجموعة في المقدمة */}
+      {urgent.length > 0 && (
+        <section className="space-y-2.5">
+          <h2 className="flex items-center gap-2 text-sm font-extrabold text-amber-700">
+            <span className="h-5 w-1.5 rounded-full bg-gradient-to-b from-amber-500 to-amber-700" />
+            <Zap className="h-4 w-4" /> يحتاج إجراء الآن ({en(urgent.reduce((a, c) => a + (c.value ?? 0), 0))})
+          </h2>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            {urgent.map((c) => (
+              <Link key={c.label} href={c.href} className="flex items-center gap-3 card-3d rounded-xl !border-amber-400 bg-amber-50 p-4 hover:bg-amber-100">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-amber-500 text-white"><c.icon className="h-5 w-5" /></span>
+                <div><div className="text-xl font-bold text-amber-800">{en(c.value ?? 0)}</div><div className="text-xs font-bold text-amber-900">{c.label}</div></div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {GROUPS.map((g) => {
-        const cards = visible.filter((c) => c.group === g.key);
+        const cards = visible.filter((c) => c.group === g.key && !urgentLabels.has(c.label));
         if (!cards.length) return null;
         return (
           <section key={g.key} className="space-y-2.5">

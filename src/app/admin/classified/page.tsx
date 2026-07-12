@@ -31,6 +31,22 @@ function StateChip({ c, globalDays }: { c: AdminClassified; globalDays: number }
 export default async function AdminClassified() {
   await requirePerm('classified');
   const [items, globalDays] = await Promise.all([getAllClassifieds(120), getClassifiedLifetimeDays().catch(() => 0)]);
+  // 💳 هل المبوّب مدفوع وكم؟ نطابق خصومات «إعلان مبوّب» لصاحبه: بالرقم في الملاحظة
+  // (إعادة التفعيل) أو بتقارب وقت الخصم مع وقت إنشاء المبوّب (النشر الأول)
+  const { prisma } = await import('@/lib/prisma');
+  const { toInt } = await import('@/lib/utils');
+  const uids = [...new Set(items.map((c) => c.userId).filter((n): n is number => !!n))];
+  const payTxns = uids.length
+    ? await prisma.wallet_txns.findMany({ where: { reason: 'classified', amount: { lt: 0 }, user_id: { in: uids.map((u) => BigInt(u)) } }, orderBy: { id: 'desc' }, take: 600 }).catch(() => [])
+    : [];
+  const paidOf = (c: (typeof items)[number]): { amount: number; at: Date | null } | null => {
+    const byNote = payTxns.find((t) => (t.note || '').includes(`#${c.id} `) || (t.note || '').endsWith(`#${c.id}`));
+    if (byNote) return { amount: Math.abs(byNote.amount), at: byNote.created_at };
+    if (!c.userId || !c.createdAt) return null;
+    const created = new Date(c.createdAt).getTime();
+    const near = payTxns.find((t) => toInt(t.user_id) === c.userId && t.created_at && Math.abs(t.created_at.getTime() - created) < 10 * 60_000);
+    return near ? { amount: Math.abs(near.amount), at: near.created_at } : null;
+  };
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -68,6 +84,9 @@ export default async function AdminClassified() {
                     {exp
                       ? <span className={exp.getTime() < Date.now() ? 'font-bold text-red-600' : ''}>ينتهي {fmtDate(exp)}{!c.expiresAt && ' (افتراضي)'}</span>
                       : <span>بلا انتهاء</span>}
+                    {(() => { const pay = paidOf(c); return pay
+                      ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-extrabold text-emerald-800">💳 مدفوع {en(pay.amount)} ر.س{pay.at ? ` • ${fmtDate(pay.at)}` : ''}</span>
+                      : <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-bold text-muted-foreground">مجاني — بلا رسوم مسجلة</span>; })()}
                     {c.link && <a href={c.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-primary"><ExternalLink className="h-3 w-3" /> رابط</a>}
                   </div>
                 </div>

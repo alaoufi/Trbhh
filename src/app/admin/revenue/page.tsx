@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks, ReceiptText, Trash2, ArrowRight, Scale, Landmark } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks, ReceiptText, Trash2, ArrowRight, Scale, Landmark, HandCoins } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
@@ -36,14 +36,15 @@ const TABS = [
   { key: 'expenses', label: 'المصروفات', icon: ReceiptText },
   { key: 'accounts', label: 'حسابات الشحن', icon: Landmark },
   { key: 'campaigns', label: 'الحملات', icon: Megaphone },
+  { key: 'payments', label: 'المدفوعات', icon: HandCoins },
   { key: 'pricing', label: 'التسعيرات', icon: ListChecks },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
-export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string; user?: string; camp?: string }> }) {
+export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string; user?: string; camp?: string; cat?: string; ppage?: string }> }) {
   await requireAction('users', 'view');
-  const { saved, tab, user, camp } = await searchParams;
-  const active: TabKey = tab === 'balances' || tab === 'pricing' || tab === 'expenses' || tab === 'accounts' || tab === 'campaigns' ? tab : 'overview';
+  const { saved, tab, user, camp, cat, ppage } = await searchParams;
+  const active: TabKey = tab === 'balances' || tab === 'pricing' || tab === 'expenses' || tab === 'accounts' || tab === 'campaigns' || tab === 'payments' ? tab : 'overview';
   const userId = Number(user || 0) || 0;
 
   return (
@@ -65,6 +66,7 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
       {active === 'expenses' && <ExpensesTab />}
       {active === 'accounts' && <AccountsTab />}
       {active === 'campaigns' && <CampaignsTab camp={camp} />}
+      {active === 'payments' && <PaymentsTab cat={cat} page={Math.max(1, parseInt(ppage || '1') || 1)} />}
       {active === 'pricing' && <PricingTab />}
     </div>
   );
@@ -459,6 +461,76 @@ async function CampaignsTab({ camp }: { camp?: string }) {
       </form>
     </div>
     </>
+  );
+}
+
+/* ===== المدفوعات المصنفة: كل ما دفعه الأعضاء مقابل الخدمات، بفلترة حسب الخدمة ===== */
+const PAY_PAGE = 30;
+async function PaymentsTab({ cat, page }: { cat?: string; page: number }) {
+  const { REASON_LABELS } = await import('@/lib/wallet');
+  const { prisma } = await import('@/lib/prisma');
+  const { toInt } = await import('@/lib/utils');
+  // فئات المدفوعات = أسباب الخصم مقابل خدمة (لا تشمل الشحن/المكافآت/الخصم الإداري)
+  const PAY_REASONS = ['featured', 'urgent', 'bump', 'classified', 'duplicate', 'subscription', 'store_plus', 'store_show', 'ad_show', 'verify_fee', 'lead', 'auction'] as const;
+  const catKey = PAY_REASONS.includes(cat as (typeof PAY_REASONS)[number]) ? (cat as (typeof PAY_REASONS)[number]) : '';
+  // إجمالي وعدد كل فئة (المبالغ سالبة لأنها خصم — نعرض القيمة المطلقة)
+  const sums = await prisma.wallet_txns.groupBy({ by: ['reason'], where: { reason: { in: [...PAY_REASONS] }, amount: { lt: 0 } }, _sum: { amount: true }, _count: { _all: true } }).catch(() => []);
+  const sumBy = new Map(sums.map((g) => [g.reason, { total: Math.abs(g._sum.amount ?? 0), n: g._count._all }]));
+  const grand = [...sumBy.values()].reduce((a, b) => a + b.total, 0);
+  const where = { amount: { lt: 0 }, reason: catKey ? catKey : { in: [...PAY_REASONS] } };
+  const total = await prisma.wallet_txns.count({ where }).catch(() => 0);
+  const pages = Math.max(1, Math.ceil(total / PAY_PAGE));
+  const cur = Math.min(page, pages);
+  const rows = await prisma.wallet_txns.findMany({ where, orderBy: { id: 'desc' }, skip: (cur - 1) * PAY_PAGE, take: PAY_PAGE }).catch(() => []);
+  const uids = [...new Set(rows.map((r) => toInt(r.user_id)))];
+  const users = uids.length ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }).catch(() => []) : [];
+  const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
+  const fmtAt = (d: Date | null) => (d ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d) : '');
+  const chip = (key: string, label: string, totalV: number, n: number) => (
+    <Link key={key || 'all'} href={`/admin/revenue?tab=payments${key ? `&cat=${key}` : ''}`} className={`flex flex-col items-center rounded-xl border-2 px-3 py-1.5 text-center ${catKey === key ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-card text-primary hover:bg-primary/5'}`}>
+      <span className="text-xs font-extrabold">{label}</span>
+      <span className={`text-[11px] font-bold ${catKey === key ? 'text-white/90' : 'text-muted-foreground'}`}>{en(totalV)} ر.س · {en(n)}</span>
+    </Link>
+  );
+  return (
+    <div className="space-y-4">
+      <div className="card-3d space-y-3 rounded-2xl p-4">
+        <div className="flex items-center gap-2 font-bold text-primary"><HandCoins className="h-5 w-5" /> المدفوعات — كل ما دفعه الأعضاء مقابل الخدمات، مصنفاً</div>
+        <p className="text-xs text-muted-foreground">تشمل الخصومات مقابل خدمة فقط (تمييز/عاجل/تحديث/مبوّبة/اشتراكات/عرض/توثيق/مزادات…) — الشحن والمكافآت والخصم الإداري في «الميزانية» و«أرصدة الأعضاء».</p>
+        {/* فلترة بالفئات مع إجمالي وعدد كل فئة */}
+        <div className="flex flex-wrap gap-1.5">
+          {chip('', 'الكل', grand, [...sumBy.values()].reduce((a, b) => a + b.n, 0))}
+          {PAY_REASONS.map((k) => { const v = sumBy.get(k); return v ? chip(k, REASON_LABELS[k], v.total, v.n) : null; })}
+        </div>
+        {rows.length === 0 && <p className="py-6 text-center text-muted-foreground">لا توجد مدفوعات في هذا التصنيف بعد.</p>}
+        {rows.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead><tr className="border-b-2 border-primary/15 text-xs text-muted-foreground"><th className="p-2 text-right">العضو</th><th className="p-2">الخدمة</th><th className="p-2">المبلغ</th><th className="p-2">التاريخ</th><th className="p-2 text-right">التفاصيل</th></tr></thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={String(r.id)} className="border-b border-border/40 text-center last:border-0">
+                    <td className="p-2 text-right"><Link href={`/admin/revenue?tab=balances&user=${toInt(r.user_id)}`} className="font-bold text-primary hover:underline">{nameById.get(toInt(r.user_id)) || `#${toInt(r.user_id)}`}</Link></td>
+                    <td className="p-2"><span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">{REASON_LABELS[r.reason as keyof typeof REASON_LABELS] ?? r.reason}</span></td>
+                    <td className="p-2 font-extrabold text-emerald-700">{en(Math.abs(r.amount))} ر.س</td>
+                    <td className="p-2 text-xs text-muted-foreground">{fmtAt(r.created_at)}</td>
+                    <td className="p-2 text-right text-xs text-muted-foreground">{r.note || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {pages > 1 && (
+          <div className="flex flex-wrap items-center justify-center gap-1 pt-1 text-sm">
+            {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
+              <Link key={n} href={`/admin/revenue?tab=payments${catKey ? `&cat=${catKey}` : ''}&ppage=${n}`} className={`rounded-lg px-2.5 py-1 font-bold ${n === cur ? 'bg-primary text-white' : 'text-primary hover:bg-primary/5'}`}>{en(n)}</Link>
+            ))}
+            <span className="mr-2 text-xs text-muted-foreground">الإجمالي: {en(total)} عملية</span>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

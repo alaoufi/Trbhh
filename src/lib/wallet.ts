@@ -223,6 +223,21 @@ const topupRow = (r: { id: bigint; user_id: bigint; amount: number; receipt: str
   decidedAt: r.decided_at ? r.decided_at.toISOString() : null,
 });
 
+/** فحص فوري لبصمة إيصال جديد قبل إنشاء الطلب: أعلى نسبة تطابق مع إيصالات سابقة (0 = لا تطابق ≥ العتبة). */
+export async function matchReceiptHash(hash: string, threshold = 90): Promise<number> {
+  if (!hash) return 0;
+  await ensure();
+  const pool = await prisma.wallet_topups.findMany({ where: { NOT: { receipt_hash: null } }, orderBy: { id: 'desc' }, take: 600, select: { receipt_hash: true } }).catch(() => []);
+  const { hashSimilarity } = await import('./phash');
+  let best = 0;
+  for (const r of pool) {
+    if (!r.receipt_hash || r.receipt_hash === '-') continue;
+    const pct = hashSimilarity(hash, r.receipt_hash);
+    if (pct > best) best = pct;
+  }
+  return best >= threshold ? best : 0;
+}
+
 /** Member files a top-up request (amount + uploaded receipt path). */
 export async function requestTopup(userId: number, amount: number, receiptRel: string | null, receiptHash = ''): Promise<boolean> {
   await ensure();

@@ -93,7 +93,7 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
             {r.status === 0 && dupMatches.has(r.id) && (() => { const m = dupMatches.get(r.id)!; return (
               <div className="space-y-2 rounded-xl border-2 border-red-400 bg-red-50 p-3">
                 <div className="flex items-center gap-1.5 text-sm font-extrabold text-red-700">
-                  <ShieldAlert className="h-4 w-4" /> إنذار: هذا السند يطابق سند طلب سابق بنسبة {m.pct}٪ — تحقق قبل التأكيد!
+                  <ShieldAlert className="h-4 w-4" /> هذا السند مطابق لسند سابق (نسبة التطابق {m.pct}٪) — تحقق قبل التأكيد!
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-red-800">
                   <span>الطلب المطابق: #{m.id}</span>
@@ -105,8 +105,8 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
                 {m.receipt && (
                   <a href={mediaUrl(m.receipt)} target="_blank" className="block w-fit">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={mediaUrl(m.receipt)} alt="السند المشابه" className="max-h-48 rounded-lg border-2 border-red-300 object-contain" />
-                    <span className="mt-1 block text-center text-[11px] font-bold text-red-700 underline">فتح السند المشابه بالحجم الكامل</span>
+                    <img src={mediaUrl(m.receipt)} alt="السند المطابق" className="max-h-48 rounded-lg border-2 border-red-300 object-contain" />
+                    <span className="mt-1 block text-center text-[11px] font-bold text-red-700 underline">السند المطابق — فتح بالحجم الكامل</span>
                   </a>
                 )}
               </div>
@@ -133,7 +133,7 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
                   <summary className="cursor-pointer list-none px-3 py-2 text-sm font-bold text-red-600">رفض الطلب (مع سبب)…</summary>
                   <form action={rejectTopupAction} className="space-y-2 p-3">
                     <input type="hidden" name="id" value={r.id} />
-                    <textarea name="reason" rows={2} required placeholder="سبب الرفض — يُحفظ ويُرسل للعضو" className="w-full rounded-lg border border-red-300 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-red-300" />
+                    <textarea name="reason" rows={2} required defaultValue={dupMatches.has(r.id) ? 'رفض لتكرار رفع السند' : undefined} placeholder="سبب الرفض — يُحفظ ويُرسل للعضو" className="w-full rounded-lg border border-red-300 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-red-300" />
                     <ConfirmSubmit msg="تأكيد رفض طلب الشحن؟ سيصل العضو رسالة بالسبب المكتوب." className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">رفض وإرسال السبب للعضو</ConfirmSubmit>
                   </form>
                 </details>

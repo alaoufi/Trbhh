@@ -13,7 +13,7 @@ import { CopyChip } from '@/components/copy-chip';
 import { Countdown } from '@/components/countdown';
 import { pointsEnabled, getPoints, getPointsConfig } from '@/lib/points';
 import { mediaUrl } from '@/lib/media';
-import { buyDupPackAction, requestTopupAction, convertPointsAction } from '../actions';
+import { requestTopupAction, convertPointsAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +34,7 @@ const TOPUP_STATUS = {
 
 const TXN_PAGE = 25;
 
-export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string; pts?: string }> }) {
+export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string; pts?: string; dupr?: string; r?: string; a?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page || '1') || 1);
@@ -153,6 +153,21 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           </div>
         )}
         {topupInfo && <p className="rounded-lg bg-primary/5 p-2.5 text-xs font-medium text-foreground/80">{topupInfo}</p>}
+        {/* ⚠️ السند مطابق لسند مرفوع من قبل — العضو يقرر: إرسال أو إلغاء */}
+        {sp.dupr && sp.r && sp.a && (
+          <div className="space-y-2 rounded-xl border-2 border-red-400 bg-red-50 p-3">
+            <div className="text-sm font-extrabold leading-6 text-red-700">⚠️ هذا السند مطابق بنسبة {sp.dupr}٪ لسند سابق — يظهر أن هناك خطأ… تأكد قبل الإرسال.</div>
+            <div className="flex items-center gap-2">
+              <form action={requestTopupAction} className="flex-1">
+                <input type="hidden" name="confirmdup" value="1" />
+                <input type="hidden" name="rel" value={sp.r} />
+                <input type="hidden" name="amount" value={sp.a} />
+                <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">إرسال</button>
+              </form>
+              <Link href="/account/wallet#topup" className="flex-1 rounded-lg border-2 border-primary/25 bg-white px-4 py-2 text-center text-sm font-bold text-muted-foreground hover:bg-secondary">إلغاء</Link>
+            </div>
+          </div>
+        )}
         <form action={requestTopupAction} className="space-y-2">
           <label className="block space-y-1">
             <span className="text-sm font-medium">المبلغ (ر.س)</span>
@@ -185,29 +200,6 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           </div>
         )}
       </div>
-
-      {/* باقات التكرار — نشر الإعلان المكرّر عدداً من المرّات (السعر حسب المدّة) */}
-      {(serviceHasPrice(pricing.dup3) || serviceHasPrice(pricing.dup5)) && (
-        <div className="card-3d space-y-2 rounded-2xl p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 font-bold text-primary"><Copy className="h-5 w-5" /> باقات التكرار</div>
-            <div className="text-sm font-bold">المتبقّي: <b className="text-primary">{dupCredit}</b> نشرة</div>
-          </div>
-          <p className="text-xs text-muted-foreground">تتيح نشر إعلان مكرّر عدداً من المرّات (تُخصم نشرة عند كل نشر مكرّر). اختر المدّة ثم اشترِ.</p>
-          <div className="grid grid-cols-2 gap-2">
-            {([['3', pricing.dup3], ['5', pricing.dup5]] as const).filter(([, p]) => serviceHasPrice(p)).map(([tier, p]) => (
-              <form key={tier} action={buyDupPackAction} className="flex flex-col items-center gap-1 rounded-xl border p-3 text-center">
-                <input type="hidden" name="tier" value={tier} />
-                <div className="text-sm font-bold">مكرّر {tier} <span className="text-[11px] text-muted-foreground">({tier} نشرات)</span></div>
-                <select name="duration" className="h-9 w-full rounded-lg border bg-background px-2 text-xs">
-                  {DURATIONS.filter((d) => p[d.key] > 0).map((d) => <option key={d.key} value={d.key}>{d.label} — {p[d.key]} ر.س</option>)}
-                </select>
-                <ConfirmSubmit msg="تأكيد شراء الباقة المختارة؟ يُخصم السعر من رصيدك فوراً." className="w-full rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">شراء</ConfirmSubmit>
-              </form>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* أسعار الخدمات — جدول واضح (خدمة × مدّة) مفصول تماماً عن شحن الرصيد */}
       {(serviceHasPrice(pricing.featured) || serviceHasPrice(pricing.classified) || serviceHasPrice(pricing.dup3) || serviceHasPrice(pricing.dup5)) && (

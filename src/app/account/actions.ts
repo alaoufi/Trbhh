@@ -78,15 +78,34 @@ export async function requestTopupAction(formData: FormData) {
   const session = await requireUser();
   const amount = Math.round(Number(formData.get('amount') || 0));
   if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) redirect('/account/wallet?error=topupamount');
-  const file = formData.get('receipt');
-  if (!(file instanceof File) || file.size === 0) redirect('/account/wallet?error=topupreceipt');
-  if (file.size > 8 * 1024 * 1024) redirect('/account/wallet?error=topupreceipt');
-  const { saveUpload } = await import('@/lib/storage');
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
-  const buf = Buffer.from(await file.arrayBuffer());
-  const rel = await saveUpload(buf, `topup_${session.uid}_${Date.now()}.${ext}`);
-  // بصمة الإيصال (aHash) — لكشف السند المكرر عند الإدارة قبل التأكيد
+  const confirmDup = String(formData.get('confirmdup') || '') === '1';
+  let rel: string;
+  let buf: Buffer;
+  if (confirmDup) {
+    // تأكيد الإرسال بعد تحذير التطابق: الملف محفوظ مسبقاً — نتحقق أنه ملف هذا العضو نفسه
+    rel = String(formData.get('rel') || '');
+    if (!rel.startsWith(`uploads/topup_${session.uid}_`)) redirect('/account/wallet?error=topupreceipt');
+    const { readLocal } = await import('@/lib/storage');
+    const b = await readLocal(rel);
+    if (!b) redirect('/account/wallet?error=topupreceipt');
+    buf = b;
+  } else {
+    const file = formData.get('receipt');
+    if (!(file instanceof File) || file.size === 0) redirect('/account/wallet?error=topupreceipt');
+    if (file.size > 8 * 1024 * 1024) redirect('/account/wallet?error=topupreceipt');
+    const { saveUpload } = await import('@/lib/storage');
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
+    buf = Buffer.from(await file.arrayBuffer());
+    rel = await saveUpload(buf, `topup_${session.uid}_${Date.now()}.${ext}`);
+  }
+  // بصمة الإيصال (aHash) — لكشف السند المكرر
   const receiptHash = await import('@/lib/phash').then((m) => m.aHash(buf)).catch(() => '');
+  // تحذير مسبق للعضو: السند مطابق لسند مرفوع من قبل — يقرر الإرسال أو الإلغاء
+  if (!confirmDup && receiptHash) {
+    const { matchReceiptHash } = await import('@/lib/wallet');
+    const pct = await matchReceiptHash(receiptHash).catch(() => 0);
+    if (pct > 0) redirect(`/account/wallet?dupr=${pct}&r=${encodeURIComponent(rel)}&a=${amount}#topup`);
+  }
   const { requestTopup } = await import('@/lib/wallet');
   const ok = await requestTopup(session.uid, amount, rel, receiptHash);
   revalidatePath('/account/wallet');

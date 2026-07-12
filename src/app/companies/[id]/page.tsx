@@ -275,6 +275,16 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
               )}
               {wa && <StoreContactLink storeId={storeId} kind="whatsapp" href={wa} target="_blank"><Button variant="whatsapp"><MessageCircle className="h-4 w-4" /> واتساب</Button></StoreContactLink>}
               {s.phone && <StoreContactLink storeId={storeId} kind="call" href={`tel:${s.phone}`}><Button variant="outline"><Phone className="h-4 w-4" /> اتصال</Button></StoreContactLink>}
+              {/* مشاركة المتجر — قائمة كل التطبيقات (بجانب واتساب تحت الإحصائيات) */}
+              <span className="flex items-center rounded-lg border bg-white px-3" style={{ color: brand }}>
+                <ShareButtons
+                  url={`https://${SITE.domain}/companies/${storeId}`}
+                  title={`متجر ${name}`}
+                  text={[`متجر ${name} على تربح`, (meta.about || s.description || '').replace(/\s+/g, ' ').trim().slice(0, 120)].filter(Boolean).join('\n')}
+                  compact
+                  card={{ url: `https://${SITE.domain}/companies/${storeId}`, title: `متجر ${name}`, city: meta.specialty || '', image: s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '/apple-icon.png' }}
+                />
+              </span>
               {canInvite && (
                 <form action={sendCollabAction}>
                   <input type="hidden" name="toStore" value={storeId} />
@@ -342,19 +352,6 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
               {meta.contacts && <div className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90 sm:col-span-2"><Link2 className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr" className="truncate">{meta.contacts}</span></div>}
             </div>
           )}
-          {/* مشاركة المتجر: زر يفتح قائمة كل التطبيقات (كقائمة مشاركة الإعلان) + بطاقة صورة للمتجر
-              (نسخ الرابط وفتحه ضمن القائمة — لا حاجة لصندوق رابط منفصل) */}
-          <div className="flex items-center justify-between gap-2 rounded-xl bg-secondary/30 p-3">
-            <div className="text-sm font-bold" style={{ color: brand }}>📣 شارك المتجر</div>
-            <ShareButtons
-              url={`https://${SITE.domain}/companies/${storeId}`}
-              title={`متجر ${name}`}
-              text={[`🏪 متجر ${name} على تربح`, (meta.about || s.description || '').replace(/\s+/g, ' ').trim().slice(0, 120)].filter(Boolean).join('\n')}
-              compact
-              card={{ url: `https://${SITE.domain}/companies/${storeId}`, title: `متجر ${name}`, city: meta.specialty || '', image: s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '/apple-icon.png' }}
-            />
-          </div>
-
           {/* نقل ملكية المتجر — يبدأ بطلب من المنقول له، ثم موافقة الصاحب الأول، ثم تنفيذ الإدارة */}
           {session && !isOwner && (
             <details className="rounded-xl border border-primary/20 bg-primary/5">

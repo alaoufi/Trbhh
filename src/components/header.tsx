@@ -11,6 +11,7 @@ import { ADMIN_NAV } from '@/components/admin-nav-def';
 import { HeaderSearch } from '@/components/header-search';
 import { HeaderCta } from '@/components/header-cta';
 import { LiveClock } from '@/components/live-clock';
+import { AdminAlertsBanner } from '@/components/admin-alerts-banner';
 
 export async function Header() {
   const session = await getSession();
@@ -33,6 +34,7 @@ export async function Header() {
   const dealsOn = await import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false);
   const auctionsOn = await import('@/lib/settings').then((m) => m.auctionsEnabled()).catch(() => false);
   return (
+    <>
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
@@ -65,5 +67,8 @@ export async function Header() {
         </Link>
       </div>
     </header>
+    {/* 🔔 تنبيه إداري عالمي: يظهر لأي إداري في كل صفحة حتى تُعالَج الطلبات المعلقة */}
+    {admin && <AdminAlertsBanner />}
+    </>
   );
 }

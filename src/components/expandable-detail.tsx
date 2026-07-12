@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 /**
- * تفاصيل الإعلان: صندوق ثلاثي الأبعاد عصري يعرض 3 أسطر مع تلاشٍ سفلي —
+ * تفاصيل الإعلان: صندوق ثلاثي الأبعاد عصري يعرض حتى 6 أسطر مع تلاشٍ سفلي —
  * الضغط على الصندوق كاملاً يُبرز النص كاملاً في لوحة منبثقة بارزة تنزلق من
  * الأسفل، تُسحب بالمقبض لأعلى ولأسفل، وتُغلق بسحبها للأسفل أو بالضغط خارجها.
  */
@@ -14,7 +14,7 @@ export function ExpandableDetail({ text }: { text: string }) {
   const pRef = useRef<HTMLParagraphElement>(null);
   const startY = useRef<number | null>(null);
 
-  // زر/تلميح «العرض الكامل» يظهر فقط إن كان النص أطول من 3 أسطر فعلاً
+  // زر/تلميح «العرض الكامل» يظهر فقط إن كان النص أطول من 6 أسطر فعلاً
   useEffect(() => {
     const el = pRef.current;
     if (el) setClamped(el.scrollHeight > el.clientHeight + 2);
@@ -54,12 +54,16 @@ export function ExpandableDetail({ text }: { text: string }) {
         <span className="flex items-center gap-2 border-b border-primary/10 bg-primary/5 px-4 py-2">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/15 text-sm shadow-inner">📄</span>
           <span className="text-sm font-extrabold text-primary">التفاصيل</span>
-          {clamped && <span className="mr-auto rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-bold text-white shadow group-hover:bg-primary/90">اضغط للعرض الكامل ⌄</span>}
         </span>
         <span className="relative block px-4 py-3">
-          <p ref={pRef} className="line-clamp-3 whitespace-pre-line leading-7 text-foreground/90">{text}</p>
-          {/* تلاشٍ سفلي يوحي بوجود بقية النص */}
-          {clamped && <span className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-card to-transparent" />}
+          <p ref={pRef} className="line-clamp-6 whitespace-pre-line leading-7 text-foreground/90">{text}</p>
+          {/* تلاشٍ سفلي يوحي بوجود بقية النص + «اضغط للمزيد» تحت يسار */}
+          {clamped && <span className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-card to-transparent" />}
+          {clamped && (
+            <span className="absolute bottom-1.5 left-3 rounded-full bg-primary px-3 py-1 text-[11px] font-bold text-white shadow-lg group-hover:bg-primary/90">
+              اضغط للمزيد ⌄
+            </span>
+          )}
         </span>
       </Box>
 

@@ -98,6 +98,24 @@ export async function saveCompanyAction(formData: FormData) {
     const clash = await findSimilarStoreName(session.uid, storeName);
     if (clash) redirect(`/store?error=namedup&other=${clash.id}&othername=${encodeURIComponent(clash.name.slice(0, 60))}&want=${encodeURIComponent(storeName.slice(0, 120))}`);
   }
+  // تعديل اسم متجر قائم = بطلب وموافقة إدارة المتاجر (أول تسمية تُحفظ مباشرة):
+  // يُنشأ طلب تغيير الاسم ويبقى الاسم الحالي حتى الموافقة — بقية الإعدادات تُحفظ عادي
+  const currentStore = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { store_name: true } }).catch(() => null);
+  const currentName = (currentStore?.store_name || '').trim();
+  let effectiveName = storeName;
+  let nameRequestFlag: '' | '1' | 'dup' = '';
+  if (currentName && storeName && storeName !== currentName) {
+    effectiveName = currentName; // لا يتغيّر إلا بموافقة الإدارة
+    const pendingReq = await prisma.name_requests.findFirst({ where: { user_id: BigInt(session.uid), kind: 'store', status: 0 } }).catch(() => null);
+    if (pendingReq) {
+      nameRequestFlag = 'dup';
+    } else {
+      await prisma.name_requests.create({
+        data: { user_id: BigInt(session.uid), kind: 'store', old_name: currentName, new_name: storeName.slice(0, 120), reason: 'طلب تعديل اسم المتجر (بموافقة إدارة المتاجر)' },
+      }).catch(() => {});
+      nameRequestFlag = '1';
+    }
+  }
 
   let logoId: number | undefined;
   const logo = formData.get('logo');
@@ -122,9 +140,11 @@ export async function saveCompanyAction(formData: FormData) {
     const { startStoreTrial } = await import('@/lib/subscription');
     await startStoreTrial(session.uid);
   }
-  await saveStoreMeta(session.uid, { storeName, color, about, banner, tagline, layout, catalog, fields, since, specialty, audience, nationalId, phone, email, contacts });
+  await saveStoreMeta(session.uid, { storeName: effectiveName, color, about, banner, tagline, layout, catalog, fields, since, specialty, audience, nationalId, phone, email, contacts });
   if (handle || existing) await setStoreHandle(session.uid, handle);
   revalidatePath('/store');
+  // طُلب تغيير الاسم؟ نعود للوحة المتجر برسالة توضح حالة الطلب
+  if (nameRequestFlag) redirect(`/store?nreq=${nameRequestFlag}`);
   // land the merchant on their own (independent) store page
   const mine = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true } });
   redirect(mine ? `/companies/${toInt(mine.id)}` : '/store');

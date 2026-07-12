@@ -21,8 +21,8 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string }> }) {
-  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus, staff, other, othername, want, exc, mm } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string }> }) {
+  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
@@ -73,6 +73,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const warnings = store ? await getStoreWarnings(store.id) : [];
   // رسائل غير مقروءة (من عملاء متجره وغيرهم) — تنبيه أول ما يفتح لوحته
   const unreadChats = store ? await prisma.chats.count({ where: { reciver_id: session.uid, is_read: 0 } }).catch(() => 0) : 0;
+  // طلب تغيير اسم المتجر المعلّق (بموافقة إدارة المتاجر)
+  const pendingNameReq = store ? await prisma.name_requests.findFirst({ where: { user_id: BigInt(session.uid), kind: 'store', status: 0 }, select: { new_name: true } }).catch(() => null) : null;
   const myActiveAds = store ? (await getMyAds(session.uid)).filter((a) => a.status === 1) : [];
   const inStore = new Set(store ? await storeProductAdIds(store.id) : []);
   // مشاهدات المتجر = عدد مرّات دخول/تحديث صفحة المتجر (مشاهدة واحدة لكل زيارة)
@@ -167,6 +169,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </div>
       )}
       {exc === '1' && <div className="card-3d rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ أُرسل طلب الاستثناء للإدارة — ستصلك رسالة بالموافقة أو الرفض، وعند الموافقة يُطبَّق الاسم تلقائياً.</div>}
+      {nreq === '1' && <div className="card-3d rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ حُفظت إعداداتك، وطلب تغيير اسم المتجر أُرسل لإدارة المتاجر — يبقى الاسم الحالي حتى الموافقة، وتصلك رسالة بالنتيجة.</div>}
+      {nreq === 'dup' && <div className="card-3d rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">حُفظت إعداداتك، لكن لديك طلب تغيير اسم سابق قيد المراجعة — انتظر نتيجته قبل طلب اسم آخر.</div>}
+      {pendingNameReq && nreq !== '1' && (
+        <div className="card-3d rounded-xl border-2 border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-900">⏳ طلب تغيير اسم متجرك إلى «{pendingNameReq.new_name}» قيد مراجعة إدارة المتاجر.</div>
+      )}
       {exc === 'dup' && <div className="card-3d rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">لديك طلب استثناء سابق قيد المراجعة — انتظر نتيجته أولاً.</div>}
 
       {store && meta && (

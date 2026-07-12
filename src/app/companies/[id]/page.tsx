@@ -345,13 +345,15 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           )}
           <CopyLink url={`https://${SITE.domain}/companies/${storeId}`} label="رابط المتجر المباشر" />
 
-          {/* مشاركة المتجر في كل التطبيقات: واتساب/تيليجرام/فيسبوك/تويتر/تيك توك + مشاركة النظام وQR */}
-          <div className="rounded-xl bg-secondary/30 p-3">
-            <div className="mb-2 text-sm font-bold" style={{ color: brand }}>📣 شارك المتجر</div>
+          {/* مشاركة المتجر: زر يفتح قائمة كل التطبيقات (كقائمة مشاركة الإعلان) + بطاقة صورة للمتجر */}
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-secondary/30 p-3">
+            <div className="text-sm font-bold" style={{ color: brand }}>📣 شارك المتجر</div>
             <ShareButtons
               url={`https://${SITE.domain}/companies/${storeId}`}
               title={`متجر ${name}`}
               text={[`🏪 متجر ${name} على تربح`, (meta.about || s.description || '').replace(/\s+/g, ' ').trim().slice(0, 120)].filter(Boolean).join('\n')}
+              compact
+              card={{ url: `https://${SITE.domain}/companies/${storeId}`, title: `متجر ${name}`, city: meta.specialty || '', image: s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '/apple-icon.png' }}
             />
           </div>
 

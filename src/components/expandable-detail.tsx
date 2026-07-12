@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 /**
  * تفاصيل الإعلان: صندوق ثلاثي الأبعاد عصري يعرض حتى 6 أسطر مع تلاشٍ سفلي —
  * الضغط على الصندوق كاملاً يُبرز النص كاملاً في لوحة منبثقة بارزة تنزلق من
- * الأسفل، تُسحب بالمقبض لأعلى ولأسفل، وتُغلق بسحبها للأسفل أو بالضغط خارجها.
+ * الأسفل، تُسحب بالمقبض لأعلى ولأسفل، وتُغلق بالضغط في أي مكان بالصفحة أو بسحبها للأسفل.
  */
 export function ExpandableDetail({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
@@ -72,7 +72,6 @@ export function ExpandableDetail({ text }: { text: string }) {
           <div
             className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border-2 border-primary/20 bg-card shadow-[0_-12px_40px_rgba(0,0,0,0.35)]"
             style={{ transform: `translateY(${dragY}px)`, transition: startY.current === null ? 'transform 200ms ease' : 'none' }}
-            onClick={(e) => e.stopPropagation()}
           >
             {/* مقبض السحب: اسحبه للأسفل لإغلاق اللوحة */}
             <div

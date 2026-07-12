@@ -3,7 +3,6 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2, Plus, BarChart3, Megaphone, Eye, LogIn } from 'lucide-react';
 import { SITE } from '@/lib/constants';
-import { CopyLink } from '@/components/copy-link';
 import { ShareButtons } from '@/components/share-buttons';
 import { getStore } from '@/lib/stores';
 import { cookies, headers } from 'next/headers';
@@ -343,9 +342,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
               {meta.contacts && <div className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90 sm:col-span-2"><Link2 className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr" className="truncate">{meta.contacts}</span></div>}
             </div>
           )}
-          <CopyLink url={`https://${SITE.domain}/companies/${storeId}`} label="رابط المتجر المباشر" />
-
-          {/* مشاركة المتجر: زر يفتح قائمة كل التطبيقات (كقائمة مشاركة الإعلان) + بطاقة صورة للمتجر */}
+          {/* مشاركة المتجر: زر يفتح قائمة كل التطبيقات (كقائمة مشاركة الإعلان) + بطاقة صورة للمتجر
+              (نسخ الرابط وفتحه ضمن القائمة — لا حاجة لصندوق رابط منفصل) */}
           <div className="flex items-center justify-between gap-2 rounded-xl bg-secondary/30 p-3">
             <div className="text-sm font-bold" style={{ color: brand }}>📣 شارك المتجر</div>
             <ShareButtons

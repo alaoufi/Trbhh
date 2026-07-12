@@ -545,8 +545,16 @@ async function PricingTab() {
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">مكافأة أول شحن (ر.س)</span><input name="topupFirstBonus" type="number" min={0} defaultValue={promo.first} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">هدية التوثيق (ر.س — مرة واحدة)</span><input name="verifyGift" type="number" min={0} defaultValue={verifyGift} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">⭐ رسوم توثيق المتجر (ر.س — 0 = معطّل)</span><input name="verifyFee" type="number" min={0} defaultValue={verifyFeeCfg.fee} className={num} /></label>
-          <label className="space-y-1"><span className="text-xs font-bold">مدة التوثيق المدفوع (أيام)</span><input name="verifyFeeDays" type="number" min={1} defaultValue={verifyFeeCfg.days} className={num} /></label>
+        </div>
+      </div>
+
+      {/* ⭐ التوثيق المدفوع: رسوم + مدة — يطلبها صاحب المتجر وتُخصم عند موافقة إدارة المتاجر */}
+      <div className="rounded-xl border border-sky-300 bg-sky-50/60 p-3">
+        <div className="mb-1 text-xs font-bold text-sky-800">⭐ توثيق المتجر المدفوع (اكتب 0 في الرسوم للتعطيل)</div>
+        <p className="mb-2 text-[11px] text-muted-foreground">يطلبه صاحب المتجر من لوحة متجره، وتُخصم الرسوم من رصيده عند موافقة إدارة المتاجر فقط — والإلغاء يعيد له قيمة الأيام غير المستخدمة.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">رسوم التوثيق (ر.س)</span><input name="verifyFee" type="number" min={0} defaultValue={verifyFeeCfg.fee} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">مدة التوثيق (أيام)</span><input name="verifyFeeDays" type="number" min={1} defaultValue={verifyFeeCfg.days} className={num} /></label>
         </div>
       </div>
 

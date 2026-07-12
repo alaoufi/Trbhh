@@ -1143,6 +1143,7 @@ model users {
   balance                   Int        @default(0)
   dup_credit                Int        @default(0)
   verify_note               String?    @db.VarChar(300) // سبب رفض التوثيق (يبقى محفوظاً)
+  verified_at               DateTime?  @db.DateTime(0)
 
   @@index([ban, ban_until], map: "users_ban")
   points                    Int        @default(0)

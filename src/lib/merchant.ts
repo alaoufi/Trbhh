@@ -70,6 +70,8 @@ export async function addStoreWarning(storeId: number, reason: string): Promise<
 
 export type AdminStore = {
   id: number; userId: number; ownerName: string; storeName: string | null; status: number; createdAt: string | null;
+  ownerTrusted: boolean; ownerVerifiedAt: string | null;
+  subUntil: string | null; onTrial: boolean; showUntil: string | null; homeFeatured: boolean;
   specialty: string | null; audience: string | null; since: string | null;
   phone: string | null; email: string | null; contacts: string | null; nationalId: string | null;
   onPlatform: boolean; termsAgreed: boolean; termsAgreedAt: string | null;
@@ -86,13 +88,14 @@ export async function adminStoreList(): Promise<AdminStore[]> {
   const userIds = [...new Set(rows.map((r) => r.user_id))];
   // one round of grouped queries instead of 4 per store (the old N+1)
   const [users, followRows, reviewRows, adRows, warnRows] = await Promise.all([
-    prisma.users.findMany({ where: { id: { in: userIds.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }),
+    prisma.users.findMany({ where: { id: { in: userIds.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true, trusted: true, verified_at: true } }),
     prisma.store_follows.groupBy({ by: ['store_id'], where: { store_id: { in: ids } }, _count: { _all: true } }).catch(() => []),
     prisma.store_reviews.groupBy({ by: ['store_id'], where: { store_id: { in: ids } }, _avg: { star: true }, _count: { _all: true } }).catch(() => []),
     prisma.ads.groupBy({ by: ['user_id'], where: { user_id: { in: userIds.map((u) => BigInt(u)) }, status: 1 }, _count: { _all: true } }).catch(() => []),
     prisma.store_warnings.findMany({ where: { store_id: { in: ids } }, orderBy: { id: 'desc' } }).catch(() => []),
   ]);
   const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || 'عضو']));
+  const trustById = new Map(users.map((u) => [toInt(u.id), { trusted: u.trusted === 1, at: u.verified_at ? u.verified_at.toISOString() : null }]));
   const followsBy = new Map(followRows.map((f) => [f.store_id, f._count._all]));
   const reviewsBy = new Map(reviewRows.map((f) => [f.store_id, { avg: f._avg.star ? Math.round(Number(f._avg.star) * 10) / 10 : 0, count: f._count._all }]));
   const adsBy = new Map(adRows.map((a) => [toInt(a.user_id), a._count._all]));
@@ -107,6 +110,10 @@ export async function adminStoreList(): Promise<AdminStore[]> {
     return {
       id, userId: r.user_id, ownerName: nameById.get(r.user_id) || 'عضو', storeName: r.store_name ?? null,
       status: r.status, createdAt: r.created_at ? r.created_at.toISOString() : null,
+      ownerTrusted: trustById.get(r.user_id)?.trusted ?? false,
+      ownerVerifiedAt: trustById.get(r.user_id)?.at ?? null,
+      subUntil: r.sub_until ? r.sub_until.toISOString() : null, onTrial: r.on_trial === 1,
+      showUntil: r.show_until ? r.show_until.toISOString() : null, homeFeatured: r.home_featured === 1,
       specialty: r.specialty ?? null, audience: r.audience ?? null, since: r.activity_since ?? null,
       phone: r.store_phone ?? null, email: r.store_email ?? null, contacts: r.contacts ?? null, nationalId: r.national_id ?? null,
       onPlatform: r.show_on_platform === 1, termsAgreed: r.terms_agreed === 1, termsAgreedAt: r.terms_agreed_at ? r.terms_agreed_at.toISOString() : null,

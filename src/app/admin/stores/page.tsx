@@ -39,6 +39,32 @@ function StoreCard({ s }: { s: AdminStore }) {
         </Link>
       </div>
 
+      {/* 📅 تدقيق التواريخ والمميزات: متى فُتح، متى وُثّق صاحبه، وما المدفوع/الممنوح ومتى ينتهي */}
+      <div className="grid gap-1.5 rounded-xl border border-primary/15 bg-primary/5 p-3 text-xs sm:grid-cols-2">
+        <div><span className="text-muted-foreground">📅 تاريخ فتح المتجر: </span><b>{fmtDate(s.createdAt) || '—'}</b></div>
+        <div>
+          <span className="text-muted-foreground">✅ توثيق صاحب المتجر: </span>
+          {s.ownerTrusted
+            ? <b className="text-emerald-700">موثّق{s.ownerVerifiedAt ? ` منذ ${fmtDate(s.ownerVerifiedAt)}` : ' (قديم — بلا تاريخ مسجّل)'}</b>
+            : <b className="text-muted-foreground">غير موثّق</b>}
+        </div>
+        <div>
+          <span className="text-muted-foreground">💳 اشتراك المتجر: </span>
+          {s.subUntil
+            ? <b className={new Date(s.subUntil) > new Date() ? 'text-emerald-700' : 'text-red-600'}>{s.onTrial ? 'تجربة ' : ''}حتى {fmtDate(s.subUntil)}{new Date(s.subUntil) > new Date() ? '' : ' (منتهٍ)'}</b>
+            : <b className="text-muted-foreground">لا اشتراك مسجّل</b>}
+        </div>
+        <div>
+          <span className="text-muted-foreground">🏠 العرض في رئيسية تربح: </span>
+          {s.homeFeatured
+            ? <b className="text-amber-700">بقرار إداري (مجاني دائم)</b>
+            : s.showUntil
+              ? <b className={new Date(s.showUntil) > new Date() ? 'text-emerald-700' : 'text-red-600'}>مدفوع حتى {fmtDate(s.showUntil)}{new Date(s.showUntil) > new Date() ? '' : ' (منتهٍ)'}</b>
+              : <b className="text-muted-foreground">غير معروض</b>}
+        </div>
+        <div className="sm:col-span-2 text-[11px] text-muted-foreground">من وافق ومتى؟ كل قرارات الاعتماد والتوثيق والمنح والعرض تُسجَّل باسم صاحب الصلاحية في <Link href="/admin/audit" className="font-bold text-primary underline">سجل النشاط</Link>.</div>
+      </div>
+
       {/* المعلومات الكاملة */}
       <div className="grid gap-1.5 rounded-xl bg-secondary/30 p-3 text-xs sm:grid-cols-2">
         {s.specialty && <div><span className="text-muted-foreground">التخصّص: </span><b>{s.specialty}</b></div>}

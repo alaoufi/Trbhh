@@ -193,61 +193,82 @@ export async function adminDeleteClassifiedAction(formData: FormData) {
 
 /** Approve or reject a merchant store. */
 export async function approveStoreAction(formData: FormData) {
-  await requireAction('stores', 'edit');
+  const session = await requireAction('stores', 'edit');
   const id = Number(formData.get('storeId'));
   const approve = String(formData.get('action')) === 'approve';
-  if (id) await setStoreStatus(id, approve ? 1 : 2);
+  if (id) {
+    await setStoreStatus(id, approve ? 1 : 2);
+    await logAdmin(session.uid, approve ? 'اعتماد متجر' : 'رفض متجر', `متجر #${id}`);
+  }
   revalidatePath('/admin/stores');
 }
 
 /** Admin asks an approved store to feature its products on the home page. */
 export async function requestStoreHomeAction(formData: FormData) {
-  await requireAction('stores', 'edit');
+  const session = await requireAction('stores', 'edit');
   const id = Number(formData.get('storeId'));
-  if (id) await adminRequestHome(id);
+  if (id) {
+    await adminRequestHome(id);
+    await logAdmin(session.uid, 'عرض متجر بالرئيسية (قرار إداري)', `متجر #${id}`);
+  }
   revalidatePath('/admin/stores');
 }
 
 /** Suspend (stop) or reactivate a store. */
 export async function toggleStoreStatusAction(formData: FormData) {
-  await requireAction('stores', 'suspend');
+  const session = await requireAction('stores', 'suspend');
   const id = Number(formData.get('storeId'));
   const suspend = String(formData.get('action')) === 'suspend';
-  if (id) await setStoreStatus(id, suspend ? 2 : 1);
+  if (id) {
+    await setStoreStatus(id, suspend ? 2 : 1);
+    await logAdmin(session.uid, suspend ? 'إيقاف متجر' : 'إعادة تفعيل متجر', `متجر #${id}`);
+  }
   revalidatePath('/admin/stores');
 }
 
 /** Issue a violation warning against a store (3 warnings → auto-suspend). */
 export async function warnStoreAction(formData: FormData) {
-  await requireAction('stores', 'edit');
+  const session = await requireAction('stores', 'edit');
   const id = Number(formData.get('storeId'));
   const reason = String(formData.get('reason') || '').trim();
-  if (id && reason) await addStoreWarning(id, reason);
+  if (id && reason) {
+    await addStoreWarning(id, reason);
+    await logAdmin(session.uid, 'إنذار متجر', `متجر #${id}`, reason);
+  }
   revalidatePath('/admin/stores');
 }
 
 /** Delete a store (store-scoped only; the owner's account and ads are untouched). */
 export async function deleteStoreAction(formData: FormData) {
-  await requireAction('stores', 'delete');
+  const session = await requireAction('stores', 'delete');
   const id = Number(formData.get('storeId'));
-  if (id && formData.get('confirm')) await deleteStore(id);
+  if (id && formData.get('confirm')) {
+    await deleteStore(id);
+    await logAdmin(session.uid, 'حذف متجر', `متجر #${id}`);
+  }
   revalidatePath('/admin/stores');
 }
 
 /** Admin approves/rejects a merchant's request to feature products on Trbhh. */
 export async function decidePlatformAction(formData: FormData) {
-  await requireAction('stores', 'edit');
+  const session = await requireAction('stores', 'edit');
   const id = Number(formData.get('storeId'));
   const approve = String(formData.get('action')) === 'approve';
-  if (id) await decidePlatformRequest(id, approve);
+  if (id) {
+    await decidePlatformRequest(id, approve);
+    await logAdmin(session.uid, approve ? 'اعتماد عرض منتجات متجر' : 'رفض عرض منتجات متجر', `متجر #${id}`);
+  }
   revalidatePath('/admin/stores');
 }
 
 /** Admin executes a mutually-consented ownership transfer (step 3). */
 export async function completeStoreTransferAction(formData: FormData) {
-  await requireAction('stores', 'edit');
+  const session = await requireAction('stores', 'edit');
   const id = Number(formData.get('storeId'));
-  if (id && formData.get('confirm')) await completeStoreTransfer(id);
+  if (id && formData.get('confirm')) {
+    await completeStoreTransfer(id);
+    await logAdmin(session.uid, 'تنفيذ نقل ملكية متجر', `متجر #${id}`);
+  }
   revalidatePath('/admin/stores');
 }
 
@@ -573,12 +594,13 @@ export async function adminSetStoreSubAction(formData: FormData) {
 
 /** Admin grants extra free days to a store (extend trial / comp time). */
 export async function grantStoreDaysAction(formData: FormData) {
-  await requireAction('stores', 'edit');
+  const session = await requireAction('stores', 'edit');
   const storeId = toInt(BigInt(String(formData.get('storeId') || '0')));
   const days = Math.max(1, parseInt(String(formData.get('days') || '0')) || 0);
   if (storeId && days) {
     const { adminGrantStoreDays } = await import('@/lib/subscription');
     await adminGrantStoreDays(storeId, days);
+    await logAdmin(session.uid, 'منح أيام مجانية لمتجر', `متجر #${storeId}`, `${days} يوم`);
   }
   revalidatePath('/admin/stores');
   redirect('/admin/stores?granted=1');
@@ -671,10 +693,15 @@ export async function restoreBackupAction(formData: FormData) {
 }
 
 export async function trustUserAction(formData: FormData) {
-  await requireAction('verifications', 'edit');
+  const session = await requireAction('verifications', 'edit');
   const id = BigInt(String(formData.get('userId')));
   const u = await prisma.users.findUnique({ where: { id } });
-  if (u) await prisma.users.update({ where: { id }, data: { trusted: u.trusted === 1 ? 0 : 1, step: 0 } });
+  if (u) {
+    const granting = u.trusted !== 1;
+    // تاريخ التوثيق + تسجيل من وثّق/ألغى في سجل النشاط (للتدقيق)
+    await prisma.users.update({ where: { id }, data: { trusted: granting ? 1 : 0, step: 0, verified_at: granting ? new Date() : null } });
+    await logAdmin(session.uid, granting ? 'توثيق عضو (زر سريع)' : 'إلغاء توثيق عضو', `العضو #${toInt(id)}`);
+  }
   revalidatePath('/admin/users');
   revalidatePath('/admin/verifications');
 }
@@ -822,7 +849,7 @@ export async function approveVerificationAction(formData: FormData) {
   const session = await requireAction('verifications', 'edit');
   const id = Number(formData.get('userId') || 0);
   if (!id) return;
-  await prisma.users.update({ where: { id: BigInt(id) }, data: { trusted: 1, step: 0, verify_note: null } }).catch(() => {});
+  await prisma.users.update({ where: { id: BigInt(id) }, data: { trusted: 1, step: 0, verify_note: null, verified_at: new Date() } }).catch(() => {});
   const { SETTING_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_OK } = await import('@/lib/settings');
   await sendVerifyMessage(id, SETTING_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_OK);
   // هدية التوثيق (إن فُعّلت من الإيرادات) — مرة واحدة لكل عضو

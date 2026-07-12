@@ -112,7 +112,7 @@ export default async function AdminVerifications({ searchParams }: { searchParam
                   <div className="flex items-center gap-1 font-extrabold text-primary">{u.name || u.userName || '—'}{u.trusted === 1 && <BadgeCheck className="h-4 w-4" />}</div>
                   <div className="text-xs text-muted-foreground" dir="ltr">{u.phoneNumber} · {timeAgo(u.created_at)}</div>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-bold ${st.cls}`}>{st.label}</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-bold ${st.cls}`}>{st.label}{st.key === 'approved' && u.verified_at ? ` · منذ ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(u.verified_at)}` : ''}</span>
               </div>
 
               <div className="space-y-3 p-4">

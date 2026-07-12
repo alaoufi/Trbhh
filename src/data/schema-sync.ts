@@ -220,6 +220,8 @@ const STATEMENTS: string[] = [
   `ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`,
   `CREATE INDEX users_ban ON users (ban, ban_until)`,
   `ALTER TABLE users ADD COLUMN verify_note VARCHAR(300) NULL`,
+  /* تاريخ التوثيق: متى مُنح العضو شارة موثّق (للتدقيق). */
+  `ALTER TABLE users ADD COLUMN verified_at DATETIME NULL`,
   /* ---- wallet / credit (رصيد) ---- */
   /* عزل إعلانات المتاجر: علامة store_only تُنشأ مع إعلان المتجر فلا يظهر في قوائم تربح إطلاقاً. */
   `ALTER TABLE ads ADD COLUMN store_only TINYINT NOT NULL DEFAULT 0`,

@@ -8,7 +8,7 @@ import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction, addStoreStaffAction, removeStoreStaffAction, requestStoreNameExceptionAction } from '@/app/account/company/actions';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction, addStoreStaffAction, removeStoreStaffAction, requestStoreNameExceptionAction, storeMessageMemberAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
 import { getStoreSubPricing } from '@/lib/settings';
 import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen, DatabaseBackup } from 'lucide-react';
@@ -21,8 +21,8 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string }> }) {
-  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus, staff, other, othername, want, exc } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string }> }) {
+  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus, staff, other, othername, want, exc, mm } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
@@ -112,6 +112,24 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           <span className="flex-1 text-sm font-bold text-sky-900">لديك {unreadChats} رسالة جديدة (من عملاء متجرك وغيرهم) — اضغط للرد من رسائلك</span>
           <span className="shrink-0 rounded-full bg-sky-500 px-2.5 py-1 text-xs font-extrabold text-white">{unreadChats}</span>
         </Link>
+      )}
+
+      {/* ✉️ مراسلة عضو من داخل المتجر — برقم جواله، تصله باسم المتجر */}
+      {store && (
+        <details className="card-3d rounded-xl">
+          <summary className="cursor-pointer list-none p-3 text-sm font-bold text-primary">✉️ مراسلة عضو (من متجرك — برقم جواله)…</summary>
+          <div className="space-y-2 border-t border-primary/10 p-3">
+            {mm === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ أُرسلت رسالتك للعضو باسم متجرك — ردّه يصلك في «رسائلي».</p>}
+            {mm === 'nouser' && <p className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">لا يوجد عضو مسجّل بهذا الرقم.</p>}
+            {mm === 'blocked' && <p className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">الرسالة تحتوي محتوى غير مسموح ولم تُرسل.</p>}
+            {mm === 'err' && <p className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">أكمل رقم الجوال ونص الرسالة.</p>}
+            <form action={storeMessageMemberAction} className="space-y-2">
+              <input name="phone" type="tel" required placeholder="جوال العضو (05xxxxxxxx)" className="h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" dir="ltr" />
+              <textarea name="message" required rows={2} maxLength={1500} placeholder="رسالتك — تصل العضو باسم متجرك…" className="w-full rounded-lg border bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+              <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إرسال</button>
+            </form>
+          </div>
+        </details>
       )}
 
       {error === 'terms' && (

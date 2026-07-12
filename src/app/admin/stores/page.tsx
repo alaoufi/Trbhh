@@ -3,7 +3,7 @@ import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone
 import { requireAction } from '@/lib/roles';
 import { getPendingStores, adminStoreList, approvedTransfers, platformRequests, type AdminStore } from '@/lib/merchant';
 import { timeAgo } from '@/lib/utils';
-import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction } from '../actions';
+import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction, adminMessageStoreOwnerAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتاجر' };
@@ -110,6 +110,13 @@ function StoreCard({ s }: { s: AdminStore }) {
         <button className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white"><ShieldAlert className="h-3.5 w-3.5" /> إنذار</button>
       </form>
 
+      {/* ✉️ رسالة رسمية من إدارة المتاجر لصاحب المتجر — تصله في «الرسائل» باسم الإدارة */}
+      <form action={adminMessageStoreOwnerAction} className="flex items-center gap-2 rounded-xl border-2 border-sky-200 bg-sky-50/40 p-2">
+        <input type="hidden" name="storeId" value={s.id} />
+        <input name="message" required maxLength={1000} placeholder="✉️ رسالة رسمية من إدارة المتاجر لصاحب المتجر…" className="h-9 min-w-0 flex-1 rounded-lg border bg-white px-2 text-xs outline-none" />
+        <button className="flex shrink-0 items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white">إرسال رسمي</button>
+      </form>
+
       {/* حذف المتجر (مطويّ لتفادي الحذف العرضي) — لا يمسّ حساب العضو ولا إعلاناته */}
       <details className="rounded-xl border border-destructive/30">
         <summary className="cursor-pointer list-none px-3 py-2 text-xs font-bold text-destructive">حذف المتجر…</summary>
@@ -126,12 +133,14 @@ function StoreCard({ s }: { s: AdminStore }) {
   );
 }
 
-export default async function AdminStores() {
+export default async function AdminStores({ searchParams }: { searchParams: Promise<{ msg?: string }> }) {
   await requireAction('stores', 'view');
+  const { msg } = await searchParams;
   const [pending, stores, transfers, platformReqs] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers(), platformRequests()]);
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold text-primary">إدارة المتاجر</h1></div>
+      {msg === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ أُرسلت الرسالة الرسمية لصاحب المتجر — تصله في «الرسائل» باسم الإدارة مع تنبيه.</div>}
       <p className="text-sm text-muted-foreground">معلومات كاملة عن كل متجر ونشاطه، مع الاعتماد والإيقاف والإنذار من المنتجات المخالفة. عند تكرار الإنذارات ٣ مرات يُوقف المتجر تلقائياً وتبقى الإنذارات موثّقة.</p>
 
       {/* طلبات عرض المنتجات في منصة تربح — إعلان المتجر يظهر تلقائياً، والمنتجات بموافقة */}

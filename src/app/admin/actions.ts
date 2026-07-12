@@ -1011,6 +1011,20 @@ export async function sendUserPasswordAction(formData: FormData) {
   redirect(`/admin/users/${uid}?${r.ok ? 'sent=1' : 'error=' + encodeURIComponent(r.error || 'فشل الإرسال')}`);
 }
 
+/** رسالة رسمية من إدارة المتاجر لصاحب متجر — تصله في «الرسائل» باسم الإدارة مع تنبيه. */
+export async function adminMessageStoreOwnerAction(formData: FormData) {
+  const session = await requireAction('stores', 'edit');
+  const storeId = Number(formData.get('storeId') || 0);
+  const text = String(formData.get('message') || '').trim().slice(0, 1000);
+  if (!storeId || !text) redirect('/admin/stores');
+  const store = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { user_id: true, store_name: true } }).catch(() => null);
+  if (!store) redirect('/admin/stores');
+  await sendVerifyMessage(store.user_id, '__none__', `📢 رسالة رسمية من إدارة المتاجر بخصوص متجرك «${store.store_name || ''}»:\n${text}`);
+  await logAdmin(session.uid, 'رسالة رسمية لتاجر', `متجر #${storeId}`, text.slice(0, 120));
+  revalidatePath('/admin/stores');
+  redirect('/admin/stores?msg=1');
+}
+
 /** موافقة الإدارة على طلب تغيير اسم العضو: يُطبَّق الاسم الجديد فوراً وتصل العضو رسالة. */
 export async function approveNameRequestAction(formData: FormData) {
   const session = await requireAction('users', 'edit');

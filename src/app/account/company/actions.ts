@@ -148,6 +148,35 @@ export async function requestStoreNameExceptionAction(formData: FormData) {
   redirect('/store?exc=1');
 }
 
+/** مراسلة عضو من داخل لوحة المتجر: التاجر يدخل جوال العضو ورسالته —
+ *  تصل العضو باسم المتجر في «الرسائل» ويستمر الحوار هناك. */
+export async function storeMessageMemberAction(formData: FormData) {
+  const session = await requireUser();
+  const store = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true, store_name: true } }).catch(() => null);
+  if (!store) redirect('/store');
+  const phone = String(formData.get('phone') || '').trim();
+  const raw = String(formData.get('message') || '').trim();
+  if (!phone || !raw) redirect('/store?mm=err');
+  const { toLocalSaudi } = await import('@/lib/sms');
+  const local = toLocalSaudi(phone);
+  const member = await prisma.users.findFirst({
+    where: { OR: [{ phoneNumber: local }, { phoneNumber: phone }, { phoneNumber: local.replace(/^0/, '') }, { phoneNumber: `966${local.replace(/^0/, '')}` }] },
+    select: { id: true },
+  }).catch(() => null);
+  if (!member) redirect('/store?mm=nouser');
+  const memberId = toInt(member.id);
+  if (memberId === session.uid) redirect('/store?mm=err');
+  // نفس حماية المراسلات (حارس المحتوى والكلمات المرفوضة)
+  const { screenChatMessage } = await import('@/lib/chat');
+  const screened = await screenChatMessage(session.uid, `من متجر «${store.store_name || 'متجرنا'}»: ${raw.slice(0, 1500)}`);
+  if (!screened.ok) redirect('/store?mm=blocked');
+  await prisma.chats.create({
+    data: { sender_id: session.uid, reciver_id: memberId, message: screened.text, is_read: 0, chat_id: 0, type_from_user: 'user', type_to_user: 'user' },
+  }).catch(() => {});
+  await prisma.notfications.create({ data: { title: `رسالة من متجر ${store.store_name || ''}`, route: `/messages/${session.uid}`, user_id: String(memberId), type: 'message' } }).catch(() => {});
+  redirect('/store?mm=1');
+}
+
 /** Merchant requests to feature their products on the Trbhh platform (admin approves). */
 export async function requestPlatformAction() {
   const session = await requireUser();

@@ -75,6 +75,9 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const unreadChats = store ? await prisma.chats.count({ where: { reciver_id: session.uid, is_read: 0 } }).catch(() => 0) : 0;
   // طلب تغيير اسم المتجر المعلّق (بموافقة إدارة المتاجر)
   const pendingNameReq = store ? await prisma.name_requests.findFirst({ where: { user_id: BigInt(session.uid), kind: 'store', status: 0 }, select: { new_name: true } }).catch(() => null) : null;
+  // وضوح المدفوعات: رصيد التاجر + المتبقي بالأيام لكل عرض
+  const merchBalance = store ? await (await import('@/lib/wallet')).getBalance(session.uid).catch(() => 0) : 0;
+  const daysLeft = (d: Date | null) => (d ? Math.max(0, Math.ceil((d.getTime() - Date.now()) / 86400000)) : 0);
   const myActiveAds = store ? (await getMyAds(session.uid)).filter((a) => a.status === 1) : [];
   const inStore = new Set(store ? await storeProductAdIds(store.id) : []);
   // مشاهدات المتجر = عدد مرّات دخول/تحديث صفحة المتجر (مشاهدة واحدة لكل زيارة)
@@ -470,6 +473,34 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
       {store && showPricing && (showPricing.store.w2 > 0 || showPricing.store.m1 > 0 || showPricing.store.y1 > 0 || showPricing.ads.some((a) => a.price > 0)) && (
         <div id="trbhh-show" className="card-3d scroll-mt-20 space-y-3 rounded-2xl p-4">
           <div className="flex items-center gap-2 font-bold text-primary">📣 الظهور في تربح (مدفوع)</div>
+
+          {/* لوحة وضوح المدفوعات: الرصيد + حالة كل عرض والمتبقي والعدد — بنظرة واحدة */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50/60 p-2.5 text-center">
+              <div className="text-[11px] font-bold text-muted-foreground">💳 رصيدك الحالي</div>
+              <div className="text-lg font-extrabold text-emerald-700">{merchBalance} ر.س</div>
+              <Link href="/account/wallet#topup" className="text-[11px] font-bold text-primary underline">اشحن رصيدك من هنا</Link>
+            </div>
+            <div className={`rounded-xl border-2 p-2.5 text-center ${storeShowActive ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-300 bg-amber-50/60'}`}>
+              <div className="text-[11px] font-bold text-muted-foreground">🏪 عرض المتجر بالرئيسية</div>
+              {storeShowActive ? (
+                <>
+                  <div className="text-lg font-extrabold text-emerald-700">باقي {daysLeft(storeShowRow!.show_until)} يوم</div>
+                  <div className="text-[11px] font-bold text-muted-foreground">حتى {fmtD(storeShowRow!.show_until)} — جدّد بالأسفل</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-lg font-extrabold text-amber-700">غير مفعّل</div>
+                  <div className="text-[11px] font-bold text-muted-foreground">فعّله بالأسفل ليظهر متجرك</div>
+                </>
+              )}
+            </div>
+            <div className={`rounded-xl border-2 p-2.5 text-center ${shownAds.length ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-300 bg-amber-50/60'}`}>
+              <div className="text-[11px] font-bold text-muted-foreground">📢 إعلانات معروضة في تربح</div>
+              <div className={`text-lg font-extrabold ${shownAds.length ? 'text-emerald-700' : 'text-amber-700'}`}>{shownAds.length} إعلان</div>
+              <div className="text-[11px] font-bold text-muted-foreground">{shownAds.length ? `أقربها ينتهي بعد ${Math.min(...shownAds.map((a) => daysLeft(a.trbhh_until)))} يوم` : 'اعرض إعلاناً بباقة بالأسفل'}</div>
+            </div>
+          </div>
           {show === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض متجرك في تربح وخُصم المبلغ من رصيدك.</div>}
           {adshow === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض إعلانك في تربح وخُصم المبلغ من رصيدك.</div>}
           {(show === 'needcredit' || adshow === 'needcredit') && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي{price ? ` (المطلوب ${price} ر.س)` : ''} — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
@@ -479,7 +510,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             <div className="space-y-2 rounded-xl border border-primary/15 bg-primary/5 p-3">
               <div className="text-sm font-bold">🏪 عرض متجرك في رئيسية تربح</div>
               <p className="text-[11px] text-muted-foreground">يظهر متجرك (ومنتجاته) في قسم المتاجر بالصفحة الرئيسية طوال المدة.</p>
-              {storeShowActive && <div className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">مفعّل حتى: {fmtD(storeShowRow!.show_until)}</div>}
+              {storeShowActive && <div className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">✅ مفعّل حتى {fmtD(storeShowRow!.show_until)} (باقي {daysLeft(storeShowRow!.show_until)} يوم) — الشراء الآن = <b>تجديد يضيف المدة</b>:</div>}
               <div className="grid grid-cols-3 gap-2">
                 {([['w2', 'أسبوعان'], ['m1', 'شهر'], ['y1', 'سنة']] as const).filter(([k]) => showPricing.store[k] > 0).map(([k, label]) => (
                   <form key={k} action={buyStoreShowAction} className="text-center">
@@ -510,8 +541,14 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
               </form>
               {shownAds.length > 0 && (
                 <div className="space-y-1 border-t border-amber-200 pt-2 text-[11px] font-bold">
-                  <div className="text-muted-foreground">المعروض حالياً في تربح:</div>
-                  {shownAds.map((a) => <div key={String(a.id)}>✅ {a.title} — حتى {fmtD(a.trbhh_until)}</div>)}
+                  <div className="text-muted-foreground">المعروض حالياً في تربح ({shownAds.length}):</div>
+                  {shownAds.map((a) => (
+                    <div key={String(a.id)} className="flex flex-wrap items-center justify-between gap-1 rounded-md bg-white px-2 py-1 shadow-sm ring-1 ring-black/5">
+                      <span className="min-w-0 flex-1 truncate">✅ {a.title}</span>
+                      <span className="shrink-0 text-emerald-700">باقي {daysLeft(a.trbhh_until)} يوم (حتى {fmtD(a.trbhh_until)})</span>
+                    </div>
+                  ))}
+                  <div className="text-muted-foreground">للتجديد: اختر نفس الإعلان وباقة من الأعلى — المدة الجديدة تُضاف.</div>
                 </div>
               )}
             </div>

@@ -98,6 +98,7 @@ type AdRow = {
   city_id: bigint;
   category_id: bigint;
   created_at: Date | null;
+  bumped_at?: Date | null;
   urgent_until?: Date | null;
   old_price?: number;
 };
@@ -133,7 +134,8 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         image: images.get(toInt(r.id)) ?? PLACEHOLDER,
         cityName: cities.get(toInt(r.city_id)) ?? null,
         categoryName: cats.get(toInt(r.category_id)) ?? null,
-        createdAt: r.created_at ? r.created_at.toISOString() : null,
+        // الوقت الظاهر على البطاقة = آخر نشاط (التحديث ⬆ إن كان أحدث من النشر) ليطابق الترتيب
+        createdAt: (r.bumped_at && r.created_at && r.bumped_at > r.created_at ? r.bumped_at : r.created_at)?.toISOString() ?? null,
         special: r.adsSpecial === 'checked',
         urgent: !!(r.urgent_until && r.urgent_until.getTime() > now),
         views: views.get(toInt(r.id)) ?? 0,
@@ -162,6 +164,7 @@ const adSelect = {
   city_id: true,
   category_id: true,
   created_at: true,
+  bumped_at: true,
   urgent_until: true,
   old_price: true,
 } as const;
@@ -224,12 +227,18 @@ export async function bustAdCaches(): Promise<void> {
   ]);
 }
 
+/** «آخر نشاط» للإعلان: التحديث (Bump) أو النشر — مفتاح الترتيب والوقت الظاهر معاً. */
+const activityMs = (r: { bumped_at?: Date | null; created_at: Date | null }) =>
+  Math.max(r.bumped_at?.getTime() ?? 0, r.created_at?.getTime() ?? 0);
+
 export async function getLatestAds(take = 12) {
   return cached(`ads:latest:${take}`, 60, async () => {
     sweepExpiredArchived().catch(() => {});
     sweepExpiredPaidAds().catch(() => {});
-    const rows = await prisma.ads.findMany({ where: activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take, select: adSelect });
-    return toCards(rows);
+    // نجلب أكثر ثم نرتب بآخر نشاط فعلياً (القديم المستورد بلا bumped_at يرتَّب بتاريخ نشره)
+    const rows = await prisma.ads.findMany({ where: activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: take * 3, select: adSelect });
+    rows.sort((a, b) => activityMs(b) - activityMs(a));
+    return toCards(rows.slice(0, take));
   });
 }
 
@@ -246,6 +255,8 @@ export async function getHomeLatestAds() {
       take: 400,
       select: adSelect,
     });
+    // الترتيب الحقيقي بآخر نشاط (نشر أو تحديث ⬆) — يطابق الوقت الظاهر على البطاقة
+    rows.sort((a, b) => activityMs(b) - activityMs(a));
     if (rows.length > 0) return toCards(rows);
     const fallback = await prisma.ads.findMany({ where: activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: 12, select: adSelect });
     return toCards(fallback);

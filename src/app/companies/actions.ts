@@ -21,6 +21,29 @@ export async function respondOfferAction(formData: FormData) {
   revalidatePath('/store');
 }
 
+/** مراسلة صاحب المتجر من صفحة متجره: تصل رسالته في «الرسائل» ويرد منها،
+ *  ويظهر للتاجر تنبيه بالرسائل الجديدة فور فتح لوحة متجره. */
+export async function messageStoreOwnerAction(formData: FormData) {
+  const session = await getSession();
+  const storeId = Number(formData.get('storeId') || 0);
+  if (!session) redirect(`/login?next=${encodeURIComponent(`/companies/${storeId}`)}`);
+  const raw = String(formData.get('message') || '').trim();
+  if (!storeId || !raw) redirect(`/companies/${storeId || ''}`);
+  const { prisma } = await import('@/lib/prisma');
+  const store = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { user_id: true, store_name: true } }).catch(() => null);
+  if (!store || store.user_id === session.uid) redirect(`/companies/${storeId}`);
+  // حماية المراسلات: حارس المحتوى والكلمات المرفوضة (نفس حماية الرسائل)
+  const { screenChatMessage } = await import('@/lib/chat');
+  const screened = await screenChatMessage(session.uid, `بخصوص متجر «${store.store_name || 'متجركم'}»: ${raw.slice(0, 1500)}`);
+  if (!screened.ok) redirect(`/companies/${storeId}?msgsent=blocked`);
+  await prisma.chats.create({
+    data: { sender_id: session.uid, reciver_id: store.user_id, message: screened.text, is_read: 0, chat_id: 0, type_from_user: 'user', type_to_user: 'user' },
+  }).catch(() => {});
+  const nDup = await prisma.notfications.findFirst({ where: { user_id: String(store.user_id), title: `رسالة جديدة من ${session.name}`, created_at: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } }, select: { id: true } }).catch(() => null);
+  if (!nDup) await prisma.notfications.create({ data: { title: `رسالة جديدة من ${session.name}`, route: `/messages/${session.uid}`, user_id: String(store.user_id), type: 'message' } }).catch(() => {});
+  redirect(`/companies/${storeId}?msgsent=1`);
+}
+
 export async function followStoreAction(formData: FormData) {
   const session = await getSession();
   const storeId = Number(formData.get('storeId') || 0);

@@ -71,6 +71,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const collabIds = store ? await collaboratorStoreIds(store.id) : [];
   const collabs = store ? (await Promise.all(collabIds.map((id) => storeCard(id)))).filter(Boolean) : [];
   const warnings = store ? await getStoreWarnings(store.id) : [];
+  // رسائل غير مقروءة (من عملاء متجره وغيرهم) — تنبيه أول ما يفتح لوحته
+  const unreadChats = store ? await prisma.chats.count({ where: { reciver_id: session.uid, is_read: 0 } }).catch(() => 0) : 0;
   const myActiveAds = store ? (await getMyAds(session.uid)).filter((a) => a.status === 1) : [];
   const inStore = new Set(store ? await storeProductAdIds(store.id) : []);
   // مشاهدات المتجر = عدد مرّات دخول/تحديث صفحة المتجر (مشاهدة واحدة لكل زيارة)
@@ -101,6 +103,15 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             <Link href={`/companies/${myStaffStoreId}`} className="flex items-center gap-1.5 rounded-lg border border-teal-300 bg-white px-4 py-2 text-sm font-bold text-teal-700">عرض واجهة المتجر ←</Link>
           </div>
         </div>
+      )}
+
+      {/* 💬 رسائل جديدة — تظهر للتاجر أول ما يفتح لوحة متجره */}
+      {unreadChats > 0 && (
+        <Link href="/messages" className="card-3d flex items-center gap-3 rounded-xl !border-sky-400 bg-sky-50 p-3 hover:bg-sky-100">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-sky-500 text-lg text-white">💬</span>
+          <span className="flex-1 text-sm font-bold text-sky-900">لديك {unreadChats} رسالة جديدة (من عملاء متجرك وغيرهم) — اضغط للرد من رسائلك</span>
+          <span className="shrink-0 rounded-full bg-sky-500 px-2.5 py-1 text-xs font-extrabold text-white">{unreadChats}</span>
+        </Link>
       )}
 
       {error === 'terms' && (

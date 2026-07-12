@@ -20,7 +20,7 @@ import { InstallPrompt } from '@/components/install-prompt';
 import { waLink } from '@/lib/classified-theme';
 import { bannerBackground, storeTier, isLightColor, layoutTokens, isCatalogStyle, DEFAULT_CATALOG_FIELDS } from '@/lib/store-style';
 import { timeAgo } from '@/lib/utils';
-import { followStoreAction, rateStoreAction, sendCollabAction, requestTransferAction } from '../actions';
+import { followStoreAction, rateStoreAction, sendCollabAction, requestTransferAction, messageStoreOwnerAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,9 +61,9 @@ function Stars({ value }: { value: number }) {
   );
 }
 
-export default async function CompanyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ q?: string; t?: string; added?: string }> }) {
+export default async function CompanyPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ q?: string; t?: string; added?: string; msgsent?: string }> }) {
   const { id } = await params;
-  const { q, t, added } = await searchParams;
+  const { q, t, added, msgsent } = await searchParams;
   const query = (q || '').trim();
   // id may be a numeric store id OR a handle (from a subdomain rewrite / clean URL)
   const storeId = /^\d+$/.test(id) ? Number(id) : await storeIdByHandle(id);
@@ -365,6 +365,24 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
               {meta.contacts && <div className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90 sm:col-span-2"><Link2 className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr" className="truncate">{meta.contacts}</span></div>}
             </div>
           )}
+          {/* ✉️ مراسلة صاحب المتجر — تصل رسالته في «الرسائل» ويرد منها */}
+          {!isOwner && (
+            <div className="rounded-xl border p-3" style={{ borderColor: `${brand}33` }}>
+              <div className="mb-2 flex items-center gap-1.5 text-sm font-bold" style={{ color: brand }}><MessageCircle className="h-4 w-4" /> راسل صاحب المتجر</div>
+              {msgsent === '1' && <p className="mb-2 rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ وصلت رسالتك لصاحب المتجر — يصلك ردّه في «رسائلي».</p>}
+              {msgsent === 'blocked' && <p className="mb-2 rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">رسالتك تحتوي محتوى غير مسموح ولم تُرسل.</p>}
+              {session ? (
+                <form action={messageStoreOwnerAction} className="space-y-2">
+                  <input type="hidden" name="storeId" value={storeId} />
+                  <textarea name="message" required rows={2} maxLength={1500} placeholder="اكتب رسالتك أو استفسارك…" className="w-full rounded-lg border bg-white p-2.5 text-sm outline-none focus:ring-2" style={{ borderColor: `${brand}44` }} />
+                  <button className="btn-3d rounded-lg px-4 py-2 text-sm font-bold text-white" style={{ background: brand }}>إرسال الرسالة</button>
+                </form>
+              ) : (
+                <Link href={`/login?next=${encodeURIComponent(`/companies/${storeId}`)}`} className="block rounded-lg bg-secondary/50 p-2.5 text-center text-xs font-bold text-muted-foreground">سجّل الدخول لمراسلة صاحب المتجر ←</Link>
+              )}
+            </div>
+          )}
+
           {/* نقل ملكية المتجر — يبدأ بطلب من المنقول له، ثم موافقة الصاحب الأول، ثم تنفيذ الإدارة */}
           {session && !isOwner && (
             <details className="rounded-xl border border-primary/20 bg-primary/5">

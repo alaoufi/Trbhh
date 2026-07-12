@@ -1,5 +1,6 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { BadgeCheck } from 'lucide-react';
+import { BadgeCheck, Megaphone, Eye, Star, MessageCircle, Phone, Send, CalendarDays } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { timeAgo } from '@/lib/utils';
 import { getMyAds } from '@/lib/account';
@@ -10,6 +11,9 @@ import { AdGrid } from '@/components/ad-card';
 import { Stars } from '@/components/stars';
 import { ReviewForm } from '@/components/review-form';
 import { PromoSlot } from '@/components/promo-slot';
+import { ShareButtons } from '@/components/share-buttons';
+import { SITE } from '@/lib/constants';
+import { mediaUrl } from '@/lib/media';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +47,18 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
     await markSeen(uid, 'reviews').catch(() => {});
   }
   const active = myAds.filter((a) => a.status === 1);
+  // مجموع مشاهدات إعلانات العضو المعروضة في تربح
+  const viewsSum = active.length
+    ? await prisma.ads_views.count({ where: { ads_id: { in: active.map((a) => BigInt(a.id)) } } }).catch(() => 0)
+    : 0;
+  // التواصل حسب خصوصية العضو (نفس قواعد صفحة الإعلان)
+  const phone = user.allow_phone ? user.phoneNumber : null;
+  const wa = user.whatsapp ? (user.phone_whatsapp || user.phoneNumber) : null;
+  const waHref = wa ? `https://wa.me/${String(wa).replace(/\D/g, '').replace(/^0/, '966')}` : null;
+  const isOwnProfile = !!(session && session.uid === uid);
+  const profileUrl = `https://${SITE.domain}/users/${uid}`;
+  const displayName = user.name || user.userName || 'مستخدم';
+  const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const ads = active.map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special,
         urgent: false, views: 0, sellerName: null, sellerTrusted: false }));
 
@@ -69,6 +85,55 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
               </div>
             )}
           </div>
+        </div>
+
+        {/* إحصائيات العضو — بنفس تصميم صفحة المتجر */}
+        <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+          <div className="rounded-xl bg-secondary/40 p-2">
+            <div className="flex items-center justify-center gap-1 font-bold text-primary"><Megaphone className="h-4 w-4" /> {en(active.length)}</div>
+            <div className="text-[11px] text-muted-foreground">إعلان</div>
+          </div>
+          <div className="rounded-xl bg-secondary/40 p-2">
+            <div className="flex items-center justify-center gap-1 font-bold text-primary"><Eye className="h-4 w-4" /> {en(viewsSum)}</div>
+            <div className="text-[11px] text-muted-foreground">مشاهدة</div>
+          </div>
+          <div className="rounded-xl bg-secondary/40 p-2">
+            <div className="flex items-center justify-center gap-1 font-bold text-primary"><CalendarDays className="h-4 w-4" /></div>
+            <div className="text-[11px] text-muted-foreground">عضو {timeAgo(user.created_at)}</div>
+          </div>
+          <div className="rounded-xl bg-secondary/40 p-2">
+            <div className="flex items-center justify-center gap-1 font-bold text-primary"><Star className="h-4 w-4 fill-amber-400 text-amber-400" /> {rating.avg}</div>
+            <div className="text-[11px] text-muted-foreground">تقييم ({en(rating.count)})</div>
+          </div>
+        </div>
+
+        {/* أزرار سطر واحد بالأيقونات: مراسلة، واتساب، اتصال، مشاركة */}
+        <div className="mt-3 flex gap-2">
+          {!isOwnProfile && (
+            <Link href={session ? `/messages/${uid}` : '/login'} aria-label="مراسلة" title="مراسلة" className="grid h-11 flex-1 place-items-center rounded-xl bg-primary text-white shadow-sm">
+              <Send className="h-5 w-5" />
+            </Link>
+          )}
+          {waHref && (
+            <a href={waHref} target="_blank" rel="noopener noreferrer" aria-label="واتساب" title="واتساب" className="grid h-11 flex-1 place-items-center rounded-xl bg-[#25D366] text-white shadow-sm">
+              <MessageCircle className="h-5 w-5" />
+            </a>
+          )}
+          {phone && (
+            <a href={`tel:${phone}`} aria-label="اتصال" title="اتصال" className="grid h-11 flex-1 place-items-center rounded-xl border bg-white text-primary shadow-sm">
+              <Phone className="h-5 w-5" />
+            </a>
+          )}
+          <span className="h-11 flex-1 rounded-xl border bg-white text-primary shadow-sm" title="مشاركة">
+            <ShareButtons
+              url={profileUrl}
+              title={`${displayName} على تربح`}
+              text={[`${displayName} على تربح`, `${active.length} إعلان نشط`].join('\n')}
+              compact
+              iconOnly
+              card={{ url: profileUrl, title: displayName, city: '', image: user.photo_path ? mediaUrl(user.photo_path) : '/apple-icon.png' }}
+            />
+          </span>
         </div>
       </div>
 

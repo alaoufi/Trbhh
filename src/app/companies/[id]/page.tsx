@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2, Plus, BarChart3, Megaphone, Eye, LogIn } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { CopyLink } from '@/components/copy-link';
+import { ShareButtons } from '@/components/share-buttons';
 import { getStore } from '@/lib/stores';
 import { cookies, headers } from 'next/headers';
 import { getSession } from '@/lib/auth';
@@ -343,6 +344,16 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             </div>
           )}
           <CopyLink url={`https://${SITE.domain}/companies/${storeId}`} label="رابط المتجر المباشر" />
+
+          {/* مشاركة المتجر في كل التطبيقات: واتساب/تيليجرام/فيسبوك/تويتر/تيك توك + مشاركة النظام وQR */}
+          <div className="rounded-xl bg-secondary/30 p-3">
+            <div className="mb-2 text-sm font-bold" style={{ color: brand }}>📣 شارك المتجر</div>
+            <ShareButtons
+              url={`https://${SITE.domain}/companies/${storeId}`}
+              title={`متجر ${name}`}
+              text={[`🏪 متجر ${name} على تربح`, (meta.about || s.description || '').replace(/\s+/g, ' ').trim().slice(0, 120)].filter(Boolean).join('\n')}
+            />
+          </div>
 
           {/* نقل ملكية المتجر — يبدأ بطلب من المنقول له، ثم موافقة الصاحب الأول، ثم تنفيذ الإدارة */}
           {session && !isOwner && (

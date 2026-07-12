@@ -263,36 +263,49 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
               </div>
             )}
 
-            {/* أزرار: متابعة + تواصل */}
-            <div className="mt-3 flex flex-wrap gap-2">
+            {/* أزرار سطر واحد بالأيقونات فقط: متابعة، واتساب، اتصال، مشاركة */}
+            <div className="mt-3 flex gap-2">
               {!isOwner && (
-                <form action={followStoreAction}>
+                <form action={followStoreAction} className="flex-1">
                   <input type="hidden" name="storeId" value={storeId} />
-                  <button className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold text-white" style={{ background: following ? '#64748b' : brand }}>
-                    <Heart className={`h-4 w-4 ${following ? 'fill-white' : ''}`} /> {following ? 'متابَع ✓' : 'متابعة'}
+                  <button aria-label={following ? 'إلغاء المتابعة' : 'متابعة'} title={following ? 'متابَع ✓' : 'متابعة'} className="grid h-11 w-full place-items-center rounded-xl text-white shadow-sm" style={{ background: following ? '#64748b' : brand }}>
+                    <Heart className={`h-5 w-5 ${following ? 'fill-white' : ''}`} />
                   </button>
                 </form>
               )}
-              {wa && <StoreContactLink storeId={storeId} kind="whatsapp" href={wa} target="_blank"><Button variant="whatsapp"><MessageCircle className="h-4 w-4" /> واتساب</Button></StoreContactLink>}
-              {s.phone && <StoreContactLink storeId={storeId} kind="call" href={`tel:${s.phone}`}><Button variant="outline"><Phone className="h-4 w-4" /> اتصال</Button></StoreContactLink>}
-              {/* مشاركة المتجر — قائمة كل التطبيقات (بجانب واتساب تحت الإحصائيات) */}
-              <span className="flex items-center rounded-lg border bg-white px-3" style={{ color: brand }}>
+              {wa && (
+                <StoreContactLink storeId={storeId} kind="whatsapp" href={wa} target="_blank" className="grid h-11 flex-1 place-items-center rounded-xl bg-[#25D366] text-white shadow-sm">
+                  <MessageCircle className="h-5 w-5" />
+                </StoreContactLink>
+              )}
+              {s.phone && (
+                <StoreContactLink storeId={storeId} kind="call" href={`tel:${s.phone}`} className="grid h-11 flex-1 place-items-center rounded-xl border bg-white shadow-sm">
+                  <Phone className="h-5 w-5" style={{ color: brand }} />
+                </StoreContactLink>
+              )}
+              {/* مشاركة المتجر — قائمة كل التطبيقات */}
+              <span className="h-11 flex-1 rounded-xl border bg-white shadow-sm" style={{ color: brand }} title="مشاركة">
                 <ShareButtons
                   url={`https://${SITE.domain}/companies/${storeId}`}
                   title={`متجر ${name}`}
                   text={[`متجر ${name} على تربح`, (meta.about || s.description || '').replace(/\s+/g, ' ').trim().slice(0, 120)].filter(Boolean).join('\n')}
                   compact
+                  iconOnly
                   card={{ url: `https://${SITE.domain}/companies/${storeId}`, title: `متجر ${name}`, city: meta.specialty || '', image: s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '/apple-icon.png' }}
                 />
               </span>
-              {canInvite && (
-                <form action={sendCollabAction}>
-                  <input type="hidden" name="toStore" value={storeId} />
-                  <Button variant="outline"><Handshake className="h-4 w-4" /> دعوة للتعاون</Button>
-                </form>
-              )}
-              {alreadyPartner && <span className="flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700"><Handshake className="h-4 w-4" /> شريك متعاون</span>}
             </div>
+            {(canInvite || alreadyPartner) && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {canInvite && (
+                  <form action={sendCollabAction}>
+                    <input type="hidden" name="toStore" value={storeId} />
+                    <Button variant="outline"><Handshake className="h-4 w-4" /> دعوة للتعاون</Button>
+                  </form>
+                )}
+                {alreadyPartner && <span className="flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700"><Handshake className="h-4 w-4" /> شريك متعاون</span>}
+              </div>
+            )}
           </div>
         </div>
 

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Share2, Link2, QrCode, Check, X, MessageCircle, Facebook, Send } from 'lucide-react';
 import { ShareCardButton, type ShareCardData } from '@/components/share-card';
 
-export function ShareButtons({ url, title, text, compact, card }: { url: string; title: string; text?: string; compact?: boolean; card?: ShareCardData }) {
+export function ShareButtons({ url, title, text, compact, card, iconOnly }: { url: string; title: string; text?: string; compact?: boolean; card?: ShareCardData; iconOnly?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [qr, setQr] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -73,9 +73,9 @@ export function ShareButtons({ url, title, text, compact, card }: { url: string;
 
   if (compact) {
     return (
-      <div className="relative">
-        <button type="button" onClick={share} className="flex flex-col items-center gap-1 text-sm font-medium text-primary">
-          <Share2 className="h-5 w-5" /> مشاركة
+      <div className={`relative ${iconOnly ? 'h-full w-full' : ''}`}>
+        <button type="button" onClick={share} aria-label="مشاركة" className={iconOnly ? 'grid h-full w-full place-items-center' : 'flex flex-col items-center gap-1 text-sm font-medium text-primary'}>
+          <Share2 className="h-5 w-5" />{!iconOnly && ' مشاركة'}
         </button>
         {menu && (
           <>

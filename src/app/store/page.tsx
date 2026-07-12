@@ -507,12 +507,12 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
 
       {store && <CopyLink url={`https://${SITE.domain}/companies/${store.id}`} />}
 
-      {/* الرابط المستقل للمتجر (نطاق فرعي) */}
+      {/* الرابط المستقل للمتجر — مسار باسم المتجر (يعمل دائماً، بلا حاجة لإعداد نطاق) */}
       {store && meta?.handle && (
         <div className="card-3d space-y-2 rounded-2xl p-4">
           <div className="flex items-center gap-2 font-bold text-primary"><Globe className="h-5 w-5" /> رابط متجرك المستقل</div>
-          <CopyLink url={`https://${meta.handle}.${SITE.domain}`} label="النطاق الفرعي للمتجر" />
-          <p className="text-xs text-muted-foreground">يعمل النطاق الفرعي فور تفعيل إعداد النطاق على الخادم. حتى ذلك الحين يعمل الرابط المختصر <b dir="ltr">{SITE.domain}/companies/{store.id}</b>.</p>
+          <CopyLink url={`https://${SITE.domain}/companies/${meta.handle}`} label="رابط باسم متجرك" />
+          <p className="text-xs text-muted-foreground">رابط جميل باسم متجرك يعمل فوراً — شاركه بدل الرقمي.</p>
         </div>
       )}
 

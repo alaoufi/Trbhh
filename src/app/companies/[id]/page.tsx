@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // fall back to a real PNG only when the merchant hasn't uploaded a logo yet.
   const rawLogo = s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '/apple-icon.png';
   const logoAbs = rawLogo.startsWith('http') ? rawLogo : `https://${SITE.domain}${rawLogo.startsWith('/') ? '' : '/'}${rawLogo}`;
-  const url = meta.handle ? `https://${meta.handle}.${SITE.domain}` : `https://${SITE.domain}/companies/${s.id}`;
+  const url = `https://${SITE.domain}/companies/${meta.handle || s.id}`;
   return {
     title: { absolute: name },
     description: desc,
@@ -127,7 +127,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const active = query ? allActive.filter((a) => (a.title || '').includes(query)) : allActive;
   // نص واتساب للمتجر: نص المتجر إن وُجد، وإلا نصّ افتراضي (لا يظهر فارغاً)
   const { parseTemplates, fillTemplate } = await import('@/lib/settings');
-  const storeUrl = meta.handle ? `https://${meta.handle}.${SITE.domain}` : `https://${SITE.domain}/companies/${storeId}`;
+  const storeUrl = `https://${SITE.domain}/companies/${meta.handle || storeId}`;
   const baseTpl = parseTemplates(meta.msgTemplates)[0] || 'السلام عليكم، لديّ استفسار عن متجر {name}';
   const wa = waLink(s.whatsapp, fillTemplate(baseTpl, { link: storeUrl, name: meta.storeName || s.name }));
   // مشاهدات المتجر = عدد مرّات دخول/تحديث صفحة المتجر (مشاهدة واحدة لكل زيارة)
@@ -428,7 +428,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         <DisclaimerBar />
       </div>
 
-      <StoreBottomNav brand={brand} wa={wa} isOwner={isOwner} storeId={storeId} canAdd={!!meta.allowAds} home={meta.handle ? `https://${meta.handle}.${SITE.domain}` : `/companies/${storeId}`} />
+      <StoreBottomNav brand={brand} wa={wa} isOwner={isOwner} storeId={storeId} canAdd={!!meta.allowAds} home={`/companies/${meta.handle || storeId}`} />
     </div>
   );
 }

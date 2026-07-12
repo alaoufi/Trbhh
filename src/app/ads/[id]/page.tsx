@@ -122,7 +122,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const shownInTrbhh = !!(ad.trbhhUntil && new Date(ad.trbhhUntil) > new Date());
   if (inStore && ad.storeOnly && !shownInTrbhh) redirect(`/companies/${sellerStoreId}/p/${ad.id}`);
   const storeMeta = inStore ? await getStoreMeta(sellerStoreId).catch(() => null) : null;
-  const storeUrl = inStore ? (storeMeta?.handle ? `https://${storeMeta.handle}.${SITE.domain}` : `/companies/${sellerStoreId}`) : '';
+  // رابط المتجر بالمسار المباشر (النطاق الفرعي يتطلب DNS Wildcard غير مجهز)
+  const storeUrl = inStore ? `/companies/${storeMeta?.handle || sellerStoreId}` : '';
 
   const shareUrl = inStore ? (storeUrl.startsWith('http') ? storeUrl : `https://${SITE.domain}/companies/${sellerStoreId}`) : `https://${SITE.domain}/ads/${ad.id}`;
   // نص واتساب مُعبّأ مسبقاً: نص المتجر إن كان إعلان متجر، وإلا نص تربح لمراسلة صاحب الإعلان

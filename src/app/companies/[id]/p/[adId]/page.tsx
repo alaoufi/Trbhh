@@ -85,7 +85,7 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
 
   const brand = meta.color || '#3287da';
   const name = meta.storeName || s.name;
-  const storeHome = meta.handle ? `https://${meta.handle}.${SITE.domain}` : `/companies/${storeId}`;
+  const storeHome = `/companies/${meta.handle || storeId}`;
   const shareUrl = `https://${SITE.domain}/companies/${storeId}/p/${ad.id}`;
   // نص واتساب: نص المتجر إن وُجد، وإلا نصّ افتراضي يذكر المنتج + رابط المنتج
   const { parseTemplates, fillTemplate } = await import('@/lib/settings');

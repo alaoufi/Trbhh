@@ -27,6 +27,7 @@ export async function AdminAlertsBanner() {
     platformReqs, oldestPlatform,
     adminUnread, oldestAdminMsg,
     pendingPromos,
+    verifyOrders,
   ] = await Promise.all([
     prisma.ads.count({ where: { status: 0, publish_at: null, paused_by_owner: 0, ...notArchived } }).catch(() => 0),
     prisma.ads.findFirst({ where: { status: 0, publish_at: null, paused_by_owner: 0, ...notArchived }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
@@ -55,6 +56,7 @@ export async function AdminAlertsBanner() {
       return r?.created_at ?? null;
     }).catch(() => null),
     import('@/lib/promos').then((m) => m.countPendingPromos()).catch(() => 0),
+    import('@/lib/verify-paid').then((m) => m.countPendingVerifyOrders()).catch(() => ({ n: 0, oldest: null })),
   ]);
 
   const items: Item[] = [
@@ -68,6 +70,7 @@ export async function AdminAlertsBanner() {
     { n: pendingStores, label: 'متجر بانتظار الاعتماد', href: '/admin/stores', oldest: oldestStore },
     { n: transfers, label: 'نقل ملكية جاهز للتنفيذ', href: '/admin/stores', oldest: oldestTransfer },
     { n: platformReqs, label: 'طلب عرض منتجات', href: '/admin/stores', oldest: oldestPlatform },
+    { n: verifyOrders.n, label: 'طلب توثيق متجر (مدفوع)', href: '/admin/stores', oldest: verifyOrders.oldest },
     { n: pendingPromos, label: 'إعلان ترويجي معلّق', href: '/admin/promos', oldest: null },
   ].filter((i) => i.n > 0);
 

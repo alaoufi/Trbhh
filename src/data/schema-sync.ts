@@ -220,6 +220,24 @@ const STATEMENTS: string[] = [
   `ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`,
   `CREATE INDEX users_ban ON users (ban, ban_until)`,
   `ALTER TABLE users ADD COLUMN verify_note VARCHAR(300) NULL`,
+  /* التوثيق المدفوع: طلب صاحب المتجر ← موافقة إدارة المتاجر ← خصم الرسوم وتفعيل لمدة أيام.
+     status: 0 معلق، 1 نشط (مدفوع)، 2 مرفوض، 3 ملغى (مع استرداد نسبي)، 4 منتهٍ. */
+  `CREATE TABLE IF NOT EXISTS verify_orders (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    store_id INT NOT NULL DEFAULT 0,
+    fee INT NOT NULL,
+    days INT NOT NULL,
+    status TINYINT NOT NULL DEFAULT 0,
+    note VARCHAR(300) NULL,
+    refund INT NOT NULL DEFAULT 0,
+    admin_id BIGINT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    decided_at DATETIME NULL,
+    expires_at DATETIME NULL,
+    INDEX verify_orders_user (user_id),
+    INDEX verify_orders_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* تاريخ التوثيق: متى مُنح العضو شارة موثّق (للتدقيق). */
   `ALTER TABLE users ADD COLUMN verified_at DATETIME NULL`,
   /* ---- wallet / credit (رصيد) ---- */

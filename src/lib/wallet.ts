@@ -6,11 +6,12 @@ import { toInt } from './utils';
 const ensure = ensureSchema;
 
 /** Reasons recorded on each wallet transaction (for member + admin history). */
-export type TxnReason = 'admin_credit' | 'admin_debit' | 'featured' | 'classified' | 'duplicate' | 'subscription' | 'refund' | 'topup' | 'bonus' | 'verify_gift' | 'store_show' | 'ad_show' | 'urgent' | 'bump' | 'points_convert' | 'referral' | 'welcome' | 'store_plus' | 'lead' | 'auction';
+export type TxnReason = 'admin_credit' | 'admin_debit' | 'featured' | 'classified' | 'duplicate' | 'subscription' | 'refund' | 'topup' | 'bonus' | 'verify_gift' | 'verify_fee' | 'store_show' | 'ad_show' | 'urgent' | 'bump' | 'points_convert' | 'referral' | 'welcome' | 'store_plus' | 'lead' | 'auction';
 export const REASON_LABELS: Record<TxnReason, string> = {
   topup: 'شحن رصيد (تحويل)',
   bonus: 'مكافأة شحن',
   verify_gift: 'هدية التوثيق',
+  verify_fee: 'رسوم توثيق المتجر',
   admin_credit: 'شحن رصيد من الإدارة',
   admin_debit: 'خصم من الإدارة',
   featured: 'إعلان مميّز',

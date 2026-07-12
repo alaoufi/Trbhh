@@ -463,10 +463,11 @@ async function CampaignsTab({ camp }: { camp?: string }) {
 }
 
 async function PricingTab() {
-  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction] = await Promise.all([
+  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction, verifyFeeCfg] = await Promise.all([
     getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
     pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
     getStorePlusPricing(), getLeadConfig(), getAuctionConfig(),
+    import('@/lib/settings').then((m) => m.getVerifyFeeConfig()),
   ]);
   const urgentPrices = await getUrgentPrices();
   const services: { key: PaidService; note?: string }[] = [
@@ -544,6 +545,8 @@ async function PricingTab() {
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">مكافأة أول شحن (ر.س)</span><input name="topupFirstBonus" type="number" min={0} defaultValue={promo.first} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">هدية التوثيق (ر.س — مرة واحدة)</span><input name="verifyGift" type="number" min={0} defaultValue={verifyGift} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">⭐ رسوم توثيق المتجر (ر.س — 0 = معطّل)</span><input name="verifyFee" type="number" min={0} defaultValue={verifyFeeCfg.fee} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">مدة التوثيق المدفوع (أيام)</span><input name="verifyFeeDays" type="number" min={1} defaultValue={verifyFeeCfg.days} className={num} /></label>
         </div>
       </div>
 

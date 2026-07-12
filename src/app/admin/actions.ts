@@ -532,6 +532,10 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting(SETTING_TOPUP_BONUS_MIN, '0');
   await setSetting(SETTING_TOPUP_FIRST_BONUS, nn('topupFirstBonus'));
   await setSetting(SETTING_VERIFY_GIFT, nn('verifyGift'));
+  // التوثيق المدفوع: الرسوم + المدة بالأيام (0 رسوم = الخدمة معطلة)
+  const { SETTING_VERIFY_FEE, SETTING_VERIFY_FEE_DAYS } = await import('@/lib/settings');
+  await setSetting(SETTING_VERIFY_FEE, nn('verifyFee'));
+  await setSetting(SETTING_VERIFY_FEE_DAYS, String(Math.max(1, parseInt(String(formData.get('verifyFeeDays') || '30')) || 30)));
   // المزادات: رسم الفتح + أقصى مدة
   await setSetting('auction_fee', nn('auctionFee'));
   await setSetting('auction_max_days', String(Math.min(30, Math.max(1, parseInt(String(formData.get('auctionMaxDays') || '7')) || 7))));
@@ -704,6 +708,56 @@ export async function trustUserAction(formData: FormData) {
   }
   revalidatePath('/admin/users');
   revalidatePath('/admin/verifications');
+}
+
+/** موافقة إدارة المتاجر على التوثيق المدفوع: خصم الرسوم أولاً — لا توثيق بلا رصيد كافٍ. */
+export async function approveVerifyOrderAction(formData: FormData) {
+  const session = await requireAction('stores', 'edit');
+  const id = Number(formData.get('id') || 0);
+  if (!id) return;
+  const { approvePaidVerification } = await import('@/lib/verify-paid');
+  const r = await approvePaidVerification(id, session.uid);
+  if (r.ok && r.order) {
+    await sendVerifyMessage(r.order.userId, 'msg_verify_paid_ok', 'تهانينا {name} 🎉 تمت الموافقة على توثيق متجرك وخُصمت الرسوم ({amount} ر.س) من رصيدك — شارة «موثّق» فعّالة الآن لمدة {days} يوماً.', '', { amount: String(r.order.fee), days: String(r.order.days) });
+    await logAdmin(session.uid, 'موافقة توثيق مدفوع', `طلب #${id} — العضو #${r.order.userId}`, `${r.order.fee} ر.س / ${r.order.days} يوم`);
+  } else if (r.reason === 'balance' && r.order) {
+    await sendVerifyMessage(r.order.userId, 'msg_verify_paid_balance', 'عذراً {name}، وافقت إدارة المتاجر على توثيق متجرك لكن رصيدك ({balance} ر.س) لا يغطي الرسوم ({amount} ر.س) — اشحن رصيدك من «محفظتي» وسيُفعَّل التوثيق فور اكتمال الرصيد وإعادة الموافقة.', '', { amount: String(r.order.fee), balance: String(r.balance ?? 0) });
+    await logAdmin(session.uid, 'موافقة توثيق مدفوع (رصيد غير كافٍ)', `طلب #${id} — العضو #${r.order.userId}`, `المطلوب ${r.order.fee} والرصيد ${r.balance ?? 0}`);
+    revalidatePath('/admin/stores');
+    redirect('/admin/stores?vbal=1');
+  }
+  revalidatePath('/admin/stores');
+}
+
+/** رفض طلب التوثيق المدفوع مع سبب يُحفظ ويصل العضو. */
+export async function rejectVerifyOrderAction(formData: FormData) {
+  const session = await requireAction('stores', 'edit');
+  const id = Number(formData.get('id') || 0);
+  const note = String(formData.get('note') || '').trim().slice(0, 300);
+  if (!id || !note) return;
+  const { rejectPaidVerification } = await import('@/lib/verify-paid');
+  const r = await rejectPaidVerification(id, session.uid, note);
+  if (r) {
+    await sendVerifyMessage(r.userId, 'msg_verify_paid_reject', 'عذراً {name}، رُفض طلب توثيق متجرك. السبب: {reason} — لم يُخصم أي مبلغ من رصيدك.', note);
+    await logAdmin(session.uid, 'رفض توثيق مدفوع', `طلب #${id} — العضو #${r.userId}`, note);
+  }
+  revalidatePath('/admin/stores');
+}
+
+/** إلغاء توثيق مدفوع نشط بسبب إلزامي + استرداد قيمة الأيام غير المستخدمة للرصيد. */
+export async function cancelVerifyOrderAction(formData: FormData) {
+  const session = await requireAction('stores', 'edit');
+  const id = Number(formData.get('id') || 0);
+  const reason = String(formData.get('reason') || '').trim().slice(0, 300);
+  if (!id || !reason) return;
+  const { cancelPaidVerification } = await import('@/lib/verify-paid');
+  const r = await cancelPaidVerification(id, session.uid, reason);
+  if (r) {
+    await sendVerifyMessage(r.order.userId, 'msg_verify_paid_cancel', 'عذراً {name}، أُلغي توثيق متجرك. السبب: {reason} — أُعيد لرصيدك {amount} ر.س قيمة الأيام غير المستخدمة.', reason, { amount: String(r.refund) });
+    await logAdmin(session.uid, 'إلغاء توثيق مدفوع', `طلب #${id} — العضو #${r.order.userId}`, `${reason} — استرداد ${r.refund} ر.س`);
+  }
+  revalidatePath('/admin/stores');
+  revalidatePath('/account/wallet');
 }
 
 /** رسالة إدارية للعضو بقرار التوثيق — النص من تبويب «النصوص» ({name}/{reason}). */

@@ -3,7 +3,7 @@ import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone
 import { requireAction } from '@/lib/roles';
 import { getPendingStores, adminStoreList, approvedTransfers, platformRequests, type AdminStore } from '@/lib/merchant';
 import { timeAgo } from '@/lib/utils';
-import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction, adminMessageStoreOwnerAction } from '../actions';
+import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction, adminMessageStoreOwnerAction, approveVerifyOrderAction, rejectVerifyOrderAction, cancelVerifyOrderAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
@@ -160,15 +160,67 @@ function StoreCard({ s }: { s: AdminStore }) {
   );
 }
 
-export default async function AdminStores({ searchParams }: { searchParams: Promise<{ msg?: string }> }) {
+export default async function AdminStores({ searchParams }: { searchParams: Promise<{ msg?: string; vbal?: string }> }) {
   await requireAction('stores', 'view');
-  const { msg } = await searchParams;
+  const { msg, vbal } = await searchParams;
   const [pending, stores, transfers, platformReqs] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers(), platformRequests()]);
+  const { listVerifyOrdersAdmin, refundOf } = await import('@/lib/verify-paid');
+  const verifyOrders = await listVerifyOrdersAdmin().catch(() => ({ pending: [], active: [] }));
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold text-primary">إدارة المتاجر</h1></div>
       {msg === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ أُرسلت الرسالة الرسمية لصاحب المتجر — تصله في «الرسائل» باسم الإدارة مع تنبيه.</div>}
       <p className="text-sm text-muted-foreground">معلومات كاملة عن كل متجر ونشاطه، مع الاعتماد والإيقاف والإنذار من المنتجات المخالفة. عند تكرار الإنذارات ٣ مرات يُوقف المتجر تلقائياً وتبقى الإنذارات موثّقة.</p>
+
+      {vbal === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 وافقت لكن رصيد العضو لا يغطي رسوم التوثيق — بقي الطلب معلقاً ووصلت العضو رسالة بشحن رصيده؛ أعد الموافقة بعد الشحن.</div>}
+
+      {/* ⭐ طلبات التوثيق المدفوع: الخصم عند الموافقة فقط — لا توثيق بلا رصيد كافٍ */}
+      {(verifyOrders.pending.length > 0 || verifyOrders.active.length > 0) && (
+        <div className="rounded-2xl border-2 border-sky-300 bg-sky-50/40 p-3">
+          <div className="mb-2 flex items-center gap-2 font-bold text-sky-700">⭐ التوثيق المدفوع — طلبات معلقة ({en(verifyOrders.pending.length)}) ونشطة ({en(verifyOrders.active.length)})</div>
+          <div className="space-y-2">
+            {verifyOrders.pending.map((o) => (
+              <div key={o.id} className="space-y-2 rounded-xl bg-white p-3 text-sm shadow-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link href={`/companies/${o.storeId}`} className="font-bold text-primary">{o.storeName || `متجر #${o.storeId}`}</Link>
+                  <Link href={`/users/${o.userId}`} className="text-xs font-bold text-muted-foreground underline">{o.userName}</Link>
+                  <span className="text-xs text-muted-foreground">طلب {timeAgo(o.at)}</span>
+                  <span className="mr-auto rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-extrabold text-sky-800">{en(o.fee)} ر.س / {en(o.days)} يوم</span>
+                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${o.balance >= o.fee ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700'}`}>رصيده: {en(o.balance)} ر.س {o.balance >= o.fee ? '✓ يكفي' : '✗ لا يكفي'}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <form action={approveVerifyOrderAction}>
+                    <input type="hidden" name="id" value={o.id} />
+                    <ConfirmSubmit msg={`تأكيد الموافقة على توثيق «${o.storeName || o.userName}»؟ سيُخصم ${o.fee} ر.س من رصيده فوراً ويُفعَّل التوثيق ${o.days} يوماً — إن لم يكفِ رصيده يبقى الطلب معلقاً ويُبلَّغ بالشحن.`} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> موافقة وخصم وتفعيل</ConfirmSubmit>
+                  </form>
+                  <form action={rejectVerifyOrderAction} className="flex min-w-0 flex-1 items-center gap-1">
+                    <input type="hidden" name="id" value={o.id} />
+                    <input name="note" required maxLength={300} placeholder="سبب الرفض (إلزامي — يصل العضو)" className="h-8 min-w-0 flex-1 rounded-lg border border-destructive/30 bg-white px-2 text-xs outline-none" />
+                    <ConfirmSubmit msg="تأكيد رفض طلب التوثيق؟ لا يُخصم شيء ويصل العضو السبب." className="flex shrink-0 items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit>
+                  </form>
+                </div>
+              </div>
+            ))}
+            {verifyOrders.active.map((o) => { const rf = refundOf(o); return (
+              <div key={o.id} className="space-y-2 rounded-xl bg-white p-3 text-sm shadow-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link href={`/companies/${o.storeId}`} className="font-bold text-primary">{o.storeName || `متجر #${o.storeId}`}</Link>
+                  <Link href={`/users/${o.userId}`} className="text-xs font-bold text-muted-foreground underline">{o.userName}</Link>
+                  <span className="mr-auto rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-extrabold text-emerald-800">✅ موثّق حتى {fmtDate(o.expiresAt)} (باقي {en(rf.remainingDays)} يوم)</span>
+                </div>
+                <details className="rounded-lg border border-slate-300">
+                  <summary className="cursor-pointer list-none px-3 py-1.5 text-xs font-bold text-slate-700">↩ إلغاء التوثيق (بسبب) — يُعاد له {en(rf.refund)} ر.س قيمة الأيام غير المستخدمة…</summary>
+                  <form action={cancelVerifyOrderAction} className="flex items-center gap-1 border-t border-slate-200 p-2">
+                    <input type="hidden" name="id" value={o.id} />
+                    <input name="reason" required maxLength={300} placeholder="سبب الإلغاء (إلزامي — يصل العضو)" className="h-8 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs outline-none" />
+                    <ConfirmSubmit msg={`تأكيد إلغاء التوثيق؟ تُسحب الشارة فوراً ويُعاد لرصيد العضو ${rf.refund} ر.س (${rf.remainingDays} يوم غير مستخدم من ${o.days}).`} className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-bold text-white">إلغاء واسترداد</ConfirmSubmit>
+                  </form>
+                </details>
+              </div>
+            ); })}
+          </div>
+        </div>
+      )}
 
       {/* طلبات عرض المنتجات في منصة تربح — إعلان المتجر يظهر تلقائياً، والمنتجات بموافقة */}
       {platformReqs.length > 0 && (

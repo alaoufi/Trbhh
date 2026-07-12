@@ -170,6 +170,18 @@ export async function requestStoreNameExceptionAction(formData: FormData) {
 
 /** مراسلة عضو من داخل لوحة المتجر: التاجر يدخل جوال العضو ورسالته —
  *  تصل العضو باسم المتجر في «الرسائل» ويستمر الحوار هناك. */
+/** طلب توثيق مدفوع من صاحب المتجر — يبقى معلقاً حتى موافقة إدارة المتاجر (الخصم عند الموافقة فقط). */
+export async function requestVerifyPaidAction() {
+  const session = await requireUser();
+  const { storeIdOfUser } = await import('@/lib/merchant');
+  const storeId = await storeIdOfUser(session.uid).catch(() => 0);
+  if (!storeId) redirect('/store');
+  const { requestPaidVerification } = await import('@/lib/verify-paid');
+  const r = await requestPaidVerification(session.uid, storeId);
+  revalidatePath('/store');
+  redirect(`/store?vreq=${r}`);
+}
+
 export async function storeMessageMemberAction(formData: FormData) {
   const session = await requireUser();
   const store = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true, store_name: true } }).catch(() => null);

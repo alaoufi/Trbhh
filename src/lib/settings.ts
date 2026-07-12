@@ -197,6 +197,9 @@ export const SETTING_TOPUP_BONUS_PCT = 'topup_bonus_pct';
 export const SETTING_TOPUP_BONUS_MIN = 'topup_bonus_min';
 export const SETTING_TOPUP_FIRST_BONUS = 'topup_first_bonus';
 export const SETTING_VERIFY_GIFT = 'verify_gift';
+/* التوثيق المدفوع: رسوم ومدة بالأيام — 0 = الخدمة معطلة. */
+export const SETTING_VERIFY_FEE = 'verify_fee';
+export const SETTING_VERIFY_FEE_DAYS = 'verify_fee_days';
 export type TopupPromo = { pct: number; min: number; first: number };
 export async function getTopupPromo(): Promise<TopupPromo> {
   const [pct, min, first] = await Promise.all([
@@ -205,6 +208,10 @@ export async function getTopupPromo(): Promise<TopupPromo> {
     getSettingNum(SETTING_TOPUP_FIRST_BONUS, 0),
   ]);
   return { pct: Math.max(0, pct), min: Math.max(0, min), first: Math.max(0, first) };
+}
+export async function getVerifyFeeConfig(): Promise<{ fee: number; days: number }> {
+  const [fee, days] = await Promise.all([getSettingNum(SETTING_VERIFY_FEE, 0), getSettingNum(SETTING_VERIFY_FEE_DAYS, 30)]);
+  return { fee: Math.max(0, Math.round(fee) || 0), days: Math.max(1, Math.round(days) || 30) };
 }
 export async function getVerifyGift(): Promise<number> {
   return Math.max(0, await getSettingNum(SETTING_VERIFY_GIFT, 0));

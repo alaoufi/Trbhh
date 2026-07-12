@@ -8,7 +8,7 @@ import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction, addStoreStaffAction, removeStoreStaffAction, requestStoreNameExceptionAction, storeMessageMemberAction } from '@/app/account/company/actions';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction, addStoreStaffAction, removeStoreStaffAction, requestStoreNameExceptionAction, storeMessageMemberAction, requestVerifyPaidAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
 import { getStoreSubPricing } from '@/lib/settings';
 import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen, DatabaseBackup } from 'lucide-react';
@@ -22,8 +22,8 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string }> }) {
-  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string; vreq?: string }> }) {
+  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq, vreq } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
@@ -78,6 +78,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const pendingNameReq = store ? await prisma.name_requests.findFirst({ where: { user_id: BigInt(session.uid), kind: 'store', status: 0 }, select: { new_name: true } }).catch(() => null) : null;
   // وضوح المدفوعات: رصيد التاجر + المتبقي بالأيام لكل عرض
   const merchBalance = store ? await (await import('@/lib/wallet')).getBalance(session.uid).catch(() => 0) : 0;
+  // التوثيق المدفوع: التسعير + آخر طلب للعضو + حالته الحالية
+  const verifyCfg = store ? await import('@/lib/settings').then((m) => m.getVerifyFeeConfig()).catch(() => ({ fee: 0, days: 30 })) : { fee: 0, days: 30 };
+  const myVerify = store && verifyCfg.fee > 0 ? await import('@/lib/verify-paid').then((m) => m.myVerifyOrder(session.uid)).catch(() => null) : null;
+  const verifyActive = !!(myVerify && myVerify.status === 1 && myVerify.expiresAt && new Date(myVerify.expiresAt) > new Date());
+  const ownerTrustedNow = store ? await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { trusted: true } }).then((u) => u?.trusted === 1).catch(() => false) : false;
   const daysLeft = (d: Date | null) => (d ? Math.max(0, Math.ceil((d.getTime() - Date.now()) / 86400000)) : 0);
   const myActiveAds = store ? (await getMyAds(session.uid)).filter((a) => a.status === 1) : [];
   const inStore = new Set(store ? await storeProductAdIds(store.id) : []);
@@ -506,6 +511,33 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           {adshow === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض إعلانك في تربح وخُصم المبلغ من رصيدك.</div>}
           {(show === 'needcredit' || adshow === 'needcredit') && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي{price ? ` (المطلوب ${price} ر.س)` : ''} — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
           {(show === 'err' || adshow === 'err') && <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs font-bold text-red-700">تعذّر التنفيذ — تأكد من الاختيار وحاول مجدداً.</div>}
+
+          {/* ⭐ توثيق المتجر المدفوع: طلب ← موافقة إدارة المتاجر ← خصم وتفعيل بمدة */}
+          {verifyCfg.fee > 0 && (
+            <div className="space-y-2 rounded-xl border border-sky-300 bg-sky-50/50 p-3">
+              <div className="text-sm font-bold">⭐ توثيق المتجر (شارة موثّق)</div>
+              <p className="text-[11px] text-muted-foreground">الرسوم: <b>{verifyCfg.fee} ر.س</b> لمدة <b>{verifyCfg.days} يوماً</b> — تُخصم من رصيدك <b>بعد موافقة إدارة المتاجر فقط</b>. وعند أي إلغاء تُعاد لرصيدك قيمة الأيام غير المستخدمة.</p>
+              {vreq === 'ok' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ أُرسل طلب التوثيق لإدارة المتاجر — لا خصم الآن؛ الخصم عند الموافقة.</div>}
+              {vreq === 'dup' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs font-bold text-amber-900">لديك طلب توثيق قيد المراجعة بالفعل.</div>}
+              {vreq === 'trusted' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">حسابك موثّق بالفعل ✓</div>}
+              {verifyActive ? (
+                <div className="rounded-lg bg-emerald-100 px-2 py-1.5 text-xs font-bold text-emerald-800">✅ موثّق (مدفوع) حتى {fmtD(new Date(myVerify!.expiresAt!))} — باقي {daysLeft(new Date(myVerify!.expiresAt!))} يوم.</div>
+              ) : ownerTrustedNow ? (
+                <div className="rounded-lg bg-emerald-100 px-2 py-1.5 text-xs font-bold text-emerald-800">✅ حسابك موثّق حالياً.</div>
+              ) : myVerify?.status === 0 ? (
+                <div className="rounded-lg bg-amber-100 px-2 py-1.5 text-xs font-bold text-amber-800">⏳ طلبك بانتظار موافقة إدارة المتاجر — تأكد أن رصيدك يغطي {verifyCfg.fee} ر.س وقت الموافقة (رصيدك الآن: {merchBalance} ر.س).</div>
+              ) : (
+                <>
+                  {myVerify?.status === 2 && myVerify.note && <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-xs font-bold text-red-700">❌ رُفض طلبك السابق: {myVerify.note} — يمكنك الطلب مجدداً.</div>}
+                  {myVerify?.status === 3 && myVerify.note && <div className="rounded-lg border border-slate-300 bg-slate-100 p-2 text-xs font-bold text-slate-700">↩ أُلغي توثيقك السابق: {myVerify.note}{myVerify.refund > 0 ? ` — أُعيد لرصيدك ${myVerify.refund} ر.س` : ''}.</div>}
+                  {myVerify?.status === 4 && <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs font-bold text-amber-900">⌛ انتهت مدة توثيقك السابق — جدّد بطلب جديد.</div>}
+                  <form action={requestVerifyPaidAction}>
+                    <ConfirmSubmit msg={`إرسال طلب توثيق المتجر لإدارة المتاجر؟ عند موافقتهم تُخصم ${verifyCfg.fee} ر.س من رصيدك ويُفعَّل التوثيق ${verifyCfg.days} يوماً.`} className="btn-3d rounded-lg bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700">⭐ اطلب توثيق متجرك ({verifyCfg.fee} ر.س / {verifyCfg.days} يوم)</ConfirmSubmit>
+                  </form>
+                </>
+              )}
+            </div>
+          )}
 
           {(showPricing.store.w2 > 0 || showPricing.store.m1 > 0 || showPricing.store.y1 > 0) && (
             <div className="space-y-2 rounded-xl border border-primary/15 bg-primary/5 p-3">

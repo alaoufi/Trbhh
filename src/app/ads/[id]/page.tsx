@@ -214,7 +214,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <select name="duration" className="h-9 rounded-lg border border-amber-300 bg-white px-2 text-xs font-bold">
               {featuredOpts.map((o) => <option key={o.key} value={o.key}>{o.label} — {o.price} ر.س</option>)}
             </select>
-            <button className="btn-3d rounded-lg bg-amber-500 px-3 py-2 text-sm font-extrabold text-white">تمييز الآن</button>
+            <ConfirmSubmit msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="btn-3d rounded-lg bg-amber-500 px-3 py-2 text-sm font-extrabold text-white">تمييز الآن</ConfirmSubmit>
           </span>
         </form>
       )}
@@ -233,7 +233,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <select name="hours" className="h-9 rounded-lg border border-red-300 bg-white px-2 text-xs font-bold">
               {urgentExtras.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours}>{p0.hours} ساعة — {p0.price} ر.س</option>)}
             </select>
-            <button className="btn-3d rounded-lg bg-red-600 px-3 py-2 text-sm font-extrabold text-white">تفعيل الآن</button>
+            <ConfirmSubmit msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="btn-3d rounded-lg bg-red-600 px-3 py-2 text-sm font-extrabold text-white">تفعيل الآن</ConfirmSubmit>
           </span>
         </form>
       )}
@@ -251,7 +251,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <form action={bumpAdAction}>
               <input type="hidden" name="adId" value={ad.id} />
               <input type="hidden" name="back" value="ad" />
-              <button className="btn-3d rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100" title="ارفع إعلانك لأعلى القوائم">⬆ حدّث إعلانك للأعلى</button>
+              <ConfirmSubmit msg="تأكيد تحديث الإعلان (رفعه لأعلى القوائم)؟ إن لم يكن التحديث المجاني متاحاً يُخصم السعر من رصيدك." title="ارفع إعلانك لأعلى القوائم" className="btn-3d rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100">⬆ حدّث إعلانك للأعلى</ConfirmSubmit>
             </form>
           )}
           {auctionOn && (
@@ -456,9 +456,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             {canArchive && (
               <form action={adminArchiveAdAction}>
                 <input type="hidden" name="adId" value={ad.id} />
-                <button className="flex w-full items-center justify-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
+                <ConfirmSubmit msg="تأكيد أرشفة/إظهار هذا الإعلان؟ الأرشفة تخفيه من الموقع (ويُحذف تلقائياً بعد 30 يوماً)." className="flex w-full items-center justify-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
                   <Archive className="h-4 w-4" /> أرشفة / إظهار
-                </button>
+                </ConfirmSubmit>
               </form>
             )}
             {canBanSeller && ad.seller && (

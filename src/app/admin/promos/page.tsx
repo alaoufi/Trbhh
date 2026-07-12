@@ -60,10 +60,10 @@ function Card({ p }: { p: import('@/lib/promos').Promo }) {
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {p.status !== 'active' && (
-            <form action={approvePromoAction}><input type="hidden" name="id" value={p.id} /><button className="flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white"><Check className="h-3.5 w-3.5" /> موافقة ونشر</button></form>
+            <form action={approvePromoAction}><input type="hidden" name="id" value={p.id} /><ConfirmSubmit msg="تأكيد الموافقة على هذا الإعلان الترويجي ونشره؟" className="flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white"><Check className="h-3.5 w-3.5" /> موافقة ونشر</ConfirmSubmit></form>
           )}
           {p.status === 'pending' && (
-            <form action={rejectPromoAction}><input type="hidden" name="id" value={p.id} /><button className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs"><X className="h-3.5 w-3.5" /> رفض</button></form>
+            <form action={rejectPromoAction}><input type="hidden" name="id" value={p.id} /><ConfirmSubmit msg="تأكيد رفض هذا الإعلان الترويجي؟" className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit></form>
           )}
           <form action={deletePromoAction}><input type="hidden" name="id" value={p.id} /><ConfirmSubmit msg="حذف هذا الإعلان الترويجي نهائياً؟ لا يمكن التراجع." className="flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1 text-xs text-destructive"><Trash2 className="h-3.5 w-3.5" /> حذف</ConfirmSubmit></form>
         </div>

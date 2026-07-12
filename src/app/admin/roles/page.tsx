@@ -5,6 +5,7 @@ import {
 } from '@/lib/roles';
 import { Button } from '@/components/ui/button';
 import { saveRolePermsAction } from '../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الأدوار والصلاحيات' };
@@ -48,7 +49,7 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
             <input type="hidden" name="role" value={role} />
             <div className={`flex items-center justify-between bg-gradient-to-br ${ROLE_COLORS[role]} p-3 text-white`}>
               <h2 className="font-extrabold drop-shadow">{ROLE_LABELS[role]}</h2>
-              <Button size="sm" className="bg-white/15 hover:bg-white/25">حفظ</Button>
+              <ConfirmSubmit msg="حفظ صلاحيات هذا الدور؟ تُطبَّق فوراً على كل من يحمله." className="rounded-md bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/25">حفظ</ConfirmSubmit>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[420px] text-center text-sm">

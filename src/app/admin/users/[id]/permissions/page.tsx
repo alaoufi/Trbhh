@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { requireAction, getUserPermKeys, SERVICES, ACTION_LABELS, ROLE_LABELS, key, type Role } from '@/lib/roles';
 import { setUserPermsAction, applyPresetAction } from '@/app/admin/actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'صلاحيات المستخدم' };
@@ -98,7 +99,7 @@ export default async function UserPermissionsPage({
             </tbody>
           </table>
         </div>
-        <button disabled={isRootAdmin} className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">حفظ الصلاحيات</button>
+        <ConfirmSubmit msg="حفظ الصلاحيات المحددة لهذا العضو؟ تُطبَّق على وصوله للوحة الإدارة فوراً." disabled={isRootAdmin} className="rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">حفظ الصلاحيات</ConfirmSubmit>
       </form>
     </div>
   );

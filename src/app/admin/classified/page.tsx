@@ -79,8 +79,8 @@ export default async function AdminClassified() {
                   <input type="hidden" name="id" value={c.id} />
                   <input type="hidden" name="action" value={enabled ? 'disable' : 'enable'} />
                   {enabled
-                    ? <button className="flex items-center gap-1 rounded-md border border-amber-400 px-2.5 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-50"><Pause className="h-3.5 w-3.5" /> تعطيل</button>
-                    : <button className="flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white"><Play className="h-3.5 w-3.5" /> تنشيط</button>}
+                    ? <ConfirmSubmit msg="تعطيل هذا المبوّب؟ يختفي من الموقع حتى تنشيطه." className="flex items-center gap-1 rounded-md border border-amber-400 px-2.5 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-50"><Pause className="h-3.5 w-3.5" /> تعطيل</ConfirmSubmit>
+                    : <ConfirmSubmit msg="تنشيط هذا المبوّب؟ يعود للظهور فوراً." className="flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white"><Play className="h-3.5 w-3.5" /> تنشيط</ConfirmSubmit>}
                 </form>
 
                 <form action={classifiedLifetimeAction} className="flex items-center gap-1 rounded-md border border-primary/30 p-0.5">

@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { timeAgo } from '@/lib/utils';
 import { openNotifAction, archiveAllNotifsAction } from './actions';
 import { AdminPager } from '@/components/admin-pager';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'التنبيهات' };
@@ -56,9 +57,9 @@ export default async function NotificationsPage({ searchParams }: { searchParams
         {fresh.length > 0 && <span className="rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-extrabold text-white">{fresh.length} جديد</span>}
         {fresh.length > 0 && (
           <form action={archiveAllNotifsAction} className="mr-auto">
-            <button className="flex items-center gap-1.5 rounded-full border-2 border-primary/25 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5">
+            <ConfirmSubmit msg="نقل كل التنبيهات الجديدة إلى الأرشيف؟" className="flex items-center gap-1.5 rounded-full border-2 border-primary/25 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5">
               <CheckCheck className="h-3.5 w-3.5" /> نقل الكل للأرشيف
-            </button>
+            </ConfirmSubmit>
           </form>
         )}
       </div>

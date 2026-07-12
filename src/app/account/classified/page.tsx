@@ -63,7 +63,7 @@ export default async function MyClassifiedPage({ searchParams }: { searchParams:
                       <option key={d.key} value={d.key}>{d.label} — {pricing.classified[d.key]} ر.س</option>
                     ))}
                   </select>
-                  <button className="flex items-center gap-1 rounded-lg bg-primary px-2 py-1.5 text-[11px] font-bold text-white"><RefreshCw className="h-3 w-3" /> تفعيل</button>
+                  <ConfirmSubmit msg="تأكيد إعادة تفعيل المبوّب للمدة المختارة؟ سيُخصم السعر من رصيدك." className="flex items-center gap-1 rounded-lg bg-primary px-2 py-1.5 text-[11px] font-bold text-white"><RefreshCw className="h-3 w-3" /> تفعيل</ConfirmSubmit>
                 </form>
               )}
               <div className="flex gap-1.5">

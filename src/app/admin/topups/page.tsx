@@ -5,6 +5,7 @@ import { listTopupsAdmin } from '@/lib/wallet';
 import { mediaUrl } from '@/lib/media';
 import { approveTopupAction, rejectTopupAction } from '../actions';
 import { AdminPager } from '@/components/admin-pager';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'طلبات شحن الرصيد' };
@@ -85,14 +86,14 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
               <div className="space-y-2 border-t border-primary/10 pt-2">
                 <form action={approveTopupAction}>
                   <input type="hidden" name="id" value={r.id} />
-                  <button className="btn-3d w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white sm:w-auto">✓ تأكيد وصول المبلغ وإضافته للرصيد</button>
+                  <ConfirmSubmit msg="تأكيد وصول المبلغ وإضافته لرصيد العضو فوراً؟" className="btn-3d w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white sm:w-auto">✓ تأكيد وصول المبلغ وإضافته للرصيد</ConfirmSubmit>
                 </form>
                 <details className="rounded-lg border border-red-200">
                   <summary className="cursor-pointer list-none px-3 py-2 text-sm font-bold text-red-600">رفض الطلب (مع سبب)…</summary>
                   <form action={rejectTopupAction} className="space-y-2 p-3">
                     <input type="hidden" name="id" value={r.id} />
                     <textarea name="reason" rows={2} required placeholder="سبب الرفض — يُحفظ ويُرسل للعضو" className="w-full rounded-lg border border-red-300 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-red-300" />
-                    <button className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">رفض وإرسال السبب للعضو</button>
+                    <ConfirmSubmit msg="تأكيد رفض طلب الشحن؟ سيصل العضو رسالة بالسبب المكتوب." className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">رفض وإرسال السبب للعضو</ConfirmSubmit>
                   </form>
                 </details>
               </div>

@@ -14,6 +14,7 @@ import { Countdown } from '@/components/countdown';
 import { pointsEnabled, getPoints, getPointsConfig } from '@/lib/points';
 import { mediaUrl } from '@/lib/media';
 import { buyDupPackAction, requestTopupAction, convertPointsAction } from '../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'محفظتي' };
@@ -82,7 +83,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           </div>
           {pts >= ptsCfg.minConvert && (
             <form action={convertPointsAction}>
-              <button className="btn-3d rounded-full bg-violet-600 px-4 py-2 text-sm font-bold text-white">حوّل نقاطك لرصيد</button>
+              <ConfirmSubmit msg="تحويل نقاطك إلى رصيد الآن؟ التحويل نهائي ولا يمكن عكسه." className="btn-3d rounded-full bg-violet-600 px-4 py-2 text-sm font-bold text-white">حوّل نقاطك لرصيد</ConfirmSubmit>
             </form>
           )}
         </div>
@@ -200,7 +201,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
                 <select name="duration" className="h-9 w-full rounded-lg border bg-background px-2 text-xs">
                   {DURATIONS.filter((d) => p[d.key] > 0).map((d) => <option key={d.key} value={d.key}>{d.label} — {p[d.key]} ر.س</option>)}
                 </select>
-                <button className="w-full rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">شراء</button>
+                <ConfirmSubmit msg="تأكيد شراء الباقة المختارة؟ يُخصم السعر من رصيدك فوراً." className="w-full rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">شراء</ConfirmSubmit>
               </form>
             ))}
           </div>

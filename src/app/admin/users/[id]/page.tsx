@@ -8,6 +8,7 @@ import { getBalance, listTxns } from '@/lib/wallet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { updateUserAction, sendUserPasswordAction, setUserPasswordAction, adjustUserBalanceAction } from '../../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'بيانات العضو' };
@@ -58,7 +59,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
         <label className="block space-y-1"><span className="flex items-center gap-1 text-sm font-bold"><User className="h-4 w-4" /> الاسم</span><input name="name" defaultValue={u.name || ''} className={field} /></label>
         <label className="block space-y-1"><span className="flex items-center gap-1 text-sm font-bold"><Phone className="h-4 w-4" /> الجوال</span><input name="phoneNumber" defaultValue={u.phoneNumber || ''} dir="ltr" className={field} /></label>
         <label className="block space-y-1"><span className="flex items-center gap-1 text-sm font-bold"><Mail className="h-4 w-4" /> البريد</span><input name="email" defaultValue={u.email || ''} dir="ltr" className={field} /></label>
-        <Button className="gap-2"><Save className="h-4 w-4" /> حفظ التعديلات</Button>
+        <ConfirmSubmit msg="حفظ تعديلات بيانات هذا العضو (الاسم/الجوال/البريد)؟" className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground hover:bg-primary/90"><Save className="h-4 w-4" /> حفظ التعديلات</ConfirmSubmit>
       </form>
 
       {/* set password manually — works without SMS */}
@@ -67,7 +68,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
         <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><KeyRound className="h-4 w-4" /> تعيين كلمة مرور يدوياً</div>
         <p className="text-xs font-bold text-muted-foreground">اكتب كلمة مرور جديدة للعضو مباشرة (بلا رسالة)، ثم أبلغه بها. يحلّ أي مشكلة دخول فوراً.</p>
         <input name="password" type="text" minLength={4} required placeholder="كلمة المرور الجديدة (4 خانات فأكثر)" className={field} />
-        <Button className="gap-2"><Save className="h-4 w-4" /> تعيين كلمة المرور</Button>
+        <ConfirmSubmit msg="تعيين كلمة المرور المكتوبة لهذا العضو؟ تحلّ محل كلمته الحالية فوراً." className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground hover:bg-primary/90"><Save className="h-4 w-4" /> تعيين كلمة المرور</ConfirmSubmit>
       </form>
 
       {/* send new password via SMS */}
@@ -75,7 +76,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
         <input type="hidden" name="userId" value={uid} />
         <div className="flex items-center gap-2 text-sm font-extrabold text-amber-800"><KeyRound className="h-4 w-4" /> إرسال كلمة مرور جديدة</div>
         <p className="text-xs font-bold text-amber-800">يُنشئ كلمة مرور جديدة للعضو ويرسلها إلى جواله عبر رسالة نصية (يتطلّب ضبط بوابة الرسائل).</p>
-        <button className="inline-flex h-10 items-center gap-2 rounded-lg bg-amber-600 px-4 text-sm font-extrabold text-white hover:bg-amber-700"><KeyRound className="h-4 w-4" /> إرسال كلمة المرور</button>
+        <ConfirmSubmit msg="إنشاء كلمة مرور جديدة وإرسالها لجوال العضو؟ تحلّ محل كلمته الحالية." className="inline-flex h-10 items-center gap-2 rounded-lg bg-amber-600 px-4 text-sm font-extrabold text-white hover:bg-amber-700"><KeyRound className="h-4 w-4" /> إرسال كلمة المرور</ConfirmSubmit>
       </form>
 
       {/* المحفظة / الرصيد */}
@@ -91,8 +92,8 @@ export default async function AdminUserDetail({ params, searchParams }: { params
             <input name="note" placeholder="ملاحظة (اختياري)" className={`${field} flex-1`} />
           </div>
           <div className="flex gap-2">
-            <button name="kind" value="credit" className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700"><Plus className="h-4 w-4" /> شحن رصيد</button>
-            <button name="kind" value="debit" className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-500 px-3 py-2 text-sm font-bold text-white hover:bg-red-600"><Minus className="h-4 w-4" /> خصم</button>
+            <ConfirmSubmit msg="تأكيد شحن المبلغ المدخل لرصيد هذا العضو؟" name="kind" value="credit" className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700"><Plus className="h-4 w-4" /> شحن رصيد</ConfirmSubmit>
+            <ConfirmSubmit msg="تأكيد خصم المبلغ المدخل من رصيد هذا العضو؟" name="kind" value="debit" className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-500 px-3 py-2 text-sm font-bold text-white hover:bg-red-600"><Minus className="h-4 w-4" /> خصم</ConfirmSubmit>
           </div>
         </form>
         {txns.length > 0 && (

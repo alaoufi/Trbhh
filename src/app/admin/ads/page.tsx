@@ -174,17 +174,17 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
               {a.status === 0 && (
                 <form action={adminToggleAdStatusAction}>
                   <input type="hidden" name="adId" value={toInt(a.id)} />
-                  <button className="flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700" title={a.data_archive ? 'إعادة النشر من الأرشيف' : 'موافقة ونشر فوري'}><Check className="h-3.5 w-3.5" /> {a.data_archive ? 'إعادة نشر' : 'موافقة ونشر'}</button>
+                  <ConfirmSubmit msg={a.data_archive ? 'تأكيد إعادة نشر هذا الإعلان من الأرشيف؟ سيظهر للزوار فوراً.' : 'تأكيد الموافقة على هذا الإعلان ونشره فوراً؟'} title={a.data_archive ? 'إعادة النشر من الأرشيف' : 'موافقة ونشر فوري'} className="flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"><Check className="h-3.5 w-3.5" /> {a.data_archive ? 'إعادة نشر' : 'موافقة ونشر'}</ConfirmSubmit>
                 </form>
               )}
               <form action={adminToggleSpecialAction}>
                 <input type="hidden" name="adId" value={toInt(a.id)} />
-                <button className={`flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold ${a.adsSpecial === 'checked' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'text-muted-foreground hover:bg-secondary'}`} title={a.adsSpecial === 'checked' ? 'إلغاء التمييز' : 'تمييز الإعلان'}>
+                <ConfirmSubmit msg={a.adsSpecial === 'checked' ? 'إلغاء تمييز هذا الإعلان؟' : 'تمييز هذا الإعلان (يظهر بإطار ذهبي في مقدمة القوائم)؟'} title={a.adsSpecial === 'checked' ? 'إلغاء التمييز' : 'تمييز الإعلان'} className={`flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold ${a.adsSpecial === 'checked' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'text-muted-foreground hover:bg-secondary'}`}>
                   <Star className={`h-3.5 w-3.5 ${a.adsSpecial === 'checked' ? 'fill-amber-400 text-amber-500' : ''}`} /> {a.adsSpecial === 'checked' ? 'إلغاء التمييز' : 'تمييز'}
-                </button>
+                </ConfirmSubmit>
               </form>
               {a.status === 1 && (
-                <form action={adminToggleAdStatusAction}><input type="hidden" name="adId" value={toInt(a.id)} /><button className="flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold hover:bg-secondary" title="إيقاف/حجب"><EyeOff className="h-3.5 w-3.5" /> إيقاف</button></form>
+                <form action={adminToggleAdStatusAction}><input type="hidden" name="adId" value={toInt(a.id)} /><ConfirmSubmit msg="تأكيد إيقاف هذا الإعلان وأرشفته؟ سيختفي من الموقع (يُحذف تلقائياً بعد 30 يوماً من الأرشفة)." title="إيقاف/حجب" className="flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold hover:bg-secondary"><EyeOff className="h-3.5 w-3.5" /> إيقاف</ConfirmSubmit></form>
               )}
               <form action={adminDeleteAdAction}><input type="hidden" name="adId" value={toInt(a.id)} /><ConfirmSubmit msg={`حذف الإعلان «${a.title?.trim() || `#${toInt(a.id)}`}» نهائياً؟ لا يمكن التراجع.`} title="حذف نهائي" className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف</ConfirmSubmit></form>
             </div>

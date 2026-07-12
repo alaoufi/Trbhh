@@ -115,7 +115,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                 </form>
                 <form action={dismissDeletionRequestAction}>
                   <input type="hidden" name="id" value={r.id} />
-                  <button className="rounded-md border px-3 py-1 text-xs font-bold text-muted-foreground hover:bg-secondary">تجاهل</button>
+                  <ConfirmSubmit msg="تجاهل طلب حذف الحساب هذا؟ يُزال من القائمة دون حذف الحساب." className="rounded-md border px-3 py-1 text-xs font-bold text-muted-foreground hover:bg-secondary">تجاهل</ConfirmSubmit>
                 </form>
               </span>
             </div>
@@ -175,14 +175,14 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                       {packages.map((p) => <option key={p.id} value={p.id}>{p.name}{p.price === 0 ? ' (مجانية)' : ` (${p.price})`}</option>)}
                     </select>
                     <input name="days" type="number" min={0} placeholder="أيام" title="مدة الاشتراك بالأيام (0 = دائم)" className="w-14 rounded-md border bg-background px-1.5 py-1 text-xs" />
-                    <button className="rounded-md border px-2 py-1 text-xs hover:bg-secondary">حفظ</button>
+                    <ConfirmSubmit msg="تأكيد تغيير باقة هذا العضو بالاختيار والمدة المحددين؟" className="rounded-md border px-2 py-1 text-xs hover:bg-secondary">حفظ</ConfirmSubmit>
                   </form>
                 </td>
                 <td className="p-3">
                   <div className="flex flex-wrap items-center gap-1">
-                    <form action={trustUserAction}><input type="hidden" name="userId" value={id} /><button className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Check className="h-3 w-3" />{u.trusted === 1 ? 'إلغاء التوثيق' : 'توثيق'}</button></form>
+                    <form action={trustUserAction}><input type="hidden" name="userId" value={id} /><ConfirmSubmit msg={u.trusted === 1 ? 'إلغاء توثيق هذا العضو؟ تُسحب الشارة فوراً.' : 'توثيق هذا العضو؟ تظهر شارة موثّق فوراً.'} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Check className="h-3 w-3" />{u.trusted === 1 ? 'إلغاء التوثيق' : 'توثيق'}</ConfirmSubmit></form>
                     {banned ? (
-                      <form action={unbanUserAction}><input type="hidden" name="userId" value={id} /><button className="flex items-center gap-1 rounded-md border border-emerald-400 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50"><Ban className="h-3 w-3" /> رفع الحظر</button></form>
+                      <form action={unbanUserAction}><input type="hidden" name="userId" value={id} /><ConfirmSubmit msg="رفع الحظر عن هذا العضو؟ تعود إعلاناته للظهور فوراً." className="flex items-center gap-1 rounded-md border border-emerald-400 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50"><Ban className="h-3 w-3" /> رفع الحظر</ConfirmSubmit></form>
                     ) : (
                       <>
                         <form action={banUserAction} className="flex items-center gap-1 rounded-md border border-destructive/30 p-0.5">

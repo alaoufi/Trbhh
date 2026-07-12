@@ -54,7 +54,7 @@ export default async function AdminNotifsPage({ searchParams }: { searchParams: 
         <h1 className="text-xl font-bold text-primary">تنبيهات الأعضاء</h1>
         {readC > 0 && (
           <form action={adminClearReadNotifsAction} className="mr-auto">
-            <button className="flex items-center gap-1.5 rounded-full border border-red-300 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /> حذف كل المقروء ({readC})</button>
+            <ConfirmSubmit msg={`حذف كل التنبيهات المقروءة (${readC}) نهائياً؟`} className="flex items-center gap-1.5 rounded-full border border-red-300 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /> حذف كل المقروء ({readC})</ConfirmSubmit>
           </form>
         )}
       </div>

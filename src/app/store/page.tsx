@@ -230,7 +230,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                 <input type="hidden" name="plan" value={plan} />
                 <div className="text-xs font-bold text-muted-foreground">{label}</div>
                 <div className="text-lg font-extrabold text-primary">{en(price)} <span className="text-[10px]">ر.س</span></div>
-                <Button size="sm" className="w-full">{subState.state === 'active' || subState.state === 'grace' ? 'تجديد' : 'اشتراك'}</Button>
+                <ConfirmSubmit msg="تأكيد الاشتراك/التجديد للخطة المختارة؟ تُخصم الرسوم من رصيدك فوراً." className="w-full rounded-md bg-primary px-3 py-1.5 text-sm font-bold text-primary-foreground">{subState.state === 'active' || subState.state === 'grace' ? 'تجديد' : 'اشتراك'}</ConfirmSubmit>
               </form>
             ))}
           </div>
@@ -247,7 +247,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                 </div>
                 <form action={toggleAutoRenewAction}>
                   <input type="hidden" name="on" value={storeXRow?.auto_renew === 1 ? '0' : '1'} />
-                  <button className={`btn-3d rounded-lg px-3 py-1.5 text-xs font-bold text-white ${storeXRow?.auto_renew === 1 ? 'bg-slate-500' : 'bg-emerald-600'}`}>{storeXRow?.auto_renew === 1 ? 'إيقاف التجديد التلقائي' : 'تفعيل التجديد التلقائي'}</button>
+                  <ConfirmSubmit msg={storeXRow?.auto_renew === 1 ? 'إيقاف التجديد التلقائي؟ لن يُجدَّد اشتراكك تلقائياً.' : 'تفعيل التجديد التلقائي؟ يُخصم سعر آخر خطة من رصيدك قبل الانتهاء بيوم.'} className={`btn-3d rounded-lg px-3 py-1.5 text-xs font-bold text-white ${storeXRow?.auto_renew === 1 ? 'bg-slate-500' : 'bg-emerald-600'}`}>{storeXRow?.auto_renew === 1 ? 'إيقاف التجديد التلقائي' : 'تفعيل التجديد التلقائي'}</ConfirmSubmit>
                 </form>
               </div>
               {storeXRow?.auto_renew === 1 && !storeXRow?.sub_plan && <p className="mt-1 text-[11px] font-bold text-amber-700">⚠ يعمل التجديد التلقائي بعد أول دفعة اشتراك (لتحديد الخطة).</p>}
@@ -271,7 +271,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                 <input type="hidden" name="plan" value={plan} />
                 <div className="text-xs font-bold text-muted-foreground">{label}</div>
                 <div className="text-lg font-extrabold text-amber-700">{en(p0)} <span className="text-[10px]">ر.س</span></div>
-                <button className="btn-3d w-full rounded-lg bg-amber-500 px-2 py-1.5 text-xs font-bold text-white">{plusActive ? 'تمديد' : 'اشتراك Plus'}</button>
+                <ConfirmSubmit msg="تأكيد اشتراك/تمديد متجر Plus للمدة المختارة؟ يُخصم السعر من رصيدك فوراً." className="btn-3d w-full rounded-lg bg-amber-500 px-2 py-1.5 text-xs font-bold text-white">{plusActive ? 'تمديد' : 'اشتراك Plus'}</ConfirmSubmit>
               </form>
             ))}
           </div>
@@ -373,7 +373,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                   <span className="min-w-0 flex-1 truncate">{c.discount}</span>
                   {c.expiresAt && <span className="text-[11px] text-muted-foreground">حتى {c.expiresAt}</span>}
                   <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${c.active ? 'bg-emerald-100 text-emerald-700' : 'bg-secondary text-muted-foreground'}`}>{c.active ? 'فعّال' : 'موقوف'}</span>
-                  <form action={toggleStoreCouponAction}><input type="hidden" name="id" value={c.id} /><button className="rounded-lg border px-2 py-1 text-[11px] font-bold text-amber-700">{c.active ? 'إيقاف' : 'تفعيل'}</button></form>
+                  <form action={toggleStoreCouponAction}><input type="hidden" name="id" value={c.id} /><ConfirmSubmit msg={c.active ? `إيقاف الكوبون «${c.code}»؟` : `تفعيل الكوبون «${c.code}»؟`} className="rounded-lg border px-2 py-1 text-[11px] font-bold text-amber-700">{c.active ? 'إيقاف' : 'تفعيل'}</ConfirmSubmit></form>
                   <form action={deleteStoreCouponAction}><input type="hidden" name="id" value={c.id} /><ConfirmSubmit msg={`حذف الكوبون «${c.code}» نهائياً؟`} className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">حذف</ConfirmSubmit></form>
                 </li>
               ))}
@@ -404,7 +404,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                   {m.phone && <span dir="ltr" className="text-xs text-muted-foreground">{m.phone}</span>}
                   <form action={removeStoreStaffAction} className="mr-auto">
                     <input type="hidden" name="userId" value={m.userId} />
-                    <button className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">إزالة</button>
+                    <ConfirmSubmit msg={`إزالة الموظف «${m.name}» من متجرك؟ يفقد صلاحية إدارة المنتجات فوراً.`} className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">إزالة</ConfirmSubmit>
                   </form>
                 </li>
               ))}
@@ -516,7 +516,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                 {([['w2', 'أسبوعان'], ['m1', 'شهر'], ['y1', 'سنة']] as const).filter(([k]) => showPricing.store[k] > 0).map(([k, label]) => (
                   <form key={k} action={buyStoreShowAction} className="text-center">
                     <input type="hidden" name="duration" value={k} />
-                    <button className="btn-3d w-full rounded-lg bg-primary px-2 py-2 text-xs font-bold text-white">{label}<br /><span className="text-[10px] opacity-90">{showPricing.store[k]} ر.س</span></button>
+                    <ConfirmSubmit msg={`تأكيد شراء عرض المتجر في تربح (${label}) بسعر ${showPricing.store[k]} ر.س؟ يُخصم من رصيدك فوراً.`} className="btn-3d w-full rounded-lg bg-primary px-2 py-2 text-xs font-bold text-white">{label}<br /><span className="text-[10px] opacity-90">{showPricing.store[k]} ر.س</span></ConfirmSubmit>
                   </form>
                 ))}
               </div>
@@ -538,7 +538,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                     <option key={a.key} value={a.key}>{a.key === 'gold' ? '🥇' : a.key === 'silver' ? '🥈' : '⭐'} {a.label} — {a.days} يوماً — {a.price} ر.س</option>
                   ))}
                 </select>
-                <button className="btn-3d w-full rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white">شراء وعرض الإعلان في تربح</button>
+                <ConfirmSubmit msg="تأكيد شراء عرض الإعلان المحدد في تربح للباقة المختارة؟ يُخصم السعر من رصيدك فوراً." className="btn-3d w-full rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white">شراء وعرض الإعلان في تربح</ConfirmSubmit>
               </form>
               {shownAds.length > 0 && (
                 <div className="space-y-1 border-t border-amber-200 pt-2 text-[11px] font-bold">
@@ -605,7 +605,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                     <a href={`/store/backup/download/${b.id}`} className="rounded-lg border px-2.5 py-1 text-xs font-bold text-primary hover:bg-secondary">تنزيل</a>
                     <form action={storeRestoreAction}>
                       <input type="hidden" name="id" value={b.id} />
-                      <button className="rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-amber-700">استعادة</button>
+                      <ConfirmSubmit msg="تأكيد استعادة هذه النسخة؟ ستستبدل بيانات متجرك الحالية ببيانات النسخة — لا يمكن التراجع." className="rounded-lg bg-amber-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-amber-700">استعادة</ConfirmSubmit>
                     </form>
                   </span>
                 </li>
@@ -619,7 +619,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             <div className="mb-1 text-xs font-bold text-muted-foreground">استعادة من ملف نسخة احتياطية</div>
             <form action={storeRestoreFileAction} className="flex flex-wrap items-center gap-2">
               <input type="file" name="file" accept="application/json,.json" required className="min-w-0 flex-1 text-xs" />
-              <button className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700">استعادة من الملف</button>
+              <ConfirmSubmit msg="تأكيد الاستعادة من الملف؟ ستستبدل بيانات متجرك الحالية ببيانات الملف — لا يمكن التراجع." className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700">استعادة من الملف</ConfirmSubmit>
             </form>
           </div>
         </div>
@@ -662,8 +662,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             بموافقتك ينتقل المتجر بكامل معلوماته (الاسم والجوال والبريد) بعد تنفيذ الإدارة، وتعود أنت عضواً عادياً.
           </p>
           <div className="flex gap-2">
-            <form action={respondTransferAction}><input type="hidden" name="storeId" value={store.id} /><input type="hidden" name="action" value="accept" /><button className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white">أوافق على النقل</button></form>
-            <form action={respondTransferAction}><input type="hidden" name="storeId" value={store.id} /><input type="hidden" name="action" value="reject" /><button className="rounded-lg border border-destructive/40 px-4 py-1.5 text-xs font-bold text-destructive">رفض</button></form>
+            <form action={respondTransferAction}><input type="hidden" name="storeId" value={store.id} /><input type="hidden" name="action" value="accept" /><ConfirmSubmit msg="تأكيد الموافقة على نقل ملكية المتجر؟ بعد تنفيذ الإدارة يصبح المتجر ملكاً للطرف الآخر نهائياً." className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white">أوافق على النقل</ConfirmSubmit></form>
+            <form action={respondTransferAction}><input type="hidden" name="storeId" value={store.id} /><input type="hidden" name="action" value="reject" /><ConfirmSubmit msg="رفض طلب نقل الملكية؟" className="rounded-lg border border-destructive/40 px-4 py-1.5 text-xs font-bold text-destructive">رفض</ConfirmSubmit></form>
           </div>
         </div>
       )}
@@ -702,8 +702,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
               </div>
               {o.from && <StoreMiniCard s={o.from} />}
               <div className="flex gap-2">
-                <form action={respondOfferAction}><input type="hidden" name="offerId" value={o.id} /><input type="hidden" name="action" value="accept" /><button className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white">قبول</button></form>
-                <form action={respondOfferAction}><input type="hidden" name="offerId" value={o.id} /><input type="hidden" name="action" value="reject" /><button className="rounded-lg border border-destructive/40 px-4 py-1.5 text-xs font-bold text-destructive">رفض</button></form>
+                <form action={respondOfferAction}><input type="hidden" name="offerId" value={o.id} /><input type="hidden" name="action" value="accept" /><ConfirmSubmit msg="قبول هذا العرض؟ سيصل الطرف الآخر إشعار بالقبول." className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white">قبول</ConfirmSubmit></form>
+                <form action={respondOfferAction}><input type="hidden" name="offerId" value={o.id} /><input type="hidden" name="action" value="reject" /><ConfirmSubmit msg="رفض هذا العرض؟" className="rounded-lg border border-destructive/40 px-4 py-1.5 text-xs font-bold text-destructive">رفض</ConfirmSubmit></form>
               </div>
             </div>
           ))}

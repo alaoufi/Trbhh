@@ -81,18 +81,18 @@ function StoreCard({ s }: { s: AdminStore }) {
       <div className="flex flex-wrap items-center gap-2">
         {s.status === 0 && (
           <>
-            <form action={approveStoreAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="approve" /><button className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد</button></form>
-            <form action={approveStoreAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="reject" /><button className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</button></form>
+            <form action={approveStoreAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="approve" /><ConfirmSubmit msg="تأكيد اعتماد هذا المتجر؟ سيُفعَّل ويصل صاحبه إشعار." className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد</ConfirmSubmit></form>
+            <form action={approveStoreAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="reject" /><ConfirmSubmit msg="تأكيد رفض طلب هذا المتجر؟" className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit></form>
           </>
         )}
         {s.status === 1 && (
           <>
-            <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend" /><button className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف</button></form>
+            <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend" /><ConfirmSubmit msg="تأكيد إيقاف هذا المتجر؟ يختفي متجره ومنتجاته من الموقع حتى إعادة التفعيل." className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف</ConfirmSubmit></form>
             <form action={requestStoreHomeAction}><input type="hidden" name="storeId" value={s.id} /><button className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white"><Home className="h-3.5 w-3.5" /> اطلب للرئيسية</button></form>
           </>
         )}
         {s.status === 2 && (
-          <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="activate" /><button className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Play className="h-3.5 w-3.5" /> إعادة تفعيل</button></form>
+          <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="activate" /><ConfirmSubmit msg="تأكيد إعادة تفعيل هذا المتجر؟ يعود للظهور فوراً." className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Play className="h-3.5 w-3.5" /> إعادة تفعيل</ConfirmSubmit></form>
         )}
       </div>
 
@@ -101,14 +101,14 @@ function StoreCard({ s }: { s: AdminStore }) {
         <input type="hidden" name="storeId" value={s.id} />
         <span className="shrink-0 text-xs font-bold text-indigo-700">🎁 منح أيام:</span>
         <input name="days" type="number" min={1} required placeholder="عدد الأيام" className="h-9 w-28 min-w-0 rounded-lg border bg-white px-2 text-xs outline-none" />
-        <button className="flex shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white">منح / تمديد التجربة</button>
+        <ConfirmSubmit msg="تأكيد منح الأيام المدخلة لهذا المتجر مجاناً؟" className="flex shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white">منح / تمديد التجربة</ConfirmSubmit>
       </form>
 
       {/* إنذار مخالفة منتجات */}
       <form action={warnStoreAction} className="flex items-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50/40 p-2">
         <input type="hidden" name="storeId" value={s.id} />
         <input name="reason" required maxLength={300} placeholder="سبب الإنذار (منتج مخالف…)" className="h-9 min-w-0 flex-1 rounded-lg border bg-white px-2 text-xs outline-none" />
-        <button className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white"><ShieldAlert className="h-3.5 w-3.5" /> إنذار</button>
+        <ConfirmSubmit msg="تأكيد تسجيل إنذار على هذا المتجر بالسبب المكتوب؟ يُحفظ في سجله ويصل صاحبه." className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white"><ShieldAlert className="h-3.5 w-3.5" /> إنذار</ConfirmSubmit>
       </form>
 
       {/* ✉️ رسالة رسمية من إدارة المتاجر لصاحب المتجر — تصله في «الرسائل» باسم الإدارة */}
@@ -155,8 +155,8 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
                   <div className="font-bold text-primary">{r.storeName || `متجر #${r.storeId}`}</div>
                   <div className="text-xs text-muted-foreground">التاجر: {r.ownerName} · طلب {timeAgo(r.at)}</div>
                 </Link>
-                <form action={decidePlatformAction}><input type="hidden" name="storeId" value={r.storeId} /><input type="hidden" name="action" value="approve" /><button className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد العرض</button></form>
-                <form action={decidePlatformAction}><input type="hidden" name="storeId" value={r.storeId} /><input type="hidden" name="action" value="reject" /><button className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</button></form>
+                <form action={decidePlatformAction}><input type="hidden" name="storeId" value={r.storeId} /><input type="hidden" name="action" value="approve" /><ConfirmSubmit msg="تأكيد اعتماد عرض منتجات هذا المتجر في تربح؟" className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد العرض</ConfirmSubmit></form>
+                <form action={decidePlatformAction}><input type="hidden" name="storeId" value={r.storeId} /><input type="hidden" name="action" value="reject" /><ConfirmSubmit msg="تأكيد رفض طلب عرض المنتجات؟" className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit></form>
               </div>
             ))}
           </div>
@@ -179,7 +179,7 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
                 <form action={completeStoreTransferAction} className="flex items-center gap-2">
                   <input type="hidden" name="storeId" value={tr.storeId} />
                   <label className="flex items-center gap-1 text-[11px] font-bold text-primary"><input type="checkbox" name="confirm" required className="h-3.5 w-3.5 accent-[hsl(var(--primary))]" /> أؤكّد</label>
-                  <button className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white"><UserCog className="h-3.5 w-3.5" /> تنفيذ النقل</button>
+                  <ConfirmSubmit msg="تأكيد تنفيذ نقل ملكية المتجر للعضو الجديد؟ لا يمكن التراجع." className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white"><UserCog className="h-3.5 w-3.5" /> تنفيذ النقل</ConfirmSubmit>
                 </form>
               </div>
             ))}

@@ -6,6 +6,7 @@ import { toInt, timeAgo } from '@/lib/utils';
 import { mediaUrl } from '@/lib/media';
 import { requirePerm } from '@/lib/roles';
 import { approveNameRequestAction, rejectNameRequestAction } from '../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'طلبات تغيير الاسم' };
@@ -125,17 +126,17 @@ export default async function AdminNameRequests({ searchParams }: { searchParams
                   <div className="space-y-2 border-t border-primary/10 pt-3">
                     <form action={approveNameRequestAction}>
                       <input type="hidden" name="id" value={toInt(r.id)} />
-                      <button className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">
+                      <ConfirmSubmit msg="تأكيد الموافقة على تغيير الاسم؟ يُطبَّق الاسم الجديد فوراً وتصل العضو رسالة." className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">
                         <Check className="h-4 w-4" /> الموافقة (يُطبَّق الاسم فوراً + رسالة للعضو)
-                      </button>
+                      </ConfirmSubmit>
                     </form>
                     <form action={rejectNameRequestAction} className="space-y-2 rounded-xl border-2 border-amber-300 bg-amber-50/60 p-3">
                       <input type="hidden" name="id" value={toInt(r.id)} />
                       <label className="block text-sm font-extrabold text-amber-800">سبب الرفض — يُحفظ ويصل العضو برسالة</label>
                       <textarea name="note" required rows={2} maxLength={250} placeholder="مثال: المستند لا يُظهر الاسم الجديد بوضوح — أرفق مستنداً أوضح…" className="w-full rounded-lg border-2 border-amber-300 bg-white p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-amber-400" />
-                      <button className="flex items-center gap-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700">
+                      <ConfirmSubmit msg="تأكيد رفض طلب تغيير الاسم؟ سيصل العضو السبب المكتوب." className="flex items-center gap-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700">
                         <XCircle className="h-4 w-4" /> رفض الطلب
-                      </button>
+                      </ConfirmSubmit>
                     </form>
                   </div>
                 )}

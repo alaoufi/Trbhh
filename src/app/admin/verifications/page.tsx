@@ -6,6 +6,7 @@ import { toInt, timeAgo } from '@/lib/utils';
 import { mediaUrl } from '@/lib/media';
 import { approveVerificationAction, rejectVerificationAction, deleteVerificationDocsAction, trustUserAction } from '../actions';
 import { requirePerm } from '@/lib/roles';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'طلبات التوثيق' };
@@ -145,16 +146,16 @@ export default async function AdminVerifications({ searchParams }: { searchParam
                   {st.key !== 'approved' ? (
                     <form action={approveVerificationAction}>
                       <input type="hidden" name="userId" value={id} />
-                      <button className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">
+                      <ConfirmSubmit msg="تأكيد الموافقة على التوثيق؟ يُفعَّل فوراً وتصل العضو رسالة." className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">
                         <Check className="h-4 w-4" /> {st.key === 'rejected' ? 'الموافقة رغم الرفض (تفعيل فوري + رسالة)' : 'الموافقة على التوثيق (يُفعَّل فوراً + رسالة للعضو)'}
-                      </button>
+                      </ConfirmSubmit>
                     </form>
                   ) : (
                     <form action={trustUserAction}>
                       <input type="hidden" name="userId" value={id} />
-                      <button className="flex items-center gap-1.5 rounded-lg border border-destructive/40 px-4 py-2 text-sm font-bold text-destructive hover:bg-destructive/10">
+                      <ConfirmSubmit msg="تأكيد إلغاء توثيق هذا العضو؟ تُسحب شارة التوثيق فوراً." className="flex items-center gap-1.5 rounded-lg border border-destructive/40 px-4 py-2 text-sm font-bold text-destructive hover:bg-destructive/10">
                         <XCircle className="h-4 w-4" /> إلغاء التوثيق
-                      </button>
+                      </ConfirmSubmit>
                     </form>
                   )}
 
@@ -170,9 +171,9 @@ export default async function AdminVerifications({ searchParams }: { searchParam
                         placeholder="اكتب سبب الرفض بوضوح، مثال: صورة الهوية غير واضحة — أعد رفع صورة أوضح…"
                         className="w-full rounded-lg border-2 border-amber-300 bg-white p-3 text-base leading-7 outline-none focus:ring-2 focus:ring-amber-400"
                       />
-                      <button className="flex items-center gap-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700">
+                      <ConfirmSubmit msg="تأكيد رفض التوثيق؟ يُحفظ السبب ويصل العضو برسالة." className="flex items-center gap-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700">
                         <XCircle className="h-4 w-4" /> رفض التوثيق
-                      </button>
+                      </ConfirmSubmit>
                     </form>
                   )}
 

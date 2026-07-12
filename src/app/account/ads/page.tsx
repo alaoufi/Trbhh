@@ -93,7 +93,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                         <option key={d.key} value={d.key}>{d.label} — {en(servicePricing.featured[d.key])} ر.س</option>
                       ))}
                     </select>
-                    <button className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-bold text-white">تمييز</button>
+                    <ConfirmSubmit msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-bold text-white">تمييز</ConfirmSubmit>
                   </form>
                 </details>
               )}
@@ -102,7 +102,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 {bumpOn && ad.status === 1 && !ad.storeOnly && (
                   <form action={bumpAdAction}>
                     <input type="hidden" name="adId" value={ad.id} />
-                    <button className="flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100" title="رفع الإعلان لأعلى القوائم">⬆ تحديث</button>
+                    <ConfirmSubmit msg="تأكيد تحديث الإعلان (رفعه لأعلى القوائم)؟ إن لم يكن التحديث المجاني متاحاً يُخصم السعر من رصيدك." title="رفع الإعلان لأعلى القوائم" className="flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100">⬆ تحديث</ConfirmSubmit>
                   </form>
                 )}
                 {auctionOn && ad.status === 1 && !ad.storeOnly && (
@@ -114,14 +114,14 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                     <select name="hours" className="h-7 rounded-md border border-red-300 bg-red-50 px-1 text-[11px] font-bold text-red-600">
                       {extras.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours}>{p0.hours} ساعة — {p0.price} ر.س</option>)}
                     </select>
-                    <button className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100">🔥 عاجل</button>
+                    <ConfirmSubmit msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100">🔥 عاجل</ConfirmSubmit>
                   </form>
                 )}
                 <form action={toggleAdStatusAction}>
                   <input type="hidden" name="adId" value={ad.id} />
-                  <button className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary">
+                  <ConfirmSubmit msg={ad.status === 1 ? 'إيقاف هذا الإعلان؟ يختفي من الموقع ويعود متى فعّلته.' : 'تفعيل هذا الإعلان؟ يعود للعرض فوراً.'} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary">
                     {ad.status === 1 ? <><EyeOff className="h-3 w-3" /> إيقاف</> : <><Eye className="h-3 w-3" /> تفعيل</>}
-                  </button>
+                  </ConfirmSubmit>
                 </form>
                 <form action={deleteAdAction}>
                   <input type="hidden" name="adId" value={ad.id} />

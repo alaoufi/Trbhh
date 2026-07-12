@@ -21,6 +21,7 @@ import { waLink } from '@/lib/classified-theme';
 import { bannerBackground, storeTier, isLightColor, layoutTokens, isCatalogStyle, DEFAULT_CATALOG_FIELDS } from '@/lib/store-style';
 import { timeAgo } from '@/lib/utils';
 import { followStoreAction, rateStoreAction, sendCollabAction, requestTransferAction, messageStoreOwnerAction } from '../actions';
+import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 
@@ -395,9 +396,9 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
                 </p>
                 <form action={requestTransferAction}>
                   <input type="hidden" name="storeId" value={storeId} />
-                  <button className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold text-white" style={{ background: brand }}>
+                  <ConfirmSubmit msg="إرسال طلب نقل ملكية هذا المتجر إليك؟ يتطلب موافقة صاحب المتجر ثم تنفيذ الإدارة." className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold text-white" style={{ background: brand }}>
                     <Handshake className="h-4 w-4" /> إرسال طلب النقل
-                  </button>
+                  </ConfirmSubmit>
                 </form>
               </div>
             </details>

@@ -52,7 +52,7 @@ export default async function AdminCategories() {
             <Badge variant={c.is_active === 'yes' ? 'trusted' : 'muted'}>{c.is_active === 'yes' ? 'مفعّل' : 'موقوف'}</Badge>
             <form action={toggleCategoryAction}>
               <input type="hidden" name="catId" value={toInt(c.id)} />
-              <button className="rounded-md border px-2 py-1.5 text-xs font-bold hover:bg-secondary">{c.is_active === 'yes' ? 'إيقاف' : 'تفعيل'}</button>
+              <ConfirmSubmit msg={c.is_active === 'yes' ? `إيقاف قسم «${c.name}»؟ يختفي من الموقع حتى إعادة تفعيله.` : `تفعيل قسم «${c.name}»؟`} className="rounded-md border px-2 py-1.5 text-xs font-bold hover:bg-secondary">{c.is_active === 'yes' ? 'إيقاف' : 'تفعيل'}</ConfirmSubmit>
             </form>
             <form action={deleteCategoryAction}>
               <input type="hidden" name="catId" value={toInt(c.id)} />

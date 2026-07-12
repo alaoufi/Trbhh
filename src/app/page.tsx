@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Users, Megaphone, LayoutGrid, Eye, Sparkles, ChevronLeft } from 'lucide-react';
+import { Users, Megaphone, LayoutGrid, Eye, Sparkles, ChevronLeft, Heart, MessageCircle, Phone } from 'lucide-react';
 import {
   getCategories,
   getFeaturedAds,
@@ -13,7 +13,9 @@ import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { PromoSlot } from '@/components/promo-slot';
 import { DisclaimerBar } from '@/components/disclaimer';
-import { getHomeStats, getHomeClassifiedText, getHomeHeadings } from '@/lib/settings';
+import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool } from '@/lib/settings';
+import { ShareButtons } from '@/components/share-buttons';
+import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
 import { getInterests } from '@/lib/interests';
 import { homeFeaturedAds, homeStoreCards, storeIdOfUser } from '@/lib/merchant';
@@ -79,6 +81,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const pinnedLabel = catsParam.length ? 'الأقسام المختارة' : '⭐ أقسام تهمّك';
   const storeAds = await homeFeaturedAds().catch(() => []);
   const feedTexts = await getFeedBannerItems().catch(() => []);
+  // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
+  const homeActionsOn = await getSettingBool('home_actions_on', true).catch(() => true);
+  const siteDigits = SITE.phone.replace(/\D/g, '').replace(/^00/, '');
   const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
   const myStore = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // الرصيد الترحيبي — بانر للزوار فقط عندما يحدد التحكم مبلغاً أكبر من صفر
@@ -102,6 +107,31 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {statCards.length > 0 && (
         <div className={`grid gap-2 ${['', 'grid-cols-1', 'grid-cols-2', 'grid-cols-3', 'grid-cols-4'][statCards.length] || 'grid-cols-4'}`}>
           {statCards.map((s) => <Stat key={s.key} icon={s.icon} value={s.value} label={s.label} href={s.href} />)}
+        </div>
+      )}
+
+      {/* أزرار الموقع بسطر واحد: متابعة تربح، واتساب واتصال بالرقم الرسمي، مشاركة الموقع */}
+      {homeActionsOn && (
+        <div className="flex gap-2">
+          <Link href={session ? '/notifications' : '/register'} aria-label="تابع تربح" title={session ? 'تابع تربح — تنبيهاتك' : 'تابع تربح — سجّل الآن'} className="grid h-11 flex-1 place-items-center rounded-xl bg-primary text-white shadow-sm">
+            <Heart className="h-5 w-5 fill-white" />
+          </Link>
+          <a href={`https://wa.me/${siteDigits}`} target="_blank" rel="noopener noreferrer" aria-label="واتساب تربح" title="راسلنا واتساب — للاستفسار والملاحظات" className="grid h-11 flex-1 place-items-center rounded-xl bg-[#25D366] text-white shadow-sm">
+            <MessageCircle className="h-5 w-5" />
+          </a>
+          <a href={`tel:+${siteDigits}`} aria-label="اتصل بتربح" title="اتصل بنا — للاستفسار والملاحظات" className="grid h-11 flex-1 place-items-center rounded-xl border bg-white text-primary shadow-sm">
+            <Phone className="h-5 w-5" />
+          </a>
+          <span className="h-11 flex-1 rounded-xl border bg-white text-primary shadow-sm" title="شارك تربح">
+            <ShareButtons
+              url={`https://${SITE.domain}`}
+              title={SITE.name}
+              text={`${SITE.name} — ${SITE.tagline}`}
+              compact
+              iconOnly
+              card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/apple-icon.png' }}
+            />
+          </span>
         </div>
       )}
 

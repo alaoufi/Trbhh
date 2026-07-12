@@ -715,27 +715,42 @@ export async function trustUserAction(formData: FormData) {
 
 /** إلغاء التوثيق بسبب إلزامي يُحفظ ويصل العضو — وإن كان توثيقاً مدفوعاً نشطاً
  *  يمر عبر مسار الإلغاء المدفوع فيُعاد للرصيد قيمة الأيام غير المستخدمة تلقائياً. */
+async function untrustCore(adminId: number, id: number, reason: string) {
+  const { cancelPaidVerification } = await import('@/lib/verify-paid');
+  const activeOrder = await prisma.verify_orders.findFirst({ where: { user_id: BigInt(id), status: 1 } }).catch(() => null);
+  if (activeOrder) {
+    const r = await cancelPaidVerification(toInt(activeOrder.id), adminId, reason);
+    if (r) {
+      await sendVerifyMessage(id, 'msg_verify_paid_cancel', 'عذراً {name}، أُلغي توثيق متجرك. السبب: {reason} — أُعيد لرصيدك {amount} ر.س قيمة الأيام غير المستخدمة.', reason, { amount: String(r.refund) });
+      await logAdmin(adminId, 'إلغاء توثيق مدفوع', `العضو #${id}`, `${reason} — استرداد ${r.refund} ر.س`);
+    }
+  } else {
+    await prisma.users.update({ where: { id: BigInt(id) }, data: { trusted: 0, verified_at: null } }).catch(() => {});
+    await sendVerifyMessage(id, 'msg_verify_cancel', 'عذراً {name}، أُلغيت علامة التوثيق عن حسابك. السبب: {reason} — للاستفسار راسل الإدارة من «الرسائل».', reason);
+    await logAdmin(adminId, 'إلغاء توثيق', `العضو #${id}`, reason);
+  }
+  revalidatePath('/admin/users');
+  revalidatePath('/admin/verifications');
+  revalidatePath('/admin/stores');
+  revalidatePath('/account/wallet');
+}
+
 export async function untrustUserAction(formData: FormData) {
   const session = await requireAction('verifications', 'edit');
   const id = Number(formData.get('userId') || 0);
   const reason = String(formData.get('reason') || '').trim().slice(0, 300);
   if (!id || !reason) return;
-  const { cancelPaidVerification } = await import('@/lib/verify-paid');
-  const activeOrder = await prisma.verify_orders.findFirst({ where: { user_id: BigInt(id), status: 1 } }).catch(() => null);
-  if (activeOrder) {
-    const r = await cancelPaidVerification(toInt(activeOrder.id), session.uid, reason);
-    if (r) {
-      await sendVerifyMessage(id, 'msg_verify_paid_cancel', 'عذراً {name}، أُلغي توثيق متجرك. السبب: {reason} — أُعيد لرصيدك {amount} ر.س قيمة الأيام غير المستخدمة.', reason, { amount: String(r.refund) });
-      await logAdmin(session.uid, 'إلغاء توثيق مدفوع', `العضو #${id}`, `${reason} — استرداد ${r.refund} ر.س`);
-    }
-  } else {
-    await prisma.users.update({ where: { id: BigInt(id) }, data: { trusted: 0, verified_at: null } }).catch(() => {});
-    await sendVerifyMessage(id, 'msg_verify_cancel', 'عذراً {name}، أُلغي توثيق حسابك. السبب: {reason} — للاستفسار راسل الإدارة من «الرسائل».', reason);
-    await logAdmin(session.uid, 'إلغاء توثيق عضو', `العضو #${id}`, reason);
-  }
-  revalidatePath('/admin/users');
-  revalidatePath('/admin/verifications');
-  revalidatePath('/account/wallet');
+  await untrustCore(session.uid, id, reason);
+}
+
+/** إلغاء توثيق المتجر من صفحة إدارة المتاجر (بصلاحية المتاجر) — يسحب علامة التوثيق فقط،
+ *  ولا يمس المتجر ولا إعلاناته؛ والمدفوع يُسترد له غير المستخدم تلقائياً. */
+export async function storeUntrustAction(formData: FormData) {
+  const session = await requireAction('stores', 'edit');
+  const id = Number(formData.get('userId') || 0);
+  const reason = String(formData.get('reason') || '').trim().slice(0, 300);
+  if (!id || !reason) return;
+  await untrustCore(session.uid, id, reason);
 }
 
 /** موافقة إدارة المتاجر على التوثيق المدفوع: خصم الرسوم أولاً — لا توثيق بلا رصيد كافٍ. */

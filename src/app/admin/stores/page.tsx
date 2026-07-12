@@ -3,7 +3,7 @@ import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone
 import { requireAction } from '@/lib/roles';
 import { getPendingStores, adminStoreList, approvedTransfers, platformRequests, type AdminStore } from '@/lib/merchant';
 import { timeAgo } from '@/lib/utils';
-import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction, adminMessageStoreOwnerAction, approveVerifyOrderAction, rejectVerifyOrderAction, cancelVerifyOrderAction } from '../actions';
+import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction, adminMessageStoreOwnerAction, approveVerifyOrderAction, rejectVerifyOrderAction, cancelVerifyOrderAction, storeUntrustAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +47,16 @@ function StoreCard({ s }: { s: AdminStore }) {
           {s.ownerTrusted
             ? <b className="text-emerald-700">موثّق{s.ownerVerifiedAt ? ` منذ ${fmtDate(s.ownerVerifiedAt)}` : ' (قديم — بلا تاريخ مسجّل)'}</b>
             : <b className="text-muted-foreground">غير موثّق</b>}
+          {s.ownerTrusted && (
+            <details className="mt-1 rounded-lg border border-slate-300 bg-white">
+              <summary className="cursor-pointer list-none px-2 py-1 text-[11px] font-bold text-slate-700">↩ إلغاء توثيق المتجر (علامة التوثيق فقط — بسبب)…</summary>
+              <form action={storeUntrustAction} className="flex items-center gap-1 border-t border-slate-200 p-1.5">
+                <input type="hidden" name="userId" value={s.userId} />
+                <input name="reason" required maxLength={300} placeholder="سبب الإلغاء (إلزامي — يصل صاحب المتجر)" className="h-8 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs outline-none" />
+                <ConfirmSubmit msg="تأكيد إلغاء توثيق المتجر؟ تُسحب علامة «موثّق» فقط — المتجر وإعلاناته لا تتأثر إطلاقاً، ويصل صاحبه السبب، والمدفوع يُسترد له غير المستخدم تلقائياً." className="shrink-0 rounded-lg bg-slate-700 px-2.5 py-1.5 text-[11px] font-bold text-white">إلغاء التوثيق</ConfirmSubmit>
+              </form>
+            </details>
+          )}
         </div>
         <div>
           <span className="text-muted-foreground">💳 اشتراك المتجر: </span>

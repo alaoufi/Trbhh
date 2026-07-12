@@ -118,6 +118,22 @@ export async function adminStoreList(): Promise<AdminStore[]> {
 
 /** Save branding fields on the caller's store. (show_on_platform is NOT set
  *  here — it is granted by admin via decidePlatformRequest.) */
+
+/** تفرّد اسم المتجر: يرفض الاسم المتشابه ٩٠٪+ مع اسم متجر آخر (بلا عقوبة —
+ *  محاولات مفتوحة) ويعيد المتجر المشابه ليُعرض للتاجر. */
+export async function findSimilarStoreName(userId: number, name: string): Promise<{ id: number; name: string } | null> {
+  await ensure();
+  const { normalizeAr, similarity } = await import('@/domain/text');
+  const n = normalizeAr(name);
+  if (!n) return null;
+  const rows = await prisma.stores.findMany({ where: { user_id: { not: userId } }, select: { id: true, store_name: true } }).catch(() => []);
+  for (const r of rows) {
+    const other = normalizeAr(r.store_name || '');
+    if (other && similarity(n, other) >= 0.9) return { id: toInt(r.id), name: r.store_name || 'متجر' };
+  }
+  return null;
+}
+
 export async function saveStoreMeta(userId: number, data: { storeName: string; color: string; about: string; banner: string; tagline: string; layout: string; catalog: string; fields: string; since: string; specialty: string; audience: string; nationalId: string; phone: string; email: string; contacts: string }) {
   await ensure();
   const { isCatalogStyle, cleanFields, DEFAULT_CATALOG_FIELDS } = await import('./store-style');

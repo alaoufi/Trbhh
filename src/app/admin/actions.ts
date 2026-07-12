@@ -1017,10 +1017,16 @@ export async function approveNameRequestAction(formData: FormData) {
   const id = BigInt(String(formData.get('id') || '0'));
   const r = await prisma.name_requests.findUnique({ where: { id } }).catch(() => null);
   if (!r || r.status !== 0) redirect('/admin/name-requests');
-  await prisma.users.update({ where: { id: BigInt(r.user_id) }, data: { name: r.new_name } }).catch(() => {});
+  if (r.kind === 'store') {
+    // استثناء اسم متجر: الموافقة تطبّق الاسم على متجر العضو رغم التشابه
+    await prisma.stores.updateMany({ where: { user_id: toInt(r.user_id) }, data: { store_name: r.new_name } }).catch(() => {});
+    await sendVerifyMessage(toInt(r.user_id), '__none__', `✅ وافقت الإدارة على استثناء اسم متجرك «${r.new_name}» — أصبح فعّالاً.`);
+  } else {
+    await prisma.users.update({ where: { id: BigInt(r.user_id) }, data: { name: r.new_name } }).catch(() => {});
+    await sendVerifyMessage(toInt(r.user_id), '__none__', `✅ تمت الموافقة على تغيير اسمك إلى «${r.new_name}» — الاسم الجديد أصبح فعّالاً.`);
+  }
   await prisma.name_requests.update({ where: { id }, data: { status: 1, decided_at: new Date() } }).catch(() => {});
-  await sendVerifyMessage(toInt(r.user_id), '__none__', `✅ تمت الموافقة على تغيير اسمك إلى «${r.new_name}» — الاسم الجديد أصبح فعّالاً.`);
-  await logAdmin(session.uid, 'قبول تغيير اسم', `العضو #${toInt(r.user_id)}: «${r.old_name}» ← «${r.new_name}»`);
+  await logAdmin(session.uid, r.kind === 'store' ? 'قبول استثناء اسم متجر' : 'قبول تغيير اسم', `العضو #${toInt(r.user_id)}: «${r.old_name}» ← «${r.new_name}»`);
   revalidatePath('/admin/name-requests');
   redirect('/admin/name-requests?done=ok');
 }
@@ -1033,8 +1039,10 @@ export async function rejectNameRequestAction(formData: FormData) {
   const r = await prisma.name_requests.findUnique({ where: { id } }).catch(() => null);
   if (!r || r.status !== 0) redirect('/admin/name-requests');
   await prisma.name_requests.update({ where: { id }, data: { status: 2, note: note || null, decided_at: new Date() } }).catch(() => {});
-  await sendVerifyMessage(toInt(r.user_id), '__none__', `❌ اعتذرت الإدارة عن تغيير اسمك إلى «${r.new_name}»${note ? ` — السبب: ${note}` : ''}. يمكنك إرسال طلب جديد بمستند أوضح.`);
-  await logAdmin(session.uid, 'رفض تغيير اسم', `العضو #${toInt(r.user_id)}: «${r.new_name}»${note ? ` — ${note}` : ''}`);
+  await sendVerifyMessage(toInt(r.user_id), '__none__', r.kind === 'store'
+    ? `❌ اعتذرت الإدارة عن استثناء اسم متجرك «${r.new_name}»${note ? ` — السبب: ${note}` : ''}. اختر اسماً مختلفاً لمتجرك.`
+    : `❌ اعتذرت الإدارة عن تغيير اسمك إلى «${r.new_name}»${note ? ` — السبب: ${note}` : ''}. يمكنك إرسال طلب جديد بمستند أوضح.`);
+  await logAdmin(session.uid, r.kind === 'store' ? 'رفض استثناء اسم متجر' : 'رفض تغيير اسم', `العضو #${toInt(r.user_id)}: «${r.new_name}»${note ? ` — ${note}` : ''}`);
   revalidatePath('/admin/name-requests');
   redirect('/admin/name-requests?done=rej');
 }

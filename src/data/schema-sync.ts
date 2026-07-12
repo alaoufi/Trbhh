@@ -209,6 +209,8 @@ const STATEMENTS: string[] = [
     INDEX name_requests_user (user_id),
     INDEX name_requests_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* نوع طلب الاسم: user (اسم عضو) أو store (استثناء اسم متجر مشابه). */
+  `ALTER TABLE name_requests ADD COLUMN kind VARCHAR(10) NOT NULL DEFAULT 'user'`,
   /* التجديد التلقائي للاشتراك: مفعّل؟ + آخر خطة مدفوعة (monthly/sixmo/yearly) للتجديد بها. */
   `ALTER TABLE stores ADD COLUMN auto_renew TINYINT NOT NULL DEFAULT 0`,
   `ALTER TABLE stores ADD COLUMN sub_plan VARCHAR(10) NULL`,

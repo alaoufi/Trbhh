@@ -1185,6 +1185,7 @@ model store_backups {
 model name_requests {
   id         BigInt    @id @default(autoincrement())
   user_id    BigInt    @db.UnsignedBigInt
+  kind       String    @default("user") @db.VarChar(10)
   old_name   String    @default("") @db.VarChar(255)
   new_name   String    @default("") @db.VarChar(255)
   reason     String?   @db.Text

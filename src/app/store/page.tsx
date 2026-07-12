@@ -8,7 +8,7 @@ import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction, addStoreStaffAction, removeStoreStaffAction } from '@/app/account/company/actions';
+import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction, addStoreStaffAction, removeStoreStaffAction, requestStoreNameExceptionAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
 import { getStoreSubPricing } from '@/lib/settings';
 import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen, DatabaseBackup } from 'lucide-react';
@@ -21,8 +21,8 @@ import { Button } from '@/components/ui/button';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string }> }) {
-  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus, staff } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string }> }) {
+  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus, staff, other, othername, want, exc } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
@@ -113,6 +113,32 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           اسم المتجر (أو وصفه المختصر) يحتوي كلمة غير مسموحة — اختر اسماً آخر أو راسل الإدارة.
         </div>
       )}
+      {error === 'namedup' && (
+        <div className="card-3d space-y-2 rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          <div>⚠ الاسم مشابه لاسم متجر آخر — عدّل لاسم مختلف. (لم يُحفظ الاسم، وبقية إعداداتك لم تتأثر — جرّب كما تشاء بلا أي قيد)</div>
+          {other && (
+            <Link href={`/companies/${other}`} target="_blank" className="inline-flex items-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100">
+              👁 عرض المتجر المشابه{othername ? `: «${othername}»` : ''} ←
+            </Link>
+          )}
+          {/* طلب استثناء: يذهب للإدارة (طلبات تغيير الاسم) وتوافق أو ترفض */}
+          {want && (
+            <details className="rounded-lg border border-amber-300 bg-white/70">
+              <summary className="cursor-pointer list-none px-3 py-2 text-xs font-extrabold text-amber-800">🙋 متمسك بالاسم؟ أرسل طلب استثناء للإدارة…</summary>
+              <form action={requestStoreNameExceptionAction} className="space-y-2 border-t border-amber-200 p-3">
+                <input type="hidden" name="want" value={want} />
+                <input type="hidden" name="other" value={other || ''} />
+                <input type="hidden" name="othername" value={othername || ''} />
+                <div className="text-xs">الاسم المطلوب: <b>«{want}»</b></div>
+                <textarea name="reason" rows={2} maxLength={500} placeholder="مبررك (اختياري): مثال — اسم سجلّي التجاري الرسمي…" className="w-full rounded-lg border border-amber-300 bg-white p-2 text-xs outline-none focus:ring-2 focus:ring-amber-400" />
+                <button className="rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700">إرسال طلب الاستثناء للإدارة</button>
+              </form>
+            </details>
+          )}
+        </div>
+      )}
+      {exc === '1' && <div className="card-3d rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ أُرسل طلب الاستثناء للإدارة — ستصلك رسالة بالموافقة أو الرفض، وعند الموافقة يُطبَّق الاسم تلقائياً.</div>}
+      {exc === 'dup' && <div className="card-3d rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">لديك طلب استثناء سابق قيد المراجعة — انتظر نتيجته أولاً.</div>}
 
       {store && meta && (
         <div className={`card-3d rounded-xl p-3 text-sm font-bold ${meta.status === 1 ? 'text-emerald-700' : meta.status === 0 ? 'text-amber-700' : 'text-red-700'}`}>

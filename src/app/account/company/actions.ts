@@ -91,6 +91,13 @@ export async function saveCompanyAction(formData: FormData) {
   if ((await containsBannedName(storeName)) || (await containsBannedName(tagline))) {
     redirect('/store?error=badname');
   }
+  // تفرّد الاسم: تشابه ٩٠٪+ مع متجر آخر يُرفض برسالة تعرض المتجر المشابه
+  // (بلا إنذار أو عقوبة — محاولات مفتوحة، أو طلب استثناء للإدارة)
+  if (storeName) {
+    const { findSimilarStoreName } = await import('@/lib/merchant');
+    const clash = await findSimilarStoreName(session.uid, storeName);
+    if (clash) redirect(`/store?error=namedup&other=${clash.id}&othername=${encodeURIComponent(clash.name.slice(0, 60))}&want=${encodeURIComponent(storeName.slice(0, 120))}`);
+  }
 
   let logoId: number | undefined;
   const logo = formData.get('logo');
@@ -121,6 +128,24 @@ export async function saveCompanyAction(formData: FormData) {
   // land the merchant on their own (independent) store page
   const mine = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true } });
   redirect(mine ? `/companies/${toInt(mine.id)}` : '/store');
+}
+
+/** طلب استثناء اسم متجر مشابه: يُرسل للإدارة (طلبات تغيير الاسم) وتوافق أو ترفض. */
+export async function requestStoreNameExceptionAction(formData: FormData) {
+  const session = await requireUser();
+  const want = String(formData.get('want') || '').trim().slice(0, 120);
+  const reason = String(formData.get('reason') || '').trim().slice(0, 500);
+  const other = String(formData.get('other') || '').trim().slice(0, 20);
+  const othername = String(formData.get('othername') || '').trim().slice(0, 60);
+  if (!want) redirect('/store');
+  const pending = await prisma.name_requests.findFirst({ where: { user_id: BigInt(session.uid), kind: 'store', status: 0 } }).catch(() => null);
+  if (pending) redirect('/store?exc=dup');
+  const store = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { store_name: true } }).catch(() => null);
+  const fullReason = `استثناء اسم متجر مشابه لمتجر «${othername || '—'}»${other ? ` (#${other})` : ''}${reason ? ` — مبرر التاجر: ${reason}` : ''}`;
+  await prisma.name_requests.create({
+    data: { user_id: BigInt(session.uid), kind: 'store', old_name: store?.store_name || '', new_name: want, reason: fullReason },
+  }).catch(() => {});
+  redirect('/store?exc=1');
 }
 
 /** Merchant requests to feature their products on the Trbhh platform (admin approves). */

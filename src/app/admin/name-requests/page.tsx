@@ -77,6 +77,7 @@ export default async function AdminNameRequests({ searchParams }: { searchParams
                   <Link href={`/admin/users/${toInt(r.user_id)}`} className="font-extrabold text-primary hover:underline">{u?.name || u?.userName || `عضو #${toInt(r.user_id)}`}</Link>
                   <div className="text-xs text-muted-foreground" dir="ltr">{u?.phoneNumber} · {timeAgo(r.created_at ? r.created_at.toISOString() : null)}</div>
                 </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-bold ${r.kind === 'store' ? 'bg-teal-100 text-teal-800' : 'bg-primary/10 text-primary'}`}>{r.kind === 'store' ? '🏪 استثناء اسم متجر' : '👤 اسم عضو'}</span>
                 {r.status === 0 && <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">بانتظار المراجعة</span>}
                 {r.status === 1 && <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">تمت الموافقة ✓</span>}
                 {r.status === 2 && <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">مرفوض</span>}
@@ -107,9 +108,9 @@ export default async function AdminNameRequests({ searchParams }: { searchParams
                     ) : null}
                     <div className="flex items-center gap-1 p-2 text-xs font-bold text-primary"><FileText className="h-3.5 w-3.5" /> مستند الإثبات {!isImg && '(PDF — اضغط للفتح)'}</div>
                   </a>
-                ) : (
+                ) : r.kind !== 'store' ? (
                   <p className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-700">لا يوجد مستند مرفق في هذا الطلب.</p>
-                )}
+                ) : null}
 
                 {/* سبب الرفض المحفوظ */}
                 {r.status === 2 && r.note && (

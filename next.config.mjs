@@ -10,11 +10,18 @@ const nextConfig = {
     return [{ source: '/.well-known/assetlinks.json', destination: '/api/assetlinks' }];
   },
   async redirects() {
-    return ['about', 'faq', 'privacy', 'terms', 'contact'].map((slug) => ({
+    const pageAliases = ['about', 'faq', 'privacy', 'terms', 'contact'].map((slug) => ({
       source: `/${slug}`,
       destination: `/pages/${slug}`,
       permanent: true,
     }));
+    // روابط الموقع القديمة: /show_ads/{اسم}/{رقم} → /ads/{رقم} (تحويل دائم 301)
+    // لحفظ أرشفة قوقل والروابط المشاركة القديمة من صفحة 404.
+    const legacyAdLinks = [
+      { source: '/show_ads/:slug/:id(\\d+)', destination: '/ads/:id', permanent: true },
+      { source: '/show_ads/:id(\\d+)', destination: '/ads/:id', permanent: true },
+    ];
+    return [...pageAliases, ...legacyAdLinks];
   },
   output: 'standalone',
   reactStrictMode: true,

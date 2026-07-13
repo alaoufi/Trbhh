@@ -58,7 +58,6 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
   const chipAdmin = 'inline-flex items-center gap-1 rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100';
   const chipSite = 'inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[11px] font-bold text-primary hover:bg-primary/10';
   const chipOff = 'inline-flex items-center gap-1 rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground';
-  const empty = <p className="px-2 py-1 text-xs text-muted-foreground">لا نتائج.</p>;
 
   return (
     <div className="max-w-2xl space-y-4">
@@ -71,9 +70,8 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
 
       {q.length >= 2 && (
         <>
-          <div className={box}>
+          {users.length > 0 && <div className={box}>
             <div className="flex items-center gap-2 text-sm font-bold text-primary"><Users className="h-4 w-4" /> الأعضاء ({users.length})</div>
-            {users.length === 0 && empty}
             {users.map((u) => (
               <div key={toInt(u.id)} className={row}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -86,11 +84,10 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
 
-          <div className={box}>
+          {ads.length > 0 && <div className={box}>
             <div className="flex items-center gap-2 text-sm font-bold text-primary"><Megaphone className="h-4 w-4" /> الإعلانات ({ads.length})</div>
-            {ads.length === 0 && empty}
             {ads.map((a) => {
               const t = adTab(a);
               const published = a.status === 1 && !a.data_archive;
@@ -109,11 +106,10 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
                 </div>
               );
             })}
-          </div>
+          </div>}
 
-          <div className={box}>
+          {stores.length > 0 && <div className={box}>
             <div className="flex items-center gap-2 text-sm font-bold text-primary"><Store className="h-4 w-4" /> المتاجر ({stores.length})</div>
-            {stores.length === 0 && empty}
             {stores.map((s) => (
               <div key={toInt(s.id)} className={row}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -128,11 +124,10 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
 
-          <div className={box}>
+          {classifieds.length > 0 && <div className={box}>
             <div className="flex items-center gap-2 text-sm font-bold text-primary"><Sparkles className="h-4 w-4" /> الإعلانات المبوّبة ({classifieds.length})</div>
-            {classifieds.length === 0 && empty}
             {classifieds.map((c) => (
               <div key={toInt(c.id)} className={row}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -147,7 +142,11 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
                 </div>
               </div>
             ))}
-          </div>
+          </div>}
+
+          {users.length + ads.length + stores.length + classifieds.length === 0 && (
+            <p className="rounded-xl border border-primary/15 bg-accent/30 p-3 text-sm text-muted-foreground">لا نتائج مطابقة في بيانات الإدارة.</p>
+          )}
         </>
       )}
       {q.length > 0 && q.length < 2 && <p className="text-xs text-muted-foreground">اكتب حرفين على الأقل.</p>}

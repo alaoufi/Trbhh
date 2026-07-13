@@ -159,19 +159,29 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
       )}
 
+      {/* بانر قصير: لا يوجد أقسام — يظهر فقط عند إخفاء الأقسام من الإدارة */}
+      {!catsOn && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-300/60 bg-gradient-to-l from-amber-50 to-orange-50 px-3 py-2 shadow-sm">
+          <span className="text-base">📣</span>
+          <p className="text-xs font-bold leading-5 text-amber-900">
+            لا يوجد أقسام — إعلانك مهم وبارز أمام الجميع، لا يدخل بزاوية الأقسام
+          </p>
+        </div>
+      )}
+
       {/* بانر مستقل: افتح متجرك — لغير أصحاب المتاجر */}
       {!myStore && <OpenStoreBanner />}
 
-      {/* Classified ads entry link */}
-      <Link href="/classified" className="card-3d flex items-center justify-between gap-3 rounded-2xl p-4">
-        <span className="flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary"><Sparkles className="h-6 w-6" /></span>
+      {/* Classified ads entry link — بارتفاع قليل */}
+      <Link href="/classified" className="card-3d flex items-center justify-between gap-2 rounded-2xl px-3 py-2">
+        <span className="flex items-center gap-2">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary"><Sparkles className="h-4 w-4" /></span>
           <span>
-            <span className="block font-bold text-primary">{clsText.title}</span>
-            <span className="block text-xs text-muted-foreground">{clsText.sub}</span>
+            <span className="block text-sm font-bold leading-5 text-primary">{clsText.title}</span>
+            <span className="block text-[11px] leading-4 text-muted-foreground">{clsText.sub}</span>
           </span>
         </span>
-        <ChevronLeft className="h-5 w-5 shrink-0 text-primary" />
+        <ChevronLeft className="h-4 w-4 shrink-0 text-primary" />
       </Link>
 
       {/* إعلان المتاجر — يظهر تلقائياً لكل متجر معتمد (بطاقة المتجر) */}

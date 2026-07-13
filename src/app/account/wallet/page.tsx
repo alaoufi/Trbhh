@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Wallet, ArrowDownCircle, ArrowUpCircle, Info, Copy, HandCoins, Receipt, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Wallet, ArrowDownCircle, ArrowUpCircle, Info, Copy, HandCoins, Receipt, Clock, CheckCircle2, XCircle, Send } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getBalance, listTxns, countTxns, getDupCredit, listMyTopups } from '@/lib/wallet';
 import { AdminPager } from '@/components/admin-pager';
@@ -34,7 +34,7 @@ const TOPUP_STATUS = {
 
 const TXN_PAGE = 25;
 
-export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string; pts?: string; dupr?: string; r?: string; a?: string }> }) {
+export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string; pts?: string; dupr?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page || '1') || 1);
@@ -153,19 +153,15 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           </div>
         )}
         {topupInfo && <p className="rounded-lg bg-primary/5 p-2.5 text-xs font-medium text-foreground/80">{topupInfo}</p>}
-        {/* ⚠️ السند مطابق لسند مرفوع من قبل — العضو يقرر: إرسال أو إلغاء */}
-        {sp.dupr && sp.r && sp.a && (
-          <div className="space-y-2 rounded-xl border-2 border-red-400 bg-red-50 p-3">
-            <div className="text-sm font-extrabold leading-6 text-red-700">⚠️ هذا السند مطابق بنسبة {sp.dupr}٪ لسند سابق — يظهر أن هناك خطأ… تأكد قبل الإرسال.</div>
-            <div className="flex items-center gap-2">
-              <form action={requestTopupAction} className="flex-1">
-                <input type="hidden" name="confirmdup" value="1" />
-                <input type="hidden" name="rel" value={sp.r} />
-                <input type="hidden" name="amount" value={sp.a} />
-                <button className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">إرسال</button>
-              </form>
-              <Link href="/account/wallet#topup" className="flex-1 rounded-lg border-2 border-primary/25 bg-white px-4 py-2 text-center text-sm font-bold text-muted-foreground hover:bg-secondary">إلغاء</Link>
+        {/* ⛔ سند مكرر — لا يُقبل ولا يُرسَل. قد يكون هناك سند بنفس الإيصال تحت المراجعة. */}
+        {sp.error === 'dupreceipt' && (
+          <div className="space-y-2.5 rounded-xl border-2 border-red-400 bg-red-50 p-3">
+            <div className="text-sm font-extrabold leading-6 text-red-700">
+              ⛔ عذراً، هذا السند مكرر{sp.dupr ? ` (تطابق ${sp.dupr}٪)` : ''} — لم يُقبل ولم يُرسَل الطلب. قد يكون هناك طلب شحن بنفس السند تحت إجراء المراجعة الآن… فضلاً انتظِر حتى تُبتّ المراجعة.
             </div>
+            <Link href="/messages/admin" className="btn-3d flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white">
+              <Send className="h-4 w-4" /> مراسلة الإدارة للضرورة
+            </Link>
           </div>
         )}
         <form action={requestTopupAction} className="space-y-2">

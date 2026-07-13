@@ -20,22 +20,29 @@ import { getMyStats } from '@/lib/account';
 
 const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', display: 'swap' });
 
-export const metadata: Metadata = {
-  metadataBase: new URL(`https://${SITE.domain}`),
-  title: { default: `${SITE.name} | ${SITE.tagline}`, template: `%s | ${SITE.name}` },
-  description: SITE.description,
-  openGraph: {
-    type: 'website',
-    locale: 'ar_SA',
-    siteName: SITE.name,
-    title: `${SITE.name} | ${SITE.tagline}`,
-    description: SITE.description,
-  },
-  robots: { index: true, follow: true },
-  manifest: '/manifest.webmanifest',
-  appleWebApp: { capable: true, statusBarStyle: 'default', title: SITE.name },
-  icons: { icon: '/icon.svg', apple: '/apple-icon.png' },
-};
+// عنوان ووصف مشاركة الموقع قابلان للتعديل من الإدارة ← النصوص ← عام
+export async function generateMetadata(): Promise<Metadata> {
+  const [shareTitle, shareDesc] = await Promise.all([
+    import('@/lib/settings').then((m) => m.getSetting(m.SETTING_SITE_SHARE_TITLE, `${SITE.name} | ${SITE.tagline}`)),
+    import('@/lib/settings').then((m) => m.getSetting(m.SETTING_SITE_SHARE_DESC, SITE.description)),
+  ]).catch(() => [`${SITE.name} | ${SITE.tagline}`, SITE.description]);
+  return {
+    metadataBase: new URL(`https://${SITE.domain}`),
+    title: { default: shareTitle, template: `%s | ${SITE.name}` },
+    description: shareDesc,
+    openGraph: {
+      type: 'website',
+      locale: 'ar_SA',
+      siteName: SITE.name,
+      title: shareTitle,
+      description: shareDesc,
+    },
+    robots: { index: true, follow: true },
+    manifest: '/manifest.webmanifest',
+    appleWebApp: { capable: true, statusBarStyle: 'default', title: SITE.name },
+    icons: { icon: '/icon.svg', apple: '/apple-icon.png' },
+  };
+}
 
 const THEME_BAR: Record<string, string> = {
   night: '#16213b', desert: '#c9a55c', agri: '#3f8f52', spring: '#e59ac0',

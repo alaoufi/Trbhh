@@ -5,6 +5,7 @@ import {
   getSetting, getHomeHeadings, getEmptyTexts,
   SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_MSG_TPL_SUPPORT, SETTING_AD_NOTICE, SETTING_SUB_REMINDER_MSG,
   SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB,
+  SETTING_SITE_SHARE_TITLE, SETTING_SITE_SHARE_DESC,
   SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT,
   SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT, SETTING_MSG_TOPUP_CANCEL,
   SETTING_TOPUP_NAME_NOTE,
@@ -16,6 +17,7 @@ import {
   DEFAULT_FEED_TEXTS_PROMO, DEFAULT_FEED_TEXTS_AWARE,
 } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
+import { SITE } from '@/lib/constants';
 import { saveTextsAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -71,6 +73,10 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
     getSetting(SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE),
     getSetting(SETTING_MSG_TOPUP_CANCEL, DEFAULT_MSG_TOPUP_CANCEL),
   ]);
+  const [shareTitle, shareDesc] = await Promise.all([
+    getSetting(SETTING_SITE_SHARE_TITLE, `${SITE.name} | ${SITE.tagline}`),
+    getSetting(SETTING_SITE_SHARE_DESC, SITE.description),
+  ]);
   const [feedPromo, feedAware] = await Promise.all([
     getSetting('feed_texts_promo', DEFAULT_FEED_TEXTS_PROMO),
     getSetting('feed_texts_aware', DEFAULT_FEED_TEXTS_AWARE),
@@ -119,11 +125,23 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
         <input type="hidden" name="sec" value={sec} />
 
         {sec === 'general' && (
+          <>
           <label className="block space-y-1">
             <span className="flex items-center gap-2 text-sm font-bold text-primary"><Megaphone className="h-4 w-4" /> الشريط العلوي المتحرك</span>
             <span className="block text-xs text-muted-foreground">النص المتحرك أعلى الموقع (بعد رقم التواصل). اتركه فارغاً لإخفائه.</span>
             <textarea name="ticker" rows={2} defaultValue={ticker} className={box} />
           </label>
+          <div className="border-t border-primary/15 pt-3 text-sm font-bold text-primary">مشاركة الموقع 🔗</div>
+          <p className="text-xs text-muted-foreground">العنوان والوصف اللذان يظهران في معاينة الرابط عند مشاركة الموقع في واتساب ووسائل التواصل ومحركات البحث.</p>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">عنوان مشاركة الموقع</span>
+            <input name="shareTitle" defaultValue={shareTitle} className={field} />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">وصف مشاركة الموقع</span>
+            <textarea name="shareDesc" rows={2} defaultValue={shareDesc} className={box} />
+          </label>
+          </>
         )}
 
         {sec === 'home' && (

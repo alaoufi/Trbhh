@@ -350,6 +350,10 @@ export async function getAdNotice(): Promise<string> {
 }
 
 /* Site-wide + home-page editable texts (تبويب النصوص → عام / الرئيسية). */
+// نص مشاركة الموقع (يظهر في معاينة الرابط عند مشاركته في واتساب وغيره)
+export const SETTING_SITE_SHARE_TITLE = 'site_share_title';
+export const SETTING_SITE_SHARE_DESC = 'site_share_desc';
+
 export const SETTING_TICKER = 'ticker_note';
 export const DEFAULT_TICKER = 'منصة تربح وسيلة عرض وربط فقط، والتعامل والدفع يتمّ خارج المنصة مباشرة بين الطرفين';
 export const SETTING_HOME_CLS_TITLE = 'home_cls_title';

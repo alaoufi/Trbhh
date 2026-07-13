@@ -13,7 +13,7 @@ import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction,
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
 
-export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string }> }) {
+export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; urgenton?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn] = await Promise.all([
@@ -40,6 +40,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {sp.bumpwait && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ التحديث المجاني متاح بعد {sp.bumpwait} يوم — أو فعّل التحديث المدفوع إن وُفّر.</div>}
       {sp.scheduled === '1' && <div className="rounded-lg border border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🕒 حُفظ إعلانك وسيُنشر تلقائياً في الموعد الذي حددته.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? <> (المطلوب {sp.price} ر.س</> : ''}{sp.bal !== undefined ? <>، ورصيدك {sp.bal} ر.س)</> : ')'}. <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
+      {sp.urgenton === '1' && <div className="rounded-lg border-2 border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🔥 شارة «عاجل» مفعّلة على هذا الإعلان بالفعل — لم يُخصم أي مبلغ. يمكنك تفعيلها من جديد بعد انتهاء مدّتها.</div>}
       {sp.urgentneed === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 حُفظ إعلانك، لكن رصيدك لا يغطي شارة «عاجل» — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم فعّلها بزر «🔥 عاجل» أسفل الإعلان.</div>}
       {sp.featuredneed === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 حُفظ إعلانك، لكن رصيدك لا يغطي رسوم التمييز ⭐ — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم ميّزه من «تمييز الإعلان (مدفوع)» أسفل الإعلان.</div>}
       {sp.pending === '1' && (
@@ -108,7 +109,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 {auctionOn && ad.status === 1 && !ad.storeOnly && (
                   <Link href={`/auctions/new?ad=${ad.id}`} className="flex items-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700 hover:bg-violet-100" title="افتح مزاداً على هذا الإعلان">🔨 مزاد</Link>
                 )}
-                {extras.urgentPacks.length > 0 && ad.status === 1 && !ad.storeOnly && (
+                {extras.urgentPacks.length > 0 && ad.status === 1 && !ad.storeOnly && !(ad.urgentUntil && new Date(ad.urgentUntil).getTime() > now) && (
                   <form action={buyUrgentAction} className="flex items-center gap-1">
                     <input type="hidden" name="adId" value={ad.id} />
                     <select name="hours" className="h-7 rounded-md border border-red-300 bg-red-50 px-1 text-[11px] font-bold text-red-600">

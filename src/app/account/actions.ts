@@ -113,7 +113,7 @@ export async function featureAdAction(formData: FormData) {
   const fee = (await getServicePricing()).featured[raw];
   if (fee <= 0) redirect(back || '/account/ads?featured=off'); // التمييز غير مُسعّر لهذه المدّة
   const paid = await charge(session.uid, fee, 'featured', `تمييز الإعلان #${toInt(adId)} (${DUR_LABEL[raw]})`);
-  if (!paid.ok) redirect(back ? `${back}?featuredneed=1` : `/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
+  if (!paid.ok) redirect(back ? `${back}?featuredneed=1#paid-result` : `/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
   // مدّة التمييز تُضاف إلى ما تبقّى من تمييز سابق (expires_at = نهاية التمييز)
   const base = ad.expires_at && new Date(ad.expires_at).getTime() > Date.now() ? new Date(ad.expires_at) : new Date();
   const until = new Date(base.getTime() + DUR_DAYS[raw] * 86400000);
@@ -122,7 +122,7 @@ export async function featureAdAction(formData: FormData) {
   await bustAdCaches().catch(() => {});
   revalidatePath('/account/ads');
   revalidatePath('/');
-  if (back) { revalidatePath(back); redirect(`${back}?featured=1`); }
+  if (back) { revalidatePath(back); redirect(`${back}?featured=1#paid-result`); }
   redirect('/account/ads?featured=1');
 }
 
@@ -208,6 +208,8 @@ export async function buyUrgentAction(formData: FormData) {
   const back = String(formData.get('back') || '') === 'ad' ? `/ads/${toInt(adId)}` : '';
   const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { user_id: true, urgent_until: true } });
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
+  // منع تكرار الدفع: شارة «عاجل» فعّالة الآن — لا نخصم مرة أخرى حتى تنتهي مدّتها
+  if (ad.urgent_until && ad.urgent_until > new Date()) redirect(back ? `${back}?urgenton=1#paid-result` : '/account/ads?urgenton=1');
   const { getAdExtras } = await import('@/lib/settings');
   const x = await getAdExtras();
   // باقتا عاجل: 24 أو 48 ساعة — لكل باقة سعرها من التحكم
@@ -215,14 +217,14 @@ export async function buyUrgentAction(formData: FormData) {
   const pack = x.urgentPacks.find((pk) => pk.hours === hours) ?? x.urgentPacks[0];
   if (!pack) redirect(back || '/account/ads');
   const paid = await charge(session.uid, pack.price, 'urgent', `شارة عاجل (${pack.hours} ساعة) #${toInt(adId)}`);
-  if (!paid.ok) redirect(back ? `${back}?urgentneed=1` : `/account/ads?error=needcredit&price=${pack.price}&bal=${paid.balance}`);
+  if (!paid.ok) redirect(back ? `${back}?urgentneed=1#paid-result` : `/account/ads?error=needcredit&price=${pack.price}&bal=${paid.balance}`);
   const base = ad.urgent_until && ad.urgent_until > new Date() ? ad.urgent_until : new Date();
   await prisma.ads.update({ where: { id: adId }, data: { urgent_until: new Date(base.getTime() + pack.hours * 3600_000) } }).catch(() => {});
   const { bustAdCaches } = await import('@/lib/data');
   await bustAdCaches().catch(() => {});
   revalidatePath('/account/ads');
   if (back) revalidatePath(back);
-  redirect(back ? `${back}?urgent=1` : '/account/ads?urgent=1');
+  redirect(back ? `${back}?urgent=1#paid-result` : '/account/ads?urgent=1');
 }
 
 /** «تحديث إعلاني»: رفع الإعلان لأعلى القوائم — مجاني كل X أيام، وما زاد يُخصم من الرصيد. */
@@ -233,6 +235,8 @@ export async function bumpAdAction(formData: FormData) {
   const back = String(formData.get('back') || '') === 'ad' ? `/ads/${toInt(adId)}` : '';
   const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { user_id: true, status: true, bumped_at: true, created_at: true } });
   if (!ad || toInt(ad.user_id) !== session.uid || ad.status !== 1) redirect('/account/ads');
+  // منع تكرار الدفع بالخطأ: حُدّث الإعلان للتو (خلال دقيقتين) — نعيد رسالة النجاح بلا خصم جديد
+  if (ad.bumped_at && (Date.now() - ad.bumped_at.getTime()) < 120_000) redirect(back ? `${back}?bumped=1#paid-result` : '/account/ads?bumped=1');
   const [{ getAdExtras, getSettingBool }] = await Promise.all([import('@/lib/settings')]);
   if (!(await getSettingBool('bump_on', false))) redirect(back || '/account/ads');
   const x = await getAdExtras();
@@ -242,16 +246,16 @@ export async function bumpAdAction(formData: FormData) {
   if (!freeOk) {
     if (x.bumpPrice <= 0) {
       const left = Math.max(1, Math.ceil(x.bumpFreeDays - daysSince));
-      redirect(back ? `${back}?bumpwait=${left}` : `/account/ads?bumpwait=${left}`);
+      redirect(back ? `${back}?bumpwait=${left}#paid-result` : `/account/ads?bumpwait=${left}`);
     }
     const paid = await charge(session.uid, x.bumpPrice, 'bump', `تحديث إعلان (رفع للأعلى) #${toInt(adId)}`);
-    if (!paid.ok) redirect(back ? `${back}?bumpneed=1` : `/account/ads?error=needcredit&price=${x.bumpPrice}&bal=${paid.balance}`);
+    if (!paid.ok) redirect(back ? `${back}?bumpneed=1#paid-result` : `/account/ads?error=needcredit&price=${x.bumpPrice}&bal=${paid.balance}`);
   }
   await prisma.ads.update({ where: { id: adId }, data: { bumped_at: new Date() } }).catch(() => {});
   const { bustAdCaches } = await import('@/lib/data');
   await bustAdCaches().catch(() => {});
   revalidatePath('/account/ads');
-  if (back) { revalidatePath(back); redirect(`${back}?bumped=1`); }
+  if (back) { revalidatePath(back); redirect(`${back}?bumped=1#paid-result`); }
   redirect('/account/ads?bumped=1');
 }
 

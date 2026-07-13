@@ -80,7 +80,7 @@ function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath
   );
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; urgent?: string; urgentneed?: string; urgenton?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -189,8 +189,12 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     <div className="space-y-4 pb-16 md:pb-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
+      {/* مرساة نتيجة أي دفع/إجراء — إليها يوجَّه التمرير لتظهر الرسالة أمام العضو مباشرة */}
+      <div id="paid-result" className="scroll-mt-20" />
+
       {/* نتيجة طلب شارة عاجل (من نموذج النشر أو زر التفعيل هنا) */}
       {spx.urgent === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🔥 فُعّلت شارة «عاجل» على إعلانك وخُصمت الرسوم من رصيدك.</div>}
+      {spx.urgenton === '1' && <div className="rounded-xl border-2 border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🔥 شارة «عاجل» مفعّلة على إعلانك بالفعل — لم يُخصم أي مبلغ. يمكنك تفعيلها من جديد بعد انتهاء مدّتها.</div>}
       {spx.urgentneed === '1' && (
         <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
           💳 نُشر إعلانك، لكن رصيدك لا يغطي شارة «عاجل» —{' '}
@@ -217,11 +221,11 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             ميّز إعلانك بإطار ذهبي بارز ومقدمة القوائم — مشاهدات وتواصل أعلى بكثير.
             <span className="block font-medium text-muted-foreground">رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</span>
           </span>
-          <span className="flex shrink-0 items-center gap-1.5">
-            <select name="duration" className="h-9 rounded-lg border border-amber-300 bg-white px-2 text-xs font-bold">
+          <span className="flex w-full items-center gap-1.5 sm:w-auto">
+            <select name="duration" className="h-10 min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 text-sm font-bold sm:flex-none sm:min-w-[150px]">
               {featuredOpts.map((o) => <option key={o.key} value={o.key}>{o.label} — {o.price} ر.س</option>)}
             </select>
-            <ConfirmSubmit msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="btn-3d rounded-lg bg-amber-500 px-3 py-2 text-sm font-extrabold text-white">تمييز الآن</ConfirmSubmit>
+            <ConfirmSubmit msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-amber-500 px-3 py-2.5 text-sm font-extrabold text-white">تمييز الآن</ConfirmSubmit>
           </span>
         </form>
       )}
@@ -236,11 +240,11 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             اجعل إعلانك يلفت الأنظار بشارة «عاجل» النابضة في كل القوائم — اختر الباقة.
             <span className="block font-medium text-muted-foreground">رصيدك: {urgentBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</span>
           </span>
-          <span className="flex shrink-0 items-center gap-1.5">
-            <select name="hours" className="h-9 rounded-lg border border-red-300 bg-white px-2 text-xs font-bold">
+          <span className="flex w-full items-center gap-1.5 sm:w-auto">
+            <select name="hours" className="h-10 min-w-0 flex-1 rounded-lg border border-red-300 bg-white px-3 text-sm font-bold sm:flex-none sm:min-w-[150px]">
               {urgentExtras.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours}>{p0.hours} ساعة — {p0.price} ر.س</option>)}
             </select>
-            <ConfirmSubmit msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="btn-3d rounded-lg bg-red-600 px-3 py-2 text-sm font-extrabold text-white">تفعيل الآن</ConfirmSubmit>
+            <ConfirmSubmit msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-red-600 px-3 py-2.5 text-sm font-extrabold text-white">تفعيل الآن</ConfirmSubmit>
           </span>
         </form>
       )}

@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { MessagesSquare, Heart, MessageCircle, Send } from 'lucide-react';
 import { getDebates } from '@/lib/debates';
+import { redirect } from 'next/navigation';
+import { debatesEnabled } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
 import { timeAgo } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -10,6 +12,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'النقاشات' };
 
 export default async function DebatesPage({ searchParams }: { searchParams?: Promise<{ error?: string }> }) {
+  if (!(await debatesEnabled().catch(() => true))) redirect('/');
   const [debates, session] = await Promise.all([getDebates(), getSession()]);
   const sp = searchParams ? await searchParams : {};
   return (

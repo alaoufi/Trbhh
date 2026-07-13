@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { SITE } from '@/lib/constants';
 import { DisclaimerBar } from '@/components/disclaimer';
 
-export function Footer() {
+export function Footer({ debatesOn = true }: { debatesOn?: boolean }) {
   return (
     <footer className="mt-12 border-t bg-card">
       <div className="container py-10">
@@ -21,7 +21,7 @@ export function Footer() {
               <li><Link href="/" className="hover:text-primary">الرئيسية</Link></li>
               <li><Link href="/categories" className="hover:text-primary">الأقسام</Link></li>
               <li><Link href="/companies" className="hover:text-primary">الشركات</Link></li>
-              <li><Link href="/debates" className="hover:text-primary">النقاشات</Link></li>
+              {debatesOn && <li><Link href="/debates" className="hover:text-primary">النقاشات</Link></li>}
               <li><Link href="/search" className="hover:text-primary">بحث متقدم</Link></li>
               <li><Link href="/pages/privacy" className="hover:text-primary">سياسة الخصوصية</Link></li>
             </ul>

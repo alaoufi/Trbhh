@@ -73,6 +73,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     }
   }
   const splashSeconds = await getClassifiedSplashSeconds().catch(() => 5);
+  const debatesOn = await import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true);
   const theme = (await cookies()).get('theme')?.value || '';
   const validThemes = ['desert', 'agri', 'spring', 'mint', 'lavender', 'sea', 'snow', 'mountain', 'sunset', 'night'];
   const design = (await cookies()).get('design')?.value || '';
@@ -90,7 +91,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             the shared header/menu/footer, even across client-side navigation. */}
         <ChromeGate
           header={<><TopBar /><Header /></>}
-          footer={<><Footer /><MobileNav unread={unread} isAuthed={!!session} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
+          footer={<><Footer debatesOn={debatesOn} /><MobileNav unread={unread} isAuthed={!!session} debatesOn={debatesOn} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
         >
           {children}
         </ChromeGate>

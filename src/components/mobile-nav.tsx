@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, MessagesSquare, PlusCircle, Bell, Mail, Building2, Search, LogIn, type LucideIcon } from 'lucide-react';
+import { Home, MessagesSquare, PlusCircle, Bell, Mail, Building2, Search, LogIn, Share2, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type NavItem = { href: string; label: string; icon: LucideIcon; primary?: boolean; badge?: boolean };
@@ -22,33 +22,62 @@ const guestItems: NavItem[] = [
   { href: '/search', label: 'بحث', icon: Search },
 ];
 
-export function MobileNav({ unread = 0, isAuthed = false }: { unread?: number; isAuthed?: boolean }) {
+// زر مشاركة الصفحة الحالية — يحل محل «مناقشات» عند إخفائها من التحكم
+const shareItem: NavItem = { href: '__share', label: 'مشاركة', icon: Share2 };
+
+export function MobileNav({ unread = 0, isAuthed = false, debatesOn = true }: { unread?: number; isAuthed?: boolean; debatesOn?: boolean }) {
   const path = usePathname();
-  const items = isAuthed ? authedItems : guestItems;
+  const items = (isAuthed ? authedItems : guestItems).map((i) => (!debatesOn && i.href === '/debates' ? shareItem : i));
+
+  const sharePage = async () => {
+    const url = window.location.href;
+    const title = document.title;
+    try {
+      if (navigator.share) await navigator.share({ url, title });
+      else {
+        await navigator.clipboard.writeText(url);
+        alert('تم نسخ رابط الصفحة ✓');
+      }
+    } catch {
+      /* أغلق العضو نافذة المشاركة */
+    }
+  };
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-primary/15 bg-accent/95 backdrop-blur md:hidden">
       <ul className="flex items-stretch justify-around">
         {items.map(({ href, label, icon: Icon, primary, badge }) => {
           const active = path === href;
+          const inner = (
+            <>
+              {primary ? (
+                <span className="grid h-11 w-11 -translate-y-2 place-items-center rounded-full bg-primary text-white shadow-lg">
+                  <Icon className="h-6 w-6" />
+                </span>
+              ) : (
+                <span className="relative">
+                  <Icon className={cn('h-6 w-6', active ? 'text-primary' : 'text-primary/80')} />
+                  {badge && unread > 0 && (
+                    <span className="absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  )}
+                </span>
+              )}
+              <span className={cn(primary && '-translate-y-1')}>{label}</span>
+            </>
+          );
           return (
             <li key={href} className="flex-1">
-              <Link href={href} className="flex flex-col items-center gap-0.5 py-1.5 text-[11px] text-primary">
-                {primary ? (
-                  <span className="grid h-11 w-11 -translate-y-2 place-items-center rounded-full bg-primary text-white shadow-lg">
-                    <Icon className="h-6 w-6" />
-                  </span>
-                ) : (
-                  <span className="relative">
-                    <Icon className={cn('h-6 w-6', active ? 'text-primary' : 'text-primary/80')} />
-                    {badge && unread > 0 && (
-                      <span className="absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-                        {unread > 99 ? '99+' : unread}
-                      </span>
-                    )}
-                  </span>
-                )}
-                <span className={cn(primary && '-translate-y-1')}>{label}</span>
-              </Link>
+              {href === '__share' ? (
+                <button type="button" onClick={sharePage} className="flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] text-primary">
+                  {inner}
+                </button>
+              ) : (
+                <Link href={href} className="flex flex-col items-center gap-0.5 py-1.5 text-[11px] text-primary">
+                  {inner}
+                </Link>
+              )}
             </li>
           );
         })}

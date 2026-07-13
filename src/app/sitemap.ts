@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = `https://${SITE.domain}`;
-  const staticPages = ['', '/categories', '/companies', '/search', '/debates', '/pages/about', '/pages/privacy', '/pages/terms', '/pages/faq'];
+  const debatesOn = await import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true);
+  const staticPages = ['', '/categories', '/companies', '/search', ...(debatesOn ? ['/debates'] : []), '/pages/about', '/pages/privacy', '/pages/terms', '/pages/faq'];
   const entries: MetadataRoute.Sitemap = staticPages.map((p) => ({
     url: `${base}${p}`,
     changeFrequency: 'daily' as const,

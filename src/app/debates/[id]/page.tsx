@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
+import { debatesEnabled } from '@/lib/settings';
 import { Heart, Send, ArrowRight } from 'lucide-react';
 import { getDebate } from '@/lib/debates';
 import { getSession } from '@/lib/auth';
@@ -10,6 +11,7 @@ import { addDebateCommentAction, toggleDebateLikeAction } from '../actions';
 export const dynamic = 'force-dynamic';
 
 export default async function DebatePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ error?: string }> }) {
+  if (!(await debatesEnabled().catch(() => true))) redirect('/');
   const { id } = await params;
   const session = await getSession();
   const d = await getDebate(Number(id), session?.uid);

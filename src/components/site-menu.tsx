@@ -40,7 +40,7 @@ function Section({ title, icon: Icon, children }: { title: string; icon: React.E
   );
 }
 
-export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], dealsOn = false, auctionsOn = false }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[]; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean }) {
+export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], dealsOn = false, auctionsOn = false, debatesOn = true }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[]; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; debatesOn?: boolean }) {
   const [open, setOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -168,7 +168,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
               {auctionsOn && <Item href="/auctions" icon={Gavel} onClick={close}>🔨 المزادات</Item>}
               <Item href="/nearby" icon={MapPin} onClick={close}>قريب منك</Item>
               <Item href="/classified" icon={Sparkles} onClick={close}>الإعلانات المبوّبة</Item>
-              <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>
+              {debatesOn && <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>}
               {/* الأقسام (تصفّح حسب القسم) — تختفي كلياً عند إخفائها من التحكم */}
               {cats.length > 0 && (
               <>

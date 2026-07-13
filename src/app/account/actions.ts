@@ -226,7 +226,7 @@ export async function buyUrgentAction(formData: FormData) {
   const hours = Number(formData.get('hours') || 0);
   const pack = x.urgentPacks.find((pk) => pk.hours === hours) ?? x.urgentPacks[0];
   if (!pack) redirect(back || '/account/ads');
-  const paid = await charge(session.uid, pack.price, 'urgent', `شارة عاجل (${pack.hours} ساعة)`);
+  const paid = await charge(session.uid, pack.price, 'urgent', `شارة عاجل (${pack.hours} ساعة) #${toInt(adId)}`);
   if (!paid.ok) redirect(back ? `${back}?urgentneed=1` : `/account/ads?error=needcredit&price=${pack.price}&bal=${paid.balance}`);
   const base = ad.urgent_until && ad.urgent_until > new Date() ? ad.urgent_until : new Date();
   await prisma.ads.update({ where: { id: adId }, data: { urgent_until: new Date(base.getTime() + pack.hours * 3600_000) } }).catch(() => {});
@@ -256,7 +256,7 @@ export async function bumpAdAction(formData: FormData) {
       const left = Math.max(1, Math.ceil(x.bumpFreeDays - daysSince));
       redirect(back ? `${back}?bumpwait=${left}` : `/account/ads?bumpwait=${left}`);
     }
-    const paid = await charge(session.uid, x.bumpPrice, 'bump', 'تحديث إعلان (رفع للأعلى)');
+    const paid = await charge(session.uid, x.bumpPrice, 'bump', `تحديث إعلان (رفع للأعلى) #${toInt(adId)}`);
     if (!paid.ok) redirect(back ? `${back}?bumpneed=1` : `/account/ads?error=needcredit&price=${x.bumpPrice}&bal=${paid.balance}`);
   }
   await prisma.ads.update({ where: { id: adId }, data: { bumped_at: new Date() } }).catch(() => {});

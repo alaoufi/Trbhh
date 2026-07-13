@@ -22,6 +22,8 @@ import { DisclaimerBar } from '@/components/disclaimer';
 import { FavoriteButton } from '@/components/favorite-button';
 import { ShareButtons } from '@/components/share-buttons';
 import { ConfirmSubmit } from '@/components/confirm-submit';
+import { getAdAddons } from '@/lib/ad-addons';
+import { AdAddonsBox } from '@/components/ad-addons-box';
 import { ExpandableDetail } from '@/components/expandable-detail';
 import { TrackedContact } from '@/components/ad-contact-track';
 import { AdGrid } from '@/components/ad-card';
@@ -95,6 +97,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const admin = canArchive || canDeleteAd || canBanSeller;
   // إعلان غير نشط (بانتظار الموافقة/مؤرشف/موقوف): لا يراه إلا صاحبه أو الإدارة
   const ownerViewing = !!(session && ad.seller && session.uid === ad.seller.id);
+  // إضافات الإعلان المدفوعة (تمييز/عاجل/عرض/تحديث) — تُعرض للإدارة ولصاحب الإعلان فقط
+  const addons = admin || ownerViewing ? await getAdAddons(ad.id).catch(() => null) : null;
   if ((ad.status !== 1 || ad.state !== 'active') && !ownerViewing && !admin) notFound();
   // إعلان عضو محظور: لا يراه الزوّار — يبقى لصاحبه وللإدارة (لرفع الحظر/الحذف)
   if (ad.seller?.banned && !ownerViewing && !admin) notFound();
@@ -263,6 +267,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           <a href="/guide/how/ad-boost" target="_blank" className="mr-auto text-xs font-extrabold text-red-600 underline">🎬 مميزات تزيد في تسويق إعلانك</a>
         </div>
       )}
+
+      {/* اشتراكات هذا الإعلان وباقاتها وتواريخ الانتهاء — لصاحب الإعلان */}
+      {ownerViewing && addons && <AdAddonsBox info={addons} title="⭐ اشتراكات هذا الإعلان — الإضافات وباقاتها وتاريخ الانتهاء" />}
 
       {/* إعلان متجر مستقل: امنع مبوّبات تربح واعرض رابط زيارة المتجر */}
       {inStore && <SplashSuppress />}
@@ -455,6 +462,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <ShieldAlert className="h-5 w-5" /> <span className="font-bold">أدوات الإدارة</span>
           </div>
           <p className="mb-3 text-xs text-amber-800/80">لا يُسمح بتعديل محتوى إعلان العضو حفاظاً على خصوصيته — الأرشفة أو الحذف فقط.</p>
+          {addons && <div className="mb-3"><AdAddonsBox info={addons} title="⭐ الإضافات المدفوعة لهذا الإعلان — الباقة وتاريخ الانتهاء" /></div>}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {canArchive && (
               <form action={adminArchiveAdAction}>

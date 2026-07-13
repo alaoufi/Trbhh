@@ -1,5 +1,6 @@
 import { Bell, Trash2 } from 'lucide-react';
-import { searchAds, countSearchAds, getCategories, getCountries, getCities } from '@/lib/data';
+import { searchAds, countSearchAds, getCategories, getCities, getAreas } from '@/lib/data';
+import { SearchAreaPicker } from '@/components/search-area-picker';
 import { AdminPager } from '@/components/admin-pager';
 import { AdGrid } from '@/components/ad-card';
 import { SearchSuggestInput } from '@/components/search-suggest';
@@ -17,12 +18,10 @@ export default async function SearchPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const sp = await searchParams;
-  const [categories, countries, cities, session, alertsOn] = await Promise.all([
-    getCategories(), getCountries(), getCities(), getSession(), savedSearchEnabled(),
+  const [categories, cities, areas, session, alertsOn] = await Promise.all([
+    getCategories(), getCities(), getAreas(), getSession(), savedSearchEnabled(),
   ]);
   const saved = session && alertsOn ? await listSavedSearches(session.uid) : [];
-  const countryId = sp.country ? Number(sp.country) : undefined;
-  const visibleCities = countryId ? cities.filter((c) => c.countryId === countryId) : cities;
   const sort = (sp.sort as 'newest' | 'price_asc' | 'price_desc') || 'newest';
 
   const page = Math.max(1, parseInt(sp.page || '1') || 1);
@@ -30,8 +29,8 @@ export default async function SearchPage({
   const sq = {
     q: sp.q,
     categoryId: sp.category ? Number(sp.category) : undefined,
-    countryId,
     cityId: sp.city ? Number(sp.city) : undefined,
+    areaId: sp.area ? Number(sp.area) : undefined,
     type: sp.type === 'offer' || sp.type === 'request' ? (sp.type as 'offer' | 'request') : undefined,
     special: sp.special === '1',
   };
@@ -56,14 +55,8 @@ export default async function SearchPage({
           {categories.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
         </select>
         )}
-        <select name="country" defaultValue={sp.country} className={sel}>
-          <option value="">كل الدول</option>
-          {countries.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-        </select>
-        <select name="city" defaultValue={sp.city} className={sel}>
-          <option value="">كل المدن</option>
-          {visibleCities.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-        </select>
+        {/* المنطقة ثم المدينة — اختيار المنطقة يحدّث المدن فوراً */}
+        <SearchAreaPicker regions={cities} areas={areas} region={sp.city || ''} area={sp.area || ''} className={sel} />
         <select name="type" defaultValue={sp.type} className={sel}>
           <option value="">عرض وطلب</option>
           <option value="offer">عروض</option>
@@ -111,7 +104,7 @@ export default async function SearchPage({
       <p className="text-sm text-muted-foreground">النتائج: {total}</p>
       <AdGrid ads={ads} />
 
-      <AdminPager basePath="/search" page={page} pages={pages} total={total} params={{ q: sp.q, category: sp.category, country: sp.country, city: sp.city, type: sp.type, sort: sp.sort, special: sp.special }} />
+      <AdminPager basePath="/search" page={page} pages={pages} total={total} params={{ q: sp.q, category: sp.category, city: sp.city, area: sp.area, type: sp.type, sort: sp.sort, special: sp.special }} />
     </div>
   );
 }

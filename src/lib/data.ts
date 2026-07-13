@@ -385,6 +385,7 @@ type SearchParamsT = {
   categoryId?: number;
   countryId?: number;
   cityId?: number;
+  areaId?: number;
   type?: 'offer' | 'request';
   sort?: 'newest' | 'price_asc' | 'price_desc';
   special?: boolean;
@@ -392,15 +393,26 @@ type SearchParamsT = {
   skip?: number;
 };
 
-function buildSearchWhere({ q, categoryId, countryId, cityId, type, special }: SearchParamsT) {
+function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special }: SearchParamsT) {
+  // بحث ذكي: تُقسَّم العبارة كلمات، وكل كلمة تُطابق العنوان أو التفاصيل بأي ترتيب،
+  // مع توحيد أشكال الألف (أ إ آ ← ا) والتاء المربوطة (ة/ه) والياء (ى/ي)
+  const norm = (w: string) => w.replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه');
+  const tokens = (q || '').trim().split(/\s+/).filter((w) => w.length >= 2).slice(0, 6);
+  if (!tokens.length && (q || '').trim()) tokens.push((q as string).trim());
+  const textClauses = tokens.map((t) => {
+    const variants = Array.from(new Set([t, norm(t), t.replace(/ه$/, 'ة'), t.replace(/ة$/, 'ه'), t.replace(/ي$/, 'ى'), t.replace(/ى$/, 'ي')]));
+    return { OR: variants.flatMap((v) => [{ title: { contains: v } }, { detail: { contains: v } }]) };
+  });
   return {
-    ...activeAdWhere(),
+    status: 1,
+    state: 'active' as const,
+    AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }] }, ...textClauses],
     ...(categoryId ? { category_id: BigInt(categoryId) } : {}),
     ...(countryId ? { country_id: countryId } : {}),
     ...(cityId ? { city_id: BigInt(cityId) } : {}),
+    ...(areaId ? { area_id: areaId } : {}),
     ...(type ? { adsType: type } : {}),
     ...(special ? { adsSpecial: 'checked' as const } : {}),
-    ...(q ? { OR: [{ title: { contains: q } }, { detail: { contains: q } }] } : {}),
   };
 }
 

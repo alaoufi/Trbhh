@@ -386,7 +386,7 @@ export async function buyAdShowAction(formData: FormData) {
   const productIds = await storeProductAdIds(storeId).catch(() => [] as number[]);
   if (!ad || toInt(ad.user_id) !== session.uid || !productIds.includes(adId)) redirect('/store?adshow=err');
   const { charge } = await import('@/lib/wallet');
-  const paid = await charge(session.uid, pkg.price, 'ad_show', `${pkg.label} (${pkg.days} يوماً) — ${String(ad.title || '').slice(0, 40)}`);
+  const paid = await charge(session.uid, pkg.price, 'ad_show', `${pkg.label} (${pkg.days} يوماً) #${adId} — ${String(ad.title || '').slice(0, 40)}`);
   if (!paid.ok) redirect(`/store?adshow=needcredit&price=${pkg.price}`);
   const base = ad.trbhh_until && ad.trbhh_until > new Date() ? ad.trbhh_until : new Date();
   const until = new Date(base.getTime() + pkg.days * 24 * 60 * 60 * 1000);

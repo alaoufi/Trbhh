@@ -132,7 +132,7 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
             <textarea name="ticker" rows={2} defaultValue={ticker} className={box} />
           </label>
           <div className="border-t border-primary/15 pt-3 text-sm font-bold text-primary">مشاركة الموقع 🔗</div>
-          <p className="text-xs text-muted-foreground">العنوان والوصف اللذان يظهران في معاينة الرابط عند مشاركة الموقع في واتساب ووسائل التواصل ومحركات البحث.</p>
+          <p className="text-xs text-muted-foreground">العنوان والوصف اللذان يظهران في معاينة الرابط عند مشاركة الموقع في واتساب ووسائل التواصل ومحركات البحث — نصان ثابتان لا يقبلان المتغيّرات.</p>
           <label className="block space-y-1">
             <span className="text-sm font-medium">عنوان مشاركة الموقع</span>
             <input name="shareTitle" defaultValue={shareTitle} className={field} />

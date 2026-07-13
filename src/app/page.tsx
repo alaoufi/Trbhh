@@ -164,7 +164,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <div className="flex items-center gap-2 rounded-xl border border-amber-300/60 bg-gradient-to-l from-amber-50 to-orange-50 px-3 py-2 shadow-sm">
           <span className="text-base">📣</span>
           <p className="text-xs font-bold leading-5 text-amber-900">
-            لا يوجد أقسام — إعلانك مهم وبارز أمام الجميع، لا يدخل بزاوية الأقسام
+            إعلانك مهم وبارز أمام الجميع، لا يدخل بزاوية الأقسام
           </p>
         </div>
       )}

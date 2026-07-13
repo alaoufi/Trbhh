@@ -12,6 +12,7 @@ export function ExpandableDetail({ text }: { text: string }) {
   const [clamped, setClamped] = useState(false);
   const [dragY, setDragY] = useState(0);
   const pRef = useRef<HTMLParagraphElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const startY = useRef<number | null>(null);
 
   // زر/تلميح «العرض الكامل» يظهر فقط إن كان النص أطول من 6 أسطر فعلاً
@@ -20,24 +21,37 @@ export function ExpandableDetail({ text }: { text: string }) {
     if (el) setClamped(el.scrollHeight > el.clientHeight + 2);
   }, [text]);
 
-  // قفل تمرير الصفحة أثناء فتح اللوحة (position: fixed يمنع نزول الصفحة الخلفية
-  // على الجوال حتى عند لمس أسفل اللوحة) + إغلاق بمفتاح Escape
+  // قفل تمرير الصفحة أثناء فتح اللوحة: تثبيت body وhtml معاً، ومنع أحداث اللمس
+  // أصلياً (non-passive) لأي لمسة خارج منطقة نص اللوحة — الصفحة الخلفية لا
+  // تتحرك إطلاقاً على الجوال + إغلاق بمفتاح Escape
   useEffect(() => {
     if (!open) return;
     const y = window.scrollY;
     const b = document.body.style;
-    const prev = { position: b.position, top: b.top, left: b.left, right: b.right, width: b.width, overflow: b.overflow };
+    const h = document.documentElement.style;
+    const prevB = { position: b.position, top: b.top, left: b.left, right: b.right, width: b.width, overflow: b.overflow };
+    const prevH = h.overflow;
     b.position = 'fixed';
     b.top = `-${y}px`;
     b.left = '0';
     b.right = '0';
     b.width = '100%';
     b.overflow = 'hidden';
+    h.overflow = 'hidden';
+    // React يسجّل touchmove بوضع passive فلا ينفع preventDefault داخله —
+    // نسجّله أصلياً هنا: أي تحريك لمس خارج منطقة النص القابلة للتمرير يُمنع
+    const onTouchMove = (e: TouchEvent) => {
+      const sc = scrollRef.current;
+      if (!sc || !(e.target instanceof Node) || !sc.contains(e.target)) e.preventDefault();
+    };
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => {
-      b.position = prev.position; b.top = prev.top; b.left = prev.left; b.right = prev.right; b.width = prev.width; b.overflow = prev.overflow;
+      b.position = prevB.position; b.top = prevB.top; b.left = prevB.left; b.right = prevB.right; b.width = prevB.width; b.overflow = prevB.overflow;
+      h.overflow = prevH;
       window.scrollTo(0, y);
+      document.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('keydown', onKey);
     };
   }, [open]);
@@ -103,7 +117,7 @@ export function ExpandableDetail({ text }: { text: string }) {
               </div>
             </div>
             {/* النص كاملاً — تمرير حر بالسحب لأعلى ولأسفل */}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+            <div ref={scrollRef} className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 py-4">
               <p className="whitespace-pre-line text-base leading-8 text-foreground/90">{text}</p>
             </div>
           </div>

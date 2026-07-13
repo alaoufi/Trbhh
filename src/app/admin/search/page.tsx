@@ -8,8 +8,20 @@ import { AdminSearch } from '@/components/admin-search';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'بحث الإدارة' };
 
-/** بحث الإدارة: يبحث في حقول الإدارة فقط (الأعضاء والإعلانات والمتاجر والمبوّبة)
- *  — مستقل تماماً عن بحث الموقع العام. */
+// تبويبات صفحة «الإعلانات» في الإدارة — لتحديد مكان كل إعلان والانتقال إليه
+const AD_TABS: Record<string, string> = {
+  special: 'المميزة', normal: 'العادية', pending: 'بانتظار الموافقة',
+  paused: 'موقوفة من أصحابها', archived: 'المؤرشفة',
+};
+function adTab(a: { status: number; paused_by_owner: number; adsSpecial: string; data_archive: string | null }): keyof typeof AD_TABS {
+  if (a.data_archive) return 'archived';
+  if (a.status === 0 && a.paused_by_owner === 1) return 'paused';
+  if (a.status === 0) return 'pending';
+  return a.adsSpecial === 'checked' ? 'special' : 'normal';
+}
+
+/** بحث الإدارة: يبحث في حقول الإدارة فقط، وكل نتيجة تعرض مكانها في الإدارة
+ *  (الصفحة والتبويب) مع رابط الانتقال إليه، ومكان عرضها في صفحات الموقع. */
 export default async function AdminSearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   await requireAnyAdmin();
   const { q: qRaw } = await searchParams;
@@ -20,29 +32,32 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
     ? await Promise.all([
         prisma.users.findMany({
           where: { OR: [{ name: { contains: q } }, { userName: { contains: q } }, { phoneNumber: { contains: q } }] },
-          select: { id: true, name: true, userName: true, phoneNumber: true },
+          select: { id: true, name: true, userName: true, phoneNumber: true, ban: true },
           orderBy: { id: 'desc' }, take: TAKE,
         }).catch(() => []),
         prisma.ads.findMany({
           where: { OR: [{ title: { contains: q } }, ...(/^\d+$/.test(q) ? [{ id: BigInt(q) }] : [])] },
-          select: { id: true, title: true, status: true },
+          select: { id: true, title: true, status: true, paused_by_owner: true, adsSpecial: true, data_archive: true },
           orderBy: { id: 'desc' }, take: TAKE,
         }).catch(() => []),
         prisma.stores.findMany({
           where: { OR: [{ store_name: { contains: q } }, { store_username: { contains: q } }] },
-          select: { id: true, store_name: true },
+          select: { id: true, store_name: true, status: true },
           orderBy: { id: 'desc' }, take: TAKE,
         }).catch(() => []),
         prisma.classified_ads.findMany({
           where: { OR: [{ title: { contains: q } }, { body: { contains: q } }] },
-          select: { id: true, title: true, body: true },
+          select: { id: true, title: true, body: true, status: true },
           orderBy: { id: 'desc' }, take: TAKE,
         }).catch(() => []),
       ])
     : [[], [], [], []];
 
-  const box = 'card-3d space-y-1 rounded-2xl p-3';
-  const row = 'flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-accent';
+  const box = 'card-3d space-y-2 rounded-2xl p-3';
+  const row = 'space-y-1 rounded-lg bg-secondary/30 px-2.5 py-2 text-sm';
+  const chipAdmin = 'inline-flex items-center gap-1 rounded-full border border-amber-400 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800 hover:bg-amber-100';
+  const chipSite = 'inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[11px] font-bold text-primary hover:bg-primary/10';
+  const chipOff = 'inline-flex items-center gap-1 rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground';
   const empty = <p className="px-2 py-1 text-xs text-muted-foreground">لا نتائج.</p>;
 
   return (
@@ -51,7 +66,7 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
         <Search className="h-6 w-6 text-primary" />
         <h1 className="text-xl font-bold text-primary">بحث الإدارة</h1>
       </div>
-      <p className="text-xs text-muted-foreground">يبحث في بيانات الإدارة فقط: الأعضاء، الإعلانات، المتاجر، والإعلانات المبوّبة — بحث الموقع العام مستقل عنه.</p>
+      <p className="text-xs text-muted-foreground">يبحث في بيانات الإدارة فقط: الأعضاء، الإعلانات، المتاجر، والإعلانات المبوّبة — وكل نتيجة تعرض مكانها في الإدارة (الصفحة والتبويب) ومكان عرضها في الموقع. بحث الموقع العام مستقل عنه.</p>
       <AdminSearch basePath="/admin/search" defaultValue={q} placeholder="ابحث باسم عضو أو جواله، عنوان إعلان أو رقمه، اسم متجر…" />
 
       {q.length >= 2 && (
@@ -60,32 +75,58 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
             <div className="flex items-center gap-2 text-sm font-bold text-primary"><Users className="h-4 w-4" /> الأعضاء ({users.length})</div>
             {users.length === 0 && empty}
             {users.map((u) => (
-              <Link key={toInt(u.id)} href={`/admin/users?q=${encodeURIComponent(u.userName || u.name || '')}`} className={row}>
-                <span className="font-medium">{u.name || u.userName}</span>
-                <span className="text-xs text-muted-foreground" dir="ltr">{u.phoneNumber}</span>
-              </Link>
+              <div key={toInt(u.id)} className={row}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-bold">{u.name || u.userName}{u.ban === 'checked' && <span className="mr-1 text-[10px] font-bold text-red-600">· محظور</span>}</span>
+                  <span className="text-xs text-muted-foreground" dir="ltr">{u.phoneNumber}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <Link href={`/admin/users?q=${encodeURIComponent(u.userName || u.name || '')}`} className={chipAdmin}>📌 في الإدارة: الأعضاء ← بطاقة العضو</Link>
+                  <Link href={`/users/${toInt(u.id)}`} className={chipSite}>🌐 في الموقع: صفحة العضو</Link>
+                </div>
+              </div>
             ))}
           </div>
 
           <div className={box}>
             <div className="flex items-center gap-2 text-sm font-bold text-primary"><Megaphone className="h-4 w-4" /> الإعلانات ({ads.length})</div>
             {ads.length === 0 && empty}
-            {ads.map((a) => (
-              <Link key={toInt(a.id)} href={`/ads/${toInt(a.id)}`} className={row}>
-                <span className="line-clamp-1 font-medium">{a.title}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">#{toInt(a.id)} {a.status === 1 ? '· منشور' : '· غير منشور'}</span>
-              </Link>
-            ))}
+            {ads.map((a) => {
+              const t = adTab(a);
+              const published = a.status === 1 && !a.data_archive;
+              return (
+                <div key={toInt(a.id)} className={row}>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="line-clamp-1 font-bold">{a.title}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">#{toInt(a.id)}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Link href={`/admin/ads?view=${t}&q=${toInt(a.id)}`} className={chipAdmin}>📌 في الإدارة: الإعلانات ← تبويب «{AD_TABS[t]}»</Link>
+                    {published
+                      ? <Link href={`/ads/${toInt(a.id)}`} className={chipSite}>🌐 في الموقع: صفحة الإعلان (القوائم والبحث)</Link>
+                      : <Link href={`/ads/${toInt(a.id)}`} className={chipOff}>🚫 لا يظهر للزوار — عرض صفحته (إدارة)</Link>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className={box}>
             <div className="flex items-center gap-2 text-sm font-bold text-primary"><Store className="h-4 w-4" /> المتاجر ({stores.length})</div>
             {stores.length === 0 && empty}
             {stores.map((s) => (
-              <Link key={toInt(s.id)} href={`/admin/stores?q=${encodeURIComponent(s.store_name || '')}`} className={row}>
-                <span className="font-medium">{s.store_name || `متجر #${toInt(s.id)}`}</span>
-                <span className="text-xs text-muted-foreground">#{toInt(s.id)}</span>
-              </Link>
+              <div key={toInt(s.id)} className={row}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-bold">{s.store_name || `متجر #${toInt(s.id)}`}</span>
+                  <span className="text-xs text-muted-foreground">#{toInt(s.id)}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <Link href="/admin/stores" className={chipAdmin}>📌 في الإدارة: إدارة المتاجر ← بطاقة المتجر</Link>
+                  {s.status === 1
+                    ? <Link href={`/companies/${toInt(s.id)}`} className={chipSite}>🌐 في الموقع: صفحة المتجر ودليل المتاجر</Link>
+                    : <span className={chipOff}>🚫 غير معتمد — لا يظهر في الموقع بعد</span>}
+                </div>
+              </div>
             ))}
           </div>
 
@@ -93,10 +134,18 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
             <div className="flex items-center gap-2 text-sm font-bold text-primary"><Sparkles className="h-4 w-4" /> الإعلانات المبوّبة ({classifieds.length})</div>
             {classifieds.length === 0 && empty}
             {classifieds.map((c) => (
-              <Link key={toInt(c.id)} href="/admin/classified" className={row}>
-                <span className="line-clamp-1 font-medium">{(c.title || c.body || '').slice(0, 80)}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">#{toInt(c.id)}</span>
-              </Link>
+              <div key={toInt(c.id)} className={row}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="line-clamp-1 font-bold">{(c.title || c.body || '').slice(0, 80)}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">#{toInt(c.id)}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <Link href="/admin/classified" className={chipAdmin}>📌 في الإدارة: الإعلانات المبوّبة</Link>
+                  {c.status === 1
+                    ? <Link href="/classified" className={chipSite}>🌐 في الموقع: صفحة المبوّبة وشاشة الافتتاح والرئيسية</Link>
+                    : <span className={chipOff}>🚫 موقوف — لا يظهر في الموقع</span>}
+                </div>
+              </div>
             ))}
           </div>
         </>

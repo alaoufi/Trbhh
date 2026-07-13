@@ -41,6 +41,7 @@ export default async function AccountHome() {
   if (alerts.messages > 0) notices.push({ href: '/messages', icon: Mail, text: `لديك ${en(alerts.messages)} رسالة جديدة غير مقروءة` });
   if (alerts.reviews > 0) notices.push({ href: `/users/${session.uid}`, icon: Star, text: `لديك ${en(alerts.reviews)} تقييم جديد` });
   if (alerts.reports > 0) notices.push({ href: '/account/reports', icon: Flag, text: `يوجد ${en(alerts.reports)} بلاغ جديد على إعلاناتك (المُبلِّغ سرّي لدى الإدارة)` });
+  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true);
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">مرحباً {session.name} 👋</h1>
@@ -119,7 +120,7 @@ export default async function AccountHome() {
       <div className="card-3d space-y-2 rounded-xl p-4">
         <div className="flex items-center gap-2 text-sm font-bold text-primary"><ListFilter className="h-4 w-4" /> أقسامي المهمّة</div>
         <p className="text-xs text-muted-foreground">اختر الأقسام التي تهمّك من القائمة، وستظهر إعلاناتها دائماً في أعلى الصفحة الرئيسية.</p>
-        <InterestsPicker categories={categories} selected={interests} action={setInterestsAction} />
+        {catsOn && <InterestsPicker categories={categories} selected={interests} action={setInterestsAction} />}
       </div>
     </div>
   );

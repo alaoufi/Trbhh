@@ -16,7 +16,9 @@ import { AdminAlertsBanner } from '@/components/admin-alerts-banner';
 export async function Header() {
   const session = await getSession();
   const admin = session ? await hasAnyAdmin(session.uid) : false;
-  const categories = await getCategories();
+  // إخفاء الأقسام من قائمة الموقع عند تعطيلها من التحكم
+  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true);
+  const categories = catsOn ? await getCategories() : [];
   const myStoreId = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // روابط الإدارة المصرّح بها — تُعرض في قائمة الهيدر داخل لوحة الإدارة
   const adminHrefs = admin

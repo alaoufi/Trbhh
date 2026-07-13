@@ -143,6 +143,9 @@ const SECTIONS: GuideSection[] = [
 ];
 
 export default async function StoreGuidePage() {
+  // عند إخفاء الأقسام من التحكم تُخفى أسطر الدليل التي تشرحها (تعود تلقائياً مع إظهارها)
+  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true);
+  const sections = catsOn ? SECTIONS : SECTIONS.map((sec) => ({ ...sec, steps: sec.steps.filter((t) => !/قسم|الأقسام|التصنيف الفرعي/.test(t)) })).filter((sec) => sec.steps.length > 0);
   return (
     <div className="container max-w-3xl py-4 pb-16">
     <GuideView
@@ -151,7 +154,7 @@ export default async function StoreGuidePage() {
       title="دليل المتجر"
       subtitle="لأصحاب المتاجر فقط: كل ما يخصّ إدارة متجرك المستقل — بالهدف والخطوات."
       fromColor="#0d9488" toColor="#115e59"
-      sections={SECTIONS}
+      sections={sections}
     >
       <div className="flex flex-wrap gap-2">
         <Link href="/store" className="inline-flex items-center gap-1.5 rounded-full border-2 border-primary/25 bg-white px-4 py-2 text-sm font-bold text-primary hover:bg-primary/5">

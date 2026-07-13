@@ -10,7 +10,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn, scheduleOn, bumpOn, adContactStatsOn, couponsOn, stockOn, hoursOn, dealsOn, autoRenewOn, auctionOn, staffOn, nameLockOn, homeActionsOn] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false), getSettingBool('schedule_on', false), getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('coupons_on', false), getSettingBool('stock_on', false), getSettingBool('hours_on', false), getSettingBool('deals_on', false), getSettingBool('autorenew_on', false), getSettingBool('auction_on', false), getSettingBool('staff_on', false), getSettingBool('namelock_on', true), getSettingBool('home_actions_on', true)]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn, scheduleOn, bumpOn, adContactStatsOn, couponsOn, stockOn, hoursOn, dealsOn, autoRenewOn, auctionOn, staffOn, nameLockOn, homeActionsOn, catsOn] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false), getSettingBool('schedule_on', false), getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('coupons_on', false), getSettingBool('stock_on', false), getSettingBool('hours_on', false), getSettingBool('deals_on', false), getSettingBool('autorenew_on', false), getSettingBool('auction_on', false), getSettingBool('staff_on', false), getSettingBool('namelock_on', true), getSettingBool('home_actions_on', true), getSettingBool('cats_on', true)]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -48,6 +48,10 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
               </label>
             ))}
           </div>
+          <label className="mt-2 flex items-start gap-2 text-sm">
+            <input type="checkbox" name="catsOn" defaultChecked={catsOn} className="mt-0.5 h-4 w-4 accent-primary" />
+            <span><b>إظهار الأقسام في الموقع</b> — إلغاء التحديد يخفي الأقسام من كل مكان (الرئيسية، البحث، إضافة الإعلان، تفاصيل الإعلان، القوائم والأدلة). الإعلانات الجديدة أثناء الإخفاء تُسند داخلياً لقسم «عروض أخرى»، وأقسام الإعلانات القائمة لا تُمس إطلاقاً — إعادة التحديد تعيد كل شيء لمكانه فوراً.</span>
+          </label>
           <label className="mt-2 flex items-start gap-2 text-sm">
             <input type="checkbox" name="homeActionsOn" defaultChecked={homeActionsOn} className="mt-0.5 h-4 w-4 accent-primary" />
             <span><b>أزرار تواصل الموقع تحت الإحصائيات</b> — صف أيقونات في الرئيسية: متابعة تربح، واتساب واتصال بالرقم الرسمي، ومشاركة الموقع.</span>

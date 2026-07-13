@@ -169,7 +169,9 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
               <Item href="/nearby" icon={MapPin} onClick={close}>قريب منك</Item>
               <Item href="/classified" icon={Sparkles} onClick={close}>الإعلانات المبوّبة</Item>
               <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>
-              {/* الأقسام (تصفّح حسب القسم) */}
+              {/* الأقسام (تصفّح حسب القسم) — تختفي كلياً عند إخفائها من التحكم */}
+              {cats.length > 0 && (
+              <>
               <button
                 onClick={() => setCatOpen((v) => !v)}
                 className="mt-1 flex w-full items-center justify-between rounded-lg bg-primary px-3 py-2.5 text-[15px] font-bold text-white"
@@ -185,6 +187,8 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
                     </Link>
                   ))}
                 </div>
+              )}
+              </>
               )}
             </Section>
 

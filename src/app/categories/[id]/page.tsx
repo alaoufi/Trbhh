@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { SlidersHorizontal } from 'lucide-react';
 import { getCategory, searchAds, countSearchAds, getCities } from '@/lib/data';
 import { AdGrid } from '@/components/ad-card';
@@ -13,6 +13,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 export default async function CategoryPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | undefined>> }) {
+  // الأقسام مخفية من التحكم — الصفحة تعود للرئيسية
+  if (!(await import('@/lib/settings').then((x) => x.categoriesEnabled()).catch(() => true))) redirect('/');
   const { id } = await params;
   const sp = await searchParams;
   const cat = await getCategory(Number(id));

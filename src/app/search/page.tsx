@@ -4,6 +4,7 @@ import { AdminPager } from '@/components/admin-pager';
 import { AdGrid } from '@/components/ad-card';
 import { SearchSuggestInput } from '@/components/search-suggest';
 import { getSession } from '@/lib/auth';
+import { categoriesEnabled } from '@/lib/settings';
 import { listSavedSearches, savedSearchEnabled } from '@/lib/saved-search';
 import { saveSearchAction, deleteSavedSearchAction } from './actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
@@ -42,16 +43,19 @@ export default async function SearchPage({
 
   const sel = 'h-10 rounded-lg border bg-background px-3 text-sm';
 
+  const catsOn = await categoriesEnabled().catch(() => true);
   return (
     <div className="space-y-4">
       <form className="grid gap-3 card-3d rounded-xl p-4 md:grid-cols-6">
         <div className="md:col-span-2">
           <SearchSuggestInput name="q" defaultValue={sp.q || ''} />
         </div>
-        <select name="category" defaultValue={sp.category} className={sel}>
+{catsOn && (
+                <select name="category" defaultValue={sp.category} className={sel}>
           <option value="">كل الأقسام</option>
           {categories.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
         </select>
+        )}
         <select name="country" defaultValue={sp.country} className={sel}>
           <option value="">كل الدول</option>
           {countries.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}

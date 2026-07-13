@@ -214,6 +214,9 @@ const SECTIONS: GuideSection[] = [
 ];
 
 export default async function GuidePage() {
+  // عند إخفاء الأقسام من التحكم تُخفى أسطر الدليل التي تشرحها (تعود تلقائياً مع إظهارها)
+  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true);
+  const sections = catsOn ? SECTIONS : SECTIONS.map((sec) => ({ ...sec, steps: sec.steps.filter((t) => !/قسم|الأقسام|التصنيف الفرعي/.test(t)) })).filter((sec) => sec.steps.length > 0);
   return (
     <GuideView
       topId="guide-top"
@@ -221,7 +224,7 @@ export default async function GuidePage() {
       title="دليل المستخدم"
       subtitle="للزوّار والأعضاء فقط: كل ما تحتاجه لتنشر وتبيع وتتواصل — بالهدف والخطوات."
       fromColor="#3287da" toColor="#1b4f8a"
-      sections={SECTIONS}
+      sections={sections}
     >
       {/* بدء سريع */}
       <section className="card-3d overflow-hidden rounded-2xl">

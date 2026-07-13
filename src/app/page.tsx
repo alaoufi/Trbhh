@@ -13,7 +13,7 @@ import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { PromoSlot } from '@/components/promo-slot';
 import { DisclaimerBar } from '@/components/disclaimer';
-import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool } from '@/lib/settings';
+import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, categoriesEnabled } from '@/lib/settings';
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
@@ -60,12 +60,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   ]);
   const H = await getHomeHeadings().catch(() => ({ stores: 'متاجر تربح', products: 'منتجات المتاجر', featured: 'إعلانات مميّزة', latest: 'أحدث الإعلانات', mostViewed: 'الأكثر مشاهدة' }));
   const catsParam = (cats || '').split(',').map((n) => parseInt(n, 10)).filter((n) => Number.isFinite(n) && n > 0);
-  const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
+  let statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
     { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
     { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
     { key: 'views', icon: Eye, value: stats.views, label: 'مشاهدة' },
     { key: 'cats', icon: LayoutGrid, value: stats.cats, label: 'قسم', href: '/search' },
   ].filter((s) => homeStats.has(s.key));
+  // بطاقة «قسم» تُخفى مع إخفاء الأقسام
+  // (تُرشَّح لاحقاً بعد جلب catsOn)
 
   // Categories to pin at the top: the dropdown selection (?cats=) if present,
   // otherwise the logged-in member's chosen "interests".
@@ -83,6 +85,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const feedTexts = await getFeedBannerItems().catch(() => []);
   // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
   const homeActionsOn = await getSettingBool('home_actions_on', true).catch(() => true);
+  // إخفاء الأقسام من كل الموقع (مفتاح التحكم) — لا يمس أقسام الإعلانات المحفوظة
+  const catsOn = await categoriesEnabled().catch(() => true);
+  if (!catsOn) statCards = statCards.filter((c) => c.key !== 'cats');
   const siteDigits = SITE.phone.replace(/\D/g, '').replace(/^00/, '');
   const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
   const myStore = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
@@ -101,7 +106,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <TopupPromoBanner />
 
       {/* Category dropdown — pick one or more categories to show */}
-      <CategorySelect categories={categories} initial={catsParam} />
+      {catsOn && <CategorySelect categories={categories} initial={catsParam} />}
 
       {/* Stats — the admin selects which cards to show */}
       {statCards.length > 0 && (
@@ -136,7 +141,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       )}
 
       {/* أقسام تهمّك — مثبّتة بالأعلى حسب اختيار العضو */}
-      {pinned.length > 0 && (
+      {catsOn && pinned.length > 0 && (
         <div className="space-y-4 rounded-2xl border-2 border-primary/20 bg-primary/5 p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-extrabold text-primary">{pinnedLabel}</span>

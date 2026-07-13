@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { getCategories } from '@/lib/data';
 import { CategoryGrid } from '@/components/category-grid';
 
@@ -5,6 +6,8 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'جميع الأقسام' };
 
 export default async function CategoriesPage() {
+  // الأقسام مخفية من التحكم — الصفحة تعود للرئيسية
+  if (!(await import('@/lib/settings').then((x) => x.categoriesEnabled()).catch(() => true))) redirect('/');
   const categories = await getCategories();
   return (
     <div className="space-y-4">

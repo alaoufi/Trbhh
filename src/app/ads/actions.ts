@@ -174,7 +174,14 @@ export async function createAdAction(formData: FormData) {
   const dest = String(formData.get('dest') || '') === 'store' ? 'store' : '';
   const q = dest ? '&dest=store' : '';
   // حقول إجبارية — أظهِر السبب بدل الرجوع الصامت
-  if (!title || !detail || category_id <= 0n) redirect(`/ads/new?error=missing${q}`);
+  if (!title || !detail) redirect(`/ads/new?error=missing${q}`);
+  // الأقسام مخفية (لا حقل قسم في النموذج): يُسند الإعلان داخلياً لقسم «عروض أخرى»
+  let catId = category_id;
+  if (catId <= 0n) {
+    const { getFallbackCategoryId } = await import('@/lib/data');
+    catId = BigInt(await getFallbackCategoryId());
+    if (catId <= 0n) redirect(`/ads/new?error=missing${q}`);
+  }
   // تعهّد صحة الإعلان وتحمّل المسؤولية إجباري
   if (!formData.get('pledge')) redirect(`/ads/new?error=pledge${q}`);
   // جوال أو واتساب إجباري حتى يستطيع العملاء التواصل مع صاحب الإعلان
@@ -290,7 +297,7 @@ export async function createAdAction(formData: FormData) {
   const ad = await prisma.ads.create({
     data: {
       title, detail, price, adsType,
-      category_id,
+      category_id: catId,
       subcategory_id: subRaw ? Number(subRaw) : null,
       city_id: BigInt(cityId || '0'),
       area_id: areaRaw ? Number(areaRaw) : null,
@@ -374,7 +381,7 @@ export async function createAdAction(formData: FormData) {
     // تنبيهات البحث المحفوظ + مطابقة عرض/طلب — لإعلانات تربح فقط (عزل المتاجر)
     import('@/lib/saved-search').then((m) => {
       m.notifySavedSearches(toInt(ad.id), title, detail, session.uid).catch(() => {});
-      m.notifyOppositeType(toInt(ad.id), title, Number(category_id), Number(cityId || '0'), adsType as 'offer' | 'request', session.uid).catch(() => {});
+      m.notifyOppositeType(toInt(ad.id), title, Number(catId), Number(cityId || '0'), adsType as 'offer' | 'request', session.uid).catch(() => {});
     }).catch(() => {});
   }
   // نشر من المتجر: أدرِج الإعلان في واجهة المتجر، ثم انتقل إلى إعلانات المتجر (لا للرجوع لصفحة الإضافة)
@@ -451,8 +458,10 @@ export async function updateAdAction(formData: FormData) {
       price_type: ePriceType,
       rent_period: eRentPeriod,
       ...(ePriceType === 'som' ? { old_price: 0 } : {}),
-      category_id: BigInt(String(formData.get('category_id') || '0')),
-      subcategory_id: formData.get('subcategory_id') ? Number(formData.get('subcategory_id')) : null,
+      // الأقسام مخفية؟ لا حقل قسم مُرسل — نبقي قسم الإعلان الحالي دون أي تغيير
+      ...(Number(formData.get('category_id') || 0) > 0
+        ? { category_id: BigInt(String(formData.get('category_id'))), subcategory_id: formData.get('subcategory_id') ? Number(formData.get('subcategory_id')) : null }
+        : {}),
       city_id: BigInt(String(formData.get('city_id') || '0')),
       area_id: formData.get('area_id') ? Number(formData.get('area_id')) : null,
       lat: eLat || null,

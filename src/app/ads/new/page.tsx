@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCategories, getSubCategories, getCountries, getCities, getAreas } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
-import { getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
+import { getSettingBool, SETTING_ADS_APPROVAL, categoriesEnabled } from '@/lib/settings';
 import { createAdAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -35,10 +35,11 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     ? DURATIONS.map((d) => ({ key: d.key, label: d.label, price: svc.featured[d.key] })).filter((o) => o.price > 0)
     : [];
   const featuredOffer = featuredOpts.length ? { options: featuredOpts, balance } : undefined;
+  const catsOn = await categoriesEnabled().catch(() => true);
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">أضف إعلاناً جديداً</h1>
-      <AdForm
+      <AdForm catsOn={catsOn}
         allowSchedule={allowSchedule}
         allowOldPrice={dealsOn}
         allowStock={stockOn && dest === 'store'}

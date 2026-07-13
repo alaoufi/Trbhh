@@ -130,6 +130,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const shareUrl = inStore ? (storeUrl.startsWith('http') ? storeUrl : `https://${SITE.domain}/companies/${sellerStoreId}`) : `https://${SITE.domain}/ads/${ad.id}`;
   // نص واتساب مُعبّأ مسبقاً: نص المتجر إن كان إعلان متجر، وإلا نص تربح لمراسلة صاحب الإعلان
   const [adNotice, adTpls] = await Promise.all([getAdNotice(), getAdMsgTemplates()]);
+  // إخفاء الأقسام: يخفي سطر القسم من التفاصيل فقط — قسم الإعلان محفوظ كما هو
+  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true);
   const storeTpls = parseTemplates(storeMeta?.msgTemplates);
   const baseTpl = (inStore && storeTpls.length ? storeTpls[0] : adTpls[0]) || '';
   // {link} = رابط الإعلان (يُضاف تلقائياً في واتساب)، {name} = عنوان الإعلان
@@ -297,7 +299,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             {ad.seller?.name}
           </Link>
         </div>
-        {ad.category && <InfoItem icon={Tag}>{ad.category.name}</InfoItem>}
+        {catsOn && ad.category && <InfoItem icon={Tag}>{ad.category.name}</InfoItem>}
         <InfoItem icon={Star}>{sellerRating.count ? `${sellerRating.avg} (${sellerRating.count})` : '0/0'}</InfoItem>
         <InfoItem icon={Hash}>#{ad.id}</InfoItem>
         <InfoItem icon={Eye}>{ad.views} مشاهدة</InfoItem>

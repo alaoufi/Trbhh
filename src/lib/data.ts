@@ -169,6 +169,15 @@ const adSelect = {
   old_price: true,
 } as const;
 
+/** القسم الداخلي «عروض أخرى»: تُسند إليه الإعلانات الجديدة عند إخفاء الأقسام —
+ *  قسم حقيقي فاعل، فعند إعادة إظهار الأقسام تبقى هذه الإعلانات سليمة في مكانها. */
+export async function getFallbackCategoryId(): Promise<number> {
+  const existing = await prisma.categories.findFirst({ where: { name: 'عروض أخرى' }, select: { id: true } }).catch(() => null);
+  if (existing) return toInt(existing.id);
+  const created = await prisma.categories.create({ data: { name: 'عروض أخرى', photo_path: '', is_active: 'yes', ordered: 999 } }).catch(() => null);
+  return created ? toInt(created.id) : 0;
+}
+
 export async function getCategories() {
   return cached('categories:active', 300, async () => {
     const cats = await prisma.categories.findMany({ where: { is_active: 'yes' }, orderBy: { ordered: 'desc' } });

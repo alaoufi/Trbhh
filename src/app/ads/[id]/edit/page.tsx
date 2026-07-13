@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
+import { categoriesEnabled } from '@/lib/settings';
 import { getCategories, getSubCategories, getCountries, getCities, getAreas, getAdForEdit } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
 import { updateAdAction } from '../../actions';
@@ -20,10 +21,11 @@ export default async function EditAdPage({ params, searchParams }: { params: Pro
     import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false),
     import('@/lib/store-extras').then((m) => m.stockEnabled()).catch(() => false),
   ]);
+  const catsOn = await categoriesEnabled().catch(() => true);
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold">تعديل الإعلان</h1>
-      <AdForm
+      <AdForm catsOn={catsOn}
         allowOldPrice={dealsOn}
         allowStock={stockOn}
         action={updateAdAction}

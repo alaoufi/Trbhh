@@ -11,12 +11,14 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الأقسام' };
 
 export default async function AdminCategories() {
+  const catsOnNow = await import('@/lib/settings').then((x) => x.categoriesEnabled()).catch(() => true);
   await requirePerm('categories');
   const cats = await prisma.categories.findMany({ orderBy: [{ ordered: 'desc' }, { id: 'desc' }] });
   const field = 'h-9 rounded-lg border bg-background px-2 text-sm';
 
   return (
     <div className="space-y-4">
+      {!catsOnNow && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">⚠ الأقسام مخفية حالياً من كل الموقع (من الإعدادات ← «إظهار الأقسام في الموقع») — إدارتها هنا تبقى متاحة، والإعلانات الجديدة تُسند داخلياً لقسم «عروض أخرى»، وإعادة الإظهار تعيد كل شيء لمكانه.</div>}
       <h1 className="text-xl font-bold text-primary">الأقسام</h1>
 
       <form action={addCategoryAction} className="flex flex-wrap items-center gap-2 card-3d rounded-xl p-3">

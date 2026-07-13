@@ -20,14 +20,26 @@ export function ExpandableDetail({ text }: { text: string }) {
     if (el) setClamped(el.scrollHeight > el.clientHeight + 2);
   }, [text]);
 
-  // قفل تمرير الصفحة أثناء فتح اللوحة + إغلاق بمفتاح Escape
+  // قفل تمرير الصفحة أثناء فتح اللوحة (position: fixed يمنع نزول الصفحة الخلفية
+  // على الجوال حتى عند لمس أسفل اللوحة) + إغلاق بمفتاح Escape
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const y = window.scrollY;
+    const b = document.body.style;
+    const prev = { position: b.position, top: b.top, left: b.left, right: b.right, width: b.width, overflow: b.overflow };
+    b.position = 'fixed';
+    b.top = `-${y}px`;
+    b.left = '0';
+    b.right = '0';
+    b.width = '100%';
+    b.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
     window.addEventListener('keydown', onKey);
-    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey); };
+    return () => {
+      b.position = prev.position; b.top = prev.top; b.left = prev.left; b.right = prev.right; b.width = prev.width; b.overflow = prev.overflow;
+      window.scrollTo(0, y);
+      window.removeEventListener('keydown', onKey);
+    };
   }, [open]);
 
   const onDragStart = (y: number) => { startY.current = y; };

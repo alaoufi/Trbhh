@@ -350,6 +350,10 @@ export async function getAdNotice(): Promise<string> {
 }
 
 /* Site-wide + home-page editable texts (تبويب النصوص → عام / الرئيسية). */
+// بانر الرئيسية القصير عند إخفاء الأقسام
+export const SETTING_HOME_NOCATS_BANNER = 'home_nocats_banner';
+export const DEFAULT_HOME_NOCATS_BANNER = 'إعلانك مهم وبارز أمام الجميع، لا يدخل بزاوية الأقسام';
+
 // نص مشاركة الموقع (يظهر في معاينة الرابط عند مشاركته في واتساب وغيره)
 export const SETTING_SITE_SHARE_TITLE = 'site_share_title';
 export const SETTING_SITE_SHARE_DESC = 'site_share_desc';

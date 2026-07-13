@@ -87,6 +87,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const homeActionsOn = await getSettingBool('home_actions_on', true).catch(() => true);
   // إخفاء الأقسام من كل الموقع (مفتاح التحكم) — لا يمس أقسام الإعلانات المحفوظة
   const catsOn = await categoriesEnabled().catch(() => true);
+  const noCatsBanner = catsOn ? '' : await import('@/lib/settings').then((m) => m.getSetting(m.SETTING_HOME_NOCATS_BANNER, m.DEFAULT_HOME_NOCATS_BANNER)).catch(() => '');
   if (!catsOn) statCards = statCards.filter((c) => c.key !== 'cats');
   const siteDigits = SITE.phone.replace(/\D/g, '').replace(/^00/, '');
   const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
@@ -159,13 +160,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
       )}
 
-      {/* بانر قصير: لا يوجد أقسام — يظهر فقط عند إخفاء الأقسام من الإدارة */}
-      {!catsOn && (
+      {/* بانر قصير عند إخفاء الأقسام — نصه يُعدَّل من الإدارة ← النصوص ← الرئيسية */}
+      {!catsOn && noCatsBanner && (
         <div className="flex items-center gap-2 rounded-xl border border-amber-300/60 bg-gradient-to-l from-amber-50 to-orange-50 px-3 py-2 shadow-sm">
           <span className="text-base">📣</span>
-          <p className="text-xs font-bold leading-5 text-amber-900">
-            إعلانك مهم وبارز أمام الجميع، لا يدخل بزاوية الأقسام
-          </p>
+          <p className="text-xs font-bold leading-5 text-amber-900">{noCatsBanner}</p>
         </div>
       )}
 

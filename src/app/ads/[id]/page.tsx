@@ -486,20 +486,20 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                   </button>
                 </form>
               ) : (
-                <div className="rounded-lg border border-amber-300 bg-amber-50/50 p-2">
-                  <div className="mb-1.5 flex items-center gap-1 text-xs font-bold text-amber-800"><Ban className="h-3.5 w-3.5" /> حظر العضو — حدّد المدة</div>
-                  <div className="flex items-center gap-1.5">
-                    <form action={adminBanSellerAction} className="flex flex-1 items-center gap-1">
+                <div className="col-span-2 rounded-lg border border-amber-300 bg-amber-50/50 p-2.5 sm:col-span-3">
+                  <div className="mb-2 flex items-center gap-1 text-xs font-bold text-amber-800"><Ban className="h-3.5 w-3.5" /> حظر العضو — حدّد المدة</div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <form action={adminBanSellerAction} className="flex min-w-0 flex-1 items-center gap-1.5">
                       <input type="hidden" name="userId" value={ad.seller.id} />
                       <input type="hidden" name="adId" value={ad.id} />
-                      <input name="days" type="number" min={1} placeholder="عدد الأيام" className="h-9 w-full min-w-0 rounded-md border bg-white px-2 text-sm" />
-                      <ConfirmSubmit msg="تأكيد الحظر المؤقت لهذا المعلن؟ ستختفي كل إعلاناته من الموقع طوال مدة الحظر." className="h-9 shrink-0 rounded-md bg-amber-600 px-3 text-xs font-bold text-white">حظر مؤقت</ConfirmSubmit>
+                      <input name="days" type="number" min={1} placeholder="عدد الأيام" className="h-9 w-full min-w-0 rounded-md border border-amber-300 bg-white px-2 text-sm" />
+                      <ConfirmSubmit msg="تأكيد الحظر المؤقت لهذا المعلن؟ ستختفي كل إعلاناته من الموقع طوال مدة الحظر." className="h-9 shrink-0 whitespace-nowrap rounded-md bg-amber-600 px-3 text-xs font-bold text-white">حظر مؤقت</ConfirmSubmit>
                     </form>
-                    <form action={adminBanSellerAction}>
+                    <form action={adminBanSellerAction} className="shrink-0">
                       <input type="hidden" name="userId" value={ad.seller.id} />
                       <input type="hidden" name="adId" value={ad.id} />
                       <input type="hidden" name="permanent" value="1" />
-                      <ConfirmSubmit msg="تأكيد الحظر الدائم لهذا المعلن؟ ستختفي كل إعلاناته من الموقع حتى رفع الحظر." className="h-9 shrink-0 rounded-md bg-destructive px-3 text-xs font-bold text-white">حظر دائم</ConfirmSubmit>
+                      <ConfirmSubmit msg="تأكيد الحظر الدائم لهذا المعلن؟ ستختفي كل إعلاناته من الموقع حتى رفع الحظر." className="h-9 w-full whitespace-nowrap rounded-md bg-destructive px-4 text-xs font-bold text-white sm:w-auto">حظر دائم</ConfirmSubmit>
                     </form>
                   </div>
                 </div>

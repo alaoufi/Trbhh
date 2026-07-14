@@ -42,7 +42,7 @@ export async function Header() {
   const debatesOn = await import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true);
   return (
     <>
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#010e23]">
+    <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
         <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />
@@ -68,9 +68,9 @@ export async function Header() {
           <LiveClock />
         </div>
 
-        {/* logo on the left (RTL: last child) — الشعار الكامل بحواف متدرّجة تندمج مع خلفية الهيدر الكحلية */}
+        {/* logo on the left (RTL: last child) */}
         <Link href="/" className="shrink-0">
-          <Image src="/logo-header-navy.png" alt="تربح" width={56} height={56} priority className="h-14 w-14 object-contain" />
+          <Image src="/logo-mark-256.png" alt="تربح" width={44} height={44} priority className="h-11 w-11 rounded-lg object-contain" />
         </Link>
       </div>
     </header>

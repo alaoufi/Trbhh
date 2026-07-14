@@ -182,11 +182,11 @@ const STATEMENTS: string[] = [
   `ALTER TABLE ads ADD COLUMN stock_state TINYINT NOT NULL DEFAULT 0`,
   /* عروض اليوم: السعر قبل الخصم — إن كان أعلى من السعر يظهر الخصم ويدخل صفحة العروض. */
   `ALTER TABLE ads ADD COLUMN old_price DOUBLE NOT NULL DEFAULT 0`,
-  /* تصحيح تصنيف «مميّز» الموروث: آلاف إعلانات الليجاسي تظهر مميّزة دائماً.
-     القاعدة: نُبقي فقط التمييز المدفوع الحديث (expires_at خلال آخر ٣٠ يوماً أو
-     في المستقبل = ساري)، ونُلغي التمييز عمّا لا تاريخ انتهاء له أو تجاوز شهراً.
-     expires_at لا يخصّ ظهور الإعلان (فقط مدة التمييز)، فالإلغاء آمن. idempotent. */
-  `UPDATE ads SET adsSpecial = 'no' WHERE adsSpecial = 'checked' AND (expires_at IS NULL OR expires_at < (NOW() - INTERVAL 30 DAY))`,
+  /* تصحيح تصنيف «مميّز» الموروث: آلاف إعلانات الليجاسي تظهر مميّزة دائماً بلا دفع.
+     القاعدة النهائية: نُبقي التمييز فقط لمن دفع فعلاً مقابله (سجلّ wallet_txns
+     بسبب 'featured' — ونصّه «تمييز الإعلان #<رقم>»)، ونُلغيه عن كل ما عداه.
+     نستخرج رقم الإعلان من نصّ الدفعة. متوافق مع MySQL 5.7/8. idempotent. */
+  `UPDATE ads a LEFT JOIN (SELECT DISTINCT CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(note,'#',-1),' ',1) AS UNSIGNED) AS ad_id FROM wallet_txns WHERE reason='featured' AND note LIKE '%#%') pp ON pp.ad_id = a.id SET a.adsSpecial='no' WHERE a.adsSpecial='checked' AND pp.ad_id IS NULL`,
   /* دوام المتجر: من/إلى (HH:MM) وأيام العمل (أرقام أيام الأسبوع 0=الأحد، مفصولة بفواصل). */
   `ALTER TABLE stores ADD COLUMN hours_from VARCHAR(5) NULL`,
   `ALTER TABLE stores ADD COLUMN hours_to VARCHAR(5) NULL`,

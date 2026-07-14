@@ -8,9 +8,13 @@ const COOKIE = 'trbhh_session';
 const INSECURE_DEFAULT = 'dev-insecure-secret-change-me-in-production-please';
 const AUTH_SECRET = process.env.AUTH_SECRET || '';
 // أمان: لا تُشغّل الإنتاج بمفتاح توقيع افتراضي/ضعيف — وإلا أمكن تزوير الجلسات
-// (بما فيها جلسة إداري) بمفتاح معروف. نفشل بوضوح بدل العمل بمفتاح غير آمن.
-if (process.env.NODE_ENV === 'production' && (AUTH_SECRET.length < 32 || AUTH_SECRET === INSECURE_DEFAULT)) {
-  throw new Error('AUTH_SECRET مفقود أو ضعيف في الإنتاج — عيّن مفتاحاً عشوائياً طوله 32 حرفاً على الأقل.');
+// (بما فيها جلسة إداري) بمفتاح معروف. الفحص عند أول استخدام فعلي للجلسة لا
+// عند استيراد الوحدة — بيئة بناء Docker لا تملك أسرار وقت التشغيل (تُحقن فقط
+// عند docker compose up)، فالفحص عند الاستيراد كان يُفشل بناء كل صفحة.
+function assertSecureSecret(): void {
+  if (process.env.NODE_ENV === 'production' && (AUTH_SECRET.length < 32 || AUTH_SECRET === INSECURE_DEFAULT)) {
+    throw new Error('AUTH_SECRET مفقود أو ضعيف في الإنتاج — عيّن مفتاحاً عشوائياً طوله 32 حرفاً على الأقل.');
+  }
 }
 const secret = new TextEncoder().encode(AUTH_SECRET || INSECURE_DEFAULT);
 
@@ -36,6 +40,7 @@ export async function hashPassword(plain: string): Promise<string> {
 }
 
 export async function createSession(payload: SessionPayload): Promise<void> {
+  assertSecureSecret();
   const token = await new SignJWT(payload as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -56,6 +61,7 @@ export async function createSession(payload: SessionPayload): Promise<void> {
 async function getSessionImpl(): Promise<SessionPayload | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
+  assertSecureSecret();
   try {
     const { payload } = await jwtVerify(token, secret);
     return payload as unknown as SessionPayload;

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, ListFilter, LayoutTemplate, Wallet, Users } from 'lucide-react';
+import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, ListFilter, LayoutTemplate, Wallet, Users, User, Store, Shield } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
 import { getBalance } from '@/lib/wallet';
@@ -32,6 +32,13 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
     referralEnabled(),
   ]);
   const refReward = refOn ? await getReferralReward() : 0;
+  // اكتشاف خدمات هذا الحساب تلقائياً عند الدخول: عضو (دائماً) + متجر + إدارة + حسابات مرتبطة
+  const [myStoreId, isAdmin] = await Promise.all([
+    import('@/lib/merchant').then((m) => m.storeIdOfUser(session.uid)).catch(() => 0),
+    import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false),
+  ]);
+  const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
+  const linkedCount = await import('@/lib/account-links').then((m) => m.linkedAccounts(session.uid)).then((a) => a.length).catch(() => 0);
   const cards = [
     { href: '/account/ads', label: 'إعلاناتي', value: stats.ads, icon: Megaphone },
     { href: '/account/favorites', label: 'المفضلة', value: stats.favorites, icon: Heart },
@@ -49,6 +56,40 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
       {sp.error === 'notlinked' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">تعذّر التبديل: هذا الحساب غير مرتبط بحسابك.</div>}
       {sp.error === 'switchbanned' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر التبديل: الحساب المطلوب محظور.</div>}
       <h1 className="text-xl font-bold text-primary">مرحباً {session.name} 👋</h1>
+
+      {/* 🎭 اكتشاف خدمات هذا الحساب تلقائياً عند الدخول (متجر/إدارة/عضو) — يظهر عند وجود صفة إضافية أو حسابات مرتبطة */}
+      {(myStoreId > 0 || isAdmin || linkedCount > 0) && (
+        <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-3">
+          <div className="mb-2 flex items-center gap-2 text-sm font-extrabold text-primary">
+            🎭 خدمات هذا الحساب <span className="text-[11px] font-normal text-muted-foreground">— اكتُشفت تلقائياً</span>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-card px-3 py-2.5 shadow-sm">
+              <span className="flex items-center gap-2 font-bold text-foreground"><User className="h-4 w-4 text-sky-600" /> عضو</span>
+              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-extrabold text-sky-700">أنت هنا</span>
+            </div>
+            {myStoreId > 0 && (
+              <Link href="/store" className="flex items-center justify-between gap-2 rounded-xl bg-card px-3 py-2.5 shadow-sm hover:border-primary hover:bg-accent">
+                <span className="flex min-w-0 items-center gap-2 font-bold text-foreground"><Store className="h-4 w-4 shrink-0 text-emerald-600" /> <span className="line-clamp-1">متجر «{myStoreName}»</span></span>
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">دخول ←</span>
+              </Link>
+            )}
+            {isAdmin && (
+              <Link href="/admin" className="flex items-center justify-between gap-2 rounded-xl bg-card px-3 py-2.5 shadow-sm hover:border-primary hover:bg-accent">
+                <span className="flex items-center gap-2 font-bold text-foreground"><Shield className="h-4 w-4 text-amber-600" /> لوحة الإدارة</span>
+                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">دخول ←</span>
+              </Link>
+            )}
+            {linkedCount > 0 && (
+              <Link href="/account/identities" className="flex items-center justify-between gap-2 rounded-xl bg-card px-3 py-2.5 shadow-sm hover:border-primary hover:bg-accent">
+                <span className="flex items-center gap-2 font-bold text-foreground"><Users className="h-4 w-4 text-violet-600" /> حسابات مرتبطة ({linkedCount})</span>
+                <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-extrabold text-violet-700">تنقّل ←</span>
+              </Link>
+            )}
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">تنتقل بين خدماتك من هنا أو من «القائمة ← 🎭 هوياتي». كل خدمة تعمل باسمها ورقمها دون تداخل.</p>
+        </div>
+      )}
 
       {notices.length > 0 && (
         <div className="space-y-2 rounded-2xl border-2 border-primary/25 bg-primary/5 p-3">

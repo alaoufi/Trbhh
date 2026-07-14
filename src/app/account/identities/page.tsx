@@ -19,7 +19,7 @@ export default async function IdentitiesPage({ searchParams }: { searchParams?: 
         <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Users className="h-5 w-5" /></span>
         <div>
           <h1 className="text-xl font-bold text-primary">هوياتي والحسابات المرتبطة</h1>
-          <p className="text-xs text-muted-foreground">ميزة اختيارية — تربط حساباتك المتعددة لتتنقّل بينها من دخول واحد.</p>
+          <p className="text-xs text-muted-foreground">ميزة اختيارية — اربط حساباتك المتعددة لتحصل على <b>دخول موحّد</b> وتنقّل بينها بلا كلمة مرور.</p>
         </div>
       </div>
 
@@ -49,6 +49,15 @@ export default async function IdentitiesPage({ searchParams }: { searchParams?: 
               <li>كرّر لأي حساب آخر تملكه. وتنتقل بينها من «القائمة ← 🎭 هوياتي ← 🔗 التبديل لحساب آخر».</li>
               <li>يمكنك <b>فكّ ارتباط</b> أي حساب في أي وقت — يعود مستقلاً كما كان.</li>
             </ol>
+          </div>
+          <div>
+            <div className="mb-1 font-extrabold text-primary">🔒 قواعد الأمان</div>
+            <ul className="mr-4 list-disc space-y-1">
+              <li><b>حساب واحد لمالك واحد:</b> لا يمكن ربط حساب مرتبط بشخص آخر — من يربط الحساب أولاً (بكلمة مروره) يملكه، ولا يستطيع شخص آخر ربطه معه.</li>
+              <li><b>لا مشاركة حساب:</b> الربط لا يفتح الحساب لعدّة أشخاص — يبقى محمياً بكلمة مروره، والتبديل يصدر جلسة واحدة نشطة فقط (لا دخول متزامن لشخصين).</li>
+              <li><b>دخول موحّد:</b> بعد الربط تدخل بأي حساب من حساباتك مرة واحدة، وتتنقّل لبقيتها من المبدّل بلا إعادة إدخال كلمة المرور.</li>
+              <li><b>تحت سيطرتك:</b> فكّ ارتباط أي حساب في أي وقت فيعود مستقلاً، ويتوقّف التبديل إليه فوراً.</li>
+            </ul>
           </div>
           <p className="rounded-lg bg-amber-50 p-2 text-[12px] font-bold text-amber-900">⚠️ اربط فقط الحسابات التي تملكها أنت. الإدارة قد ترى الحسابات المرتبطة كياناً واحداً لكنها لا تنشر أو تراسل بالنيابة عنك — أنت وحدك من يبدّل وينشر.</p>
         </div>

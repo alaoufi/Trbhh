@@ -40,7 +40,7 @@ function Section({ title, icon: Icon, children }: { title: string; icon: React.E
   );
 }
 
-export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], dealsOn = false, auctionsOn = false, debatesOn = true }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[]; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; debatesOn?: boolean }) {
+export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], dealsOn = false, auctionsOn = false, debatesOn = true, myStoreId = 0, myStoreName = '' }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[]; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; debatesOn?: boolean; myStoreId?: number; myStoreName?: string }) {
   const [open, setOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -118,6 +118,21 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
           </div>
         ) : (
           <div className="flex-1 p-2">
+            {/* 🎭 مبدّل الهوية — اختياري: يظهر فقط لأصحاب المتاجر لعزل النشاط بين هوياتهم */}
+            {isAuthed && myStoreId > 0 && (
+              <div className="mb-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-2">
+                <div className="mb-1.5 px-1 text-[11px] font-extrabold text-primary">🎭 هوياتي</div>
+                <Link href="/account" onClick={close} className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
+                  <User className="h-4 w-4 shrink-0 text-primary" /> <span>👤 حسابي الشخصي</span>
+                </Link>
+                <Link href="/store" onClick={close} className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
+                  <Store className="h-4 w-4 shrink-0 text-primary" /> <span className="line-clamp-1">🏬 متجر «{myStoreName || 'متجري'}»</span>
+                </Link>
+                <Link href="/ads/new?dest=store" onClick={close} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-bold text-primary hover:bg-accent">
+                  <PlusCircle className="h-4 w-4 shrink-0" /> <span>أنشر باسم متجري</span>
+                </Link>
+              </div>
+            )}
             {/* أهم الروابط أولاً */}
             <Item href="/" icon={Home} onClick={close}>الرئيسية</Item>
             <Item href="/companies" icon={Store} onClick={close}>المتاجر</Item>

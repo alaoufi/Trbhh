@@ -42,7 +42,7 @@ export async function Header() {
   const debatesOn = await import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true);
   return (
     <>
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#010e23]">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-gradient-to-l from-[#1b4f8a] to-[#3287da]">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
         <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />
@@ -56,7 +56,7 @@ export async function Header() {
         {/* جرس الرسائل والتنبيهات + ساعة حية بتوقيت الرياض تحته */}
         <div className="flex shrink-0 flex-col items-center gap-0.5">
           {session && (
-            <Link href="/notifications" aria-label="التنبيهات والرسائل" className="relative text-primary">
+            <Link href="/notifications" aria-label="التنبيهات والرسائل" className="relative text-white">
               <Bell className="h-5 w-5" />
               {bellCount > 0 && (
                 <span className="absolute -left-2 -top-1.5 grid min-w-[18px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-extrabold leading-[18px] text-white shadow">
@@ -68,9 +68,9 @@ export async function Header() {
           <LiveClock />
         </div>
 
-        {/* logo on the left (RTL: last child) — الشعار الكامل بحواف متدرّجة تندمج مع خلفية الهيدر الكحلية */}
+        {/* logo on the left (RTL: last child) — الشعار الكامل بحواف متدرّجة تندمج مع تدرّج الهيدر الأزرق */}
         <Link href="/" className="shrink-0">
-          <Image src="/logo-header-navy.png" alt="تربح" width={56} height={56} priority className="h-14 w-14 object-contain" />
+          <Image src="/logo-header-blue.png" alt="تربح" width={56} height={56} priority className="h-14 w-14 object-contain" />
         </Link>
       </div>
     </header>

@@ -142,11 +142,20 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const baseTpl = (inStore && storeTpls.length ? storeTpls[0] : adTpls[0]) || '';
   // {link} = رابط الإعلان (يُضاف تلقائياً في واتساب)، {name} = عنوان الإعلان
   const waMsg = fillTemplate(baseTpl, { link: shareUrl, name: ad.title, appendLink: true });
-  const waNumber = waLink(ad.seller?.whatsapp, waMsg);
+  // هوية الإعلان: إعلان المتجر يظهر باسم المتجر ورقمه (لا باسم صاحبه الشخصي) —
+  // عزل تام يمنع التداخل بين هوية المتجر والهوية الشخصية.
+  const identityIsStore = inStore && !!storeMeta;
+  const identityName = identityIsStore ? (storeMeta?.storeName || 'المتجر') : (ad.seller?.name || 'مستخدم');
+  const identityHref = identityIsStore ? (storeUrl || `/companies/${sellerStoreId}`) : `/users/${ad.seller?.id}`;
+  const storePhone = identityIsStore ? (storeMeta?.phone || null) : null;
+  const callPhone = storePhone || ad.seller?.phone || null;
+  const waNumber = identityIsStore
+    ? (storePhone ? waLink(storePhone, waMsg) : null)
+    : waLink(ad.seller?.whatsapp, waMsg);
   // صاحب الإعلان لا يرى المراسلة/البلاغ/التقييم على إعلانه (لا يراسل/يبلّغ/يقيّم نفسه)
   const isAdOwner = !!(session && ad.seller && session.uid === ad.seller.id);
-  // "مراسلة" available to non-owners; WhatsApp/call only when the seller provides them
-  const contactCols = (isAdOwner ? 0 : 1) + (waNumber ? 1 : 0) + (ad.seller?.phone ? 1 : 0);
+  // "مراسلة" available to non-owners; WhatsApp/call only when provided
+  const contactCols = (isAdOwner ? 0 : 1) + (waNumber ? 1 : 0) + (callPhone ? 1 : 0);
 
   // شارة عاجل لصاحب الإعلان: زر تفعيل مباشر — يغطي الرصيد → خصم، لا يغطي → دعوة لشحن الرصيد
   const urgentActive = !!(ad.urgentUntil && new Date(ad.urgentUntil) > new Date());
@@ -301,15 +310,15 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <InfoItem icon={MapPin}>{ad.area ? `${ad.area} - ${ad.city}` : (ad.city || 'غير محدد')}</InfoItem>
         <div className="flex items-center gap-2 text-primary">
           <span className="relative">
-            <User className="h-5 w-5" />
+            {identityIsStore ? <Store className="h-5 w-5" /> : <User className="h-5 w-5" />}
             {ad.seller?.trusted ? (
               <BadgeCheck className="absolute -bottom-1 -left-1 h-3 w-3 fill-primary text-white" />
             ) : (
               <span className="absolute -bottom-0.5 -left-0.5 h-2 w-2 rounded-full bg-red-500" />
             )}
           </span>
-          <Link href={`/users/${ad.seller?.id}`} className="line-clamp-1 text-sm font-medium hover:underline">
-            {ad.seller?.name}
+          <Link href={identityHref} className="line-clamp-1 text-sm font-medium hover:underline">
+            {identityName}{identityIsStore && <span className="mr-1 rounded bg-primary/10 px-1 text-[10px] font-bold text-primary">متجر</span>}
           </Link>
         </div>
         {catsOn && ad.category && <InfoItem icon={Tag}>{ad.category.name}</InfoItem>}
@@ -373,8 +382,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <MessageCircle className="h-6 w-6" /> واتساب
           </TrackedContact>
         )}
-        {ad.seller?.phone && (
-          <TrackedContact adId={ad.id} kind="call" href={`tel:${ad.seller.phone}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+        {callPhone && (
+          <TrackedContact adId={ad.id} kind="call" href={`tel:${callPhone}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
             <Phone className="h-6 w-6" /> اتصال
           </TrackedContact>
         )}

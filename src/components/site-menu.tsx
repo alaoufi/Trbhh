@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel, Palette, UserPen, ShieldCheck,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel, Palette, UserPen, ShieldCheck, Users,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
@@ -125,20 +125,19 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
             {isAuthed && (myStoreId > 0 || isAdmin || linkedAccounts.length > 1) && (
               <div className="mb-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-2">
                 <div className="mb-1.5 px-1 text-[11px] font-extrabold text-primary">🎭 هوياتي</div>
-                <Link href="/account" onClick={close} className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
-                  <span className="flex items-center gap-2"><User className="h-4 w-4 shrink-0 text-primary" /> حسابي</span>
-                  <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-extrabold text-sky-700">عضو</span>
-                </Link>
+                {/* الحساب الحالي وصفاته — شارات فقط، بلا روابط مكرّرة مع القائمة (حسابي/لوحة الإدارة لهما مكانهما أدناه) */}
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-background px-2 py-2">
+                  <span className="flex min-w-0 items-center gap-2 text-sm font-bold text-foreground"><User className="h-4 w-4 shrink-0 text-primary" /> <span className="line-clamp-1">أنت الآن</span></span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-extrabold text-sky-700">عضو</span>
+                    {myStoreId > 0 && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">متجر</span>}
+                    {isAdmin && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">إدارة</span>}
+                  </span>
+                </div>
                 {myStoreId > 0 && (
-                  <Link href="/store" onClick={close} className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
-                    <span className="flex items-center gap-2"><Store className="h-4 w-4 shrink-0 text-primary" /> <span className="line-clamp-1">«{myStoreName || 'متجري'}»</span></span>
-                    <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">متجر</span>
-                  </Link>
-                )}
-                {isAdmin && (
-                  <Link href="/admin" onClick={close} className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
-                    <span className="flex items-center gap-2"><Shield className="h-4 w-4 shrink-0 text-amber-600" /> لوحة الإدارة</span>
-                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">إدارة</span>
+                  <Link href="/store" onClick={close} className="mt-0.5 flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
+                    <span className="flex min-w-0 items-center gap-2"><Store className="h-4 w-4 shrink-0 text-primary" /> <span className="line-clamp-1">واجهة «{myStoreName || 'متجري'}»</span></span>
+                    <span className="shrink-0 text-[11px] text-primary">عرض ←</span>
                   </Link>
                 )}
                 {myStoreId > 0 && (
@@ -165,6 +164,9 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
                     ))}
                   </div>
                 )}
+                <Link href="/account/identities" onClick={close} className="mt-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-bold text-muted-foreground hover:bg-accent">
+                  <Users className="h-4 w-4 shrink-0" /> <span>إدارة الحسابات المرتبطة</span>
+                </Link>
               </div>
             )}
             {/* أهم الروابط أولاً */}
@@ -192,6 +194,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
               <Section title="حسابي" icon={User}>
                 <Item href="/account" icon={User} onClick={close}>لوحة حسابي</Item>
                 <Item href="/account/profile" icon={UserPen} onClick={close}>الملف الشخصي</Item>
+                <Item href="/account/identities" icon={Users} onClick={close}>هوياتي والحسابات المرتبطة</Item>
                 <Item href="/account/verify" icon={ShieldCheck} onClick={close}>توثيق الحساب</Item>
                 <Item href="/messages" icon={Mail} onClick={close}>رسائلي</Item>
                 <Item href="/notifications" icon={Bell} onClick={close}>التنبيهات</Item>

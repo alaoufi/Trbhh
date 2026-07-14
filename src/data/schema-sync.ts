@@ -130,6 +130,9 @@ const STATEMENTS: string[] = [
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX account_links_group (group_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* تفضيل التبديل لكل حساب مرتبط: 'direct' تبديل مباشر، 'confirm' يطلب تأكيداً
+     قبل أي إجراء (ذكّرني). الافتراضي 'confirm' للأمان. */
+  `ALTER TABLE account_links ADD COLUMN mode VARCHAR(10) NOT NULL DEFAULT 'confirm'`,
   /* products the merchant explicitly showcases in the store (independent
      catalog — nothing from the owner's platform ads appears automatically) */
   `CREATE TABLE IF NOT EXISTS store_products (

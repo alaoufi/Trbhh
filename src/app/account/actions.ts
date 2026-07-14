@@ -295,16 +295,59 @@ export async function bumpAdAction(formData: FormData) {
 export async function switchAccountAction(formData: FormData) {
   const session = await requireUser();
   const target = Number(formData.get('userId') || 0);
+  const confirmed = formData.get('confirmed') === '1';
   if (!target || target === session.uid) redirect('/account');
-  const { linkedUserIds } = await import('@/lib/account-links');
+  const { linkedUserIds, getLinkMode } = await import('@/lib/account-links');
   const linked = await linkedUserIds(session.uid).catch(() => [session.uid]);
   if (!linked.includes(target)) redirect('/account?error=notlinked');
   const u = await prisma.users.findUnique({ where: { id: BigInt(target) }, select: { id: true, name: true, userName: true, ban: true } }).catch(() => null);
   if (!u) redirect('/account');
   if (u.ban === 'checked') redirect('/account?error=switchbanned');
+  // «ذكّرني قبل أي إجراء»: يمرّ بصفحة تأكيد قبل التبديل ما لم يكن مباشراً أو مؤكّداً
+  if (!confirmed) {
+    const mode = await getLinkMode(target).catch(() => 'confirm' as const);
+    if (mode === 'confirm') redirect(`/account/switch?to=${target}`);
+  }
   const { createSession } = await import('@/lib/auth');
   await createSession({ uid: toInt(u.id), name: u.name || u.userName || 'مستخدم', type: 'user' });
   redirect('/account?switched=1');
+}
+
+/** ربط ذاتي لحساب آخر يملكه العضو — يثبت ملكيته باسم الدخول وكلمة المرور. */
+export async function linkOwnAccountAction(formData: FormData) {
+  const session = await requireUser();
+  const identifier = String(formData.get('identifier') || '');
+  const password = String(formData.get('password') || '');
+  if (!identifier || !password) redirect('/account/identities?error=empty');
+  const { verifyAndLinkOwn } = await import('@/lib/account-links');
+  const res = await verifyAndLinkOwn(session.uid, identifier, password).catch(() => ({ ok: false as const, error: 'تعذّر الربط' }));
+  revalidatePath('/account/identities');
+  if (!res.ok) redirect(`/account/identities?error=link&msg=${encodeURIComponent(res.error || 'تعذّر الربط')}`);
+  redirect(`/account/identities?linked=${encodeURIComponent(res.name || 'الحساب')}`);
+}
+
+/** ضبط تفضيل التبديل لحساب مرتبط: مباشر أو تأكيد قبل الإجراء. */
+export async function setLinkModeAction(formData: FormData) {
+  const session = await requireUser();
+  const target = Number(formData.get('userId') || 0);
+  const mode = formData.get('mode') === 'direct' ? 'direct' : 'confirm';
+  if (target) {
+    const { setLinkMode } = await import('@/lib/account-links');
+    await setLinkMode(session.uid, target, mode).catch(() => {});
+  }
+  revalidatePath('/account/identities');
+  redirect('/account/identities?saved=1');
+}
+
+/** فك ارتباط حساب من مجموعة العضو (يجب أن يكون ضمن مجموعته). */
+export async function unlinkOwnAccountAction(formData: FormData) {
+  const session = await requireUser();
+  const target = Number(formData.get('userId') || 0);
+  const { linkedUserIds, unlinkAccount } = await import('@/lib/account-links');
+  const linked = await linkedUserIds(session.uid).catch(() => [session.uid]);
+  if (target && linked.includes(target)) await unlinkAccount(target).catch(() => {});
+  revalidatePath('/account/identities');
+  redirect('/account/identities?unlinked=1');
 }
 
 /** تحويل نقاط العضو إلى رصيد — بالمعدل والحد الأدنى المحددين من التحكم. */

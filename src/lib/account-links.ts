@@ -15,22 +15,61 @@ export async function linkedUserIds(userId: number): Promise<number[]> {
   return ids.length ? ids : [userId];
 }
 
-export type LinkedAccount = { id: number; name: string; userName: string | null; phone: string | null; hasStore: boolean; storeName: string | null; isAdmin: boolean };
+export type LinkedAccount = { id: number; name: string; userName: string | null; phone: string | null; hasStore: boolean; storeName: string | null; isAdmin: boolean; mode: 'direct' | 'confirm' };
 
-/** بيانات عرض الحسابات المرتبطة (للمبدّل وللإدارة). */
+/** بيانات عرض الحسابات المرتبطة (للمبدّل وللإدارة) — مع تفضيل التبديل لكل حساب. */
 export async function linkedAccounts(userId: number): Promise<LinkedAccount[]> {
   const ids = await linkedUserIds(userId);
   if (ids.length <= 1) return [];
-  const [users, stores] = await Promise.all([
+  const [users, stores, links] = await Promise.all([
     prisma.users.findMany({ where: { id: { in: ids.map((i) => BigInt(i)) } }, select: { id: true, name: true, userName: true, phoneNumber: true, is_admin: true } }).catch(() => []),
     prisma.stores.findMany({ where: { user_id: { in: ids } }, select: { user_id: true, store_name: true } }).catch(() => []),
+    prisma.account_links.findMany({ where: { user_id: { in: ids.map((i) => BigInt(i)) } }, select: { user_id: true, mode: true } }).catch(() => [] as { user_id: bigint; mode: string }[]),
   ]);
   const storeBy = new Map(stores.map((s) => [s.user_id, s.store_name || 'متجر']));
+  const modeBy = new Map(links.map((l) => [toInt(l.user_id), l.mode === 'direct' ? 'direct' : 'confirm']));
   return users.map((u) => ({
     id: toInt(u.id), name: u.name || u.userName || `#${toInt(u.id)}`, userName: u.userName ?? null,
     phone: u.phoneNumber ?? null, hasStore: storeBy.has(toInt(u.id)), storeName: storeBy.get(toInt(u.id)) ?? null,
-    isAdmin: u.is_admin === 1,
+    isAdmin: u.is_admin === 1, mode: (modeBy.get(toInt(u.id)) as 'direct' | 'confirm') ?? 'confirm',
   }));
+}
+
+/** تفضيل التبديل لحساب مرتبط ('direct' | 'confirm'). الافتراضي 'confirm'. */
+export async function getLinkMode(userId: number): Promise<'direct' | 'confirm'> {
+  await ensure();
+  const row = await prisma.account_links.findUnique({ where: { user_id: BigInt(userId) }, select: { mode: true } }).catch(() => null);
+  return row?.mode === 'direct' ? 'direct' : 'confirm';
+}
+
+/** ضبط تفضيل التبديل لحساب مرتبط — يُسمح فقط إن كان الحساب في مجموعة صاحب الطلب. */
+export async function setLinkMode(ownerId: number, targetId: number, mode: 'direct' | 'confirm'): Promise<{ ok: boolean }> {
+  await ensure();
+  const group = await linkedUserIds(ownerId);
+  if (!group.includes(targetId)) return { ok: false };
+  await prisma.account_links.update({ where: { user_id: BigInt(targetId) }, data: { mode } }).catch(() => {});
+  return { ok: true };
+}
+
+/** ربط ذاتي: العضو يثبت ملكية حساب آخر ببياناته (اسم الدخول + كلمة المرور) ثم يُضمّ
+ *  لمجموعته. لا يُدمج شيء ولا يُحذف — فقط علاقة «نفس المالك» للتبديل بينهما. */
+export async function verifyAndLinkOwn(ownerId: number, identifier: string, password: string): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+  await ensure();
+  const { verifyLogin } = await import('./login-core');
+  const res = await verifyLogin((identifier || '').trim(), password || '');
+  if (!res.ok) return { ok: false, error: res.error };
+  if (res.uid === ownerId) return { ok: false, error: 'هذا هو حسابك الحالي — اختر حساباً آخر لك.' };
+  // إن كان الحساب الهدف مرتبطاً بمجموعة أخرى (لمالك مختلف) لا تُدمج المجموعات تلقائياً
+  const targetGroup = await prisma.account_links.findUnique({ where: { user_id: BigInt(res.uid) }, select: { group_id: true } }).catch(() => null);
+  if (targetGroup) {
+    const myGroup = await prisma.account_links.findUnique({ where: { user_id: BigInt(ownerId) }, select: { group_id: true } }).catch(() => null);
+    if (!myGroup || myGroup.group_id !== targetGroup.group_id) {
+      return { ok: false, error: 'هذا الحساب مرتبط بمجموعة أخرى بالفعل. فُكّ ارتباطه أولاً أو راجع الإدارة.' };
+    }
+    return { ok: true, name: res.name }; // مرتبط أصلاً بمجموعتك
+  }
+  await linkAccounts([ownerId, res.uid], ownerId);
+  return { ok: true, name: res.name };
 }
 
 /** ربط مجموعة حسابات معاً في مجموعة واحدة (دمج مجموعاتها القائمة إن وُجدت). */
@@ -73,7 +112,7 @@ export type LinkGroup = { groupId: number; members: LinkedAccount[] };
 /** كل مجموعات الربط (للتبويب الإداري «ربط الأعضاء»). */
 export async function listLinkGroups(): Promise<LinkGroup[]> {
   await ensure();
-  const rows = await prisma.account_links.findMany({ orderBy: { group_id: 'asc' }, select: { user_id: true, group_id: true } }).catch(() => []);
+  const rows = await prisma.account_links.findMany({ orderBy: { group_id: 'asc' }, select: { user_id: true, group_id: true, mode: true } }).catch(() => []);
   if (!rows.length) return [];
   const ids = [...new Set(rows.map((r) => toInt(r.user_id)))];
   const [users, stores] = await Promise.all([
@@ -91,7 +130,7 @@ export async function listLinkGroups(): Promise<LinkGroup[]> {
     arr.push({
       id: toInt(u.id), name: u.name || u.userName || `#${toInt(u.id)}`, userName: u.userName ?? null,
       phone: u.phoneNumber ?? null, hasStore: storeBy.has(toInt(u.id)), storeName: storeBy.get(toInt(u.id)) ?? null,
-      isAdmin: u.is_admin === 1,
+      isAdmin: u.is_admin === 1, mode: r.mode === 'direct' ? 'direct' : 'confirm',
     });
     byGroup.set(g, arr);
   }

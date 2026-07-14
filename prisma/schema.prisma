@@ -966,6 +966,7 @@ model account_links {
   user_id    BigInt    @id @db.UnsignedBigInt
   group_id   BigInt    @db.UnsignedBigInt
   linked_by  BigInt?   @db.UnsignedBigInt
+  mode       String    @default("confirm") @db.VarChar(10)
   created_at DateTime? @default(now()) @db.Timestamp(0)
 
   @@index([group_id], map: "account_links_group")

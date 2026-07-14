@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -36,9 +37,38 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     : [];
   const featuredOffer = featuredOpts.length ? { options: featuredOpts, balance } : undefined;
   const catsOn = await categoriesEnabled().catch(() => true);
+  // «أنشر باسم…» — إن كان للعضو متجر نشط يختار: باسمه الشخصي أو باسم متجره (عزل الهويات)
+  const myStore = await import('@/lib/merchant').then(async (m) => {
+    const sid = await m.storeIdOfUser(session.uid).catch(() => 0);
+    if (!sid) return null;
+    const meta = await m.getStoreMeta(sid).catch(() => null);
+    return meta && meta.status === 1 ? { id: sid, name: meta.storeName || 'متجري' } : null;
+  }).catch(() => null);
+  const publishingAsStore = dest === 'store';
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">أضف إعلاناً جديداً</h1>
+
+      {/* اختيار الهوية: باسمي الشخصي أو باسم متجري — يمنع تداخل النشر بين الهويات */}
+      {myStore && (
+        <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-3">
+          <div className="mb-2 text-sm font-extrabold text-primary">🎭 أنشر باسم</div>
+          <div className="grid grid-cols-2 gap-2">
+            <Link href="/ads/new" className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold ${!publishingAsStore ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
+              👤 باسمي الشخصي
+            </Link>
+            <Link href="/ads/new?dest=store" className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold ${publishingAsStore ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
+              🏬 باسم متجر «{myStore.name}»
+            </Link>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {publishingAsStore
+              ? 'سيظهر هذا الإعلان لزوّار متجرك باسم متجرك ورقمه — لا باسمك الشخصي.'
+              : 'سيظهر هذا الإعلان في تربح باسمك الشخصي. اختر «باسم متجري» لنشره داخل متجرك بهويته.'}
+          </p>
+        </div>
+      )}
+
       <AdForm catsOn={catsOn}
         allowSchedule={allowSchedule}
         allowOldPrice={dealsOn}

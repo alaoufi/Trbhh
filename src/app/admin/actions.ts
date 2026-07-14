@@ -318,6 +318,31 @@ export async function adminArchiveAdAction(formData: FormData) {
   revalidatePath(`/ads/${toInt(id)}`);
 }
 
+/** إعلان متجر: صلاحية الإدارة محدودة — إخفاؤه عن النشر (يبقى ظاهراً لإدارة
+ *  المتجر مع سبب المخالفة) وإرسال إنذار مخالفة لصاحب المتجر (يحتسب ضمن ٣
+ *  إنذارات)، أو إعادة نشره. لا أرشفة ولا حذف ولا حظر للمتجر. */
+export async function adminHideStoreAdAction(formData: FormData) {
+  const session = await requireAction('ads', 'archive');
+  const id = BigInt(String(formData.get('adId')));
+  const storeId = Number(formData.get('storeId') || 0);
+  const reason = String(formData.get('reason') || '').trim();
+  const a = await prisma.ads.findUnique({ where: { id }, select: { status: true } }).catch(() => null);
+  if (!a) { revalidatePath(`/ads/${toInt(id)}`); return; }
+  if (a.status === 1) {
+    // إخفاء عن النشر + تسجيل السبب على الإعلان (يراه صاحب المتجر) + إنذار مخالفة
+    await prisma.ads.update({ where: { id }, data: { status: 0, arc_msg: (reason || 'مخفي من الإدارة لمخالفة').slice(0, 225) } }).catch(() => {});
+    if (storeId && reason) await addStoreWarning(storeId, reason).catch(() => {});
+    await logAdmin(session.uid, 'إخفاء إعلان متجر عن النشر + إنذار مخالفة', `إعلان #${toInt(id)} · متجر #${storeId}`, reason);
+  } else {
+    // إعادة النشر — يمسح سبب الإخفاء (الإنذار السابق يبقى مسجّلاً على المتجر)
+    await prisma.ads.update({ where: { id }, data: { status: 1, arc_msg: null } }).catch(() => {});
+    await logAdmin(session.uid, 'إعادة نشر إعلان متجر', `إعلان #${toInt(id)}`);
+  }
+  await bustAdCaches().catch(() => {});
+  revalidatePath(`/ads/${toInt(id)}`);
+  revalidatePath('/');
+}
+
 /** Ban/unban the seller from the ad detail page (admin). Asks for duration:
  *  `permanent` flag → permanent, else `days` (temporary). If already banned → unban. */
 export async function adminBanSellerAction(formData: FormData) {

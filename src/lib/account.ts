@@ -46,6 +46,8 @@ export async function getMyAds(userId: number) {
     expiresAt: r.expires_at ? r.expires_at.toISOString() : null,
     oldPrice: r.old_price ?? 0,
     stockState: r.stock_state ?? 0,
+    // سبب إخفاء الإدارة للإعلان (مخالفة) — يظهر لصاحب الإعلان/المتجر
+    hiddenReason: r.status !== 1 && r.arc_msg ? r.arc_msg : null,
   }));
 }
 

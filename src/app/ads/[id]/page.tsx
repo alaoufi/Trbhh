@@ -4,12 +4,12 @@ import { notFound, redirect } from 'next/navigation';
 import {
   MapPin, Eye, Phone, MessageCircle, Timer, Tag, Flag, Send,
   User, BadgeCheck, Hash, ArrowLeftRight, Star, Share2, Heart, Navigation,
-  ShieldAlert, Trash2, Archive, Ban, Store,
+  ShieldAlert, Trash2, Archive, Ban, Store, EyeOff, Check,
 } from 'lucide-react';
 import { SplashSuppress } from '@/components/splash-suppress';
 import { getAd, getSimilarAds, getSellerAds, recordView } from '@/lib/data';
 import { hasAction } from '@/lib/roles';
-import { adminArchiveAdAction, adminBanSellerAction, adminDeleteAdRedirectAction } from '@/app/admin/actions';
+import { adminArchiveAdAction, adminBanSellerAction, adminDeleteAdRedirectAction, adminHideStoreAdAction } from '@/app/admin/actions';
 import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
@@ -128,6 +128,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const shownInTrbhh = !!(ad.trbhhUntil && new Date(ad.trbhhUntil) > new Date());
   if (inStore && ad.storeOnly && !shownInTrbhh) redirect(`/companies/${sellerStoreId}/p/${ad.id}`);
   const storeMeta = inStore ? await getStoreMeta(sellerStoreId).catch(() => null) : null;
+  // عدّاد إنذارات المتجر — لأدوات إشراف إعلان المتجر (صلاحية محدودة: إخفاء + إنذار)
+  const storeWarnCount = inStore && sellerStoreId ? await import('@/lib/merchant').then((m) => m.warningsCount(sellerStoreId)).catch(() => 0) : 0;
   // رابط المتجر بالمسار المباشر (النطاق الفرعي يتطلب DNS Wildcard غير مجهز)
   const storeUrl = inStore ? `/companies/${storeMeta?.handle || sellerStoreId}` : '';
 
@@ -465,8 +467,43 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           <div className="mb-3 flex items-center gap-2 text-amber-800">
             <ShieldAlert className="h-5 w-5" /> <span className="font-bold">أدوات الإدارة</span>
           </div>
-          <p className="mb-3 text-xs text-amber-800/80">لا يُسمح بتعديل محتوى إعلان العضو حفاظاً على خصوصيته — الأرشفة أو الإظهار فقط. الحذف النهائي يتم من تبويب «المؤرشفة» في صفحة إدارة الإعلانات.</p>
           {addons && <div className="mb-3"><AdAddonsBox info={addons} title="⭐ الإضافات المدفوعة لهذا الإعلان — الباقة وتاريخ الانتهاء" /></div>}
+
+          {inStore ? (
+            /* إعلان متجر: صلاحية محدودة — إخفاء عن النشر + إنذار مخالفة لصاحب المتجر (لا أرشفة/حذف/حظر) */
+            <div className="space-y-2">
+              <p className="rounded-lg bg-white/70 p-2.5 text-xs font-bold leading-5 text-amber-800">
+                🏬 هذا إعلان متجر — لا نتحكّم بالمتجر. صلاحيتنا: <b>إخفاؤه عن النشر</b> مع <b>إنذار مخالفة</b> لصاحب المتجر (يظهر له في لوحة متجره ويُحتسب ضمن ٣ إنذارات؛ عند الثالث يُوقف المتجر).
+              </p>
+              {ad.status !== 1 && (
+                <div className="rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs font-bold leading-5 text-red-700">
+                  🚫 مخفيّ حالياً عن النشر{ad.hiddenReason ? ` — السبب المُرسل للمتجر: «${ad.hiddenReason}»` : ''}
+                </div>
+              )}
+              <form action={adminHideStoreAdAction} className="space-y-2">
+                <input type="hidden" name="adId" value={ad.id} />
+                <input type="hidden" name="storeId" value={sellerStoreId} />
+                {ad.status === 1 ? (
+                  <>
+                    <textarea name="reason" required rows={2} placeholder="سبب المخالفة (يصل صاحب المتجر ويُنذَر به)" className="w-full rounded-lg border border-amber-300 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-amber-300" />
+                    <ConfirmSubmit msg="إخفاء هذا الإعلان عن النشر وإرسال إنذار مخالفة لصاحب المتجر؟ يبقى ظاهراً في إدارة متجره مع السبب." className="flex w-full items-center justify-center gap-1 rounded-lg bg-amber-600 px-3 py-2 text-sm font-bold text-white hover:bg-amber-700">
+                      <EyeOff className="h-4 w-4" /> إخفاء عن النشر + إنذار مخالفة
+                    </ConfirmSubmit>
+                  </>
+                ) : (
+                  <ConfirmSubmit msg="إعادة نشر هذا الإعلان للزوّار؟" className="flex w-full items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700">
+                    <Check className="h-4 w-4" /> إعادة النشر
+                  </ConfirmSubmit>
+                )}
+              </form>
+              <div className="flex items-center justify-between gap-2 text-xs font-bold text-amber-800">
+                <span>إنذارات هذا المتجر: {storeWarnCount}/3</span>
+                <Link href="/admin/stores" className="text-primary underline">إدارة المتاجر ←</Link>
+              </div>
+            </div>
+          ) : (
+          <>
+          <p className="mb-3 text-xs text-amber-800/80">لا يُسمح بتعديل محتوى إعلان العضو حفاظاً على خصوصيته — الأرشفة أو الإظهار فقط. الحذف النهائي يتم من تبويب «المؤرشفة» في صفحة إدارة الإعلانات.</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {canArchive && (
               <form action={adminArchiveAdAction}>
@@ -514,6 +551,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
               </form>
             )}
           </div>
+          </>
+          )}
         </div>
       )}
 

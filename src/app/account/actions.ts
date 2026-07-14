@@ -47,6 +47,11 @@ export async function toggleAdStatusAction(formData: FormData) {
   const adId = BigInt(String(formData.get('adId')));
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (ad && toInt(ad.user_id) === session.uid) {
+    // إعلان أخفته الإدارة لمخالفة (arc_msg مضبوط وهو موقوف): لا يعيد العضو نشره
+    // بنفسه — يعالج السبب ويعيده للإدارة أو يعتذر؛ الإدارة وحدها تعيد نشره.
+    if (ad.status === 0 && ad.arc_msg && ad.arc_msg.trim() !== '') {
+      redirect('/account/ads?error=adminhidden');
+    }
     // الإيقاف من العضو يُعلَّم paused_by_owner حتى لا يختلط بطلبات الموافقة عند الإدارة
     const pausing = ad.status === 1;
     await prisma.ads.update({ where: { id: adId }, data: { status: pausing ? 0 : 1, paused_by_owner: pausing ? 1 : 0 } });

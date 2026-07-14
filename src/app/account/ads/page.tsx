@@ -39,6 +39,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {sp.bumped === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">⬆ تم تحديث إعلانك — أصبح في مقدمة القوائم.</div>}
       {sp.bumpwait && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ التحديث المجاني متاح بعد {sp.bumpwait} يوم — أو فعّل التحديث المدفوع إن وُفّر.</div>}
       {sp.scheduled === '1' && <div className="rounded-lg border border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🕒 حُفظ إعلانك وسيُنشر تلقائياً في الموعد الذي حددته.</div>}
+      {sp.error === 'adminhidden' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">🚫 هذا الإعلان أخفته الإدارة عن النشر لمخالفة — لا يمكنك إعادة نشره بنفسك. عالِج سبب المخالفة (المذكور تحت الإعلان) وراسل الإدارة لإعادة نشره.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? <> (المطلوب {sp.price} ر.س</> : ''}{sp.bal !== undefined ? <>، ورصيدك {sp.bal} ر.س)</> : ')'}. <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
       {sp.urgenton === '1' && <div className="rounded-lg border-2 border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🔥 شارة «عاجل» مفعّلة على هذا الإعلان بالفعل — لم يُخصم أي مبلغ. يمكنك تفعيلها من جديد بعد انتهاء مدّتها.</div>}
       {sp.urgentneed === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 حُفظ إعلانك، لكن رصيدك لا يغطي شارة «عاجل» — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم فعّلها بزر «🔥 عاجل» أسفل الإعلان.</div>}
@@ -66,7 +67,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 <div className="flex shrink-0 gap-1">
                   {ad.special && <Badge variant="special">مميّز</Badge>}
                   {ad.urgentUntil && new Date(ad.urgentUntil).getTime() > now && <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>}
-                  <Badge variant={ad.status === 1 ? 'trusted' : 'special'}>{ad.status === 1 ? 'نشط' : ad.pausedByOwner ? 'موقوف (أوقفته أنت)' : ad.publishAt ? `مجدول: ${fmtDay(ad.publishAt)}` : 'بانتظار الموافقة'}</Badge>
+                  <Badge variant={ad.status === 1 ? 'trusted' : 'special'}>{ad.status === 1 ? 'نشط' : ad.hiddenReason ? 'مخفيّ من الإدارة' : ad.pausedByOwner ? 'موقوف (أوقفته أنت)' : ad.publishAt ? `مجدول: ${fmtDay(ad.publishAt)}` : 'بانتظار الموافقة'}</Badge>
                 </div>
               </div>
               <span className="text-sm font-bold text-primary">{formatPrice(ad.price, 'ر.س', ad.adsType)}</span>
@@ -75,8 +76,10 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 {contactStatsOn && (() => { const c = contacts.get(ad.id); return c && (c.whatsapp + c.call) > 0 ? <> • 💬 {c.whatsapp} واتساب • 📞 {c.call} اتصال</> : null; })()}
               </span>
               {ad.status !== 1 && (
-                <span className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold leading-4 text-amber-700">
-                  {ad.pausedByOwner
+                <span className={`mt-1 rounded-md px-2 py-1 text-[11px] font-bold leading-4 ${ad.hiddenReason ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
+                  {ad.hiddenReason
+                    ? <>🚫 <b>أخفت الإدارة هذا الإعلان عن النشر</b> لمخالفة: «{ad.hiddenReason}» — عالِج السبب، وقد سُجّل إنذار على متجرك (راجع لوحة متجرك). للاعتراض راسل الإدارة.</>
+                    : ad.pausedByOwner
                     ? <>سبب عدم الظهور: <b>أوقفته أنت</b> — اضغط <b>«تفعيل»</b> ليعود للعرض فوراً.</>
                     : <>سبب عدم الظهور: الإعلان <b>بانتظار الموافقة</b> — غالباً لتشابهه مع إعلان قائم (٩٠٪+) أو تفعيل مراجعة الإعلانات. اضغط <b>«تفعيل»</b> لعرضه فوراً، أو احذف النسخة المكرّرة.</>}
                 </span>

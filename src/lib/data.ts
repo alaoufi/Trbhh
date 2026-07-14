@@ -486,6 +486,7 @@ async function getAdImpl(id: number) {
     status: ad.status,
     state: ad.state,
     archived: !!(ad.data_archive && ad.data_archive.trim() !== ''),
+    hiddenReason: ad.arc_msg ?? null,
     storeOnly: ad.store_only === 1,
     trbhhUntil: ad.trbhh_until ? ad.trbhh_until.toISOString() : null,
     urgentUntil: ad.urgent_until ? ad.urgent_until.toISOString() : null,

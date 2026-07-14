@@ -15,7 +15,8 @@ const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
 const STATUS: Record<number, { label: string; cls: string }> = {
   1: { label: 'معتمد', cls: 'bg-emerald-100 text-emerald-700' },
   0: { label: 'بانتظار الاعتماد', cls: 'bg-amber-100 text-amber-700' },
-  2: { label: 'موقوف', cls: 'bg-red-100 text-red-700' },
+  2: { label: 'موقوف مؤقتاً', cls: 'bg-red-100 text-red-700' },
+  3: { label: 'موقوف نهائياً', cls: 'bg-red-200 text-red-800' },
 };
 
 function fmtDate(iso: string | null) {
@@ -149,11 +150,12 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
         )}
         {s.status === 1 && (
           <>
-            <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend" /><ConfirmSubmit msg="تأكيد إيقاف هذا المتجر؟ يختفي متجره ومنتجاته من الموقع حتى إعادة التفعيل." className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف</ConfirmSubmit></form>
+            <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend" /><ConfirmSubmit msg="إيقاف مؤقت لهذا المتجر؟ يختفي متجره ومنتجاته ويُمنع النشر منه — من يفتحه يرى «المتجر غير نشط حالياً، أعد المحاولة لاحقاً» حتى إعادة التفعيل." className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف مؤقت</ConfirmSubmit></form>
+            <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend_perm" /><ConfirmSubmit msg="إيقاف نهائي لهذا المتجر؟ يُمنع النشر والتصفّح — من يفتحه يرى «لا يوجد متجر نشط بهذا الاسم». يمكن إعادة تفعيله لاحقاً من هنا." className="flex items-center gap-1 rounded-lg bg-red-800 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف نهائي</ConfirmSubmit></form>
             <form action={requestStoreHomeAction}><input type="hidden" name="storeId" value={s.id} /><button className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white"><Home className="h-3.5 w-3.5" /> اطلب للرئيسية</button></form>
           </>
         )}
-        {s.status === 2 && (
+        {(s.status === 2 || s.status === 3) && (
           <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="activate" /><ConfirmSubmit msg="تأكيد إعادة تفعيل هذا المتجر؟ يعود للظهور فوراً." className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Play className="h-3.5 w-3.5" /> إعادة تفعيل</ConfirmSubmit></form>
         )}
       </div>

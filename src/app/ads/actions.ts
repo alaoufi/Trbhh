@@ -173,6 +173,12 @@ export async function createAdAction(formData: FormData) {
   // نشر من داخل المتجر: للرجوع للمتجر وإدراج الإعلان في واجهته تلقائياً
   const dest = String(formData.get('dest') || '') === 'store' ? 'store' : '';
   const q = dest ? '&dest=store' : '';
+  // متجر موقوف (مؤقتاً أو نهائياً): لا يُسمح بنشر إعلانات منه
+  if (dest === 'store') {
+    const { storeStatusOfUser } = await import('@/lib/merchant');
+    const st = await storeStatusOfUser(session.uid).catch(() => 1);
+    if (st === 2 || st === 3) redirect(st === 3 ? '/store?error=suspended_perm' : '/store?error=suspended');
+  }
   // حقول إجبارية — أظهِر السبب بدل الرجوع الصامت
   if (!title || !detail) redirect(`/ads/new?error=missing${q}`);
   // الأقسام مخفية (لا حقل قسم في النموذج): يُسند الإعلان داخلياً لقسم «عروض أخرى»

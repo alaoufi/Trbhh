@@ -163,6 +163,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </details>
       )}
 
+      {(error === 'suspended' || error === 'suspended_perm') && (
+        <div className="card-3d rounded-xl border-2 border-destructive/40 bg-red-50 p-3 text-sm font-bold text-destructive">
+          {error === 'suspended_perm' ? '⛔ متجرك موقوف نهائياً — لا يمكنك نشر إعلانات منه. راسل الإدارة.' : '⛔ متجرك موقوف مؤقتاً — لا يمكنك نشر إعلانات منه حتى إعادة تفعيله. راسل الإدارة.'}
+        </div>
+      )}
       {error === 'terms' && (
         <div className="card-3d rounded-xl border-2 border-destructive/40 p-3 text-sm font-bold text-destructive">
           يجب الموافقة على شروط المتجر وتحمّل مسؤولية الإعلانات قبل فتح المتجر.
@@ -207,7 +212,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
 
       {store && meta && (
         <div className={`card-3d rounded-xl p-3 text-sm font-bold ${meta.status === 1 ? 'text-emerald-700' : meta.status === 0 ? 'text-amber-700' : 'text-red-700'}`}>
-          {meta.status === 1 ? '✓ متجرك مُعتمَد وظاهر للجميع.' : meta.status === 0 ? '⏳ متجرك بانتظار موافقة الإدارة قبل الظهور.' : '⛔ متجرك موقوف. تواصل مع الإدارة.'}
+          {meta.status === 1 ? '✓ متجرك مُعتمَد وظاهر للجميع.' : meta.status === 0 ? '⏳ متجرك بانتظار موافقة الإدارة قبل الظهور.' : meta.status === 3 ? '⛔ متجرك موقوف نهائياً — لا يظهر للزوّار («لا يوجد متجر نشط بهذا الاسم») ولا يمكنك النشر منه. راسل الإدارة.' : '⛔ متجرك موقوف مؤقتاً — لا يظهر للزوّار («المتجر غير نشط حالياً») ولا يمكنك النشر منه حتى إعادة التفعيل. راسل الإدارة.'}
         </div>
       )}
 

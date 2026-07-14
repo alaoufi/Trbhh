@@ -315,6 +315,13 @@ export async function setStoreStatus(storeId: number, status: number) {
   await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { status } }).catch(() => {});
 }
 
+/** حالة متجر العضو (لأي متجر يملكه): 1 معتمد · 0 بانتظار · 2 موقوف مؤقتاً · 3 موقوف نهائياً · -1 لا متجر. */
+export async function storeStatusOfUser(userId: number): Promise<number> {
+  await ensure();
+  const r = await prisma.stores.findFirst({ where: { user_id: userId }, select: { status: true }, orderBy: { id: 'desc' } }).catch(() => null);
+  return r ? r.status : -1;
+}
+
 /**
  * Delete a store and ONLY its store-scoped data (branches, warnings, follows,
  * reviews, collaboration offers). Never touches the owner's platform account

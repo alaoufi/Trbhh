@@ -80,6 +80,18 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   // show a friendly status page (e.g. when a merchant previews a store still under review).
   // اشتراك المتجر: عند انتهائه بعد المهلة يُخفى المتجر من العرض (دون حذف). المالك والإدارة يريانه.
   const subBlocked = await isStoreSubBlocked(storeId).catch(() => false);
+  // متجر موقوف: لا تصفّح للجميع عدا الإدارة (حتى المالك يرى الرسالة) — رسالتان مختلفتان
+  if ((meta.status === 2 || meta.status === 3) && !admin) {
+    const perm = meta.status === 3;
+    return (
+      <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="grid h-16 w-16 place-items-center rounded-2xl bg-red-100 text-red-600 text-3xl">🚫</div>
+        <h1 className="text-lg font-extrabold text-red-700">{perm ? 'لا يوجد متجر نشط بهذا الاسم' : 'المتجر غير نشط حالياً'}</h1>
+        <p className="text-sm text-muted-foreground">{perm ? 'هذا المتجر موقوف نهائياً ولم يعد متاحاً.' : 'أعد المحاولة لاحقاً.'}</p>
+        <Link href="/" className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">الصفحة الرئيسية</Link>
+      </div>
+    );
+  }
   if ((meta.status !== 1 || subBlocked) && !isOwner && !admin) {
     const pending = meta.status === 0;
     const subOnly = meta.status === 1 && subBlocked;

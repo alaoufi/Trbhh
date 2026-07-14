@@ -218,10 +218,12 @@ export async function requestStoreHomeAction(formData: FormData) {
 export async function toggleStoreStatusAction(formData: FormData) {
   const session = await requireAction('stores', 'suspend');
   const id = Number(formData.get('storeId'));
-  const suspend = String(formData.get('action')) === 'suspend';
+  const action = String(formData.get('action'));
   if (id) {
-    await setStoreStatus(id, suspend ? 2 : 1);
-    await logAdmin(session.uid, suspend ? 'إيقاف متجر' : 'إعادة تفعيل متجر', `متجر #${id}`);
+    const status = action === 'suspend_perm' ? 3 : action === 'suspend' ? 2 : 1;
+    await setStoreStatus(id, status);
+    const label = status === 3 ? 'إيقاف نهائي لمتجر' : status === 2 ? 'إيقاف مؤقت لمتجر' : 'إعادة تفعيل متجر';
+    await logAdmin(session.uid, label, `متجر #${id}`);
   }
   revalidatePath('/admin/stores');
 }

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone, Phone, Mail, Link2, IdCard, CalendarDays, FileCheck2, AlertTriangle, Trash2, UserCog } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import { getPendingStores, adminStoreList, approvedTransfers, platformRequests, type AdminStore } from '@/lib/merchant';
+import { getStoresCommsLog, type StoreComm } from '@/lib/audit';
 import { timeAgo } from '@/lib/utils';
 import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction, adminMessageStoreOwnerAction, approveVerifyOrderAction, rejectVerifyOrderAction, cancelVerifyOrderAction, storeUntrustAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
@@ -23,7 +24,13 @@ function fmtDate(iso: string | null) {
   return isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d);
 }
 
-function StoreCard({ s }: { s: AdminStore }) {
+const COMM_META: Record<StoreComm['kind'], { icon: string; label: string; cls: string }> = {
+  warn: { icon: '⚠️', label: 'إنذار مخالفة', cls: 'text-red-700' },
+  adhide: { icon: '🚫', label: 'إخفاء إعلان + إنذار', cls: 'text-red-700' },
+  message: { icon: '✉️', label: 'رسالة رسمية', cls: 'text-sky-700' },
+};
+
+function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
   const st = STATUS[s.status] || STATUS[1];
   const warns = s.warnings.length;
   return (
@@ -101,18 +108,36 @@ function StoreCard({ s }: { s: AdminStore }) {
         <Link href="/store-terms" target="_blank" className="mr-auto underline">عرض التعهّد</Link>
       </div>
 
-      {/* سِجل الإنذارات */}
+      {/* عدّاد الإنذارات (نحو الإيقاف عند ٣) */}
       {warns > 0 && (
-        <div className="space-y-1 rounded-xl border border-red-200 bg-red-50/50 p-3">
-          <div className="flex items-center gap-1 text-xs font-bold text-red-700"><ShieldAlert className="h-4 w-4" /> سِجل الإنذارات ({en(warns)})</div>
-          {s.warnings.map((w) => (
-            <div key={w.id} className="flex items-start justify-between gap-2 text-[11px] text-foreground/80">
-              <span>• {w.reason || 'مخالفة'}</span>
-              <span className="shrink-0 text-muted-foreground">{timeAgo(w.at)}</span>
-            </div>
-          ))}
+        <div className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50/50 px-3 py-1.5 text-xs font-bold text-red-700">
+          <ShieldAlert className="h-4 w-4" /> إنذارات المخالفة: {en(warns)}/3 {warns >= 3 && '— أُوقف المتجر تلقائياً'}
         </div>
       )}
+
+      {/* 📋 سجل الرسائل والإنذارات المرسلة للمتجر من الإدارة — مع اسم المُرسِل */}
+      <details className="rounded-xl border border-primary/15 bg-secondary/20 p-2.5">
+        <summary className="cursor-pointer text-xs font-bold text-primary">📋 سجل الرسائل والإنذارات من الإدارة ({en(comms.length)})</summary>
+        {comms.length === 0 ? (
+          <p className="mt-2 text-[11px] text-muted-foreground">لم تُرسل الإدارة أي رسالة أو إنذار لهذا المتجر بعد.</p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {comms.map((c) => {
+              const m = COMM_META[c.kind];
+              return (
+                <li key={c.id} className="rounded-lg bg-white/70 p-2 text-[11px] leading-5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`font-bold ${m.cls}`}>{m.icon} {m.label}</span>
+                    <span className="shrink-0 text-muted-foreground">{timeAgo(c.at)}</span>
+                  </div>
+                  {c.text && <div className="mt-0.5 text-foreground/80">«{c.text}»</div>}
+                  <div className="mt-0.5 text-muted-foreground">أرسلها: <b className="text-foreground/70">{c.adminName}</b></div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </details>
 
       {/* الإجراءات */}
       <div className="flex flex-wrap items-center gap-2">
@@ -175,7 +200,7 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
   await requireAction('stores', 'view');
   const { msg, vbal, q } = await searchParams;
   const term = (q || '').trim();
-  const [pending, stores, transfers, platformReqs] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers(), platformRequests()]);
+  const [pending, stores, transfers, platformReqs, commsByStore] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers(), platformRequests(), getStoresCommsLog().catch(() => new Map<number, StoreComm[]>())]);
   const { listVerifyOrdersAdmin, refundOf } = await import('@/lib/verify-paid');
   const verifyOrders = await listVerifyOrdersAdmin().catch(() => ({ pending: [], active: [] }));
   const verifyPkgs = await import('@/lib/settings').then((m) => m.getVerifyPackages()).catch(() => []);
@@ -304,7 +329,7 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
           <>
             {shown.length === 0 && <p className="py-8 text-center text-muted-foreground">{term ? `لا توجد متاجر مطابقة لـ «${term}».` : 'لا توجد متاجر بعد.'}</p>}
             <div className="space-y-3">
-              {shown.map((s) => <StoreCard key={s.id} s={s} />)}
+              {shown.map((s) => <StoreCard key={s.id} s={s} comms={commsByStore.get(s.id) || []} />)}
             </div>
           </>
         );

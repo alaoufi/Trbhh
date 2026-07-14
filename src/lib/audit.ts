@@ -17,6 +17,41 @@ export async function logAdmin(adminId: number, action: string, target = '', not
 
 export type AdminLogRow = { id: number; adminId: number; adminName: string; action: string; target: string | null; note: string | null; at: string | null };
 
+/** سجل ما أرسلته الإدارة للمتاجر (إنذارات ورسائل رسمية وإخفاء إعلانات) مع اسم المُرسِل.
+ *  مبني من سجل النشاط الإداري، مجمّعاً حسب المتجر. */
+export type StoreComm = { id: number; kind: 'warn' | 'message' | 'adhide'; adminName: string; text: string | null; at: string | null };
+const STORE_COMM_ACTIONS: Record<string, StoreComm['kind']> = {
+  'إنذار متجر': 'warn',
+  'رسالة رسمية لتاجر': 'message',
+  'إخفاء إعلان متجر عن النشر + إنذار مخالفة': 'adhide',
+};
+export async function getStoresCommsLog(limit = 500): Promise<Map<number, StoreComm[]>> {
+  await ensure();
+  const rows = await prisma.admin_log.findMany({
+    where: { action: { in: Object.keys(STORE_COMM_ACTIONS) } },
+    orderBy: { id: 'desc' }, take: Math.min(1000, limit),
+  }).catch(() => []);
+  const ids = [...new Set(rows.map((r) => toInt(r.admin_id)))];
+  const users = ids.length ? await prisma.users.findMany({ where: { id: { in: ids.map((i) => BigInt(i)) } }, select: { id: true, name: true, userName: true } }).catch(() => []) : [];
+  const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
+  const map = new Map<number, StoreComm[]>();
+  for (const r of rows) {
+    const m = (r.target || '').match(/متجر #(\d+)/);
+    if (!m) continue;
+    const sid = Number(m[1]);
+    const arr = map.get(sid) || [];
+    if (arr.length < 40) {
+      arr.push({
+        id: toInt(r.id), kind: STORE_COMM_ACTIONS[r.action] || 'message',
+        adminName: nameById.get(toInt(r.admin_id)) || `#${toInt(r.admin_id)}`,
+        text: r.note, at: r.created_at ? r.created_at.toISOString() : null,
+      });
+      map.set(sid, arr);
+    }
+  }
+  return map;
+}
+
 /** إجمالي أسطر سجل النشاط. */
 export async function countAdminLog(): Promise<number> {
   await ensure();

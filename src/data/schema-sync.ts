@@ -182,11 +182,11 @@ const STATEMENTS: string[] = [
   `ALTER TABLE ads ADD COLUMN stock_state TINYINT NOT NULL DEFAULT 0`,
   /* عروض اليوم: السعر قبل الخصم — إن كان أعلى من السعر يظهر الخصم ويدخل صفحة العروض. */
   `ALTER TABLE ads ADD COLUMN old_price DOUBLE NOT NULL DEFAULT 0`,
-  /* تصحيح تصنيف «مميّز» الموروث: بيانات ليجاسي مستوردة تحمل adsSpecial='checked'
-     بلا تاريخ انتهاء (expires_at IS NULL) فتظهر آلاف الإعلانات كأنها مميّزة دائماً.
-     التمييز المدفوع الحقيقي يضبط expires_at دوماً، فنُلغي التمييز عن كل ما لا
-     تاريخ انتهاء له فقط (آمن، ولا يمسّ التمييز الساري). idempotent. */
-  `UPDATE ads SET adsSpecial = 'no' WHERE adsSpecial = 'checked' AND expires_at IS NULL`,
+  /* تصحيح تصنيف «مميّز» الموروث: آلاف إعلانات الليجاسي تظهر مميّزة دائماً.
+     القاعدة: نُبقي فقط التمييز المدفوع الحديث (expires_at خلال آخر ٣٠ يوماً أو
+     في المستقبل = ساري)، ونُلغي التمييز عمّا لا تاريخ انتهاء له أو تجاوز شهراً.
+     expires_at لا يخصّ ظهور الإعلان (فقط مدة التمييز)، فالإلغاء آمن. idempotent. */
+  `UPDATE ads SET adsSpecial = 'no' WHERE adsSpecial = 'checked' AND (expires_at IS NULL OR expires_at < (NOW() - INTERVAL 30 DAY))`,
   /* دوام المتجر: من/إلى (HH:MM) وأيام العمل (أرقام أيام الأسبوع 0=الأحد، مفصولة بفواصل). */
   `ALTER TABLE stores ADD COLUMN hours_from VARCHAR(5) NULL`,
   `ALTER TABLE stores ADD COLUMN hours_to VARCHAR(5) NULL`,

@@ -24,10 +24,19 @@ hostport=${hp%%/*}       # host:port
 DBH=${hostport%%:*}      # host
 DBN=${hp##*/}; DBN=${DBN%%\?*}
 
-echo "▶ القاعدة: $DBN @ $DBH  (مستخدم: $DBU)"
+# فك ترميز URL لكلمة المرور (إن كانت مُرمّزة مثل %40=@)
+urldecode() { local s="${1//+/ }"; printf '%b' "${s//%/\\x}"; }
+DBP=$(urldecode "$DBP")
 
-# عميل mysql مؤقّت داخل حاوية تصل host.docker.internal (بلا اعتماد على أدوات المضيف)
-run() { docker run --rm -i --add-host=host.docker.internal:host-gateway -e MYSQL_PWD="$DBP" mysql:8.0 "$@"; }
+# IP المضيف كما يراه التطبيق فعلاً (من /etc/hosts داخل حاوية التطبيق)
+HOSTIP=$(docker compose exec -T app sh -c 'grep -m1 host.docker.internal /etc/hosts' 2>/dev/null | awk '{print $1}')
+[ -n "${HOSTIP:-}" ] || HOSTIP="$DBH"
+
+echo "▶ القاعدة: $DBN @ $HOSTIP  (مستخدم: $DBU)"
+
+# عميل mysql مؤقّت يشارك مكدّس شبكة حاوية التطبيق ⇒ نفس عنوان المصدر المصرّح له
+run() { docker run --rm -i --network "container:trbhh-app" -e MYSQL_PWD="$DBP" mysql:8.0 "$@"; }
+DBH="$HOSTIP"
 q()   { run mysql -N -h "$DBH" -u"$DBU" "$DBN"; }
 
 echo "▶ عدد الإعلانات قبل الدمج:"

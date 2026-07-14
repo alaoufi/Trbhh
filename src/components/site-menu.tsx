@@ -118,19 +118,32 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
           </div>
         ) : (
           <div className="flex-1 p-2">
-            {/* 🎭 مبدّل الهوية — اختياري: يظهر فقط لأصحاب المتاجر لعزل النشاط بين هوياتهم */}
-            {isAuthed && myStoreId > 0 && (
+            {/* 🎭 مبدّل الهوية — اختياري: يظهر فقط لمن له أكثر من صفة (متجر و/أو إدارة).
+                يعرض كل هوية متاحة بوسم نوعها (عضو/متجر/إدارة) للتنقّل بينها بضغطة. */}
+            {isAuthed && (myStoreId > 0 || isAdmin) && (
               <div className="mb-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-2">
                 <div className="mb-1.5 px-1 text-[11px] font-extrabold text-primary">🎭 هوياتي</div>
-                <Link href="/account" onClick={close} className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
-                  <User className="h-4 w-4 shrink-0 text-primary" /> <span>👤 حسابي الشخصي</span>
+                <Link href="/account" onClick={close} className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
+                  <span className="flex items-center gap-2"><User className="h-4 w-4 shrink-0 text-primary" /> حسابي</span>
+                  <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-extrabold text-sky-700">عضو</span>
                 </Link>
-                <Link href="/store" onClick={close} className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
-                  <Store className="h-4 w-4 shrink-0 text-primary" /> <span className="line-clamp-1">🏬 متجر «{myStoreName || 'متجري'}»</span>
-                </Link>
-                <Link href="/ads/new?dest=store" onClick={close} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-bold text-primary hover:bg-accent">
-                  <PlusCircle className="h-4 w-4 shrink-0" /> <span>أنشر باسم متجري</span>
-                </Link>
+                {myStoreId > 0 && (
+                  <Link href="/store" onClick={close} className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
+                    <span className="flex items-center gap-2"><Store className="h-4 w-4 shrink-0 text-primary" /> <span className="line-clamp-1">«{myStoreName || 'متجري'}»</span></span>
+                    <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">متجر</span>
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link href="/admin" onClick={close} className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
+                    <span className="flex items-center gap-2"><Shield className="h-4 w-4 shrink-0 text-amber-600" /> لوحة الإدارة</span>
+                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">إدارة</span>
+                  </Link>
+                )}
+                {myStoreId > 0 && (
+                  <Link href="/ads/new?dest=store" onClick={close} className="mt-0.5 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-bold text-primary hover:bg-accent">
+                    <PlusCircle className="h-4 w-4 shrink-0" /> <span>أنشر باسم متجري</span>
+                  </Link>
+                )}
               </div>
             )}
             {/* أهم الروابط أولاً */}

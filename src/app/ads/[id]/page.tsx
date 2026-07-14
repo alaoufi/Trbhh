@@ -465,13 +465,13 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           <div className="mb-3 flex items-center gap-2 text-amber-800">
             <ShieldAlert className="h-5 w-5" /> <span className="font-bold">أدوات الإدارة</span>
           </div>
-          <p className="mb-3 text-xs text-amber-800/80">لا يُسمح بتعديل محتوى إعلان العضو حفاظاً على خصوصيته — الأرشفة أو الحذف فقط.</p>
+          <p className="mb-3 text-xs text-amber-800/80">لا يُسمح بتعديل محتوى إعلان العضو حفاظاً على خصوصيته — الأرشفة أو الإظهار فقط. الحذف النهائي يتم من تبويب «المؤرشفة» في صفحة إدارة الإعلانات.</p>
           {addons && <div className="mb-3"><AdAddonsBox info={addons} title="⭐ الإضافات المدفوعة لهذا الإعلان — الباقة وتاريخ الانتهاء" /></div>}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {canArchive && (
               <form action={adminArchiveAdAction}>
                 <input type="hidden" name="adId" value={ad.id} />
-                <ConfirmSubmit msg="تأكيد أرشفة/إظهار هذا الإعلان؟ الأرشفة تخفيه من الموقع (ويُحذف تلقائياً بعد 30 يوماً)." className="flex w-full items-center justify-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
+                <ConfirmSubmit msg="تأكيد أرشفة/إظهار هذا الإعلان؟ الأرشفة تخفيه من الموقع وتنقله لتبويب «المؤرشفة» — يبقى محفوظاً ولا يُحذف تلقائياً." className="flex w-full items-center justify-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
                   <Archive className="h-4 w-4" /> أرشفة / إظهار
                 </ConfirmSubmit>
               </form>
@@ -505,11 +505,11 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                 </div>
               )
             )}
-            {canDeleteAd && (
+            {canDeleteAd && ad.archived && (
               <form action={adminDeleteAdRedirectAction}>
                 <input type="hidden" name="adId" value={ad.id} />
-                <ConfirmSubmit msg="حذف هذا الإعلان نهائياً؟ لا يمكن التراجع." className="flex w-full items-center justify-center gap-1 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90">
-                  <Trash2 className="h-4 w-4" /> حذف الإعلان
+                <ConfirmSubmit msg="حذف هذا الإعلان المؤرشف نهائياً؟ لا يمكن التراجع." className="flex w-full items-center justify-center gap-1 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90">
+                  <Trash2 className="h-4 w-4" /> حذف نهائي (من الأرشيف)
                 </ConfirmSubmit>
               </form>
             )}

@@ -281,11 +281,24 @@ export async function adminDeleteMessageAction(formData: FormData) {
 }
 
 /** Delete an ad from its detail page (admin), then go home. */
+/** لا حذف مباشر: إن لم يكن الإعلان مؤرشفاً يُؤرشف أولاً (ينتقل للأرشيف)،
+ *  والحذف النهائي لا يتم إلا على إعلان مؤرشف. */
 export async function adminDeleteAdRedirectAction(formData: FormData) {
-  await requireAction('ads', 'delete');
+  const session = await requireAction('ads', 'delete');
   const id = BigInt(String(formData.get('adId')));
+  const a = await prisma.ads.findUnique({ where: { id }, select: { data_archive: true } }).catch(() => null);
+  const isArchived = !!(a?.data_archive && a.data_archive.trim() !== '');
+  if (!isArchived) {
+    await prisma.ads.update({ where: { id }, data: { status: 0, data_archive: new Date().toISOString() } }).catch(() => {});
+    await logAdmin(session.uid, 'أرشفة إعلان (بدل الحذف المباشر)', `إعلان #${toInt(id)}`);
+    await bustAdCaches().catch(() => {});
+    revalidatePath(`/ads/${toInt(id)}`);
+    redirect(`/ads/${toInt(id)}?archived=1`);
+  }
   await prisma.photos.deleteMany({ where: { other_id: id } }).catch(() => {});
   await prisma.ads.delete({ where: { id } }).catch(() => {});
+  await logAdmin(session.uid, 'حذف إعلان نهائياً من الأرشيف', `إعلان #${toInt(id)}`);
+  await bustAdCaches().catch(() => {});
   redirect('/');
 }
 
@@ -996,12 +1009,25 @@ export async function deleteVerificationDocsAction(formData: FormData) {
   revalidatePath('/admin/verifications');
 }
 
+/** لا حذف مباشر: إعلان غير مؤرشف يُؤرشف أولاً (ينتقل لتبويب «المؤرشفة»)،
+ *  والحذف النهائي لا يتم إلا على إعلان مؤرشف (من الأرشيف، يدوياً بتأكيد). */
 export async function adminDeleteAdAction(formData: FormData) {
   const session = await requireAction('ads', 'delete');
   const id = BigInt(String(formData.get('adId')));
+  const a = await prisma.ads.findUnique({ where: { id }, select: { data_archive: true } }).catch(() => null);
+  if (!a) { revalidatePath('/admin/ads'); return; }
+  const isArchived = !!(a.data_archive && a.data_archive.trim() !== '');
+  if (!isArchived) {
+    await prisma.ads.update({ where: { id }, data: { status: 0, data_archive: new Date().toISOString() } }).catch(() => {});
+    await logAdmin(session.uid, 'أرشفة إعلان (بدل الحذف المباشر)', `إعلان #${toInt(id)}`);
+    await bustAdCaches().catch(() => {});
+    revalidatePath('/admin/ads'); revalidatePath('/');
+    return;
+  }
   await prisma.photos.deleteMany({ where: { other_id: id } });
   await prisma.ads.delete({ where: { id } }).catch(() => {});
-  await logAdmin(session.uid, 'حذف إعلان', `إعلان #${toInt(id)}`);
+  await logAdmin(session.uid, 'حذف إعلان نهائياً من الأرشيف', `إعلان #${toInt(id)}`);
+  await bustAdCaches().catch(() => {});
   revalidatePath('/admin/ads');
 }
 
@@ -1030,22 +1056,17 @@ export async function adminToggleAdStatusAction(formData: FormData) {
   revalidatePath('/');
 }
 
-/** Delete ALL ads that are waiting for approval (status 0, not archived). */
+/** أرشفة كل الإعلانات المنتظِرة للموافقة (لا حذف مباشر) — تنتقل لتبويب
+ *  «المؤرشفة» ومنه يمكن حذفها نهائياً بتأكيد. */
 export async function deleteAllPendingAdsAction() {
-  await requireAction('ads', 'delete');
-  const pend = await prisma.ads.findMany({
-    // لا يشمل الموقوفة من أصحابها — تلك ليست بانتظار موافقة ولا تُحذف جماعياً
+  const session = await requireAction('ads', 'delete');
+  const r = await prisma.ads.updateMany({
+    // لا يشمل الموقوفة من أصحابها — تلك ليست بانتظار موافقة
     where: { status: 0, paused_by_owner: 0, OR: [{ data_archive: null }, { data_archive: '' }] },
-    select: { id: true },
-  });
-  const ids = pend.map((p) => p.id);
-  // Delete in chunks so a large backlog (1000+) never overflows the IN clause or times out.
-  const chunk = 200;
-  for (let i = 0; i < ids.length; i += chunk) {
-    const slice = ids.slice(i, i + chunk);
-    await prisma.photos.deleteMany({ where: { other_id: { in: slice } } }).catch(() => {});
-    await prisma.ads.deleteMany({ where: { id: { in: slice } } }).catch(() => {});
-  }
+    data: { status: 0, data_archive: new Date().toISOString() },
+  }).catch(() => ({ count: 0 }));
+  await logAdmin(session.uid, 'أرشفة كل الإعلانات المنتظِرة', `${r.count} إعلان`);
+  await bustAdCaches().catch(() => {});
   revalidatePath('/admin/ads');
   revalidatePath('/admin');
 }

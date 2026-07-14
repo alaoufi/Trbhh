@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { LayoutDashboard, Megaphone, Heart, User, LogOut, UserX, PlusCircle, Building2, ShieldCheck, Wallet } from 'lucide-react';
 import { getSession } from '@/lib/auth';
+import { AccountNavScroller } from '@/components/account-nav-scroller';
 
 const nav = [
   { href: '/account', label: 'لوحة التحكم', icon: LayoutDashboard },
@@ -25,25 +26,25 @@ export default async function AccountLayout({ children }: { children: React.Reac
           </span>
           <span className="text-sm font-semibold">{session.name}</span>
         </div>
-        {/* على الجوال: شريط تنقّل أفقي مضغوط (صف واحد) لا يغطّي المحتوى ولا يتجاوز عرض الشاشة؛ على الشاشات الكبيرة: قائمة جانبية عمودية */}
-        <nav className="flex min-w-0 max-w-full gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
-          <Link href="/ads/new" className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+        {/* على الجوال: شريط تنقّل أفقي مضغوط بأسهم يمين/يسار تُظهر العناصر المخفية؛ على الشاشات الكبيرة: قائمة جانبية عمودية */}
+        <AccountNavScroller>
+          <Link href="/ads/new" className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             <PlusCircle className="h-4 w-4" /> أضف إعلان
           </Link>
           {nav.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm hover:bg-secondary">
+            <Link key={href} href={href} className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm hover:bg-secondary">
               <Icon className="h-4 w-4" /> {label}
             </Link>
           ))}
           {/* حذف الحساب — متطلب متاجر التطبيقات (يظهر داخل التطبيق) */}
-          <Link href="/delete-account" className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm text-destructive/80 hover:bg-destructive/10">
+          <Link href="/delete-account" className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm text-destructive/80 hover:bg-destructive/10">
             <UserX className="h-4 w-4" /> حذف الحساب
           </Link>
           {/* خروج: رابط عادي (لا يُستبق تلقائياً) حتى لا يُلغى الجلسة عند التصفّح */}
-          <a href="/logout" className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10">
+          <a href="/logout" className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10">
             <LogOut className="h-4 w-4" /> خروج
           </a>
-        </nav>
+        </AccountNavScroller>
       </aside>
       <section className="min-w-0">{children}</section>
     </div>

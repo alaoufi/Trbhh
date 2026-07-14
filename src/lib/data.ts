@@ -211,14 +211,19 @@ export async function sweepExpiredArchived() {
   const now = Date.now();
   if (now - lastArchiveSweep < 3600_000) return; // at most once/hour
   lastArchiveSweep = now;
-  const cutoff = now - 30 * 86400_000;
+  // الحذف التلقائي للمؤرشف مُعطَّل افتراضياً (الحذف يدوي) — يحمي الإعلانات
+  // المستوردة القديمة من الحذف. يُفعّله المشرف صراحةً عند الحاجة من الإعدادات.
+  const on = await import('./settings').then((m) => m.getSettingBool('archive_autodelete_on', false)).catch(() => false);
+  if (!on) return;
+  // مدة الأرشفة قبل الحذف: ٦ أشهر (١٨٠ يوماً) — لا يُحذف إلا ما بقي مؤرشفاً أطول من ذلك.
+  const cutoffOld = now - 180 * 86400_000;
   const rows = await prisma.ads.findMany({
     where: { NOT: [{ data_archive: null }, { data_archive: '' }] },
     select: { id: true, data_archive: true },
   }).catch(() => [] as { id: bigint; data_archive: string | null }[]);
   const expired = rows.filter((r) => {
     const t = new Date(r.data_archive || '').getTime();
-    return Number.isFinite(t) && t < cutoff;
+    return Number.isFinite(t) && t < cutoffOld;
   }).map((r) => r.id);
   if (expired.length) {
     await prisma.photos.deleteMany({ where: { other_id: { in: expired } } }).catch(() => {});

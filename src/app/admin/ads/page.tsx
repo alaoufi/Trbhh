@@ -59,7 +59,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
     : {};
   const where: Prisma.adsWhereInput = { AND: [tabWhere, searchWhere] };
 
-  const [total, allCount, specialCount, normalCount, pendingCount, pausedCount, archivedCount, bannedCount] = await Promise.all([
+  const [total, allCount, specialCount, normalCount, pendingCount, pausedCount, archivedCount, bannedCount, activeLiveCount] = await Promise.all([
     prisma.ads.count({ where }),
     prisma.ads.count(),
     prisma.ads.count({ where: { status: 1, adsSpecial: 'checked', ...notArchived } }),
@@ -68,6 +68,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
     prisma.ads.count({ where: { status: 0, paused_by_owner: 1, ...notArchived } }),
     prisma.ads.count({ where: archived }),
     prisma.ads.count({ where: bannedWhere }),
+    prisma.ads.count({ where: { status: 1, state: 'active', ...notArchived } }),
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const cur = Math.min(page, pages);
@@ -85,8 +86,28 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
   const tabCls = (t: Tab) => `rounded-lg border px-3 py-1.5 ${tab === t ? 'bg-primary text-white' : 'text-primary'}`;
   const badge = (n: number, color: string) => n > 0 && <span className={`mr-1 rounded-full px-1.5 text-xs text-white ${color}`}>{n}</span>;
 
+  const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   return (
     <div className="space-y-4">
+      {/* ملخّص إجمالي إعلانات القاعدة: الكلي/النشط/المؤرشف/المحجوب */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-3 text-center">
+          <div className="text-2xl font-extrabold text-primary">{en(allCount)}</div>
+          <div className="text-xs font-bold text-muted-foreground">إجمالي القاعدة</div>
+        </div>
+        <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-center">
+          <div className="text-2xl font-extrabold text-emerald-700">{en(activeLiveCount)}</div>
+          <div className="text-xs font-bold text-emerald-700/80">نشط (ظاهر)</div>
+        </div>
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-center">
+          <div className="text-2xl font-extrabold text-amber-700">{en(archivedCount)}</div>
+          <div className="text-xs font-bold text-amber-700/80">مؤرشف</div>
+        </div>
+        <div className="rounded-xl border-2 border-slate-300 bg-slate-50 p-3 text-center">
+          <div className="text-2xl font-extrabold text-slate-700">{en(bannedCount)}</div>
+          <div className="text-xs font-bold text-slate-700/80">محجوب (لأعضاء محظورين)</div>
+        </div>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-bold text-primary">الإعلانات</h1>
         <div className="flex flex-wrap gap-2 text-sm">

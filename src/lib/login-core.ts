@@ -14,6 +14,13 @@ export type LoginResult = { ok: true; uid: number; name: string; type: string } 
 export async function verifyLogin(identifier: string, password: string): Promise<LoginResult> {
   if (!identifier || !password) return { ok: false, error: 'أدخل بيانات الدخول كاملة' };
 
+  // تحديد المعدّل: نمنع تخمين كلمة المرور بعد عدة محاولات فاشلة لنفس المُعرِّف.
+  const { rateGet, rateHit, rateReset } = await import('./redis');
+  const rlKey = `rl:login:${identifier.toLowerCase().replace(/\s+/g, '')}`;
+  if ((await rateGet(rlKey)) >= 8) {
+    return { ok: false, error: 'محاولات دخول كثيرة، انتظر قليلاً ثم أعد المحاولة' };
+  }
+
   let user = await prisma.users.findFirst({
     where: { OR: [{ userName: identifier }, { email: identifier }, { phoneNumber: identifier }] },
   });
@@ -36,9 +43,11 @@ export async function verifyLogin(identifier: string, password: string): Promise
   }
 
   if (!user || !(await verifyPassword(password, user.password))) {
+    await rateHit(rlKey, 600); // احتسب المحاولة الفاشلة ضمن نافذة ١٠ دقائق
     return { ok: false, error: 'بيانات الدخول غير صحيحة' };
   }
   const uid = toInt(user.id);
   if (await isUserBanned(uid)) return { ok: false, error: 'هذا الحساب محظور' };
+  await rateReset(rlKey); // نجاح الدخول يصفّر العدّاد
   return { ok: true, uid, name: user.name || user.userName || 'عضو', type: user.type };
 }

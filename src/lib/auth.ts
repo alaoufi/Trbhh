@@ -5,9 +5,14 @@ import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
 
 const COOKIE = 'trbhh_session';
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET || 'dev-insecure-secret-change-me-in-production-please',
-);
+const INSECURE_DEFAULT = 'dev-insecure-secret-change-me-in-production-please';
+const AUTH_SECRET = process.env.AUTH_SECRET || '';
+// أمان: لا تُشغّل الإنتاج بمفتاح توقيع افتراضي/ضعيف — وإلا أمكن تزوير الجلسات
+// (بما فيها جلسة إداري) بمفتاح معروف. نفشل بوضوح بدل العمل بمفتاح غير آمن.
+if (process.env.NODE_ENV === 'production' && (AUTH_SECRET.length < 32 || AUTH_SECRET === INSECURE_DEFAULT)) {
+  throw new Error('AUTH_SECRET مفقود أو ضعيف في الإنتاج — عيّن مفتاحاً عشوائياً طوله 32 حرفاً على الأقل.');
+}
+const secret = new TextEncoder().encode(AUTH_SECRET || INSECURE_DEFAULT);
 
 export type SessionPayload = { uid: number; name: string; type: string; scope?: string };
 
@@ -71,6 +76,12 @@ export async function getCurrentUser() {
   return prisma.users.findUnique({ where: { id: BigInt(session.uid) } });
 }
 
+/* فحص الحظر لجلسة قائمة — مموّن لكل طلب حتى لا يتكرر الاستعلام عبر النداءات. */
+const sessionBanned = cache(async (uid: number): Promise<boolean> => {
+  const { isUserBanned } = await import('./moderation');
+  return isUserBanned(uid).catch(() => false);
+});
+
 /** Guard: return session or redirect to /login (remembering where to return). */
 export async function requireUser() {
   const session = await getSession();
@@ -80,6 +91,12 @@ export async function requireUser() {
     const path = (await headers()).get('x-pathname') || '';
     const next = path && path.startsWith('/') && !path.startsWith('/login') ? `?next=${encodeURIComponent(path)}` : '';
     redirect(`/login${next}`);
+  }
+  // أمان: افرض الحظر على الجلسات القائمة أيضاً — المحظور أثناء جلسته لا يواصل
+  // النشر/المراسلة/الصرف بجلسته السابقة (الرمز صالح ٣٠ يوماً بلا هذا الفحص).
+  if (await sessionBanned(session!.uid)) {
+    const { redirect } = await import('next/navigation');
+    redirect('/login?banned=1');
   }
   return session!;
 }

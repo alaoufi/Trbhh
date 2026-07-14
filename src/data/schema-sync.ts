@@ -57,6 +57,12 @@ const STATEMENTS: string[] = [
   `ALTER TABLE stores ADD COLUMN on_trial TINYINT NOT NULL DEFAULT 0`,
   `ALTER TABLE ads ADD COLUMN expires_at DATETIME NULL`,
   `CREATE INDEX ads_expires_at ON ads (expires_at)`,
+  /* فهارس مركّبة لمسار القوائم الساخن: WHERE status,state + ORDER BY bumped_at/created_at
+     (كان مسحاً كاملاً + filesort في كل تحميل للرئيسية/الأقسام/القوائم). */
+  `CREATE INDEX ads_listing_bumped ON ads (status, state, bumped_at)`,
+  `CREATE INDEX ads_listing_created ON ads (status, state, created_at)`,
+  /* تسريع فحص «هل شاهد هذا العضو هذا الإعلان» (كان يمسح كل مشاهدات الإعلان). */
+  `CREATE INDEX ads_views_ad_user ON ads_views (ads_id, user_id)`,
   `CREATE TABLE IF NOT EXISTS store_visits (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     store_id BIGINT UNSIGNED NOT NULL,

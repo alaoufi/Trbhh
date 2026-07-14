@@ -216,8 +216,13 @@ export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; de
   const secs = otp ? Math.floor((Date.now() - otp.last_sent.getTime()) / 1000) : 999;
   if (secs < 60) return { ok: false, delivered: false, error: `انتظر ${60 - secs} ثانية قبل إعادة إرسال الرمز` };
 
-  const code = String(randomInt(1000, 10000)); // 4-digit verification code (1000–9999)
-  const fresh = { code, expires_at: new Date(Date.now() + 10 * 60_000), attempts: 0, last_sent: new Date() };
+  // أمان: نُبقي عدّاد المحاولات عبر عمليات إعادة الإرسال داخل النافذة حتى لا
+  // يُلتَفّ على حدّ المحاولات بطلب رمز جديد؛ ونحظر الرقم بعد تجاوز حدّ عام.
+  const prevAttempts = otp && otp.expires_at.getTime() > Date.now() ? otp.attempts : 0;
+  if (prevAttempts >= 10) return { ok: false, delivered: false, error: 'تجاوزت الحدّ المسموح للمحاولات — حاول بعد قليل' };
+
+  const code = String(randomInt(100000, 1000000)); // رمز تحقّق من ٦ خانات (100000–999999)
+  const fresh = { code, expires_at: new Date(Date.now() + 10 * 60_000), attempts: prevAttempts, last_sent: new Date() };
   await prisma.password_otps.upsert({ where: { phone: norm }, create: { phone: norm, ...fresh }, update: fresh });
   const delivered = await sendVerification(norm, `رمز استعادة كلمة المرور في تربح: ${code}`);
   return { ok: true, delivered };
@@ -248,11 +253,22 @@ export async function verifyOtp(phone: string, code: string): Promise<boolean> {
 /** Set a new password for the member owning this phone. */
 export async function resetPasswordByPhone(phone: string, newPassword: string): Promise<boolean> {
   const norm = normalizeSaudi(phone);
-  const last9 = norm.slice(-9);
-  const user = await prisma.users.findFirst({ where: { phoneNumber: { contains: last9 } }, select: { id: true } }).catch(() => null);
-  if (!user) return false;
+  // أمان: طابق الرقم بصيغته الكاملة الدقيقة (لا «contains» على آخر ٩ أرقام الذي
+  // قد يصادف حساباً آخر بصيغة دولية مختلفة)، وارفض إن تطابق أكثر من حساب.
+  const digits = norm.replace(/\D/g, '');
+  let sig = digits.startsWith('966') ? digits.slice(3) : digits;
+  sig = sig.replace(/^0+/, '');
+  if (sig.length < 8) return false;
+  const forms = [sig, `0${sig}`, `966${sig}`, `00966${sig}`];
+  const rows = await prisma.$queryRawUnsafe<{ id: bigint }[]>(
+    `SELECT id FROM users
+     WHERE REPLACE(REPLACE(REPLACE(IFNULL(phoneNumber,''),' ',''),'-','') , '+','') IN (?,?,?,?)`,
+    forms[0], forms[1], forms[2], forms[3],
+  ).catch(() => [] as { id: bigint }[]);
+  const ids = [...new Set(rows.map((r) => r.id.toString()))];
+  if (ids.length !== 1) return false; // لا تطابق أو تطابق متعدّد غامض
   const hash = await hashPassword(newPassword);
-  await prisma.users.update({ where: { id: user.id }, data: { password: hash } });
+  await prisma.users.update({ where: { id: BigInt(ids[0]) }, data: { password: hash } });
   await prisma.password_otps.deleteMany({ where: { phone: norm } }).catch(() => {});
   return true;
 }

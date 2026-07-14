@@ -31,14 +31,15 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
     prisma.notfications.count({ where: { user_id: String(session.uid), read_at: null } }).catch(() => 0),
     referralEnabled(),
   ]);
-  const refReward = refOn ? await getReferralReward() : 0;
-  // اكتشاف خدمات هذا الحساب تلقائياً عند الدخول: عضو (دائماً) + متجر + إدارة + حسابات مرتبطة
-  const [myStoreId, isAdmin] = await Promise.all([
+  // اكتشاف خدمات هذا الحساب + بقية الإعدادات المستقلّة بالتوازي (بدل جولات متتابعة)
+  const [refReward, myStoreId, isAdmin, linkedCount, catsOn] = await Promise.all([
+    refOn ? getReferralReward() : Promise.resolve(0),
     import('@/lib/merchant').then((m) => m.storeIdOfUser(session.uid)).catch(() => 0),
     import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false),
+    import('@/lib/account-links').then((m) => m.linkedAccounts(session.uid)).then((a) => a.length).catch(() => 0),
+    import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true),
   ]);
   const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
-  const linkedCount = await import('@/lib/account-links').then((m) => m.linkedAccounts(session.uid)).then((a) => a.length).catch(() => 0);
   const cards = [
     { href: '/account/ads', label: 'إعلاناتي', value: stats.ads, icon: Megaphone },
     { href: '/account/favorites', label: 'المفضلة', value: stats.favorites, icon: Heart },
@@ -49,12 +50,12 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
   if (alerts.messages > 0) notices.push({ href: '/messages', icon: Mail, text: `لديك ${en(alerts.messages)} رسالة جديدة غير مقروءة` });
   if (alerts.reviews > 0) notices.push({ href: `/users/${session.uid}`, icon: Star, text: `لديك ${en(alerts.reviews)} تقييم جديد` });
   if (alerts.reports > 0) notices.push({ href: '/account/reports', icon: Flag, text: `يوجد ${en(alerts.reports)} بلاغ جديد على إعلاناتك (المُبلِّغ سرّي لدى الإدارة)` });
-  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true);
   return (
     <div className="space-y-4">
       {sp.switched === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم التبديل — أنت الآن في حساب «{session.name}».</div>}
       {sp.error === 'notlinked' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">تعذّر التبديل: هذا الحساب غير مرتبط بحسابك.</div>}
       {sp.error === 'switchbanned' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر التبديل: الحساب المطلوب محظور.</div>}
+      {sp.error === 'switchadmin' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">لأمان الإدارة: ادخل إلى حساب الإدارة بكلمة مروره مباشرةً — لا يُتاح التبديل إليه بلا كلمة مرور.</div>}
       <h1 className="text-xl font-bold text-primary">مرحباً {session.name} 👋</h1>
 
       {/* 🎭 اكتشاف خدمات هذا الحساب تلقائياً — شريط أفقي منزلق يُظهر الخدمات المخفية بالسحب */}

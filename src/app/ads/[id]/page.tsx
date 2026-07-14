@@ -196,9 +196,17 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       : {}),
   };
 
+  // أمان: هرّب < > & وفواصل الأسطر يونيكود حتى لا يكسر محتوى المستخدم وسم <script ld+json> (XSS مخزّن).
+  const jsonLdHtml = JSON.stringify(jsonLd)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+
   return (
     <div className="space-y-4 pb-16 md:pb-4">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml }} />
 
       {/* مرساة نتيجة أي دفع/إجراء — إليها يوجَّه التمرير لتظهر الرسالة أمام العضو مباشرة */}
       <div id="paid-result" className="scroll-mt-20" />

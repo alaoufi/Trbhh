@@ -61,16 +61,18 @@ export async function generateViewport(): Promise<Viewport> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  let unread = 0;
-  if (session) {
-    try {
-      unread = (await getMyStats(session.uid)).unread;
-    } catch {
-      /* ignore */
-    }
-  }
+  // اقرأ الكوكيز مرة واحدة، وشغّل الاستعلامات المستقلّة بالتوازي بدل التسلسل
+  // (كانت ~٦ جولات متتابعة تُضاف لكل صفحة في الموقع لأنه التخطيط الجذري).
+  const ck = await cookies();
+  const theme = ck.get('theme')?.value || '';
+  const design = ck.get('design')?.value || '';
+  const [unread, isAdminUser, splashSeconds, debatesOn] = await Promise.all([
+    session ? getMyStats(session.uid).then((s) => s.unread).catch(() => 0) : Promise.resolve(0),
+    session ? import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false) : Promise.resolve(false),
+    getClassifiedSplashSeconds().catch(() => 5),
+    import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true),
+  ]);
   // شاشة المبوّبات الافتتاحية تُحجب كلياً عن أعضاء الإدارة (لا تعيقهم عن عملهم)
-  const isAdminUser = session ? await import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false) : false;
   let splashAds: Awaited<ReturnType<typeof getSplashClassifieds>> = [];
   if (!isAdminUser) {
     try {
@@ -79,11 +81,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       /* classified table may not be ready yet */
     }
   }
-  const splashSeconds = await getClassifiedSplashSeconds().catch(() => 5);
-  const debatesOn = await import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true);
-  const theme = (await cookies()).get('theme')?.value || '';
   const validThemes = ['desert', 'agri', 'spring', 'mint', 'lavender', 'sea', 'snow', 'mountain', 'sunset', 'night'];
-  const design = (await cookies()).get('design')?.value || '';
   const validDesigns = ['aurora', 'shop', 'list', 'flat', 'soft', 'sharp'];
   return (
     <html

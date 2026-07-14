@@ -74,6 +74,43 @@ export async function cacheDelPattern(pattern: string): Promise<void> {
   }
 }
 
+/* ---- تحديد المعدّل (rate limiting) لمنع تخمين كلمات المرور ----
+   يعمل عبر Redis عند توفّره، وإلا يسقط لعدّاد في الذاكرة داخل العملية (احتياط
+   يظلّ يحدّ من محاولات التخمين على العقدة الواحدة). */
+const rlMem = new Map<string, { n: number; exp: number }>();
+
+/** زِد عدّاد المفتاح وأعد قيمته الحالية (يضبط انتهاء النافذة عند أول زيادة). */
+export async function rateHit(key: string, windowSec: number): Promise<number> {
+  if (redis) {
+    try {
+      const n = await redis.incr(key);
+      if (n === 1) await redis.expire(key, windowSec);
+      return n;
+    } catch { /* fall through to memory */ }
+  }
+  const now = Date.now();
+  const e = rlMem.get(key);
+  if (!e || now > e.exp) { rlMem.set(key, { n: 1, exp: now + windowSec * 1000 }); return 1; }
+  e.n += 1;
+  return e.n;
+}
+
+/** اقرأ العدّاد الحالي دون زيادته (0 إن غاب أو انتهت نافذته). */
+export async function rateGet(key: string): Promise<number> {
+  if (redis) {
+    try { const v = await redis.get(key); return v ? parseInt(v, 10) || 0 : 0; } catch { /* fall through */ }
+  }
+  const e = rlMem.get(key);
+  if (!e || Date.now() > e.exp) return 0;
+  return e.n;
+}
+
+/** صفّر العدّاد (يُستدعى عند نجاح الدخول). */
+export async function rateReset(key: string): Promise<void> {
+  rlMem.delete(key);
+  if (redis) { try { await redis.del(key); } catch { /* ignore */ } }
+}
+
 /** Cache-aside: L1 (ذاكرة) ثم Redis ثم المصدر. يعمل جيداً حتى بلا Redis. */
 export async function cached<T>(key: string, ttlSeconds: number, loader: () => Promise<T>): Promise<T> {
   const l1Hit = l1Get<T>(key);

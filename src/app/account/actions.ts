@@ -303,6 +303,10 @@ export async function switchAccountAction(formData: FormData) {
   const u = await prisma.users.findUnique({ where: { id: BigInt(target) }, select: { id: true, name: true, userName: true, ban: true } }).catch(() => null);
   if (!u) redirect('/account');
   if (u.ban === 'checked') redirect('/account?error=switchbanned');
+  // أمان: لا يُسمح بالتبديل بلا كلمة مرور إلى حساب له صلاحيات إدارة — يجب الدخول
+  // إليه بكلمة مروره مباشرةً (يمنع تصعيد الصلاحية عبر مجموعة ربط تضمّ حساب إدارة).
+  const { hasAnyAdmin } = await import('@/lib/roles');
+  if (await hasAnyAdmin(target).catch(() => false)) redirect('/account?error=switchadmin');
   // «ذكّرني قبل أي إجراء»: يمرّ بصفحة تأكيد قبل التبديل ما لم يكن مباشراً أو مؤكّداً
   if (!confirmed) {
     const mode = await getLinkMode(target).catch(() => 'confirm' as const);

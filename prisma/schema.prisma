@@ -73,6 +73,8 @@ model ads {
   @@index([city_id], map: "ads_city_id_foreign")
   @@index([user_id], map: "ads_user_id_foreign")
   @@index([expires_at], map: "ads_expires_at")
+  @@index([status, state, bumped_at], map: "ads_listing_bumped")
+  @@index([status, state, created_at], map: "ads_listing_created")
 }
 
 model ads_admins {
@@ -130,6 +132,7 @@ model ads_views {
 
   @@index([ads_id], map: "ads_views_ads_id_foreign")
   @@index([user_id], map: "ads_views_user_id_foreign")
+  @@index([ads_id, user_id], map: "ads_views_ad_user")
 }
 
 model areas {

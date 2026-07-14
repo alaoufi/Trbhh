@@ -10,3 +10,8 @@ gradle.properties
 store_icon.png
 manifest-checksum.txt
 .gradle/
+
+# مخرجات البناء (تُولّد بـ bubblewrap build — لا تُتعقّب)
+*.aab
+*.apk
+*.apk.idsig

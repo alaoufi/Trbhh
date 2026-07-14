@@ -70,6 +70,12 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
     ...args,
   ).catch(() => [] as Row[]);
   const ids = users.map((u) => toInt(u.id));
+  // صفات كل عضو للإدارة (مشاهدة فقط): هل يملك متجراً؟ — لعرض هوياته بلا تدخّل
+  const storeByUser = new Map<number, { id: number; name: string; status: number }>();
+  if (ids.length) {
+    const srows = await prisma.stores.findMany({ where: { user_id: { in: ids } }, select: { id: true, user_id: true, store_name: true, status: true } }).catch(() => []);
+    for (const s of srows) storeByUser.set(s.user_id, { id: toInt(s.id), name: s.store_name || 'متجر', status: s.status });
+  }
   const [packages, pkgMap, roleById, banMap, pendingVerify, pendingNames] = await Promise.all([
     getPackages(),
     getUserPackageMap(ids),
@@ -155,7 +161,21 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
               const until = banMap.get(id) ?? null; // Date = temporary, null (while banned) = permanent
               return (
               <tr key={id} className="border-b last:border-0">
-                <td className="p-3"><Link href={`/admin/users/${id}`} className="flex items-center gap-1 font-medium text-primary hover:underline">{u.name || u.userName || '—'}{u.trusted === 1 && <BadgeCheck className="h-4 w-4 text-primary" />}</Link><div className="text-xs text-muted-foreground">{timeAgo(u.created_at)}</div></td>
+                <td className="p-3">
+                  <Link href={`/admin/users/${id}`} className="flex items-center gap-1 font-medium text-primary hover:underline">{u.name || u.userName || '—'}{u.trusted === 1 && <BadgeCheck className="h-4 w-4 text-primary" />}</Link>
+                  <div className="text-xs text-muted-foreground">{timeAgo(u.created_at)}</div>
+                  {/* 🎭 صفات العضو (مشاهدة فقط للإدارة — لا تدخّل): عضو دائماً، متجر إن ملك، إدارة إن كان مشرفاً + مراسلة */}
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">عضو</span>
+                    {storeByUser.get(id) && (
+                      <Link href={`/admin/stores?q=${encodeURIComponent(storeByUser.get(id)!.name)}`} className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200">🏬 متجر «{storeByUser.get(id)!.name}»{storeByUser.get(id)!.status !== 1 && ' (موقوف)'}</Link>
+                    )}
+                    {(roleById.get(id) || u.is_admin === 1) && (
+                      <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">إدارة</span>
+                    )}
+                    <Link href={`/messages/${id}`} className="rounded-full border border-primary/30 px-1.5 py-0.5 text-[10px] font-bold text-primary hover:bg-accent">✉ مراسلة</Link>
+                  </div>
+                </td>
                 <td className="p-3" dir="ltr">{u.phoneNumber || '—'}</td>
                 <td className="p-3">
                   {banned

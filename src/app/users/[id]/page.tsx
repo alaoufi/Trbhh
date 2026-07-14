@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, Megaphone, Eye, Star, MessageCircle, Phone, Send, CalendarDays } from 'lucide-react';
+import { BadgeCheck, Megaphone, Eye, Star, MessageCircle, Phone, Send, CalendarDays, Ban, ShieldOff } from 'lucide-react';
+import { blockUserAction, unblockUserAction } from '@/app/messages/actions';
 import { prisma } from '@/lib/prisma';
 import { timeAgo } from '@/lib/utils';
 import { getMyAds } from '@/lib/account';
@@ -56,6 +57,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
   const wa = user.whatsapp ? (user.phone_whatsapp || user.phoneNumber) : null;
   const waHref = wa ? `https://wa.me/${String(wa).replace(/\D/g, '').replace(/^0/, '966')}` : null;
   const isOwnProfile = !!(session && session.uid === uid);
+  const iBlocked = session && !isOwnProfile ? await import('@/lib/blocks').then((m) => m.hasBlocked(session.uid, uid)).catch(() => false) : false;
   const profileUrl = `https://${SITE.domain}/users/${uid}`;
   const displayName = user.name || user.userName || 'مستخدم';
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
@@ -135,6 +137,26 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
             />
           </span>
         </div>
+
+        {/* حظر/رفع حظر العضو — يمنع المراسلة بين الطرفين (متطلّب سياسات المتاجر) */}
+        {session && !isOwnProfile && (
+          iBlocked ? (
+            <form action={unblockUserAction} className="mt-2">
+              <input type="hidden" name="userId" value={uid} />
+              <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl border border-primary/30 py-2 text-sm font-bold text-primary hover:bg-accent">
+                <ShieldOff className="h-4 w-4" /> رفع الحظر عن هذا العضو
+              </button>
+            </form>
+          ) : (
+            <form action={blockUserAction} className="mt-2">
+              <input type="hidden" name="userId" value={uid} />
+              <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/30 py-2 text-sm font-bold text-destructive hover:bg-destructive/10">
+                <Ban className="h-4 w-4" /> حظر هذا العضو
+              </button>
+            </form>
+          )
+        )}
+        {iBlocked && <p className="mt-1 text-center text-[11px] text-muted-foreground">أنت حظرت هذا العضو — لا يمكنكما تبادل الرسائل.</p>}
       </div>
 
       <h2 className="text-lg font-bold">إعلانات العضو</h2>

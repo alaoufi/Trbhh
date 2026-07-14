@@ -965,6 +965,15 @@ model store_warnings {
   created_at DateTime? @default(now()) @db.Timestamp(0)
 }
 
+model user_blocks {
+  blocker_id BigInt    @db.UnsignedBigInt
+  blocked_id BigInt    @db.UnsignedBigInt
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@id([blocker_id, blocked_id])
+  @@index([blocked_id], map: "user_blocks_blocked")
+}
+
 model account_links {
   user_id    BigInt    @id @db.UnsignedBigInt
   group_id   BigInt    @db.UnsignedBigInt

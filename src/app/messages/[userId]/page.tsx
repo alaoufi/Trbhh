@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect, notFound } from 'next/navigation';
-import { ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Star, Ban, ShieldOff } from 'lucide-react';
+import { blockUserAction, unblockUserAction } from '@/app/messages/actions';
 import { getSession } from '@/lib/auth';
 import { getThread } from '@/lib/messages';
 import { getMsgDeleteMinutes, getAdMsgTemplates, getAdminMsgTemplates, getSupportTemplates, parseTemplates, fillTemplate } from '@/lib/settings';
@@ -19,6 +20,9 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
   if (otherId === session.uid) redirect('/messages');
   const [thread, delWindow] = await Promise.all([getThread(session.uid, otherId), getMsgDeleteMinutes()]);
   if (!thread.other) notFound();
+  // حالة الحظر: لا مراسلة إن حظر أحد الطرفين الآخر (لا نعرض المحرّر)
+  const { blockedBetween, hasBlocked } = await import('@/lib/blocks');
+  const [blocked, iBlocked] = await Promise.all([blockedBetween(session.uid, otherId), hasBlocked(session.uid, otherId)]);
 
   // نصوص المراسلة الجاهزة: للإدارة نصوص تربح الإدارية، ولصاحب متجر نصوصه الخاصة
   // (تظهر لعملائه فقط)، وللمعلن العادي نصوص تربح لمراسلة صاحب الإعلان.
@@ -44,7 +48,21 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
     <div className="mx-auto flex max-w-2xl flex-col">
       <div className="mb-3 flex items-center gap-2">
         <Link href="/messages" className="rounded-lg p-2 hover:bg-secondary"><ArrowRight className="h-5 w-5" /></Link>
-        <Link href={`/users/${thread.other.id}`} className="font-bold hover:text-primary">{thread.other.name}</Link>
+        <Link href={`/users/${thread.other.id}`} className="flex-1 font-bold hover:text-primary">{thread.other.name}</Link>
+        {/* حظر/رفع حظر — لا يُحظر حساب الإدارة */}
+        {otherId !== adminId && (
+          iBlocked ? (
+            <form action={unblockUserAction}>
+              <input type="hidden" name="userId" value={otherId} />
+              <button type="submit" title="رفع الحظر" className="flex items-center gap-1 rounded-lg border border-primary/30 px-2 py-1 text-xs font-bold text-primary hover:bg-accent"><ShieldOff className="h-3.5 w-3.5" /> رفع الحظر</button>
+            </form>
+          ) : (
+            <form action={blockUserAction}>
+              <input type="hidden" name="userId" value={otherId} />
+              <button type="submit" title="حظر" className="flex items-center gap-1 rounded-lg border border-destructive/30 px-2 py-1 text-xs font-bold text-destructive hover:bg-destructive/10"><Ban className="h-3.5 w-3.5" /> حظر</button>
+            </form>
+          )
+        )}
       </div>
 
       <DisclaimerBar className="mb-3" />
@@ -56,7 +74,13 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
         </Link>
       )}
 
-      <ChatRoom peerId={otherId} initial={thread.messages} deleteWindowMin={delWindow} templates={templates} />
+      {blocked ? (
+        <div className="rounded-2xl border-2 border-destructive/30 bg-destructive/5 p-4 text-center text-sm font-bold text-destructive">
+          {iBlocked ? 'أنت حظرت هذا العضو — لا يمكنكما تبادل الرسائل. ارفع الحظر لاستئناف المراسلة.' : 'لا يمكن مراسلة هذا العضو حالياً.'}
+        </div>
+      ) : (
+        <ChatRoom peerId={otherId} initial={thread.messages} deleteWindowMin={delWindow} templates={templates} />
+      )}
     </div>
   );
 }

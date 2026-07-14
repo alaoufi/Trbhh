@@ -1,0 +1,34 @@
+name: نشر تربح على Hostinger VPS
+
+# نشر تلقائي: عند كل دفع للفرع، يتّصل GitHub بالخادم عبر SSH ويسحب أحدث الكود
+# ويعيد بناء خدمة app في docker compose. يدوياً أيضاً عبر Run workflow.
+on:
+  push:
+    branches:
+      - claude/hostinger-vps-project-amw8vb
+  workflow_dispatch:
+
+# لا تشغّل نشرين متوازيين على نفس الخادم
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: النشر عبر SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || '22' }}
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+            cd /root/trbhh
+            git fetch origin claude/hostinger-vps-project-amw8vb
+            git reset --hard origin/claude/hostinger-vps-project-amw8vb
+            docker compose up -d --build app
+            docker compose ps

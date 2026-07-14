@@ -3,22 +3,23 @@ import Image from 'next/image';
 import { Pencil, Trash2, Eye, EyeOff, Wallet } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyAds, adContactCounts } from '@/lib/account';
-import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingBool } from '@/lib/settings';
+import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingBool, getAdRestoreFee } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmSubmit } from '@/components/confirm-submit';
-import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction, bumpAdAction } from '../actions';
+import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction, bumpAdAction, restoreArchivedAdAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
 
-export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; urgenton?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string }> }) {
+export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; urgenton?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn] = await Promise.all([
+  const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee] = await Promise.all([
     getMyAds(session.uid), getServicePricing(), getBalance(session.uid), getAdExtras(),
     getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('auction_on', false),
+    getAdRestoreFee(),
   ]);
   const contacts = contactStatsOn ? await adContactCounts(ads.map((a) => a.id)) : new Map<number, { whatsapp: number; call: number }>();
   const now = Date.now();
@@ -39,6 +40,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {sp.bumped === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">⬆ تم تحديث إعلانك — أصبح في مقدمة القوائم.</div>}
       {sp.bumpwait && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ التحديث المجاني متاح بعد {sp.bumpwait} يوم — أو فعّل التحديث المدفوع إن وُفّر.</div>}
       {sp.scheduled === '1' && <div className="rounded-lg border border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🕒 حُفظ إعلانك وسيُنشر تلقائياً في الموعد الذي حددته.</div>}
+      {sp.restored === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">📤 أُعيد إعلانك للظهور من الأرشيف وعاد لمقدمة القوائم.</div>}
       {sp.error === 'adminhidden' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">🚫 هذا الإعلان أخفته الإدارة عن النشر لمخالفة — لا يمكنك إعادة نشره بنفسك. عالِج سبب المخالفة (المذكور تحت الإعلان) وراسل الإدارة لإعادة نشره.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? <> (المطلوب {sp.price} ر.س</> : ''}{sp.bal !== undefined ? <>، ورصيدك {sp.bal} ر.س)</> : ')'}. <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
       {sp.urgenton === '1' && <div className="rounded-lg border-2 border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🔥 شارة «عاجل» مفعّلة على هذا الإعلان بالفعل — لم يُخصم أي مبلغ. يمكنك تفعيلها من جديد بعد انتهاء مدّتها.</div>}
@@ -67,7 +69,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 <div className="flex shrink-0 gap-1">
                   {ad.special && <Badge variant="special">مميّز</Badge>}
                   {ad.urgentUntil && new Date(ad.urgentUntil).getTime() > now && <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>}
-                  <Badge variant={ad.status === 1 ? 'trusted' : 'special'}>{ad.status === 1 ? 'نشط' : ad.hiddenReason ? 'مخفيّ من الإدارة' : ad.pausedByOwner ? 'موقوف (أوقفته أنت)' : ad.publishAt ? `مجدول: ${fmtDay(ad.publishAt)}` : 'بانتظار الموافقة'}</Badge>
+                  <Badge variant={ad.status === 1 ? 'trusted' : 'special'}>{ad.status === 1 ? 'نشط' : ad.hiddenReason ? 'مخفيّ من الإدارة' : ad.archived ? 'مؤرشف' : ad.pausedByOwner ? 'موقوف (أوقفته أنت)' : ad.publishAt ? `مجدول: ${fmtDay(ad.publishAt)}` : 'بانتظار الموافقة'}</Badge>
                 </div>
               </div>
               <span className="text-sm font-bold text-primary">{formatPrice(ad.price, 'ر.س', ad.adsType)}</span>
@@ -79,6 +81,8 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 <span className={`mt-1 rounded-md px-2 py-1 text-[11px] font-bold leading-4 ${ad.hiddenReason ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
                   {ad.hiddenReason
                     ? <>🚫 <b>أخفت الإدارة هذا الإعلان عن النشر</b> لمخالفة: «{ad.hiddenReason}» — عالِج السبب، وقد سُجّل إنذار على متجرك (راجع لوحة متجرك). للاعتراض راسل الإدارة.</>
+                    : ad.archived
+                    ? <>📦 <b>مؤرشف</b> — لم يعد ظاهراً للعامة (مضت مدة عرضه أو أرشفته الإدارة). يظهر لك وحدك، واضغط <b>«أعِد للظهور»</b>{restoreFee > 0 ? <> ليعود بخصم <b>{restoreFee} ر.س</b> من رصيدك</> : ' ليعود مجاناً'}.</>
                     : ad.pausedByOwner
                     ? <>سبب عدم الظهور: <b>أوقفته أنت</b> — اضغط <b>«تفعيل»</b> ليعود للعرض فوراً.</>
                     : <>سبب عدم الظهور: الإعلان <b>بانتظار الموافقة</b> — غالباً لتشابهه مع إعلان قائم (٩٠٪+) أو تفعيل مراجعة الإعلانات. اضغط <b>«تفعيل»</b> لعرضه فوراً، أو احذف النسخة المكرّرة.</>}
@@ -121,12 +125,22 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                     <ConfirmSubmit msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100">🔥 عاجل</ConfirmSubmit>
                   </form>
                 )}
-                <form action={toggleAdStatusAction}>
-                  <input type="hidden" name="adId" value={ad.id} />
-                  <ConfirmSubmit msg={ad.status === 1 ? 'إيقاف هذا الإعلان؟ يختفي من الموقع ويعود متى فعّلته.' : 'تفعيل هذا الإعلان؟ يعود للعرض فوراً.'} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary">
-                    {ad.status === 1 ? <><EyeOff className="h-3 w-3" /> إيقاف</> : <><Eye className="h-3 w-3" /> تفعيل</>}
-                  </ConfirmSubmit>
-                </form>
+                {/* مؤرشف → إعادة إظهار برسوم (لا يُعاد مجاناً)؛ مخفيّ من الإدارة → لا زر؛ غير ذلك → إيقاف/تفعيل مجاني */}
+                {ad.hiddenReason ? null : ad.archived ? (
+                  <form action={restoreArchivedAdAction}>
+                    <input type="hidden" name="adId" value={ad.id} />
+                    <ConfirmSubmit msg={restoreFee > 0 ? `إعادة إظهار هذا الإعلان المؤرشف؟ سيُخصم ${restoreFee} ر.س من رصيدك فوراً.` : 'إعادة إظهار هذا الإعلان المؤرشف؟'} className="flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
+                      <Eye className="h-3 w-3" /> أعِد للظهور{restoreFee > 0 ? ` (${restoreFee} ر.س)` : ''}
+                    </ConfirmSubmit>
+                  </form>
+                ) : (
+                  <form action={toggleAdStatusAction}>
+                    <input type="hidden" name="adId" value={ad.id} />
+                    <ConfirmSubmit msg={ad.status === 1 ? 'إيقاف هذا الإعلان؟ يختفي من الموقع ويعود متى فعّلته.' : 'تفعيل هذا الإعلان؟ يعود للعرض فوراً.'} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary">
+                      {ad.status === 1 ? <><EyeOff className="h-3 w-3" /> إيقاف</> : <><Eye className="h-3 w-3" /> تفعيل</>}
+                    </ConfirmSubmit>
+                  </form>
+                )}
                 <form action={deleteAdAction}>
                   <input type="hidden" name="adId" value={ad.id} />
                   <ConfirmSubmit msg={`حذف إعلانك «${ad.title || `#${ad.id}`}» نهائياً؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"><Trash2 className="h-3 w-3" /> حذف</ConfirmSubmit>

@@ -5,6 +5,7 @@ import { getPendingStores, adminStoreList, approvedTransfers, platformRequests, 
 import { timeAgo } from '@/lib/utils';
 import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction, adminMessageStoreOwnerAction, approveVerifyOrderAction, rejectVerifyOrderAction, cancelVerifyOrderAction, storeUntrustAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
+import { AdminSearch } from '@/components/admin-search';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتاجر' };
@@ -170,9 +171,10 @@ function StoreCard({ s }: { s: AdminStore }) {
   );
 }
 
-export default async function AdminStores({ searchParams }: { searchParams: Promise<{ msg?: string; vbal?: string }> }) {
+export default async function AdminStores({ searchParams }: { searchParams: Promise<{ msg?: string; vbal?: string; q?: string }> }) {
   await requireAction('stores', 'view');
-  const { msg, vbal } = await searchParams;
+  const { msg, vbal, q } = await searchParams;
+  const term = (q || '').trim();
   const [pending, stores, transfers, platformReqs] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers(), platformRequests()]);
   const { listVerifyOrdersAdmin, refundOf } = await import('@/lib/verify-paid');
   const verifyOrders = await listVerifyOrdersAdmin().catch(() => ({ pending: [], active: [] }));
@@ -294,10 +296,19 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
         </div>
       )}
 
-      {stores.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد متاجر بعد.</p>}
-      <div className="space-y-3">
-        {stores.map((s) => <StoreCard key={s.id} s={s} />)}
-      </div>
+      {/* بحث المتاجر بالاسم أو الرقم */}
+      <AdminSearch basePath="/admin/stores" defaultValue={term} placeholder="بحث عن متجر بالاسم أو رقمه…" />
+      {(() => {
+        const shown = term ? stores.filter((s) => (s.storeName || '').includes(term) || String(s.id) === term) : stores;
+        return (
+          <>
+            {shown.length === 0 && <p className="py-8 text-center text-muted-foreground">{term ? `لا توجد متاجر مطابقة لـ «${term}».` : 'لا توجد متاجر بعد.'}</p>}
+            <div className="space-y-3">
+              {shown.map((s) => <StoreCard key={s.id} s={s} />)}
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }

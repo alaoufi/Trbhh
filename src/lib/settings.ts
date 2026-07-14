@@ -434,6 +434,12 @@ export async function getHomeStats(): Promise<Set<string>> {
 export const SETTING_ADS_APPROVAL = 'ads_require_approval';
 
 /* How many days a classified ad stays published (0 = unlimited). */
+// أرشفة الإعلان تلقائياً بعد مدة (يوم) — 0 = معطّل؛ ورسوم إعادة إظهار المؤرشف من الرصيد
+export const SETTING_AD_LIFETIME_DAYS = 'ad_lifetime_days';
+export const SETTING_AD_RESTORE_FEE = 'ad_restore_fee';
+export const getAdLifetimeDays = () => getSettingNum(SETTING_AD_LIFETIME_DAYS, 0);
+export const getAdRestoreFee = () => getSettingNum(SETTING_AD_RESTORE_FEE, 0);
+
 export const SETTING_CLASSIFIED_DAYS = 'classified_days';
 export async function getClassifiedLifetimeDays(): Promise<number> {
   return getSettingNum(SETTING_CLASSIFIED_DAYS, 0);

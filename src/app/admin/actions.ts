@@ -514,6 +514,8 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_HOME_STATS, homeStats);
   await setSetting(SETTING_CLASSIFIED_STATS, classifiedStats);
   await setSetting(SETTING_CLASSIFIED_DAYS, String(classifiedDays));
+  await setSetting('ad_lifetime_days', String(Math.max(0, parseInt(String(formData.get('adLifetimeDays') || '0')) || 0)));
+  await setSetting('ad_restore_fee', String(Math.max(0, parseInt(String(formData.get('adRestoreFee') || '0')) || 0)));
   await setSetting(SETTING_CLASSIFIED_SECONDS, String(splashSeconds));
   // مفاتيح الميزات: التنبيهات الفورية، اقتراحات البحث، تنبيهات البحث المحفوظ
   await setSetting('home_actions_on', formData.get('homeActionsOn') !== null ? '1' : '0');

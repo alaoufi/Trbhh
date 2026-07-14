@@ -195,6 +195,31 @@ export async function getCategories() {
 /** Auto-delete ads that have been archived for more than 30 days. Throttled. */
 let lastArchiveSweep = 0;
 let lastExpirySweep = 0;
+let lastLifetimeSweep = 0;
+
+/** أرشفة تلقائية: إعلانات (غير المتجر) مضى على آخر نشاطها أكثر من المدة المحددة
+ *  في الإعدادات تُؤرشف (تختفي عن العامة، تبقى لصاحبها الذي يعيدها للظهور برسوم).
+ *  0 = معطّل. لا تحذف شيئاً — أرشفة فقط. مُخنَّقة مرة/ساعة لكل حاوية. */
+export async function sweepOldAdsToArchive() {
+  const now = Date.now();
+  if (now - lastLifetimeSweep < 3600_000) return;
+  lastLifetimeSweep = now;
+  const days = await import('./settings').then((m) => m.getAdLifetimeDays()).catch(() => 0);
+  if (!Number.isFinite(days) || days <= 0) return;
+  const cutoff = new Date(now - days * 86400_000);
+  // آخر نشاط = الأحدث بين bumped_at و created_at؛ نؤرشف حين يكون كلاهما أقدم من الحد
+  await prisma.ads.updateMany({
+    where: {
+      status: 1, state: 'active', store_only: 0,
+      OR: [{ data_archive: null }, { data_archive: '' }],
+      AND: [
+        { OR: [{ bumped_at: { lt: cutoff } }, { bumped_at: null }] },
+        { OR: [{ created_at: { lt: cutoff } }, { created_at: null }] },
+      ],
+    },
+    data: { status: 0, data_archive: new Date().toISOString() },
+  }).catch(() => {});
+}
 
 /** Remove the «مميّز» badge from ads whose paid featuring period ended (expires_at = featured-until).
  *  The ad stays published — only the featuring lapses. Cheap, throttled. */
@@ -249,6 +274,7 @@ export async function getLatestAds(take = 12) {
   return cached(`ads:latest:${take}`, 60, async () => {
     sweepExpiredArchived().catch(() => {});
     sweepExpiredPaidAds().catch(() => {});
+    sweepOldAdsToArchive().catch(() => {});
     // نجلب أكثر ثم نرتب بآخر نشاط فعلياً (القديم المستورد بلا bumped_at يرتَّب بتاريخ نشره)
     const rows = await prisma.ads.findMany({ where: activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: take * 3, select: adSelect });
     rows.sort((a, b) => activityMs(b) - activityMs(a));
@@ -262,6 +288,7 @@ export async function getHomeLatestAds() {
   return cached('ads:home-latest:30d', 60, async () => {
     sweepExpiredArchived().catch(() => {});
     sweepExpiredPaidAds().catch(() => {});
+    sweepOldAdsToArchive().catch(() => {});
     const since = new Date(Date.now() - 30 * 86400000);
     const rows = await prisma.ads.findMany({
       where: { ...activeAdWhere(), created_at: { gte: since } },

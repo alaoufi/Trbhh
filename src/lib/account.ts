@@ -48,6 +48,8 @@ export async function getMyAds(userId: number) {
     stockState: r.stock_state ?? 0,
     // سبب إخفاء الإدارة للإعلان (مخالفة) — يظهر لصاحب الإعلان/المتجر
     hiddenReason: r.status !== 1 && r.arc_msg ? r.arc_msg : null,
+    // مؤرشف (تلقائياً بعد المدة أو من الإدارة) — يعيده صاحبه للظهور برسوم
+    archived: !!(r.data_archive && r.data_archive.trim() !== ''),
   }));
 }
 

@@ -473,7 +473,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             /* إعلان متجر: صلاحية محدودة — إخفاء عن النشر + إنذار مخالفة لصاحب المتجر (لا أرشفة/حذف/حظر) */
             <div className="space-y-2">
               <p className="rounded-lg bg-white/70 p-2.5 text-xs font-bold leading-5 text-amber-800">
-                🏬 هذا إعلان متجر — لا نتحكّم بالمتجر. صلاحيتنا: <b>إخفاؤه عن النشر</b> مع <b>إنذار مخالفة</b> لصاحب المتجر (يظهر له في لوحة متجره ويُحتسب ضمن ٣ إنذارات؛ عند الثالث يُوقف المتجر).
+                🏬 هذا إعلان تابع لمتجر <Link href={storeUrl || `/companies/${sellerStoreId}`} className="text-primary underline">«{storeMeta?.storeName || `متجر #${sellerStoreId}`}»</Link> — لا نتحكّم بالمتجر. صلاحيتنا: <b>إخفاؤه عن النشر</b> مع <b>إنذار مخالفة</b> لصاحب المتجر (يظهر له في لوحة متجره ويُحتسب ضمن ٣ إنذارات؛ عند الثالث يُوقف المتجر).
               </p>
               {ad.status !== 1 && (
                 <div className="rounded-lg border border-red-300 bg-red-50 p-2.5 text-xs font-bold leading-5 text-red-700">
@@ -497,8 +497,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                 )}
               </form>
               <div className="flex items-center justify-between gap-2 text-xs font-bold text-amber-800">
-                <span>إنذارات هذا المتجر: {storeWarnCount}/3</span>
-                <Link href="/admin/stores" className="text-primary underline">إدارة المتاجر ←</Link>
+                <span>إنذارات متجر «{storeMeta?.storeName || `#${sellerStoreId}`}»: {storeWarnCount}/3</span>
+                <Link href={`/admin/stores?q=${encodeURIComponent(storeMeta?.storeName || '')}`} className="text-primary underline">إدارة المتجر ←</Link>
               </div>
             </div>
           ) : (

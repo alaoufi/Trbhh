@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
-import { getMemberWindows, withinWindow, getServicePricing, DUR_DAYS, DUR_LABEL, DUP_PACK_COUNT, isDur } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getServicePricing, DUR_DAYS, DUR_LABEL, DUP_PACK_COUNT, isDur, getAdRestoreFee } from '@/lib/settings';
 import { charge, buyDupPack } from '@/lib/wallet';
 import { setUserArea } from '@/lib/user-location';
 import { toLocalSaudi } from '@/lib/sms';
@@ -60,6 +60,30 @@ export async function toggleAdStatusAction(formData: FormData) {
   }
   revalidatePath('/account/ads');
   revalidatePath('/');
+}
+
+/** إعادة إظهار إعلان مؤرشف (تلقائياً بعد المدة أو من الإدارة) بخصم رسوم من
+ *  الرصيد. إعلان أخفته الإدارة لمخالفة (arc_msg) لا يُعاد بالدفع. */
+export async function restoreArchivedAdAction(formData: FormData) {
+  const session = await requireUser();
+  const adId = BigInt(String(formData.get('adId') || '0'));
+  const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { user_id: true, data_archive: true, arc_msg: true } });
+  if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
+  // مخالفة أخفتها الإدارة: لا تُعاد بالدفع — تُعالج ويُراسَل بها الإدارة
+  if (ad.arc_msg && ad.arc_msg.trim() !== '') redirect('/account/ads?error=adminhidden');
+  const isArchived = !!(ad.data_archive && ad.data_archive.trim() !== '');
+  if (!isArchived) redirect('/account/ads');
+  const fee = await getAdRestoreFee().catch(() => 0);
+  if (fee > 0) {
+    const paid = await charge(session.uid, fee, 'ad_show', `إعادة إظهار إعلان مؤرشف #${toInt(adId)}`);
+    if (!paid.ok) redirect(`/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);
+  }
+  await prisma.ads.update({ where: { id: adId }, data: { status: 1, data_archive: null, bumped_at: new Date() } }).catch(() => {});
+  const { bustAdCaches } = await import('@/lib/data');
+  await bustAdCaches().catch(() => {});
+  revalidatePath('/account/ads');
+  revalidatePath('/');
+  redirect('/account/ads?restored=1');
 }
 
 /** Buy a duplicate-publish package («مكرّر 3» / «مكرّر 5») for a chosen duration. */

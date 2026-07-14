@@ -22,6 +22,8 @@ export async function Header() {
   const myStoreId = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // اسم المتجر لمبدّل الهوية (اختياري: يظهر فقط لأصحاب المتاجر)
   const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
+  // الحسابات المرتبطة بنفس المالك (للتبديل من مبدّل الهوية) — فارغة إن لا ربط
+  const linkedAccts = session ? await import('@/lib/account-links').then((m) => m.linkedAccounts(session.uid)).catch(() => []) : [];
   // روابط الإدارة المصرّح بها — تُعرض في قائمة الهيدر داخل لوحة الإدارة
   const adminHrefs = admin
     ? await getUserPerms(session!.uid).then((perms) => ADMIN_NAV.filter((n) => n.perm === null || perms.has(n.perm)).map((n) => n.href)).catch(() => [] as string[])
@@ -43,7 +45,7 @@ export async function Header() {
     <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
-        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} />
+        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />
 
         {/* الزر الرئيسي — يتغيّر حسب الصفحة (دخول/رابط المتجر/الصفحة الرئيسية في صفحة الدخول) */}
         <HeaderCta isAuthed={!!session} myStoreId={myStoreId} />

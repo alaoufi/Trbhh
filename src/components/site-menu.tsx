@@ -11,6 +11,7 @@ import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
 import { ADMIN_GROUPS } from '@/components/admin-nav-def';
 import { TUTORIALS } from '@/components/tutorials-def';
+import { switchAccountAction } from '@/app/account/actions';
 
 type Cat = { id: number; name: string };
 
@@ -40,7 +41,8 @@ function Section({ title, icon: Icon, children }: { title: string; icon: React.E
   );
 }
 
-export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], dealsOn = false, auctionsOn = false, debatesOn = true, myStoreId = 0, myStoreName = '' }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[]; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; debatesOn?: boolean; myStoreId?: number; myStoreName?: string }) {
+type LinkedAcct = { id: number; name: string; hasStore: boolean; storeName: string | null; isAdmin: boolean };
+export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], dealsOn = false, auctionsOn = false, debatesOn = true, myStoreId = 0, myStoreName = '', currentUid = 0, linkedAccounts = [] }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[]; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; debatesOn?: boolean; myStoreId?: number; myStoreName?: string; currentUid?: number; linkedAccounts?: LinkedAcct[] }) {
   const [open, setOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -118,9 +120,9 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
           </div>
         ) : (
           <div className="flex-1 p-2">
-            {/* 🎭 مبدّل الهوية — اختياري: يظهر فقط لمن له أكثر من صفة (متجر و/أو إدارة).
-                يعرض كل هوية متاحة بوسم نوعها (عضو/متجر/إدارة) للتنقّل بينها بضغطة. */}
-            {isAuthed && (myStoreId > 0 || isAdmin) && (
+            {/* 🎭 مبدّل الهوية — اختياري: يظهر لمن له صفة إضافية (متجر/إدارة) أو حسابات مرتبطة.
+                يعرض صفات الحساب الحالي (عضو/متجر/إدارة) + التبديل للحسابات المرتبطة بنفس المالك. */}
+            {isAuthed && (myStoreId > 0 || isAdmin || linkedAccounts.length > 1) && (
               <div className="mb-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-2">
                 <div className="mb-1.5 px-1 text-[11px] font-extrabold text-primary">🎭 هوياتي</div>
                 <Link href="/account" onClick={close} className="flex items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
@@ -143,6 +145,25 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
                   <Link href="/ads/new?dest=store" onClick={close} className="mt-0.5 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-bold text-primary hover:bg-accent">
                     <PlusCircle className="h-4 w-4 shrink-0" /> <span>أنشر باسم متجري</span>
                   </Link>
+                )}
+                {/* 🔗 التبديل لحساب آخر مرتبط بنفس المالك (دخول واحد) */}
+                {linkedAccounts.filter((a) => a.id !== currentUid).length > 0 && (
+                  <div className="mt-1.5 border-t border-primary/15 pt-1.5">
+                    <div className="mb-1 px-1 text-[10px] font-extrabold text-muted-foreground">🔗 التبديل لحساب آخر</div>
+                    {linkedAccounts.filter((a) => a.id !== currentUid).map((a) => (
+                      <form key={a.id} action={switchAccountAction} onSubmit={close}>
+                        <input type="hidden" name="userId" value={a.id} />
+                        <button type="submit" className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm font-bold text-foreground hover:bg-accent">
+                          <span className="flex items-center gap-2"><User className="h-4 w-4 shrink-0 text-primary" /> <span className="line-clamp-1">{a.name}</span></span>
+                          <span className="flex shrink-0 items-center gap-1">
+                            {a.hasStore && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">متجر</span>}
+                            {a.isAdmin && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">إدارة</span>}
+                            <span className="rounded-md bg-primary px-2 py-0.5 text-[10px] font-bold text-white">تبديل</span>
+                          </span>
+                        </button>
+                      </form>
+                    ))}
+                  </div>
                 )}
               </div>
             )}

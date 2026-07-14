@@ -21,8 +21,9 @@ export const metadata = { title: 'لوحة التحكم' };
 
 const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
 
-export default async function AccountHome() {
+export default async function AccountHome({ searchParams }: { searchParams?: Promise<{ switched?: string; error?: string }> }) {
   const session = await requireUser();
+  const sp = searchParams ? await searchParams : {};
   // نقطة الزيارة اليومية (إن فُعّلت) — لا تؤخر الصفحة
   import('@/lib/points').then((m) => m.grantDailyVisit(session.uid)).catch(() => {});
   const [stats, alerts, categories, interests, rating, balance, newNotifs, refOn] = await Promise.all([
@@ -44,6 +45,9 @@ export default async function AccountHome() {
   const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true);
   return (
     <div className="space-y-4">
+      {sp.switched === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم التبديل — أنت الآن في حساب «{session.name}».</div>}
+      {sp.error === 'notlinked' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">تعذّر التبديل: هذا الحساب غير مرتبط بحسابك.</div>}
+      {sp.error === 'switchbanned' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر التبديل: الحساب المطلوب محظور.</div>}
       <h1 className="text-xl font-bold text-primary">مرحباً {session.name} 👋</h1>
 
       {notices.length > 0 && (

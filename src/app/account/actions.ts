@@ -289,6 +289,24 @@ export async function bumpAdAction(formData: FormData) {
 }
 
 
+/** التبديل إلى حساب آخر مرتبط بنفس المالك (من دخول واحد) — يتحقّق خادمياً أن
+ *  الحساب الهدف في نفس مجموعة الربط قبل إصدار جلسة له. لا كلمة مرور لأن
+ *  الإدارة وثّقت أنهما لنفس الشخص عبر «ربط الأعضاء». */
+export async function switchAccountAction(formData: FormData) {
+  const session = await requireUser();
+  const target = Number(formData.get('userId') || 0);
+  if (!target || target === session.uid) redirect('/account');
+  const { linkedUserIds } = await import('@/lib/account-links');
+  const linked = await linkedUserIds(session.uid).catch(() => [session.uid]);
+  if (!linked.includes(target)) redirect('/account?error=notlinked');
+  const u = await prisma.users.findUnique({ where: { id: BigInt(target) }, select: { id: true, name: true, userName: true, ban: true } }).catch(() => null);
+  if (!u) redirect('/account');
+  if (u.ban === 'checked') redirect('/account?error=switchbanned');
+  const { createSession } = await import('@/lib/auth');
+  await createSession({ uid: toInt(u.id), name: u.name || u.userName || 'مستخدم', type: 'user' });
+  redirect('/account?switched=1');
+}
+
 /** تحويل نقاط العضو إلى رصيد — بالمعدل والحد الأدنى المحددين من التحكم. */
 export async function convertPointsAction() {
   const session = await requireUser();

@@ -57,37 +57,41 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
       {sp.error === 'switchbanned' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر التبديل: الحساب المطلوب محظور.</div>}
       <h1 className="text-xl font-bold text-primary">مرحباً {session.name} 👋</h1>
 
-      {/* 🎭 اكتشاف خدمات هذا الحساب تلقائياً عند الدخول (متجر/إدارة/عضو) — يظهر عند وجود صفة إضافية أو حسابات مرتبطة */}
+      {/* 🎭 اكتشاف خدمات هذا الحساب تلقائياً — شريط أفقي منزلق يُظهر الخدمات المخفية بالسحب */}
       {(myStoreId > 0 || isAdmin || linkedCount > 0) && (
-        <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-extrabold text-primary">
-            🎭 خدمات هذا الحساب <span className="text-[11px] font-normal text-muted-foreground">— اكتُشفت تلقائياً</span>
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-2">
+          <div className="mb-1.5 flex items-center justify-between gap-2 px-0.5">
+            <span className="text-[12px] font-extrabold text-primary">🎭 خدمات هذا الحساب</span>
+            <span className="text-[10px] text-muted-foreground">اسحب لعرض المزيد ←</span>
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <div className="flex items-center justify-between gap-2 rounded-xl bg-card px-3 py-2.5 shadow-sm">
-              <span className="flex items-center gap-2 font-bold text-foreground"><User className="h-4 w-4 text-sky-600" /> عضو</span>
-              <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-extrabold text-sky-700">أنت هنا</span>
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-0.5">
+            <div className="flex shrink-0 items-center gap-2 rounded-lg bg-card px-3 py-1.5 shadow-sm">
+              <User className="h-4 w-4 shrink-0 text-sky-600" />
+              <span className="text-[13px] font-bold text-foreground">عضو</span>
+              <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-extrabold text-sky-700">أنت</span>
             </div>
             {myStoreId > 0 && (
-              <Link href="/store" className="flex items-center justify-between gap-2 rounded-xl bg-card px-3 py-2.5 shadow-sm hover:border-primary hover:bg-accent">
-                <span className="flex min-w-0 items-center gap-2 font-bold text-foreground"><Store className="h-4 w-4 shrink-0 text-emerald-600" /> <span className="line-clamp-1">متجر «{myStoreName}»</span></span>
-                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">دخول ←</span>
+              <Link href="/store" className="flex shrink-0 items-center gap-2 rounded-lg bg-card px-3 py-1.5 shadow-sm hover:bg-accent">
+                <Store className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span className="max-w-[120px] truncate text-[13px] font-bold text-foreground">متجر «{myStoreName}»</span>
+                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-extrabold text-emerald-700">دخول ←</span>
               </Link>
             )}
             {isAdmin && (
-              <Link href="/admin" className="flex items-center justify-between gap-2 rounded-xl bg-card px-3 py-2.5 shadow-sm hover:border-primary hover:bg-accent">
-                <span className="flex items-center gap-2 font-bold text-foreground"><Shield className="h-4 w-4 text-amber-600" /> لوحة الإدارة</span>
-                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">دخول ←</span>
+              <Link href="/admin" className="flex shrink-0 items-center gap-2 rounded-lg bg-card px-3 py-1.5 shadow-sm hover:bg-accent">
+                <Shield className="h-4 w-4 shrink-0 text-amber-600" />
+                <span className="text-[13px] font-bold text-foreground">الإدارة</span>
+                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold text-amber-700">دخول ←</span>
               </Link>
             )}
             {linkedCount > 0 && (
-              <Link href="/account/identities" className="flex items-center justify-between gap-2 rounded-xl bg-card px-3 py-2.5 shadow-sm hover:border-primary hover:bg-accent">
-                <span className="flex items-center gap-2 font-bold text-foreground"><Users className="h-4 w-4 text-violet-600" /> حسابات مرتبطة ({linkedCount})</span>
-                <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-extrabold text-violet-700">تنقّل ←</span>
+              <Link href="/account/identities" className="flex shrink-0 items-center gap-2 rounded-lg bg-card px-3 py-1.5 shadow-sm hover:bg-accent">
+                <Users className="h-4 w-4 shrink-0 text-violet-600" />
+                <span className="text-[13px] font-bold text-foreground">مرتبطة ({linkedCount})</span>
+                <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-extrabold text-violet-700">تنقّل ←</span>
               </Link>
             )}
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">تنتقل بين خدماتك من هنا أو من «القائمة ← 🎭 هوياتي». كل خدمة تعمل باسمها ورقمها دون تداخل.</p>
         </div>
       )}
 
@@ -103,11 +107,11 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
           ))}
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {cards.map(({ href, label, value, icon: Icon }) => (
-          <Link key={href} href={href} className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
-            <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><Icon className="h-5 w-5" /></span>
-            <div><div className="text-xl font-bold">{value}</div><div className="text-xs text-muted-foreground">{label}</div></div>
+          <Link key={href} href={href} className="flex items-center gap-2.5 card-3d rounded-lg p-2.5 hover:border-primary">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground"><Icon className="h-4 w-4" /></span>
+            <div className="min-w-0"><div className="text-lg font-bold leading-tight">{value}</div><div className="truncate text-[11px] text-muted-foreground">{label}</div></div>
           </Link>
         ))}
       </div>

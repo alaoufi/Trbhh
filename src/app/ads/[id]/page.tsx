@@ -213,39 +213,39 @@ export default async function AdPage({ params, searchParams }: { params: Promise
 
       {/* التمييز ⭐ — عرض تسويقي دائم لصاحب الإعلان النشط غير المميّز */}
       {featuredOpts.length > 0 && (
-        <form action={featureAdAction} className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-amber-300 bg-amber-50/70 p-3 shadow-sm">
+        <form action={featureAdAction} className="space-y-2 rounded-xl border-2 border-amber-300 bg-amber-50/70 p-3 shadow-sm">
           <input type="hidden" name="adId" value={ad.id} />
           <input type="hidden" name="back" value="ad" />
-          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-white">⭐ مميّز</span>
-          <span className="min-w-0 flex-1 text-xs font-bold text-amber-800">
-            ميّز إعلانك بإطار ذهبي بارز ومقدمة القوائم — مشاهدات وتواصل أعلى بكثير.
-            <span className="block font-medium text-muted-foreground">رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</span>
-          </span>
-          <span className="flex w-full items-center gap-1.5 sm:w-auto">
-            <select name="duration" className="h-10 min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 text-sm font-bold sm:flex-none sm:min-w-[150px]">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-white">⭐ مميّز</span>
+            <span className="text-xs font-bold text-amber-800">ميّز إعلانك بإطار ذهبي بارز ومقدمة القوائم</span>
+          </div>
+          <p className="text-xs font-medium text-muted-foreground">مشاهدات وتواصل أعلى بكثير. رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
+          <div className="flex items-center gap-1.5">
+            <select name="duration" className="h-10 min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 text-sm font-bold">
               {featuredOpts.map((o) => <option key={o.key} value={o.key}>{o.label} — {o.price} ر.س</option>)}
             </select>
             <ConfirmSubmit msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-amber-500 px-3 py-2.5 text-sm font-extrabold text-white">تمييز الآن</ConfirmSubmit>
-          </span>
+          </div>
         </form>
       )}
 
       {/* شارة عاجل — باقتا 24/48 ساعة: عرض تسويقي دائم لصاحب الإعلان النشط */}
       {urgentExtras && urgentExtras.urgentPacks.length > 0 && !urgentActive && (
-        <form action={buyUrgentAction} className="flex flex-wrap items-center gap-3 rounded-xl border-2 border-red-300 bg-red-50/70 p-3 shadow-sm">
+        <form action={buyUrgentAction} className="space-y-2 rounded-xl border-2 border-red-300 bg-red-50/70 p-3 shadow-sm">
           <input type="hidden" name="adId" value={ad.id} />
           <input type="hidden" name="back" value="ad" />
-          <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>
-          <span className="min-w-0 flex-1 text-xs font-bold text-red-700">
-            اجعل إعلانك يلفت الأنظار بشارة «عاجل» النابضة في كل القوائم — اختر الباقة.
-            <span className="block font-medium text-muted-foreground">رصيدك: {urgentBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</span>
-          </span>
-          <span className="flex w-full items-center gap-1.5 sm:w-auto">
-            <select name="hours" className="h-10 min-w-0 flex-1 rounded-lg border border-red-300 bg-white px-3 text-sm font-bold sm:flex-none sm:min-w-[150px]">
+          <div className="flex items-center gap-2">
+            <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>
+            <span className="text-xs font-bold text-red-700">اجعل إعلانك يلفت الأنظار بشارة «عاجل» النابضة</span>
+          </div>
+          <p className="text-xs font-medium text-muted-foreground">تظهر في كل القوائم — اختر الباقة. رصيدك: {urgentBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
+          <div className="flex items-center gap-1.5">
+            <select name="hours" className="h-10 min-w-0 flex-1 rounded-lg border border-red-300 bg-white px-3 text-sm font-bold">
               {urgentExtras.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours}>{p0.hours} ساعة — {p0.price} ر.س</option>)}
             </select>
             <ConfirmSubmit msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-red-600 px-3 py-2.5 text-sm font-extrabold text-white">تفعيل الآن</ConfirmSubmit>
-          </span>
+          </div>
         </form>
       )}
 
@@ -256,19 +256,19 @@ export default async function AdPage({ params, searchParams }: { params: Promise
 
       {/* خدمات تسويق إضافية لصاحب الإعلان: تحديث ⬆ + مزاد 🔨 + الشرح المتحرك */}
       {(bumpOn || auctionOn) && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
-          <span className="text-xs font-extrabold text-primary">🚀 سوّق إعلانك أكثر:</span>
+        <div className="space-y-2.5 rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
+          <span className="text-xs font-extrabold text-primary">🚀 سوّق إعلانك أكثر</span>
           {bumpOn && (
-            <form action={bumpAdAction}>
+            <form action={bumpAdAction} className="flex items-center gap-2">
               <input type="hidden" name="adId" value={ad.id} />
               <input type="hidden" name="back" value="ad" />
-              <ConfirmSubmit msg="تأكيد تحديث الإعلان (رفعه لأعلى القوائم)؟ إن لم يكن التحديث المجاني متاحاً يُخصم السعر من رصيدك." title="ارفع إعلانك لأعلى القوائم" className="btn-3d rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-100">⬆ حدّث إعلانك للأعلى</ConfirmSubmit>
+              <ConfirmSubmit msg="تأكيد تحديث الإعلان (رفعه لأعلى القوائم)؟ إن لم يكن التحديث المجاني متاحاً يُخصم السعر من رصيدك." title="ارفع إعلانك لأعلى القوائم" className="btn-3d w-full rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 hover:bg-sky-100">⬆ حدّث إعلانك للأعلى</ConfirmSubmit>
             </form>
           )}
           {auctionOn && (
-            <Link href={`/auctions/new?ad=${ad.id}`} className="btn-3d rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100" title="دع المشترين يتنافسون على السعر">🔨 افتح مزاداً عليه</Link>
+            <Link href={`/auctions/new?ad=${ad.id}`} className="btn-3d block w-fit rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100" title="دع المشترين يتنافسون على السعر">🔨 افتح مزاداً عليه</Link>
           )}
-          <a href="/guide/how/ad-boost" target="_blank" className="mr-auto text-xs font-extrabold text-red-600 underline">🎬 مميزات تزيد في تسويق إعلانك</a>
+          <a href="/guide/how/ad-boost" target="_blank" className="block text-xs font-extrabold text-red-600 underline">🎬 مميزات تزيد في تسويق إعلانك</a>
         </div>
       )}
 

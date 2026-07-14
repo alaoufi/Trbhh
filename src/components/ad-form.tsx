@@ -82,6 +82,8 @@ export function AdForm({
   const [geoBusy, setGeoBusy] = useState(false);
   const [mapLink, setMapLink] = useState('');
   const [mapErr, setMapErr] = useState('');
+  // المكان اختياري بالكامل: افتراضياً «غير مطلوب» (مطوي) إلا عند تعديل إعلان له مكان محدد مسبقاً
+  const [wantLocation, setWantLocation] = useState<boolean>(!!(initial?.cityId));
 
   function applyMapLink() {
     const ll = parseMapsUrl(mapLink);
@@ -320,7 +322,18 @@ export function AdForm({
         </div>
       </Section>
 
-      <Section icon={MapPin} title="المنطقة والمدينة">
+      <Section icon={MapPin} title="المكان">
+        {/* هل تحديد المكان مطلوب؟ اختيار «غير مطلوب» يطوي الخيارات فلا تزحم النموذج */}
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setWantLocation(false)} className={`flex-1 rounded-lg border-2 px-3 py-2 text-sm font-bold ${!wantLocation ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
+            المكان غير مطلوب
+          </button>
+          <button type="button" onClick={() => setWantLocation(true)} className={`flex-1 rounded-lg border-2 px-3 py-2 text-sm font-bold ${wantLocation ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
+            تحديد المكان
+          </button>
+        </div>
+        {wantLocation && (
+        <>
         <input type="hidden" name="country_id" value={saudiId} />
         <RegionCityPicker regions={regions} areas={areas} initialRegion={initial?.cityId} initialArea={initial?.areaId} />
         <div className="rounded-lg border-2 border-dashed border-primary/25 bg-accent/30 p-3">
@@ -349,6 +362,8 @@ export function AdForm({
           </div>
           {mapErr && <p className="mt-1 text-xs font-bold text-red-600">{mapErr}</p>}
         </div>
+        </>
+        )}
       </Section>
 
       <Section icon={ImageIcon} title="الصور" hint={initial?.id ? 'أضِف المزيد من الصور (تُضغط تلقائياً للرفع السريع).' : 'حتى 10 صور — تُضغط تلقائياً للرفع السريع.'}>

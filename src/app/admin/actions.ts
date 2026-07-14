@@ -1333,3 +1333,28 @@ export async function deleteTopupCampaignAction(formData: FormData) {
   revalidatePath('/');
   redirect('/admin/revenue?tab=campaigns&camp=del');
 }
+
+/** ربط حسابات أعضاء معاً (نفس المالك) — تبويب «ربط الأعضاء». الإدارة تنشئ الرابط فقط. */
+export async function linkAccountsAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const raw = String(formData.get('userIds') || '');
+  const ids = raw.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isInteger(n) && n > 0);
+  if (ids.length >= 2) {
+    const { linkAccounts } = await import('@/lib/account-links');
+    const r = await linkAccounts(ids, session.uid);
+    if (r.ok) await logAdmin(session.uid, 'ربط حسابات أعضاء', ids.map((i) => `#${i}`).join(' + '));
+  }
+  revalidatePath('/admin/links');
+}
+
+/** فك ربط حساب من مجموعته. */
+export async function unlinkAccountAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const uid = Number(formData.get('userId') || 0);
+  if (uid > 0) {
+    const { unlinkAccount } = await import('@/lib/account-links');
+    await unlinkAccount(uid);
+    await logAdmin(session.uid, 'فك ربط حساب عضو', `#${uid}`);
+  }
+  revalidatePath('/admin/links');
+}

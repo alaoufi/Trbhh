@@ -121,6 +121,15 @@ const STATEMENTS: string[] = [
     store_id INT NOT NULL, reason VARCHAR(300) NULL,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* ربط حسابات الشخص الواحد المنفصلة في مجموعة واحدة (نفس المالك). كل حساب
+     في مجموعة واحدة عبر group_id — لا دمج بيانات، فقط علاقة «نفس المالك». */
+  `CREATE TABLE IF NOT EXISTS account_links (
+    user_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    group_id BIGINT UNSIGNED NOT NULL,
+    linked_by BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX account_links_group (group_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* products the merchant explicitly showcases in the store (independent
      catalog — nothing from the owner's platform ads appears automatically) */
   `CREATE TABLE IF NOT EXISTS store_products (

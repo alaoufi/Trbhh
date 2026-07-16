@@ -7,10 +7,12 @@ const ensureTable = ensureSchema;
 let cache: { list: string[]; re: RegExp | null; exp: number } = { list: [], re: null, exp: 0 };
 
 function buildRegex(words: string[]): RegExp | null {
+  // كل حرف مفصول بفاصل اختياري بين حروف الكلمة — يكشف التحايل بإدخال مسافات/نقاط
+  // بين الحروف (مثل "س ك س" أو "s.e.x") الذي يفلت من مطابقة الكلمة الحرفية.
   const cleaned = words
     .map((w) => w.trim())
     .filter(Boolean)
-    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    .map((w) => [...w].map((ch) => ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^\\p{L}\\p{N}]*'));
   if (!cleaned.length) return null;
   // whole-word only: not preceded/followed by a letter or number
   try {

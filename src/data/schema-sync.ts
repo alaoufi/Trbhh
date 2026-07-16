@@ -407,6 +407,15 @@ const STATEMENTS: string[] = [
     INDEX mod_log_user (user_id),
     INDEX mod_log_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* سجل نشر ثابت — لا يتأثر بحذف الإعلان لاحقاً، فيمنع الحد اليومي/الفاصل
+     الزمني من "إعادة التصفير" بحذف الإعلان ونشر آخر بدلاً عنه. */
+  `CREATE TABLE IF NOT EXISTS ad_publish_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX ad_publish_log_user (user_id),
+    INDEX ad_publish_log_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   /* ---- roles & permissions ---- */
   `CREATE TABLE IF NOT EXISTS admin_perms (

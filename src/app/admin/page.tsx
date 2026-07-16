@@ -61,7 +61,7 @@ export default async function AdminHome() {
     { group: 'money', label: 'سجل النشاط', icon: ScrollText, href: '/admin/audit', perm: 'users', nav: true },
     // الحماية والرقابة
     { group: 'safety', label: 'البلاغات', value: s.reports, icon: Flag, href: '/admin/reports', perm: 'reports' },
-    { group: 'safety', label: 'سجل الحماية', icon: ShieldAlert, href: '/admin/moderation', perm: 'reports', nav: true },
+    { group: 'safety', label: 'سجل التجاوزات', icon: ShieldAlert, href: '/admin/moderation', perm: 'reports', nav: true },
     { group: 'safety', label: 'مراقبة المراسلات', icon: MessagesSquare, href: '/admin/messages', perm: 'messages', nav: true },
     { group: 'safety', label: 'الكلمات وحارس المحتوى', icon: Ban, href: '/admin/words', perm: 'words', nav: true },
     // التسويق والباقات

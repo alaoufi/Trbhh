@@ -59,6 +59,13 @@ export async function AdminAlertsBanner() {
     import('@/lib/verify-paid').then((m) => m.countPendingVerifyOrders()).catch(() => ({ n: 0, oldest: null })),
   ]);
 
+  // حظر آلي جديد (تجاوز حدود التكرار/المحتوى الممنوع/الباقة) خلال ٢٤ ساعة — يستحق مراجعة الإدارة
+  const dayAgo = new Date(Date.now() - 86400000);
+  const [newBans, oldestNewBan] = await Promise.all([
+    prisma.mod_log.count({ where: { action: 'banned', created_at: { gte: dayAgo } } }).catch(() => 0),
+    prisma.mod_log.findFirst({ where: { action: 'banned', created_at: { gte: dayAgo } }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
+  ]);
+
   const items: Item[] = [
     { n: pendingTopups, label: 'تأكيد شحن رصيد', href: '/admin/topups', oldest: oldestTopup },
     { n: pendingAds, label: 'إعلان بانتظار الموافقة', href: '/admin/ads?view=pending', oldest: oldestAd },
@@ -72,6 +79,7 @@ export async function AdminAlertsBanner() {
     { n: platformReqs, label: 'طلب عرض منتجات', href: '/admin/stores', oldest: oldestPlatform },
     { n: verifyOrders.n, label: 'طلب توثيق متجر (مدفوع)', href: '/admin/stores', oldest: verifyOrders.oldest },
     { n: pendingPromos, label: 'إعلان ترويجي معلّق', href: '/admin/promos', oldest: null },
+    { n: newBans, label: 'حظر آلي جديد (تجاوزات)', href: '/admin/moderation', oldest: oldestNewBan },
   ].filter((i) => i.n > 0);
 
   if (!items.length) return null;

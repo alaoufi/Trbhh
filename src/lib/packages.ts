@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from './prisma';
+import { ensureSchema } from '@/data/schema-sync';
 
 export type Tier = 'gold' | 'silver' | '';
 
@@ -244,16 +245,25 @@ export async function applyFeaturedToNewAd(userId: number, adId: bigint, pkg: Pa
   );
 }
 
+/** يُنادى فور نجاح نشر إعلان — سجل ثابت لا يتأثر بحذف الإعلان لاحقاً، حتى لا
+ *  يُعيد الحذف ثم النشر ضبط العداد اليومي والفاصل الزمني إلى الصفر. */
+export async function logAdPublish(userId: number): Promise<void> {
+  await ensureSchema();
+  await prisma.ad_publish_log.create({ data: { user_id: BigInt(userId) } }).catch(() => {});
+}
+
 /** Count of a member's ads posted since local midnight (for the daily cap). */
 export async function countAdsToday(userId: number): Promise<number> {
+  await ensureSchema();
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
-  return prisma.ads.count({ where: { user_id: BigInt(userId), created_at: { gte: dayStart } } }).catch(() => 0);
+  return prisma.ad_publish_log.count({ where: { user_id: BigInt(userId), created_at: { gte: dayStart } } }).catch(() => 0);
 }
 
 /** Timestamp of the member's most recent ad (for the gap-hours rule). */
 export async function lastAdAt(userId: number): Promise<Date | null> {
-  const row = await prisma.ads.findFirst({
+  await ensureSchema();
+  const row = await prisma.ad_publish_log.findFirst({
     where: { user_id: BigInt(userId), created_at: { not: null } },
     orderBy: { created_at: 'desc' },
     select: { created_at: true },

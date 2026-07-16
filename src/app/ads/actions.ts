@@ -8,7 +8,7 @@ import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { aHash, hashSimilarity } from '@/lib/phash';
 import { bumpDupAttempts, banUserFor, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned } from '@/lib/moderation';
-import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
+import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd, logAdPublish } from '@/lib/packages';
 import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getServicePricing, serviceHasPrice, getStrikeBanDays } from '@/lib/settings';
 import { charge, consumeDupCredit } from '@/lib/wallet';
 import { bustAdCaches } from '@/lib/data';
@@ -231,9 +231,10 @@ export async function createAdAction(formData: FormData) {
   const flood = await checkFlood(session.uid);
   if (flood.blocked) redirect(`/ads/new?error=flood&wait=${flood.waitSec}`);
 
-  // حدود الباقة: عدد الإعلانات باليوم والفارق الزمني بين إعلان وآخر
+  // حدود الباقة: عدد الإعلانات باليوم والفارق الزمني بين إعلان وآخر — لا تُتجاوَز إطلاقاً
   const pkg = await getUserPackage(session.uid);
   if (pkg.adsPerDay > 0 && (await countAdsToday(session.uid)) >= pkg.adsPerDay) {
+    await logMod(session.uid, { kind: 'limit', action: 'blocked', snippet: `تجاوز الحد اليومي (${pkg.adsPerDay}/يوم) — العنوان: ${title.slice(0, 60)}` });
     redirect(`/ads/new?error=limit&max=${pkg.adsPerDay}`);
   }
   if (pkg.gapHours > 0) {
@@ -242,6 +243,7 @@ export async function createAdAction(formData: FormData) {
       const elapsedH = (Date.now() - new Date(last).getTime()) / 3600000;
       if (elapsedH < pkg.gapHours) {
         const wait = Math.max(1, Math.ceil(pkg.gapHours - elapsedH));
+        await logMod(session.uid, { kind: 'limit', action: 'blocked', snippet: `تجاوز الفاصل الزمني (${pkg.gapHours} ساعة) — العنوان: ${title.slice(0, 60)}` });
         redirect(`/ads/new?error=gap&hours=${pkg.gapHours}&wait=${wait}`);
       }
     }
@@ -370,6 +372,7 @@ export async function createAdAction(formData: FormData) {
   await storeImages(images, session.uid, ad.id);
   const audio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);
   if (audio) await setAdMedia(ad.id, 'audio', audio).catch(() => {});
+  await logAdPublish(session.uid); // سجل ثابت لحدّ الباقة — لا يتأثر بحذف الإعلان لاحقاً
   await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
   // نقاط أول إعلان + مكافأة الإحالة — لا تعطّل النشر
   import('@/lib/points').then(async (m) => {

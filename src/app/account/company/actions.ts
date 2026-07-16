@@ -6,6 +6,8 @@ import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { saveStoreMeta, markStorePending, agreeStoreTerms, setStoreProducts, setStoreHandle, requestPlatform, saveStoreSettings, setStorePassword, setStoreUsername, STORE_HIDE_KEYS } from '@/lib/merchant';
 import { toInt } from '@/lib/utils';
+import { scanContent } from '@/lib/content-guard';
+import { handleProhibited } from '@/lib/moderation';
 
 /** Owner subscribes/renews the store to a plan (monthly/6mo/yearly), charged from wallet. */
 export async function subscribeStoreAction(formData: FormData) {
@@ -50,13 +52,21 @@ export async function saveStoreSettingsAction(formData: FormData) {
   const hFrom = String(formData.get('hoursFrom') || '').trim();
   const hTo = String(formData.get('hoursTo') || '').trim();
   const hDays = formData.getAll('hoursDay').map((v) => Number(v)).filter((n) => Number.isFinite(n));
+  const msgTemplates = String(formData.get('msgTemplates') || '');
+  const announce = String(formData.get('announce') || '');
+  const productNote = String(formData.get('productNote') || '');
+  const badContent = await scanContent(msgTemplates, announce, productNote);
+  if (badContent) {
+    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `${msgTemplates} ${announce} ${productNote}`);
+    redirect(`/store?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : ''}`);
+  }
   await saveStoreSettings(session.uid, {
     allowAds: formData.get('allowAds') !== null,
     allowReviews: formData.get('allowReviews') !== null,
-    msgTemplates: String(formData.get('msgTemplates') || ''),
+    msgTemplates,
     hidden,
-    announce: String(formData.get('announce') || ''),
-    productNote: String(formData.get('productNote') || ''),
+    announce,
+    productNote,
     ...(hoursPresent ? { hours: hFrom && hTo ? { from: hFrom, to: hTo, days: hDays } : null } : {}),
   });
   revalidatePath('/store');
@@ -90,6 +100,13 @@ export async function saveCompanyAction(formData: FormData) {
   const { containsBannedName } = await import('@/lib/censor');
   if ((await containsBannedName(storeName)) || (await containsBannedName(tagline))) {
     redirect('/store?error=badname');
+  }
+  // فحص حارس المحتوى (غير أخلاقي/مخدرات/أسلحة/سياسي/جمعيات) على كل حقول المتجر
+  // النصية العامة — نفس فحص الإعلان تماماً، فبيانات المتجر تظهر للجميع وتبقى معلّقة.
+  const badContent = await scanContent(storeName, description, about, banner, tagline, catalog, specialty, audience, contacts);
+  if (badContent) {
+    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `${storeName} ${description} ${about} ${tagline}`.slice(0, 300));
+    redirect(`/store?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : ''}`);
   }
   // تفرّد الاسم: تشابه ٩٠٪+ مع متجر آخر يُرفض برسالة تعرض المتجر المشابه
   // (بلا إنذار أو عقوبة — محاولات مفتوحة، أو طلب استثناء للإدارة)
@@ -312,11 +329,23 @@ export async function bulkUploadProductsAction(formData: FormData) {
   const categoryId = Number(formData.get('category') || 0) || cats[0]?.id || 0;
   if (!categoryId) redirect('/store?bulk=err');
   // نفس بوابات النشر العادية: متجر معتمد يُنشر مباشرة، وإلا حسب إعداد المراجعة
-  const [{ isApprovedStoreOwner }, { getSettingBool, SETTING_ADS_APPROVAL }, { scanContent }] = await Promise.all([
-    import('@/lib/merchant'), import('@/lib/settings'), import('@/lib/content-guard'),
+  const [{ isApprovedStoreOwner }, { getSettingBool, SETTING_ADS_APPROVAL }, { scanContent }, { checkFlood, logMod }, { getUserPackage, countAdsToday, lastAdAt, logAdPublish }] = await Promise.all([
+    import('@/lib/merchant'), import('@/lib/settings'), import('@/lib/content-guard'), import('@/lib/moderation'), import('@/lib/packages'),
   ]);
   const approvedOwner = await isApprovedStoreOwner(session.uid).catch(() => false);
   const requireApproval = approvedOwner ? false : await getSettingBool(SETTING_ADS_APPROVAL, false).catch(() => false);
+
+  // نفس حدود الباقة والإغراق المطبَّقة على الإعلان الفردي — الرفع بالجملة لا يتجاوزها إطلاقاً
+  const flood = await checkFlood(session.uid);
+  if (flood.blocked) redirect('/store?bulk=flood');
+  const pkg = await getUserPackage(session.uid);
+  if (pkg.gapHours > 0) {
+    const last = await lastAdAt(session.uid);
+    if (last && (Date.now() - last.getTime()) / 3600000 < pkg.gapHours) redirect('/store?bulk=gap');
+  }
+  const alreadyToday = await countAdsToday(session.uid);
+  const dailyLeft = pkg.adsPerDay > 0 ? Math.max(0, pkg.adsPerDay - alreadyToday) : Infinity;
+  let truncatedByLimit = false;
 
   let created = 0;
   const now = new Date();
@@ -327,6 +356,7 @@ export async function bulkUploadProductsAction(formData: FormData) {
     if (!title || title.length < 3) continue;
     if (/^(العنوان|title)$/i.test(title)) continue; // صف العناوين
     if (created >= 50) break;
+    if (created >= dailyLeft) { truncatedByLimit = true; break; }
     if (await scanContent(title, detail).catch(() => null)) continue; // حارس المحتوى: تخطَّ الصف المخالف
     const price = Math.max(0, parseInt(priceRaw.replace(/[^0-9]/g, ''), 10) || 0);
     try {
@@ -352,13 +382,17 @@ export async function bulkUploadProductsAction(formData: FormData) {
         },
       });
       await addStoreProduct(session.uid, toInt(ad.id)).catch(() => {});
+      await logAdPublish(session.uid);
       created++;
     } catch { /* صف تالف — تخطَّ */ }
+  }
+  if (truncatedByLimit) {
+    await logMod(session.uid, { kind: 'limit', action: 'blocked', snippet: `رفع بالجملة: توقف عند ${created} بعد بلوغ الحد اليومي (${pkg.adsPerDay}/يوم)` });
   }
   const { bustAdCaches } = await import('@/lib/data');
   await bustAdCaches().catch(() => {});
   revalidatePath('/store');
-  redirect(`/store?bulk=${created}`);
+  redirect(`/store?bulk=${created}${truncatedByLimit ? '&bulklimit=1' : ''}`);
 }
 
 

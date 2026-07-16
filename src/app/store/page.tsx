@@ -16,14 +16,15 @@ import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
+import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { Button } from '@/components/ui/button';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string; areq?: string; vreq?: string }> }) {
-  const { error, sub, added, settings, backup, bulk, show, adshow, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq, areq, vreq } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; bulklimit?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string; areq?: string; vreq?: string; cat?: string; banned?: string }> }) {
+  const { error, sub, added, settings, backup, bulk, bulklimit, show, adshow, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq, areq, vreq, cat, banned } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
@@ -177,6 +178,12 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
       {error === 'badname' && (
         <div className="card-3d rounded-xl border-2 border-destructive/40 p-3 text-sm font-bold text-destructive">
           اسم المتجر (أو وصفه المختصر) يحتوي كلمة غير مسموحة — اختر اسماً آخر أو راسل الإدارة.
+        </div>
+      )}
+      {error === 'blocked' && (
+        <div className="card-3d rounded-xl border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
+          🚫 رُفض الحفظ لاحتواء بيانات المتجر على <b>{CATEGORY_LABEL[(cat as GuardCategory) || 'immoral'] || 'محتوى مخالف'}</b> — التعديل ممنوع منعاً باتاً.
+          {banned === '1' && <div className="mt-1">وتم <b>حظر حسابك</b> لمخالفة سياسة المحتوى. للاعتراض تواصل مع الإدارة.</div>}
         </div>
       )}
       {error === 'namedup' && (
@@ -621,7 +628,14 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         <div className="card-3d space-y-2 rounded-2xl p-4">
           <div className="flex items-center gap-2 font-bold text-primary">📥 رفع منتجات دفعة واحدة (Excel/CSV)</div>
           {bulk === 'err' && <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs font-bold text-red-700">تعذّر قراءة الملف — تأكد أنه CSV (من Excel: حفظ باسم ← CSV UTF-8) وبحجم أقل من 2MB.</div>}
-          {bulk && bulk !== 'err' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ أُضيف {bulk} منتجاً لمتجرك دفعة واحدة.</div>}
+          {bulk === 'flood' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs font-bold text-amber-800">⏳ نشر متسارع — انتظر قليلاً قبل رفع دفعة جديدة.</div>}
+          {bulk === 'gap' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs font-bold text-amber-800">⏳ لم تمر المدة المطلوبة بين الإعلانات حسب باقتك بعد.</div>}
+          {bulk && !['err', 'flood', 'gap'].includes(bulk) && (
+            <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">
+              ✓ أُضيف {bulk} منتجاً لمتجرك دفعة واحدة.
+              {bulklimit === '1' && <span className="mr-1 text-amber-800">(توقف الرفع عند بلوغ الحد اليومي لباقتك — أكمل الباقي غداً أو رقِّ باقتك.)</span>}
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
             أعمدة الملف: <b>العنوان، التفاصيل، السعر</b> (صف لكل منتج، حتى ٥٠). من Excel: حفظ باسم ← CSV UTF-8.
             {' '}<a href="/bulk-template.csv" download className="font-bold text-primary underline">تنزيل ملف نموذجي</a>

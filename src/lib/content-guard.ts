@@ -26,6 +26,13 @@ function normalize(s: string): string {
     .trim();
 }
 
+/** نسخة "مضغوطة" بلا أي فراغات — تكشف تحايل التباعد بين الحروف (مثل
+ *  "س ك س" أو "s e x") الذي يفلت من المطابقة العادية لأنها تحترم حدود
+ *  الكلمات. تُستخدم كطبقة إضافية فوق المطابقة الأصلية، لا بديلاً عنها. */
+function squash(s: string): string {
+  return normalize(s).replace(/\s+/g, '');
+}
+
 /** Very explicit tokens matched even inside other words (safe substrings). */
 const HARD: { sub: string; cat: GuardCategory }[] = [
   { sub: 'سكس', cat: 'immoral' }, { sub: 'سيكس', cat: 'immoral' }, { sub: 'اباحي', cat: 'immoral' },
@@ -84,14 +91,19 @@ async function loadGuardWords() {
  */
 export async function scanContent(...parts: (string | null | undefined)[]): Promise<{ category: GuardCategory; term: string } | null> {
   await loadGuardWords().catch(() => {});
-  const t = normalize(parts.filter(Boolean).join(' '));
+  const raw = parts.filter(Boolean).join(' ');
+  const t = normalize(raw);
   if (!t) return null;
-  for (const h of HARD) if (t.includes(h.sub)) return { category: h.cat, term: h.sub };
+  const sq = squash(raw);
+  for (const h of HARD) if (t.includes(h.sub) || sq.includes(h.sub)) return { category: h.cat, term: h.sub };
   const padded = ` ${t} `;
   for (const cat of GUARD_CATEGORIES) {
     for (const term of [...BUILTIN[cat], ...custom[cat]]) {
       const nt = normalize(term);
-      if (nt && padded.includes(` ${nt} `)) return { category: cat, term };
+      if (!nt) continue;
+      if (padded.includes(` ${nt} `)) return { category: cat, term };
+      const sqTerm = nt.replace(/\s+/g, '');
+      if (sqTerm.length >= 3 && sq.includes(sqTerm)) return { category: cat, term };
     }
   }
   return null;

@@ -6,13 +6,14 @@ import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { timeAgo } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'سجل الحماية' };
+export const metadata = { title: 'سجل التجاوزات' };
 
 const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
   content: { label: 'محتوى ممنوع', icon: ShieldAlert },
   duplicate: { label: 'إعلان مكرر', icon: Copy },
   duplicate_cross: { label: 'مطابق لإعلان عضو آخر', icon: Copy },
   flood: { label: 'إغراق (نشر متسارع)', icon: Waves },
+  limit: { label: 'تجاوز حدّ الباقة', icon: Ban },
 };
 
 export default async function AdminModeration() {
@@ -25,11 +26,12 @@ export default async function AdminModeration() {
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <ShieldAlert className="h-6 w-6 text-primary" />
-        <h1 className="text-xl font-bold text-primary">سجل الحماية</h1>
+        <h1 className="text-xl font-bold text-primary">سجل التجاوزات</h1>
       </div>
       <p className="text-sm text-muted-foreground">
-        كل محاولة نشر محتوى ممنوع أو مكرّر أو إغراق تُسجَّل هنا تلقائياً. المحتوى غير الأخلاقي يحظر الحساب فوراً،
-        والأمني/السياسي/المخدرات يُحظر عند التكرار.
+        كل محاولة نشر محتوى ممنوع أو مكرّر أو إغراق أو تجاوز لحدود الباقة (اليومي/الفاصل الزمني) تُسجَّل هنا تلقائياً.
+        المحتوى غير الأخلاقي يحظر الحساب فوراً، وبقية المخالفات (تكرار الإعلانات، الأمني/السياسي/المخدرات/الجمعيات)
+        تُحظر عند بلوغ حدّ الإنذارات المحدَّد في الإعدادات.
       </p>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

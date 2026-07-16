@@ -286,8 +286,8 @@ button:active { }
   animation: marquee 18s linear infinite;
 }
 @keyframes marquee {
-  from { transform: translateX(-12.5%); }
-  to   { transform: translateX(0); }
+  from { transform: translateX(0); }
+  to   { transform: translateX(-12.5%); }
 }
 
 /* gently floating 3D cards (classified entry splash) */

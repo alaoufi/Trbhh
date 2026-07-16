@@ -273,7 +273,11 @@ button:active { }
 }
 @media (prefers-reduced-motion: reduce) { .btn-3d { transition: none; } .btn-3d:hover, .btn-3d:active { transform: none; } }
 
-/* moving announcement ticker (top bar) — seamless continuous loop */
+/* moving announcement ticker (top bar) — seamless continuous loop.
+   يُكرَّر النص TICKER_COPIES مرّة (top-bar.tsx) فتبقى الشاشة مغطاة بالنص
+   طوال الحركة بلا فراغ، مهما كان طول النص أو عرض الشاشة. الحركة تنقل
+   الشريط بمقدار نسخة واحدة بالضبط كل دورة: -١٠٠٪/TICKER_COPIES = -١٢.٥٪
+   (لثمانِ نسخ) — عدّل الرقمين معاً إن تغيّر عدد النسخ. */
 .marquee { overflow: hidden; white-space: nowrap; }
 .marquee-track {
   display: flex;
@@ -282,7 +286,7 @@ button:active { }
   animation: marquee 18s linear infinite;
 }
 @keyframes marquee {
-  from { transform: translateX(-50%); }
+  from { transform: translateX(-12.5%); }
   to   { transform: translateX(0); }
 }
 

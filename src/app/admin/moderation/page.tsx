@@ -11,6 +11,7 @@ export const metadata = { title: 'سجل الحماية' };
 const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
   content: { label: 'محتوى ممنوع', icon: ShieldAlert },
   duplicate: { label: 'إعلان مكرر', icon: Copy },
+  duplicate_cross: { label: 'مطابق لإعلان عضو آخر', icon: Copy },
   flood: { label: 'إغراق (نشر متسارع)', icon: Waves },
 };
 

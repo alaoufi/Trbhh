@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig, getAdLifetimeDays, getAdRestoreFee } from '@/lib/settings';
+import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig, getAdLifetimeDays, getAdRestoreFee, getStrikeBanDays } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -10,7 +10,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn, scheduleOn, bumpOn, adContactStatsOn, couponsOn, stockOn, hoursOn, dealsOn, autoRenewOn, auctionOn, staffOn, nameLockOn, homeActionsOn, catsOn, debatesOn, archiveAutodeleteOn, adLifetimeDays, adRestoreFee] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false), getSettingBool('schedule_on', false), getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('coupons_on', false), getSettingBool('stock_on', false), getSettingBool('hours_on', false), getSettingBool('deals_on', false), getSettingBool('autorenew_on', false), getSettingBool('auction_on', false), getSettingBool('staff_on', false), getSettingBool('namelock_on', true), getSettingBool('home_actions_on', true), getSettingBool('cats_on', true), getSettingBool('debates_on', true), getSettingBool('archive_autodelete_on', false), getAdLifetimeDays(), getAdRestoreFee()]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn, scheduleOn, bumpOn, adContactStatsOn, couponsOn, stockOn, hoursOn, dealsOn, autoRenewOn, auctionOn, staffOn, nameLockOn, homeActionsOn, catsOn, debatesOn, archiveAutodeleteOn, adLifetimeDays, adRestoreFee, strikeBanDays] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false), getSettingBool('schedule_on', false), getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('coupons_on', false), getSettingBool('stock_on', false), getSettingBool('hours_on', false), getSettingBool('deals_on', false), getSettingBool('autorenew_on', false), getSettingBool('auction_on', false), getSettingBool('staff_on', false), getSettingBool('namelock_on', true), getSettingBool('home_actions_on', true), getSettingBool('cats_on', true), getSettingBool('debates_on', true), getSettingBool('archive_autodelete_on', false), getAdLifetimeDays(), getAdRestoreFee(), getStrikeBanDays()]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -160,7 +160,13 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
               <input name="dupImagePct" type="number" min={50} max={100} defaultValue={dupThresholds.image} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
             </label>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">يُعدّ الإعلان مكرّراً إذا تطابق <b>العنوان</b> أو <b>التفاصيل</b> أو <b>الصور</b> مع إعلان سابق للعضو نفسه بالنسبة المحددة. مطابقة الصور إدراكية (تكشف نفس الصورة ولو صُغّرت أو أُعيد حفظها). كلما زادت النسبة قلّت الحساسية.</p>
+          <p className="mt-1 text-xs text-muted-foreground">يُعدّ الإعلان مكرّراً إذا تطابق <b>العنوان</b> أو <b>التفاصيل</b> أو <b>الصور</b> مع إعلان سابق للعضو نفسه — أو لعضو آخر — بالنسبة المحددة. مطابقة الصور إدراكية (تكشف نفس الصورة ولو صُغّرت أو أُعيد حفظها). كلما زادت النسبة قلّت الحساسية.</p>
+
+          <label className="mt-3 block space-y-1">
+            <span className="text-xs font-bold">مدة الحظر التلقائي عند تكرار المخالفات (بالأيام) — اكتب 0 للحظر الدائم</span>
+            <input name="strikeBanDays" type="number" min={0} defaultValue={strikeBanDays} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+          </label>
+          <p className="mt-1 text-xs text-muted-foreground">تُطبَّق عند بلوغ حدّ المخالفات: <b>٣ إنذارات</b> لتكرار الإعلانات ثم حظر، و<b>إنذاران</b> للمحتوى الممنوع (سياسي/مخدرات/أسلحة/جمعيات) ثم حظر — والمحتوى غير الأخلاقي يُحظر من أول مخالفة. لا تهاون في أي منها.</p>
         </div>
 
         <div className="border-t border-primary/15 pt-3">

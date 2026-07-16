@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
+import { getStrikeBanDays } from './settings';
 import type { GuardCategory } from './content-guard';
 
 /** Max duplicate attempts before the account is banned. */
@@ -138,13 +139,13 @@ export async function handleProhibited(
   snippet: string,
 ): Promise<ProhibitedOutcome> {
   if (category === 'immoral') {
-    await banUser(userId);
+    await banUserFor(userId, await getStrikeBanDays());
     await logMod(userId, { kind: 'content', category, term, snippet, action: 'banned' });
     return { banned: true, left: 0, category };
   }
   const n = await recordStrike(userId, 'content');
   const banned = n >= CONTENT_STRIKE_LIMIT;
-  if (banned) await banUser(userId);
+  if (banned) await banUserFor(userId, await getStrikeBanDays());
   await logMod(userId, { kind: 'content', category, term, snippet, action: banned ? 'banned' : 'blocked' });
   return { banned, left: Math.max(0, CONTENT_STRIKE_LIMIT - n), category };
 }

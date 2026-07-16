@@ -7,9 +7,9 @@ import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { aHash, hashSimilarity } from '@/lib/phash';
-import { bumpDupAttempts, banUser, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned } from '@/lib/moderation';
+import { bumpDupAttempts, banUserFor, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd } from '@/lib/packages';
-import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getServicePricing, serviceHasPrice } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getServicePricing, serviceHasPrice, getStrikeBanDays } from '@/lib/settings';
 import { charge, consumeDupCredit } from '@/lib/wallet';
 import { bustAdCaches } from '@/lib/data';
 import { setAdMedia } from '@/lib/ad-media';
@@ -139,6 +139,30 @@ async function ownDuplicateOf(userId: number, title: string, detail: string, ima
         }
       }
     }
+  }
+  return null;
+}
+
+/** Duplicate against OTHER members' ads (spam networks reposting the same ad text
+ *  under different accounts/phone numbers — e.g. "دينا" hauling ads). Text only
+ *  (title/detail) — matching on images too would false-positive on sellers who
+ *  legitimately share the same manufacturer/stock photo. Scoped to the last 30
+ *  days so the comparison set stays bounded and relevant. */
+async function crossUserDuplicateOf(userId: number, title: string, detail: string): Promise<{ id: number; title: string } | null> {
+  const { title: titlePct, detail: detailPct } = await getDupThresholds();
+  const since = new Date(Date.now() - 30 * 86_400_000);
+  const others = await prisma.ads.findMany({
+    where: { user_id: { not: BigInt(userId) }, created_at: { gte: since } },
+    select: { id: true, title: true, detail: true },
+    orderBy: { id: 'desc' },
+    take: 1500,
+  });
+  const nTitle = normalizeAr(title);
+  const nDetail = normalizeAr(detail);
+  for (const r of others) {
+    const titleMatch = similarity(nTitle, normalizeAr(r.title)) * 100 >= titlePct;
+    const detailMatch = similarity(nDetail, normalizeAr(r.detail)) * 100 >= detailPct;
+    if (titleMatch || detailMatch) return { id: toInt(r.id), title: r.title };
   }
   return null;
 }
@@ -276,11 +300,25 @@ export async function createAdAction(formData: FormData) {
       // يُسجَّل للإدارة: أي إعلان تطابق معه بالضبط (السجل الرقابي)
       await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مكرّر مع #${dup.id} «${dup.title}» — الجديد: ${title.slice(0, 60)}` });
       if (n >= DUP_LIMIT) {
-        await banUser(session.uid);
+        await banUserFor(session.uid, await getStrikeBanDays());
         redirect('/ads/new?error=banned');
       }
       redirect(`/ads/new?error=duplicate&left=${Math.max(0, DUP_LIMIT - n)}&dup=${dup.id}`);
     }
+  }
+
+  // تكرار عبر أعضاء مختلفين (شبكات سبام تنشر نفس النص بأرقام/حسابات متعددة —
+  // مثل إعلانات "دينا" المتكررة). منع فوري دون خيار الدفع (المحتوى ليس ملكه
+  // أصلاً)، مع نفس نظام المخالفات المتدرّج قبل الحظر.
+  const crossDup = dest === 'store' ? null : await crossUserDuplicateOf(session.uid, title, detail);
+  if (crossDup) {
+    const n = await bumpDupAttempts(session.uid);
+    await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مطابق لإعلان عضو آخر #${crossDup.id} «${crossDup.title}» — الجديد: ${title.slice(0, 60)}` });
+    if (n >= DUP_LIMIT) {
+      await banUserFor(session.uid, await getStrikeBanDays());
+      redirect('/ads/new?error=banned');
+    }
+    redirect(`/ads/new?error=crossdup&left=${Math.max(0, DUP_LIMIT - n)}&dup=${crossDup.id}`);
   }
 
   // النشر الفوري ما لم تُفعّل الإدارة «مراجعة الإعلانات قبل النشر».

@@ -498,6 +498,13 @@ export async function getDupThresholds(): Promise<{ title: number; detail: numbe
   return { title: clamp(t), detail: clamp(d), image: clamp(im) };
 }
 
+/** مدة الحظر التلقائي (بالأيام) عند بلوغ حد المخالفات (تكرار الإعلانات أو المحتوى
+ *  الممنوع) — 0 = حظر دائم. تُطبَّق على كل عمليات الحظر الآلي بلا استثناء. */
+export const SETTING_STRIKE_BAN_DAYS = 'strike_ban_days';
+export async function getStrikeBanDays(): Promise<number> {
+  return Math.max(0, Math.round(await getSettingNum(SETTING_STRIKE_BAN_DAYS, 0)));
+}
+
 /** Classified-ad duplicate prevention — a toggle plus three thresholds (percent):
  *  content (title+body text), image (perceptual), and background (theme+pattern+accent design). */
 export const SETTING_CDUP_ON = 'cdup_enabled';

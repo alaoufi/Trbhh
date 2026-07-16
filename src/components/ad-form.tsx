@@ -192,6 +192,17 @@ export function AdForm({
             : ' هذه محاولتك الأخيرة قبل الحظر.'}
         </div>
       )}
+      {error === 'crossdup' && (
+        <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-medium text-red-800">
+          ⚠️ هذا الإعلان مطابق لإعلان منشور من عضو آخر ولم يُنشر — لا يُسمح بنسخ نفس النص.
+          {dupId && Number(dupId) > 0 && (
+            <span> الإعلان المطابق: <a href={`/ads/${dupId}`} target="_blank" rel="noopener noreferrer" className="font-bold underline">افتح الإعلان رقم {dupId}</a>.</span>
+          )}
+          {dupLeft && Number(dupLeft) > 0
+            ? ` تبقّى لك ${dupLeft} ${Number(dupLeft) === 1 ? 'محاولة' : 'محاولات'} قبل حظر حسابك.`
+            : ' هذه محاولتك الأخيرة قبل الحظر.'}
+        </div>
+      )}
       {error === 'needdup' && (
         <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
           🔁 هذا الإعلان مكرّر. لنشره عدّة مرّات اشترِ <b>باقة تكرار</b> (مكرّر 3 أو مكرّر 5) من <Link href="/account/wallet" className="underline">محفظتي</Link>، ثم أعد النشر.

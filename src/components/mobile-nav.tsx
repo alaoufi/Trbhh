@@ -51,8 +51,8 @@ export function MobileNav({ unread = 0, isAuthed = false, debatesOn = true }: { 
           const inner = (
             <>
               {primary ? (
-                <span className="grid h-11 w-11 -translate-y-2 place-items-center rounded-full bg-[#f0b429] text-[#16294a] shadow-lg">
-                  <Icon className="h-6 w-6" />
+                <span className="grid h-9 w-9 -translate-y-1 place-items-center rounded-full bg-[#f0b429] text-[#16294a] shadow-lg">
+                  <Icon className="h-5 w-5" />
                 </span>
               ) : (
                 <span className="relative">

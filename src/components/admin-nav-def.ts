@@ -48,6 +48,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
   {
     key: 'safety', title: 'الحماية والمخالفات', icon: Shield, color: '#dc2626',
     items: [
+      { href: '/admin/moderation', label: 'سجل التجاوزات', icon: ShieldAlert, perm: 'reports' },
       { href: '/admin/words', label: 'الكلمات المرفوضة', icon: Ban, perm: 'words' },
       { href: '/admin/guard-words', label: 'كلمات حارس المحتوى', icon: ShieldAlert, perm: 'words' },
       { href: '/admin/reports', label: 'البلاغات', icon: Flag, perm: 'reports' },

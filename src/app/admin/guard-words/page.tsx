@@ -13,6 +13,7 @@ const COLORS: Record<GuardCategory, string> = {
   drugs: 'from-orange-500 to-orange-700',
   weapons: 'from-slate-600 to-slate-800',
   political: 'from-amber-500 to-amber-700',
+  charity: 'from-teal-600 to-teal-800',
 };
 
 export default async function GuardWordsPage() {

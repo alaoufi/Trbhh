@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { useFormStatus } from 'react-dom';
 import { Phone, MessageCircle, ExternalLink, Sparkles, AlignRight, AlignCenter, ArrowUpToLine, ArrowDownToLine, AlignVerticalJustifyCenter, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -187,12 +188,12 @@ export function ClassifiedForm({ action, error, initial, submitLabel, needPrice,
         {error === 'content' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">أضف صورة أو نصّاً على الأقل.</div>}
         {error === 'contact' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">أضف رقم جوال أو واتساب على الأقل.</div>}
         {error === 'save' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">تعذّر حفظ الإعلان. حاول مرة أخرى، وإذا تكرّر أخبرنا.</div>}
-        {error === 'blocked' && <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">🚫 رُفض هذا الإعلان لاحتوائه على محتوى مخالف (غير أخلاقي / مخدرات / أمني / سياسي). النشر ممنوع، وقد يُحظر الحساب فوراً عند المحتوى غير الأخلاقي.</div>}
+        {error === 'blocked' && <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">🚫 رُفض هذا الإعلان لاحتوائه على محتوى مخالف (غير أخلاقي / مخدرات / أمني / سياسي / جمع تبرعات غير مرخّص). النشر ممنوع، وقد يُحظر الحساب فوراً عند المحتوى غير الأخلاقي.</div>}
         {error === 'image' && <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">🚫 رُفضت الصورة لاشتباه المحتوى بأنه غير لائق. الرجاء رفع صورة مناسبة فقط.</div>}
         {error === 'window' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">انتهت المدة المسموح بها لتعديل هذا الإعلان حسب إعدادات الموقع. للتعديل بعدها تواصل مع الإدارة.</div>}
         {error === 'duplicate' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">⚠️ هذا الإعلان المبوّب مطابق لإعلان سابق لك (في المحتوى أو الصورة أو الخلفية). لا يُسمح بتكرار نفس الإعلان — عدّل المحتوى أو الصورة لنشره.</div>}
-        {error === 'needdup' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">🔁 هذا المبوّب مكرّر. لنشره عدّة مرّات اشترِ <b>باقة تكرار</b> (مكرّر 3/5) من <a href="/account/wallet" className="underline">محفظتي</a> ثم أعد النشر.</div>}
-        {error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 <b>اشحن رصيدك</b> لإتمام النشر{needPrice ? <> — التكلفة <b>{needPrice} ر.س</b></> : ''}{needBal !== undefined ? <> ورصيدك <b>{needBal} ر.س</b></> : ''}. راجع <a href="/account/wallet" className="underline">محفظتي</a> أو تواصل مع الإدارة للشحن.</div>}
+        {error === 'needdup' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">🔁 هذا المبوّب مكرّر. لنشره عدّة مرّات اشترِ <b>باقة تكرار</b> (مكرّر 3/5) من <Link href="/account/wallet" className="underline">محفظتي</Link> ثم أعد النشر.</div>}
+        {error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 <b>اشحن رصيدك</b> لإتمام النشر{needPrice ? <> — التكلفة <b>{needPrice} ر.س</b></> : ''}{needBal !== undefined ? <> ورصيدك <b>{needBal} ر.س</b></> : ''}. راجع <Link href="/account/wallet" className="underline">محفظتي</Link> أو تواصل مع الإدارة للشحن.</div>}
 
         {durations && (
           <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-3">

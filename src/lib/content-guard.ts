@@ -2,14 +2,15 @@ import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 
-export type GuardCategory = 'immoral' | 'drugs' | 'weapons' | 'political';
-export const GUARD_CATEGORIES: GuardCategory[] = ['immoral', 'drugs', 'weapons', 'political'];
+export type GuardCategory = 'immoral' | 'drugs' | 'weapons' | 'political' | 'charity';
+export const GUARD_CATEGORIES: GuardCategory[] = ['immoral', 'drugs', 'weapons', 'political', 'charity'];
 
 export const CATEGORY_LABEL: Record<GuardCategory, string> = {
   immoral: 'محتوى غير أخلاقي',
   drugs: 'مخدرات أو مسكرات',
   weapons: 'أسلحة أو محتوى أمني',
   political: 'محتوى سياسي مشبوه',
+  charity: 'جمع تبرعات أو نشاط جمعية غير مرخّص',
 };
 
 /** Normalize Arabic for robust matching (strip diacritics, unify letters). */
@@ -54,18 +55,24 @@ export const BUILTIN: Record<GuardCategory, string[]> = {
     'اسقاط النظام', 'ضد الحكومه', 'ضد الدوله', 'ضد الحاكم', 'تحريض سياسي', 'مظاهره', 'تظاهر',
     'اعتصام سياسي', 'منشور سياسي', 'ضد ولي الامر', 'ضد الملك', 'انقلاب',
   ],
+  // جمع التبرعات المالية باسم جمعية/صندوق خيري يتطلّب ترخيصاً رسمياً (المركز الوطني
+  // لتنمية القطاع غير الربحي) — يُمنع نشره كإعلان تصنيفي عام دون ترخيص موثّق.
+  charity: [
+    'جمعيه خيريه', 'جمعية خيرية', 'جمع تبرعات', 'حملة تبرعات', 'صندوق خيري', 'وقف خيري',
+    'تبرعوا الان', 'ادعموا الجمعيه', 'جمعية غير مرخصة', 'تبرع لجمعية', 'جمع زكاة', 'تحصيل تبرعات',
+  ],
 };
 
 /* ---- custom (admin-editable) words ---- */
 const ensure = ensureSchema;
 
-let custom: Record<GuardCategory, string[]> = { immoral: [], drugs: [], weapons: [], political: [] };
+let custom: Record<GuardCategory, string[]> = { immoral: [], drugs: [], weapons: [], political: [], charity: [] };
 let loadedAt = 0;
 async function loadGuardWords() {
   if (Date.now() - loadedAt < 60000) return; // 60s cache
   await ensure();
   const rows = await prisma.guard_words.findMany({ select: { category: true, word: true } }).catch(() => []);
-  const next: Record<GuardCategory, string[]> = { immoral: [], drugs: [], weapons: [], political: [] };
+  const next: Record<GuardCategory, string[]> = { immoral: [], drugs: [], weapons: [], political: [], charity: [] };
   for (const r of rows) if ((GUARD_CATEGORIES as string[]).includes(r.category)) next[r.category as GuardCategory].push(r.word);
   custom = next;
   loadedAt = Date.now();

@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useFormStatus } from 'react-dom';
 import { Tag, MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -64,7 +65,7 @@ export function AdForm({
   /** عرض تسويقي للتمييز ⭐ عند النشر: المدد المسعّرة ورصيد العضو الحالي */
   featuredOffer?: { options: { key: string; label: string; price: number }[]; balance: number };
 }) {
-  const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
+  const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه', charity: 'جمع تبرعات أو نشاط جمعية غير مرخّص' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
   const isReq = adsType === 'request';
   // نوع السعر للمعروض: تأجير (سعر + مدة) / بيع (سعر) / على السوم (بلا سعر)
@@ -193,7 +194,7 @@ export function AdForm({
       )}
       {error === 'needdup' && (
         <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
-          🔁 هذا الإعلان مكرّر. لنشره عدّة مرّات اشترِ <b>باقة تكرار</b> (مكرّر 3 أو مكرّر 5) من <a href="/account/wallet" className="underline">محفظتي</a>، ثم أعد النشر.
+          🔁 هذا الإعلان مكرّر. لنشره عدّة مرّات اشترِ <b>باقة تكرار</b> (مكرّر 3 أو مكرّر 5) من <Link href="/account/wallet" className="underline">محفظتي</Link>، ثم أعد النشر.
         </div>
       )}
       {error === 'needcredit' && (
@@ -201,7 +202,7 @@ export function AdForm({
           💳 رصيدك لا يكفي لإتمام العملية.
           {needPrice && <span> المطلوب: <b>{needPrice} ر.س</b>.</span>}
           {needBal !== undefined && <span> رصيدك الحالي: <b>{needBal} ر.س</b>.</span>}
-          <span> <a href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك من هنا</a> ثم أعد المحاولة.</span>
+          <span> <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</span>
         </div>
       )}
       {error === 'banned' && (
@@ -216,12 +217,12 @@ export function AdForm({
       )}
       {error === 'limit' && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          لقد بلغت الحد اليومي لعدد الإعلانات في باقتك{limitMax ? ` (${limitMax} إعلان/اليوم)` : ''}. للمزيد بإمكانك ترقية باقتك من صفحة <a href="/packages" className="font-bold underline">الباقات</a>.
+          لقد بلغت الحد اليومي لعدد الإعلانات في باقتك{limitMax ? ` (${limitMax} إعلان/اليوم)` : ''}. للمزيد بإمكانك ترقية باقتك من صفحة <Link href="/packages" className="font-bold underline">الباقات</Link>.
         </div>
       )}
       {error === 'gap' && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          يجب الانتظار{gapHours ? ` ${gapHours} ساعة` : ''} بين كل إعلان وآخر في باقتك{gapWait ? ` — تبقّى نحو ${gapWait} ساعة` : ''}. للترقية طالع صفحة <a href="/packages" className="font-bold underline">الباقات</a>.
+          يجب الانتظار{gapHours ? ` ${gapHours} ساعة` : ''} بين كل إعلان وآخر في باقتك{gapWait ? ` — تبقّى نحو ${gapWait} ساعة` : ''}. للترقية طالع صفحة <Link href="/packages" className="font-bold underline">الباقات</Link>.
         </div>
       )}
 

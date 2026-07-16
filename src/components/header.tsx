@@ -68,8 +68,8 @@ export async function Header() {
           <LiveClock />
         </div>
 
-        {/* logo on the left (RTL: last child) — الشعار كما هو بحواف متلاشية (المركز معتم كاملاً، فقط الأطراف تذوب في الهيدر الكحلي الخفيف)؛ الأصل القديم محفوظ بالاسم logo-mark-256.png للتراجع الفوري */}
-        <Link href="/" className="shrink-0">
+        {/* logo on the left (RTL: last child) — مزاح لأقصى يسار الهيدر (يتجاوز فراغ .container الجانبي) ليلامس الحافة؛ الأصل القديم محفوظ بالاسم logo-mark-256.png للتراجع الفوري */}
+        <Link href="/" className="-ml-4 shrink-0">
           <Image src="/logo-feathered.png" alt="تربح" width={48} height={48} priority className="h-12 w-12 object-contain" />
         </Link>
       </div>

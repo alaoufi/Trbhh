@@ -42,7 +42,7 @@ export async function Header() {
   const debatesOn = await import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true);
   return (
     <>
-    <header className="sticky top-0 z-40 border-b border-black/20 bg-[#16294a]">
+    <header className="sticky top-0 z-40 border-b border-black/20 bg-gradient-to-r from-[#01091a] to-[#16294a]">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
         <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />

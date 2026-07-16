@@ -21,7 +21,9 @@ const nextConfig = {
       { source: '/show_ads/:slug/:id(\\d+)', destination: '/ads/:id', permanent: true },
       { source: '/show_ads/:id(\\d+)', destination: '/ads/:id', permanent: true },
     ];
-    return [...pageAliases, ...legacyAdLinks];
+    // /home كانت الصفحة الرئيسية على الموقع القديم (لارافيل) — تحويلها للرئيسية الجديدة.
+    const legacyHome = [{ source: '/home', destination: '/', permanent: true }];
+    return [...pageAliases, ...legacyAdLinks, ...legacyHome];
   },
   output: 'standalone',
   reactStrictMode: true,

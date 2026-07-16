@@ -554,6 +554,11 @@ const STATEMENTS: string[] = [
   /* ---- legacy-table amendments ---- */
   `ALTER TABLE repord_ads ADD COLUMN response TEXT NULL`,
   `ALTER TABLE repord_ads ADD COLUMN responded_at TIMESTAMP NULL`,
+  // معالجة البلاغ: إجراء إجباري (حظر/حذف/تجاهل) يُغلق البلاغ ويُرسل رسالة للمُبلِّغ ولصاحب الإعلان
+  `ALTER TABLE repord_ads ADD COLUMN status TINYINT NOT NULL DEFAULT 0`,
+  `ALTER TABLE repord_ads ADD COLUMN action VARCHAR(16) NULL`,
+  `ALTER TABLE repord_ads ADD COLUMN handled_at TIMESTAMP NULL`,
+  `ALTER TABLE repord_ads ADD COLUMN handled_by BIGINT UNSIGNED NULL`,
   `ALTER TABLE chats MODIFY message TEXT`,
 ];
 

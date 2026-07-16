@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ShieldAlert, Ban, AlertTriangle, Copy, Waves } from 'lucide-react';
+import { ShieldAlert, Ban, AlertTriangle, Copy, Waves, Flag } from 'lucide-react';
 import { requirePerm } from '@/lib/roles';
 import { getModLog } from '@/lib/moderation';
 import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
@@ -14,6 +14,7 @@ const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
   duplicate_cross: { label: 'مطابق لإعلان عضو آخر', icon: Copy },
   flood: { label: 'إغراق (نشر متسارع)', icon: Waves },
   limit: { label: 'تجاوز حدّ الباقة', icon: Ban },
+  report: { label: 'إجراء بلاغ', icon: Flag },
 };
 
 export default async function AdminModeration() {

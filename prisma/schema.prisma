@@ -649,6 +649,11 @@ model repord_ads {
   // -- self-provisioned (report defence by the reported member) --
   response     String?   @db.Text
   responded_at DateTime? @db.Timestamp(0)
+  // -- self-provisioned (resolution: forces ban/delete/dismiss + notifies both sides) --
+  status     Int       @default(0) @db.TinyInt
+  action     String?   @db.VarChar(16)
+  handled_at DateTime? @db.Timestamp(0)
+  handled_by BigInt?   @db.UnsignedBigInt
 }
 
 model report_resons {

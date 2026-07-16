@@ -7,12 +7,12 @@ import { findDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
 import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore, completeStoreTransfer, decidePlatformRequest } from '@/lib/merchant';
-import { banUserFor, unbanUser } from '@/lib/moderation';
+import { banUserFor, unbanUser, logMod } from '@/lib/moderation';
 import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAccountNow } from '@/lib/account-delete';
 import { addBannedWord, deleteBannedWord, addNameWord, deleteNameWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_STRIKE_BAN_DAYS, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_SITE_SHARE_TITLE, SETTING_SITE_SHARE_DESC, SETTING_HOME_NOCATS_BANNER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT, SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT, SETTING_MSG_TOPUP_CANCEL, SETTING_TOPUP_NAME_NOTE, getTopupAccounts, setTopupAccounts, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_TRIAL_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_STRIKE_BAN_DAYS, getStrikeBanDays, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_SITE_SHARE_TITLE, SETTING_SITE_SHARE_DESC, SETTING_HOME_NOCATS_BANNER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT, SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT, SETTING_MSG_TOPUP_CANCEL, SETTING_TOPUP_NAME_NOTE, getTopupAccounts, setTopupAccounts, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_TRIAL_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
@@ -1060,6 +1060,54 @@ export async function adminDeleteAdAction(formData: FormData) {
   await logAdmin(session.uid, 'حذف إعلان نهائياً من الأرشيف', `إعلان #${toInt(id)}`);
   await bustAdCaches().catch(() => {});
   revalidatePath('/admin/ads');
+}
+
+/**
+ * إغلاق بلاغ بإجراء إجباري: حظر صاحب الإعلان، حذفه (أرشفة)، أو تجاهل البلاغ (لا
+ * مخالفة). يُرسل رسالة لصاحب الإعلان (إن حُظر أو حُذف) ورسالة تأكيد للمُبلِّغ
+ * دائماً، ويُسجَّل في سجل التجاوزات — لا يبقى بلاغ بلا قرار وبلا إشعار الطرفين.
+ */
+export async function resolveReportAction(formData: FormData) {
+  const session = await requireAction('reports', 'delete');
+  const reportId = BigInt(String(formData.get('reportId') || '0'));
+  const action = String(formData.get('action') || '');
+  if (!reportId || !['ban', 'delete', 'dismiss'].includes(action)) { revalidatePath('/admin/reports'); return; }
+
+  const report = await prisma.repord_ads.findUnique({ where: { id: reportId } });
+  if (!report || report.status !== 0) { revalidatePath('/admin/reports'); return; }
+
+  const ad = await prisma.ads.findUnique({ where: { id: BigInt(report.ads_id) }, select: { id: true, title: true, user_id: true, data_archive: true } });
+  const adTitle = (ad?.title || `إعلان #${report.ads_id}`).slice(0, 80);
+  const ownerId = ad ? toInt(ad.user_id) : 0;
+
+  if (action === 'ban' && ownerId) {
+    await banUserFor(ownerId, await getStrikeBanDays());
+    await logMod(ownerId, { kind: 'report', category: null, term: null, snippet: `حظر بسبب بلاغ على «${adTitle}»`, action: 'banned' });
+  }
+  if (action === 'delete' && ad) {
+    const isArchived = !!(ad.data_archive && ad.data_archive.trim() !== '');
+    if (!isArchived) await prisma.ads.update({ where: { id: ad.id }, data: { status: 0, data_archive: new Date().toISOString() } }).catch(() => {});
+    await logMod(ownerId || 0, { kind: 'report', category: null, term: null, snippet: `حذف الإعلان «${adTitle}» بسبب بلاغ`, action: 'blocked' });
+  }
+  await logAdmin(session.uid, `معالجة بلاغ: ${action === 'ban' ? 'حظر الناشر' : action === 'delete' ? 'حذف الإعلان' : 'تجاهل البلاغ'}`, `إعلان #${report.ads_id}`);
+
+  // رسالة إجبارية لصاحب الإعلان عند اتخاذ إجراء ضده
+  if (ownerId && (action === 'ban' || action === 'delete')) {
+    const ownerMsg = action === 'ban'
+      ? `تم حظر حسابك بسبب مخالفة إعلانك «${adTitle}» بعد مراجعة بلاغ من الإدارة.`
+      : `تمت إزالة إعلانك «${adTitle}» لمخالفته شروط الاستخدام بعد مراجعة بلاغ من الإدارة.`;
+    await prisma.notfications.create({ data: { title: ownerMsg.slice(0, 180), route: '/account/ads', user_id: String(ownerId), type: 'report', model_id: Number(report.ads_id) } }).catch(() => {});
+  }
+  // رسالة إجبارية للمُبلِّغ دائماً — تؤكد أن البلاغ رُوجع مهما كانت النتيجة
+  const reporterMsg = action === 'dismiss'
+    ? `تمت مراجعة بلاغك على «${adTitle}» ولم نجد مخالفة تستدعي إجراءً. شكراً لك.`
+    : `تمت مراجعة بلاغك على «${adTitle}» واتُخذ الإجراء المناسب. شكراً لك.`;
+  await prisma.notfications.create({ data: { title: reporterMsg.slice(0, 180), route: '/', user_id: String(report.user_id), type: 'report', model_id: Number(report.ads_id) } }).catch(() => {});
+
+  await prisma.repord_ads.update({ where: { id: reportId }, data: { status: 1, action, handled_at: new Date(), handled_by: BigInt(session.uid) } });
+  await bustAdCaches().catch(() => {});
+  revalidatePath('/admin/reports');
+  revalidatePath('/admin/moderation');
 }
 
 export async function adminToggleSpecialAction(formData: FormData) {

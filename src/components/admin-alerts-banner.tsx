@@ -12,7 +12,6 @@ type Item = { n: number; label: string; href: string; oldest: Date | null };
  */
 export async function AdminAlertsBanner() {
   const notArchived = { OR: [{ data_archive: null }, { data_archive: '' }] };
-  const twoWeeks = new Date(Date.now() - 14 * 86400000);
 
   // عدّاد + أقدم طلب لكل بند (لحساب وقت التأخير)
   const [
@@ -39,9 +38,9 @@ export async function AdminAlertsBanner() {
     prisma.name_requests.findFirst({ where: { status: 0, kind: 'user' }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
     prisma.name_requests.count({ where: { status: 0, kind: 'store' } }).catch(() => 0),
     prisma.name_requests.findFirst({ where: { status: 0, kind: 'store' }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
-    // البلاغات والشكاوى الجديدة (آخر ١٤ يوماً) — تُعالَج من صفحة البلاغات
-    prisma.repord_ads.count({ where: { created_at: { gte: twoWeeks } } }).catch(() => 0),
-    prisma.repord_ads.findFirst({ where: { created_at: { gte: twoWeeks } }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
+    // البلاغات بانتظار إجراء (لم تُغلق بعد بحظر/حذف/تجاهل) — تُعالَج من صفحة البلاغات
+    prisma.repord_ads.count({ where: { status: 0 } }).catch(() => 0),
+    prisma.repord_ads.findFirst({ where: { status: 0 }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
     prisma.stores.count({ where: { status: 0 } }).catch(() => 0),
     prisma.stores.findFirst({ where: { status: 0 }, orderBy: { id: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
     prisma.store_transfers.count({ where: { status: 1 } }).catch(() => 0),

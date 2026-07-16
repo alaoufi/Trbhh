@@ -14,7 +14,7 @@ export function LiveClock() {
     return () => clearInterval(t);
   }, []);
   return (
-    <span className="flex flex-col items-center leading-none text-primary/80" suppressHydrationWarning dir="ltr">
+    <span className="flex flex-col items-center leading-none text-[#f0b429]/85" suppressHydrationWarning dir="ltr">
       <span className="text-[10px] font-extrabold tabular-nums" suppressHydrationWarning>{now ? fmtTime.format(now) : '--:--:--'}</span>
       <span className="mt-0.5 text-[8px] font-bold tabular-nums" suppressHydrationWarning>{now ? fmtDate.format(now) : ''}</span>
     </span>

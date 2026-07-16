@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Store, LogIn, Home } from 'lucide-react';
 
-const cls = 'btn-3d flex h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-gradient-to-l from-primary to-primary/80 px-3 text-sm font-bold text-white';
+const cls = 'flex h-11 flex-1 items-center justify-start gap-2 whitespace-nowrap px-2 text-sm font-extrabold text-[#f0b429] transition hover:text-[#ffd166]';
 
 /**
  * زر الهيدر الرئيسي — يتغيّر حسب الصفحة (عميل، ليتفاعل مع التنقّل الفوري):

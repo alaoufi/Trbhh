@@ -42,7 +42,7 @@ export async function Header() {
   const debatesOn = await import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true);
   return (
     <>
-    <header className="sticky top-0 z-40 border-b border-[#d8dfeb] bg-[#eef1f7]">
+    <header className="sticky top-0 z-40 border-b border-black/20 bg-[#16294a]">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
         <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />
@@ -56,7 +56,7 @@ export async function Header() {
         {/* جرس الرسائل والتنبيهات + ساعة حية بتوقيت الرياض تحته */}
         <div className="flex shrink-0 flex-col items-center gap-0.5">
           {session && (
-            <Link href="/notifications" aria-label="التنبيهات والرسائل" className="relative text-primary">
+            <Link href="/notifications" aria-label="التنبيهات والرسائل" className="relative text-[#f0b429]">
               <Bell className="h-5 w-5" />
               {bellCount > 0 && (
                 <span className="absolute -left-2 -top-1.5 grid min-w-[18px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-extrabold leading-[18px] text-white shadow">

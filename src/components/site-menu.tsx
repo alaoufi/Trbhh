@@ -284,7 +284,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
 
   return (
     <>
-      <button onClick={() => setOpen(true)} aria-label="القائمة" className="text-primary">
+      <button onClick={() => setOpen(true)} aria-label="القائمة" className="text-[#f0b429]">
         <Menu className="h-7 w-7" />
       </button>
       {mounted && createPortal(drawer, document.body)}

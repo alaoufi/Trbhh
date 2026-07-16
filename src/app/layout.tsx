@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import { Cairo } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
-import { TopBar } from '@/components/top-bar';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { MobileNav } from '@/components/mobile-nav';
@@ -95,7 +94,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* Storefront (/companies/[id]) = fully independent site: ChromeGate hides
             the shared header/menu/footer, even across client-side navigation. */}
         <ChromeGate
-          header={<><TopBar /><Header /></>}
+          header={<Header />}
           footer={<><Footer debatesOn={debatesOn} /><MobileNav unread={unread} isAuthed={!!session} debatesOn={debatesOn} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
         >
           {children}

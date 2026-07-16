@@ -15,7 +15,7 @@ export async function TopBar() {
   );
   return (
     <div className="site-ticker bg-primary text-primary-foreground">
-      <div className="marquee container h-9 text-xs leading-9 sm:text-sm">
+      <div className="marquee h-9 w-full text-xs leading-9 sm:text-sm">
         <div className="marquee-track">
           <Item />
           <Item />

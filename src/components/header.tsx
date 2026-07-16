@@ -68,9 +68,9 @@ export async function Header() {
           <LiveClock />
         </div>
 
-        {/* logo on the left (RTL: last child) */}
+        {/* logo on the left (RTL: last child) — الشعار الذهبي الجديد؛ الأصل محفوظ بالاسم logo-mark-256.png للتراجع الفوري */}
         <Link href="/" className="shrink-0">
-          <Image src="/logo-mark-256.png" alt="تربح" width={44} height={44} priority className="h-11 w-11 rounded-lg object-contain" />
+          <Image src="/logo-mark-gold-256.png" alt="تربح" width={44} height={44} priority className="h-11 w-11 rounded-lg object-contain" />
         </Link>
       </div>
     </header>

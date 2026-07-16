@@ -42,7 +42,7 @@ export async function Header() {
   const debatesOn = await import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true);
   return (
     <>
-    <header className="sticky top-0 z-40 border-b border-primary/15 bg-accent/70 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-[#d8dfeb] bg-[#eef1f7]">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
         <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />
@@ -68,9 +68,9 @@ export async function Header() {
           <LiveClock />
         </div>
 
-        {/* logo on the left (RTL: last child) — الشعار المرفق كما هو بالضبط (بلا اقتصاص)؛ الأصل القديم محفوظ بالاسم logo-mark-256.png للتراجع الفوري */}
+        {/* logo on the left (RTL: last child) — الشعار كما هو بحواف متلاشية (المركز معتم كاملاً، فقط الأطراف تذوب في الهيدر الكحلي الخفيف)؛ الأصل القديم محفوظ بالاسم logo-mark-256.png للتراجع الفوري */}
         <Link href="/" className="shrink-0">
-          <Image src="/logo-full-asis.png" alt="تربح" width={44} height={44} priority className="h-11 w-11 rounded-lg object-contain" />
+          <Image src="/logo-feathered.png" alt="تربح" width={48} height={48} priority className="h-12 w-12 object-contain" />
         </Link>
       </div>
     </header>

@@ -44,19 +44,19 @@ export function MobileNav({ unread = 0, isAuthed = false, debatesOn = true }: { 
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-primary/15 bg-accent/95 backdrop-blur md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-black/20 bg-[#16294a] md:hidden">
       <ul className="flex items-stretch justify-around">
         {items.map(({ href, label, icon: Icon, primary, badge }) => {
           const active = path === href;
           const inner = (
             <>
               {primary ? (
-                <span className="grid h-11 w-11 -translate-y-2 place-items-center rounded-full bg-primary text-white shadow-lg">
+                <span className="grid h-11 w-11 -translate-y-2 place-items-center rounded-full bg-[#f0b429] text-[#16294a] shadow-lg">
                   <Icon className="h-6 w-6" />
                 </span>
               ) : (
                 <span className="relative">
-                  <Icon className={cn('h-6 w-6', active ? 'text-primary' : 'text-primary/80')} />
+                  <Icon className={cn('h-6 w-6', active ? 'text-[#f0b429]' : 'text-[#f0b429]/70')} />
                   {badge && unread > 0 && (
                     <span className="absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
                       {unread > 99 ? '99+' : unread}
@@ -70,11 +70,11 @@ export function MobileNav({ unread = 0, isAuthed = false, debatesOn = true }: { 
           return (
             <li key={href} className="flex-1">
               {href === '__share' ? (
-                <button type="button" onClick={sharePage} className="flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] text-primary">
+                <button type="button" onClick={sharePage} className="flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] text-[#f0b429]">
                   {inner}
                 </button>
               ) : (
-                <Link href={href} className="flex flex-col items-center gap-0.5 py-1.5 text-[11px] text-primary">
+                <Link href={href} className="flex flex-col items-center gap-0.5 py-1.5 text-[11px] text-[#f0b429]">
                   {inner}
                 </Link>
               )}

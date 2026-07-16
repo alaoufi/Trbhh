@@ -39,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
     robots: { index: true, follow: true },
     manifest: '/manifest.webmanifest',
     appleWebApp: { capable: true, statusBarStyle: 'default', title: SITE.name },
-    icons: { icon: '/icon.svg', apple: '/apple-icon.png' },
+    icons: { icon: '/icon.svg', apple: '/apple-icon.png?v=2' },
   };
 }
 

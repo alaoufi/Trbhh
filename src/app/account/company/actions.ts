@@ -388,6 +388,8 @@ export async function bulkUploadProductsAction(formData: FormData) {
   }
   if (truncatedByLimit) {
     await logMod(session.uid, { kind: 'limit', action: 'blocked', snippet: `رفع بالجملة: توقف عند ${created} بعد بلوغ الحد اليومي (${pkg.adsPerDay}/يوم)` });
+    const { notifyModBlock } = await import('@/lib/moderation');
+    await notifyModBlock(session.uid, `⚠️ لقد تجاوزت الحد المسموح لك من الإعلانات اليوم (${pkg.adsPerDay}/يوم) — توقف الرفع بالجملة عند ${created}. هل ترغب بالترقية إلى باقة أفضل؟`, '/packages');
   }
   const { bustAdCaches } = await import('@/lib/data');
   await bustAdCaches().catch(() => {});

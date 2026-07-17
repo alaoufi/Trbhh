@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Bell, MessageCircle, Star, MessagesSquare, Sparkles, Archive, CheckCheck } from 'lucide-react';
+import { Bell, MessageCircle, Star, MessagesSquare, Sparkles, Archive, CheckCheck, ShieldAlert } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { timeAgo } from '@/lib/utils';
@@ -16,10 +16,11 @@ const KINDS = [
   { key: 'message', label: 'الرسائل', icon: MessageCircle, color: '#0ea5e9', bg: 'bg-sky-50', border: 'border-sky-400', text: 'text-sky-800' },
   { key: 'comment', label: 'التعليقات', icon: MessagesSquare, color: '#8b5cf6', bg: 'bg-violet-50', border: 'border-violet-400', text: 'text-violet-800' },
   { key: 'review', label: 'التقييمات', icon: Star, color: '#f59e0b', bg: 'bg-amber-50', border: 'border-amber-400', text: 'text-amber-800' },
+  { key: 'warning', label: 'تنبيهات وإنذارات', icon: ShieldAlert, color: '#dc2626', bg: 'bg-red-50', border: 'border-red-400', text: 'text-red-800' },
   { key: 'other', label: 'أخرى', icon: Sparkles, color: '#64748b', bg: 'bg-slate-50', border: 'border-slate-400', text: 'text-slate-700' },
 ] as const;
 type Kind = typeof KINDS[number];
-const kindOf = (t: string | null): Kind => KINDS.find((k) => k.key === t) || KINDS[3];
+const kindOf = (t: string | null): Kind => KINDS.find((k) => k.key === t) || KINDS.find((k) => k.key === 'other')!;
 
 const PAGE_SIZE = 30;
 

@@ -60,6 +60,53 @@ export async function findDuplicateAds(): Promise<{ groups: DupGroup[]; dupCount
   return { groups, dupCount };
 }
 
+export type CrossDupGroup = {
+  key: string;
+  keepId: number;
+  keepTitle: string;
+  keepUserId: number;
+  dups: { id: number; title: string; userId: number; createdAt: string | null }[];
+};
+
+/**
+ * Find duplicate ads across DIFFERENT sellers (identical normalized title + detail,
+ * regardless of owner) — spam networks reposting the same ad under multiple
+ * accounts/phone numbers. Same-seller duplicates are covered by findDuplicateAds()
+ * already, so groups here are strictly cross-user only. Oldest ad is kept.
+ */
+export async function findCrossUserDuplicateAds(): Promise<{ groups: CrossDupGroup[]; dupCount: number }> {
+  const ads = await prisma.ads.findMany({
+    select: { id: true, title: true, detail: true, user_id: true, created_at: true },
+    orderBy: { id: 'asc' },
+  });
+
+  const buckets = new Map<string, typeof ads>();
+  for (const a of ads) {
+    const key = `${normalizeAr(a.title)}|${normalizeAr(a.detail)}`;
+    const arr = buckets.get(key);
+    if (arr) arr.push(a);
+    else buckets.set(key, [a]);
+  }
+
+  const groups: CrossDupGroup[] = [];
+  let dupCount = 0;
+  for (const [key, arr] of buckets) {
+    if (arr.length < 2) continue;
+    if (new Set(arr.map((a) => toInt(a.user_id))).size < 2) continue; // نفس العضو فقط ← تُغطّى بالأداة الأخرى
+    const [keep, ...rest] = arr;
+    dupCount += rest.length;
+    groups.push({
+      key,
+      keepId: toInt(keep.id),
+      keepTitle: keep.title,
+      keepUserId: toInt(keep.user_id),
+      dups: rest.map((r) => ({ id: toInt(r.id), title: r.title, userId: toInt(r.user_id), createdAt: r.created_at ? r.created_at.toISOString() : null })),
+    });
+  }
+  groups.sort((a, b) => b.dups.length - a.dups.length);
+  return { groups, dupCount };
+}
+
 
 /* ===================== صور مستخدمة من أكثر من عضو (سرقة صور محتملة) ===================== */
 

@@ -7,7 +7,7 @@ import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { aHash, hashSimilarity } from '@/lib/phash';
-import { bumpDupAttempts, banUserFor, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned } from '@/lib/moderation';
+import { bumpDupAttempts, banUserFor, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned, notifyModBlock } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd, logAdPublish } from '@/lib/packages';
 import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getServicePricing, serviceHasPrice, getStrikeBanDays } from '@/lib/settings';
 import { charge, consumeDupCredit } from '@/lib/wallet';
@@ -235,6 +235,7 @@ export async function createAdAction(formData: FormData) {
   const pkg = await getUserPackage(session.uid);
   if (pkg.adsPerDay > 0 && (await countAdsToday(session.uid)) >= pkg.adsPerDay) {
     await logMod(session.uid, { kind: 'limit', action: 'blocked', snippet: `تجاوز الحد اليومي (${pkg.adsPerDay}/يوم) — العنوان: ${title.slice(0, 60)}` });
+    await notifyModBlock(session.uid, `⚠️ لقد تجاوزت الحد المسموح لك من الإعلانات اليوم (${pkg.adsPerDay}/يوم). هل ترغب بالترقية إلى باقة أفضل للحصول على عدد إعلانات أكبر يومياً؟`, '/packages');
     redirect(`/ads/new?error=limit&max=${pkg.adsPerDay}`);
   }
   if (pkg.gapHours > 0) {
@@ -244,6 +245,7 @@ export async function createAdAction(formData: FormData) {
       if (elapsedH < pkg.gapHours) {
         const wait = Math.max(1, Math.ceil(pkg.gapHours - elapsedH));
         await logMod(session.uid, { kind: 'limit', action: 'blocked', snippet: `تجاوز الفاصل الزمني (${pkg.gapHours} ساعة) — العنوان: ${title.slice(0, 60)}` });
+        await notifyModBlock(session.uid, `⚠️ يجب الانتظار ${pkg.gapHours} ساعة بين كل إعلان وآخر حسب باقتك. هل ترغب بالترقية إلى باقة أفضل لتقليل الفاصل الزمني؟`, '/packages');
         redirect(`/ads/new?error=gap&hours=${pkg.gapHours}&wait=${wait}`);
       }
     }
@@ -303,8 +305,10 @@ export async function createAdAction(formData: FormData) {
       await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مكرّر مع #${dup.id} «${dup.title}» — الجديد: ${title.slice(0, 60)}` });
       if (n >= DUP_LIMIT) {
         await banUserFor(session.uid, await getStrikeBanDays());
+        await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان أكثر من مرة.`);
         redirect('/ads/new?error=banned');
       }
+      await notifyModBlock(session.uid, `⚠️ رُفض نشر إعلانك لأنه مطابق لإعلان سابق لك — إنذار (${DUP_LIMIT - n} متبقية)، التكرار يؤدي للحظر.`, '/ads/new');
       redirect(`/ads/new?error=duplicate&left=${Math.max(0, DUP_LIMIT - n)}&dup=${dup.id}`);
     }
   }
@@ -318,8 +322,10 @@ export async function createAdAction(formData: FormData) {
     await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مطابق لإعلان عضو آخر #${crossDup.id} «${crossDup.title}» — الجديد: ${title.slice(0, 60)}` });
     if (n >= DUP_LIMIT) {
       await banUserFor(session.uid, await getStrikeBanDays());
+      await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر محتوى مطابق لإعلانات أعضاء آخرين.`);
       redirect('/ads/new?error=banned');
     }
+    await notifyModBlock(session.uid, `⚠️ رُفض نشر إعلانك لأنه مطابق لإعلان عضو آخر — إنذار (${DUP_LIMIT - n} متبقية)، التكرار يؤدي للحظر.`, '/ads/new');
     redirect(`/ads/new?error=crossdup&left=${Math.max(0, DUP_LIMIT - n)}&dup=${crossDup.id}`);
   }
 

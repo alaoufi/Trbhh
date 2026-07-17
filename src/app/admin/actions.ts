@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAction, requireUserBan, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
-import { findDuplicateAds } from '@/lib/duplicates';
+import { findDuplicateAds, findCrossUserDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
 import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore, completeStoreTransfer, decidePlatformRequest } from '@/lib/merchant';
@@ -377,6 +377,22 @@ export async function adminDeleteDuplicatesAction() {
   revalidatePath('/admin/ads');
   revalidatePath('/admin/duplicates');
   redirect(`/admin/duplicates?deleted=${deleted}`);
+}
+
+/** حذف الإعلانات المكررة عبر أعضاء مختلفين (شبكات سبام بأرقام/حسابات متعددة). */
+export async function adminDeleteCrossDuplicatesAction() {
+  await requireAction('duplicates', 'delete');
+  const { groups } = await findCrossUserDuplicateAds();
+  const dupIds = groups.flatMap((g) => g.dups.map((d) => BigInt(d.id)));
+  let deleted = 0;
+  for (const id of dupIds) {
+    await prisma.photos.deleteMany({ where: { other_id: id } }).catch(() => {});
+    const ok = await prisma.ads.delete({ where: { id } }).then(() => true).catch(() => false);
+    if (ok) deleted++;
+  }
+  revalidatePath('/admin/ads');
+  revalidatePath('/admin/duplicates');
+  redirect(`/admin/duplicates?crossdeleted=${deleted}`);
 }
 
 /** Execute a logged-out account-deletion request (Google Play requirement). */
@@ -1096,13 +1112,13 @@ export async function resolveReportAction(formData: FormData) {
     const ownerMsg = action === 'ban'
       ? `تم حظر حسابك بسبب مخالفة إعلانك «${adTitle}» بعد مراجعة بلاغ من الإدارة.`
       : `تمت إزالة إعلانك «${adTitle}» لمخالفته شروط الاستخدام بعد مراجعة بلاغ من الإدارة.`;
-    await prisma.notfications.create({ data: { title: ownerMsg.slice(0, 180), route: '/account/ads', user_id: String(ownerId), type: 'report', model_id: Number(report.ads_id) } }).catch(() => {});
+    await prisma.notfications.create({ data: { title: ownerMsg.slice(0, 180), route: '/account/ads', user_id: String(ownerId), type: 'warning', model_id: Number(report.ads_id) } }).catch(() => {});
   }
   // رسالة إجبارية للمُبلِّغ دائماً — تؤكد أن البلاغ رُوجع مهما كانت النتيجة
   const reporterMsg = action === 'dismiss'
     ? `تمت مراجعة بلاغك على «${adTitle}» ولم نجد مخالفة تستدعي إجراءً. شكراً لك.`
     : `تمت مراجعة بلاغك على «${adTitle}» واتُخذ الإجراء المناسب. شكراً لك.`;
-  await prisma.notfications.create({ data: { title: reporterMsg.slice(0, 180), route: '/', user_id: String(report.user_id), type: 'report', model_id: Number(report.ads_id) } }).catch(() => {});
+  await prisma.notfications.create({ data: { title: reporterMsg.slice(0, 180), route: '/', user_id: String(report.user_id), type: 'other', model_id: Number(report.ads_id) } }).catch(() => {});
 
   await prisma.repord_ads.update({ where: { id: reportId }, data: { status: 1, action, handled_at: new Date(), handled_by: BigInt(session.uid) } });
   await bustAdCaches().catch(() => {});

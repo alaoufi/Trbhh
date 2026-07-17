@@ -2,7 +2,14 @@ import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { getStrikeBanDays } from './settings';
-import type { GuardCategory } from './content-guard';
+import { CATEGORY_LABEL, type GuardCategory } from './content-guard';
+
+/** رسالة إشعار دائمة (تظهر في جرس التنبيهات) عند أي رفض/حظر آلي — إنذار موثّق
+ *  يبقى للعضو، لا مجرد شريط صفحة يختفي بعد إعادة التحميل. */
+export async function notifyModBlock(userId: number, title: string, route = '/'): Promise<void> {
+  if (!userId) return;
+  await prisma.notfications.create({ data: { title: title.slice(0, 180), route, user_id: String(userId), type: 'warning' } }).catch(() => {});
+}
 
 /** Max duplicate attempts before the account is banned. */
 export const DUP_LIMIT = 3;
@@ -141,12 +148,19 @@ export async function handleProhibited(
   if (category === 'immoral') {
     await banUserFor(userId, await getStrikeBanDays());
     await logMod(userId, { kind: 'content', category, term, snippet, action: 'banned' });
+    await notifyModBlock(userId, `🚫 تم حظر حسابك بسبب نشر محتوى غير أخلاقي مخالف — الكلمة/العبارة: «${term}».`);
     return { banned: true, left: 0, category };
   }
   const n = await recordStrike(userId, 'content');
   const banned = n >= CONTENT_STRIKE_LIMIT;
   if (banned) await banUserFor(userId, await getStrikeBanDays());
   await logMod(userId, { kind: 'content', category, term, snippet, action: banned ? 'banned' : 'blocked' });
+  await notifyModBlock(
+    userId,
+    banned
+      ? `🚫 تم حظر حسابك بعد تكرار مخالفة كلمة/عبارة ممنوعة (${CATEGORY_LABEL[category]}): «${term}».`
+      : `⚠️ تجاوزت بكلمة/عبارة ممنوعة (${CATEGORY_LABEL[category]}): «${term}» — لا تكرر التجاوز وإلا تعرّض حسابك للحظر.`,
+  );
   return { banned, left: Math.max(0, CONTENT_STRIKE_LIMIT - n), category };
 }
 

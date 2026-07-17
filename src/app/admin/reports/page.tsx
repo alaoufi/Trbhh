@@ -209,24 +209,33 @@ async function AutoReportsTab() {
           {rest.map((e) => {
             const k = KIND_LABEL[e.kind] || { label: e.kind, icon: AlertTriangle };
             const banned = e.action === 'banned';
+            const hasDetails = !!(e.snippet || e.term);
             return (
-              <div key={e.id} className={`card-3d flex flex-wrap items-center gap-2 rounded-xl p-3 ${banned ? '!border-red-200 bg-red-50/40 opacity-80' : ''}`}>
-                <k.icon className={`h-4 w-4 shrink-0 ${banned ? 'text-red-600' : 'text-amber-600'}`} />
-                <span className="text-sm font-bold text-primary">{k.label}</span>
-                <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary"><Bot className="h-3 w-3" /> رصد آلي</span>
-                {e.category && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{CATEGORY_LABEL[e.category as GuardCategory] || e.category}</span>}
-                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${banned ? 'bg-red-600 text-white' : 'bg-amber-200 text-amber-900'}`}>
-                  {banned ? 'حظر الحساب' : 'رفض النشر'}
-                </span>
-                {banned && e.reviewedAt && (
-                  <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                    <Check className="h-3 w-3" /> رُوجع — الحساب الآن: {isBannedNowById.get(e.userId) ? 'محظور' : 'غير محظور'}
+              <details key={e.id} className={`card-3d rounded-xl ${banned ? '!border-red-200 bg-red-50/40 opacity-80' : ''}`}>
+                <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 p-3">
+                  <k.icon className={`h-4 w-4 shrink-0 ${banned ? 'text-red-600' : 'text-amber-600'}`} />
+                  <span className="text-sm font-bold text-primary">{k.label}</span>
+                  <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary"><Bot className="h-3 w-3" /> رصد آلي</span>
+                  {e.category && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{CATEGORY_LABEL[e.category as GuardCategory] || e.category}</span>}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${banned ? 'bg-red-600 text-white' : 'bg-amber-200 text-amber-900'}`}>
+                    {banned ? 'حظر الحساب' : 'رفض النشر'}
                   </span>
+                  {banned && e.reviewedAt && (
+                    <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                      <Check className="h-3 w-3" /> رُوجع — الحساب الآن: {isBannedNowById.get(e.userId) ? 'محظور' : 'غير محظور'}
+                    </span>
+                  )}
+                  <Link href={`/admin/users/${e.userId}`} className="text-xs font-bold text-primary underline">{nameById.get(e.userId) || `عضو #${en(e.userId)}`}</Link>
+                  <span className="text-xs text-muted-foreground">{timeAgo(e.createdAt)}</span>
+                  {hasDetails && <span className="mr-auto shrink-0 text-[11px] font-bold text-primary">عرض التفاصيل ▾</span>}
+                </summary>
+                {hasDetails && (
+                  <div className="space-y-1 border-t border-border/50 px-3 py-2 text-sm">
+                    {e.term && <div><b className="text-primary">الكلمة/العبارة الممنوعة:</b> «{e.term}»</div>}
+                    {e.snippet && <div className="text-muted-foreground">المحتوى: «{e.snippet}»</div>}
+                  </div>
                 )}
-                <Link href={`/admin/users/${e.userId}`} className="text-xs font-bold text-primary underline">{nameById.get(e.userId) || `عضو #${en(e.userId)}`}</Link>
-                {e.snippet && <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={e.snippet}>«{e.snippet}»</span>}
-                <span className="text-xs text-muted-foreground">{timeAgo(e.createdAt)}</span>
-              </div>
+              </details>
             );
           })}
         </div>

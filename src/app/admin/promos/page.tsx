@@ -26,7 +26,7 @@ export default async function AdminPromos() {
           <Megaphone className="h-6 w-6 text-primary" />
           <h1 className="text-xl font-bold text-primary">الإعلانات الترويجية</h1>
         </div>
-        <Link href="/admin/promos/packages" className="flex items-center gap-1 rounded-lg border border-primary/30 px-3 py-2 text-sm font-medium text-primary hover:bg-accent">
+        <Link href="/admin/revenue?tab=pricing#promo-packages" className="flex items-center gap-1 rounded-lg border border-primary/30 px-3 py-2 text-sm font-medium text-primary hover:bg-accent">
           <Settings2 className="h-4 w-4" /> باقات المدد والأسعار
         </Link>
       </div>

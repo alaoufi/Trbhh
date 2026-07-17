@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Settings, Check, BarChart3, Eye } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig, getAdLifetimeDays, getAdRestoreFee, getStrikeBanDays } from '@/lib/settings';
+import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig, getAdLifetimeDays, getStrikeBanDays } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
 
@@ -10,7 +10,7 @@ export const metadata = { title: 'الإعدادات' };
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
-  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn, scheduleOn, bumpOn, adContactStatsOn, couponsOn, stockOn, hoursOn, dealsOn, autoRenewOn, auctionOn, staffOn, nameLockOn, homeActionsOn, catsOn, debatesOn, archiveAutodeleteOn, adLifetimeDays, adRestoreFee, strikeBanDays] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false), getSettingBool('schedule_on', false), getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('coupons_on', false), getSettingBool('stock_on', false), getSettingBool('hours_on', false), getSettingBool('deals_on', false), getSettingBool('autorenew_on', false), getSettingBool('auction_on', false), getSettingBool('staff_on', false), getSettingBool('namelock_on', true), getSettingBool('home_actions_on', true), getSettingBool('cats_on', true), getSettingBool('debates_on', true), getSettingBool('archive_autodelete_on', false), getAdLifetimeDays(), getAdRestoreFee(), getStrikeBanDays()]);
+  const [{ saved }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn, scheduleOn, bumpOn, adContactStatsOn, couponsOn, stockOn, hoursOn, dealsOn, autoRenewOn, auctionOn, staffOn, nameLockOn, homeActionsOn, catsOn, debatesOn, archiveAutodeleteOn, adLifetimeDays, strikeBanDays] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false), getSettingBool('schedule_on', false), getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('coupons_on', false), getSettingBool('stock_on', false), getSettingBool('hours_on', false), getSettingBool('deals_on', false), getSettingBool('autorenew_on', false), getSettingBool('auction_on', false), getSettingBool('staff_on', false), getSettingBool('namelock_on', true), getSettingBool('home_actions_on', true), getSettingBool('cats_on', true), getSettingBool('debates_on', true), getSettingBool('archive_autodelete_on', false), getAdLifetimeDays(), getStrikeBanDays()]);
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -175,10 +175,11 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <span className="text-sm"><b>أرشفة الإعلان تلقائياً بعد (بالأيام)</b> — اكتب 0 لتعطيل الأرشفة التلقائية</span>
             <input name="adLifetimeDays" type="number" min={0} defaultValue={adLifetimeDays} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
             <span className="block text-xs text-muted-foreground">بعد مرور هذه المدة على آخر نشاط للإعلان (النشر أو التحديث) يُؤرشف تلقائياً: يختفي عن العامة ويبقى ظاهراً لصاحبه في «إعلاناتي» فقط. لا يُحذف. (يُطبَّق على إعلانات الأعضاء لا المتاجر.)</span>
-            <span className="mt-1 text-sm"><b>رسوم إعادة إظهار الإعلان المؤرشف (ر.س)</b> — اكتب 0 لتكون مجانية</span>
-            <input name="adRestoreFee" type="number" min={0} defaultValue={adRestoreFee} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
-            <span className="block text-xs text-muted-foreground">المبلغ الذي يُخصم من رصيد صاحب الإعلان عند ضغط «أعِد للظهور» ليعود إعلانه المؤرشف لمقدمة القوائم.</span>
           </label>
+          <p className="mt-2 text-xs text-muted-foreground">
+            رسوم إعادة إظهار الإعلان المؤرشف — ضمن كل التسعير الآن في{' '}
+            <Link href="/admin/revenue?tab=pricing#restore-fee" className="font-bold text-primary underline">الإيرادات ← كل التسعير</Link>.
+          </p>
         </div>
 
         <div className="border-t border-primary/15 pt-3">
@@ -212,10 +213,10 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
           <p className="mt-1 text-xs text-muted-foreground">يُعدّ المبوّب مكرّراً إذا تطابق <b>المحتوى</b> (العنوان+النص) أو <b>الصورة</b> (مطابقة إدراكية) مع مبوّب سابق للعضو نفسه بالنسبة المحددة. <b>الخلفية</b> (الثيم+النقشة+الزخرفة) تُحتسب مع تشابه المحتوى ٥٠٪+ فقط، حتى لا تُحجب إعلانات مختلفة تشترك في نفس التصميم. الخلفية ١٠٠٪ = تصميم مطابق تماماً.</p>
         </div>
 
-        {/* التسعير والاشتراكات وأرصدة الأعضاء تُدار من صفحة مستقلة */}
+        {/* كل تسعير في تربح — باقات، اشتراكات، عاجل وتمييز، استعادة المؤرشف… — تبويب واحد */}
         <div className="border-t border-primary/15 pt-3">
-          <Link href="/admin/revenue" className="flex items-center justify-between gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
-            <span>💳 التسعيرات والاشتراكات وأرصدة الأعضاء</span>
+          <Link href="/admin/revenue?tab=pricing" className="flex items-center justify-between gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
+            <span>💳 كل التسعير — الباقات والاشتراكات وأرصدة الأعضاء</span>
             <span className="text-xs text-muted-foreground">إدارة الإيرادات ←</span>
           </Link>
         </div>

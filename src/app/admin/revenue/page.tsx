@@ -1,12 +1,17 @@
 import Link from 'next/link';
-import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks, ReceiptText, Trash2, ArrowRight, Scale, Landmark, HandCoins } from 'lucide-react';
-import { requireAction } from '@/lib/roles';
+import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks, ReceiptText, Trash2, ArrowRight, Scale, Landmark, HandCoins, Star, Settings2 } from 'lucide-react';
+import { requireAction, getUserPerms } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupCampaigns, getActiveTopupCampaign, topupCampaignsHealth, campaignState, DURATIONS, SERVICE_LABELS, servicePriceKey, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupCampaigns, getActiveTopupCampaign, topupCampaignsHealth, campaignState, DURATIONS, SERVICE_LABELS, servicePriceKey, getAdRestoreFee, type PaidService } from '@/lib/settings';
 import { pointsEnabled, getPointsConfig, referralEnabled, getReferralReward, getWelcomeCredit } from '@/lib/points';
-import { saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction, addTopupCampaignAction, deleteTopupCampaignAction } from '../actions';
+import { getPackages, type Package } from '@/lib/packages';
+import { getPromoPackages, type PromoPackage } from '@/lib/promos';
+import {
+  saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction, addTopupCampaignAction, deleteTopupCampaignAction,
+  createPackageAction, updatePackageAction, deletePackageAction, createPromoPackageAction, updatePromoPackageAction, deletePromoPackageAction,
+} from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
@@ -37,15 +42,16 @@ const TABS = [
   { key: 'accounts', label: 'حسابات الشحن', icon: Landmark },
   { key: 'campaigns', label: 'الحملات', icon: Megaphone },
   { key: 'payments', label: 'المدفوعات', icon: HandCoins },
-  { key: 'pricing', label: 'التسعيرات', icon: ListChecks },
+  { key: 'pricing', label: 'كل التسعير', icon: ListChecks },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
 export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string; user?: string; camp?: string; cat?: string; ppage?: string }> }) {
-  await requireAction('users', 'view');
+  const session = await requireAction('users', 'view');
   const { saved, tab, user, camp, cat, ppage } = await searchParams;
   const active: TabKey = tab === 'balances' || tab === 'pricing' || tab === 'expenses' || tab === 'accounts' || tab === 'campaigns' || tab === 'payments' ? tab : 'overview';
   const userId = Number(user || 0) || 0;
+  const perms = await getUserPerms(session.uid);
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -67,7 +73,7 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
       {active === 'accounts' && <AccountsTab />}
       {active === 'campaigns' && <CampaignsTab camp={camp} />}
       {active === 'payments' && <PaymentsTab cat={cat} page={Math.max(1, parseInt(ppage || '1') || 1)} />}
-      {active === 'pricing' && <PricingTab />}
+      {active === 'pricing' && <PricingTab canPackages={perms.has('packages')} canPromos={perms.has('promos')} />}
     </div>
   );
 }
@@ -534,8 +540,8 @@ async function PaymentsTab({ cat, page }: { cat?: string; page: number }) {
   );
 }
 
-async function PricingTab() {
-  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction, verifyPkgsAll] = await Promise.all([
+async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; canPromos: boolean }) {
+  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction, verifyPkgsAll, restoreFee] = await Promise.all([
     getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
     pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
     getStorePlusPricing(), getLeadConfig(), getAuctionConfig(),
@@ -547,6 +553,7 @@ async function PricingTab() {
       ]);
       return [{ fee: f1, days: d1 }, { fee: f2, days: d2 }, { fee: f3, days: d3 }];
     }),
+    getAdRestoreFee(),
   ]);
   const urgentPrices = await getUrgentPrices();
   const services: { key: PaidService; note?: string }[] = [
@@ -558,8 +565,21 @@ async function PricingTab() {
   return (
     <>
 
+    <p className="text-xs text-muted-foreground">كل تسعير في تربح — مهما كان نوعه — مجمَّع هنا في تبويب واحد بأقسامه؛ وأي تسعير جديد يُضاف مستقبلاً يُلحَق بنفس التبويب.</p>
+    {/* قفزة سريعة بين الأقسام — الصفحة طويلة لأنها تجمع كل تسعير في تربح */}
+    <div className="flex flex-wrap gap-1.5 rounded-xl border border-primary/15 bg-primary/5 p-2 text-xs font-bold">
+      {canPackages && <a href="#packages" className="rounded-lg px-2 py-1 text-primary hover:bg-white">باقات عدد الإعلانات</a>}
+      <a href="#store-sub" className="rounded-lg px-2 py-1 text-primary hover:bg-white">اشتراك المتجر والظهور</a>
+      <a href="#ad-extras" className="rounded-lg px-2 py-1 text-primary hover:bg-white">عاجل وتحديث الإعلان</a>
+      <a href="#restore-fee" className="rounded-lg px-2 py-1 text-primary hover:bg-white">استعادة الإعلان المؤرشف</a>
+      <a href="#services-matrix" className="rounded-lg px-2 py-1 text-primary hover:bg-white">تمييز ومبوّب وتكرار</a>
+      {canPromos && <a href="#promo-packages" className="rounded-lg px-2 py-1 text-primary hover:bg-white">باقات الإعلانات الترويجية</a>}
+    </div>
+
+    {canPackages && <PackagesSection />}
+
     <form action={saveRevenueAction} className="card-3d space-y-4 rounded-2xl p-4">
-      <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> اشتراك المتاجر</div>
+      <div id="store-sub" className="flex items-center gap-2 font-bold text-primary scroll-mt-20"><Crown className="h-5 w-5" /> اشتراك المتاجر</div>
       <label className="flex items-center gap-2 text-sm font-bold">
         <input type="checkbox" name="subEnabled" defaultChecked={sub.enabled} className="h-4 w-4 accent-[hsl(var(--primary))]" />
         تفعيل اشتراكات المتاجر (يُشترط اشتراك ساري لظهور المتجر)
@@ -607,7 +627,7 @@ async function PricingTab() {
       </div>
 
       {/* خدمات الإعلان الإضافية: عاجل (باقتان) + تحديث (Bump) */}
-      <div className="rounded-xl border border-red-300 bg-red-50/50 p-3">
+      <div id="ad-extras" className="scroll-mt-20 rounded-xl border border-red-300 bg-red-50/50 p-3">
         <div className="mb-1 text-xs font-bold text-red-700">🔥 شارة «عاجل» — باقتان (سعر 0 = تعطيل الباقة) — و«تحديث الإعلان»</div>
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">باقة عاجل 24 ساعة (ر.س)</span><input name="urgentPrice24" type="number" min={0} defaultValue={urgentPrices.p24} className={num} /></label>
@@ -616,6 +636,13 @@ async function PricingTab() {
           <label className="space-y-1"><span className="text-xs font-bold">سعر التحديث قبل الموعد (ر.س)</span><input name="bumpPrice" type="number" min={0} defaultValue={extras.bumpPrice} className={num} /></label>
         </div>
         <p className="mt-1 text-[11px] text-muted-foreground">يختار المعلن باقة 24 أو 48 ساعة عند النشر أو من صفحة إعلانه. «تحديث» يرفع الإعلان لأعلى القوائم — مجاني كل عدد الأيام المحدد، وقبله يُخصم السعر من الرصيد (تفعيل زر التحديث نفسه من الإعدادات ← الميزات).</p>
+      </div>
+
+      {/* رسوم إعادة إظهار الإعلان المؤرشف — كانت مبعثرة داخل الإعدادات العامة */}
+      <div id="restore-fee" className="scroll-mt-20 rounded-xl border border-orange-300 bg-orange-50/60 p-3">
+        <div className="mb-1 text-xs font-bold text-orange-800">🗄️ رسوم إعادة إظهار الإعلان المؤرشف (0 = مجانية)</div>
+        <p className="mb-2 text-[11px] text-muted-foreground">المبلغ الذي يُخصم من رصيد صاحب الإعلان عند «أعِد للظهور» من الأرشيف — مدة الأرشفة التلقائية نفسها (بالأيام) في «الإعدادات».</p>
+        <label className="block max-w-[220px] space-y-1"><span className="text-xs font-bold">الرسوم (ر.س)</span><input name="adRestoreFee" type="number" min={0} defaultValue={restoreFee} className={num} /></label>
       </div>
 
       {/* مكافآت الشحن الثابتة — حملات الشحن المجدولة لها جدول مستقل أعلى هذا النموذج */}
@@ -699,7 +726,7 @@ async function PricingTab() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 border-t border-primary/15 pt-3 font-bold text-primary"><Megaphone className="h-5 w-5" /> تسعيرات الخدمات (السعر لكل مدّة)</div>
+      <div id="services-matrix" className="flex scroll-mt-20 items-center gap-2 border-t border-primary/15 pt-3 font-bold text-primary"><Megaphone className="h-5 w-5" /> تسعيرات الخدمات (السعر لكل مدّة)</div>
       <p className="text-[11px] text-muted-foreground">المدّة اختيار فقط بلا سعر مستقل؛ كل خدمة لها سعر لكل مدّة. اترك 0 لتعطيل الخدمة/المدّة.</p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[420px] text-sm">
@@ -726,6 +753,146 @@ async function PricingTab() {
       </div>
       <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"><Save className="h-4 w-4" /> حفظ التسعيرات</button>
     </form>
+
+    {canPromos && <PromoPackagesSection />}
     </>
+  );
+}
+
+/* ===== باقات عدد الإعلانات (تُدار سابقاً في /admin/packages المستقلة) ===== */
+const pkgInputCls = 'h-9 w-full rounded-lg border border-primary/30 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-primary/40';
+const pkgLabelCls = 'text-[11px] font-medium text-muted-foreground';
+
+function PkgField({ label, name, defaultValue, type = 'number', min = 0, placeholder }: { label: string; name: string; defaultValue?: string | number; type?: string; min?: number; placeholder?: string }) {
+  return (
+    <label className="block space-y-0.5">
+      <span className={pkgLabelCls}>{label}</span>
+      <input name={name} type={type} min={type === 'number' ? min : undefined} step={name === 'price' ? '0.01' : undefined} defaultValue={defaultValue} placeholder={placeholder} className={pkgInputCls} />
+    </label>
+  );
+}
+
+function PkgTierSelect({ value }: { value?: string }) {
+  return (
+    <label className="block space-y-0.5">
+      <span className={pkgLabelCls}>باقة تميز</span>
+      <select name="tier" defaultValue={value ?? ''} className={pkgInputCls}>
+        <option value="">لا</option>
+        <option value="gold">ذهبي</option>
+        <option value="silver">فضي</option>
+      </select>
+    </label>
+  );
+}
+
+function PackageFields({ p }: { p?: Package }) {
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <PkgField label="اسم الباقة" name="name" type="text" defaultValue={p?.name} placeholder="مثال: الذهبية" />
+        <PkgField label="السعر (0 = مجانية)" name="price" defaultValue={p?.price} />
+        <PkgField label="إعلانات/اليوم (0 = بلا حد)" name="adsPerDay" defaultValue={p?.adsPerDay} />
+        <PkgField label="فارق بالساعات (0 = بلا)" name="gapHours" defaultValue={p?.gapHours} />
+        <PkgField label="عدد إعلانات التميز بالأعلى" name="featuredSlots" defaultValue={p?.featuredSlots} />
+        <PkgField label="أيام البقاء بالأعلى" name="featuredDays" defaultValue={p?.featuredDays} />
+        <PkgField label="مدة بقاء الإعلان (أيام، 0=دائم)" name="adDays" defaultValue={p?.adDays} />
+        <PkgTierSelect value={p?.tier} />
+        <PkgField label="الترتيب" name="sort" defaultValue={p?.sort} />
+      </div>
+      <div className="flex flex-wrap items-center gap-4 pt-1">
+        <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name="isDefault" defaultChecked={p?.isDefault} /> الباقة الافتراضية للأعضاء</label>
+        <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name="active" defaultChecked={p ? p.active : true} /> مُفعّلة</label>
+      </div>
+    </>
+  );
+}
+
+async function PackagesSection() {
+  const packages = await getPackages();
+  return (
+    <div id="packages" className="card-3d scroll-mt-20 space-y-4 rounded-2xl p-4">
+      <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> باقات عدد الإعلانات ({packages.length})</div>
+      <p className="text-[11px] text-muted-foreground">لكل باقة: السعر (0 = مجانية)، عدد الإعلانات المسموح بها يومياً، الفارق الزمني بالساعات بين إعلان وآخر، وباقات التميز (كم إعلاناً يُثبّت بالأعلى وكم يوماً يبقى، ذهبي أو فضي).</p>
+
+      <form action={createPackageAction} className="space-y-2 rounded-xl border border-primary/20 bg-card p-3">
+        <div className="text-sm font-bold text-primary">➕ باقة جديدة</div>
+        <PackageFields />
+        <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة الباقة</button>
+      </form>
+
+      <div className="space-y-3">
+        {packages.map((p) => (
+          <form key={p.id} action={updatePackageAction} className="space-y-2 rounded-xl border border-primary/20 bg-white p-3">
+            <input type="hidden" name="id" value={p.id} />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-bold">
+                {p.tier === 'gold' && <Star className="h-4 w-4 fill-amber-400 text-amber-400" />}
+                {p.tier === 'silver' && <Star className="h-4 w-4 fill-slate-400 text-slate-400" />}
+                {p.name}
+                <span className="text-xs font-normal text-muted-foreground">{p.price === 0 ? 'مجانية' : `${p.price} ﷼`}</span>
+                {!p.active && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">موقوفة</span>}
+                {p.isDefault && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">افتراضية</span>}
+              </div>
+            </div>
+            <PackageFields p={p} />
+            <div className="flex items-center gap-2">
+              <button className="btn-3d rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-white">حفظ</button>
+              <button formAction={deletePackageAction} className="flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10">
+                <Trash2 className="h-3.5 w-3.5" /> حذف
+              </button>
+            </div>
+          </form>
+        ))}
+        {packages.length === 0 && <p className="py-6 text-center text-muted-foreground">لا توجد باقات بعد — أضِف أول باقة بالأعلى.</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ===== باقات الإعلانات الترويجية: المدد والأسعار (تُدار سابقاً في /admin/promos/packages المستقلة) ===== */
+function PromoFields({ p }: { p?: PromoPackage }) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <label className="space-y-0.5"><span className="text-[11px] text-muted-foreground">الاسم</span><input name="name" defaultValue={p?.name} placeholder="مثال: أسبوعان" className={pkgInputCls} /></label>
+      <label className="space-y-0.5"><span className="text-[11px] text-muted-foreground">المدة (أيام)</span><input name="days" type="number" min={1} defaultValue={p?.days ?? 30} className={pkgInputCls} /></label>
+      <label className="space-y-0.5"><span className="text-[11px] text-muted-foreground">السعر</span><input name="price" type="number" min={0} step="0.01" defaultValue={p?.price ?? 0} className={pkgInputCls} /></label>
+      <label className="space-y-0.5"><span className="text-[11px] text-muted-foreground">الترتيب</span><input name="sort" type="number" defaultValue={p?.sort ?? 0} className={pkgInputCls} /></label>
+    </div>
+  );
+}
+
+async function PromoPackagesSection() {
+  const packages = await getPromoPackages();
+  return (
+    <div id="promo-packages" className="card-3d scroll-mt-20 space-y-4 rounded-2xl p-4">
+      <div className="flex items-center gap-2 font-bold text-primary"><Settings2 className="h-5 w-5" /> باقات الإعلانات الترويجية — المدد والأسعار ({packages.length})</div>
+      <p className="text-[11px] text-muted-foreground">حدّد المدد وأسعارها (مثال: أسبوعان = 14 يوم، شهر = 30، ستة أشهر = 180، سنة = 365). تظهر للمعلن عند تصميم إعلانه الترويجي، وتبدأ من تاريخ الموافقة — مراجعة الطلبات نفسها من «الإعلانات الترويجية».</p>
+
+      <form action={createPromoPackageAction} className="space-y-2 rounded-xl border border-primary/20 bg-card p-3">
+        <div className="text-sm font-bold text-primary">➕ باقة مدة جديدة</div>
+        <PromoFields />
+        <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name="active" defaultChecked /> مُفعّلة</label>
+        <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة</button>
+      </form>
+
+      <div className="space-y-3">
+        {packages.map((p) => (
+          <form key={p.id} action={updatePromoPackageAction} className="space-y-2 rounded-xl border border-primary/20 bg-white p-3">
+            <input type="hidden" name="id" value={p.id} />
+            <div className="flex items-center justify-between gap-2 text-sm font-bold">
+              <span>{p.name} — {p.days} يوم — {p.price === 0 ? 'مجاني' : `${p.price} ﷼`}</span>
+              {!p.active && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">موقوفة</span>}
+            </div>
+            <PromoFields p={p} />
+            <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name="active" defaultChecked={p.active} /> مُفعّلة</label>
+            <div className="flex gap-2">
+              <button className="btn-3d rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-white">حفظ</button>
+              <button formAction={deletePromoPackageAction} className="flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف</button>
+            </div>
+          </form>
+        ))}
+        {packages.length === 0 && <p className="py-6 text-center text-muted-foreground">لا توجد باقات — أضِف أول باقة بالأعلى.</p>}
+      </div>
+    </div>
   );
 }

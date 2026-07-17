@@ -7,7 +7,7 @@ import { findDuplicateAds, findCrossUserDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
 import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore, completeStoreTransfer, decidePlatformRequest } from '@/lib/merchant';
-import { banUserFor, unbanUser, logMod } from '@/lib/moderation';
+import { banUserFor, unbanUser, logMod, notifyModBlock } from '@/lib/moderation';
 import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAccountNow } from '@/lib/account-delete';
 import { addBannedWord, deleteBannedWord, addNameWord, deleteNameWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
@@ -53,21 +53,21 @@ export async function deletePromoAction(formData: FormData) {
 export async function createPromoPackageAction(formData: FormData) {
   await requireAction('promos', 'add');
   await createPromoPackage(readPromoPkgForm(formData));
-  revalidatePath('/admin/promos/packages');
+  revalidatePath('/admin/revenue');
   revalidatePath('/promote');
 }
 export async function updatePromoPackageAction(formData: FormData) {
   await requireAction('promos', 'edit');
   const id = Number(formData.get('id'));
   if (id) await updatePromoPackage(id, readPromoPkgForm(formData));
-  revalidatePath('/admin/promos/packages');
+  revalidatePath('/admin/revenue');
   revalidatePath('/promote');
 }
 export async function deletePromoPackageAction(formData: FormData) {
   await requireAction('promos', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deletePromoPackage(id);
-  revalidatePath('/admin/promos/packages');
+  revalidatePath('/admin/revenue');
   revalidatePath('/promote');
 }
 
@@ -91,7 +91,7 @@ function readPackageForm(formData: FormData) {
 export async function createPackageAction(formData: FormData) {
   await requireAction('packages', 'add');
   await createPackage(readPackageForm(formData));
-  revalidatePath('/admin/packages');
+  revalidatePath('/admin/revenue');
   revalidatePath('/packages');
 }
 
@@ -99,7 +99,7 @@ export async function updatePackageAction(formData: FormData) {
   await requireAction('packages', 'edit');
   const id = Number(formData.get('id'));
   if (id) await updatePackage(id, readPackageForm(formData));
-  revalidatePath('/admin/packages');
+  revalidatePath('/admin/revenue');
   revalidatePath('/packages');
 }
 
@@ -107,7 +107,7 @@ export async function deletePackageAction(formData: FormData) {
   await requireAction('packages', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deletePackage(id);
-  revalidatePath('/admin/packages');
+  revalidatePath('/admin/revenue');
   revalidatePath('/packages');
 }
 
@@ -318,6 +318,24 @@ export async function adminArchiveAdAction(formData: FormData) {
     }).catch(() => {});
   }
   revalidatePath(`/ads/${toInt(id)}`);
+}
+
+/** حظر إعلان مخالف نهائياً: حذف فوري ولا رجعة فيه — يختلف عن «الأرشفة» (مؤقتة وقابلة للاستعادة).
+ *  يُستخدم للمحتوى المخالف الواضح؛ يُسجَّل في سجل التجاوزات وسجل نشاط الإدارة. */
+export async function adminBanAdAction(formData: FormData) {
+  const session = await requireAction('ads', 'delete');
+  const id = BigInt(String(formData.get('adId')));
+  const reason = String(formData.get('reason') || '').trim().slice(0, 300);
+  const ad = await prisma.ads.findUnique({ where: { id }, select: { title: true, user_id: true } }).catch(() => null);
+  if (ad) {
+    await prisma.photos.deleteMany({ where: { other_id: id } }).catch(() => {});
+    await prisma.ads.delete({ where: { id } }).catch(() => {});
+    await logMod(toInt(ad.user_id), { kind: 'content', category: null, term: null, snippet: `حظر إعلان نهائياً: «${ad.title}»${reason ? ` — السبب: ${reason}` : ''}`, action: 'banned' });
+    await logAdmin(session.uid, 'حظر إعلان مخالف نهائياً (حذف لا رجعة فيه)', `إعلان #${toInt(id)} «${ad.title}»${reason ? ` — ${reason}` : ''}`);
+    await notifyModBlock(toInt(ad.user_id), `🚫 حُذف إعلانك «${ad.title}» نهائياً لمخالفته لوائح الموقع${reason ? ` — السبب: ${reason}` : ''}. هذا القرار نهائي ولا يمكن التراجع عنه.`, '/account/ads');
+  }
+  await bustAdCaches().catch(() => {});
+  redirect('/');
 }
 
 /** إعلان متجر: صلاحية الإدارة محدودة — إخفاؤه عن النشر (يبقى ظاهراً لإدارة
@@ -535,7 +553,6 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_CLASSIFIED_STATS, classifiedStats);
   await setSetting(SETTING_CLASSIFIED_DAYS, String(classifiedDays));
   await setSetting('ad_lifetime_days', String(Math.max(0, parseInt(String(formData.get('adLifetimeDays') || '0')) || 0)));
-  await setSetting('ad_restore_fee', String(Math.max(0, parseInt(String(formData.get('adRestoreFee') || '0')) || 0)));
   await setSetting(SETTING_CLASSIFIED_SECONDS, String(splashSeconds));
   // مفاتيح الميزات: التنبيهات الفورية، اقتراحات البحث، تنبيهات البحث المحفوظ
   await setSetting('home_actions_on', formData.get('homeActionsOn') !== null ? '1' : '0');
@@ -632,6 +649,8 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting('urgent_price_48', nn('urgentPrice48'));
   await setSetting('bump_free_days', nn('bumpFreeDays'));
   await setSetting('bump_price', nn('bumpPrice'));
+  // رسوم إعادة إظهار الإعلان المؤرشف
+  await setSetting('ad_restore_fee', nn('adRestoreFee'));
   // الظهور المدفوع في تربح: عرض المتجر (بالمدد) + باقات عرض الإعلان (السعر والمدة لكل باقة)
   await setSetting('show_store_w2', nn('showStoreW2'));
   await setSetting('show_store_m1', nn('showStoreM1'));

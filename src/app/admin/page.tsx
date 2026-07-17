@@ -56,7 +56,8 @@ export default async function AdminHome() {
     { group: 'stores', label: 'طلبات توثيق متجر (مدفوع)', value: pendingVerifyOrders, icon: ShieldCheck, href: '/admin/stores', highlight: true, perm: 'stores' },
     // المال والمدفوعات
     { group: 'money', label: 'طلبات شحن معلقة', value: pendingTopups, icon: HandCoins, href: '/admin/topups', highlight: true, perm: 'users' },
-    { group: 'money', label: 'الإيرادات والتسعير', icon: Coins, href: '/admin/revenue', perm: 'users', nav: true },
+    { group: 'money', label: 'الإيرادات (تقارير مالية)', icon: Coins, href: '/admin/revenue', perm: 'users', nav: true },
+    { group: 'money', label: 'كل التسعير (باقات وأسعار)', icon: Crown, href: '/admin/revenue?tab=pricing', perm: 'users', nav: true },
     { group: 'money', label: 'المدفوعات مصنفة', icon: HandCoins, href: '/admin/revenue?tab=payments', perm: 'users', nav: true },
     { group: 'money', label: 'سجل النشاط', icon: ScrollText, href: '/admin/audit', perm: 'users', nav: true },
     // الحماية والرقابة
@@ -65,7 +66,7 @@ export default async function AdminHome() {
     { group: 'safety', label: 'مراقبة المراسلات', icon: MessagesSquare, href: '/admin/messages', perm: 'messages', nav: true },
     { group: 'safety', label: 'الكلمات وحارس المحتوى', icon: Ban, href: '/admin/words', perm: 'words', nav: true },
     // التسويق والباقات
-    { group: 'marketing', label: 'الباقات', value: packages.length, icon: Crown, href: '/admin/packages', perm: 'packages' },
+    { group: 'marketing', label: 'باقات عدد الإعلانات', value: packages.length, icon: Crown, href: '/admin/revenue?tab=pricing#packages', perm: 'packages' },
     { group: 'marketing', label: 'ترويجية بانتظار الموافقة', value: pendingPromos, icon: MonitorPlay, href: '/admin/promos', highlight: true, perm: 'promos' },
     // النظام والإعدادات
     { group: 'system', label: 'الإعدادات', icon: Settings, href: '/admin/settings', perm: 'users', nav: true },

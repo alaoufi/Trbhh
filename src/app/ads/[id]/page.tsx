@@ -9,7 +9,7 @@ import {
 import { SplashSuppress } from '@/components/splash-suppress';
 import { getAd, getSimilarAds, getSellerAds, recordView } from '@/lib/data';
 import { hasAction } from '@/lib/roles';
-import { adminArchiveAdAction, adminBanSellerAction, adminDeleteAdRedirectAction, adminHideStoreAdAction } from '@/app/admin/actions';
+import { adminArchiveAdAction, adminBanAdAction, adminBanSellerAction, adminDeleteAdRedirectAction, adminHideStoreAdAction } from '@/app/admin/actions';
 import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
@@ -210,6 +210,14 @@ export default async function AdPage({ params, searchParams }: { params: Promise
 
       {/* مرساة نتيجة أي دفع/إجراء — إليها يوجَّه التمرير لتظهر الرسالة أمام العضو مباشرة */}
       <div id="paid-result" className="scroll-mt-20" />
+
+      {/* تنويه إلزامي: الإعلان المؤرشف لا يظهر إلا لصاحبه وللإدارة — لا يراه الزوّار ولا بقية الأعضاء إطلاقاً */}
+      {ad.archived && (ownerViewing || admin) && (
+        <div className="flex items-center gap-2 rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          <Archive className="h-5 w-5 shrink-0" />
+          <span>🗄️ هذا الإعلان مؤرشف — لا يظهر للزوّار ولا لأي عضو آخر، ويظهر لك الآن فقط بصفتك {admin && !ownerViewing ? 'الإدارة' : ownerViewing && admin ? 'صاحب الإعلان/الإدارة' : 'صاحب الإعلان'}.</span>
+        </div>
+      )}
 
       {/* نتيجة طلب شارة عاجل (من نموذج النشر أو زر التفعيل هنا) */}
       {spx.urgent === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🔥 فُعّلت شارة «عاجل» على إعلانك وخُصمت الرسوم من رصيدك.</div>}
@@ -520,15 +528,42 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             </div>
           ) : (
           <>
-          <p className="mb-3 text-xs text-amber-800/80">لا يُسمح بتعديل محتوى إعلان العضو حفاظاً على خصوصيته — الأرشفة أو الإظهار فقط. الحذف النهائي يتم من تبويب «المؤرشفة» في صفحة إدارة الإعلانات.</p>
+          <p className="mb-3 text-xs text-amber-800/80">لا يُسمح بتعديل محتوى إعلان العضو حفاظاً على خصوصيته. «الأرشفة» مؤقتة وقابلة للاستعادة (صاحبها يعيدها للظهور برسوم) — أما «حظر الإعلان» فحذف فوري نهائي لا رجعة فيه إطلاقاً، وللإعلانات المخالفة الواضحة فقط.</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {canArchive && (
               <form action={adminArchiveAdAction}>
                 <input type="hidden" name="adId" value={ad.id} />
-                <ConfirmSubmit msg="تأكيد أرشفة/إظهار هذا الإعلان؟ الأرشفة تخفيه من الموقع وتنقله لتبويب «المؤرشفة» — يبقى محفوظاً ولا يُحذف تلقائياً." className="flex w-full items-center justify-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
-                  <Archive className="h-4 w-4" /> أرشفة / إظهار
-                </ConfirmSubmit>
+                {ad.archived ? (
+                  <ConfirmSubmit msg="تأكيد إظهار (استعادة) هذا الإعلان من الأرشيف؟ يعود ظاهراً للعامة في الموقع فوراً." className="flex w-full items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50">
+                    <Check className="h-4 w-4" /> إظهار (استعادة من الأرشيف)
+                  </ConfirmSubmit>
+                ) : (
+                  <ConfirmSubmit msg="تأكيد أرشفة هذا الإعلان؟ يختفي فوراً من الموقع وينتقل لتبويب «المؤرشفة» — يبقى محفوظاً ولا يُحذف تلقائياً." className="flex w-full items-center justify-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
+                    <Archive className="h-4 w-4" /> أرشفة (إخفاء عن الموقع)
+                  </ConfirmSubmit>
+                )}
               </form>
+            )}
+            {canArchive && (
+              <div className="col-span-2 -mt-1 flex items-center gap-1.5 text-[11px] font-bold sm:col-span-3">
+                {ad.archived ? (
+                  <span className="flex items-center gap-1 text-amber-700"><Archive className="h-3 w-3" /> الحالة الآن: مؤرشف (مخفي عن الزوّار)</span>
+                ) : (
+                  <span className="flex items-center gap-1 text-emerald-700"><Check className="h-3 w-3" /> الحالة الآن: نشط (ظاهر للزوّار)</span>
+                )}
+              </div>
+            )}
+            {canDeleteAd && (
+              <div className="col-span-2 rounded-lg border-2 border-destructive/40 bg-destructive/5 p-2.5 sm:col-span-3">
+                <div className="mb-2 flex items-center gap-1 text-xs font-bold text-destructive"><Trash2 className="h-3.5 w-3.5" /> حظر الإعلان نهائياً — حذف فوري لا رجعة فيه (للمخالف الواضح فقط)</div>
+                <form action={adminBanAdAction} className="space-y-2">
+                  <input type="hidden" name="adId" value={ad.id} />
+                  <textarea name="reason" rows={2} placeholder="سبب الحظر (اختياري — يُسجَّل في سجل التجاوزات ويصل صاحب الإعلان)" className="w-full rounded-lg border border-destructive/30 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-destructive/30" />
+                  <ConfirmSubmit msg="تأكيد حظر هذا الإعلان نهائياً؟ يُحذف فوراً ولا يمكن التراجع أو استرجاعه إطلاقاً — استخدمه فقط للمحتوى المخالف الواضح، وليس بديلاً عن الأرشفة المؤقتة." className="flex w-full items-center justify-center gap-1 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90">
+                    <Trash2 className="h-4 w-4" /> حظر الإعلان نهائياً
+                  </ConfirmSubmit>
+                </form>
+              </div>
             )}
             {canBanSeller && ad.seller && (
               ad.seller.banned ? (

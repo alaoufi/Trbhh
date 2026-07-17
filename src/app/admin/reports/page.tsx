@@ -68,6 +68,13 @@ async function MemberReportsTab() {
   ]);
   const reasonById = new Map(reasons.map((r) => [toInt(r.id), r.reason]));
   const adById = new Map(ads.map((a) => [toInt(a.id), a.title]));
+  // البلاغات القديمة قد يكون إعلانها محذوفاً نهائياً — رابط لا يعمل (404) بدل تعطيل الزر بلا تفسير
+  const AdRef = ({ adId }: { adId: number }) =>
+    adById.has(adId) ? (
+      <Link href={`/ads/${adId}`} className="font-medium hover:text-primary">{adById.get(adId)}</Link>
+    ) : (
+      <span className="font-medium text-muted-foreground" title="حُذف هذا الإعلان نهائياً ولم يعد له صفحة">🗑 إعلان #{adId} (محذوف نهائياً)</span>
+    );
   // member responses live in a column Prisma doesn't map → read raw (ignore if column not present yet)
   const respRows = await prisma.$queryRawUnsafe<{ id: bigint | number; response: string | null }[]>(
     `SELECT id, response FROM repord_ads ORDER BY id DESC LIMIT 100`,
@@ -83,7 +90,7 @@ async function MemberReportsTab() {
         {pending.map((r) => (
           <div key={toInt(r.id)} className="card-3d rounded-xl border-2 border-amber-300 p-3">
             <div className="flex items-center justify-between">
-              <Link href={`/ads/${r.ads_id}`} className="font-medium hover:text-primary">{adById.get(r.ads_id) || `إعلان #${r.ads_id}`}</Link>
+              <AdRef adId={r.ads_id} />
               <span className="text-xs text-muted-foreground">{timeAgo(r.created_at)}</span>
             </div>
             <div className="mt-1 text-sm"><span className="rounded bg-destructive/10 px-2 py-0.5 text-xs text-destructive">{reasonById.get(r.reason_id) || 'بلاغ'}</span> {r.comment && <span className="text-muted-foreground">— {r.comment}</span>}</div>
@@ -107,7 +114,7 @@ async function MemberReportsTab() {
           {resolved.map((r) => (
             <div key={toInt(r.id)} className="card-3d rounded-xl p-3 opacity-70">
               <div className="flex items-center justify-between">
-                <Link href={`/ads/${r.ads_id}`} className="font-medium hover:text-primary">{adById.get(r.ads_id) || `إعلان #${r.ads_id}`}</Link>
+                <AdRef adId={r.ads_id} />
                 <span className="text-xs text-muted-foreground">{timeAgo(r.created_at)}</span>
               </div>
               <div className="mt-1 text-sm"><span className="rounded bg-secondary px-2 py-0.5 text-xs">{reasonById.get(r.reason_id) || 'بلاغ'}</span> {r.comment && <span className="text-muted-foreground">— {r.comment}</span>}</div>
@@ -149,6 +156,17 @@ async function AutoReportsTab() {
     return [k.label, cat, e.term ? `«${e.term}»` : null].filter(Boolean).join(' — ');
   };
   const adLinkLabel = (kind: string) => (kind === 'duplicate' || kind === 'duplicate_cross' ? 'عرض الإعلان الأصلي المطابق' : 'عرض الإعلان محل البلاغ');
+  // الإعلان المرتبط قد يكون حُذف نهائياً لاحقاً — رابط لا يعمل (404) بدل تعطيله بلا تفسير
+  const AdEventLink = ({ e, danger }: { e: (typeof log)[number]; danger?: boolean }) => {
+    if (!e.adId) return null;
+    return adTitleById.has(e.adId) ? (
+      <Link href={`/ads/${e.adId}`} className={`flex w-fit items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold text-primary underline ${danger ? 'border-red-300 bg-white hover:bg-red-50' : 'border-primary/20 bg-primary/5 hover:bg-primary/10'}`}>
+        📄 {adLinkLabel(e.kind)}: «{adTitleById.get(e.adId)}» ←
+      </Link>
+    ) : (
+      <span className="flex w-fit items-center gap-1 rounded-lg border border-border/60 bg-secondary/40 px-2.5 py-1.5 text-xs font-bold text-muted-foreground">🗑 الإعلان المرتبط محذوف نهائياً</span>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -199,11 +217,7 @@ async function AutoReportsTab() {
                   <Megaphone className="mt-0.5 h-3.5 w-3.5 shrink-0" /> <span>«{e.snippet}»</span>
                 </div>
               )}
-              {e.adId && (
-                <Link href={`/ads/${e.adId}`} className="flex w-fit items-center gap-1 rounded-lg border border-red-300 bg-white px-2.5 py-1.5 text-xs font-bold text-primary underline hover:bg-red-50">
-                  📄 {adLinkLabel(e.kind)}{adTitleById.get(e.adId) ? `: «${adTitleById.get(e.adId)}»` : ''} ←
-                </Link>
-              )}
+              <AdEventLink e={e} danger />
               <div className="text-xs font-bold text-amber-800">الإجراء المطلوب: افتحوا الإعلان (وإن كان تكراراً قارنوه بالأصلي)، ثم فكّوا الحظر إن كان غير مستحق، أو أبقوه إن كانت المخالفة واضحة.</div>
               <form action={reviewModLogAction} className="flex flex-wrap gap-2 pt-1">
                 <input type="hidden" name="modLogId" value={e.id} />
@@ -246,11 +260,7 @@ async function AutoReportsTab() {
                   <div className="space-y-1.5 border-t border-border/50 px-3 py-2 text-sm">
                     {e.term && <div><b className="text-primary">الكلمة/العبارة الممنوعة:</b> «{e.term}»</div>}
                     {e.snippet && <div className="text-muted-foreground">المحتوى: «{e.snippet}»</div>}
-                    {e.adId && (
-                      <Link href={`/ads/${e.adId}`} className="flex w-fit items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-xs font-bold text-primary underline hover:bg-primary/10">
-                        📄 {adLinkLabel(e.kind)}{adTitleById.get(e.adId) ? `: «${adTitleById.get(e.adId)}»` : ''} ←
-                      </Link>
-                    )}
+                    <AdEventLink e={e} />
                   </div>
                 )}
               </details>

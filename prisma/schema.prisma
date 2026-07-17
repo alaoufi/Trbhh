@@ -1032,6 +1032,7 @@ model mod_log {
   snippet    String?   @db.VarChar(300)
   action     String    @db.VarChar(16)
   created_at DateTime? @default(now()) @db.Timestamp(0)
+  reviewed_at DateTime? @db.Timestamp(0)
 
   @@index([user_id], map: "mod_log_user")
   @@index([created_at], map: "mod_log_created")

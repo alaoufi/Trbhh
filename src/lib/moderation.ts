@@ -207,7 +207,7 @@ async function blocked(waitSec: number, userId: number): Promise<{ blocked: bool
 
 /** Recent moderation events for the admin log (newest first). */
 export async function getModLog(limit = 200): Promise<{
-  id: number; userId: number; kind: string; category: string | null; term: string | null; snippet: string | null; action: string; createdAt: string | null;
+  id: number; userId: number; kind: string; category: string | null; term: string | null; snippet: string | null; action: string; createdAt: string | null; reviewedAt: string | null;
 }[]> {
   await ensureTables();
   const rows = await prisma.mod_log.findMany({ orderBy: { id: 'desc' }, take: limit }).catch(() => []);
@@ -220,5 +220,17 @@ export async function getModLog(limit = 200): Promise<{
     snippet: r.snippet,
     action: r.action,
     createdAt: r.created_at ? r.created_at.toISOString() : null,
+    reviewedAt: r.reviewed_at ? r.reviewed_at.toISOString() : null,
   }));
+}
+
+/** مراجعة حظر آلي: يُغلق تنبيه «حظر آلي جديد» — فكّ الحظر فوراً أو الإبقاء عليه بعد المراجعة. */
+export async function reviewAutoBan(modLogId: number, decision: 'unban' | 'keep'): Promise<{ userId: number } | null> {
+  await ensureTables();
+  const row = await prisma.mod_log.findUnique({ where: { id: modLogId } }).catch(() => null);
+  if (!row) return null;
+  const userId = Number(row.user_id);
+  if (decision === 'unban') await unbanUser(userId);
+  await prisma.mod_log.update({ where: { id: modLogId }, data: { reviewed_at: new Date() } }).catch(() => {});
+  return { userId };
 }

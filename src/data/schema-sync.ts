@@ -559,6 +559,8 @@ const STATEMENTS: string[] = [
   `ALTER TABLE repord_ads ADD COLUMN action VARCHAR(16) NULL`,
   `ALTER TABLE repord_ads ADD COLUMN handled_at TIMESTAMP NULL`,
   `ALTER TABLE repord_ads ADD COLUMN handled_by BIGINT UNSIGNED NULL`,
+  // مراجعة حظر آلي: فك الحظر أو الإبقاء عليه — يُغلق تنبيه «حظر آلي جديد» في لوحة الإدارة
+  `ALTER TABLE mod_log ADD COLUMN reviewed_at TIMESTAMP NULL`,
   `ALTER TABLE chats MODIFY message TEXT`,
 ];
 

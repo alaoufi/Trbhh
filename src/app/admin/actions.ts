@@ -7,7 +7,7 @@ import { findDuplicateAds, findCrossUserDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
 import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore, completeStoreTransfer, decidePlatformRequest } from '@/lib/merchant';
-import { banUserFor, unbanUser, logMod, notifyModBlock } from '@/lib/moderation';
+import { banUserFor, unbanUser, logMod, notifyModBlock, reviewAutoBan } from '@/lib/moderation';
 import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAccountNow } from '@/lib/account-delete';
 import { addBannedWord, deleteBannedWord, addNameWord, deleteNameWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
@@ -1141,6 +1141,26 @@ export async function resolveReportAction(formData: FormData) {
 
   await prisma.repord_ads.update({ where: { id: reportId }, data: { status: 1, action, handled_at: new Date(), handled_by: BigInt(session.uid) } });
   await bustAdCaches().catch(() => {});
+  revalidatePath('/admin/reports');
+}
+
+/** مراجعة حظر آلي (تبويب بلاغات الرصد الآلي): فكّ الحظر فوراً، أو الإبقاء عليه —
+ *  أي قرار يُغلق تنبيه «حظر آلي جديد» في لوحة الإدارة ويصل العضو إشعار بالنتيجة. */
+export async function reviewModLogAction(formData: FormData) {
+  const session = await requireAction('reports', 'delete');
+  const modLogId = parseInt(String(formData.get('modLogId') || '0'), 10);
+  const decision = String(formData.get('decision') || '');
+  if (!modLogId || !['unban', 'keep'].includes(decision)) { revalidatePath('/admin/reports'); return; }
+
+  const result = await reviewAutoBan(modLogId, decision as 'unban' | 'keep');
+  if (result?.userId) {
+    await logAdmin(session.uid, decision === 'unban' ? 'فكّ حظر آلي بعد المراجعة' : 'الإبقاء على حظر آلي بعد المراجعة', `mod_log #${modLogId}`);
+    await notifyModBlock(
+      result.userId,
+      decision === 'unban' ? '✅ راجعت الإدارة حظرك ورفعته عن حسابك — يمكنك المتابعة الآن.' : '⛔ راجعت الإدارة حظرك وقررت الإبقاء عليه.',
+      '/account/ads',
+    );
+  }
   revalidatePath('/admin/reports');
 }
 

@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { Ban, Trash2, XCircle, Flag, ShieldAlert, AlertTriangle, Copy, Waves, Bot } from 'lucide-react';
+import { Ban, Trash2, XCircle, Flag, ShieldAlert, AlertTriangle, Copy, Waves, Bot, Check, Megaphone } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { requirePerm } from '@/lib/roles';
 import { getModLog } from '@/lib/moderation';
 import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
-import { resolveReportAction } from '../actions';
+import { resolveReportAction, reviewModLogAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
@@ -120,17 +120,27 @@ async function MemberReportsTab() {
   );
 }
 
-/** بلاغات الرصد الآلي: كل مخالفة يرصدها النظام نفسه بلا أي تدخل يدوي (محتوى ممنوع/تكرار/إغراق/تجاوز حد الباقة). */
+/** بلاغات الرصد الآلي: كل مخالفة يرصدها النظام نفسه بلا أي تدخل يدوي (محتوى ممنوع/تكرار/إغراق/تجاوز حد الباقة).
+ *  كل حظر آلي جديد يبقى بانتظار مراجعتكم: فكّ الحظر أو الإبقاء عليه — لا يُغلق تلقائياً. */
 async function AutoReportsTab() {
   const log = await getModLog(300);
   const bans = log.filter((e) => e.action === 'banned').length;
+  const pendingBans = log.filter((e) => e.action === 'banned' && !e.reviewedAt);
+  const rest = log.filter((e) => !(e.action === 'banned' && !e.reviewedAt));
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
 
   const uids = [...new Set(log.map((e) => e.userId))].filter(Boolean);
   const users = uids.length
-    ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }).catch(() => [])
+    ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true, ban: true } }).catch(() => [])
     : [];
   const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
+  const isBannedNowById = new Map(users.map((u) => [toInt(u.id), u.ban === 'checked']));
+
+  const reasonText = (e: (typeof log)[number]) => {
+    const k = KIND_LABEL[e.kind] || { label: e.kind };
+    const cat = e.category ? (CATEGORY_LABEL[e.category as GuardCategory] || e.category) : null;
+    return [k.label, cat, e.term ? `«${e.term}»` : null].filter(Boolean).join(' — ');
+  };
 
   return (
     <div className="space-y-4">
@@ -139,7 +149,7 @@ async function AutoReportsTab() {
         <span>
           <b className="text-primary">رصد آلي</b> بالكامل — كل محاولة نشر محتوى ممنوع أو مكرّر أو إغراق أو تجاوز لحدود الباقة (اليومي/الفاصل الزمني) يرصدها النظام ويسجّلها هنا لحظياً بلا أي تدخّل يدوي.
           المحتوى غير الأخلاقي يحظر الحساب فوراً، وبقية المخالفات (تكرار الإعلانات، الأمني/السياسي/المخدرات/الجمعيات)
-          تُحظر عند بلوغ حدّ الإنذارات المحدَّد في الإعدادات.
+          تُحظر عند بلوغ حدّ الإنذارات المحدَّد في الإعدادات. <b className="text-red-700">كل حظر آلي جديد ينتظر قراركم</b>: فكّ الحظر أو الإبقاء عليه.
         </span>
       </p>
 
@@ -154,30 +164,73 @@ async function AutoReportsTab() {
           <div className="text-xl font-bold text-red-600">{en(bans)}</div>
           <div className="text-[11px] text-muted-foreground">حسابات حُظرت</div>
         </div>
+        <div className="card-3d flex flex-col items-center gap-1 rounded-xl p-3 text-center">
+          <ShieldAlert className="h-5 w-5 text-amber-600" />
+          <div className="text-xl font-bold text-amber-600">{en(pendingBans.length)}</div>
+          <div className="text-[11px] text-muted-foreground">بانتظار مراجعتكم</div>
+        </div>
       </div>
 
       {log.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد أحداث مسجّلة بعد.</p>}
 
-      <div className="space-y-2">
-        {log.map((e) => {
-          const k = KIND_LABEL[e.kind] || { label: e.kind, icon: AlertTriangle };
-          const banned = e.action === 'banned';
-          return (
-            <div key={e.id} className={`card-3d flex flex-wrap items-center gap-2 rounded-xl p-3 ${banned ? '!border-red-400 bg-red-50' : ''}`}>
-              <k.icon className={`h-4 w-4 shrink-0 ${banned ? 'text-red-600' : 'text-amber-600'}`} />
-              <span className="text-sm font-bold text-primary">{k.label}</span>
-              <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary"><Bot className="h-3 w-3" /> رصد آلي</span>
-              {e.category && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{CATEGORY_LABEL[e.category as GuardCategory] || e.category}</span>}
-              <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${banned ? 'bg-red-600 text-white' : 'bg-amber-200 text-amber-900'}`}>
-                {banned ? 'حظر الحساب' : 'رفض النشر'}
-              </span>
-              <Link href={`/admin/users/${e.userId}`} className="text-xs font-bold text-primary underline">{nameById.get(e.userId) || `عضو #${en(e.userId)}`}</Link>
-              {e.snippet && <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={e.snippet}>«{e.snippet}»</span>}
-              <span className="text-xs text-muted-foreground">{timeAgo(e.createdAt)}</span>
+      {/* حظر آلي بانتظار المراجعة — يعرض سبب الإنذار كاملاً والإجراء المطلوب */}
+      {pendingBans.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-bold text-red-700">🔔 حظر آلي بانتظار المراجعة ({pendingBans.length})</h2>
+          {pendingBans.map((e) => (
+            <div key={e.id} className="card-3d space-y-2 rounded-xl border-2 border-red-400 bg-red-50 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Ban className="h-4 w-4 shrink-0 text-red-600" />
+                <Link href={`/admin/users/${e.userId}`} className="text-sm font-bold text-primary underline">{nameById.get(e.userId) || `عضو #${en(e.userId)}`}</Link>
+                <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white">حُظر الحساب</span>
+                <span className="mr-auto text-xs text-muted-foreground">{timeAgo(e.createdAt)}</span>
+              </div>
+              <div className="text-sm font-bold text-red-800">سبب الإنذار: {reasonText(e)}</div>
+              {e.snippet && (
+                <div className="flex items-start gap-1.5 rounded-lg border border-red-200 bg-white p-2 text-sm text-red-900">
+                  <Megaphone className="mt-0.5 h-3.5 w-3.5 shrink-0" /> <span>«{e.snippet}»</span>
+                </div>
+              )}
+              <div className="text-xs font-bold text-amber-800">الإجراء المطلوب: راجعوا الحالة ثم فكّوا الحظر إن كان غير مستحق، أو أبقوه إن كانت المخالفة واضحة.</div>
+              <form action={reviewModLogAction} className="flex flex-wrap gap-2 pt-1">
+                <input type="hidden" name="modLogId" value={e.id} />
+                <ConfirmSubmit name="decision" value="unban" msg="فكّ الحظر عن هذا العضو؟ يصله إشعار بذلك وتعود إعلاناته للظهور فوراً." className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"><Check className="h-3.5 w-3.5" /> فكّ الحظر</ConfirmSubmit>
+                <ConfirmSubmit name="decision" value="keep" msg="الإبقاء على الحظر بعد المراجعة؟ يصل العضو إشعار بذلك." className="flex items-center gap-1 rounded-lg border-2 border-red-400 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"><Ban className="h-3.5 w-3.5" /> استمرار الحظر</ConfirmSubmit>
+              </form>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {/* بقية السجل: مخالفات لم تصل لحدّ الحظر، وحالات حظر رُوجعت بالفعل */}
+      {rest.length > 0 && (
+        <div className="space-y-2 pt-1">
+          {pendingBans.length > 0 && <h2 className="text-sm font-bold text-muted-foreground">بقية السجل</h2>}
+          {rest.map((e) => {
+            const k = KIND_LABEL[e.kind] || { label: e.kind, icon: AlertTriangle };
+            const banned = e.action === 'banned';
+            return (
+              <div key={e.id} className={`card-3d flex flex-wrap items-center gap-2 rounded-xl p-3 ${banned ? '!border-red-200 bg-red-50/40 opacity-80' : ''}`}>
+                <k.icon className={`h-4 w-4 shrink-0 ${banned ? 'text-red-600' : 'text-amber-600'}`} />
+                <span className="text-sm font-bold text-primary">{k.label}</span>
+                <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary"><Bot className="h-3 w-3" /> رصد آلي</span>
+                {e.category && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{CATEGORY_LABEL[e.category as GuardCategory] || e.category}</span>}
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${banned ? 'bg-red-600 text-white' : 'bg-amber-200 text-amber-900'}`}>
+                  {banned ? 'حظر الحساب' : 'رفض النشر'}
+                </span>
+                {banned && e.reviewedAt && (
+                  <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                    <Check className="h-3 w-3" /> رُوجع — الحساب الآن: {isBannedNowById.get(e.userId) ? 'محظور' : 'غير محظور'}
+                  </span>
+                )}
+                <Link href={`/admin/users/${e.userId}`} className="text-xs font-bold text-primary underline">{nameById.get(e.userId) || `عضو #${en(e.userId)}`}</Link>
+                {e.snippet && <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={e.snippet}>«{e.snippet}»</span>}
+                <span className="text-xs text-muted-foreground">{timeAgo(e.createdAt)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

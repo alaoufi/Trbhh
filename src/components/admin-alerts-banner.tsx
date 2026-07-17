@@ -58,11 +58,10 @@ export async function AdminAlertsBanner() {
     import('@/lib/verify-paid').then((m) => m.countPendingVerifyOrders()).catch(() => ({ n: 0, oldest: null })),
   ]);
 
-  // حظر آلي جديد (تجاوز حدود التكرار/المحتوى الممنوع/الباقة) خلال ٢٤ ساعة — يستحق مراجعة الإدارة
-  const dayAgo = new Date(Date.now() - 86400000);
+  // حظر آلي بانتظار مراجعتكم (فكّ الحظر أو الإبقاء عليه) — يبقى ظاهراً حتى تُبتّ فيه، لا يزول بمرور الوقت
   const [newBans, oldestNewBan] = await Promise.all([
-    prisma.mod_log.count({ where: { action: 'banned', created_at: { gte: dayAgo } } }).catch(() => 0),
-    prisma.mod_log.findFirst({ where: { action: 'banned', created_at: { gte: dayAgo } }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
+    prisma.mod_log.count({ where: { action: 'banned', reviewed_at: null } }).catch(() => 0),
+    prisma.mod_log.findFirst({ where: { action: 'banned', reviewed_at: null }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
   ]);
 
   const items: Item[] = [

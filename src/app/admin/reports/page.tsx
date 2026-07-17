@@ -71,7 +71,7 @@ async function MemberReportsTab() {
   // البلاغات القديمة قد يكون إعلانها محذوفاً نهائياً — رابط لا يعمل (404) بدل تعطيل الزر بلا تفسير
   const AdRef = ({ adId }: { adId: number }) =>
     adById.has(adId) ? (
-      <Link href={`/ads/${adId}`} className="font-medium hover:text-primary">{adById.get(adId)}</Link>
+      <Link href={`/ads/${adId}#admin-tools`} className="font-medium hover:text-primary">{adById.get(adId)}</Link>
     ) : (
       <span className="font-medium text-muted-foreground" title="حُذف هذا الإعلان نهائياً ولم يعد له صفحة">🗑 إعلان #{adId} (محذوف نهائياً)</span>
     );
@@ -160,7 +160,7 @@ async function AutoReportsTab() {
   const AdEventLink = ({ e, danger }: { e: (typeof log)[number]; danger?: boolean }) => {
     if (!e.adId) return null;
     return adTitleById.has(e.adId) ? (
-      <Link href={`/ads/${e.adId}`} className={`flex w-fit items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold text-primary underline ${danger ? 'border-red-300 bg-white hover:bg-red-50' : 'border-primary/20 bg-primary/5 hover:bg-primary/10'}`}>
+      <Link href={`/ads/${e.adId}#admin-tools`} className={`flex w-fit items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold text-primary underline ${danger ? 'border-red-300 bg-white hover:bg-red-50' : 'border-primary/20 bg-primary/5 hover:bg-primary/10'}`}>
         📄 {adLinkLabel(e.kind)}: «{adTitleById.get(e.adId)}» ←
       </Link>
     ) : (
@@ -236,16 +236,17 @@ async function AutoReportsTab() {
           {rest.map((e) => {
             const k = KIND_LABEL[e.kind] || { label: e.kind, icon: AlertTriangle };
             const banned = e.action === 'banned';
-            const hasDetails = !!(e.snippet || e.term || e.adId);
+            const adBanned = e.action === 'ad_banned';
+            const hasDetails = !!(e.snippet || e.term || e.adId || adBanned);
             return (
-              <details key={e.id} className={`card-3d rounded-xl ${banned ? '!border-red-200 bg-red-50/40 opacity-80' : ''}`}>
+              <details key={e.id} className={`card-3d rounded-xl ${banned || adBanned ? '!border-red-200 bg-red-50/40 opacity-80' : ''}`}>
                 <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 p-3">
-                  <k.icon className={`h-4 w-4 shrink-0 ${banned ? 'text-red-600' : 'text-amber-600'}`} />
+                  <k.icon className={`h-4 w-4 shrink-0 ${banned || adBanned ? 'text-red-600' : 'text-amber-600'}`} />
                   <span className="text-sm font-bold text-primary">{k.label}</span>
                   <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary"><Bot className="h-3 w-3" /> رصد آلي</span>
                   {e.category && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{CATEGORY_LABEL[e.category as GuardCategory] || e.category}</span>}
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${banned ? 'bg-red-600 text-white' : 'bg-amber-200 text-amber-900'}`}>
-                    {banned ? 'حظر الحساب' : 'رفض النشر'}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${banned ? 'bg-red-600 text-white' : adBanned ? 'bg-destructive text-white' : 'bg-amber-200 text-amber-900'}`}>
+                    {banned ? 'حظر الحساب' : adBanned ? '🚫 حُذف الإعلان نهائياً' : 'رفض النشر'}
                   </span>
                   {banned && e.reviewedAt && (
                     <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
@@ -260,6 +261,7 @@ async function AutoReportsTab() {
                   <div className="space-y-1.5 border-t border-border/50 px-3 py-2 text-sm">
                     {e.term && <div><b className="text-primary">الكلمة/العبارة الممنوعة:</b> «{e.term}»</div>}
                     {e.snippet && <div className="text-muted-foreground">المحتوى: «{e.snippet}»</div>}
+                    {adBanned && <div className="text-xs text-muted-foreground">🗑 هذا الإعلان حُذف نهائياً عبر هذا الإجراء نفسه (إجراء إداري مباشر مكتمل) — لا صفحة له بعد الآن، ولا حاجة لأي إجراء إضافي.</div>}
                     <AdEventLink e={e} />
                   </div>
                 )}

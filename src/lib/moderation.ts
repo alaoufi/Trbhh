@@ -121,7 +121,7 @@ export async function getBanMap(ids: number[]): Promise<Map<number, Date | null>
  *  reported ad) lets the admin open the exact ad behind the decision. */
 export async function logMod(
   userId: number,
-  e: { kind: string; category?: string | null; term?: string | null; snippet?: string | null; action: 'blocked' | 'banned' | 'charged'; adId?: number | null },
+  e: { kind: string; category?: string | null; term?: string | null; snippet?: string | null; action: 'blocked' | 'banned' | 'charged' | 'ad_banned'; adId?: number | null },
 ) {
   await ensureTables();
   await prisma.mod_log.create({

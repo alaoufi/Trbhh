@@ -330,7 +330,9 @@ export async function adminBanAdAction(formData: FormData) {
   if (ad) {
     await prisma.photos.deleteMany({ where: { other_id: id } }).catch(() => {});
     await prisma.ads.delete({ where: { id } }).catch(() => {});
-    await logMod(toInt(ad.user_id), { kind: 'content', category: null, term: null, snippet: `حظر إعلان نهائياً: «${ad.title}»${reason ? ` — السبب: ${reason}` : ''}`, action: 'banned' });
+    // action: 'ad_banned' — الإعلان نفسه حُذف نهائياً، لا حساب العضو؛ يختلف عن 'banned' (حظر حساب)
+    // فلا يظهر في صندوق «حظر آلي بانتظار المراجعة» (لا يوجد حظر حساب لفكّه أو استمراره).
+    await logMod(toInt(ad.user_id), { kind: 'content', category: null, term: null, snippet: `حظر إعلان نهائياً: «${ad.title}»${reason ? ` — السبب: ${reason}` : ''}`, action: 'ad_banned' });
     await logAdmin(session.uid, 'حظر إعلان مخالف نهائياً (حذف لا رجعة فيه)', `إعلان #${toInt(id)} «${ad.title}»${reason ? ` — ${reason}` : ''}`);
     await notifyModBlock(toInt(ad.user_id), `🚫 حُذف إعلانك «${ad.title}» نهائياً لمخالفته لوائح الموقع${reason ? ` — السبب: ${reason}` : ''}. هذا القرار نهائي ولا يمكن التراجع عنه.`, '/account/ads');
   }

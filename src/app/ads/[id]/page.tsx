@@ -486,9 +486,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         </div>
       )}
 
-      {/* Admin moderation controls (only visible to admins) */}
+      {/* Admin moderation controls (only visible to admins) — رابط مباشر إليها (#admin-tools) من سجل التجاوزات */}
       {admin && (
-        <div className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-4">
+        <div id="admin-tools" className="scroll-mt-20 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4">
           <div className="mb-3 flex items-center gap-2 text-amber-800">
             <ShieldAlert className="h-5 w-5" /> <span className="font-bold">أدوات الإدارة</span>
           </div>

@@ -615,6 +615,7 @@ async function run(): Promise<void> {
   }
 
   await backfillDupModLogAdIds();
+  await backfillAdBanAction();
 }
 
 /** ترقيع لمرة واحدة: سجلات التكرار الآلي القديمة (قبل إضافة عمود ad_id) خزّنت
@@ -630,6 +631,17 @@ async function backfillDupModLogAdIds(): Promise<void> {
     if (!m) continue;
     await prisma.mod_log.update({ where: { id: r.id }, data: { ad_id: BigInt(m[1]) } }).catch(() => {});
   }
+}
+
+/** ترقيع لمرة واحدة: سجلات «حظر إعلان نهائياً» (زر الحظر المباشر لإعلان مخالف)
+ *  كانت تُخزَّن بـ action='banned' — نفس قيمة حظر الحساب — فتظهر خطأً في صندوق
+ *  «حظر آلي بانتظار المراجعة» رغم أنه لا يوجد حساب محظور لفكّه أو الإبقاء عليه؛
+ *  الإعلان نفسه محذوف نهائياً بالفعل (إجراء إداري مباشر مكتمل). نصحّحها لـ 'ad_banned'. */
+async function backfillAdBanAction(): Promise<void> {
+  await prisma.mod_log.updateMany({
+    where: { action: 'banned', kind: 'content', snippet: { startsWith: 'حظر إعلان نهائياً:' } },
+    data: { action: 'ad_banned' },
+  }).catch(() => {});
 }
 
 /** Idempotent schema sync — shared promise so concurrent callers run it once. */

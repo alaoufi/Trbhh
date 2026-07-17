@@ -1142,7 +1142,6 @@ export async function resolveReportAction(formData: FormData) {
   await prisma.repord_ads.update({ where: { id: reportId }, data: { status: 1, action, handled_at: new Date(), handled_by: BigInt(session.uid) } });
   await bustAdCaches().catch(() => {});
   revalidatePath('/admin/reports');
-  revalidatePath('/admin/moderation');
 }
 
 export async function adminToggleSpecialAction(formData: FormData) {

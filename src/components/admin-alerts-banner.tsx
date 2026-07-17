@@ -78,7 +78,7 @@ export async function AdminAlertsBanner() {
     { n: platformReqs, label: 'طلب عرض منتجات', href: '/admin/stores', oldest: oldestPlatform },
     { n: verifyOrders.n, label: 'طلب توثيق متجر (مدفوع)', href: '/admin/stores', oldest: verifyOrders.oldest },
     { n: pendingPromos, label: 'إعلان ترويجي معلّق', href: '/admin/promos', oldest: null },
-    { n: newBans, label: 'حظر آلي جديد (تجاوزات)', href: '/admin/moderation', oldest: oldestNewBan },
+    { n: newBans, label: 'حظر آلي جديد (تجاوزات)', href: '/admin/reports?tab=auto', oldest: oldestNewBan },
   ].filter((i) => i.n > 0);
 
   if (!items.length) return null;

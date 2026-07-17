@@ -1,8 +1,10 @@
 import Link from 'next/link';
-import { Ban, Trash2, XCircle } from 'lucide-react';
+import { Ban, Trash2, XCircle, Flag, ShieldAlert, AlertTriangle, Copy, Waves, Bot } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { requirePerm } from '@/lib/roles';
+import { getModLog } from '@/lib/moderation';
+import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { resolveReportAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
@@ -10,9 +12,53 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'البلاغات' };
 
 const ACTION_LABEL: Record<string, string> = { ban: 'حُظر صاحب الإعلان', delete: 'حُذف الإعلان', dismiss: 'تم التجاهل (لا مخالفة)' };
+const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
+  content: { label: 'محتوى ممنوع', icon: ShieldAlert },
+  duplicate: { label: 'إعلان مكرر', icon: Copy },
+  duplicate_cross: { label: 'مطابق لإعلان عضو آخر', icon: Copy },
+  flood: { label: 'إغراق (نشر متسارع)', icon: Waves },
+  limit: { label: 'تجاوز حدّ الباقة', icon: Ban },
+  report: { label: 'إجراء بلاغ', icon: Flag },
+};
 
-export default async function AdminReports() {
+const TABS = [
+  { key: 'members', label: 'بلاغات الأعضاء', icon: Flag },
+  { key: 'auto', label: 'بلاغات الرصد الآلي', icon: Bot },
+] as const;
+type TabKey = typeof TABS[number]['key'];
+
+export default async function AdminReportsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   await requirePerm('reports');
+  const { tab } = await searchParams;
+  const active: TabKey = tab === 'auto' ? 'auto' : 'members';
+  const pendingCount = await prisma.repord_ads.count({ where: { status: 0 } }).catch(() => 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Flag className="h-6 w-6 text-primary" />
+        <h1 className="text-xl font-bold text-primary">البلاغات</h1>
+      </div>
+
+      {/* التبويبان: بلاغات يرفعها الأعضاء يدوياً، مقابل مخالفات يرصدها النظام آلياً */}
+      <div className="flex gap-1 overflow-x-auto rounded-xl bg-secondary/40 p-1">
+        {TABS.map((t) => (
+          <Link key={t.key} href={`/admin/reports?tab=${t.key}`} className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-bold ${active === t.key ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-white/60'}`}>
+            <t.icon className="h-4 w-4" /> {t.label}
+            {t.key === 'members' && pendingCount > 0 && (
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${active === t.key ? 'bg-white/25 text-white' : 'bg-amber-500 text-white'}`}>{pendingCount}</span>
+            )}
+          </Link>
+        ))}
+      </div>
+
+      {active === 'members' ? <MemberReportsTab /> : <AutoReportsTab />}
+    </div>
+  );
+}
+
+/** بلاغات الأعضاء: بلاغ يرفعه عضو على إعلان مخالف — يُغلق دائماً بإجراء (حظر/حذف/تجاهل). */
+async function MemberReportsTab() {
   const reports = await prisma.repord_ads.findMany({ orderBy: { id: 'desc' }, take: 100 });
   const reasonIds = [...new Set(reports.map((r) => r.reason_id))].map((n) => BigInt(n));
   const adIds = [...new Set(reports.map((r) => BigInt(r.ads_id)))];
@@ -31,8 +77,7 @@ export default async function AdminReports() {
   const resolved = reports.filter((r) => r.status !== 0);
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold text-primary">بلاغات الإعلانات ({pending.length} بانتظار الإجراء)</h1>
-      <p className="text-sm text-muted-foreground">كل بلاغ يجب أن يُغلق بإجراء: حظر صاحب الإعلان، حذف الإعلان، أو تجاهل البلاغ — يصل صاحب الإعلان رسالة عند الحظر/الحذف، ويصل المُبلِّغ رسالة تأكيد دائماً.</p>
+      <p className="text-sm text-muted-foreground">بلاغات يرفعها الأعضاء يدوياً على إعلانات مخالفة ({pending.length} بانتظار الإجراء) — كل بلاغ يجب أن يُغلق بإجراء: حظر صاحب الإعلان، حذف الإعلان، أو تجاهل البلاغ — يصل صاحب الإعلان رسالة عند الحظر/الحذف، ويصل المُبلِّغ رسالة تأكيد دائماً.</p>
       {reports.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد بلاغات.</p>}
       <div className="space-y-2">
         {pending.map((r) => (
@@ -71,6 +116,68 @@ export default async function AdminReports() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** بلاغات الرصد الآلي: كل مخالفة يرصدها النظام نفسه بلا أي تدخل يدوي (محتوى ممنوع/تكرار/إغراق/تجاوز حد الباقة). */
+async function AutoReportsTab() {
+  const log = await getModLog(300);
+  const bans = log.filter((e) => e.action === 'banned').length;
+  const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
+
+  const uids = [...new Set(log.map((e) => e.userId))].filter(Boolean);
+  const users = uids.length
+    ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }).catch(() => [])
+    : [];
+  const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
+
+  return (
+    <div className="space-y-4">
+      <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
+        <Bot className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <span>
+          <b className="text-primary">رصد آلي</b> بالكامل — كل محاولة نشر محتوى ممنوع أو مكرّر أو إغراق أو تجاوز لحدود الباقة (اليومي/الفاصل الزمني) يرصدها النظام ويسجّلها هنا لحظياً بلا أي تدخّل يدوي.
+          المحتوى غير الأخلاقي يحظر الحساب فوراً، وبقية المخالفات (تكرار الإعلانات، الأمني/السياسي/المخدرات/الجمعيات)
+          تُحظر عند بلوغ حدّ الإنذارات المحدَّد في الإعدادات.
+        </span>
+      </p>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="card-3d flex flex-col items-center gap-1 rounded-xl p-3 text-center">
+          <AlertTriangle className="h-5 w-5 text-amber-500" />
+          <div className="text-xl font-bold text-primary">{en(log.length)}</div>
+          <div className="text-[11px] text-muted-foreground">إجمالي الأحداث</div>
+        </div>
+        <div className="card-3d flex flex-col items-center gap-1 rounded-xl p-3 text-center">
+          <Ban className="h-5 w-5 text-red-600" />
+          <div className="text-xl font-bold text-red-600">{en(bans)}</div>
+          <div className="text-[11px] text-muted-foreground">حسابات حُظرت</div>
+        </div>
+      </div>
+
+      {log.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد أحداث مسجّلة بعد.</p>}
+
+      <div className="space-y-2">
+        {log.map((e) => {
+          const k = KIND_LABEL[e.kind] || { label: e.kind, icon: AlertTriangle };
+          const banned = e.action === 'banned';
+          return (
+            <div key={e.id} className={`card-3d flex flex-wrap items-center gap-2 rounded-xl p-3 ${banned ? '!border-red-400 bg-red-50' : ''}`}>
+              <k.icon className={`h-4 w-4 shrink-0 ${banned ? 'text-red-600' : 'text-amber-600'}`} />
+              <span className="text-sm font-bold text-primary">{k.label}</span>
+              <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary"><Bot className="h-3 w-3" /> رصد آلي</span>
+              {e.category && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{CATEGORY_LABEL[e.category as GuardCategory] || e.category}</span>}
+              <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${banned ? 'bg-red-600 text-white' : 'bg-amber-200 text-amber-900'}`}>
+                {banned ? 'حظر الحساب' : 'رفض النشر'}
+              </span>
+              <Link href={`/admin/users/${e.userId}`} className="text-xs font-bold text-primary underline">{nameById.get(e.userId) || `عضو #${en(e.userId)}`}</Link>
+              {e.snippet && <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={e.snippet}>«{e.snippet}»</span>}
+              <span className="text-xs text-muted-foreground">{timeAgo(e.createdAt)}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

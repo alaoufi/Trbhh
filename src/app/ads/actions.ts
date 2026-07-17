@@ -292,17 +292,17 @@ export async function createAdAction(formData: FormData) {
     const consumed = await consumeDupCredit(session.uid);
     if (consumed) {
       await resetDupAttempts(session.uid);
-      await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مسموح (باقة) مع #${dup.id} «${dup.title}»` });
+      await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مسموح (باقة) مع #${dup.id} «${dup.title}»`, adId: dup.id });
     } else {
       const svc = await getServicePricing();
       if (serviceHasPrice(svc.dup3) || serviceHasPrice(svc.dup5)) {
         // باقات التكرار مُفعّلة والرصيد نفد → يُطلب شراء باقة (لا حظر)
-        await logMod(session.uid, { kind: 'duplicate', action: 'blocked', snippet: `تكرار مع #${dup.id} «${dup.title}» — يلزم باقة تكرار` });
+        await logMod(session.uid, { kind: 'duplicate', action: 'blocked', snippet: `تكرار مع #${dup.id} «${dup.title}» — يلزم باقة تكرار`, adId: dup.id });
         redirect(`/ads/new?error=needdup&dup=${dup.id}`);
       }
       const n = await bumpDupAttempts(session.uid);
-      // يُسجَّل للإدارة: أي إعلان تطابق معه بالضبط (السجل الرقابي)
-      await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مكرّر مع #${dup.id} «${dup.title}» — الجديد: ${title.slice(0, 60)}` });
+      // يُسجَّل للإدارة: أي إعلان تطابق معه بالضبط (السجل الرقابي) — مع رقم الإعلان الأصلي لعرضه عند اتخاذ القرار
+      await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مكرّر مع #${dup.id} «${dup.title}» — الجديد: ${title.slice(0, 60)}`, adId: dup.id });
       if (n >= DUP_LIMIT) {
         await banUserFor(session.uid, await getStrikeBanDays());
         await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان أكثر من مرة.`);
@@ -319,7 +319,7 @@ export async function createAdAction(formData: FormData) {
   const crossDup = dest === 'store' ? null : await crossUserDuplicateOf(session.uid, title, detail);
   if (crossDup) {
     const n = await bumpDupAttempts(session.uid);
-    await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مطابق لإعلان عضو آخر #${crossDup.id} «${crossDup.title}» — الجديد: ${title.slice(0, 60)}` });
+    await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مطابق لإعلان عضو آخر #${crossDup.id} «${crossDup.title}» — الجديد: ${title.slice(0, 60)}`, adId: crossDup.id });
     if (n >= DUP_LIMIT) {
       await banUserFor(session.uid, await getStrikeBanDays());
       await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر محتوى مطابق لإعلانات أعضاء آخرين.`);

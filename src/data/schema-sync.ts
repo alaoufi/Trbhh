@@ -561,6 +561,8 @@ const STATEMENTS: string[] = [
   `ALTER TABLE repord_ads ADD COLUMN handled_by BIGINT UNSIGNED NULL`,
   // مراجعة حظر آلي: فك الحظر أو الإبقاء عليه — يُغلق تنبيه «حظر آلي جديد» في لوحة الإدارة
   `ALTER TABLE mod_log ADD COLUMN reviewed_at TIMESTAMP NULL`,
+  // الإعلان المرتبط بالحدث (الإعلان الأصلي المطابق في حالة التكرار، أو إعلان البلاغ) — لعرضه عند اتخاذ القرار
+  `ALTER TABLE mod_log ADD COLUMN ad_id BIGINT UNSIGNED NULL`,
   `ALTER TABLE chats MODIFY message TEXT`,
 ];
 

@@ -136,11 +136,19 @@ async function AutoReportsTab() {
   const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
   const isBannedNowById = new Map(users.map((u) => [toInt(u.id), u.ban === 'checked']));
 
+  // الإعلان المرتبط بالحدث (الأصلي في حالة التكرار، أو المُبلَّغ عنه) — لعرضه ومقارنته قبل اتخاذ القرار
+  const adIds = [...new Set(log.map((e) => e.adId).filter((id): id is number => !!id))];
+  const linkedAds = adIds.length
+    ? await prisma.ads.findMany({ where: { id: { in: adIds.map((id) => BigInt(id)) } }, select: { id: true, title: true } }).catch(() => [])
+    : [];
+  const adTitleById = new Map(linkedAds.map((a) => [toInt(a.id), a.title]));
+
   const reasonText = (e: (typeof log)[number]) => {
     const k = KIND_LABEL[e.kind] || { label: e.kind };
     const cat = e.category ? (CATEGORY_LABEL[e.category as GuardCategory] || e.category) : null;
     return [k.label, cat, e.term ? `«${e.term}»` : null].filter(Boolean).join(' — ');
   };
+  const adLinkLabel = (kind: string) => (kind === 'duplicate' || kind === 'duplicate_cross' ? 'عرض الإعلان الأصلي المطابق' : 'عرض الإعلان محل البلاغ');
 
   return (
     <div className="space-y-4">
@@ -191,7 +199,12 @@ async function AutoReportsTab() {
                   <Megaphone className="mt-0.5 h-3.5 w-3.5 shrink-0" /> <span>«{e.snippet}»</span>
                 </div>
               )}
-              <div className="text-xs font-bold text-amber-800">الإجراء المطلوب: راجعوا الحالة ثم فكّوا الحظر إن كان غير مستحق، أو أبقوه إن كانت المخالفة واضحة.</div>
+              {e.adId && (
+                <Link href={`/ads/${e.adId}`} className="flex w-fit items-center gap-1 rounded-lg border border-red-300 bg-white px-2.5 py-1.5 text-xs font-bold text-primary underline hover:bg-red-50">
+                  📄 {adLinkLabel(e.kind)}{adTitleById.get(e.adId) ? `: «${adTitleById.get(e.adId)}»` : ''} ←
+                </Link>
+              )}
+              <div className="text-xs font-bold text-amber-800">الإجراء المطلوب: افتحوا الإعلان (وإن كان تكراراً قارنوه بالأصلي)، ثم فكّوا الحظر إن كان غير مستحق، أو أبقوه إن كانت المخالفة واضحة.</div>
               <form action={reviewModLogAction} className="flex flex-wrap gap-2 pt-1">
                 <input type="hidden" name="modLogId" value={e.id} />
                 <ConfirmSubmit name="decision" value="unban" msg="فكّ الحظر عن هذا العضو؟ يصله إشعار بذلك وتعود إعلاناته للظهور فوراً." className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"><Check className="h-3.5 w-3.5" /> فكّ الحظر</ConfirmSubmit>
@@ -209,7 +222,7 @@ async function AutoReportsTab() {
           {rest.map((e) => {
             const k = KIND_LABEL[e.kind] || { label: e.kind, icon: AlertTriangle };
             const banned = e.action === 'banned';
-            const hasDetails = !!(e.snippet || e.term);
+            const hasDetails = !!(e.snippet || e.term || e.adId);
             return (
               <details key={e.id} className={`card-3d rounded-xl ${banned ? '!border-red-200 bg-red-50/40 opacity-80' : ''}`}>
                 <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 p-3">
@@ -230,9 +243,14 @@ async function AutoReportsTab() {
                   {hasDetails && <span className="mr-auto shrink-0 text-[11px] font-bold text-primary">عرض التفاصيل ▾</span>}
                 </summary>
                 {hasDetails && (
-                  <div className="space-y-1 border-t border-border/50 px-3 py-2 text-sm">
+                  <div className="space-y-1.5 border-t border-border/50 px-3 py-2 text-sm">
                     {e.term && <div><b className="text-primary">الكلمة/العبارة الممنوعة:</b> «{e.term}»</div>}
                     {e.snippet && <div className="text-muted-foreground">المحتوى: «{e.snippet}»</div>}
+                    {e.adId && (
+                      <Link href={`/ads/${e.adId}`} className="flex w-fit items-center gap-1 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-xs font-bold text-primary underline hover:bg-primary/10">
+                        📄 {adLinkLabel(e.kind)}{adTitleById.get(e.adId) ? `: «${adTitleById.get(e.adId)}»` : ''} ←
+                      </Link>
+                    )}
                   </div>
                 )}
               </details>

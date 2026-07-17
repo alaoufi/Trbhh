@@ -116,16 +116,19 @@ export async function getBanMap(ids: number[]): Promise<Map<number, Date | null>
   return map;
 }
 
-/** Write one moderation event to the audit log (best-effort). */
+/** Write one moderation event to the audit log (best-effort).
+ *  `adId` (when known — e.g. the matched original ad in a duplicate hit, or a
+ *  reported ad) lets the admin open the exact ad behind the decision. */
 export async function logMod(
   userId: number,
-  e: { kind: string; category?: string | null; term?: string | null; snippet?: string | null; action: 'blocked' | 'banned' | 'charged' },
+  e: { kind: string; category?: string | null; term?: string | null; snippet?: string | null; action: 'blocked' | 'banned' | 'charged'; adId?: number | null },
 ) {
   await ensureTables();
   await prisma.mod_log.create({
     data: {
       user_id: BigInt(userId), kind: e.kind, category: e.category ?? null,
       term: e.term?.slice(0, 160) ?? null, snippet: e.snippet?.slice(0, 300) ?? null, action: e.action,
+      ad_id: e.adId ? BigInt(e.adId) : null,
     },
   }).catch(() => {});
 }
@@ -207,7 +210,7 @@ async function blocked(waitSec: number, userId: number): Promise<{ blocked: bool
 
 /** Recent moderation events for the admin log (newest first). */
 export async function getModLog(limit = 200): Promise<{
-  id: number; userId: number; kind: string; category: string | null; term: string | null; snippet: string | null; action: string; createdAt: string | null; reviewedAt: string | null;
+  id: number; userId: number; kind: string; category: string | null; term: string | null; snippet: string | null; action: string; createdAt: string | null; reviewedAt: string | null; adId: number | null;
 }[]> {
   await ensureTables();
   const rows = await prisma.mod_log.findMany({ orderBy: { id: 'desc' }, take: limit }).catch(() => []);
@@ -221,6 +224,7 @@ export async function getModLog(limit = 200): Promise<{
     action: r.action,
     createdAt: r.created_at ? r.created_at.toISOString() : null,
     reviewedAt: r.reviewed_at ? r.reviewed_at.toISOString() : null,
+    adId: r.ad_id ? Number(r.ad_id) : null,
   }));
 }
 

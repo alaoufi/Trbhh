@@ -1117,12 +1117,12 @@ export async function resolveReportAction(formData: FormData) {
 
   if (action === 'ban' && ownerId) {
     await banUserFor(ownerId, await getStrikeBanDays());
-    await logMod(ownerId, { kind: 'report', category: null, term: null, snippet: `حظر بسبب بلاغ على «${adTitle}»`, action: 'banned' });
+    await logMod(ownerId, { kind: 'report', category: null, term: null, snippet: `حظر بسبب بلاغ على «${adTitle}»`, action: 'banned', adId: ad ? toInt(ad.id) : null });
   }
   if (action === 'delete' && ad) {
     const isArchived = !!(ad.data_archive && ad.data_archive.trim() !== '');
     if (!isArchived) await prisma.ads.update({ where: { id: ad.id }, data: { status: 0, data_archive: new Date().toISOString() } }).catch(() => {});
-    await logMod(ownerId || 0, { kind: 'report', category: null, term: null, snippet: `حذف الإعلان «${adTitle}» بسبب بلاغ`, action: 'blocked' });
+    await logMod(ownerId || 0, { kind: 'report', category: null, term: null, snippet: `حذف الإعلان «${adTitle}» بسبب بلاغ`, action: 'blocked', adId: toInt(ad.id) });
   }
   await logAdmin(session.uid, `معالجة بلاغ: ${action === 'ban' ? 'حظر الناشر' : action === 'delete' ? 'حذف الإعلان' : 'تجاهل البلاغ'}`, `إعلان #${report.ads_id}`);
 

@@ -166,8 +166,11 @@ export async function saveCompanyAction(formData: FormData) {
   } else {
     // فتح متجر جديد يتطلب الموافقة على شروط المتجر وتحمّل مسؤولية المنتجات
     if (!agreeTerms) redirect('/store?error=terms');
-    await prisma.stores.create({ data: { user_id: session.uid, description, address, logo: logoId ?? 0 } });
-    await markStorePending(session.uid); // new store waits for admin approval
+    // status: 0 صراحةً هنا — العمود الافتراضي في القاعدة 1 (نشِط)، والاعتماد فقط
+    // على استدعاء markStorePending التالي (وهو .catch صامت) قد يترك متجراً
+    // معتمَداً وظاهراً للعامة تلقائياً لو فشل ذلك الاستدعاء لأي خلل عابر.
+    await prisma.stores.create({ data: { user_id: session.uid, description, address, logo: logoId ?? 0, status: 0 } });
+    await markStorePending(session.uid); // احتياط إضافي (لا يضر تكراره)
     await agreeStoreTerms(session.uid);
     // منح فترة تجربة مجانية عند فتح المتجر (تبدأ فور الإنشاء)
     const { startStoreTrial } = await import('@/lib/subscription');

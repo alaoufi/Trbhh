@@ -613,6 +613,23 @@ async function run(): Promise<void> {
       for (const r of rows) colSet.add(`${createTbl[1].toLowerCase()}.${r.c.toLowerCase()}`);
     }
   }
+
+  await backfillDupModLogAdIds();
+}
+
+/** ترقيع لمرة واحدة: سجلات التكرار الآلي القديمة (قبل إضافة عمود ad_id) خزّنت
+ *  رقم الإعلان الأصلي داخل نص المقتطف («مكرّر مع #123 ...») — نستخرجه رجعياً
+ *  ليعمل زر «عرض الإعلان» حتى على الحوادث السابقة. لا تأثير على سجلات مكتملة أصلاً. */
+async function backfillDupModLogAdIds(): Promise<void> {
+  const rows = await prisma.mod_log.findMany({
+    where: { ad_id: null, kind: { in: ['duplicate', 'duplicate_cross'] }, snippet: { not: null } },
+    select: { id: true, snippet: true },
+  }).catch(() => []);
+  for (const r of rows) {
+    const m = r.snippet?.match(/#(\d+)/);
+    if (!m) continue;
+    await prisma.mod_log.update({ where: { id: r.id }, data: { ad_id: BigInt(m[1]) } }).catch(() => {});
+  }
 }
 
 /** Idempotent schema sync — shared promise so concurrent callers run it once. */

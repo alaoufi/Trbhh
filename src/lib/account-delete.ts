@@ -82,7 +82,10 @@ export async function deleteAccountNow(userId: number): Promise<void> {
     },
   }).catch(() => {});
 
-  await logMod(userId, { kind: 'account', action: 'banned', snippet: 'account deleted at owner request' }).catch(() => {});
+  // action: 'account_deleted' — الحساب مموَّه ومقفل نهائياً (لا حظر إشرافي يحتاج
+  // مراجعة/فكاً)؛ لو استُخدم 'banned' هنا لظهر خطأً في صندوق «حظر آلي بانتظار
+  // المراجعة» يطلب فكّ حظر حساب محذوف مموَّه لا هوية حقيقية له بعد الآن.
+  await logMod(userId, { kind: 'account', action: 'account_deleted', snippet: 'account deleted at owner request' }).catch(() => {});
 }
 
 /* ---- logged-out deletion requests (processed by the admin) ---- */

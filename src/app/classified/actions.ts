@@ -8,7 +8,7 @@ import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified, reactivateClassified } from '@/lib/classified';
 import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS } from '@/lib/settings';
-import { charge, consumeDupCredit } from '@/lib/wallet';
+import { charge, consumeDupCredit, addDupCredit, adjustBalance } from '@/lib/wallet';
 import { scanContent } from '@/lib/content-guard';
 import { handleProhibited, logMod } from '@/lib/moderation';
 import { checkImageBuffer, imageModerationEnabled } from '@/lib/nsfw';
@@ -157,6 +157,7 @@ export async function createClassifiedAction(formData: FormData) {
   // التكرار: من اشترى «باقة تكرار» تُخصم نشرة واحدة ويُسمح؛ وإلا يُطلب شراء باقة أو يُمنع
   const pricing = await getServicePricing();
   const dup = await classifiedDuplicateOf(session.uid, title, body, img, { theme: Number.isFinite(theme) ? theme : 0, pattern, accent });
+  let dupCreditConsumed = false;
   if (dup) {
     const consumed = await consumeDupCredit(session.uid);
     if (!consumed) {
@@ -164,18 +165,26 @@ export async function createClassifiedAction(formData: FormData) {
       await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: 'blocked' });
       redirect(`/classified/new?error=duplicate&dup=${dup.id}`);
     }
+    dupCreditConsumed = true;
     await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مبوّب مسموح (باقة) مع #${dup.id} «${dup.title}»` });
   }
 
   // رسوم نشر المبوّب حسب المدّة (إن سُعّرت) — تُخصم من الرصيد ويُضبط انتهاء المبوّب
   let cExpires: Date | null = null;
+  let fee = 0;
   if (serviceHasPrice(pricing.classified)) {
     const raw = String(formData.get('duration') || '');
-    if (!isDur(raw)) redirect('/classified/new?error=duration');
-    const fee = pricing.classified[raw];
+    if (!isDur(raw)) {
+      if (dupCreditConsumed) await addDupCredit(session.uid, 1); // استرجاع رصيد التكرار — لن يُنشر شيء
+      redirect('/classified/new?error=duration');
+    }
+    fee = pricing.classified[raw];
     if (fee > 0) {
       const paid = await charge(session.uid, fee, 'classified', `نشر إعلان مبوّب (${DUR_DAYS[raw]} يوم)`);
-      if (!paid.ok) redirect(`/classified/new?error=needcredit&price=${fee}&bal=${paid.balance}`);
+      if (!paid.ok) {
+        if (dupCreditConsumed) await addDupCredit(session.uid, 1); // استرجاع رصيد التكرار المستهلك — النشر لن يتم بلا سداد الرسوم
+        redirect(`/classified/new?error=needcredit&price=${fee}&bal=${paid.balance}`);
+      }
     }
     cExpires = new Date(Date.now() + DUR_DAYS[raw] * 86400000);
   }
@@ -189,6 +198,9 @@ export async function createClassifiedAction(formData: FormData) {
     });
     if (cExpires && newId) await prisma.classified_ads.updateMany({ where: { id: BigInt(newId) }, data: { expires_at: cExpires } }).catch(() => {});
   } catch {
+    // فشل الحفظ بعد خصم رصيد التكرار و/أو رسوم النشر — استرجاع كل ما خُصم بدل خسارته على نشر لم يتم
+    if (dupCreditConsumed) await addDupCredit(session.uid, 1);
+    if (fee > 0) await adjustBalance(session.uid, fee, 'refund', { note: 'استرداد رسوم نشر مبوّب فشل حفظه' });
     redirect('/classified/new?error=save');
   }
   revalidatePath('/');
@@ -243,6 +255,7 @@ export async function updateClassifiedAction(formData: FormData) {
 
   // منع التكرار عند التعديل (باستثناء الإعلان نفسه) — يُتجاوز بخصم نشرة من «باقة التكرار»
   const dup = await classifiedDuplicateOf(session.uid, title, body, img, { theme: Number.isFinite(theme) ? theme : 0, pattern, accent }, id);
+  let dupCreditConsumed = false;
   if (dup) {
     const consumed = await consumeDupCredit(session.uid);
     if (!consumed) {
@@ -251,6 +264,7 @@ export async function updateClassifiedAction(formData: FormData) {
       await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: 'blocked' });
       redirect(`/classified/${id}/edit?error=duplicate&dup=${dup.id}`);
     }
+    dupCreditConsumed = true;
     await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مبوّب مسموح (باقة، تعديل) مع #${dup.id}` });
   }
 
@@ -262,6 +276,8 @@ export async function updateClassifiedAction(formData: FormData) {
       theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent, layout,
     });
   } catch {
+    // فشل الحفظ بعد خصم رصيد التكرار — استرجاعه بدل خسارته على تعديل لم يُحفظ
+    if (dupCreditConsumed) await addDupCredit(session.uid, 1);
     redirect(`/classified/${id}/edit?error=save`);
   }
   revalidatePath('/');

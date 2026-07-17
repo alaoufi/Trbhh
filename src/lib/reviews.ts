@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from './prisma';
 import { toInt } from './utils';
+import { loadBanned, censorSync } from './censor';
 
 export async function getSellerRating(userId: number) {
   const rows = await prisma.reviews.findMany({ where: { reciver_id: BigInt(userId) }, select: { star: true } });
@@ -14,9 +15,10 @@ export async function getUserReviews(userId: number) {
   const senderIds = [...new Set(rows.map((r) => toInt(r.sender_id)))].map((n) => BigInt(n));
   const users = senderIds.length ? await prisma.users.findMany({ where: { id: { in: senderIds } }, select: { id: true, name: true, userName: true } }) : [];
   const byId = new Map(users.map((u) => [toInt(u.id), u]));
+  await loadBanned().catch(() => {}); // دفاع إضافي: تقييمات قديمة سُجّلت قبل تفعيل فحص المحتوى على هذا الحقل
   return rows.map((r) => {
     const u = byId.get(toInt(r.sender_id));
-    return { id: toInt(r.id), star: r.star, review: r.review, author: u?.name || u?.userName || 'مستخدم', createdAt: r.created_at ? r.created_at.toISOString() : null };
+    return { id: toInt(r.id), star: r.star, review: censorSync(r.review), author: u?.name || u?.userName || 'مستخدم', createdAt: r.created_at ? r.created_at.toISOString() : null };
   });
 }
 

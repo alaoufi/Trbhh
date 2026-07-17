@@ -616,6 +616,7 @@ async function run(): Promise<void> {
 
   await backfillDupModLogAdIds();
   await backfillAdBanAction();
+  await backfillAccountDeletedAction();
 }
 
 /** ترقيع لمرة واحدة: سجلات التكرار الآلي القديمة (قبل إضافة عمود ad_id) خزّنت
@@ -641,6 +642,15 @@ async function backfillAdBanAction(): Promise<void> {
   await prisma.mod_log.updateMany({
     where: { action: 'banned', kind: 'content', snippet: { startsWith: 'حظر إعلان نهائياً:' } },
     data: { action: 'ad_banned' },
+  }).catch(() => {});
+}
+
+/** ترقيع لمرة واحدة: سجلات حذف حساب (بطلب صاحبه) كانت تُخزَّن أيضاً بـ action='banned'
+ *  لنفس السبب — لا حظر إشرافي فعلي يحتاج مراجعة على حساب مموَّه ومقفل نهائياً. */
+async function backfillAccountDeletedAction(): Promise<void> {
+  await prisma.mod_log.updateMany({
+    where: { action: 'banned', kind: 'account', snippet: 'account deleted at owner request' },
+    data: { action: 'account_deleted' },
   }).catch(() => {});
 }
 

@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requireAction, requireUserBan, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
+import { requireAction, requireUserBan, requireManager, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
 import { findDuplicateAds, findCrossUserDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
 import { adminDeleteMessage } from '@/lib/chat';
@@ -454,9 +454,12 @@ export async function unbanUserAction(formData: FormData) {
   revalidatePath('/admin/users');
 }
 
-/** Save a user's granular permissions from the permissions matrix (checkboxes named perm[]). */
+/** Save a user's granular permissions from the permissions matrix (checkboxes named perm[]).
+ *  Manager-only: granting permissions must not be doable by an admin who merely
+ *  has 'users:edit' (e.g. a limited profile-editing grant) — otherwise they could
+ *  hand themselves (or anyone) every permission in the system. */
 export async function setUserPermsAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireManager();
   const id = Number(formData.get('userId'));
   if (!id) redirect('/admin/users');
   const keys = formData.getAll('perm').map((v) => String(v)).filter((k) => ALL_KEYS.includes(k));
@@ -465,9 +468,9 @@ export async function setUserPermsAction(formData: FormData) {
   redirect(`/admin/users/${id}/permissions?saved=1`);
 }
 
-/** Apply a quick role preset (manager/moderator/monitor/none) to a user. */
+/** Apply a quick role preset (manager/moderator/monitor/none) to a user. Manager-only — see setUserPermsAction. */
 export async function applyPresetAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireManager();
   const id = Number(formData.get('userId'));
   const role = String(formData.get('role') || 'none') as Role | 'none';
   if (id) await applyRolePreset(id, role);
@@ -701,9 +704,9 @@ export async function grantStoreDaysAction(formData: FormData) {
   redirect('/admin/stores?granted=1');
 }
 
-/** Save the permission matrix for one role (checkbox keys named "k"). */
+/** Save the permission matrix for one role (checkbox keys named "k"). Manager-only — see setUserPermsAction. */
 export async function saveRolePermsAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireManager();
   const role = String(formData.get('role') || '') as Role;
   if (!MATRIX_ROLES.includes(role)) return;
   const keys = formData.getAll('k').map((v) => String(v));
@@ -1148,8 +1151,11 @@ export async function resolveReportAction(formData: FormData) {
 
 /** مراجعة حظر آلي (تبويب بلاغات الرصد الآلي): فكّ الحظر فوراً، أو الإبقاء عليه —
  *  أي قرار يُغلق تنبيه «حظر آلي جديد» في لوحة الإدارة ويصل العضو إشعار بالنتيجة. */
+/** يبتّ في حظر آلي معلَّق (فكّ/إبقاء) — نفس صلاحية الحظر اليدوي المباشر (users:ban)
+ *  لا صلاحية البلاغات: القرار هنا يغيّر حالة حظر حساب فعلياً، فلا يجوز لدور بلا
+ *  صلاحية حظر (مثل «مراقب») فكّ حظر عضو من هذا المسار الجانبي. */
 export async function reviewModLogAction(formData: FormData) {
-  const session = await requireAction('reports', 'delete');
+  const session = await requireUserBan();
   const modLogId = parseInt(String(formData.get('modLogId') || '0'), 10);
   const decision = String(formData.get('decision') || '');
   if (!modLogId || !['unban', 'keep'].includes(decision)) { revalidatePath('/admin/reports'); return; }

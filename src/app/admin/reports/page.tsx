@@ -19,6 +19,7 @@ const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
   flood: { label: 'إغراق (نشر متسارع)', icon: Waves },
   limit: { label: 'تجاوز حدّ الباقة', icon: Ban },
   report: { label: 'إجراء بلاغ', icon: Flag },
+  account: { label: 'حذف حساب', icon: Trash2 },
 };
 
 const TABS = [
@@ -237,16 +238,18 @@ async function AutoReportsTab() {
             const k = KIND_LABEL[e.kind] || { label: e.kind, icon: AlertTriangle };
             const banned = e.action === 'banned';
             const adBanned = e.action === 'ad_banned';
-            const hasDetails = !!(e.snippet || e.term || e.adId || adBanned);
+            const accountDeleted = e.action === 'account_deleted';
+            const terminal = banned || adBanned || accountDeleted;
+            const hasDetails = !!(e.snippet || e.term || e.adId || adBanned || accountDeleted);
             return (
-              <details key={e.id} className={`card-3d rounded-xl ${banned || adBanned ? '!border-red-200 bg-red-50/40 opacity-80' : ''}`}>
+              <details key={e.id} className={`card-3d rounded-xl ${terminal ? '!border-red-200 bg-red-50/40 opacity-80' : ''}`}>
                 <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 p-3">
-                  <k.icon className={`h-4 w-4 shrink-0 ${banned || adBanned ? 'text-red-600' : 'text-amber-600'}`} />
+                  <k.icon className={`h-4 w-4 shrink-0 ${terminal ? 'text-red-600' : 'text-amber-600'}`} />
                   <span className="text-sm font-bold text-primary">{k.label}</span>
                   <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary"><Bot className="h-3 w-3" /> رصد آلي</span>
                   {e.category && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{CATEGORY_LABEL[e.category as GuardCategory] || e.category}</span>}
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${banned ? 'bg-red-600 text-white' : adBanned ? 'bg-destructive text-white' : 'bg-amber-200 text-amber-900'}`}>
-                    {banned ? 'حظر الحساب' : adBanned ? '🚫 حُذف الإعلان نهائياً' : 'رفض النشر'}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${banned ? 'bg-red-600 text-white' : terminal ? 'bg-destructive text-white' : 'bg-amber-200 text-amber-900'}`}>
+                    {banned ? 'حظر الحساب' : adBanned ? '🚫 حُذف الإعلان نهائياً' : accountDeleted ? '🗑️ حُذف الحساب' : 'رفض النشر'}
                   </span>
                   {banned && e.reviewedAt && (
                     <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
@@ -262,6 +265,7 @@ async function AutoReportsTab() {
                     {e.term && <div><b className="text-primary">الكلمة/العبارة الممنوعة:</b> «{e.term}»</div>}
                     {e.snippet && <div className="text-muted-foreground">المحتوى: «{e.snippet}»</div>}
                     {adBanned && <div className="text-xs text-muted-foreground">🗑 هذا الإعلان حُذف نهائياً عبر هذا الإجراء نفسه (إجراء إداري مباشر مكتمل) — لا صفحة له بعد الآن، ولا حاجة لأي إجراء إضافي.</div>}
+                    {accountDeleted && <div className="text-xs text-muted-foreground">🗑️ حذف العضو حسابه بنفسه — الاسم والبيانات مموَّهة نهائياً، ولا حاجة لأي إجراء إضافي.</div>}
                     <AdEventLink e={e} />
                   </div>
                 )}

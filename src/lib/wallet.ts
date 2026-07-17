@@ -78,7 +78,17 @@ export async function getBalance(userId: number): Promise<number> {
 
 /** Atomically change a balance and record a transaction. `amount` is signed
  *  (positive = credit, negative = debit). Refuses a debit that would go negative
- *  (returns { ok:false }). Returns the new balance on success. */
+ *  (returns { ok:false }). Returns the new balance on success.
+ *
+ *  A debit uses a conditional `updateMany` (`WHERE balance >= amount`) rather
+ *  than read-balance-then-write-balance — the DB row lock from that single
+ *  atomic UPDATE is what actually prevents a double-spend. Two concurrent debits
+ *  for the same user (two tabs, two rapid purchases) serialize on the row lock:
+ *  the second only proceeds once the first has committed, and its WHERE clause
+ *  then sees the already-reduced balance. The previous read-then-write version
+ *  computed the new balance in JS from a plain (unlocked) read, so both
+ *  concurrent calls could read the same starting balance and both succeed —
+ *  granting two paid features while only one payment's worth was ever deducted. */
 export async function adjustBalance(
   userId: number,
   amount: number,
@@ -92,11 +102,21 @@ export async function adjustBalance(
   }
   try {
     return await prisma.$transaction(async (tx) => {
-      const u = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
-      const cur = u?.balance ?? 0;
-      const next = cur + amt;
-      if (next < 0) return { ok: false, balance: cur }; // insufficient funds
-      await tx.users.update({ where: { id: BigInt(userId) }, data: { balance: next } });
+      if (amt < 0) {
+        const r = await tx.users.updateMany({
+          where: { id: BigInt(userId), balance: { gte: -amt } },
+          data: { balance: { decrement: -amt } },
+        });
+        if (r.count === 0) {
+          const cur = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
+          return { ok: false, balance: cur?.balance ?? 0 }; // insufficient funds
+        }
+      } else {
+        await tx.users.update({ where: { id: BigInt(userId) }, data: { balance: { increment: amt } } });
+      }
+      // القراءة بعد التحديث الذري ضمن نفس المعاملة تعكس الرصيد الصحيح دائماً
+      const after = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
+      const next = after?.balance ?? 0;
       await tx.wallet_txns.create({
         data: {
           user_id: BigInt(userId),

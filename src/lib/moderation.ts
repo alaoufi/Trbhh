@@ -121,7 +121,7 @@ export async function getBanMap(ids: number[]): Promise<Map<number, Date | null>
  *  reported ad) lets the admin open the exact ad behind the decision. */
 export async function logMod(
   userId: number,
-  e: { kind: string; category?: string | null; term?: string | null; snippet?: string | null; action: 'blocked' | 'banned' | 'charged' | 'ad_banned'; adId?: number | null },
+  e: { kind: string; category?: string | null; term?: string | null; snippet?: string | null; action: 'blocked' | 'banned' | 'charged' | 'ad_banned' | 'account_deleted'; adId?: number | null },
 ) {
   await ensureTables();
   await prisma.mod_log.create({
@@ -228,11 +228,13 @@ export async function getModLog(limit = 200): Promise<{
   }));
 }
 
-/** مراجعة حظر آلي: يُغلق تنبيه «حظر آلي جديد» — فكّ الحظر فوراً أو الإبقاء عليه بعد المراجعة. */
+/** مراجعة حظر آلي: يُغلق تنبيه «حظر آلي جديد» — فكّ الحظر فوراً أو الإبقاء عليه بعد المراجعة.
+ *  يتحقق أن السطر فعلاً حظر حساب لم يُراجَع بعد — وإلا يُتاح تمرير أي مود-لوج id
+ *  (بما فيها سطور رفض بلا حظر، أو مراجَعة مسبقاً) لرفع حظر حساب عشوائي. */
 export async function reviewAutoBan(modLogId: number, decision: 'unban' | 'keep'): Promise<{ userId: number } | null> {
   await ensureTables();
   const row = await prisma.mod_log.findUnique({ where: { id: modLogId } }).catch(() => null);
-  if (!row) return null;
+  if (!row || row.action !== 'banned' || row.reviewed_at) return null;
   const userId = Number(row.user_id);
   if (decision === 'unban') await unbanUser(userId);
   await prisma.mod_log.update({ where: { id: modLogId }, data: { reviewed_at: new Date() } }).catch(() => {});

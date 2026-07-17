@@ -10,6 +10,7 @@ import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { recordStoreVisit, classifySource, bumpStoreView, getStoreViews } from '@/lib/store-analytics';
 import { isStoreSubBlocked } from '@/lib/subscription';
+import { isUserBanned } from '@/lib/moderation';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle, parseHiddenFields, adViewCounts } from '@/lib/merchant';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -100,6 +101,18 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary text-3xl">{pending ? '⏳' : '🚫'}</div>
         <h1 className="text-lg font-extrabold text-primary">{pending ? 'هذا المتجر قيد المراجعة' : 'هذا المتجر غير متاح حالياً'}</h1>
         <p className="text-sm text-muted-foreground">{pending ? 'يخضع المتجر لموافقة الإدارة وسيظهر للعملاء بعد اعتماده.' : subOnly ? 'المتجر غير متاح مؤقتاً. سيعود للظهور قريباً.' : 'تم إيقاف هذا المتجر مؤقتاً من قبل الإدارة.'}</p>
+        <Link href="/" className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">الصفحة الرئيسية</Link>
+      </div>
+    );
+  }
+  // صاحب المتجر محظور: الحظر يجب أن يخفي واجهة متجره عن العامة أيضاً — كان يبقى ظاهراً
+  // وقابلاً للتواصل معه بالكامل (منتجات/واتساب/اتصال) رغم حظر حسابه. المالك والإدارة يريانه.
+  if ((await isUserBanned(s.userId).catch(() => false)) && !isOwner && !admin) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="grid h-16 w-16 place-items-center rounded-2xl bg-red-100 text-red-600 text-3xl">🚫</div>
+        <h1 className="text-lg font-extrabold text-red-700">لا يوجد متجر نشط بهذا الاسم</h1>
+        <p className="text-sm text-muted-foreground">هذا المتجر غير متاح حالياً.</p>
         <Link href="/" className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">الصفحة الرئيسية</Link>
       </div>
     );

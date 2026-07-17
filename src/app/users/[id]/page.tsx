@@ -15,6 +15,7 @@ import { PromoSlot } from '@/components/promo-slot';
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { mediaUrl } from '@/lib/media';
+import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,8 +27,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: u?.name || u?.userName || 'ملف العضو' };
 }
 
-export default async function UserProfilePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function UserProfilePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ error?: string; cat?: string; banned?: string }> }) {
   const { id } = await params;
+  const sp = searchParams ? await searchParams : {};
   const uid = Number(id);
   if (!Number.isInteger(uid) || uid <= 0) notFound();
   const user = await prisma.users.findUnique({ where: { id: BigInt(uid) } });
@@ -164,6 +166,12 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
 
       <section id="review" className="scroll-mt-20 space-y-3">
         <h2 className="text-lg font-bold text-primary">التقييمات ({reviews.length})</h2>
+        {sp.error === 'blocked' && (
+          <div className="rounded-lg border-2 border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800">
+            تعذّر نشر تقييمك — يحتوي محتوى ممنوعاً ({CATEGORY_LABEL[sp.cat as GuardCategory] || sp.cat}).
+            {sp.banned === '1' && ' تم حظر حسابك بسبب هذه المخالفة.'}
+          </div>
+        )}
         {allowReview ? (
           <ReviewForm reciverId={uid} />
         ) : !session ? (

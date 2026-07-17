@@ -304,6 +304,19 @@ export async function requirePerm(service: Service) {
   return requireAction(service, 'view');
 }
 
+/** Full-manager-only gate — for actions that grant/edit OTHER admins' permissions
+ *  or role matrices (setUserPermsAction/applyPresetAction/saveRolePermsAction).
+ *  `users:edit` alone is NOT enough here: it would let a limited admin (e.g.
+ *  granted only to edit member profiles) promote themselves or anyone else to
+ *  full manager — a privilege-escalation hole. Only an existing full manager
+ *  may change what any admin (including themselves) is allowed to do. */
+export async function requireManager() {
+  const session = await getSession();
+  if (!session) redirect('/login');
+  if (!(await isManager(session.uid))) redirect('/admin');
+  return session;
+}
+
 export async function requireAnyAdmin() {
   const session = await getSession();
   if (!session) redirect('/login');

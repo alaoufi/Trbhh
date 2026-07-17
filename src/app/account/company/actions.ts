@@ -463,6 +463,11 @@ export async function addStoreCouponAction(formData: FormData) {
   if (!(await couponsEnabled())) redirect('/store');
   const code = String(formData.get('code') || '');
   const discount = String(formData.get('discount') || '');
+  const badContent = await scanContent(code, discount);
+  if (badContent) {
+    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `${code} ${discount}`.slice(0, 300));
+    redirect(`/store?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : ''}`);
+  }
   const expRaw = String(formData.get('expires') || '').trim();
   const exp = expRaw ? new Date(expRaw) : null;
   const ok = await addStoreCoupon(storeId, code, discount, exp && !isNaN(exp.getTime()) ? exp : null);

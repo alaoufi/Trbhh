@@ -285,6 +285,24 @@ export async function createAdAction(formData: FormData) {
     }
   }
 
+  // تكرار عبر أعضاء مختلفين (شبكات سبام تنشر نفس النص بأرقام/حسابات متعددة —
+  // مثل إعلانات "دينا" المتكررة). منع فوري دون خيار الدفع (المحتوى ليس ملكه
+  // أصلاً)، مع نفس نظام المخالفات المتدرّج قبل الحظر.
+  // يُفحص قبل التكرار الذاتي عمداً: هذا الفحص لا يقبل شراء باقة لتجاوزه إطلاقاً،
+  // فلا داعي لاستهلاك رصيد تكرار (consumeDupCredit) هنا فقط لينتهي الأمر بحظر لاحق.
+  const crossDup = dest === 'store' ? null : await crossUserDuplicateOf(session.uid, title, detail);
+  if (crossDup) {
+    const n = await bumpDupAttempts(session.uid);
+    await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مطابق لإعلان عضو آخر #${crossDup.id} «${crossDup.title}» — الجديد: ${title.slice(0, 60)}`, adId: crossDup.id });
+    if (n >= DUP_LIMIT) {
+      await banUserFor(session.uid, await getStrikeBanDays());
+      await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر محتوى مطابق لإعلانات أعضاء آخرين.`);
+      redirect('/ads/new?error=banned');
+    }
+    await notifyModBlock(session.uid, `⚠️ رُفض نشر إعلانك لأنه مطابق لإعلان عضو آخر — إنذار (${DUP_LIMIT - n} متبقية)، التكرار يؤدي للحظر.`, '/ads/new');
+    redirect(`/ads/new?error=crossdup&left=${Math.max(0, DUP_LIMIT - n)}&dup=${crossDup.id}`);
+  }
+
   // المتجر مستقل تماماً: إعلانات المتجر لا تخضع لسياسة تكرار تربح ولا تسعيراتها (سياسة
   // المتجر مختلفة). أمّا إعلانات تربح فتخضع لكشف التكرار وباقاته. (فحص المحتوى يبقى للجميع.)
   const dup = dest === 'store' ? null : await ownDuplicateOf(session.uid, title, detail, images);
@@ -311,22 +329,6 @@ export async function createAdAction(formData: FormData) {
       await notifyModBlock(session.uid, `⚠️ رُفض نشر إعلانك لأنه مطابق لإعلان سابق لك — إنذار (${DUP_LIMIT - n} متبقية)، التكرار يؤدي للحظر.`, '/ads/new');
       redirect(`/ads/new?error=duplicate&left=${Math.max(0, DUP_LIMIT - n)}&dup=${dup.id}`);
     }
-  }
-
-  // تكرار عبر أعضاء مختلفين (شبكات سبام تنشر نفس النص بأرقام/حسابات متعددة —
-  // مثل إعلانات "دينا" المتكررة). منع فوري دون خيار الدفع (المحتوى ليس ملكه
-  // أصلاً)، مع نفس نظام المخالفات المتدرّج قبل الحظر.
-  const crossDup = dest === 'store' ? null : await crossUserDuplicateOf(session.uid, title, detail);
-  if (crossDup) {
-    const n = await bumpDupAttempts(session.uid);
-    await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مطابق لإعلان عضو آخر #${crossDup.id} «${crossDup.title}» — الجديد: ${title.slice(0, 60)}`, adId: crossDup.id });
-    if (n >= DUP_LIMIT) {
-      await banUserFor(session.uid, await getStrikeBanDays());
-      await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر محتوى مطابق لإعلانات أعضاء آخرين.`);
-      redirect('/ads/new?error=banned');
-    }
-    await notifyModBlock(session.uid, `⚠️ رُفض نشر إعلانك لأنه مطابق لإعلان عضو آخر — إنذار (${DUP_LIMIT - n} متبقية)، التكرار يؤدي للحظر.`, '/ads/new');
-    redirect(`/ads/new?error=crossdup&left=${Math.max(0, DUP_LIMIT - n)}&dup=${crossDup.id}`);
   }
 
   // النشر الفوري ما لم تُفعّل الإدارة «مراجعة الإعلانات قبل النشر».

@@ -13,6 +13,7 @@ import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { getStoreMeta, storeProductAdIds, collaboratorAds, storeIdByHandle } from '@/lib/merchant';
 import { isStoreSubBlocked } from '@/lib/subscription';
+import { isUserBanned } from '@/lib/moderation';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { waLink } from '@/lib/classified-theme';
 import { AdGallery } from '@/components/ad-gallery';
@@ -67,6 +68,8 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
   // بوابة الاعتماد/الاشتراك: نفس منطق واجهة المتجر
   const subBlocked = await isStoreSubBlocked(storeId).catch(() => false);
   if ((meta.status !== 1 || subBlocked) && !isOwner && !admin) notFound();
+  // صاحب المتجر محظور: لا يبقى منتجه قابلاً للعرض والتواصل للعامة
+  if ((await isUserBanned(s.userId).catch(() => false)) && !isOwner && !admin) notFound();
 
   // الإعلان يجب أن يكون ضمن منتجات هذا المتجر (أو ضمن إعلانات الشركاء المعروضة فيه)
   const [productIds, partners] = await Promise.all([

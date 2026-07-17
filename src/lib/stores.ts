@@ -12,9 +12,10 @@ async function logoUrl(logoId: number | null): Promise<string> {
 
 export async function getStores() {
   const rows = await prisma.stores.findMany({ orderBy: { id: 'desc' }, take: 60 });
-  return Promise.all(
+  const list = await Promise.all(
     rows.map(async (s) => {
-      const owner = await prisma.users.findUnique({ where: { id: BigInt(s.user_id) }, select: { name: true, userName: true, trusted: true } });
+      const owner = await prisma.users.findUnique({ where: { id: BigInt(s.user_id) }, select: { name: true, userName: true, trusted: true, ban: true } });
+      if (owner?.ban === 'checked') return null; // صاحب متجر محظور: لا يظهر متجره في الدليل العام
       return {
         id: toInt(s.id),
         name: owner?.name || owner?.userName || 'شركة',
@@ -25,6 +26,7 @@ export async function getStores() {
       };
     }),
   );
+  return list.filter((s): s is NonNullable<typeof s> => s !== null);
 }
 
 async function getStoreImpl(id: number) {

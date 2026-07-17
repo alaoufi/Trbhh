@@ -42,7 +42,8 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
   type Row = { id: bigint; name: string | null; userName: string | null; phoneNumber: string | null; trusted: number | null; ban: string | null; is_admin: number | null; created_at: Date | null };
 
   // بحث + تصنيف + ترقيم صفحات — استعلام موحّد
-  const conds: string[] = [];
+  // الحسابات المحذوفة (مموَّهة باسم deleted_<id>) تُستبعد من القائمة الحيّة — تُراجَع من الأرشيف
+  const conds: string[] = [`(userName IS NULL OR userName NOT LIKE 'deleted\\_%')`];
   const args: unknown[] = [];
   if (term) {
     const like = `%${term}%`;

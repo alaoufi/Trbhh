@@ -240,15 +240,43 @@ export async function warnStoreAction(formData: FormData) {
   revalidatePath('/admin/stores');
 }
 
-/** Delete a store (store-scoped only; the owner's account and ads are untouched). */
-export async function deleteStoreAction(formData: FormData) {
+/** حذف نهائي حقيقي — فقط من الأرشيف (متجر موقوف نهائياً بالفعل، أي «حذفه» سابقاً
+ *  من لوحة المتاجر عبر «إيقاف نهائي» = toggleStoreStatusAction)، ولا رجعة فيه. */
+export async function adminDeleteStoreForeverAction(formData: FormData) {
   const session = await requireAction('stores', 'delete');
   const id = Number(formData.get('storeId'));
   if (id && formData.get('confirm')) {
-    await deleteStore(id);
-    await logAdmin(session.uid, 'حذف متجر', `متجر #${id}`);
+    const s = await prisma.stores.findUnique({ where: { id: BigInt(id) }, select: { status: true, store_name: true } }).catch(() => null);
+    if (s?.status === 3) {
+      await deleteStore(id);
+      await logAdmin(session.uid, 'حذف متجر نهائياً من الأرشيف', `متجر #${id} «${s.store_name || ''}»`);
+    }
   }
-  revalidatePath('/admin/stores');
+  revalidatePath('/admin/archive');
+}
+
+/** أرشفة تعليق (إخفاء عن الجمهور دون حذفه) — يظهر في تبويب «التعليقات» بالأرشيف. */
+export async function adminHideCommentAction(formData: FormData) {
+  const session = await requireAction('comments', 'delete');
+  const id = Number(formData.get('commentId'));
+  const adId = Number(formData.get('adId') || 0);
+  if (id) {
+    await prisma.comments.updateMany({ where: { id: BigInt(id) }, data: { hide: 'yes' } });
+    await logAdmin(session.uid, 'أرشفة تعليق', `تعليق #${id}${adId ? ` · إعلان #${adId}` : ''}`);
+  }
+  if (adId) revalidatePath(`/ads/${adId}`);
+  revalidatePath('/admin/archive');
+}
+
+/** استعادة تعليق من الأرشيف. */
+export async function adminRestoreCommentAction(formData: FormData) {
+  const session = await requireAction('comments', 'delete');
+  const id = Number(formData.get('commentId'));
+  if (id) {
+    await prisma.comments.updateMany({ where: { id: BigInt(id) }, data: { hide: 'no' } });
+    await logAdmin(session.uid, 'استعادة تعليق من الأرشيف', `تعليق #${id}`);
+  }
+  revalidatePath('/admin/archive');
 }
 
 /** Admin approves/rejects a merchant's request to feature products on Trbhh. */
@@ -1170,6 +1198,35 @@ export async function reviewModLogAction(formData: FormData) {
     );
   }
   revalidatePath('/admin/reports');
+}
+
+/** مسح نهائي لسجل بلاغ عضو مُعالَج بالفعل (من الأرشيف فقط) — سجل تاريخي بحت لا يمس الإعلان أو العضو. */
+export async function adminDeleteReportRecordAction(formData: FormData) {
+  const session = await requireAction('reports', 'delete');
+  const reportId = BigInt(String(formData.get('reportId') || '0'));
+  if (reportId) {
+    const r = await prisma.repord_ads.findUnique({ where: { id: reportId }, select: { status: true } }).catch(() => null);
+    if (r && r.status !== 0) {
+      await prisma.repord_ads.delete({ where: { id: reportId } }).catch(() => {});
+      await logAdmin(session.uid, 'مسح سجل بلاغ من الأرشيف', `بلاغ #${reportId}`);
+    }
+  }
+  revalidatePath('/admin/archive');
+}
+
+/** مسح نهائي لسطر في سجل الرصد الآلي (من الأرشيف فقط) — سجل تاريخي بحت. */
+export async function adminDeleteModLogAction(formData: FormData) {
+  const session = await requireAction('reports', 'delete');
+  const id = parseInt(String(formData.get('modLogId') || '0'), 10);
+  if (id) {
+    const r = await prisma.mod_log.findUnique({ where: { id }, select: { action: true, reviewed_at: true } }).catch(() => null);
+    // لا يُمسح حظر بانتظار المراجعة (يجب البتّ فيه أولاً من تبويب البلاغات الحيّ)
+    if (r && !(r.action === 'banned' && !r.reviewed_at)) {
+      await prisma.mod_log.delete({ where: { id } }).catch(() => {});
+      await logAdmin(session.uid, 'مسح سطر من سجل الرصد الآلي (الأرشيف)', `mod_log #${id}`);
+    }
+  }
+  revalidatePath('/admin/archive');
 }
 
 export async function adminToggleSpecialAction(formData: FormData) {

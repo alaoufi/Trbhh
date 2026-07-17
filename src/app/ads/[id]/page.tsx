@@ -9,7 +9,7 @@ import {
 import { SplashSuppress } from '@/components/splash-suppress';
 import { getAd, getSimilarAds, getSellerAds, recordView } from '@/lib/data';
 import { hasAction } from '@/lib/roles';
-import { adminArchiveAdAction, adminBanAdAction, adminBanSellerAction, adminDeleteAdRedirectAction, adminHideStoreAdAction } from '@/app/admin/actions';
+import { adminArchiveAdAction, adminBanAdAction, adminBanSellerAction, adminDeleteAdRedirectAction, adminHideStoreAdAction, adminHideCommentAction } from '@/app/admin/actions';
 import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
@@ -475,9 +475,18 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             {comments.map((c) => (
               <li key={c.id} className="flex gap-2">
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">{(c.author || 'ع').charAt(0)}</span>
-                <div className="rounded-lg bg-white/70 p-2 ring-1 ring-primary/10">
+                <div className="flex-1 rounded-lg bg-white/70 p-2 ring-1 ring-primary/10">
                   <div className="flex items-center gap-2"><span className="text-sm font-semibold text-primary">{c.author}</span><span className="text-xs text-muted-foreground">{timeAgo(c.createdAt)}</span></div>
                   <p className="text-sm">{c.comment}</p>
+                  {admin && (
+                    <form action={adminHideCommentAction} className="mt-1">
+                      <input type="hidden" name="commentId" value={c.id} />
+                      <input type="hidden" name="adId" value={ad.id} />
+                      <ConfirmSubmit msg="أرشفة هذا التعليق؟ يختفي عن الجمهور وينتقل لتبويب «التعليقات» بالأرشيف — يمكن استعادته لاحقاً." className="text-[11px] font-bold text-destructive hover:underline">
+                        🗑 أرشفة
+                      </ConfirmSubmit>
+                    </form>
+                  )}
                 </div>
               </li>
             ))}

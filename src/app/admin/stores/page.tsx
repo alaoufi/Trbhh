@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone, Phone, Mail, Link2, IdCard, CalendarDays, FileCheck2, AlertTriangle, Trash2, UserCog } from 'lucide-react';
+import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone, Phone, Mail, Link2, IdCard, CalendarDays, FileCheck2, AlertTriangle, UserCog } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import { getPendingStores, adminStoreList, approvedTransfers, platformRequests, type AdminStore } from '@/lib/merchant';
 import { getStoresCommsLog, type StoreComm } from '@/lib/audit';
 import { timeAgo } from '@/lib/utils';
-import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, deleteStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction, adminMessageStoreOwnerAction, approveVerifyOrderAction, rejectVerifyOrderAction, cancelVerifyOrderAction, storeUntrustAction } from '../actions';
+import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction, adminMessageStoreOwnerAction, approveVerifyOrderAction, rejectVerifyOrderAction, cancelVerifyOrderAction, storeUntrustAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { AdminSearch } from '@/components/admin-search';
 
@@ -182,18 +182,6 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
         <button className="flex shrink-0 items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white">إرسال رسمي</button>
       </form>
 
-      {/* حذف المتجر (مطويّ لتفادي الحذف العرضي) — لا يمسّ حساب العضو ولا إعلاناته */}
-      <details className="rounded-xl border border-destructive/30">
-        <summary className="cursor-pointer list-none px-3 py-2 text-xs font-bold text-destructive">حذف المتجر…</summary>
-        <div className="border-t border-destructive/20 p-2">
-          <p className="mb-2 text-[11px] text-muted-foreground">يحذف المتجر وبياناته (متابعون/تقييمات/إنذارات/فروع) فقط. حساب العضو وإعلاناته على المنصّة تبقى كما هي.</p>
-          <form action={deleteStoreAction} className="flex items-center gap-2">
-            <input type="hidden" name="storeId" value={s.id} />
-            <label className="flex items-center gap-1 text-[11px] font-bold text-destructive"><input type="checkbox" name="confirm" required className="h-3.5 w-3.5 accent-red-600" /> أؤكّد الحذف</label>
-            <ConfirmSubmit msg={`حذف متجر «${s.storeName || `#${s.id}`}» نهائياً بكل بياناته (متابعون/تقييمات/فروع)؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-lg bg-destructive px-3 py-1.5 text-xs font-bold text-white"><Trash2 className="h-3.5 w-3.5" /> حذف نهائي</ConfirmSubmit>
-          </form>
-        </div>
-      </details>
     </div>
   );
 }

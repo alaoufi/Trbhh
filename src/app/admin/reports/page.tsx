@@ -11,7 +11,6 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'البلاغات' };
 
-const ACTION_LABEL: Record<string, string> = { ban: 'حُظر صاحب الإعلان', delete: 'حُذف الإعلان', dismiss: 'تم التجاهل (لا مخالفة)' };
 const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
   content: { label: 'محتوى ممنوع', icon: ShieldAlert },
   duplicate: { label: 'إعلان مكرر', icon: Copy },
@@ -82,7 +81,7 @@ async function MemberReportsTab() {
   ).catch(() => []);
   const respById = new Map(respRows.map((r) => [toInt(r.id), r.response]));
   const pending = reports.filter((r) => r.status === 0);
-  const resolved = reports.filter((r) => r.status !== 0);
+  const resolvedCount = await prisma.repord_ads.count({ where: { status: { not: 0 } } }).catch(() => 0);
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">بلاغات يرفعها الأعضاء يدوياً على إعلانات مخالفة ({pending.length} بانتظار الإجراء) — كل بلاغ يجب أن يُغلق بإجراء: حظر صاحب الإعلان، حذف الإعلان، أو تجاهل البلاغ — يصل صاحب الإعلان رسالة عند الحظر/الحذف، ويصل المُبلِّغ رسالة تأكيد دائماً.</p>
@@ -109,20 +108,11 @@ async function MemberReportsTab() {
         ))}
       </div>
 
-      {resolved.length > 0 && (
-        <div className="space-y-2 pt-2">
-          <h2 className="text-sm font-bold text-muted-foreground">بلاغات مُعالَجة ({resolved.length})</h2>
-          {resolved.map((r) => (
-            <div key={toInt(r.id)} className="card-3d rounded-xl p-3 opacity-70">
-              <div className="flex items-center justify-between">
-                <AdRef adId={r.ads_id} />
-                <span className="text-xs text-muted-foreground">{timeAgo(r.created_at)}</span>
-              </div>
-              <div className="mt-1 text-sm"><span className="rounded bg-secondary px-2 py-0.5 text-xs">{reasonById.get(r.reason_id) || 'بلاغ'}</span> {r.comment && <span className="text-muted-foreground">— {r.comment}</span>}</div>
-              <div className="mt-1 text-xs font-bold text-emerald-700">✓ {ACTION_LABEL[r.action || ''] || 'عولج'}{r.handled_at ? ` — ${timeAgo(r.handled_at)}` : ''}</div>
-            </div>
-          ))}
-        </div>
+      {resolvedCount > 0 && (
+        <Link href="/admin/archive?tab=reports" className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
+          <span>📁 البلاغات المُعالَجة ({resolvedCount}) انتقلت للأرشيف</span>
+          <span>فتح الأرشيف ←</span>
+        </Link>
       )}
     </div>
   );
@@ -230,49 +220,12 @@ async function AutoReportsTab() {
         </div>
       )}
 
-      {/* بقية السجل: مخالفات لم تصل لحدّ الحظر، وحالات حظر رُوجعت بالفعل */}
+      {/* بقية السجل: مخالفات لم تصل لحدّ الحظر، وحالات حظر رُوجعت بالفعل — انتقلت للأرشيف لإبقاء هذا العرض حياً بالمعلّق فقط */}
       {rest.length > 0 && (
-        <div className="space-y-2 pt-1">
-          {pendingBans.length > 0 && <h2 className="text-sm font-bold text-muted-foreground">بقية السجل</h2>}
-          {rest.map((e) => {
-            const k = KIND_LABEL[e.kind] || { label: e.kind, icon: AlertTriangle };
-            const banned = e.action === 'banned';
-            const adBanned = e.action === 'ad_banned';
-            const accountDeleted = e.action === 'account_deleted';
-            const terminal = banned || adBanned || accountDeleted;
-            const hasDetails = !!(e.snippet || e.term || e.adId || adBanned || accountDeleted);
-            return (
-              <details key={e.id} className={`card-3d rounded-xl ${terminal ? '!border-red-200 bg-red-50/40 opacity-80' : ''}`}>
-                <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 p-3">
-                  <k.icon className={`h-4 w-4 shrink-0 ${terminal ? 'text-red-600' : 'text-amber-600'}`} />
-                  <span className="text-sm font-bold text-primary">{k.label}</span>
-                  <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary"><Bot className="h-3 w-3" /> رصد آلي</span>
-                  {e.category && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs">{CATEGORY_LABEL[e.category as GuardCategory] || e.category}</span>}
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${banned ? 'bg-red-600 text-white' : terminal ? 'bg-destructive text-white' : 'bg-amber-200 text-amber-900'}`}>
-                    {banned ? 'حظر الحساب' : adBanned ? '🚫 حُذف الإعلان نهائياً' : accountDeleted ? '🗑️ حُذف الحساب' : 'رفض النشر'}
-                  </span>
-                  {banned && e.reviewedAt && (
-                    <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                      <Check className="h-3 w-3" /> رُوجع — الحساب الآن: {isBannedNowById.get(e.userId) ? 'محظور' : 'غير محظور'}
-                    </span>
-                  )}
-                  <Link href={`/admin/users/${e.userId}`} className="text-xs font-bold text-primary underline">{nameById.get(e.userId) || `عضو #${en(e.userId)}`}</Link>
-                  <span className="text-xs text-muted-foreground">{timeAgo(e.createdAt)}</span>
-                  {hasDetails && <span className="mr-auto shrink-0 text-[11px] font-bold text-primary">عرض التفاصيل ▾</span>}
-                </summary>
-                {hasDetails && (
-                  <div className="space-y-1.5 border-t border-border/50 px-3 py-2 text-sm">
-                    {e.term && <div><b className="text-primary">الكلمة/العبارة الممنوعة:</b> «{e.term}»</div>}
-                    {e.snippet && <div className="text-muted-foreground">المحتوى: «{e.snippet}»</div>}
-                    {adBanned && <div className="text-xs text-muted-foreground">🗑 هذا الإعلان حُذف نهائياً عبر هذا الإجراء نفسه (إجراء إداري مباشر مكتمل) — لا صفحة له بعد الآن، ولا حاجة لأي إجراء إضافي.</div>}
-                    {accountDeleted && <div className="text-xs text-muted-foreground">🗑️ حذف العضو حسابه بنفسه — الاسم والبيانات مموَّهة نهائياً، ولا حاجة لأي إجراء إضافي.</div>}
-                    <AdEventLink e={e} />
-                  </div>
-                )}
-              </details>
-            );
-          })}
-        </div>
+        <Link href="/admin/archive?tab=modlog" className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
+          <span>📁 بقية السجل ({rest.length}) — مخالفات مُغلقة وحالات رُوجعت، بالأرشيف</span>
+          <span>فتح الأرشيف ←</span>
+        </Link>
       )}
     </div>
   );

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import {
   Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles, Crown,
   MonitorPlay, ShieldAlert, Mail, BookOpen, LayoutGrid, KeyRound, Ban, Settings, Database, Smartphone, Store,
-  HandCoins, Coins, ScrollText, Zap,
+  HandCoins, Coins, ScrollText, Zap, Archive,
 } from 'lucide-react';
 import { adminStats } from '@/lib/admin';
 import { getPackages } from '@/lib/packages';
@@ -72,6 +72,7 @@ export default async function AdminHome() {
     { group: 'system', label: 'الإعدادات', icon: Settings, href: '/admin/settings', perm: 'users', nav: true },
     { group: 'system', label: 'النسخ الاحتياطي', icon: Database, href: '/admin/backup', perm: 'backup', nav: true },
     { group: 'system', label: 'النقاشات', value: s.debates, icon: MessagesSquare, href: '/debates', perm: null },
+    { group: 'system', label: 'الأرشيف', icon: Archive, href: '/admin/archive', perm: null, nav: true },
     { group: 'system', label: 'دليل الإدارة', icon: BookOpen, href: '/admin/guide', perm: null, nav: true },
   ];
   const visible = allCards.filter((c) => c.perm === null || perms.has(c.perm));

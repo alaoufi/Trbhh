@@ -23,6 +23,7 @@ export async function getComments(adId: number) {
       parentId: r.parent_id,
       author: u?.name || u?.userName || 'مستخدم',
       avatar: u?.photo_path ? mediaUrl(u.photo_path) : null,
+      senderId: toInt(r.sender_id),
     };
   });
 }

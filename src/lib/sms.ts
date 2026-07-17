@@ -199,7 +199,7 @@ export async function userExistsByPhone(phone: string): Promise<boolean> {
   return !!u;
 }
 
-/** Generate a 4-digit code, store it, and send via the active channel(s).
+/** Generate a 6-digit code, store it, and send via the active channel(s).
  *  ok    = the code was created and the gateway is configured (advance to entry)
  *  delivered = the send call reported success (best-effort; detection can vary) */
 export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; delivered: boolean; error?: string }> {

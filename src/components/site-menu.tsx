@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel, Palette, UserPen, ShieldCheck, Users,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel, Palette, UserPen, ShieldCheck, Users, LayoutGrid,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
@@ -24,19 +24,19 @@ function Item({ href, icon: Icon, children, onClick }: { href: string; icon: Rea
   );
 }
 
-/** قسم قابل للطي — المتشابهات في قائمة فرعية واحدة */
+/** قسم قابل للطي — المتشابهات في قائمة فرعية واحدة، بمظهر سلس يندمج مع بقية القائمة */
 function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mt-1 overflow-hidden rounded-lg border border-primary/15">
+    <div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 bg-secondary/40 px-3 py-2.5 text-[15px] font-bold text-primary"
+        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-[15px] font-medium text-foreground hover:bg-accent"
       >
-        <span className="flex items-center gap-3"><Icon className="h-5 w-5 shrink-0" /> {title}</span>
-        <ChevronDown className={`h-5 w-5 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span className="flex items-center gap-3"><Icon className="h-5 w-5 shrink-0 text-primary" /> {title}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div className="p-1">{children}</div>}
+      {open && <div className="mr-2 space-y-0.5 border-r-2 border-border py-0.5 pr-2">{children}</div>}
     </div>
   );
 }
@@ -226,15 +226,15 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
               <>
               <button
                 onClick={() => setCatOpen((v) => !v)}
-                className="mt-1 flex w-full items-center justify-between rounded-lg bg-primary px-3 py-2.5 text-[15px] font-bold text-white"
+                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-[15px] font-medium text-foreground hover:bg-accent"
               >
-                <span>الأقسام</span>
-                <ChevronDown className={`h-5 w-5 transition-transform ${catOpen ? 'rotate-180' : ''}`} />
+                <span className="flex items-center gap-3"><LayoutGrid className="h-5 w-5 shrink-0 text-primary" /> الأقسام</span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${catOpen ? 'rotate-180' : ''}`} />
               </button>
               {catOpen && cats.length > 0 && (
-                <div className="mb-1 mt-1 max-h-64 overflow-y-auto rounded-lg border border-primary/15">
+                <div className="mr-2 max-h-64 space-y-0.5 overflow-y-auto border-r-2 border-border py-0.5 pr-2">
                   {cats.map((c) => (
-                    <Link key={c.id} href={`/categories/${c.id}`} onClick={close} className="block px-4 py-2.5 text-sm hover:bg-accent">
+                    <Link key={c.id} href={`/categories/${c.id}`} onClick={close} className="block rounded-lg px-3 py-2 text-sm text-foreground hover:bg-accent">
                       {c.name}
                     </Link>
                   ))}

@@ -303,6 +303,22 @@ button:active { }
   .float-3d { animation: none; }
 }
 
+/* بوب أب الترحيب: دخول ثلاثي الأبعاد بارز (تكبير + ميل خفيف) وخروج سريع بالتلاشي */
+.popup-3d-enter { animation: popup-3d-in .5s cubic-bezier(.34,1.56,.64,1) both; }
+.popup-3d-exit { animation: popup-3d-out .28s ease-in both; }
+@keyframes popup-3d-in {
+  0%   { opacity: 0; transform: translateY(-24px) scale(.82) rotateX(8deg); }
+  60%  { opacity: 1; transform: translateY(4px) scale(1.03) rotateX(0deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0deg); }
+}
+@keyframes popup-3d-out {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-10px) scale(.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .popup-3d-enter, .popup-3d-exit { animation: none; }
+}
+
 /* animated «open your store» banner: shifting vivid gradient + shimmer sweep */
 .store-cta-anim { background-size: 220% 220%; animation: store-cta-shift 6s ease-in-out infinite; }
 @keyframes store-cta-shift {

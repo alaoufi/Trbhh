@@ -68,8 +68,10 @@ export async function Header() {
           <LiveClock />
         </div>
 
-        {/* logo on the left (RTL: last child) — مزاح لأقصى يسار الهيدر (يتجاوز فراغ .container الجانبي) ليلامس الحافة؛ الأصل القديم محفوظ بالاسم logo-mark-256.png للتراجع الفوري */}
-        <Link href="/" className="-ml-4 shrink-0">
+        {/* logo on the left (RTL: last child) — يبقى داخل هامش الحاوية بدل ملامسة حافة
+            الشاشة تماماً، لأن الحافة القصوى تُحجب أحياناً بشريط عنوان المتصفح العائم أو
+            بزوايا الشاشة المدوّرة على بعض الأجهزة (ظهر الشعار مختفياً/مقصوصاً هناك). */}
+        <Link href="/" className="shrink-0">
           <Image src="/logo-feathered.png" alt="تربح" width={48} height={48} priority className="h-12 w-12 object-contain" />
         </Link>
       </div>

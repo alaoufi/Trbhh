@@ -358,6 +358,18 @@ export const DEFAULT_HOME_NOCATS_BANNER = 'إعلانك مهم وبارز أما
 export const SETTING_SITE_SHARE_TITLE = 'site_share_title';
 export const SETTING_SITE_SHARE_DESC = 'site_share_desc';
 
+/* بوب أب الترحيب (بالرئيسية للزائر، وبصفحة الحساب للعضو): نصّاه ومدة ظهوره قبل
+   الاختفاء التلقائي — تظهران في «النصوص الظاهرة» ← «رسائل الترحيب». */
+export const SETTING_WELCOME_GUEST_TEXT = 'welcome_guest_text';
+export const DEFAULT_WELCOME_GUEST_TEXT = 'مرحباً ضيفنا العزيز ،، نرحب بك في مكانك — سجّل معنا ليصلك ما يهمّك.';
+export const SETTING_WELCOME_MEMBER_TEXT = 'welcome_member_text';
+export const DEFAULT_WELCOME_MEMBER_TEXT = 'نرحب بك مجدداً يا {name}، ونسعد بوجودك ومشاركتك.';
+export const SETTING_WELCOME_POPUP_SECONDS = 'welcome_popup_seconds';
+export async function getWelcomePopupSeconds(): Promise<number> {
+  const n = await getSettingNum(SETTING_WELCOME_POPUP_SECONDS, 4);
+  return Math.min(30, Math.max(2, n || 4));
+}
+
 export const SETTING_TICKER = 'ticker_note';
 export const DEFAULT_TICKER = 'منصة تربح وسيلة عرض وربط فقط، والتعامل والدفع يتمّ خارج المنصة مباشرة بين الطرفين';
 export const SETTING_HOME_CLS_TITLE = 'home_cls_title';

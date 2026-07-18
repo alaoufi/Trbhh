@@ -13,7 +13,7 @@ import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { PromoSlot } from '@/components/promo-slot';
 import { DisclaimerBar } from '@/components/disclaimer';
-import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, categoriesEnabled } from '@/lib/settings';
+import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, categoriesEnabled, getSetting, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
@@ -95,6 +95,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const myStore = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // الرصيد الترحيبي — بانر للزوار فقط عندما يحدد التحكم مبلغاً أكبر من صفر
   const welcomeCredit = session ? 0 : await import('@/lib/points').then((m) => m.getWelcomeCredit()).catch(() => 0);
+  const [guestWelcomeText, welcomePopupSeconds] = await Promise.all([
+    getSetting(SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT),
+    getWelcomePopupSeconds(),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -105,7 +109,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {!session && welcomeCredit > 0 && <WelcomeBanner amount={welcomeCredit} />}
 
       {/* ترحيب بالزائر غير المسجّل + دعوة للتسجيل — أول زيارة في الجلسة فقط، لا يتكرر مزعجاً */}
-      {!session && <GuestWelcomeBanner />}
+      {!session && <GuestWelcomeBanner text={guestWelcomeText} seconds={welcomePopupSeconds} />}
 
       {/* بانر عرض الشحن: اشحن بـ100 ونضيف لك 10 — يظهر عند تفعيل مكافآت الشحن من التحكم */}
       <TopupPromoBanner />

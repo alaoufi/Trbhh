@@ -1,11 +1,12 @@
 import Link from 'next/link';
-import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox, Braces, ShieldCheck, HandCoins } from 'lucide-react';
+import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox, Braces, ShieldCheck, HandCoins, Smile } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import {
-  getSetting, getHomeHeadings, getEmptyTexts,
+  getSetting, getHomeHeadings, getEmptyTexts, getWelcomePopupSeconds,
   SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_MSG_TPL_SUPPORT, SETTING_AD_NOTICE, SETTING_SUB_REMINDER_MSG,
   SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB,
   SETTING_SITE_SHARE_TITLE, SETTING_SITE_SHARE_DESC,
+  SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT, SETTING_WELCOME_MEMBER_TEXT, DEFAULT_WELCOME_MEMBER_TEXT,
   SETTING_HOME_NOCATS_BANNER, DEFAULT_HOME_NOCATS_BANNER,
   SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT,
   SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT, SETTING_MSG_TOPUP_CANCEL,
@@ -30,6 +31,7 @@ const field = 'h-11 w-full rounded-lg border border-primary/30 bg-white px-3 tex
 const SECTIONS = [
   { key: 'vars', label: 'المتغيّرات', icon: Braces },
   { key: 'general', label: 'عام', icon: Megaphone },
+  { key: 'welcome', label: 'رسائل الترحيب', icon: Smile },
   { key: 'home', label: 'الرئيسية', icon: Home },
   { key: 'ad', label: 'صفحة الإعلان', icon: Sparkles },
   { key: 'msg', label: 'المراسلة', icon: MessageSquare },
@@ -44,7 +46,7 @@ type Sec = typeof SECTIONS[number]['key'];
 // المتغيّرات المتاحة — تُكتب داخل أي نص وتُستبدل بالقيمة الفعلية عند العرض/الإرسال.
 const VARIABLES = [
   { token: '{link}', meaning: 'رابط الإعلان أو المنتج أو المتجر', where: 'نصوص المراسلة — ويُضاف تلقائياً في رسائل واتساب من صفحة الإعلان/المنتج حتى لو لم تكتبه.' },
-  { token: '{name}', meaning: 'اسم الإعلان/المنتج، أو اسم المتجر، أو اسم الطرف الآخر في المحادثة', where: 'نصوص المراسلة، ورسالة تنبيه الاشتراك (اسم المتجر).' },
+  { token: '{name}', meaning: 'اسم الإعلان/المنتج، أو اسم المتجر، أو اسم الطرف الآخر في المحادثة', where: 'نصوص المراسلة، ورسالة تنبيه الاشتراك (اسم المتجر)، ورسالة ترحيب العضو (اسمه).' },
   { token: '{days}', meaning: 'عدد الأيام المتبقية قبل انتهاء الاشتراك', where: 'رسالة تنبيه الاشتراك.' },
   { token: '{date}', meaning: 'تاريخ انتهاء الاشتراك', where: 'رسالة تنبيه الاشتراك.' },
   { token: '{reason}', meaning: 'سبب رفض الطلب (توثيق أو شحن رصيد)', where: 'رسالة رفض التوثيق (تبويب «التوثيق») ورسالة رفض شحن الرصيد (تبويب «المحفظة»).' },
@@ -82,6 +84,11 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
   const [feedPromo, feedAware] = await Promise.all([
     getSetting('feed_texts_promo', DEFAULT_FEED_TEXTS_PROMO),
     getSetting('feed_texts_aware', DEFAULT_FEED_TEXTS_AWARE),
+  ]);
+  const [welcomeGuestText, welcomeMemberText, welcomePopupSeconds] = await Promise.all([
+    getSetting(SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT),
+    getSetting(SETTING_WELCOME_MEMBER_TEXT, DEFAULT_WELCOME_MEMBER_TEXT),
+    getWelcomePopupSeconds(),
   ]);
 
   return (
@@ -143,6 +150,26 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
             <span className="text-sm font-medium">وصف مشاركة الموقع</span>
             <textarea name="shareDesc" rows={2} defaultValue={shareDesc} className={box} />
           </label>
+          </>
+        )}
+
+        {sec === 'welcome' && (
+          <>
+            <p className="text-xs text-muted-foreground">
+              بوب أب يظهر فوق المحتوى مرة واحدة فقط لكل جلسة تصفح (الرئيسية للزائر، وصفحة الحساب للعضو عند الدخول) ثم يختفي تلقائياً. المتغيّر <b dir="ltr">{'{name}'}</b> في رسالة العضو يُستبدل باسمه.
+            </p>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">ترحيب الزائر غير المسجّل (الرئيسية)</span>
+              <textarea name="welcomeGuestText" rows={2} defaultValue={welcomeGuestText} className={box} />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">ترحيب العضو عند دخول حسابه — المتغيّر {'{name}'}</span>
+              <textarea name="welcomeMemberText" rows={2} defaultValue={welcomeMemberText} className={box} />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">مدة الظهور قبل الاختفاء التلقائي (ثوانٍ، بين 2 و30)</span>
+              <input name="welcomePopupSeconds" type="number" min={2} max={30} defaultValue={welcomePopupSeconds} className={field} />
+            </label>
           </>
         )}
 

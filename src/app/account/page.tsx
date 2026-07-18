@@ -14,6 +14,7 @@ import { CopyChip } from '@/components/copy-chip';
 import { TopupPromoBanner } from '@/components/topup-promo-banner';
 import { referralEnabled, getReferralReward } from '@/lib/points';
 import { SITE } from '@/lib/constants';
+import { getSetting, getWelcomePopupSeconds, fillTemplate, SETTING_WELCOME_MEMBER_TEXT, DEFAULT_WELCOME_MEMBER_TEXT } from '@/lib/settings';
 import { AccountWelcomeCard } from '@/components/account-welcome-card';
 import { setInterestsAction } from './actions';
 
@@ -27,11 +28,14 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
   const sp = searchParams ? await searchParams : {};
   // نقطة الزيارة اليومية (إن فُعّلت) — لا تؤخر الصفحة
   import('@/lib/points').then((m) => m.grantDailyVisit(session.uid)).catch(() => {});
-  const [stats, alerts, categories, interests, rating, balance, newNotifs, refOn] = await Promise.all([
+  const [stats, alerts, categories, interests, rating, balance, newNotifs, refOn, welcomeTpl, welcomeSeconds] = await Promise.all([
     getMyStats(session.uid), getMemberAlerts(session.uid), getCategories(), getInterests(session.uid), getSellerRating(session.uid), getBalance(session.uid),
     prisma.notfications.count({ where: { user_id: String(session.uid), read_at: null } }).catch(() => 0),
     referralEnabled(),
+    getSetting(SETTING_WELCOME_MEMBER_TEXT, DEFAULT_WELCOME_MEMBER_TEXT),
+    getWelcomePopupSeconds(),
   ]);
+  const welcomeText = fillTemplate(welcomeTpl, { name: session.name });
   // اكتشاف خدمات هذا الحساب + بقية الإعدادات المستقلّة بالتوازي (بدل جولات متتابعة)
   const [refReward, myStoreId, isAdmin, linkedCount, catsOn] = await Promise.all([
     refOn ? getReferralReward() : Promise.resolve(0),
@@ -60,10 +64,11 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
       <h1 className="text-xl font-bold text-primary">مرحباً {session.name} 👋</h1>
       {/* ترحيب بالعضو عند دخوله حسابه + دعوة لمشاركة المنصة — أول زيارة في الجلسة فقط */}
       <AccountWelcomeCard
-        name={session.name}
+        text={welcomeText}
+        seconds={welcomeSeconds}
         url={`https://${SITE.domain}`}
         title={SITE.name}
-        text={`${SITE.name} — ${SITE.tagline}`}
+        shareText={`${SITE.name} — ${SITE.tagline}`}
         card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/apple-icon.png' }}
       />
 

@@ -214,11 +214,15 @@ export async function createAdAction(formData: FormData) {
   }
   // حقول إجبارية — أظهِر السبب بدل الرجوع الصامت
   if (!title || !detail) redirect(`/ads/new?error=missing${q}`);
-  // الأقسام مخفية (لا حقل قسم في النموذج): يُسند الإعلان داخلياً لقسم «عروض أخرى»
+  // الأقسام مخفية (لا حقل قسم في النموذج): تصنيف ذكي محلي بالكلمات المفتاحية
+  // يختار أنسب قسم فعلي من العنوان والتفاصيل، ويُعلَّم الإعلان لمراجعة الإدارة لاحقاً
   let catId = category_id;
+  let aiClassified = false;
   if (catId <= 0n) {
-    const { getFallbackCategoryId } = await import('@/lib/data');
-    catId = BigInt(await getFallbackCategoryId());
+    const { classifyAdText } = await import('@/lib/classifier');
+    const r = await classifyAdText(title, detail);
+    catId = BigInt(r.categoryId);
+    aiClassified = true;
     if (catId <= 0n) redirect(`/ads/new?error=missing${q}`);
   }
   // تعهّد صحة الإعلان وتحمّل المسؤولية إجباري
@@ -380,6 +384,7 @@ export async function createAdAction(formData: FormData) {
       old_price: priceType === 'som' ? 0 : Math.max(0, parseFloat(String(formData.get('old_price') || '0')) || 0),
       stock_state: [0, 1, 2].includes(Number(formData.get('stock_state'))) ? Number(formData.get('stock_state')) : 0,
       store_only: dest === 'store' ? 1 : 0, // عزل تام: إعلان المتجر لا يظهر في تربح
+      cat_reviewed: aiClassified ? 0 : 1, // تصنيف آلي؟ ينتظر مراجعة الإدارة
       bumped_at: new Date(), // ترتيب «الأحدث» يعتمد آخر تحديث (Bump)
       ...(scheduledAt ? { status: 0, publish_at: scheduledAt } : {}),
       created_at: new Date(),
@@ -524,9 +529,10 @@ export async function updateAdAction(formData: FormData) {
       price_type: ePriceType,
       rent_period: eRentPeriod,
       ...(ePriceType === 'som' ? { old_price: 0 } : {}),
-      // الأقسام مخفية؟ لا حقل قسم مُرسل — نبقي قسم الإعلان الحالي دون أي تغيير
+      // الأقسام مخفية؟ لا حقل قسم مُرسل — نبقي قسم الإعلان الحالي دون أي تغيير.
+      // اختيار العضو صراحةً لقسم = لا حاجة لمراجعة إدارية (ليس تصنيفاً آلياً).
       ...(Number(formData.get('category_id') || 0) > 0
-        ? { category_id: BigInt(String(formData.get('category_id'))), subcategory_id: formData.get('subcategory_id') ? Number(formData.get('subcategory_id')) : null }
+        ? { category_id: BigInt(String(formData.get('category_id'))), subcategory_id: formData.get('subcategory_id') ? Number(formData.get('subcategory_id')) : null, cat_reviewed: 1 }
         : {}),
       city_id: BigInt(String(formData.get('city_id') || '0')),
       area_id: formData.get('area_id') ? Number(formData.get('area_id')) : null,

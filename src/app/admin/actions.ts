@@ -1341,6 +1341,52 @@ export async function moveCategoryAction(formData: FormData) {
   await refreshCategories();
 }
 
+/* ---- التصنيف الذكي المحلي للإعلانات (بلا خدمة خارجية) ---- */
+
+/** يشغّل المصنّف على دفعات من الإعلانات القديمة الجالسة في «عروض أخرى»
+ *  (حتى ٦٠٠ إعلان لكل ضغطة، ليبقى ضمن مهلة الطلب) — يمكن تكرار الضغط للمتبقي. */
+export async function runBatchClassifyAction() {
+  const session = await requireAction('categories', 'edit');
+  const { classifyPendingAds } = await import('@/lib/classifier');
+  let processed = 0;
+  let moved = 0;
+  for (let i = 0; i < 3; i++) {
+    const r = await classifyPendingAds(200);
+    processed += r.processed;
+    moved += r.moved;
+    if (r.processed < 200) break;
+  }
+  await bustAdCaches().catch(() => {});
+  await logAdmin(session.uid, 'تصنيف آلي للإعلانات القديمة', '', `عولج ${processed} إعلان، انتقل ${moved} منها لقسم جديد`);
+  revalidatePath('/admin/classifier');
+  redirect(`/admin/classifier?ran=1&processed=${processed}&moved=${moved}`);
+}
+
+/** اعتماد/تصحيح تصنيف إعلان واحد من صفحة المراجعة. */
+export async function confirmAdCategoryAction(formData: FormData) {
+  const session = await requireAction('categories', 'edit');
+  const adId = BigInt(String(formData.get('adId') || '0'));
+  const catId = BigInt(String(formData.get('category_id') || '0'));
+  if (adId <= 0n || catId <= 0n) return;
+  const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { category_id: true, title: true } });
+  if (!ad) return;
+  await prisma.ads.update({ where: { id: adId }, data: { category_id: catId, cat_reviewed: 1 } });
+  if (toInt(ad.category_id) !== toInt(catId)) {
+    await logAdmin(session.uid, 'تصحيح تصنيف إعلان', `الإعلان #${toInt(adId)}`, `«${ad.title.slice(0, 60)}»`);
+  }
+  await bustAdCaches().catch(() => {});
+  revalidatePath('/admin/classifier');
+}
+
+/** اعتماد كل الاقتراحات الظاهرة حالياً كما هي دون تعديل فردي (تسريع المراجعة الجماعية). */
+export async function confirmAllPendingAction(formData: FormData) {
+  await requireAction('categories', 'edit');
+  const ids = String(formData.get('adIds') || '').split(',').map((s) => BigInt(s.trim())).filter((n) => n > 0n);
+  if (ids.length) await prisma.ads.updateMany({ where: { id: { in: ids } }, data: { cat_reviewed: 1 } });
+  await bustAdCaches().catch(() => {});
+  revalidatePath('/admin/classifier');
+}
+
 /* ---- User view / edit / send-password ---- */
 /** Admin credits or debits a member's wallet (رصيد). action=credit|debit. */
 export async function adjustUserBalanceAction(formData: FormData) {

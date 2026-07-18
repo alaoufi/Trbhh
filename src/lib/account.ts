@@ -5,7 +5,7 @@ import { toInt } from './utils';
 
 /** الصور الأساسية دفعةً واحدة (استعلامان للكل) — كانت ٢ لكل إعلان (N+1)
  *  فتستهلك حوض الاتصالات وتبطّئ لوحة العضو والمتجر ومنتجات الرئيسية. */
-async function primaryImages(adIds: bigint[]): Promise<Map<number, string>> {
+export async function primaryImages(adIds: bigint[]): Promise<Map<number, string>> {
   const out = new Map<number, string>();
   if (!adIds.length) return out;
   const photos = await prisma.photos.findMany({ where: { other_id: { in: adIds } }, orderBy: { id: 'asc' } }).catch(() => []);

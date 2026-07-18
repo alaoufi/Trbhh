@@ -570,6 +570,10 @@ const STATEMENTS: string[] = [
   `CREATE INDEX photos_other_id ON photos (other_id)`,
   // مواضيع النقاش كانت بلا صاحب مسجَّل إطلاقاً — يمنع كشف تكرار نفس العضو لموضوعه
   `ALTER TABLE debates ADD COLUMN user_id INT NULL`,
+  /* تصنيف ذكي محلي للإعلانات: 0 = عيّنه المصنّف الآلي وبانتظار مراجعة الإدارة،
+     1 = اختاره العضو صراحةً أو اعتمدته الإدارة (لا حاجة لمراجعة). */
+  `ALTER TABLE ads ADD COLUMN cat_reviewed TINYINT NOT NULL DEFAULT 1`,
+  `CREATE INDEX ads_cat_reviewed ON ads (cat_reviewed)`,
 ];
 
 let syncPromise: Promise<void> | null = null;

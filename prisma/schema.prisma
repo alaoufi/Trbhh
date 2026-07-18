@@ -68,6 +68,7 @@ model ads {
   end_date_price   String?
   start_date_price String?
   expires_at       DateTime? @db.DateTime(0)
+  cat_reviewed     Int       @default(1) @db.TinyInt
 
   @@index([category_id], map: "ads_category_id_foreign")
   @@index([city_id], map: "ads_city_id_foreign")
@@ -75,6 +76,7 @@ model ads {
   @@index([expires_at], map: "ads_expires_at")
   @@index([status, state, bumped_at], map: "ads_listing_bumped")
   @@index([status, state, created_at], map: "ads_listing_created")
+  @@index([cat_reviewed], map: "ads_cat_reviewed")
 }
 
 model ads_admins {

@@ -4,7 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import {
   MapPin, Eye, Phone, MessageCircle, Timer, Tag, Flag, Send,
   User, BadgeCheck, Hash, ArrowLeftRight, Star, Share2, Heart, Navigation,
-  ShieldAlert, Trash2, Archive, Ban, Store, EyeOff, Check,
+  ShieldAlert, Trash2, Archive, Ban, Store, EyeOff, Check, Pencil,
 } from 'lucide-react';
 import { SplashSuppress } from '@/components/splash-suppress';
 import { getAd, getSimilarAds, getSellerAds, recordView } from '@/lib/data';
@@ -15,7 +15,7 @@ import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { waLink } from '@/lib/classified-theme';
-import { getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate } from '@/lib/settings';
+import { getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate, getMemberWindows, adWindowState } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
@@ -30,7 +30,7 @@ import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
-import { buyUrgentAction, featureAdAction, bumpAdAction } from '@/app/account/actions';
+import { buyUrgentAction, featureAdAction, bumpAdAction, deleteAdAction, archiveAdAction } from '@/app/account/actions';
 import { PromoSlot } from '@/components/promo-slot';
 import { getAdAudio } from '@/lib/ad-media';
 import { mediaUrl } from '@/lib/media';
@@ -80,7 +80,7 @@ function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath
   );
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; urgenton?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; urgenton?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -169,6 +169,10 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         return m.DURATIONS.map((d) => ({ key: d.key, label: d.label, price: svc.featured[d.key] })).filter((o) => o.price > 0);
       }).catch(() => [])
     : [];
+  // إدارة الإعلان لصاحبه مباشرة من صفحته: تعديل/أرشفة/حذف، بنفس مهل السماح المعمول بها في «إعلاناتي»
+  const memberWindows = isAdOwner ? await getMemberWindows().catch(() => ({ editHours: 0, deleteHours: 0 })) : null;
+  const editState = memberWindows ? adWindowState(ad.createdAt, memberWindows.editHours) : null;
+  const deleteState = memberWindows ? adWindowState(ad.createdAt, memberWindows.deleteHours) : null;
   const ownerBalance = (urgentExtras && urgentExtras.urgentPacks.length > 0) || featuredOpts.length
     ? await import('@/lib/wallet').then((m) => m.getBalance(session!.uid)).catch(() => 0)
     : 0;
@@ -216,6 +220,49 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <div className="flex items-center gap-2 rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
           <Archive className="h-5 w-5 shrink-0" />
           <span>🗄️ هذا الإعلان مؤرشف — لا يظهر للزوّار ولا لأي عضو آخر، ويظهر لك الآن فقط بصفتك {admin && !ownerViewing ? 'الإدارة' : ownerViewing && admin ? 'صاحب الإعلان/الإدارة' : 'صاحب الإعلان'}.</span>
+        </div>
+      )}
+
+      {/* إدارة الإعلان لصاحبه مباشرة من صفحته: تعديل/أرشفة/حذف — بلا حاجة للذهاب لـ«إعلاناتي» */}
+      {isAdOwner && editState && deleteState && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
+          <span className="text-xs font-extrabold text-primary">إدارة إعلانك:</span>
+          {editState.expired ? (
+            <span className="flex items-center gap-1 rounded-md border border-border/50 bg-secondary/30 px-2.5 py-1.5 text-xs text-muted-foreground" title="تجاوز الإعلان مدة السماح بالتعديل">
+              <Pencil className="h-3.5 w-3.5" /> انتهت مهلة السماح
+            </span>
+          ) : (
+            <Link href={`/ads/${ad.id}/edit`} className="flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-bold hover:bg-secondary">
+              <Pencil className="h-3.5 w-3.5" /> تعديل{editState.label ? ` (${editState.label})` : ''}
+            </Link>
+          )}
+          {!ad.archived && (
+            <form action={archiveAdAction}>
+              <input type="hidden" name="adId" value={ad.id} />
+              <ConfirmSubmit msg={`نقل «${ad.title || `#${ad.id}`}» للأرشيف؟ يختفي فوراً عن الموقع ولا يُحذف.`} className="flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">
+                <Archive className="h-3.5 w-3.5" /> نقل للأرشيف
+              </ConfirmSubmit>
+            </form>
+          )}
+          {deleteState.expired ? (
+            <span className="flex items-center gap-1 rounded-md border border-border/50 bg-secondary/30 px-2.5 py-1.5 text-xs text-muted-foreground" title="تجاوز الإعلان مدة السماح بالحذف">
+              <Trash2 className="h-3.5 w-3.5" /> انتهت مهلة السماح
+            </span>
+          ) : (
+            <form action={deleteAdAction}>
+              <input type="hidden" name="adId" value={ad.id} />
+              <input type="hidden" name="back" value="ad" />
+              <ConfirmSubmit msg={`حذف إعلانك «${ad.title || `#${ad.id}`}» نهائياً؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10">
+                <Trash2 className="h-3.5 w-3.5" /> حذف{deleteState.label ? ` (${deleteState.label})` : ''}
+              </ConfirmSubmit>
+            </form>
+          )}
+          <Link href="/account/ads" className="mr-auto text-xs font-bold text-primary underline">كل إعلاناتي ←</Link>
+        </div>
+      )}
+      {spx.error === 'deleteWindow' && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          انتهت المدة المسموح بها لحذف الإعلان{spx.hours ? ` (${spx.hours} ساعة من النشر)` : ''} حسب إعدادات الموقع. للحذف بعد هذه المدة تواصل مع الإدارة.
         </div>
       )}
 

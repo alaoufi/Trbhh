@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { Pencil, Trash2, Eye, EyeOff, Wallet, Archive } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyAds, adContactCounts } from '@/lib/account';
-import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingBool, getAdRestoreFee, getMemberWindows } from '@/lib/settings';
+import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingBool, getAdRestoreFee, getMemberWindows, adWindowState } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -27,20 +27,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const fmtDay = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d); };
   // متبقي مهلة التعديل/الحذف على كل زر — 0 = بلا حد فلا نعرض شيئاً
-  const fmtRemaining = (ms: number) => {
-    const totalMin = Math.max(0, Math.ceil(ms / 60000));
-    const h = Math.floor(totalMin / 60);
-    const m = totalMin % 60;
-    if (h > 0 && m > 0) return `متبقي ${h}س ${m}د`;
-    if (h > 0) return `متبقي ${h}س`;
-    return `متبقي ${m}د`;
-  };
-  const windowState = (createdAt: string | null, hours: number): { expired: boolean; label: string | null } => {
-    if (!hours || hours <= 0) return { expired: false, label: null };
-    const createdMs = createdAt ? new Date(createdAt).getTime() : 0;
-    const remain = createdMs + hours * 3600_000 - now;
-    return remain <= 0 ? { expired: true, label: 'انتهت مهلة السماح' } : { expired: false, label: fmtRemaining(remain) };
-  };
+  const windowState = adWindowState;
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">

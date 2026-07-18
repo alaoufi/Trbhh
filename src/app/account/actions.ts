@@ -39,16 +39,20 @@ export async function setInterestsAction(formData: FormData) {
 export async function deleteAdAction(formData: FormData) {
   const session = await requireUser();
   const adId = BigInt(String(formData.get('adId')));
+  // back=ad: الزر من صفحة الإعلان نفسها — بعد الحذف لا يوجد إعلان يُعرض فنعود لـ«إعلاناتي»
+  const back = String(formData.get('back') || '') === 'ad' ? `/ads/${toInt(adId)}` : '';
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (ad && toInt(ad.user_id) === session.uid) {
     const { deleteHours } = await getMemberWindows();
     if (!withinWindow(ad.created_at, deleteHours)) {
-      redirect(`/account/ads?error=deleteWindow&hours=${deleteHours}`);
+      redirect(back ? `${back}?error=deleteWindow&hours=${deleteHours}` : `/account/ads?error=deleteWindow&hours=${deleteHours}`);
     }
     await prisma.photos.deleteMany({ where: { other_id: adId } });
     await prisma.ads.delete({ where: { id: adId } });
   }
   revalidatePath('/account/ads');
+  revalidatePath('/');
+  if (back) redirect('/account/ads?deleted=1');
 }
 
 export async function toggleAdStatusAction(formData: FormData) {
@@ -87,6 +91,7 @@ export async function archiveAdAction(formData: FormData) {
   }
   revalidatePath('/account/ads');
   revalidatePath('/');
+  revalidatePath(`/ads/${toInt(adId)}`);
 }
 
 /** إعادة إظهار إعلان مؤرشف (تلقائياً بعد المدة أو من الإدارة) بخصم رسوم من

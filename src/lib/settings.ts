@@ -488,6 +488,19 @@ export function withinWindow(createdAt: Date | string | null | undefined, window
   return hoursSince(createdAt) <= windowHours;
 }
 
+/** عرض متبقي مهلة التعديل/الحذف على شكل تسمية جاهزة — نفس حدود withinWindow تماماً
+ *  (hours<=0 يعني بلا حد فلا نعرض شيئاً). مستخدَمة في «إعلاناتي» وصفحة الإعلان نفسها. */
+export function adWindowState(createdAt: Date | string | null | undefined, hours: number): { expired: boolean; label: string | null } {
+  if (!hours || hours <= 0) return { expired: false, label: null };
+  const remainMs = hours * 3600_000 - hoursSince(createdAt) * 3600_000;
+  if (remainMs <= 0) return { expired: true, label: 'انتهت مهلة السماح' };
+  const totalMin = Math.max(0, Math.ceil(remainMs / 60000));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  const label = h > 0 && m > 0 ? `متبقي ${h}س ${m}د` : h > 0 ? `متبقي ${h}س` : `متبقي ${m}د`;
+  return { expired: false, label };
+}
+
 /** How long the classified entry splash plays before auto-entering (seconds). */
 export const SETTING_CLASSIFIED_SECONDS = 'classified_splash_seconds';
 export async function getClassifiedSplashSeconds(): Promise<number> {

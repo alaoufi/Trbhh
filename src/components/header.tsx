@@ -69,10 +69,11 @@ export async function Header() {
         </div>
 
         {/* logo on the left (RTL: last child) — يبقى داخل هامش الحاوية بدل ملامسة حافة
-            الشاشة تماماً، لأن الحافة القصوى تُحجب أحياناً بشريط عنوان المتصفح العائم أو
-            بزوايا الشاشة المدوّرة على بعض الأجهزة (ظهر الشعار مختفياً/مقصوصاً هناك). */}
+            الشاشة تماماً. logo-header.png نسخة بخلفية شفافة حقيقية (لا مربّع داكن) من
+            نفس الشعار: النسخة القديمة logo-feathered.png كانت تتلاشى (يسارها خصوصاً)
+            إلى نفس لون تدرّج الهيدر الداكن فيظهر الشعار وكأنه مختفٍ رغم أنه يُرسَم كاملاً. */}
         <Link href="/" className="shrink-0">
-          <Image src="/logo-feathered.png" alt="تربح" width={48} height={48} priority className="h-12 w-12 object-contain" />
+          <Image src="/logo-header.png" alt="تربح" width={92} height={48} priority className="h-9 w-auto object-contain" />
         </Link>
       </div>
     </header>

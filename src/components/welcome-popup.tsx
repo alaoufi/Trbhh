@@ -28,14 +28,12 @@ export function WelcomePopup({ storageKey, autoHideMs = 4000, children }: { stor
       <div
         onClick={(e) => e.stopPropagation()}
         onAnimationEnd={() => { if (phase === 'out') setPhase('hidden'); }}
-        className={`card-3d w-full max-w-sm rounded-2xl bg-gradient-to-l from-primary/10 to-primary/5 p-4 ${phase === 'in' ? 'popup-3d-enter' : 'popup-3d-exit'}`}
+        className={`card-3d relative w-full max-w-sm rounded-2xl bg-gradient-to-l from-primary/10 to-primary/5 p-4 pt-8 ${phase === 'in' ? 'popup-3d-enter' : 'popup-3d-exit'}`}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">{children}</div>
-          <button type="button" aria-label="إغلاق" onClick={close} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-primary/60 hover:bg-primary/10">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        <button type="button" aria-label="إغلاق" onClick={close} className="absolute left-2 top-2 grid h-6 w-6 shrink-0 place-items-center rounded-full text-primary/60 hover:bg-primary/10">
+          <X className="h-4 w-4" />
+        </button>
+        <div className="text-center">{children}</div>
       </div>
     </div>
   );

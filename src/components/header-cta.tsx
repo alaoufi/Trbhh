@@ -16,7 +16,7 @@ export function HeaderCta({ isAuthed, myStoreId }: { isAuthed: boolean; myStoreI
     return <Link href="/" className={`${cls} !text-xs`}><Home className="h-4 w-4 shrink-0" /> الصفحة الرئيسية</Link>;
   }
   if (!isAuthed) {
-    return <Link href="/login" className={cls}><LogIn className="h-5 w-5" /> تسجيل الدخول</Link>;
+    return <Link href="/login" className={`${cls} !text-xs`}><LogIn className="h-5 w-5" /> تسجيل الدخول</Link>;
   }
   if (myStoreId > 0) {
     return <Link href={`/companies/${myStoreId}`} className={cls}><Store className="h-5 w-5" /> رابط المتجر</Link>;

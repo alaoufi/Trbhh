@@ -219,12 +219,17 @@ async function blocked(waitSec: number, userId: number): Promise<{ blocked: bool
   return { blocked: true, waitSec: wait };
 }
 
-/** Recent moderation events for the admin log (newest first). */
-export async function getModLog(limit = 200): Promise<{
+/** Recent moderation events for the admin log (newest first) — optionally
+ *  scoped to one member (per-user violation history). */
+export async function getModLog(limit = 200, userId?: number): Promise<{
   id: number; userId: number; kind: string; category: string | null; term: string | null; snippet: string | null; action: string; createdAt: string | null; reviewedAt: string | null; adId: number | null;
 }[]> {
   await ensureTables();
-  const rows = await prisma.mod_log.findMany({ orderBy: { id: 'desc' }, take: limit }).catch(() => []);
+  const rows = await prisma.mod_log.findMany({
+    where: userId ? { user_id: BigInt(userId) } : undefined,
+    orderBy: { id: 'desc' },
+    take: limit,
+  }).catch(() => []);
   return rows.map((r) => ({
     id: Number(r.id),
     userId: Number(r.user_id),

@@ -29,11 +29,17 @@ const COMM_META: Record<StoreComm['kind'], { icon: string; label: string; cls: s
   warn: { icon: '⚠️', label: 'إنذار مخالفة', cls: 'text-red-700' },
   adhide: { icon: '🚫', label: 'إخفاء إعلان + إنذار', cls: 'text-red-700' },
   message: { icon: '✉️', label: 'رسالة رسمية', cls: 'text-sky-700' },
+  suspend: { icon: '⏸️', label: 'إيقاف مؤقت', cls: 'text-amber-700' },
+  suspend_perm: { icon: '⛔', label: 'إيقاف نهائي', cls: 'text-red-800' },
+  reactivate: { icon: '▶️', label: 'إعادة تفعيل', cls: 'text-emerald-700' },
+  approve: { icon: '✅', label: 'اعتماد المتجر', cls: 'text-emerald-700' },
+  reject: { icon: '❌', label: 'رفض المتجر', cls: 'text-red-700' },
 };
 
 function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
   const st = STATUS[s.status] || STATUS[1];
   const warns = s.warnings.length;
+  const suspensions = comms.filter((c) => c.kind === 'suspend' || c.kind === 'suspend_perm').length;
   return (
     <div className="card-3d space-y-3 rounded-2xl p-4">
       {/* الرأس */}
@@ -109,16 +115,25 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
         <Link href="/store-terms" target="_blank" className="mr-auto underline">عرض التعهّد</Link>
       </div>
 
-      {/* عدّاد الإنذارات (نحو الإيقاف عند ٣) */}
-      {warns > 0 && (
-        <div className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50/50 px-3 py-1.5 text-xs font-bold text-red-700">
-          <ShieldAlert className="h-4 w-4" /> إنذارات المخالفة: {en(warns)}/3 {warns >= 3 && '— أُوقف المتجر تلقائياً'}
+      {/* عدّاد الإنذارات (نحو الإيقاف عند ٣) + عدد مرات الإيقاف تاريخياً */}
+      {(warns > 0 || suspensions > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {warns > 0 && (
+            <div className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50/50 px-3 py-1.5 text-xs font-bold text-red-700">
+              <ShieldAlert className="h-4 w-4" /> إنذارات المخالفة: {en(warns)}/3 {warns >= 3 && '— أُوقف المتجر تلقائياً'}
+            </div>
+          )}
+          {suspensions > 0 && (
+            <div className="flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50/60 px-3 py-1.5 text-xs font-bold text-amber-800">
+              ⏸️ عدد مرات الإيقاف: {en(suspensions)}
+            </div>
+          )}
         </div>
       )}
 
-      {/* 📋 سجل الرسائل والإنذارات المرسلة للمتجر من الإدارة — مع اسم المُرسِل */}
+      {/* 📋 السجل التاريخي الكامل: رسائل، إنذارات، اعتماد/رفض، إيقاف/تفعيل — مع اسم المُنفّذ */}
       <details className="rounded-xl border border-primary/15 bg-secondary/20 p-2.5">
-        <summary className="cursor-pointer text-xs font-bold text-primary">📋 سجل الرسائل والإنذارات من الإدارة ({en(comms.length)})</summary>
+        <summary className="cursor-pointer text-xs font-bold text-primary">📋 السجل التاريخي الكامل ({en(comms.length)})</summary>
         {comms.length === 0 ? (
           <p className="mt-2 text-[11px] text-muted-foreground">لم تُرسل الإدارة أي رسالة أو إنذار لهذا المتجر بعد.</p>
         ) : (

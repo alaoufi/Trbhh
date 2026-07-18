@@ -19,11 +19,16 @@ export type AdminLogRow = { id: number; adminId: number; adminName: string; acti
 
 /** سجل ما أرسلته الإدارة للمتاجر (إنذارات ورسائل رسمية وإخفاء إعلانات) مع اسم المُرسِل.
  *  مبني من سجل النشاط الإداري، مجمّعاً حسب المتجر. */
-export type StoreComm = { id: number; kind: 'warn' | 'message' | 'adhide'; adminName: string; text: string | null; at: string | null };
+export type StoreComm = { id: number; kind: 'warn' | 'message' | 'adhide' | 'suspend' | 'suspend_perm' | 'reactivate' | 'approve' | 'reject'; adminName: string; text: string | null; at: string | null };
 const STORE_COMM_ACTIONS: Record<string, StoreComm['kind']> = {
   'إنذار متجر': 'warn',
   'رسالة رسمية لتاجر': 'message',
   'إخفاء إعلان متجر عن النشر + إنذار مخالفة': 'adhide',
+  'إيقاف مؤقت لمتجر': 'suspend',
+  'إيقاف نهائي لمتجر': 'suspend_perm',
+  'إعادة تفعيل متجر': 'reactivate',
+  'اعتماد متجر': 'approve',
+  'رفض متجر': 'reject',
 };
 export async function getStoresCommsLog(limit = 500): Promise<Map<number, StoreComm[]>> {
   await ensure();
@@ -56,6 +61,27 @@ export async function getStoresCommsLog(limit = 500): Promise<Map<number, StoreC
 export async function countAdminLog(): Promise<number> {
   await ensure();
   return prisma.admin_log.count().catch(() => 0);
+}
+
+/** كل ما نفّذته الإدارة تجاه عضو معيّن (حظر/رفع حظر/توثيق/قرارات طلباته...) —
+ *  سجل تاريخي كامل لصفحة العضو. يطابق «العضو #<id>» في حقل target مع حدّ فاصل
+ *  يمنع تطابق #12 خطأً مع #123. */
+export async function getUserAdminLog(userId: number, limit = 200): Promise<AdminLogRow[]> {
+  await ensure();
+  const rows = await prisma.admin_log.findMany({
+    where: { target: { contains: `العضو #${userId}` } },
+    orderBy: { id: 'desc' },
+    take: Math.min(500, limit) * 2, // هامش قبل الفلترة الدقيقة بحدّ الرقم
+  }).catch(() => []);
+  const re = new RegExp(`العضو #${userId}(?!\\d)`);
+  const filtered = rows.filter((r) => re.test(r.target || '')).slice(0, Math.min(500, limit));
+  const ids = [...new Set(filtered.map((r) => toInt(r.admin_id)))];
+  const users = ids.length ? await prisma.users.findMany({ where: { id: { in: ids.map((i) => BigInt(i)) } }, select: { id: true, name: true, userName: true } }).catch(() => []) : [];
+  const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
+  return filtered.map((r) => ({
+    id: toInt(r.id), adminId: toInt(r.admin_id), adminName: nameById.get(toInt(r.admin_id)) || `#${toInt(r.admin_id)}`,
+    action: r.action, target: r.target, note: r.note, at: r.created_at ? r.created_at.toISOString() : null,
+  }));
 }
 
 /** قراءة سجل النشاط (الأحدث أولاً) مع أسماء المشرفين. */

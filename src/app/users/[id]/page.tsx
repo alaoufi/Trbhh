@@ -135,7 +135,7 @@ export default async function UserProfilePage({ params, searchParams }: { params
               text={[`${displayName} على تربح`, `${active.length} إعلان نشط`].join('\n')}
               compact
               iconOnly
-              card={{ url: profileUrl, title: displayName, city: '', image: user.photo_path ? mediaUrl(user.photo_path) : '/apple-icon.png' }}
+              card={{ url: profileUrl, title: displayName, city: '', image: user.photo_path ? mediaUrl(user.photo_path) : '/logo-header.png' }}
             />
           </span>
         </div>

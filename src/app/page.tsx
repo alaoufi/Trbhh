@@ -143,7 +143,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               text={`${SITE.name} — ${SITE.tagline}`}
               compact
               iconOnly
-              card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/apple-icon.png' }}
+              card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/logo-header.png' }}
             />
           </span>
         </div>

@@ -105,6 +105,30 @@ async function classifiedDuplicateOf(
   return null;
 }
 
+/** Detect a duplicate classified TEXT posted by a DIFFERENT member (spam networks
+ *  reposting the same banner text under different accounts) — text only, mirrors
+ *  crossUserDuplicateOf() in the main ads flow exactly. Never bypassable by a paid
+ *  "duplicate repost" credit — that credit only covers reposting YOUR OWN content,
+ *  not someone else's. Scoped to the last 30 days. */
+async function crossUserClassifiedDuplicateOf(userId: number, title: string | null, body: string | null): Promise<{ id: number; title: string } | null> {
+  const cfg = await getClassifiedDupConfig();
+  if (!cfg.enabled) return null;
+  const nNew = normalizeAr(`${title || ''} ${body || ''}`);
+  if (!nNew) return null;
+  const since = new Date(Date.now() - 30 * 86_400_000);
+  const others = await prisma.classified_ads.findMany({
+    where: { user_id: { not: BigInt(userId) }, created_at: { gte: since } },
+    select: { id: true, title: true, body: true },
+    orderBy: { id: 'desc' },
+    take: 1500,
+  });
+  for (const r of others) {
+    const textSim = similarity(nNew, normalizeAr(`${r.title || ''} ${r.body || ''}`)) * 100;
+    if (textSim >= cfg.content) return { id: toInt(r.id), title: r.title || 'إعلان مبوّب' };
+  }
+  return null;
+}
+
 function cleanLink(v: string): string | null {
   const s = v.trim();
   if (!s) return null;
@@ -156,6 +180,20 @@ export async function createClassifiedAction(formData: FormData) {
   const pattern = String(formData.get('pattern') || 'none');
   const accent = String(formData.get('accent') || 'none');
   const layout = String(formData.get('layout') || 'auto');
+
+  // تكرار عبر أعضاء مختلفين (شبكات سبام) — منع فوري بلا خيار دفع (المحتوى ليس
+  // ملكه أصلاً)، يُفحص قبل التكرار الذاتي عمداً كما في إعلانات تربح تماماً.
+  const crossDup = await crossUserClassifiedDuplicateOf(session.uid, title, body);
+  if (crossDup) {
+    const n = await bumpDupAttempts(session.uid);
+    await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مبوّب مطابق لعضو آخر #${crossDup.id} «${crossDup.title}» — الجديد: ${(title || '').slice(0, 60)}` });
+    if (n >= DUP_LIMIT) {
+      await banUserFor(session.uid, await getStrikeBanDays());
+      await notifyModBlock(session.uid, '🚫 تم حظر حسابك بعد تكرار نشر محتوى مطابق لإعلانات مبوّبة لأعضاء آخرين.');
+      redirect('/classified/new?error=banned');
+    }
+    redirect(`/classified/new?error=crossdup&dup=${crossDup.id}&left=${Math.max(0, DUP_LIMIT - n)}`);
+  }
 
   // التكرار: من اشترى «باقة تكرار» تُخصم نشرة واحدة ويُسمح؛ وإلا يُطلب شراء باقة أو يُمنع
   const pricing = await getServicePricing();
@@ -262,6 +300,19 @@ export async function updateClassifiedAction(formData: FormData) {
   const pattern = String(formData.get('pattern') || 'none');
   const accent = String(formData.get('accent') || 'none');
   const layout = String(formData.get('layout') || 'auto');
+
+  // تكرار عبر أعضاء مختلفين عند التعديل — نفس فحص النشر، بلا خيار دفع
+  const crossDup = await crossUserClassifiedDuplicateOf(session.uid, title, body);
+  if (crossDup) {
+    const n = await bumpDupAttempts(session.uid);
+    await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مبوّب مطابق لعضو آخر #${crossDup.id} «${crossDup.title}» (تعديل) — الجديد: ${(title || '').slice(0, 60)}` });
+    if (n >= DUP_LIMIT) {
+      await banUserFor(session.uid, await getStrikeBanDays());
+      await notifyModBlock(session.uid, '🚫 تم حظر حسابك بعد تكرار نشر محتوى مطابق لإعلانات مبوّبة لأعضاء آخرين.');
+      redirect('/account/classified?error=banned');
+    }
+    redirect(`/classified/${id}/edit?error=crossdup&dup=${crossDup.id}&left=${Math.max(0, DUP_LIMIT - n)}`);
+  }
 
   // منع التكرار عند التعديل (باستثناء الإعلان نفسه) — يُتجاوز بخصم نشرة من «باقة التكرار»
   const dup = await classifiedDuplicateOf(session.uid, title, body, img, { theme: Number.isFinite(theme) ? theme : 0, pattern, accent }, id);

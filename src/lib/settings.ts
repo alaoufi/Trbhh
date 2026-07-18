@@ -514,7 +514,7 @@ export const SETTING_CDUP_BG_PCT = 'cdup_bg_percent';
 export async function getClassifiedDupConfig(): Promise<{ enabled: boolean; content: number; image: number; background: number }> {
   const clamp = (n: number, d: number) => Math.min(100, Math.max(50, Math.round(n) || d));
   const [on, c, im, bg] = await Promise.all([
-    getSettingBool(SETTING_CDUP_ON, false),
+    getSettingBool(SETTING_CDUP_ON, true),
     getSettingNum(SETTING_CDUP_CONTENT_PCT, 90),
     getSettingNum(SETTING_CDUP_IMAGE_PCT, 95),
     getSettingNum(SETTING_CDUP_BG_PCT, 100),

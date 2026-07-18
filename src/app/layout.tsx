@@ -35,13 +35,13 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: SITE.name,
       title: shareTitle,
       description: shareDesc,
-      images: [{ url: '/icon-512.png?v=2', width: 512, height: 512, alt: SITE.name }],
+      images: [{ url: '/icon-512.png?v=3', width: 512, height: 512, alt: SITE.name }],
     },
-    twitter: { card: 'summary', title: shareTitle, description: shareDesc, images: ['/icon-512.png?v=2'] },
+    twitter: { card: 'summary', title: shareTitle, description: shareDesc, images: ['/icon-512.png?v=3'] },
     robots: { index: true, follow: true },
     manifest: '/manifest.webmanifest',
     appleWebApp: { capable: true, statusBarStyle: 'default', title: SITE.name },
-    icons: { icon: '/icon.svg', apple: '/apple-icon.png?v=2' },
+    icons: { icon: '/icon-192.png?v=3', apple: '/apple-icon.png?v=3' },
   };
 }
 

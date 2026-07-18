@@ -14,7 +14,7 @@ import { CopyChip } from '@/components/copy-chip';
 import { TopupPromoBanner } from '@/components/topup-promo-banner';
 import { referralEnabled, getReferralReward } from '@/lib/points';
 import { SITE } from '@/lib/constants';
-import { ShareButtons } from '@/components/share-buttons';
+import { AccountWelcomeCard } from '@/components/account-welcome-card';
 import { setInterestsAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -57,22 +57,15 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
       {sp.error === 'notlinked' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">تعذّر التبديل: هذا الحساب غير مرتبط بحسابك.</div>}
       {sp.error === 'switchbanned' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر التبديل: الحساب المطلوب محظور.</div>}
       {sp.error === 'switchadmin' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">لأمان الإدارة: ادخل إلى حساب الإدارة بكلمة مروره مباشرةً — لا يُتاح التبديل إليه بلا كلمة مرور.</div>}
-      {/* ترحيب بالعضو عند دخوله حسابه + دعوة لمشاركة المنصة */}
-      <div className="card-3d flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-l from-primary/10 to-primary/5 p-4">
-        <div>
-          <h1 className="text-xl font-bold text-primary">مرحباً {session.name} 👋</h1>
-          <p className="mt-1 text-sm font-bold text-primary/80">نرحب بك مجدداً، ونسعد بوجودك ومشاركتك.</p>
-        </div>
-        <div className="shrink-0 rounded-xl border border-primary/25 bg-white px-3 py-2">
-          <ShareButtons
-            url={`https://${SITE.domain}`}
-            title={SITE.name}
-            text={`${SITE.name} — ${SITE.tagline}`}
-            compact
-            card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/apple-icon.png' }}
-          />
-        </div>
-      </div>
+      <h1 className="text-xl font-bold text-primary">مرحباً {session.name} 👋</h1>
+      {/* ترحيب بالعضو عند دخوله حسابه + دعوة لمشاركة المنصة — أول زيارة في الجلسة فقط */}
+      <AccountWelcomeCard
+        name={session.name}
+        url={`https://${SITE.domain}`}
+        title={SITE.name}
+        text={`${SITE.name} — ${SITE.tagline}`}
+        card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/apple-icon.png' }}
+      />
 
       {/* 🎭 اكتشاف خدمات هذا الحساب تلقائياً — شريط أفقي منزلق يُظهر الخدمات المخفية بالسحب */}
       {(myStoreId > 0 || isAdmin || linkedCount > 0) && (

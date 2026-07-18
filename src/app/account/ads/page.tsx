@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { Pencil, Trash2, Eye, EyeOff, Wallet } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyAds, adContactCounts } from '@/lib/account';
-import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingBool, getAdRestoreFee } from '@/lib/settings';
+import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingBool, getAdRestoreFee, getMemberWindows } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -16,16 +16,31 @@ export const metadata = { title: 'إعلاناتي' };
 export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; urgenton?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee] = await Promise.all([
+  const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee, memberWindows] = await Promise.all([
     getMyAds(session.uid), getServicePricing(), getBalance(session.uid), getAdExtras(),
     getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('auction_on', false),
-    getAdRestoreFee(),
+    getAdRestoreFee(), getMemberWindows(),
   ]);
   const contacts = contactStatsOn ? await adContactCounts(ads.map((a) => a.id)) : new Map<number, { whatsapp: number; call: number }>();
   const now = Date.now();
   const featuredSold = serviceHasPrice(servicePricing.featured);
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const fmtDay = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d); };
+  // متبقي مهلة التعديل/الحذف على كل زر — 0 = بلا حد فلا نعرض شيئاً
+  const fmtRemaining = (ms: number) => {
+    const totalMin = Math.max(0, Math.ceil(ms / 60000));
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h > 0 && m > 0) return `متبقي ${h}س ${m}د`;
+    if (h > 0) return `متبقي ${h}س`;
+    return `متبقي ${m}د`;
+  };
+  const windowState = (createdAt: string | null, hours: number): { expired: boolean; label: string | null } => {
+    if (!hours || hours <= 0) return { expired: false, label: null };
+    const createdMs = createdAt ? new Date(createdAt).getTime() : 0;
+    const remain = createdMs + hours * 3600_000 - now;
+    return remain <= 0 ? { expired: true, label: 'انتهت مهلة السماح' } : { expired: false, label: fmtRemaining(remain) };
+  };
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
@@ -58,7 +73,10 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       )}
       {ads.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد إعلانات بعد.</p>}
       <div className="space-y-3">
-        {ads.map((ad) => (
+        {ads.map((ad) => {
+          const editState = windowState(ad.createdAt, memberWindows.editHours);
+          const deleteState = windowState(ad.createdAt, memberWindows.deleteHours);
+          return (
           <div key={ad.id} className="flex gap-3 card-3d rounded-xl p-3">
             <Link href={`/ads/${ad.id}`} className="relative block h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
               <Image src={ad.image} alt={ad.title} fill sizes="80px" className="object-cover" />
@@ -106,7 +124,15 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 </details>
               )}
               <div className="mt-auto flex flex-wrap gap-2 pt-2">
-                <Link href={`/ads/${ad.id}/edit`} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Pencil className="h-3 w-3" /> تعديل</Link>
+                {editState.expired ? (
+                  <span className="flex items-center gap-1 rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-xs text-muted-foreground" title="تجاوز الإعلان مدة السماح بالتعديل">
+                    <Pencil className="h-3 w-3" /> انتهت مهلة السماح
+                  </span>
+                ) : (
+                  <Link href={`/ads/${ad.id}/edit`} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary">
+                    <Pencil className="h-3 w-3" /> تعديل{editState.label ? ` (${editState.label})` : ''}
+                  </Link>
+                )}
                 {bumpOn && ad.status === 1 && !ad.storeOnly && (
                   <form action={bumpAdAction}>
                     <input type="hidden" name="adId" value={ad.id} />
@@ -141,14 +167,23 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                     </ConfirmSubmit>
                   </form>
                 )}
-                <form action={deleteAdAction}>
-                  <input type="hidden" name="adId" value={ad.id} />
-                  <ConfirmSubmit msg={`حذف إعلانك «${ad.title || `#${ad.id}`}» نهائياً؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"><Trash2 className="h-3 w-3" /> حذف</ConfirmSubmit>
-                </form>
+                {deleteState.expired ? (
+                  <span className="flex items-center gap-1 rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-xs text-muted-foreground" title="تجاوز الإعلان مدة السماح بالحذف">
+                    <Trash2 className="h-3 w-3" /> انتهت مهلة السماح
+                  </span>
+                ) : (
+                  <form action={deleteAdAction}>
+                    <input type="hidden" name="adId" value={ad.id} />
+                    <ConfirmSubmit msg={`حذف إعلانك «${ad.title || `#${ad.id}`}» نهائياً؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10">
+                      <Trash2 className="h-3 w-3" /> حذف{deleteState.label ? ` (${deleteState.label})` : ''}
+                    </ConfirmSubmit>
+                  </form>
+                )}
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

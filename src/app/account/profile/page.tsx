@@ -31,6 +31,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
     '1': { cls: 'border-emerald-300 bg-emerald-50 text-emerald-800', text: '✓ أُرسل طلب تغيير الاسم للإدارة — ستصلك رسالة بالنتيجة.' },
     err: { cls: 'border-red-300 bg-red-50 text-red-800', text: 'اكتب اسماً جديداً مختلفاً عن اسمك الحالي.' },
     banned: { cls: 'border-red-300 bg-red-50 text-red-800', text: 'الاسم الجديد يحتوي كلمة غير مسموحة — اختر اسماً آخر.' },
+    blocked: { cls: 'border-red-300 bg-red-50 text-red-800', text: '🚫 رُفض الطلب لاحتواء الاسم أو السبب المكتوب على محتوى مخالف.' },
     reason: { cls: 'border-red-300 bg-red-50 text-red-800', text: 'اذكر سبب طلب تغيير الاسم.' },
     doc: { cls: 'border-red-300 bg-red-50 text-red-800', text: 'أرفق مستنداً (صورة أو PDF) يثبت الاسم الجديد — إلزامي.' },
     dup: { cls: 'border-amber-300 bg-amber-50 text-amber-900', text: 'لديك طلب سابق قيد المراجعة — انتظر نتيجته أولاً.' },

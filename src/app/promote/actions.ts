@@ -6,6 +6,8 @@ import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { createPromo, getPromoPackage } from '@/lib/promos';
 import { isPlacement } from '@/lib/promo-placements';
+import { scanContent } from '@/lib/content-guard';
+import { handleProhibited } from '@/lib/moderation';
 
 /** Save a promo banner image as-is (keeps animated GIFs; no watermark on paid banners). */
 async function savePromoImage(formData: FormData): Promise<string | null> {
@@ -49,6 +51,12 @@ export async function createPromoAction(formData: FormData) {
 
   if (!image && !title && !body) redirect(`/promote?error=content&placement=${placement}&pkg=${packageId}`);
   if (!phone && !whatsapp) redirect(`/promote?error=contact&placement=${placement}&pkg=${packageId}`);
+
+  const badContent = await scanContent(title, body);
+  if (badContent) {
+    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `إعلان ترويجي: ${title || ''} ${body || ''}`.slice(0, 300));
+    redirect(`/promote?error=blocked&cat=${o.category}&placement=${placement}&pkg=${packageId}`);
+  }
 
   try {
     await createPromo({

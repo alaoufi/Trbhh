@@ -15,11 +15,12 @@ function Submit() {
 const field = 'h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40';
 
 export function PromoDesigner({
-  action, packages, error, defaultPlacement, defaultPkg,
+  action, packages, error, catLabel, defaultPlacement, defaultPkg,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   packages: PromoPackage[];
   error?: string;
+  catLabel?: string;
   defaultPlacement?: string;
   defaultPkg?: string;
 }) {
@@ -84,6 +85,7 @@ export function PromoDesigner({
         {error === 'contact' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">أضف رقم جوال أو واتساب.</div>}
         {error === 'package' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">اختر باقة صحيحة.</div>}
         {error === 'save' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">تعذّر الحفظ، حاول مجدداً.</div>}
+        {error === 'blocked' && <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">🚫 رُفض الإعلان لاحتوائه على <b>{catLabel || 'محتوى مخالف'}</b> — النشر ممنوع منعاً باتاً.</div>}
 
         <input type="hidden" name="placement" value={placement} />
         <input type="hidden" name="packageId" value={pkgId} />

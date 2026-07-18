@@ -10,9 +10,9 @@ export const metadata = { title: 'تعديل الإعلان المبوّب' };
 
 export default async function EditClassifiedPage({
   params, searchParams,
-}: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; price?: string; bal?: string }> }) {
+}: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; price?: string; bal?: string; left?: string }> }) {
   const session = await requireUser();
-  const [{ id }, { error, price, bal }] = await Promise.all([params, searchParams]);
+  const [{ id }, { error, price, bal, left }] = await Promise.all([params, searchParams]);
   const c = await getClassifiedById(Number(id));
   if (!c) notFound();
   if (c.userId !== session.uid) redirect('/account/classified');
@@ -28,6 +28,7 @@ export default async function EditClassifiedPage({
         error={error}
         needPrice={price}
         needBal={bal}
+        dupLeft={left}
         submitLabel="حفظ التعديلات"
         initial={{
           id: c.id, title: c.title, body: c.text, phone: c.phone, whatsapp: c.whatsapp, link: c.link, image: c.image,

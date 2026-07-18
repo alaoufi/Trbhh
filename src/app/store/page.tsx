@@ -665,6 +665,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           {backup === 'done' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ تم أخذ نسخة احتياطية جديدة.</div>}
           {backup === 'restored' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ تمت استعادة المتجر من النسخة.</div>}
           {backup === 'error' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">⚠️ تعذّرت الاستعادة — تأكّد من صحة الملف/النسخة.</div>}
+          {backup === 'blocked' && <div className="rounded-lg border-2 border-red-500 bg-red-100 p-2 text-xs font-bold text-red-900">🚫 رُفضت الاستعادة لاحتواء النسخة على محتوى مخالف — التعديل ممنوع منعاً باتاً.</div>}
           <p className="text-xs text-muted-foreground">تُؤخذ نسخة تلقائية دورية لإعدادات متجرك ومنتجاته وفروعه (مرة يومياً)، ويمكنك أخذ نسخة الآن أو الاستعادة. <b className="text-amber-700">تنبيه: الاستعادة تستبدل إعدادات متجرك الحالية ولا يمكن التراجع.</b></p>
 
           <form action={storeBackupNowAction}>

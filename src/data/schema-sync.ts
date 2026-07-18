@@ -568,6 +568,8 @@ const STATEMENTS: string[] = [
      التكرار بالصور وجلب صور كل إعلان — كل صفحة إعلان وكل نشر يمرّان من هنا. */
   `CREATE INDEX uploads_user_type ON uploads (user_id, type)`,
   `CREATE INDEX photos_other_id ON photos (other_id)`,
+  // مواضيع النقاش كانت بلا صاحب مسجَّل إطلاقاً — يمنع كشف تكرار نفس العضو لموضوعه
+  `ALTER TABLE debates ADD COLUMN user_id INT NULL`,
 ];
 
 let syncPromise: Promise<void> | null = null;

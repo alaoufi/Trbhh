@@ -103,9 +103,9 @@ export async function saveCompanyAction(formData: FormData) {
   }
   // فحص حارس المحتوى (غير أخلاقي/مخدرات/أسلحة/سياسي/جمعيات) على كل حقول المتجر
   // النصية العامة — نفس فحص الإعلان تماماً، فبيانات المتجر تظهر للجميع وتبقى معلّقة.
-  const badContent = await scanContent(storeName, description, about, banner, tagline, catalog, specialty, audience, contacts);
+  const badContent = await scanContent(storeName, description, about, banner, tagline, catalog, specialty, audience, contacts, address);
   if (badContent) {
-    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `${storeName} ${description} ${about} ${tagline}`.slice(0, 300));
+    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `${storeName} ${description} ${about} ${tagline} ${address}`.slice(0, 300));
     redirect(`/store?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : ''}`);
   }
   // تفرّد الاسم: تشابه ٩٠٪+ مع متجر آخر يُرفض برسالة تعرض المتجر المشابه
@@ -195,6 +195,11 @@ export async function requestStoreNameExceptionAction(formData: FormData) {
   const other = String(formData.get('other') || '').trim().slice(0, 20);
   const othername = String(formData.get('othername') || '').trim().slice(0, 60);
   if (!want) redirect('/store');
+  const badContent = await scanContent(want, reason, othername);
+  if (badContent) {
+    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `طلب استثناء اسم متجر: ${want} — ${reason}`.slice(0, 300));
+    redirect(`/store?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : ''}`);
+  }
   const pending = await prisma.name_requests.findFirst({ where: { user_id: BigInt(session.uid), kind: 'store', status: 0 } }).catch(() => null);
   if (pending) redirect('/store?exc=dup');
   const store = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { store_name: true } }).catch(() => null);
@@ -278,10 +283,10 @@ export async function storeRestoreAction(formData: FormData) {
   const session = await requireUser();
   const id = Number(formData.get('id') || 0);
   const { restoreFromId } = await import('@/lib/store-backup');
-  const ok = id ? await restoreFromId(session.uid, id) : false;
+  const result = id ? await restoreFromId(session.uid, id) : 'error';
   revalidatePath('/store');
   revalidatePath('/');
-  redirect(ok ? '/store?backup=restored' : '/store?backup=error');
+  redirect(`/store?backup=${result === 'ok' ? 'restored' : result}`);
 }
 
 /** استعادة المتجر من ملف نسخة احتياطية مرفوع. */
@@ -291,10 +296,10 @@ export async function storeRestoreFileAction(formData: FormData) {
   let text = '';
   if (file instanceof File && file.size > 0 && file.size < 5_000_000) text = await file.text();
   const { restoreFromJson } = await import('@/lib/store-backup');
-  const ok = text ? await restoreFromJson(session.uid, text) : false;
+  const result = text ? await restoreFromJson(session.uid, text) : 'error';
   revalidatePath('/store');
   revalidatePath('/');
-  redirect(ok ? '/store?backup=restored' : '/store?backup=error');
+  redirect(`/store?backup=${result === 'ok' ? 'restored' : result}`);
 }
 
 export async function addBranchAction(formData: FormData) {
@@ -304,6 +309,11 @@ export async function addBranchAction(formData: FormData) {
   const name = String(formData.get('name') || '').trim();
   const address = String(formData.get('address') || '').trim();
   if (!name) return;
+  const badContent = await scanContent(name, address);
+  if (badContent) {
+    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `${name} ${address}`.slice(0, 300));
+    redirect(`/store?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : ''}`);
+  }
   await prisma.store_branches.create({ data: { store_id: toInt(store.id), name, address } });
   revalidatePath('/store');
 }
@@ -332,7 +342,7 @@ export async function bulkUploadProductsAction(formData: FormData) {
   const categoryId = Number(formData.get('category') || 0) || cats[0]?.id || 0;
   if (!categoryId) redirect('/store?bulk=err');
   // نفس بوابات النشر العادية: متجر معتمد يُنشر مباشرة، وإلا حسب إعداد المراجعة
-  const [{ isApprovedStoreOwner }, { getSettingBool, SETTING_ADS_APPROVAL }, { scanContent }, { checkFlood, logMod }, { getUserPackage, countAdsToday, lastAdAt, logAdPublish }] = await Promise.all([
+  const [{ isApprovedStoreOwner }, { getSettingBool, SETTING_ADS_APPROVAL }, { scanContent }, { checkFlood, logMod, handleProhibited }, { getUserPackage, countAdsToday, lastAdAt, logAdPublish }] = await Promise.all([
     import('@/lib/merchant'), import('@/lib/settings'), import('@/lib/content-guard'), import('@/lib/moderation'), import('@/lib/packages'),
   ]);
   const approvedOwner = await isApprovedStoreOwner(session.uid).catch(() => false);
@@ -351,6 +361,7 @@ export async function bulkUploadProductsAction(formData: FormData) {
   let truncatedByLimit = false;
 
   let created = 0;
+  let blockedCat: string | null = null;
   const now = new Date();
   for (const line of rows) {
     // فاصلة أو فاصلة منقوطة (إعدادات Excel الإقليمية)
@@ -360,7 +371,14 @@ export async function bulkUploadProductsAction(formData: FormData) {
     if (/^(العنوان|title)$/i.test(title)) continue; // صف العناوين
     if (created >= 50) break;
     if (created >= dailyLeft) { truncatedByLimit = true; break; }
-    if (await scanContent(title, detail).catch(() => null)) continue; // حارس المحتوى: تخطَّ الصف المخالف
+    // حارس المحتوى: صف مخالف يوقف الرفع بالكامل ويُسجَّل كمخالفة (لا يُتخطَّ بصمت —
+    // كان يسمح بتجربة قائمة كلمات الحارس بلا أي عقوبة عبر رفع ملفات متكررة).
+    const badContent = await scanContent(title, detail).catch(() => null);
+    if (badContent) {
+      const o = await handleProhibited(session.uid, badContent.category, badContent.term, `رفع منتجات بالجملة: ${title} — ${detail}`.slice(0, 300));
+      blockedCat = o.category;
+      break;
+    }
     const price = Math.max(0, parseInt(priceRaw.replace(/[^0-9]/g, ''), 10) || 0);
     try {
       const ad = await prisma.ads.create({
@@ -397,6 +415,7 @@ export async function bulkUploadProductsAction(formData: FormData) {
   const { bustAdCaches } = await import('@/lib/data');
   await bustAdCaches().catch(() => {});
   revalidatePath('/store');
+  if (blockedCat) redirect(`/store?error=blocked&cat=${blockedCat}${created ? `&bulk=${created}` : ''}`);
   redirect(`/store?bulk=${created}${truncatedByLimit ? '&bulklimit=1' : ''}`);
 }
 

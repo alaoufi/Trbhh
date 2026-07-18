@@ -295,6 +295,8 @@ model debates {
   created_at  DateTime? @db.Timestamp(0)
   updated_at  DateTime? @db.Timestamp(0)
   hide        Int       @default(0) @db.TinyInt
+  // -- self-provisioned (see src/data/schema-sync.ts) --
+  user_id     Int?
 }
 
 model failed_jobs {

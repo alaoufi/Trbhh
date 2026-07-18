@@ -3,6 +3,8 @@ import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { storeIdOfUser } from './merchant';
 import { toInt } from './utils';
+import { scanContent } from './content-guard';
+import { handleProhibited } from './moderation';
 
 const ensure = ensureSchema;
 
@@ -73,13 +75,28 @@ export async function getBackupJson(storeId: number, id: number): Promise<string
   return r?.data ?? null;
 }
 
-/** Apply a parsed snapshot to the owner's store (overwrites settings + products + branches). */
-async function applySnapshot(userId: number, snap: StoreBackup): Promise<boolean> {
+/** Apply a parsed snapshot to the owner's store (overwrites settings + products + branches).
+ *  Returns 'blocked' instead of restoring when the snapshot content fails the content
+ *  guard — a manually-edited backup JSON is a real bypass vector around the normal
+ *  save-path scan (save clean, then "restore" a doctored file with prohibited content
+ *  straight onto the live public storefront). */
+async function applySnapshot(userId: number, snap: StoreBackup): Promise<'ok' | 'blocked' | 'error'> {
   const storeId = await storeIdOfUser(userId);
-  if (!storeId) return false;
+  if (!storeId) return 'error';
   const src = (snap.store || {}) as Record<string, unknown>;
   const data: Record<string, unknown> = {};
   for (const f of CONTENT_FIELDS) if (f in src) data[f] = src[f];
+
+  const textParts = [data.store_name, data.about, data.banner, data.tagline, data.announce, data.product_note, data.description, data.address, data.contacts, data.specialty, data.audience]
+    .filter((v): v is string => typeof v === 'string' && v.trim() !== '');
+  const branches = Array.isArray(snap.branches) ? snap.branches.slice(0, 50) : [];
+  const branchText = branches.map((b) => `${b?.name || ''} ${b?.address || ''}`).join(' ');
+  const bad = await scanContent(textParts.join(' '), branchText);
+  if (bad) {
+    await handleProhibited(userId, bad.category, bad.term, `استعادة نسخة احتياطية للمتجر — محتوى ممنوع: ${textParts.join(' ')} ${branchText}`.slice(0, 300));
+    return 'blocked';
+  }
+
   await prisma.stores.updateMany({ where: { user_id: userId }, data }).catch(() => {});
 
   if (Array.isArray(snap.products)) {
@@ -91,29 +108,29 @@ async function applySnapshot(userId: number, snap: StoreBackup): Promise<boolean
     if (owned.length) await prisma.store_products.createMany({ data: owned.map((a) => ({ store_id: storeId, ad_id: toInt(a.id) })), skipDuplicates: true }).catch(() => {});
   }
 
-  if (Array.isArray(snap.branches)) {
+  if (branches.length) {
     await prisma.store_branches.deleteMany({ where: { store_id: storeId } }).catch(() => {});
-    for (const b of snap.branches.slice(0, 50)) {
+    for (const b of branches) {
       if (b && b.name) await prisma.store_branches.create({ data: { store_id: storeId, name: String(b.name).slice(0, 120), address: b.address ? String(b.address).slice(0, 200) : null } }).catch(() => {});
     }
   }
-  return true;
+  return 'ok';
 }
 
-export async function restoreFromId(userId: number, id: number): Promise<boolean> {
+export async function restoreFromId(userId: number, id: number): Promise<'ok' | 'blocked' | 'error'> {
   await ensure();
   const storeId = await storeIdOfUser(userId);
-  if (!storeId) return false;
+  if (!storeId) return 'error';
   const json = await getBackupJson(storeId, id);
-  if (!json) return false;
-  try { return await applySnapshot(userId, JSON.parse(json) as StoreBackup); } catch { return false; }
+  if (!json) return 'error';
+  try { return await applySnapshot(userId, JSON.parse(json) as StoreBackup); } catch { return 'error'; }
 }
 
-export async function restoreFromJson(userId: number, jsonText: string): Promise<boolean> {
+export async function restoreFromJson(userId: number, jsonText: string): Promise<'ok' | 'blocked' | 'error'> {
   await ensure();
   try {
     const snap = JSON.parse(jsonText) as StoreBackup;
-    if (!snap || typeof snap !== 'object' || !snap.store) return false;
+    if (!snap || typeof snap !== 'object' || !snap.store) return 'error';
     return await applySnapshot(userId, snap);
-  } catch { return false; }
+  } catch { return 'error'; }
 }

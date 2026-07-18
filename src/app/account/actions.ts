@@ -10,12 +10,21 @@ import { toLocalSaudi } from '@/lib/sms';
 import { respondToReport } from '@/lib/alerts';
 import { setInterests } from '@/lib/interests';
 import { toInt } from '@/lib/utils';
+import { scanContent } from '@/lib/content-guard';
+import { handleProhibited } from '@/lib/moderation';
 
 export async function respondToReportAction(formData: FormData) {
   const session = await requireUser();
   const reportId = Number(formData.get('reportId') || 0);
   const text = String(formData.get('response') || '').trim();
-  if (reportId && text) await respondToReport(session.uid, reportId, text);
+  if (reportId && text) {
+    const badContent = await scanContent(text);
+    if (badContent) {
+      await handleProhibited(session.uid, badContent.category, badContent.term, `ردّ على بلاغ: ${text}`.slice(0, 300));
+    } else {
+      await respondToReport(session.uid, reportId, text);
+    }
+  }
   revalidatePath('/account/reports');
 }
 
@@ -216,6 +225,11 @@ export async function requestNameChangeAction(formData: FormData) {
   const { containsBannedName } = await import('@/lib/censor');
   if (await containsBannedName(newName)) redirect('/account/profile?namereq=banned');
   if (!reason) redirect('/account/profile?namereq=reason');
+  const badContent = await scanContent(newName, reason);
+  if (badContent) {
+    await handleProhibited(session.uid, badContent.category, badContent.term, `طلب تغيير اسم: ${newName} — ${reason}`.slice(0, 300));
+    redirect('/account/profile?namereq=blocked');
+  }
   // طلب واحد معلّق لكل عضو
   const pending = await prisma.name_requests.findFirst({ where: { user_id: BigInt(session.uid), status: 0 } }).catch(() => null);
   if (pending) redirect('/account/profile?namereq=dup');

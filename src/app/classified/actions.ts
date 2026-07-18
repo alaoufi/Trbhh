@@ -7,10 +7,10 @@ import { prisma } from '@/lib/prisma';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified, reactivateClassified } from '@/lib/classified';
-import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS, getStrikeBanDays } from '@/lib/settings';
 import { charge, consumeDupCredit, addDupCredit, adjustBalance } from '@/lib/wallet';
 import { scanContent } from '@/lib/content-guard';
-import { handleProhibited, logMod, checkFlood } from '@/lib/moderation';
+import { handleProhibited, logMod, checkFlood, bumpDupAttempts, banUserFor, notifyModBlock, DUP_LIMIT } from '@/lib/moderation';
 import { checkImageBuffer, imageModerationEnabled } from '@/lib/nsfw';
 import { aHash, hashSimilarity } from '@/lib/phash';
 import { normalizeAr, similarity } from '@/domain/text';
@@ -165,8 +165,15 @@ export async function createClassifiedAction(formData: FormData) {
     const consumed = await consumeDupCredit(session.uid);
     if (!consumed) {
       if (serviceHasPrice(pricing.dup3) || serviceHasPrice(pricing.dup5)) redirect(`/classified/new?error=needdup&dup=${dup.id}`);
-      await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: 'blocked' });
-      redirect(`/classified/new?error=duplicate&dup=${dup.id}`);
+      // إنذار متصاعد — كان يُرفض فقط بلا أي عقوبة، فيُعاد المحاولة للأبد بلا حظر
+      const n = await bumpDupAttempts(session.uid);
+      await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: n >= DUP_LIMIT ? 'banned' : 'blocked' });
+      if (n >= DUP_LIMIT) {
+        await banUserFor(session.uid, await getStrikeBanDays());
+        await notifyModBlock(session.uid, '🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان المبوّب.');
+        redirect('/classified/new?error=banned');
+      }
+      redirect(`/classified/new?error=duplicate&dup=${dup.id}&left=${Math.max(0, DUP_LIMIT - n)}`);
     }
     dupCreditConsumed = true;
     await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مبوّب مسموح (باقة) مع #${dup.id} «${dup.title}»` });
@@ -264,8 +271,14 @@ export async function updateClassifiedAction(formData: FormData) {
     if (!consumed) {
       const svc = await getServicePricing();
       if (serviceHasPrice(svc.dup3) || serviceHasPrice(svc.dup5)) redirect(`/classified/${id}/edit?error=needdup&dup=${dup.id}`);
-      await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: 'blocked' });
-      redirect(`/classified/${id}/edit?error=duplicate&dup=${dup.id}`);
+      const n = await bumpDupAttempts(session.uid);
+      await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: n >= DUP_LIMIT ? 'banned' : 'blocked' });
+      if (n >= DUP_LIMIT) {
+        await banUserFor(session.uid, await getStrikeBanDays());
+        await notifyModBlock(session.uid, '🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان المبوّب.');
+        redirect('/account/classified?error=banned');
+      }
+      redirect(`/classified/${id}/edit?error=duplicate&dup=${dup.id}&left=${Math.max(0, DUP_LIMIT - n)}`);
     }
     dupCreditConsumed = true;
     await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مبوّب مسموح (باقة، تعديل) مع #${dup.id}` });

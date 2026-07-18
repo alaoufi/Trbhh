@@ -10,7 +10,7 @@ import { addDebateCommentAction, toggleDebateLikeAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function DebatePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ error?: string }> }) {
+export default async function DebatePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ error?: 'blocked' | 'duplicate' | 'banned' | 'flood' }> }) {
   if (!(await debatesEnabled().catch(() => true))) redirect('/');
   const { id } = await params;
   const session = await getSession();
@@ -20,6 +20,9 @@ export default async function DebatePage({ params, searchParams }: { params: Pro
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       {sp.error === 'blocked' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2.5 text-sm font-bold text-red-800">مشاركتك تحتوي محتوى ممنوعاً ولم تُنشر — تكرار المخالفة يعرّض حسابك للحظر.</div>}
+      {sp.error === 'duplicate' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2.5 text-sm font-bold text-amber-900">⚠️ سبق أن نشرت تعليقاً مطابقاً لهذا — تكرار المحاولة يعرّض حسابك للحظر.</div>}
+      {sp.error === 'banned' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2.5 text-sm font-bold text-red-800">🚫 تم حظر حسابك بعد تكرار نشر نفس التعليق.</div>}
+      {sp.error === 'flood' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2.5 text-sm font-bold text-amber-900">⏳ أنت تنشر بسرعة كبيرة — انتظر قليلاً قبل مشاركة أخرى.</div>}
       <div className="flex items-center gap-2">
         <Link href="/debates" className="rounded-lg p-2 hover:bg-secondary"><ArrowRight className="h-5 w-5" /></Link>
         <h1 className="text-xl font-bold text-primary">{d.title}</h1>

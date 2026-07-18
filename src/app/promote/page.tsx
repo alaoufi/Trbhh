@@ -2,16 +2,18 @@ import { redirect } from 'next/navigation';
 import { Megaphone } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getPromoPackages } from '@/lib/promos';
+import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { PromoDesigner } from '@/components/promo-designer';
 import { createPromoAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'أعلن معنا — المصمم الذكي' };
 
-export default async function PromotePage({ searchParams }: { searchParams: Promise<{ error?: string; placement?: string; pkg?: string }> }) {
+export default async function PromotePage({ searchParams }: { searchParams: Promise<{ error?: string; cat?: string; placement?: string; pkg?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
-  const [{ error, placement, pkg }, packages] = await Promise.all([searchParams, getPromoPackages(true)]);
+  const [{ error, cat, placement, pkg }, packages] = await Promise.all([searchParams, getPromoPackages(true)]);
+  const catLabel = cat ? CATEGORY_LABEL[cat as GuardCategory] : undefined;
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -24,7 +26,7 @@ export default async function PromotePage({ searchParams }: { searchParams: Prom
       {packages.length === 0 && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">لا توجد باقات إعلانية متاحة حالياً. عد لاحقاً.</div>
       )}
-      <PromoDesigner action={createPromoAction} packages={packages} error={error} defaultPlacement={placement} defaultPkg={pkg} />
+      <PromoDesigner action={createPromoAction} packages={packages} error={error} catLabel={catLabel} defaultPlacement={placement} defaultPkg={pkg} />
     </div>
   );
 }

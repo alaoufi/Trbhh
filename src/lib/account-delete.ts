@@ -5,6 +5,7 @@ import { deleteStore, storeIdOfUser } from './merchant';
 import { logMod } from './moderation';
 import { hashPassword } from './auth';
 import { toInt } from './utils';
+import { scanContent } from './content-guard';
 
 /**
  * Account deletion (Google Play data-safety requirement).
@@ -97,7 +98,10 @@ export async function requestAccountDeletion(phone: string, name: string, note: 
   // one open request per phone
   const open = await prisma.deletion_requests.count({ where: { phone: p, status: 0 } }).catch(() => 0);
   if (open > 0) return true;
-  await prisma.deletion_requests.create({ data: { phone: p, name: name.trim().slice(0, 120) || null, note: note.trim().slice(0, 500) || null } }).catch(() => {});
+  // طلب من زائر غير مسجَّل دخوله — لا حساب لمعاقبته، فقط لا تُحفظ ملاحظة ممنوعة
+  const cleanNote = note.trim().slice(0, 500);
+  const safeNote = cleanNote && !(await scanContent(cleanNote).catch(() => null)) ? cleanNote : null;
+  await prisma.deletion_requests.create({ data: { phone: p, name: name.trim().slice(0, 120) || null, note: safeNote } }).catch(() => {});
   return true;
 }
 

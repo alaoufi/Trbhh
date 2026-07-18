@@ -11,13 +11,16 @@ import { createDebateAction } from './actions';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'النقاشات' };
 
-export default async function DebatesPage({ searchParams }: { searchParams?: Promise<{ error?: string }> }) {
+export default async function DebatesPage({ searchParams }: { searchParams?: Promise<{ error?: 'blocked' | 'duplicate' | 'banned' | 'flood' }> }) {
   if (!(await debatesEnabled().catch(() => true))) redirect('/');
   const [debates, session] = await Promise.all([getDebates(), getSession()]);
   const sp = searchParams ? await searchParams : {};
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       {sp.error === 'blocked' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2.5 text-sm font-bold text-red-800">نقاشك يحتوي محتوى ممنوعاً ولم يُنشر — تكرار المخالفة يعرّض حسابك للحظر.</div>}
+      {sp.error === 'duplicate' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2.5 text-sm font-bold text-amber-900">⚠️ هذا الموضوع مطابق لموضوع سابق طرحته — تكرار المحاولة يعرّض حسابك للحظر.</div>}
+      {sp.error === 'banned' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2.5 text-sm font-bold text-red-800">🚫 تم حظر حسابك بعد تكرار طرح مواضيع مطابقة.</div>}
+      {sp.error === 'flood' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2.5 text-sm font-bold text-amber-900">⏳ أنت تنشر بسرعة كبيرة — انتظر قليلاً قبل طرح موضوع آخر.</div>}
       <div className="flex items-center gap-2">
         <MessagesSquare className="h-6 w-6 text-primary" />
         <h1 className="text-xl font-bold text-primary">النقاشات</h1>

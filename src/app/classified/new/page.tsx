@@ -7,10 +7,10 @@ import { createClassifiedAction } from '../actions';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'المصمم الذكي — إعلان مبوّب' };
 
-export default async function NewClassifiedPage({ searchParams }: { searchParams: Promise<{ error?: string; price?: string; bal?: string; wait?: string }> }) {
+export default async function NewClassifiedPage({ searchParams }: { searchParams: Promise<{ error?: string; price?: string; bal?: string; wait?: string; left?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
-  const { error, price, bal, wait } = await searchParams;
+  const { error, price, bal, wait, left } = await searchParams;
   const { getServicePricing, serviceHasPrice, DURATIONS } = await import('@/lib/settings');
   const { getBalance } = await import('@/lib/wallet');
   const [cp, balance] = await Promise.all([getServicePricing().then((p) => p.classified), getBalance(session.uid)]);
@@ -44,7 +44,7 @@ export default async function NewClassifiedPage({ searchParams }: { searchParams
         </div>
       )}
 
-      <ClassifiedForm action={createClassifiedAction} error={error} needPrice={price} needBal={bal} gapWait={wait} durations={durations} />
+      <ClassifiedForm action={createClassifiedAction} error={error} needPrice={price} needBal={bal} gapWait={wait} dupLeft={left} durations={durations} />
     </div>
   );
 }

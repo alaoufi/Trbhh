@@ -80,7 +80,7 @@ function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath
   );
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; urgent?: string; urgentneed?: string; urgenton?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; urgenton?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -461,6 +461,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <div className="card-3d rounded-2xl p-4">
           <h2 className="mb-3 font-bold text-primary">التعليقات ({comments.length})</h2>
           {spx.cblocked === '1' && <div className="mb-3 rounded-lg border-2 border-red-400 bg-red-50 p-2.5 text-sm font-bold text-red-800">تعليقك يحتوي محتوى ممنوعاً ولم يُنشر — تكرار المخالفة يعرّض حسابك للحظر.</div>}
+          {spx.cdup === '1' && <div className="mb-3 rounded-lg border-2 border-amber-400 bg-amber-50 p-2.5 text-sm font-bold text-amber-900">⚠️ سبق أن نشرت تعليقاً مطابقاً — تكرار المحاولة يعرّض حسابك للحظر.</div>}
+          {spx.cbanned === '1' && <div className="mb-3 rounded-lg border-2 border-red-400 bg-red-50 p-2.5 text-sm font-bold text-red-800">🚫 تم حظر حسابك بعد تكرار نشر نفس التعليق.</div>}
+          {spx.cflood === '1' && <div className="mb-3 rounded-lg border-2 border-amber-400 bg-amber-50 p-2.5 text-sm font-bold text-amber-900">⏳ أنت تنشر بسرعة كبيرة — انتظر قليلاً قبل تعليق آخر.</div>}
           {session ? (
             <form action={addCommentAction} className="mb-4 flex gap-2">
               <input type="hidden" name="adId" value={ad.id} />

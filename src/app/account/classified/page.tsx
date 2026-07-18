@@ -38,6 +38,7 @@ export default async function MyClassifiedPage({ searchParams }: { searchParams:
       {sp.reactivated === '1' && <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800"><Check className="h-4 w-4" /> تمت إعادة تفعيل الإعلان وعاد للعرض.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي لإعادة التفعيل{sp.price ? ` (المطلوب ${sp.price} ر.س)` : ''}. راجع <Link href="/account/wallet" className="underline">محفظتي</Link>.</div>}
       {sp.error === 'deleteWindow' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">انتهت المدة المسموح بها لحذف الإعلان حسب إعدادات الموقع. للحذف تواصل مع الإدارة.</div>}
+      {sp.error === 'banned' && <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان المبوّب.</div>}
       {classifiedSold && <div className="rounded-lg border border-primary/20 bg-primary/5 p-2 text-xs text-muted-foreground">رصيدك: <b className="text-primary">{balance} ر.س</b>. الإعلان المبوّب يظهر طوال المدّة المدفوعة، وبعد انتهائها يُحفظ في الأرشيف ويمكنك إعادة تفعيله متى شئت.</div>}
 
       {items.length === 0 ? (

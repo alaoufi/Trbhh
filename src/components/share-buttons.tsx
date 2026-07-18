@@ -51,8 +51,11 @@ export function ShareButtons({ url, title, text, compact, card, iconOnly }: { ur
   );
 
   // المشاركة: مشاركة النظام إن توفّرت، وإلا قائمة بدائل تعمل دائماً.
+  // في الوضع المضغوط (compact) مع بطاقة (card) نفتح القائمة بدل المشاركة المباشرة
+  // (القائمة تعرض خيار «مشاركة كصورة بطاقة» إضافياً) — لكن الوضع غير المضغوط لا
+  // يعرض أي قائمة إطلاقاً، فيجب أن يستدعي المشاركة المباشرة دائماً وإلا يصبح الزر بلا أثر.
   const share = async () => {
-    if (!card && typeof navigator !== 'undefined' && navigator.share) {
+    if ((!card || !compact) && typeof navigator !== 'undefined' && navigator.share) {
       try { await navigator.share({ title, text: msg, url }); } catch { /* أُلغيت */ }
       return;
     }

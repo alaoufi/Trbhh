@@ -497,11 +497,17 @@ async function getAdImpl(id: number) {
     .filter(Boolean)
     .map((f) => mediaUrl(f as string));
 
-  // video_path stores an uploads id ("0"/"" = none) — resolve to its file name
-  const videoUploadId = parseInt(ad.video_path || '', 10) || 0;
-  const videoFile = videoUploadId > 0
-    ? (await prisma.uploads.findUnique({ where: { id: BigInt(videoUploadId) }, select: { file_name: true } }).catch(() => null))?.file_name || null
-    : null;
+  // video_path holds either a modern storage path ("uploads/video_<hash>.mp4",
+  // written directly by createAdAction/updateAdAction) or — for legacy
+  // imported ads only — a numeric uploads-table id that must be resolved to
+  // its file name. A pure-digit string is always the legacy id shape (modern
+  // paths always start with "uploads/").
+  const videoPathRaw = ad.video_path || '';
+  const videoFile = /^\d+$/.test(videoPathRaw)
+    ? (parseInt(videoPathRaw, 10) > 0
+      ? (await prisma.uploads.findUnique({ where: { id: BigInt(videoPathRaw) }, select: { file_name: true } }).catch(() => null))?.file_name || null
+      : null)
+    : (videoPathRaw || null);
 
   await loadBanned();
   return {

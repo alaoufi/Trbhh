@@ -25,7 +25,7 @@ import { GuestWelcomeBanner } from '@/components/guest-welcome-banner';
 import { TopupPromoBanner } from '@/components/topup-promo-banner';
 import { FeedTextBanner } from '@/components/feed-text-banner';
 import { getFeedBannerItems } from '@/lib/settings';
-import { Fragment } from 'react';
+import { ProgressiveReveal } from '@/components/progressive-reveal';
 
 export const dynamic = 'force-dynamic';
 
@@ -215,22 +215,21 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       <Section title={H.latest} href="/search">
         <div className="space-y-4">
-          <AdGrid ads={latest.slice(0, 4)} />
-          {/* Paid banner — in-feed after 4 ads */}
-          <PromoSlot placement="feed" />
-          {/* بقية الإعلانات على دفعات: بانر نصي (تسويقي/توعوي متبدل) كل ~10 أسطر
-              (20 إعلاناً على شبكة عمودين — أول بانر بعد 20 إعلاناً من أعلى القائمة) */}
+          {/* الإعلانات على دفعات: كل دفعة ١٠ أسطر (٢٠ إعلاناً على شبكة عمودين)،
+              تليها بانر إعلاني مدفوع، ثم زر "عرض المزيد" يكشف الدفعة التالية. */}
           {(() => {
-            const rest = latest.slice(4);
-            if (!rest.length) return null;
-            const chunks: typeof rest[] = [rest.slice(0, 16)];
-            for (let i = 16; i < rest.length; i += 20) chunks.push(rest.slice(i, i + 20));
-            return chunks.map((c, i) => (
-              <Fragment key={i}>
-                <AdGrid ads={c} />
-                {feedTexts.length > 0 && i < chunks.length - 1 && <FeedTextBanner items={feedTexts} />}
-              </Fragment>
+            const BATCH = 20;
+            const groups: typeof latest[] = [];
+            for (let i = 0; i < latest.length; i += BATCH) groups.push(latest.slice(i, i + BATCH));
+            if (!groups.length) return null;
+            const chunks = groups.map((g, i) => (
+              <div key={i} className="space-y-4">
+                <AdGrid ads={g} />
+                <PromoSlot placement="feed" />
+                {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
+              </div>
             ));
+            return <ProgressiveReveal chunks={chunks} />;
           })()}
           {/* الرئيسية تعرض كل إعلانات آخر شهر — والأقدم عبر البحث والأقسام */}
           <Link href="/search" className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">

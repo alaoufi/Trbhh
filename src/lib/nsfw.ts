@@ -114,13 +114,16 @@ export async function checkImageBuffer(buf: Buffer): Promise<ImageVerdict> {
  * Scan a set of images. Returns the strictest outcome:
  *   explicit → at least one hardcore image (ban).
  *   review   → at least one borderline image (reject, hold).
+ * Runs all images concurrently — each check's sharp decode/resize overlaps on
+ * libuv's thread pool, and the resulting Promise.all is far faster than
+ * awaiting one image at a time in the publish critical path.
  */
 export async function scanImages(bufs: Buffer[]): Promise<ImageVerdict> {
+  const verdicts = await Promise.all(bufs.map(checkImageBuffer));
   let worst: ImageVerdict = { ok: false, explicit: false, review: false, hardcore: 0, sexy: 0 };
-  for (const b of bufs) {
-    const v = await checkImageBuffer(b);
+  for (const v of verdicts) {
     if (v.ok) worst = { ...worst, ok: true };
-    if (v.explicit) return v; // strictest — stop early
+    if (v.explicit) return v; // strictest wins
     if (v.review && !worst.review) worst = v;
   }
   return worst;

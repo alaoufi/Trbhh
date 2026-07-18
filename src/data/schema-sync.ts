@@ -564,6 +564,10 @@ const STATEMENTS: string[] = [
   // الإعلان المرتبط بالحدث (الإعلان الأصلي المطابق في حالة التكرار، أو إعلان البلاغ) — لعرضه عند اتخاذ القرار
   `ALTER TABLE mod_log ADD COLUMN ad_id BIGINT UNSIGNED NULL`,
   `ALTER TABLE chats MODIFY message TEXT`,
+  /* نشر إعلان ببصور كان يمسح كامل جدولي uploads/photos بلا فهرس عند فحص
+     التكرار بالصور وجلب صور كل إعلان — كل صفحة إعلان وكل نشر يمرّان من هنا. */
+  `CREATE INDEX uploads_user_type ON uploads (user_id, type)`,
+  `CREATE INDEX photos_other_id ON photos (other_id)`,
 ];
 
 let syncPromise: Promise<void> | null = null;

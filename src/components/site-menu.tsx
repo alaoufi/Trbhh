@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
+  Menu, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
   Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel, Palette, UserPen, ShieldCheck, Users, LayoutGrid,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
@@ -49,15 +49,6 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
   const pathname = usePathname() || '';
   useEffect(() => setMounted(true), []);
 
-  // lock body scroll while the drawer is open
-  useEffect(() => {
-    if (open) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = prev; };
-    }
-  }, [open]);
-
   const cats = categories ?? [];
   const close = () => setOpen(false);
 
@@ -85,17 +76,12 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
   }
 
   const drawer = open ? (
-    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/40" onClick={close} />
-      <nav className="absolute inset-y-0 right-0 flex w-80 max-w-[85%] flex-col overflow-y-auto bg-card text-card-foreground shadow-2xl">
-        <div className="flex items-center justify-between border-b border-primary/15 bg-accent/60 p-4">
-          <span className="text-lg font-bold text-primary">{adminMode ? 'قائمة الإدارة' : 'القائمة'}</span>
-          <button onClick={close} aria-label="إغلاق" className="text-primary"><X className="h-6 w-6" /></button>
-        </div>
-
+    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label={adminMode ? 'قائمة الإدارة' : 'القائمة'}>
+      <div className="fixed inset-0" onClick={close} />
+      <nav className="fixed left-3 right-3 top-16 z-[101] mx-auto max-h-[75vh] w-full max-w-sm overflow-y-auto rounded-xl border bg-card p-1.5 text-card-foreground shadow-xl sm:left-auto sm:mx-0">
         {adminMode ? (
           /* ===== قائمة الإدارة داخل اللوحة — مجموعات ملوّنة قابلة للطي ===== */
-          <div className="flex-1 space-y-1.5 p-2">
+          <div className="space-y-1.5 p-1">
             {adminGroups.map((g) =>
               g.key === 'top' ? (
                 g.items.map((n) => <Item key={n.href} href={n.href} icon={n.icon} onClick={close}>{n.label}</Item>)
@@ -119,7 +105,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
             <Item href="/" icon={Home} onClick={close}>العودة للموقع</Item>
           </div>
         ) : (
-          <div className="flex-1 p-2">
+          <div className="p-1">
             {/* 🎭 مبدّل الهوية — اختياري: يظهر لمن له صفة إضافية (متجر/إدارة) أو حسابات مرتبطة.
                 يعرض صفات الحساب الحالي (عضو/متجر/إدارة) + التبديل للحسابات المرتبطة بنفس المالك. */}
             {isAuthed && (myStoreId > 0 || isAdmin || linkedAccounts.length > 1) && (

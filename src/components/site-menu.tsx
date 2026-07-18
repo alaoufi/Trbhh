@@ -78,7 +78,7 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
   const drawer = open ? (
     <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-label={adminMode ? 'قائمة الإدارة' : 'القائمة'}>
       <div className="fixed inset-0" onClick={close} />
-      <nav className="fixed left-3 right-3 top-16 z-[101] mx-auto max-h-[75vh] w-full max-w-sm overflow-y-auto rounded-xl border bg-card p-1.5 text-card-foreground shadow-xl sm:left-auto sm:mx-0">
+      <nav className="fixed right-3 top-16 z-[101] max-h-[70vh] w-72 max-w-[85vw] overflow-y-auto rounded-xl border bg-card p-1.5 text-card-foreground shadow-xl">
         {adminMode ? (
           /* ===== قائمة الإدارة داخل اللوحة — مجموعات ملوّنة قابلة للطي ===== */
           <div className="space-y-1.5 p-1">

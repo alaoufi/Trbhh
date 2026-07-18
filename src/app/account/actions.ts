@@ -62,6 +62,24 @@ export async function toggleAdStatusAction(formData: FormData) {
   revalidatePath('/');
 }
 
+/** أرشفة العضو لإعلانه بنفسه (اختياري، مجاني) — يختفي فوراً عن الموقع وينتقل
+ *  لحالة «مؤرشف» تماماً كأرشفة الإدارة أو الأرشفة التلقائية؛ استعادته لاحقاً
+ *  عبر «أعِد للظهور» تخضع لنفس رسوم الاستعادة إن كانت مفعّلة. تختلف عن
+ *  «إيقاف» (مجاني الاستعادة دائماً) — خيار للعضو الذي يريد إخفاء إعلان طويل
+ *  الأمد (مثل مباع) دون حذفه نهائياً. */
+export async function archiveAdAction(formData: FormData) {
+  const session = await requireUser();
+  const adId = BigInt(String(formData.get('adId') || '0'));
+  const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { user_id: true, status: true, arc_msg: true } });
+  if (ad && toInt(ad.user_id) === session.uid && ad.status === 1 && !(ad.arc_msg && ad.arc_msg.trim() !== '')) {
+    await prisma.ads.update({ where: { id: adId }, data: { status: 0, data_archive: new Date().toISOString(), paused_by_owner: 0 } }).catch(() => {});
+    const { bustAdCaches } = await import('@/lib/data');
+    await bustAdCaches().catch(() => {});
+  }
+  revalidatePath('/account/ads');
+  revalidatePath('/');
+}
+
 /** إعادة إظهار إعلان مؤرشف (تلقائياً بعد المدة أو من الإدارة) بخصم رسوم من
  *  الرصيد. إعلان أخفته الإدارة لمخالفة (arc_msg) لا يُعاد بالدفع. */
 export async function restoreArchivedAdAction(formData: FormData) {

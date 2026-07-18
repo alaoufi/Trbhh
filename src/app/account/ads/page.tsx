@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Pencil, Trash2, Eye, EyeOff, Wallet } from 'lucide-react';
+import { Pencil, Trash2, Eye, EyeOff, Wallet, Archive } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyAds, adContactCounts } from '@/lib/account';
 import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingBool, getAdRestoreFee, getMemberWindows } from '@/lib/settings';
@@ -8,7 +8,7 @@ import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmSubmit } from '@/components/confirm-submit';
-import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction, bumpAdAction, restoreArchivedAdAction } from '../actions';
+import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction, bumpAdAction, restoreArchivedAdAction, archiveAdAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
@@ -160,12 +160,22 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                     </ConfirmSubmit>
                   </form>
                 ) : (
-                  <form action={toggleAdStatusAction}>
-                    <input type="hidden" name="adId" value={ad.id} />
-                    <ConfirmSubmit msg={ad.status === 1 ? 'إيقاف هذا الإعلان؟ يختفي من الموقع ويعود متى فعّلته.' : 'تفعيل هذا الإعلان؟ يعود للعرض فوراً.'} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary">
-                      {ad.status === 1 ? <><EyeOff className="h-3 w-3" /> إيقاف</> : <><Eye className="h-3 w-3" /> تفعيل</>}
-                    </ConfirmSubmit>
-                  </form>
+                  <>
+                    <form action={toggleAdStatusAction}>
+                      <input type="hidden" name="adId" value={ad.id} />
+                      <ConfirmSubmit msg={ad.status === 1 ? 'إيقاف هذا الإعلان؟ يختفي من الموقع ويعود متى فعّلته.' : 'تفعيل هذا الإعلان؟ يعود للعرض فوراً.'} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary">
+                        {ad.status === 1 ? <><EyeOff className="h-3 w-3" /> إيقاف</> : <><Eye className="h-3 w-3" /> تفعيل</>}
+                      </ConfirmSubmit>
+                    </form>
+                    {ad.status === 1 && (
+                      <form action={archiveAdAction}>
+                        <input type="hidden" name="adId" value={ad.id} />
+                        <ConfirmSubmit msg={`نقل «${ad.title || `#${ad.id}`}» للأرشيف؟ يختفي فوراً عن الموقع ولا يُحذف — إعادته لاحقاً${restoreFee > 0 ? ` تُكلّف ${restoreFee} ر.س` : ' مجانية'}.`} className="flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100">
+                          <Archive className="h-3 w-3" /> نقل للأرشيف
+                        </ConfirmSubmit>
+                      </form>
+                    )}
+                  </>
                 )}
                 {deleteState.expired ? (
                   <span className="flex items-center gap-1 rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-xs text-muted-foreground" title="تجاوز الإعلان مدة السماح بالحذف">

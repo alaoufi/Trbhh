@@ -438,9 +438,15 @@ export async function buyAdShowAction(formData: FormData) {
   const pkg = pricing.ads.find((x) => x.key === pkgKey && x.price > 0);
   if (!adId || !pkg) redirect('/store?adshow=err');
   // الإعلان لصاحب المتجر ومن منتجات متجره
-  const ad = await prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { user_id: true, trbhh_until: true, title: true } }).catch(() => null);
+  const ad = await prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { user_id: true, trbhh_until: true, title: true, detail: true } }).catch(() => null);
   const productIds = await storeProductAdIds(storeId).catch(() => [] as number[]);
   if (!ad || toInt(ad.user_id) !== session.uid || !productIds.includes(adId)) redirect('/store?adshow=err');
+  // منتجات المتجر معفاة من فحص التكرار عند إنشائها (سياسة المتجر مستقلة)، لكن
+  // عرضها في تربح بالدفع يُخرجها لجمهور تربح — فتخضع لسياسة التكرار هنا فقط،
+  // حتى لا يصبح الدفع وسيلة لتفادي كشف التكرار بين الأعضاء.
+  const { crossUserDuplicateOf } = await import('@/app/ads/actions');
+  const dup = await crossUserDuplicateOf(session.uid, ad.title, ad.detail || '');
+  if (dup) redirect(`/store?adshow=dup&dupid=${dup.id}`);
   const { charge } = await import('@/lib/wallet');
   const paid = await charge(session.uid, pkg.price, 'ad_show', `${pkg.label} (${pkg.days} يوماً) #${adId} — ${String(ad.title || '').slice(0, 40)}`);
   if (!paid.ok) redirect(`/store?adshow=needcredit&price=${pkg.price}`);

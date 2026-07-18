@@ -157,7 +157,7 @@ async function ownDuplicateOf(userId: number, title: string, detail: string, ima
  *  (title/detail) — matching on images too would false-positive on sellers who
  *  legitimately share the same manufacturer/stock photo. Scoped to the last 30
  *  days so the comparison set stays bounded and relevant. */
-async function crossUserDuplicateOf(userId: number, title: string, detail: string): Promise<{ id: number; title: string } | null> {
+export async function crossUserDuplicateOf(userId: number, title: string, detail: string): Promise<{ id: number; title: string } | null> {
   const { title: titlePct, detail: detailPct } = await getDupThresholds();
   const since = new Date(Date.now() - 30 * 86_400_000);
   const others = await prisma.ads.findMany({
@@ -390,7 +390,9 @@ export async function createAdAction(formData: FormData) {
   const audio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);
   if (audio) await setAdMedia(ad.id, 'audio', audio).catch(() => {});
   await logAdPublish(session.uid); // سجل ثابت لحدّ الباقة — لا يتأثر بحذف الإعلان لاحقاً
-  await resetDupAttempts(session.uid); // successful non-duplicate → clear strikes
+  // لا تصفير لعدّاد محاولات التكرار هنا: تصفيره عند أي نشر ناجح كان يتيح
+  // للمخالف التناوب بين إعلان سليم وآخر مكرّر بلا نهاية دون بلوغ حدّ الحظر
+  // (bumpDupAttempts أدناه يتكفّل بتقادم العدّاد تلقائياً بعد ٢٤ ساعة هدوء).
   // نقاط أول إعلان + مكافأة الإحالة — لا تعطّل النشر
   import('@/lib/points').then(async (m) => {
     const count = await prisma.ads.count({ where: { user_id: BigInt(session.uid) } }).catch(() => 99);

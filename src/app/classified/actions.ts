@@ -10,7 +10,7 @@ import { createClassified, getClassifiedById, updateClassified, deleteClassified
 import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS } from '@/lib/settings';
 import { charge, consumeDupCredit, addDupCredit, adjustBalance } from '@/lib/wallet';
 import { scanContent } from '@/lib/content-guard';
-import { handleProhibited, logMod } from '@/lib/moderation';
+import { handleProhibited, logMod, checkFlood } from '@/lib/moderation';
 import { checkImageBuffer, imageModerationEnabled } from '@/lib/nsfw';
 import { aHash, hashSimilarity } from '@/lib/phash';
 import { normalizeAr, similarity } from '@/domain/text';
@@ -144,6 +144,9 @@ export async function createClassifiedAction(formData: FormData) {
     const o = await handleProhibited(session.uid, bad.category, bad.term, `${title || ''} ${body || ''}`);
     redirect(`/classified/new?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : `&left=${o.left}`}`);
   }
+  // حاجز إغراق صلب — نفس الحاجز المطبَّق على إعلانات تربح، لم يكن مفعّلاً هنا سابقاً
+  const flood = await checkFlood(session.uid);
+  if (flood.blocked) redirect(`/classified/new?error=flood&wait=${flood.waitSec}`);
 
   const theme = parseInt(String(formData.get('theme') || ''), 10);
   const pos = String(formData.get('pos') || 'bottom');

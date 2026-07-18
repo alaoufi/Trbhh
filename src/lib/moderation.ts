@@ -30,13 +30,24 @@ export const FLOOD = {
 
 const ensureTables = ensureSchema;
 
-/** Increment a user's duplicate-attempt counter and return the new total. */
+/** نافذة تقادم عدّاد محاولات التكرار: محاولة أقدم من هذا تبدأ العدّاد من جديد
+ *  بدل الاستمرار من حيث توقف — منع تراكم محاولات متباعدة جداً زمنياً كأنها
+ *  حادثة واحدة، دون فتح ثغرة تصفير فوري (كان التصفير يحدث عند أي نشر ناجح). */
+const DUP_ATTEMPT_DECAY_MS = 24 * 3600_000;
+
+/** Increment a user's duplicate-attempt counter and return the new total.
+ *  Attempts older than DUP_ATTEMPT_DECAY_MS restart the counter at 1 instead
+ *  of accumulating forever — this is now the ONLY way strikes clear, so a
+ *  member can't dodge the ban threshold by interleaving one legitimate post
+ *  between each duplicate attempt. */
 export async function bumpDupAttempts(userId: number): Promise<number> {
   await ensureTables();
+  const existing = await prisma.dup_attempts.findUnique({ where: { user_id: BigInt(userId) } }).catch(() => null);
+  const stale = !!(existing?.updated_at && Date.now() - existing.updated_at.getTime() > DUP_ATTEMPT_DECAY_MS);
   const row = await prisma.dup_attempts.upsert({
     where: { user_id: BigInt(userId) },
     create: { user_id: BigInt(userId), count: 1 },
-    update: { count: { increment: 1 }, updated_at: new Date() },
+    update: stale ? { count: 1, updated_at: new Date() } : { count: { increment: 1 }, updated_at: new Date() },
   });
   return row.count;
 }

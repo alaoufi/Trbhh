@@ -23,8 +23,8 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; bulklimit?: string; show?: string; adshow?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string; areq?: string; vreq?: string; cat?: string; banned?: string }> }) {
-  const { error, sub, added, settings, backup, bulk, bulklimit, show, adshow, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq, areq, vreq, cat, banned } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; bulklimit?: string; show?: string; adshow?: string; dupid?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string; areq?: string; vreq?: string; cat?: string; banned?: string }> }) {
+  const { error, sub, added, settings, backup, bulk, bulklimit, show, adshow, dupid, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq, areq, vreq, cat, banned } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
@@ -529,6 +529,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           {adshow === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض إعلانك في تربح وخُصم المبلغ من رصيدك.</div>}
           {(show === 'needcredit' || adshow === 'needcredit') && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي{price ? ` (المطلوب ${price} ر.س)` : ''} — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
           {(show === 'err' || adshow === 'err') && <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs font-bold text-red-700">تعذّر التنفيذ — تأكد من الاختيار وحاول مجدداً.</div>}
+          {adshow === 'dup' && (
+            <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">
+              ⚠️ تعذّر عرض هذا المنتج في تربح — عنوانه/تفاصيله تطابق إعلاناً قائماً{dupid ? <> (<Link href={`/ads/${dupid}`} target="_blank" className="text-primary underline">عرضه</Link>)</> : ''} لعضو آخر. عدّل المحتوى ليكون مميزاً ثم أعد المحاولة — لم يُخصم أي مبلغ.
+            </div>
+          )}
 
           {/* ⭐ توثيق المتجر المدفوع: باقة + تعهد ← موافقة إدارة المتاجر ← خصم وتفعيل بمدة */}
           {verifyPkgs.length > 0 && (

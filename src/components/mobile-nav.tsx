@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, MessagesSquare, PlusCircle, Bell, Mail, Building2, Search, LogIn, Share2, type LucideIcon } from 'lucide-react';
+import { Home, MessagesSquare, PlusCircle, Mail, Building2, Search, LogIn, Share2, Users, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type NavItem = { href: string; label: string; icon: LucideIcon; primary?: boolean; badge?: boolean };
@@ -11,7 +11,7 @@ const authedItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },
   { href: '/companies', label: 'المتاجر', icon: Building2 },
   { href: '/ads/new', label: 'أضف إعلان', icon: PlusCircle, primary: true },
-  { href: '/notifications', label: 'الاشعارات', icon: Bell, badge: true },
+  { href: '/account/identities', label: 'الحسابات', icon: Users },
   { href: '/pages/contact', label: 'تواصل', icon: Mail },
 ];
 const guestItems: NavItem[] = [

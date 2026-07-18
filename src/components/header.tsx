@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { Bell } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
@@ -70,10 +69,14 @@ export async function Header() {
 
         {/* logo on the left (RTL: last child) — يبقى داخل هامش الحاوية بدل ملامسة حافة
             الشاشة تماماً. logo-header.png نسخة بخلفية شفافة حقيقية (لا مربّع داكن) من
-            نفس الشعار: النسخة القديمة logo-feathered.png كانت تتلاشى (يسارها خصوصاً)
-            إلى نفس لون تدرّج الهيدر الداكن فيظهر الشعار وكأنه مختفٍ رغم أنه يُرسَم كاملاً. */}
+            نفس الشعار: النسخة القديمة كانت تتلاشى (يسارها خصوصاً) إلى نفس لون تدرّج
+            الهيدر الداكن فيظهر الشعار وكأنه مختفٍ رغم أنه يُرسَم كاملاً.
+            <img> عادي بدل next/image عمداً: محسّن الصور عبر sharp على هذا السيرفر
+            المستضاف ذاتياً سبق أن سبّب اختفاء محتوى كامل لصور أخرى (انظر next.config.js
+            تعليق remotePatterns) — نفس فئة العطل هنا (شعار يظهر ثم يختفي فوراً). صورة
+            محلية صغيرة من public/ لا تحتاج تحسيناً خادمياً أصلاً. */}
         <Link href="/" className="shrink-0">
-          <Image src="/logo-header.png" alt="تربح" width={92} height={48} priority className="h-9 w-auto object-contain" />
+          <img src="/logo-header.png" alt="تربح" width={92} height={48} className="h-9 w-auto object-contain" />
         </Link>
       </div>
     </header>

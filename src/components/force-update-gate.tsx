@@ -48,7 +48,7 @@ export function ForceUpdateGate() {
   return (
     <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center gap-5 bg-gradient-to-b from-[#3287da] to-[#16213b] p-8 text-center text-white">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo-mark-256.png" alt="تربح" className="h-24 w-24 rounded-3xl bg-white p-2 shadow-2xl" />
+      <img src="/apple-icon.png" alt="تربح" className="h-24 w-24 rounded-3xl bg-white p-2 shadow-2xl" />
       <div>
         <h1 className="text-2xl font-extrabold drop-shadow">تحديث إجباري</h1>
         <p className="mt-2 max-w-sm text-sm leading-7 text-white/90">

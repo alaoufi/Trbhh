@@ -68,7 +68,7 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
         seconds={welcomeSeconds}
         url={`https://${SITE.domain}`}
         title={SITE.name}
-        shareText={`${SITE.name} — ${SITE.tagline}`}
+        shareText={`${SITE.name} ${SITE.tagline}`}
         card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/logo-header.png' }}
       />
 

@@ -140,7 +140,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <ShareButtons
               url={`https://${SITE.domain}`}
               title={SITE.name}
-              text={`${SITE.name} — ${SITE.tagline}`}
+              text={`${SITE.name} ${SITE.tagline}`}
               compact
               iconOnly
               card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/logo-header.png' }}

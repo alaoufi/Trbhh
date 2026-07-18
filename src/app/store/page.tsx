@@ -329,6 +329,14 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             <span className="mt-0.5 block text-xs text-muted-foreground">نص يظهر بارزاً أعلى واجهة متجرك (عرض، ساعات العمل، ملاحظة...). اتركه فارغاً لإخفائه.</span>
             <textarea name="announce" rows={2} maxLength={300} defaultValue={meta?.announce ?? ''} placeholder="مثال: خصم ٢٠٪ هذا الأسبوع • التوصيل خلال ٢٤ ساعة" className="mt-2 w-full rounded-lg border bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </div>
+          <label className="flex items-start gap-2 rounded-xl border p-3 text-sm">
+            <input type="checkbox" name="welcomeOn" defaultChecked={meta?.welcomeOn ?? false} className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
+            <span className="flex-1">
+              <b className="flex items-center gap-1"><Megaphone className="h-4 w-4" /> بوب أب ترحيب بالزائر</b>
+              <span className="block text-xs text-muted-foreground">رسالة ترحيبية تظهر بوب أب بارزاً لزائري متجرك (مرة واحدة لكل زيارة) وتختفي تلقائياً خلال ثوانٍ. الاسم {'{name}'} يُستبدل تلقائياً باسم متجرك. اتركها فارغة لتُستخدم رسالة افتراضية.</span>
+              <textarea name="welcomeMsg" rows={2} maxLength={300} defaultValue={meta?.welcomeMsg ?? ''} placeholder={`مرحباً بكم في متجر {name} 👋`} className="mt-2 w-full rounded-lg border bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+            </span>
+          </label>
           <div className="rounded-xl border p-3">
             <b className="flex items-center gap-1 text-sm"><MessageSquare className="h-4 w-4" /> نصوص مراسلة المتجر الجاهزة</b>
             <span className="mt-0.5 block text-xs text-muted-foreground">نصوص تظهر لعملاء متجرك داخل مربّع المحادثة ليعدّلوها ويرسلوها، وتُعبَّأ في واتساب عند التواصل (مع رابط المنتج تلقائياً). المتغيّرات: {'{link}'} الرابط، {'{name}'} اسم المنتج. كل سطر = نص مستقل.</span>

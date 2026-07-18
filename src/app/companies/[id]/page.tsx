@@ -11,7 +11,9 @@ import { hasAnyAdmin } from '@/lib/roles';
 import { recordStoreVisit, classifySource, bumpStoreView, getStoreViews } from '@/lib/store-analytics';
 import { isStoreSubBlocked } from '@/lib/subscription';
 import { isUserBanned } from '@/lib/moderation';
-import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle, parseHiddenFields, adViewCounts } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle, parseHiddenFields, adViewCounts, DEFAULT_STORE_WELCOME_MSG } from '@/lib/merchant';
+import { fillTemplate } from '@/lib/settings';
+import { WelcomePopup } from '@/components/welcome-popup';
 import { Button } from '@/components/ui/button';
 import { DisclaimerBar } from '@/components/disclaimer';
 import { StoreBottomNav } from '@/components/store-bottomnav';
@@ -219,6 +221,16 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         )}
         {meta.status !== 1 && (isOwner || admin) && (
           <div className="rounded-xl border bg-white p-3 text-sm font-bold text-amber-700 shadow-sm">⏳ هذا المتجر {meta.status === 0 ? 'بانتظار موافقة الإدارة' : 'موقوف'} — يظهر لك فقط حالياً.</div>
+        )}
+
+        {/* بوب أب ترحيب بزائر المتجر — يفعّله/يعطّله صاحب المتجر بمفتاح مستقل، ويظهر
+            مرة واحدة فقط لكل جلسة تصفح (مفتاح منفصل لكل متجر) ثم يختفي تلقائياً. */}
+        {meta.welcomeOn && (
+          <WelcomePopup storageKey={`trbhh_store_welcomed_${storeId}`}>
+            <p className="text-sm font-bold leading-6" style={{ color: brand }}>
+              {fillTemplate(meta.welcomeMsg || DEFAULT_STORE_WELCOME_MSG, { name })}
+            </p>
+          </WelcomePopup>
         )}
 
         {/* إعلان/تنويه المتجر — نص يتحكّم به صاحب المتجر (استقلالية تامة) */}

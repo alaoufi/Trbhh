@@ -19,7 +19,10 @@ async function logoUrl(logoId: number | null): Promise<string> {
  */
 const ensure = ensureSchema;
 
-export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; onPlatform: boolean; handle: string | null; nationalId: string | null; phone: string | null; email: string | null; contacts: string | null; termsAgreed: boolean; termsAgreedAt: string | null; allowAds: boolean; allowReviews: boolean; msgTemplates: string | null; hiddenFields: string | null; announce: string | null; productNote: string | null; status: number };
+export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; onPlatform: boolean; handle: string | null; nationalId: string | null; phone: string | null; email: string | null; contacts: string | null; termsAgreed: boolean; termsAgreedAt: string | null; allowAds: boolean; allowReviews: boolean; msgTemplates: string | null; hiddenFields: string | null; announce: string | null; productNote: string | null; welcomeMsg: string | null; welcomeOn: boolean; status: number };
+
+/** نص بوب أب ترحيب المتجر الافتراضي حين لا يكتب المالك نصاً مخصصاً — {name} يُستبدل باسم المتجر. */
+export const DEFAULT_STORE_WELCOME_MSG = 'مرحباً بكم في متجر {name} 👋 يسعدنا تصفّحكم.';
 
 /** Storefront elements each merchant can independently show/hide (کل متجر منفصل). */
 export const STORE_HIDE_FIELDS = [
@@ -40,7 +43,7 @@ async function getStoreMetaImpl(storeId: number): Promise<StoreMeta> {
   const r = Number.isInteger(storeId) && storeId > 0
     ? await prisma.stores.findUnique({ where: { id: BigInt(storeId) } }).catch(() => null)
     : null;
-  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, since: r?.activity_since ?? null, specialty: r?.specialty ?? null, audience: r?.audience ?? null, onPlatform: (r?.show_on_platform ?? 0) === 1, handle: r?.handle ?? null, nationalId: r?.national_id ?? null, phone: r?.store_phone ?? null, email: r?.store_email ?? null, contacts: r?.contacts ?? null, termsAgreed: (r?.terms_agreed ?? 0) === 1, termsAgreedAt: r?.terms_agreed_at ? r.terms_agreed_at.toISOString() : null, allowAds: (r?.allow_ads ?? 1) === 1, allowReviews: (r?.allow_reviews ?? 1) === 1, msgTemplates: r?.msg_templates ?? null, hiddenFields: r?.hidden_fields ?? null, announce: r?.announce ?? null, productNote: r?.product_note ?? null, status: r?.status ?? 1 };
+  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, since: r?.activity_since ?? null, specialty: r?.specialty ?? null, audience: r?.audience ?? null, onPlatform: (r?.show_on_platform ?? 0) === 1, handle: r?.handle ?? null, nationalId: r?.national_id ?? null, phone: r?.store_phone ?? null, email: r?.store_email ?? null, contacts: r?.contacts ?? null, termsAgreed: (r?.terms_agreed ?? 0) === 1, termsAgreedAt: r?.terms_agreed_at ? r.terms_agreed_at.toISOString() : null, allowAds: (r?.allow_ads ?? 1) === 1, allowReviews: (r?.allow_reviews ?? 1) === 1, msgTemplates: r?.msg_templates ?? null, hiddenFields: r?.hidden_fields ?? null, announce: r?.announce ?? null, productNote: r?.product_note ?? null, welcomeMsg: r?.welcome_msg ?? null, welcomeOn: (r?.welcome_on ?? 0) === 1, status: r?.status ?? 1 };
 }
 
 /* ---- Warnings & admin store oversight ---- */
@@ -168,13 +171,14 @@ export async function saveStoreMeta(userId: number, data: { storeName: string; c
 
 /** Store owner toggles: allow publishing ads, lock/unlock reviews+comments, and
  *  the store's OWN quick-reply message templates (shown only to its customers). */
-export async function saveStoreSettings(userId: number, data: { allowAds: boolean; allowReviews: boolean; msgTemplates: string; hidden: string[]; announce: string; productNote: string; hours?: { from: string; to: string; days: number[] } | null }) {
+export async function saveStoreSettings(userId: number, data: { allowAds: boolean; allowReviews: boolean; msgTemplates: string; hidden: string[]; announce: string; productNote: string; welcomeMsg: string; welcomeOn: boolean; hours?: { from: string; to: string; days: number[] } | null }) {
   await ensure();
   const { parseTemplates } = await import('./settings');
   const tpl = parseTemplates(data.msgTemplates).join('\n');
   const hidden = [...new Set(data.hidden.filter((k) => STORE_HIDE_KEYS.includes(k)))].join(',');
   const announce = data.announce.trim().slice(0, 300);
   const productNote = data.productNote.trim().slice(0, 300);
+  const welcomeMsg = data.welcomeMsg.trim().slice(0, 300);
   // دوام المتجر: undefined = لا تغيير (الميزة موقوفة)، null = مسح الدوام، وإلا HH:MM + أرقام الأيام
   const hhmm = /^\d{1,2}:\d{2}$/;
   const hoursData = data.hours === undefined
@@ -182,7 +186,7 @@ export async function saveStoreSettings(userId: number, data: { allowAds: boolea
     : data.hours && hhmm.test(data.hours.from) && hhmm.test(data.hours.to)
       ? { hours_from: data.hours.from, hours_to: data.hours.to, hours_days: data.hours.days.filter((d) => d >= 0 && d <= 6).join(',') || null }
       : { hours_from: null, hours_to: null, hours_days: null };
-  await prisma.stores.updateMany({ where: { user_id: userId }, data: { allow_ads: data.allowAds ? 1 : 0, allow_reviews: data.allowReviews ? 1 : 0, msg_templates: tpl || null, hidden_fields: hidden || null, announce: announce || null, product_note: productNote || null, ...hoursData } }).catch(() => {});
+  await prisma.stores.updateMany({ where: { user_id: userId }, data: { allow_ads: data.allowAds ? 1 : 0, allow_reviews: data.allowReviews ? 1 : 0, msg_templates: tpl || null, hidden_fields: hidden || null, announce: announce || null, product_note: productNote || null, welcome_msg: welcomeMsg || null, welcome_on: data.welcomeOn ? 1 : 0, ...hoursData } }).catch(() => {});
 }
 
 /** Record that the owner agreed to the store terms (accountability). */

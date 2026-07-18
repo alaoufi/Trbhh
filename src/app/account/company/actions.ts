@@ -55,9 +55,10 @@ export async function saveStoreSettingsAction(formData: FormData) {
   const msgTemplates = String(formData.get('msgTemplates') || '');
   const announce = String(formData.get('announce') || '');
   const productNote = String(formData.get('productNote') || '');
-  const badContent = await scanContent(msgTemplates, announce, productNote);
+  const welcomeMsg = String(formData.get('welcomeMsg') || '');
+  const badContent = await scanContent(msgTemplates, announce, productNote, welcomeMsg);
   if (badContent) {
-    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `${msgTemplates} ${announce} ${productNote}`);
+    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `${msgTemplates} ${announce} ${productNote} ${welcomeMsg}`);
     redirect(`/store?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : ''}`);
   }
   await saveStoreSettings(session.uid, {
@@ -67,6 +68,8 @@ export async function saveStoreSettingsAction(formData: FormData) {
     hidden,
     announce,
     productNote,
+    welcomeMsg,
+    welcomeOn: formData.get('welcomeOn') !== null,
     ...(hoursPresent ? { hours: hFrom && hTo ? { from: hFrom, to: hTo, days: hDays } : null } : {}),
   });
   revalidatePath('/store');

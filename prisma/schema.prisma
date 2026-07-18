@@ -878,6 +878,8 @@ model stores {
   hidden_fields    String?   @db.VarChar(200)
   announce         String?   @db.VarChar(300)
   product_note     String?   @db.VarChar(300)
+  welcome_msg      String?   @db.VarChar(300)
+  welcome_on       Int       @default(0) @db.TinyInt
   store_password   String?   @db.VarChar(255)
   store_username   String?   @unique(map: "uniq_store_username") @db.VarChar(60)
   views            Int       @default(0)

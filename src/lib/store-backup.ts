@@ -13,6 +13,7 @@ const CONTENT_FIELDS = [
   'store_name', 'brand_color', 'about', 'banner', 'tagline', 'layout', 'catalog', 'catalog_fields',
   'activity_since', 'specialty', 'audience', 'national_id', 'store_phone', 'store_email', 'contacts',
   'allow_ads', 'allow_reviews', 'msg_templates', 'hidden_fields', 'announce', 'product_note',
+  'welcome_msg', 'welcome_on',
   'description', 'address',
 ] as const;
 
@@ -87,7 +88,7 @@ async function applySnapshot(userId: number, snap: StoreBackup): Promise<'ok' | 
   const data: Record<string, unknown> = {};
   for (const f of CONTENT_FIELDS) if (f in src) data[f] = src[f];
 
-  const textParts = [data.store_name, data.about, data.banner, data.tagline, data.announce, data.product_note, data.description, data.address, data.contacts, data.specialty, data.audience]
+  const textParts = [data.store_name, data.about, data.banner, data.tagline, data.announce, data.product_note, data.welcome_msg, data.description, data.address, data.contacts, data.specialty, data.audience]
     .filter((v): v is string => typeof v === 'string' && v.trim() !== '');
   const branches = Array.isArray(snap.branches) ? snap.branches.slice(0, 50) : [];
   const branchText = branches.map((b) => `${b?.name || ''} ${b?.address || ''}`).join(' ');

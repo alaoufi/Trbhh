@@ -48,6 +48,10 @@ const STATEMENTS: string[] = [
   `ALTER TABLE stores ADD COLUMN hidden_fields VARCHAR(200) NULL`,
   `ALTER TABLE stores ADD COLUMN announce VARCHAR(300) NULL`,
   `ALTER TABLE stores ADD COLUMN product_note VARCHAR(300) NULL`,
+  /* بوب أب ترحيب خاص بكل متجر — نص يعدّله المالك وتفعيل/تعطيل مستقل (لا يعتمد
+     على إفراغ النص فقط، بخلاف announce) لأن المالك قد يريد إيقافه مؤقتاً دون فقد نصه. */
+  `ALTER TABLE stores ADD COLUMN welcome_msg VARCHAR(300) NULL`,
+  `ALTER TABLE stores ADD COLUMN welcome_on TINYINT NOT NULL DEFAULT 0`,
   `ALTER TABLE uploads ADD COLUMN phash VARCHAR(20) NULL`,
   `ALTER TABLE stores ADD COLUMN store_password VARCHAR(255) NULL`,
   `ALTER TABLE stores ADD COLUMN store_username VARCHAR(60) NULL`,

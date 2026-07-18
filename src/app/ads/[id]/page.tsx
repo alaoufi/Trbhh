@@ -18,7 +18,6 @@ import { waLink } from '@/lib/classified-theme';
 import { getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate, getMemberWindows, adWindowState } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
-import { DisclaimerBar } from '@/components/disclaimer';
 import { FavoriteButton } from '@/components/favorite-button';
 import { ShareButtons } from '@/components/share-buttons';
 import { ConfirmSubmit } from '@/components/confirm-submit';
@@ -680,8 +679,6 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           <AdGrid ads={similar} />
         </section>
       )}
-
-      <DisclaimerBar />
     </div>
   );
 }

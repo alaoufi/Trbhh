@@ -3,7 +3,6 @@ import { Flame } from 'lucide-react';
 import { getDealAds } from '@/lib/data';
 import { dealsEnabled } from '@/lib/store-extras';
 import { AdGrid } from '@/components/ad-card';
-import { DisclaimerBar } from '@/components/disclaimer';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'عروض اليوم', description: 'أقوى التخفيضات والعروض الحالية على منصة تربح' };
@@ -26,7 +25,6 @@ export default async function DealsPage() {
         <span className="rounded-full bg-white px-3 py-1 text-sm font-extrabold text-rose-700">{new Intl.NumberFormat('en-US').format(ads.length)} عرض</span>
       </div>
       {ads.length ? <AdGrid ads={ads} /> : <p className="rounded-2xl bg-secondary/30 py-12 text-center text-sm text-muted-foreground">لا توجد عروض مخفّضة حالياً — عد لاحقاً.</p>}
-      <DisclaimerBar />
     </div>
   );
 }

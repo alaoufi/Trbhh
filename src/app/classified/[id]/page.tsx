@@ -7,7 +7,6 @@ import { hasAnyAdmin } from '@/lib/roles';
 import { getClassifiedById, recordClassifiedView } from '@/lib/classified';
 import { getClassifiedStatsAudience, getClassifiedLifetimeDays } from '@/lib/settings';
 import { ClassifiedVisual, ClassifiedContact } from '@/components/classified-card';
-import { DisclaimerBar } from '@/components/disclaimer';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,8 +90,6 @@ export default async function ClassifiedDetailPage({ params }: { params: Promise
           )}
         </div>
       )}
-
-      <DisclaimerBar />
     </div>
   );
 }

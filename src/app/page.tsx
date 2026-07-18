@@ -12,7 +12,6 @@ import { CategorySelect } from '@/components/category-select';
 import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { PromoSlot } from '@/components/promo-slot';
-import { DisclaimerBar } from '@/components/disclaimer';
 import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, categoriesEnabled, getSetting, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
@@ -246,7 +245,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </Section>
       )}
 
-      <DisclaimerBar />
     </div>
   );
 }

@@ -4,7 +4,6 @@ import { notFound } from 'next/navigation';
 import { Gavel, Timer, TrendingUp } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { auctionsEnabled, listAuctions, closeDueAuctions, type AuctionCard } from '@/lib/auctions';
-import { DisclaimerBar } from '@/components/disclaimer';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'المزادات', description: 'زايد على أفضل العروض في مزادات تربح' };
@@ -74,7 +73,6 @@ export default async function AuctionsPage() {
           <div className="space-y-3 opacity-80">{closed.map((a) => <AuctionRow key={a.id} a={a} />)}</div>
         </>
       )}
-      <DisclaimerBar />
     </div>
   );
 }

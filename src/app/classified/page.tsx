@@ -3,7 +3,6 @@ import { Sparkles, Plus, Check } from 'lucide-react';
 import { getClassifieds } from '@/lib/classified';
 import { getEmptyText } from '@/lib/settings';
 import { ClassifiedGrid } from '@/components/classified-card';
-import { DisclaimerBar } from '@/components/disclaimer';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الإعلانات المبوّبة' };
@@ -37,8 +36,6 @@ export default async function ClassifiedPage({ searchParams }: { searchParams: P
       ) : (
         <ClassifiedGrid items={items} />
       )}
-
-      <DisclaimerBar />
     </div>
   );
 }

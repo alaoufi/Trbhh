@@ -7,7 +7,6 @@ import { getThread } from '@/lib/messages';
 import { getMsgDeleteMinutes, getAdMsgTemplates, getAdminMsgTemplates, getSupportTemplates, parseTemplates, fillTemplate } from '@/lib/settings';
 import { getPrimaryAdminId } from '@/lib/admin-inbox';
 import { storeIdOfUser, getStoreMeta } from '@/lib/merchant';
-import { DisclaimerBar } from '@/components/disclaimer';
 import { ChatRoom } from '@/components/chat-room';
 
 export const dynamic = 'force-dynamic';
@@ -64,8 +63,6 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
           )
         )}
       </div>
-
-      <DisclaimerBar className="mb-3" />
 
       {/* بعد محادثة نشطة: دعوة لتقييم التجربة (ليست للإدارة) */}
       {adminId !== otherId && session.uid !== adminId && thread.messages.length >= 4 && (

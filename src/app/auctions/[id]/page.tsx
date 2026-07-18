@@ -5,7 +5,6 @@ import { Gavel, Timer, User } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { auctionsEnabled, getAuctionDetail, closeDueAuctions } from '@/lib/auctions';
 import { timeAgo } from '@/lib/utils';
-import { DisclaimerBar } from '@/components/disclaimer';
 import { placeBidAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -88,7 +87,6 @@ export default async function AuctionPage({ params, searchParams }: { params: Pr
           </ul>
         </div>
       )}
-      <DisclaimerBar />
     </div>
   );
 }

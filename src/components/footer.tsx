@@ -6,7 +6,7 @@ import { DisclaimerBar } from '@/components/disclaimer';
 export function Footer({ debatesOn = true }: { debatesOn?: boolean }) {
   return (
     <footer className="mt-12 border-t border-black/20 bg-[#16294a] text-white">
-      <div className="container py-10">
+      <div className="container py-10 pb-24 md:pb-10">
         <DisclaimerBar variant="full" className="mb-8" />
         <div className="grid gap-8 md:grid-cols-3">
           <div>

@@ -5,7 +5,6 @@ import {
 } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { SITE, DISCLAIMER } from '@/lib/constants';
-import { DisclaimerBar } from '@/components/disclaimer';
 import { FaqAccordion, type QA } from '@/components/faq-accordion';
 
 const waPhone = SITE.phone.replace(/\D/g, '').replace(/^00/, ''); // 966XXXXXXXXX
@@ -187,7 +186,6 @@ export default async function StaticPage({ params }: { params: Promise<{ slug: s
         </div>
       ))}
 
-      {slug !== 'privacy' && slug !== 'contact' && <DisclaimerBar />}
     </div>
   );
 }

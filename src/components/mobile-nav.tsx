@@ -12,7 +12,7 @@ const authedItems: NavItem[] = [
   { href: '/debates', label: 'مناقشات', icon: MessagesSquare },
   { href: '/ads/new', label: 'أضف إعلان', icon: PlusCircle, primary: true },
   { href: '/notifications', label: 'الاشعارات', icon: Bell, badge: true },
-  { href: '/messages', label: 'الرسائل', icon: Mail },
+  { href: '/pages/contact', label: 'تواصل', icon: Mail },
 ];
 const guestItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },

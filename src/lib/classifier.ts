@@ -102,10 +102,8 @@ export interface ClassifyResult {
   matched: string[];
 }
 
-/** يصنّف نص إعلان (عنوان + تفاصيل) إلى أنسب قسم حالي فعّال في قاعدة البيانات.
- *  عدم العثور على أي تطابق يُعيد قسم «عروض أخرى» الاحتياطي بثقة صفر. */
-export async function classifyAdText(title: string, detail: string): Promise<ClassifyResult> {
-  const categories = await getCategories();
+/** التصنيف المحلي الأساسي — يعمل دائماً ولا يفشل أبداً، وهو وحده الفعّال حالياً. */
+async function classifyLocally(title: string, detail: string, categories: { id: number; name: string }[]): Promise<ClassifyResult> {
   // العنوان يُكرَّر ليُعطى وزناً أكبر من التفاصيل عند التصنيف
   const text = normalizeAr(`${title} ${title} ${detail}`);
   let best: { id: number; score: number; hits: string[] } | null = null;
@@ -126,6 +124,54 @@ export async function classifyAdText(title: string, detail: string): Promise<Cla
     return { categoryId: await getFallbackCategoryId(), confidence: 0, matched: [] };
   }
   return { categoryId: best.id, confidence: Math.min(1, best.score / 8), matched: best.hits };
+}
+
+/**
+ * نقطة ربط اختيارية بخدمة خارجية — معطّلة تماماً افتراضياً (لا اتصال إنترنت،
+ * لا مفتاح API مطلوب). لا توجد فعلياً خدمة ذكاء اصطناعي "مجانية بالكامل بلا
+ * مفتاح وبلا سقف استخدام" آمنة للإنتاج، لذا لا يوجد اتصال فعلي بأي خدمة حالياً.
+ *
+ * عند اختيار خدمة لاحقاً (لتحليل الصور مثلاً، وهو ما لا يقدر عليه التصنيف
+ * المحلي النصي): يكفي ضبط EXTERNAL_CLASSIFIER_URL في متغيرات البيئة وتنفيذ
+ * الطلب الفعلي هنا. التصنيف المحلي يبقى دائماً الأساس المحسوب أولاً؛ الخارجي
+ * يُستخدم فقط لتعزيزه إن كان أعلى ثقة، ومهلته القصوى 3 ثوانٍ — أي فشل أو
+ * انقطاع أو بطء منه يُتجاهل بصمت ولا يؤثر على نشر الإعلان إطلاقاً.
+ */
+async function externalEnhance(title: string, detail: string): Promise<{ categoryId: number; confidence: number } | null> {
+  const url = process.env.EXTERNAL_CLASSIFIER_URL;
+  if (!url) return null; // الوضع الحالي: لا خدمة مضبوطة = لا اتصال إطلاقاً
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3000);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, detail }),
+      signal: ctrl.signal,
+    }).finally(() => clearTimeout(timer));
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const categoryId = Number(data?.categoryId);
+    const confidence = Number(data?.confidence);
+    if (!Number.isFinite(categoryId) || categoryId <= 0) return null;
+    return { categoryId, confidence: Number.isFinite(confidence) ? Math.min(1, Math.max(0, confidence)) : 0.5 };
+  } catch {
+    return null;
+  }
+}
+
+/** يصنّف نص إعلان (عنوان + تفاصيل) إلى أنسب قسم حالي فعّال في قاعدة البيانات.
+ *  المحلي يُحسب دائماً أولاً؛ التعزيز الخارجي (إن فُعِّل مستقبلاً) لا يستبدله
+ *  إلا بثقة أعلى ولقسم فعلي موجود. عدم العثور على أي تطابق يُعيد قسم «عروض
+ *  أخرى» الاحتياطي بثقة صفر. */
+export async function classifyAdText(title: string, detail: string): Promise<ClassifyResult> {
+  const categories = await getCategories();
+  const local = await classifyLocally(title, detail, categories);
+  const boosted = await externalEnhance(title, detail);
+  if (boosted && boosted.confidence > local.confidence && categories.some((c) => c.id === boosted.categoryId)) {
+    return { categoryId: boosted.categoryId, confidence: boosted.confidence, matched: local.matched };
+  }
+  return local;
 }
 
 /** إعادة تصنيف دفعة من الإعلانات القديمة الجالسة في «عروض أخرى» ولم تُعالَج بعد

@@ -9,7 +9,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon; primary?: boolea
 // بنود تتطلّب تسجيل الدخول → تظهر فقط للمسجّل. للزائر بنود عامة فقط.
 const authedItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },
-  { href: '/debates', label: 'مناقشات', icon: MessagesSquare },
+  { href: '/companies', label: 'المتاجر', icon: Building2 },
   { href: '/ads/new', label: 'أضف إعلان', icon: PlusCircle, primary: true },
   { href: '/notifications', label: 'الاشعارات', icon: Bell, badge: true },
   { href: '/pages/contact', label: 'تواصل', icon: Mail },

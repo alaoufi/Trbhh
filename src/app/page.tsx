@@ -103,6 +103,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {/* سجّل واحصل على رصيد ترحيبي — للزوار فقط وقابل للإغلاق */}
       {!session && welcomeCredit > 0 && <WelcomeBanner amount={welcomeCredit} />}
 
+      {/* ترحيب بالزائر غير المسجّل + دعوة للتسجيل — يظهر دائماً بغضّ النظر عن الرصيد الترحيبي */}
+      {!session && (
+        <div className="card-3d flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gradient-to-l from-primary/10 to-primary/5 p-4">
+          <p className="text-sm font-bold leading-6 text-primary">
+            مرحباً ضيفنا العزيز ،، نرحب بك في مكانك — سجّل معنا ليصلك ما يهمّك.
+          </p>
+          <Link href="/register" className="shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-primary/90">سجّل الآن</Link>
+        </div>
+      )}
+
       {/* بانر عرض الشحن: اشحن بـ100 ونضيف لك 10 — يظهر عند تفعيل مكافآت الشحن من التحكم */}
       <TopupPromoBanner />
 

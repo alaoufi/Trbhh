@@ -8,7 +8,7 @@ import { getStore } from '@/lib/stores';
 import { cookies, headers } from 'next/headers';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
-import { recordStoreVisit, classifySource, bumpStoreView, getStoreViews } from '@/lib/store-analytics';
+import { recordStoreVisit, classifySource, getStoreViews } from '@/lib/store-analytics';
 import { isStoreSubBlocked } from '@/lib/subscription';
 import { isUserBanned } from '@/lib/moderation';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle, parseHiddenFields, adViewCounts, DEFAULT_STORE_WELCOME_MSG } from '@/lib/merchant';
@@ -120,9 +120,9 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
     );
   }
 
-  // مشاهدة متجر = كل دخول/تحديث (لا تُحتسب مشاهدة المالك). أمّا الزوّار فمُزال تكرارهم يومياً.
+  // مشاهدة متجر = زيارة مزالة التكرار (مرة واحدة لكل زائر يومياً)، لا تُحتسب مشاهدة المالك —
+  // فلا يزيد العدد بتكرار الضغط على «الرئيسية» أو تحديث الصفحة من نفس الزائر في نفس اليوم.
   if (!isOwner) {
-    await bumpStoreView(storeId);
     const vid = (await cookies()).get('trbhh_vid')?.value;
     const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
     if (viewerKey) {

@@ -253,7 +253,7 @@ export function AdForm({
       <Section icon={Tag} title={isReq ? 'بيانات الطلب' : 'بيانات العرض'}>
         <div>
           <label className={lbl}>{isReq ? 'ماذا تطلب؟' : 'عنوان الإعلان'}</label>
-          <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مثال: مطلوب رافعة شوكية للإيجار بالدمام' : 'مثال: رافعة سيزرلفت للإيجار بالدمام'} />
+          <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مثال: مطلوب سيارة للشراء' : 'مثال: سيارة للبيع'} />
         </div>
         {catsOn && (
           <div className="grid gap-3 sm:grid-cols-2">

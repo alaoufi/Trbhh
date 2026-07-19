@@ -214,7 +214,7 @@ export function ClassifiedForm({ action, error, initial, submitLabel, needPrice,
           </div>
         )}
 
-        <fieldset disabled={noneAffordable} className={noneAffordable ? 'space-y-4 opacity-40' : 'space-y-4'}>
+        <fieldset disabled={noneAffordable} className={noneAffordable ? 'space-y-4 border-0 p-0 opacity-40' : 'space-y-4 border-0 p-0'}>
           {durationOptions && (
             <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
               {error === 'duration' && <div className="mb-2 text-sm font-bold text-red-700">اختر مدّة النشر.</div>}

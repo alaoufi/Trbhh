@@ -96,20 +96,28 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
               {ad.special && ad.expiresAt && (
                 <span className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold leading-4 text-amber-700">⭐ مميّز حتى {fmtDay(ad.expiresAt)}.</span>
               )}
-              {featuredSold && (
-                <details className="mt-1">
-                  <summary className="cursor-pointer list-none text-[11px] font-bold text-amber-700">{ad.special ? 'تمديد التمييز…' : 'تمييز الإعلان (مدفوع)…'}</summary>
-                  <form action={featureAdAction} className="mt-1 flex flex-wrap items-center gap-1">
-                    <input type="hidden" name="adId" value={ad.id} />
-                    <select name="duration" className="h-8 rounded-md border bg-background px-2 text-xs">
-                      {DURATIONS.filter((d) => servicePricing.featured[d.key] > 0).map((d) => (
-                        <option key={d.key} value={d.key}>{d.label} — {en(servicePricing.featured[d.key])} ر.س</option>
-                      ))}
-                    </select>
-                    <ConfirmSubmit msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-bold text-white">تمييز</ConfirmSubmit>
-                  </form>
-                </details>
-              )}
+              {featuredSold && (() => {
+                const priced = DURATIONS.filter((d) => servicePricing.featured[d.key] > 0);
+                const affordable = priced.filter((d) => servicePricing.featured[d.key] <= balance);
+                return (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer list-none text-[11px] font-bold text-amber-700">{ad.special ? 'تمديد التمييز…' : 'تمييز الإعلان (مدفوع)…'}</summary>
+                    {priced.length > 0 && affordable.length === 0 ? (
+                      <div className="mt-1 rounded-md border-2 border-red-400 bg-red-50 px-2 py-1.5 text-[11px] font-bold text-red-700">💳 رصيدك لا يكفي لتمييز الإعلان — <Link href="/account/wallet" className="underline">اشحن رصيدك</Link></div>
+                    ) : (
+                      <form action={featureAdAction} className="mt-1 flex flex-wrap items-center gap-1">
+                        <input type="hidden" name="adId" value={ad.id} />
+                        <select name="duration" defaultValue={affordable[0]?.key} className="h-8 rounded-md border bg-background px-2 text-xs">
+                          {priced.map((d) => (
+                            <option key={d.key} value={d.key} disabled={servicePricing.featured[d.key] > balance}>{d.label} — {en(servicePricing.featured[d.key])} ر.س{servicePricing.featured[d.key] > balance ? ' (غير متاح)' : ''}</option>
+                          ))}
+                        </select>
+                        <ConfirmSubmit msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-bold text-white">تمييز</ConfirmSubmit>
+                      </form>
+                    )}
+                  </details>
+                );
+              })()}
               <div className="mt-auto flex flex-wrap gap-2 pt-2">
                 {editState.expired ? (
                   <span className="flex items-center gap-1 rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-xs text-muted-foreground" title="تجاوز الإعلان مدة السماح بالتعديل">
@@ -120,33 +128,59 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                     <Pencil className="h-3 w-3" /> تعديل{editState.label ? ` (${editState.label})` : ''}
                   </Link>
                 )}
-                {bumpOn && ad.status === 1 && !ad.storeOnly && (
-                  <form action={bumpAdAction}>
-                    <input type="hidden" name="adId" value={ad.id} />
-                    <ConfirmSubmit msg="تأكيد تحديث الإعلان (رفعه لأعلى القوائم)؟ إن لم يكن التحديث المجاني متاحاً يُخصم السعر من رصيدك." title="رفع الإعلان لأعلى القوائم" className="flex items-center gap-1 rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-bold text-sky-700 hover:bg-sky-100">⬆ تحديث</ConfirmSubmit>
-                  </form>
-                )}
+                {bumpOn && ad.status === 1 && !ad.storeOnly && (() => {
+                  const last = new Date(ad.bumpedAt || ad.createdAt || 0);
+                  const daysSince = (now - last.getTime()) / 86400_000;
+                  const bumpFree = extras.bumpFreeDays > 0 && daysSince >= extras.bumpFreeDays;
+                  const bumpCost = bumpFree ? 0 : extras.bumpPrice;
+                  const canBump = bumpCost <= 0 || balance >= bumpCost;
+                  return (
+                    <form action={bumpAdAction}>
+                      <input type="hidden" name="adId" value={ad.id} />
+                      <ConfirmSubmit
+                        disabled={!canBump}
+                        msg="تأكيد تحديث الإعلان (رفعه لأعلى القوائم)؟ إن لم يكن التحديث المجاني متاحاً يُخصم السعر من رصيدك."
+                        title={canBump ? 'رفع الإعلان لأعلى القوائم' : `رصيدك لا يكفي (${bumpCost} ر.س)`}
+                        className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-bold ${canBump ? 'border-sky-300 bg-sky-50 text-sky-700 hover:bg-sky-100' : 'cursor-not-allowed border-red-300 bg-red-50 text-red-400 opacity-60'}`}
+                      >⬆ تحديث{!canBump ? ` (${bumpCost} ر.س)` : ''}</ConfirmSubmit>
+                    </form>
+                  );
+                })()}
                 {auctionOn && ad.status === 1 && !ad.storeOnly && (
                   <Link href={`/auctions/new?ad=${ad.id}`} className="flex items-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700 hover:bg-violet-100" title="افتح مزاداً على هذا الإعلان">🔨 مزاد</Link>
                 )}
-                {extras.urgentPacks.length > 0 && ad.status === 1 && !ad.storeOnly && !(ad.urgentUntil && new Date(ad.urgentUntil).getTime() > now) && (
-                  <form action={buyUrgentAction} className="flex items-center gap-1">
-                    <input type="hidden" name="adId" value={ad.id} />
-                    <select name="hours" className="h-7 rounded-md border border-red-300 bg-red-50 px-1 text-[11px] font-bold text-red-600">
-                      {extras.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours}>{p0.hours} ساعة — {p0.price} ر.س</option>)}
-                    </select>
-                    <ConfirmSubmit msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100">🔥 عاجل</ConfirmSubmit>
-                  </form>
-                )}
+                {extras.urgentPacks.length > 0 && ad.status === 1 && !ad.storeOnly && !(ad.urgentUntil && new Date(ad.urgentUntil).getTime() > now) && (() => {
+                  const affordablePacks = extras.urgentPacks.filter((p0) => p0.price <= balance);
+                  if (affordablePacks.length === 0) {
+                    return <span className="flex items-center gap-1 rounded-md border-2 border-red-300 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-600">💳 لا يكفي لباقة عاجل — <Link href="/account/wallet" className="underline">اشحن رصيدك</Link></span>;
+                  }
+                  return (
+                    <form action={buyUrgentAction} className="flex items-center gap-1">
+                      <input type="hidden" name="adId" value={ad.id} />
+                      <select name="hours" defaultValue={affordablePacks[0]?.hours} className="h-7 rounded-md border border-red-300 bg-red-50 px-1 text-[11px] font-bold text-red-600">
+                        {extras.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours} disabled={p0.price > balance}>{p0.hours} ساعة — {p0.price} ر.س{p0.price > balance ? ' (غير متاح)' : ''}</option>)}
+                      </select>
+                      <ConfirmSubmit msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100">🔥 عاجل</ConfirmSubmit>
+                    </form>
+                  );
+                })()}
                 {/* مؤرشف → إعادة إظهار برسوم (لا يُعاد مجاناً)؛ مخفيّ من الإدارة → لا زر؛ غير ذلك → إيقاف/تفعيل مجاني */}
-                {ad.hiddenReason ? null : ad.archived ? (
-                  <form action={restoreArchivedAdAction}>
-                    <input type="hidden" name="adId" value={ad.id} />
-                    <ConfirmSubmit msg={restoreFee > 0 ? `إعادة إظهار هذا الإعلان المؤرشف؟ سيُخصم ${restoreFee} ر.س من رصيدك فوراً.` : 'إعادة إظهار هذا الإعلان المؤرشف؟'} className="flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
-                      <Eye className="h-3 w-3" /> أعِد للظهور{restoreFee > 0 ? ` (${restoreFee} ر.س)` : ''}
-                    </ConfirmSubmit>
-                  </form>
-                ) : (
+                {ad.hiddenReason ? null : ad.archived ? (() => {
+                  const canRestore = restoreFee <= 0 || balance >= restoreFee;
+                  return (
+                    <form action={restoreArchivedAdAction}>
+                      <input type="hidden" name="adId" value={ad.id} />
+                      <ConfirmSubmit
+                        disabled={!canRestore}
+                        msg={restoreFee > 0 ? `إعادة إظهار هذا الإعلان المؤرشف؟ سيُخصم ${restoreFee} ر.س من رصيدك فوراً.` : 'إعادة إظهار هذا الإعلان المؤرشف؟'}
+                        title={canRestore ? undefined : `رصيدك لا يكفي (${restoreFee} ر.س)`}
+                        className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-bold ${canRestore ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'cursor-not-allowed border-red-300 bg-red-50 text-red-400 opacity-60'}`}
+                      >
+                        <Eye className="h-3 w-3" /> أعِد للظهور{restoreFee > 0 ? ` (${restoreFee} ر.س)` : ''}
+                      </ConfirmSubmit>
+                    </form>
+                  );
+                })() : (
                   <>
                     <form action={toggleAdStatusAction}>
                       <input type="hidden" name="adId" value={ad.id} />

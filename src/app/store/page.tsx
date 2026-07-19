@@ -248,14 +248,17 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           {subState.state === 'suspended' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">⛔ اشتراكك منتهٍ ومتجرك <b>مخفيّ من العرض</b> (بياناتك وإعلاناتك محفوظة). جدّد لإعادة الظهور فوراً.</div>}
           {subState.state === 'none' && <div className="rounded-lg bg-sky-50 p-2 text-xs font-bold text-sky-700">لم تشترك بعد. اشترك ليظهر متجرك للعملاء.</div>}
           <div className="grid grid-cols-3 gap-2">
-            {([['monthly', subPricing.monthly, 'شهري'], ['sixmo', subPricing.sixmo, '6 أشهر'], ['yearly', subPricing.yearly, 'سنوي']] as const).map(([plan, price, label]) => (
-              <form key={plan} action={subscribeStoreAction} className="flex flex-col items-center gap-1 rounded-xl border p-3 text-center">
-                <input type="hidden" name="plan" value={plan} />
-                <div className="text-xs font-bold text-muted-foreground">{label}</div>
-                <div className="text-lg font-extrabold text-primary">{en(price)} <span className="text-[10px]">ر.س</span></div>
-                <ConfirmSubmit msg="تأكيد الاشتراك/التجديد للخطة المختارة؟ تُخصم الرسوم من رصيدك فوراً." className="w-full rounded-md bg-primary px-3 py-1.5 text-sm font-bold text-primary-foreground">{subState.state === 'active' || subState.state === 'grace' ? 'تجديد' : 'اشتراك'}</ConfirmSubmit>
-              </form>
-            ))}
+            {([['monthly', subPricing.monthly, 'شهري'], ['sixmo', subPricing.sixmo, '6 أشهر'], ['yearly', subPricing.yearly, 'سنوي']] as const).map(([plan, price, label]) => {
+              const canAfford = merchBalance >= price;
+              return (
+                <form key={plan} action={subscribeStoreAction} className={`flex flex-col items-center gap-1 rounded-xl border p-3 text-center ${canAfford ? '' : 'border-red-300 bg-red-50/40 opacity-60'}`}>
+                  <input type="hidden" name="plan" value={plan} />
+                  <div className="text-xs font-bold text-muted-foreground">{label}</div>
+                  <div className={`text-lg font-extrabold ${canAfford ? 'text-primary' : 'text-red-600'}`}>{en(price)} <span className="text-[10px]">ر.س</span></div>
+                  <ConfirmSubmit disabled={!canAfford} msg="تأكيد الاشتراك/التجديد للخطة المختارة؟ تُخصم الرسوم من رصيدك فوراً." className={`w-full rounded-md px-3 py-1.5 text-sm font-bold ${canAfford ? 'bg-primary text-primary-foreground' : 'cursor-not-allowed bg-red-200 text-red-500'}`}>{canAfford ? (subState.state === 'active' || subState.state === 'grace' ? 'تجديد' : 'اشتراك') : 'رصيدك لا يكفي'}</ConfirmSubmit>
+                </form>
+              );
+            })}
           </div>
           <p className="text-[11px] text-muted-foreground">تُخصم الرسوم من رصيدك. التجديد المبكر يضيف المدة إلى ما تبقّى. عند انتهاء الاشتراك تُمنح مهلة {en(subState.graceDays)} أيام قبل الإخفاء، ولا يُحذف المتجر أو إعلاناته.</p>
 
@@ -289,14 +292,17 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           {plusActive && <div className="rounded-lg bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">⭐ باقة Plus مفعّلة حتى: {fmtD(storeXRow!.plus_until)}</div>}
           <p className="text-xs text-muted-foreground">صفقة واحدة تجمع: <b>اشتراك المتجر</b> + <b>عرض متجرك ومنتجاته في رئيسية تربح</b> + <b>شارة ⭐ Plus</b> على واجهة متجرك طوال المدة — تُخصم من رصيدك.</p>
           <div className="grid grid-cols-3 gap-2">
-            {([['monthly', plusPricing.monthly, 'شهري'], ['sixmo', plusPricing.sixmo, '6 أشهر'], ['yearly', plusPricing.yearly, 'سنوي']] as const).filter(([, p0]) => p0 > 0).map(([plan, p0, label]) => (
-              <form key={plan} action={buyStorePlusAction} className="flex flex-col items-center gap-1 rounded-xl border border-amber-300 bg-white p-3 text-center">
-                <input type="hidden" name="plan" value={plan} />
-                <div className="text-xs font-bold text-muted-foreground">{label}</div>
-                <div className="text-lg font-extrabold text-amber-700">{en(p0)} <span className="text-[10px]">ر.س</span></div>
-                <ConfirmSubmit msg="تأكيد اشتراك/تمديد متجر Plus للمدة المختارة؟ يُخصم السعر من رصيدك فوراً." className="btn-3d w-full rounded-lg bg-amber-500 px-2 py-1.5 text-xs font-bold text-white">{plusActive ? 'تمديد' : 'اشتراك Plus'}</ConfirmSubmit>
-              </form>
-            ))}
+            {([['monthly', plusPricing.monthly, 'شهري'], ['sixmo', plusPricing.sixmo, '6 أشهر'], ['yearly', plusPricing.yearly, 'سنوي']] as const).filter(([, p0]) => p0 > 0).map(([plan, p0, label]) => {
+              const canAfford = merchBalance >= p0;
+              return (
+                <form key={plan} action={buyStorePlusAction} className={`flex flex-col items-center gap-1 rounded-xl border p-3 text-center ${canAfford ? 'border-amber-300 bg-white' : 'border-red-300 bg-red-50/40 opacity-60'}`}>
+                  <input type="hidden" name="plan" value={plan} />
+                  <div className="text-xs font-bold text-muted-foreground">{label}</div>
+                  <div className={`text-lg font-extrabold ${canAfford ? 'text-amber-700' : 'text-red-600'}`}>{en(p0)} <span className="text-[10px]">ر.س</span></div>
+                  <ConfirmSubmit disabled={!canAfford} msg="تأكيد اشتراك/تمديد متجر Plus للمدة المختارة؟ يُخصم السعر من رصيدك فوراً." className={`btn-3d w-full rounded-lg px-2 py-1.5 text-xs font-bold text-white ${canAfford ? 'bg-amber-500' : 'cursor-not-allowed bg-red-300'}`}>{canAfford ? (plusActive ? 'تمديد' : 'اشتراك Plus') : 'رصيدك لا يكفي'}</ConfirmSubmit>
+                </form>
+              );
+            })}
           </div>
         </div>
       )}
@@ -592,12 +598,16 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
               <p className="text-[11px] text-muted-foreground">يظهر متجرك (ومنتجاته) في قسم المتاجر بالصفحة الرئيسية طوال المدة.</p>
               {storeShowActive && <div className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">✅ مفعّل حتى {fmtD(storeShowRow!.show_until)} (باقي {daysLeft(storeShowRow!.show_until)} يوم) — الشراء الآن = <b>تجديد يضيف المدة</b>:</div>}
               <div className="grid grid-cols-3 gap-2">
-                {([['w2', 'أسبوعان'], ['m1', 'شهر'], ['y1', 'سنة']] as const).filter(([k]) => showPricing.store[k] > 0).map(([k, label]) => (
-                  <form key={k} action={buyStoreShowAction} className="text-center">
-                    <input type="hidden" name="duration" value={k} />
-                    <ConfirmSubmit msg={`تأكيد شراء عرض المتجر في تربح (${label}) بسعر ${showPricing.store[k]} ر.س؟ يُخصم من رصيدك فوراً.`} className="btn-3d w-full rounded-lg bg-primary px-2 py-2 text-xs font-bold text-white">{label}<br /><span className="text-[10px] opacity-90">{showPricing.store[k]} ر.س</span></ConfirmSubmit>
-                  </form>
-                ))}
+                {([['w2', 'أسبوعان'], ['m1', 'شهر'], ['y1', 'سنة']] as const).filter(([k]) => showPricing.store[k] > 0).map(([k, label]) => {
+                  const price = showPricing.store[k];
+                  const canAfford = merchBalance >= price;
+                  return (
+                    <form key={k} action={buyStoreShowAction} className="text-center">
+                      <input type="hidden" name="duration" value={k} />
+                      <ConfirmSubmit disabled={!canAfford} msg={`تأكيد شراء عرض المتجر في تربح (${label}) بسعر ${price} ر.س؟ يُخصم من رصيدك فوراً.`} className={`btn-3d w-full rounded-lg px-2 py-2 text-xs font-bold text-white ${canAfford ? 'bg-primary' : 'cursor-not-allowed bg-red-300'}`}>{label}<br /><span className="text-[10px] opacity-90">{price} ر.س{canAfford ? '' : ' — لا يكفي'}</span></ConfirmSubmit>
+                    </form>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -606,19 +616,28 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             <div className="space-y-2 rounded-xl border border-amber-300 bg-amber-50/50 p-3">
               <div className="text-sm font-bold">📢 عرض إعلان من متجرك في تربح</div>
               <p className="text-[11px] text-muted-foreground">يظهر الإعلان المحدد في كل قوائم تربح (الرئيسية/البحث/الأقسام) طوال مدة الباقة، ويُخصم سعرها من رصيدك.</p>
-              <form action={buyAdShowAction} className="space-y-2">
-                <select name="adId" required className="h-10 w-full rounded-lg border border-primary/30 bg-background px-2 text-sm">
-                  {showProducts.map((a) => (
-                    <option key={String(a.id)} value={String(a.id)}>{a.title}{a.trbhh_until && a.trbhh_until > new Date() ? ` — معروض حتى ${fmtD(a.trbhh_until)}` : ''}</option>
-                  ))}
-                </select>
-                <select name="pkg" required className="h-10 w-full rounded-lg border border-primary/30 bg-background px-2 text-sm">
-                  {showPricing.ads.filter((a) => a.price > 0).map((a) => (
-                    <option key={a.key} value={a.key}>{a.key === 'gold' ? '🥇' : a.key === 'silver' ? '🥈' : '⭐'} {a.label} — {a.days} يوماً — {a.price} ر.س</option>
-                  ))}
-                </select>
-                <ConfirmSubmit msg="تأكيد شراء عرض الإعلان المحدد في تربح للباقة المختارة؟ يُخصم السعر من رصيدك فوراً." className="btn-3d w-full rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white">شراء وعرض الإعلان في تربح</ConfirmSubmit>
-              </form>
+              {(() => {
+                const pkgs = showPricing.ads.filter((a) => a.price > 0);
+                const affordablePkgs = pkgs.filter((a) => a.price <= merchBalance);
+                if (affordablePkgs.length === 0) {
+                  return <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-bold text-red-700">💳 رصيدك لا يكفي لأي باقة عرض إعلان — <Link href="/account/wallet" className="underline">اشحن رصيدك</Link> ثم عد لاختيار الباقة.</div>;
+                }
+                return (
+                  <form action={buyAdShowAction} className="space-y-2">
+                    <select name="adId" required className="h-10 w-full rounded-lg border border-primary/30 bg-background px-2 text-sm">
+                      {showProducts.map((a) => (
+                        <option key={String(a.id)} value={String(a.id)}>{a.title}{a.trbhh_until && a.trbhh_until > new Date() ? ` — معروض حتى ${fmtD(a.trbhh_until)}` : ''}</option>
+                      ))}
+                    </select>
+                    <select name="pkg" required defaultValue={affordablePkgs[0]?.key} className="h-10 w-full rounded-lg border border-primary/30 bg-background px-2 text-sm">
+                      {pkgs.map((a) => (
+                        <option key={a.key} value={a.key} disabled={a.price > merchBalance}>{a.key === 'gold' ? '🥇' : a.key === 'silver' ? '🥈' : '⭐'} {a.label} — {a.days} يوماً — {a.price} ر.س{a.price > merchBalance ? ' (لا يكفي)' : ''}</option>
+                      ))}
+                    </select>
+                    <ConfirmSubmit msg="تأكيد شراء عرض الإعلان المحدد في تربح للباقة المختارة؟ يُخصم السعر من رصيدك فوراً." className="btn-3d w-full rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white">شراء وعرض الإعلان في تربح</ConfirmSubmit>
+                  </form>
+                );
+              })()}
               {shownAds.length > 0 && (
                 <div className="space-y-1 border-t border-amber-200 pt-2 text-[11px] font-bold">
                   <div className="text-muted-foreground">المعروض حالياً في تربح ({shownAds.length}):</div>

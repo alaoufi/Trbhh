@@ -21,6 +21,8 @@ export default async function MyClassifiedPage({ searchParams }: { searchParams:
   const session = await requireUser();
   const [items, sp, lifeDays, pricing, balance] = await Promise.all([getMyClassifieds(session.uid), searchParams, getClassifiedLifetimeDays(), getServicePricing(), getBalance(session.uid)]);
   const classifiedSold = serviceHasPrice(pricing.classified);
+  const pricedDurations = DURATIONS.filter((d) => pricing.classified[d.key] > 0);
+  const affordableDurations = pricedDurations.filter((d) => pricing.classified[d.key] <= balance);
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -57,15 +59,21 @@ export default async function MyClassifiedPage({ searchParams }: { searchParams:
                 )}
               </div>
               {classifiedSold && isExpired(c.expiresAt, c.createdAt, lifeDays) && (
-                <form action={reactivateClassifiedAction} className="flex items-center gap-1">
-                  <input type="hidden" name="id" value={c.id} />
-                  <select name="duration" className="h-8 min-w-0 flex-1 rounded-lg border bg-background px-1 text-[11px]">
-                    {DURATIONS.filter((d) => pricing.classified[d.key] > 0).map((d) => (
-                      <option key={d.key} value={d.key}>{d.label} — {pricing.classified[d.key]} ر.س</option>
-                    ))}
-                  </select>
-                  <ConfirmSubmit msg="تأكيد إعادة تفعيل المبوّب للمدة المختارة؟ سيُخصم السعر من رصيدك." className="flex items-center gap-1 rounded-lg bg-primary px-2 py-1.5 text-[11px] font-bold text-white"><RefreshCw className="h-3 w-3" /> تفعيل</ConfirmSubmit>
-                </form>
+                pricedDurations.length > 0 && affordableDurations.length === 0 ? (
+                  <Link href="/account/wallet" className="flex items-center justify-center gap-1 rounded-lg border-2 border-red-400 bg-red-50 py-1.5 text-[11px] font-bold text-red-700">
+                    💳 رصيدك لا يكفي — اشحن رصيدك
+                  </Link>
+                ) : (
+                  <form action={reactivateClassifiedAction} className="flex items-center gap-1">
+                    <input type="hidden" name="id" value={c.id} />
+                    <select name="duration" defaultValue={affordableDurations[0]?.key} className="h-8 min-w-0 flex-1 rounded-lg border bg-background px-1 text-[11px]">
+                      {pricedDurations.map((d) => (
+                        <option key={d.key} value={d.key} disabled={pricing.classified[d.key] > balance}>{d.label} — {pricing.classified[d.key]} ر.س{pricing.classified[d.key] > balance ? ' (غير متاح)' : ''}</option>
+                      ))}
+                    </select>
+                    <ConfirmSubmit msg="تأكيد إعادة تفعيل المبوّب للمدة المختارة؟ سيُخصم السعر من رصيدك." className="flex items-center gap-1 rounded-lg bg-primary px-2 py-1.5 text-[11px] font-bold text-white"><RefreshCw className="h-3 w-3" /> تفعيل</ConfirmSubmit>
+                  </form>
+                )
               )}
               <div className="flex gap-1.5">
                 <Link href={`/classified/${c.id}/edit`} className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-primary/30 py-1.5 text-xs font-medium text-primary hover:bg-accent">

@@ -456,8 +456,13 @@ export function AdForm({
           </div>
           <select name="featuredDur" defaultValue="" className="mt-2 h-11 w-full rounded-lg border-2 border-amber-300 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-amber-400/50">
             <option value="">بدون تمييز</option>
-            {featuredOffer.options.map((o) => <option key={o.key} value={o.key}>⭐ تمييز {o.label} — {o.price} ر.س</option>)}
+            {featuredOffer.options.map((o) => (
+              <option key={o.key} value={o.key} disabled={o.price > featuredOffer.balance}>⭐ تمييز {o.label} — {o.price} ر.س{o.price > featuredOffer.balance ? ' (رصيدك لا يكفي)' : ''}</option>
+            ))}
           </select>
+          {featuredOffer.options.every((o) => o.price > featuredOffer.balance) && (
+            <p className="mt-1.5 text-xs font-bold text-red-700">💳 رصيدك لا يكفي لأي مدّة تمييز — <a href="/account/wallet#topup" target="_blank" className="underline">اشحن رصيدك</a> ثم عد لاختيارها.</p>
+          )}
         </div>
       )}
 
@@ -483,8 +488,13 @@ export function AdForm({
           </span>
           <select name="urgent" defaultValue="" className="mt-2 h-11 w-full rounded-lg border-2 border-red-300 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-red-400/50">
             <option value="">بدون شارة عاجل</option>
-            {urgentOffer.packs.map((p0) => <option key={p0.hours} value={p0.hours}>🔥 باقة {p0.hours} ساعة — {p0.price} ر.س</option>)}
+            {urgentOffer.packs.map((p0) => (
+              <option key={p0.hours} value={p0.hours} disabled={p0.price > urgentOffer.balance}>🔥 باقة {p0.hours} ساعة — {p0.price} ر.س{p0.price > urgentOffer.balance ? ' (رصيدك لا يكفي)' : ''}</option>
+            ))}
           </select>
+          {urgentOffer.packs.every((p0) => p0.price > urgentOffer.balance) && (
+            <p className="mt-1.5 text-xs font-bold text-red-700">💳 رصيدك لا يكفي لأي باقة عاجل — <a href="/account/wallet#topup" target="_blank" className="underline">اشحن رصيدك</a> ثم عد لاختيارها.</p>
+          )}
         </div>
       )}
       <Submit label={submitLabel} />

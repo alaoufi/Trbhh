@@ -69,7 +69,7 @@ export function ClassifiedForm({ action, error, initial, submitLabel, needPrice,
   return (
     <div className="grid gap-5 md:grid-cols-2">
       {/* preview + template library */}
-      <div className="order-1 space-y-4 md:order-2">
+      <div className="order-2 space-y-4 md:order-2">
         <div>
           <p className="mb-2 text-center text-xs text-muted-foreground">معاينة مباشرة</p>
           <div className="mx-auto max-w-[260px]">
@@ -182,7 +182,7 @@ export function ClassifiedForm({ action, error, initial, submitLabel, needPrice,
       </div>
 
       {/* form */}
-      <form action={action} className="order-2 space-y-4 md:order-1">
+      <form action={action} className="order-1 space-y-4 md:order-1">
         <SubmitOverlay label="جارٍ التصميم والنشر…" />
         {initial?.id && <input type="hidden" name="id" value={initial.id} />}
         {error === 'content' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">أضف صورة أو نصّاً على الأقل.</div>}

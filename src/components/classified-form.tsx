@@ -12,9 +12,9 @@ import { ClassifiedDecor } from '@/components/classified-decor';
 import { SubmitOverlay } from '@/components/submit-overlay';
 import { compressInputFiles } from '@/lib/image-compress';
 
-function Submit({ label }: { label: string }) {
+function Submit({ label, disabled }: { label: string; disabled?: boolean }) {
   const { pending } = useFormStatus();
-  return <Button size="lg" className="w-full gap-2" disabled={pending}><Sparkles className="h-4 w-4" /> {pending ? 'جارٍ التصميم والنشر...' : label}</Button>;
+  return <Button size="lg" className="w-full gap-2" disabled={pending || disabled}><Sparkles className="h-4 w-4" /> {pending ? 'جارٍ التصميم والنشر...' : label}</Button>;
 }
 
 export type ClassifiedInitial = {
@@ -24,10 +24,18 @@ export type ClassifiedInitial = {
   layout?: 'auto' | 'manual';
 };
 
-export function ClassifiedForm({ action, error, initial, submitLabel, needPrice, needBal, gapWait, dupLeft, durations }: {
+export function ClassifiedForm({ action, error, initial, submitLabel, needPrice, needBal, gapWait, dupLeft, durations, balance }: {
   action: (fd: FormData) => void | Promise<void>; error?: string; initial?: ClassifiedInitial; submitLabel?: string; needPrice?: string; needBal?: string; gapWait?: string; dupLeft?: string;
   durations?: { w2: number; m1: number; y1: number } | null;
+  balance?: number;
 }) {
+  const hasBalance = typeof balance === 'number';
+  const durationOptions = durations
+    ? ([['w2', 'أسبوعان', durations.w2], ['m1', 'شهر', durations.m1], ['y1', 'سنة', durations.y1]] as const)
+    : null;
+  const affordableOptions = durationOptions ? durationOptions.filter(([, , price]) => !hasBalance || price <= (balance as number)) : [];
+  const noneAffordable = !!durationOptions && hasBalance && affordableOptions.length === 0;
+  const [duration, setDuration] = useState<string | null>(() => affordableOptions[0]?.[0] ?? null);
   const [title, setTitle] = useState(initial?.title ?? '');
   const [body, setBody] = useState(initial?.body ?? '');
   const [phone, setPhone] = useState(initial?.phone ?? '');
@@ -69,7 +77,7 @@ export function ClassifiedForm({ action, error, initial, submitLabel, needPrice,
   return (
     <div className="grid gap-5 md:grid-cols-2">
       {/* preview + template library */}
-      <div className="order-2 space-y-4 md:order-2">
+      <div className={`order-2 space-y-4 md:order-2 ${noneAffordable ? 'pointer-events-none select-none opacity-40' : ''}`}>
         <div>
           <p className="mb-2 text-center text-xs text-muted-foreground">معاينة مباشرة</p>
           <div className="mx-auto max-w-[260px]">
@@ -198,80 +206,96 @@ export function ClassifiedForm({ action, error, initial, submitLabel, needPrice,
         {error === 'needdup' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">🔁 هذا المبوّب مكرّر. لنشره عدّة مرّات اشترِ <b>باقة تكرار</b> (مكرّر 3/5) من <Link href="/account/wallet" className="underline">محفظتي</Link> ثم أعد النشر.</div>}
         {error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 <b>اشحن رصيدك</b> لإتمام النشر{needPrice ? <> — التكلفة <b>{needPrice} ر.س</b></> : ''}{needBal !== undefined ? <> ورصيدك <b>{needBal} ر.س</b></> : ''}. راجع <Link href="/account/wallet" className="underline">محفظتي</Link> أو تواصل مع الإدارة للشحن.</div>}
 
-        {durations && (
-          <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
-            {error === 'duration' && <div className="mb-2 text-sm font-bold text-red-700">اختر مدّة النشر.</div>}
-            <div className="mb-2 text-sm font-bold text-primary">مدّة نشر الإعلان المبوّب</div>
-            <div className="grid grid-cols-3 gap-2">
-              {([['w2', 'أسبوعان', durations.w2], ['m1', 'شهر', durations.m1], ['y1', 'سنة', durations.y1]] as const).map(([val, label, price], i) => (
-                <label key={val} className="flex cursor-pointer flex-col items-center gap-0.5 rounded-lg border-2 border-border bg-white p-2 text-center text-xs has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                  <input type="radio" name="duration" value={val} defaultChecked={i === 0} required className="accent-primary" />
-                  <span className="font-bold">{label}</span>
-                  <span className="font-extrabold text-primary">{price} ر.س</span>
-                </label>
-              ))}
-            </div>
+        {noneAffordable && (
+          <div className="rounded-xl border-2 border-red-400 bg-red-50 p-4 text-center">
+            <p className="mb-1 font-extrabold text-red-800">💳 رصيدك الحالي لا يكفي لنشر إعلان مبوّب</p>
+            <p className="mb-3 text-sm text-red-700">اشحن رصيدك أولاً، ثم صمّم إعلانك وانشره.</p>
+            <Link href="/account/wallet" className="inline-block rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">اشحن رصيدي الآن</Link>
           </div>
         )}
 
-        {/* hidden style fields */}
-        <input type="hidden" name="theme" value={theme} />
-        <input type="hidden" name="pos" value={pos} />
-        <input type="hidden" name="align" value={align} />
-        <input type="hidden" name="size" value={size} />
-        <input type="hidden" name="pattern" value={pattern} />
-        <input type="hidden" name="accent" value={accent} />
-        <input type="hidden" name="layout" value={layout} />
-        {bold && <input type="hidden" name="bold" value="1" />}
-
-        <div>
-          <label className="mb-1 block text-sm font-medium">العنوان (اختياري)</label>
-          <input name="title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255} className={field} placeholder="مثال: عروض رمضان" />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">النص <span className="text-muted-foreground">(نص أو صورة إجباري)</span></label>
-          <textarea name="body" value={body} onChange={(e) => setBody(e.target.value)} rows={3} maxLength={2000} className="w-full rounded-lg border border-primary/30 bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" placeholder="اكتب نص إعلانك…" />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">الصورة (اختياري إن كتبت نصاً)</label>
-          <input name="image" type="file" accept="image/*" onChange={onImage} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1" />
-          {imgBusy && <p className="mt-1 text-xs text-primary">⏳ جارٍ تجهيز الصورة وتصغيرها للرفع السريع…</p>}
-          {!imgBusy && imgUrl && <p className="mt-1 text-xs text-green-600">✓ الصورة جاهزة</p>}
-          {initial?.id && initial?.image && <p className="mt-1 text-xs text-muted-foreground">اترك الحقل فارغاً للإبقاء على الصورة الحالية.</p>}
-        </div>
-
-        {/* صورة + نص: اختر ترتيباً تلقائياً جميلاً أو تحكّم في مكان النص */}
-        {imgUrl && (title || body) && (
-          <div className="rounded-lg border border-primary/20 bg-accent/30 p-3">
-            <p className="mb-2 text-sm font-semibold text-primary">ترتيب النص فوق الصورة</p>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setLayout('auto')} className={`flex-1 rounded-lg border p-2 text-xs font-medium ${layout === 'auto' ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}>
-                ✨ ترتيب تلقائي جميل
-              </button>
-              <button type="button" onClick={() => setLayout('manual')} className={`flex-1 rounded-lg border p-2 text-xs font-medium ${layout === 'manual' ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}>
-                🎯 أتحكّم في مكان النص
-              </button>
+        <fieldset disabled={noneAffordable} className={noneAffordable ? 'space-y-4 opacity-40' : 'space-y-4'}>
+          {durationOptions && (
+            <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
+              {error === 'duration' && <div className="mb-2 text-sm font-bold text-red-700">اختر مدّة النشر.</div>}
+              <div className="mb-2 text-sm font-bold text-primary">مدّة نشر الإعلان المبوّب</div>
+              <div className="grid grid-cols-3 gap-2">
+                {durationOptions.map(([val, label, price]) => {
+                  const affordable = !hasBalance || price <= (balance as number);
+                  return (
+                    <label key={val} className={`flex flex-col items-center gap-0.5 rounded-lg border-2 border-border bg-white p-2 text-center text-xs has-[:checked]:border-primary has-[:checked]:bg-primary/5 ${affordable ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'}`}>
+                      <input type="radio" name="duration" value={val} checked={duration === val} disabled={!affordable} onChange={() => setDuration(val)} required className="accent-primary" />
+                      <span className="font-bold">{label}</span>
+                      <span className={`font-extrabold ${affordable ? 'text-primary' : 'text-red-500'}`}>{price} ر.س</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {hasBalance && !noneAffordable && affordableOptions.length < durationOptions.length && (
+                <p className="mt-2 text-xs font-bold text-amber-700">بعض المدد غير متاحة برصيدك الحالي — اشحن رصيدك من <Link href="/account/wallet" className="underline">محفظتي</Link> لإتاحتها.</p>
+              )}
             </div>
-            {layout === 'manual' && <p className="mt-2 text-xs text-muted-foreground">اضبط مكان النص ومحاذاته من «تخصيص الشكل» بجانب المعاينة بالأعلى.</p>}
-          </div>
-        )}
+          )}
 
-        <div className="rounded-lg border border-primary/20 bg-accent/40 p-3">
-          <p className="mb-2 text-sm font-semibold text-primary">وسيلة التواصل <span className="text-red-600">*</span></p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <input name="phone" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" maxLength={40} className={field} placeholder="رقم الجوال" />
-            <input name="whatsapp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} inputMode="tel" maxLength={40} className={field} placeholder="رقم الواتساب" />
-          </div>
-        </div>
+          {/* hidden style fields */}
+          <input type="hidden" name="theme" value={theme} />
+          <input type="hidden" name="pos" value={pos} />
+          <input type="hidden" name="align" value={align} />
+          <input type="hidden" name="size" value={size} />
+          <input type="hidden" name="pattern" value={pattern} />
+          <input type="hidden" name="accent" value={accent} />
+          <input type="hidden" name="layout" value={layout} />
+          {bold && <input type="hidden" name="bold" value="1" />}
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">رابط يحوّل إليه (اختياري)</label>
-          <input name="link" value={link} onChange={(e) => setLink(e.target.value)} maxLength={500} className={field} placeholder="https://…" />
-        </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">العنوان (اختياري)</label>
+            <input name="title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255} className={field} placeholder="مثال: عروض رمضان" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">النص <span className="text-muted-foreground">(نص أو صورة إجباري)</span></label>
+            <textarea name="body" value={body} onChange={(e) => setBody(e.target.value)} rows={3} maxLength={2000} className="w-full rounded-lg border border-primary/30 bg-white p-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" placeholder="اكتب نص إعلانك…" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">الصورة (اختياري إن كتبت نصاً)</label>
+            <input name="image" type="file" accept="image/*" onChange={onImage} className="w-full rounded-lg border border-primary/30 bg-white p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1" />
+            {imgBusy && <p className="mt-1 text-xs text-primary">⏳ جارٍ تجهيز الصورة وتصغيرها للرفع السريع…</p>}
+            {!imgBusy && imgUrl && <p className="mt-1 text-xs text-green-600">✓ الصورة جاهزة</p>}
+            {initial?.id && initial?.image && <p className="mt-1 text-xs text-muted-foreground">اترك الحقل فارغاً للإبقاء على الصورة الحالية.</p>}
+          </div>
+
+          {/* صورة + نص: اختر ترتيباً تلقائياً جميلاً أو تحكّم في مكان النص */}
+          {imgUrl && (title || body) && (
+            <div className="rounded-lg border border-primary/20 bg-accent/30 p-3">
+              <p className="mb-2 text-sm font-semibold text-primary">ترتيب النص فوق الصورة</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setLayout('auto')} className={`flex-1 rounded-lg border p-2 text-xs font-medium ${layout === 'auto' ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}>
+                  ✨ ترتيب تلقائي جميل
+                </button>
+                <button type="button" onClick={() => setLayout('manual')} className={`flex-1 rounded-lg border p-2 text-xs font-medium ${layout === 'manual' ? 'border-primary bg-accent text-primary' : 'border-primary/20'}`}>
+                  🎯 أتحكّم في مكان النص
+                </button>
+              </div>
+              {layout === 'manual' && <p className="mt-2 text-xs text-muted-foreground">اضبط مكان النص ومحاذاته من «تخصيص الشكل» بجانب المعاينة بالأعلى.</p>}
+            </div>
+          )}
+
+          <div className="rounded-lg border border-primary/20 bg-accent/40 p-3">
+            <p className="mb-2 text-sm font-semibold text-primary">وسيلة التواصل <span className="text-red-600">*</span></p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input name="phone" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" maxLength={40} className={field} placeholder="رقم الجوال" />
+              <input name="whatsapp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} inputMode="tel" maxLength={40} className={field} placeholder="رقم الواتساب" />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">رابط يحوّل إليه (اختياري)</label>
+            <input name="link" value={link} onChange={(e) => setLink(e.target.value)} maxLength={500} className={field} placeholder="https://…" />
+          </div>
+        </fieldset>
 
         {/* شريط ثابت أسفل الشاشة (فوق القائمة السفلية) — لا يضيع بين خيارات التصميم الكثيرة */}
         <div className="sticky bottom-16 z-30 -mx-1 rounded-xl border-2 border-primary/20 bg-white/95 p-2 shadow-lg backdrop-blur">
-          <Submit label={submitLabel ?? 'صمّم وانشر'} />
+          <Submit label={submitLabel ?? 'صمّم وانشر'} disabled={!!durationOptions && !duration} />
         </div>
       </form>
     </div>

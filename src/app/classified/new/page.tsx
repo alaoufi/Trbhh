@@ -44,7 +44,7 @@ export default async function NewClassifiedPage({ searchParams }: { searchParams
         </div>
       )}
 
-      <ClassifiedForm action={createClassifiedAction} error={error} needPrice={price} needBal={bal} gapWait={wait} dupLeft={left} durations={durations} />
+      <ClassifiedForm action={createClassifiedAction} error={error} needPrice={price} needBal={bal} gapWait={wait} dupLeft={left} durations={durations} balance={paid ? balance : undefined} />
     </div>
   );
 }

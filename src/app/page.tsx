@@ -12,6 +12,7 @@ import {
 import { CategorySelect } from '@/components/category-select';
 import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
+import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
 import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, categoriesEnabled, getSetting, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
 import { ShareButtons } from '@/components/share-buttons';
@@ -112,9 +113,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {/* 🎯 يهمّك الآن — تغذية مخصّصة بدلالة ما تصفّحه وبحث عنه فعلياً (بلا اعتماد
           على الأقسام)، تظهر أول محتوى في الصفحة لمن له تصفّح سابق. */}
       {personalizedAds.length > 0 && (
-        <Section title="🎯 يهمّك الآن">
+        <CollapsibleSection title="🎯 يهمّك الآن" defaultOpen={false}>
           <AdGrid ads={personalizedAds} />
-        </Section>
+        </CollapsibleSection>
       )}
 
       {/* Category dropdown — pick one or more categories to show */}

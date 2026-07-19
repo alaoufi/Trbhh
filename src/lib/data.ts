@@ -723,6 +723,67 @@ export async function getSimilarAds(adId: number, categoryId: number, take = 6) 
   return toCards(rows);
 }
 
+/* ---- تغذية مخصّصة بدلالة المحتوى: بلا اعتماد على الأقسام (معطّلة موقعياً) ---- */
+
+/**
+ * اهتمام الزائر يُستنتَج من نصوص ما تصفّحه فعلاً: عناوين الإعلانات والمتاجر
+ * التي زارها + بحثه المحفوظ (إشارة أقوى) — بنفس أسلوب مطابقة الكلمات
+ * المستخدم في «إعلانات مشابهة»، لا بتصنيف الأقسام المحفوظة (معطّل بالموقع).
+ */
+export async function getPersonalizedAds(viewerKey: string | null, userId: number, take = 8) {
+  if (!viewerKey) return [];
+  const [viewedAds, visitedStores, saved] = await Promise.all([
+    prisma.ads_views.findMany({ where: { user_id: viewerKey }, orderBy: { id: 'desc' }, take: 40, select: { ads_id: true } }).catch(() => []),
+    prisma.store_visits.findMany({ where: { viewer: viewerKey }, orderBy: { id: 'desc' }, take: 20, select: { store_id: true } }).catch(() => []),
+    userId ? prisma.saved_searches.findMany({ where: { user_id: BigInt(userId) }, orderBy: { id: 'desc' }, take: 10, select: { query: true } }).catch(() => []) : Promise.resolve([]),
+  ]);
+  const viewedAdIds = [...new Set(viewedAds.map((v) => v.ads_id))];
+  const visitedStoreIds = [...new Set(visitedStores.map((v) => v.store_id))];
+  if (!viewedAdIds.length && !visitedStoreIds.length && !saved.length) return [];
+
+  const [seenAds, seenStores] = await Promise.all([
+    viewedAdIds.length ? prisma.ads.findMany({ where: { id: { in: viewedAdIds } }, select: { title: true, detail: true } }).catch(() => []) : Promise.resolve([]),
+    visitedStoreIds.length ? prisma.stores.findMany({ where: { id: { in: visitedStoreIds } }, select: { store_name: true, tagline: true, about: true } }).catch(() => []) : Promise.resolve([]),
+  ]);
+
+  // ترددات الكلمات عبر كل ما تصفّحه وبحث عنه — الأعلى وزناً (تكراراً) = أهم اهتمامه
+  const freq = new Map<string, number>();
+  const add = (text: string, weight: number) => {
+    for (const t of simTokens(text || '')) freq.set(t, (freq.get(t) || 0) + weight);
+  };
+  for (const a of seenAds) { add(a.title, 2); add((a.detail || '').slice(0, 300), 1); }
+  for (const s of seenStores) { add(s.store_name || '', 2); add(s.tagline || '', 1); add((s.about || '').slice(0, 200), 1); }
+  for (const q of saved) add(q.query, 3); // بحث صريح = إشارة أقوى من مجرد تصفّح
+
+  if (!freq.size) return [];
+  const weights = [...freq.entries()].sort((a, b) => b[1] - a[1]);
+  const topWords = weights.slice(0, 6).map(([w]) => w);
+  const weightMap = new Map(weights);
+
+  const excludeIds = viewedAdIds.map((n) => BigInt(n));
+  const candidates = await prisma.ads.findMany({
+    where: {
+      ...activeAdWhere(),
+      ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
+      OR: topWords.map((w) => ({ OR: [{ title: { contains: w } }, { detail: { contains: w } }] })),
+    },
+    orderBy: { id: 'desc' },
+    take: 200,
+    select: adSelect,
+  }).catch(() => []);
+
+  const scored = candidates
+    .map((r) => {
+      let score = 0;
+      for (const t of new Set(simTokens(r.title || ''))) score += weightMap.get(t) || 0;
+      return { r, score };
+    })
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score || toInt(b.r.id) - toInt(a.r.id));
+
+  return toCards(scored.slice(0, take).map((s) => s.r));
+}
+
 /* memoized per-request (React cache): tames repeated hot reads within one navigation */
 export const getAd = cache(getAdImpl);
 

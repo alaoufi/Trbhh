@@ -24,32 +24,3 @@ export async function setInterests(userId: number, categoryIds: number[]) {
     }).catch(() => {});
   }
 }
-
-/**
- * اهتمامات مُستنتَجة تلقائياً من سلوك التصفّح: الأقسام التي زار فيها العضو
- * (أو الزائر عبر معرّف جهازه) إعلانات أو متاجر أكثر من غيرها — تُستخدم كبديل
- * عندما لا يحدد العضو اهتماماته يدوياً (تعمل للزوّار أيضاً عبر معرّف الزيارة).
- */
-export async function getInferredInterests(viewerKey: string, limit = 6): Promise<number[]> {
-  await ensure();
-  try {
-    const rows = await prisma.$queryRaw<{ category_id: number | null; cnt: bigint }[]>`
-      SELECT category_id, COUNT(*) AS cnt FROM (
-        SELECT a.category_id AS category_id FROM ads_views v
-          JOIN ads a ON a.id = v.ads_id
-          WHERE v.user_id = ${viewerKey}
-        UNION ALL
-        SELECT s.category_id AS category_id FROM store_visits sv
-          JOIN stores s ON s.id = sv.store_id
-          WHERE sv.viewer = ${viewerKey}
-      ) t
-      WHERE category_id IS NOT NULL
-      GROUP BY category_id
-      ORDER BY cnt DESC
-      LIMIT ${limit}
-    `;
-    return rows.map((r) => Number(r.category_id)).filter((n) => Number.isFinite(n) && n > 0);
-  } catch {
-    return [];
-  }
-}

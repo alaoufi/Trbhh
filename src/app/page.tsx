@@ -7,7 +7,7 @@ import {
   getHomeLatestAds,
   getMostViewedAds,
   getStats,
-  getAdsByCategory,
+  getPersonalizedAds,
 } from '@/lib/data';
 import { CategorySelect } from '@/components/category-select';
 import { AdGrid } from '@/components/ad-card';
@@ -17,7 +17,6 @@ import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, c
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
-import { getInterests, getInferredInterests } from '@/lib/interests';
 import { homeFeaturedAds, homeStoreCards, storeIdOfUser } from '@/lib/merchant';
 import { StoreMiniCard, type StoreCardData } from '@/components/store-mini-card';
 import { OpenStoreBanner } from '@/components/open-store-banner';
@@ -70,26 +69,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // بطاقة «قسم» تُخفى مع إخفاء الأقسام
   // (تُرشَّح لاحقاً بعد جلب catsOn)
 
-  // Categories to pin at the top: the dropdown selection (?cats=) if present,
-  // otherwise the logged-in member's chosen "interests" — وإن لم يحدد شيئاً
-  // (أو كان زائراً) تُستنتَج الاهتمامات تلقائياً من الأقسام التي زارها فعلاً
-  // (إعلانات ومتاجر)، عبر معرّف جلسته أو معرّف زيارته الدائم (trbhh_vid).
   const session = await getSession().catch(() => null);
+  // اهتمام الزائر/العضو يُستنتَج بدلالة المحتوى الفعلي الذي تصفّحه وبحث عنه
+  // (كلمات عناوين الإعلانات والمتاجر التي زارها + بحثه المحفوظ) — بلا أي
+  // اعتماد على تصنيف الأقسام (معطّل بالموقع). يعمل للزوّار أيضاً عبر معرّف
+  // زيارته الدائم (trbhh_vid)، لا الأعضاء فقط.
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
-  const [manualInterests, inferredInterests] = await Promise.all([
-    session ? getInterests(session.uid).catch(() => []) : Promise.resolve([] as number[]),
-    viewerKey ? getInferredInterests(viewerKey, 6).catch(() => []) : Promise.resolve([] as number[]),
-  ]);
-  const interestIds = manualInterests.length ? manualInterests : inferredInterests;
-  const showIds = catsParam.length ? catsParam : interestIds;
-  const nameById = new Map(categories.map((c) => [c.id, c.name]));
-  const pinned = (
-    await Promise.all(
-      showIds.slice(0, 6).map(async (id) => ({ id, name: nameById.get(id) || 'قسم', ads: await getAdsByCategory(id, 4).catch(() => []) })),
-    )
-  ).filter((p) => p.ads.length > 0);
-  const pinnedLabel = catsParam.length ? 'الأقسام المختارة' : '⭐ أقسام تهمّك';
+  const personalizedAds = await getPersonalizedAds(viewerKey, session?.uid || 0, 8).catch(() => []);
   const storeAds = await homeFeaturedAds().catch(() => []);
   const feedTexts = await getFeedBannerItems().catch(() => []);
   // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
@@ -121,6 +108,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       {/* بانر عرض الشحن: اشحن بـ100 ونضيف لك 10 — يظهر عند تفعيل مكافآت الشحن من التحكم */}
       <TopupPromoBanner />
+
+      {/* 🎯 يهمّك الآن — تغذية مخصّصة بدلالة ما تصفّحه وبحث عنه فعلياً (بلا اعتماد
+          على الأقسام)، تظهر أول محتوى في الصفحة لمن له تصفّح سابق. */}
+      {personalizedAds.length > 0 && (
+        <Section title="🎯 يهمّك الآن">
+          <AdGrid ads={personalizedAds} />
+        </Section>
+      )}
 
       {/* Category dropdown — pick one or more categories to show */}
       {catsOn && <CategorySelect categories={categories} initial={catsParam} />}
@@ -154,25 +149,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/logo-header.png' }}
             />
           </span>
-        </div>
-      )}
-
-      {/* أقسام تهمّك — مثبّتة بالأعلى حسب اختيار العضو */}
-      {catsOn && pinned.length > 0 && (
-        <div className="space-y-4 rounded-2xl border-2 border-primary/20 bg-primary/5 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-extrabold text-primary">{pinnedLabel}</span>
-            {catsParam.length ? (
-              <Link href="/" className="text-xs text-primary hover:underline">إلغاء التصفية</Link>
-            ) : (
-              <Link href="/account" className="text-xs text-primary hover:underline">تعديل اهتماماتي</Link>
-            )}
-          </div>
-          {pinned.map((p) => (
-            <Section key={p.id} title={p.name} href={`/categories/${p.id}`}>
-              <AdGrid ads={p.ads} />
-            </Section>
-          ))}
         </div>
       )}
 

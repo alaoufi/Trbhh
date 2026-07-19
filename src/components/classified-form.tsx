@@ -269,7 +269,10 @@ export function ClassifiedForm({ action, error, initial, submitLabel, needPrice,
           <input name="link" value={link} onChange={(e) => setLink(e.target.value)} maxLength={500} className={field} placeholder="https://…" />
         </div>
 
-        <Submit label={submitLabel ?? 'صمّم وانشر'} />
+        {/* شريط ثابت أسفل الشاشة (فوق القائمة السفلية) — لا يضيع بين خيارات التصميم الكثيرة */}
+        <div className="sticky bottom-16 z-30 -mx-1 rounded-xl border-2 border-primary/20 bg-white/95 p-2 shadow-lg backdrop-blur">
+          <Submit label={submitLabel ?? 'صمّم وانشر'} />
+        </div>
       </form>
     </div>
   );

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { Users, Megaphone, LayoutGrid, Eye, Sparkles, ChevronLeft, Heart, MessageCircle, Phone } from 'lucide-react';
 import {
   getCategories,
@@ -16,7 +17,7 @@ import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, c
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
-import { getInterests } from '@/lib/interests';
+import { getInterests, getInferredInterests } from '@/lib/interests';
 import { homeFeaturedAds, homeStoreCards, storeIdOfUser } from '@/lib/merchant';
 import { StoreMiniCard, type StoreCardData } from '@/components/store-mini-card';
 import { OpenStoreBanner } from '@/components/open-store-banner';
@@ -70,9 +71,17 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // (تُرشَّح لاحقاً بعد جلب catsOn)
 
   // Categories to pin at the top: the dropdown selection (?cats=) if present,
-  // otherwise the logged-in member's chosen "interests".
+  // otherwise the logged-in member's chosen "interests" — وإن لم يحدد شيئاً
+  // (أو كان زائراً) تُستنتَج الاهتمامات تلقائياً من الأقسام التي زارها فعلاً
+  // (إعلانات ومتاجر)، عبر معرّف جلسته أو معرّف زيارته الدائم (trbhh_vid).
   const session = await getSession().catch(() => null);
-  const interestIds = session ? await getInterests(session.uid).catch(() => []) : [];
+  const vid = (await cookies()).get('trbhh_vid')?.value;
+  const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
+  const [manualInterests, inferredInterests] = await Promise.all([
+    session ? getInterests(session.uid).catch(() => []) : Promise.resolve([] as number[]),
+    viewerKey ? getInferredInterests(viewerKey, 6).catch(() => []) : Promise.resolve([] as number[]),
+  ]);
+  const interestIds = manualInterests.length ? manualInterests : inferredInterests;
   const showIds = catsParam.length ? catsParam : interestIds;
   const nameById = new Map(categories.map((c) => [c.id, c.name]));
   const pinned = (

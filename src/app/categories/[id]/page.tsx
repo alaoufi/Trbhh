@@ -3,13 +3,23 @@ import { SlidersHorizontal } from 'lucide-react';
 import { getCategory, searchAds, countSearchAds, getCities } from '@/lib/data';
 import { AdGrid } from '@/components/ad-card';
 import { AdminPager } from '@/components/admin-pager';
+import { SITE } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const cat = await getCategory(Number(id));
-  return { title: cat?.name ?? 'القسم' };
+  if (!cat) return { title: 'القسم' };
+  const title = `إعلانات ${cat.name} — بيع وشراء`;
+  const description = `تصفّح أحدث إعلانات ${cat.name}: عروض وطلبات بيع وشراء من شركات وأفراد على منصة ${SITE.name}. أضف إعلانك مجاناً ليصل لعملاء مهتمين بـ${cat.name}.`;
+  const url = `https://${SITE.domain}/categories/${id}`;
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { type: 'website', locale: 'ar_SA', title, description, url },
+  };
 }
 
 export default async function CategoryPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | undefined>> }) {

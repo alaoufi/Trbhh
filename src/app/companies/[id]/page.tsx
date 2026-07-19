@@ -185,9 +185,29 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   ].filter((c) => !hidden.has(c.key));
   const gridCols: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4' };
   const showReviews = meta.allowReviews && !hidden.has('rating');
+  // بيانات منظَّمة (JSON-LD): تساعد جوجل على عرض المتجر كنتيجة غنية
+  // (اسم/تقييم/عنوان) في نتائج البحث بدل رابط عادي.
+  const storeJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Store',
+    name,
+    url: `https://${SITE.domain}/companies/${meta.handle || storeId}`,
+    image: s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : undefined,
+    address: s.address ? { '@type': 'PostalAddress', addressLocality: s.address, addressCountry: 'SA' } : undefined,
+    telephone: s.phone || undefined,
+    ...(rating.count > 0 ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: rating.avg, reviewCount: rating.count } } : {}),
+  };
+  // أمان: هرّب < > & وفواصل الأسطر يونيكود حتى لا يكسر محتوى المتجر وسم <script ld+json> (XSS مخزّن).
+  const storeJsonLdHtml = JSON.stringify(storeJsonLd)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 
   return (
     <div className="min-h-screen bg-muted/20 pb-24">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: storeJsonLdHtml }} />
       {/* تثبيت المتجر كتطبيق مستقل (لغير المالك) */}
       {!isOwner && <InstallPrompt scope="store" name={name} brand={brand} storageKey={`trbhh_install_store_${storeId}`} />}
 

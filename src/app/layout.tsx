@@ -85,6 +85,33 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   const validThemes = ['desert', 'agri', 'spring', 'mint', 'lavender', 'sea', 'snow', 'mountain', 'sunset', 'night'];
   const validDesigns = ['aurora', 'shop', 'list', 'flat', 'soft', 'sharp'];
+  // بيانات منظَّمة (JSON-LD) لمحركات البحث: تعرّف جوجل بهوية الموقع ونوعه
+  // وتفعّل صندوق البحث المباشر ضمن نتائج البحث (Sitelinks Search Box).
+  const base = `https://${SITE.domain}`;
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        name: SITE.name,
+        alternateName: SITE.nameEn,
+        url: base,
+        logo: `${base}/icon-512.png`,
+        description: SITE.description,
+      },
+      {
+        '@type': 'WebSite',
+        name: SITE.name,
+        url: base,
+        inLanguage: 'ar',
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: { '@type': 'EntryPoint', urlTemplate: `${base}/search?q={search_term_string}` },
+          'query-input': 'required name=search_term_string',
+        },
+      },
+    ],
+  };
   return (
     <html
       lang="ar"
@@ -94,6 +121,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       {...(validDesigns.includes(design) ? { 'data-design': design } : {})}
     >
       <body className="min-h-screen font-sans antialiased">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         {/* Storefront (/companies/[id]) = fully independent site: ChromeGate hides
             the shared header/menu/footer, even across client-side navigation. */}
         <ChromeGate

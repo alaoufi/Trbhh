@@ -10,7 +10,10 @@ import { listSavedSearches, savedSearchEnabled } from '@/lib/saved-search';
 import { saveSearchAction, deleteSavedSearchAction } from './actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
-export const metadata = { title: 'البحث' };
+export const metadata = {
+  title: 'بحث متقدم',
+  description: 'ابحث بين آلاف إعلانات البيع والشراء من متاجر وأفراد — فلترة بالقسم والمدينة والسعر والنوع (عرض/طلب) على منصة تربح.',
+};
 
 export default async function SearchPage({
   searchParams,

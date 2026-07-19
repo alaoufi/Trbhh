@@ -71,6 +71,11 @@ services:
       NODE_ENV: production
       # كل الأوقات والتواريخ بتوقيت الرياض (+3)
       TZ: Asia/Riyadh
+      # بيكسلات التتبع الإعلاني — اختيارية، كل منها يعمل فقط عند ضبط معرّفه
+      META_PIXEL_ID: ${META_PIXEL_ID:-}
+      GOOGLE_ADS_ID: ${GOOGLE_ADS_ID:-}
+      TIKTOK_PIXEL_ID: ${TIKTOK_PIXEL_ID:-}
+      SNAP_PIXEL_ID: ${SNAP_PIXEL_ID:-}
     volumes:
       # Named volume (not a host bind mount) so it inherits the image's
       # nextjs-owned /app/storage — the non-root app user can write uploads,

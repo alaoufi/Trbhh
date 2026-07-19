@@ -16,6 +16,7 @@ import { getClassifiedSplashSeconds } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
+import { AdPixels } from '@/components/ad-pixels';
 
 const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', display: 'swap' });
 
@@ -122,6 +123,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <body className="min-h-screen font-sans antialiased">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        {/* بيكسلات التتبع الإعلاني (Meta/Google Ads/TikTok/Snapchat) — لا تعمل
+            إطلاقاً إلا بعد ضبط معرّفاتها الحقيقية في متغيرات البيئة على الخادم. */}
+        <AdPixels />
         {/* Storefront (/companies/[id]) = fully independent site: ChromeGate hides
             the shared header/menu/footer, even across client-side navigation. */}
         <ChromeGate

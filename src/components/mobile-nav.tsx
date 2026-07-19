@@ -1,8 +1,10 @@
 'use client';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, MessagesSquare, PlusCircle, Mail, Building2, Search, LogIn, Share2, Users, type LucideIcon } from 'lucide-react';
+import { Home, MessagesSquare, PlusCircle, Mail, Building2, Search, LogIn, Share2, Users, Phone, MessageCircle, Send, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SITE } from '@/lib/constants';
 
 type NavItem = { href: string; label: string; icon: LucideIcon; primary?: boolean; badge?: boolean };
 
@@ -12,7 +14,7 @@ const authedItems: NavItem[] = [
   { href: '/companies', label: 'المتاجر', icon: Building2 },
   { href: '/ads/new', label: 'أضف إعلان', icon: PlusCircle, primary: true },
   { href: '/account/identities', label: 'الحسابات', icon: Users },
-  { href: '/pages/contact', label: 'تواصل', icon: Mail },
+  { href: '__contact', label: 'تواصل', icon: Mail },
 ];
 const guestItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },
@@ -28,6 +30,14 @@ const shareItem: NavItem = { href: '__share', label: 'مشاركة', icon: Share
 export function MobileNav({ unread = 0, isAuthed = false, debatesOn = true }: { unread?: number; isAuthed?: boolean; debatesOn?: boolean }) {
   const path = usePathname();
   const items = (isAuthed ? authedItems : guestItems).map((i) => (!debatesOn && i.href === '/debates' ? shareItem : i));
+  const [contactOpen, setContactOpen] = useState(false);
+  const waPhone = SITE.phone.replace(/\D/g, '').replace(/^00/, '');
+  const telPhone = '+' + waPhone;
+  const contactLinks = [
+    { label: 'اتصال هاتفي', href: `tel:${telPhone}`, icon: Phone, cls: 'text-red-600' },
+    { label: 'واتساب', href: `https://wa.me/${waPhone}`, icon: MessageCircle, cls: 'text-[#25D366]' },
+    { label: 'مراسلة الإدارة', href: '/messages/admin', icon: Send, cls: 'text-primary' },
+  ];
 
   const sharePage = async () => {
     const url = window.location.href;
@@ -68,11 +78,36 @@ export function MobileNav({ unread = 0, isAuthed = false, debatesOn = true }: { 
             </>
           );
           return (
-            <li key={href} className="flex-1">
+            <li key={href} className="relative flex-1">
               {href === '__share' ? (
                 <button type="button" onClick={sharePage} className="flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] text-[#f0b429]">
                   {inner}
                 </button>
+              ) : href === '__contact' ? (
+                <>
+                  <button type="button" onClick={() => setContactOpen((v) => !v)} className="flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] text-[#f0b429]">
+                    {inner}
+                  </button>
+                  {contactOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setContactOpen(false)} />
+                      <div className="absolute bottom-full left-0 z-50 mb-2 w-48 rounded-xl border bg-card p-1.5 text-card-foreground shadow-xl">
+                        {contactLinks.map((c) => (
+                          <a
+                            key={c.label}
+                            href={c.href}
+                            target={c.href.startsWith('http') ? '_blank' : undefined}
+                            rel="noopener noreferrer"
+                            onClick={() => setContactOpen(false)}
+                            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"
+                          >
+                            <c.icon className={cn('h-4 w-4', c.cls)} /> {c.label}
+                          </a>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
               ) : (
                 <Link href={href} className="flex flex-col items-center gap-0.5 py-1.5 text-[11px] text-[#f0b429]">
                   {inner}

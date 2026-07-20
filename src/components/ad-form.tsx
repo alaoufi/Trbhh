@@ -8,6 +8,8 @@ import { SubmitOverlay } from '@/components/submit-overlay';
 import { compressInputFiles } from '@/lib/image-compress';
 import { RegionCityPicker } from '@/components/region-city-picker';
 import { AudioRecorder } from '@/components/audio-recorder';
+import { ImageUploader } from '@/components/image-uploader';
+import { AdExtraFields } from '@/components/ad-extra-fields';
 import { parseMapsUrl } from '@/lib/maps';
 
 const MAX_VIDEO = 25 * 1024 * 1024; // 25MB
@@ -334,6 +336,18 @@ export function AdForm({
         </div>
       </Section>
 
+      <Section icon={Tag} title="تفاصيل إضافية">
+        <AdExtraFields
+          initial={{
+            negotiable: initial?.priceType === 'negotiable',
+            condition: (initial?.stockState === 0 ? 'new' : initial?.stockState === 1 ? 'used' : 'refurbished') as 'new' | 'used' | 'refurbished',
+            delivery: false,
+            warranty: '',
+            quantity: 1,
+          }}
+        />
+      </Section>
+
       <Section icon={MapPin} title="المكان">
         {/* هل تحديد المكان مطلوب؟ اختيار «غير مطلوب» يطوي الخيارات فلا تزحم النموذج */}
         <div className="flex gap-2">
@@ -379,7 +393,18 @@ export function AdForm({
       </Section>
 
       <Section icon={ImageIcon} title="الصور" hint={initial?.id ? 'أضِف المزيد من الصور (تُضغط تلقائياً للرفع السريع).' : 'حتى 10 صور — تُضغط تلقائياً للرفع السريع.'}>
-        <input name="images" type="file" accept="image/*" multiple onChange={onImages} className="w-full rounded-lg border-2 border-primary/25 bg-white p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-primary file:px-3 file:py-1 file:font-bold file:text-white" />
+        <ImageUploader
+          onImagesChange={(files) => {
+            // Create a synthetic event to pass to existing handler
+            const dataTransfer = new DataTransfer();
+            files.forEach(f => dataTransfer.items.add(f));
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.files = dataTransfer.files;
+            onImages({ target: input } as React.ChangeEvent<HTMLInputElement>);
+          }}
+          maxImages={10}
+        />
         {imgBusy && <p className="text-xs font-bold text-primary">⏳ جارٍ تجهيز الصور…</p>}
         {!imgBusy && imgReady > 0 && <p className="text-xs font-bold text-green-600">✓ {imgReady} صورة جاهزة</p>}
       </Section>

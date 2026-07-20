@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Pencil, Trash2, Eye, EyeOff, Wallet, Archive } from 'lucide-react';
+import { AdActions } from '@/components/ad-actions';
+import { AdStatsCard } from '@/components/ad-stats-card';
 import { requireUser } from '@/lib/auth';
 import { getMyAds, adContactCounts } from '@/lib/account';
 import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingBool, getAdRestoreFee, getMemberWindows, adWindowState } from '@/lib/settings';
@@ -93,6 +95,35 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                     : <>سبب عدم الظهور: الإعلان <b>بانتظار الموافقة</b> — غالباً لتشابهه مع إعلان قائم (٩٠٪+) أو تفعيل مراجعة الإعلانات. اضغط <b>«تفعيل»</b> لعرضه فوراً، أو احذف النسخة المكرّرة.</>}
                 </span>
               )}
+
+              {/* إحصائيات الإعلان */}
+              {contactStatsOn && (
+                <AdStatsCard
+                  stats={{
+                    views: ad.views,
+                    contacts: (contacts.get(ad.id)?.whatsapp || 0) + (contacts.get(ad.id)?.call || 0),
+                    messages: 0, // TODO: add messages count
+                    favorites: 0, // TODO: add favorites count
+                    createdAt: ad.createdAt,
+                    expiresAt: ad.expiresAt || ad.createdAt,
+                  }}
+                />
+              )}
+
+              {/* إجراءات الإعلان */}
+              <AdActions
+                adId={ad.id}
+                canEdit={!editState.expired}
+                canDelete={!deleteState.expired}
+                isHidden={ad.status !== 1}
+                isPinned={ad.special}
+                onRefresh={() => { /* handled by bump form */ }}
+                onPin={() => { /* handled by feature form */ }}
+                onHide={() => { /* handled by toggle form */ }}
+                onStats={() => { /* already showing */ }}
+                onEdit={() => window.location.href = `/ads/${ad.id}/edit`}
+                onDelete={() => { /* handled by delete form */ }}
+              />
               {ad.special && ad.expiresAt && (
                 <span className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold leading-4 text-amber-700">⭐ مميّز حتى {fmtDay(ad.expiresAt)}.</span>
               )}

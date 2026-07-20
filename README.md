@@ -78,6 +78,10 @@ bash scripts/deploy.sh                      # يبني ويشغّل كل شيء
 bash scripts/init-ssl.sh trbhh.com admin@trbhh.com   # شهادة SSL مجانية
 ```
 
+> **بعد الإعداد الأول:** كل دفع (`git push`) لفرع التطوير يُنشر تلقائياً على هذا الخادم عبر
+> GitHub Actions (`.github/workflows/deploy.yml`) — بلا حاجة لتكرار الخطوات أعلاه يدوياً.
+> التفاصيل الكاملة (الأسرار المطلوبة، النشر اليدوي البديل) في `دليل-المطور.md` § 5.
+
 ### النسخ الاحتياطي اليومي
 ```bash
 # crontab -e

@@ -1,0 +1,50 @@
+# تربح (Trbhh) — دليل سريع للعمل على هذا المستودع
+
+منصة إعلانات مبوّبة وأعمال تجارية B2B، عربية RTL، Next.js 15 (App Router) + TypeScript +
+Prisma على MySQL 8 + Redis، منشورة على Hostinger VPS عبر Docker Compose.
+الموقع المباشر: **https://trbhh.com**. المنصة **ليست وسيطاً مالياً** — تعرض الإعلانات
+وتربط الأطراف فقط؛ كل تعامل ودفع يتم خارجها مباشرة بين الطرفين.
+
+للتفاصيل الكاملة (البنية، قاعدة البيانات، استكشاف الأعطال) اقرأ **`دليل-المطور.md`** —
+هذا الملف مرجع سريع فقط.
+
+## حقائق حرجة
+
+- **فرع التطوير:** `claude/hostinger-vps-project-amw8vb` — كل العمل يكون عليه.
+- **النشر تلقائي بالكامل:** أي `git push` لهذا الفرع يُشغّل `.github/workflows/deploy.yml`
+  (GitHub Actions عبر SSH) الذي يبني وينشر مباشرة على الخادم بلا أي تدخل يدوي. النشر
+  اليدوي (`git pull && docker compose up -d --build app` على الخادم في `/root/trbhh`)
+  يبقى بديلاً احتياطياً يعمل دائماً. التفاصيل والأسرار المطلوبة في `دليل-المطور.md` § 5.
+- **بوابات الجودة قبل أي دفع:** `npx tsc --noEmit` و`pnpm lint` و`pnpm build` (و`pnpm test`
+  إن وُجد). لا تدفع كوداً لم يجتزها.
+- **رسائل الالتزام (commit) بالعربية دائماً.**
+
+## قواعد ثابتة للمشروع
+
+1. أي ميزة جديدة يجب أن تكون **قابلة للتحكم من لوحة الإدارة** (مفتاح/نص في جدول `settings`
+   عبر `src/lib/settings.ts`) — لا تكتب نصوص واجهة أو مفاتيح تفعيل ثابتة في الكود.
+2. **مخطط متسامح:** `src/data/schema-sync.ts` يضيف الأعمدة/الجداول الناقصة تلقائياً عند
+   الإقلاع. عند إضافة عمود جديد أضِفه هنا **و** في `prisma/schema.prisma` معاً، ثم
+   `npx prisma generate`.
+3. **الصلاحيات:** `src/lib/roles.ts` — `requireAction(service, action)` و`requireAnyAdmin()`.
+4. **المحفظة/الرصيد:** `src/lib/wallet.ts` — `charge()`/`adjustBalance()`. أي ميزة مدفوعة
+   يجب أن تتحقق من الرصيد **قبل** تفعيل الاختيار (تعطيل بصري + رسالة "اشحن رصيدك")، لا أن
+   تترك العضو يكتشف نقص الرصيد بعد إكمال الخطوات.
+5. حدّث الأدلة الثلاثة مع أي تغيير يخص المستخدم/الإدارة: `/guide` (العضو) ·
+   `/guide/store` (المتجر) · `/admin/guide` (الإدارة).
+6. لا تضع أسراراً (كلمات مرور، `AUTH_SECRET`، مفاتيح SSH/توقيع) في المستودع — عبر أسرار
+   GitHub أو `.env` (غير المُتتبَّع) فقط.
+7. **الحذر من انزلاق HEAD المحلي في بيئة التطوير:** قبل أي `commit`، تحقّق أن
+   `git rev-parse HEAD` يطابق `git rev-parse origin/<الفرع>` بعد `git fetch`. إن اختلفا
+   وكان HEAD المحلي سلفاً لـ origin (`git merge-base --is-ancestor`)، افصل أي تعديلات
+   حقيقية غير مدفوعة بـ `git stash` قبل `git reset --hard origin/<الفرع>`، ثم أعد تطبيقها.
+
+## بنية سريعة
+
+```
+src/app/            صفحات App Router + Server Actions (actions.ts بكل مجلد)
+src/components/      مكوّنات واجهة قابلة لإعادة الاستخدام
+src/lib/             منطق الخادم: prisma, auth, roles, wallet, settings, data…
+prisma/schema.prisma  مخطط Prisma
+.github/workflows/    ci.yml (فحوصات) + deploy.yml (نشر تلقائي)
+```

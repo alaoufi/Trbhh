@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Map, Home, Grid3x3, Search, PlusCircle, FileText } from 'lucide-react';
 import { getCategories } from '@/lib/data';
-import { categoriesEnabled, debatesEnabled, auctionsEnabled } from '@/lib/settings';
+import { categoriesEnabled, auctionsEnabled } from '@/lib/settings';
 import { dealsEnabled } from '@/lib/store-extras';
 import { Breadcrumb } from '@/components/breadcrumb';
 import { SITE } from '@/lib/constants';
@@ -16,8 +16,8 @@ type Item = { label: string; href: string };
 type Group = { title: string; icon: React.ElementType; items: Item[] };
 
 export default async function SiteMapPage() {
-  const [catsOn, debatesOn, auctionsOn, dealsOn] = await Promise.all([
-    categoriesEnabled(), debatesEnabled(), auctionsEnabled(), dealsEnabled(),
+  const [catsOn, auctionsOn, dealsOn] = await Promise.all([
+    categoriesEnabled(), auctionsEnabled(), dealsEnabled(),
   ]);
   const categories = catsOn ? await getCategories() : [];
 
@@ -37,7 +37,6 @@ export default async function SiteMapPage() {
         { label: 'قريب مني', href: '/nearby' },
         ...(dealsOn ? [{ label: 'عروض اليوم', href: '/deals' }] : []),
         ...(auctionsOn ? [{ label: 'المزادات', href: '/auctions' }] : []),
-        ...(debatesOn ? [{ label: 'النقاشات', href: '/debates' }] : []),
       ],
     },
     {

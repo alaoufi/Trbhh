@@ -1,0 +1,33 @@
+name: جدولة نسخة احتياطية كاملة أسبوعية على Hostinger VPS
+
+# يضبط مهمة cron على الخادم لتشغيل scripts/full-backup.sh أسبوعياً تلقائياً
+# (كود + قاعدة بيانات حيّة + وسائط مرفوعة)، مع الاحتفاظ بآخر 8 نسخ فقط لتفادي
+# امتلاء القرص. تشغيل يدوي فقط (Run workflow) — آمن للتكرار (لا يكرّر السطر).
+on:
+  workflow_dispatch:
+
+jobs:
+  setup-cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: تثبيت مهمة النسخ الاحتياطي الأسبوعية عبر SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          if [ -z "$VPS_SSH_KEY" ] || [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
+            echo "❌ أسرار الاتصال بالخادم غير مكتملة (VPS_HOST/VPS_USER/VPS_SSH_KEY)."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${VPS_PORT:-22}"
+          CRON_LINE='0 3 * * 0 cd /root/trbhh && bash scripts/full-backup.sh >> backups/full-backup.log 2>&1 && ls -1t backups/*.zip 2>/dev/null | tail -n +9 | xargs -r rm -f'
+          # نزيل أي سطر cron سابق لنفس المهمة قبل إضافة النسخة الحالية (تشغيل آمن للتكرار)
+          REMOTE_CMD="(crontab -l 2>/dev/null | grep -vF 'full-backup.sh'; echo \"$CRON_LINE\") | crontab -; echo '--- crontab الحالي ---'; crontab -l"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
+            -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" "$REMOTE_CMD"

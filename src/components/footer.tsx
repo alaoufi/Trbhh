@@ -39,8 +39,8 @@ export function Footer({ debatesOn = true, catsOn = true }: { debatesOn?: boolea
             </a>
           </div>
         </div>
-        <div className="mt-8 border-t border-white/15 pt-6 text-center text-sm text-white/60">
-          جميع الحقوق محفوظة {SITE.name} © 2026
+        <div className="mt-8 border-t border-white/15 pt-6 text-center text-xs text-white/60">
+          جميع الحقوق محفوظة لمنصة {SITE.name} © 2015
         </div>
       </div>
     </footer>

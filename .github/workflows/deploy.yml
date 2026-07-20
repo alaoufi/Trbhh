@@ -22,12 +22,12 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
-          # المفتاح الخاص مُرمّز base64 (سطر واحد) لتفادي تشوّه الأسطر عند اللصق
-          VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
+          # المفتاح الخاص كنص خام متعدد الأسطر (يُلصق كما هو — بلا أي ترميز يعرّضه للتلف)
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
           set -e
-          if [ -z "$VPS_SSH_KEY_B64" ]; then
-            echo "❌ السرّ VPS_SSH_KEY_B64 غير موجود — أضِفه في إعدادات الأسرار."
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "❌ السرّ VPS_SSH_KEY غير موجود — أضِفه في إعدادات الأسرار."
             exit 1
           fi
           if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
@@ -35,11 +35,11 @@ jobs:
             exit 1
           fi
           mkdir -p ~/.ssh
-          # نزيل أي مسافات/أسطر جديدة قد تتسرّب عند اللصق من الجوال قبل فك base64
-          printf '%s' "$VPS_SSH_KEY_B64" | tr -d ' \t\r\n' | base64 -d > ~/.ssh/deploy_key
+          # نزيل أحرف \r فقط (قد تتسرّب من لوحات مفاتيح الجوال) مع إبقاء الأسطر كما هي
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           if ! grep -q "PRIVATE KEY" ~/.ssh/deploy_key; then
-            echo "❌ فشل فكّ المفتاح — تأكد أن قيمة VPS_SSH_KEY_B64 نُسخت كاملة بلا نقص."
+            echo "❌ المفتاح غير صالح — تأكد أن قيمة VPS_SSH_KEY لصقت كاملة بأسطرها (تبدأ بـ BEGIN OPENSSH PRIVATE KEY وتنتهي بـ END OPENSSH PRIVATE KEY)."
             exit 1
           fi
           PORT="${VPS_PORT:-22}"

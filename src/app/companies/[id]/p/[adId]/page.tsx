@@ -31,10 +31,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const ad = await getAd(Number(adId));
   if (!ad || !sid) return { title: 'إعلان' };
   const meta = await getStoreMeta(sid);
+  const desc = (ad.detail || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  const url = `https://${SITE.domain}/companies/${meta.handle || sid}/p/${ad.id}`;
   return {
     title: `${ad.title} — ${meta.storeName || 'متجر'}`,
-    description: ad.detail?.slice(0, 160),
-    openGraph: { images: (ad.images || []).slice(0, 1), title: ad.title },
+    description: desc,
+    alternates: { canonical: url },
+    openGraph: { images: (ad.images || []).slice(0, 1), title: ad.title, description: desc, url },
   };
 }
 
@@ -102,8 +105,29 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
   const showOld = dealsOn && ad.oldPrice > ad.price && ad.price > 0;
   const dealPct = showOld ? Math.round((1 - ad.price / ad.oldPrice) * 100) : 0;
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: ad.title,
+    description: ad.detail,
+    image: ad.images,
+    url: shareUrl,
+    ...(ad.createdAt ? { datePosted: ad.createdAt } : {}),
+    ...(ad.price > 0
+      ? { offers: { '@type': 'Offer', price: ad.price, priceCurrency: 'SAR', availability: 'https://schema.org/InStock', url: shareUrl, seller: { '@type': 'Organization', name } } }
+      : {}),
+  };
+  // أمان: هرّب < > & وفواصل الأسطر يونيكود حتى لا يكسر محتوى المستخدم وسم <script ld+json> (XSS مخزّن).
+  const jsonLdHtml = JSON.stringify(jsonLd)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+
   return (
     <div className="min-h-screen bg-muted/20 pb-24">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml }} />
       {/* رأس المتجر — رجوع + هوية المتجر (لا هوية تربح) */}
       <div className="sticky top-0 z-30 border-b bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-3 py-2">

@@ -43,10 +43,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!ad) return { title: 'إعلان غير موجود' };
   // معاينة الرابط (واتساب/تويتر…): العنوان + أول الإعلان
   const desc = (ad.detail || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  const url = `https://${SITE.domain}/ads/${ad.id}`;
   return {
     title: ad.title,
     description: desc,
-    openGraph: { images: (ad.images || []).slice(0, 1), title: ad.title, description: desc },
+    alternates: { canonical: url },
+    openGraph: { images: (ad.images || []).slice(0, 1), title: ad.title, description: desc, url },
   };
 }
 
@@ -194,8 +196,10 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     name: ad.title,
     description: ad.detail,
     image: ad.images,
+    url: `https://${SITE.domain}/ads/${ad.id}`,
+    ...(ad.createdAt ? { datePosted: ad.createdAt } : {}),
     ...(ad.price > 0
-      ? { offers: { '@type': 'Offer', price: ad.price, priceCurrency: 'SAR', availability: 'https://schema.org/InStock' } }
+      ? { offers: { '@type': 'Offer', price: ad.price, priceCurrency: 'SAR', availability: 'https://schema.org/InStock', url: `https://${SITE.domain}/ads/${ad.id}` } }
       : {}),
   };
 

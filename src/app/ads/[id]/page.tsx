@@ -34,6 +34,7 @@ import { PromoSlot } from '@/components/promo-slot';
 import { getAdAudio } from '@/lib/ad-media';
 import { mediaUrl } from '@/lib/media';
 import { AdGallery } from '@/components/ad-gallery';
+import { Breadcrumb } from '@/components/breadcrumb';
 
 export const dynamic = 'force-dynamic';
 
@@ -214,6 +215,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   return (
     <div className="space-y-4 pb-16 md:pb-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml }} />
+      <Breadcrumb items={catsOn && ad.category ? [{ label: ad.category.name, href: `/categories/${ad.category.id}` }, { label: ad.title }] : [{ label: ad.title }]} />
 
       {/* مرساة نتيجة أي دفع/إجراء — إليها يوجَّه التمرير لتظهر الرسالة أمام العضو مباشرة */}
       <div id="paid-result" className="scroll-mt-20" />

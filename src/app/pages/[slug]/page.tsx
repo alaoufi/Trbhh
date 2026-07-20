@@ -6,6 +6,7 @@ import {
 import { notFound } from 'next/navigation';
 import { SITE, DISCLAIMER } from '@/lib/constants';
 import { FaqAccordion, type QA } from '@/components/faq-accordion';
+import { Breadcrumb } from '@/components/breadcrumb';
 
 const waPhone = SITE.phone.replace(/\D/g, '').replace(/^00/, ''); // 966XXXXXXXXX
 const telPhone = '+' + waPhone;
@@ -151,6 +152,7 @@ export default async function StaticPage({ params }: { params: Promise<{ slug: s
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
+      <Breadcrumb items={[{ label: HERO[slug].title }]} />
       <Hero slug={slug} />
 
       {slug === 'privacy' && (

@@ -13,7 +13,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     import('@/lib/settings').then((m) => m.auctionsEnabled()).catch(() => false),
   ]);
   const staticPages = [
-    '', '/categories', '/companies', '/search', '/classified', '/nearby',
+    '', '/categories', '/companies', '/search', '/classified', '/nearby', '/site-map',
     ...(debatesOn ? ['/debates'] : []),
     ...(dealsOn ? ['/deals'] : []),
     ...(auctionsOn ? ['/auctions'] : []),

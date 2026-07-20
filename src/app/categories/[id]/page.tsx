@@ -3,6 +3,7 @@ import { SlidersHorizontal } from 'lucide-react';
 import { getCategory, searchAds, countSearchAds, getCities } from '@/lib/data';
 import { AdGrid } from '@/components/ad-card';
 import { AdminPager } from '@/components/admin-pager';
+import { Breadcrumb } from '@/components/breadcrumb';
 import { SITE } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -55,6 +56,7 @@ export default async function CategoryPage({ params, searchParams }: { params: P
   const sel = 'h-10 rounded-lg border bg-background px-2 text-sm';
   return (
     <div className="space-y-4">
+      <Breadcrumb items={[{ label: 'جميع الأقسام', href: '/categories' }, { label: cat.name }]} />
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">{cat.name}</h1>
         <span className="text-sm text-muted-foreground">{total} إعلان</span>

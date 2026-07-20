@@ -4,6 +4,7 @@ import { SearchAreaPicker } from '@/components/search-area-picker';
 import { AdminPager } from '@/components/admin-pager';
 import { AdGrid } from '@/components/ad-card';
 import { SearchSuggestInput } from '@/components/search-suggest';
+import { Breadcrumb } from '@/components/breadcrumb';
 import { getSession } from '@/lib/auth';
 import { categoriesEnabled } from '@/lib/settings';
 import { listSavedSearches, savedSearchEnabled } from '@/lib/saved-search';
@@ -48,6 +49,7 @@ export default async function SearchPage({
   const catsOn = await categoriesEnabled().catch(() => true);
   return (
     <div className="space-y-4">
+      <Breadcrumb items={[{ label: 'بحث متقدم' }]} />
       <form className="grid gap-3 card-3d rounded-xl p-4 md:grid-cols-6">
         <div className="md:col-span-2">
           <SearchSuggestInput name="q" defaultValue={sp.q || ''} />

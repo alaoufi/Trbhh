@@ -3,6 +3,7 @@ import { Sparkles, Plus, Check } from 'lucide-react';
 import { getClassifieds } from '@/lib/classified';
 import { getEmptyText } from '@/lib/settings';
 import { ClassifiedGrid } from '@/components/classified-card';
+import { Breadcrumb } from '@/components/breadcrumb';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الإعلانات المبوّبة' };
@@ -12,6 +13,7 @@ export default async function ClassifiedPage({ searchParams }: { searchParams: P
   const emptyClassified = await getEmptyText('classified').catch(() => 'لا توجد إعلانات مبوّبة بعد.');
   return (
     <div className="space-y-4">
+      <Breadcrumb items={[{ label: 'الإعلانات المبوّبة' }]} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Sparkles className="h-6 w-6 text-primary" />

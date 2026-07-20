@@ -4,6 +4,7 @@ import { BadgeCheck, Store, MapPin } from 'lucide-react';
 import { getStores } from '@/lib/stores';
 import { approvedStoreIds } from '@/lib/merchant';
 import { getEmptyText } from '@/lib/settings';
+import { Breadcrumb } from '@/components/breadcrumb';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'المتاجر' };
@@ -14,6 +15,7 @@ export default async function CompaniesPage() {
   const emptyStores = await getEmptyText('stores').catch(() => 'لا توجد متاجر معتمدة بعد.');
   return (
     <div className="space-y-4">
+      <Breadcrumb items={[{ label: 'المتاجر' }]} />
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold">المتاجر</h1></div>
         <Link href="/account/company" className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white">افتح متجرك</Link>

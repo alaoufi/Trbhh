@@ -28,6 +28,7 @@ export function Footer({ debatesOn = true, catsOn = true }: { debatesOn?: boolea
               <li><Link href="/pages/faq" className="hover:text-[#f0b429]">الأسئلة الشائعة</Link></li>
               <li><Link href="/pages/terms" className="hover:text-[#f0b429]">شروط الاستخدام</Link></li>
               <li><Link href="/pages/privacy" className="hover:text-[#f0b429]">سياسة الخصوصية</Link></li>
+              <li><Link href="/site-map" className="hover:text-[#f0b429]">خارطة الموقع</Link></li>
             </ul>
           </div>
           <div>

@@ -53,6 +53,7 @@ export default async function SiteMapPage() {
       icon: FileText,
       items: [
         { label: 'من نحن', href: '/pages/about' },
+        { label: 'دليل الاستخدام', href: '/guide' },
         { label: 'الأسئلة الشائعة', href: '/pages/faq' },
         { label: 'شروط الاستخدام', href: '/pages/terms' },
         { label: 'سياسة الخصوصية', href: '/pages/privacy' },

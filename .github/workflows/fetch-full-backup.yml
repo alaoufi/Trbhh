@@ -1,0 +1,46 @@
+name: جلب نسخة احتياطية كاملة (كود + قاعدة بيانات + وسائط) كملف تنزيل
+
+# ينشئ نسخة full-backup.sh على الخادم، ثم ينقلها إلى هذا التشغيل كـ Artifact
+# قابل للتنزيل مباشرة من GitHub (تبويب Actions ← هذا التشغيل ← Artifacts).
+on:
+  workflow_dispatch:
+
+jobs:
+  fetch-backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: إنشاء النسخة على الخادم ونقلها لهذا التشغيل
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          if [ -z "$VPS_SSH_KEY" ] || [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
+            echo "❌ أسرار الاتصال بالخادم غير مكتملة."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${VPS_PORT:-22}"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/deploy_key -p $PORT"
+
+          echo "🔧 إنشاء النسخة الاحتياطية الكاملة على الخادم…"
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "cd /root/trbhh && bash scripts/full-backup.sh"
+
+          LATEST=$(ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" "ls -t /root/trbhh/backups/*.zip | head -1")
+          echo "📦 أحدث نسخة: $LATEST"
+
+          echo "⬇️ نقلها إلى هذا التشغيل…"
+          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -P "$PORT" -i ~/.ssh/deploy_key \
+            "$VPS_USER@$VPS_HOST:$LATEST" ./trbhh-full-backup.zip
+          ls -lh trbhh-full-backup.zip
+
+      - name: رفع الملف كـ Artifact قابل للتنزيل
+        uses: actions/upload-artifact@v4
+        with:
+          name: trbhh-full-backup
+          path: trbhh-full-backup.zip
+          retention-days: 3

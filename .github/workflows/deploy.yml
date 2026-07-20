@@ -35,8 +35,13 @@ jobs:
             exit 1
           fi
           mkdir -p ~/.ssh
-          printf '%s' "$VPS_SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
+          # نزيل أي مسافات/أسطر جديدة قد تتسرّب عند اللصق من الجوال قبل فك base64
+          printf '%s' "$VPS_SSH_KEY_B64" | tr -d ' \t\r\n' | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          if ! grep -q "PRIVATE KEY" ~/.ssh/deploy_key; then
+            echo "❌ فشل فكّ المفتاح — تأكد أن قيمة VPS_SSH_KEY_B64 نُسخت كاملة بلا نقص."
+            exit 1
+          fi
           PORT="${VPS_PORT:-22}"
           echo "🔗 الاتصال بـ $VPS_USER@$VPS_HOST:$PORT ..."
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \

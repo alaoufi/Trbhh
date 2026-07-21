@@ -8,7 +8,7 @@ export const metadata = { title: 'جميع الأقسام' };
 
 export default async function CategoriesPage() {
   // الأقسام مخفية من التحكم — الصفحة تعود للرئيسية
-  if (!(await import('@/lib/settings').then((x) => x.categoriesEnabled()).catch(() => true))) redirect('/');
+  if (!(await import('@/lib/settings').then((x) => x.categoriesEnabled()).catch(() => false))) redirect('/');
   const categories = await getCategories();
   return (
     <div className="space-y-4">

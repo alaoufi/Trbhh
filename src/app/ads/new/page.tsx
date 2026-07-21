@@ -36,7 +36,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     ? DURATIONS.map((d) => ({ key: d.key, label: d.label, price: svc.featured[d.key] })).filter((o) => o.price > 0)
     : [];
   const featuredOffer = featuredOpts.length ? { options: featuredOpts, balance } : undefined;
-  const catsOn = await categoriesEnabled().catch(() => true);
+  const catsOn = await categoriesEnabled().catch(() => false);
   // «أنشر باسم…» — إن كان للعضو متجر نشط يختار: باسمه الشخصي أو باسم متجره (عزل الهويات)
   const myStore = await import('@/lib/merchant').then(async (m) => {
     const sid = await m.storeIdOfUser(session.uid).catch(() => 0);

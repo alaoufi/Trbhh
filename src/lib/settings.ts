@@ -639,8 +639,9 @@ export const STORE_STAFF_MAX = 5;
 
 /** قفل اسم العضو: التعديل عبر طلب بموافقة الإدارة فقط (سبب + مستند) — مفعّل افتراضياً. */
 export const nameLockEnabled = () => getSettingBool('namelock_on', true);
-/** إظهار الأقسام في كل الموقع (إخفاؤها لا يمس أقسام الإعلانات المحفوظة إطلاقاً). */
-export const categoriesEnabled = () => getSettingBool('cats_on', true);
+/** إظهار الأقسام في كل الموقع (إخفاؤها لا يمس أقسام الإعلانات المحفوظة إطلاقاً).
+ *  الافتراضي مخفي (false): أي فشل بقراءة الإعداد يجب أن يُبقيها مخفية لا أن يُظهرها. */
+export const categoriesEnabled = () => getSettingBool('cats_on', false);
 
 /** إظهار/إخفاء المناقشات في كل الموقع — مفتاح واحد من الإعدادات */
 export const debatesEnabled = () => getSettingBool('debates_on', true);

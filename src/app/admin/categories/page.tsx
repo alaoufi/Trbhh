@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الأقسام' };
 
 export default async function AdminCategories() {
-  const catsOnNow = await import('@/lib/settings').then((x) => x.categoriesEnabled()).catch(() => true);
+  const catsOnNow = await import('@/lib/settings').then((x) => x.categoriesEnabled()).catch(() => false);
   await requirePerm('categories');
   const cats = await prisma.categories.findMany({ orderBy: [{ ordered: 'desc' }, { id: 'desc' }] });
   const field = 'h-9 rounded-lg border bg-background px-2 text-sm';

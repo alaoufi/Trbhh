@@ -46,7 +46,7 @@ export default async function SearchPage({
 
   const sel = 'h-10 rounded-lg border bg-background px-3 text-sm';
 
-  const catsOn = await categoriesEnabled().catch(() => true);
+  const catsOn = await categoriesEnabled().catch(() => false);
   return (
     <div className="space-y-4">
       <Breadcrumb items={[{ label: 'بحث متقدم' }]} />

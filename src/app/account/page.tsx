@@ -42,7 +42,7 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
     import('@/lib/merchant').then((m) => m.storeIdOfUser(session.uid)).catch(() => 0),
     import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false),
     import('@/lib/account-links').then((m) => m.linkedAccounts(session.uid)).then((a) => a.length).catch(() => 0),
-    import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true),
+    import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => false),
   ]);
   const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
   const cards = [

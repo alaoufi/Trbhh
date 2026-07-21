@@ -16,7 +16,7 @@ export async function Header() {
   const session = await getSession();
   const admin = session ? await hasAnyAdmin(session.uid) : false;
   // إخفاء الأقسام من قائمة الموقع عند تعطيلها من التحكم
-  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true);
+  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => false);
   const categories = catsOn ? await getCategories() : [];
   const myStoreId = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // اسم المتجر لمبدّل الهوية (اختياري: يظهر فقط لأصحاب المتاجر)

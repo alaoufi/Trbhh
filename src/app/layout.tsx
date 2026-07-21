@@ -73,7 +73,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     session ? import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false) : Promise.resolve(false),
     getClassifiedSplashSeconds().catch(() => 5),
     import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true),
-    import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true),
+    import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => false),
   ]);
   // شاشة المبوّبات الافتتاحية تُحجب كلياً عن أعضاء الإدارة (لا تعيقهم عن عملهم)
   let splashAds: Awaited<ReturnType<typeof getSplashClassifieds>> = [];

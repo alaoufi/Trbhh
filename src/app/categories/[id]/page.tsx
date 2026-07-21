@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function CategoryPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | undefined>> }) {
   // الأقسام مخفية من التحكم — الصفحة تعود للرئيسية
-  if (!(await import('@/lib/settings').then((x) => x.categoriesEnabled()).catch(() => true))) redirect('/');
+  if (!(await import('@/lib/settings').then((x) => x.categoriesEnabled()).catch(() => false))) redirect('/');
   const { id } = await params;
   const sp = await searchParams;
   const cat = await getCategory(Number(id));

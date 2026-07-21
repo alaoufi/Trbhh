@@ -139,7 +139,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   // نص واتساب مُعبّأ مسبقاً: نص المتجر إن كان إعلان متجر، وإلا نص تربح لمراسلة صاحب الإعلان
   const [adNotice, adTpls] = await Promise.all([getAdNotice(), getAdMsgTemplates()]);
   // إخفاء الأقسام: يخفي سطر القسم من التفاصيل فقط — قسم الإعلان محفوظ كما هو
-  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => true);
+  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => false);
   const storeTpls = parseTemplates(storeMeta?.msgTemplates);
   const baseTpl = (inStore && storeTpls.length ? storeTpls[0] : adTpls[0]) || '';
   // {link} = رابط الإعلان (يُضاف تلقائياً في واتساب)، {name} = عنوان الإعلان

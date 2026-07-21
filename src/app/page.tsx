@@ -83,7 +83,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
   const homeActionsOn = await getSettingBool('home_actions_on', true).catch(() => true);
   // إخفاء الأقسام من كل الموقع (مفتاح التحكم) — لا يمس أقسام الإعلانات المحفوظة
-  const catsOn = await categoriesEnabled().catch(() => true);
+  const catsOn = await categoriesEnabled().catch(() => false);
   const noCatsBanner = catsOn ? '' : await import('@/lib/settings').then((m) => m.getSetting(m.SETTING_HOME_NOCATS_BANNER, m.DEFAULT_HOME_NOCATS_BANNER)).catch(() => '');
   if (!catsOn) statCards = statCards.filter((c) => c.key !== 'cats');
   const siteDigits = SITE.phone.replace(/\D/g, '').replace(/^00/, '');

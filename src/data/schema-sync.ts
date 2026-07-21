@@ -378,6 +378,20 @@ const STATEMENTS: string[] = [
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX ad_contacts_ad (ad_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* نظام وقائي: كل خطأ تصيير/انقطاع يعترضه العضو (شاشة «حدث خطأ غير متوقع») يُسجَّل هنا
+   *  تلقائياً — رسالة الخطأ ورقمه التعريفي (digest) ورابط الصفحة والعضو (إن كان مسجّلاً)
+   *  ومتصفحه — ليكتشف الفريق أي أعطال متكررة قبل أن يبلّغ عنها أحد. */
+  `CREATE TABLE IF NOT EXISTS error_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    message VARCHAR(500) NOT NULL,
+    digest VARCHAR(64) NULL,
+    stack TEXT NULL,
+    url VARCHAR(300) NULL,
+    user_id BIGINT UNSIGNED NULL,
+    user_agent VARCHAR(300) NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX error_log_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* admin activity audit log — who did what and when. */
   `CREATE TABLE IF NOT EXISTS admin_log (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

@@ -154,11 +154,25 @@ export async function requestTopupAction(formData: FormData) {
     if (!(file instanceof File) || file.size === 0) redirect('/account/wallet?error=topupreceipt');
     if (file.size > 8 * 1024 * 1024) redirect('/account/wallet?error=topupreceipt');
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
-    const buf = Buffer.from(await file.arrayBuffer());
+
+    // قراءة الملف وحفظه: مغلَّفان بحماية — فشل نادر هنا (ملف تالف/امتلاء القرص) كان
+    // يتسبّب سابقاً بشاشة «حدث خطأ غير متوقع» العامة بدل رسالة واضحة قابلة لإعادة المحاولة.
+    let buf: Buffer;
+    try {
+      buf = Buffer.from(await file.arrayBuffer());
+    } catch {
+      await import('@/lib/error-log').then((m) => m.logClientError({ message: 'فشل قراءة ملف إيصال الشحن', userId: session.uid, url: '/account/wallet#topup' })).catch(() => {});
+      redirect('/account/wallet?error=topupreceipt');
+    }
     // بصمة الإيصال (receiptHash: aHash+dHash مدمجة بدقة أعلى) — لكشف السند المكرر
     receiptHash = await import('@/lib/phash').then((m) => m.receiptHash(buf)).catch(() => '');
-    const { saveUpload } = await import('@/lib/storage');
-    rel = await saveUpload(buf, `topup_${session.uid}_${Date.now()}.${ext}`);
+    try {
+      const { saveUpload } = await import('@/lib/storage');
+      rel = await saveUpload(buf, `topup_${session.uid}_${Date.now()}.${ext}`);
+    } catch (e) {
+      await import('@/lib/error-log').then((m) => m.logClientError({ message: `فشل حفظ إيصال الشحن: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`, userId: session.uid, url: '/account/wallet#topup' })).catch(() => {});
+      redirect('/account/wallet?error=topup#topup');
+    }
 
     // سند يشبه سنداً سابقاً: لا نرفض الطلب ولا نُسقط الرفع — نعرض تذكيراً للعضو، وإن كان
     // متأكداً يرسله رغم التشابه فيصل الإدارة (تراجعه بمقارنته مع السند المشابه قبل القبول).

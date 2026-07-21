@@ -4,11 +4,19 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { RefreshCw, Home } from 'lucide-react';
+import { reportClientErrorAction } from './error-actions';
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     // surfaced in the browser/server console for diagnosis
     console.error('App route error:', error);
+    // يُسجَّل أيضاً في سجل الأخطاء بالإدارة (/admin/errors) — نظام وقائي يكتشف الأعطال قبل أن يبلّغ عنها أحد
+    reportClientErrorAction({
+      message: error.message || 'خطأ غير معروف',
+      digest: error.digest,
+      stack: error.stack,
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+    }).catch(() => {});
   }, [error]);
 
   return (

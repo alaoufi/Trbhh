@@ -1,8 +1,19 @@
 'use client';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { RefreshCw, ArrowRight } from 'lucide-react';
+import { reportClientErrorAction } from '../error-actions';
 
-export default function ClassifiedError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function ClassifiedError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    console.error('Classified route error:', error);
+    reportClientErrorAction({
+      message: error.message || 'خطأ غير معروف',
+      digest: error.digest,
+      stack: error.stack,
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+    }).catch(() => {});
+  }, [error]);
   return (
     <div className="mx-auto max-w-md space-y-4 py-10 text-center">
       <p className="text-lg font-bold text-primary">تعذّر عرض هذا الإعلان</p>

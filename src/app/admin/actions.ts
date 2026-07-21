@@ -976,6 +976,15 @@ export async function adminClearReadNotifsAction() {
   revalidatePath('/admin/notifs');
 }
 
+/** مسح سجل الأخطاء التقنية بالكامل (بعد المراجعة/الإصلاح). */
+export async function clearErrorLogAction() {
+  const session = await requireAction('users', 'edit');
+  const { clearErrorLogs } = await import('@/lib/error-log');
+  await clearErrorLogs();
+  await logAdmin(session.uid, 'مسح سجل الأخطاء التقنية');
+  revalidatePath('/admin/errors');
+}
+
 /** تأكيد وصول مبلغ طلب الشحن: إضافة المبلغ للرصيد + رسالة للعضو. */
 export async function approveTopupAction(formData: FormData) {
   const session = await requireAction('users', 'edit');

@@ -34,7 +34,7 @@ const TOPUP_STATUS = {
 
 const TXN_PAGE = 25;
 
-export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string; pts?: string; dupr?: string }> }) {
+export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string; pts?: string; dupr?: string; dupamt?: string; duprel?: string; duphash?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page || '1') || 1);
@@ -153,15 +153,25 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           </div>
         )}
         {topupInfo && <p className="rounded-lg bg-primary/5 p-2.5 text-xs font-medium text-foreground/80">{topupInfo}</p>}
-        {/* ⛔ سند مكرر — لا يُقبل ولا يُرسَل. قد يكون هناك سند بنفس الإيصال تحت المراجعة. */}
+        {/* ⚠️ سند يشبه سنداً سابقاً — تذكير لا رفض: نُبقي الرفع ونطلب تأكيداً، والإدارة تراجعه بمقارنة مع الأصل قبل القبول. */}
         {sp.error === 'dupreceipt' && (
           <div className="space-y-2.5 rounded-xl border-2 border-red-400 bg-red-50 p-3">
             <div className="text-sm font-extrabold leading-6 text-red-700">
-              ⛔ عذراً، هذا السند مكرر{sp.dupr ? ` (تطابق ${sp.dupr}٪)` : ''} — لم يُقبل ولم يُرسَل الطلب. قد يكون هناك طلب شحن بنفس السند تحت إجراء المراجعة الآن… فضلاً انتظِر حتى تُبتّ المراجعة.
+              ⚠️ هذا السند يشبه سنداً آخر بنسبة {sp.dupr}٪ — إن كنت متأكداً أنه غير مكرر اضغط «إرسال رغم التشابه» وستراجعه الإدارة بمقارنته مع السند المشابه قبل القبول.
             </div>
-            <Link href="/messages/admin" className="btn-3d flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white">
-              <Send className="h-4 w-4" /> مراسلة الإدارة للضرورة
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <form action={requestTopupAction}>
+                <input type="hidden" name="confirmDup" value="1" />
+                <input type="hidden" name="amount" value={sp.dupamt} />
+                <input type="hidden" name="existingReceipt" value={sp.duprel} />
+                <input type="hidden" name="existingHash" value={sp.duphash} />
+                <button className="btn-3d rounded-lg bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700">إرسال رغم التشابه</button>
+              </form>
+              <Link href="/account/wallet#topup" className="rounded-lg border-2 border-red-300 bg-white px-4 py-2.5 text-sm font-bold text-red-700">إلغاء</Link>
+              <Link href="/messages/admin" className="flex items-center gap-1.5 rounded-lg border-2 border-primary/25 px-4 py-2.5 text-sm font-bold text-primary">
+                <Send className="h-4 w-4" /> مراسلة الإدارة
+              </Link>
+            </div>
           </div>
         )}
         <form action={requestTopupAction} className="space-y-2">

@@ -288,6 +288,9 @@ const STATEMENTS: string[] = [
   `ALTER TABLE ads ADD COLUMN bumped_at DATETIME NULL`,
   /* بصمة إيصال الشحن (aHash): لكشف تطابق السند مع سند طلب سابق. */
   `ALTER TABLE wallet_topups ADD COLUMN receipt_hash VARCHAR(16) NULL`,
+  /* توسيع البصمة إلى بصمة مركّبة أدق (receiptHash: aHash+dHash بدقة 16×16 = 512 بت) —
+   *  البصمة القديمة (aHash 8×8 وحدها) كانت تخلط بين مستندات مختلفة بنفس قالب التصميم. */
+  `ALTER TABLE wallet_topups MODIFY COLUMN receipt_hash VARCHAR(140) NULL`,
   /* إيقاف من صاحب الإعلان: يميّز الموقوف بإرادته عن المنتظر موافقة الإدارة. */
   `ALTER TABLE ads ADD COLUMN paused_by_owner TINYINT NOT NULL DEFAULT 0`,
   /* جدولة النشر: يبقى مخفياً حتى هذا الموعد ثم يُنشر تلقائياً. */
@@ -631,6 +634,7 @@ async function run(): Promise<void> {
   await backfillDupModLogAdIds();
   await backfillAdBanAction();
   await backfillAccountDeletedAction();
+  await backfillLegacyReceiptHashes();
 }
 
 /** ترقيع لمرة واحدة: سجلات التكرار الآلي القديمة (قبل إضافة عمود ad_id) خزّنت
@@ -666,6 +670,15 @@ async function backfillAccountDeletedAction(): Promise<void> {
     where: { action: 'banned', kind: 'account', snippet: 'account deleted at owner request' },
     data: { action: 'account_deleted' },
   }).catch(() => {});
+}
+
+/** ترقيع لمرة واحدة: بصمات إيصالات الشحن القديمة (aHash 8×8 وحدها، 16 حرفاً) تُصفَّر
+ *  لتُعاد حسابتها تلقائياً بالبصمة المركّبة الأدق الجديدة (128 حرفاً) — لا تُقارَن بصمة
+ *  قديمة بأخرى جديدة (طولان مختلفان) فيبقى الكشف غير فعّال لولا هذا الترقيع. */
+async function backfillLegacyReceiptHashes(): Promise<void> {
+  await prisma.$executeRawUnsafe(
+    `UPDATE wallet_topups SET receipt_hash = NULL WHERE receipt_hash IS NOT NULL AND receipt_hash != '-' AND CHAR_LENGTH(receipt_hash) < 100`,
+  ).catch(() => {});
 }
 
 /** Idempotent schema sync — shared promise so concurrent callers run it once. */

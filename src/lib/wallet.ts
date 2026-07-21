@@ -244,7 +244,7 @@ const topupRow = (r: { id: bigint; user_id: bigint; amount: number; receipt: str
 });
 
 /** فحص فوري لبصمة إيصال جديد قبل إنشاء الطلب: أعلى نسبة تطابق مع إيصالات سابقة (0 = لا تطابق ≥ العتبة). */
-export async function matchReceiptHash(hash: string, threshold = 90): Promise<number> {
+export async function matchReceiptHash(hash: string, threshold = 95): Promise<number> {
   if (!hash) return 0;
   await ensure();
   const pool = await prisma.wallet_topups.findMany({ where: { NOT: { receipt_hash: null } }, orderBy: { id: 'desc' }, take: 600, select: { receipt_hash: true } }).catch(() => []);
@@ -352,7 +352,7 @@ export async function cancelTopup(id: number, adminId: number, reason: string): 
 /** كشف تطابق السند: يضمن بصمة (aHash) لكل إيصال ثم يقارن إيصالات القائمة
  *  المعروضة مع كل الإيصالات السابقة — يعيد أفضل تطابق ≥ العتبة لكل طلب. */
 export type ReceiptMatch = { pct: number; id: number; userId: number; userName: string; amount: number; receipt: string | null; at: string | null; status: TopupStatus };
-export async function findReceiptMatches(rowIds: number[], threshold = 90): Promise<Map<number, ReceiptMatch>> {
+export async function findReceiptMatches(rowIds: number[], threshold = 95): Promise<Map<number, ReceiptMatch>> {
   const out = new Map<number, ReceiptMatch>();
   if (!rowIds.length) return out;
   await ensure();
@@ -365,10 +365,10 @@ export async function findReceiptMatches(rowIds: number[], threshold = 90): Prom
   // بصمات ناقصة (طلبات قديمة قبل الميزة): تُحسب مرة واحدة وتُحفظ — بحد أقصى دفعة معقولة
   const missing = pool.filter((r) => !r.receipt_hash && r.receipt).slice(0, 120);
   if (missing.length) {
-    const [{ readLocal }, { aHash }] = await Promise.all([import('./storage'), import('./phash')]);
+    const [{ readLocal }, { receiptHash }] = await Promise.all([import('./storage'), import('./phash')]);
     for (const r of missing) {
       const buf = await readLocal(r.receipt!).catch(() => null);
-      const h = buf ? await aHash(buf).catch(() => '') : '';
+      const h = buf ? await receiptHash(buf).catch(() => '') : '';
       r.receipt_hash = h || '-'; // '-' = تعذّر الحساب فلا نعيد المحاولة كل مرة
       await prisma.wallet_topups.update({ where: { id: r.id }, data: { receipt_hash: r.receipt_hash } }).catch(() => {});
     }

@@ -155,8 +155,8 @@ export async function requestTopupAction(formData: FormData) {
     if (file.size > 8 * 1024 * 1024) redirect('/account/wallet?error=topupreceipt');
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
     const buf = Buffer.from(await file.arrayBuffer());
-    // بصمة الإيصال (aHash) — لكشف السند المكرر
-    receiptHash = await import('@/lib/phash').then((m) => m.aHash(buf)).catch(() => '');
+    // بصمة الإيصال (receiptHash: aHash+dHash مدمجة بدقة أعلى) — لكشف السند المكرر
+    receiptHash = await import('@/lib/phash').then((m) => m.receiptHash(buf)).catch(() => '');
     const { saveUpload } = await import('@/lib/storage');
     rel = await saveUpload(buf, `topup_${session.uid}_${Date.now()}.${ext}`);
 

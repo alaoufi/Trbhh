@@ -82,6 +82,12 @@ function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath
   );
 }
 
+function fmtAdminMsgDate(iso: string | null) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '' : `— ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d)}`;
+}
+
 export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; urgenton?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
@@ -101,6 +107,10 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const ownerViewing = !!(session && ad.seller && session.uid === ad.seller.id);
   // إضافات الإعلان المدفوعة (تمييز/عاجل/عرض/تحديث) — تُعرض للإدارة ولصاحب الإعلان فقط
   const addons = admin || ownerViewing ? await getAdAddons(ad.id).catch(() => null) : null;
+  // رسائل سابقة من أي مشرف لصاحب الإعلان — تمنع تكرار نفس الرسالة من مسؤول آخر
+  const priorAdminMsgs = admin && !ownerViewing && ad.seller
+    ? await import('@/lib/chat').then((m) => m.listAdminMessagesTo(ad.seller!.id)).catch(() => [])
+    : [];
   if ((ad.status !== 1 || ad.state !== 'active') && !ownerViewing && !admin) notFound();
   // إعلان عضو محظور: لا يراه الزوّار — يبقى لصاحبه وللإدارة (لرفع الحظر/الحذف)
   if (ad.seller?.banned && !ownerViewing && !admin) notFound();
@@ -568,6 +578,18 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <div className="mb-3 rounded-lg bg-white/70 p-2.5">
               <div className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-amber-800"><Send className="h-3.5 w-3.5" /> راسل صاحب الإعلان</div>
               {spx.adminmsg === '1' && <p className="mb-2 rounded-md bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700">✓ أُرسلت رسالتك — رابط الإعلان أُضيف تلقائياً في نهايتها.</p>}
+              {priorAdminMsgs.length > 0 && (
+                <div className="mb-2 space-y-1.5 rounded-lg border border-amber-300 bg-amber-50 p-2">
+                  <div className="text-[11px] font-extrabold text-amber-800">⚠ سبق أن راسله مسؤول — تجنّب تكرار نفس الرسالة:</div>
+                  {priorAdminMsgs.map((m) => (
+                    <div key={m.id} className="rounded-md bg-white/80 px-2 py-1.5 text-[11px] leading-5">
+                      <span className="font-bold text-primary">{m.senderName}</span>
+                      <span className="mr-1 text-muted-foreground">{fmtAdminMsgDate(m.at)}</span>
+                      <p className="mt-0.5 whitespace-pre-wrap text-foreground/80">{m.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
               <form action={adminMessageAdOwnerAction} className="space-y-2">
                 <input type="hidden" name="adId" value={ad.id} />
                 <textarea name="message" required rows={2} placeholder="اكتب رسالتك لصاحب الإعلان — يُضاف رابط الإعلان تلقائياً في نهايتها" className="w-full rounded-lg border border-amber-300 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-amber-300" />

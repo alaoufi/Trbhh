@@ -176,3 +176,27 @@ export async function pollThread(userId: number, otherId: number, afterId: numbe
     ids: allRows.map((r) => toInt(r.id)),
   };
 }
+
+export type AdminMessageRow = { id: number; senderId: number; senderName: string; message: string; at: string | null };
+
+/** آخر رسائل أرسلها أي مشرف/إدارة (لا العضو نفسه) لهذا المستلم — تُعرض في صناديق
+ *  المراسلة الإدارية (راسل صاحب الإعلان/المتجر) فيرى أي مسؤول آخر أنه سبق تواصُل
+ *  معه ولا يكرّر نفس الرسالة. */
+export async function listAdminMessagesTo(recipientId: number, limit = 5): Promise<AdminMessageRow[]> {
+  const admins = await prisma.users.findMany({ where: { is_admin: 1 }, select: { id: true } }).catch(() => []);
+  const adminIds = admins.map((a) => toInt(a.id));
+  if (!adminIds.length) return [];
+  const rows = await prisma.chats.findMany({
+    where: { reciver_id: recipientId, sender_id: { in: adminIds } },
+    orderBy: { id: 'desc' }, take: limit,
+    select: { id: true, sender_id: true, message: true, created_at: true },
+  }).catch(() => []);
+  if (!rows.length) return [];
+  const senderIds = [...new Set(rows.map((r) => r.sender_id))];
+  const senders = await prisma.users.findMany({ where: { id: { in: senderIds.map((id) => BigInt(id)) } }, select: { id: true, name: true, userName: true } }).catch(() => []);
+  const nameById = new Map(senders.map((s) => [toInt(s.id), s.name || s.userName || `#${toInt(s.id)}`]));
+  return rows.map((r) => ({
+    id: toInt(r.id), senderId: r.sender_id, senderName: nameById.get(r.sender_id) || `#${r.sender_id}`,
+    message: r.message, at: r.created_at ? r.created_at.toISOString() : null,
+  }));
+}

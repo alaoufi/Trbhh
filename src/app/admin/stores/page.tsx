@@ -40,6 +40,7 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
   const st = STATUS[s.status] || STATUS[1];
   const warns = s.warnings.length;
   const suspensions = comms.filter((c) => c.kind === 'suspend' || c.kind === 'suspend_perm').length;
+  const priorMsgs = comms.filter((c) => c.kind === 'message').slice(0, 3);
   return (
     <div className="card-3d space-y-3 rounded-2xl p-4">
       {/* الرأس */}
@@ -189,6 +190,20 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
         <input name="reason" required maxLength={300} placeholder="سبب الإنذار (منتج مخالف…)" className="h-9 min-w-0 flex-1 rounded-lg border bg-white px-2 text-xs outline-none" />
         <ConfirmSubmit msg="تأكيد تسجيل إنذار على هذا المتجر بالسبب المكتوب؟ يُحفظ في سجله ويصل صاحبه." className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white"><ShieldAlert className="h-3.5 w-3.5" /> إنذار</ConfirmSubmit>
       </form>
+
+      {/* ⚠ رسائل رسمية سابقة — ظاهرة هنا مباشرة (لا داخل السجل المطوي) حتى لا يكرّر مسؤول آخر نفس الرسالة */}
+      {priorMsgs.length > 0 && (
+        <div className="space-y-1.5 rounded-xl border border-amber-300 bg-amber-50 p-2">
+          <div className="text-[11px] font-extrabold text-amber-800">⚠ سبق أن راسل هذا المتجر مسؤول — تجنّب تكرار نفس الرسالة:</div>
+          {priorMsgs.map((c) => (
+            <div key={c.id} className="rounded-md bg-white/80 px-2 py-1.5 text-[11px] leading-5">
+              <span className="font-bold text-primary">{c.adminName}</span>
+              <span className="mr-1 text-muted-foreground">{timeAgo(c.at)}</span>
+              {c.text && <p className="mt-0.5 whitespace-pre-wrap text-foreground/80">{c.text}</p>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ✉️ رسالة رسمية من إدارة المتاجر لصاحب المتجر — تصله في «الرسائل» باسم الإدارة */}
       <form action={adminMessageStoreOwnerAction} className="flex items-center gap-2 rounded-xl border-2 border-sky-200 bg-sky-50/40 p-2">

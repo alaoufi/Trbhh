@@ -9,7 +9,7 @@ import {
 import { SplashSuppress } from '@/components/splash-suppress';
 import { getAd, getSimilarAds, getSellerAds, recordView } from '@/lib/data';
 import { hasAction } from '@/lib/roles';
-import { adminArchiveAdAction, adminBanAdAction, adminBanSellerAction, adminDeleteAdRedirectAction, adminHideStoreAdAction, adminHideCommentAction } from '@/app/admin/actions';
+import { adminArchiveAdAction, adminBanAdAction, adminBanSellerAction, adminDeleteAdRedirectAction, adminHideStoreAdAction, adminHideCommentAction, adminMessageAdOwnerAction } from '@/app/admin/actions';
 import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
@@ -82,7 +82,7 @@ function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath
   );
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; urgenton?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; urgenton?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -563,6 +563,18 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <ShieldAlert className="h-5 w-5" /> <span className="font-bold">أدوات الإدارة</span>
           </div>
           {addons && <div className="mb-3"><AdAddonsBox info={addons} title="⭐ الإضافات المدفوعة لهذا الإعلان — الباقة وتاريخ الانتهاء" /></div>}
+
+          {ad.seller && !ownerViewing && (
+            <div className="mb-3 rounded-lg bg-white/70 p-2.5">
+              <div className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-amber-800"><Send className="h-3.5 w-3.5" /> راسل صاحب الإعلان</div>
+              {spx.adminmsg === '1' && <p className="mb-2 rounded-md bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700">✓ أُرسلت رسالتك — رابط الإعلان أُضيف تلقائياً في نهايتها.</p>}
+              <form action={adminMessageAdOwnerAction} className="space-y-2">
+                <input type="hidden" name="adId" value={ad.id} />
+                <textarea name="message" required rows={2} placeholder="اكتب رسالتك لصاحب الإعلان — يُضاف رابط الإعلان تلقائياً في نهايتها" className="w-full rounded-lg border border-amber-300 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-amber-300" />
+                <button className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"><Send className="h-3.5 w-3.5" /> إرسال</button>
+              </form>
+            </div>
+          )}
 
           {inStore ? (
             /* إعلان متجر: صلاحية محدودة — إخفاء عن النشر + إنذار مخالفة لصاحب المتجر (لا أرشفة/حذف/حظر) */

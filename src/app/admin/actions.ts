@@ -348,6 +348,24 @@ export async function adminArchiveAdAction(formData: FormData) {
   revalidatePath(`/ads/${toInt(id)}`);
 }
 
+/** رسالة من الإدارة لصاحب الإعلان (من داخل صفحة الإعلان) — يُضاف رابط الإعلان تلقائياً
+ *  آخر الرسالة، وتُرسَل من حساب المشرف الحالي فتصله ردوده في «الرسائل». */
+export async function adminMessageAdOwnerAction(formData: FormData) {
+  const session = await requireAction('ads', 'archive');
+  const adId = Number(formData.get('adId') || 0);
+  const text = String(formData.get('message') || '').trim().slice(0, 1000);
+  if (!adId || !text) redirect(`/ads/${adId}#admin-tools`);
+  const ad = await prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { user_id: true, title: true } }).catch(() => null);
+  const sellerId = ad ? toInt(ad.user_id) : 0;
+  if (!sellerId || sellerId === session.uid) redirect(`/ads/${adId}#admin-tools`);
+  const { SITE } = await import('@/lib/constants');
+  const { sendChat } = await import('@/lib/chat');
+  const body = `${text}\n\nرابط الإعلان: https://${SITE.domain}/ads/${adId}`;
+  await sendChat(session.uid, sellerId, body);
+  await logAdmin(session.uid, 'رسالة لصاحب إعلان', `إعلان #${adId}${ad?.title ? ` «${ad.title}»` : ''}`, text.slice(0, 120));
+  redirect(`/ads/${adId}?adminmsg=1#admin-tools`);
+}
+
 /** حظر إعلان مخالف نهائياً: حذف فوري ولا رجعة فيه — يختلف عن «الأرشفة» (مؤقتة وقابلة للاستعادة).
  *  يُستخدم للمحتوى المخالف الواضح؛ يُسجَّل في سجل التجاوزات وسجل نشاط الإدارة. */
 export async function adminBanAdAction(formData: FormData) {

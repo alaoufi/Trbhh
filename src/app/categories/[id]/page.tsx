@@ -1,9 +1,10 @@
 import { notFound, redirect } from 'next/navigation';
 import { SlidersHorizontal } from 'lucide-react';
-import { getCategory, searchAds, countSearchAds, getCities } from '@/lib/data';
+import { getCategory, searchAds, countSearchAds, getCities, getAreas } from '@/lib/data';
 import { AdGrid } from '@/components/ad-card';
 import { AdminPager } from '@/components/admin-pager';
 import { Breadcrumb } from '@/components/breadcrumb';
+import { SearchAreaPicker } from '@/components/search-area-picker';
 import { SITE } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,7 @@ export default async function CategoryPage({ params, searchParams }: { params: P
   if (!cat) notFound();
 
   const cityId = sp.city ? Number(sp.city) : undefined;
+  const areaId = sp.area ? Number(sp.area) : undefined;
   const type = sp.type === 'offer' || sp.type === 'request' ? sp.type : undefined;
   const sort = (sp.sort as 'newest' | 'price_asc' | 'price_desc') || 'newest';
   const min = sp.min ? Number(sp.min) : 0;
@@ -39,11 +41,13 @@ export default async function CategoryPage({ params, searchParams }: { params: P
   const page = Math.max(1, parseInt(sp.page || '1') || 1);
   const PAGE_SIZE = 48;
 
-  const [cities, base, total] = await Promise.all([
+  const [allCities, areas, base, total] = await Promise.all([
     getCities(),
-    searchAds({ categoryId: cat.id, cityId, type, sort, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }),
-    countSearchAds({ categoryId: cat.id, cityId, type }),
+    getAreas(),
+    searchAds({ categoryId: cat.id, cityId, areaId, type, sort, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }),
+    countSearchAds({ categoryId: cat.id, cityId, areaId, type }),
   ]);
+  const cities = allCities.filter((c) => c.countryId === 1); // السعودية فقط
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // فلترة السعر من/إلى بعد الجلب (السعر مخزَّن نصاً أحياناً)
   const ads = base.filter((a) => {
@@ -62,12 +66,9 @@ export default async function CategoryPage({ params, searchParams }: { params: P
         <span className="text-sm text-muted-foreground">{total} إعلان</span>
       </div>
 
-      {/* فلاتر القسم: المدينة، النوع، السعر من/إلى، الترتيب */}
+      {/* فلاتر القسم: المنطقة/المدينة، النوع، السعر من/إلى، الترتيب */}
       <form className="card-3d grid grid-cols-2 gap-2 rounded-xl p-3 sm:grid-cols-3 md:grid-cols-6">
-        <select name="city" defaultValue={sp.city} className={sel}>
-          <option value="">كل المدن</option>
-          {cities.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-        </select>
+        <SearchAreaPicker regions={cities} areas={areas} region={sp.city || ''} area={sp.area || ''} className={sel} />
         <select name="type" defaultValue={sp.type} className={sel}>
           <option value="">عرض وطلب</option>
           <option value="offer">عروض</option>
@@ -88,7 +89,7 @@ export default async function CategoryPage({ params, searchParams }: { params: P
       {ads.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد إعلانات مطابقة — جرّب تخفيف الفلاتر.</p>}
       <AdGrid ads={ads} />
 
-      <AdminPager basePath={`/categories/${cat.id}`} page={page} pages={pages} total={total} params={{ city: sp.city, type: sp.type, sort: sp.sort, min: sp.min, max: sp.max }} />
+      <AdminPager basePath={`/categories/${cat.id}`} page={page} pages={pages} total={total} params={{ city: sp.city, area: sp.area, type: sp.type, sort: sp.sort, min: sp.min, max: sp.max }} />
     </div>
   );
 }

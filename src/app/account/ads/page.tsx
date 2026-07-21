@@ -5,6 +5,7 @@ import { AdActions } from '@/components/ad-actions';
 import { AdStatsCard } from '@/components/ad-stats-card';
 import { requireUser } from '@/lib/auth';
 import { getMyAds, adContactCounts } from '@/lib/account';
+import { adViewCounts } from '@/lib/merchant';
 import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingBool, getAdRestoreFee, getMemberWindows, adWindowState } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
@@ -24,6 +25,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
     getAdRestoreFee(), getMemberWindows(),
   ]);
   const contacts = contactStatsOn ? await adContactCounts(ads.map((a) => a.id)) : new Map<number, { whatsapp: number; call: number }>();
+  const viewCounts = contactStatsOn ? await adViewCounts(ads.map((a) => a.id)) : new Map<number, number>();
   const now = Date.now();
   const featuredSold = serviceHasPrice(servicePricing.featured);
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
@@ -100,12 +102,12 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
               {contactStatsOn && (
                 <AdStatsCard
                   stats={{
-                    views: ad.views,
+                    views: viewCounts.get(ad.id) || 0,
                     contacts: (contacts.get(ad.id)?.whatsapp || 0) + (contacts.get(ad.id)?.call || 0),
                     messages: 0, // TODO: add messages count
                     favorites: 0, // TODO: add favorites count
-                    createdAt: ad.createdAt,
-                    expiresAt: ad.expiresAt || ad.createdAt,
+                    createdAt: ad.createdAt || '',
+                    expiresAt: ad.expiresAt || ad.createdAt || '',
                   }}
                 />
               )}

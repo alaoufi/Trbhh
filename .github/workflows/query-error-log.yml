@@ -44,3 +44,16 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
             -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
             "cd /root/trbhh && docker compose exec -T app node" < query.js
+
+      - name: سجلات الحاوية حول وقت الخطأ (stack trace كامل غير مُختصَر)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          PORT="${VPS_PORT:-22}"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
+            -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
+            "cd /root/trbhh && docker compose logs app --since 2026-07-22T07:10:00 --until 2026-07-22T07:25:00 2>&1 | grep -B2 -A 40 -i 'error\|3259426802' | tail -n 300"

@@ -1,0 +1,63 @@
+name: بناء تطبيق أندرويد (AAB/APK) على الخادم
+
+# يبني تطبيق TWA عبر bubblewrap مباشرة على خادم Hostinger (اتصال إنترنت حر
+# بلا قيود شبكة بيئة الجلسة)، ثم يرفع ملفي AAB وAPK كمخرجات (artifacts) للتنزيل.
+# يتطلب سرّ المستودع ANDROID_KEYSTORE_PASSWORD (كلمة مرور مفتاح التوقيع).
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: بناء التطبيق عبر SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -e
+          if [ -z "$KS_PASS" ]; then
+            echo "❌ السرّ ANDROID_KEYSTORE_PASSWORD غير موجود — أضِفه في إعدادات الأسرار أولاً."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${VPS_PORT:-22}"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o ServerAliveInterval=30 -o ServerAliveCountInterval=10 -i ~/.ssh/deploy_key -p $PORT"
+
+          echo "🔗 تحديث الكود على الخادم..."
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" \
+            "cd /root/trbhh && git fetch origin claude/hostinger-vps-project-amw8vb && git reset --hard origin/claude/hostinger-vps-project-amw8vb"
+
+          echo "📦 تجهيز bubblewrap..."
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" \
+            "command -v bubblewrap >/dev/null 2>&1 || npm i -g @bubblewrap/cli"
+
+          echo "🔨 بناء التطبيق (قد يستغرق حتى ٢٠ دقيقة أول مرة لتثبيت JDK وأدوات أندرويد)..."
+          # كلمة المرور تُرسل عبر stdin (heredoc) لا كوسيطة سطر أوامر، حتى لا تظهر في قوائم
+          # العمليات (ps) على الخادم.
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" bash -s <<REMOTE_SCRIPT
+          set -e
+          cd /root/trbhh/apps/android-twa
+          export BUBBLEWRAP_KEYSTORE_PASSWORD='$KS_PASS'
+          export BUBBLEWRAP_KEY_PASSWORD='$KS_PASS'
+          timeout 2400 bash -c 'yes Y | bubblewrap build --skipPwaValidation'
+          REMOTE_SCRIPT
+
+          echo "📥 تنزيل الملفات الناتجة..."
+          mkdir -p out
+          scp $SSH_OPTS "$VPS_USER@$VPS_HOST:/root/trbhh/apps/android-twa/app-release-bundle.aab" out/ || echo "⚠️ لم يوجد ملف aab"
+          scp $SSH_OPTS "$VPS_USER@$VPS_HOST:/root/trbhh/apps/android-twa/app-release-signed.apk" out/ || echo "⚠️ لم يوجد ملف apk"
+          ls -la out/
+
+      - name: رفع الملفات كمخرجات
+        uses: actions/upload-artifact@v4
+        with:
+          name: trbhh-android-build
+          path: out/*
+          if-no-files-found: error

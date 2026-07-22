@@ -46,37 +46,46 @@ jobs:
           const { chromium } = require("playwright");
           (async () => {
             const b = await chromium.launch();
-            const ctx = await b.newContext({
+
+            const shotWith = async (ctx, prefix) => {
+              const p = await ctx.newPage();
+              const shot = async (url, name) => {
+                try {
+                  await p.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+                  await p.waitForTimeout(600);
+                  await p.click("[aria-label=\"إغلاق\"]", { timeout: 1500 }).catch(() => {});
+                  await p.waitForTimeout(500);
+                  await p.screenshot({ path: `/root/trbhh-shots/${prefix}-${name}.png` });
+                  console.log("OK", prefix, name, url);
+                } catch (e) {
+                  console.log("SKIP", prefix, name, url, e.message);
+                }
+              };
+              await shot("https://trbhh.com/", "01-home");
+              await shot("https://trbhh.com/companies", "02-companies");
+              await shot("https://trbhh.com/deals", "03-deals");
+              const adHref = await p.evaluate(() => {
+                const a = document.querySelector("a[href*=\"/ads/\"]");
+                return a ? a.getAttribute("href") : null;
+              }).catch(() => null);
+              if (adHref) await shot(new URL(adHref, "https://trbhh.com").href, "04-ad-detail");
+              await p.close();
+            };
+
+            const phoneCtx = await b.newContext({
               viewport: { width: 412, height: 915 },
-              deviceScaleFactor: 2,
+              deviceScaleFactor: 3,
               userAgent: "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36",
             });
-            const p = await ctx.newPage();
-            const shot = async (url, name) => {
-              try {
-                await p.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-                await p.waitForTimeout(600);
-                await p.click("[aria-label=\"إغلاق\"]", { timeout: 1500 }).catch(() => {});
-                await p.waitForTimeout(500);
-                await p.screenshot({ path: `/root/trbhh-shots/${name}.png` });
-                console.log("OK", name, url);
-              } catch (e) {
-                console.log("SKIP", name, url, e.message);
-              }
-            };
-            await shot("https://trbhh.com/", "01-home");
-            await shot("https://trbhh.com/companies", "02-companies");
-            await shot("https://trbhh.com/deals", "03-deals");
-            const adHref = await p.evaluate(() => {
-              const a = document.querySelector("a[href*=\"/ads/\"]");
-              return a ? a.getAttribute("href") : null;
-            }).catch(() => null);
-            if (adHref) await shot(new URL(adHref, "https://trbhh.com").href, "04-ad-detail");
-            const companyHref = await p.evaluate(() => {
-              const a = document.querySelector("a[href*=\"/companies/\"]");
-              return a ? a.getAttribute("href") : null;
-            }).catch(() => null);
-            if (companyHref) await shot(new URL(companyHref, "https://trbhh.com").href, "05-company");
+            await shotWith(phoneCtx, "phone");
+
+            const tabletCtx = await b.newContext({
+              viewport: { width: 800, height: 1280 },
+              deviceScaleFactor: 2,
+              userAgent: "Mozilla/5.0 (Linux; Android 13; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            });
+            await shotWith(tabletCtx, "tablet");
+
             await b.close();
           })();
           '

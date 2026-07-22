@@ -19,17 +19,13 @@ jobs:
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           PORT="${VPS_PORT:-22}"
-          BCRYPT_PATH=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
+          echo "📦 تثبيت bcryptjs مؤقتاً داخل الحاوية..."
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
             -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
-            "cd /root/trbhh && docker compose exec -T app find / -maxdepth 8 -type d -name bcryptjs 2>/dev/null | head -1" | tr -d '\r')
-          echo "bcryptjs path: $BCRYPT_PATH"
-          if [ -z "$BCRYPT_PATH" ]; then
-            echo "❌ لم يوجد bcryptjs داخل الحاوية"
-            exit 1
-          fi
+            "cd /root/trbhh && docker compose exec -T app npm install bcryptjs --no-save --prefix /tmp/bcrypt-tmp"
           cat > /tmp/create-user.js <<'EOF'
           const { PrismaClient } = require('@prisma/client');
-          const bcrypt = require('BCRYPT_PATH_PLACEHOLDER');
+          const bcrypt = require('/tmp/bcrypt-tmp/node_modules/bcryptjs');
           const prisma = new PrismaClient();
           (async () => {
             const phone = '0500000001';
@@ -60,7 +56,6 @@ jobs:
             await prisma.$disconnect();
           })().catch((e) => { console.error('ERR', e.message); process.exit(1); });
           EOF
-          sed -i "s#BCRYPT_PATH_PLACEHOLDER#$BCRYPT_PATH#" /tmp/create-user.js
           scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -P "$PORT" -i ~/.ssh/deploy_key /tmp/create-user.js "$VPS_USER@$VPS_HOST:/tmp/create-user.js"
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
             -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \

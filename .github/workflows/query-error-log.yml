@@ -15,14 +15,24 @@ jobs:
           cat > query.js << 'EOF'
           const { PrismaClient } = require('@prisma/client');
           const p = new PrismaClient();
-          p.error_log.findMany({ orderBy: { id: 'desc' }, take: 20 })
-            .then((rows) => {
-              console.log('===ERROR_LOG_START===');
-              console.log(JSON.stringify(rows, (k, v) => (typeof v === 'bigint' ? v.toString() : v), 2));
-              console.log('===ERROR_LOG_END===');
-              return p.$disconnect();
-            })
-            .catch((e) => { console.error('QUERY_FAILED:', e); process.exit(1); });
+          (async () => {
+            const total = await p.error_log.count();
+            const rows = await p.error_log.findMany({ orderBy: { id: 'desc' }, take: 200 });
+            const groups = new Map();
+            for (const r of rows) {
+              const key = (r.digest || r.message || '').slice(0, 120);
+              if (!groups.has(key)) groups.set(key, { count: 0, message: r.message, digest: r.digest, url: r.url, first_id: r.id, last_at: r.created_at });
+              groups.get(key).count++;
+            }
+            console.log('===TOTAL_COUNT===', total);
+            console.log('===GROUPED_START===');
+            console.log(JSON.stringify([...groups.values()], (k, v) => (typeof v === 'bigint' ? v.toString() : v), 2));
+            console.log('===GROUPED_END===');
+            console.log('===ERROR_LOG_START===');
+            console.log(JSON.stringify(rows, (k, v) => (typeof v === 'bigint' ? v.toString() : v), 2));
+            console.log('===ERROR_LOG_END===');
+            await p.$disconnect();
+          })().catch((e) => { console.error('QUERY_FAILED:', e); process.exit(1); });
           EOF
 
       - name: الاستعلام عبر SSH
@@ -44,16 +54,3 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
             -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
             "cd /root/trbhh && docker compose exec -T app node" < query.js
-
-      - name: سجلات الحاوية حول وقت الخطأ (stack trace كامل غير مُختصَر)
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-        run: |
-          set -e
-          PORT="${VPS_PORT:-22}"
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
-            -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
-            "cd /root/trbhh && docker compose logs app --since 2026-07-22T07:10:00 --until 2026-07-22T07:25:00 2>&1 | grep -B2 -A 40 -i 'error\|3259426802' | tail -n 300"

@@ -40,6 +40,7 @@ jobs:
           echo "📸 التقاط الصفحات..."
           ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" bash -s <<'REMOTE_SCRIPT'
           set -e
+          rm -rf /root/trbhh-shots
           mkdir -p /root/trbhh-shots
           NODE_PATH="$(npm root -g)" node -e '
           const { chromium } = require("playwright");

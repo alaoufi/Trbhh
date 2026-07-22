@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Pencil, Trash2, Eye, EyeOff, Wallet, Archive } from 'lucide-react';
-import { AdActions } from '@/components/ad-actions';
 import { AdStatsCard } from '@/components/ad-stats-card';
 import { requireUser } from '@/lib/auth';
 import { getMyAds, adContactCounts } from '@/lib/account';
@@ -112,20 +111,6 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 />
               )}
 
-              {/* إجراءات الإعلان */}
-              <AdActions
-                adId={ad.id}
-                canEdit={!editState.expired}
-                canDelete={!deleteState.expired}
-                isHidden={ad.status !== 1}
-                isPinned={ad.special}
-                onRefresh={() => { /* handled by bump form */ }}
-                onPin={() => { /* handled by feature form */ }}
-                onHide={() => { /* handled by toggle form */ }}
-                onStats={() => { /* already showing */ }}
-                onEdit={() => window.location.href = `/ads/${ad.id}/edit`}
-                onDelete={() => { /* handled by delete form */ }}
-              />
               {ad.special && ad.expiresAt && (
                 <span className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold leading-4 text-amber-700">⭐ مميّز حتى {fmtDay(ad.expiresAt)}.</span>
               )}

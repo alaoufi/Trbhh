@@ -1,0 +1,30 @@
+name: تشخيص - فحص أدوات البناء على الخادم
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: فحص عبر SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${VPS_PORT:-22}"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
+            -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
+            "echo '--- node ---'; node -v 2>&1 || echo NO_NODE
+             echo '--- npm ---'; npm -v 2>&1 || echo NO_NPM
+             echo '--- java ---'; java -version 2>&1 || echo NO_JAVA
+             echo '--- disk ---'; df -h / /root 2>&1
+             echo '--- mem ---'; free -h
+             echo '--- docker ---'; docker -v
+             echo '--- internet test (github release) ---'; curl -sS -o /dev/null -w '%{http_code}\n' https://github.com/gradle/gradle-distributions/releases/download/v8.11.1/gradle-8.11.1-bin.zip || echo CURL_FAIL"

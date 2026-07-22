@@ -6,11 +6,19 @@ name: بناء تطبيق أندرويد (AAB/APK) على الخادم
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: سحب المستودع
+        uses: actions/checkout@v4
+        with:
+          ref: claude/hostinger-vps-project-amw8vb
+
       - name: بناء التطبيق عبر SSH
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -62,3 +70,20 @@ jobs:
           name: trbhh-android-build
           path: out/*
           if-no-files-found: error
+
+      - name: نقل الملفات عبر فرع مؤقت (مخرجات Actions غير قابلة للتنزيل من جلسة العمل)
+        run: |
+          set -e
+          git config user.name "trbhh-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -B android-build-artifacts
+          mkdir -p dist/android
+          rm -f dist/android/*
+          cp out/*.aab out/*.apk dist/android/ 2>/dev/null || true
+          git add dist/android
+          if git diff --cached --quiet; then
+            echo "لا ملفات لنقلها"
+          else
+            git commit -m "نقل مؤقت لملفي AAB/APK المبنيين (فرع نقل، غير مخصص للدمج)"
+            git push --force origin android-build-artifacts:android-build-artifacts
+          fi

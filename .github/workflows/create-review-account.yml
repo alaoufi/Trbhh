@@ -22,7 +22,7 @@ jobs:
           echo "📦 تثبيت bcryptjs مؤقتاً داخل الحاوية..."
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
             -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
-            "cd /root/trbhh && docker compose exec -T app npm install bcryptjs --no-save --prefix /tmp/bcrypt-tmp"
+            "cd /root/trbhh && docker compose exec -T -e HOME=/tmp app npm install bcryptjs --no-save --prefix /tmp/bcrypt-tmp --cache /tmp/npm-cache"
           cat > /tmp/create-user.js <<'EOF'
           const { PrismaClient } = require('@prisma/client');
           const bcrypt = require('/tmp/bcrypt-tmp/node_modules/bcryptjs');

@@ -29,6 +29,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           PORT="${VPS_PORT:-22}"
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o ServerAliveInterval=30 -o ServerAliveCountInterval=10 -i ~/.ssh/deploy_key -p $PORT"
+          SCP_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/deploy_key -P $PORT"
 
           echo "🔗 تحديث الكود على الخادم..."
           ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" \
@@ -51,8 +52,8 @@ jobs:
 
           echo "📥 تنزيل الملفات الناتجة..."
           mkdir -p out
-          scp $SSH_OPTS "$VPS_USER@$VPS_HOST:/root/trbhh/apps/android-twa/app-release-bundle.aab" out/ || echo "⚠️ لم يوجد ملف aab"
-          scp $SSH_OPTS "$VPS_USER@$VPS_HOST:/root/trbhh/apps/android-twa/app-release-signed.apk" out/ || echo "⚠️ لم يوجد ملف apk"
+          scp $SCP_OPTS "$VPS_USER@$VPS_HOST:/root/trbhh/apps/android-twa/app-release-bundle.aab" out/ || echo "⚠️ لم يوجد ملف aab"
+          scp $SCP_OPTS "$VPS_USER@$VPS_HOST:/root/trbhh/apps/android-twa/app-release-signed.apk" out/ || echo "⚠️ لم يوجد ملف apk"
           ls -la out/
 
       - name: رفع الملفات كمخرجات

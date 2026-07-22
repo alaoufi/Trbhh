@@ -23,6 +23,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           PORT="${VPS_PORT:-22}"
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o ServerAliveInterval=30 -i ~/.ssh/deploy_key -p $PORT"
+          SCP_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/deploy_key -P $PORT"
 
           echo "📦 تجهيز Playwright..."
           ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" \
@@ -73,7 +74,7 @@ jobs:
 
           echo "📥 تنزيل الصور..."
           mkdir -p out
-          scp $SSH_OPTS -r "$VPS_USER@$VPS_HOST:/root/trbhh-shots/*.png" out/
+          scp $SCP_OPTS "$VPS_USER@$VPS_HOST:/root/trbhh-shots/*.png" out/
           ls -la out/
 
       - name: رفع الصور كمخرجات

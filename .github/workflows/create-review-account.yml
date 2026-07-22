@@ -1,0 +1,58 @@
+name: تشخيص - إنشاء حساب تجريبي لمراجعي Google Play
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: إنشاء الحساب عبر SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${VPS_PORT:-22}"
+          cat > /tmp/create-user.js <<'EOF'
+          const { PrismaClient } = require('@prisma/client');
+          const bcrypt = require('bcryptjs');
+          const prisma = new PrismaClient();
+          (async () => {
+            const phone = '0500000001';
+            const existing = await prisma.users.findFirst({ where: { phoneNumber: phone } });
+            if (existing) {
+              console.log('EXISTS id=', existing.id.toString());
+              await prisma.$disconnect();
+              return;
+            }
+            const hash = await bcrypt.hash('TrbhhReview2026', 10);
+            const user = await prisma.users.create({
+              data: {
+                name: 'مراجع Google Play',
+                userName: phone,
+                phoneNumber: phone,
+                password: hash,
+                type: 'user',
+                ban: 'no',
+                trusted: 0,
+                allow_phone: 1,
+                whatsapp: 1,
+                step: 0,
+                forget: 0,
+                is_admin: 0,
+              },
+            });
+            console.log('CREATED id=', user.id.toString());
+            await prisma.$disconnect();
+          })().catch((e) => { console.error('ERR', e.message); process.exit(1); });
+          EOF
+          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -P "$PORT" -i ~/.ssh/deploy_key /tmp/create-user.js "$VPS_USER@$VPS_HOST:/tmp/create-user.js"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
+            -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
+            "cd /root/trbhh && docker compose exec -T app node < /tmp/create-user.js && rm -f /tmp/create-user.js"

@@ -54,7 +54,9 @@ jobs:
             const shot = async (url, name) => {
               try {
                 await p.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-                await p.waitForTimeout(800);
+                await p.waitForTimeout(600);
+                await p.click("[aria-label=\"إغلاق\"]", { timeout: 1500 }).catch(() => {});
+                await p.waitForTimeout(500);
                 await p.screenshot({ path: `/root/trbhh-shots/${name}.png` });
                 console.log("OK", name, url);
               } catch (e) {
@@ -62,18 +64,18 @@ jobs:
               }
             };
             await shot("https://trbhh.com/", "01-home");
-            await shot("https://trbhh.com/categories", "02-categories");
+            await shot("https://trbhh.com/companies", "02-companies");
             await shot("https://trbhh.com/deals", "03-deals");
             const adHref = await p.evaluate(() => {
               const a = document.querySelector("a[href*=\"/ads/\"]");
               return a ? a.getAttribute("href") : null;
             }).catch(() => null);
             if (adHref) await shot(new URL(adHref, "https://trbhh.com").href, "04-ad-detail");
-            const storeHref = await p.evaluate(() => {
-              const a = document.querySelector("a[href*=\"/store/\"]");
+            const companyHref = await p.evaluate(() => {
+              const a = document.querySelector("a[href*=\"/companies/\"]");
               return a ? a.getAttribute("href") : null;
             }).catch(() => null);
-            if (storeHref) await shot(new URL(storeHref, "https://trbhh.com").href, "05-store");
+            if (companyHref) await shot(new URL(companyHref, "https://trbhh.com").href, "05-company");
             await b.close();
           })();
           '

@@ -126,7 +126,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       )}
 
       {/* تقييم منصة تربح بالنجوم — للزوّار والأعضاء، مرة واحدة لكل منهما */}
-      {platformRatingOn && <PlatformRatingWidget avg={platformRating.avg} count={platformRating.count} alreadyRated={platformRated} />}
+      {platformRatingOn && (
+        <div className="-mt-2">
+          <PlatformRatingWidget avg={platformRating.avg} count={platformRating.count} alreadyRated={platformRated} />
+        </div>
+      )}
 
       {/* Category dropdown — pick one or more categories to show */}
       {catsOn && <CategorySelect categories={categories} initial={catsParam} />}

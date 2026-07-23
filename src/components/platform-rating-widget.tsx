@@ -22,17 +22,15 @@ export function PlatformRatingWidget({ avg, count, alreadyRated }: { avg: number
   const showForm = !alreadyRated && !sent;
 
   return (
-    <div className="card-3d flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4">
-      <div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-lg font-extrabold text-primary">{avg > 0 ? avg.toFixed(1) : '—'}</span>
-          <div className="flex items-center">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Star key={i} className={cn('h-4 w-4', i <= Math.round(avg) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30')} />
-            ))}
-          </div>
+    <div className="card-3d flex flex-wrap items-center justify-between gap-2 rounded-2xl px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-sm font-extrabold text-primary">{avg > 0 ? avg.toFixed(1) : '—'}</span>
+        <div className="flex items-center">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Star key={i} className={cn('h-3.5 w-3.5', i <= Math.round(avg) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30')} />
+          ))}
         </div>
-        <p className="text-xs text-muted-foreground">تقييم منصة تربح{count > 0 ? ` — من ${count} تقييم` : ' — كن أول من يقيّم'}</p>
+        <span className="text-xs text-muted-foreground">تقييم منصة تربح{count > 0 ? ` — من ${count} تقييم` : ' — كن أول من يقيّم'}</span>
       </div>
 
       {showForm ? (

@@ -3,10 +3,12 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { RefreshCw, ArrowRight } from 'lucide-react';
 import { reportClientErrorAction } from '../error-actions';
+import { reloadOnChunkError } from '@/lib/chunk-error';
 
 export default function ClassifiedError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error('Classified route error:', error);
+    if (reloadOnChunkError(error)) return; // إصدار جديد من الموقع — تحديث كامل يحلّها تلقائياً
     reportClientErrorAction({
       message: error.message || 'خطأ غير معروف',
       digest: error.digest,

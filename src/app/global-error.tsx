@@ -5,10 +5,12 @@
 import { useEffect } from 'react';
 import { RefreshCw, Home } from 'lucide-react';
 import { reportClientErrorAction } from './error-actions';
+import { reloadOnChunkError } from '@/lib/chunk-error';
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error('Global app error:', error);
+    if (reloadOnChunkError(error)) return; // إصدار جديد من الموقع — تحديث كامل يحلّها تلقائياً
     reportClientErrorAction({
       message: error.message || 'خطأ غير معروف',
       digest: error.digest,

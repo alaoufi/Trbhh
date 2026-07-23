@@ -13,10 +13,12 @@ export function CopyLink({ url, label = 'رابط متجرك المباشر' }: 
       await navigator.clipboard.writeText(url);
     } catch {
       // fallback for insecure contexts
-      const ta = document.createElement('textarea');
-      ta.value = url; document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); } catch { /* ignore */ }
-      document.body.removeChild(ta);
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = url; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch { /* ignore */ }
+        document.body.removeChild(ta);
+      } catch { /* ignore */ }
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);

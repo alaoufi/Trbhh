@@ -94,20 +94,23 @@ export async function AdminAlertsBanner() {
   const isLate = (d: Date | null) => !!d && Date.now() - d.getTime() > 24 * 3600_000;
 
   return (
-    <div className="border-b-2 border-red-300 bg-gradient-to-l from-red-50 via-amber-50 to-red-50">
+    // sticky top-16 = يلتصق أسفل الهيدر الثابت (h-16) مباشرة فيبقى ظاهراً أثناء
+    // التمرير حتى تُعالَج كل البنود؛ ألوان صريحة داكنة تختلف عمداً عن شارات
+    // تنبيهات الأعضاء الفاتحة (bg-*-50) حتى يتميّز فوراً كطابور قرارات إدارية.
+    <div className="sticky top-16 z-30 border-b-2 border-red-950 bg-gradient-to-l from-red-800 via-orange-700 to-red-800 shadow-lg">
       <div className="container flex flex-wrap items-center gap-2 py-2">
-        <span className="flex shrink-0 items-center gap-1.5 text-sm font-extrabold text-red-700">
-          <span className="grid h-6 w-6 animate-pulse place-items-center rounded-full bg-red-600 text-[11px] text-white">{total > 99 ? '99+' : total}</span>
+        <span className="flex shrink-0 items-center gap-1.5 text-sm font-extrabold text-white">
+          <span className="grid h-6 w-6 animate-pulse place-items-center rounded-full bg-white text-[11px] text-red-800">{total > 99 ? '99+' : total}</span>
           🔔 بانتظار إجرائكم:
         </span>
         {items.map((i) => (
           <Link
             key={`${i.href}-${i.label}`}
             href={i.href}
-            className={`rounded-full border px-2.5 py-1 text-xs font-bold shadow-sm ${isLate(i.oldest) ? 'border-red-700 bg-red-600 text-white hover:bg-red-700' : 'border-red-300 bg-white text-red-700 hover:bg-red-100'}`}
+            className={`rounded-full border px-2.5 py-1 text-xs font-bold shadow-sm ${isLate(i.oldest) ? 'border-white bg-white text-red-800 hover:bg-red-50' : 'border-white/40 bg-black/20 text-white hover:bg-black/30'}`}
           >
             {i.n} {i.label}
-            {i.oldest && <span className={`mr-1 font-extrabold ${isLate(i.oldest) ? 'text-amber-200' : 'text-amber-700'}`}>⏱ تأخير: {timeAgo(i.oldest)}</span>}
+            {i.oldest && <span className={`mr-1 font-extrabold ${isLate(i.oldest) ? 'text-red-700' : 'text-amber-200'}`}>⏱ تأخير: {timeAgo(i.oldest)}</span>}
             {' ←'}
           </Link>
         ))}

@@ -6,6 +6,9 @@ on:
   push:
     branches:
       - claude/hostinger-vps-project-amw8vb
+    # سجلّ مراقب الأخطاء (ops/) دفتر متابعة فقط — تحديثه لا يستدعي إعادة نشر
+    paths-ignore:
+      - 'ops/**'
   workflow_dispatch:
 
 # لا تشغّل نشرين متوازيين على نفس الخادم

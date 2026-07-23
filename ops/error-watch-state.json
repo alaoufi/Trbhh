@@ -1,0 +1,28 @@
+{
+  "$schema": "internal — read by the hourly error-watch cron loop, not by app code",
+  "known_signatures": [
+    {
+      "key": "ad_actions",
+      "match": { "digest": "3259426802" },
+      "status": "fixed_deployed",
+      "fixedInCommit": "8d0b07c",
+      "note": "تمرير دالة من Server Component لمكوّن عميل في /account/ads — حُذف ad-actions.tsx"
+    },
+    {
+      "key": "chunk_load",
+      "match": { "messagePattern": "Loading chunk [\\w.-]+ failed" },
+      "status": "fixed_deployed",
+      "fixedInCommit": "b7f46ad",
+      "note": "تحديث تلقائي كامل للصفحة عبر src/lib/chunk-error.ts في كل حدود الأخطاء"
+    },
+    {
+      "key": "remove_child",
+      "match": { "messagePattern": "removeChild" },
+      "status": "fixed_deployed",
+      "fixedInCommit": "b7f46ad",
+      "note": "حماية try/catch في copy-link.tsx مطابقة لبقية مكوّنات النسخ"
+    }
+  ],
+  "pending": [],
+  "lastRunAt": null
+}

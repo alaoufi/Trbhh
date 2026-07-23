@@ -302,8 +302,8 @@ export async function buyUrgentAction(formData: FormData) {
   const back = String(formData.get('back') || '') === 'ad' ? `/ads/${toInt(adId)}` : '';
   const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { user_id: true, urgent_until: true } });
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
-  // منع تكرار الدفع: شارة «عاجل» فعّالة الآن — لا نخصم مرة أخرى حتى تنتهي مدّتها
-  if (ad.urgent_until && ad.urgent_until > new Date()) redirect(back ? `${back}?urgenton=1#paid-result` : '/account/ads?urgenton=1');
+  // شارة «عاجل» فعّالة الآن: لا نرفض الشراء — العضو يُخيَّر صراحةً (عبر تأكيد
+  // العميل) بتمديد المدة الحالية، ثم تُضاف المدة الجديدة فوق ما تبقّى (لا استبدال)
   const { getAdExtras } = await import('@/lib/settings');
   const x = await getAdExtras();
   // باقتا عاجل: 24 أو 48 ساعة — لكل باقة سعرها من التحكم

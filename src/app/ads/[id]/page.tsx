@@ -15,7 +15,7 @@ import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { waLink } from '@/lib/classified-theme';
-import { getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate, getMemberWindows, adWindowState } from '@/lib/settings';
+import { getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate, getMemberWindows, adWindowState, DUR_DAYS } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { FavoriteButton } from '@/components/favorite-button';
@@ -88,7 +88,7 @@ function fmtAdminMsgDate(iso: string | null) {
   return isNaN(d.getTime()) ? '' : `— ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d)}`;
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; urgenton?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -174,8 +174,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const urgentExtras = isAdOwner && !ad.storeOnly && ad.status === 1
     ? await import('@/lib/settings').then((m) => m.getAdExtras()).catch(() => null)
     : null;
-  // التمييز ⭐ لصاحب الإعلان: مدد مسعّرة + زر شراء مباشر
-  const featuredOpts = isAdOwner && !ad.storeOnly && ad.status === 1 && !ad.special
+  // التمييز ⭐ لصاحب الإعلان: مدد مسعّرة + زر شراء مباشر (يظهر حتى لو مميّز حالياً — لتمديد المدة)
+  const featuredOpts = isAdOwner && !ad.storeOnly && ad.status === 1
     ? await import('@/lib/settings').then(async (m) => {
         const svc = await m.getServicePricing();
         return m.DURATIONS.map((d) => ({ key: d.key, label: d.label, price: svc.featured[d.key] })).filter((o) => o.price > 0);
@@ -283,7 +283,6 @@ export default async function AdPage({ params, searchParams }: { params: Promise
 
       {/* نتيجة طلب شارة عاجل (من نموذج النشر أو زر التفعيل هنا) */}
       {spx.urgent === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🔥 فُعّلت شارة «عاجل» على إعلانك وخُصمت الرسوم من رصيدك.</div>}
-      {spx.urgenton === '1' && <div className="rounded-xl border-2 border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🔥 شارة «عاجل» مفعّلة على إعلانك بالفعل — لم يُخصم أي مبلغ. يمكنك تفعيلها من جديد بعد انتهاء مدّتها.</div>}
       {spx.urgentneed === '1' && (
         <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
           💳 نُشر إعلانك، لكن رصيدك لا يغطي شارة «عاجل» —{' '}
@@ -300,43 +299,75 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         </div>
       )}
 
-      {/* التمييز ⭐ — عرض تسويقي دائم لصاحب الإعلان النشط غير المميّز */}
-      {featuredOpts.length > 0 && (
-        <form action={featureAdAction} className="space-y-2 rounded-xl border-2 border-amber-300 bg-amber-50/70 p-3 shadow-sm">
-          <input type="hidden" name="adId" value={ad.id} />
-          <input type="hidden" name="back" value="ad" />
-          <div className="flex items-center gap-2">
-            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-white">⭐ مميّز</span>
-            <span className="text-xs font-bold text-amber-800">ميّز إعلانك بإطار ذهبي بارز ومقدمة القوائم</span>
-          </div>
-          <p className="text-xs font-medium text-muted-foreground">مشاهدات وتواصل أعلى بكثير. رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
-          <div className="flex items-center gap-1.5">
-            <select name="duration" className="h-10 min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 text-sm font-bold">
-              {featuredOpts.map((o) => <option key={o.key} value={o.key}>{o.label} — {o.price} ر.س</option>)}
-            </select>
-            <ConfirmSubmit msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-amber-500 px-3 py-2.5 text-sm font-extrabold text-white">تمييز الآن</ConfirmSubmit>
-          </div>
-        </form>
-      )}
+      {/* التمييز ⭐ — عرض تسويقي دائم؛ إن كان مميّزاً بالفعل يُعرض كتمديد للمدة الحالية بدل رفض الشراء */}
+      {featuredOpts.length > 0 && (() => {
+        const featuredActive = ad.special && ad.expiresAt && new Date(ad.expiresAt) > new Date();
+        const untilLabel = featuredActive ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(new Date(ad.expiresAt!)) : '';
+        return (
+          <form action={featureAdAction} className="space-y-2 rounded-xl border-2 border-amber-300 bg-amber-50/70 p-3 shadow-sm">
+            <input type="hidden" name="adId" value={ad.id} />
+            <input type="hidden" name="back" value="ad" />
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-white">⭐ مميّز</span>
+              <span className="text-xs font-bold text-amber-800">
+                {featuredActive ? `إعلانك مميّز حالياً حتى ${untilLabel} — مدّد المدة` : 'ميّز إعلانك بإطار ذهبي بارز ومقدمة القوائم'}
+              </span>
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">مشاهدات وتواصل أعلى بكثير. رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
+            <div className="flex items-center gap-1.5">
+              <select name="duration" className="h-10 min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 text-sm font-bold">
+                {featuredOpts.map((o) => <option key={o.key} value={o.key}>{o.label} — {o.price} ر.س</option>)}
+              </select>
+              <ConfirmSubmit
+                msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً."
+                extendUntil={featuredActive ? ad.expiresAt! : undefined}
+                extendField="duration"
+                extendUnit="days"
+                extendMap={DUR_DAYS}
+                extendTemplate={`إعلانك مميّز حالياً حتى ${untilLabel} — عند التأكيد سيُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
+                className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-amber-500 px-3 py-2.5 text-sm font-extrabold text-white"
+              >
+                {featuredActive ? 'تمديد التمييز' : 'تمييز الآن'}
+              </ConfirmSubmit>
+            </div>
+          </form>
+        );
+      })()}
 
-      {/* شارة عاجل — باقتا 24/48 ساعة: عرض تسويقي دائم لصاحب الإعلان النشط */}
-      {urgentExtras && urgentExtras.urgentPacks.length > 0 && !urgentActive && (
-        <form action={buyUrgentAction} className="space-y-2 rounded-xl border-2 border-red-300 bg-red-50/70 p-3 shadow-sm">
-          <input type="hidden" name="adId" value={ad.id} />
-          <input type="hidden" name="back" value="ad" />
-          <div className="flex items-center gap-2">
-            <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>
-            <span className="text-xs font-bold text-red-700">اجعل إعلانك يلفت الأنظار بشارة «عاجل» النابضة</span>
-          </div>
-          <p className="text-xs font-medium text-muted-foreground">تظهر في كل القوائم — اختر الباقة. رصيدك: {urgentBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
-          <div className="flex items-center gap-1.5">
-            <select name="hours" className="h-10 min-w-0 flex-1 rounded-lg border border-red-300 bg-white px-3 text-sm font-bold">
-              {urgentExtras.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours}>{p0.hours} ساعة — {p0.price} ر.س</option>)}
-            </select>
-            <ConfirmSubmit msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-red-600 px-3 py-2.5 text-sm font-extrabold text-white">تفعيل الآن</ConfirmSubmit>
-          </div>
-        </form>
-      )}
+      {/* شارة عاجل — باقتا 24/48 ساعة: عرض تسويقي دائم؛ إن كانت فعّالة تُعرض كتمديد بدل رفض الشراء */}
+      {urgentExtras && urgentExtras.urgentPacks.length > 0 && (() => {
+        const untilLabel = urgentActive ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ad.urgentUntil!)) : '';
+        const hoursMap = Object.fromEntries(urgentExtras!.urgentPacks.map((p) => [String(p.hours), p.hours]));
+        return (
+          <form action={buyUrgentAction} className="space-y-2 rounded-xl border-2 border-red-300 bg-red-50/70 p-3 shadow-sm">
+            <input type="hidden" name="adId" value={ad.id} />
+            <input type="hidden" name="back" value="ad" />
+            <div className="flex items-center gap-2">
+              <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>
+              <span className="text-xs font-bold text-red-700">
+                {urgentActive ? `شارة «عاجل» فعّالة حتى ${untilLabel} — مدّد المدة` : 'اجعل إعلانك يلفت الأنظار بشارة «عاجل» النابضة'}
+              </span>
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">تظهر في كل القوائم — اختر الباقة. رصيدك: {urgentBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
+            <div className="flex items-center gap-1.5">
+              <select name="hours" className="h-10 min-w-0 flex-1 rounded-lg border border-red-300 bg-white px-3 text-sm font-bold">
+                {urgentExtras!.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours}>{p0.hours} ساعة — {p0.price} ر.س</option>)}
+              </select>
+              <ConfirmSubmit
+                msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً."
+                extendUntil={urgentActive ? ad.urgentUntil! : undefined}
+                extendField="hours"
+                extendUnit="hours"
+                extendMap={hoursMap}
+                extendTemplate={`شارة «عاجل» فعّالة على إعلانك الآن حتى ${untilLabel} — عند التأكيد ستُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
+                className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-red-600 px-3 py-2.5 text-sm font-extrabold text-white"
+              >
+                {urgentActive ? 'تمديد الشارة' : 'تفعيل الآن'}
+              </ConfirmSubmit>
+            </div>
+          </form>
+        );
+      })()}
 
       {/* نتيجة تحديث الإعلان ⬆ */}
       {spx.bumped === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">⬆ تم تحديث إعلانك — أصبح في مقدمة القوائم الآن.</div>}

@@ -66,7 +66,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
 
       {sp.dup === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تمت إضافة باقة التكرار وخُصمت الرسوم من رصيدك.</div>}
       {sp.pts && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🎯 حُوّلت نقاطك — أُضيف {sp.pts} ر.س لرصيدك.</div>}
-      {sp.topup === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ أُرسل طلب الشحن للإدارة — بعد تأكيد وصول المبلغ يُضاف لرصيدك وستصلك رسالة.</div>}
+      {sp.topup === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم رفع السند، وسوف يقوم مسؤول تدقيق الحوالات بمراجعته واعتماده — بعد الاعتماد يُضاف المبلغ لرصيدك وستصلك رسالة.</div>}
       {sp.error === 'topupamount' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">أدخل مبلغاً صحيحاً لطلب الشحن.</div>}
       {sp.error === 'topupreceipt' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">أرفق صورة إيصال التحويل (حتى 8MB).</div>}
       {sp.error === 'topup' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-900">تعذّر إرسال طلب الشحن — حاول مجدداً.</div>}

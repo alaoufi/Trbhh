@@ -5,7 +5,7 @@ import { AdStatsCard } from '@/components/ad-stats-card';
 import { requireUser } from '@/lib/auth';
 import { getMyAds, adContactCounts } from '@/lib/account';
 import { adViewCounts } from '@/lib/merchant';
-import { getServicePricing, serviceHasPrice, DURATIONS, getAdExtras, getSettingBool, getAdRestoreFee, getMemberWindows, adWindowState } from '@/lib/settings';
+import { getServicePricing, serviceHasPrice, DURATIONS, DUR_DAYS, getAdExtras, getSettingBool, getAdRestoreFee, getMemberWindows, adWindowState } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,7 @@ import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction,
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
 
-export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; urgenton?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string }> }) {
+export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee, memberWindows] = await Promise.all([
@@ -48,7 +48,6 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {sp.restored === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">📤 أُعيد إعلانك للظهور من الأرشيف وعاد لمقدمة القوائم.</div>}
       {sp.error === 'adminhidden' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">🚫 هذا الإعلان أخفته الإدارة عن النشر لمخالفة — لا يمكنك إعادة نشره بنفسك. عالِج سبب المخالفة (المذكور تحت الإعلان) وراسل الإدارة لإعادة نشره.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? <> (المطلوب {sp.price} ر.س</> : ''}{sp.bal !== undefined ? <>، ورصيدك {sp.bal} ر.س)</> : ')'}. <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
-      {sp.urgenton === '1' && <div className="rounded-lg border-2 border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🔥 شارة «عاجل» مفعّلة على هذا الإعلان بالفعل — لم يُخصم أي مبلغ. يمكنك تفعيلها من جديد بعد انتهاء مدّتها.</div>}
       {sp.urgentneed === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 حُفظ إعلانك، لكن رصيدك لا يغطي شارة «عاجل» — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم فعّلها بزر «🔥 عاجل» أسفل الإعلان.</div>}
       {sp.featuredneed === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 حُفظ إعلانك، لكن رصيدك لا يغطي رسوم التمييز ⭐ — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم ميّزه من «تمييز الإعلان (مدفوع)» أسفل الإعلان.</div>}
       {sp.pending === '1' && (
@@ -117,9 +116,10 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
               {featuredSold && (() => {
                 const priced = DURATIONS.filter((d) => servicePricing.featured[d.key] > 0);
                 const affordable = priced.filter((d) => servicePricing.featured[d.key] <= balance);
+                const featuredActive = !!(ad.special && ad.expiresAt && new Date(ad.expiresAt).getTime() > now);
                 return (
                   <details className="mt-1">
-                    <summary className="cursor-pointer list-none text-[11px] font-bold text-amber-700">{ad.special ? 'تمديد التمييز…' : 'تمييز الإعلان (مدفوع)…'}</summary>
+                    <summary className="cursor-pointer list-none text-[11px] font-bold text-amber-700">{featuredActive ? 'تمديد التمييز…' : 'تمييز الإعلان (مدفوع)…'}</summary>
                     {priced.length > 0 && affordable.length === 0 ? (
                       <div className="mt-1 rounded-md border-2 border-red-400 bg-red-50 px-2 py-1.5 text-[11px] font-bold text-red-700">💳 رصيدك لا يكفي لتمييز الإعلان — <Link href="/account/wallet" className="underline">اشحن رصيدك</Link></div>
                     ) : (
@@ -130,7 +130,17 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                             <option key={d.key} value={d.key} disabled={servicePricing.featured[d.key] > balance}>{d.label} — {en(servicePricing.featured[d.key])} ر.س{servicePricing.featured[d.key] > balance ? ' (غير متاح)' : ''}</option>
                           ))}
                         </select>
-                        <ConfirmSubmit msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-bold text-white">تمييز</ConfirmSubmit>
+                        <ConfirmSubmit
+                          msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً."
+                          extendUntil={featuredActive ? ad.expiresAt! : undefined}
+                          extendField="duration"
+                          extendUnit="days"
+                          extendMap={DUR_DAYS}
+                          extendTemplate={`إعلانك مميّز حالياً حتى ${fmtDay(ad.expiresAt)} — عند التأكيد سيُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
+                          className="rounded-md bg-amber-500 px-3 py-1.5 text-xs font-bold text-white"
+                        >
+                          {featuredActive ? 'تمديد' : 'تمييز'}
+                        </ConfirmSubmit>
                       </form>
                     )}
                   </details>
@@ -167,18 +177,31 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 {auctionOn && ad.status === 1 && !ad.storeOnly && (
                   <Link href={`/auctions/new?ad=${ad.id}`} className="flex items-center gap-1 rounded-md border border-violet-300 bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700 hover:bg-violet-100" title="افتح مزاداً على هذا الإعلان">🔨 مزاد</Link>
                 )}
-                {extras.urgentPacks.length > 0 && ad.status === 1 && !ad.storeOnly && !(ad.urgentUntil && new Date(ad.urgentUntil).getTime() > now) && (() => {
+                {extras.urgentPacks.length > 0 && ad.status === 1 && !ad.storeOnly && (() => {
+                  const urgentActive = !!(ad.urgentUntil && new Date(ad.urgentUntil).getTime() > now);
                   const affordablePacks = extras.urgentPacks.filter((p0) => p0.price <= balance);
                   if (affordablePacks.length === 0) {
                     return <span className="flex items-center gap-1 rounded-md border-2 border-red-300 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-600">💳 لا يكفي لباقة عاجل — <Link href="/account/wallet" className="underline">اشحن رصيدك</Link></span>;
                   }
+                  const hoursMap = Object.fromEntries(extras.urgentPacks.map((p) => [String(p.hours), p.hours]));
+                  const untilLabel = urgentActive ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ad.urgentUntil!)) : '';
                   return (
                     <form action={buyUrgentAction} className="flex items-center gap-1">
                       <input type="hidden" name="adId" value={ad.id} />
                       <select name="hours" defaultValue={affordablePacks[0]?.hours} className="h-7 rounded-md border border-red-300 bg-red-50 px-1 text-[11px] font-bold text-red-600">
                         {extras.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours} disabled={p0.price > balance}>{p0.hours} ساعة — {p0.price} ر.س{p0.price > balance ? ' (غير متاح)' : ''}</option>)}
                       </select>
-                      <ConfirmSubmit msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً." className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100">🔥 عاجل</ConfirmSubmit>
+                      <ConfirmSubmit
+                        msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً."
+                        extendUntil={urgentActive ? ad.urgentUntil! : undefined}
+                        extendField="hours"
+                        extendUnit="hours"
+                        extendMap={hoursMap}
+                        extendTemplate={`شارة «عاجل» فعّالة حتى ${untilLabel} — عند التأكيد ستُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
+                        className="flex items-center gap-1 rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-bold text-red-600 hover:bg-red-100"
+                      >
+                        {urgentActive ? 'تمديد عاجل' : '🔥 عاجل'}
+                      </ConfirmSubmit>
                     </form>
                   );
                 })()}

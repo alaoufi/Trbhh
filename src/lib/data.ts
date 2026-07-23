@@ -523,6 +523,7 @@ async function getAdImpl(id: number) {
     storeOnly: ad.store_only === 1,
     trbhhUntil: ad.trbhh_until ? ad.trbhh_until.toISOString() : null,
     urgentUntil: ad.urgent_until ? ad.urgent_until.toISOString() : null,
+    expiresAt: ad.expires_at ? ad.expires_at.toISOString() : null,
     oldPrice: ad.old_price ?? 0,
     stockState: ad.stock_state ?? 0,
     priceType: ad.price_type ?? null,

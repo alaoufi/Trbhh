@@ -1,0 +1,70 @@
+name: تشخيص - حذف أخطاء تم إصلاحها من سجل الأخطاء
+
+# أداة تنظيف عند الحاجة فقط: تستعلم سجل error_log الحالي أولاً (لضمان حذف
+# الصفوف الموجودة فعلياً فقط، لا قائمة ثابتة قديمة)، ثم تحذف بمعرّفات (id)
+# محددة صراحة، وتطبع حالة السجل قبل وبعد الحذف.
+on:
+  workflow_dispatch:
+
+jobs:
+  clear:
+    runs-on: ubuntu-latest
+    steps:
+      - name: كتابة سكربت الحذف
+        run: |
+          cat > clear.js << 'EOF'
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+
+          // أنواع الأخطاء المؤكَّد إصلاحها ونشرها فقط — أي صف آخر (خطأ جديد لم يُشخَّص بعد) يبقى بلا مساس.
+          const FIXED_SIGNATURES = [
+            { key: 'ad_actions', test: (r) => r.digest === '3259426802' },
+            { key: 'chunk_load', test: (r) => /Loading chunk [\w.-]+ failed/i.test(r.message || '') },
+            { key: 'remove_child', test: (r) => /removeChild/i.test(r.message || '') },
+          ];
+
+          (async () => {
+            const before = await p.error_log.findMany({ orderBy: { id: 'desc' } });
+            console.log('===BEFORE_COUNT===', before.length);
+
+            const toDelete = [];
+            const kept = [];
+            for (const r of before) {
+              const sig = FIXED_SIGNATURES.find((s) => s.test(r));
+              if (sig) toDelete.push({ id: r.id, key: sig.key });
+              else kept.push({ id: r.id, message: r.message, url: r.url });
+            }
+
+            console.log('===TO_DELETE===', JSON.stringify(toDelete, (k, v) => (typeof v === 'bigint' ? v.toString() : v)));
+            console.log('===KEPT_UNMATCHED===', JSON.stringify(kept, (k, v) => (typeof v === 'bigint' ? v.toString() : v)));
+
+            const result = toDelete.length
+              ? await p.error_log.deleteMany({ where: { id: { in: toDelete.map((d) => d.id) } } })
+              : { count: 0 };
+            console.log('===DELETED===', result.count);
+
+            const after = await p.error_log.count();
+            console.log('===AFTER_COUNT===', after);
+            await p.$disconnect();
+          })().catch((e) => { console.error('CLEAR_FAILED:', e); process.exit(1); });
+          EOF
+
+      - name: الحذف عبر SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "❌ السرّ VPS_SSH_KEY غير موجود."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${VPS_PORT:-22}"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
+            -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
+            "cd /root/trbhh && docker compose exec -T app node" < clear.js

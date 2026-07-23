@@ -101,6 +101,7 @@ type AdRow = {
   bumped_at?: Date | null;
   urgent_until?: Date | null;
   old_price?: number;
+  expires_at?: Date | null;
 };
 
 async function toCards(rows: AdRow[]): Promise<AdCard[]> {
@@ -119,6 +120,11 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
     .filter((r) => {
       // إعلانات الأعضاء المحظورين لا تظهر للزوّار في أي قائمة
       if (sellers.get(toInt(r.user_id))?.banned) return false;
+      // مميّز أو عاجل ساري الدفع يُستثنى تماماً من سقف «مدة بقاء الإعلان» —
+      // العضو دفع مقابل الظهور، فلا يُخفى إعلانه لمجرد تجاوز أيام باقته العادية.
+      const featuredActive = r.adsSpecial === 'checked' && !!r.expires_at && r.expires_at.getTime() > now;
+      const urgentActive = !!(r.urgent_until && r.urgent_until.getTime() > now);
+      if (featuredActive || urgentActive) return true;
       // ad lifetime by the owner's package (0 => unlimited)
       const days = adMeta.get(toInt(r.user_id))?.adDays ?? 0;
       if (!days || !r.created_at) return true;
@@ -167,6 +173,7 @@ const adSelect = {
   bumped_at: true,
   urgent_until: true,
   old_price: true,
+  expires_at: true,
 } as const;
 
 /** القسم الداخلي «عروض أخرى»: تُسند إليه الإعلانات الجديدة عند إخفاء الأقسام —

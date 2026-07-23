@@ -6,8 +6,9 @@ import { getSession } from '@/lib/auth';
 
 /** تقييم منصة تربح بالنجوم — عضو أو زائر (عبر كوكي trbhh_vid الدائم)، مرة واحدة لكل منهما. */
 export async function submitPlatformRatingAction(formData: FormData) {
-  const star = Math.min(5, Math.max(1, Number(formData.get('star') || 0)));
-  if (!star) return;
+  const raw = Number(formData.get('star') || 0);
+  if (!Number.isInteger(raw) || raw < 1 || raw > 5) return; // لم يختر نجمة فعلياً — لا نسجّل تقييماً تخمينياً
+  const star = raw;
   const session = await getSession().catch(() => null);
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;

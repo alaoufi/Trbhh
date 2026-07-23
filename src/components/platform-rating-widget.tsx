@@ -5,10 +5,10 @@ import { useFormStatus } from 'react-dom';
 import { submitPlatformRatingAction } from '@/app/actions';
 import { cn } from '@/lib/utils';
 
-function Submit() {
+function Submit({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" disabled={pending} className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-60">
+    <button type="submit" disabled={pending || disabled} className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white disabled:opacity-60">
       {pending ? '...' : 'إرسال تقييمك'}
     </button>
   );
@@ -16,7 +16,7 @@ function Submit() {
 
 /** تقييم منصة تربح بالنجوم — للزوّار والأعضاء، مرة واحدة لكل منهما. */
 export function PlatformRatingWidget({ avg, count, alreadyRated }: { avg: number; count: number; alreadyRated: boolean }) {
-  const [star, setStar] = useState(5);
+  const [star, setStar] = useState(0);
   const [hover, setHover] = useState(0);
   const [sent, setSent] = useState(false);
   const showForm = !alreadyRated && !sent;
@@ -36,7 +36,11 @@ export function PlatformRatingWidget({ avg, count, alreadyRated }: { avg: number
       </div>
 
       {showForm ? (
-        <form action={submitPlatformRatingAction} onSubmit={() => setSent(true)} className="flex items-center gap-2">
+        <form
+          action={submitPlatformRatingAction}
+          onSubmit={(e) => { if (star < 1) { e.preventDefault(); return; } setSent(true); }}
+          className="flex items-center gap-2"
+        >
           <input type="hidden" name="star" value={star} />
           <div className="flex items-center gap-0.5" onMouseLeave={() => setHover(0)}>
             {[1, 2, 3, 4, 5].map((i) => (
@@ -45,7 +49,7 @@ export function PlatformRatingWidget({ avg, count, alreadyRated }: { avg: number
               </button>
             ))}
           </div>
-          <Submit />
+          <Submit disabled={star < 1} />
         </form>
       ) : (
         <span className="flex items-center gap-1 text-xs font-bold text-emerald-700">✓ شكراً على تقييمك</span>

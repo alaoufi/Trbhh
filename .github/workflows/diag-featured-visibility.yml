@@ -32,13 +32,16 @@ jobs:
             for (const r of [...featured, ...urgent]) byId.set(r.id.toString(), r);
             const rows = [...byId.values()];
 
-            const defPkg = await p.packages.findFirst({ where: { is_default: 1 }, select: { id: true, name: true, ad_days: true } });
-            const userIds = [...new Set(rows.map((r) => r.user_id))];
-            const subs = await p.$queryRawUnsafe(
-              `SELECT user_id, package_id, expires_at FROM user_packages WHERE user_id IN (${userIds.map(() => '?').join(',')})`,
-              ...userIds
-            ).catch((e) => ({ __error: String(e) }));
-            const pkgs = await p.packages.findMany({ select: { id: true, name: true, ad_days: true, active: true } });
+            // packages/user_packages ليستا في مخطط Prisma (تُداران بـ SQL خام في src/lib/packages.ts) — استعلام خام هنا أيضاً
+            const pkgs = await p.$queryRawUnsafe(`SELECT id, name, ad_days, is_default, active FROM packages`).catch((e) => { throw new Error('PKGS_QUERY_FAILED: ' + e); });
+            const defPkg = pkgs.find((pk) => pk.is_default === 1) || null;
+            const userIds = [...new Set(rows.map((r) => Number(r.user_id)))];
+            const subs = userIds.length
+              ? await p.$queryRawUnsafe(
+                  `SELECT user_id, package_id, expires_at FROM user_packages WHERE user_id IN (${userIds.map(() => '?').join(',')})`,
+                  ...userIds
+                ).catch((e) => ({ __error: String(e) }))
+              : [];
 
             const out = [];
             for (const r of rows) {

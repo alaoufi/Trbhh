@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { timeAgo } from '@/lib/utils';
+import { cached } from '@/lib/redis';
 
 type Item = { n: number; label: string; href: string; oldest: Date | null };
 
@@ -58,6 +59,12 @@ export async function AdminAlertsBanner() {
     import('@/lib/verify-paid').then((m) => m.countPendingVerifyOrders()).catch(() => ({ n: 0, oldest: null })),
   ]);
 
+  // سندات شحن مكرَّرة (تطابق سند سابق) بانتظار المراجعة — مقارنة البصمات مكلفة
+  // نسبياً فتُخزَّن مؤقتاً لدقيقة واحدة بدل إعادة حسابها في كل تحميل صفحة إدارية
+  const dupTopups = await cached('admin:dup-topups-count', 60, () =>
+    import('@/lib/wallet').then((m) => m.countPendingDupTopups()).catch(() => 0),
+  );
+
   // حظر آلي بانتظار مراجعتكم (فكّ الحظر أو الإبقاء عليه) — يبقى ظاهراً حتى تُبتّ فيه، لا يزول بمرور الوقت
   const [newBans, oldestNewBan] = await Promise.all([
     prisma.mod_log.count({ where: { action: 'banned', reviewed_at: null } }).catch(() => 0),
@@ -65,6 +72,8 @@ export async function AdminAlertsBanner() {
   ]);
 
   const items: Item[] = [
+    // سند مكرّر: خطورته أعلى من طلب شحن عادي — يظهر دائماً بالأسلوب العاجل (أحمر) بغض النظر عن عمره
+    { n: dupTopups, label: '⚠️ سند شحن مكرَّر يحتاج مطابقة', href: '/admin/topups', oldest: dupTopups > 0 ? new Date(0) : null },
     { n: pendingTopups, label: 'تأكيد شحن رصيد', href: '/admin/topups', oldest: oldestTopup },
     { n: pendingAds, label: 'إعلان بانتظار الموافقة', href: '/admin/ads?view=pending', oldest: oldestAd },
     { n: adminUnread, label: 'مراسلة للإدارة بلا رد (أعضاء وتجار)', href: '/messages', oldest: oldestAdminMsg },

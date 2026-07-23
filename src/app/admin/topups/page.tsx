@@ -89,7 +89,7 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
               <div className="rounded-lg border border-slate-300 bg-slate-100 p-2.5 text-sm font-bold text-slate-700">سبب الإلغاء (خُصم {r.amount} ر.س من رصيد العضو): {r.note}</div>
             )}
 
-            {/* ⚠️ إنذار السند المكرر: يظهر قبل التأكيد مع عرض السند المشابه */}
+            {/* ⚠️ إنذار السند المكرر: يظهر قبل التأكيد مع عرض السندين جنباً إلى جنب للمطابقة المباشرة */}
             {r.status === 0 && dupMatches.has(r.id) && (() => { const m = dupMatches.get(r.id)!; return (
               <div className="space-y-2 rounded-xl border-2 border-red-400 bg-red-50 p-3">
                 <div className="flex items-center gap-1.5 text-sm font-extrabold text-red-700">
@@ -102,13 +102,27 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
                   <span>{fmt(m.at)}</span>
                   <span className="rounded-full bg-white px-2 py-0.5">{m.status === 1 ? '✅ سبق تأكيده' : m.status === 0 ? '⏳ معلق أيضاً' : m.status === 3 ? '↩ ملغى' : '❌ مرفوض'}</span>
                 </div>
-                {m.receipt && (
-                  <a href={mediaUrl(m.receipt)} target="_blank" className="block w-fit">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={mediaUrl(m.receipt)} alt="السند المطابق" className="max-h-48 rounded-lg border-2 border-red-300 object-contain" />
-                    <span className="mt-1 block text-center text-[11px] font-bold text-red-700 underline">السند المطابق — فتح بالحجم الكامل</span>
-                  </a>
-                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="mb-1 block text-center text-[11px] font-extrabold text-red-700">السند الجديد (هذا الطلب #{r.id})</span>
+                    {r.receipt ? (
+                      <a href={mediaUrl(r.receipt)} target="_blank" className="block">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={mediaUrl(r.receipt)} alt="السند الجديد" className="max-h-64 w-full rounded-lg border-2 border-red-300 object-contain bg-white" />
+                      </a>
+                    ) : <span className="block text-center text-[11px] text-red-500">لا يوجد</span>}
+                  </div>
+                  <div>
+                    <span className="mb-1 block text-center text-[11px] font-extrabold text-red-700">السند المطابق (طلب #{m.id})</span>
+                    {m.receipt ? (
+                      <a href={mediaUrl(m.receipt)} target="_blank" className="block">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={mediaUrl(m.receipt)} alt="السند المطابق" className="max-h-64 w-full rounded-lg border-2 border-red-300 object-contain bg-white" />
+                      </a>
+                    ) : <span className="block text-center text-[11px] text-red-500">لا يوجد</span>}
+                  </div>
+                </div>
+                <span className="block text-center text-[11px] font-bold text-red-700">اضغط أي سند لفتحه بالحجم الكامل في نافذة جديدة</span>
               </div>
             ); })()}
 

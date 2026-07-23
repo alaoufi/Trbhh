@@ -404,6 +404,16 @@ export async function findReceiptMatches(rowIds: number[], threshold = 95): Prom
   return out;
 }
 
+/** عدد طلبات الشحن المعلَّقة التي لها سند مطابق لسند سابق — لتنبيه الإدارة
+ *  فوراً (شريط التنبيهات العام) قبل حتى فتح صفحة الطلبات. */
+export async function countPendingDupTopups(): Promise<number> {
+  await ensure();
+  const pending = await prisma.wallet_topups.findMany({ where: { status: 0, NOT: { receipt: null } }, select: { id: true } }).catch(() => []);
+  if (!pending.length) return 0;
+  const matches = await findReceiptMatches(pending.map((r) => toInt(r.id)));
+  return matches.size;
+}
+
 /** مكافآت الشحن (من التسعيرات): شرائح حملة الشحن كما هي في لوحة التحكم حرفياً —
  *  تُطبَّق أعلى شريحة يبلغها المبلغ + مكافأة أول شحن. */
 async function applyTopupBonuses(userId: number, amount: number, adminId: number): Promise<void> {

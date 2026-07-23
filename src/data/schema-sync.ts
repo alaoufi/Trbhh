@@ -88,6 +88,14 @@ const STATEMENTS: string[] = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* subscription-expiry reminders: dedupe how many times we've reminded a store
      in the CURRENT sub period (sub_until), at most once per day. */
+  /* تقييم منصة تربح بالنجوم — صف واحد لكل زائر/عضو (viewer_key: u{id} للعضو، g{vid} للزائر عبر كوكي trbhh_vid). */
+  `CREATE TABLE IF NOT EXISTS platform_reviews (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    viewer_key VARCHAR(64) NOT NULL,
+    star TINYINT NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY platform_reviews_viewer (viewer_key)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS store_sub_reminders (
     store_id INT NOT NULL PRIMARY KEY,
     sub_until DATETIME NULL,

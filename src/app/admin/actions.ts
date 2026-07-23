@@ -617,6 +617,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('cats_on', formData.get('catsOn') !== null ? '1' : '0');
   await setSetting('debates_on', formData.get('debatesOn') !== null ? '1' : '0');
   await setSetting('archive_autodelete_on', formData.get('archiveAutodeleteOn') !== null ? '1' : '0');
+  await setSetting('platform_rating_on', formData.get('platformRatingOn') !== null ? '1' : '0');
   await setSetting('push_on', formData.get('pushOn') !== null ? '1' : '0');
   await setSetting('search_suggest_on', formData.get('searchSuggestOn') !== null ? '1' : '0');
   await setSetting('saved_search_on', formData.get('savedSearchOn') !== null ? '1' : '0');

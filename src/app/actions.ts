@@ -1,0 +1,20 @@
+'use server';
+import { cookies } from 'next/headers';
+import { revalidatePath } from 'next/cache';
+import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
+
+/** تقييم منصة تربح بالنجوم — عضو أو زائر (عبر كوكي trbhh_vid الدائم)، مرة واحدة لكل منهما. */
+export async function submitPlatformRatingAction(formData: FormData) {
+  const star = Math.min(5, Math.max(1, Number(formData.get('star') || 0)));
+  if (!star) return;
+  const session = await getSession().catch(() => null);
+  const vid = (await cookies()).get('trbhh_vid')?.value;
+  const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
+  if (!viewerKey) return;
+  const { ensureSchema } = await import('@/data/schema-sync');
+  await ensureSchema();
+  // فشل صامت لو سبق أن قيّم (viewer_key فريد) — لا تكرار
+  await prisma.platform_reviews.create({ data: { viewer_key: viewerKey, star } }).catch(() => {});
+  revalidatePath('/');
+}

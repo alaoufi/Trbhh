@@ -27,6 +27,8 @@ import { TopupPromoBanner } from '@/components/topup-promo-banner';
 import { FeedTextBanner } from '@/components/feed-text-banner';
 import { getFeedBannerItems } from '@/lib/settings';
 import { ProgressiveReveal } from '@/components/progressive-reveal';
+import { PlatformRatingWidget } from '@/components/platform-rating-widget';
+import { getPlatformRating, hasRatedPlatform } from '@/lib/platform-rating';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,6 +97,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     getSetting(SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT),
     getWelcomePopupSeconds(),
   ]);
+  // تقييم المنصة بالنجوم — قابل للإخفاء من التحكم ← الإعدادات
+  const platformRatingOn = await getSettingBool('platform_rating_on', true).catch(() => true);
+  const [platformRating, platformRated] = platformRatingOn
+    ? await Promise.all([getPlatformRating().catch(() => ({ avg: 0, count: 0 })), hasRatedPlatform(viewerKey).catch(() => false)])
+    : [{ avg: 0, count: 0 }, false];
 
   return (
     <div className="space-y-4">
@@ -117,6 +124,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <AdGrid ads={personalizedAds} />
         </CollapsibleSection>
       )}
+
+      {/* تقييم منصة تربح بالنجوم — للزوّار والأعضاء، مرة واحدة لكل منهما */}
+      {platformRatingOn && <PlatformRatingWidget avg={platformRating.avg} count={platformRating.count} alreadyRated={platformRated} />}
 
       {/* Category dropdown — pick one or more categories to show */}
       {catsOn && <CategorySelect categories={categories} initial={catsParam} />}

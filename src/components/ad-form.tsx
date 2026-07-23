@@ -296,7 +296,7 @@ export function AdForm({
               <div className="space-y-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-3">
                 <span className="block text-xs font-extrabold text-primary">حدد السعر ومدة التأجير</span>
                 <div className="grid grid-cols-2 gap-2">
-                  <input name="price" type="number" min="0" step="any" required defaultValue={initial?.price || ''} className={field} placeholder="السعر (ر.س)" />
+                  <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="السعر (ر.س) — اختياري" />
                   <select name="rentPeriod" defaultValue={initial?.rentPeriod || 'شهري'} className={field}>
                     {RENT_PERIODS.map((p0) => <option key={p0} value={p0}>{p0}</option>)}
                   </select>

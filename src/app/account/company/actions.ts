@@ -447,37 +447,40 @@ export async function buyStoreShowAction(formData: FormData) {
   redirect('/store?show=1');
 }
 
-/** شراء «عرض إعلان المتجر في تربح» بباقة (المدة والسعر من التحكم) — يُخصم من الرصيد. */
+/** شراء «عرض إعلان المتجر في تربح» بباقة (المدة والسعر من التحكم) — يُخصم من الرصيد.
+ *  back=ad: الزر من صفحة الإعلان نفسه (وليس لوحة المتجر) فيعود إليها بنتيجة الشراء. */
 export async function buyAdShowAction(formData: FormData) {
   const session = await requireUser();
   const { storeIdOfUser, storeProductAdIds } = await import('@/lib/merchant');
   const storeId = await storeIdOfUser(session.uid).catch(() => 0);
   if (!storeId) redirect('/store');
   const adId = Number(formData.get('adId') || 0);
+  const back = String(formData.get('back') || '') === 'ad' ? `/ads/${adId}` : '';
   const pkgKey = String(formData.get('pkg') || '');
   const { getTrbhhShowPricing } = await import('@/lib/settings');
   const pricing = await getTrbhhShowPricing();
   const pkg = pricing.ads.find((x) => x.key === pkgKey && x.price > 0);
-  if (!adId || !pkg) redirect('/store?adshow=err');
+  if (!adId || !pkg) redirect(back ? `${back}?adshow=err` : '/store?adshow=err');
   // الإعلان لصاحب المتجر ومن منتجات متجره
   const ad = await prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { user_id: true, trbhh_until: true, title: true, detail: true } }).catch(() => null);
   const productIds = await storeProductAdIds(storeId).catch(() => [] as number[]);
-  if (!ad || toInt(ad.user_id) !== session.uid || !productIds.includes(adId)) redirect('/store?adshow=err');
+  if (!ad || toInt(ad.user_id) !== session.uid || !productIds.includes(adId)) redirect(back ? `${back}?adshow=err` : '/store?adshow=err');
   // منتجات المتجر معفاة من فحص التكرار عند إنشائها (سياسة المتجر مستقلة)، لكن
   // عرضها في تربح بالدفع يُخرجها لجمهور تربح — فتخضع لسياسة التكرار هنا فقط،
   // حتى لا يصبح الدفع وسيلة لتفادي كشف التكرار بين الأعضاء.
   const { crossUserDuplicateOf } = await import('@/app/ads/actions');
   const dup = await crossUserDuplicateOf(session.uid, ad.title, ad.detail || '');
-  if (dup) redirect(`/store?adshow=dup&dupid=${dup.id}`);
+  if (dup) redirect(back ? `${back}?adshow=dup&dupid=${dup.id}` : `/store?adshow=dup&dupid=${dup.id}`);
   const { charge } = await import('@/lib/wallet');
   const paid = await charge(session.uid, pkg.price, 'ad_show', `${pkg.label} (${pkg.days} يوماً) #${adId} — ${String(ad.title || '').slice(0, 40)}`);
-  if (!paid.ok) redirect(`/store?adshow=needcredit&price=${pkg.price}`);
+  if (!paid.ok) redirect(back ? `${back}?adshow=needcredit&price=${pkg.price}` : `/store?adshow=needcredit&price=${pkg.price}`);
   const base = ad.trbhh_until && ad.trbhh_until > new Date() ? ad.trbhh_until : new Date();
   const until = new Date(base.getTime() + pkg.days * 24 * 60 * 60 * 1000);
   await prisma.ads.updateMany({ where: { id: BigInt(adId) }, data: { trbhh_until: until } }).catch(() => {});
   const { bustAdCaches } = await import('@/lib/data');
   await bustAdCaches().catch(() => {});
   revalidatePath('/store');
+  if (back) { revalidatePath(back); redirect(`${back}?adshow=1#paid-result`); }
   redirect('/store?adshow=1');
 }
 

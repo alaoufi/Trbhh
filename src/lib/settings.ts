@@ -687,6 +687,14 @@ export async function getStoreSubReminderConfig(): Promise<{ days: number; count
   return { days: Math.max(0, Math.round(d) || 0), count: Math.max(0, Math.round(c) || 0) };
 }
 
+/* تنبيهات قرب انتهاء «عرض المتجر في تربح» و«عرض إعلان في تربح» — تستخدم نفس
+   سياسة التوقيت (قبل كم يوم/كم مرة) من إعدادات الاشتراك أعلاه (سياسة موحّدة
+   لكل الميزات المنتهية)، لكن بنص رسالة مستقل لكل منها من تبويب «النصوص». */
+export const SETTING_SHOW_REMINDER_MSG = 'show_reminder_msg';
+export const DEFAULT_SHOW_REMINDER_MSG = 'تنبيه من تربح: يقترب انتهاء «عرض متجرك في تربح» خلال {days} يوم (بتاريخ {date}). جدّده من لوحة متجرك ليستمر ظهور متجرك في رئيسية تربح. — الإدارة';
+export const SETTING_ADSHOW_REMINDER_MSG = 'adshow_reminder_msg';
+export const DEFAULT_ADSHOW_REMINDER_MSG = 'تنبيه من تربح: يقترب انتهاء عرض إعلانك «{name}» في تربح خلال {days} يوم (بتاريخ {date}). جدّده من لوحة متجرك ليستمر ظهوره في قوائم تربح. — الإدارة';
+
 /** Ad service pricing (SAR) by duration + duplicate tiers. */
 /** Durations are a shared CHOICE (not priced by themselves). Each paid service has a price per duration. */
 export type Dur = 'w2' | 'm1' | 'y1';

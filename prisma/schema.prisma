@@ -1262,6 +1262,20 @@ model store_sub_reminders {
   last_sent DateTime? @db.DateTime(0)
 }
 
+model store_show_reminders {
+  store_id   Int       @id
+  show_until DateTime? @db.DateTime(0)
+  sent       Int       @default(0)
+  last_sent  DateTime? @db.DateTime(0)
+}
+
+model ad_show_reminders {
+  ad_id       BigInt    @id
+  trbhh_until DateTime? @db.DateTime(0)
+  sent        Int       @default(0)
+  last_sent   DateTime? @db.DateTime(0)
+}
+
 model wallet_txns {
   id            BigInt    @id @default(autoincrement())
   user_id       BigInt    @db.UnsignedBigInt

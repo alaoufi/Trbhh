@@ -11,6 +11,7 @@ import {
   SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT,
   SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT, SETTING_MSG_TOPUP_CANCEL,
   SETTING_TOPUP_NAME_NOTE,
+  SETTING_SHOW_REMINDER_MSG, DEFAULT_SHOW_REMINDER_MSG, SETTING_ADSHOW_REMINDER_MSG, DEFAULT_ADSHOW_REMINDER_MSG,
   DEFAULT_MSG_TPL_AD, DEFAULT_MSG_TPL_ADMIN, DEFAULT_MSG_TPL_SUPPORT, DEFAULT_AD_NOTICE, DEFAULT_SUB_REMINDER_MSG,
   DEFAULT_TICKER, DEFAULT_HOME_CLS_TITLE, DEFAULT_HOME_CLS_SUB,
   DEFAULT_MSG_VERIFY_OK, DEFAULT_MSG_VERIFY_REJECT,
@@ -36,7 +37,7 @@ const SECTIONS = [
   { key: 'ad', label: 'صفحة الإعلان', icon: Sparkles },
   { key: 'msg', label: 'المراسلة', icon: MessageSquare },
   { key: 'empty', label: 'رسائل فارغة', icon: Inbox },
-  { key: 'sub', label: 'الاشتراك', icon: BellRing },
+  { key: 'sub', label: 'تذكيرات الانتهاء', icon: BellRing },
   { key: 'verify', label: 'التوثيق', icon: ShieldCheck },
   { key: 'wallet', label: 'المحفظة', icon: HandCoins },
   { key: 'feedbanner', label: 'بانر الرئيسية 📢', icon: Megaphone },
@@ -57,12 +58,14 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
   await requireAction('users', 'edit');
   const { saved, sec: secRaw } = await searchParams;
   const sec: Sec = (SECTIONS.some((s) => s.key === secRaw) ? secRaw : 'general') as Sec;
-  const [tplAd, tplAdmin, tplSupport, adNotice, subMsg, ticker, clsTitle, clsSub, headings, empty, verifyOk, verifyReject, topupInfo, topupOk, topupReject, topupNameNote, topupCancel] = await Promise.all([
+  const [tplAd, tplAdmin, tplSupport, adNotice, subMsg, showMsg, adshowMsg, ticker, clsTitle, clsSub, headings, empty, verifyOk, verifyReject, topupInfo, topupOk, topupReject, topupNameNote, topupCancel] = await Promise.all([
     getSetting(SETTING_MSG_TPL_AD, DEFAULT_MSG_TPL_AD),
     getSetting(SETTING_MSG_TPL_ADMIN, DEFAULT_MSG_TPL_ADMIN),
     getSetting(SETTING_MSG_TPL_SUPPORT, DEFAULT_MSG_TPL_SUPPORT),
     getSetting(SETTING_AD_NOTICE, DEFAULT_AD_NOTICE),
     getSetting(SETTING_SUB_REMINDER_MSG, DEFAULT_SUB_REMINDER_MSG),
+    getSetting(SETTING_SHOW_REMINDER_MSG, DEFAULT_SHOW_REMINDER_MSG),
+    getSetting(SETTING_ADSHOW_REMINDER_MSG, DEFAULT_ADSHOW_REMINDER_MSG),
     getSetting(SETTING_TICKER, DEFAULT_TICKER),
     getSetting(SETTING_HOME_CLS_TITLE, DEFAULT_HOME_CLS_TITLE),
     getSetting(SETTING_HOME_CLS_SUB, DEFAULT_HOME_CLS_SUB),
@@ -236,11 +239,24 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
         )}
 
         {sec === 'sub' && (
-          <label className="block space-y-1">
-            <span className="flex items-center gap-2 text-sm font-bold text-primary"><BellRing className="h-4 w-4" /> رسالة تنبيه قرب انتهاء الاشتراك</span>
-            <span className="block text-xs text-muted-foreground">تُرسَل لصاحب المتجر قبل انتهاء اشتراكه (عدد الأيام والمرّات من الإعدادات ← الإيرادات والتسعير). المتغيّرات: <b dir="ltr">{'{days}'}</b> الأيام المتبقية، <b dir="ltr">{'{date}'}</b> تاريخ الانتهاء، <b dir="ltr">{'{name}'}</b> اسم المتجر.</span>
-            <textarea name="subReminderMsg" rows={3} defaultValue={subMsg} className={box} />
-          </label>
+          <>
+            <p className="text-xs text-muted-foreground">الرسائل الثلاث تُرسَل بنفس توقيت التذكير (عدد الأيام والمرّات) المضبوط في الإعدادات ← الإيرادات والتسعير — سياسة واحدة تحكم قرب انتهاء أي ميزة مدفوعة للمتجر.</p>
+            <label className="block space-y-1">
+              <span className="flex items-center gap-2 text-sm font-bold text-primary"><BellRing className="h-4 w-4" /> رسالة تنبيه قرب انتهاء الاشتراك</span>
+              <span className="block text-xs text-muted-foreground">المتغيّرات: <b dir="ltr">{'{days}'}</b> الأيام المتبقية، <b dir="ltr">{'{date}'}</b> تاريخ الانتهاء، <b dir="ltr">{'{name}'}</b> اسم المتجر.</span>
+              <textarea name="subReminderMsg" rows={3} defaultValue={subMsg} className={box} />
+            </label>
+            <label className="block space-y-1">
+              <span className="flex items-center gap-2 text-sm font-bold text-primary"><BellRing className="h-4 w-4" /> رسالة تنبيه قرب انتهاء «عرض المتجر في تربح»</span>
+              <span className="block text-xs text-muted-foreground">نفس المتغيّرات أعلاه.</span>
+              <textarea name="showReminderMsg" rows={3} defaultValue={showMsg} className={box} />
+            </label>
+            <label className="block space-y-1">
+              <span className="flex items-center gap-2 text-sm font-bold text-primary"><BellRing className="h-4 w-4" /> رسالة تنبيه قرب انتهاء «عرض إعلان في تربح»</span>
+              <span className="block text-xs text-muted-foreground">نفس المتغيّرات أعلاه، و<b dir="ltr">{'{name}'}</b> هنا اسم الإعلان نفسه.</span>
+              <textarea name="adshowReminderMsg" rows={3} defaultValue={adshowMsg} className={box} />
+            </label>
+          </>
         )}
 
         {sec === 'verify' && (

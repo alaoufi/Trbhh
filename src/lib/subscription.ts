@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
-import { getStoreSubPricing, subPlanPrice, SUB_PLAN_MONTHS, SUB_PLAN_LABELS, getStoreSubReminderConfig, getSetting, setSetting, SETTING_SUB_REMINDER_MSG, DEFAULT_SUB_REMINDER_MSG, getStorePlusPricing, plusPlanPrice, autoRenewEnabled, type SubPlan } from './settings';
+import { getStoreSubPricing, subPlanPrice, SUB_PLAN_MONTHS, SUB_PLAN_LABELS, getStoreSubReminderConfig, getSetting, setSetting, SETTING_SUB_REMINDER_MSG, DEFAULT_SUB_REMINDER_MSG, SETTING_SHOW_REMINDER_MSG, DEFAULT_SHOW_REMINDER_MSG, SETTING_ADSHOW_REMINDER_MSG, DEFAULT_ADSHOW_REMINDER_MSG, getStorePlusPricing, plusPlanPrice, autoRenewEnabled, type SubPlan } from './settings';
 import { charge } from './wallet';
 import { storeIdOfUser } from './merchant';
 import { toInt } from './utils';
@@ -242,6 +242,119 @@ export async function sendDueSubReminders(): Promise<void> {
         where: { store_id: storeId },
         create: { store_id: storeId, sub_until: r.sub_until, sent: 1, last_sent: now },
         update: { sub_until: r.sub_until, sent: sent + 1, last_sent: now },
+      })
+      .catch(() => {});
+  }
+}
+
+/**
+ * Notify store owners whose «عرض المتجر في تربح» is approaching expiry — نفس
+ * منهجية sendDueSubReminders تماماً (سياسة الأيام/المرّات مشتركة من إعدادات
+ * الاشتراك، نص الرسالة مستقل، تشغيل كسول ذاتي الخنق، دفعتر تكرار مستقل).
+ */
+export async function sendDueStoreShowReminders(): Promise<void> {
+  await ensure();
+  const { days, count } = await getStoreSubReminderConfig();
+  if (days <= 0 || count <= 0) return;
+
+  const last = await getSetting('show_remind_lastrun', '');
+  if (last && Date.now() - Date.parse(last) < 30 * 60 * 1000) return;
+  await setSetting('show_remind_lastrun', new Date().toISOString());
+
+  const now = new Date();
+  const horizon = new Date(now.getTime() + days * 86400000);
+  const rows = await prisma.stores
+    .findMany({ where: { show_until: { gt: now, lte: horizon }, status: 1 }, select: { id: true, user_id: true, show_until: true, store_name: true } })
+    .catch(() => [] as { id: bigint; user_id: number; show_until: Date | null; store_name: string | null }[]);
+  if (!rows.length) return;
+
+  const { getPrimaryAdminId } = await import('./admin-inbox');
+  const { sendChat } = await import('./chat');
+  const adminId = await getPrimaryAdminId().catch(() => 0);
+  if (!adminId) return;
+  const rawMsg = await getSetting(SETTING_SHOW_REMINDER_MSG, DEFAULT_SHOW_REMINDER_MSG);
+  if (!rawMsg.trim()) return;
+  const ymd = (d: Date) => d.toISOString().slice(0, 10);
+  const today = ymd(now);
+
+  for (const r of rows) {
+    if (!r.show_until) continue;
+    const storeId = Number(r.id);
+    const ownerId = Number(r.user_id);
+    if (!ownerId) continue;
+    const daysLeft = Math.max(0, Math.ceil((r.show_until.getTime() - now.getTime()) / 86400000));
+    const mark = await prisma.store_show_reminders.findUnique({ where: { store_id: storeId } }).catch(() => null);
+    const samePeriod = !!(mark?.show_until && r.show_until && mark.show_until.getTime() === r.show_until.getTime());
+    const sent = samePeriod ? mark!.sent : 0;
+    if (sent >= count) continue;
+    if (samePeriod && mark?.last_sent && ymd(mark.last_sent) === today) continue;
+
+    const body = rawMsg
+      .replace(/\{days\}/g, String(daysLeft))
+      .replace(/\{date\}/g, ymd(r.show_until))
+      .replace(/\{name\}/g, r.store_name || 'متجرك');
+    await sendChat(adminId, ownerId, body).catch(() => {});
+    await prisma.store_show_reminders
+      .upsert({
+        where: { store_id: storeId },
+        create: { store_id: storeId, show_until: r.show_until, sent: 1, last_sent: now },
+        update: { show_until: r.show_until, sent: sent + 1, last_sent: now },
+      })
+      .catch(() => {});
+  }
+}
+
+/**
+ * نفس الفكرة لكل إعلان معروض مدفوعاً في تربح («عرض إعلان في تربح» — ads.trbhh_until)،
+ * بدفتر تكرار مستقل بمعرّف الإعلان (لا المتجر) لأن كل إعلان له مدّته الخاصة.
+ */
+export async function sendDueAdShowReminders(): Promise<void> {
+  await ensure();
+  const { days, count } = await getStoreSubReminderConfig();
+  if (days <= 0 || count <= 0) return;
+
+  const last = await getSetting('adshow_remind_lastrun', '');
+  if (last && Date.now() - Date.parse(last) < 30 * 60 * 1000) return;
+  await setSetting('adshow_remind_lastrun', new Date().toISOString());
+
+  const now = new Date();
+  const horizon = new Date(now.getTime() + days * 86400000);
+  const rows = await prisma.ads
+    .findMany({ where: { trbhh_until: { gt: now, lte: horizon }, status: 1 }, select: { id: true, user_id: true, trbhh_until: true, title: true } })
+    .catch(() => [] as { id: bigint; user_id: bigint; trbhh_until: Date | null; title: string }[]);
+  if (!rows.length) return;
+
+  const { getPrimaryAdminId } = await import('./admin-inbox');
+  const { sendChat } = await import('./chat');
+  const adminId = await getPrimaryAdminId().catch(() => 0);
+  if (!adminId) return;
+  const rawMsg = await getSetting(SETTING_ADSHOW_REMINDER_MSG, DEFAULT_ADSHOW_REMINDER_MSG);
+  if (!rawMsg.trim()) return;
+  const ymd = (d: Date) => d.toISOString().slice(0, 10);
+  const today = ymd(now);
+
+  for (const r of rows) {
+    if (!r.trbhh_until) continue;
+    const adId = toInt(r.id);
+    const ownerId = toInt(r.user_id);
+    if (!ownerId) continue;
+    const daysLeft = Math.max(0, Math.ceil((r.trbhh_until.getTime() - now.getTime()) / 86400000));
+    const mark = await prisma.ad_show_reminders.findUnique({ where: { ad_id: adId } }).catch(() => null);
+    const samePeriod = !!(mark?.trbhh_until && r.trbhh_until && mark.trbhh_until.getTime() === r.trbhh_until.getTime());
+    const sent = samePeriod ? mark!.sent : 0;
+    if (sent >= count) continue;
+    if (samePeriod && mark?.last_sent && ymd(mark.last_sent) === today) continue;
+
+    const body = rawMsg
+      .replace(/\{days\}/g, String(daysLeft))
+      .replace(/\{date\}/g, ymd(r.trbhh_until))
+      .replace(/\{name\}/g, r.title || 'إعلانك');
+    await sendChat(adminId, ownerId, body).catch(() => {});
+    await prisma.ad_show_reminders
+      .upsert({
+        where: { ad_id: adId },
+        create: { ad_id: adId, trbhh_until: r.trbhh_until, sent: 1, last_sent: now },
+        update: { trbhh_until: r.trbhh_until, sent: sent + 1, last_sent: now },
       })
       .catch(() => {});
   }

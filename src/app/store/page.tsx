@@ -26,8 +26,10 @@ export const metadata = { title: 'إدارة المتجر' };
 export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; bulklimit?: string; show?: string; adshow?: string; dupid?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string; areq?: string; vreq?: string; cat?: string; banned?: string }> }) {
   const { error, sub, added, settings, backup, bulk, bulklimit, show, adshow, dupid, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq, areq, vreq, cat, banned } = await searchParams;
   const session = await requireUser();
-  // تذكيرات قرب انتهاء الاشتراك + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
+  // تذكيرات قرب انتهاء الاشتراك/عرض المتجر/عرض الإعلان + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
+  import('@/lib/subscription').then((m) => m.sendDueStoreShowReminders()).catch(() => {});
+  import('@/lib/subscription').then((m) => m.sendDueAdShowReminders()).catch(() => {});
   import('@/lib/subscription').then((m) => m.runAutoRenewals()).catch(() => {});
   // نسخة احتياطية دورية تلقائية للمتجر (مرة يومياً كحدّ أقصى)
   import('@/lib/store-backup').then((m) => m.maybeAutoBackup(session.uid)).catch(() => {});

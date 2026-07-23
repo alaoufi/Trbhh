@@ -94,6 +94,20 @@ const STATEMENTS: string[] = [
     sent INT NOT NULL DEFAULT 0,
     last_sent DATETIME NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* نفس فكرة store_sub_reminders لكن لـ«عرض المتجر في تربح» (stores.show_until). */
+  `CREATE TABLE IF NOT EXISTS store_show_reminders (
+    store_id INT NOT NULL PRIMARY KEY,
+    show_until DATETIME NULL,
+    sent INT NOT NULL DEFAULT 0,
+    last_sent DATETIME NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* نفس الفكرة لكن لكل إعلان على حدة («عرض الإعلان في تربح» — ads.trbhh_until). */
+  `CREATE TABLE IF NOT EXISTS ad_show_reminders (
+    ad_id BIGINT NOT NULL PRIMARY KEY,
+    trbhh_until DATETIME NULL,
+    sent INT NOT NULL DEFAULT 0,
+    last_sent DATETIME NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS store_contacts (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     store_id BIGINT UNSIGNED NOT NULL,

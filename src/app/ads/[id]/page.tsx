@@ -30,6 +30,7 @@ import { getSellerRating } from '@/lib/reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
 import { buyUrgentAction, featureAdAction, bumpAdAction, deleteAdAction, archiveAdAction } from '@/app/account/actions';
+import { buyAdShowAction } from '@/app/account/company/actions';
 import { PromoSlot } from '@/components/promo-slot';
 import { getAdAudio } from '@/lib/ad-media';
 import { mediaUrl } from '@/lib/media';
@@ -88,7 +89,7 @@ function fmtAdminMsgDate(iso: string | null) {
   return isNaN(d.getTime()) ? '' : `— ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d)}`;
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string; adshow?: string; dupid?: string; price?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -181,11 +182,15 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         return m.DURATIONS.map((d) => ({ key: d.key, label: d.label, price: svc.featured[d.key] })).filter((o) => o.price > 0);
       }).catch(() => [])
     : [];
+  // «عرض الإعلان في تربح» — لصاحب متجر على منتج متجره فقط (شارة عاجل/تمييز تخص إعلان تربح العادي، وهذه تخص منتج المتجر تحديداً)
+  const adShowPkgs = isAdOwner && inStore
+    ? await import('@/lib/settings').then((m) => m.getTrbhhShowPricing()).then((p) => p.ads.filter((a) => a.price > 0)).catch(() => [])
+    : [];
   // إدارة الإعلان لصاحبه مباشرة من صفحته: تعديل/أرشفة/حذف، بنفس مهل السماح المعمول بها في «إعلاناتي»
   const memberWindows = isAdOwner ? await getMemberWindows().catch(() => ({ editHours: 0, deleteHours: 0 })) : null;
   const editState = memberWindows ? adWindowState(ad.createdAt, memberWindows.editHours) : null;
   const deleteState = memberWindows ? adWindowState(ad.createdAt, memberWindows.deleteHours) : null;
-  const ownerBalance = (urgentExtras && urgentExtras.urgentPacks.length > 0) || featuredOpts.length
+  const ownerBalance = (urgentExtras && urgentExtras.urgentPacks.length > 0) || featuredOpts.length || adShowPkgs.length
     ? await import('@/lib/wallet').then((m) => m.getBalance(session!.uid)).catch(() => 0)
     : 0;
   const urgentBalance = ownerBalance;
@@ -363,6 +368,59 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                 className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-red-600 px-3 py-2.5 text-sm font-extrabold text-white"
               >
                 {urgentActive ? 'تمديد الشارة' : 'تفعيل الآن'}
+              </ConfirmSubmit>
+            </div>
+          </form>
+        );
+      })()}
+
+      {/* نتيجة طلب عرض الإعلان في تربح 📢 */}
+      {spx.adshow === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">📢 أصبح إعلانك معروضاً في قوائم تربح وخُصمت الرسوم من رصيدك.</div>}
+      {spx.adshow === 'needcredit' && (
+        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          💳 رصيدك لا يكفي{spx.price ? ` (المطلوب ${spx.price} ر.س)` : ''} لعرض الإعلان في تربح —{' '}
+          <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.
+        </div>
+      )}
+      {spx.adshow === 'dup' && (
+        <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">
+          ⛔ تعذّر العرض في تربح — هذا الإعلان يشابه إعلاناً {spx.dupid ? <Link href={`/ads/${spx.dupid}`} className="underline">آخر منشوراً بالفعل</Link> : 'آخر منشوراً بالفعل'} في تربح (فحص التكرار العام يشمل إعلانات المتاجر عند عرضها بالدفع).
+        </div>
+      )}
+      {spx.adshow === 'err' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر تنفيذ الطلب — حاول مجدداً.</div>}
+
+      {/* عرض الإعلان في تربح 📢 — لمنتج المتجر فقط: يظهر الإعلان في كل قوائم تربح (لا يقتصر على متجرك) */}
+      {adShowPkgs.length > 0 && (() => {
+        const adShowActive = shownInTrbhh;
+        const untilLabel = adShowActive ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(new Date(ad.trbhhUntil!)) : '';
+        const daysMap = Object.fromEntries(adShowPkgs.map((p) => [p.key, p.days]));
+        return (
+          <form action={buyAdShowAction} className="space-y-2 rounded-xl border-2 border-sky-300 bg-sky-50/70 p-3 shadow-sm">
+            <input type="hidden" name="adId" value={ad.id} />
+            <input type="hidden" name="back" value="ad" />
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-extrabold text-white">📢 عرض في تربح</span>
+              <span className="text-xs font-bold text-sky-800">
+                {adShowActive ? `إعلانك معروض في تربح حتى ${untilLabel} — مدّد المدة` : 'اعرض إعلان متجرك في كل قوائم تربح (الرئيسية/البحث/الأقسام)'}
+              </span>
+            </div>
+            <p className="text-xs font-medium text-muted-foreground">تظهر منتجات متجرك عادة داخل متجرك فقط — هذا يعرضها لكل زوّار تربح. رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
+            <div className="flex items-center gap-1.5">
+              <select name="pkg" className="h-10 min-w-0 flex-1 rounded-lg border border-sky-300 bg-white px-3 text-sm font-bold">
+                {adShowPkgs.map((p) => (
+                  <option key={p.key} value={p.key}>{p.key === 'gold' ? '🥇' : p.key === 'silver' ? '🥈' : '⭐'} {p.label} — {p.days} يوماً — {p.price} ر.س</option>
+                ))}
+              </select>
+              <ConfirmSubmit
+                msg="تأكيد شراء عرض هذا الإعلان في تربح للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً."
+                extendUntil={adShowActive ? ad.trbhhUntil! : undefined}
+                extendField="pkg"
+                extendUnit="days"
+                extendMap={daysMap}
+                extendTemplate={`إعلانك معروض في تربح حالياً حتى ${untilLabel} — عند التأكيد سيُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
+                className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-sky-600 px-3 py-2.5 text-sm font-extrabold text-white"
+              >
+                {adShowActive ? 'تمديد العرض' : 'اعرض الآن'}
               </ConfirmSubmit>
             </div>
           </form>

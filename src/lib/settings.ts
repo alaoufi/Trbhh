@@ -350,10 +350,6 @@ export async function getAdNotice(): Promise<string> {
 }
 
 /* Site-wide + home-page editable texts (تبويب النصوص → عام / الرئيسية). */
-// بانر الرئيسية القصير عند إخفاء الأقسام
-export const SETTING_HOME_NOCATS_BANNER = 'home_nocats_banner';
-export const DEFAULT_HOME_NOCATS_BANNER = 'إعلانك مهم وبارز أمام الجميع، لا يدخل بزاوية الأقسام';
-
 // نص مشاركة الموقع (يظهر في معاينة الرابط عند مشاركته في واتساب وغيره)
 export const SETTING_SITE_SHARE_TITLE = 'site_share_title';
 export const SETTING_SITE_SHARE_DESC = 'site_share_desc';
@@ -430,10 +426,10 @@ export async function getEmptyTexts(): Promise<typeof EMPTY_DEFAULTS> {
 /* Which stat cards show on the home page (CSV of keys; unset => all). */
 export const SETTING_SHOW_STATS = 'show_home_stats'; // legacy on/off (kept for compat)
 export const SETTING_HOME_STATS = 'home_stats';
-export const HOME_STAT_KEYS = ['ads', 'users', 'views', 'cats'] as const;
+export const HOME_STAT_KEYS = ['ads', 'users', 'views'] as const;
 export type HomeStatKey = typeof HOME_STAT_KEYS[number];
 export const HOME_STAT_LABELS: Record<HomeStatKey, string> = {
-  ads: 'إعلان نشط', users: 'عضو مسجّل', views: 'مشاهدة', cats: 'قسم',
+  ads: 'إعلان نشط', users: 'عضو مسجّل', views: 'مشاهدة',
 };
 /** Set of enabled home-stat keys. Unset setting => all shown by default. */
 export async function getHomeStats(): Promise<Set<string>> {
@@ -639,9 +635,6 @@ export const STORE_STAFF_MAX = 5;
 
 /** قفل اسم العضو: التعديل عبر طلب بموافقة الإدارة فقط (سبب + مستند) — مفعّل افتراضياً. */
 export const nameLockEnabled = () => getSettingBool('namelock_on', true);
-/** إظهار الأقسام في كل الموقع (إخفاؤها لا يمس أقسام الإعلانات المحفوظة إطلاقاً).
- *  الافتراضي مخفي (false): أي فشل بقراءة الإعداد يجب أن يُبقيها مخفية لا أن يُظهرها. */
-export const categoriesEnabled = () => getSettingBool('cats_on', false);
 
 /** إظهار/إخفاء المناقشات في كل الموقع — مفتاح واحد من الإعدادات */
 export const debatesEnabled = () => getSettingBool('debates_on', true);

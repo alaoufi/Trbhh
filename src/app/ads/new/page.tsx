@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getCategories, getSubCategories, getCountries, getCities, getAreas } from '@/lib/data';
+import { getCountries, getCities, getAreas } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
-import { getSettingBool, SETTING_ADS_APPROVAL, categoriesEnabled } from '@/lib/settings';
+import { getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { createAdAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -21,8 +21,8 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   const session = await getSession();
   if (!session) redirect('/login');
   const { error, left, max, hours, wait, cat, banned, dup, price, bal, dest } = await searchParams;
-  const [categories, subcategories, countries, cities, areas, user] = await Promise.all([
-    getCategories(), getSubCategories(), getCountries(), getCities(), getAreas(),
+  const [countries, cities, areas, user] = await Promise.all([
+    getCountries(), getCities(), getAreas(),
     prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true, phone_whatsapp: true } }),
   ]);
   const balance = await import('@/lib/wallet').then((m) => m.getBalance(session.uid)).catch(() => 0);
@@ -36,7 +36,6 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     ? DURATIONS.map((d) => ({ key: d.key, label: d.label, price: svc.featured[d.key] })).filter((o) => o.price > 0)
     : [];
   const featuredOffer = featuredOpts.length ? { options: featuredOpts, balance } : undefined;
-  const catsOn = await categoriesEnabled().catch(() => false);
   // «أنشر باسم…» — إن كان للعضو متجر نشط يختار: باسمه الشخصي أو باسم متجره (عزل الهويات)
   const myStore = await import('@/lib/merchant').then(async (m) => {
     const sid = await m.storeIdOfUser(session.uid).catch(() => 0);
@@ -69,15 +68,13 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
         </div>
       )}
 
-      <AdForm catsOn={catsOn}
+      <AdForm
         allowSchedule={allowSchedule}
         allowOldPrice={dealsOn}
         allowStock={stockOn && dest === 'store'}
         urgentOffer={urgentOffer}
         featuredOffer={featuredOffer}
         action={createAdAction}
-        categories={categories}
-        subcategories={subcategories}
         countries={countries}
         cities={cities}
         areas={areas}

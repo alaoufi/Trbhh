@@ -7,7 +7,7 @@ import { getSetting, setSetting } from './settings';
 import { ensureSchema } from '@/data/schema-sync';
 
 export type Service =
-  | 'users' | 'ads' | 'duplicates' | 'classified' | 'categories'
+  | 'users' | 'ads' | 'duplicates' | 'classified'
   | 'words' | 'reports' | 'verifications' | 'debates' | 'comments' | 'packages' | 'promos' | 'backup' | 'messages' | 'stores';
 export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive' | 'suspend' | 'ban';
 
@@ -24,7 +24,6 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
   { key: 'ads',           label: 'الإعلانات',          actions: ['view', 'archive', 'delete'] },
   { key: 'duplicates',    label: 'الإعلانات المكررة',   actions: ['view', 'delete'] },
   { key: 'classified',    label: 'الإعلانات المبوّبة',   actions: ['view', 'edit', 'suspend', 'delete'] },
-  { key: 'categories',    label: 'الأقسام',            actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'words',         label: 'الكلمات المرفوضة',    actions: ['view', 'add', 'delete'] },
   { key: 'reports',       label: 'البلاغات',           actions: ['view', 'delete'] },
   { key: 'messages',      label: 'مراقبة المراسلات',    actions: ['view', 'delete'] },
@@ -102,7 +101,7 @@ export const DEFAULT_ROLE_PERMS: Record<Role, string[]> = {
   monitor: ROLE_PRESET.monitor.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
   store_monitor: ROLE_PRESET.store_monitor.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
   member: ['ads:view', 'ads:add', 'classified:view', 'classified:add', 'comments:view', 'comments:add', 'debates:view', 'debates:add'].filter((k) => MATRIX_SET.has(k)),
-  visitor: ['ads:view', 'classified:view', 'categories:view', 'comments:view', 'debates:view'].filter((k) => MATRIX_SET.has(k)),
+  visitor: ['ads:view', 'classified:view', 'comments:view', 'debates:view'].filter((k) => MATRIX_SET.has(k)),
 };
 
 let rolePermsEnsured = false;

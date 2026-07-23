@@ -29,8 +29,6 @@ function Section({ icon: Icon, title, hint, children }: { icon: React.ElementTyp
   );
 }
 
-type Cat = { id: number; name: string };
-type Sub = { id: number; name: string; categoryId: number };
 type Country = { id: number; name: string };
 type City = { id: number; name: string; countryId: number };
 type Area = { id: number; name: string; cityId: number };
@@ -52,16 +50,14 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, categories, subcategories, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, allowOldPrice, allowStock, urgentOffer, featuredOffer, catsOn = true,
+  action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, allowOldPrice, allowStock, urgentOffer, featuredOffer,
 }: {
   action: (fd: FormData) => void | Promise<void>;
-  categories: Cat[]; subcategories: Sub[]; countries: Country[]; cities: City[]; areas?: Area[];
+  countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string; dupId?: string;
   needPrice?: string; needBal?: string; dest?: string;
   limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean; allowSchedule?: boolean;
   allowOldPrice?: boolean; allowStock?: boolean;
-  /** إظهار الأقسام — عند الإخفاء لا تُعرض حقول القسم ويُسند الإعلان داخلياً لقسم «عروض أخرى» */
-  catsOn?: boolean;
   /** عرض تسويقي لشارة «عاجل» عند النشر: باقتا 24/48 ساعة بأسعارهما ورصيد العضو */
   urgentOffer?: { packs: { hours: number; price: number }[]; balance: number };
   /** عرض تسويقي للتمييز ⭐ عند النشر: المدد المسعّرة ورصيد العضو الحالي */
@@ -76,7 +72,6 @@ export function AdForm({
       : initial?.priceType === 'sale' || (initial?.price ?? 0) > 0 ? 'sale'
       : initial?.id ? 'som' : 'sale',
   );
-  const [category, setCategory] = useState(initial?.categoryId ?? categories[0]?.id ?? 0);
   // الموقع موجّه للسعودية فقط
   const saudiId = useMemo(() => countries.find((c) => /سعود/.test(c.name))?.id ?? countries[0]?.id ?? 1, [countries]);
   const [geo, setGeo] = useState<{ lat: string; lng: string } | null>(
@@ -111,7 +106,6 @@ export function AdForm({
       { enableHighAccuracy: true, timeout: 10000 },
     );
   }
-  const subs = useMemo(() => subcategories.filter((s) => s.categoryId === category), [subcategories, category]);
   const regions = useMemo(() => cities.filter((c) => c.countryId === saudiId), [cities, saudiId]);
 
   const [imgBusy, setImgBusy] = useState(false);
@@ -145,7 +139,7 @@ export function AdForm({
 
       {error === 'missing' && (
         <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">
-          أكمل الحقول الإجبارية: <b>العنوان</b> و<b>التفاصيل</b>{catsOn ? <> و<b>القسم</b></> : null} قبل النشر.
+          أكمل الحقول الإجبارية: <b>العنوان</b> و<b>التفاصيل</b> قبل النشر.
         </div>
       )}
       {error === 'contact' && (
@@ -257,23 +251,6 @@ export function AdForm({
           <label className={lbl}>{isReq ? 'ماذا تطلب؟' : 'عنوان الإعلان'}</label>
           <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مثال: مطلوب سيارة للشراء' : 'مثال: سيارة للبيع'} />
         </div>
-        {catsOn && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className={lbl}>القسم</label>
-              <select name="category_id" value={category} onChange={(e) => setCategory(Number(e.target.value))} className={field}>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={lbl}>التصنيف الفرعي</label>
-              <select name="subcategory_id" defaultValue={initial?.subcategoryId ?? ''} className={field}>
-                <option value="">— بدون —</option>
-                {subs.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-          </div>
-        )}
         {isReq ? (
           <div>
             <label className={lbl}>الميزانية المتوقّعة</label>
@@ -463,6 +440,7 @@ export function AdForm({
       {(featuredOffer || urgentOffer) && (
         <a href="/guide/how/ad-boost" target="_blank" className="block rounded-xl bg-red-600 p-3 text-center text-sm font-extrabold text-white shadow hover:bg-red-700">
           🎬 شاهد: مميزات تزيد في تسويق إعلانك (شرح متحرك)
+          <span className="mt-1 block text-xs font-bold underline underline-offset-2">اضغط هنا</span>
         </a>
       )}
 

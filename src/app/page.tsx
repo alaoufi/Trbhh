@@ -1,20 +1,18 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
-import { Users, Megaphone, LayoutGrid, Eye, Sparkles, ChevronLeft, Heart, MessageCircle, Phone } from 'lucide-react';
+import { Users, Megaphone, Eye, Sparkles, ChevronLeft, Heart, MessageCircle, Phone } from 'lucide-react';
 import {
-  getCategories,
   getFeaturedAds,
   getHomeLatestAds,
   getMostViewedAds,
   getStats,
   getPersonalizedAds,
 } from '@/lib/data';
-import { CategorySelect } from '@/components/category-select';
 import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
-import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, categoriesEnabled, getSetting, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
+import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, getSetting, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
@@ -48,35 +46,28 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
   );
 }
 
-export default async function HomePage({ searchParams }: { searchParams: Promise<{ cats?: string }> }) {
+export default async function HomePage() {
   // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
-  const { cats } = await searchParams;
-  const [categories, featured, latest, mostViewed, stats, homeStats, clsText] = await Promise.all([
-    getCategories(),
+  const [featured, latest, mostViewed, stats, homeStats, clsText] = await Promise.all([
     getFeaturedAds(8),
     getHomeLatestAds(),
     getMostViewedAds(8),
     getStats(),
-    getHomeStats().catch(() => new Set(['ads', 'users', 'views', 'cats'])),
+    getHomeStats().catch(() => new Set(['ads', 'users', 'views'])),
     getHomeClassifiedText().catch(() => ({ title: 'الإعلانات المبوّبة', sub: 'تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي' })),
   ]);
   const H = await getHomeHeadings().catch(() => ({ stores: 'متاجر تربح', products: 'منتجات المتاجر', featured: 'إعلانات مميّزة', latest: 'أحدث الإعلانات', mostViewed: 'الأكثر مشاهدة' }));
-  const catsParam = (cats || '').split(',').map((n) => parseInt(n, 10)).filter((n) => Number.isFinite(n) && n > 0);
-  let statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
+  const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
     { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
     { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
     { key: 'views', icon: Eye, value: stats.views, label: 'مشاهدة' },
-    { key: 'cats', icon: LayoutGrid, value: stats.cats, label: 'قسم', href: '/search' },
   ].filter((s) => homeStats.has(s.key));
-  // بطاقة «قسم» تُخفى مع إخفاء الأقسام
-  // (تُرشَّح لاحقاً بعد جلب catsOn)
 
   const session = await getSession().catch(() => null);
   // اهتمام الزائر/العضو يُستنتَج بدلالة المحتوى الفعلي الذي تصفّحه وبحث عنه
-  // (كلمات عناوين الإعلانات والمتاجر التي زارها + بحثه المحفوظ) — بلا أي
-  // اعتماد على تصنيف الأقسام (معطّل بالموقع). يعمل للزوّار أيضاً عبر معرّف
-  // زيارته الدائم (trbhh_vid)، لا الأعضاء فقط.
+  // (كلمات عناوين الإعلانات والمتاجر التي زارها + بحثه المحفوظ). يعمل للزوّار
+  // أيضاً عبر معرّف زيارته الدائم (trbhh_vid)، لا الأعضاء فقط.
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
   const personalizedAds = await getPersonalizedAds(viewerKey, session?.uid || 0, 8).catch(() => []);
@@ -84,10 +75,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const feedTexts = await getFeedBannerItems().catch(() => []);
   // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
   const homeActionsOn = await getSettingBool('home_actions_on', true).catch(() => true);
-  // إخفاء الأقسام من كل الموقع (مفتاح التحكم) — لا يمس أقسام الإعلانات المحفوظة
-  const catsOn = await categoriesEnabled().catch(() => false);
-  const noCatsBanner = catsOn ? '' : await import('@/lib/settings').then((m) => m.getSetting(m.SETTING_HOME_NOCATS_BANNER, m.DEFAULT_HOME_NOCATS_BANNER)).catch(() => '');
-  if (!catsOn) statCards = statCards.filter((c) => c.key !== 'cats');
   const siteDigits = SITE.phone.replace(/\D/g, '').replace(/^00/, '');
   const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
   const myStore = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
@@ -117,8 +104,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {/* بانر عرض الشحن: اشحن بـ100 ونضيف لك 10 — يظهر عند تفعيل مكافآت الشحن من التحكم */}
       <TopupPromoBanner />
 
-      {/* 🎯 يهمّك الآن — تغذية مخصّصة بدلالة ما تصفّحه وبحث عنه فعلياً (بلا اعتماد
-          على الأقسام)، تظهر أول محتوى في الصفحة لمن له تصفّح سابق. */}
+      {/* 🎯 يهمّك الآن — تغذية مخصّصة بدلالة ما تصفّحه وبحث عنه فعلياً،
+          تظهر أول محتوى في الصفحة لمن له تصفّح سابق. */}
       {personalizedAds.length > 0 && (
         <CollapsibleSection title="🎯 يهمّك الآن" defaultOpen={false}>
           <AdGrid ads={personalizedAds} />
@@ -131,9 +118,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <PlatformRatingWidget avg={platformRating.avg} count={platformRating.count} alreadyRated={platformRated} />
         </div>
       )}
-
-      {/* Category dropdown — pick one or more categories to show */}
-      {catsOn && <CategorySelect categories={categories} initial={catsParam} />}
 
       {/* Stats — the admin selects which cards to show */}
       {statCards.length > 0 && (
@@ -164,14 +148,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/logo-header.png' }}
             />
           </span>
-        </div>
-      )}
-
-      {/* بانر قصير عند إخفاء الأقسام — نصه يُعدَّل من الإدارة ← النصوص ← الرئيسية */}
-      {!catsOn && noCatsBanner && (
-        <div className="flex items-center gap-2 rounded-xl border border-amber-300/60 bg-gradient-to-l from-amber-50 to-orange-50 px-3 py-2 shadow-sm">
-          <span className="text-base">📣</span>
-          <p className="text-xs font-bold leading-5 text-amber-900">{noCatsBanner}</p>
         </div>
       )}
 
@@ -231,9 +207,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             ));
             return <ProgressiveReveal chunks={chunks} />;
           })()}
-          {/* الرئيسية تعرض كل إعلانات آخر شهر — والأقدم عبر البحث والأقسام */}
+          {/* الرئيسية تعرض كل إعلانات آخر شهر — والأقدم عبر البحث */}
           <Link href="/search" className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
-            الإعلانات الأقدم من شهر تجدها في البحث والأقسام — عرض الكل ←
+            الإعلانات الأقدم من شهر تجدها في البحث — عرض الكل ←
           </Link>
         </div>
       </Section>

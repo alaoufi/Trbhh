@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import {
-  MapPin, Eye, Phone, MessageCircle, Timer, Tag, ArrowLeftRight,
+  MapPin, Eye, Phone, MessageCircle, Timer, ArrowLeftRight,
   Hash, Navigation, ArrowRight, BadgeCheck,
 } from 'lucide-react';
 import { SITE } from '@/lib/constants';
@@ -104,7 +104,6 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
   const stockBadge = stockOn ? xtr.STOCK_BADGE[ad.stockState ?? 0] : undefined;
   const showOld = dealsOn && ad.oldPrice > ad.price && ad.price > 0;
   const dealPct = showOld ? Math.round((1 - ad.price / ad.oldPrice) * 100) : 0;
-  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => false);
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -160,7 +159,6 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
           <InfoItem icon={ArrowLeftRight} color={brand}>{ad.adsType === 'offer' ? 'عرض' : 'طلب'}</InfoItem>
           <InfoItem icon={Timer} color={brand}>{timeAgo(ad.createdAt)}</InfoItem>
           <InfoItem icon={MapPin} color={brand}>{ad.area ? `${ad.area} - ${ad.city}` : (ad.city || 'غير محدد')}</InfoItem>
-          {catsOn && ad.category && <InfoItem icon={Tag} color={brand}>{ad.category.name}</InfoItem>}
           <InfoItem icon={Hash} color={brand}>#{ad.id}</InfoItem>
           <InfoItem icon={Eye} color={brand}>{ad.views} مشاهدة</InfoItem>
         </div>

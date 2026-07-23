@@ -1,8 +1,8 @@
 import {
-  LayoutDashboard, Users, Megaphone, LayoutGrid, Flag, ShieldCheck, Copy, Sparkles, Ban,
+  LayoutDashboard, Users, Megaphone, Flag, ShieldCheck, Copy, Sparkles, Ban,
   Crown, Settings, MonitorPlay, BookOpen, ShieldAlert, DatabaseBackup, KeyRound, MessageSquare, Coins,
   Store, MessagesSquare, FileText, Shield, HandCoins, ScrollText, BellRing, Search as SearchIcon, Link2 as LinkIcon,
-  Archive, Wand2, AlertTriangle,
+  Archive, AlertTriangle,
 } from 'lucide-react';
 import type { Perm } from '@/lib/roles';
 
@@ -38,8 +38,6 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
       { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone, perm: 'ads' },
       { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy, perm: 'duplicates' },
       { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles, perm: 'classified' },
-      { href: '/admin/categories', label: 'الأقسام', icon: LayoutGrid, perm: 'categories' },
-      { href: '/admin/classifier', label: 'مراجعة التصنيف الذكي', icon: Wand2, perm: 'categories' },
     ],
   },
   {

@@ -5,15 +5,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel, Palette, UserPen, ShieldCheck, Users, LayoutGrid,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel, Palette, UserPen, ShieldCheck, Users,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
 import { ADMIN_GROUPS } from '@/components/admin-nav-def';
 import { TUTORIALS } from '@/components/tutorials-def';
 import { switchAccountAction } from '@/app/account/actions';
-
-type Cat = { id: number; name: string };
 
 function Item({ href, icon: Icon, children, onClick }: { href: string; icon: React.ElementType; children: React.ReactNode; onClick: () => void }) {
   return (
@@ -42,9 +40,8 @@ function Section({ title, icon: Icon, children }: { title: string; icon: React.E
 }
 
 type LinkedAcct = { id: number; name: string; hasStore: boolean; storeName: string | null; isAdmin: boolean };
-export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], dealsOn = false, auctionsOn = false, debatesOn = true, myStoreId = 0, myStoreName = '', currentUid = 0, linkedAccounts = [] }: { isAuthed: boolean; isAdmin: boolean; categories: Cat[]; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; debatesOn?: boolean; myStoreId?: number; myStoreName?: string; currentUid?: number; linkedAccounts?: LinkedAcct[] }) {
+export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, auctionsOn = false, debatesOn = true, myStoreId = 0, myStoreName = '', currentUid = 0, linkedAccounts = [] }: { isAuthed: boolean; isAdmin: boolean; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; debatesOn?: boolean; myStoreId?: number; myStoreName?: string; currentUid?: number; linkedAccounts?: LinkedAcct[] }) {
   const [open, setOpen] = useState(false);
-  const [catOpen, setCatOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname() || '';
   useEffect(() => setMounted(true), []);
@@ -58,7 +55,6 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
     }
   }, [open]);
 
-  const cats = categories ?? [];
   const close = () => setOpen(false);
 
   // داخل لوحة الإدارة: القائمة = قائمة الإدارة (المصرّح بها فقط) بدل قائمة الموقع
@@ -221,27 +217,6 @@ export function SiteMenu({ isAuthed, isAdmin, categories, adminHrefs = [], deals
               <Item href="/nearby" icon={MapPin} onClick={close}>قريب منك</Item>
               <Item href="/classified" icon={Sparkles} onClick={close}>الإعلانات المبوّبة</Item>
               {debatesOn && <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>}
-              {/* الأقسام (تصفّح حسب القسم) — تختفي كلياً عند إخفائها من التحكم */}
-              {cats.length > 0 && (
-              <>
-              <button
-                onClick={() => setCatOpen((v) => !v)}
-                className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-[15px] font-medium text-foreground hover:bg-accent"
-              >
-                <span className="flex items-center gap-3"><LayoutGrid className="h-5 w-5 shrink-0 text-primary" /> الأقسام</span>
-                <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${catOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {catOpen && cats.length > 0 && (
-                <div className="mr-2 max-h-64 space-y-0.5 overflow-y-auto border-r-2 border-border py-0.5 pr-2">
-                  {cats.map((c) => (
-                    <Link key={c.id} href={`/categories/${c.id}`} onClick={close} className="block rounded-lg px-3 py-2 text-sm text-foreground hover:bg-accent">
-                      {c.name}
-                    </Link>
-                  ))}
-                </div>
-              )}
-              </>
-              )}
             </Section>
 
             <Section title="التواصل" icon={Mail}>

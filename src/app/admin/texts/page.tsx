@@ -7,7 +7,6 @@ import {
   SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB,
   SETTING_SITE_SHARE_TITLE, SETTING_SITE_SHARE_DESC,
   SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT, SETTING_WELCOME_MEMBER_TEXT, DEFAULT_WELCOME_MEMBER_TEXT,
-  SETTING_HOME_NOCATS_BANNER, DEFAULT_HOME_NOCATS_BANNER,
   SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT,
   SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT, SETTING_MSG_TOPUP_CANCEL,
   SETTING_TOPUP_NAME_NOTE,
@@ -79,7 +78,6 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
     getSetting(SETTING_TOPUP_NAME_NOTE, DEFAULT_TOPUP_NAME_NOTE),
     getSetting(SETTING_MSG_TOPUP_CANCEL, DEFAULT_MSG_TOPUP_CANCEL),
   ]);
-  const noCatsBanner = await getSetting(SETTING_HOME_NOCATS_BANNER, DEFAULT_HOME_NOCATS_BANNER);
   const [shareTitle, shareDesc] = await Promise.all([
     getSetting(SETTING_SITE_SHARE_TITLE, `${SITE.name} | ${SITE.tagline}`),
     getSetting(SETTING_SITE_SHARE_DESC, SITE.description),
@@ -186,11 +184,6 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
             <label className="block space-y-1">
               <span className="text-sm font-medium">الوصف</span>
               <input name="homeClsSub" defaultValue={clsSub} className={field} />
-            </label>
-            <div className="border-t border-primary/15 pt-3 text-sm font-bold text-primary">بانر «إخفاء الأقسام» 📣</div>
-            <label className="block space-y-1">
-              <span className="block text-xs text-muted-foreground">البانر القصير الذي يظهر أعلى بانر «افتح متجرك» في الرئيسية عندما تكون الأقسام مخفية من الإعدادات. اتركه فارغاً لإخفائه.</span>
-              <input name="homeNoCatsBanner" defaultValue={noCatsBanner} className={field} />
             </label>
             <div className="border-t border-primary/15 pt-3 text-sm font-bold text-primary">عناوين أقسام الرئيسية</div>
             <label className="block space-y-1"><span className="text-sm font-medium">قسم المتاجر</span><input name="homeHStores" defaultValue={headings.stores} className={field} /></label>

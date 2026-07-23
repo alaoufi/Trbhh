@@ -341,8 +341,7 @@ export async function bulkUploadProductsAction(formData: FormData) {
   const rows = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 60);
   const user = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { city_id: true, country_id: true } }).catch(() => null);
   const { getFallbackCategoryId } = await import('@/lib/data');
-  const formCategoryId = Number(formData.get('category') || 0);
-  const categoryId = formCategoryId || await getFallbackCategoryId().catch(() => 0);
+  const categoryId = await getFallbackCategoryId().catch(() => 0);
   if (!categoryId) redirect('/store?bulk=err');
   // نفس بوابات النشر العادية: متجر معتمد يُنشر مباشرة، وإلا حسب إعداد المراجعة
   const [{ isApprovedStoreOwner }, { getSettingBool, SETTING_ADS_APPROVAL }, { scanContent }, { checkFlood, logMod, handleProhibited }, { getUserPackage, countAdsToday, lastAdAt, logAdPublish }] = await Promise.all([

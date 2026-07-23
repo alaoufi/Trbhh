@@ -13,7 +13,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     import('@/lib/settings').then((m) => m.auctionsEnabled()).catch(() => false),
   ]);
   const staticPages = [
-    '', '/categories', '/companies', '/search', '/classified', '/nearby', '/site-map',
+    '', '/companies', '/search', '/classified', '/nearby', '/site-map',
     ...(debatesOn ? ['/debates'] : []),
     ...(dealsOn ? ['/deals'] : []),
     ...(auctionsOn ? ['/auctions'] : []),
@@ -26,14 +26,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   try {
-    const [cats, ads, stores] = await Promise.all([
-      prisma.categories.findMany({ where: { is_active: 'yes' }, select: { id: true } }),
+    const [ads, stores] = await Promise.all([
       // كل الإعلانات النشطة تقريباً — سقف 45000 وقائي فقط لبقاء الملف ضمن حد بروتوكول
       // خرائط الموقع (50000 رابط)؛ عند الاقتراب من هذا العدد يلزم تقسيم الملف لعدة ملفات.
       prisma.ads.findMany({ where: { status: 1, state: 'active', AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }] }] }, select: { id: true, updated_at: true }, orderBy: { id: 'desc' }, take: 45000 }),
       prisma.stores.findMany({ where: { status: 1 }, select: { id: true, updated_at: true } }),
     ]);
-    for (const c of cats) entries.push({ url: `${base}/categories/${Number(c.id)}`, changeFrequency: 'daily', priority: 0.7 });
     for (const a of ads) entries.push({ url: `${base}/ads/${Number(a.id)}`, lastModified: a.updated_at ?? undefined, changeFrequency: 'weekly', priority: 0.5 });
     for (const s of stores) entries.push({ url: `${base}/companies/${Number(s.id)}`, lastModified: s.updated_at ?? undefined, changeFrequency: 'weekly', priority: 0.7 });
 

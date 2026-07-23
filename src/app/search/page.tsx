@@ -1,12 +1,11 @@
 import { Bell, Trash2 } from 'lucide-react';
-import { searchAds, countSearchAds, getCategories, getCities, getAreas } from '@/lib/data';
+import { searchAds, countSearchAds, getCities, getAreas } from '@/lib/data';
 import { SearchAreaPicker } from '@/components/search-area-picker';
 import { AdminPager } from '@/components/admin-pager';
 import { AdGrid } from '@/components/ad-card';
 import { SearchSuggestInput } from '@/components/search-suggest';
 import { Breadcrumb } from '@/components/breadcrumb';
 import { getSession } from '@/lib/auth';
-import { categoriesEnabled } from '@/lib/settings';
 import { listSavedSearches, savedSearchEnabled } from '@/lib/saved-search';
 import { saveSearchAction, deleteSavedSearchAction } from './actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
@@ -22,8 +21,8 @@ export default async function SearchPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const sp = await searchParams;
-  const [categories, cities, areas, session, alertsOn] = await Promise.all([
-    getCategories(), getCities(), getAreas(), getSession(), savedSearchEnabled(),
+  const [cities, areas, session, alertsOn] = await Promise.all([
+    getCities(), getAreas(), getSession(), savedSearchEnabled(),
   ]);
   const saved = session && alertsOn ? await listSavedSearches(session.uid) : [];
   const sort = (sp.sort as 'newest' | 'price_asc' | 'price_desc') || 'newest';
@@ -46,7 +45,6 @@ export default async function SearchPage({
 
   const sel = 'h-10 rounded-lg border bg-background px-3 text-sm';
 
-  const catsOn = await categoriesEnabled().catch(() => false);
   return (
     <div className="space-y-4">
       <Breadcrumb items={[{ label: 'بحث متقدم' }]} />
@@ -54,12 +52,6 @@ export default async function SearchPage({
         <div className="md:col-span-2">
           <SearchSuggestInput name="q" defaultValue={sp.q || ''} />
         </div>
-{catsOn && (
-                <select name="category" defaultValue={sp.category} className={sel}>
-          <option value="">كل الأقسام</option>
-          {categories.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-        </select>
-        )}
         {/* المنطقة ثم المدينة — اختيار المنطقة يحدّث المدن فوراً */}
         <SearchAreaPicker regions={cities} areas={areas} region={sp.city || ''} area={sp.area || ''} className={sel} />
         <select name="type" defaultValue={sp.type} className={sel}>

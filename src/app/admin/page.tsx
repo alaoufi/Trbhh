@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
   Users, Megaphone, ShieldCheck, Flag, MessagesSquare, Clock, Copy, Sparkles, Crown,
-  MonitorPlay, ShieldAlert, Mail, BookOpen, LayoutGrid, KeyRound, Ban, Settings, Database, Smartphone, Store,
+  MonitorPlay, ShieldAlert, Mail, BookOpen, KeyRound, Ban, Settings, Database, Smartphone, Store,
   HandCoins, Coins, ScrollText, Zap, Archive,
 } from 'lucide-react';
 import { adminStats } from '@/lib/admin';
@@ -44,7 +44,6 @@ export default async function AdminHome() {
     { group: 'ads', label: 'إعلانات نشطة', value: s.activeAds, icon: Megaphone, href: '/admin/ads', perm: 'ads' },
     { group: 'ads', label: 'الإعلانات المكررة', value: s.duplicateAds, icon: Copy, href: '/admin/duplicates', highlight: true, perm: 'duplicates' },
     { group: 'ads', label: 'الإعلانات المبوّبة', value: s.classified, icon: Sparkles, href: '/admin/classified', perm: 'classified' },
-    { group: 'ads', label: 'الأقسام', icon: LayoutGrid, href: '/admin/categories', perm: 'categories', nav: true },
     // الأعضاء والصلاحيات
     { group: 'members', label: 'الأعضاء', value: s.users, icon: Users, href: '/admin/users', perm: 'users' },
     { group: 'members', label: 'طلبات توثيق معلّقة', value: s.pendingVerify, icon: ShieldCheck, href: '/admin/verifications', highlight: true, perm: 'verifications' },

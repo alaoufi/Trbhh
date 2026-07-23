@@ -8,7 +8,6 @@ import { charge, buyDupPack } from '@/lib/wallet';
 import { setUserArea } from '@/lib/user-location';
 import { toLocalSaudi } from '@/lib/sms';
 import { respondToReport } from '@/lib/alerts';
-import { setInterests } from '@/lib/interests';
 import { toInt } from '@/lib/utils';
 import { scanContent } from '@/lib/content-guard';
 import { handleProhibited } from '@/lib/moderation';
@@ -26,14 +25,6 @@ export async function respondToReportAction(formData: FormData) {
     }
   }
   revalidatePath('/account/reports');
-}
-
-export async function setInterestsAction(formData: FormData) {
-  const session = await requireUser();
-  const ids = formData.getAll('categoryId').map((v) => Number(v)).filter((n) => Number.isFinite(n) && n > 0);
-  await setInterests(session.uid, ids);
-  revalidatePath('/account');
-  revalidatePath('/');
 }
 
 export async function deleteAdAction(formData: FormData) {

@@ -3,7 +3,6 @@ import { Bell } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin, getUserPerms } from '@/lib/roles';
-import { getCategories } from '@/lib/data';
 import { storeIdOfUser } from '@/lib/merchant';
 import { SiteMenu } from '@/components/site-menu';
 import { ADMIN_NAV } from '@/components/admin-nav-def';
@@ -15,9 +14,6 @@ import { AdminAlertsBanner } from '@/components/admin-alerts-banner';
 export async function Header() {
   const session = await getSession();
   const admin = session ? await hasAnyAdmin(session.uid) : false;
-  // إخفاء الأقسام من قائمة الموقع عند تعطيلها من التحكم
-  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => false);
-  const categories = catsOn ? await getCategories() : [];
   const myStoreId = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // اسم المتجر لمبدّل الهوية (اختياري: يظهر فقط لأصحاب المتاجر)
   const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
@@ -44,7 +40,7 @@ export async function Header() {
     <header className="sticky top-0 z-40 border-b border-black/20 bg-gradient-to-r from-[#01091a] to-[#16294a]">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
-        <SiteMenu isAuthed={!!session} isAdmin={admin} categories={categories} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />
+        <SiteMenu isAuthed={!!session} isAdmin={admin} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />
 
         {/* الزر الرئيسي — يتغيّر حسب الصفحة (دخول/رابط المتجر/الصفحة الرئيسية في صفحة الدخول) */}
         <HeaderCta isAuthed={!!session} myStoreId={myStoreId} />

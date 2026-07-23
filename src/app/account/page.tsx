@@ -1,14 +1,11 @@
 import Link from 'next/link';
-import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, ListFilter, LayoutTemplate, Wallet, Users, User, Store, Shield } from 'lucide-react';
+import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, LayoutTemplate, Wallet, Users, User, Store, Shield } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
 import { getBalance } from '@/lib/wallet';
 import { prisma } from '@/lib/prisma';
 import { getMemberAlerts } from '@/lib/alerts';
-import { getCategories } from '@/lib/data';
-import { getInterests } from '@/lib/interests';
 import { getSellerRating } from '@/lib/reviews';
-import { InterestsPicker } from '@/components/interests-picker';
 import { PushToggle } from '@/components/push-toggle';
 import { CopyChip } from '@/components/copy-chip';
 import { TopupPromoBanner } from '@/components/topup-promo-banner';
@@ -16,7 +13,6 @@ import { referralEnabled, getReferralReward } from '@/lib/points';
 import { SITE } from '@/lib/constants';
 import { getSetting, getWelcomePopupSeconds, fillTemplate, SETTING_WELCOME_MEMBER_TEXT, DEFAULT_WELCOME_MEMBER_TEXT } from '@/lib/settings';
 import { AccountWelcomeCard } from '@/components/account-welcome-card';
-import { setInterestsAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'لوحة التحكم' };
@@ -28,21 +24,20 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
   const sp = searchParams ? await searchParams : {};
   // نقطة الزيارة اليومية (إن فُعّلت) — لا تؤخر الصفحة
   import('@/lib/points').then((m) => m.grantDailyVisit(session.uid)).catch(() => {});
-  const [stats, alerts, categories, interests, rating, balance, newNotifs, refOn, welcomeTpl, welcomeSeconds] = await Promise.all([
-    getMyStats(session.uid), getMemberAlerts(session.uid), getCategories(), getInterests(session.uid), getSellerRating(session.uid), getBalance(session.uid),
+  const [stats, alerts, rating, balance, newNotifs, refOn, welcomeTpl, welcomeSeconds] = await Promise.all([
+    getMyStats(session.uid), getMemberAlerts(session.uid), getSellerRating(session.uid), getBalance(session.uid),
     prisma.notfications.count({ where: { user_id: String(session.uid), read_at: null } }).catch(() => 0),
     referralEnabled(),
     getSetting(SETTING_WELCOME_MEMBER_TEXT, DEFAULT_WELCOME_MEMBER_TEXT),
     getWelcomePopupSeconds(),
   ]);
   const welcomeText = fillTemplate(welcomeTpl, { name: session.name });
-  // اكتشاف خدمات هذا الحساب + بقية الإعدادات المستقلّة بالتوازي (بدل جولات متتابعة)
-  const [refReward, myStoreId, isAdmin, linkedCount, catsOn] = await Promise.all([
+  // اكتشاف خدمات هذا الحساب — بالتوازي (بدل جولات متتابعة)
+  const [refReward, myStoreId, isAdmin, linkedCount] = await Promise.all([
     refOn ? getReferralReward() : Promise.resolve(0),
     import('@/lib/merchant').then((m) => m.storeIdOfUser(session.uid)).catch(() => 0),
     import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false),
     import('@/lib/account-links').then((m) => m.linkedAccounts(session.uid)).then((a) => a.length).catch(() => 0),
-    import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => false),
   ]);
   const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
   const cards = [
@@ -183,13 +178,6 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
           <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><Flag className="h-5 w-5" /></span>
           <div><div className="font-bold">البلاغات على إعلاناتي</div><div className="text-xs text-muted-foreground">راجع البلاغات وأرسل ردّك للإدارة</div></div>
         </Link>
-      </div>
-
-      {/* الأقسام ذات الاهتمام — تظهر دائماً بأعلى الرئيسية */}
-      <div className="card-3d space-y-2 rounded-xl p-4">
-        <div className="flex items-center gap-2 text-sm font-bold text-primary"><ListFilter className="h-4 w-4" /> أقسامي المهمّة</div>
-        <p className="text-xs text-muted-foreground">اختر الأقسام التي تهمّك من القائمة، وستظهر إعلاناتها دائماً في أعلى الصفحة الرئيسية.</p>
-        {catsOn && <InterestsPicker categories={categories} selected={interests} action={setInterestsAction} />}
       </div>
     </div>
   );

@@ -176,8 +176,9 @@ const adSelect = {
   expires_at: true,
 } as const;
 
-/** القسم الداخلي «عروض أخرى»: تُسند إليه الإعلانات الجديدة عند إخفاء الأقسام —
- *  قسم حقيقي فاعل، فعند إعادة إظهار الأقسام تبقى هذه الإعلانات سليمة في مكانها. */
+/** القسم الاحتياطي «عروض أخرى»: يُسنَد لكل إعلان جديد داخلياً (تصنيف آلي بحت
+ *  للتوافق مع عمود category_id في القاعدة) — ميزة الأقسام نفسها مُزالة نهائياً
+ *  من التطبيق، هذا الإسناد غير ظاهر لأحد. */
 export async function getFallbackCategoryId(): Promise<number> {
   const existing = await prisma.categories.findFirst({ where: { name: 'عروض أخرى' }, select: { id: true } }).catch(() => null);
   if (existing) return toInt(existing.id);
@@ -731,12 +732,12 @@ export async function getSimilarAds(adId: number, categoryId: number, take = 6) 
   return toCards(rows);
 }
 
-/* ---- تغذية مخصّصة بدلالة المحتوى: بلا اعتماد على الأقسام (معطّلة موقعياً) ---- */
+/* ---- تغذية مخصّصة بدلالة المحتوى (بلا واجهة أقسام على الموقع) ---- */
 
 /**
  * اهتمام الزائر يُستنتَج من نصوص ما تصفّحه فعلاً: عناوين الإعلانات والمتاجر
  * التي زارها + بحثه المحفوظ (إشارة أقوى) — بنفس أسلوب مطابقة الكلمات
- * المستخدم في «إعلانات مشابهة»، لا بتصنيف الأقسام المحفوظة (معطّل بالموقع).
+ * المستخدم في «إعلانات مشابهة».
  */
 export async function getPersonalizedAds(viewerKey: string | null, userId: number, take = 8) {
   if (!viewerKey) return [];

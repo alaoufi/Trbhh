@@ -1,5 +1,4 @@
 import 'server-only';
-import { prisma } from './prisma';
 import { getCategories, getFallbackCategoryId } from './data';
 import { normalizeAr } from '@/domain/text';
 
@@ -174,34 +173,3 @@ export async function classifyAdText(title: string, detail: string): Promise<Cla
   return local;
 }
 
-/** إعادة تصنيف دفعة من الإعلانات القديمة الجالسة في «عروض أخرى» ولم تُعالَج بعد
- *  (cat_reviewed=1 يعني «لم يمرّ عليها المصنّف قط» طالما كانت في القسم الاحتياطي).
- *  كل إعلان تُعالِجه الدفعة يُعلَّم cat_reviewed=0 ليظهر في قائمة مراجعة الإدارة،
- *  سواء انتقل لقسم جديد أو بقي في «عروض أخرى» (لا شيء أفضل له فعلياً). */
-export async function classifyPendingAds(limit = 200): Promise<{ processed: number; moved: number }> {
-  const fid = await getFallbackCategoryId();
-  const ads = await prisma.ads.findMany({
-    where: { category_id: BigInt(fid), cat_reviewed: 1 },
-    select: { id: true, title: true, detail: true },
-    take: limit,
-    orderBy: { id: 'asc' },
-  });
-  let moved = 0;
-  for (const ad of ads) {
-    const r = await classifyAdText(ad.title, ad.detail);
-    await prisma.ads.update({ where: { id: ad.id }, data: { category_id: BigInt(r.categoryId), cat_reviewed: 0 } }).catch(() => {});
-    if (r.categoryId !== fid) moved++;
-  }
-  return { processed: ads.length, moved };
-}
-
-/** عدد الإعلانات القديمة التي لم تُعرَض على المصنّف بعد (لزر «تصنيف الإعلانات القديمة»). */
-export async function countUnclassifiedAds(): Promise<number> {
-  const fid = await getFallbackCategoryId();
-  return prisma.ads.count({ where: { category_id: BigInt(fid), cat_reviewed: 1 } }).catch(() => 0);
-}
-
-/** عدد الإعلانات التي صنّفها المصنّف الآلي وتنتظر مراجعة الإدارة. */
-export async function countPendingReview(): Promise<number> {
-  return prisma.ads.count({ where: { cat_reviewed: 0 } }).catch(() => 0);
-}

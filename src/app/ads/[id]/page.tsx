@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import {
-  MapPin, Eye, Phone, MessageCircle, Timer, Tag, Flag, Send,
+  MapPin, Eye, Phone, MessageCircle, Timer, Flag, Send,
   User, BadgeCheck, Hash, ArrowLeftRight, Star, Share2, Heart, Navigation,
   ShieldAlert, Trash2, Archive, Ban, Store, EyeOff, Check, Pencil,
 } from 'lucide-react';
@@ -149,8 +149,6 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const shareUrl = inStore ? (storeUrl.startsWith('http') ? storeUrl : `https://${SITE.domain}/companies/${sellerStoreId}`) : `https://${SITE.domain}/ads/${ad.id}`;
   // نص واتساب مُعبّأ مسبقاً: نص المتجر إن كان إعلان متجر، وإلا نص تربح لمراسلة صاحب الإعلان
   const [adNotice, adTpls] = await Promise.all([getAdNotice(), getAdMsgTemplates()]);
-  // إخفاء الأقسام: يخفي سطر القسم من التفاصيل فقط — قسم الإعلان محفوظ كما هو
-  const catsOn = await import('@/lib/settings').then((m) => m.categoriesEnabled()).catch(() => false);
   const storeTpls = parseTemplates(storeMeta?.msgTemplates);
   const baseTpl = (inStore && storeTpls.length ? storeTpls[0] : adTpls[0]) || '';
   // {link} = رابط الإعلان (يُضاف تلقائياً في واتساب)، {name} = عنوان الإعلان
@@ -230,7 +228,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   return (
     <div className="space-y-4 pb-16 md:pb-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml }} />
-      <Breadcrumb items={catsOn && ad.category ? [{ label: ad.category.name, href: `/categories/${ad.category.id}` }, { label: ad.title }] : [{ label: ad.title }]} />
+      <Breadcrumb items={[{ label: ad.title }]} />
 
       {/* مرساة نتيجة أي دفع/إجراء — إليها يوجَّه التمرير لتظهر الرسالة أمام العضو مباشرة */}
       <div id="paid-result" className="scroll-mt-20" />
@@ -401,7 +399,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <div className="flex items-center gap-2">
               <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-extrabold text-white">📢 عرض في تربح</span>
               <span className="text-xs font-bold text-sky-800">
-                {adShowActive ? `إعلانك معروض في تربح حتى ${untilLabel} — مدّد المدة` : 'اعرض إعلان متجرك في كل قوائم تربح (الرئيسية/البحث/الأقسام)'}
+                {adShowActive ? `إعلانك معروض في تربح حتى ${untilLabel} — مدّد المدة` : 'اعرض إعلان متجرك في كل قوائم تربح (الرئيسية/البحث)'}
               </span>
             </div>
             <p className="text-xs font-medium text-muted-foreground">تظهر منتجات متجرك عادة داخل متجرك فقط — هذا يعرضها لكل زوّار تربح. رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
@@ -494,7 +492,6 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             {identityName}{identityIsStore && <span className="mr-1 rounded bg-primary/10 px-1 text-[10px] font-bold text-primary">متجر</span>}
           </Link>
         </div>
-        {catsOn && ad.category && <InfoItem icon={Tag}>{ad.category.name}</InfoItem>}
         <InfoItem icon={Star}>{sellerRating.count ? `${sellerRating.avg} (${sellerRating.count})` : '0/0'}</InfoItem>
         <InfoItem icon={Hash}>#{ad.id}</InfoItem>
         <InfoItem icon={Eye}>{ad.views} مشاهدة</InfoItem>

@@ -12,12 +12,11 @@ import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAcco
 import { addBannedWord, deleteBannedWord, addNameWord, deleteNameWord } from '@/lib/censor';
 import { addGuardWord, deleteGuardWord, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { createPackage, updatePackage, deletePackage, assignUserPackage, type Tier } from '@/lib/packages';
-import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_STRIKE_BAN_DAYS, getStrikeBanDays, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_SITE_SHARE_TITLE, SETTING_SITE_SHARE_DESC, SETTING_WELCOME_GUEST_TEXT, SETTING_WELCOME_MEMBER_TEXT, SETTING_WELCOME_POPUP_SECONDS, SETTING_HOME_NOCATS_BANNER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT, SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT, SETTING_MSG_TOPUP_CANCEL, SETTING_TOPUP_NAME_NOTE, getTopupAccounts, setTopupAccounts, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_TRIAL_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, SETTING_SHOW_REMINDER_MSG, SETTING_ADSHOW_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
+import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_STRIKE_BAN_DAYS, getStrikeBanDays, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_SITE_SHARE_TITLE, SETTING_SITE_SHARE_DESC, SETTING_WELCOME_GUEST_TEXT, SETTING_WELCOME_MEMBER_TEXT, SETTING_WELCOME_POPUP_SECONDS, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT, SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT, SETTING_MSG_TOPUP_CANCEL, SETTING_TOPUP_NAME_NOTE, getTopupAccounts, setTopupAccounts, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_TRIAL_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, SETTING_SHOW_REMINDER_MSG, SETTING_ADSHOW_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
 import { hashPassword } from '@/lib/auth';
-import { cacheDel } from '@/lib/redis';
 import { bustAdCaches } from '@/lib/data';
 import { toInt } from '@/lib/utils';
 import { logAdmin } from '@/lib/audit';
@@ -535,7 +534,6 @@ export async function saveTextsAction(formData: FormData) {
     await put(SETTING_SITE_SHARE_TITLE, 'shareTitle');
     await put(SETTING_SITE_SHARE_DESC, 'shareDesc');
   } else if (sec === 'home') {
-    await put(SETTING_HOME_NOCATS_BANNER, 'homeNoCatsBanner');
     await put(SETTING_HOME_CLS_TITLE, 'homeClsTitle');
     await put(SETTING_HOME_CLS_SUB, 'homeClsSub');
     await put(SETTING_HOME_H_STORES, 'homeHStores');
@@ -614,7 +612,6 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_CLASSIFIED_SECONDS, String(splashSeconds));
   // مفاتيح الميزات: التنبيهات الفورية، اقتراحات البحث، تنبيهات البحث المحفوظ
   await setSetting('home_actions_on', formData.get('homeActionsOn') !== null ? '1' : '0');
-  await setSetting('cats_on', formData.get('catsOn') !== null ? '1' : '0');
   await setSetting('debates_on', formData.get('debatesOn') !== null ? '1' : '0');
   await setSetting('archive_autodelete_on', formData.get('archiveAutodeleteOn') !== null ? '1' : '0');
   await setSetting('platform_rating_on', formData.get('platformRatingOn') !== null ? '1' : '0');
@@ -1319,107 +1316,6 @@ export async function deleteAllArchivedAdsAction() {
   }
   revalidatePath('/admin/ads');
   revalidatePath('/admin');
-}
-
-async function refreshCategories() {
-  await cacheDel('categories:active');
-  revalidatePath('/admin/categories');
-  revalidatePath('/');
-}
-
-export async function addCategoryAction(formData: FormData) {
-  await requireAction('categories', 'add');
-  const name = String(formData.get('name') || '').trim();
-  if (!name) return;
-  const ordered = parseInt(String(formData.get('ordered') || '0')) || 0;
-  await prisma.categories.create({ data: { name, photo_path: '0', is_active: 'yes', ordered } });
-  await refreshCategories();
-}
-
-export async function toggleCategoryAction(formData: FormData) {
-  await requireAction('categories', 'edit');
-  const id = BigInt(String(formData.get('catId')));
-  const c = await prisma.categories.findUnique({ where: { id } });
-  if (c) await prisma.categories.update({ where: { id }, data: { is_active: c.is_active === 'yes' ? 'no' : 'yes' } });
-  await refreshCategories();
-}
-
-export async function updateCategoryAction(formData: FormData) {
-  await requireAction('categories', 'edit');
-  const id = BigInt(String(formData.get('catId')));
-  const name = String(formData.get('name') || '').trim();
-  const ordered = parseInt(String(formData.get('ordered') || '0')) || 0;
-  if (name) await prisma.categories.update({ where: { id }, data: { name, ordered } }).catch(() => {});
-  await refreshCategories();
-}
-
-export async function deleteCategoryAction(formData: FormData) {
-  await requireAction('categories', 'delete');
-  const id = BigInt(String(formData.get('catId')));
-  await prisma.categories.delete({ where: { id } }).catch(() => {});
-  await refreshCategories();
-}
-
-export async function moveCategoryAction(formData: FormData) {
-  await requireAction('categories', 'edit');
-  const id = BigInt(String(formData.get('catId')));
-  const dir = String(formData.get('dir')); // 'up' | 'down'
-  const cats = await prisma.categories.findMany({ orderBy: [{ ordered: 'desc' }, { id: 'desc' }], select: { id: true } });
-  const ids = cats.map((c) => c.id);
-  const idx = ids.findIndex((x) => x === id);
-  const swap = dir === 'up' ? idx - 1 : idx + 1;
-  if (idx >= 0 && swap >= 0 && swap < ids.length) {
-    [ids[idx], ids[swap]] = [ids[swap], ids[idx]];
-    const n = ids.length;
-    for (let i = 0; i < n; i++) await prisma.categories.update({ where: { id: ids[i] }, data: { ordered: n - i } }).catch(() => {});
-  }
-  await refreshCategories();
-}
-
-/* ---- التصنيف الذكي المحلي للإعلانات (بلا خدمة خارجية) ---- */
-
-/** يشغّل المصنّف على دفعات من الإعلانات القديمة الجالسة في «عروض أخرى»
- *  (حتى ٦٠٠ إعلان لكل ضغطة، ليبقى ضمن مهلة الطلب) — يمكن تكرار الضغط للمتبقي. */
-export async function runBatchClassifyAction() {
-  const session = await requireAction('categories', 'edit');
-  const { classifyPendingAds } = await import('@/lib/classifier');
-  let processed = 0;
-  let moved = 0;
-  for (let i = 0; i < 3; i++) {
-    const r = await classifyPendingAds(200);
-    processed += r.processed;
-    moved += r.moved;
-    if (r.processed < 200) break;
-  }
-  await bustAdCaches().catch(() => {});
-  await logAdmin(session.uid, 'تصنيف آلي للإعلانات القديمة', '', `عولج ${processed} إعلان، انتقل ${moved} منها لقسم جديد`);
-  revalidatePath('/admin/classifier');
-  redirect(`/admin/classifier?ran=1&processed=${processed}&moved=${moved}`);
-}
-
-/** اعتماد/تصحيح تصنيف إعلان واحد من صفحة المراجعة. */
-export async function confirmAdCategoryAction(formData: FormData) {
-  const session = await requireAction('categories', 'edit');
-  const adId = BigInt(String(formData.get('adId') || '0'));
-  const catId = BigInt(String(formData.get('category_id') || '0'));
-  if (adId <= 0n || catId <= 0n) return;
-  const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { category_id: true, title: true } });
-  if (!ad) return;
-  await prisma.ads.update({ where: { id: adId }, data: { category_id: catId, cat_reviewed: 1 } });
-  if (toInt(ad.category_id) !== toInt(catId)) {
-    await logAdmin(session.uid, 'تصحيح تصنيف إعلان', `الإعلان #${toInt(adId)}`, `«${ad.title.slice(0, 60)}»`);
-  }
-  await bustAdCaches().catch(() => {});
-  revalidatePath('/admin/classifier');
-}
-
-/** اعتماد كل الاقتراحات الظاهرة حالياً كما هي دون تعديل فردي (تسريع المراجعة الجماعية). */
-export async function confirmAllPendingAction(formData: FormData) {
-  await requireAction('categories', 'edit');
-  const ids = String(formData.get('adIds') || '').split(',').map((s) => BigInt(s.trim())).filter((n) => n > 0n);
-  if (ids.length) await prisma.ads.updateMany({ where: { id: { in: ids } }, data: { cat_reviewed: 1 } });
-  await bustAdCaches().catch(() => {});
-  revalidatePath('/admin/classifier');
 }
 
 /* ---- User view / edit / send-password ---- */

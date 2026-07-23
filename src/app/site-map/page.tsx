@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import { Map, Home, Grid3x3, Search, PlusCircle, FileText } from 'lucide-react';
-import { getCategories } from '@/lib/data';
-import { categoriesEnabled, auctionsEnabled } from '@/lib/settings';
+import { Map, Home, Search, PlusCircle, FileText } from 'lucide-react';
+import { auctionsEnabled } from '@/lib/settings';
 import { dealsEnabled } from '@/lib/store-extras';
 import { Breadcrumb } from '@/components/breadcrumb';
 import { SITE } from '@/lib/constants';
@@ -9,17 +8,16 @@ import { SITE } from '@/lib/constants';
 export const dynamic = 'force-dynamic';
 export const metadata = {
   title: 'خارطة الموقع',
-  description: `دليل شامل لكل أقسام وصفحات منصة ${SITE.name}: الأقسام، الإعلانات المبوّبة، المتاجر، البحث، والصفحات الثابتة.`,
+  description: `دليل شامل لكل أقسام وصفحات منصة ${SITE.name}: الإعلانات المبوّبة، المتاجر، البحث، والصفحات الثابتة.`,
 };
 
 type Item = { label: string; href: string };
 type Group = { title: string; icon: React.ElementType; items: Item[] };
 
 export default async function SiteMapPage() {
-  const [catsOn, auctionsOn, dealsOn] = await Promise.all([
-    categoriesEnabled(), auctionsEnabled(), dealsEnabled(),
+  const [auctionsOn, dealsOn] = await Promise.all([
+    auctionsEnabled(), dealsEnabled(),
   ]);
-  const categories = catsOn ? await getCategories() : [];
 
   const groups: Group[] = [
     {
@@ -65,10 +63,8 @@ export default async function SiteMapPage() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
-    itemListElement: [
-      ...groups.flatMap((g) => g.items),
-      ...categories.map((c) => ({ label: c.name, href: `/categories/${c.id}` })),
-    ].map((it, i) => ({ '@type': 'ListItem', position: i + 1, name: it.label, url: `https://${SITE.domain}${it.href}` })),
+    itemListElement: groups.flatMap((g) => g.items)
+      .map((it, i) => ({ '@type': 'ListItem', position: i + 1, name: it.label, url: `https://${SITE.domain}${it.href}` })),
   };
   const jsonLdHtml = JSON.stringify(jsonLd)
     .replace(/</g, '\\u003c')
@@ -99,19 +95,6 @@ export default async function SiteMapPage() {
           </ul>
         </div>
       ))}
-
-      {catsOn && categories.length > 0 && (
-        <div className="card-3d space-y-2 rounded-2xl p-4">
-          <div className="flex items-center gap-2 font-extrabold text-primary"><Grid3x3 className="h-5 w-5" /> جميع الأقسام ({categories.length})</div>
-          <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-3">
-            {categories.map((c) => (
-              <li key={c.id}>
-                <Link href={`/categories/${c.id}`} className="block truncate rounded-lg px-2 py-1.5 text-sm text-foreground/85 hover:bg-accent hover:text-primary">{c.name}</Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

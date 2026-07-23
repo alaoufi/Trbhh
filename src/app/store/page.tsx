@@ -10,7 +10,7 @@ import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
 import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction, addStoreStaffAction, removeStoreStaffAction, requestStoreNameExceptionAction, storeMessageMemberAction, requestVerifyPaidAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
-import { getStoreSubPricing, categoriesEnabled } from '@/lib/settings';
+import { getStoreSubPricing } from '@/lib/settings';
 import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen, DatabaseBackup } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
@@ -40,8 +40,6 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const myStaffStoreId = !store && staffOn ? await (await import('@/lib/merchant')).staffStoreId(session.uid).catch(() => 0) : 0;
   const staffStore = myStaffStoreId ? await (await import('@/lib/merchant')).storeCard(myStaffStoreId).catch(() => null) : null;
   const backups = store ? await (await import('@/lib/store-backup')).listStoreBackups(store.id).catch(() => []) : [];
-  const catsOn = await categoriesEnabled().catch(() => false);
-  const bulkCats = store && catsOn ? await (await import('@/lib/data')).getCategories().catch(() => []) : [];
   // الظهور المدفوع في تربح: التسعيرات + حالة المتجر + منتجاته وحالات عرضها
   const showPricing = store ? await (await import('@/lib/settings')).getTrbhhShowPricing().catch(() => null) : null;
   const { prisma: db } = await import('@/lib/prisma');
@@ -618,7 +616,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           {showPricing.ads.some((a) => a.price > 0) && showProducts.length > 0 && (
             <div className="space-y-2 rounded-xl border border-amber-300 bg-amber-50/50 p-3">
               <div className="text-sm font-bold">📢 عرض إعلان من متجرك في تربح</div>
-              <p className="text-[11px] text-muted-foreground">يظهر الإعلان المحدد في كل قوائم تربح (الرئيسية/البحث/الأقسام) طوال مدة الباقة، ويُخصم سعرها من رصيدك.</p>
+              <p className="text-[11px] text-muted-foreground">يظهر الإعلان المحدد في كل قوائم تربح (الرئيسية/البحث) طوال مدة الباقة، ويُخصم سعرها من رصيدك.</p>
               {(() => {
                 const pkgs = showPricing.ads.filter((a) => a.price > 0);
                 const affordablePkgs = pkgs.filter((a) => a.price <= merchBalance);
@@ -676,14 +674,6 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             {' '}<a href="/bulk-template.csv" download className="font-bold text-primary underline">تنزيل ملف نموذجي</a>
           </p>
           <form action={bulkUploadProductsAction} className="space-y-2">
-            {catsOn && (
-              <label className="block space-y-1">
-                <span className="text-xs font-bold">قسم المنتجات (يُطبَّق على كل الصفوف)</span>
-                <select name="category" className="h-10 w-full rounded-lg border border-primary/30 bg-background px-2 text-sm">
-                  {bulkCats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </label>
-            )}
             <input type="file" name="file" accept=".csv,text/csv" required className="w-full rounded-lg border border-primary/30 bg-background p-2 text-sm" />
             <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">رفع المنتجات</button>
           </form>

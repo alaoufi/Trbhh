@@ -1,8 +1,9 @@
 name: تشخيص - إعلانات مميّزة/عاجلة لا تظهر في القوائم العامة
 
-# أداة تشخيص عند الحاجة فقط: يجد كل الإعلانات المميّزة/العاجلة سارية المفعول
-# حالياً، ويحدد لكل منها إن كانت ستُستبعد من قوائم تربح العامة بسبب عزل
-# المتاجر (store_only بلا عرض مدفوع "في تربح" ساري)، لتشخيص سبب عدم ظهورها.
+# أداة تشخيص عند الحاجة فقط: يفحص فرضية جديدة — سقف "مدة بقاء الإعلان"
+# (ad_days) في باقة صاحب الإعلان، والذي يستبعد الإعلان من toCards() بعد
+# مرور عدد الأيام هذا من created_at، بصرف النظر تماماً عن كونه مميّزاً/عاجلاً
+# وسارياً (expires_at/urgent_until لا علاقة لهما بهذا الفلتر).
 on:
   workflow_dispatch:
 
@@ -19,37 +20,51 @@ jobs:
             const now = new Date();
             const featured = await p.ads.findMany({
               where: { status: 1, state: 'active', adsSpecial: 'checked', expires_at: { gt: now } },
-              select: { id: true, title: true, user_id: true, store_only: true, trbhh_until: true, expires_at: true, urgent_until: true, created_at: true },
+              select: { id: true, title: true, user_id: true, created_at: true, expires_at: true },
               orderBy: { id: 'desc' },
             });
             const urgent = await p.ads.findMany({
               where: { status: 1, state: 'active', urgent_until: { gt: now } },
-              select: { id: true, title: true, user_id: true, store_only: true, trbhh_until: true, expires_at: true, urgent_until: true, created_at: true },
+              select: { id: true, title: true, user_id: true, created_at: true, urgent_until: true },
               orderBy: { id: 'desc' },
             });
             const byId = new Map();
             for (const r of [...featured, ...urgent]) byId.set(r.id.toString(), r);
             const rows = [...byId.values()];
 
-            const hiddenByStoreIsolation = rows.filter((r) => r.store_only === 1 && !(r.trbhh_until && r.trbhh_until > now));
+            const defPkg = await p.packages.findFirst({ where: { is_default: 1 }, select: { id: true, name: true, ad_days: true } });
+            const userIds = [...new Set(rows.map((r) => r.user_id))];
+            const subs = await p.$queryRawUnsafe(
+              `SELECT user_id, package_id, expires_at FROM user_packages WHERE user_id IN (${userIds.map(() => '?').join(',')})`,
+              ...userIds
+            ).catch((e) => ({ __error: String(e) }));
+            const pkgs = await p.packages.findMany({ select: { id: true, name: true, ad_days: true, active: true } });
+
+            const out = [];
+            for (const r of rows) {
+              const uid = r.user_id.toString();
+              const userSubs = Array.isArray(subs) ? subs.filter((s) => s.user_id.toString() === uid) : [];
+              const activeSub = userSubs.find((s) => !s.expires_at || new Date(s.expires_at).getTime() > now.getTime());
+              const pkg = activeSub ? pkgs.find((pk) => pk.id === activeSub.package_id) : null;
+              const effectiveAdDays = pkg ? pkg.ad_days : (defPkg ? defPkg.ad_days : 0);
+              const ageDays = (now.getTime() - new Date(r.created_at).getTime()) / 86400000;
+              out.push({
+                id: r.id.toString(),
+                title: r.title,
+                user_id: uid,
+                created_at: r.created_at,
+                ageDays: Math.round(ageDays * 10) / 10,
+                usingPackage: pkg ? pkg.name : `(افتراضية: ${defPkg ? defPkg.name : '?'})`,
+                effectiveAdDays,
+                hiddenByAdDaysCap: !!effectiveAdDays && ageDays > effectiveAdDays,
+              });
+            }
 
             console.log('===NOW===', now.toISOString());
-            console.log('===FEATURED_ACTIVE_COUNT===', featured.length);
-            console.log('===URGENT_ACTIVE_COUNT===', urgent.length);
-            console.log('===TOTAL_UNIQUE===', rows.length);
-            console.log('===HIDDEN_BY_STORE_ISOLATION_COUNT===', hiddenByStoreIsolation.length);
-            console.log('===ALL_ROWS===');
-            console.log(JSON.stringify(rows.map((r) => ({
-              id: r.id.toString(),
-              title: r.title,
-              user_id: r.user_id.toString(),
-              store_only: r.store_only,
-              trbhh_until: r.trbhh_until,
-              expires_at: r.expires_at,
-              urgent_until: r.urgent_until,
-              created_at: r.created_at,
-              hiddenFromGeneralLists: r.store_only === 1 && !(r.trbhh_until && r.trbhh_until > now),
-            })), null, 2));
+            console.log('===DEFAULT_PACKAGE===', JSON.stringify(defPkg));
+            console.log('===ALL_PACKAGES===', JSON.stringify(pkgs));
+            console.log('===ROWS===');
+            console.log(JSON.stringify(out, null, 2));
             await p.$disconnect();
           })().catch((e) => { console.error('QUERY_FAILED:', e); process.exit(1); });
           EOF

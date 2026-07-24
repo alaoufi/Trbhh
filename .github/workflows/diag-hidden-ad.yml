@@ -1,0 +1,82 @@
+name: تشخيص - أحدث الإعلانات وحالتها (سبب اختفاء إعلان)
+
+# أداة تشخيص عند الحاجة فقط: تستعلم أحدث ٢٥ إعلاناً من قاعدة الإنتاج مع كل
+# العوامل التي قد تُخفيها (status/state/store_only/publish_at/trbhh_until) وعدد
+# صورها وامتداداتها — لمعرفة هل «الإعلان المختفي» لم يُنشأ أصلاً أم أُنشئ وأُخفي.
+on:
+  workflow_dispatch:
+
+jobs:
+  query:
+    runs-on: ubuntu-latest
+    steps:
+      - name: كتابة سكربت الاستعلام
+        run: |
+          cat > query.js << 'EOF'
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          (async () => {
+            const now = new Date();
+            const total = await p.ads.count();
+            const last24 = await p.ads.count({ where: { created_at: { gte: new Date(Date.now() - 86400000) } } });
+            const ads = await p.ads.findMany({
+              orderBy: { id: 'desc' }, take: 25,
+              select: { id: true, title: true, created_at: true, status: true, state: true, store_only: true, trbhh_until: true, publish_at: true, adsSpecial: true, expires_at: true, urgent_until: true, user_id: true, video_path: true, cat_reviewed: true },
+            });
+            const ids = ads.map((a) => a.id);
+            const photos = ids.length ? await p.photos.findMany({ where: { other_id: { in: ids } }, select: { other_id: true, photo_path: true } }) : [];
+            const cnt = new Map();
+            const upIds = [];
+            for (const ph of photos) {
+              const k = ph.other_id.toString();
+              cnt.set(k, (cnt.get(k) || 0) + 1);
+              const n = Number(ph.photo_path);
+              if (Number.isFinite(n) && n > 0) upIds.push(BigInt(n));
+            }
+            const ups = upIds.length ? await p.uploads.findMany({ where: { id: { in: upIds } }, select: { id: true, file_name: true, extension: true } }).catch(() => []) : [];
+            const rows = ads.map((a) => ({
+              id: a.id.toString(),
+              title: (a.title || '').slice(0, 22),
+              created: a.created_at,
+              status: a.status,
+              state: a.state,
+              store_only: a.store_only,
+              trbhh_until: a.trbhh_until,
+              publish_at: a.publish_at,
+              special: a.adsSpecial,
+              urgent_until: a.urgent_until,
+              cat_reviewed: a.cat_reviewed,
+              user_id: a.user_id ? a.user_id.toString() : null,
+              video: a.video_path ? 1 : 0,
+              images: cnt.get(a.id.toString()) || 0,
+            }));
+            console.log('===STATS===', 'total_ads=' + total, 'created_last24h=' + last24, 'now=' + now.toISOString());
+            console.log('===ADS_START===');
+            console.log(JSON.stringify(rows, (k, v) => (typeof v === 'bigint' ? v.toString() : v), 2));
+            console.log('===ADS_END===');
+            console.log('===UPLOADS_START===');
+            console.log(JSON.stringify(ups, (k, v) => (typeof v === 'bigint' ? v.toString() : v), 2));
+            console.log('===UPLOADS_END===');
+            await p.$disconnect();
+          })().catch((e) => { console.error('QUERY_FAILED:', e); process.exit(1); });
+          EOF
+
+      - name: الاستعلام عبر SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "❌ السرّ VPS_SSH_KEY غير موجود."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${VPS_PORT:-22}"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
+            -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
+            "cd /root/trbhh && docker compose exec -T app node" < query.js

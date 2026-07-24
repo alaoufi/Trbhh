@@ -34,6 +34,11 @@ jobs:
               if (Number.isFinite(n) && n > 0) upIds.push(BigInt(n));
             }
             const ups = upIds.length ? await p.uploads.findMany({ where: { id: { in: upIds } }, select: { id: true, file_name: true, extension: true } }).catch(() => []) : [];
+            // سجل الرقابة: آخر ٤٠ رفضاً/إجراءً (يكشف سبب «اختفاء» إعلان لم يُنشأ)
+            const mods = await p.mod_log.findMany({ orderBy: { id: 'desc' }, take: 40, select: { id: true, user_id: true, kind: true, action: true, snippet: true, created_at: true, ad_id: true } }).catch(() => []);
+            console.log('===MODLOG_START===');
+            console.log(JSON.stringify(mods, (k, v) => (typeof v === 'bigint' ? v.toString() : v), 2));
+            console.log('===MODLOG_END===');
             const rows = ads.map((a) => ({
               id: a.id.toString(),
               title: (a.title || '').slice(0, 22),

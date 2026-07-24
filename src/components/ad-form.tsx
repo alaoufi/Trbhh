@@ -5,7 +5,6 @@ import { useFormStatus } from 'react-dom';
 import { Tag, MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SubmitOverlay } from '@/components/submit-overlay';
-import { compressInputFiles } from '@/lib/image-compress';
 import { RegionCityPicker } from '@/components/region-city-picker';
 import { AudioRecorder } from '@/components/audio-recorder';
 import { ImageUploader } from '@/components/image-uploader';
@@ -110,14 +109,6 @@ export function AdForm({
 
   const [imgBusy, setImgBusy] = useState(false);
   const [imgReady, setImgReady] = useState(0);
-  async function onImages(e: React.ChangeEvent<HTMLInputElement>) {
-    const input = e.target;
-    if (!input.files?.length) { setImgReady(0); return; }
-    setImgBusy(true);
-    await compressInputFiles(input); // shrink before upload (fast on slow نت)
-    setImgReady(input.files?.length || 0);
-    setImgBusy(false);
-  }
 
   const [vidName, setVidName] = useState('');
   const [vidErr, setVidErr] = useState('');
@@ -386,16 +377,10 @@ export function AdForm({
 
       <Section icon={ImageIcon} title="الصور" hint={initial?.id ? 'أضِف المزيد من الصور (تُضغط تلقائياً للرفع السريع).' : 'حتى 10 صور — تُضغط تلقائياً للرفع السريع.'}>
         <ImageUploader
-          onImagesChange={(files) => {
-            // Create a synthetic event to pass to existing handler
-            const dataTransfer = new DataTransfer();
-            files.forEach(f => dataTransfer.items.add(f));
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.files = dataTransfer.files;
-            onImages({ target: input } as React.ChangeEvent<HTMLInputElement>);
-          }}
+          name="images"
           maxImages={10}
+          onBusyChange={setImgBusy}
+          onImagesChange={(files) => setImgReady(files.length)}
         />
         {imgBusy && <p className="text-xs font-bold text-primary">⏳ جارٍ تجهيز الصور…</p>}
         {!imgBusy && imgReady > 0 && <p className="text-xs font-bold text-green-600">✓ {imgReady} صورة جاهزة</p>}

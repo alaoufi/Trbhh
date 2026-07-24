@@ -47,12 +47,16 @@ async function compressImage(file: File): Promise<File> {
   }
 }
 
-export function ImageUploader({ 
-  onImagesChange, 
+export function ImageUploader({
+  onImagesChange,
+  onBusyChange,
+  name = 'images',
   maxImages = 10,
   initialImages = []
-}: { 
+}: {
   onImagesChange: (files: File[]) => void;
+  onBusyChange?: (busy: boolean) => void;
+  name?: string;
   maxImages?: number;
   initialImages?: string[];
 }) {
@@ -61,12 +65,26 @@ export function ImageUploader({
   // Ref mirrors state so async compression callbacks always commit against the
   // latest list without stale closures.
   const imagesRef = useRef<ImagePreview[]>([]);
+  // A REAL hidden <input name="images"> whose FileList we keep in sync — this is
+  // what the form actually submits. Without it the picker is preview-only and no
+  // image ever reaches the server (formData.getAll('images') would be empty).
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
+  const pendingRef = useRef(0);
 
   const generateId = () => Math.random().toString(36).substring(2, 9);
 
   const commit = useCallback((next: ImagePreview[]) => {
     imagesRef.current = next;
     setImages(next);
+    // sync the submittable file field (originals now, compressed versions once ready)
+    const el = hiddenInputRef.current;
+    if (el) {
+      try {
+        const dt = new DataTransfer();
+        next.forEach((i) => dt.items.add(i.file));
+        el.files = dt.files;
+      } catch { /* DataTransfer unsupported on a very old browser → leave as-is */ }
+    }
     onImagesChange(next.map(img => img.file));
   }, [onImagesChange]);
 
@@ -76,25 +94,37 @@ export function ImageUploader({
     const remainingSlots = maxImages - imagesRef.current.length;
     const additions: ImagePreview[] = [];
     Array.from(files).slice(0, remainingSlots).forEach(file => {
-      if (file.type.startsWith('image/')) {
+      // Accept by MIME or by extension — some pickers report an empty type for HEIC.
+      const isImg = file.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|bmp|tiff?|heic|heif|avif)$/i.test(file.name);
+      if (isImg) {
         additions.push({ file, preview: URL.createObjectURL(file), id: generateId() });
       }
     });
     if (!additions.length) return;
 
-    // Show previews immediately (from the originals) for instant feedback…
+    // Show previews immediately (from the originals) for instant feedback, and
+    // sync them into the submittable field right away — so even if the member
+    // submits before compression finishes, the originals are sent (and the
+    // server downscales/normalizes them) rather than nothing.
     commit([...imagesRef.current, ...additions].slice(0, maxImages));
 
-    // …then compress each in the background and swap the file in place.
+    // …then compress each in the background and swap the smaller file in place.
     additions.forEach((item) => {
+      pendingRef.current += 1;
+      onBusyChange?.(true);
       compressImage(item.file).then((out) => {
-        if (out === item.file) return; // unchanged
-        const cur = imagesRef.current;
-        if (!cur.some((i) => i.id === item.id)) return; // removed meanwhile
-        commit(cur.map((i) => (i.id === item.id ? { ...i, file: out } : i)));
+        if (out !== item.file) {
+          const cur = imagesRef.current;
+          if (cur.some((i) => i.id === item.id)) {
+            commit(cur.map((i) => (i.id === item.id ? { ...i, file: out } : i)));
+          }
+        }
+      }).finally(() => {
+        pendingRef.current = Math.max(0, pendingRef.current - 1);
+        if (pendingRef.current === 0) onBusyChange?.(false);
       });
     });
-  }, [maxImages, commit]);
+  }, [maxImages, commit, onBusyChange]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -124,6 +154,9 @@ export function ImageUploader({
 
   return (
     <div className="space-y-3">
+      {/* The actual submitted field — kept in sync with the selected/compressed
+          files so the form uploads them (hidden inputs still submit their files). */}
+      <input ref={hiddenInputRef} type="file" name={name} multiple accept="image/*" className="hidden" tabIndex={-1} aria-hidden="true" />
       {/* Drop Zone */}
       <div
         onDrop={handleDrop}

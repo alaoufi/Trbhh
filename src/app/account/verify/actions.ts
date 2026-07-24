@@ -7,10 +7,11 @@ import { toInt } from '@/lib/utils';
 
 async function storeDoc(file: FormDataEntryValue | null, userId: number, kind: string): Promise<number | undefined> {
   if (!(file instanceof File) || file.size === 0) return undefined;
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-  const buf = Buffer.from(await file.arrayBuffer());
-  const rel = await saveUpload(buf, `verify_${kind}_${userId}_${Date.now()}.${ext}`);
-  const up = await prisma.uploads.create({ data: { file_name: rel, extension: ext, type: `verify_${kind}`, file_size: file.size, user_id: userId } });
+  const srcExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const { normalizeUpload } = await import('@/lib/upload-normalize');
+  const norm = await normalizeUpload(Buffer.from(await file.arrayBuffer()), srcExt); // HEIC → JPEG (PDF kept) so admins can view the doc
+  const rel = await saveUpload(norm.buf, `verify_${kind}_${userId}_${Date.now()}.${norm.ext}`);
+  const up = await prisma.uploads.create({ data: { file_name: rel, extension: norm.ext, type: `verify_${kind}`, file_size: norm.buf.length, user_id: userId } });
   return toInt(up.id);
 }
 

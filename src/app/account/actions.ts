@@ -144,22 +144,26 @@ export async function requestTopupAction(formData: FormData) {
     const file = formData.get('receipt');
     if (!(file instanceof File) || file.size === 0) redirect('/account/wallet?error=topupreceipt');
     if (file.size > 8 * 1024 * 1024) redirect('/account/wallet?error=topupreceipt');
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
+    const srcExt = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'jpg';
 
     // قراءة الملف وحفظه: مغلَّفان بحماية — فشل نادر هنا (ملف تالف/امتلاء القرص) كان
     // يتسبّب سابقاً بشاشة «حدث خطأ غير متوقع» العامة بدل رسالة واضحة قابلة لإعادة المحاولة.
-    let buf: Buffer;
+    let raw: Buffer;
     try {
-      buf = Buffer.from(await file.arrayBuffer());
+      raw = Buffer.from(await file.arrayBuffer());
     } catch {
       await import('@/lib/error-log').then((m) => m.logClientError({ message: 'فشل قراءة ملف إيصال الشحن', userId: session.uid, url: '/account/wallet#topup' })).catch(() => {});
       redirect('/account/wallet?error=topupreceipt');
     }
+    // توحيد الصيغة: سند HEIC (آيفون) → JPEG حتى تراه الإدارة (مع إبقاء PDF كما هو)
+    const { normalizeUpload } = await import('@/lib/upload-normalize');
+    const norm = await normalizeUpload(raw, srcExt);
+    const buf = norm.buf;
     // بصمة الإيصال (receiptHash: aHash+dHash مدمجة بدقة أعلى) — لكشف السند المكرر
     receiptHash = await import('@/lib/phash').then((m) => m.receiptHash(buf)).catch(() => '');
     try {
       const { saveUpload } = await import('@/lib/storage');
-      rel = await saveUpload(buf, `topup_${session.uid}_${Date.now()}.${ext}`);
+      rel = await saveUpload(buf, `topup_${session.uid}_${Date.now()}.${norm.ext}`);
     } catch (e) {
       await import('@/lib/error-log').then((m) => m.logClientError({ message: `فشل حفظ إيصال الشحن: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`, userId: session.uid, url: '/account/wallet#topup' })).catch(() => {});
       redirect('/account/wallet?error=topup#topup');
@@ -261,11 +265,11 @@ export async function requestNameChangeAction(formData: FormData) {
   const file = formData.get('doc');
   let docId = 0;
   if (file instanceof File && file.size > 0) {
-    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    const buf = Buffer.from(await file.arrayBuffer());
-    const { saveUpload } = await import('@/lib/storage');
-    const rel = await saveUpload(buf, `namechg_${session.uid}_${Date.now()}.${ext}`);
-    const up = await prisma.uploads.create({ data: { file_name: rel, extension: ext, type: 'name_change', file_size: file.size, user_id: session.uid } });
+    const srcExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const [{ saveUpload }, { normalizeUpload }] = await Promise.all([import('@/lib/storage'), import('@/lib/upload-normalize')]);
+    const norm = await normalizeUpload(Buffer.from(await file.arrayBuffer()), srcExt); // HEIC → JPEG (PDF kept)
+    const rel = await saveUpload(norm.buf, `namechg_${session.uid}_${Date.now()}.${norm.ext}`);
+    const up = await prisma.uploads.create({ data: { file_name: rel, extension: norm.ext, type: 'name_change', file_size: norm.buf.length, user_id: session.uid } });
     docId = toInt(up.id);
   }
   if (!docId) redirect('/account/profile?namereq=doc');

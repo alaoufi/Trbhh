@@ -15,12 +15,16 @@ async function savePromoImage(formData: FormData): Promise<string | null> {
     const file = formData.get('image');
     if (!(file instanceof File) || file.size === 0) return null;
     if (file.size > 10 * 1024 * 1024) return null;
-    const buf = Buffer.from(await file.arrayBuffer());
-    if (!buf.length) return null;
-    let ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    if (!['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext)) ext = 'jpg';
-    const hash = createHash('sha256').update(new Uint8Array(buf)).digest('hex');
-    return await saveUpload(buf, `promo_${hash}.${ext}`);
+    const raw = Buffer.from(await file.arrayBuffer());
+    if (!raw.length) return null;
+    const srcExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    // Re-encode odd formats (HEIC/…) to real JPEG bytes — animated GIFs are kept.
+    // Previously the extension was renamed to .jpg WITHOUT converting, so HEIC
+    // bytes were served as image/jpeg and never rendered.
+    const { normalizeUpload } = await import('@/lib/upload-normalize');
+    const norm = await normalizeUpload(raw, srcExt);
+    const hash = createHash('sha256').update(new Uint8Array(norm.buf)).digest('hex');
+    return await saveUpload(norm.buf, `promo_${hash}.${norm.ext}`);
   } catch {
     return null;
   }

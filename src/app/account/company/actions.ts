@@ -156,10 +156,11 @@ export async function saveCompanyAction(formData: FormData) {
   let logoId: number | undefined;
   const logo = formData.get('logo');
   if (logo instanceof File && logo.size > 0) {
-    const ext = (logo.name.split('.').pop() || 'png').toLowerCase();
-    const buf = Buffer.from(await logo.arrayBuffer());
-    const rel = await saveUpload(buf, `store_${session.uid}_${Date.now()}.${ext}`);
-    const up = await prisma.uploads.create({ data: { file_name: rel, extension: ext, type: 'store', file_size: logo.size, user_id: session.uid } });
+    const srcExt = (logo.name.split('.').pop() || 'png').toLowerCase();
+    const { normalizeUpload } = await import('@/lib/upload-normalize');
+    const norm = await normalizeUpload(Buffer.from(await logo.arrayBuffer()), srcExt); // HEIC → JPEG so the logo always renders
+    const rel = await saveUpload(norm.buf, `store_${session.uid}_${Date.now()}.${norm.ext}`);
+    const up = await prisma.uploads.create({ data: { file_name: rel, extension: norm.ext, type: 'store', file_size: norm.buf.length, user_id: session.uid } });
     logoId = toInt(up.id);
   }
 

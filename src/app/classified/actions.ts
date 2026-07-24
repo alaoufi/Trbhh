@@ -19,7 +19,7 @@ import { toInt } from '@/lib/utils';
 /** Read the uploaded classified image into a buffer (or null), enforcing size/type. */
 async function readImageBuffer(formData: FormData): Promise<{ buf: Buffer; name: string } | null> {
   const file = formData.get('image');
-  if (!(file instanceof File) || file.size === 0 || file.size > 12 * 1024 * 1024) return null;
+  if (!(file instanceof File) || file.size === 0 || file.size > 30 * 1024 * 1024) return null;
   const buf = Buffer.from(await file.arrayBuffer());
   if (!buf.length) return null;
   return { buf, name: file.name };
@@ -29,15 +29,17 @@ async function readImageBuffer(formData: FormData): Promise<{ buf: Buffer; name:
 async function saveOneImage(img: { buf: Buffer; name: string } | null, userId: number): Promise<string | null> {
   try {
     if (!img?.buf.length) return null;
-    let ext = (img.name.split('.').pop() || 'jpg').toLowerCase();
-    if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) ext = 'jpg'; // normalize odd formats
+    const ext = (img.name.split('.').pop() || 'jpg').toLowerCase();
     const hash = createHash('sha256').update(new Uint8Array(img.buf)).digest('hex');
     const phash = await aHash(img.buf).catch(() => ''); // بصمة إدراكية لكشف تكرار الصورة
-    const stamped = await watermarkImage(img.buf, ext); // burn "تربح" watermark (also downscales)
-    const rel = await saveUpload(stamped, `${hash}.${ext}`);
+    const stamped = await watermarkImage(img.buf, ext); // burn "تربح" watermark (also downscales + normalizes format)
+    // Store with the REAL output extension (HEIC/odd formats become JPEG) so the
+    // file is served with a matching Content-Type and always renders.
+    const outExt = stamped.ext || 'jpg';
+    const rel = await saveUpload(stamped.buf, `${hash}.${outExt}`);
     // register in uploads (with owner + phash) so duplicate detection can match by image
     await prisma.uploads
-      .create({ data: { file_name: rel, file_original_name: img.name, extension: ext, type: 'classified', file_size: img.buf.length, user_id: userId, phash: phash || null } })
+      .create({ data: { file_name: rel, file_original_name: img.name, extension: outExt, type: 'classified', file_size: img.buf.length, user_id: userId, phash: phash || null } })
       .catch(() => {});
     return rel;
   } catch {

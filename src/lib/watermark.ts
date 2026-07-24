@@ -2,13 +2,30 @@ import 'server-only';
 
 const TIMEOUT_MS = 8000; // never let image processing hang a publish request
 
+export type WatermarkResult = { buf: Buffer; ext: string };
+
+/** Canonical, browser-displayable output format for a given input extension.
+ *  Anything that isn't png/webp is re-encoded to JPEG — so HEIC/HEIF (iPhone),
+ *  gif, bmp, tiff… all become a format every browser can render. The stored
+ *  file MUST carry this extension, otherwise it is served as
+ *  `application/octet-stream` and the image silently fails to display. */
+function outFormat(ext: string): 'png' | 'webp' | 'jpg' {
+  return ext === 'png' ? 'png' : ext === 'webp' ? 'webp' : 'jpg';
+}
+
 /**
  * Burn a "تربح" watermark into an uploaded image (copyright protection),
- * auto-orient and downscale it. Returns the ORIGINAL buffer on any failure
- * or if processing exceeds a hard timeout, so publishing never hangs/crashes.
+ * auto-orient and downscale it. Returns { buf, ext } where `ext` is the ACTUAL
+ * format of the returned bytes — callers must store the file with this
+ * extension so the served Content-Type matches the bytes. Never hangs/crashes:
+ * on any failure or timeout it falls back to a plain re-encode, and only as a
+ * last resort returns the original bytes with the original extension.
  */
-export async function watermarkImage(buf: Buffer, ext: string): Promise<Buffer> {
-  const work = (async (): Promise<Buffer> => {
+export async function watermarkImage(buf: Buffer, ext: string): Promise<WatermarkResult> {
+  const target = outFormat(ext);
+  const original: WatermarkResult = { buf, ext };
+
+  const work = (async (): Promise<WatermarkResult> => {
     // dynamic import so a missing/broken native sharp binary degrades gracefully
     const sharp = (await import('sharp')).default;
     // Downscale first: large phone photos (e.g. 4000×3000) are slow and memory-heavy.
@@ -31,16 +48,31 @@ export async function watermarkImage(buf: Buffer, ext: string): Promise<Buffer> 
       `</svg>`,
     );
     let out = base.composite([{ input: svg, top: 0, left: 0 }]);
-    if (ext === 'png') out = out.png();
-    else if (ext === 'webp') out = out.webp();
+    if (target === 'png') out = out.png();
+    else if (target === 'webp') out = out.webp();
     else out = out.jpeg({ quality: 82 });
-    return await out.toBuffer();
+    return { buf: await out.toBuffer(), ext: target };
   })();
 
-  const timeout = new Promise<Buffer>((resolve) => setTimeout(() => resolve(buf), TIMEOUT_MS));
+  // If the full pipeline throws, still guarantee displayable bytes by re-encoding
+  // (no watermark) to the target format — the resulting bytes then match `ext`.
+  const safe = work.catch(async (): Promise<WatermarkResult> => {
+    try {
+      const sharp = (await import('sharp')).default;
+      const s = sharp(buf, { failOn: 'none' }).rotate();
+      const b = target === 'png' ? await s.png().toBuffer()
+        : target === 'webp' ? await s.webp().toBuffer()
+        : await s.jpeg({ quality: 82 }).toBuffer();
+      return { buf: b, ext: target };
+    } catch {
+      return original; // truly undecodable — store as-is (best effort)
+    }
+  });
+
+  const timeout = new Promise<WatermarkResult>((resolve) => setTimeout(() => resolve(original), TIMEOUT_MS));
   try {
-    return await Promise.race([work.catch(() => buf), timeout]);
+    return await Promise.race([safe, timeout]);
   } catch {
-    return buf;
+    return original;
   }
 }

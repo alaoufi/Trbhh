@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
+import { logClientError } from '@/lib/error-log';
 import { aHash, hashSimilarity } from '@/lib/phash';
 import { bumpDupAttempts, banUserFor, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned, notifyModBlock } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd, logAdPublish } from '@/lib/packages';
@@ -63,7 +64,10 @@ async function readImages(formData: FormData): Promise<PreparedImage[]> {
   const files = formData.getAll('images').filter((f): f is File => f instanceof File && f.size > 0);
   const out: PreparedImage[] = [];
   for (const file of files) {
-    if (file.size > 8 * 1024 * 1024) continue; // 8MB cap
+    // 30MB cap: raw phone photos (esp. HEIC) are large; watermarkImage downscales
+    // to ≤1600px anyway, so accepting big originals costs nothing and stops
+    // full-resolution images from vanishing silently before they're processed.
+    if (file.size > 30 * 1024 * 1024) continue;
     const buf = Buffer.from(await file.arrayBuffer());
     if (!buf.length) continue;
     const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
@@ -77,19 +81,27 @@ async function readImages(formData: FormData): Promise<PreparedImage[]> {
  *  rather than failing the whole publish. */
 async function storeOneImage(img: PreparedImage, userId: number, adId: bigint) {
   try {
-    // content-addressed filename → identical images resolve to the same file
-    const safe = `${img.hash}.${img.ext}`;
     const [stamped, phash] = await Promise.all([
-      watermarkImage(img.buf, img.ext), // burn "تربح" watermark (also downscales)
+      watermarkImage(img.buf, img.ext), // burn "تربح" watermark (also downscales + normalizes format)
       aHash(img.buf), // بصمة إدراكية للصورة (لكشف التكرار بالنسبة)
     ]);
-    const rel = await saveUpload(stamped, safe);
+    // Store with the ACTUAL output extension (watermarkImage re-encodes HEIC/gif/…
+    // to JPEG). A content-addressed name keeps identical uploads on one file.
+    const outExt = stamped.ext || img.ext;
+    const safe = `${img.hash}.${outExt}`;
+    const rel = await saveUpload(stamped.buf, safe);
     const up = await prisma.uploads.create({
-      data: { file_name: rel, file_original_name: img.name, extension: img.ext, type: 'ad', file_size: img.buf.length, user_id: userId, phash: phash || null },
+      data: { file_name: rel, file_original_name: img.name, extension: outExt, type: 'ad', file_size: img.buf.length, user_id: userId, phash: phash || null },
     });
     await prisma.photos.create({ data: { photo_path: String(toInt(up.id)), other_id: adId } });
-  } catch {
-    // skip a problematic image rather than failing the whole publish
+  } catch (e) {
+    // Skip a problematic image rather than failing the whole publish — but LOG it
+    // (previously a silent drop that made "the image disappeared" undiagnosable).
+    await logClientError({
+      message: `فشل حفظ صورة إعلان #${toInt(adId)} (${img.ext}, ${img.buf.length} بايت): ${e instanceof Error ? e.message : String(e)}`,
+      url: '/ads/new',
+      userId,
+    }).catch(() => {});
   }
 }
 

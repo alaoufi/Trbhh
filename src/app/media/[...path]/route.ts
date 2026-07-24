@@ -15,6 +15,10 @@ const TYPES: Record<string, string> = {
   gif: 'image/gif', svg: 'image/svg+xml', mp4: 'video/mp4', avif: 'image/avif',
   mov: 'video/quicktime', m4v: 'video/mp4', webm: 'video/webm', mkv: 'video/x-matroska',
   '3gp': 'video/3gpp', ogg: 'audio/ogg', mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav',
+  // Legacy safety net: images uploaded before the format fix were re-encoded to
+  // JPEG bytes but saved with the source extension (.heic/.heif from iPhones).
+  // Serving them as image/jpeg makes those already-stored images render again.
+  heic: 'image/jpeg', heif: 'image/jpeg', bmp: 'image/jpeg', tiff: 'image/jpeg', tif: 'image/jpeg',
 };
 
 function parseRange(range: string | null, size: number): { start: number; end: number } | null {

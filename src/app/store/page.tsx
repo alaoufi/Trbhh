@@ -327,6 +327,21 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
             <input type="checkbox" name="allowAds" defaultChecked={meta?.allowAds ?? true} className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
             <span><b className="flex items-center gap-1"><Megaphone className="h-4 w-4" /> السماح بنشر الإعلانات</b><span className="block text-xs text-muted-foreground">يظهر زر «أضف إعلان» ويسمح لمتجرك بالمشاركة في نشر الإعلانات.</span></span>
           </label>
+          <div className="rounded-xl border p-3">
+            <b className="flex items-center gap-1 text-sm"><ShieldCheck className="h-4 w-4" /> العلامة المائية على صور إعلاناتك</b>
+            <span className="mt-0.5 block text-xs text-muted-foreground">تُطبع تلقائياً على صور إعلانات متجرك لحماية حقوقك. اختر أن تكون شعار متجرك أو اسمه (بدل «تربح»).</span>
+            <div className="mt-2 flex gap-2">
+              <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border p-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                <input type="radio" name="watermarkKind" value="name" defaultChecked={(meta?.watermarkKind ?? 'name') !== 'logo'} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+                اسم المتجر
+              </label>
+              <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border p-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                <input type="radio" name="watermarkKind" value="logo" defaultChecked={meta?.watermarkKind === 'logo'} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+                شعار المتجر
+              </label>
+            </div>
+            <span className="mt-1.5 block text-[11px] text-muted-foreground">إن اخترت الشعار ولم تكن قد رفعته بعد، يُستخدم اسم المتجر مؤقتاً حتى ترفعه.</span>
+          </div>
           <label className="flex items-start gap-2 rounded-xl border p-3 text-sm">
             <input type="checkbox" name="allowReviews" defaultChecked={meta?.allowReviews ?? true} className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
             <span><b className="flex items-center gap-1"><MessageSquare className="h-4 w-4" /> فتح التعليقات والتقييم</b><span className="block text-xs text-muted-foreground">عند الإيقاف تُقفل تقييمات وتعليقات العملاء في صفحة المتجر.</span></span>

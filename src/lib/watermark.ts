@@ -4,6 +4,11 @@ const TIMEOUT_MS = 8000; // never let image processing hang a publish request
 
 export type WatermarkResult = { buf: Buffer; ext: string };
 
+/** Optional custom watermark (store ads use the store's identity instead of
+ *  the platform's "تربح"). `logo` wins over `text` when both are given and the
+ *  logo decodes; otherwise `text` is burned; otherwise the default "تربح". */
+export type WatermarkOptions = { text?: string; logo?: Buffer };
+
 /** Canonical, browser-displayable output format for a given input extension.
  *  Anything that isn't png/webp is re-encoded to JPEG — so HEIC/HEIF (iPhone),
  *  gif, bmp, tiff… all become a format every browser can render. The stored
@@ -21,9 +26,10 @@ function outFormat(ext: string): 'png' | 'webp' | 'jpg' {
  * on any failure or timeout it falls back to a plain re-encode, and only as a
  * last resort returns the original bytes with the original extension.
  */
-export async function watermarkImage(buf: Buffer, ext: string): Promise<WatermarkResult> {
+export async function watermarkImage(buf: Buffer, ext: string, opts?: WatermarkOptions): Promise<WatermarkResult> {
   const target = outFormat(ext);
   const original: WatermarkResult = { buf, ext };
+  const label = (opts?.text || '').trim().slice(0, 40) || 'تربح';
 
   const work = (async (): Promise<WatermarkResult> => {
     // dynamic import so a missing/broken native sharp binary degrades gracefully
@@ -37,14 +43,41 @@ export async function watermarkImage(buf: Buffer, ext: string): Promise<Watermar
     const meta = await base.metadata();
     const w = meta.width || 800;
     const h = meta.height || 800;
+
+    // Store logo watermark: overlay the logo (semi-transparent) in the corner.
+    if (opts?.logo && opts.logo.length) {
+      try {
+        const lw = Math.max(48, Math.round(Math.min(w, h) * 0.22)); // ~22% of the short side
+        const pad = Math.max(6, Math.round(lw * 0.16));
+        // Resize + fade the logo, then pad it with transparent margin on the
+        // right/bottom so gravity:'southeast' leaves a gap from the edges.
+        const logoPng = await sharp(opts.logo, { failOn: 'none' })
+          .resize(lw, lw, { fit: 'inside', withoutEnlargement: true })
+          .ensureAlpha()
+          // multiply the alpha channel by 0.72 → a subtle, non-intrusive watermark
+          .composite([{ input: Buffer.from([255, 255, 255, Math.round(255 * 0.72)]), raw: { width: 1, height: 1, channels: 4 }, tile: true, blend: 'dest-in' }])
+          .extend({ top: pad, bottom: pad, left: pad, right: pad, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .png()
+          .toBuffer();
+        let out = base.composite([{ input: logoPng, gravity: 'southeast' }]);
+        if (target === 'png') out = out.png();
+        else if (target === 'webp') out = out.webp();
+        else out = out.jpeg({ quality: 82 });
+        return { buf: await out.toBuffer(), ext: target };
+      } catch {
+        // logo failed to decode → fall through to the text watermark below
+      }
+    }
+
     const fs = Math.max(18, Math.round(Math.min(w, h) * 0.075));
     const pad = Math.round(fs * 0.55);
     const stroke = Math.max(1, fs * 0.03);
+    const safeLabel = label.replace(/[<>&]/g, ' '); // keep the SVG well-formed
     const svg = Buffer.from(
       `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">` +
       `<text x="${w - pad}" y="${h - pad}" text-anchor="end" ` +
       `font-family="Cairo, Amiri, 'Noto Sans Arabic', DejaVu Sans, sans-serif" font-size="${fs}" font-weight="700" ` +
-      `fill="#ffffff" fill-opacity="0.7" stroke="#0b2a4a" stroke-opacity="0.28" stroke-width="${stroke}">تربح</text>` +
+      `fill="#ffffff" fill-opacity="0.7" stroke="#0b2a4a" stroke-opacity="0.28" stroke-width="${stroke}">${safeLabel}</text>` +
       `</svg>`,
     );
     let out = base.composite([{ input: svg, top: 0, left: 0 }]);

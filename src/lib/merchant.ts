@@ -13,13 +13,46 @@ async function logoUrl(logoId: number | null): Promise<string> {
 }
 
 /**
+ * Watermark to burn onto a store owner's ad images: the store logo or the store
+ * name (owner's choice in store settings). Returns `{ logo?, text? }` for
+ * watermarkImage — logo wins when chosen and readable, otherwise the name text.
+ * Returns undefined when the user has no store / no usable identity (→ the
+ * default "تربح" watermark applies). Never throws.
+ */
+export async function getStoreWatermark(userId: number): Promise<{ text?: string; logo?: Buffer } | undefined> {
+  try {
+    await ensure();
+    const s = await prisma.stores.findFirst({
+      where: { user_id: userId },
+      select: { watermark_kind: true, store_name: true, logo: true },
+      orderBy: { id: 'desc' },
+    }).catch(() => null);
+    if (!s) return undefined;
+    const name = (s.store_name || '').trim();
+    const kind = s.watermark_kind || 'name';
+    if (kind === 'logo' && s.logo && s.logo > 0) {
+      const up = await prisma.uploads.findUnique({ where: { id: BigInt(s.logo) }, select: { file_name: true } }).catch(() => null);
+      if (up?.file_name) {
+        const { readLocal } = await import('./storage');
+        const buf = await readLocal(up.file_name).catch(() => null);
+        // keep the name as a text fallback in case the logo can't be decoded
+        if (buf && buf.length) return { logo: buf, text: name || undefined };
+      }
+    }
+    return name ? { text: name } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Merchant-store extras layered on top of the base `stores` table:
  * branding (name/color/about), admin approval status, followers and reviews.
  * New columns/tables are self-provisioned (the legacy DB has no migrations).
  */
 const ensure = ensureSchema;
 
-export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; onPlatform: boolean; handle: string | null; nationalId: string | null; phone: string | null; email: string | null; contacts: string | null; termsAgreed: boolean; termsAgreedAt: string | null; allowAds: boolean; allowReviews: boolean; msgTemplates: string | null; hiddenFields: string | null; announce: string | null; productNote: string | null; welcomeMsg: string | null; welcomeOn: boolean; status: number };
+export type StoreMeta = { storeName: string | null; color: string | null; about: string | null; banner: string | null; tagline: string | null; layout: string | null; catalog: string | null; fields: string | null; since: string | null; specialty: string | null; audience: string | null; onPlatform: boolean; handle: string | null; nationalId: string | null; phone: string | null; email: string | null; contacts: string | null; termsAgreed: boolean; termsAgreedAt: string | null; allowAds: boolean; allowReviews: boolean; msgTemplates: string | null; hiddenFields: string | null; announce: string | null; productNote: string | null; welcomeMsg: string | null; welcomeOn: boolean; watermarkKind: 'name' | 'logo'; status: number };
 
 /** نص بوب أب ترحيب المتجر الافتراضي حين لا يكتب المالك نصاً مخصصاً — {name} يُستبدل باسم المتجر. */
 export const DEFAULT_STORE_WELCOME_MSG = 'مرحباً بكم في متجر {name} 👋 يسعدنا تصفّحكم.';
@@ -43,7 +76,7 @@ async function getStoreMetaImpl(storeId: number): Promise<StoreMeta> {
   const r = Number.isInteger(storeId) && storeId > 0
     ? await prisma.stores.findUnique({ where: { id: BigInt(storeId) } }).catch(() => null)
     : null;
-  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, since: r?.activity_since ?? null, specialty: r?.specialty ?? null, audience: r?.audience ?? null, onPlatform: (r?.show_on_platform ?? 0) === 1, handle: r?.handle ?? null, nationalId: r?.national_id ?? null, phone: r?.store_phone ?? null, email: r?.store_email ?? null, contacts: r?.contacts ?? null, termsAgreed: (r?.terms_agreed ?? 0) === 1, termsAgreedAt: r?.terms_agreed_at ? r.terms_agreed_at.toISOString() : null, allowAds: (r?.allow_ads ?? 1) === 1, allowReviews: (r?.allow_reviews ?? 1) === 1, msgTemplates: r?.msg_templates ?? null, hiddenFields: r?.hidden_fields ?? null, announce: r?.announce ?? null, productNote: r?.product_note ?? null, welcomeMsg: r?.welcome_msg ?? null, welcomeOn: (r?.welcome_on ?? 0) === 1, status: r?.status ?? 1 };
+  return { storeName: r?.store_name ?? null, color: r?.brand_color ?? null, about: r?.about ?? null, banner: r?.banner ?? null, tagline: r?.tagline ?? null, layout: r?.layout ?? null, catalog: r?.catalog ?? null, fields: r?.catalog_fields ?? null, since: r?.activity_since ?? null, specialty: r?.specialty ?? null, audience: r?.audience ?? null, onPlatform: (r?.show_on_platform ?? 0) === 1, handle: r?.handle ?? null, nationalId: r?.national_id ?? null, phone: r?.store_phone ?? null, email: r?.store_email ?? null, contacts: r?.contacts ?? null, termsAgreed: (r?.terms_agreed ?? 0) === 1, termsAgreedAt: r?.terms_agreed_at ? r.terms_agreed_at.toISOString() : null, allowAds: (r?.allow_ads ?? 1) === 1, allowReviews: (r?.allow_reviews ?? 1) === 1, msgTemplates: r?.msg_templates ?? null, hiddenFields: r?.hidden_fields ?? null, announce: r?.announce ?? null, productNote: r?.product_note ?? null, welcomeMsg: r?.welcome_msg ?? null, welcomeOn: (r?.welcome_on ?? 0) === 1, watermarkKind: (r?.watermark_kind === 'logo' ? 'logo' : 'name') as 'logo' | 'name', status: r?.status ?? 1 };
 }
 
 /* ---- Warnings & admin store oversight ---- */
@@ -171,7 +204,7 @@ export async function saveStoreMeta(userId: number, data: { storeName: string; c
 
 /** Store owner toggles: allow publishing ads, lock/unlock reviews+comments, and
  *  the store's OWN quick-reply message templates (shown only to its customers). */
-export async function saveStoreSettings(userId: number, data: { allowAds: boolean; allowReviews: boolean; msgTemplates: string; hidden: string[]; announce: string; productNote: string; welcomeMsg: string; welcomeOn: boolean; hours?: { from: string; to: string; days: number[] } | null }) {
+export async function saveStoreSettings(userId: number, data: { allowAds: boolean; allowReviews: boolean; msgTemplates: string; hidden: string[]; announce: string; productNote: string; welcomeMsg: string; welcomeOn: boolean; watermarkKind?: 'name' | 'logo'; hours?: { from: string; to: string; days: number[] } | null }) {
   await ensure();
   const { parseTemplates } = await import('./settings');
   const tpl = parseTemplates(data.msgTemplates).join('\n');
@@ -186,7 +219,8 @@ export async function saveStoreSettings(userId: number, data: { allowAds: boolea
     : data.hours && hhmm.test(data.hours.from) && hhmm.test(data.hours.to)
       ? { hours_from: data.hours.from, hours_to: data.hours.to, hours_days: data.hours.days.filter((d) => d >= 0 && d <= 6).join(',') || null }
       : { hours_from: null, hours_to: null, hours_days: null };
-  await prisma.stores.updateMany({ where: { user_id: userId }, data: { allow_ads: data.allowAds ? 1 : 0, allow_reviews: data.allowReviews ? 1 : 0, msg_templates: tpl || null, hidden_fields: hidden || null, announce: announce || null, product_note: productNote || null, welcome_msg: welcomeMsg || null, welcome_on: data.welcomeOn ? 1 : 0, ...hoursData } }).catch(() => {});
+  const wmKind = data.watermarkKind === 'logo' ? 'logo' : 'name';
+  await prisma.stores.updateMany({ where: { user_id: userId }, data: { allow_ads: data.allowAds ? 1 : 0, allow_reviews: data.allowReviews ? 1 : 0, msg_templates: tpl || null, hidden_fields: hidden || null, announce: announce || null, product_note: productNote || null, welcome_msg: welcomeMsg || null, welcome_on: data.welcomeOn ? 1 : 0, watermark_kind: wmKind, ...hoursData } }).catch(() => {});
 }
 
 /** Record that the owner agreed to the store terms (accountability). */

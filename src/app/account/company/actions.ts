@@ -70,6 +70,7 @@ export async function saveStoreSettingsAction(formData: FormData) {
     productNote,
     welcomeMsg,
     welcomeOn: formData.get('welcomeOn') !== null,
+    watermarkKind: String(formData.get('watermarkKind') || '') === 'logo' ? 'logo' : 'name',
     ...(hoursPresent ? { hours: hFrom && hTo ? { from: hFrom, to: hTo, days: hDays } : null } : {}),
   });
   revalidatePath('/store');

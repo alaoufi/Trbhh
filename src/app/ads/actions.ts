@@ -5,7 +5,7 @@ import { createHash } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { saveUpload } from '@/lib/storage';
-import { watermarkImage } from '@/lib/watermark';
+import { watermarkImage, type WatermarkOptions } from '@/lib/watermark';
 import { logClientError } from '@/lib/error-log';
 import { aHash, hashSimilarity } from '@/lib/phash';
 import { bumpDupAttempts, banUserFor, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned, notifyModBlock } from '@/lib/moderation';
@@ -79,10 +79,10 @@ async function readImages(formData: FormData): Promise<PreparedImage[]> {
 
 /** Watermark + hash + persist ONE image; failures here just skip that image
  *  rather than failing the whole publish. */
-async function storeOneImage(img: PreparedImage, userId: number, adId: bigint) {
+async function storeOneImage(img: PreparedImage, userId: number, adId: bigint, wm?: WatermarkOptions) {
   try {
     const [stamped, phash] = await Promise.all([
-      watermarkImage(img.buf, img.ext), // burn "تربح" watermark (also downscales + normalizes format)
+      watermarkImage(img.buf, img.ext, wm), // burn watermark (store logo/name for store ads, else "تربح"); also downscales + normalizes format
       aHash(img.buf), // بصمة إدراكية للصورة (لكشف التكرار بالنسبة)
     ]);
     // Store with the ACTUAL output extension (watermarkImage re-encodes HEIC/gif/…
@@ -108,8 +108,8 @@ async function storeOneImage(img: PreparedImage, userId: number, adId: bigint) {
 /** Every image's watermark/hash/upload/DB-write pipeline runs concurrently —
  *  was a fully serial for-loop that made an ad's save time scale linearly
  *  with its photo count. */
-async function storeImages(images: PreparedImage[], userId: number, adId: bigint) {
-  await Promise.all(images.map((img) => storeOneImage(img, userId, adId)));
+async function storeImages(images: PreparedImage[], userId: number, adId: bigint, wm?: WatermarkOptions) {
+  await Promise.all(images.map((img) => storeOneImage(img, userId, adId, wm)));
 }
 
 /**
@@ -403,7 +403,9 @@ export async function createAdAction(formData: FormData) {
     },
   });
 
-  await storeImages(images, session.uid, ad.id);
+  // إعلان المتجر: العلامة المائية هوية المتجر (شعار/اسم حسب اختيار المالك) بدل «تربح»
+  const wm = dest === 'store' ? await (await import('@/lib/merchant')).getStoreWatermark(session.uid) : undefined;
+  await storeImages(images, session.uid, ad.id, wm);
   const audio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);
   if (audio) await setAdMedia(ad.id, 'audio', audio).catch(() => {});
   await logAdPublish(session.uid); // سجل ثابت لحدّ الباقة — لا يتأثر بحذف الإعلان لاحقاً
@@ -570,7 +572,9 @@ export async function updateAdAction(formData: FormData) {
       redirect(`/ads/${toInt(adId)}/edit?error=image`);
     }
   }
-  if (images.length) await storeImages(images, session.uid, adId);
+  // تعديل إعلان متجر: حافظ على علامة المتجر المائية (شعار/اسم) بدل «تربح»
+  const eWm = Number(ad.store_only) === 1 ? await (await import('@/lib/merchant')).getStoreWatermark(session.uid) : undefined;
+  if (images.length) await storeImages(images, session.uid, adId, eWm);
   const newVideo = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
   if (newVideo) await prisma.ads.update({ where: { id: adId }, data: { video_path: newVideo } }).catch(() => {});
   const newAudio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);

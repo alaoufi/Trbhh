@@ -52,6 +52,8 @@ const STATEMENTS: string[] = [
      على إفراغ النص فقط، بخلاف announce) لأن المالك قد يريد إيقافه مؤقتاً دون فقد نصه. */
   `ALTER TABLE stores ADD COLUMN welcome_msg VARCHAR(300) NULL`,
   `ALTER TABLE stores ADD COLUMN welcome_on TINYINT NOT NULL DEFAULT 0`,
+  /* العلامة المائية على صور إعلانات المتجر: 'name' اسم المتجر أو 'logo' شعاره (اختيار المالك) */
+  `ALTER TABLE stores ADD COLUMN watermark_kind VARCHAR(8) NULL`,
   `ALTER TABLE uploads ADD COLUMN phash VARCHAR(20) NULL`,
   `ALTER TABLE stores ADD COLUMN store_password VARCHAR(255) NULL`,
   `ALTER TABLE stores ADD COLUMN store_username VARCHAR(60) NULL`,

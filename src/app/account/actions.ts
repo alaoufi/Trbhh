@@ -34,9 +34,14 @@ export async function deleteAdAction(formData: FormData) {
   const back = String(formData.get('back') || '') === 'ad' ? `/ads/${toInt(adId)}` : '';
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (ad && toInt(ad.user_id) === session.uid) {
-    const { deleteHours } = await getMemberWindows();
-    if (!withinWindow(ad.created_at, deleteHours)) {
-      redirect(back ? `${back}?error=deleteWindow&hours=${deleteHours}` : `/account/ads?error=deleteWindow&hours=${deleteHours}`);
+    // صاحب المتجر يملك التحكّم الكامل بإعلانات متجره: يحذفها نهائياً في أي وقت
+    // بلا قيد «فترة السماح بالحذف» (تلك تخصّ إعلانات تربح العادية فقط).
+    const isStoreAd = Number(ad.store_only) === 1;
+    if (!isStoreAd) {
+      const { deleteHours } = await getMemberWindows();
+      if (!withinWindow(ad.created_at, deleteHours)) {
+        redirect(back ? `${back}?error=deleteWindow&hours=${deleteHours}` : `/account/ads?error=deleteWindow&hours=${deleteHours}`);
+      }
     }
     await prisma.photos.deleteMany({ where: { other_id: adId } });
     await prisma.ads.delete({ where: { id: adId } });
@@ -90,13 +95,16 @@ export async function archiveAdAction(formData: FormData) {
 export async function restoreArchivedAdAction(formData: FormData) {
   const session = await requireUser();
   const adId = BigInt(String(formData.get('adId') || '0'));
-  const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { user_id: true, data_archive: true, arc_msg: true } });
+  const ad = await prisma.ads.findUnique({ where: { id: adId }, select: { user_id: true, data_archive: true, arc_msg: true, store_only: true } });
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
   // مخالفة أخفتها الإدارة: لا تُعاد بالدفع — تُعالج ويُراسَل بها الإدارة
   if (ad.arc_msg && ad.arc_msg.trim() !== '') redirect('/account/ads?error=adminhidden');
   const isArchived = !!(ad.data_archive && ad.data_archive.trim() !== '');
   if (!isArchived) redirect('/account/ads');
-  const fee = await getAdRestoreFee().catch(() => 0);
+  // إعلان المتجر: يعيده صاحب المتجر من الأرشيف مجاناً بلا رسوم استعادة (رسوم
+  // الاستعادة تخصّ إعلانات تربح العادية فقط).
+  const isStoreAd = Number(ad.store_only) === 1;
+  const fee = isStoreAd ? 0 : await getAdRestoreFee().catch(() => 0);
   if (fee > 0) {
     const paid = await charge(session.uid, fee, 'ad_show', `إعادة إظهار إعلان مؤرشف #${toInt(adId)}`);
     if (!paid.ok) redirect(`/account/ads?error=needcredit&price=${fee}&bal=${paid.balance}`);

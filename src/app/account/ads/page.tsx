@@ -207,17 +207,19 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 })()}
                 {/* مؤرشف → إعادة إظهار برسوم (لا يُعاد مجاناً)؛ مخفيّ من الإدارة → لا زر؛ غير ذلك → إيقاف/تفعيل مجاني */}
                 {ad.hiddenReason ? null : ad.archived ? (() => {
-                  const canRestore = restoreFee <= 0 || balance >= restoreFee;
+                  // إعلان المتجر: إعادته من الأرشيف مجانية دائماً لصاحب المتجر.
+                  const effFee = ad.storeOnly ? 0 : restoreFee;
+                  const canRestore = effFee <= 0 || balance >= effFee;
                   return (
                     <form action={restoreArchivedAdAction}>
                       <input type="hidden" name="adId" value={ad.id} />
                       <ConfirmSubmit
                         disabled={!canRestore}
-                        msg={restoreFee > 0 ? `إعادة إظهار هذا الإعلان المؤرشف؟ سيُخصم ${restoreFee} ر.س من رصيدك فوراً.` : 'إعادة إظهار هذا الإعلان المؤرشف؟'}
-                        title={canRestore ? undefined : `رصيدك لا يكفي (${restoreFee} ر.س)`}
+                        msg={effFee > 0 ? `إعادة إظهار هذا الإعلان المؤرشف؟ سيُخصم ${effFee} ر.س من رصيدك فوراً.` : 'إعادة إظهار هذا الإعلان المؤرشف؟'}
+                        title={canRestore ? undefined : `رصيدك لا يكفي (${effFee} ر.س)`}
                         className={`flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-bold ${canRestore ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'cursor-not-allowed border-red-300 bg-red-50 text-red-400 opacity-60'}`}
                       >
-                        <Eye className="h-3 w-3" /> أعِد للظهور{restoreFee > 0 ? ` (${restoreFee} ر.س)` : ''}
+                        <Eye className="h-3 w-3" /> أعِد للظهور{effFee > 0 ? ` (${effFee} ر.س)` : ''}
                       </ConfirmSubmit>
                     </form>
                   );
@@ -239,7 +241,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                     )}
                   </>
                 )}
-                {deleteState.expired ? (
+                {(!ad.storeOnly && deleteState.expired) ? (
                   <span className="flex items-center gap-1 rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-xs text-muted-foreground" title="تجاوز الإعلان مدة السماح بالحذف">
                     <Trash2 className="h-3 w-3" /> انتهت مهلة السماح
                   </span>
@@ -247,7 +249,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                   <form action={deleteAdAction}>
                     <input type="hidden" name="adId" value={ad.id} />
                     <ConfirmSubmit msg={`حذف إعلانك «${ad.title || `#${ad.id}`}» نهائياً؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10">
-                      <Trash2 className="h-3 w-3" /> حذف{deleteState.label ? ` (${deleteState.label})` : ''}
+                      <Trash2 className="h-3 w-3" /> حذف{!ad.storeOnly && deleteState.label ? ` (${deleteState.label})` : ''}
                     </ConfirmSubmit>
                   </form>
                 )}

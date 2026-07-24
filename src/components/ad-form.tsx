@@ -227,8 +227,12 @@ export function AdForm({
           <div className="flex items-center gap-2 text-base font-extrabold">🚫 لقد تجاوزت حدك اليومي</div>
           <p className="mt-1 text-sm font-medium">
             {limitMax ? `باقتك تسمح بـ ${limitMax} إعلان في اليوم، وقد استوفيت هذا العدد.` : 'لقد بلغت الحد اليومي المسموح به لعدد إعلاناتك.'}
-            {' '}لم يُنشر إعلانك. يمكنك النشر مجدداً غداً، أو ترقية باقتك الآن من صفحة <Link href="/packages" className="font-bold underline">الباقات</Link> لعدد إعلانات أكبر.
+            {' '}لم يُنشر إعلانك — يمكنك النشر مجدداً غداً.
           </p>
+          <p className="mt-2 text-sm font-bold">هل ترغب بالاشتراك في باقة للحصول على عدد إعلانات أكبر؟</p>
+          <Link href="/packages" className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white shadow-sm transition hover:opacity-90">
+            نعم، اعرض الباقات المتاحة ←
+          </Link>
         </div>
       )}
       {error === 'gap' && (

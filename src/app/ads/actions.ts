@@ -496,9 +496,12 @@ export async function updateAdAction(formData: FormData) {
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
 
-  // مدة السماح بالتعديل التي تحددها الإدارة
-  const { editHours } = await getMemberWindows();
-  if (!withinWindow(ad.created_at, editHours)) redirect(`/ads/${toInt(adId)}/edit?error=editWindow&hours=${editHours}`);
+  // مدة السماح بالتعديل التي تحددها الإدارة — لا تنطبق على إعلانات المتجر:
+  // صاحب المتجر يتحكّم بإعلانات متجره كاملاً ويعدّلها في أي وقت.
+  if (Number(ad.store_only) !== 1) {
+    const { editHours } = await getMemberWindows();
+    if (!withinWindow(ad.created_at, editHours)) redirect(`/ads/${toInt(adId)}/edit?error=editWindow&hours=${editHours}`);
+  }
 
   const phone = String(formData.get('phone') || '').trim();
   const whatsapp = String(formData.get('whatsapp') || '').trim();

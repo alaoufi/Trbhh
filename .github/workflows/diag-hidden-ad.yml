@@ -34,8 +34,18 @@ jobs:
               if (Number.isFinite(n) && n > 0) upIds.push(BigInt(n));
             }
             const ups = upIds.length ? await p.uploads.findMany({ where: { id: { in: upIds } }, select: { id: true, file_name: true, extension: true } }).catch(() => []) : [];
-            // سجل الرقابة: آخر ٤٠ رفضاً/إجراءً (يكشف سبب «اختفاء» إعلان لم يُنشأ)
-            const mods = await p.mod_log.findMany({ orderBy: { id: 'desc' }, take: 40, select: { id: true, user_id: true, kind: true, action: true, snippet: true, created_at: true, ad_id: true } }).catch(() => []);
+            // جدول الباقات: لكشف قيمة ads_per_day/gap_hours الفعلية للباقة الافتراضية/المجانية
+            const packages = await p.$queryRawUnsafe('SELECT id, name, price, ads_per_day, gap_hours, is_default, active FROM packages ORDER BY id').catch((e) => ({ error: String(e) }));
+            console.log('===PACKAGES_START===');
+            console.log(JSON.stringify(packages, (k, v) => (typeof v === 'bigint' ? v.toString() : v), 2));
+            console.log('===PACKAGES_END===');
+            // عدد المشتركين في كل باقة (كم عضواً له اشتراك فعلي)
+            const subs = await p.$queryRawUnsafe('SELECT package_id, COUNT(*) c FROM user_packages GROUP BY package_id').catch((e) => ({ error: String(e) }));
+            console.log('===SUBS_START===');
+            console.log(JSON.stringify(subs, (k, v) => (typeof v === 'bigint' ? v.toString() : v), 2));
+            console.log('===SUBS_END===');
+            // سجل الرقابة: آخر ١٠ فقط (اختصار)
+            const mods = await p.mod_log.findMany({ orderBy: { id: 'desc' }, take: 10, select: { id: true, kind: true, action: true, snippet: true, created_at: true } }).catch(() => []);
             console.log('===MODLOG_START===');
             console.log(JSON.stringify(mods, (k, v) => (typeof v === 'bigint' ? v.toString() : v), 2));
             console.log('===MODLOG_END===');

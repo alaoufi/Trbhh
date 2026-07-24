@@ -223,8 +223,12 @@ export function AdForm({
         </div>
       )}
       {error === 'limit' && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          لقد بلغت الحد اليومي لعدد الإعلانات في باقتك{limitMax ? ` (${limitMax} إعلان/اليوم)` : ''}. للمزيد بإمكانك ترقية باقتك من صفحة <Link href="/packages" className="font-bold underline">الباقات</Link>.
+        <div className="rounded-xl border-2 border-red-400 bg-red-50 p-4 text-red-900">
+          <div className="flex items-center gap-2 text-base font-extrabold">🚫 لقد تجاوزت حدك اليومي</div>
+          <p className="mt-1 text-sm font-medium">
+            {limitMax ? `باقتك تسمح بـ ${limitMax} إعلان في اليوم، وقد استوفيت هذا العدد.` : 'لقد بلغت الحد اليومي المسموح به لعدد إعلاناتك.'}
+            {' '}لم يُنشر إعلانك. يمكنك النشر مجدداً غداً، أو ترقية باقتك الآن من صفحة <Link href="/packages" className="font-bold underline">الباقات</Link> لعدد إعلانات أكبر.
+          </p>
         </div>
       )}
       {error === 'gap' && (

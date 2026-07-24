@@ -241,36 +241,29 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         </div>
       )}
 
-      {/* إدارة الإعلان لصاحبه مباشرة من صفحته: تعديل/أرشفة/حذف — بلا حاجة للذهاب لـ«إعلاناتي».
-          إعلان المتجر: تحكّم كامل لصاحب المتجر بلا فترة سماح (تعديل/حذف في أي وقت + إعادة مجانية). */}
-      {isAdOwner && editState && deleteState && (
-        <div className={`flex flex-wrap items-center gap-2 rounded-xl border-2 p-3 ${ad.storeOnly ? 'border-primary/40 bg-primary/10' : 'border-primary/20 bg-primary/5'}`}>
-          <span className="text-xs font-extrabold text-primary">{ad.storeOnly ? '🏪 إدارة إعلان متجرك:' : 'إدارة إعلانك:'}</span>
-          {(editState.expired && !ad.storeOnly) ? (
+      {/* إدارة الإعلان العادي (تربح) لصاحبه من أعلى صفحته: تعديل/أرشفة/حذف — بمهل السماح.
+          إعلان المتجر له مربع منفصل بأسلوب «أدوات الإدارة» بعد التفاصيل (أدناه). */}
+      {isAdOwner && !ad.storeOnly && editState && deleteState && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
+          <span className="text-xs font-extrabold text-primary">إدارة إعلانك:</span>
+          {editState.expired ? (
             <span className="flex items-center gap-1 rounded-md border border-border/50 bg-secondary/30 px-2.5 py-1.5 text-xs text-muted-foreground" title="تجاوز الإعلان مدة السماح بالتعديل">
               <Pencil className="h-3.5 w-3.5" /> انتهت مهلة السماح
             </span>
           ) : (
             <Link href={`/ads/${ad.id}/edit`} className="flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-bold hover:bg-secondary">
-              <Pencil className="h-3.5 w-3.5" /> تعديل{!ad.storeOnly && editState.label ? ` (${editState.label})` : ''}
+              <Pencil className="h-3.5 w-3.5" /> تعديل{editState.label ? ` (${editState.label})` : ''}
             </Link>
           )}
-          {!ad.archived ? (
+          {!ad.archived && (
             <form action={archiveAdAction}>
               <input type="hidden" name="adId" value={ad.id} />
               <ConfirmSubmit msg={`نقل «${ad.title || `#${ad.id}`}» للأرشيف؟ يختفي فوراً عن الموقع ولا يُحذف.`} className="flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">
                 <Archive className="h-3.5 w-3.5" /> نقل للأرشيف
               </ConfirmSubmit>
             </form>
-          ) : ad.storeOnly ? (
-            <form action={restoreArchivedAdAction}>
-              <input type="hidden" name="adId" value={ad.id} />
-              <ConfirmSubmit msg={`إعادة إظهار «${ad.title || `#${ad.id}`}» من الأرشيف؟ يعود للعرض في متجرك فوراً.`} className="flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
-                <Eye className="h-3.5 w-3.5" /> أعِد للظهور
-              </ConfirmSubmit>
-            </form>
-          ) : null}
-          {(deleteState.expired && !ad.storeOnly) ? (
+          )}
+          {deleteState.expired ? (
             <span className="flex items-center gap-1 rounded-md border border-border/50 bg-secondary/30 px-2.5 py-1.5 text-xs text-muted-foreground" title="تجاوز الإعلان مدة السماح بالحذف">
               <Trash2 className="h-3.5 w-3.5" /> انتهت مهلة السماح
             </span>
@@ -279,7 +272,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
               <input type="hidden" name="adId" value={ad.id} />
               <input type="hidden" name="back" value="ad" />
               <ConfirmSubmit msg={`حذف إعلانك «${ad.title || `#${ad.id}`}» نهائياً؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10">
-                <Trash2 className="h-3.5 w-3.5" /> حذف{!ad.storeOnly && deleteState.label ? ` (${deleteState.label})` : ''}
+                <Trash2 className="h-3.5 w-3.5" /> حذف{deleteState.label ? ` (${deleteState.label})` : ''}
               </ConfirmSubmit>
             </form>
           )}
@@ -657,6 +650,47 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             ))}
             {comments.length === 0 && <p className="text-sm text-muted-foreground">لا توجد تعليقات بعد.</p>}
           </ul>
+        </div>
+      )}
+
+      {/* إدارة إعلان المتجر لصاحبه — بأسلوب «أدوات الإدارة» وبعد التفاصيل، ويظهر لصاحب المتجر فقط.
+          تحكّم كامل بلا فترة سماح: تعديل/حذف في أي وقت + أرشفة + إعادة مجانية. */}
+      {isAdOwner && ad.storeOnly && (
+        <div className="scroll-mt-20 rounded-2xl border-2 border-primary/30 bg-primary/5 p-4">
+          <div className="mb-2 flex items-center gap-2 text-primary">
+            <Store className="h-5 w-5" /> <span className="font-bold">إدارة إعلان متجرك</span>
+          </div>
+          <p className="mb-3 text-xs font-medium leading-5 text-primary/80">
+            لك تحكّم كامل بإعلان متجرك بلا فترة سماح: عدّله أو احذفه نهائياً في أي وقت، أو انقله للأرشيف (يختفي مؤقتاً دون حذف) وأعِده مجاناً متى شئت.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <Link href={`/ads/${ad.id}/edit`} className="flex items-center justify-center gap-1 rounded-lg border-2 border-primary/30 bg-white px-3 py-2 text-sm font-bold text-primary hover:bg-accent">
+              <Pencil className="h-4 w-4" /> تعديل
+            </Link>
+            {!ad.archived ? (
+              <form action={archiveAdAction}>
+                <input type="hidden" name="adId" value={ad.id} />
+                <ConfirmSubmit msg={`نقل «${ad.title || `#${ad.id}`}» للأرشيف؟ يختفي فوراً عن متجرك ولا يُحذف.`} className="flex w-full items-center justify-center gap-1 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-100">
+                  <Archive className="h-4 w-4" /> نقل للأرشيف
+                </ConfirmSubmit>
+              </form>
+            ) : (
+              <form action={restoreArchivedAdAction}>
+                <input type="hidden" name="adId" value={ad.id} />
+                <ConfirmSubmit msg={`إعادة إظهار «${ad.title || `#${ad.id}`}» من الأرشيف؟ يعود لمتجرك فوراً.`} className="flex w-full items-center justify-center gap-1 rounded-lg border-2 border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
+                  <Eye className="h-4 w-4" /> أعِد للظهور
+                </ConfirmSubmit>
+              </form>
+            )}
+            <form action={deleteAdAction}>
+              <input type="hidden" name="adId" value={ad.id} />
+              <input type="hidden" name="back" value="ad" />
+              <ConfirmSubmit msg={`حذف إعلان متجرك «${ad.title || `#${ad.id}`}» نهائياً؟ لا يمكن التراجع.`} className="flex w-full items-center justify-center gap-1 rounded-lg border-2 border-destructive/30 bg-white px-3 py-2 text-sm font-bold text-destructive hover:bg-destructive/10">
+                <Trash2 className="h-4 w-4" /> حذف نهائي
+              </ConfirmSubmit>
+            </form>
+          </div>
+          <Link href="/account/ads" className="mt-3 inline-block text-xs font-bold text-primary underline">كل إعلاناتي ←</Link>
         </div>
       )}
 

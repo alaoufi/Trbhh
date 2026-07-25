@@ -4,8 +4,10 @@ import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import {
   MapPin, Eye, Phone, MessageCircle, Timer, ArrowLeftRight,
-  Hash, Navigation, ArrowRight, BadgeCheck,
+  Hash, Navigation, ArrowRight, BadgeCheck, Store, Pencil, Archive, Trash2,
 } from 'lucide-react';
+import { ConfirmSubmit } from '@/components/confirm-submit';
+import { deleteAdAction, archiveAdAction, restoreArchivedAdAction } from '@/app/account/actions';
 import { SITE } from '@/lib/constants';
 import { getAd, recordView } from '@/lib/data';
 import { getStore } from '@/lib/stores';
@@ -173,6 +175,46 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
           </div>
           <p className="whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
         </div>
+
+        {/* إدارة إعلان المتجر لصاحبه — بعد التفاصيل، يظهر لصاحب الإعلان فقط. تحكّم كامل
+            بلا فترة سماح: تعديل/حذف في أي وقت + أرشفة + إعادة مجانية. الشرط يطابق صلاحية
+            الخادم تماماً (صاحب الإعلان = user_id) فلا يظهر زر لا يعمل. */}
+        {!!(session && ad.seller && session.uid === ad.seller.id) && (
+          <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-4">
+            <div className="mb-2 flex items-center gap-2 text-primary">
+              <Store className="h-5 w-5" /> <span className="font-bold">إدارة إعلان متجرك</span>
+            </div>
+            <p className="mb-3 text-xs font-medium leading-5 text-primary/80">
+              لك تحكّم كامل بإعلان متجرك بلا فترة سماح: عدّله أو احذفه نهائياً في أي وقت، أو انقله للأرشيف (يختفي مؤقتاً دون حذف) وأعِده مجاناً متى شئت.
+            </p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <Link href={`/ads/${ad.id}/edit`} className="flex items-center justify-center gap-1 rounded-lg border-2 border-primary/30 bg-white px-3 py-2 text-sm font-bold text-primary hover:bg-accent">
+                <Pencil className="h-4 w-4" /> تعديل
+              </Link>
+              {!ad.archived ? (
+                <form action={archiveAdAction}>
+                  <input type="hidden" name="adId" value={ad.id} />
+                  <ConfirmSubmit msg={`نقل «${ad.title || `#${ad.id}`}» للأرشيف؟ يختفي فوراً عن متجرك ولا يُحذف.`} className="flex w-full items-center justify-center gap-1 rounded-lg border-2 border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-100">
+                    <Archive className="h-4 w-4" /> نقل للأرشيف
+                  </ConfirmSubmit>
+                </form>
+              ) : (
+                <form action={restoreArchivedAdAction}>
+                  <input type="hidden" name="adId" value={ad.id} />
+                  <ConfirmSubmit msg={`إعادة إظهار «${ad.title || `#${ad.id}`}» من الأرشيف؟ يعود لمتجرك فوراً.`} className="flex w-full items-center justify-center gap-1 rounded-lg border-2 border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
+                    <Eye className="h-4 w-4" /> أعِد للظهور
+                  </ConfirmSubmit>
+                </form>
+              )}
+              <form action={deleteAdAction}>
+                <input type="hidden" name="adId" value={ad.id} />
+                <ConfirmSubmit msg={`حذف إعلان متجرك «${ad.title || `#${ad.id}`}» نهائياً؟ لا يمكن التراجع.`} className="flex w-full items-center justify-center gap-1 rounded-lg border-2 border-destructive/30 bg-white px-3 py-2 text-sm font-bold text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4" /> حذف نهائي
+                </ConfirmSubmit>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* الموقع على الخريطة */}
         {ad.lat && ad.lng && (

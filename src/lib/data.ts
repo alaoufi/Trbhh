@@ -553,25 +553,24 @@ async function getAdImpl(id: number) {
     city: city?.name ?? null,
     area: area?.name ?? null,
     category: category ? { id: toInt(category.id), name: category.name } : null,
+    // الهوية الافتراضية تعرض بيانات الحساب الحيّة (فلا يتقادم الاسم بعد تغييره)؛
+    // الهويات الفرعية فقط تعرض لقطة بياناتها المستقلة المحفوظة.
     seller: seller
-      ? {
-          id: toInt(seller.id),
-          name: pubProfile?.type === 'personal' ? pubProfile.name : (seller.name || seller.userName || 'مستخدم'),
-          phone: pubProfile?.type === 'personal'
-            ? (pubProfile.phone || (pubProfile.isDefault && seller.allow_phone ? seller.phoneNumber : null))
-            : (seller.allow_phone ? seller.phoneNumber : null),
-          whatsapp: pubProfile?.type === 'personal'
-            ? (pubProfile.whatsapp || (pubProfile.isDefault && seller.whatsapp ? seller.phone_whatsapp || seller.phoneNumber : null))
-            : (seller.whatsapp ? seller.phone_whatsapp || seller.phoneNumber : null),
-          trusted: seller.trusted === 1,
-          banned: seller.ban === 'checked',
-          avatar: pubProfile?.type === 'personal' && pubProfile.avatar
-            ? pubProfile.avatarUrl
-            : (seller.photo_path ? mediaUrl(seller.photo_path) : null),
-          color: pubProfile?.type === 'personal' ? pubProfile.color : null,
-          handle: pubProfile?.type === 'personal' ? pubProfile.handle : null,
-          memberSince: seller.created_at ? seller.created_at.toISOString() : null,
-        }
+      ? (() => {
+          const useProfile = pubProfile?.type === 'personal' && !pubProfile.isDefault;
+          return {
+            id: toInt(seller.id),
+            name: useProfile ? pubProfile!.name : (seller.name || seller.userName || 'مستخدم'),
+            phone: useProfile ? (pubProfile!.phone || null) : (seller.allow_phone ? seller.phoneNumber : null),
+            whatsapp: useProfile ? (pubProfile!.whatsapp || null) : (seller.whatsapp ? seller.phone_whatsapp || seller.phoneNumber : null),
+            trusted: seller.trusted === 1,
+            banned: seller.ban === 'checked',
+            avatar: useProfile && pubProfile!.avatar ? pubProfile!.avatarUrl : (seller.photo_path ? mediaUrl(seller.photo_path) : null),
+            color: useProfile ? pubProfile!.color : null,
+            handle: useProfile ? pubProfile!.handle : null,
+            memberSince: seller.created_at ? seller.created_at.toISOString() : null,
+          };
+        })()
       : null,
   };
 }

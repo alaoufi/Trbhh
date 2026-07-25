@@ -40,7 +40,7 @@ function fields(formData: FormData) {
     whatsapp: String(formData.get('whatsapp') || '').trim(),
     email: String(formData.get('email') || '').trim(),
     handle: String(formData.get('handle') || '').trim(),
-    color: String(formData.get('color') || '').trim(),
+    theme: String(formData.get('theme') || '').trim(),
   };
 }
 
@@ -168,9 +168,13 @@ export async function switchProfileAction(formData: FormData) {
   const session = await requireUser();
   const profileId = Number(formData.get('profileId') || 0);
   const back = String(formData.get('back') || '/').trim() || '/';
-  // تأكّد أن الهوية تخصّ المستخدم قبل تفعيلها
-  const owned = await prisma.profiles.findFirst({ where: { id: BigInt(profileId), user_id: BigInt(session.uid) }, select: { id: true } }).catch(() => null);
-  if (owned) await setActiveProfileCookie(profileId);
-  revalidatePath('/');
+  // تأكّد أن الهوية تخصّ المستخدم قبل تفعيلها، وطبّق قالبها على الموقع
+  const owned = await prisma.profiles.findFirst({ where: { id: BigInt(profileId), user_id: BigInt(session.uid) }, select: { id: true, theme: true } }).catch(() => null);
+  if (owned) {
+    await setActiveProfileCookie(profileId);
+    const { setThemeCookie } = await import('@/lib/profiles');
+    await setThemeCookie(owned.theme);
+  }
+  revalidatePath('/', 'layout');
   redirect(back.startsWith('/') ? back : '/');
 }

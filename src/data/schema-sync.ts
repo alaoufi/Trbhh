@@ -640,8 +640,14 @@ const STATEMENTS: string[] = [
     INDEX profiles_store (store_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
   `CREATE UNIQUE INDEX uniq_profile_handle ON profiles (handle)`,
+  // قالب الهوية: يُطبَّق على الموقع (data-theme) عند تفعيل الهوية للتفريق البصري
+  `ALTER TABLE profiles ADD COLUMN theme VARCHAR(16) NULL`,
   // اشتراك الهوية الإضافية: نهاية الاشتراك الشهري المدفوع (التجربة تُحتسب من created_at)
   `ALTER TABLE profiles ADD COLUMN paid_until DATETIME NULL`,
+  // اشتراك باقات الهويات الموحّدة على مستوى العضو: نهاية الاشتراك + عدد الحسابات الممنوحة + اسم الباقة
+  `ALTER TABLE users ADD COLUMN identity_paid_until DATETIME NULL`,
+  `ALTER TABLE users ADD COLUMN identity_accounts INT NOT NULL DEFAULT 0`,
+  `ALTER TABLE users ADD COLUMN identity_plan VARCHAR(24) NULL`,
   // الإعلان يحمل هوية نشره — null = إعلان قديم يُنسب لهوية صاحبه الافتراضية عند العرض
   `ALTER TABLE ads ADD COLUMN profile_id BIGINT NULL`,
   `CREATE INDEX ads_profile_id ON ads (profile_id)`,

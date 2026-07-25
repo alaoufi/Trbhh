@@ -93,6 +93,7 @@ model profiles {
   handle     String?   @db.VarChar(32)
   avatar     Int       @default(0)
   color      String?   @db.VarChar(9)
+  theme      String?   @db.VarChar(16)
   status     Int       @default(1) @db.TinyInt
   is_default Int       @default(0) @db.TinyInt
   created_at DateTime? @default(now()) @db.Timestamp(0)
@@ -1222,6 +1223,9 @@ model users {
   ref_by                    Int?
   merged_into               BigInt?    // حساب مدموج في حساب موحّد (يُمنع دخوله المستقل)
   primary_verified          Int        @default(0) @db.TinyInt // تأكيد جوال الحساب الرئيسي برمز
+  identity_paid_until       DateTime?  @db.DateTime(0) // اشتراك باقات الهويات — نهاية الاشتراك
+  identity_accounts         Int        @default(0) // عدد الهويات الممنوحة بالباقة الحالية
+  identity_plan             String?    @db.VarChar(24) // اسم الباقة الحالية
 }
 
 model store_visits {

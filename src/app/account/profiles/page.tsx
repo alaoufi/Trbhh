@@ -9,6 +9,7 @@ import { getUserProfiles, getActiveProfile, getIdentityPricing, identitySubState
 import { getMergeCandidates } from '@/lib/account-merge';
 import { linkedAccounts } from '@/lib/account-links';
 import { getBalance } from '@/lib/wallet';
+import { IDENTITY_THEMES } from '@/lib/identity-themes';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { switchAccountAction } from '@/app/account/actions';
 import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfileAction, linkAccountAction, startLinkOtpAction, confirmLinkOtpAction, dismissProfilesIntroAction, startPrimaryVerifyAction, confirmPrimaryVerifyAction, subscribeIdentityAction } from './actions';
@@ -16,7 +17,6 @@ import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfi
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'هوياتي — حسابات ومتاجر' };
 
-const PRESET_COLORS = ['#3287da', '#16a34a', '#db2777', '#9333ea', '#ea580c', '#0d9488', '#dc2626', '#4f46e5'];
 const field = 'w-full rounded-lg border-2 border-primary/25 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40';
 const lbl = 'mb-1 block text-xs font-bold text-foreground/70';
 
@@ -52,19 +52,18 @@ function ProfileForm({ p }: { p?: Profile }) {
         </div>
       </div>
       <div>
-        <label className={lbl}>لون الهوية (للتفريق البصري)</label>
+        <label className={lbl}>قالب الهوية (لون الموقع عند تفعيلها — للتفريق بينها)</label>
         <div className="flex flex-wrap items-center gap-2">
-          {PRESET_COLORS.map((c) => (
-            <label key={c} className="relative cursor-pointer">
-              <input type="radio" name="color" value={c} defaultChecked={p?.color === c} className="peer sr-only" />
-              <span className="block h-7 w-7 rounded-full ring-2 ring-transparent ring-offset-2 peer-checked:ring-foreground" style={{ background: c }} />
+          {IDENTITY_THEMES.map((t) => (
+            <label key={t.key} className="relative cursor-pointer" title={t.name}>
+              <input type="radio" name="theme" value={t.key} defaultChecked={(p?.theme || '') === t.key} className="peer sr-only" />
+              <span className="flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ring-2 ring-transparent peer-checked:ring-foreground" style={{ borderColor: t.hex, color: t.hex }}>
+                <span className="h-3.5 w-3.5 rounded-full" style={{ background: t.hex }} /> {t.name}
+              </span>
             </label>
           ))}
-          <label className="flex items-center gap-1 text-xs text-muted-foreground">
-            مخصّص: <input type="color" name="color" defaultValue={p?.color || '#3287da'} className="h-7 w-9 cursor-pointer rounded border" />
-          </label>
         </div>
-        <p className="mt-1 text-[11px] text-muted-foreground">اختر لوناً واحداً (المخصّص يتقدّم إن غيّرته).</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">عند تفعيل هذه الهوية يتغيّر قالب الموقع للونها لتعرف بأي هوية تعمل.</p>
       </div>
       <button className="flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90">
         {edit ? <><Check className="h-4 w-4" /> حفظ التعديلات</> : <><Plus className="h-4 w-4" /> إضافة الهوية</>}

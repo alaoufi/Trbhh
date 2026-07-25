@@ -4,6 +4,7 @@ import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { toInt } from './utils';
 import { mediaUrl, PLACEHOLDER } from './media';
+import { normTheme, themeHex } from './identity-themes';
 
 /**
  * نظام هويات النشر المتعددة تحت دخول واحد.
@@ -28,6 +29,7 @@ export type Profile = {
   avatar: number;
   avatarUrl: string;
   color: string | null;
+  theme: string;
   isDefault: boolean;
   createdAt: string | null;
   paidUntil: string | null;
@@ -37,7 +39,7 @@ type Row = {
   id: bigint; user_id: bigint; type: string; store_id: bigint | null;
   name: string | null; phone: string | null; whatsapp: string | null;
   email: string | null; handle: string | null; avatar: number; color: string | null; is_default: number;
-  created_at?: Date | null; paid_until?: Date | null;
+  theme?: string | null; created_at?: Date | null; paid_until?: Date | null;
 };
 
 async function avatarUrls(uploadIds: number[]): Promise<Map<number, string>> {
@@ -60,7 +62,8 @@ function toProfile(r: Row, avatarMap: Map<number, string>): Profile {
     handle: r.handle || null,
     avatar: r.avatar || 0,
     avatarUrl: r.avatar ? (avatarMap.get(r.avatar) || PLACEHOLDER) : PLACEHOLDER,
-    color: normColor(r.color),
+    color: normColor(r.color) || (r.theme ? themeHex(r.theme) : null),
+    theme: normTheme(r.theme),
     isDefault: r.is_default === 1,
     createdAt: r.created_at ? r.created_at.toISOString() : null,
     paidUntil: r.paid_until ? r.paid_until.toISOString() : null,
@@ -165,12 +168,27 @@ export async function setActiveProfileCookie(profileId: number): Promise<void> {
   });
 }
 
+/** يطبّق قالب الهوية على الموقع (كوكي theme) — يُمسح للقالب الافتراضي. */
+export async function setThemeCookie(theme: string | null | undefined): Promise<void> {
+  const t = normTheme(theme);
+  const c = await cookies();
+  if (t) c.set('theme', t, { httpOnly: false, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
+  else c.set('theme', '', { httpOnly: false, sameSite: 'lax', path: '/', maxAge: 0 });
+}
+
+/** قالب هوية العضو الافتراضية (لتطبيقه عند التبديل لحساب مرتبط). */
+export async function defaultProfileTheme(userId: number): Promise<string> {
+  await ensure();
+  const p = await prisma.profiles.findFirst({ where: { user_id: BigInt(userId), is_default: 1 }, select: { theme: true } }).catch(() => null);
+  return normTheme(p?.theme);
+}
+
 /** التحقق أن الهوية تخصّ المستخدم، وأنها شخصية (المتجر يُدار من إعداداته). */
 async function ownedPersonalProfile(userId: number, profileId: number) {
   return prisma.profiles.findFirst({ where: { id: BigInt(profileId), user_id: BigInt(userId), type: 'personal' } }).catch(() => null);
 }
 
-type ProfileInput = { name: string; phone: string; whatsapp: string; email: string; handle: string; color?: string; avatar?: number };
+type ProfileInput = { name: string; phone: string; whatsapp: string; email: string; handle: string; color?: string; theme?: string; avatar?: number };
 
 export async function createPersonalProfile(userId: number, data: ProfileInput): Promise<{ ok: boolean; error?: string }> {
   await ensure();
@@ -184,7 +202,7 @@ export async function createPersonalProfile(userId: number, data: ProfileInput):
       phone: data.phone.trim().slice(0, 24) || null,
       whatsapp: data.whatsapp.trim().slice(0, 24) || null,
       email: data.email.trim().slice(0, 120) || null,
-      handle: handle || null, avatar: data.avatar || 0, color: normColor(data.color),
+      handle: handle || null, avatar: data.avatar || 0, color: normColor(data.color), theme: normTheme(data.theme) || null,
     },
   });
   return { ok: true };
@@ -204,7 +222,7 @@ export async function updatePersonalProfile(userId: number, profileId: number, d
       name, phone: data.phone.trim().slice(0, 24) || null,
       whatsapp: data.whatsapp.trim().slice(0, 24) || null,
       email: data.email.trim().slice(0, 120) || null,
-      handle: handle || null, color: normColor(data.color),
+      handle: handle || null, color: normColor(data.color), theme: normTheme(data.theme) || null,
       ...(data.avatar ? { avatar: data.avatar } : {}),
     },
   });

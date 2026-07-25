@@ -371,10 +371,13 @@ export async function switchAccountAction(formData: FormData) {
   const u = await prisma.users.findUnique({ where: { id: BigInt(target) }, select: { id: true, name: true, userName: true, ban: true } }).catch(() => null);
   if (!u) redirect('/account');
   if (u.ban === 'checked') redirect('/account?error=switchbanned');
-  // أمان: لا يُسمح بالتبديل بلا كلمة مرور إلى حساب له صلاحيات إدارة — يجب الدخول
-  // إليه بكلمة مروره مباشرةً (يمنع تصعيد الصلاحية عبر مجموعة ربط تضمّ حساب إدارة).
+  // أمان: يُمنع تصعيد الصلاحية — لا تبديل بلا كلمة مرور من حساب عادي إلى حساب إدارة.
+  // أمّا التبديل بين حسابين إداريين (كلاهما يملك صلاحية أصلاً) فمسموح — لا تصعيد فيه.
   const { hasAnyAdmin } = await import('@/lib/roles');
-  if (await hasAnyAdmin(target).catch(() => false)) redirect('/account?error=switchadmin');
+  if (await hasAnyAdmin(target).catch(() => false)) {
+    const meAdmin = await hasAnyAdmin(session.uid).catch(() => false);
+    if (!meAdmin) redirect('/account?error=switchadmin');
+  }
   // «ذكّرني قبل أي إجراء»: يمرّ بصفحة تأكيد قبل التبديل ما لم يكن مباشراً أو مؤكّداً
   if (!confirmed) {
     const mode = await getLinkMode(target).catch(() => 'confirm' as const);
@@ -382,6 +385,12 @@ export async function switchAccountAction(formData: FormData) {
   }
   const { createSession } = await import('@/lib/auth');
   await createSession({ uid: toInt(u.id), name: u.name || u.userName || 'مستخدم', type: 'user' });
+  // طبّق قالب الحساب الهدف (هويته الافتراضية) وامسح الهوية الفعّالة القديمة
+  const { setThemeCookie, defaultProfileTheme, setActiveProfileCookie, ensureDefaultProfile } = await import('@/lib/profiles');
+  await setThemeCookie(await defaultProfileTheme(toInt(u.id)).catch(() => ''));
+  const def = await ensureDefaultProfile(toInt(u.id)).catch(() => null);
+  if (def) await setActiveProfileCookie(def.id);
+  revalidatePath('/', 'layout');
   redirect('/account?switched=1');
 }
 

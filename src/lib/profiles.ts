@@ -29,12 +29,15 @@ export type Profile = {
   avatarUrl: string;
   color: string | null;
   isDefault: boolean;
+  createdAt: string | null;
+  paidUntil: string | null;
 };
 
 type Row = {
   id: bigint; user_id: bigint; type: string; store_id: bigint | null;
   name: string | null; phone: string | null; whatsapp: string | null;
   email: string | null; handle: string | null; avatar: number; color: string | null; is_default: number;
+  created_at?: Date | null; paid_until?: Date | null;
 };
 
 async function avatarUrls(uploadIds: number[]): Promise<Map<number, string>> {
@@ -59,6 +62,8 @@ function toProfile(r: Row, avatarMap: Map<number, string>): Profile {
     avatarUrl: r.avatar ? (avatarMap.get(r.avatar) || PLACEHOLDER) : PLACEHOLDER,
     color: normColor(r.color),
     isDefault: r.is_default === 1,
+    createdAt: r.created_at ? r.created_at.toISOString() : null,
+    paidUntil: r.paid_until ? r.paid_until.toISOString() : null,
   };
 }
 
@@ -224,4 +229,59 @@ async function handleFree(handle: string, exceptProfileId: number): Promise<bool
   if (inProfiles) return false;
   const inStores = await prisma.stores.findFirst({ where: { handle }, select: { id: true } }).catch(() => null);
   return !inStores;
+}
+
+/* ===== اشتراك الهوية الإضافية: الرئيسية مجانية، وكل هوية شخصية إضافية لها تجربة
+   ثم اشتراك شهري (المتاجر لها اشتراكها المستقل). التسعير من لوحة الإدارة. ===== */
+
+export type IdentitySubState = { status: 'free' | 'trial' | 'active' | 'expired'; daysLeft: number; until: string | null };
+
+/** تسعيرة اشتراك الهوية الشهري وأيام التجربة (من الإعدادات). سعر 0 = الميزة مجانية (بلا تفعيل دفع). */
+export async function getIdentityPricing(): Promise<{ month: number; trialDays: number }> {
+  const { getSettingNum } = await import('./settings');
+  const [month, trialDays] = await Promise.all([
+    getSettingNum('identity_month_price', 0).catch(() => 0),
+    getSettingNum('identity_trial_days', 10).catch(() => 10),
+  ]);
+  return { month: Math.max(0, month), trialDays: Math.max(0, trialDays) };
+}
+
+/** حالة اشتراك هوية: الرئيسية/المتجر مجانية دائماً؛ الشخصية الإضافية: تجربة ثم شهري. */
+export function identitySubState(p: Profile, pricing: { month: number; trialDays: number }): IdentitySubState {
+  const free = { status: 'free' as const, daysLeft: 0, until: null };
+  if (p.isDefault || p.type === 'store' || pricing.month <= 0) return free;
+  const now = Date.now();
+  const paidEnd = p.paidUntil ? new Date(p.paidUntil).getTime() : 0;
+  if (paidEnd > now) return { status: 'active', daysLeft: Math.ceil((paidEnd - now) / 86400_000), until: p.paidUntil };
+  const trialEnd = p.createdAt ? new Date(p.createdAt).getTime() + pricing.trialDays * 86400_000 : 0;
+  if (trialEnd > now) return { status: 'trial', daysLeft: Math.ceil((trialEnd - now) / 86400_000), until: new Date(trialEnd).toISOString() };
+  return { status: 'expired', daysLeft: 0, until: null };
+}
+
+/** هل الهوية مسموح النشر بها الآن؟ (نشِطة/تجربة/مجانية) — تُستخدم كبوابة عند النشر. */
+export async function isIdentityPublishable(userId: number, profileId: number): Promise<boolean> {
+  await ensure();
+  const p = await prisma.profiles.findFirst({ where: { id: BigInt(profileId), user_id: BigInt(userId) } }).catch(() => null);
+  if (!p) return true; // لا هوية محدّدة → الافتراضية (مجانية)
+  const prof = toProfile(p as Row, new Map());
+  const st = identitySubState(prof, await getIdentityPricing());
+  return st.status !== 'expired';
+}
+
+/** اشتراك/تجديد شهري لهوية شخصية إضافية — يخصم من المحفظة ويمدّد شهراً. */
+export async function subscribeIdentity(userId: number, profileId: number): Promise<{ ok: boolean; error?: string; balance?: number; price?: number }> {
+  await ensure();
+  const p = await prisma.profiles.findFirst({ where: { id: BigInt(profileId), user_id: BigInt(userId), type: 'personal', is_default: 0 } }).catch(() => null);
+  if (!p) return { ok: false, error: 'notfound' };
+  const pricing = await getIdentityPricing();
+  if (pricing.month <= 0) return { ok: false, error: 'free' };
+  const { charge } = await import('./wallet');
+  const paid = await charge(userId, pricing.month, 'subscription', `اشتراك هوية النشر «${(p.name || '').slice(0, 40)}» شهر`);
+  if (!paid.ok) return { ok: false, error: 'nocredit', balance: paid.balance, price: pricing.month };
+  // مدّد من نهاية الاشتراك الحالي إن كان سارياً، وإلا من الآن
+  const now = Date.now();
+  const base = p.paid_until && p.paid_until.getTime() > now ? p.paid_until.getTime() : now;
+  const until = new Date(base + 30 * 86400_000);
+  await prisma.profiles.update({ where: { id: BigInt(profileId) }, data: { paid_until: until } }).catch(() => {});
+  return { ok: true, price: pricing.month };
 }

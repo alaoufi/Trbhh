@@ -77,6 +77,20 @@ export async function deleteProfileAction(formData: FormData) {
   redirect('/account/profiles?deleted=1');
 }
 
+/** اشتراك/تجديد شهري لهوية شخصية إضافية (خصم من المحفظة). */
+export async function subscribeIdentityAction(formData: FormData) {
+  const session = await requireUser();
+  const profileId = Number(formData.get('profileId') || 0);
+  const { subscribeIdentity } = await import('@/lib/profiles');
+  const r = await subscribeIdentity(session.uid, profileId);
+  if (!r.ok) {
+    if (r.error === 'nocredit') redirect(`/account/profiles?iderror=nocredit&price=${r.price || 0}&bal=${r.balance || 0}#id-${profileId}`);
+    redirect(`/account/profiles?iderror=${r.error || 'fail'}#id-${profileId}`);
+  }
+  revalidatePath('/account/profiles');
+  redirect(`/account/profiles?idsubbed=1#id-${profileId}`);
+}
+
 /** توثيق الحساب الرئيسي — إرسال رمز إلى جوال العضو الحالي. */
 export async function startPrimaryVerifyAction() {
   const session = await requireUser();

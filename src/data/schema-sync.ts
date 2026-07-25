@@ -640,6 +640,8 @@ const STATEMENTS: string[] = [
     INDEX profiles_store (store_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
   `CREATE UNIQUE INDEX uniq_profile_handle ON profiles (handle)`,
+  // اشتراك الهوية الإضافية: نهاية الاشتراك الشهري المدفوع (التجربة تُحتسب من created_at)
+  `ALTER TABLE profiles ADD COLUMN paid_until DATETIME NULL`,
   // الإعلان يحمل هوية نشره — null = إعلان قديم يُنسب لهوية صاحبه الافتراضية عند العرض
   `ALTER TABLE ads ADD COLUMN profile_id BIGINT NULL`,
   `CREATE INDEX ads_profile_id ON ads (profile_id)`,

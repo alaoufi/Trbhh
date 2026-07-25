@@ -286,6 +286,12 @@ export async function createAdAction(formData: FormData) {
     profileId = sp ? toInt(sp.id) : null;
   }
   const publishingAsDefault = active.type === 'personal' && active.isDefault;
+  // بوابة اشتراك الهوية: هوية شخصية إضافية انتهت تجربتها بلا اشتراك لا يُنشر بها (الرئيسية مجانية)
+  if (active.type === 'personal' && !active.isDefault) {
+    const { identitySubState, getIdentityPricing } = await import('@/lib/profiles');
+    const st = identitySubState(active, await getIdentityPricing());
+    if (st.status === 'expired') redirect(`/account/profiles?idexpired=${active.id}#id-${active.id}`);
+  }
 
   // احفظ وسيلة التواصل والموقع في ملف العضو تلقائياً حتى تظهر في إعلاناته وملفه —
   // فقط عند النشر بالهوية الأساسية؛ الهويات الفرعية بياناتها مستقلة ولا تُلوّث الحساب.

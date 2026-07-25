@@ -606,6 +606,8 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_AD_DELETE_HOURS, String(delH));
   await setSetting(SETTING_MSG_DELETE_MINUTES, String(msgDelMin));
   await setSetting('max_profiles', String(Math.max(0, parseInt(String(formData.get('maxProfiles') || '0')) || 0)));
+  await setSetting('identity_month_price', String(Math.max(0, parseInt(String(formData.get('identityMonthPrice') || '0')) || 0)));
+  await setSetting('identity_trial_days', String(Math.max(0, parseInt(String(formData.get('identityTrialDays') || '0')) || 0)));
   await setSetting(SETTING_HOME_STATS, homeStats);
   await setSetting(SETTING_CLASSIFIED_STATS, classifiedStats);
   await setSetting(SETTING_CLASSIFIED_DAYS, String(classifiedDays));

@@ -2,15 +2,16 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { UserRound, Store, Check, Pencil, Trash2, Plus, Star, Link2, ShieldAlert, MessageSquare, KeyRound, Sparkles, ShieldCheck } from 'lucide-react';
+import { UserRound, Store, Check, Pencil, Trash2, Plus, Star, Link2, ShieldAlert, MessageSquare, KeyRound, Sparkles, ShieldCheck, Crown } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getUserProfiles, getActiveProfile, PROFILES_INTRO_COOKIE, type Profile } from '@/lib/profiles';
+import { getUserProfiles, getActiveProfile, getIdentityPricing, identitySubState, PROFILES_INTRO_COOKIE, type Profile, type IdentitySubState } from '@/lib/profiles';
 import { getMergeCandidates } from '@/lib/account-merge';
 import { linkedAccounts } from '@/lib/account-links';
+import { getBalance } from '@/lib/wallet';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { switchAccountAction } from '@/app/account/actions';
-import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfileAction, linkAccountAction, startLinkOtpAction, confirmLinkOtpAction, dismissProfilesIntroAction, startPrimaryVerifyAction, confirmPrimaryVerifyAction } from './actions';
+import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfileAction, linkAccountAction, startLinkOtpAction, confirmLinkOtpAction, dismissProfilesIntroAction, startPrimaryVerifyAction, confirmPrimaryVerifyAction, subscribeIdentityAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'هوياتي — حسابات ومتاجر' };
@@ -72,14 +73,39 @@ function ProfileForm({ p }: { p?: Profile }) {
   );
 }
 
-export default async function ProfilesPage({ searchParams }: { searchParams: Promise<{ error?: string; max?: string; added?: string; saved?: string; deleted?: string; merror?: string; linked?: string; lname?: string; motp?: string; mident?: string; mmask?: string; omsg?: string; potp?: string; pverified?: string; perror?: string }> }) {
+function IdentitySubRow({ p, st, price, balance }: { p: Profile; st: IdentitySubState; price: number; balance: number }) {
+  if (p.isDefault || p.type === 'store' || st.status === 'free') return null;
+  const canPay = balance >= price;
+  const payBtn = (label: string) => (canPay ? (
+    <form action={subscribeIdentityAction}>
+      <input type="hidden" name="profileId" value={p.id} />
+      <ConfirmSubmit msg={`اشتراك/تجديد هوية «${p.name}» لشهر مقابل ${price} ر.س من رصيدك؟`} className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-extrabold text-white hover:opacity-90">
+        <Crown className="h-3 w-3" /> {label} ({price} ر.س)
+      </ConfirmSubmit>
+    </form>
+  ) : (
+    <Link href="/account/wallet#topup" className="inline-flex items-center gap-1 rounded-md border border-amber-400 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">💳 اشحن رصيدك ({price} ر.س)</Link>
+  ));
+  return (
+    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-primary/15 bg-primary/5 p-2">
+      {st.status === 'trial' && <span className="text-xs font-bold text-primary">🎁 تجربة مجانية — متبقٍ {st.daysLeft} يوم</span>}
+      {st.status === 'active' && <span className="text-xs font-bold text-emerald-700">✓ مشترك — متبقٍ {st.daysLeft} يوم</span>}
+      {st.status === 'expired' && <span className="text-xs font-bold text-red-700">⚠️ انتهت التجربة — يلزم اشتراك شهري للنشر بهذه الهوية</span>}
+      {payBtn(st.status === 'expired' ? 'اشترك' : 'تجديد')}
+    </div>
+  );
+}
+
+export default async function ProfilesPage({ searchParams }: { searchParams: Promise<{ error?: string; max?: string; added?: string; saved?: string; deleted?: string; merror?: string; linked?: string; lname?: string; motp?: string; mident?: string; mmask?: string; omsg?: string; potp?: string; pverified?: string; perror?: string; idsubbed?: string; idexpired?: string; iderror?: string; price?: string; bal?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
   const sp = await searchParams;
-  const [profiles, active, candidates, linked, me, cookieStore] = await Promise.all([
+  const [profiles, active, candidates, linked, me, balance, pricing, cookieStore] = await Promise.all([
     getUserProfiles(session.uid), getActiveProfile(session.uid), getMergeCandidates(session.uid).catch(() => []),
     linkedAccounts(session.uid).catch(() => []),
     prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { name: true, userName: true, phoneNumber: true, primary_verified: true } }).catch(() => null),
+    getBalance(session.uid).catch(() => 0),
+    getIdentityPricing().catch(() => ({ month: 0, trialDays: 10 })),
     cookies(),
   ]);
   const otpStage = sp.motp === '1';
@@ -88,6 +114,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
   const otherLinked = linked.filter((a) => a.id !== session.uid);
   const primaryVerified = (me?.primary_verified ?? 0) === 1;
   const pOtpStage = sp.potp === '1';
+  const paidOn = pricing.month > 0;
 
   return (
     <div className="space-y-5">
@@ -126,6 +153,10 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
       {(sp.merror === 'alreadymerged' || sp.merror === 'othergroup') && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">هذا الحساب مرتبط بمجموعة أخرى — فُكّ ارتباطه أولاً أو راجع الإدارة.</div>}
       {sp.merror && !['creds', 'verify', 'badcode', 'notfound', 'nophone', 'otp', 'self', 'admin', 'alreadymerged', 'othergroup'].includes(sp.merror) && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر ربط الحساب — حاول لاحقاً.</div>}
       {sp.pverified && <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم التحقق من حسابك الرئيسي.</div>}
+      {sp.idsubbed && <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم تفعيل/تجديد اشتراك الهوية لشهر.</div>}
+      {sp.idexpired && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">انتهت التجربة المجانية لهذه الهوية — اشترك لتنشر بها، أو بدّل للحساب الرئيسي (مجاني) من الشريط أعلى الصفحة.</div>}
+      {sp.iderror === 'nocredit' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">رصيدك لا يكفي للاشتراك{sp.price ? ` (المطلوب ${sp.price} ر.س)` : ''} — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك</Link> ثم أعد المحاولة.</div>}
+      {sp.iderror && sp.iderror !== 'nocredit' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر تنفيذ الاشتراك — حاول لاحقاً.</div>}
       {sp.perror === 'badcode' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">رمز التحقق غير صحيح أو منتهي — أعد المحاولة.</div>}
       {sp.perror === 'nophone' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">لا يوجد رقم جوال في حسابك الرئيسي — أضِفه من الملف الشخصي أولاً.</div>}
       {sp.perror === 'otp' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر إرسال الرمز{sp.omsg ? `: ${sp.omsg}` : ''}.</div>}
@@ -182,7 +213,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
       <div className="space-y-3">
         <h2 className="text-sm font-extrabold text-foreground/80">كل هوياتك ({profiles.length})</h2>
         {profiles.map((p) => (
-          <div key={p.id} className="card-3d rounded-xl p-3" style={{ borderInlineStart: `4px solid ${p.color || '#cbd5e1'}` }}>
+          <div key={p.id} id={`id-${p.id}`} className="card-3d rounded-xl p-3" style={{ borderInlineStart: `4px solid ${p.color || '#cbd5e1'}` }}>
             <div className="flex items-center gap-3">
               <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-muted">
                 <Image src={p.avatarUrl} alt={p.name} fill sizes="44px" className="object-cover" />
@@ -209,6 +240,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
                 )}
               </div>
             </div>
+            {paidOn && <IdentitySubRow p={p} st={identitySubState(p, pricing)} price={pricing.month} balance={balance} />}
             {/* تعديل الهوية الشخصية (المتجر يُعدّل من إعدادات متجره) */}
             {p.type === 'personal' ? (
               <details className="mt-2">
@@ -236,7 +268,10 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
 
       {/* إضافة هوية جديدة */}
       <div className="card-3d rounded-2xl p-4">
-        <h2 className="mb-3 flex items-center gap-1 text-sm font-extrabold text-primary"><Plus className="h-4 w-4" /> إضافة هوية شخصية جديدة</h2>
+        <h2 className="mb-1 flex items-center gap-1 text-sm font-extrabold text-primary"><Plus className="h-4 w-4" /> إضافة هوية شخصية جديدة</h2>
+        {paidOn
+          ? <p className="mb-3 text-xs text-amber-700">هوية إضافية: <b>تجربة مجانية {pricing.trialDays} أيام</b>، ثم اشتراك شهري <b>{pricing.month} ر.س</b>. الحساب الرئيسي مجاني دائماً.</p>
+          : <p className="mb-3 text-xs text-muted-foreground">أضِف هوية للنشر باسمها وأيقونتها ولونها — الجوال للمراسلات فقط.</p>}
         <ProfileForm />
       </div>
 

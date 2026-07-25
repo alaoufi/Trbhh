@@ -1,0 +1,47 @@
+name: تشخيص - حذف إعلان محدّد (لمرة واحدة)
+
+# أداة لمرة واحدة: تحذف إعلاناً بمعرّفه (photos ثم صف ads) — نفس عمل deleteAdAction.
+# مخصّصة لطلب صريح من المالك لحذف إعلان بعينه، ثم تُحذف الأداة.
+on:
+  workflow_dispatch:
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - name: كتابة سكربت الحذف
+        run: |
+          cat > del.js << 'EOF'
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          const AD_ID = 3122n; // الإعلان المطلوب حذفه (بطلب المالك)
+          (async () => {
+            const ad = await p.ads.findUnique({ where: { id: AD_ID }, select: { id: true, title: true, user_id: true, store_only: true, status: true } });
+            console.log('===BEFORE===', JSON.stringify(ad, (k, v) => (typeof v === 'bigint' ? v.toString() : v)));
+            if (!ad) { console.log('NOT_FOUND — الإعلان غير موجود (ربما حُذف مسبقاً).'); await p.$disconnect(); return; }
+            const photos = await p.photos.deleteMany({ where: { other_id: AD_ID } }).catch((e) => ({ count: 'ERR:' + e }));
+            const del = await p.ads.delete({ where: { id: AD_ID } }).then(() => 'OK').catch((e) => 'ERR:' + e);
+            console.log('===PHOTOS_DELETED===', JSON.stringify(photos));
+            console.log('===AD_DELETED===', del);
+            const check = await p.ads.findUnique({ where: { id: AD_ID }, select: { id: true } }).catch(() => null);
+            console.log('===AFTER===', check ? 'STILL_EXISTS' : 'GONE');
+            await p.$disconnect();
+          })().catch((e) => { console.error('DELETE_FAILED:', e); process.exit(1); });
+          EOF
+
+      - name: التنفيذ عبر SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          if [ -z "$VPS_SSH_KEY" ]; then echo "❌ السرّ VPS_SSH_KEY غير موجود."; exit 1; fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${VPS_PORT:-22}"
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
+            -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
+            "cd /root/trbhh && docker compose exec -T app node" < del.js

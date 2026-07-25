@@ -651,6 +651,9 @@ const STATEMENTS: string[] = [
   // الإعلان يحمل هوية نشره — null = إعلان قديم يُنسب لهوية صاحبه الافتراضية عند العرض
   `ALTER TABLE ads ADD COLUMN profile_id BIGINT NULL`,
   `CREATE INDEX ads_profile_id ON ads (profile_id)`,
+  // التعليق/التقييم يحمل هوية كاتبه أيضاً (يُعرض باسمها) — null = هوية افتراضية
+  `ALTER TABLE comments ADD COLUMN profile_id BIGINT NULL`,
+  `ALTER TABLE reviews ADD COLUMN profile_id BIGINT NULL`,
   // دمج الحسابات: حساب قديم دُمج في حساب موحّد → معرّف الحساب الأساسي (يُمنع دخوله)
   `ALTER TABLE users ADD COLUMN merged_into BIGINT NULL`,
   // توثيق الحساب الرئيسي (تأكيد الجوال برمز) قبل ربط بقية الحسابات — «تم التحقق»

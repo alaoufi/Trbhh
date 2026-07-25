@@ -97,7 +97,7 @@ async function ProfileBar({ uid }: { uid: number }) {
   const toItem = (p: { id: number; name: string; type: 'personal' | 'store'; avatarUrl: string; color: string | null }) => ({ id: p.id, name: p.name, type: p.type, avatarUrl: p.avatarUrl, color: p.color });
   const linkedItems = linked.filter((a) => a.id !== uid).map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName }));
   return (
-    <div className="border-b bg-white/95 backdrop-blur">
+    <div className="relative z-50 border-b bg-white/95">
       <div className="container flex h-9 items-center">
         <ProfileSwitcher active={toItem(active)} profiles={profiles.map(toItem)} linked={linkedItems} />
       </div>

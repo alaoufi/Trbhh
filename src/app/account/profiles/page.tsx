@@ -247,6 +247,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
       {paidOn && (
         <div id="packages" className="card-3d rounded-2xl border-2 border-amber-300 p-4">
           <h2 className="mb-1 flex items-center gap-1 text-sm font-extrabold text-amber-700"><Crown className="h-4 w-4" /> باقات الهويات (الرئيسي مجاني)</h2>
+          <p className="mb-2 text-[11px] text-muted-foreground">الباقات على الحسابات الشخصية فقط. <b>المتاجر مشمولة باشتراكها الشهري المستقل — لا رسوم إضافية عليها هنا.</b></p>
           {memberSub?.paid
             ? <p className="mb-3 text-xs font-bold text-emerald-700">✓ مشترك بباقة «{memberSub.planName}» — {memberSub.slots >= 999 ? 'غير محدود' : memberSub.slots} هوية، حتى {String(memberSub.until).slice(0, 10)}.</p>
             : memberSub?.exemptActive

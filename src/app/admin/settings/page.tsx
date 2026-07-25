@@ -44,7 +44,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
         </label>
         <div className="rounded-lg border border-amber-300 bg-amber-50/40 p-3">
           <div className="mb-1 text-sm font-bold text-amber-800">باقات الهويات الإضافية (الحساب الرئيسي مجاني)</div>
-          <p className="mb-2 text-xs text-muted-foreground">٣ باقات، كل باقة عدد حسابات + أسعار المدد. سعر 0 لأي مدة = تلك المدة غير معروضة. الميزة مجانية بالكامل ما لم تضع عدد حسابات وسعراً.</p>
+          <p className="mb-2 text-xs text-muted-foreground">على الحسابات الشخصية فقط — المتاجر مستثناة (لها اشتراكها الشهري المستقل). ٣ باقات، كل باقة عدد حسابات + أسعار المدد. سعر 0 لأي مدة = تلك المدة غير معروضة. الميزة مجانية بالكامل ما لم تضع عدد حسابات وسعراً.</p>
           {identityPlans.map((pl) => (
             <div key={pl.idx} className="mb-2 rounded-lg border border-amber-200 bg-white p-2">
               <div className="mb-1 grid grid-cols-2 gap-2">

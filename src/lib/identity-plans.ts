@@ -66,7 +66,7 @@ export async function getMemberIdentitySub(userId: number): Promise<MemberSub> {
   const paid = paidEnd > now;
   // إعفاء: يُحتسب من تاريخ أول هوية إضافية (أقدمها) — للحسابات الموجودة سابقاً
   const exemptDays = await getExemptDays();
-  const firstExtra = await prisma.profiles.findFirst({ where: { user_id: BigInt(userId), is_default: 0 }, orderBy: { id: 'asc' }, select: { created_at: true } }).catch(() => null);
+  const firstExtra = await prisma.profiles.findFirst({ where: { user_id: BigInt(userId), is_default: 0, type: 'personal' }, orderBy: { id: 'asc' }, select: { created_at: true } }).catch(() => null);
   const exemptEnd = exemptDays > 0 && firstExtra?.created_at ? firstExtra.created_at.getTime() + exemptDays * 86400_000 : 0;
   const exemptActive = exemptEnd > now;
   const active = !featurePaid || paid || exemptActive;

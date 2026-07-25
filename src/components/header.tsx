@@ -10,6 +10,7 @@ import { HeaderSearch } from '@/components/header-search';
 import { HeaderCta } from '@/components/header-cta';
 import { LiveClock } from '@/components/live-clock';
 import { AdminAlertsBanner } from '@/components/admin-alerts-banner';
+import { ProfileSwitcher } from '@/components/profile-switcher';
 
 export async function Header() {
   const session = await getSession();
@@ -76,8 +77,24 @@ export async function Header() {
         </Link>
       </div>
     </header>
+    {/* شريط الهوية الفعّالة — يظهر لكل مستخدم مسجّل في كل الصفحات: باسم من يُعلن، مع مبدّل الهويات */}
+    {session && <ProfileBar uid={session.uid} />}
     {/* 🔔 تنبيه إداري عالمي: يظهر لأي إداري في كل صفحة حتى تُعالَج الطلبات المعلقة */}
     {admin && <AdminAlertsBanner />}
     </>
+  );
+}
+
+async function ProfileBar({ uid }: { uid: number }) {
+  const { getUserProfiles, getActiveProfile } = await import('@/lib/profiles');
+  const [profiles, active] = await Promise.all([getUserProfiles(uid).catch(() => []), getActiveProfile(uid).catch(() => null)]);
+  if (!active) return null;
+  const toItem = (p: { id: number; name: string; type: 'personal' | 'store'; avatarUrl: string; color: string | null }) => ({ id: p.id, name: p.name, type: p.type, avatarUrl: p.avatarUrl, color: p.color });
+  return (
+    <div className="border-b bg-white/95 backdrop-blur">
+      <div className="container flex h-9 items-center">
+        <ProfileSwitcher active={toItem(active)} profiles={profiles.map(toItem)} />
+      </div>
+    </div>
   );
 }

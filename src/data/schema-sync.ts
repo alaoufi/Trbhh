@@ -619,6 +619,30 @@ const STATEMENTS: string[] = [
      1 = اختاره العضو صراحةً أو اعتمدته الإدارة (لا حاجة لمراجعة). */
   `ALTER TABLE ads ADD COLUMN cat_reviewed TINYINT NOT NULL DEFAULT 1`,
   `CREATE INDEX ads_cat_reviewed ON ads (cat_reviewed)`,
+  /* ---- نظام هويات النشر المتعددة تحت دخول واحد (profiles) ----
+     كل هوية تتبع مستخدماً (user_id): شخصية أو متجر، ببياناتها الظاهرة المستقلة. */
+  `CREATE TABLE IF NOT EXISTS profiles (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    type VARCHAR(10) NOT NULL DEFAULT 'personal',
+    store_id BIGINT UNSIGNED NULL,
+    name VARCHAR(120) NULL,
+    phone VARCHAR(24) NULL,
+    whatsapp VARCHAR(24) NULL,
+    email VARCHAR(120) NULL,
+    handle VARCHAR(32) NULL,
+    avatar INT NOT NULL DEFAULT 0,
+    color VARCHAR(9) NULL,
+    status TINYINT NOT NULL DEFAULT 1,
+    is_default TINYINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX profiles_user (user_id),
+    INDEX profiles_store (store_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+  `CREATE UNIQUE INDEX uniq_profile_handle ON profiles (handle)`,
+  // الإعلان يحمل هوية نشره — null = إعلان قديم يُنسب لهوية صاحبه الافتراضية عند العرض
+  `ALTER TABLE ads ADD COLUMN profile_id BIGINT NULL`,
+  `CREATE INDEX ads_profile_id ON ads (profile_id)`,
 ];
 
 let syncPromise: Promise<void> | null = null;

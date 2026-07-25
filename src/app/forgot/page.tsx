@@ -45,7 +45,7 @@ export default async function ForgotPage({ searchParams }: { searchParams: Promi
           <input type="hidden" name="phone" value={phone} />
           <label className="block space-y-1">
             <span className="text-sm font-bold">رمز التحقّق</span>
-            <input name="code" inputMode="numeric" maxLength={6} required placeholder="######" className={`${field} tracking-[0.5em] text-center`} />
+            <input name="code" inputMode="numeric" maxLength={4} required placeholder="####" className={`${field} tracking-[0.5em] text-center`} />
           </label>
           <label className="block space-y-1">
             <span className="text-sm font-bold">كلمة المرور الجديدة</span>

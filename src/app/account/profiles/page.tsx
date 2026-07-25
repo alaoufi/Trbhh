@@ -156,7 +156,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
             <form action={confirmPrimaryVerifyAction} className="mt-3 flex flex-wrap items-end gap-2">
               <div>
                 <label className={lbl}>رمز التحقق الواصل لجوالك</label>
-                <input name="code" required inputMode="numeric" maxLength={6} className={`${field} w-40`} placeholder="______" dir="ltr" autoComplete="one-time-code" />
+                <input name="code" required inputMode="numeric" maxLength={4} className={`${field} w-40`} placeholder="____" dir="ltr" autoComplete="one-time-code" />
               </div>
               <button className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90"><Check className="h-4 w-4" /> تأكيد</button>
             </form>
@@ -368,8 +368,8 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
             </div>
             <input type="hidden" name="identifier" value={mIdent} />
             <div>
-              <label className={lbl}>رمز التحقق (٦ أرقام)</label>
-              <input name="code" required inputMode="numeric" maxLength={6} className={field} placeholder="______" dir="ltr" autoComplete="one-time-code" />
+              <label className={lbl}>رمز التحقق (٤ أرقام)</label>
+              <input name="code" required inputMode="numeric" maxLength={4} className={field} placeholder="____" dir="ltr" autoComplete="one-time-code" />
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <ConfirmSubmit msg="ربط هذا الحساب بحسابك؟ يبقى مستقلاً بإعلاناته ورصيده، وتتنقّل إليه من دخول واحد." className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-extrabold text-white hover:opacity-90">

@@ -221,7 +221,7 @@ export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; de
   const prevAttempts = otp && otp.expires_at.getTime() > Date.now() ? otp.attempts : 0;
   if (prevAttempts >= 10) return { ok: false, delivered: false, error: 'تجاوزت الحدّ المسموح للمحاولات — حاول بعد قليل' };
 
-  const code = String(randomInt(100000, 1000000)); // رمز تحقّق من ٦ خانات (100000–999999)
+  const code = String(randomInt(1000, 10000)); // رمز تحقّق من ٤ خانات (1000–9999)
   const fresh = { code, expires_at: new Date(Date.now() + 10 * 60_000), attempts: prevAttempts, last_sent: new Date() };
   await prisma.password_otps.upsert({ where: { phone: norm }, create: { phone: norm, ...fresh }, update: fresh });
   const delivered = await sendVerification(norm, `رمز استعادة كلمة المرور في تربح: ${code}`);

@@ -1,13 +1,26 @@
-name: تشخيص - سجل تطبيق الخادم
+name: تشخيص - كل مفاتيح الإعدادات
 
 on:
   workflow_dispatch:
 
 jobs:
-  logs:
+  query:
     runs-on: ubuntu-latest
     steps:
-      - name: قراءة سجل التطبيق عبر SSH
+      - name: كتابة سكربت الاستعلام
+        run: |
+          cat > q.js << 'EOF'
+          const { PrismaClient } = require('@prisma/client');
+          const p = new PrismaClient();
+          (async () => {
+            const rows = await p.site_settings.findMany({ orderBy: { k: 'asc' } });
+            console.log('===SITE_SETTINGS_COUNT===', rows.length);
+            console.log('===KEYS===');
+            console.log(rows.map(r => r.k).join('\n'));
+            console.log('===END===');
+          })().catch((e) => { console.error('FAIL:', e); process.exit(1); }).finally(()=>p.$disconnect());
+          EOF
+      - name: تنفيذ عبر SSH
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -22,4 +35,4 @@ jobs:
           PORT="${VPS_PORT:-22}"
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
             -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
-            'cd /root/trbhh && echo "=== APP UPTIME ===" && docker compose ps app && echo "=== LAST 250 LOG LINES (filtered) ===" && docker compose logs --tail=400 app 2>&1 | grep -iE "error|unhandled|reject|prisma|settings|digest|Error:|at async|redirect|Body exceeded" | tail -90'
+            "cd /root/trbhh && docker compose exec -T app node" < q.js

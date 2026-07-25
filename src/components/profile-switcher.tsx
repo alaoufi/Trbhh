@@ -23,12 +23,19 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
         : (active.name.trim().charAt(0) || (active.type === 'store' ? '🏪' : '؟'))}
     </span>
   );
+  // وسم يميّز نوع الهوية: متجر أو حساب
+  const kindBadge = (
+    <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-extrabold text-white" style={{ background: active.type === 'store' ? '#059669' : '#0284c7' }}>
+      {active.type === 'store' ? 'متجر' : 'حساب'}
+    </span>
+  );
 
   // هوية واحدة فقط: المؤشّر رابط لصفحة «هوياتي» لإضافة هويات جديدة.
   if (!multi) {
     return (
       <Link href="/account/profiles" className={btnCls} style={btnStyle} aria-label="الهوية الفعّالة — إدارة الهويات">
         {icon}
+        {kindBadge}
         <span className="truncate">أنت: {active.name}</span>
         <Settings2 className="h-3.5 w-3.5 opacity-70" />
       </Link>
@@ -45,6 +52,7 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
         aria-label="الهوية الفعّالة"
       >
         {icon}
+        {kindBadge}
         <span className="truncate">أنت: {active.name}</span>
         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -77,8 +85,11 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
                                 : (p.name.trim().charAt(0) || (p.type === 'store' ? '🏪' : '؟'))}
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate font-bold">{p.name}</span>
-                              <span className="block text-[11px] text-muted-foreground">{p.type === 'store' ? 'متجر — النشر داخله فقط' : 'حساب شخصي'}</span>
+                              <span className="flex items-center gap-1 font-bold">
+                                <span className="shrink-0 rounded px-1 text-[9px] font-extrabold text-white" style={{ background: p.type === 'store' ? '#059669' : '#0284c7' }}>{p.type === 'store' ? 'متجر' : 'حساب'}</span>
+                                <span className="truncate">{p.name}</span>
+                              </span>
+                              <span className="block text-[11px] text-muted-foreground">{p.type === 'store' ? 'النشر داخله فقط' : 'حساب في المنصة'}</span>
                             </span>
                             {isActive && <Check className="h-4 w-4 shrink-0 text-emerald-600" />}
                           </button>

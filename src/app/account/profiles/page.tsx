@@ -178,6 +178,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
           </span>
           <div>
             <div className="flex items-center gap-1.5 font-extrabold" style={{ color: active.color || undefined }}>
+              <span className="rounded px-1.5 py-0.5 text-[10px] font-extrabold text-white" style={{ background: active.type === 'store' ? '#059669' : '#0284c7' }}>{active.type === 'store' ? 'متجر' : 'حساب'}</span>
               {active.type === 'store' ? <Store className="h-4 w-4" /> : <UserRound className="h-4 w-4" />}
               {active.name}
               {active.isDefault && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">افتراضي</span>}
@@ -198,13 +199,14 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 font-bold">
+                  <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-extrabold text-white" style={{ background: p.type === 'store' ? '#059669' : '#0284c7' }}>{p.type === 'store' ? 'متجر' : 'حساب'}</span>
                   {p.type === 'store' ? <Store className="h-4 w-4 text-primary" /> : <UserRound className="h-4 w-4 text-primary" />}
                   <span className="truncate">{p.name}</span>
                   {p.isDefault && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
                   {active.id === p.id && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">فعّالة</span>}
                 </div>
                 <div className="truncate text-xs text-muted-foreground">
-                  {p.type === 'store' ? 'متجر' : 'حساب شخصي'}
+                  {p.type === 'store' ? 'متجر — النشر داخله فقط، بصلاحيات المتجر' : 'حساب في المنصة'}
                   {p.phone ? ` • 📱 ${p.phone}` : ''}{p.handle ? ` • @${p.handle}` : ''}
                 </div>
               </div>

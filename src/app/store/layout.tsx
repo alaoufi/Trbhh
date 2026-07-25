@@ -5,6 +5,9 @@ import { getStoreMeta } from '@/lib/merchant';
 import { mediaUrl } from '@/lib/media';
 import { prisma } from '@/lib/prisma';
 import { Store, ExternalLink, LogOut } from 'lucide-react';
+import { ProfileSwitcher } from '@/components/profile-switcher';
+import { getUserProfiles, getActiveProfile } from '@/lib/profiles';
+import { linkedAccounts } from '@/lib/account-links';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +25,14 @@ export default async function StoreAdminLayout({ children }: { children: React.R
   const name = meta?.storeName || 'متجري';
   const brand = /^#[0-9a-fA-F]{6}$/.test(meta?.color || '') ? meta!.color! : '#3287da';
   const logo = store?.logo ? mediaUrl((await prisma.uploads.findUnique({ where: { id: BigInt(store.logo) } }))?.file_name) : null;
+  // مبدّل الهوية داخل لوحة المتجر: للرجوع لحساباتك أو التبديل لمتجر آخر
+  const [profiles, active, linked] = await Promise.all([
+    getUserProfiles(session.uid).catch(() => []),
+    getActiveProfile(session.uid).catch(() => null),
+    linkedAccounts(session.uid).catch(() => []),
+  ]);
+  const toItem = (p: { id: number; name: string; type: 'personal' | 'store'; avatarUrl: string; color: string | null }) => ({ id: p.id, name: p.name, type: p.type, avatarUrl: p.avatarUrl, color: p.color });
+  const linkedItems = linked.filter((a) => a.id !== session.uid).map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName }));
   return (
     <div className="min-h-screen bg-muted/20">
       <header className="sticky top-0 z-30 border-b bg-white/95 backdrop-blur">
@@ -49,6 +60,15 @@ export default async function StoreAdminLayout({ children }: { children: React.R
           </a>
         </div>
       </header>
+      {/* شريط التبديل: الرجوع للحساب أو التبديل لمتجر/هوية أخرى من داخل لوحة المتجر */}
+      {active && (
+        <div className="relative z-40 border-b bg-white/95">
+          <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-1.5">
+            <ProfileSwitcher active={toItem(active)} profiles={profiles.map(toItem)} linked={linkedItems} />
+            <span className="text-[11px] text-muted-foreground">بدّل بين حساباتك ومتاجرك</span>
+          </div>
+        </div>
+      )}
       <main className="mx-auto max-w-3xl px-3 py-4">{children}</main>
     </div>
   );

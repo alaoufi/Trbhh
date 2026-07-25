@@ -190,7 +190,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
               <Section title="حسابي" icon={User}>
                 <Item href="/account" icon={User} onClick={close}>لوحة حسابي</Item>
                 <Item href="/account/profile" icon={UserPen} onClick={close}>الملف الشخصي</Item>
-                <Item href="/account/identities" icon={Users} onClick={close}>هوياتي والحسابات المرتبطة</Item>
+                <Item href="/account/profiles" icon={Users} onClick={close}>هوياتي (حسابات ومتاجر)</Item>
                 <Item href="/account/verify" icon={ShieldCheck} onClick={close}>توثيق الحساب</Item>
                 <Item href="/messages" icon={Mail} onClick={close}>رسائلي</Item>
                 <Item href="/notifications" icon={Bell} onClick={close}>التنبيهات</Item>

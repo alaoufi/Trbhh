@@ -158,10 +158,10 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><LayoutTemplate className="h-5 w-5" /></span>
         <div><div className="font-bold">قالب التصميم</div><div className="text-xs text-muted-foreground">اختر هوية الموقع وعاينها قبل الاعتماد</div></div>
       </Link>
-      {/* ربط حساباتي — الدخول بحساب آخر والتبديل بينها (اختياري) */}
-      <Link href="/account/identities" className="flex items-center gap-3 card-3d rounded-xl border-2 border-violet-500/30 bg-violet-50/40 p-4 hover:border-violet-500">
+      {/* هوياتي — تعدّد الحسابات والمتاجر بدخول واحد، والنشر بالهوية الفعّالة، ودمج حساب قديم */}
+      <Link href="/account/profiles" className="flex items-center gap-3 card-3d rounded-xl border-2 border-violet-500/30 bg-violet-50/40 p-4 hover:border-violet-500">
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-violet-100 text-violet-700"><Users className="h-5 w-5" /></span>
-        <div><div className="font-bold text-violet-800">ربط حساباتي</div><div className="text-xs text-muted-foreground">ادخل بحساباتك الأخرى وتنقّل بينها من دخول واحد — اختياري</div></div>
+        <div><div className="font-bold text-violet-800">هوياتي (حسابات ومتاجر)</div><div className="text-xs text-muted-foreground">دخول واحد وعدّة هويات للنشر — أضف هوية أو متجراً، وبدّل الهوية الفعّالة، وادمج حساباً قديماً</div></div>
       </Link>
       <Link href="/account/classified" className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><Sparkles className="h-5 w-5" /></span>

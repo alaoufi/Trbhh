@@ -1,13 +1,21 @@
 'use server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { toInt } from '@/lib/utils';
-import { createPersonalProfile, updatePersonalProfile, deletePersonalProfile, setActiveProfileCookie, getUserProfiles } from '@/lib/profiles';
+import { createPersonalProfile, updatePersonalProfile, deletePersonalProfile, setActiveProfileCookie, getUserProfiles, PROFILES_INTRO_COOKIE } from '@/lib/profiles';
 import { getSettingNum } from '@/lib/settings';
 
 const MAX_PERSONAL_DEFAULT = 5;
+
+/** إخفاء رسالة الشرح التعريفية (تُعرض أول مرة فقط). */
+export async function dismissProfilesIntroAction() {
+  await requireUser();
+  (await cookies()).set(PROFILES_INTRO_COOKIE, '1', { httpOnly: false, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
+  redirect('/account/profiles');
+}
 
 /** حفظ صورة تعريفية مرفوعة → معرّف upload، أو 0. يوحّد الصيغة (HEIC→JPEG). */
 async function saveAvatar(formData: FormData, userId: number): Promise<number> {
@@ -69,19 +77,53 @@ export async function deleteProfileAction(formData: FormData) {
   redirect('/account/profiles?deleted=1');
 }
 
-/** دمج ذاتي: استيراد حساب آخر للعضو بعد التحقق من كلمة مروره. */
+/** الخطوة ١ (رمز التحقق): إرسال رمز SMS إلى رقم الحساب الآخر لإثبات ملكيته. */
+export async function startMergeOtpAction(formData: FormData) {
+  const session = await requireUser();
+  const identifier = String(formData.get('identifier') || '').trim();
+  if (!identifier) redirect('/account/profiles?merror=creds#merge');
+  const { findMergeableAccount, maskPhone } = await import('@/lib/account-merge');
+  const r = await findMergeableAccount(identifier, session.uid);
+  if (!r.ok) redirect(`/account/profiles?merror=${r.error}#merge`);
+  if (!r.phone) redirect('/account/profiles?merror=nophone#merge'); // لا جوال → استخدم كلمة المرور
+  const { createAndSendOtp } = await import('@/lib/sms');
+  const sent = await createAndSendOtp(r.phone);
+  if (!sent.ok) redirect(`/account/profiles?merror=otp&omsg=${encodeURIComponent(sent.error || '')}#merge`);
+  redirect(`/account/profiles?motp=1&mident=${encodeURIComponent(identifier)}&mmask=${encodeURIComponent(maskPhone(r.phone))}#merge`);
+}
+
+/** الخطوة ٢ (رمز التحقق): التأكد من الرمز ثم دمج الحساب. */
+export async function confirmMergeOtpAction(formData: FormData) {
+  const session = await requireUser();
+  const identifier = String(formData.get('identifier') || '').trim();
+  const code = String(formData.get('code') || '').trim();
+  if (!identifier || !code) redirect('/account/profiles?merror=creds#merge');
+  const { findMergeableAccount } = await import('@/lib/account-merge');
+  const r = await findMergeableAccount(identifier, session.uid);
+  if (!r.ok || !r.phone || !r.uid) redirect(`/account/profiles?merror=${r.error || 'fail'}#merge`);
+  const { verifyOtp } = await import('@/lib/sms');
+  if (!(await verifyOtp(r.phone, code))) redirect(`/account/profiles?merror=badcode&motp=1&mident=${encodeURIComponent(identifier)}#merge`);
+  const { mergeAccountInto } = await import('@/lib/account-merge');
+  const res = await mergeAccountInto(session.uid, r.uid);
+  if (!res.ok) redirect(`/account/profiles?merror=${res.error || 'fail'}#merge`);
+  revalidatePath('/account/profiles');
+  revalidatePath('/');
+  redirect(`/account/profiles?merged=1&ads=${res.movedAds || 0}&bal=${res.movedBalance || 0}`);
+}
+
+/** دمج ذاتي (بديل): استيراد حساب آخر للعضو بعد التحقق من كلمة مروره. */
 export async function mergeAccountAction(formData: FormData) {
   const session = await requireUser();
   const identifier = String(formData.get('identifier') || '').trim();
   const password = String(formData.get('password') || '');
-  if (!identifier || !password) redirect('/account/profiles?merror=creds');
+  if (!identifier || !password) redirect('/account/profiles?merror=creds#merge');
   const { verifyLogin } = await import('@/lib/login-core');
   const r = await verifyLogin(identifier, password);
-  if (!r.ok) redirect('/account/profiles?merror=verify');
-  if (r.uid === session.uid) redirect('/account/profiles?merror=self');
+  if (!r.ok) redirect('/account/profiles?merror=verify#merge');
+  if (r.uid === session.uid) redirect('/account/profiles?merror=self#merge');
   const { mergeAccountInto } = await import('@/lib/account-merge');
   const res = await mergeAccountInto(session.uid, r.uid);
-  if (!res.ok) redirect(`/account/profiles?merror=${res.error || 'fail'}`);
+  if (!res.ok) redirect(`/account/profiles?merror=${res.error || 'fail'}#merge`);
   revalidatePath('/account/profiles');
   revalidatePath('/');
   redirect(`/account/profiles?merged=1&ads=${res.movedAds || 0}&bal=${res.movedBalance || 0}`);

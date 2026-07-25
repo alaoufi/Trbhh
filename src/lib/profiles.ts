@@ -13,6 +13,7 @@ import { mediaUrl, PLACEHOLDER } from './media';
 
 const ensure = ensureSchema;
 export const ACTIVE_PROFILE_COOKIE = 'trbhh_profile';
+export const PROFILES_INTRO_COOKIE = 'trbhh_profiles_intro';
 
 export type Profile = {
   id: number;

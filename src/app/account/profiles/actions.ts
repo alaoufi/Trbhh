@@ -46,11 +46,17 @@ function fields(formData: FormData) {
 
 export async function addProfileAction(formData: FormData) {
   const session = await requireUser();
-  // حدّ عدد الهويات الشخصية (يحدّده الإداري) — المتاجر لا تُحتسب هنا
-  const max = await getSettingNum('max_profiles', MAX_PERSONAL_DEFAULT).catch(() => MAX_PERSONAL_DEFAULT);
+  // الحد = الأصغر بين حدّ الإدارة الصلب (max_profiles) وعدد حسابات الباقة/الإعفاء الساري
+  const hardMax = await getSettingNum('max_profiles', MAX_PERSONAL_DEFAULT).catch(() => MAX_PERSONAL_DEFAULT);
+  const { getMemberIdentitySub } = await import('@/lib/identity-plans');
+  const sub = await getMemberIdentitySub(session.uid);
   const profs = await getUserProfiles(session.uid);
-  const personalCount = profs.filter((p) => p.type === 'personal').length;
-  if (max > 0 && personalCount >= max) redirect('/account/profiles?error=limit&max=' + max);
+  const extraCount = profs.filter((p) => p.type === 'personal' && !p.isDefault).length; // عدا الرئيسية المجانية
+  const limit = hardMax > 0 ? Math.min(hardMax, sub.slots) : sub.slots;
+  if (extraCount >= limit) {
+    if (sub.featurePaid && !sub.active) redirect('/account/profiles?error=needsub#packages');
+    redirect('/account/profiles?error=limit&max=' + limit + '#packages');
+  }
   const avatar = await saveAvatar(formData, session.uid);
   const r = await createPersonalProfile(session.uid, { ...fields(formData), avatar });
   if (!r.ok) redirect(`/account/profiles?error=${r.error}`);
@@ -77,18 +83,21 @@ export async function deleteProfileAction(formData: FormData) {
   redirect('/account/profiles?deleted=1');
 }
 
-/** اشتراك/تجديد شهري لهوية شخصية إضافية (خصم من المحفظة). */
+/** اشتراك/تجديد بباقة هويات لمدّة (شهري/نصف سنوي/سنوي) — خصم من المحفظة. */
 export async function subscribeIdentityAction(formData: FormData) {
   const session = await requireUser();
-  const profileId = Number(formData.get('profileId') || 0);
-  const { subscribeIdentity } = await import('@/lib/profiles');
-  const r = await subscribeIdentity(session.uid, profileId);
+  const idx = Number(formData.get('plan') || 0);
+  const durRaw = String(formData.get('dur') || 'month');
+  const dur = (['month', 'half', 'year'].includes(durRaw) ? durRaw : 'month') as 'month' | 'half' | 'year';
+  const { subscribeIdentityPlan } = await import('@/lib/identity-plans');
+  const r = await subscribeIdentityPlan(session.uid, idx, dur);
   if (!r.ok) {
-    if (r.error === 'nocredit') redirect(`/account/profiles?iderror=nocredit&price=${r.price || 0}&bal=${r.balance || 0}#id-${profileId}`);
-    redirect(`/account/profiles?iderror=${r.error || 'fail'}#id-${profileId}`);
+    if (r.error === 'nocredit') redirect(`/account/profiles?iderror=nocredit&price=${r.price || 0}&bal=${r.balance || 0}#packages`);
+    redirect(`/account/profiles?iderror=${r.error || 'fail'}#packages`);
   }
   revalidatePath('/account/profiles');
-  redirect(`/account/profiles?idsubbed=1#id-${profileId}`);
+  revalidatePath('/');
+  redirect('/account/profiles?idsubbed=1#packages');
 }
 
 /** توثيق الحساب الرئيسي — إرسال رمز إلى جوال العضو الحالي. */

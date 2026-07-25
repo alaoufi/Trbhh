@@ -286,11 +286,11 @@ export async function createAdAction(formData: FormData) {
     profileId = sp ? toInt(sp.id) : null;
   }
   const publishingAsDefault = active.type === 'personal' && active.isDefault;
-  // بوابة اشتراك الهوية: هوية شخصية إضافية انتهت تجربتها بلا اشتراك لا يُنشر بها (الرئيسية مجانية)
+  // بوابة اشتراك الباقات: النشر بهوية إضافية يتطلّب اشتراكاً سارياً أو إعفاءً (الرئيسية مجانية)
   if (active.type === 'personal' && !active.isDefault) {
-    const { identitySubState, getIdentityPricing } = await import('@/lib/profiles');
-    const st = identitySubState(active, await getIdentityPricing());
-    if (st.status === 'expired') redirect(`/account/profiles?idexpired=${active.id}#id-${active.id}`);
+    const { getMemberIdentitySub } = await import('@/lib/identity-plans');
+    const sub = await getMemberIdentitySub(session.uid);
+    if (!sub.active) redirect('/account/profiles?idexpired=1#packages');
   }
 
   // احفظ وسيلة التواصل والموقع في ملف العضو تلقائياً حتى تظهر في إعلاناته وملفه —

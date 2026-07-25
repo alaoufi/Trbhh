@@ -606,8 +606,14 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_AD_DELETE_HOURS, String(delH));
   await setSetting(SETTING_MSG_DELETE_MINUTES, String(msgDelMin));
   await setSetting('max_profiles', String(Math.max(0, parseInt(String(formData.get('maxProfiles') || '0')) || 0)));
-  await setSetting('identity_month_price', String(Math.max(0, parseInt(String(formData.get('identityMonthPrice') || '0')) || 0)));
-  await setSetting('identity_trial_days', String(Math.max(0, parseInt(String(formData.get('identityTrialDays') || '0')) || 0)));
+  // باقات الهويات: ٣ باقات × (اسم + عدد + شهري/نصف/سنوي) + إعفاء
+  for (let i = 1; i <= 3; i++) {
+    await setSetting(`idpkg${i}_name`, String(formData.get(`idpkg${i}_name`) || '').trim().slice(0, 24));
+    for (const k of ['acc', 'm', 'h', 'y']) {
+      await setSetting(`idpkg${i}_${k}`, String(Math.max(0, parseInt(String(formData.get(`idpkg${i}_${k}`) || '0')) || 0)));
+    }
+  }
+  await setSetting('identity_exempt_days', String(Math.max(0, parseInt(String(formData.get('identityExemptDays') || '0')) || 0)));
   await setSetting(SETTING_HOME_STATS, homeStats);
   await setSetting(SETTING_CLASSIFIED_STATS, classifiedStats);
   await setSetting(SETTING_CLASSIFIED_DAYS, String(classifiedDays));

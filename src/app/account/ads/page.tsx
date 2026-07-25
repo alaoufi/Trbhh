@@ -3,7 +3,8 @@ import Image from 'next/image';
 import { Pencil, Trash2, Eye, EyeOff, Wallet, Archive } from 'lucide-react';
 import { AdStatsCard } from '@/components/ad-stats-card';
 import { requireUser } from '@/lib/auth';
-import { getMyAds, adContactCounts } from '@/lib/account';
+import { getMyIdentityAds, adContactCounts } from '@/lib/account';
+import { getActiveProfile } from '@/lib/profiles';
 import { adViewCounts } from '@/lib/merchant';
 import { getServicePricing, serviceHasPrice, DURATIONS, DUR_DAYS, getAdExtras, getSettingBool, getAdRestoreFee, getMemberWindows, adWindowState } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
@@ -18,10 +19,10 @@ export const metadata = { title: 'إعلاناتي' };
 export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee, memberWindows] = await Promise.all([
-    getMyAds(session.uid), getServicePricing(), getBalance(session.uid), getAdExtras(),
+  const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee, memberWindows, active] = await Promise.all([
+    getMyIdentityAds(session.uid), getServicePricing(), getBalance(session.uid), getAdExtras(),
     getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('auction_on', false),
-    getAdRestoreFee(), getMemberWindows(),
+    getAdRestoreFee(), getMemberWindows(), getActiveProfile(session.uid).catch(() => null),
   ]);
   const contacts = contactStatsOn ? await adContactCounts(ads.map((a) => a.id)) : new Map<number, { whatsapp: number; call: number }>();
   const viewCounts = contactStatsOn ? await adViewCounts(ads.map((a) => a.id)) : new Map<number, number>();
@@ -34,7 +35,15 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl font-bold">إعلاناتي ({ads.length})</h1>
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold">إعلاناتي ({ads.length})</h1>
+          {active && (
+            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-extrabold text-white" style={{ background: active.type === 'store' ? '#059669' : '#0284c7' }}>{active.type === 'store' ? 'متجر' : 'حساب'}</span>
+              <span className="truncate">إعلانات هوية «{active.name}» فقط — بدّل الهوية أعلى الصفحة لعرض غيرها.</span>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <Link href="/account/wallet" className="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2 text-xs font-bold text-primary"><Wallet className="h-4 w-4" /> رصيدي: {balance} ر.س</Link>
           <Link href="/ads/new" className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">أضف إعلان</Link>

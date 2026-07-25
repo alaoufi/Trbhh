@@ -1,4 +1,5 @@
 import 'server-only';
+import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { toInt } from './utils';
@@ -24,8 +25,37 @@ export async function primaryImages(adIds: bigint[]): Promise<Map<number, string
   return out;
 }
 
-export async function getMyAds(userId: number) {
-  const rows = await prisma.ads.findMany({ where: { user_id: BigInt(userId) }, orderBy: { id: 'desc' } });
+/** نطاق «إعلاناتي» بحسب الهوية الفعّالة — لمنع تداخل إعلانات الهويات المختلفة. */
+export type MyAdsScope = { type: 'personal' | 'store'; id: number; isDefault: boolean };
+
+/** يبني شرط تصفية الإعلانات حسب الهوية:
+ *  - متجر: إعلانات هذا المتجر تحديداً (بهويته، store_only).
+ *  - شخصية رئيسية: إعلاناتها + الإعلانات القديمة بلا هوية (توافق) — بلا إعلانات متاجر.
+ *  - شخصية إضافية: إعلاناتها فقط. */
+function scopeWhere(userId: number, scope?: MyAdsScope): Prisma.adsWhereInput {
+  const where: Prisma.adsWhereInput = { user_id: BigInt(userId) };
+  if (!scope) return where;
+  if (scope.type === 'store') {
+    where.store_only = 1;
+    where.profile_id = BigInt(scope.id);
+  } else {
+    where.store_only = 0;
+    if (scope.isDefault) where.OR = [{ profile_id: BigInt(scope.id) }, { profile_id: null }];
+    else where.profile_id = BigInt(scope.id);
+  }
+  return where;
+}
+
+/** إعلانات العضو المقيّدة بهويته الفعّالة (من الكوكي) — لصفحة «إعلاناتي». */
+export async function getMyIdentityAds(userId: number) {
+  const { getActiveProfile } = await import('./profiles');
+  const active = await getActiveProfile(userId).catch(() => null);
+  const scope: MyAdsScope | undefined = active ? { type: active.type, id: active.id, isDefault: active.isDefault } : undefined;
+  return getMyAds(userId, scope);
+}
+
+export async function getMyAds(userId: number, scope?: MyAdsScope) {
+  const rows = await prisma.ads.findMany({ where: scopeWhere(userId, scope), orderBy: { id: 'desc' } });
   const images = await primaryImages(rows.map((r) => r.id));
   return rows.map((r) => ({
     id: toInt(r.id),

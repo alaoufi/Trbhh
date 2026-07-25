@@ -266,6 +266,7 @@ model comments {
   updated_at DateTime?       @db.Timestamp(0)
   date_edit  String?
   parent_id  Int             @default(0)
+  profile_id BigInt?
 
   @@index([ads_id], map: "comments_ads_id_foreign")
   @@index([sender_id], map: "comments_sender_id_foreign")
@@ -731,6 +732,7 @@ model reviews {
   report     reviews_report @default(dbgenerated("لا"))
   created_at DateTime?      @db.Timestamp(0)
   updated_at DateTime?      @db.Timestamp(0)
+  profile_id BigInt?
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.

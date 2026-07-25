@@ -24,7 +24,9 @@ export async function submitReviewAction(formData: FormData) {
     }
   }
   const censored = review ? await censor(review) : '';
-  await prisma.reviews.create({ data: { reciver_id: BigInt(reciverId), sender_id: BigInt(session.uid), star, review: censored, report: 'no' } });
+  const { getActiveProfile } = await import('@/lib/profiles');
+  const active = await getActiveProfile(session.uid).catch(() => null);
+  await prisma.reviews.create({ data: { reciver_id: BigInt(reciverId), sender_id: BigInt(session.uid), star, review: censored, report: 'no', profile_id: active && active.type === 'personal' ? BigInt(active.id) : null } });
   // notify the reviewed user
   {
     // منع تكرار نفس التنبيه بنفس اليوم

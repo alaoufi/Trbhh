@@ -15,10 +15,14 @@ export async function getUserReviews(userId: number) {
   const senderIds = [...new Set(rows.map((r) => toInt(r.sender_id)))].map((n) => BigInt(n));
   const users = senderIds.length ? await prisma.users.findMany({ where: { id: { in: senderIds } }, select: { id: true, name: true, userName: true } }) : [];
   const byId = new Map(users.map((u) => [toInt(u.id), u]));
+  // هوية النشر: التقييم المكتوب بهوية شخصية غير افتراضية يُعرض باسمها
+  const { getProfilesDisplayMap } = await import('./profiles');
+  const profMap = await getProfilesDisplayMap(rows.map((r) => toInt(r.profile_id ?? 0n))).catch(() => new Map());
   await loadBanned().catch(() => {}); // دفاع إضافي: تقييمات قديمة سُجّلت قبل تفعيل فحص المحتوى على هذا الحقل
   return rows.map((r) => {
     const u = byId.get(toInt(r.sender_id));
-    return { id: toInt(r.id), star: r.star, review: censorSync(r.review), author: u?.name || u?.userName || 'مستخدم', createdAt: r.created_at ? r.created_at.toISOString() : null };
+    const pr = r.profile_id ? profMap.get(toInt(r.profile_id)) : undefined;
+    return { id: toInt(r.id), star: r.star, review: censorSync(r.review), author: pr?.name || u?.name || u?.userName || 'مستخدم', createdAt: r.created_at ? r.created_at.toISOString() : null };
   });
 }
 

@@ -39,6 +39,9 @@ export async function addCommentAction(formData: FormData) {
     }
     redirect(`/ads/${Number(adId)}?cdup=1`);
   }
+  // هوية النشر الفعّالة: يُنسب التعليق إليها (يُعرض باسمها)
+  const { getActiveProfile } = await import('@/lib/profiles');
+  const active = await getActiveProfile(session.uid).catch(() => null);
   await prisma.comments.create({
     data: {
       ads_id: adId,
@@ -48,6 +51,7 @@ export async function addCommentAction(formData: FormData) {
       active: 'yes',
       hide: 'no',
       parent_id: parentId,
+      profile_id: active && active.type === 'personal' ? BigInt(active.id) : null,
     },
   });
   // notify the ad owner (unless commenting on own ad)

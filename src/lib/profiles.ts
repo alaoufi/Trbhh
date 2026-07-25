@@ -145,6 +145,22 @@ export async function getProfileDisplay(profileId: number): Promise<Profile | nu
   return toProfile(p as Row, await avatarUrls([p.avatar || 0]));
 }
 
+/** خريطة عرض هويات دفعة واحدة (للتعليقات/التقييمات) — تُرجع الهويات الشخصية غير الافتراضية فقط
+ *  (الافتراضية تبقى ببيانات الحساب الحيّة تفادياً لتقادم الاسم). */
+export async function getProfilesDisplayMap(profileIds: number[]): Promise<Map<number, { name: string; avatarUrl: string; color: string | null; handle: string | null }>> {
+  const ids = [...new Set(profileIds.filter((n) => n > 0))];
+  if (!ids.length) return new Map();
+  await ensure();
+  const rows = await prisma.profiles.findMany({ where: { id: { in: ids.map((n) => BigInt(n)) } } }).catch(() => []);
+  const avatarMap = await avatarUrls(rows.map((r) => r.avatar || 0));
+  const out = new Map<number, { name: string; avatarUrl: string; color: string | null; handle: string | null }>();
+  for (const r of rows) {
+    const p = toProfile(r as Row, avatarMap);
+    if (p.type === 'personal' && !p.isDefault) out.set(p.id, { name: p.name, avatarUrl: p.avatar ? p.avatarUrl : '', color: p.color, handle: p.handle });
+  }
+  return out;
+}
+
 /** تعبئة جوال/واتساب/بريد هوية شخصية من أول إعلان يُنشر بها إن كانت فارغة (مرة واحدة). */
 export async function backfillProfileContact(profileId: number, phone: string, whatsapp: string): Promise<void> {
   if (!profileId || (!phone && !whatsapp)) return;

@@ -13,7 +13,7 @@ const authedItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },
   { href: '/companies', label: 'المتاجر', icon: Building2 },
   { href: '/ads/new', label: 'أضف إعلان', icon: PlusCircle, primary: true },
-  { href: '/account/identities', label: 'الحسابات', icon: Users },
+  { href: '/account/profiles', label: 'الحسابات', icon: Users },
   { href: '__contact', label: 'تواصل', icon: Mail },
 ];
 const guestItems: NavItem[] = [

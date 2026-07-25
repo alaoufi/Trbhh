@@ -160,8 +160,8 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
                     ))}
                   </div>
                 )}
-                <Link href="/account/identities" onClick={close} className="mt-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-bold text-muted-foreground hover:bg-accent">
-                  <Users className="h-4 w-4 shrink-0" /> <span>إدارة الحسابات المرتبطة</span>
+                <Link href="/account/profiles" onClick={close} className="mt-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-bold text-muted-foreground hover:bg-accent">
+                  <Users className="h-4 w-4 shrink-0" /> <span>هوياتي والحسابات المرتبطة</span>
                 </Link>
               </div>
             )}

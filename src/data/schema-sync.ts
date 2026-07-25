@@ -645,6 +645,8 @@ const STATEMENTS: string[] = [
   `CREATE INDEX ads_profile_id ON ads (profile_id)`,
   // دمج الحسابات: حساب قديم دُمج في حساب موحّد → معرّف الحساب الأساسي (يُمنع دخوله)
   `ALTER TABLE users ADD COLUMN merged_into BIGINT NULL`,
+  // توثيق الحساب الرئيسي (تأكيد الجوال برمز) قبل ربط بقية الحسابات — «تم التحقق»
+  `ALTER TABLE users ADD COLUMN primary_verified TINYINT NOT NULL DEFAULT 0`,
 ];
 
 let syncPromise: Promise<void> | null = null;

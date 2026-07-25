@@ -2,14 +2,15 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { UserRound, Store, Check, Pencil, Trash2, Plus, Star, Link2, ShieldAlert, MessageSquare, KeyRound, Sparkles } from 'lucide-react';
+import { UserRound, Store, Check, Pencil, Trash2, Plus, Star, Link2, ShieldAlert, MessageSquare, KeyRound, Sparkles, ShieldCheck } from 'lucide-react';
 import { getSession } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { getUserProfiles, getActiveProfile, PROFILES_INTRO_COOKIE, type Profile } from '@/lib/profiles';
 import { getMergeCandidates } from '@/lib/account-merge';
 import { linkedAccounts } from '@/lib/account-links';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { switchAccountAction } from '@/app/account/actions';
-import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfileAction, linkAccountAction, startLinkOtpAction, confirmLinkOtpAction, dismissProfilesIntroAction } from './actions';
+import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfileAction, linkAccountAction, startLinkOtpAction, confirmLinkOtpAction, dismissProfilesIntroAction, startPrimaryVerifyAction, confirmPrimaryVerifyAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'هوياتي — حسابات ومتاجر' };
@@ -71,51 +72,40 @@ function ProfileForm({ p }: { p?: Profile }) {
   );
 }
 
-export default async function ProfilesPage({ searchParams }: { searchParams: Promise<{ error?: string; max?: string; added?: string; saved?: string; deleted?: string; merror?: string; linked?: string; lname?: string; motp?: string; mident?: string; mmask?: string; omsg?: string }> }) {
+export default async function ProfilesPage({ searchParams }: { searchParams: Promise<{ error?: string; max?: string; added?: string; saved?: string; deleted?: string; merror?: string; linked?: string; lname?: string; motp?: string; mident?: string; mmask?: string; omsg?: string; potp?: string; pverified?: string; perror?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
   const sp = await searchParams;
-  const [profiles, active, candidates, linked, cookieStore] = await Promise.all([getUserProfiles(session.uid), getActiveProfile(session.uid), getMergeCandidates(session.uid).catch(() => []), linkedAccounts(session.uid).catch(() => []), cookies()]);
+  const [profiles, active, candidates, linked, me, cookieStore] = await Promise.all([
+    getUserProfiles(session.uid), getActiveProfile(session.uid), getMergeCandidates(session.uid).catch(() => []),
+    linkedAccounts(session.uid).catch(() => []),
+    prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { name: true, userName: true, phoneNumber: true, primary_verified: true } }).catch(() => null),
+    cookies(),
+  ]);
   const otpStage = sp.motp === '1';
   const mIdent = sp.mident || '';
   const showIntro = cookieStore.get(PROFILES_INTRO_COOKIE)?.value !== '1';
   const otherLinked = linked.filter((a) => a.id !== session.uid);
+  const primaryVerified = (me?.primary_verified ?? 0) === 1;
+  const pOtpStage = sp.potp === '1';
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
         <UserRound className="h-6 w-6 text-primary" />
-        <h1 className="text-xl font-bold text-primary">هوياتي — حسابات ومتاجر</h1>
+        <h1 className="text-xl font-bold text-primary">هوياتي — دخول واحد لكل حساباتك</h1>
       </div>
-      <p className="text-sm text-muted-foreground">دخول واحد، وعدّة هويات للنشر — كل هوية ببياناتها المستقلة (اسم/جوال/بريد/صورة/لون). اختر الهوية الفعّالة لتُعلن باسمها.</p>
 
-      {/* رسالة تعريفية تُعرض أول مرة فقط: شرح الميزة وخطوات استخدامها */}
+      {/* رسالة تعريفية موجزة — أول مرة فقط */}
       {showIntro && (
         <div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-4">
-          <div className="mb-2 flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-extrabold text-primary">مرحباً بك في «هوياتي» — دخول واحد وعدّة هويات</h2>
-          </div>
-          <p className="mb-3 text-sm text-foreground/80">
-            تقدر الآن تُدير أكثر من هوية للنشر من دخول واحد: هوية شخصية أو أكثر، ومتجراً أو أكثر — كل واحدة باسمها وجوالها وصورتها ولونها،
-            دون أن تختلط ببعضها. إليك الخطوات:
+          <div className="mb-1 flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /><h2 className="text-sm font-extrabold text-primary">دخول واحد يدير كل حساباتك ومتاجرك</h2></div>
+          <p className="text-xs leading-6 text-foreground/80">
+            وثّق حسابك الرئيسي مرة واحدة، ثم اربط حساباتك الأخرى (برمز يصل لكل رقم) أو أضِف هويات ومتاجر جديدة باسمها وأيقونتها.
+            بدّل الهوية الفعّالة قبل النشر لتُعلن باسمها. كل حساب يبقى مستقلاً، والجوال للمراسلات فقط (يجوز تكراره).
           </p>
-          <ol className="space-y-2 text-sm">
-            {[
-              ['هويتك الأساسية جاهزة', 'أُنشئت تلقائياً باسمك وجوالك — تظهر أعلى كل صفحة في شريط «أنت: …».'],
-              ['أضِف هوية شخصية جديدة', 'من قسم «إضافة هوية شخصية» أدناه: اسم ظاهر، جوال/واتساب/بريد للمراسلات، صورة، ولون مميّز.'],
-              ['أضِف متجراً', 'من «إضافة متجر» تفتح متجرك المستقل، ويظهر تلقائياً كهوية نشر باسمه وشعاره.'],
-              ['بدّل الهوية الفعّالة قبل النشر', 'من الشريط أعلى الصفحة اضغط «تفعيل» على الهوية التي تريد الإعلان باسمها — كل إعلان يحمل بيانات الهوية الفعّالة وقتها.'],
-              ['عندك حساب آخر؟ اربطه', 'من «حساباتي المرتبطة» أدخل رقمه، يصلك رمز تحقّق على ذلك الرقم لإثبات ملكيته — فيُربط بحسابك وتتنقّل بينهما من دخول واحد. كل حساب يبقى مستقلاً بإعلاناته ورصيده.'],
-            ].map(([t, d], i) => (
-              <li key={i} className="flex gap-2">
-                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-extrabold text-white">{i + 1}</span>
-                <span><b className="font-extrabold text-foreground">{t}:</b> <span className="text-foreground/75">{d}</span></span>
-              </li>
-            ))}
-          </ol>
-          <form action={dismissProfilesIntroAction} className="mt-3">
-            <button className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-xs font-extrabold text-white hover:opacity-90"><Check className="h-3.5 w-3.5" /> فهمت، ابدأ</button>
+          <form action={dismissProfilesIntroAction} className="mt-2">
+            <button className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-1.5 text-xs font-extrabold text-white hover:opacity-90"><Check className="h-3.5 w-3.5" /> فهمت، ابدأ</button>
           </form>
         </div>
       )}
@@ -131,10 +121,44 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
       {sp.merror === 'notfound' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">لا يوجد حساب بهذا المُعرّف.</div>}
       {sp.merror === 'nophone' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">هذا الحساب بلا رقم جوال مسجّل — استخدم «التحقق بكلمة المرور» بدل الرمز.</div>}
       {sp.merror === 'otp' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر إرسال الرمز{sp.omsg ? `: ${sp.omsg}` : ''}.</div>}
-      {sp.merror === 'self' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">هذا هو حسابك الحالي — أدخل حساباً آخر تريد دمجه.</div>}
-      {sp.merror === 'admin' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">لا يمكن دمج حساب إداري.</div>}
-      {sp.merror === 'alreadymerged' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">هذا الحساب مدموج بالفعل.</div>}
-      {sp.merror && !['creds', 'verify', 'badcode', 'notfound', 'nophone', 'otp', 'self', 'admin', 'alreadymerged'].includes(sp.merror) && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر دمج الحساب — حاول لاحقاً.</div>}
+      {sp.merror === 'self' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">هذا هو حسابك الحالي — أدخل حساباً آخر تريد ربطه.</div>}
+      {sp.merror === 'admin' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">لا يمكن ربط حساب إداري.</div>}
+      {(sp.merror === 'alreadymerged' || sp.merror === 'othergroup') && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">هذا الحساب مرتبط بمجموعة أخرى — فُكّ ارتباطه أولاً أو راجع الإدارة.</div>}
+      {sp.merror && !['creds', 'verify', 'badcode', 'notfound', 'nophone', 'otp', 'self', 'admin', 'alreadymerged', 'othergroup'].includes(sp.merror) && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر ربط الحساب — حاول لاحقاً.</div>}
+      {sp.pverified && <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم التحقق من حسابك الرئيسي.</div>}
+      {sp.perror === 'badcode' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">رمز التحقق غير صحيح أو منتهي — أعد المحاولة.</div>}
+      {sp.perror === 'nophone' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">لا يوجد رقم جوال في حسابك الرئيسي — أضِفه من الملف الشخصي أولاً.</div>}
+      {sp.perror === 'otp' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر إرسال الرمز{sp.omsg ? `: ${sp.omsg}` : ''}.</div>}
+
+      {/* ١) الحساب الرئيسي — الدخول والتوثيق */}
+      <div id="main" className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-xs font-bold text-muted-foreground">حسابك الرئيسي (الدخول لكل حساباتك)</div>
+            <div className="truncate font-extrabold">{me?.name || me?.userName || 'حسابي'}</div>
+            {me?.phoneNumber && <div className="text-xs text-muted-foreground" dir="ltr">{me.phoneNumber}</div>}
+          </div>
+          {primaryVerified
+            ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-extrabold text-emerald-700"><ShieldCheck className="h-3.5 w-3.5" /> تم التحقق</span>
+            : <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-extrabold text-amber-700"><ShieldAlert className="h-3.5 w-3.5" /> غير موثّق</span>}
+        </div>
+        {!primaryVerified && (
+          pOtpStage ? (
+            <form action={confirmPrimaryVerifyAction} className="mt-3 flex flex-wrap items-end gap-2">
+              <div>
+                <label className={lbl}>رمز التحقق الواصل لجوالك</label>
+                <input name="code" required inputMode="numeric" maxLength={6} className={`${field} w-40`} placeholder="______" dir="ltr" autoComplete="one-time-code" />
+              </div>
+              <button className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90"><Check className="h-4 w-4" /> تأكيد</button>
+            </form>
+          ) : (
+            <form action={startPrimaryVerifyAction} className="mt-3">
+              <button className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90"><MessageSquare className="h-4 w-4" /> تحقّق برمز SMS</button>
+              <p className="mt-1 text-[11px] text-muted-foreground">وثّق حسابك الرئيسي مرة واحدة قبل ربط بقية حساباتك.</p>
+            </form>
+          )
+        )}
+      </div>
 
       {/* الهوية الفعّالة */}
       <div className="rounded-2xl border-2 p-4" style={{ borderColor: active.color || 'hsl(var(--primary))', background: `${active.color || '#3287da'}14` }}>
@@ -225,11 +249,9 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
 
       {/* حساباتي المرتبطة — ربط وتبديل (كل حساب يبقى مستقلاً) */}
       <div id="merge" className="card-3d rounded-2xl border-2 border-amber-300 p-4">
-        <h2 className="mb-1 flex items-center gap-1 text-sm font-extrabold text-amber-700"><Link2 className="h-4 w-4" /> حساباتي المرتبطة</h2>
+        <h2 className="mb-1 flex items-center gap-1 text-sm font-extrabold text-amber-700"><Link2 className="h-4 w-4" /> حساباتي المرتبطة — إضافة حساب موجود</h2>
         <p className="mb-3 text-xs text-muted-foreground">
-          عندك حساب آخر (ولو برقم مختلف)؟ اربطه بحسابك لتتنقّل بينهما من دخول واحد. <b>كل حساب يبقى مستقلاً</b> بإعلاناته ورسائله ورصيده وجواله —
-          الربط للتسهيل فقط، لا يُنقل شيء ولا يُحذف، وتقدر تفكّه متى شئت. نُرسل رمز تحقّق إلى <b>رقم الحساب المُراد ربطه</b> لإثبات أنه لك
-          (لأن التبديل إليه يمنح دخولاً كاملاً).
+          أدخل رقم حسابك الآخر، يصله رمز تحقّق فيُربط بحسابك للتنقّل من دخول واحد. <b>كل حساب يبقى مستقلاً</b> (لا نقل ولا حذف، قابل للفك).
         </p>
 
         {/* الحسابات المرتبطة حالياً + التبديل */}

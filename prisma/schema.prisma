@@ -1220,6 +1220,7 @@ model users {
   points                    Int        @default(0)
   ref_by                    Int?
   merged_into               BigInt?    // حساب مدموج في حساب موحّد (يُمنع دخوله المستقل)
+  primary_verified          Int        @default(0) @db.TinyInt // تأكيد جوال الحساب الرئيسي برمز
 }
 
 model store_visits {

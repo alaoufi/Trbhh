@@ -77,6 +77,30 @@ export async function deleteProfileAction(formData: FormData) {
   redirect('/account/profiles?deleted=1');
 }
 
+/** توثيق الحساب الرئيسي — إرسال رمز إلى جوال العضو الحالي. */
+export async function startPrimaryVerifyAction() {
+  const session = await requireUser();
+  const u = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true } }).catch(() => null);
+  if (!u?.phoneNumber) redirect('/account/profiles?perror=nophone#main');
+  const { createAndSendOtp } = await import('@/lib/sms');
+  const sent = await createAndSendOtp(u.phoneNumber);
+  if (!sent.ok) redirect(`/account/profiles?perror=otp&omsg=${encodeURIComponent(sent.error || '')}#main`);
+  redirect('/account/profiles?potp=1#main');
+}
+
+/** توثيق الحساب الرئيسي — تأكيد الرمز. */
+export async function confirmPrimaryVerifyAction(formData: FormData) {
+  const session = await requireUser();
+  const code = String(formData.get('code') || '').trim();
+  const u = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true } }).catch(() => null);
+  if (!u?.phoneNumber) redirect('/account/profiles?perror=nophone#main');
+  const { verifyOtp } = await import('@/lib/sms');
+  if (!(await verifyOtp(u.phoneNumber, code))) redirect('/account/profiles?perror=badcode&potp=1#main');
+  await prisma.users.update({ where: { id: BigInt(session.uid) }, data: { primary_verified: 1 } }).catch(() => {});
+  revalidatePath('/account/profiles');
+  redirect('/account/profiles?pverified=1#main');
+}
+
 /** الخطوة ١ (رمز التحقق): إرسال رمز SMS إلى رقم الحساب الآخر لإثبات ملكيته قبل ربطه. */
 export async function startLinkOtpAction(formData: FormData) {
   const session = await requireUser();

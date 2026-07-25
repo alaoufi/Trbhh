@@ -144,7 +144,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
       {sp.merror === 'creds' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">أكمل بيانات الحساب الآخر.</div>}
       {sp.merror === 'verify' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">بيانات دخول الحساب الآخر غير صحيحة.</div>}
       {sp.merror === 'badcode' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">رمز التحقق غير صحيح أو منتهي — أعد الإرسال وحاول مجدداً.</div>}
-      {sp.merror === 'notfound' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">لا يوجد حساب بهذا المُعرّف.</div>}
+      {sp.merror === 'notfound' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">هذا الرقم غير مسجّل في المنصة — تأكّد من الرقم، أو استخدم «إضافة هوية جديدة» بدل ربط حساب موجود.</div>}
       {sp.merror === 'nophone' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">هذا الحساب بلا رقم جوال مسجّل — استخدم «التحقق بكلمة المرور» بدل الرمز.</div>}
       {sp.merror === 'otp' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر إرسال الرمز{sp.omsg ? `: ${sp.omsg}` : ''}.</div>}
       {sp.merror === 'self' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">هذا هو حسابك الحالي — أدخل حساباً آخر تريد ربطه.</div>}

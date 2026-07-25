@@ -643,6 +643,8 @@ const STATEMENTS: string[] = [
   // الإعلان يحمل هوية نشره — null = إعلان قديم يُنسب لهوية صاحبه الافتراضية عند العرض
   `ALTER TABLE ads ADD COLUMN profile_id BIGINT NULL`,
   `CREATE INDEX ads_profile_id ON ads (profile_id)`,
+  // دمج الحسابات: حساب قديم دُمج في حساب موحّد → معرّف الحساب الأساسي (يُمنع دخوله)
+  `ALTER TABLE users ADD COLUMN merged_into BIGINT NULL`,
 ];
 
 let syncPromise: Promise<void> | null = null;

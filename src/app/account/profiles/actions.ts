@@ -69,6 +69,24 @@ export async function deleteProfileAction(formData: FormData) {
   redirect('/account/profiles?deleted=1');
 }
 
+/** دمج ذاتي: استيراد حساب آخر للعضو بعد التحقق من كلمة مروره. */
+export async function mergeAccountAction(formData: FormData) {
+  const session = await requireUser();
+  const identifier = String(formData.get('identifier') || '').trim();
+  const password = String(formData.get('password') || '');
+  if (!identifier || !password) redirect('/account/profiles?merror=creds');
+  const { verifyLogin } = await import('@/lib/login-core');
+  const r = await verifyLogin(identifier, password);
+  if (!r.ok) redirect('/account/profiles?merror=verify');
+  if (r.uid === session.uid) redirect('/account/profiles?merror=self');
+  const { mergeAccountInto } = await import('@/lib/account-merge');
+  const res = await mergeAccountInto(session.uid, r.uid);
+  if (!res.ok) redirect(`/account/profiles?merror=${res.error || 'fail'}`);
+  revalidatePath('/account/profiles');
+  revalidatePath('/');
+  redirect(`/account/profiles?merged=1&ads=${res.movedAds || 0}&bal=${res.movedBalance || 0}`);
+}
+
 /** تبديل الهوية الفعّالة — من المبدّل أعلى الصفحة أو صفحة الهويات. */
 export async function switchProfileAction(formData: FormData) {
   const session = await requireUser();

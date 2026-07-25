@@ -1,11 +1,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { UserRound, Store, Check, Pencil, Trash2, Plus, Star } from 'lucide-react';
+import { UserRound, Store, Check, Pencil, Trash2, Plus, Star, Link2, ShieldAlert } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { getUserProfiles, getActiveProfile, type Profile } from '@/lib/profiles';
 import { ConfirmSubmit } from '@/components/confirm-submit';
-import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfileAction } from './actions';
+import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfileAction, mergeAccountAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'هوياتي — حسابات ومتاجر' };
@@ -67,7 +67,7 @@ function ProfileForm({ p }: { p?: Profile }) {
   );
 }
 
-export default async function ProfilesPage({ searchParams }: { searchParams: Promise<{ error?: string; max?: string; added?: string; saved?: string; deleted?: string }> }) {
+export default async function ProfilesPage({ searchParams }: { searchParams: Promise<{ error?: string; max?: string; added?: string; saved?: string; deleted?: string; merror?: string; merged?: string; ads?: string; bal?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
   const sp = await searchParams;
@@ -85,6 +85,13 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
       {sp.error === 'handle' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">المعرّف الظاهر مستخدم مسبقاً — اختر غيره.</div>}
       {sp.error === 'name' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">الاسم الظاهر مطلوب.</div>}
       {(sp.added || sp.saved || sp.deleted) && <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم الحفظ.</div>}
+      {sp.merged && <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم دمج الحساب في حسابك الموحّد — نُقل {sp.ads || 0} إعلان{Number(sp.bal) > 0 ? ` وأُضيف رصيد ${sp.bal} ريال` : ''}. سجّل الدخول من هذا الحساب فقط بعد الآن.</div>}
+      {sp.merror === 'creds' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">أدخل بيانات دخول الحساب الآخر كاملة.</div>}
+      {sp.merror === 'verify' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">بيانات دخول الحساب الآخر غير صحيحة.</div>}
+      {sp.merror === 'self' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">هذا هو حسابك الحالي — أدخل بيانات حساب آخر تريد دمجه.</div>}
+      {sp.merror === 'admin' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">لا يمكن دمج حساب إداري.</div>}
+      {sp.merror === 'alreadymerged' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">هذا الحساب مدموج بالفعل.</div>}
+      {sp.merror && !['creds', 'verify', 'self', 'admin', 'alreadymerged'].includes(sp.merror) && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر دمج الحساب — حاول لاحقاً.</div>}
 
       {/* الهوية الفعّالة */}
       <div className="rounded-2xl border-2 p-4" style={{ borderColor: active.color || 'hsl(var(--primary))', background: `${active.color || '#3287da'}14` }}>
@@ -164,6 +171,38 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
       <div className="card-3d rounded-2xl p-4">
         <h2 className="mb-3 flex items-center gap-1 text-sm font-extrabold text-primary"><Plus className="h-4 w-4" /> إضافة هوية شخصية جديدة</h2>
         <ProfileForm />
+      </div>
+
+      {/* إضافة متجر */}
+      <div className="card-3d rounded-2xl p-4">
+        <h2 className="mb-2 flex items-center gap-1 text-sm font-extrabold text-primary"><Store className="h-4 w-4" /> إضافة متجر</h2>
+        <p className="mb-3 text-xs text-muted-foreground">افتح متجراً تحت حسابك الموحّد — يظهر كهوية نشر مستقلة باسمه وشعاره، وتُضاف تلقائياً إلى هوياتك هنا.</p>
+        <Link href="/store" className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90"><Plus className="h-4 w-4" /> إدارة/فتح متجر</Link>
+      </div>
+
+      {/* دمج حساب قديم منفصل */}
+      <div className="card-3d rounded-2xl border-2 border-amber-300 p-4">
+        <h2 className="mb-1 flex items-center gap-1 text-sm font-extrabold text-amber-700"><Link2 className="h-4 w-4" /> عندك حساب آخر منفصل؟ ادمجه هنا</h2>
+        <p className="mb-3 text-xs text-muted-foreground">
+          إن كان لديك حساب قديم بدخول مستقل، ادخل بياناته لدمجه في حسابك الحالي: تُنقل إعلاناته كهوية نشر جديدة، ويُضاف رصيده إلى رصيدك،
+          ثم يتوقّف الدخول المستقل لذلك الحساب (تدخل من حسابك الحالي فقط).
+        </p>
+        <form action={mergeAccountAction} className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className={lbl}>جوال/بريد/اسم مستخدم الحساب الآخر</label>
+            <input name="identifier" required className={field} placeholder="05xxxxxxxx" dir="ltr" autoComplete="off" />
+          </div>
+          <div>
+            <label className={lbl}>كلمة مرور الحساب الآخر</label>
+            <input name="password" type="password" required className={field} placeholder="••••••••" dir="ltr" autoComplete="off" />
+          </div>
+          <div className="sm:col-span-2">
+            <ConfirmSubmit msg="دمج هذا الحساب في حسابك الحالي؟ سيتوقّف الدخول المستقل للحساب الآخر نهائياً، وتُنقل إعلاناته ورصيده إليك." className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-extrabold text-white hover:opacity-90">
+              <Link2 className="h-4 w-4" /> دمج الحساب الآن
+            </ConfirmSubmit>
+          </div>
+        </form>
+        <p className="mt-2 flex items-start gap-1 text-[11px] text-amber-700"><ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /> الدمج نهائي ولا يمكن التراجع عنه — تأكّد أن الحساب الآخر يخصّك.</p>
       </div>
     </div>
   );

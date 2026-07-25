@@ -47,6 +47,10 @@ export async function verifyLogin(identifier: string, password: string): Promise
     return { ok: false, error: 'بيانات الدخول غير صحيحة' };
   }
   const uid = toInt(user.id);
+  // حساب دُمج في حساب موحّد: يُمنع دخوله — يدخل صاحبه بالحساب الأساسي
+  if (user.merged_into && Number(user.merged_into) > 0) {
+    return { ok: false, error: 'هذا الحساب مدموج في حسابك الموحّد — ادخل بالحساب الأساسي.' };
+  }
   if (await isUserBanned(uid)) return { ok: false, error: 'هذا الحساب محظور' };
   await rateReset(rlKey); // نجاح الدخول يصفّر العدّاد
   return { ok: true, uid, name: user.name || user.userName || 'عضو', type: user.type };

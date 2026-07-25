@@ -1219,6 +1219,7 @@ model users {
   @@index([ban, ban_until], map: "users_ban")
   points                    Int        @default(0)
   ref_by                    Int?
+  merged_into               BigInt?    // حساب مدموج في حساب موحّد (يُمنع دخوله المستقل)
 }
 
 model store_visits {

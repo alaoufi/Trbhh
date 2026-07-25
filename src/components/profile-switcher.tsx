@@ -2,15 +2,17 @@
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Check, ChevronDown, Settings2 } from 'lucide-react';
+import { Check, ChevronDown, Settings2, Store, UserRound, Repeat2 } from 'lucide-react';
 import { switchProfileAction } from '@/app/account/profiles/actions';
+import { switchAccountAction } from '@/app/account/actions';
 
 type Item = { id: number; name: string; type: 'personal' | 'store'; avatarUrl: string; color: string | null };
+type LinkedItem = { id: number; name: string; hasStore: boolean; storeName: string | null };
 
-export function ProfileSwitcher({ active, profiles }: { active: Item; profiles: Item[] }) {
+export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Item; profiles: Item[]; linked?: LinkedItem[] }) {
   const [open, setOpen] = useState(false);
   const path = usePathname() || '/';
-  const multi = profiles.length > 1;
+  const multi = profiles.length > 1 || linked.length > 0;
   const color = active.color || '#3287da';
   const btnCls = 'flex max-w-[70vw] items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-bold';
   const btnStyle = { borderColor: color, background: `${color}1f`, color } as React.CSSProperties;
@@ -76,8 +78,27 @@ export function ProfileSwitcher({ active, profiles }: { active: Item; profiles: 
                 );
               })}
             </div>
+            {linked.length > 0 && (
+              <div className="border-t">
+                <div className="flex items-center gap-1 bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-800"><Repeat2 className="h-3.5 w-3.5" /> التبديل لحساب آخر (دخول مستقل)</div>
+                {linked.map((a) => (
+                  <form key={a.id} action={switchAccountAction} onSubmit={() => setOpen(false)}>
+                    <input type="hidden" name="userId" value={a.id} />
+                    <button type="submit" className="flex w-full items-center gap-2 px-3 py-2 text-right text-sm hover:bg-secondary">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-700">
+                        {a.hasStore ? <Store className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-bold">{a.name}</span>
+                        <span className="block text-[11px] text-muted-foreground">{a.hasStore && a.storeName ? `متجر: ${a.storeName}` : 'حساب مرتبط'}</span>
+                      </span>
+                    </button>
+                  </form>
+                ))}
+              </div>
+            )}
             <Link href="/account/profiles" onClick={() => setOpen(false)} className="flex items-center gap-1.5 border-t bg-primary/5 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/10">
-              <Settings2 className="h-3.5 w-3.5" /> إدارة الهويات (إضافة/تعديل)
+              <Settings2 className="h-3.5 w-3.5" /> إدارة الهويات والحسابات
             </Link>
           </div>
         </>

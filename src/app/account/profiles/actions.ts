@@ -187,7 +187,8 @@ export async function switchProfileAction(formData: FormData) {
   }
   revalidatePath('/', 'layout');
   // وجهة التبديل: المتجر → لوحة المتجر لممارسة صلاحياته؛ الحساب → المنصة
-  // (يخرج من صفحة المتجر إن كان فيها، وإلا يبقى في موقعه).
-  const dest = owned?.type === 'store' ? '/store' : (safeBack.startsWith('/store') ? '/' : safeBack);
+  // (يخرج من صفحة المتجر/واجهة متجر إن كان فيها، وإلا يبقى في موقعه).
+  const inStoreArea = safeBack.startsWith('/store') || safeBack.startsWith('/companies/');
+  const dest = owned?.type === 'store' ? '/store' : (inStoreArea ? '/' : safeBack);
   redirect(dest);
 }

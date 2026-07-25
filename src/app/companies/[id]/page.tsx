@@ -7,6 +7,9 @@ import { ShareButtons } from '@/components/share-buttons';
 import { getStore } from '@/lib/stores';
 import { cookies, headers } from 'next/headers';
 import { getSession } from '@/lib/auth';
+import { ProfileSwitcher } from '@/components/profile-switcher';
+import { getUserProfiles, getActiveProfile } from '@/lib/profiles';
+import { linkedAccounts } from '@/lib/account-links';
 import { hasAnyAdmin } from '@/lib/roles';
 import { recordStoreVisit, classifySource, getStoreViews } from '@/lib/store-analytics';
 import { isStoreSubBlocked } from '@/lib/subscription';
@@ -165,6 +168,16 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const alreadyPartner = viewerStoreId ? await isCollaborator(viewerStoreId, storeId) : false;
   const canInvite = viewerStoreId > 0 && viewerStoreId !== storeId && !alreadyPartner;
   const partnerAds = await collaboratorAds(storeId).catch(() => []);
+  // مبدّل الهوية للمالك على واجهة متجره: يرجع لحساباته أو يبدّل لمتجر آخر (تعدّد المتاجر)
+  const [ownerProfiles, ownerActive, ownerLinked] = isOwner
+    ? await Promise.all([
+        getUserProfiles(session!.uid).catch(() => []),
+        getActiveProfile(session!.uid).catch(() => null),
+        linkedAccounts(session!.uid).catch(() => []),
+      ])
+    : [[], null, []];
+  const toSwItem = (p: { id: number; name: string; type: 'personal' | 'store'; avatarUrl: string; color: string | null }) => ({ id: p.id, name: p.name, type: p.type, avatarUrl: p.avatarUrl, color: p.color });
+  const ownerLinkedItems = ownerLinked.filter((a) => a.id !== session!.uid).map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName }));
   const brand = meta.color || '#3287da';
   const name = meta.storeName || s.name;
   const tier = storeTier(followers, rating.avg, rating.count);
@@ -233,6 +246,15 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <a href="/store" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إدارة المتجر"><Building2 className="h-4 w-4" /></a>
           )}
         </div>
+        {/* شريط التبديل للمالك: الرجوع لحساباتك أو التبديل لمتجر آخر من داخل واجهة المتجر */}
+        {isOwner && ownerActive && (
+          <div className="relative z-40 border-t bg-white/95">
+            <div className="mx-auto flex max-w-2xl items-center gap-2 px-3 py-1.5">
+              <ProfileSwitcher active={toSwItem(ownerActive)} profiles={ownerProfiles.map(toSwItem)} linked={ownerLinkedItems} />
+              <span className="text-[11px] text-muted-foreground">بدّل بين حساباتك ومتاجرك</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mx-auto max-w-2xl space-y-4 px-3 py-3">

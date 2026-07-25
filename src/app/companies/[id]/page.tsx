@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2, Plus, BarChart3, Megaphone, Eye, LogIn } from 'lucide-react';
+import { BadgeCheck, MapPin, Phone, MessageCircle, Building2, Users, Star, Search, Heart, Handshake, ShieldCheck, CalendarDays, Crown, Tag, Target, Mail, Link2, Plus, BarChart3, Megaphone, Eye, LogIn, Home } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { ShareButtons } from '@/components/share-buttons';
 import { getStore } from '@/lib/stores';
@@ -168,16 +168,16 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const alreadyPartner = viewerStoreId ? await isCollaborator(viewerStoreId, storeId) : false;
   const canInvite = viewerStoreId > 0 && viewerStoreId !== storeId && !alreadyPartner;
   const partnerAds = await collaboratorAds(storeId).catch(() => []);
-  // مبدّل الهوية للمالك على واجهة متجره: يرجع لحساباته أو يبدّل لمتجر آخر (تعدّد المتاجر)
-  const [ownerProfiles, ownerActive, ownerLinked] = isOwner
+  // مبدّل الهوية لأي عضو مسجّل يتصفّح المتجر: يرجع لحساباته/المنصة أو يبدّل هويته (تعدّد المتاجر)
+  const [viewerProfiles, viewerActive, viewerLinked] = session
     ? await Promise.all([
-        getUserProfiles(session!.uid).catch(() => []),
-        getActiveProfile(session!.uid).catch(() => null),
-        linkedAccounts(session!.uid).catch(() => []),
+        getUserProfiles(session.uid).catch(() => []),
+        getActiveProfile(session.uid).catch(() => null),
+        linkedAccounts(session.uid).catch(() => []),
       ])
     : [[], null, []];
   const toSwItem = (p: { id: number; name: string; type: 'personal' | 'store'; avatarUrl: string; color: string | null }) => ({ id: p.id, name: p.name, type: p.type, avatarUrl: p.avatarUrl, color: p.color });
-  const ownerLinkedItems = ownerLinked.filter((a) => a.id !== session!.uid).map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName }));
+  const viewerLinkedItems = session ? viewerLinked.filter((a) => a.id !== session.uid).map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName })) : [];
   const brand = meta.color || '#3287da';
   const name = meta.storeName || s.name;
   const tier = storeTier(followers, rating.avg, rating.count);
@@ -232,9 +232,12 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <input name="q" defaultValue={query} placeholder="ابحث في المتجر" className="h-10 w-full rounded-full border bg-muted/40 pr-9 pl-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </form>
           {!session && (
-            <Link href={`/store-login?s=${encodeURIComponent(meta.handle || String(storeId))}`} className="btn-3d flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-bold text-white" style={{ background: brand }}>
-              <LogIn className="h-4 w-4" /> دخول
-            </Link>
+            <>
+              <a href="/" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border text-primary" aria-label="الرجوع لتربح"><Home className="h-4 w-4" /></a>
+              <Link href={`/store-login?s=${encodeURIComponent(meta.handle || String(storeId))}`} className="btn-3d flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-bold text-white" style={{ background: brand }}>
+                <LogIn className="h-4 w-4" /> دخول
+              </Link>
+            </>
           )}
           {isOwner && meta.allowAds && (
             <Link href="/ads/new?dest=store" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="أضف إعلان"><Plus className="h-5 w-5" /></Link>
@@ -246,12 +249,14 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <a href="/store" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إدارة المتجر"><Building2 className="h-4 w-4" /></a>
           )}
         </div>
-        {/* شريط التبديل للمالك: الرجوع لحساباتك أو التبديل لمتجر آخر من داخل واجهة المتجر */}
-        {isOwner && ownerActive && (
+        {/* شريط التبديل لأي عضو مسجّل: الرجوع لتربح/حساباتك أو التبديل لهوية/متجر آخر */}
+        {session && viewerActive && (
           <div className="relative z-40 border-t bg-white/95">
             <div className="mx-auto flex max-w-2xl items-center gap-2 px-3 py-1.5">
-              <ProfileSwitcher active={toSwItem(ownerActive)} profiles={ownerProfiles.map(toSwItem)} linked={ownerLinkedItems} />
-              <span className="text-[11px] text-muted-foreground">بدّل بين حساباتك ومتاجرك</span>
+              <ProfileSwitcher active={toSwItem(viewerActive)} profiles={viewerProfiles.map(toSwItem)} linked={viewerLinkedItems} />
+              <Link href="/" className="ms-auto inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold text-primary hover:bg-primary/5">
+                <Home className="h-3.5 w-3.5" /> الرجوع لتربح
+              </Link>
             </div>
           </div>
         )}

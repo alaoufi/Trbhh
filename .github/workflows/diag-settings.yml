@@ -1,36 +1,13 @@
-name: تشخيص - قراءة إعدادات الباقات من الخادم
+name: تشخيص - سجل تطبيق الخادم
 
 on:
   workflow_dispatch:
 
 jobs:
-  query:
+  logs:
     runs-on: ubuntu-latest
     steps:
-      - name: كتابة سكربت الاستعلام
-        run: |
-          cat > query.js << 'EOF'
-          const { PrismaClient } = require('@prisma/client');
-          const p = new PrismaClient();
-          (async () => {
-            const keys = ['max_profiles','identity_exempt_days',
-              'idpkg1_name','idpkg1_acc','idpkg1_m','idpkg1_h','idpkg1_y',
-              'idpkg2_name','idpkg2_acc','idpkg2_m','idpkg2_h','idpkg2_y',
-              'idpkg3_name','idpkg3_acc','idpkg3_m','idpkg3_h','idpkg3_y',
-              'ad_lifetime_days','strike_ban_days'];
-            const rows = await p.site_settings.findMany({ where: { k: { in: keys } } });
-            console.log('===SETTINGS_START===');
-            console.log(JSON.stringify(rows, null, 2));
-            console.log('===SETTINGS_END===');
-            // اختبار كتابة: عيّن قيمة ثم اقرأها
-            await p.site_settings.upsert({ where: { k: 'diag_write_test' }, create: { k: 'diag_write_test', v: 'ok-'+Date.now() }, update: { v: 'ok-'+Date.now() } });
-            const back = await p.site_settings.findUnique({ where: { k: 'diag_write_test' } });
-            console.log('===WRITE_TEST===', JSON.stringify(back));
-            await p.$disconnect();
-          })().catch((e) => { console.error('QUERY_FAILED:', e); process.exit(1); });
-          EOF
-
-      - name: الاستعلام عبر SSH
+      - name: قراءة سجل التطبيق عبر SSH
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -45,4 +22,4 @@ jobs:
           PORT="${VPS_PORT:-22}"
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
             -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
-            "cd /root/trbhh && docker compose exec -T app node" < query.js
+            'cd /root/trbhh && echo "=== APP UPTIME ===" && docker compose ps app && echo "=== LAST 250 LOG LINES (filtered) ===" && docker compose logs --tail=400 app 2>&1 | grep -iE "error|unhandled|reject|prisma|settings|digest|Error:|at async|redirect|Body exceeded" | tail -90'

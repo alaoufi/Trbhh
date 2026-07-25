@@ -18,6 +18,8 @@ export async function Header() {
   const myStoreId = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // اسم المتجر لمبدّل الهوية (اختياري: يظهر فقط لأصحاب المتاجر)
   const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
+  // الهوية الفعّالة الآن (اسمها ونوعها) — لعرض «من أنا» في القائمة، تتغيّر عند التبديل
+  const activeProfile = session ? await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).catch(() => null) : null;
   // الحسابات المرتبطة بنفس المالك (للتبديل من مبدّل الهوية) — فارغة إن لا ربط
   const linkedAccts = session ? await import('@/lib/account-links').then((m) => m.linkedAccounts(session.uid)).catch(() => []) : [];
   // روابط الإدارة المصرّح بها — تُعرض في قائمة الهيدر داخل لوحة الإدارة
@@ -41,7 +43,7 @@ export async function Header() {
     <header className="sticky top-0 z-40 border-b border-black/20 bg-gradient-to-r from-[#01091a] to-[#16294a]">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
-        <SiteMenu isAuthed={!!session} isAdmin={admin} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />
+        <SiteMenu isAuthed={!!session} isAdmin={admin} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} activeName={activeProfile?.name || ''} activeType={activeProfile?.type || 'personal'} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />
 
         {/* الزر الرئيسي — يتغيّر حسب الصفحة (دخول/رابط المتجر/الصفحة الرئيسية في صفحة الدخول) */}
         <HeaderCta isAuthed={!!session} myStoreId={myStoreId} />

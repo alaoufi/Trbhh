@@ -40,7 +40,7 @@ function Section({ title, icon: Icon, children }: { title: string; icon: React.E
 }
 
 type LinkedAcct = { id: number; name: string; hasStore: boolean; storeName: string | null; isAdmin: boolean };
-export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, auctionsOn = false, debatesOn = true, myStoreId = 0, myStoreName = '', currentUid = 0, linkedAccounts = [] }: { isAuthed: boolean; isAdmin: boolean; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; debatesOn?: boolean; myStoreId?: number; myStoreName?: string; currentUid?: number; linkedAccounts?: LinkedAcct[] }) {
+export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, auctionsOn = false, debatesOn = true, myStoreId = 0, myStoreName = '', currentUid = 0, activeName = '', activeType = 'personal', linkedAccounts = [] }: { isAuthed: boolean; isAdmin: boolean; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; debatesOn?: boolean; myStoreId?: number; myStoreName?: string; currentUid?: number; activeName?: string; activeType?: 'personal' | 'store'; linkedAccounts?: LinkedAcct[] }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname() || '';
@@ -123,10 +123,15 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
                 <div className="mb-1.5 px-1 text-[11px] font-extrabold text-primary">🎭 هوياتي</div>
                 {/* الحساب الحالي وصفاته — شارات فقط، بلا روابط مكرّرة مع القائمة (حسابي/لوحة الإدارة لهما مكانهما أدناه) */}
                 <div className="flex items-center justify-between gap-2 rounded-lg bg-background px-2 py-2">
-                  <span className="flex min-w-0 items-center gap-2 text-sm font-bold text-foreground"><User className="h-4 w-4 shrink-0 text-primary" /> <span className="line-clamp-1">أنت الآن</span></span>
+                  <span className="flex min-w-0 items-center gap-2 text-sm font-bold text-foreground">
+                    {activeType === 'store' ? <Store className="h-4 w-4 shrink-0 text-emerald-600" /> : <User className="h-4 w-4 shrink-0 text-primary" />}
+                    <span className="min-w-0 leading-tight">
+                      <span className="block text-[10px] font-normal leading-none text-muted-foreground">أنت الآن</span>
+                      <span className="line-clamp-1">{activeName || 'حسابي'}</span>
+                    </span>
+                  </span>
                   <span className="flex shrink-0 items-center gap-1">
-                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-extrabold text-sky-700">عضو</span>
-                    {myStoreId > 0 && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700">متجر</span>}
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-extrabold text-white" style={{ background: activeType === 'store' ? '#059669' : '#0284c7' }}>{activeType === 'store' ? 'متجر' : 'حساب'}</span>
                     {isAdmin && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">إدارة</span>}
                   </span>
                 </div>

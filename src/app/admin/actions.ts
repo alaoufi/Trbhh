@@ -583,6 +583,7 @@ export async function saveTextsAction(formData: FormData) {
 }
 
 export async function saveSettingsAction(formData: FormData) {
+ try {
   const session = await requireAction('users', 'edit');
   const editH = Math.max(0, parseInt(String(formData.get('editHours') || '0')) || 0);
   const delH = Math.max(0, parseInt(String(formData.get('deleteHours') || '0')) || 0);
@@ -659,6 +660,16 @@ export async function saveSettingsAction(formData: FormData) {
   revalidatePath('/');
   revalidatePath('/classified');
   redirect('/admin/settings?saved=1');
+ } catch (e: unknown) {
+  // أعد رمي إعادة التوجيه/عدم الوجود (سلوك Next الطبيعي) — والباقي أخطاء حقيقية تُسجَّل
+  const digest = (e as { digest?: string })?.digest || '';
+  if (typeof digest === 'string' && (digest.startsWith('NEXT_REDIRECT') || digest.startsWith('NEXT_NOT_FOUND'))) throw e;
+  try {
+    const { logClientError } = await import('@/lib/error-log');
+    await logClientError({ message: 'saveSettingsAction: ' + ((e as Error)?.message || String(e)), stack: (e as Error)?.stack, url: '/admin/settings' });
+  } catch { /* لا شيء */ }
+  redirect('/admin/settings?error=save');
+ }
 }
 
 /** Revenue hub: store-subscription plans + grace, and ad-service/duplicate pricing. */

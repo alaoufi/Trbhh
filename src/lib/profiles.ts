@@ -127,6 +127,26 @@ export async function getActiveProfile(userId: number): Promise<Profile> {
   return ensureDefaultProfile(userId);
 }
 
+/** بيانات هوية النشر لعرضها على الإعلان (بلا مزامنة) — أو null إن لم توجد. */
+export async function getProfileDisplay(profileId: number): Promise<Profile | null> {
+  if (!profileId || profileId <= 0) return null;
+  await ensure();
+  const p = await prisma.profiles.findUnique({ where: { id: BigInt(profileId) } }).catch(() => null);
+  if (!p) return null;
+  return toProfile(p as Row, await avatarUrls([p.avatar || 0]));
+}
+
+/** تعبئة جوال/واتساب/بريد هوية شخصية من أول إعلان يُنشر بها إن كانت فارغة (مرة واحدة). */
+export async function backfillProfileContact(profileId: number, phone: string, whatsapp: string): Promise<void> {
+  if (!profileId || (!phone && !whatsapp)) return;
+  const p = await prisma.profiles.findUnique({ where: { id: BigInt(profileId) }, select: { phone: true, whatsapp: true } }).catch(() => null);
+  if (!p) return;
+  const data: { phone?: string; whatsapp?: string } = {};
+  if (!p.phone && phone) data.phone = phone.slice(0, 24);
+  if (!p.whatsapp && whatsapp) data.whatsapp = whatsapp.slice(0, 24);
+  if (Object.keys(data).length) await prisma.profiles.update({ where: { id: BigInt(profileId) }, data }).catch(() => {});
+}
+
 /** عدّ هويات المستخدم (بلا مزامنة ثقيلة) — للهيدر. */
 export async function countUserProfiles(userId: number): Promise<number> {
   await ensure();

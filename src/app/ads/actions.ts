@@ -20,6 +20,7 @@ import { scanImages, imageModerationEnabled } from '@/lib/nsfw';
 import { parseMapsUrl, type LatLng } from '@/lib/maps';
 import { toInt } from '@/lib/utils';
 import { isApprovedStoreOwner } from '@/lib/merchant';
+import { getActiveProfile, backfillProfileContact } from '@/lib/profiles';
 import { normalizeAr, similarity, isKeywordStuffing } from '@/domain/text';
 
 /** Resolve coordinates from a pasted maps link — follows shortened goo.gl links. */
@@ -276,15 +277,28 @@ export async function createAdAction(formData: FormData) {
     }
   }
 
-  // احفظ وسيلة التواصل والموقع في ملف العضو تلقائياً حتى تظهر في إعلاناته وملفه
+  // هوية النشر الفعّالة: يُنشر الإعلان باسمها وبياناتها. للمتجر (dest=store) نستخدم
+  // هوية المتجر، وإلا الهوية الشخصية الفعّالة (الافتراضية إن لم يبدّل العضو).
+  const active = await getActiveProfile(session.uid);
+  let profileId: number | null = active.type === 'personal' ? active.id : null;
+  if (dest === 'store') {
+    const sp = await prisma.profiles.findFirst({ where: { user_id: BigInt(session.uid), type: 'store' }, orderBy: { id: 'asc' }, select: { id: true } }).catch(() => null);
+    profileId = sp ? toInt(sp.id) : null;
+  }
+  const publishingAsDefault = active.type === 'personal' && active.isDefault;
+
+  // احفظ وسيلة التواصل والموقع في ملف العضو تلقائياً حتى تظهر في إعلاناته وملفه —
+  // فقط عند النشر بالهوية الأساسية؛ الهويات الفرعية بياناتها مستقلة ولا تُلوّث الحساب.
   await prisma.users.update({
     where: { id: BigInt(session.uid) },
     data: {
-      ...(phone ? { phoneNumber: phone, allow_phone: 1 } : {}),
-      ...(whatsapp ? { phone_whatsapp: whatsapp, whatsapp: 1 } : {}),
+      ...(publishingAsDefault && phone ? { phoneNumber: phone, allow_phone: 1 } : {}),
+      ...(publishingAsDefault && whatsapp ? { phone_whatsapp: whatsapp, whatsapp: 1 } : {}),
       ...(cityId && cityId !== '0' ? { city_id: BigInt(cityId) } : {}),
     },
   }).catch(() => {});
+  // هوية فرعية بلا جوال/واتساب محفوظ: عبّئها من أول إعلان يُنشر بها.
+  if (profileId && !publishingAsDefault) await backfillProfileContact(profileId, phone, whatsapp).catch(() => {});
   if (areaRaw) await setUserArea(session.uid, Number(areaRaw)).catch(() => {});
 
   const images = await readImages(formData);
@@ -382,6 +396,7 @@ export async function createAdAction(formData: FormData) {
       area_id: areaRaw ? Number(areaRaw) : null,
       country_id: countryRaw ? Number(countryRaw) : (user?.country_id ?? null),
       user_id: BigInt(session.uid),
+      profile_id: profileId ? BigInt(profileId) : null,
       video_path: video || '',
       lat: lat || null,
       lng: lng || null,

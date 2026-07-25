@@ -6,6 +6,7 @@ import { mediaUrl, PLACEHOLDER } from './media';
 import { loadBanned, censorSync } from './censor';
 import { sweepExpiredFeatured, getFeaturedTierMap, getUsersAdMeta } from './packages';
 import { ensureSaudiAreas } from './seed-areas';
+import { getProfileDisplay } from './profiles';
 import { toInt } from './utils';
 
 export type AdCard = {
@@ -517,6 +518,10 @@ async function getAdImpl(id: number) {
       : null)
     : (videoPathRaw || null);
 
+  // هوية النشر: إن نُشر الإعلان بهوية شخصية (profile_id) تُعرض بياناتها (اسم/صورة/تواصل/لون)
+  // بدل بيانات الحساب الأساسي. إعلانات المتجر تبقى بعرض المتجر كما هو.
+  const pubProfile = ad.profile_id ? await getProfileDisplay(toInt(ad.profile_id)).catch(() => null) : null;
+
   await loadBanned();
   return {
     id: toInt(ad.id),
@@ -551,12 +556,20 @@ async function getAdImpl(id: number) {
     seller: seller
       ? {
           id: toInt(seller.id),
-          name: seller.name || seller.userName || 'مستخدم',
-          phone: seller.allow_phone ? seller.phoneNumber : null,
-          whatsapp: seller.whatsapp ? seller.phone_whatsapp || seller.phoneNumber : null,
+          name: pubProfile?.type === 'personal' ? pubProfile.name : (seller.name || seller.userName || 'مستخدم'),
+          phone: pubProfile?.type === 'personal'
+            ? (pubProfile.phone || (pubProfile.isDefault && seller.allow_phone ? seller.phoneNumber : null))
+            : (seller.allow_phone ? seller.phoneNumber : null),
+          whatsapp: pubProfile?.type === 'personal'
+            ? (pubProfile.whatsapp || (pubProfile.isDefault && seller.whatsapp ? seller.phone_whatsapp || seller.phoneNumber : null))
+            : (seller.whatsapp ? seller.phone_whatsapp || seller.phoneNumber : null),
           trusted: seller.trusted === 1,
           banned: seller.ban === 'checked',
-          avatar: seller.photo_path ? mediaUrl(seller.photo_path) : null,
+          avatar: pubProfile?.type === 'personal' && pubProfile.avatar
+            ? pubProfile.avatarUrl
+            : (seller.photo_path ? mediaUrl(seller.photo_path) : null),
+          color: pubProfile?.type === 'personal' ? pubProfile.color : null,
+          handle: pubProfile?.type === 'personal' ? pubProfile.handle : null,
           memberSince: seller.created_at ? seller.created_at.toISOString() : null,
         }
       : null,

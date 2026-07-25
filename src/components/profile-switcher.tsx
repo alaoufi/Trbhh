@@ -55,26 +55,37 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
           <div className="absolute right-0 z-50 mt-1 w-64 overflow-hidden rounded-xl border bg-white shadow-xl">
             <div className="border-b px-3 py-2 text-[11px] font-bold text-muted-foreground">اختر الهوية التي تُعلن باسمها:</div>
             <div className="max-h-72 overflow-y-auto">
-              {profiles.map((p) => {
-                const c = p.color || '#3287da';
-                const isActive = p.id === active.id;
+              {(['personal', 'store'] as const).map((grp) => {
+                const items = profiles.filter((p) => p.type === grp);
+                if (!items.length) return null;
                 return (
-                  <form key={p.id} action={switchProfileAction}>
-                    <input type="hidden" name="profileId" value={p.id} />
-                    <input type="hidden" name="back" value={path} />
-                    <button type="submit" disabled={isActive} className={`flex w-full items-center gap-2 px-3 py-2 text-right text-sm hover:bg-secondary ${isActive ? 'bg-emerald-50' : ''}`} style={{ borderInlineStart: `4px solid ${c}` }}>
-                      <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-extrabold text-white" style={{ background: c }}>
-                        {p.avatarUrl && !p.avatarUrl.endsWith('.svg')
-                          ? <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" />
-                          : (p.name.trim().charAt(0) || (p.type === 'store' ? '🏪' : '؟'))}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-bold">{p.name}</span>
-                        <span className="block text-[11px] text-muted-foreground">{p.type === 'store' ? 'متجر' : 'حساب شخصي'}</span>
-                      </span>
-                      {isActive && <Check className="h-4 w-4 shrink-0 text-emerald-600" />}
-                    </button>
-                  </form>
+                  <div key={grp}>
+                    <div className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-extrabold ${grp === 'store' ? 'bg-emerald-50 text-emerald-800' : 'bg-sky-50 text-sky-800'}`}>
+                      {grp === 'store' ? <><Store className="h-3.5 w-3.5" /> متاجري</> : <><UserRound className="h-3.5 w-3.5" /> حساباتي في تربح</>}
+                    </div>
+                    {items.map((p) => {
+                      const c = p.color || '#3287da';
+                      const isActive = p.id === active.id;
+                      return (
+                        <form key={p.id} action={switchProfileAction}>
+                          <input type="hidden" name="profileId" value={p.id} />
+                          <input type="hidden" name="back" value={path} />
+                          <button type="submit" disabled={isActive} className={`flex w-full items-center gap-2 px-3 py-2 text-right text-sm hover:bg-secondary ${isActive ? 'bg-emerald-50' : ''}`} style={{ borderInlineStart: `4px solid ${c}` }}>
+                            <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-extrabold text-white" style={{ background: c }}>
+                              {p.avatarUrl && !p.avatarUrl.endsWith('.svg')
+                                ? <img src={p.avatarUrl} alt="" className="h-full w-full object-cover" />
+                                : (p.name.trim().charAt(0) || (p.type === 'store' ? '🏪' : '؟'))}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-bold">{p.name}</span>
+                              <span className="block text-[11px] text-muted-foreground">{p.type === 'store' ? 'متجر — النشر داخله فقط' : 'حساب شخصي'}</span>
+                            </span>
+                            {isActive && <Check className="h-4 w-4 shrink-0 text-emerald-600" />}
+                          </button>
+                        </form>
+                      );
+                    })}
+                  </div>
                 );
               })}
             </div>

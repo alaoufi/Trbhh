@@ -216,8 +216,10 @@ export async function createAdAction(formData: FormData) {
     const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
     if (ll) { lat = String(ll.lat); lng = String(ll.lng); }
   }
-  // نشر من داخل المتجر: للرجوع للمتجر وإدراج الإعلان في واجهته تلقائياً
-  const dest = String(formData.get('dest') || '') === 'store' ? 'store' : '';
+  // هوية النشر الفعّالة: إن كانت «متجراً» فكل إعلان يُنشر داخل المتجر تلقائياً (لا في تربح العام)،
+  // وإلا يُحترم dest القادم من نموذج المتجر.
+  const active = await getActiveProfile(session.uid);
+  const dest = (String(formData.get('dest') || '') === 'store' || active.type === 'store') ? 'store' : '';
   const q = dest ? '&dest=store' : '';
   // متجر موقوف (مؤقتاً أو نهائياً): لا يُسمح بنشر إعلانات منه
   if (dest === 'store') {
@@ -277,11 +279,10 @@ export async function createAdAction(formData: FormData) {
     }
   }
 
-  // هوية النشر الفعّالة: يُنشر الإعلان باسمها وبياناتها. للمتجر (dest=store) نستخدم
-  // هوية المتجر، وإلا الهوية الشخصية الفعّالة (الافتراضية إن لم يبدّل العضو).
-  const active = await getActiveProfile(session.uid);
-  let profileId: number | null = active.type === 'personal' ? active.id : null;
-  if (dest === 'store') {
+  // هوية النشر: الهوية الفعّالة (شخصية أو متجر). إن كان dest=store من النموذج بينما
+  // الهوية الشخصية فعّالة، نربطه بهوية المتجر.
+  let profileId: number | null = active.id;
+  if (dest === 'store' && active.type !== 'store') {
     const sp = await prisma.profiles.findFirst({ where: { user_id: BigInt(session.uid), type: 'store' }, orderBy: { id: 'asc' }, select: { id: true } }).catch(() => null);
     profileId = sp ? toInt(sp.id) : null;
   }

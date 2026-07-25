@@ -493,11 +493,11 @@ export async function createAdAction(formData: FormData) {
   }
   // نشر من المتجر: أدرِج الإعلان في واجهة المتجر، ثم انتقل إلى إعلانات المتجر (لا للرجوع لصفحة الإضافة)
   if (dest === 'store') {
-    const { addStoreProduct, storeIdOfUser, staffStoreId } = await import('@/lib/merchant');
+    const { addStoreProduct, getActiveStoreId, staffStoreId } = await import('@/lib/merchant');
     await addStoreProduct(session.uid, toInt(ad.id)).catch(() => {});
     if (requireApproval) redirect('/store?added=pending'); // بانتظار الموافقة → لا يظهر بعد
-    // المالك أو الموظف — كلاهما يعود لواجهة المتجر نفسه
-    const sid = (await storeIdOfUser(session.uid).catch(() => 0)) || (await staffStoreId(session.uid).catch(() => 0));
+    // المالك أو الموظف — كلاهما يعود لواجهة المتجر الفعّال نفسه
+    const sid = (await getActiveStoreId(session.uid).catch(() => 0)) || (await staffStoreId(session.uid).catch(() => 0));
     redirect(sid ? `/companies/${sid}?added=1` : '/store?added=1');
   }
   // ينشر مباشرة، إلا إذا كان مقيّداً بالموافقة أو مجدولاً

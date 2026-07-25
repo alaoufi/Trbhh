@@ -23,8 +23,8 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; bulklimit?: string; show?: string; adshow?: string; dupid?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string; areq?: string; vreq?: string; cat?: string; banned?: string }> }) {
-  const { error, sub, added, settings, backup, bulk, bulklimit, show, adshow, dupid, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq, areq, vreq, cat, banned } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; bulklimit?: string; show?: string; adshow?: string; dupid?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string; areq?: string; vreq?: string; cat?: string; banned?: string; newstore?: string }> }) {
+  const { error, sub, added, settings, backup, bulk, bulklimit, show, adshow, dupid, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq, areq, vreq, cat, banned, newstore } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك/عرض المتجر/عرض الإعلان + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
@@ -224,6 +224,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
       )}
       {exc === 'dup' && <div className="card-3d rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">لديك طلب استثناء سابق قيد المراجعة — انتظر نتيجته أولاً.</div>}
 
+      {newstore === '1' && <div className="card-3d rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ فُتح متجرك الجديد وأصبح هويتك الفعّالة الآن — أكمل بياناته (الاسم/الشعار/الوصف) أدناه. يبدأ «بانتظار اعتماد الإدارة».</div>}
       {store && meta && (
         <div className={`card-3d rounded-xl p-3 text-sm font-bold ${meta.status === 1 ? 'text-emerald-700' : meta.status === 0 ? 'text-amber-700' : 'text-red-700'}`}>
           {meta.status === 1 ? '✓ متجرك مُعتمَد وظاهر للجميع.' : meta.status === 0 ? '⏳ متجرك بانتظار موافقة الإدارة قبل الظهور.' : meta.status === 3 ? '⛔ متجرك موقوف نهائياً — لا يظهر للزوّار («لا يوجد متجر نشط بهذا الاسم») ولا يمكنك النشر منه. راسل الإدارة.' : '⛔ متجرك موقوف مؤقتاً — لا يظهر للزوّار («المتجر غير نشط حالياً») ولا يمكنك النشر منه حتى إعادة التفعيل. راسل الإدارة.'}

@@ -53,7 +53,12 @@ async function getStoreImpl(id: number) {
 }
 
 export async function getStoreByUser(userId: number) {
-  const s = await prisma.stores.findFirst({ where: { user_id: userId } });
+  // المتجر الفعّال (من هوية المتجر النشطة) — وإلا أول متجر (توافق مع متجر واحد)
+  const { getActiveStoreId } = await import('./merchant');
+  const sid = await getActiveStoreId(userId).catch(() => 0);
+  const s = sid
+    ? await prisma.stores.findFirst({ where: { id: BigInt(sid), user_id: userId } })
+    : await prisma.stores.findFirst({ where: { user_id: userId } });
   return s ? { id: toInt(s.id), description: s.description, address: s.address, logo: s.logo } : null;
 }
 

@@ -3,7 +3,7 @@ import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { getStoreSubPricing, subPlanPrice, SUB_PLAN_MONTHS, SUB_PLAN_LABELS, getStoreSubReminderConfig, getSetting, setSetting, SETTING_SUB_REMINDER_MSG, DEFAULT_SUB_REMINDER_MSG, SETTING_SHOW_REMINDER_MSG, DEFAULT_SHOW_REMINDER_MSG, SETTING_ADSHOW_REMINDER_MSG, DEFAULT_ADSHOW_REMINDER_MSG, getStorePlusPricing, plusPlanPrice, autoRenewEnabled, type SubPlan } from './settings';
 import { charge } from './wallet';
-import { storeIdOfUser } from './merchant';
+import { getActiveStoreId } from './merchant';
 import { toInt } from './utils';
 
 const ensure = ensureSchema;
@@ -74,7 +74,7 @@ export async function isStoreSubBlocked(storeId: number): Promise<boolean> {
  *  later of now / current expiry (so renewing early never loses remaining days). */
 export async function subscribeStore(userId: number, plan: SubPlan): Promise<{ ok: boolean; error?: string; until?: Date }> {
   await ensure();
-  const storeId = await storeIdOfUser(userId);
+  const storeId = await getActiveStoreId(userId);
   if (!storeId) return { ok: false, error: 'لا يوجد متجر.' };
   const pricing = await getStoreSubPricing();
   const months = SUB_PLAN_MONTHS[plan];
@@ -148,7 +148,7 @@ export async function runAutoRenewals(): Promise<void> {
 /** شراء باقة Plus: اشتراك + عرض المتجر في تربح + شارة ⭐ — دفعة واحدة من الرصيد. */
 export async function buyStorePlus(userId: number, plan: SubPlan): Promise<{ ok: boolean; error?: string }> {
   await ensure();
-  const storeId = await storeIdOfUser(userId);
+  const storeId = await getActiveStoreId(userId);
   if (!storeId) return { ok: false, error: 'لا يوجد متجر.' };
   const pricing = await getStorePlusPricing();
   if (!pricing.enabled) return { ok: false, error: 'الباقة غير متاحة حالياً.' };

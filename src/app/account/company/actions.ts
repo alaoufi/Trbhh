@@ -9,6 +9,13 @@ import { toInt } from '@/lib/utils';
 import { scanContent } from '@/lib/content-guard';
 import { handleProhibited } from '@/lib/moderation';
 
+/** شرط اختيار «متجري» = المتجر الفعّال (تعدّد المتاجر)، وإلا أول متجر (توافق). */
+async function myStoreWhereFor(uid: number): Promise<{ id?: bigint; user_id: number }> {
+  const { getActiveStoreId } = await import('@/lib/merchant');
+  const sid = await getActiveStoreId(uid).catch(() => 0);
+  return sid ? { id: BigInt(sid), user_id: uid } : { user_id: uid };
+}
+
 /** Owner subscribes/renews the store to a plan (monthly/6mo/yearly), charged from wallet. */
 export async function subscribeStoreAction(formData: FormData) {
   const session = await requireUser();
@@ -80,6 +87,10 @@ export async function saveStoreSettingsAction(formData: FormData) {
 
 export async function saveCompanyAction(formData: FormData) {
   const session = await requireUser();
+  // المتجر الفعّال (تعدّد المتاجر): التعديل يطبّق على المتجر المُفعّل حالياً لا أول متجر
+  const { getActiveStoreId } = await import('@/lib/merchant');
+  const activeSid = await getActiveStoreId(session.uid).catch(() => 0);
+  const myStoreWhere = activeSid ? { id: BigInt(activeSid), user_id: session.uid } : { user_id: session.uid };
   const description = String(formData.get('description') || '').trim();
   const address = String(formData.get('address') || '').trim();
   const storeName = String(formData.get('storeName') || '').trim();
@@ -121,7 +132,7 @@ export async function saveCompanyAction(formData: FormData) {
   }
   // تعديل اسم متجر قائم = بطلب وموافقة إدارة المتاجر (أول تسمية تُحفظ مباشرة):
   // يُنشأ طلب تغيير الاسم ويبقى الاسم الحالي حتى الموافقة — بقية الإعدادات تُحفظ عادي
-  const currentStore = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { store_name: true, specialty: true } }).catch(() => null);
+  const currentStore = await prisma.stores.findFirst({ where: myStoreWhere, select: { store_name: true, specialty: true } }).catch(() => null);
   const currentName = (currentStore?.store_name || '').trim();
   let effectiveName = storeName;
   let nameRequestFlag: '' | '1' | 'dup' = '';
@@ -165,7 +176,7 @@ export async function saveCompanyAction(formData: FormData) {
     logoId = toInt(up.id);
   }
 
-  const existing = await prisma.stores.findFirst({ where: { user_id: session.uid } });
+  const existing = await prisma.stores.findFirst({ where: myStoreWhere });
   if (existing) {
     await prisma.stores.update({ where: { id: existing.id }, data: { description, address, ...(logoId ? { logo: logoId } : {}) } });
   } else {
@@ -188,8 +199,45 @@ export async function saveCompanyAction(formData: FormData) {
   if (nameRequestFlag) redirect(`/store?nreq=${nameRequestFlag}${actRequestFlag ? `&areq=${actRequestFlag}` : ''}`);
   if (actRequestFlag) redirect(`/store?areq=${actRequestFlag}`);
   // land the merchant on their own (independent) store page
-  const mine = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true } });
+  const mine = await prisma.stores.findFirst({ where: myStoreWhere, select: { id: true } });
   redirect(mine ? `/companies/${toInt(mine.id)}` : '/store');
+}
+
+/** فتح متجر إضافي (تعدّد المتاجر): ينشئ متجراً مستقلاً جديداً تحت نفس الحساب،
+ *  يبدأ «بانتظار الاعتماد» بتجربة مجانية، ويحوّل الهوية النشطة إليه مباشرة. */
+export async function createNewStoreAction(formData: FormData) {
+  const session = await requireUser();
+  if (!formData.get('agreeTerms')) redirect('/account/profiles?storerr=terms#stores');
+  const { storeCountOfUser } = await import('@/lib/merchant');
+  const { getSettingNum, getStoreSubPricing } = await import('@/lib/settings');
+  const [count, max] = await Promise.all([storeCountOfUser(session.uid), getSettingNum('max_stores', 3)]);
+  if (max > 0 && count >= max) redirect(`/account/profiles?storerr=limit&max=${max}#stores`);
+  const storeName = String(formData.get('storeName') || '').trim().slice(0, 120);
+  if (storeName) {
+    const { containsBannedName } = await import('@/lib/censor');
+    if (await containsBannedName(storeName)) redirect('/account/profiles?storerr=badname#stores');
+    // تفرّد الاسم عبر المتاجر: تشابه عالٍ يُرفض (كما في حفظ المتجر)
+    const { findSimilarStoreName } = await import('@/lib/merchant');
+    const clash = await findSimilarStoreName(session.uid, storeName);
+    if (clash) redirect(`/account/profiles?storerr=namedup&othername=${encodeURIComponent(clash.name.slice(0, 60))}#stores`);
+  }
+  // إنشاء المتجر «بانتظار الاعتماد» (status:0) — كل الحقول مقيّدة بمعرّف هذا المتجر تحديداً
+  const created = await prisma.stores.create({ data: { user_id: session.uid, description: '', address: '', logo: 0, status: 0 } });
+  await prisma.stores.update({ where: { id: created.id }, data: { terms_agreed: 1, terms_agreed_at: new Date(), ...(storeName ? { store_name: storeName } : {}) } }).catch(() => {});
+  // تجربة مجانية على هذا المتجر تحديداً (لا تمسّ بقية المتاجر)
+  const { trialDays } = await getStoreSubPricing();
+  if (trialDays > 0) {
+    const until = new Date(Date.now() + trialDays * 86400000);
+    await prisma.stores.update({ where: { id: created.id }, data: { sub_until: until, on_trial: 1 } }).catch(() => {});
+  }
+  // مزامنة الهويات لإنشاء هوية لهذا المتجر ثم تفعيلها (يتحوّل العضو للعمل به فوراً)
+  const { getUserProfiles, setActiveProfileCookie } = await import('@/lib/profiles');
+  const profiles = await getUserProfiles(session.uid).catch(() => []);
+  const sp = profiles.find((p) => p.type === 'store' && p.storeId === toInt(created.id));
+  if (sp) await setActiveProfileCookie(sp.id);
+  revalidatePath('/', 'layout');
+  revalidatePath('/store');
+  redirect('/store?newstore=1');
 }
 
 /** طلب استثناء اسم متجر مشابه: يُرسل للإدارة (طلبات تغيير الاسم) وتوافق أو ترفض. */
@@ -207,7 +255,7 @@ export async function requestStoreNameExceptionAction(formData: FormData) {
   }
   const pending = await prisma.name_requests.findFirst({ where: { user_id: BigInt(session.uid), kind: 'store', status: 0 } }).catch(() => null);
   if (pending) redirect('/store?exc=dup');
-  const store = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { store_name: true } }).catch(() => null);
+  const store = await prisma.stores.findFirst({ where: await myStoreWhereFor(session.uid), select: { store_name: true } }).catch(() => null);
   const fullReason = `استثناء اسم متجر مشابه لمتجر «${othername || '—'}»${other ? ` (#${other})` : ''}${reason ? ` — مبرر التاجر: ${reason}` : ''}`;
   await prisma.name_requests.create({
     data: { user_id: BigInt(session.uid), kind: 'store', old_name: store?.store_name || '', new_name: want, reason: fullReason },
@@ -234,7 +282,7 @@ export async function requestVerifyPaidAction(formData: FormData) {
 
 export async function storeMessageMemberAction(formData: FormData) {
   const session = await requireUser();
-  const store = await prisma.stores.findFirst({ where: { user_id: session.uid }, select: { id: true, store_name: true } }).catch(() => null);
+  const store = await prisma.stores.findFirst({ where: await myStoreWhereFor(session.uid), select: { id: true, store_name: true } }).catch(() => null);
   if (!store) redirect('/store');
   const phone = String(formData.get('phone') || '').trim();
   const raw = String(formData.get('message') || '').trim();
@@ -309,7 +357,7 @@ export async function storeRestoreFileAction(formData: FormData) {
 
 export async function addBranchAction(formData: FormData) {
   const session = await requireUser();
-  const store = await prisma.stores.findFirst({ where: { user_id: session.uid } });
+  const store = await prisma.stores.findFirst({ where: await myStoreWhereFor(session.uid) });
   if (!store) return;
   const name = String(formData.get('name') || '').trim();
   const address = String(formData.get('address') || '').trim();

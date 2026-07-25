@@ -22,8 +22,10 @@ async function logoUrl(logoId: number | null): Promise<string> {
 export async function getStoreWatermark(userId: number): Promise<{ text?: string; logo?: Buffer } | undefined> {
   try {
     await ensure();
+    // المتجر الفعّال (تعدّد المتاجر): علامة النشر تعود لمتجر الهوية النشطة لا أول متجر
+    const wmSid = await getActiveStoreId(userId).catch(() => 0);
     const s = await prisma.stores.findFirst({
-      where: { user_id: userId },
+      where: wmSid ? { id: BigInt(wmSid), user_id: userId } : { user_id: userId },
       select: { watermark_kind: true, store_name: true, logo: true },
       orderBy: { id: 'desc' },
     }).catch(() => null);
@@ -184,8 +186,9 @@ export async function saveStoreMeta(userId: number, data: { storeName: string; c
   const layout = ['classic', 'modern', 'minimal', 'luxury', 'grid', 'bold'].includes(data.layout) ? data.layout : 'classic';
   const catalog = isCatalogStyle(data.catalog) ? data.catalog : 'tiles';
   const fields = cleanFields(data.fields || DEFAULT_CATALOG_FIELDS) || DEFAULT_CATALOG_FIELDS;
+  const metaSid = await getActiveStoreId(userId).catch(() => 0); // المتجر الفعّال فقط (تعدّد المتاجر)
   await prisma.stores.updateMany({
-    where: { user_id: userId },
+    where: metaSid ? { id: BigInt(metaSid), user_id: userId } : { user_id: userId },
     data: {
       store_name: data.storeName.slice(0, 120) || null,
       brand_color: /^#[0-9a-fA-F]{6}$/.test(data.color) ? data.color : null,
@@ -220,7 +223,8 @@ export async function saveStoreSettings(userId: number, data: { allowAds: boolea
       ? { hours_from: data.hours.from, hours_to: data.hours.to, hours_days: data.hours.days.filter((d) => d >= 0 && d <= 6).join(',') || null }
       : { hours_from: null, hours_to: null, hours_days: null };
   const wmKind = data.watermarkKind === 'logo' ? 'logo' : 'name';
-  await prisma.stores.updateMany({ where: { user_id: userId }, data: { allow_ads: data.allowAds ? 1 : 0, allow_reviews: data.allowReviews ? 1 : 0, msg_templates: tpl || null, hidden_fields: hidden || null, announce: announce || null, product_note: productNote || null, welcome_msg: welcomeMsg || null, welcome_on: data.welcomeOn ? 1 : 0, watermark_kind: wmKind, ...hoursData } }).catch(() => {});
+  const setSid = await getActiveStoreId(userId).catch(() => 0); // المتجر الفعّال فقط
+  await prisma.stores.updateMany({ where: setSid ? { id: BigInt(setSid), user_id: userId } : { user_id: userId }, data: { allow_ads: data.allowAds ? 1 : 0, allow_reviews: data.allowReviews ? 1 : 0, msg_templates: tpl || null, hidden_fields: hidden || null, announce: announce || null, product_note: productNote || null, welcome_msg: welcomeMsg || null, welcome_on: data.welcomeOn ? 1 : 0, watermark_kind: wmKind, ...hoursData } }).catch(() => {});
 }
 
 /** Record that the owner agreed to the store terms (accountability). */
@@ -243,7 +247,7 @@ export async function storeProductAdIds(storeId: number): Promise<number[]> {
 /** Replace the store's showcased products (only the owner's own ads qualify). */
 export async function setStoreProducts(userId: number, adIds: number[]) {
   await ensure();
-  const storeId = await storeIdOfUser(userId);
+  const storeId = await getActiveStoreId(userId);
   if (!storeId) return;
   const uniq = [...new Set(adIds.filter((n) => Number.isInteger(n) && n > 0))].slice(0, 500);
   const owned = uniq.length
@@ -257,8 +261,8 @@ export async function setStoreProducts(userId: number, adIds: number[]) {
 /** Append a single owned ad to the store's showcase (used when publishing from the store). */
 export async function addStoreProduct(userId: number, adId: number) {
   await ensure();
-  // مالك المتجر، وإلا موظف متجر (عند تفعيل ميزة الموظفين) — يضيف منتجات باسم المتجر
-  const storeId = (await storeIdOfUser(userId)) || (await staffStoreId(userId));
+  // المتجر الفعّال للمالك، وإلا موظف متجر (عند تفعيل ميزة الموظفين) — يضيف المنتج للمتجر الصحيح
+  const storeId = (await getActiveStoreId(userId)) || (await staffStoreId(userId));
   if (!storeId || !adId) return;
   const owns = await prisma.ads.findFirst({ where: { id: BigInt(adId), user_id: BigInt(userId) }, select: { id: true } }).catch(() => null);
   if (!owns) return;
@@ -356,7 +360,11 @@ export async function setStoreStatus(storeId: number, status: number) {
 /** حالة متجر العضو (لأي متجر يملكه): 1 معتمد · 0 بانتظار · 2 موقوف مؤقتاً · 3 موقوف نهائياً · -1 لا متجر. */
 export async function storeStatusOfUser(userId: number): Promise<number> {
   await ensure();
-  const r = await prisma.stores.findFirst({ where: { user_id: userId }, select: { status: true }, orderBy: { id: 'desc' } }).catch(() => null);
+  // حالة المتجر الفعّال (المُراد النشر فيه) لا أول متجر
+  const sid = await getActiveStoreId(userId).catch(() => 0);
+  const r = sid
+    ? await prisma.stores.findFirst({ where: { id: BigInt(sid), user_id: userId }, select: { status: true } }).catch(() => null)
+    : await prisma.stores.findFirst({ where: { user_id: userId }, select: { status: true }, orderBy: { id: 'desc' } }).catch(() => null);
   return r ? r.status : -1;
 }
 
@@ -463,7 +471,7 @@ export function normalizeStoreUsername(raw: string): string {
 /** Owner sets/changes a dedicated password for logging into the store directly. */
 export async function setStorePassword(userId: number, plain: string): Promise<boolean> {
   await ensure();
-  const storeId = await storeIdOfUser(userId);
+  const storeId = await getActiveStoreId(userId);
   if (!storeId || !plain || plain.length < STORE_PW_MIN) return false;
   const { hashPassword } = await import('./auth');
   const hash = await hashPassword(plain);
@@ -474,7 +482,7 @@ export async function setStorePassword(userId: number, plain: string): Promise<b
 /** Owner sets/changes a dedicated login username (independent of the subdomain handle). */
 export async function setStoreUsername(userId: number, raw: string): Promise<{ ok: boolean; username?: string; msg: string }> {
   await ensure();
-  const storeId = await storeIdOfUser(userId);
+  const storeId = await getActiveStoreId(userId);
   if (!storeId) return { ok: false, msg: 'لا يوجد متجر.' };
   if (!raw.trim()) { // clearing the username → fall back to logging in by the subdomain handle
     await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { store_username: null } }).catch(() => {});
@@ -520,14 +528,16 @@ export async function resetStoreCredentialsByPhone(phone: string): Promise<{ use
 /** Current store-login credentials state for the owner dashboard. */
 export async function getStoreLogin(userId: number): Promise<{ username: string | null; hasPassword: boolean }> {
   await ensure();
-  const s = await prisma.stores.findFirst({ where: { user_id: userId }, select: { store_username: true, store_password: true } }).catch(() => null);
+  const sid = await getActiveStoreId(userId).catch(() => 0);
+  const s = await prisma.stores.findFirst({ where: sid ? { id: BigInt(sid), user_id: userId } : { user_id: userId }, select: { store_username: true, store_password: true } }).catch(() => null);
   return { username: s?.store_username ?? null, hasPassword: !!s?.store_password };
 }
 
 /** Does the caller's store have a dedicated login password set? */
 export async function hasStorePassword(userId: number): Promise<boolean> {
   await ensure();
-  const s = await prisma.stores.findFirst({ where: { user_id: userId }, select: { store_password: true } }).catch(() => null);
+  const sid = await getActiveStoreId(userId).catch(() => 0);
+  const s = await prisma.stores.findFirst({ where: sid ? { id: BigInt(sid), user_id: userId } : { user_id: userId }, select: { store_password: true } }).catch(() => null);
   return !!s?.store_password;
 }
 
@@ -551,7 +561,7 @@ export async function storeLogin(login: string, plain: string): Promise<{ uid: n
 /** Set the caller store's handle. Returns the outcome for UI feedback. */
 export async function setStoreHandle(userId: number, raw: string): Promise<{ ok: boolean; handle?: string; msg: string }> {
   await ensure();
-  const storeId = await storeIdOfUser(userId);
+  const storeId = await getActiveStoreId(userId);
   if (!storeId) return { ok: false, msg: 'لا يوجد متجر.' };
   if (!raw.trim()) { // clearing the handle
     await prisma.stores.update({ where: { id: BigInt(storeId) }, data: { handle: null } }).catch(() => {});
@@ -738,7 +748,7 @@ async function loadHomeFeaturedAds() {
 /** Merchant requests to feature their products on the Trbhh platform. */
 export async function requestPlatform(userId: number): Promise<boolean> {
   await ensure();
-  const storeId = await storeIdOfUser(userId);
+  const storeId = await getActiveStoreId(userId);
   if (!storeId) return false;
   await prisma.store_offers.upsert({
     where: { from_store_to_store_kind: { from_store: storeId, to_store: 0, kind: 'platform' } },
@@ -899,3 +909,20 @@ export async function getPendingStores() {
 /* memoized per-request (React cache): tames repeated hot reads within one navigation */
 export const getStoreMeta = cache(getStoreMetaImpl);
 export const storeIdOfUser = cache(storeIdOfUserImpl);
+
+/** معرّف المتجر الفعّال: من هوية المتجر النشطة (إن كانت)، وإلا أول متجر للمالك (توافق كامل مع متجر واحد). */
+export async function getActiveStoreId(userId: number): Promise<number> {
+  const { getActiveProfile } = await import('./profiles');
+  const active = await getActiveProfile(userId).catch(() => null);
+  if (active && active.type === 'store' && active.storeId) {
+    const s = await prisma.stores.findFirst({ where: { id: BigInt(active.storeId), user_id: userId }, select: { id: true } }).catch(() => null);
+    if (s) return toInt(s.id);
+  }
+  return storeIdOfUser(userId);
+}
+
+/** عدد متاجر المالك (لعرض خيار «متجر جديد» والتبديل). */
+export async function storeCountOfUser(userId: number): Promise<number> {
+  await ensure();
+  return prisma.stores.count({ where: { user_id: userId } }).catch(() => 0);
+}

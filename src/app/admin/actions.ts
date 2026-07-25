@@ -607,6 +607,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_AD_DELETE_HOURS, String(delH));
   await setSetting(SETTING_MSG_DELETE_MINUTES, String(msgDelMin));
   await setSetting('max_profiles', String(Math.max(0, parseInt(String(formData.get('maxProfiles') || '0')) || 0)));
+  await setSetting('max_stores', String(Math.max(0, parseInt(String(formData.get('maxStores') || '0')) || 0)));
   // باقات الهويات: ٣ باقات × (اسم + عدد + شهري/نصف/سنوي) + إعفاء
   for (let i = 1; i <= 3; i++) {
     await setSetting(`idpkg${i}_name`, String(formData.get(`idpkg${i}_name`) || '').trim().slice(0, 24));

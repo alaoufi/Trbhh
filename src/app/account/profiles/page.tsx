@@ -13,6 +13,9 @@ import { getBalance } from '@/lib/wallet';
 import { IDENTITY_THEMES } from '@/lib/identity-themes';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { switchAccountAction } from '@/app/account/actions';
+import { createNewStoreAction } from '@/app/account/company/actions';
+import { storeCountOfUser } from '@/lib/merchant';
+import { getSettingNum } from '@/lib/settings';
 import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfileAction, linkAccountAction, startLinkOtpAction, confirmLinkOtpAction, dismissProfilesIntroAction, startPrimaryVerifyAction, confirmPrimaryVerifyAction, subscribeIdentityAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -73,7 +76,7 @@ function ProfileForm({ p }: { p?: Profile }) {
   );
 }
 
-export default async function ProfilesPage({ searchParams }: { searchParams: Promise<{ error?: string; max?: string; added?: string; saved?: string; deleted?: string; merror?: string; linked?: string; lname?: string; motp?: string; mident?: string; mmask?: string; omsg?: string; potp?: string; pverified?: string; perror?: string; idsubbed?: string; idexpired?: string; iderror?: string; price?: string; bal?: string }> }) {
+export default async function ProfilesPage({ searchParams }: { searchParams: Promise<{ error?: string; max?: string; added?: string; saved?: string; deleted?: string; merror?: string; linked?: string; lname?: string; motp?: string; mident?: string; mmask?: string; omsg?: string; potp?: string; pverified?: string; perror?: string; idsubbed?: string; idexpired?: string; iderror?: string; price?: string; bal?: string; storerr?: string; othername?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
   const sp = await searchParams;
@@ -84,7 +87,13 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
     getBalance(session.uid).catch(() => 0),
     cookies(),
   ]);
-  const [memberSub, plans] = await Promise.all([getMemberIdentitySub(session.uid).catch(() => null), getIdentityPlans().catch(() => [])]);
+  const [memberSub, plans, storeCount, maxStores] = await Promise.all([
+    getMemberIdentitySub(session.uid).catch(() => null),
+    getIdentityPlans().catch(() => []),
+    storeCountOfUser(session.uid).catch(() => 0),
+    getSettingNum('max_stores', 3).catch(() => 3),
+  ]);
+  const canAddStore = maxStores <= 0 || storeCount < maxStores;
   const otpStage = sp.motp === '1';
   const mIdent = sp.mident || '';
   const showIntro = cookieStore.get(PROFILES_INTRO_COOKIE)?.value !== '1';
@@ -138,6 +147,10 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
       {sp.perror === 'badcode' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">رمز التحقق غير صحيح أو منتهي — أعد المحاولة.</div>}
       {sp.perror === 'nophone' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">لا يوجد رقم جوال في حسابك الرئيسي — أضِفه من الملف الشخصي أولاً.</div>}
       {sp.perror === 'otp' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر إرسال الرمز{sp.omsg ? `: ${sp.omsg}` : ''}.</div>}
+      {sp.storerr === 'terms' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">يلزم الموافقة على شروط المتجر لفتح متجر جديد.</div>}
+      {sp.storerr === 'limit' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">بلغت الحد الأقصى لعدد المتاجر{sp.max ? ` (${sp.max})` : ''} — راجع الإدارة لرفع الحد.</div>}
+      {sp.storerr === 'badname' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">اسم المتجر يحوي كلمة غير مسموحة — اختر اسماً آخر.</div>}
+      {sp.storerr === 'namedup' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">يوجد متجر باسم مشابه{sp.othername ? ` «${sp.othername}»` : ''} — اختر اسماً مميّزاً.</div>}
 
       {/* ١) الحساب الرئيسي — الدخول والتوثيق */}
       <div id="main" className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-4">
@@ -294,11 +307,37 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
         <ProfileForm />
       </div>
 
-      {/* إضافة متجر */}
-      <div className="card-3d rounded-2xl p-4">
-        <h2 className="mb-2 flex items-center gap-1 text-sm font-extrabold text-primary"><Store className="h-4 w-4" /> إضافة متجر</h2>
-        <p className="mb-3 text-xs text-muted-foreground">افتح متجراً تحت حسابك الموحّد — يظهر كهوية نشر مستقلة باسمه وشعاره، وتُضاف تلقائياً إلى هوياتك هنا.</p>
-        <Link href="/store" className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90"><Plus className="h-4 w-4" /> إدارة/فتح متجر</Link>
+      {/* المتاجر — فتح متجر (وتعدّد المتاجر) */}
+      <div id="stores" className="card-3d rounded-2xl p-4">
+        <h2 className="mb-2 flex items-center gap-1 text-sm font-extrabold text-primary"><Store className="h-4 w-4" /> متاجري ({storeCount})</h2>
+        <p className="mb-3 text-xs text-muted-foreground">
+          كل متجر هوية نشر مستقلة باسمه وشعاره، النشر داخله فقط بصلاحيات المتجر — ويُضاف تلقائياً إلى هوياتك أعلاه.
+          <b> المتاجر مشمولة باشتراكها الشهري المستقل ولا تدخل في باقات الهويات.</b>
+        </p>
+        {storeCount === 0 ? (
+          <Link href="/store" className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90"><Plus className="h-4 w-4" /> فتح متجري الأول</Link>
+        ) : canAddStore ? (
+          <details>
+            <summary className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90"><Plus className="h-4 w-4" /> فتح متجر إضافي</summary>
+            <form action={createNewStoreAction} className="mt-3 space-y-3 rounded-lg border border-primary/15 bg-primary/5 p-3">
+              <div>
+                <label className={lbl}>اسم المتجر الجديد (اختياري — تكمله لاحقاً)</label>
+                <input name="storeName" maxLength={120} className={field} placeholder="مثال: متجر النور للعطور" />
+              </div>
+              <label className="flex items-start gap-2 text-xs font-bold text-foreground/80">
+                <input type="checkbox" name="agreeTerms" value="1" required className="mt-0.5 h-4 w-4" />
+                <span>أوافق على <Link href="/store-terms" className="text-primary underline">شروط المتجر</Link> وأتحمّل مسؤولية منتجاته. يبدأ المتجر «بانتظار اعتماد الإدارة».</span>
+              </label>
+              <button className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90"><Store className="h-4 w-4" /> فتح المتجر والتحوّل إليه</button>
+              <p className="text-[11px] text-muted-foreground">تُكمل بيانات المتجر (الشعار/الوصف/التواصل) من <Link href="/store" className="font-bold text-primary underline">إدارة المتجر</Link> بعد الفتح.</p>
+            </form>
+          </details>
+        ) : (
+          <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs font-bold text-amber-800">بلغت الحد الأقصى لعدد المتاجر ({maxStores}). لإضافة متجر آخر راجع الإدارة.</div>
+        )}
+        {storeCount > 0 && (
+          <div className="mt-3 text-xs text-muted-foreground">تنتقل بين متاجرك من مبدّل الهوية أعلى الصفحة، أو تديرها من <Link href="/store" className="font-bold text-primary underline">لوحة المتجر</Link>.</div>
+        )}
       </div>
 
       {/* حساباتي المرتبطة — ربط وتبديل (كل حساب يبقى مستقلاً) */}

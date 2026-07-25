@@ -16,7 +16,7 @@ import { switchAccountAction } from '@/app/account/actions';
 import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfileAction, linkAccountAction, startLinkOtpAction, confirmLinkOtpAction, dismissProfilesIntroAction, startPrimaryVerifyAction, confirmPrimaryVerifyAction, subscribeIdentityAction } from './actions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'هوياتي — حسابات ومتاجر' };
+export const metadata = { title: 'الحسابات الموحدة — حسابات ومتاجر' };
 
 const field = 'w-full rounded-lg border-2 border-primary/25 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40';
 const lbl = 'mb-1 block text-xs font-bold text-foreground/70';
@@ -97,7 +97,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
     <div className="space-y-5">
       <div className="flex items-center gap-2">
         <UserRound className="h-6 w-6 text-primary" />
-        <h1 className="text-xl font-bold text-primary">هوياتي — دخول واحد لكل حساباتك</h1>
+        <h1 className="text-xl font-bold text-primary">الحسابات الموحدة — دخول واحد لكل حساباتك</h1>
       </div>
 
       {/* رسالة تعريفية موجزة — أول مرة فقط */}

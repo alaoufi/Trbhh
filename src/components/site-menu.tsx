@@ -160,14 +160,16 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
                     ))}
                   </div>
                 )}
-                <Link href="/account/profiles" onClick={close} className="mt-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-bold text-muted-foreground hover:bg-accent">
-                  <Users className="h-4 w-4 shrink-0" /> <span>هوياتي والحسابات المرتبطة</span>
-                </Link>
               </div>
             )}
             {/* أهم الروابط أولاً */}
             <Item href="/" icon={Home} onClick={close}>الرئيسية</Item>
             <Item href="/companies" icon={Store} onClick={close}>المتاجر</Item>
+            {isAuthed && (
+              <Link href="/account/profiles" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg border-2 border-violet-400/40 bg-violet-500/15 px-3 py-3 text-[15px] font-extrabold text-violet-700 hover:bg-violet-500/25">
+                <Users className="h-5 w-5 shrink-0" /> <span>الحسابات الموحدة</span>
+              </Link>
+            )}
             {isAdmin && (
               <Link href="/admin" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-amber-500/15 px-3 py-3 text-[15px] font-extrabold text-amber-700 hover:bg-amber-500/25">
                 <Shield className="h-5 w-5 shrink-0" /> <span>لوحة الإدارة</span>
@@ -190,7 +192,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
               <Section title="حسابي" icon={User}>
                 <Item href="/account" icon={User} onClick={close}>لوحة حسابي</Item>
                 <Item href="/account/profile" icon={UserPen} onClick={close}>الملف الشخصي</Item>
-                <Item href="/account/profiles" icon={Users} onClick={close}>هوياتي (حسابات ومتاجر)</Item>
+                <Item href="/account/profiles" icon={Users} onClick={close}>الحسابات الموحدة</Item>
                 <Item href="/account/verify" icon={ShieldCheck} onClick={close}>توثيق الحساب</Item>
                 <Item href="/messages" icon={Mail} onClick={close}>رسائلي</Item>
                 <Item href="/notifications" icon={Bell} onClick={close}>التنبيهات</Item>

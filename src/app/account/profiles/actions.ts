@@ -77,8 +77,8 @@ export async function deleteProfileAction(formData: FormData) {
   redirect('/account/profiles?deleted=1');
 }
 
-/** الخطوة ١ (رمز التحقق): إرسال رمز SMS إلى رقم الحساب الآخر لإثبات ملكيته. */
-export async function startMergeOtpAction(formData: FormData) {
+/** الخطوة ١ (رمز التحقق): إرسال رمز SMS إلى رقم الحساب الآخر لإثبات ملكيته قبل ربطه. */
+export async function startLinkOtpAction(formData: FormData) {
   const session = await requireUser();
   const identifier = String(formData.get('identifier') || '').trim();
   if (!identifier) redirect('/account/profiles?merror=creds#merge');
@@ -92,8 +92,8 @@ export async function startMergeOtpAction(formData: FormData) {
   redirect(`/account/profiles?motp=1&mident=${encodeURIComponent(identifier)}&mmask=${encodeURIComponent(maskPhone(r.phone))}#merge`);
 }
 
-/** الخطوة ٢ (رمز التحقق): التأكد من الرمز ثم دمج الحساب. */
-export async function confirmMergeOtpAction(formData: FormData) {
+/** الخطوة ٢ (رمز التحقق): التأكد من الرمز ثم ربط الحساب (يبقى مستقلاً — للتبديل فقط). */
+export async function confirmLinkOtpAction(formData: FormData) {
   const session = await requireUser();
   const identifier = String(formData.get('identifier') || '').trim();
   const code = String(formData.get('code') || '').trim();
@@ -103,30 +103,26 @@ export async function confirmMergeOtpAction(formData: FormData) {
   if (!r.ok || !r.phone || !r.uid) redirect(`/account/profiles?merror=${r.error || 'fail'}#merge`);
   const { verifyOtp } = await import('@/lib/sms');
   if (!(await verifyOtp(r.phone, code))) redirect(`/account/profiles?merror=badcode&motp=1&mident=${encodeURIComponent(identifier)}#merge`);
-  const { mergeAccountInto } = await import('@/lib/account-merge');
-  const res = await mergeAccountInto(session.uid, r.uid);
+  const { linkVerifiedAccount } = await import('@/lib/account-links');
+  const res = await linkVerifiedAccount(session.uid, r.uid);
   if (!res.ok) redirect(`/account/profiles?merror=${res.error || 'fail'}#merge`);
   revalidatePath('/account/profiles');
   revalidatePath('/');
-  redirect(`/account/profiles?merged=1&ads=${res.movedAds || 0}&bal=${res.movedBalance || 0}`);
+  redirect(`/account/profiles?linked=1&lname=${encodeURIComponent(res.name || '')}`);
 }
 
-/** دمج ذاتي (بديل): استيراد حساب آخر للعضو بعد التحقق من كلمة مروره. */
-export async function mergeAccountAction(formData: FormData) {
+/** ربط ذاتي (بديل): ربط حساب آخر للعضو بعد التحقق من كلمة مروره. */
+export async function linkAccountAction(formData: FormData) {
   const session = await requireUser();
   const identifier = String(formData.get('identifier') || '').trim();
   const password = String(formData.get('password') || '');
   if (!identifier || !password) redirect('/account/profiles?merror=creds#merge');
-  const { verifyLogin } = await import('@/lib/login-core');
-  const r = await verifyLogin(identifier, password);
-  if (!r.ok) redirect('/account/profiles?merror=verify#merge');
-  if (r.uid === session.uid) redirect('/account/profiles?merror=self#merge');
-  const { mergeAccountInto } = await import('@/lib/account-merge');
-  const res = await mergeAccountInto(session.uid, r.uid);
-  if (!res.ok) redirect(`/account/profiles?merror=${res.error || 'fail'}#merge`);
+  const { verifyAndLinkOwn } = await import('@/lib/account-links');
+  const res = await verifyAndLinkOwn(session.uid, identifier, password);
+  if (!res.ok) redirect(`/account/profiles?merror=verify&omsg=${encodeURIComponent(res.error || '')}#merge`);
   revalidatePath('/account/profiles');
   revalidatePath('/');
-  redirect(`/account/profiles?merged=1&ads=${res.movedAds || 0}&bal=${res.movedBalance || 0}`);
+  redirect(`/account/profiles?linked=1&lname=${encodeURIComponent(res.name || '')}`);
 }
 
 /** تبديل الهوية الفعّالة — من المبدّل أعلى الصفحة أو صفحة الهويات. */

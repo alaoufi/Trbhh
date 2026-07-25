@@ -6,8 +6,10 @@ import { UserRound, Store, Check, Pencil, Trash2, Plus, Star, Link2, ShieldAlert
 import { getSession } from '@/lib/auth';
 import { getUserProfiles, getActiveProfile, PROFILES_INTRO_COOKIE, type Profile } from '@/lib/profiles';
 import { getMergeCandidates } from '@/lib/account-merge';
+import { linkedAccounts } from '@/lib/account-links';
 import { ConfirmSubmit } from '@/components/confirm-submit';
-import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfileAction, mergeAccountAction, startMergeOtpAction, confirmMergeOtpAction, dismissProfilesIntroAction } from './actions';
+import { switchAccountAction } from '@/app/account/actions';
+import { addProfileAction, updateProfileAction, deleteProfileAction, switchProfileAction, linkAccountAction, startLinkOtpAction, confirmLinkOtpAction, dismissProfilesIntroAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'هوياتي — حسابات ومتاجر' };
@@ -69,14 +71,15 @@ function ProfileForm({ p }: { p?: Profile }) {
   );
 }
 
-export default async function ProfilesPage({ searchParams }: { searchParams: Promise<{ error?: string; max?: string; added?: string; saved?: string; deleted?: string; merror?: string; merged?: string; ads?: string; bal?: string; motp?: string; mident?: string; mmask?: string; omsg?: string }> }) {
+export default async function ProfilesPage({ searchParams }: { searchParams: Promise<{ error?: string; max?: string; added?: string; saved?: string; deleted?: string; merror?: string; linked?: string; lname?: string; motp?: string; mident?: string; mmask?: string; omsg?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
   const sp = await searchParams;
-  const [profiles, active, candidates, cookieStore] = await Promise.all([getUserProfiles(session.uid), getActiveProfile(session.uid), getMergeCandidates(session.uid).catch(() => []), cookies()]);
+  const [profiles, active, candidates, linked, cookieStore] = await Promise.all([getUserProfiles(session.uid), getActiveProfile(session.uid), getMergeCandidates(session.uid).catch(() => []), linkedAccounts(session.uid).catch(() => []), cookies()]);
   const otpStage = sp.motp === '1';
   const mIdent = sp.mident || '';
   const showIntro = cookieStore.get(PROFILES_INTRO_COOKIE)?.value !== '1';
+  const otherLinked = linked.filter((a) => a.id !== session.uid);
 
   return (
     <div className="space-y-5">
@@ -103,7 +106,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
               ['أضِف هوية شخصية جديدة', 'من قسم «إضافة هوية شخصية» أدناه: اسم ظاهر، جوال/واتساب/بريد للمراسلات، صورة، ولون مميّز.'],
               ['أضِف متجراً', 'من «إضافة متجر» تفتح متجرك المستقل، ويظهر تلقائياً كهوية نشر باسمه وشعاره.'],
               ['بدّل الهوية الفعّالة قبل النشر', 'من الشريط أعلى الصفحة اضغط «تفعيل» على الهوية التي تريد الإعلان باسمها — كل إعلان يحمل بيانات الهوية الفعّالة وقتها.'],
-              ['عندك حساب قديم منفصل؟ اجمعه', 'من «اجمع حساباً منفصلاً» أدخل رقمه، يصلك رمز تحقّق على ذلك الرقم، فتُنقل إعلاناته ورصيده إليك ويصبح دخولك موحّداً.'],
+              ['عندك حساب آخر؟ اربطه', 'من «حساباتي المرتبطة» أدخل رقمه، يصلك رمز تحقّق على ذلك الرقم لإثبات ملكيته — فيُربط بحسابك وتتنقّل بينهما من دخول واحد. كل حساب يبقى مستقلاً بإعلاناته ورصيده.'],
             ].map(([t, d], i) => (
               <li key={i} className="flex gap-2">
                 <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-extrabold text-white">{i + 1}</span>
@@ -121,7 +124,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
       {sp.error === 'handle' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">المعرّف الظاهر مستخدم مسبقاً — اختر غيره.</div>}
       {sp.error === 'name' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">الاسم الظاهر مطلوب.</div>}
       {(sp.added || sp.saved || sp.deleted) && <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم الحفظ.</div>}
-      {sp.merged && <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم دمج الحساب في حسابك الموحّد — نُقل {sp.ads || 0} إعلان{Number(sp.bal) > 0 ? ` وأُضيف رصيد ${sp.bal} ريال` : ''}. سجّل الدخول من هذا الحساب فقط بعد الآن.</div>}
+      {sp.linked && <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم ربط الحساب{sp.lname ? ` «${sp.lname}»` : ''} بحسابك — يبقى مستقلاً بإعلاناته ورسائله ورصيده، وتقدر تتنقّل إليه من قائمة «حساباتي المرتبطة» أدناه.</div>}
       {sp.merror === 'creds' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">أكمل بيانات الحساب الآخر.</div>}
       {sp.merror === 'verify' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">بيانات دخول الحساب الآخر غير صحيحة.</div>}
       {sp.merror === 'badcode' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">رمز التحقق غير صحيح أو منتهي — أعد الإرسال وحاول مجدداً.</div>}
@@ -220,21 +223,45 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
         <Link href="/store" className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90"><Plus className="h-4 w-4" /> إدارة/فتح متجر</Link>
       </div>
 
-      {/* دمج حساب قديم منفصل */}
+      {/* حساباتي المرتبطة — ربط وتبديل (كل حساب يبقى مستقلاً) */}
       <div id="merge" className="card-3d rounded-2xl border-2 border-amber-300 p-4">
-        <h2 className="mb-1 flex items-center gap-1 text-sm font-extrabold text-amber-700"><Link2 className="h-4 w-4" /> عندك حساب آخر منفصل؟ اجمعه هنا</h2>
+        <h2 className="mb-1 flex items-center gap-1 text-sm font-extrabold text-amber-700"><Link2 className="h-4 w-4" /> حساباتي المرتبطة</h2>
         <p className="mb-3 text-xs text-muted-foreground">
-          إن كان لديك حساب قديم بدخول مستقل (ولو برقم مختلف)، اجمعه في حسابك الحالي: تُنقل إعلاناته كهوية نشر جديدة، ويُضاف رصيده إلى رصيدك،
-          ثم يتوقّف الدخول المستقل لذلك الحساب (تدخل من حسابك الحالي فقط). نثبت ملكيتك له برمز تحقّق يصل لرقمه.
+          عندك حساب آخر (ولو برقم مختلف)؟ اربطه بحسابك لتتنقّل بينهما من دخول واحد. <b>كل حساب يبقى مستقلاً</b> بإعلاناته ورسائله ورصيده وجواله —
+          الربط للتسهيل فقط، لا يُنقل شيء ولا يُحذف، وتقدر تفكّه متى شئت. نُرسل رمز تحقّق إلى <b>رقم الحساب المُراد ربطه</b> لإثبات أنه لك
+          (لأن التبديل إليه يمنح دخولاً كاملاً).
         </p>
 
-        {/* حسابات مرشّحة للدمج (تشارك هويتك الوطنية/بريدك) */}
+        {/* الحسابات المرتبطة حالياً + التبديل */}
+        {otherLinked.length > 0 && (
+          <div className="mb-4 space-y-2">
+            <div className="text-xs font-extrabold text-foreground/80">مرتبطة بك ({otherLinked.length}) — اضغط للتبديل:</div>
+            {otherLinked.map((a) => (
+              <div key={a.id} className="flex items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white p-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 truncate text-sm font-bold">
+                    {a.hasStore ? <Store className="h-3.5 w-3.5 text-primary" /> : <UserRound className="h-3.5 w-3.5 text-primary" />}
+                    <span className="truncate">{a.name}</span>
+                    {a.hasStore && a.storeName && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">{a.storeName}</span>}
+                  </div>
+                  {a.phone && <div className="text-[11px] text-muted-foreground" dir="ltr">{a.phone}</div>}
+                </div>
+                <form action={switchAccountAction}>
+                  <input type="hidden" name="userId" value={a.id} />
+                  <button className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"><Check className="h-3 w-3" /> تبديل</button>
+                </form>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* حسابات مرشّحة للربط (تشارك هويتك الوطنية/بريدك) */}
         {candidates.length > 0 && !otpStage && (
           <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50/60 p-3">
             <div className="mb-2 flex items-center gap-1 text-xs font-extrabold text-emerald-800"><Sparkles className="h-3.5 w-3.5" /> حسابات نرجّح أنها تخصّك</div>
             <div className="space-y-2">
-              {candidates.map((c) => (
-                <form key={c.uid} action={startMergeOtpAction} className="flex items-center justify-between gap-2 rounded-lg bg-white p-2">
+              {candidates.filter((c) => !otherLinked.some((l) => l.id === c.uid)).map((c) => (
+                <form key={c.uid} action={startLinkOtpAction} className="flex items-center justify-between gap-2 rounded-lg bg-white p-2">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-bold">{c.name}</div>
                     <div className="text-[11px] text-muted-foreground" dir="ltr">{c.maskedPhone} · {c.via === 'national' ? 'نفس الهوية' : 'نفس البريد'}</div>
@@ -249,7 +276,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
 
         {!otpStage ? (
           /* الخطوة ١: أدخل الرقم → أرسل رمز التحقق */
-          <form action={startMergeOtpAction} className="space-y-3">
+          <form action={startLinkOtpAction} className="space-y-3">
             <div>
               <label className={lbl}>جوال الحساب الآخر (أو اسم مستخدمه/بريده)</label>
               <input name="identifier" required defaultValue={mIdent} className={field} placeholder="05xxxxxxxx" dir="ltr" autoComplete="off" />
@@ -259,8 +286,8 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
             </button>
           </form>
         ) : (
-          /* الخطوة ٢: أدخل الرمز الواصل → دمج */
-          <form action={confirmMergeOtpAction} className="space-y-3">
+          /* الخطوة ٢: أدخل الرمز الواصل → ربط */
+          <form action={confirmLinkOtpAction} className="space-y-3">
             <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">
               أرسلنا رمز تحقّق إلى الرقم {sp.mmask ? <span dir="ltr">{sp.mmask}</span> : 'المسجّل'} — أدخله خلال ١٠ دقائق.
             </div>
@@ -270,18 +297,15 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
               <input name="code" required inputMode="numeric" maxLength={6} className={field} placeholder="______" dir="ltr" autoComplete="one-time-code" />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <ConfirmSubmit msg="دمج هذا الحساب في حسابك الحالي؟ سيتوقّف الدخول المستقل للحساب الآخر نهائياً، وتُنقل إعلاناته ورصيده إليك." className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-extrabold text-white hover:opacity-90">
-                <Link2 className="h-4 w-4" /> تأكيد الدمج
+              <ConfirmSubmit msg="ربط هذا الحساب بحسابك؟ يبقى مستقلاً بإعلاناته ورصيده، وتتنقّل إليه من دخول واحد." className="inline-flex items-center gap-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-extrabold text-white hover:opacity-90">
+                <Link2 className="h-4 w-4" /> تأكيد الربط
               </ConfirmSubmit>
               <span className="text-[11px] text-muted-foreground">لم يصلك الرمز؟</span>
-            </div>
-            <div className="border-t pt-2">
-              <input form="resend-merge" type="hidden" name="identifier" value={mIdent} />
             </div>
           </form>
         )}
         {otpStage && (
-          <form id="resend-merge" action={startMergeOtpAction} className="mt-2">
+          <form id="resend-merge" action={startLinkOtpAction} className="mt-2">
             <input type="hidden" name="identifier" value={mIdent} />
             <button className="text-xs font-bold text-amber-700 underline">إعادة إرسال الرمز أو تغيير الرقم →</button>
           </form>
@@ -289,8 +313,8 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
 
         {/* التحقق بكلمة المرور (بديل لمن لا يصله الرمز) */}
         <details className="mt-4 border-t pt-3">
-          <summary className="flex cursor-pointer items-center gap-1 text-xs font-bold text-muted-foreground"><KeyRound className="h-3.5 w-3.5" /> أو تحقّق بكلمة مرور الحساب الآخر بدل الرمز</summary>
-          <form action={mergeAccountAction} className="mt-3 grid gap-3 sm:grid-cols-2">
+          <summary className="flex cursor-pointer items-center gap-1 text-xs font-bold text-muted-foreground"><KeyRound className="h-3.5 w-3.5" /> أو اربط بكلمة مرور الحساب الآخر بدل الرمز</summary>
+          <form action={linkAccountAction} className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
               <label className={lbl}>جوال/بريد/اسم مستخدم الحساب الآخر</label>
               <input name="identifier" required className={field} placeholder="05xxxxxxxx" dir="ltr" autoComplete="off" />
@@ -300,14 +324,14 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
               <input name="password" type="password" required className={field} placeholder="••••••••" dir="ltr" autoComplete="off" />
             </div>
             <div className="sm:col-span-2">
-              <ConfirmSubmit msg="دمج هذا الحساب في حسابك الحالي؟ سيتوقّف الدخول المستقل للحساب الآخر نهائياً، وتُنقل إعلاناته ورصيده إليك." className="inline-flex items-center gap-1 rounded-lg bg-amber-700 px-4 py-2 text-sm font-extrabold text-white hover:opacity-90">
-                <Link2 className="h-4 w-4" /> دمج بكلمة المرور
-              </ConfirmSubmit>
+              <button className="inline-flex items-center gap-1 rounded-lg bg-amber-700 px-4 py-2 text-sm font-extrabold text-white hover:opacity-90">
+                <Link2 className="h-4 w-4" /> ربط بكلمة المرور
+              </button>
             </div>
           </form>
         </details>
 
-        <p className="mt-3 flex items-start gap-1 text-[11px] text-amber-700"><ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /> الدمج نهائي ولا يمكن التراجع عنه — تأكّد أن الحساب الآخر يخصّك.</p>
+        <p className="mt-3 flex items-start gap-1 text-[11px] text-amber-700"><ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" /> تُدير حساباتك المرتبطة (وتفكّها) أيضاً من <Link href="/account/identities" className="font-bold underline">صفحة الحسابات المرتبطة</Link>.</p>
       </div>
     </div>
   );

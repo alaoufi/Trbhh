@@ -72,6 +72,25 @@ export async function verifyAndLinkOwn(ownerId: number, identifier: string, pass
   return { ok: true, name: res.name };
 }
 
+/** ربط حساب أثبت العضو ملكيته (عبر رمز تحقّق وصل لرقمه) بمجموعته — بلا كلمة مرور.
+ *  لا يُدمج شيء ولا يُحذف: علاقة «نفس المالك» للتبديل فقط. يحرس ضدّ ربط حساب إداري
+ *  أو حساب يخصّ مجموعة مالك آخر. */
+export async function linkVerifiedAccount(ownerId: number, targetUid: number): Promise<{ ok: boolean; error?: string; name?: string }> {
+  await ensure();
+  if (!targetUid || targetUid === ownerId) return { ok: false, error: 'self' };
+  const u = await prisma.users.findUnique({ where: { id: BigInt(targetUid) }, select: { name: true, userName: true, is_admin: true } }).catch(() => null);
+  if (!u) return { ok: false, error: 'notfound' };
+  if (u.is_admin === 1) return { ok: false, error: 'admin' };
+  const targetGroup = await prisma.account_links.findUnique({ where: { user_id: BigInt(targetUid) }, select: { group_id: true } }).catch(() => null);
+  if (targetGroup) {
+    const myGroup = await prisma.account_links.findUnique({ where: { user_id: BigInt(ownerId) }, select: { group_id: true } }).catch(() => null);
+    if (!myGroup || myGroup.group_id !== targetGroup.group_id) return { ok: false, error: 'othergroup' };
+    return { ok: true, name: u.name || u.userName || 'حساب' }; // مرتبط أصلاً بمجموعتك
+  }
+  await linkAccounts([ownerId, targetUid], ownerId);
+  return { ok: true, name: u.name || u.userName || 'حساب' };
+}
+
 /** ربط مجموعة حسابات معاً في مجموعة واحدة (دمج مجموعاتها القائمة إن وُجدت). */
 export async function linkAccounts(userIds: number[], adminId: number): Promise<{ ok: boolean; count: number }> {
   await ensure();

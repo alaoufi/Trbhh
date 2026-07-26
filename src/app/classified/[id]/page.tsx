@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { Sparkles, ExternalLink, Eye, MousePointerClick, ArrowRight, Pencil, Trash2, Pause, Play, ShieldCheck } from 'lucide-react';
+import { Sparkles, ExternalLink, Eye, MousePointerClick, ArrowRight, Pencil, Trash2, Pause, Play } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
 import { getClassifiedById, recordClassifiedView, getClassifiedOwnerState } from '@/lib/classified';
@@ -33,6 +33,8 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
   // حالة الإعلان (ظاهر/موقوف) — تلزم لأزرار الإجراءات (المالك/الإدارة فقط)
   const ownerState = (isOwner || admin) ? await getClassifiedOwnerState(numId).catch(() => null) : null;
   const isPaused = ownerState ? ownerState.status !== 1 : false;
+  const shareUrl = `https://${SITE.domain}/classified/${c.id}`;
+  const shareText = 'الإعلانات المبوّبة .. منصة تربح الإعلانية';
 
   // hide expired classifieds from the public (owner/admin can still view)
   const lifeDays = await getClassifiedLifetimeDays().catch(() => 0);
@@ -63,43 +65,6 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
       {sp.error === 'deleteWindow' && <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">انتهت المهلة المسموح بها لحذف الإعلان — للحذف بعدها تواصل مع الإدارة.</div>}
       {isPaused && (isOwner || admin) && <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-800">⏸ هذا الإعلان موقوف حالياً — يظهر لك فقط. اضغط «استئناف» لإعادته للزوّار.</div>}
 
-      {/* مشاركة الإعلان — نفس مشاركة الإعلانات العادية */}
-      <ShareButtons url={`https://${SITE.domain}/classified/${c.id}`} title={c.title || c.text?.slice(0, 60) || 'إعلان مبوّب'} />
-
-      {/* الإجراءات — للمالك والإدارة فقط (تعديل للمالك؛ إيقاف/حذف للطرفين) */}
-      {(isOwner || admin) && (
-        <div className="card-3d space-y-2 rounded-xl border border-primary/20 p-3">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-            {admin && !isOwner ? <><ShieldCheck className="h-3.5 w-3.5" /> إجراءات إدارية</> : 'إجراءات إعلانك'}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {isOwner && (
-              <Link href={`/classified/${c.id}/edit`} className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-bold hover:bg-secondary">
-                <Pencil className="h-3.5 w-3.5" /> تعديل
-              </Link>
-            )}
-            <form action={toggleClassifiedStatusAction}>
-              <input type="hidden" name="id" value={c.id} />
-              <ConfirmSubmit
-                msg={isPaused ? 'استئناف عرض هذا الإعلان للزوّار؟' : 'إيقاف هذا الإعلان؟ يختفي عن الزوّار ويعود متى استأنفته.'}
-                className={`flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-bold ${isPaused ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'}`}
-              >
-                {isPaused ? <><Play className="h-3.5 w-3.5" /> استئناف</> : <><Pause className="h-3.5 w-3.5" /> إيقاف</>}
-              </ConfirmSubmit>
-            </form>
-            <form action={deleteClassifiedFromDetailAction}>
-              <input type="hidden" name="id" value={c.id} />
-              <ConfirmSubmit
-                msg={`حذف هذا الإعلان المبوّب نهائياً؟ لا يمكن التراجع.`}
-                className="flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="h-3.5 w-3.5" /> حذف
-              </ConfirmSubmit>
-            </form>
-          </div>
-        </div>
-      )}
-
       <div className="card-3d overflow-hidden rounded-2xl">
         {c.link ? (
           // الضغط على الإعلان المكبّر ينتقل إلى الرابط (ويُحتسب كنقرة)
@@ -117,6 +82,47 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
           <ExternalLink className="h-5 w-5" /> زيارة الرابط
         </a>
       )}
+
+      {/* شريط تحت الاتصال: مشاركة (أيقونة قائمة منسدلة، للجميع) + إجراءات المالك/الإدارة بخط صغير */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
+        <ShareButtons
+          url={shareUrl}
+          title={shareText}
+          text={shareText}
+          card={{ url: shareUrl, title: shareText, image: c.image ?? undefined, desc: c.text ?? undefined }}
+          compact
+        />
+        {(isOwner || admin) && (
+          <>
+            <span className="text-[11px] font-bold text-muted-foreground">
+              {admin && !isOwner ? 'إجراءات إدارية:' : 'إجراءات إعلانك:'}
+            </span>
+            {isOwner && (
+              <Link href={`/classified/${c.id}/edit`} className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-primary">
+                <Pencil className="h-3.5 w-3.5" /> تعديل
+              </Link>
+            )}
+            <form action={toggleClassifiedStatusAction}>
+              <input type="hidden" name="id" value={c.id} />
+              <ConfirmSubmit
+                msg={isPaused ? 'استئناف عرض هذا الإعلان للزوّار؟' : 'إيقاف هذا الإعلان؟ يختفي عن الزوّار ويعود متى استأنفته.'}
+                className={`flex items-center gap-1 text-[11px] font-bold hover:opacity-80 ${isPaused ? 'text-emerald-700' : 'text-amber-700'}`}
+              >
+                {isPaused ? <><Play className="h-3.5 w-3.5" /> استئناف</> : <><Pause className="h-3.5 w-3.5" /> إيقاف</>}
+              </ConfirmSubmit>
+            </form>
+            <form action={deleteClassifiedFromDetailAction}>
+              <input type="hidden" name="id" value={c.id} />
+              <ConfirmSubmit
+                msg="حذف هذا الإعلان المبوّب نهائياً؟ لا يمكن التراجع."
+                className="flex items-center gap-1 text-[11px] font-bold text-destructive hover:opacity-80"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> حذف
+              </ConfirmSubmit>
+            </form>
+          </>
+        )}
+      </div>
 
       {/* الإحصائيات — تظهر للمعلن والإدارة فقط */}
       {canSeeStats && (

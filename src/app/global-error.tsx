@@ -5,12 +5,13 @@
 import { useEffect } from 'react';
 import { RefreshCw, Home } from 'lucide-react';
 import { reportClientErrorAction } from './error-actions';
-import { reloadOnChunkError } from '@/lib/chunk-error';
+import { reloadOnChunkError, isBenignBrowserError } from '@/lib/chunk-error';
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error('Global app error:', error);
     if (reloadOnChunkError(error)) return; // إصدار جديد من الموقع — تحديث كامل يحلّها تلقائياً
+    if (isBenignBrowserError(error)) return; // تدخّل المتصفح (ترجمة/إضافة) لا كودنا — لا نُغرق السجل به
     reportClientErrorAction({
       message: error.message || 'خطأ غير معروف',
       digest: error.digest,

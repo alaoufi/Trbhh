@@ -13,6 +13,7 @@ import {
   createPackageAction, updatePackageAction, deletePackageAction, createPromoPackageAction, updatePromoPackageAction, deletePromoPackageAction,
 } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
+import { Collapse } from '@/components/admin-collapse';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الإيرادات' };
@@ -442,8 +443,8 @@ async function CampaignsTab({ camp }: { camp?: string }) {
       ) : (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] font-extrabold text-amber-800">⚠ لا توجد حملات — البانر مخفي حتى تضيف حملة يشمل تاريخُها اليوم.</div>
       )}
-      <form action={addTopupCampaignAction} className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
-        <div className="text-xs font-bold text-emerald-800">➕ إضافة حملة جديدة</div>
+      <Collapse summary={<span className="text-emerald-800">➕ إضافة حملة جديدة</span>} className="border-emerald-200 bg-emerald-50/40">
+        <form action={addTopupCampaignAction} className="space-y-2">
         <div className="grid grid-cols-3 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">تبدأ من تاريخ</span><input name="from" type="date" required className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">وقت البداية (اختياري)</span><input name="fromTime" type="time" defaultValue="00:00" className={num} /></label>
@@ -464,7 +465,8 @@ async function CampaignsTab({ camp }: { camp?: string }) {
           <p className="text-[10px] text-muted-foreground">كل سطر شريحة مستقلة (الأسطر الفارغة تُتجاهل) — تُعرض في البانر بنفس هذا الترتيب، وتُطبَّق أعلى شريحة يبلغها مبلغ الشحن.</p>
         </div>
         <button className="btn-3d rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">💾 إضافة الحملة</button>
-      </form>
+        </form>
+      </Collapse>
     </div>
     </>
   );
@@ -814,34 +816,38 @@ async function PackagesSection() {
       <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> باقات عدد الإعلانات ({packages.length})</div>
       <p className="text-[11px] text-muted-foreground">لكل باقة: السعر (0 = مجانية)، عدد الإعلانات المسموح بها يومياً، الفارق الزمني بالساعات بين إعلان وآخر، وباقات التميز (كم إعلاناً يُثبّت بالأعلى وكم يوماً يبقى، ذهبي أو فضي).</p>
 
-      <form action={createPackageAction} className="space-y-2 rounded-xl border border-primary/20 bg-card p-3">
-        <div className="text-sm font-bold text-primary">➕ باقة جديدة</div>
-        <PackageFields />
-        <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة الباقة</button>
-      </form>
+      <Collapse summary={<span className="text-primary">➕ إضافة باقة جديدة</span>} className="bg-primary/5">
+        <form action={createPackageAction} className="space-y-2">
+          <PackageFields />
+          <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة الباقة</button>
+        </form>
+      </Collapse>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {packages.map((p) => (
-          <form key={p.id} action={updatePackageAction} className="space-y-2 rounded-xl border border-primary/20 bg-white p-3">
-            <input type="hidden" name="id" value={p.id} />
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm font-bold">
-                {p.tier === 'gold' && <Star className="h-4 w-4 fill-amber-400 text-amber-400" />}
-                {p.tier === 'silver' && <Star className="h-4 w-4 fill-slate-400 text-slate-400" />}
-                {p.name}
-                <span className="text-xs font-normal text-muted-foreground">{p.price === 0 ? 'مجانية' : `${p.price} ﷼`}</span>
-                {!p.active && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">موقوفة</span>}
-                {p.isDefault && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">افتراضية</span>}
+          <Collapse
+            key={p.id}
+            className="bg-white"
+            summary={<>
+              {p.tier === 'gold' && <Star className="h-4 w-4 fill-amber-400 text-amber-400" />}
+              {p.tier === 'silver' && <Star className="h-4 w-4 fill-slate-400 text-slate-400" />}
+              <span className="truncate">{p.name}</span>
+              <span className="text-xs font-normal text-muted-foreground">{p.price === 0 ? 'مجانية' : `${p.price} ﷼`}</span>
+              {!p.active && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">موقوفة</span>}
+              {p.isDefault && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">افتراضية</span>}
+            </>}
+          >
+            <form action={updatePackageAction} className="space-y-2">
+              <input type="hidden" name="id" value={p.id} />
+              <PackageFields p={p} />
+              <div className="flex items-center gap-2">
+                <button className="btn-3d rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-white">حفظ</button>
+                <button formAction={deletePackageAction} className="flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-3.5 w-3.5" /> حذف
+                </button>
               </div>
-            </div>
-            <PackageFields p={p} />
-            <div className="flex items-center gap-2">
-              <button className="btn-3d rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-white">حفظ</button>
-              <button formAction={deletePackageAction} className="flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10">
-                <Trash2 className="h-3.5 w-3.5" /> حذف
-              </button>
-            </div>
-          </form>
+            </form>
+          </Collapse>
         ))}
         {packages.length === 0 && <p className="py-6 text-center text-muted-foreground">لا توجد باقات بعد — أضِف أول باقة بالأعلى.</p>}
       </div>
@@ -868,28 +874,34 @@ async function PromoPackagesSection() {
       <div className="flex items-center gap-2 font-bold text-primary"><Settings2 className="h-5 w-5" /> باقات الإعلانات الترويجية — المدد والأسعار ({packages.length})</div>
       <p className="text-[11px] text-muted-foreground">حدّد المدد وأسعارها (مثال: أسبوعان = 14 يوم، شهر = 30، ستة أشهر = 180، سنة = 365). تظهر للمعلن عند تصميم إعلانه الترويجي، وتبدأ من تاريخ الموافقة — مراجعة الطلبات نفسها من «الإعلانات الترويجية».</p>
 
-      <form action={createPromoPackageAction} className="space-y-2 rounded-xl border border-primary/20 bg-card p-3">
-        <div className="text-sm font-bold text-primary">➕ باقة مدة جديدة</div>
-        <PromoFields />
-        <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name="active" defaultChecked /> مُفعّلة</label>
-        <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة</button>
-      </form>
+      <Collapse summary={<span className="text-primary">➕ إضافة باقة مدة جديدة</span>} className="bg-primary/5">
+        <form action={createPromoPackageAction} className="space-y-2">
+          <PromoFields />
+          <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name="active" defaultChecked /> مُفعّلة</label>
+          <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة</button>
+        </form>
+      </Collapse>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {packages.map((p) => (
-          <form key={p.id} action={updatePromoPackageAction} className="space-y-2 rounded-xl border border-primary/20 bg-white p-3">
-            <input type="hidden" name="id" value={p.id} />
-            <div className="flex items-center justify-between gap-2 text-sm font-bold">
-              <span>{p.name} — {p.days} يوم — {p.price === 0 ? 'مجاني' : `${p.price} ﷼`}</span>
+          <Collapse
+            key={p.id}
+            className="bg-white"
+            summary={<>
+              <span className="truncate">{p.name} — {p.days} يوم — {p.price === 0 ? 'مجاني' : `${p.price} ﷼`}</span>
               {!p.active && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">موقوفة</span>}
-            </div>
-            <PromoFields p={p} />
-            <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name="active" defaultChecked={p.active} /> مُفعّلة</label>
-            <div className="flex gap-2">
-              <button className="btn-3d rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-white">حفظ</button>
-              <button formAction={deletePromoPackageAction} className="flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف</button>
-            </div>
-          </form>
+            </>}
+          >
+            <form action={updatePromoPackageAction} className="space-y-2">
+              <input type="hidden" name="id" value={p.id} />
+              <PromoFields p={p} />
+              <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name="active" defaultChecked={p.active} /> مُفعّلة</label>
+              <div className="flex gap-2">
+                <button className="btn-3d rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-white">حفظ</button>
+                <button formAction={deletePromoPackageAction} className="flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف</button>
+              </div>
+            </form>
+          </Collapse>
         ))}
         {packages.length === 0 && <p className="py-6 text-center text-muted-foreground">لا توجد باقات — أضِف أول باقة بالأعلى.</p>}
       </div>

@@ -227,7 +227,11 @@ export async function createClassifiedAction(formData: FormData) {
   const rawSched = String(formData.get('publishAt') || '').trim();
   if (schedOn && rawSched) {
     const d = new Date(rawSched);
-    if (!isNaN(d.getTime()) && d.getTime() > Date.now() + 60_000 && d.getTime() < Date.now() + 30 * 86400_000) publishAt = d;
+    // أقصى مدى للجدولة من الإعدادات (0 = بلا حد)
+    const { getScheduleMaxDays } = await import('@/lib/settings');
+    const maxDays = await getScheduleMaxDays().catch(() => 30);
+    const maxMs = maxDays > 0 ? Date.now() + maxDays * 86400_000 : Infinity;
+    if (!isNaN(d.getTime()) && d.getTime() > Date.now() + 60_000 && d.getTime() < maxMs) publishAt = d;
   }
   const startAt = publishAt ? publishAt.getTime() : Date.now();
 

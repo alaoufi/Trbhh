@@ -49,13 +49,13 @@ function Submit({ label }: { label: string }) {
 }
 
 export function AdForm({
-  action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, allowOldPrice, allowStock, urgentOffer, featuredOffer,
+  action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, scheduleMaxDays = 30, allowOldPrice, allowStock, urgentOffer, featuredOffer,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string; dupId?: string;
   needPrice?: string; needBal?: string; dest?: string;
-  limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean; allowSchedule?: boolean;
+  limitMax?: string; gapHours?: string; gapWait?: string; blockCat?: string; banned?: boolean; allowSchedule?: boolean; scheduleMaxDays?: number;
   allowOldPrice?: boolean; allowStock?: boolean;
   /** عرض تسويقي لشارة «عاجل» عند النشر: باقتا 24/48 ساعة بأسعارهما ورصيد العضو */
   urgentOffer?: { packs: { hours: number; price: number }[]; balance: number };
@@ -424,7 +424,7 @@ export function AdForm({
       {allowSchedule && (
         <label className="block space-y-1 rounded-xl border border-sky-200 bg-sky-50/60 p-3">
           <span className="text-sm font-bold text-sky-800">🕒 جدولة النشر (اختياري)</span>
-          <span className="block text-xs text-muted-foreground">اترك الحقل فارغاً للنشر فوراً، أو اختر موعداً (حتى ٣٠ يوماً) ليُنشر إعلانك تلقائياً وقتها.</span>
+          <span className="block text-xs text-muted-foreground">اترك الحقل فارغاً للنشر فوراً، أو اختر موعداً {scheduleMaxDays > 0 ? `(حتى ${scheduleMaxDays} يوماً)` : ''} ليُنشر إعلانك تلقائياً وقتها.</span>
           <input type="datetime-local" name="publishAt" className="h-11 w-full rounded-lg border border-sky-300 bg-background px-3 text-sm" dir="ltr" />
         </label>
       )}

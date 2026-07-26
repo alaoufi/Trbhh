@@ -389,7 +389,11 @@ export async function createAdAction(formData: FormData) {
     const rawSched = String(formData.get('publishAt') || '').trim();
     if (schedOn && rawSched) {
       const d = new Date(rawSched);
-      if (!isNaN(d.getTime()) && d.getTime() > Date.now() + 60_000 && d.getTime() < Date.now() + 30 * 86400_000) scheduledAt = d;
+      // أقصى مدى للجدولة من الإعدادات (0 = بلا حد)
+      const { getScheduleMaxDays } = await import('@/lib/settings');
+      const maxDays = await getScheduleMaxDays().catch(() => 30);
+      const maxMs = maxDays > 0 ? Date.now() + maxDays * 86400_000 : Infinity;
+      if (!isNaN(d.getTime()) && d.getTime() > Date.now() + 60_000 && d.getTime() < maxMs) scheduledAt = d;
     }
   }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);

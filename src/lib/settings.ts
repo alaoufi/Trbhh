@@ -32,6 +32,9 @@ export async function getSettingNum(k: string, fallback = 0): Promise<number> {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/** أقصى مدى مستقبلي (بالأيام) لجدولة نشر الإعلانات والمبوّبة — 0 = بلا حد. */
+export const getScheduleMaxDays = () => getSettingNum('schedule_max_days', 30);
+
 export async function setSetting(k: string, v: string) {
   await ensure();
   await prisma.site_settings.upsert({ where: { k }, create: { k, v }, update: { v } });

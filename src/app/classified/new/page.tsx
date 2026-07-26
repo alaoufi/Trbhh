@@ -13,8 +13,8 @@ export default async function NewClassifiedPage({ searchParams }: { searchParams
   const { error, price, bal, wait, left } = await searchParams;
   const { getServicePricing, serviceHasPrice, DURATIONS } = await import('@/lib/settings');
   const { getBalance } = await import('@/lib/wallet');
-  const { getSettingBool } = await import('@/lib/settings');
-  const [cp, balance, allowSchedule] = await Promise.all([getServicePricing().then((p) => p.classified), getBalance(session.uid), getSettingBool('schedule_on', false).catch(() => false)]);
+  const { getSettingBool, getScheduleMaxDays } = await import('@/lib/settings');
+  const [cp, balance, allowSchedule, scheduleMaxDays] = await Promise.all([getServicePricing().then((p) => p.classified), getBalance(session.uid), getSettingBool('schedule_on', false).catch(() => false), getScheduleMaxDays().catch(() => 30)]);
   const paid = serviceHasPrice(cp);
   const durations = paid ? cp : null;
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
@@ -45,7 +45,7 @@ export default async function NewClassifiedPage({ searchParams }: { searchParams
         </div>
       )}
 
-      <ClassifiedForm action={createClassifiedAction} error={error} needPrice={price} needBal={bal} gapWait={wait} dupLeft={left} durations={durations} balance={paid ? balance : undefined} allowSchedule={allowSchedule} />
+      <ClassifiedForm action={createClassifiedAction} error={error} needPrice={price} needBal={bal} gapWait={wait} dupLeft={left} durations={durations} balance={paid ? balance : undefined} allowSchedule={allowSchedule} scheduleMaxDays={scheduleMaxDays} />
     </div>
   );
 }

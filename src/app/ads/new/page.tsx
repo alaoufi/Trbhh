@@ -12,6 +12,7 @@ export const metadata = { title: 'أضف إعلان' };
 
 export default async function NewAdPage({ searchParams }: { searchParams: Promise<{ error?: string; left?: string; max?: string; hours?: string; wait?: string; cat?: string; banned?: string; dup?: string; price?: string; bal?: string; dest?: string }> }) {
   const allowSchedule = (await getSettingBool('schedule_on', false).catch(() => false)) && !(await getSettingBool(SETTING_ADS_APPROVAL, false).catch(() => false));
+  const scheduleMaxDays = await import('@/lib/settings').then((m) => m.getScheduleMaxDays()).catch(() => 30);
   const [dealsOn, stockOn] = await Promise.all([
     import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false),
     import('@/lib/store-extras').then((m) => m.stockEnabled()).catch(() => false),
@@ -70,6 +71,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
 
       <AdForm
         allowSchedule={allowSchedule}
+        scheduleMaxDays={scheduleMaxDays}
         allowOldPrice={dealsOn}
         allowStock={stockOn && dest === 'store'}
         urgentOffer={urgentOffer}

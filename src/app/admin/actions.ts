@@ -631,6 +631,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('match_notify_on', formData.get('matchNotifyOn') !== null ? '1' : '0');
   await setSetting('store_report_on', formData.get('storeReportOn') !== null ? '1' : '0');
   await setSetting('schedule_on', formData.get('scheduleOn') !== null ? '1' : '0');
+  await setSetting('schedule_max_days', String(Math.max(0, parseInt(String(formData.get('scheduleMaxDays') || '30')) || 0)));
   await setSetting('bump_on', formData.get('bumpOn') !== null ? '1' : '0');
   await setSetting('ad_contact_stats_on', formData.get('adContactStatsOn') !== null ? '1' : '0');
   // ميزات المتاجر: كوبونات + حالة التوفر + الدوام + عروض اليوم

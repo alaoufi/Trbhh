@@ -22,7 +22,7 @@ const authedItems: NavItem[] = [
 const guestItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },
   { href: '/companies', label: 'المتاجر', icon: Building2 },
-  { href: '/login', label: 'تسجيل الدخول', icon: LogIn, primary: true },
+  { href: '/login', label: 'الدخول', icon: LogIn, primary: true },
   shareItem,
   { href: '/search', label: 'بحث', icon: Search },
 ];

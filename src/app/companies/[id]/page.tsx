@@ -12,7 +12,6 @@ import { getUserProfiles, getActiveProfile } from '@/lib/profiles';
 import { linkedAccounts } from '@/lib/account-links';
 import { hasAnyAdmin } from '@/lib/roles';
 import { recordStoreVisit, classifySource, getStoreViews } from '@/lib/store-analytics';
-import { isStoreSubBlocked } from '@/lib/subscription';
 import { getBalance } from '@/lib/wallet';
 import { isUserBanned } from '@/lib/moderation';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle, parseHiddenFields, adViewCounts, DEFAULT_STORE_WELCOME_MSG } from '@/lib/merchant';
@@ -86,7 +85,12 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   // approval gate: pending/suspended stores aren't public. Instead of a bare 404,
   // show a friendly status page (e.g. when a merchant previews a store still under review).
   // اشتراك المتجر: عند انتهائه بعد المهلة يُخفى المتجر من العرض (دون حذف). المالك والإدارة يريانه.
-  const subBlocked = await isStoreSubBlocked(storeId).catch(() => false);
+  // حالة الاشتراك الكاملة: أثناء المهلة (grace) يبقى المتجر ظاهراً للزوار وصاحبه يُذكَّر؛
+  // بعد انتهاء المهلة (suspended) يُغلق عن الزوار برسالة، وصاحبه يرى رسالة التجديد.
+  const { getStoreSub } = await import('@/lib/subscription');
+  const sub = await getStoreSub(storeId).catch(() => null);
+  const subBlocked = sub?.state === 'suspended';
+  const subGrace = sub?.state === 'grace';
   // متجر موقوف: لا تصفّح للجميع عدا الإدارة (حتى المالك يرى الرسالة) — رسالتان مختلفتان
   if ((meta.status === 2 || meta.status === 3) && !admin) {
     const perm = meta.status === 3;
@@ -300,6 +304,17 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         )}
         {meta.status !== 1 && (isOwner || admin) && (
           <div className="rounded-xl border bg-white p-3 text-sm font-bold text-amber-700 shadow-sm">⏳ هذا المتجر {meta.status === 0 ? 'بانتظار موافقة الإدارة' : 'موقوف'} — يظهر لك فقط حالياً.</div>
+        )}
+        {/* مهلة السداد: المتجر ما زال ظاهراً للزوار، وصاحبه يُذكَّر بالتجديد قبل انتهائها وإلا يُغلق */}
+        {subGrace && isOwner && (
+          <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm shadow-sm">
+            <div className="font-extrabold text-amber-800">⏳ انتهى اشتراك متجرك — أنت في مهلة السداد{typeof sub?.graceDaysLeft === 'number' && sub.graceDaysLeft > 0 ? ` (${sub.graceDaysLeft} يوم متبقية)` : ''}.</div>
+            <div className="mt-1 text-xs text-amber-700">متجرك ما زال ظاهراً لعملائك الآن، لكنه سيُغلق تلقائياً بعد انتهاء المهلة حتى تجدّد. بادر بالتجديد.</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Link href="/store#sub" className="rounded-lg bg-primary px-4 py-1.5 text-xs font-extrabold text-white">تجديد الاشتراك الآن</Link>
+              <Link href="/account/wallet#topup" className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-bold text-primary">شحن الرصيد</Link>
+            </div>
+          </div>
         )}
 
         {/* بوب أب ترحيب بزائر المتجر — يفعّله/يعطّله صاحب المتجر بمفتاح مستقل، ويظهر

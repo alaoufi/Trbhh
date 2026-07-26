@@ -23,7 +23,7 @@ export function StoreBottomNav({ brand, wa, isOwner, storeId, home, canAdd }: { 
         {wa
           ? <StoreContactLink storeId={storeId} kind="whatsapp" href={wa} target="_blank" className={item}><MessageCircle className="h-5 w-5" /> تواصل</StoreContactLink>
           : <a href="#about" className={item}><MessageCircle className="h-5 w-5" /> نبذة</a>}
-        {isOwner && <a href="/account/company" className={item}><Store className="h-5 w-5" /> إدارة</a>}
+        {isOwner && <Link href="/account/company" className={item}><Store className="h-5 w-5" /> إدارة</Link>}
       </div>
     </nav>
   );

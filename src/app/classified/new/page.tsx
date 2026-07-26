@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 import { getSession } from '@/lib/auth';
@@ -40,7 +41,7 @@ export default async function NewClassifiedPage({ searchParams }: { searchParams
             ))}
           </ul>
           <div className="mt-2 font-bold text-amber-900">رصيدك الحالي: <b>{en(balance)} ر.س</b>{' '}
-            <a href="/account/wallet" className="underline">محفظتي</a>
+            <Link href="/account/wallet" className="underline">محفظتي</Link>
           </div>
         </div>
       )}

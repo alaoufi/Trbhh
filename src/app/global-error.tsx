@@ -32,6 +32,9 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
             <button onClick={() => reset()} style={{ display: 'flex', alignItems: 'center', gap: 8, borderRadius: 8, background: '#3287da', color: '#fff', padding: '8px 16px', fontSize: 14, fontWeight: 700, border: 0, cursor: 'pointer' }}>
               <RefreshCw size={16} /> إعادة المحاولة
             </button>
+            {/* global-error يُصيَّر خارج سياق الموجّه (يستبدل html/body كاملاً عند خطأ
+                جذري) — يجب أن يكون <a> لا <Link> (لا يتوفّر سياق التنقّل هنا). */}
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, borderRadius: 8, border: '1px solid #3287da', color: '#3287da', padding: '8px 16px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
               <Home size={16} /> الرئيسية
             </a>

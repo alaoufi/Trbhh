@@ -41,7 +41,9 @@ export default async function AccountLayout({ children }: { children: React.Reac
           <Link href="/delete-account" className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm text-destructive/80 hover:bg-destructive/10">
             <UserX className="h-4 w-4" /> حذف الحساب
           </Link>
-          {/* خروج: رابط عادي (لا يُستبق تلقائياً) حتى لا يُلغى الجلسة عند التصفّح */}
+          {/* خروج: /logout معالج مسار (route handler) لا صفحة — يجب أن يكون <a> بتنقّل
+              كامل لا <Link> (الاستباق التلقائي كان سيُلغي الجلسة عند التصفّح). */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a href="/logout" className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10">
             <LogOut className="h-4 w-4" /> خروج
           </a>

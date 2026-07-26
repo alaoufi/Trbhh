@@ -175,7 +175,7 @@ export default async function UserProfilePage({ params, searchParams }: { params
         {allowReview ? (
           <ReviewForm reciverId={uid} />
         ) : !session ? (
-          <a href="/login" className="card-3d block rounded-xl p-3 text-center text-sm text-primary">سجّل الدخول لتقييم هذا العضو</a>
+          <Link href="/login" className="card-3d block rounded-xl p-3 text-center text-sm text-primary">سجّل الدخول لتقييم هذا العضو</Link>
         ) : session.uid === uid ? (
           <p className="text-sm text-muted-foreground">لا يمكنك تقييم نفسك.</p>
         ) : (

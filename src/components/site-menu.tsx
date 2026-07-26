@@ -250,6 +250,9 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
 
         <div className="border-t border-primary/15 p-3">
           {isAuthed ? (
+            // /logout معالج مسار (route handler) لا صفحة — يبقى <a> بتنقّل كامل لا <Link>
+            // (الاستباق التلقائي كان سيُلغي الجلسة عند فتح القائمة).
+            // eslint-disable-next-line @next/next/no-html-link-for-pages
             <a href="/logout" className="flex items-center justify-center gap-2 rounded-lg border border-destructive/30 px-3 py-2.5 text-sm font-medium text-destructive">
               <LogOut className="h-4 w-4" /> تسجيل الخروج
             </a>

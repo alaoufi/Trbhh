@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Gavel } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
@@ -25,13 +26,13 @@ export default async function NewAuctionPage({ searchParams }: { searchParams: P
   return (
     <div className="mx-auto max-w-lg space-y-4">
       <h1 className="flex items-center gap-2 text-xl font-bold text-primary"><Gavel className="h-6 w-6" /> افتح مزاداً على إعلانك</h1>
-      {error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي لرسم فتح المزاد ({cfg.fee} ر.س، ورصيدك {balance} ر.س) — <a href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</a> ثم أعد المحاولة.</div>}
+      {error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي لرسم فتح المزاد ({cfg.fee} ر.س، ورصيدك {balance} ر.س) — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
       {error && error !== 'needcredit' && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-700">{decodeURIComponent(error)}</div>}
       {!canAfford && (
         <div className="rounded-xl border-2 border-red-400 bg-red-50 p-4 text-center">
           <p className="mb-1 font-extrabold text-red-800">💳 رصيدك لا يكفي لتنفيذ فتح المزاد</p>
           <p className="mb-3 text-sm text-red-700">رسم الفتح {cfg.fee} ر.س، ورصيدك {balance} ر.س — اشحن رصيدك أولاً.</p>
-          <a href="/account/wallet#topup" className="inline-block rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">اشحن رصيدي الآن</a>
+          <Link href="/account/wallet#topup" className="inline-block rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">اشحن رصيدي الآن</Link>
         </div>
       )}
       <p className="rounded-xl bg-secondary/30 p-3 text-xs leading-5 text-muted-foreground">

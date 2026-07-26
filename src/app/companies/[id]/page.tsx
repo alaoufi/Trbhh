@@ -269,7 +269,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           </form>
           {!session && (
             <>
-              <a href="/" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border text-primary" aria-label="الرجوع لتربح"><Home className="h-4 w-4" /></a>
+              <Link href="/" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border text-primary" aria-label="الرجوع لتربح"><Home className="h-4 w-4" /></Link>
               <Link href={`/store-login?s=${encodeURIComponent(meta.handle || String(storeId))}`} className="btn-3d flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-bold text-white" style={{ background: brand }}>
                 <LogIn className="h-4 w-4" /> دخول
               </Link>
@@ -279,10 +279,10 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <Link href="/ads/new?dest=store" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="أضف إعلان"><Plus className="h-5 w-5" /></Link>
           )}
           {isOwner && (
-            <a href="/store/analytics" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إحصائيات المتجر"><BarChart3 className="h-4 w-4" /></a>
+            <Link href="/store/analytics" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إحصائيات المتجر"><BarChart3 className="h-4 w-4" /></Link>
           )}
           {isOwner && (
-            <a href="/store" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إدارة المتجر"><Building2 className="h-4 w-4" /></a>
+            <Link href="/store" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إدارة المتجر"><Building2 className="h-4 w-4" /></Link>
           )}
         </div>
         {/* شريط التبديل لأي عضو مسجّل: الرجوع لتربح/حساباتك أو التبديل لهوية/متجر آخر */}

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Heart } from 'lucide-react';
 import { toggleFavoriteAction } from '@/app/account/actions';
 import { cn } from '@/lib/utils';
@@ -6,9 +7,9 @@ export function FavoriteButton({ adId, active, disabled, compact }: { adId: numb
   if (compact) {
     if (disabled) {
       return (
-        <a href="/login" className="flex flex-col items-center gap-1 text-sm font-medium text-primary">
+        <Link href="/login" className="flex flex-col items-center gap-1 text-sm font-medium text-primary">
           <Heart className="h-5 w-5" /> المفضلة
-        </a>
+        </Link>
       );
     }
     return (
@@ -22,9 +23,9 @@ export function FavoriteButton({ adId, active, disabled, compact }: { adId: numb
   }
   if (disabled) {
     return (
-      <a href="/login" className="flex h-10 items-center justify-center gap-2 rounded-lg border text-sm hover:bg-secondary">
+      <Link href="/login" className="flex h-10 items-center justify-center gap-2 rounded-lg border text-sm hover:bg-secondary">
         <Heart className="h-4 w-4" /> أضف للمفضلة
-      </a>
+      </Link>
     );
   }
   return (

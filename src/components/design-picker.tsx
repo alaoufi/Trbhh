@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Check, LayoutTemplate } from 'lucide-react';
 
@@ -45,7 +46,7 @@ export function DesignPicker() {
           );
         })}
       </div>
-      <a href="/account/design" className="mt-2 block rounded-lg bg-primary/10 px-3 py-1.5 text-center text-xs font-bold text-primary hover:bg-primary/15">معاينة القوالب قبل الاعتماد ←</a>
+      <Link href="/account/design" className="mt-2 block rounded-lg bg-primary/10 px-3 py-1.5 text-center text-xs font-bold text-primary hover:bg-primary/15">معاينة القوالب قبل الاعتماد ←</Link>
     </div>
   );
 }

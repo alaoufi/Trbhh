@@ -54,7 +54,9 @@ export default async function StoreAdminLayout({ children }: { children: React.R
               <ExternalLink className="h-3.5 w-3.5" /> عرض المتجر
             </Link>
           )}
-          {/* خروج: رابط عادي (لا يُستبق) حتى لا تُلغى الجلسة أثناء التصفّح */}
+          {/* خروج: /logout معالج مسار (route handler) لا صفحة — يبقى <a> بتنقّل كامل
+              لا <Link> (الاستباق كان سيُلغي الجلسة أثناء التصفّح). */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a href="/logout" className="flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-bold text-destructive">
             <LogOut className="h-3.5 w-3.5" /> خروج
           </a>

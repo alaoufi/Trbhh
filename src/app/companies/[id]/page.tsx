@@ -13,6 +13,7 @@ import { linkedAccounts } from '@/lib/account-links';
 import { hasAnyAdmin } from '@/lib/roles';
 import { recordStoreVisit, classifySource, getStoreViews } from '@/lib/store-analytics';
 import { isStoreSubBlocked } from '@/lib/subscription';
+import { getBalance } from '@/lib/wallet';
 import { isUserBanned } from '@/lib/moderation';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle, parseHiddenFields, adViewCounts, DEFAULT_STORE_WELCOME_MSG } from '@/lib/merchant';
 import { fillTemplate } from '@/lib/settings';
@@ -98,19 +99,44 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
       </div>
     );
   }
-  if ((meta.status !== 1 || subBlocked) && !isOwner && !admin) {
+  // اشتراك المتجر منتهٍ (المتجر معتمد status 1 لكن انتهى اشتراكه بعد المهلة): الإدارة تتصفّح؛
+  // الزائر يرى رسالة عامة لا تكشف السبب؛ وصاحب المتجر يرى رسالة إجرائية بروابط التجديد والشحن.
+  if (subBlocked && meta.status === 1 && !admin) {
+    if (isOwner) {
+      const balance = await getBalance(session!.uid).catch(() => 0);
+      return (
+        <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 px-6 text-center">
+          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-amber-100 text-amber-700 text-3xl">🔔</div>
+          <h1 className="text-lg font-extrabold text-amber-800">متجرك موقوف حالياً لعدم تجديد الاشتراك</h1>
+          <p className="text-sm text-muted-foreground">جدّد اشتراك متجرك ليعود للظهور لعملائك فوراً.</p>
+          <Link href="/store#sub" className="btn-3d mt-1 rounded-lg bg-primary px-5 py-2.5 text-sm font-extrabold text-white">بادر بالاشتراك (تجديد الآن)</Link>
+          <Link href="/account/wallet#topup" className="rounded-lg border border-primary/30 px-4 py-2 text-xs font-bold text-primary">رصيدك: {balance} ر.س — اشحن رصيدك إن لم يكفِ</Link>
+          <Link href="/" className="text-xs text-muted-foreground underline">الصفحة الرئيسية</Link>
+        </div>
+      );
+    }
+    return (
+      <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary text-3xl">🚫</div>
+        <h1 className="text-lg font-extrabold text-primary">المتجر غير نشط حالياً</h1>
+        <p className="text-sm text-muted-foreground">سيعود للظهور قريباً.</p>
+        {!session && (
+          <p className="text-xs font-bold text-primary">صاحب المتجر؟ <Link href={`/login?next=${encodeURIComponent(`/companies/${storeId}`)}`} className="underline">سجّل الدخول</Link> لتجديد اشتراكك.</p>
+        )}
+        <Link href="/" className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">الصفحة الرئيسية</Link>
+      </div>
+    );
+  }
+  // متجر قيد المراجعة (status 0) أو غير معتمد: رسالة للزائر (والمالك يعاين متجره)
+  if (meta.status !== 1 && !isOwner && !admin) {
     const pending = meta.status === 0;
-    const subOnly = meta.status === 1 && subBlocked;
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 px-6 text-center">
         <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary text-3xl">{pending ? '⏳' : '🚫'}</div>
         <h1 className="text-lg font-extrabold text-primary">{pending ? 'هذا المتجر قيد المراجعة' : 'هذا المتجر غير متاح حالياً'}</h1>
-        <p className="text-sm text-muted-foreground">{pending ? 'يخضع المتجر لموافقة الإدارة وسيظهر للعملاء بعد اعتماده.' : subOnly ? 'المتجر غير متاح مؤقتاً. سيعود للظهور قريباً.' : 'تم إيقاف هذا المتجر مؤقتاً من قبل الإدارة.'}</p>
-        {/* تلميح لصاحب المتجر: يرى هذه الرسالة إن لم يكن مسجّلاً دخوله على هذا الجهاز */}
+        <p className="text-sm text-muted-foreground">{pending ? 'يخضع المتجر لموافقة الإدارة وسيظهر للعملاء بعد اعتماده.' : 'تم إيقاف هذا المتجر مؤقتاً من قبل الإدارة.'}</p>
         {!session && (
-          <p className="text-xs font-bold text-primary">
-            صاحب المتجر؟ <Link href={`/login?next=${encodeURIComponent(`/companies/${storeId}`)}`} className="underline">سجّل الدخول</Link> لعرض متجرك وإدارته{subOnly ? ' وتجديد اشتراكه' : ''}.
-          </p>
+          <p className="text-xs font-bold text-primary">صاحب المتجر؟ <Link href={`/login?next=${encodeURIComponent(`/companies/${storeId}`)}`} className="underline">سجّل الدخول</Link> لعرض متجرك وإدارته.</p>
         )}
         <Link href="/" className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">الصفحة الرئيسية</Link>
       </div>

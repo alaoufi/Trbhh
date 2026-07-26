@@ -233,7 +233,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
 
       {/* اشتراك المتجر — حالة + تذكيرات + خطط الدفع (يظهر عند تفعيل الاشتراكات) */}
       {store && subState && subState.enabled && (
-        <div className="card-3d space-y-3 rounded-2xl p-4">
+        <div id="sub" className="card-3d scroll-mt-20 space-y-3 rounded-2xl p-4">
           <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> اشتراك المتجر</div>
           {sub === 'ok' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ تم تجديد الاشتراك وخُصمت الرسوم من رصيدك.</div>}
           {sub === 'nocredit' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-700">الرصيد غير كافٍ — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}

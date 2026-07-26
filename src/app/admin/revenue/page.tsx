@@ -543,7 +543,7 @@ async function PaymentsTab({ cat, page }: { cat?: string; page: number }) {
 }
 
 async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; canPromos: boolean }) {
-  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction, verifyPkgsAll, restoreFee] = await Promise.all([
+  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction, verifyPkgsAll, restoreFee, acctVerify] = await Promise.all([
     getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
     pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
     getStorePlusPricing(), getLeadConfig(), getAuctionConfig(),
@@ -556,6 +556,7 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
       return [{ fee: f1, days: d1 }, { fee: f2, days: d2 }, { fee: f3, days: d3 }];
     }),
     getAdRestoreFee(),
+    import('@/lib/settings').then((m) => m.getAccountVerifyRenew()),
   ]);
   const urgentPrices = await getUrgentPrices();
   const services: { key: PaidService; note?: string }[] = [
@@ -667,6 +668,16 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
           <label className="space-y-1"><span className="text-xs font-bold">باقة 2 — المدة (أيام)</span><input name="verifyFeeDays2" type="number" min={1} defaultValue={verifyPkgsAll[1].days} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">باقة 3 — الرسوم (ر.س)</span><input name="verifyFee3" type="number" min={0} defaultValue={verifyPkgsAll[2].fee} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">باقة 3 — المدة (أيام)</span><input name="verifyFeeDays3" type="number" min={1} defaultValue={verifyPkgsAll[2].days} className={num} /></label>
+        </div>
+        {/* توثيق الحساب العادي: أول توثيق بموافقة الإدارة (مجاناً بالمستندات)، ثم التجديد
+            تلقائي بالحسم بلا موافقة. المدة 0 = دائم بلا انتهاء (السلوك الافتراضي). */}
+        <div className="mt-3 border-t border-sky-200 pt-2">
+          <div className="mb-1 text-xs font-bold text-sky-800">🪪 توثيق الحساب العادي — مدة الصلاحية والتجديد التلقائي</div>
+          <p className="mb-2 text-[11px] text-muted-foreground">أول توثيق يبقى بموافقة الإدارة (بالمستندات، مجاناً). <b>المدة 0 = توثيق دائم بلا انتهاء</b> (كما هو الآن). عند ضبط مدة ورسم، ينتهي التوثيق بعدها ويُجدَّد فورياً بخصم الرسم من رصيد العضو دون موافقة.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="space-y-1"><span className="text-xs font-bold">مدة الصلاحية (أيام، 0 = دائم)</span><input name="acctVerifyDays" type="number" min={0} defaultValue={acctVerify.days} className={num} /></label>
+            <label className="space-y-1"><span className="text-xs font-bold">رسم التجديد (ر.س)</span><input name="acctVerifyFee" type="number" min={0} defaultValue={acctVerify.fee} className={num} /></label>
+          </div>
         </div>
       </div>
 

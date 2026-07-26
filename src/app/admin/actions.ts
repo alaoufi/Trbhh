@@ -700,6 +700,9 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting('verify_fee_days_2', String(Math.max(1, parseInt(String(formData.get('verifyFeeDays2') || '90')) || 90)));
   await setSetting('verify_fee_3', nn('verifyFee3'));
   await setSetting('verify_fee_days_3', String(Math.max(1, parseInt(String(formData.get('verifyFeeDays3') || '365')) || 365)));
+  // توثيق الحساب العادي: مدة الصلاحية (0 = دائم) + رسم التجديد التلقائي
+  await setSetting('acct_verify_days', String(Math.max(0, parseInt(String(formData.get('acctVerifyDays') || '0')) || 0)));
+  await setSetting('acct_verify_fee', nn('acctVerifyFee'));
   // المزادات: رسم الفتح + أقصى مدة
   await setSetting('auction_fee', nn('auctionFee'));
   await setSetting('auction_max_days', String(Math.min(30, Math.max(1, parseInt(String(formData.get('auctionMaxDays') || '7')) || 7))));

@@ -216,6 +216,13 @@ export async function getVerifyFeeConfig(): Promise<{ fee: number; days: number 
   const [fee, days] = await Promise.all([getSettingNum(SETTING_VERIFY_FEE, 0), getSettingNum(SETTING_VERIFY_FEE_DAYS, 30)]);
   return { fee: Math.max(0, Math.round(fee) || 0), days: Math.max(1, Math.round(days) || 30) };
 }
+/* توثيق الحساب العادي: مدة الصلاحية بالأيام (0 = دائم بلا انتهاء = السلوك الافتراضي)
+ * ورسم التجديد بعد الانتهاء. أول توثيق يبقى بموافقة الإدارة (مجاناً بالمستندات)؛
+ * فإن ضُبطت مدة (>0) انتهى التوثيق بعدها وجُدّد تلقائياً بالخصم دون موافقة. */
+export async function getAccountVerifyRenew(): Promise<{ days: number; fee: number }> {
+  const [days, fee] = await Promise.all([getSettingNum('acct_verify_days', 0), getSettingNum('acct_verify_fee', 0)]);
+  return { days: Math.max(0, Math.round(days) || 0), fee: Math.max(0, Math.round(fee) || 0) };
+}
 /* ثلاث باقات توثيق (سعر + مدة) — الباقة برسوم 0 لا تُعرض؛ كل الباقات 0 = الخدمة معطلة. */
 export type VerifyPackage = { idx: number; fee: number; days: number };
 export async function getVerifyPackages(): Promise<VerifyPackage[]> {

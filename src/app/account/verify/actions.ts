@@ -15,6 +15,16 @@ async function storeDoc(file: FormDataEntryValue | null, userId: number, kind: s
   return toInt(up.id);
 }
 
+/** تجديد توثيق الحساب العادي فوراً بالخصم من الرصيد — بلا موافقة (أول توثيق فقط بموافقة). */
+export async function renewAccountVerificationAction() {
+  const session = await requireUser();
+  const { redirect } = await import('next/navigation');
+  const { renewAccountVerification } = await import('@/lib/account-verify');
+  const r = await renewAccountVerification(session.uid);
+  revalidatePath('/account/verify');
+  redirect(r.ok ? '/account/verify?renewed=1' : `/account/verify?err=${r.reason || 'err'}`);
+}
+
 export async function submitVerificationAction(formData: FormData) {
   const session = await requireUser();
   const national = await storeDoc(formData.get('national_identity'), session.uid, 'nid');

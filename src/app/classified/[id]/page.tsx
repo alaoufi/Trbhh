@@ -98,7 +98,7 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
           url={shareUrl}
           title={shareText}
           text={shareText}
-          card={{ url: shareUrl, title: shareText, image: c.image ?? undefined, desc: c.text ?? undefined }}
+          card={{ url: shareUrl, title: shareText, image: c.image ?? undefined, desc: c.text ?? undefined, contain: true }}
           compact
         />
         {(isOwner || admin) && (

@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { ImageDown, Loader2 } from 'lucide-react';
+import { ImageDown, Loader2, Share2 } from 'lucide-react';
 
-export type ShareCardData = { url: string; title: string; desc?: string; price?: string; city?: string; image?: string };
+export type ShareCardData = { url: string; title: string; desc?: string; price?: string; city?: string; image?: string; contain?: boolean };
 
 function loadImg(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
@@ -33,7 +33,7 @@ function drawWrapped(ctx: CanvasRenderingContext2D, text: string, x: number, y: 
 }
 
 /** توليد بطاقة صورة جاهزة للمشاركة (واتساب/سناب/تويتر) من بيانات الإعلان — كلها على جهاز الزائر. */
-export function ShareCardButton({ data, className }: { data: ShareCardData; className?: string }) {
+export function ShareCardButton({ data, className, label, primary }: { data: ShareCardData; className?: string; label?: string; primary?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
@@ -73,12 +73,20 @@ export function ShareCardButton({ data, className }: { data: ShareCardData; clas
       if (data.image) {
         const img = await loadImg(data.image);
         if (img) {
-          const scale = Math.max(W / img.width, imgH / img.height);
-          const dw = img.width * scale, dh = img.height * scale;
-          ctx.save(); ctx.beginPath(); ctx.rect(0, imgTop, W, imgH); ctx.clip();
-          // القصّ من أعلى الصورة (وليس وسطها): الصور الطويلة/النصية يُؤخذ أولها فتبقى مفهومة
-          ctx.drawImage(img, (W - dw) / 2, imgTop, dw, dh);
-          ctx.restore();
+          if (data.contain) {
+            // احتواء كامل: الصورة كلها تظهر بلا اقتطاع من الأطراف (تُوضع على خلفية داكنة)
+            ctx.fillStyle = '#0f172a'; ctx.fillRect(0, imgTop, W, imgH);
+            const scale = Math.min(W / img.width, imgH / img.height);
+            const dw = img.width * scale, dh = img.height * scale;
+            ctx.drawImage(img, (W - dw) / 2, imgTop + (imgH - dh) / 2, dw, dh);
+          } else {
+            const scale = Math.max(W / img.width, imgH / img.height);
+            const dw = img.width * scale, dh = img.height * scale;
+            ctx.save(); ctx.beginPath(); ctx.rect(0, imgTop, W, imgH); ctx.clip();
+            // القصّ من أعلى الصورة (وليس وسطها): الصور الطويلة/النصية يُؤخذ أولها فتبقى مفهومة
+            ctx.drawImage(img, (W - dw) / 2, imgTop, dw, dh);
+            ctx.restore();
+          }
         } else { ctx.fillStyle = '#e2e8f0'; ctx.fillRect(0, imgTop, W, imgH); }
       } else { ctx.fillStyle = '#e2e8f0'; ctx.fillRect(0, imgTop, W, imgH); }
 
@@ -139,7 +147,7 @@ export function ShareCardButton({ data, className }: { data: ShareCardData; clas
   return (
     <>
       <button type="button" onClick={generate} disabled={busy} className={className || 'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary'}>
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageDown className="h-4 w-4 text-primary" />} بطاقة صورة للمشاركة
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : primary ? <Share2 className="h-4 w-4 text-primary" /> : <ImageDown className="h-4 w-4 text-primary" />} {label || 'بطاقة صورة للمشاركة'}
       </button>
       {linkCopied && (
         <p className="rounded-lg bg-emerald-50 px-3 py-1.5 text-[11px] font-bold leading-relaxed text-emerald-800">

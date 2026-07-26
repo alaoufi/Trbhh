@@ -84,8 +84,11 @@ export function ShareButtons({ url, title, text, compact, card, iconOnly }: { ur
           <>
             <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
             <div className="absolute bottom-full right-0 z-50 mb-2 w-48 max-w-[calc(100vw-1.5rem)] rounded-xl border bg-card p-1.5 shadow-xl">
-              {card && typeof navigator !== 'undefined' && 'share' in navigator && (
-                <button type="button" onClick={() => { navigator.share({ title, text: msg, url }).catch(() => {}); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Share2 className="h-4 w-4 text-primary" /> مشاركة الرابط</button>
+              {/* مشاركة موحّدة: صورة الإعلان + الرابط معاً في خيار واحد */}
+              {card && (
+                <div onClick={() => setMenu(false)}>
+                  <ShareCardButton data={card} primary label="مشاركة (صورة + رابط)" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-primary hover:bg-secondary" />
+                </div>
               )}
               <a href={wa} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><MessageCircle className="h-4 w-4 text-[#25D366]" /> واتساب</a>
               <a href={tg} target="_blank" rel="noopener noreferrer" onClick={() => setMenu(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Send className="h-4 w-4 text-[#229ED9]" /> تيليجرام</a>
@@ -94,7 +97,6 @@ export function ShareButtons({ url, title, text, compact, card, iconOnly }: { ur
               <button type="button" onClick={() => { tiktok(); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><TikTokIcon className="h-4 w-4" /> تيك توك <span className="text-[10px] text-muted-foreground">(يُنسخ الرابط)</span></button>
               <button type="button" onClick={() => { copy(); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary">{copied ? <Check className="h-4 w-4 text-primary" /> : <Link2 className="h-4 w-4" />} نسخ الرابط</button>
               <button type="button" onClick={() => { setQr(true); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><QrCode className="h-4 w-4" /> رمز QR</button>
-              {card && <ShareCardButton data={card} />}
             </div>
           </>
         )}

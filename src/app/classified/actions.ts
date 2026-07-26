@@ -263,10 +263,15 @@ export async function updateClassifiedAction(formData: FormData) {
   const session = await requireUser();
   const id = Number(formData.get('id'));
   const existing = id ? await getClassifiedById(id) : null;
-  if (!existing || existing.userId !== session.uid) redirect('/account/classified');
-
-  const { editHours } = await getMemberWindows();
-  if (!withinWindow(existing.createdAt, editHours)) redirect(`/classified/${id}/edit?error=window`);
+  if (!existing) redirect('/account/classified');
+  const isAdmin = await hasAnyAdmin(session.uid).catch(() => false);
+  const isOwner = existing!.userId === session.uid;
+  if (!isOwner && !isAdmin) redirect('/account/classified');
+  // المالك مقيّد بمهلة التعديل؛ الإدارة تعدّل بلا قيد
+  if (isOwner && !isAdmin) {
+    const { editHours } = await getMemberWindows();
+    if (!withinWindow(existing!.createdAt, editHours)) redirect(`/classified/${id}/edit?error=window`);
+  }
 
   const title = String(formData.get('title') || '').trim().slice(0, 255) || null;
   const body = String(formData.get('body') || '').trim().slice(0, 2000) || null;
@@ -353,7 +358,7 @@ export async function updateClassifiedAction(formData: FormData) {
   revalidatePath('/');
   revalidatePath('/classified');
   revalidatePath('/account/classified');
-  redirect('/account/classified?updated=1');
+  redirect(isOwner ? '/account/classified?updated=1' : `/classified/${id}`);
 }
 
 /** Re-activate an expired classified from the archive — charges classified[duration] and republishes. */

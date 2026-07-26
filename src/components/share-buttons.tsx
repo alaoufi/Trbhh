@@ -83,7 +83,7 @@ export function ShareButtons({ url, title, text, compact, card, iconOnly }: { ur
         {menu && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
-            <div className="absolute bottom-full left-1/2 z-50 mb-2 w-48 -translate-x-1/2 rounded-xl border bg-card p-1.5 shadow-xl">
+            <div className="absolute bottom-full right-0 z-50 mb-2 w-48 max-w-[calc(100vw-1.5rem)] rounded-xl border bg-card p-1.5 shadow-xl">
               {card && typeof navigator !== 'undefined' && 'share' in navigator && (
                 <button type="button" onClick={() => { navigator.share({ title, text: msg, url }).catch(() => {}); setMenu(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-secondary"><Share2 className="h-4 w-4 text-primary" /> مشاركة الرابط</button>
               )}

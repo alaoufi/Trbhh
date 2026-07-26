@@ -17,7 +17,18 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const c = await getClassifiedById(Number(id));
-  return { title: c?.title || c?.text?.slice(0, 40) || 'إعلان مبوّب' };
+  const title = c?.title || c?.text?.slice(0, 40) || 'إعلان مبوّب';
+  const desc = 'الإعلانات المبوّبة .. منصة تربح الإعلانية';
+  const url = `https://${SITE.domain}/classified/${Number(id)}`;
+  // صورة الإعلان في معاينة الرابط (واتساب/تويتر/فيسبوك) — تظهر تلقائياً عند مشاركة الرابط
+  const images = c?.image ? [c.image] : undefined;
+  return {
+    title,
+    description: desc,
+    alternates: { canonical: url },
+    openGraph: { title, description: desc, url, images },
+    twitter: { card: 'summary_large_image' as const, title, description: desc, images },
+  };
 }
 
 export default async function ClassifiedDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ status?: string; error?: string }> }) {
@@ -94,14 +105,9 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
         />
         {(isOwner || admin) && (
           <>
-            <span className="text-[11px] font-bold text-muted-foreground">
-              {admin && !isOwner ? 'إجراءات إدارية:' : 'إجراءات إعلانك:'}
-            </span>
-            {isOwner && (
-              <Link href={`/classified/${c.id}/edit`} className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-primary">
-                <Pencil className="h-3.5 w-3.5" /> تعديل
-              </Link>
-            )}
+            <Link href={`/classified/${c.id}/edit`} className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-primary">
+              <Pencil className="h-3.5 w-3.5" /> تعديل
+            </Link>
             <form action={toggleClassifiedStatusAction}>
               <input type="hidden" name="id" value={c.id} />
               <ConfirmSubmit

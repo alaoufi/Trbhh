@@ -26,7 +26,7 @@ import { FeedTextBanner } from '@/components/feed-text-banner';
 import { getFeedBannerItems } from '@/lib/settings';
 import { ProgressiveReveal } from '@/components/progressive-reveal';
 import { PlatformRatingWidget } from '@/components/platform-rating-widget';
-import { getPlatformRating, hasRatedPlatform } from '@/lib/platform-rating';
+import { getPlatformRating, getMyPlatformReview } from '@/lib/platform-rating';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,10 +86,12 @@ export default async function HomePage() {
   ]);
   // تقييم المنصة بالنجوم — قابل للإخفاء من التحكم ← الإعدادات
   const platformRatingOn = await getSettingBool('platform_rating_on', true).catch(() => true);
-  // التقييم للمسجّلين فقط: نتحقق من تقييم العضو بمفتاحه (u{id})، لا الزائر
-  const [platformRating, platformRated] = platformRatingOn
-    ? await Promise.all([getPlatformRating().catch(() => ({ avg: 0, count: 0 })), hasRatedPlatform(session ? `u${session.uid}` : null).catch(() => false)])
-    : [{ avg: 0, count: 0 }, false];
+  // التقييم للمسجّلين فقط: نتحقق من تقييم العضو بمفتاحه (u{id})، لا الزائر — ونجلب تقييمه الحالي للتعديل
+  const myViewerKey = session ? `u${session.uid}` : null;
+  const [platformRating, myReview] = platformRatingOn
+    ? await Promise.all([getPlatformRating().catch(() => ({ avg: 0, count: 0 })), getMyPlatformReview(myViewerKey).catch(() => null)])
+    : [{ avg: 0, count: 0 }, null];
+  const platformRated = !!myReview;
 
   return (
     <div className="space-y-4">
@@ -116,7 +118,7 @@ export default async function HomePage() {
       {/* تقييم منصة تربح بالنجوم — للزوّار والأعضاء، مرة واحدة لكل منهما */}
       {platformRatingOn && (
         <div className="-mt-2">
-          <PlatformRatingWidget avg={platformRating.avg} count={platformRating.count} alreadyRated={platformRated} isLoggedIn={!!session} />
+          <PlatformRatingWidget avg={platformRating.avg} count={platformRating.count} alreadyRated={platformRated} isLoggedIn={!!session} myStar={myReview?.star || 0} myNote={myReview?.note || ''} />
         </div>
       )}
 

@@ -56,3 +56,11 @@ export async function hasRatedPlatform(viewerKey: string | null): Promise<boolea
   const existing = await prisma.platform_reviews.findUnique({ where: { viewer_key: viewerKey } }).catch(() => null);
   return !!existing;
 }
+
+/** تقييم العضو الحالي (نجومه وملاحظته) — لعرضه وتعبئته عند التعديل. */
+export async function getMyPlatformReview(viewerKey: string | null): Promise<{ star: number; note: string | null } | null> {
+  if (!viewerKey) return null;
+  await ensure();
+  const r = await prisma.platform_reviews.findUnique({ where: { viewer_key: viewerKey }, select: { star: true, note: true } }).catch(() => null);
+  return r ? { star: r.star, note: r.note ?? null } : null;
+}

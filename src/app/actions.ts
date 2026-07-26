@@ -20,7 +20,11 @@ export async function submitPlatformRatingAction(formData: FormData) {
   const viewerKey = `u${session.uid}`;
   const { ensureSchema } = await import('@/data/schema-sync');
   await ensureSchema();
-  // فشل صامت لو سبق أن قيّم (viewer_key فريد) — لا تكرار
-  await prisma.platform_reviews.create({ data: { viewer_key: viewerKey, star, user_id: session.uid, note: note || null } }).catch(() => {});
+  // upsert: يُنشئ التقييم أول مرة، ويُحدّثه إن سبق للعضو أن قيّم (تعديل تقييمه إن أخطأ)
+  await prisma.platform_reviews.upsert({
+    where: { viewer_key: viewerKey },
+    create: { viewer_key: viewerKey, star, user_id: session.uid, note: note || null },
+    update: { star, note: note || null, user_id: session.uid },
+  }).catch(() => {});
   revalidatePath('/');
 }

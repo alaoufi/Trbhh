@@ -258,10 +258,14 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${o.balance >= o.fee ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700'}`}>رصيده: {en(o.balance)} ر.س {o.balance >= o.fee ? '✓ يكفي' : '✗ لا يكفي'}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <form action={approveVerifyOrderAction}>
-                    <input type="hidden" name="id" value={o.id} />
-                    <ConfirmSubmit msg={`تأكيد الموافقة على توثيق «${o.storeName || o.userName}»؟ سيُخصم ${o.fee} ر.س من رصيده فوراً ويُفعَّل التوثيق ${o.days} يوماً — إن لم يكفِ رصيده يبقى الطلب معلقاً ويُبلَّغ بالشحن.`} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> موافقة وخصم وتفعيل</ConfirmSubmit>
-                  </form>
+                  {o.balance >= o.fee ? (
+                    <form action={approveVerifyOrderAction}>
+                      <input type="hidden" name="id" value={o.id} />
+                      <ConfirmSubmit msg={`تأكيد الموافقة على توثيق «${o.storeName || o.userName}»؟ سيُخصم ${o.fee} ر.س من رصيده فوراً ويُفعَّل التوثيق ${o.days} يوماً.`} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> موافقة وخصم وتفعيل</ConfirmSubmit>
+                    </form>
+                  ) : (
+                    <span className="flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-500" title="رصيد العضو لا يغطي رسوم الباقة — اطلب منه شحن رصيده ثم وافق، أو ارفض الطلب">✗ يتعذّر الخصم — رصيد العضو لا يكفي</span>
+                  )}
                   <form action={rejectVerifyOrderAction} className="flex min-w-0 flex-1 items-center gap-1">
                     <input type="hidden" name="id" value={o.id} />
                     <input name="note" required maxLength={300} placeholder="سبب الرفض (إلزامي — يصل العضو)" className="h-8 min-w-0 flex-1 rounded-lg border border-destructive/30 bg-white px-2 text-xs outline-none" />

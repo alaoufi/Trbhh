@@ -11,9 +11,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # لا تحدّد إصدار pnpm هنا — يُقرأ من حقل packageManager في package.json
+      # (تحديده في الموضعين يسبّب ERR_PNPM_BAD_PM_VERSION ويُفشل الفحص).
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:

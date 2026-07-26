@@ -12,6 +12,7 @@ function b64ToU8(b64: string) {
 export function PushToggle() {
   const [state, setState] = useState<'hidden' | 'off' | 'on' | 'busy' | 'denied'>('hidden');
   const [key, setKey] = useState('');
+  const [test, setTest] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -40,6 +41,20 @@ export function PushToggle() {
     } catch { setState('off'); }
   }
 
+  async function sendTest() {
+    setTest('…جارٍ الإرسال');
+    try {
+      const r = await fetch('/api/push/test', { method: 'POST' }).then((x) => x.json()).catch(() => null);
+      if (!r) setTest('تعذّر الاتصال — حاول لاحقاً.');
+      else if (!r.enabled) setTest('التنبيهات الفورية غير مفعّلة من لوحة الإدارة.');
+      else if (r.subs === 0) setTest('لا يوجد اشتراك لهذا الجهاز — أوقف التفعيل ثم فعّله من جديد.');
+      else if (r.sent > 0) setTest('أُرسل تنبيه تجريبي ✓ — يجب أن يظهر خلال ثوانٍ. إن لم يظهر فتحقّق من إذن الإشعارات في المتصفح/النظام.');
+      else setTest(`تعذّر الإرسال (${r.failed} جهاز)${r.error ? ` — ${r.error}` : ''}. أعد التفعيل.`);
+    } catch {
+      setTest('تعذّر الإرسال.');
+    }
+  }
+
   async function disable() {
     setState('busy');
     try {
@@ -55,7 +70,7 @@ export function PushToggle() {
 
   if (state === 'hidden') return null;
   return (
-    <div className="card-3d flex items-center gap-3 rounded-xl p-4">
+    <div className="card-3d flex flex-wrap items-center gap-3 rounded-xl p-4">
       <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${state === 'on' ? 'bg-emerald-100 text-emerald-700' : 'bg-accent text-accent-foreground'}`}>
         {state === 'on' ? <BellRing className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
       </span>
@@ -69,10 +84,14 @@ export function PushToggle() {
         </div>
       </div>
       {state === 'on' ? (
-        <button onClick={disable} className="flex shrink-0 items-center gap-1 rounded-full border border-red-300 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"><BellOff className="h-3.5 w-3.5" /> إيقاف</button>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <button onClick={sendTest} className="rounded-full border border-primary/40 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5">إرسال تجربة</button>
+          <button onClick={disable} className="flex items-center gap-1 rounded-full border border-red-300 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"><BellOff className="h-3.5 w-3.5" /> إيقاف</button>
+        </div>
       ) : state === 'off' ? (
         <button onClick={enable} className="btn-3d shrink-0 rounded-full bg-primary px-4 py-2 text-xs font-bold text-white">تفعيل</button>
       ) : null}
+      {test && <div className="mt-2 w-full basis-full text-[11px] font-bold text-foreground/80">{test}</div>}
     </div>
   );
 }

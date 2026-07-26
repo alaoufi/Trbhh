@@ -50,6 +50,36 @@ export async function hasPushSub(userId: number): Promise<boolean> {
   return n > 0;
 }
 
+/** تنبيه تجريبي للعضو نفسه لتشخيص السلسلة — يُرجع تفاصيل النتيجة (لا يتجاهل بصمت).
+ *  subs=0 → الجهاز غير مشترك · sent>0 → وصل الطلب لخدمة الدفع · failed مع أسباب. */
+export async function sendTestPush(userId: number): Promise<{ enabled: boolean; subs: number; sent: number; failed: number; error?: string }> {
+  const enabled = await pushEnabled();
+  if (!enabled) return { enabled: false, subs: 0, sent: 0, failed: 0 };
+  await ensure();
+  const subs = await prisma.push_subs.findMany({ where: { user_id: BigInt(userId) }, take: 8 }).catch(() => []);
+  if (!subs.length) return { enabled: true, subs: 0, sent: 0, failed: 0 };
+  try {
+    const webpush = (await import('web-push')).default;
+    const { publicKey, privateKey } = await getVapid();
+    webpush.setVapidDetails('mailto:admin@trbhh.com', publicKey, privateKey);
+    const data = JSON.stringify({ title: 'تجربة تنبيه ✓', body: 'التنبيهات الفورية تعمل على هذا الجهاز.', url: '/notifications' });
+    let sent = 0, failed = 0;
+    await Promise.all(subs.map(async (s) => {
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, data, { TTL: 3600 });
+        sent += 1;
+      } catch (e) {
+        failed += 1;
+        const code = (e as { statusCode?: number })?.statusCode;
+        if (code === 404 || code === 410) await prisma.push_subs.delete({ where: { id: s.id } }).catch(() => {}); // اشتراك ميّت يُنظَّف
+      }
+    }));
+    return { enabled: true, subs: subs.length, sent, failed };
+  } catch (e) {
+    return { enabled: true, subs: subs.length, sent: 0, failed: subs.length, error: (e as Error)?.message?.slice(0, 120) };
+  }
+}
+
 /** إرسال تنبيه فوري لكل أجهزة عضو — يتجاهل بصمت عند التعطيل أو غياب الاشتراكات. */
 export async function sendPushToUser(userId: number, payload: { title: string; body: string; url?: string }): Promise<void> {
   try {

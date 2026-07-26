@@ -570,8 +570,10 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           {verifyPkgs.length > 0 && (
             <div className="space-y-2 rounded-xl border border-sky-300 bg-sky-50/50 p-3">
               <div className="text-sm font-bold">⭐ توثيق المتجر (شارة موثّق)</div>
-              <p className="text-[11px] text-muted-foreground">اختر باقة — الرسوم تُخصم من رصيدك <b>بعد موافقة إدارة المتاجر فقط</b>، وعند أي إلغاء تُعاد لرصيدك قيمة الأيام غير المستخدمة تلقائياً.</p>
+              <p className="text-[11px] text-muted-foreground">اختر باقة — <b>أول توثيق</b> يُخصم من رصيدك بعد موافقة إدارة المتاجر، و<b>التجديد لاحقاً فوري</b> بالخصم مباشرة بلا موافقة. وعند أي إلغاء تُعاد لرصيدك قيمة الأيام غير المستخدمة تلقائياً.</p>
               {vreq === 'ok' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ أُرسل طلب التوثيق لإدارة المتاجر — لا خصم الآن؛ الخصم عند الموافقة.</div>}
+              {vreq === 'renewed' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ تم تجديد توثيق متجرك وخُصمت الرسوم من رصيدك — الشارة فعّالة الآن مباشرة.</div>}
+              {vreq === 'balance' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي لتجديد التوثيق — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك</Link> ثم أعد المحاولة.</div>}
               {vreq === 'dup' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs font-bold text-amber-900">لديك طلب توثيق قيد المراجعة بالفعل.</div>}
               {vreq === 'trusted' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">حسابك موثّق بالفعل ✓</div>}
               {vreq === 'pledge' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">يلزم الموافقة على التعهد قبل إرسال الطلب.</div>}
@@ -581,31 +583,45 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                 <div className="rounded-lg bg-emerald-100 px-2 py-1.5 text-xs font-bold text-emerald-800">✅ حسابك موثّق حالياً.</div>
               ) : myVerify?.status === 0 ? (
                 <div className="rounded-lg bg-amber-100 px-2 py-1.5 text-xs font-bold text-amber-800">⏳ طلبك (باقة {myVerify.fee} ر.س / {myVerify.days} يوم) بانتظار موافقة إدارة المتاجر — تأكد أن رصيدك يغطي الرسوم وقت الموافقة (رصيدك الآن: {merchBalance} ر.س).</div>
-              ) : (
+              ) : (() => {
+                // تجديد: آخر توثيق مدفوع انتهت مدّته طبيعياً (status 4) ⇒ فوري بالخصم بلا موافقة.
+                // الرفض (2) والإلغاء الإداري (3) يعودان لمسار «أول مرة» (بموافقة).
+                const isRenewal = myVerify?.status === 4;
+                const cheapest = Math.min(...verifyPkgs.map((p) => p.fee));
+                const canAffordAny = !isRenewal || merchBalance >= cheapest;
+                const firstAffordIdx = isRenewal ? verifyPkgs.findIndex((p) => p.fee <= merchBalance) : 0;
+                return (
                 <>
                   {myVerify?.status === 2 && myVerify.note && <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-xs font-bold text-red-700">❌ رُفض طلبك السابق: {myVerify.note} — يمكنك الطلب مجدداً.</div>}
                   {myVerify?.status === 3 && myVerify.note && <div className="rounded-lg border border-slate-300 bg-slate-100 p-2 text-xs font-bold text-slate-700">↩ أُلغي توثيقك السابق: {myVerify.note}{myVerify.refund > 0 ? ` — أُعيد لرصيدك ${myVerify.refund} ر.س` : ''}.</div>}
-                  {myVerify?.status === 4 && <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs font-bold text-amber-900">⌛ انتهت مدة توثيقك السابق — جدّد بطلب جديد.</div>}
+                  {isRenewal && <div className="rounded-lg border border-sky-300 bg-sky-50 p-2 text-xs font-bold text-sky-800">⌛ انتهت مدة توثيقك السابق — التجديد <b>فوري</b> بالخصم من رصيدك مباشرةً بلا انتظار موافقة (رصيدك: {merchBalance} ر.س).</div>}
+                  {!canAffordAny ? (
+                    <div className="rounded-lg border-2 border-red-400 bg-red-50 p-2 text-xs font-bold text-red-700">💳 رصيدك ({merchBalance} ر.س) لا يكفي لأقل باقة توثيق ({cheapest} ر.س) — <Link href="/account/wallet#topup" className="underline">اشحن رصيدك</Link> ثم جدّد.</div>
+                  ) : (
                   <form action={requestVerifyPaidAction} className="space-y-2">
-                    {/* اختيار الباقة */}
+                    {/* اختيار الباقة (في التجديد: تُعطَّل الباقات التي لا يغطيها الرصيد) */}
                     <div className={`grid gap-2 ${verifyPkgs.length === 3 ? 'grid-cols-3' : verifyPkgs.length === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                      {verifyPkgs.map((pkg, i) => (
-                        <label key={pkg.idx} className="flex cursor-pointer flex-col items-center gap-0.5 rounded-xl border-2 border-sky-200 bg-white p-2 text-center has-[:checked]:border-sky-600 has-[:checked]:bg-sky-100">
-                          <input type="radio" name="pkg" value={pkg.idx} defaultChecked={i === 0} required className="h-4 w-4 accent-sky-600" />
+                      {verifyPkgs.map((pkg, i) => {
+                        const afford = !isRenewal || pkg.fee <= merchBalance;
+                        return (
+                        <label key={pkg.idx} className={`flex flex-col items-center gap-0.5 rounded-xl border-2 border-sky-200 bg-white p-2 text-center has-[:checked]:border-sky-600 has-[:checked]:bg-sky-100 ${afford ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
+                          <input type="radio" name="pkg" value={pkg.idx} defaultChecked={i === firstAffordIdx} disabled={!afford} required className="h-4 w-4 accent-sky-600" />
                           <span className="text-sm font-extrabold text-sky-800">{pkg.fee} ر.س</span>
-                          <span className="text-[11px] font-bold text-muted-foreground">{pkg.days} يوم</span>
+                          <span className="text-[11px] font-bold text-muted-foreground">{pkg.days} يوم{!afford ? ' — لا يكفي' : ''}</span>
                         </label>
-                      ))}
+                      );})}
                     </div>
                     {/* التعهد الإلزامي */}
                     <label className="flex items-start gap-2 rounded-lg border border-sky-200 bg-white p-2 text-[11px] font-bold leading-5 text-foreground/90">
                       <input type="checkbox" name="pledge" required className="mt-0.5 h-4 w-4 shrink-0 accent-sky-600" />
                       <span>أتعهد بالالتزام بلوائح وأنظمة الموقع، وأقر بأنه في حال إلغاء التوثيق لأي سبب يعيد الموقع لرصيدي قيمة المدة غير المستخدمة فقط.</span>
                     </label>
-                    <ConfirmSubmit msg="إرسال طلب توثيق المتجر بالباقة المختارة لإدارة المتاجر؟ لا خصم الآن — الرسوم تُخصم من رصيدك عند موافقتهم ويُفعَّل التوثيق طوال مدة الباقة." className="btn-3d rounded-lg bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700">⭐ اطلب توثيق متجرك</ConfirmSubmit>
+                    <ConfirmSubmit msg={isRenewal ? 'تجديد توثيق متجرك بالباقة المختارة؟ سيُخصم السعر من رصيدك فوراً ويُفعَّل التوثيق مباشرة طوال مدة الباقة.' : 'إرسال طلب توثيق المتجر بالباقة المختارة لإدارة المتاجر؟ لا خصم الآن — الرسوم تُخصم من رصيدك عند موافقتهم ويُفعَّل التوثيق طوال مدة الباقة.'} className="btn-3d rounded-lg bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700">{isRenewal ? '⭐ جدّد توثيق متجرك الآن' : '⭐ اطلب توثيق متجرك'}</ConfirmSubmit>
                   </form>
+                  )}
                 </>
-              )}
+                );
+              })()}
             </div>
           )}
 

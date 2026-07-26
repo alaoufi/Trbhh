@@ -22,18 +22,35 @@ const row = (r: { id: bigint; user_id: bigint; store_id: number; fee: number; da
   expiresAt: r.expires_at ? r.expires_at.toISOString() : null,
 });
 
-/** طلب صاحب المتجر توثيقاً مدفوعاً بباقة محددة — يُحفظ معلقاً حتى موافقة إدارة المتاجر (لا خصم الآن). */
-export async function requestPaidVerification(userId: number, storeId: number, pkgIdx = 1): Promise<'ok' | 'dup' | 'off' | 'trusted'> {
+/** طلب صاحب المتجر توثيقاً مدفوعاً بباقة محددة.
+ *  - أول توثيق: يُحفظ معلقاً حتى موافقة إدارة المتاجر (لا خصم الآن) → 'ok'.
+ *  - تجديد (سبق توثيقٌ مدفوع انتهت مدّته طبيعياً status=4): يُخصم فوراً ويُفعَّل مباشرة
+ *    دون موافقة → 'renewed' (أو 'balance' إن لم يكفِ الرصيد). سياسة الموافقة تقتصر على
+ *    «أول مرة»؛ التجديد تلقائي بالحسم. */
+export async function requestPaidVerification(userId: number, storeId: number, pkgIdx = 1): Promise<'ok' | 'renewed' | 'balance' | 'dup' | 'off' | 'trusted'> {
   await ensure();
   const packages = await getVerifyPackages();
   const pkg = packages.find((x) => x.idx === pkgIdx) || packages[0];
   if (!pkg) return 'off';
-  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { trusted: true } }).catch(() => null);
   const active = await prisma.verify_orders.findFirst({ where: { user_id: BigInt(userId), status: 1, expires_at: { gt: new Date() } } }).catch(() => null);
-  if (u?.trusted === 1 && !active) return 'trusted'; // موثّق أصلاً (بالمستندات) — لا حاجة للدفع
   if (active) return 'trusted';
+  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { trusted: true } }).catch(() => null);
+  if (u?.trusted === 1) return 'trusted'; // موثّق أصلاً (بالمستندات) — لا حاجة للدفع
   const pending = await prisma.verify_orders.findFirst({ where: { user_id: BigInt(userId), status: 0 } }).catch(() => null);
   if (pending) return 'dup';
+  // تجديد بلا موافقة: آخر توثيق مدفوع للعضو انتهت مدّته طبيعياً (status=4) ⇒ ليست أول مرة.
+  // (الرفض status=2 أو الإلغاء الإداري status=3 يُعاملان كأول مرة فيعودان للموافقة.)
+  const latest = await prisma.verify_orders.findFirst({ where: { user_id: BigInt(userId) }, orderBy: { id: 'desc' } }).catch(() => null);
+  if (latest && latest.status === 4) {
+    const paid = await charge(userId, pkg.fee, 'verify_fee', `تجديد توثيق المتجر (${pkg.days} يوم)`);
+    if (!paid.ok) return 'balance';
+    const now = new Date();
+    const expires = new Date(now.getTime() + pkg.days * DAY);
+    await prisma.verify_orders.create({ data: { user_id: BigInt(userId), store_id: storeId, fee: pkg.fee, days: pkg.days, status: 1, decided_at: now, expires_at: expires } }).catch(() => {});
+    await prisma.users.update({ where: { id: BigInt(userId) }, data: { trusted: 1, step: 0, verified_at: now } }).catch(() => {});
+    return 'renewed';
+  }
+  // أول مرة: يبقى بموافقة إدارة المتاجر (الخصم عند الموافقة)
   await prisma.verify_orders.create({ data: { user_id: BigInt(userId), store_id: storeId, fee: pkg.fee, days: pkg.days } });
   return 'ok';
 }

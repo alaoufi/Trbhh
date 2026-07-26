@@ -188,10 +188,6 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const memberWindows = isAdOwner ? await getMemberWindows().catch(() => ({ editHours: 0, deleteHours: 0 })) : null;
   const editState = memberWindows ? adWindowState(ad.createdAt, memberWindows.editHours) : null;
   const deleteState = memberWindows ? adWindowState(ad.createdAt, memberWindows.deleteHours) : null;
-  const ownerBalance = (urgentExtras && urgentExtras.urgentPacks.length > 0) || featuredOpts.length || adShowPkgs.length
-    ? await import('@/lib/wallet').then((m) => m.getBalance(session!.uid)).catch(() => 0)
-    : 0;
-  const urgentBalance = ownerBalance;
   // خدمات تسويق إضافية لصاحب الإعلان: التحديث ⬆ والمزاد 🔨 (كل منها بمفتاحه من التحكم)
   const [bumpOn, auctionOn] = isAdOwner && !ad.storeOnly && ad.status === 1
     ? await Promise.all([
@@ -199,6 +195,16 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         import('@/lib/settings').then((m) => m.auctionsEnabled()).catch(() => false),
       ])
     : [false, false];
+  // نجلب الرصيد متى وُجدت أي خدمة مدفوعة قابلة للتفعيل (شامل التحديث المدفوع) لنحجب الرابط بصرياً عند نقص الرصيد
+  const ownerBalance = (urgentExtras && urgentExtras.urgentPacks.length > 0) || featuredOpts.length || adShowPkgs.length || bumpOn
+    ? await import('@/lib/wallet').then((m) => m.getBalance(session!.uid)).catch(() => 0)
+    : 0;
+  const urgentBalance = ownerBalance;
+  // حالة التحديث ⬆: مجاني إن مرّت مدة السماح، وإلا مدفوع — نحسبها هنا لحجب الزر بصرياً عند نقص الرصيد
+  const bumpLast = new Date(ad.createdAt || 0).getTime(); // getAd يجعل createdAt = آخر نشاط (max لـ bumped_at/created_at)
+  const bumpFree = !!(urgentExtras && urgentExtras.bumpFreeDays > 0 && (Date.now() - bumpLast) / 86400000 >= urgentExtras.bumpFreeDays);
+  const bumpCost = bumpFree ? 0 : (urgentExtras?.bumpPrice ?? 0);
+  const canBump = bumpCost <= 0 || ownerBalance >= bumpCost;
 
   // Distance between the visitor (from the trbhh_geo cookie) and the ad location
   const viewerLoc = await getViewerLocation();
@@ -317,23 +323,34 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                 {featuredActive ? `إعلانك مميّز حالياً حتى ${untilLabel} — مدّد المدة` : 'ميّز إعلانك بإطار ذهبي بارز ومقدمة القوائم'}
               </span>
             </div>
-            <p className="text-xs font-medium text-muted-foreground">مشاهدات وتواصل أعلى بكثير. رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
-            <div className="flex items-center gap-1.5">
-              <select name="duration" className="h-10 min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 text-sm font-bold">
-                {featuredOpts.map((o) => <option key={o.key} value={o.key}>{o.label} — {o.price} ر.س</option>)}
-              </select>
-              <ConfirmSubmit
-                msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً."
-                extendUntil={featuredActive ? ad.expiresAt! : undefined}
-                extendField="duration"
-                extendUnit="days"
-                extendMap={DUR_DAYS}
-                extendTemplate={`إعلانك مميّز حالياً حتى ${untilLabel} — عند التأكيد سيُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
-                className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-amber-500 px-3 py-2.5 text-sm font-extrabold text-white"
-              >
-                {featuredActive ? 'تمديد التمييز' : 'تمييز الآن'}
-              </ConfirmSubmit>
-            </div>
+            {(() => {
+              const minPrice = Math.min(...featuredOpts.map((o) => o.price));
+              const canAfford = ownerBalance >= minPrice;
+              const firstAfford = featuredOpts.find((o) => o.price <= ownerBalance)?.key;
+              return !canAfford ? (
+                <p className="rounded-lg border-2 border-red-400 bg-red-50 px-2.5 py-2 text-xs font-bold text-red-700">💳 رصيدك ({ownerBalance} ر.س) لا يكفي لأقل باقة تمييز ({minPrice} ر.س) — <Link href="/account/wallet#topup" className="underline">اشحن رصيدك</Link></p>
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-muted-foreground">مشاهدات وتواصل أعلى بكثير. رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
+                  <div className="flex items-center gap-1.5">
+                    <select name="duration" defaultValue={firstAfford} className="h-10 min-w-0 flex-1 rounded-lg border border-amber-300 bg-white px-3 text-sm font-bold">
+                      {featuredOpts.map((o) => <option key={o.key} value={o.key} disabled={o.price > ownerBalance}>{o.label} — {o.price} ر.س{o.price > ownerBalance ? ' (غير متاح)' : ''}</option>)}
+                    </select>
+                    <ConfirmSubmit
+                      msg="تأكيد تمييز الإعلان للمدة المختارة؟ سيُخصم السعر من رصيدك فوراً."
+                      extendUntil={featuredActive ? ad.expiresAt! : undefined}
+                      extendField="duration"
+                      extendUnit="days"
+                      extendMap={DUR_DAYS}
+                      extendTemplate={`إعلانك مميّز حالياً حتى ${untilLabel} — عند التأكيد سيُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
+                      className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-amber-500 px-3 py-2.5 text-sm font-extrabold text-white"
+                    >
+                      {featuredActive ? 'تمديد التمييز' : 'تمييز الآن'}
+                    </ConfirmSubmit>
+                  </div>
+                </>
+              );
+            })()}
           </form>
         );
       })()}
@@ -352,23 +369,34 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                 {urgentActive ? `شارة «عاجل» فعّالة حتى ${untilLabel} — مدّد المدة` : 'اجعل إعلانك يلفت الأنظار بشارة «عاجل» النابضة'}
               </span>
             </div>
-            <p className="text-xs font-medium text-muted-foreground">تظهر في كل القوائم — اختر الباقة. رصيدك: {urgentBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
-            <div className="flex items-center gap-1.5">
-              <select name="hours" className="h-10 min-w-0 flex-1 rounded-lg border border-red-300 bg-white px-3 text-sm font-bold">
-                {urgentExtras!.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours}>{p0.hours} ساعة — {p0.price} ر.س</option>)}
-              </select>
-              <ConfirmSubmit
-                msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً."
-                extendUntil={urgentActive ? ad.urgentUntil! : undefined}
-                extendField="hours"
-                extendUnit="hours"
-                extendMap={hoursMap}
-                extendTemplate={`شارة «عاجل» فعّالة على إعلانك الآن حتى ${untilLabel} — عند التأكيد ستُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
-                className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-red-600 px-3 py-2.5 text-sm font-extrabold text-white"
-              >
-                {urgentActive ? 'تمديد الشارة' : 'تفعيل الآن'}
-              </ConfirmSubmit>
-            </div>
+            {(() => {
+              const minPrice = Math.min(...urgentExtras!.urgentPacks.map((p) => p.price));
+              const canAfford = urgentBalance >= minPrice;
+              const firstAfford = urgentExtras!.urgentPacks.find((p) => p.price <= urgentBalance)?.hours;
+              return !canAfford ? (
+                <p className="rounded-lg border-2 border-red-400 bg-red-50 px-2.5 py-2 text-xs font-bold text-red-700">💳 رصيدك ({urgentBalance} ر.س) لا يكفي لأقل باقة عاجل ({minPrice} ر.س) — <Link href="/account/wallet#topup" className="underline">اشحن رصيدك</Link></p>
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-muted-foreground">تظهر في كل القوائم — اختر الباقة. رصيدك: {urgentBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
+                  <div className="flex items-center gap-1.5">
+                    <select name="hours" defaultValue={firstAfford} className="h-10 min-w-0 flex-1 rounded-lg border border-red-300 bg-white px-3 text-sm font-bold">
+                      {urgentExtras!.urgentPacks.map((p0) => <option key={p0.hours} value={p0.hours} disabled={p0.price > urgentBalance}>{p0.hours} ساعة — {p0.price} ر.س{p0.price > urgentBalance ? ' (غير متاح)' : ''}</option>)}
+                    </select>
+                    <ConfirmSubmit
+                      msg="تأكيد تفعيل شارة «عاجل» للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً."
+                      extendUntil={urgentActive ? ad.urgentUntil! : undefined}
+                      extendField="hours"
+                      extendUnit="hours"
+                      extendMap={hoursMap}
+                      extendTemplate={`شارة «عاجل» فعّالة على إعلانك الآن حتى ${untilLabel} — عند التأكيد ستُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
+                      className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-red-600 px-3 py-2.5 text-sm font-extrabold text-white"
+                    >
+                      {urgentActive ? 'تمديد الشارة' : 'تفعيل الآن'}
+                    </ConfirmSubmit>
+                  </div>
+                </>
+              );
+            })()}
           </form>
         );
       })()}
@@ -403,25 +431,36 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                 {adShowActive ? `إعلانك معروض في تربح حتى ${untilLabel} — مدّد المدة` : 'اعرض إعلان متجرك في كل قوائم تربح (الرئيسية/البحث)'}
               </span>
             </div>
-            <p className="text-xs font-medium text-muted-foreground">تظهر منتجات متجرك عادة داخل متجرك فقط — هذا يعرضها لكل زوّار تربح. رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
-            <div className="flex items-center gap-1.5">
-              <select name="pkg" className="h-10 min-w-0 flex-1 rounded-lg border border-sky-300 bg-white px-3 text-sm font-bold">
-                {adShowPkgs.map((p) => (
-                  <option key={p.key} value={p.key}>{p.key === 'gold' ? '🥇' : p.key === 'silver' ? '🥈' : '⭐'} {p.label} — {p.days} يوماً — {p.price} ر.س</option>
-                ))}
-              </select>
-              <ConfirmSubmit
-                msg="تأكيد شراء عرض هذا الإعلان في تربح للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً."
-                extendUntil={adShowActive ? ad.trbhhUntil! : undefined}
-                extendField="pkg"
-                extendUnit="days"
-                extendMap={daysMap}
-                extendTemplate={`إعلانك معروض في تربح حالياً حتى ${untilLabel} — عند التأكيد سيُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
-                className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-sky-600 px-3 py-2.5 text-sm font-extrabold text-white"
-              >
-                {adShowActive ? 'تمديد العرض' : 'اعرض الآن'}
-              </ConfirmSubmit>
-            </div>
+            {(() => {
+              const minPrice = Math.min(...adShowPkgs.map((p) => p.price));
+              const canAfford = ownerBalance >= minPrice;
+              const firstAfford = adShowPkgs.find((p) => p.price <= ownerBalance)?.key;
+              return !canAfford ? (
+                <p className="rounded-lg border-2 border-red-400 bg-red-50 px-2.5 py-2 text-xs font-bold text-red-700">💳 رصيدك ({ownerBalance} ر.س) لا يكفي لأقل باقة عرض ({minPrice} ر.س) — <Link href="/account/wallet#topup" className="underline">اشحن رصيدك</Link></p>
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-muted-foreground">تظهر منتجات متجرك عادة داخل متجرك فقط — هذا يعرضها لكل زوّار تربح. رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
+                  <div className="flex items-center gap-1.5">
+                    <select name="pkg" defaultValue={firstAfford} className="h-10 min-w-0 flex-1 rounded-lg border border-sky-300 bg-white px-3 text-sm font-bold">
+                      {adShowPkgs.map((p) => (
+                        <option key={p.key} value={p.key} disabled={p.price > ownerBalance}>{p.key === 'gold' ? '🥇' : p.key === 'silver' ? '🥈' : '⭐'} {p.label} — {p.days} يوماً — {p.price} ر.س{p.price > ownerBalance ? ' (غير متاح)' : ''}</option>
+                      ))}
+                    </select>
+                    <ConfirmSubmit
+                      msg="تأكيد شراء عرض هذا الإعلان في تربح للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً."
+                      extendUntil={adShowActive ? ad.trbhhUntil! : undefined}
+                      extendField="pkg"
+                      extendUnit="days"
+                      extendMap={daysMap}
+                      extendTemplate={`إعلانك معروض في تربح حالياً حتى ${untilLabel} — عند التأكيد سيُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
+                      className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-sky-600 px-3 py-2.5 text-sm font-extrabold text-white"
+                    >
+                      {adShowActive ? 'تمديد العرض' : 'اعرض الآن'}
+                    </ConfirmSubmit>
+                  </div>
+                </>
+              );
+            })()}
           </form>
         );
       })()}
@@ -436,11 +475,15 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <div className="space-y-2.5 rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
           <span className="text-xs font-extrabold text-primary">🚀 سوّق إعلانك أكثر</span>
           {bumpOn && (
-            <form action={bumpAdAction} className="flex items-center gap-2">
-              <input type="hidden" name="adId" value={ad.id} />
-              <input type="hidden" name="back" value="ad" />
-              <ConfirmSubmit msg="تأكيد تحديث الإعلان (رفعه لأعلى القوائم)؟ إن لم يكن التحديث المجاني متاحاً يُخصم السعر من رصيدك." title="ارفع إعلانك لأعلى القوائم" className="btn-3d w-full rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 hover:bg-sky-100">⬆ حدّث إعلانك للأعلى</ConfirmSubmit>
-            </form>
+            canBump ? (
+              <form action={bumpAdAction} className="flex items-center gap-2">
+                <input type="hidden" name="adId" value={ad.id} />
+                <input type="hidden" name="back" value="ad" />
+                <ConfirmSubmit msg="تأكيد تحديث الإعلان (رفعه لأعلى القوائم)؟ إن لم يكن التحديث المجاني متاحاً يُخصم السعر من رصيدك." title="ارفع إعلانك لأعلى القوائم" className="btn-3d w-full rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 hover:bg-sky-100">⬆ حدّث إعلانك للأعلى{bumpCost > 0 ? ` (${bumpCost} ر.س)` : ' (مجاناً)'}</ConfirmSubmit>
+              </form>
+            ) : (
+              <p className="rounded-lg border-2 border-red-400 bg-red-50 px-2.5 py-2 text-xs font-bold text-red-700">💳 رصيدك ({ownerBalance} ر.س) لا يكفي لرسوم التحديث المبكر ({bumpCost} ر.س) — <Link href="/account/wallet#topup" className="underline">اشحن رصيدك</Link></p>
+            )
           )}
           {auctionOn && (
             <Link href={`/auctions/new?ad=${ad.id}`} className="btn-3d block w-fit rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100" title="دع المشترين يتنافسون على السعر">🔨 افتح مزاداً عليه</Link>

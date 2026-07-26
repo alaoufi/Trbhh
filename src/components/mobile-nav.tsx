@@ -2,11 +2,14 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, MessagesSquare, PlusCircle, Mail, Building2, Search, LogIn, Share2, Users, Phone, MessageCircle, Send, type LucideIcon } from 'lucide-react';
+import { Home, PlusCircle, Mail, Building2, Search, LogIn, Share2, Users, Phone, MessageCircle, Send, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SITE } from '@/lib/constants';
 
 type NavItem = { href: string; label: string; icon: LucideIcon; primary?: boolean; badge?: boolean };
+
+// زر مشاركة الصفحة الحالية
+const shareItem: NavItem = { href: '__share', label: 'مشاركة', icon: Share2 };
 
 // بنود تتطلّب تسجيل الدخول → تظهر فقط للمسجّل. للزائر بنود عامة فقط.
 const authedItems: NavItem[] = [
@@ -20,16 +23,13 @@ const guestItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },
   { href: '/companies', label: 'المتاجر', icon: Building2 },
   { href: '/login', label: 'تسجيل الدخول', icon: LogIn, primary: true },
-  { href: '/debates', label: 'مناقشات', icon: MessagesSquare },
+  shareItem,
   { href: '/search', label: 'بحث', icon: Search },
 ];
 
-// زر مشاركة الصفحة الحالية — يحل محل «مناقشات» عند إخفائها من التحكم
-const shareItem: NavItem = { href: '__share', label: 'مشاركة', icon: Share2 };
-
-export function MobileNav({ unread = 0, isAuthed = false, debatesOn = true }: { unread?: number; isAuthed?: boolean; debatesOn?: boolean }) {
+export function MobileNav({ unread = 0, isAuthed = false }: { unread?: number; isAuthed?: boolean }) {
   const path = usePathname();
-  const items = (isAuthed ? authedItems : guestItems).map((i) => (!debatesOn && i.href === '/debates' ? shareItem : i));
+  const items = isAuthed ? authedItems : guestItems;
   const [contactOpen, setContactOpen] = useState(false);
   const waPhone = SITE.phone.replace(/\D/g, '').replace(/^00/, '');
   const telPhone = '+' + waPhone;

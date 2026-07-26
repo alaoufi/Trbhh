@@ -70,7 +70,6 @@ export default async function AdminHome() {
     // النظام والإعدادات
     { group: 'system', label: 'الإعدادات', icon: Settings, href: '/admin/settings', perm: 'users', nav: true },
     { group: 'system', label: 'النسخ الاحتياطي', icon: Database, href: '/admin/backup', perm: 'backup', nav: true },
-    { group: 'system', label: 'النقاشات', value: s.debates, icon: MessagesSquare, href: '/debates', perm: null },
     { group: 'system', label: 'الأرشيف', icon: Archive, href: '/admin/archive', perm: null, nav: true },
     { group: 'system', label: 'دليل الإدارة', icon: BookOpen, href: '/admin/guide', perm: null, nav: true },
   ];

@@ -20,7 +20,7 @@ export async function isAdmin(userId: number) {
 }
 
 export async function adminStats() {
-  const [users, ads, activeAds, pendingAds, pendingVerify, reports, debates, dup, classified, pendingNames] = await Promise.all([
+  const [users, ads, activeAds, pendingAds, pendingVerify, reports, dup, classified, pendingNames] = await Promise.all([
     prisma.users.count(),
     prisma.ads.count(),
     prisma.ads.count({ where: { status: 1, state: 'active' } }),
@@ -29,10 +29,9 @@ export async function adminStats() {
     // توثيق معلّق = نفس تعريف تبويب «بانتظار الموافقة» في صفحة التوثيق: ليس موثقاً وليس مرفوضاً (step=2 يعني مرفوضاً)
     prisma.users.count({ where: { trusted: { not: 1 }, step: { not: 2 }, OR: [{ step: 1 }, { national_identity: { gt: 0 } }, { commercial_register: { gt: 0 } }, { work_permit: { gt: 0 } }] } }),
     prisma.repord_ads.count(),
-    prisma.debates.count(),
     findDuplicateAds().then((r) => r.dupCount).catch(() => 0),
     countClassifieds().catch(() => 0),
     prisma.name_requests.count({ where: { status: 0 } }).catch(() => 0),
   ]);
-  return { users, ads, activeAds, pendingAds, pendingVerify, reports, debates, duplicateAds: dup, classified, pendingNames };
+  return { users, ads, activeAds, pendingAds, pendingVerify, reports, duplicateAds: dup, classified, pendingNames };
 }

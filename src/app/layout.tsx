@@ -68,11 +68,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const ck = await cookies();
   const theme = ck.get('theme')?.value || '';
   const design = ck.get('design')?.value || '';
-  const [unread, isAdminUser, splashSeconds, debatesOn] = await Promise.all([
+  const [unread, isAdminUser, splashSeconds] = await Promise.all([
     session ? getMyStats(session.uid).then((s) => s.unread).catch(() => 0) : Promise.resolve(0),
     session ? import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false) : Promise.resolve(false),
     getClassifiedSplashSeconds().catch(() => 5),
-    import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true),
   ]);
   // شاشة المبوّبات الافتتاحية تُحجب كلياً عن أعضاء الإدارة (لا تعيقهم عن عملهم)
   let splashAds: Awaited<ReturnType<typeof getSplashClassifieds>> = [];
@@ -129,7 +128,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             the shared header/menu/footer, even across client-side navigation. */}
         <ChromeGate
           header={<Header />}
-          footer={<><Footer debatesOn={debatesOn} /><MobileNav unread={unread} isAuthed={!!session} debatesOn={debatesOn} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
+          footer={<><Footer /><MobileNav unread={unread} isAuthed={!!session} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
         >
           {children}
         </ChromeGate>

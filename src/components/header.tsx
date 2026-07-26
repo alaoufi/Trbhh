@@ -38,13 +38,12 @@ export async function Header() {
   // «عروض اليوم» و«المزادات» في القائمة — تظهر فقط عند تفعيلها من التحكم
   const dealsOn = await import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false);
   const auctionsOn = await import('@/lib/settings').then((m) => m.auctionsEnabled()).catch(() => false);
-  const debatesOn = await import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true);
   return (
     <>
     <header className="sticky top-0 z-40 border-b border-black/20 bg-gradient-to-r from-[#01091a] to-[#16294a]">
       <div className="container relative flex h-16 items-center gap-2">
         {/* hamburger on the right (RTL: first child) */}
-        <SiteMenu isAuthed={!!session} isAdmin={admin} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} debatesOn={debatesOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} activeName={activeProfile?.name || ''} activeType={activeProfile?.type || 'personal'} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />
+        <SiteMenu isAuthed={!!session} isAdmin={admin} adminHrefs={adminHrefs} dealsOn={dealsOn} auctionsOn={auctionsOn} myStoreId={myStoreId} myStoreName={myStoreName} currentUid={session?.uid || 0} activeName={activeProfile?.name || ''} activeType={activeProfile?.type || 'personal'} linkedAccounts={linkedAccts.map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName, isAdmin: a.isAdmin }))} />
 
         {/* الزر الرئيسي — يتغيّر حسب الصفحة (دخول/رابط المتجر/الصفحة الرئيسية في صفحة الدخول) */}
         <HeaderCta isAuthed={!!session} myStoreId={myStoreId} />

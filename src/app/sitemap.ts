@@ -7,14 +7,12 @@ export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = `https://${SITE.domain}`;
-  const [debatesOn, dealsOn, auctionsOn] = await Promise.all([
-    import('@/lib/settings').then((m) => m.debatesEnabled()).catch(() => true),
+  const [dealsOn, auctionsOn] = await Promise.all([
     import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false),
     import('@/lib/settings').then((m) => m.auctionsEnabled()).catch(() => false),
   ]);
   const staticPages = [
     '', '/companies', '/search', '/classified', '/nearby', '/site-map',
-    ...(debatesOn ? ['/debates'] : []),
     ...(dealsOn ? ['/deals'] : []),
     ...(auctionsOn ? ['/auctions'] : []),
     '/pages/about', '/pages/contact', '/pages/privacy', '/pages/terms', '/pages/faq',

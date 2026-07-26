@@ -8,7 +8,7 @@ import { ensureSchema } from '@/data/schema-sync';
 
 export type Service =
   | 'users' | 'ads' | 'duplicates' | 'classified'
-  | 'words' | 'reports' | 'verifications' | 'debates' | 'comments' | 'packages' | 'promos' | 'backup' | 'messages' | 'stores';
+  | 'words' | 'reports' | 'verifications' | 'comments' | 'packages' | 'promos' | 'backup' | 'messages' | 'stores';
 export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive' | 'suspend' | 'ban';
 
 /** Backward-compat alias: a "Perm" is a service (page-level access). */
@@ -28,7 +28,6 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
   { key: 'reports',       label: 'البلاغات',           actions: ['view', 'delete'] },
   { key: 'messages',      label: 'مراقبة المراسلات',    actions: ['view', 'delete'] },
   { key: 'verifications', label: 'طلبات التوثيق',       actions: ['view', 'edit'] },
-  { key: 'debates',       label: 'النقاشات',           actions: ['view', 'delete'] },
   { key: 'comments',      label: 'التعليقات',          actions: ['view', 'delete'] },
   { key: 'packages',      label: 'الباقات',            actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'promos',        label: 'الإعلانات الترويجية',  actions: ['view', 'add', 'edit', 'delete'] },
@@ -57,7 +56,6 @@ export const ROLE_PRESET: Record<Role, string[]> = {
     'ads:view', 'ads:archive', 'ads:delete',
     'classified:view', 'classified:delete',
     'comments:view', 'comments:delete',
-    'debates:view', 'debates:delete',
     'reports:view', 'reports:delete',
     'messages:view', 'messages:delete',
     'duplicates:view', 'duplicates:delete',
@@ -72,7 +70,7 @@ export const ROLE_PRESET: Record<Role, string[]> = {
 /** Backward-compat: services a role can reach (used by older callers). */
 export const ROLE_PERMS: Record<Role, Perm[]> = {
   manager: SERVICES.map((s) => s.key),
-  moderator: ['ads', 'classified', 'comments', 'debates', 'reports', 'duplicates', 'messages'],
+  moderator: ['ads', 'classified', 'comments', 'reports', 'duplicates', 'messages'],
   monitor: ['reports', 'verifications', 'words'],
   store_monitor: ['stores'],
   member: [],
@@ -100,8 +98,8 @@ export const DEFAULT_ROLE_PERMS: Record<Role, string[]> = {
   moderator: ROLE_PRESET.moderator.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
   monitor: ROLE_PRESET.monitor.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
   store_monitor: ROLE_PRESET.store_monitor.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
-  member: ['ads:view', 'ads:add', 'classified:view', 'classified:add', 'comments:view', 'comments:add', 'debates:view', 'debates:add'].filter((k) => MATRIX_SET.has(k)),
-  visitor: ['ads:view', 'classified:view', 'comments:view', 'debates:view'].filter((k) => MATRIX_SET.has(k)),
+  member: ['ads:view', 'ads:add', 'classified:view', 'classified:add', 'comments:view', 'comments:add'].filter((k) => MATRIX_SET.has(k)),
+  visitor: ['ads:view', 'classified:view', 'comments:view'].filter((k) => MATRIX_SET.has(k)),
 };
 
 let rolePermsEnsured = false;

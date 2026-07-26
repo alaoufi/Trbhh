@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Menu, X, ChevronDown, Home, User, Heart, Megaphone, MessagesSquare,
+  Menu, X, ChevronDown, Home, User, Heart, Megaphone,
   Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel, Palette, UserPen, ShieldCheck, Users,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
@@ -40,7 +40,7 @@ function Section({ title, icon: Icon, children }: { title: string; icon: React.E
 }
 
 type LinkedAcct = { id: number; name: string; hasStore: boolean; storeName: string | null; isAdmin: boolean };
-export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, auctionsOn = false, debatesOn = true, myStoreId = 0, myStoreName = '', currentUid = 0, activeName = '', activeType = 'personal', linkedAccounts = [] }: { isAuthed: boolean; isAdmin: boolean; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; debatesOn?: boolean; myStoreId?: number; myStoreName?: string; currentUid?: number; activeName?: string; activeType?: 'personal' | 'store'; linkedAccounts?: LinkedAcct[] }) {
+export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, auctionsOn = false, myStoreId = 0, myStoreName = '', currentUid = 0, activeName = '', activeType = 'personal', linkedAccounts = [] }: { isAuthed: boolean; isAdmin: boolean; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; myStoreId?: number; myStoreName?: string; currentUid?: number; activeName?: string; activeType?: 'personal' | 'store'; linkedAccounts?: LinkedAcct[] }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname() || '';
@@ -223,7 +223,6 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
               {auctionsOn && <Item href="/auctions" icon={Gavel} onClick={close}>🔨 المزادات</Item>}
               <Item href="/nearby" icon={MapPin} onClick={close}>قريب منك</Item>
               <Item href="/classified" icon={Sparkles} onClick={close}>الإعلانات المبوّبة</Item>
-              {debatesOn && <Item href="/debates" icon={MessagesSquare} onClick={close}>المناقشات</Item>}
             </Section>
 
             <Section title="التواصل" icon={Mail}>

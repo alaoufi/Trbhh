@@ -3,7 +3,7 @@ import { Phone } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { DisclaimerBar } from '@/components/disclaimer';
 
-export function Footer({ debatesOn = true }: { debatesOn?: boolean }) {
+export function Footer() {
   return (
     <footer className="mt-12 border-t border-black/20 bg-[#16294a] text-white">
       <div className="container py-10 pb-24 md:pb-10">
@@ -20,8 +20,6 @@ export function Footer({ debatesOn = true }: { debatesOn?: boolean }) {
             <h4 className="mb-3 font-extrabold text-[#f0b429]">روابط مهمة</h4>
             <ul className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-white/70">
               <li><Link href="/" className="hover:text-[#f0b429]">الرئيسية</Link></li>
-              <li><Link href="/companies" className="hover:text-[#f0b429]">الشركات</Link></li>
-              {debatesOn && <li><Link href="/debates" className="hover:text-[#f0b429]">النقاشات</Link></li>}
               <li><Link href="/search" className="hover:text-[#f0b429]">بحث متقدم</Link></li>
               <li><Link href="/pages/about" className="hover:text-[#f0b429]">من نحن</Link></li>
               <li><Link href="/pages/faq" className="hover:text-[#f0b429]">الأسئلة الشائعة</Link></li>

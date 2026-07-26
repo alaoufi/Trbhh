@@ -9,6 +9,8 @@ import { CATEGORY_LABEL, type GuardCategory } from './content-guard';
 export async function notifyModBlock(userId: number, title: string, route = '/'): Promise<void> {
   if (!userId) return;
   await prisma.notfications.create({ data: { title: title.slice(0, 180), route, user_id: String(userId), type: 'warning' } }).catch(() => {});
+  // دفع فوري للإنذار (لا يعطّل شيئاً عند تعطيل الدفع أو غياب اشتراك)
+  import('./push').then(({ sendPushToUser }) => sendPushToUser(userId, { title: title.slice(0, 80), body: '', url: route })).catch(() => {});
 }
 
 /** Max duplicate attempts before the account is banned. */

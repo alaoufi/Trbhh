@@ -27,10 +27,11 @@ export async function Header() {
     ? await getUserPerms(session!.uid).then((perms) => ADMIN_NAV.filter((n) => n.perm === null || perms.has(n.perm)).map((n) => n.href)).catch(() => [] as string[])
     : [];
   // جرس الهيدر: مجموع الرسائل غير المقروءة + التنبيهات الجديدة
+  // الجرس = رسائل غير مقروءة + تنبيهات (عدا نوع message لئلا تُعدّ الرسالة مرتين)
   const [unreadMsgs, newNotifs] = session
     ? await Promise.all([
         prisma.chats.count({ where: { reciver_id: session.uid, is_read: 0 } }).catch(() => 0),
-        prisma.notfications.count({ where: { user_id: String(session.uid), read_at: null } }).catch(() => 0),
+        prisma.notfications.count({ where: { user_id: String(session.uid), read_at: null, type: { not: 'message' } } }).catch(() => 0),
       ])
     : [0, 0];
   const bellCount = unreadMsgs + newNotifs;

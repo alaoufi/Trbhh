@@ -31,18 +31,40 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   const page = Math.max(1, parseInt(pageRaw || '1') || 1);
 
   const all = await prisma.notfications.findMany({
-    where: { user_id: String(session.uid) },
+    // نوع message قديم: الرسائل تُعرض حيّة أدناه (قسم مستقل) فلا تُكرّر هنا
+    where: { user_id: String(session.uid), type: { not: 'message' } },
     orderBy: { id: 'desc' },
     take: 500,
   }).catch(() => []);
+
+  // الرسائل غير المقروءة (حيّة) — تجميع حسب المُرسِل، ليطابق الجرس صفحته
+  const unreadChats = await prisma.chats.findMany({
+    where: { reciver_id: session.uid, is_read: 0 },
+    orderBy: { id: 'desc' },
+    take: 200,
+    select: { sender_id: true, message: true, created_at: true },
+  }).catch(() => []);
+  const bySender = new Map<number, { count: number; last: string; at: Date | null }>();
+  for (const c of unreadChats) {
+    const ex = bySender.get(c.sender_id);
+    if (ex) ex.count += 1;
+    else bySender.set(c.sender_id, { count: 1, last: c.message, at: c.created_at });
+  }
+  const senderIds = [...bySender.keys()];
+  const senderRows = senderIds.length
+    ? await prisma.users.findMany({ where: { id: { in: senderIds.map((n) => BigInt(n)) } }, select: { id: true, name: true, userName: true } }).catch(() => [])
+    : [];
+  const senderName = new Map(senderRows.map((u) => [Number(u.id), u.name || u.userName || 'عضو']));
+  const unreadMsgThreads = senderIds.map((id) => ({ id, name: senderName.get(id) || 'عضو', ...bySender.get(id)! }));
+  const unreadMsgTotal = unreadChats.length;
 
   const fresh = all.filter((n) => !n.read_at);
   const archived = all.filter((n) => !!n.read_at);
   const countBy = (key: string) => fresh.filter((n) => kindOf(n.type).key === key).length;
 
   const TABS = [
-    { key: 'all', label: 'الجديدة', count: fresh.length, cls: 'bg-primary' },
-    ...KINDS.map((k) => ({ key: k.key, label: k.label, count: countBy(k.key), cls: '' })),
+    { key: 'all', label: 'الجديدة', count: fresh.length + unreadMsgTotal, cls: 'bg-primary' },
+    ...KINDS.map((k) => ({ key: k.key, label: k.label, count: k.key === 'message' ? unreadMsgTotal : countBy(k.key), cls: '' })),
     { key: 'archive', label: 'الأرشيف', count: archived.length, cls: 'bg-slate-500' },
   ];
   const tab = TABS.some((t) => t.key === tabRaw) ? (tabRaw as string) : 'all';
@@ -79,7 +101,23 @@ export default async function NotificationsPage({ searchParams }: { searchParams
         })}
       </div>
 
-      {rows.length === 0 && (
+      {/* الرسائل غير المقروءة (حيّة) — تظهر في «الجديدة» و«الرسائل»، وتُمسح فور قراءتها */}
+      {(tab === 'all' || tab === 'message') && unreadMsgThreads.length > 0 && (
+        <div className="space-y-2">
+          {unreadMsgThreads.map((t) => (
+            <Link key={t.id} href={`/messages/${t.id}`} className="flex w-full items-center gap-3 rounded-xl border-r-4 border-sky-400 bg-sky-50 p-3 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sky-500 text-white"><MessageCircle className="h-5 w-5" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-bold text-sky-800">رسالة من {t.name}{t.count > 1 ? ` (${t.count})` : ''}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">{t.last}{t.at ? ` • ${timeAgo(t.at)}` : ''}</span>
+              </span>
+              <span className="shrink-0 rounded-full bg-sky-500 px-2 py-0.5 text-[10px] font-extrabold text-white">جديد</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {rows.length === 0 && !((tab === 'all' || tab === 'message') && unreadMsgThreads.length > 0) && (
         <div className="card-3d rounded-2xl p-8 text-center text-muted-foreground">
           <Bell className="mx-auto mb-2 h-8 w-8" /> {tab === 'archive' ? 'الأرشيف فارغ.' : 'لا توجد تنبيهات جديدة — كل شيء تمام ✓'}
         </div>

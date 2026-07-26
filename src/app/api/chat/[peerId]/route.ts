@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import { pollThread, sendChat, setTyping, deleteChatMessage } from '@/lib/chat';
 import { getMsgDeleteMinutes } from '@/lib/settings';
 import { getPrimaryAdminId, smartAdminReply, shouldAutoReply } from '@/lib/admin-inbox';
@@ -37,12 +36,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ peerId: st
   const { screenChatMessage } = await import('@/lib/chat');
   const screened = await screenChatMessage(session.uid, message);
   if (!screened.ok) return Response.json({ ok: false, blocked: true, banned: screened.banned });
+  // sendChat يرسل تنبيهاً فورياً (Web Push) للمستلم، وتُحتسب الرسالة من غير المقروء
+  // في الجرس — فلا نُنشئ صف تنبيه إضافي (كان يُعدّ الرسالة مرتين في الجرس).
   const id = await sendChat(session.uid, other, screened.text);
-  {
-    // منع تكرار نفس التنبيه بنفس اليوم
-    const nDup = await prisma.notfications.findFirst({ where: { user_id: String(other), title: `رسالة جديدة من ${session.name || 'عضو'}`, created_at: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } }, select: { id: true } }).catch(() => null);
-    if (!nDup) await prisma.notfications.create({ data: { title: `رسالة جديدة من ${session.name || 'عضو'}`, route: `/messages/${session.uid}`, user_id: String(other), type: 'message' } }).catch(() => {});
-  }
 
   // Smart automatic acknowledgement when a member messages the administration
   try {

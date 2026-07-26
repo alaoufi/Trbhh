@@ -3,7 +3,7 @@ import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { toInt } from './utils';
 import { getVerifyPackages } from './settings';
-import { charge, adjustBalance } from './wallet';
+import { charge, adjustBalance, holdBalance, captureHold, releaseHold, getAvailableBalance } from './wallet';
 
 const ensure = ensureSchema;
 const DAY = 86400000;
@@ -50,9 +50,19 @@ export async function requestPaidVerification(userId: number, storeId: number, p
     await prisma.users.update({ where: { id: BigInt(userId) }, data: { trusted: 1, step: 0, verified_at: now } }).catch(() => {});
     return 'renewed';
   }
-  // أول مرة: يبقى بموافقة إدارة المتاجر (الخصم عند الموافقة)
+  // أول مرة: بموافقة إدارة المتاجر. لا يُرسَل الطلب ما لم يكفِ الرصيد المتاح؛ وعند
+  // كفايته يُحجز مبلغ الرسوم (دون خصم) حتى قرار الإدارة — يُخصم عند الموافقة أو يُعاد عند الرفض.
+  if (pkg.fee > 0) {
+    const held = await holdBalance(userId, pkg.fee);
+    if (!held.ok) return 'balance';
+  }
   await prisma.verify_orders.create({ data: { user_id: BigInt(userId), store_id: storeId, fee: pkg.fee, days: pkg.days } });
   return 'ok';
+}
+
+/** الرصيد المتاح للعضو (الكلي − المحجوز) — لحجب طلب التوثيق قبل الإرسال. */
+export async function verifyAvailableBalance(userId: number): Promise<number> {
+  return getAvailableBalance(userId);
 }
 
 /** أحدث طلب توثيق مدفوع للعضو (لعرض حالته في لوحة متجره). */
@@ -68,8 +78,14 @@ export async function approvePaidVerification(orderId: number, adminId: number):
   await ensure();
   const r = await prisma.verify_orders.findFirst({ where: { id: BigInt(orderId), status: 0 } }).catch(() => null);
   if (!r) return { ok: false, reason: 'gone' };
-  const paid = await charge(toInt(r.user_id), r.fee, 'verify_fee', `توثيق مدفوع — طلب #${toInt(r.id)} (${r.days} يوم)`);
-  if (!paid.ok) return { ok: false, reason: 'balance', order: row(r), balance: paid.balance };
+  // الخصم النهائي من المبلغ المحجوز عند الطلب. الطلبات القديمة (قبل آلية الحجز) لا حجز
+  // لها → captureHold يفشل فنعود للحسم المباشر إن كفى الرصيد.
+  const note = `توثيق مدفوع — طلب #${toInt(r.id)} (${r.days} يوم)`;
+  const cap = await captureHold(toInt(r.user_id), r.fee, 'verify_fee', note);
+  if (!cap.ok) {
+    const paid = await charge(toInt(r.user_id), r.fee, 'verify_fee', note);
+    if (!paid.ok) return { ok: false, reason: 'balance', order: row(r), balance: paid.balance };
+  }
   const now = new Date();
   const expires = new Date(now.getTime() + r.days * DAY);
   await prisma.verify_orders.update({ where: { id: r.id }, data: { status: 1, admin_id: BigInt(adminId), decided_at: now, expires_at: expires } }).catch(() => {});
@@ -82,6 +98,8 @@ export async function rejectPaidVerification(orderId: number, adminId: number, n
   await ensure();
   const r = await prisma.verify_orders.findFirst({ where: { id: BigInt(orderId), status: 0 } }).catch(() => null);
   if (!r) return null;
+  // إعادة المبلغ المحجوز للرصيد المتاح (لم يُخصم أصلاً — كان محجوزاً فقط).
+  await releaseHold(toInt(r.user_id), r.fee);
   await prisma.verify_orders.update({ where: { id: r.id }, data: { status: 2, note: note.slice(0, 300), admin_id: BigInt(adminId), decided_at: new Date() } }).catch(() => {});
   return row({ ...r, status: 2, note });
 }

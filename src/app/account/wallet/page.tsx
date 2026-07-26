@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Wallet, ArrowDownCircle, ArrowUpCircle, Info, Copy, HandCoins, Receipt, Clock, CheckCircle2, XCircle, Send } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
-import { getBalance, listTxns, countTxns, getDupCredit, listMyTopups } from '@/lib/wallet';
+import { getBalance, getReserved, listTxns, countTxns, getDupCredit, listMyTopups } from '@/lib/wallet';
 import { AdminPager } from '@/components/admin-pager';
 import {
   getServicePricing, serviceHasPrice, DURATIONS, getSetting,
@@ -47,6 +47,8 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     countTxns(session.uid),
     pointsEnabled(),
   ]);
+  const reserved = await getReserved(session.uid).catch(() => 0);
+  const available = Math.max(0, balance - reserved);
   const { getActiveTopupCampaign } = await import('@/lib/settings');
   const activeCampaign = await getActiveTopupCampaign().catch(() => null);
   const topupTiers = activeCampaign?.tiers ?? [];
@@ -59,8 +61,15 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       <h1 className="flex items-center gap-2 text-xl font-bold text-primary"><Wallet className="h-6 w-6" /> محفظتي</h1>
 
       <div className="card-3d rounded-2xl border-2 border-primary/30 bg-card p-5">
-        <div className="text-sm font-bold text-muted-foreground">الرصيد المتاح</div>
+        <div className="text-sm font-bold text-muted-foreground">{reserved > 0 ? 'رصيدك' : 'الرصيد المتاح'}</div>
         <div className="mt-1 text-4xl font-extrabold text-primary">{balance} <span className="text-lg">ر.س</span></div>
+        {reserved > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold">
+            <span className="rounded-lg bg-amber-100 px-2 py-1 text-amber-800">🔒 محجوز: {reserved} ر.س</span>
+            <span className="rounded-lg bg-emerald-100 px-2 py-1 text-emerald-800">المتاح للإنفاق: {available} ر.س</span>
+            <span className="text-[11px] font-medium text-muted-foreground">المحجوز رسومُ طلب توثيق بانتظار الموافقة — يُخصم عند الموافقة أو يُعاد إن رُفض.</span>
+          </div>
+        )}
         <p className="mt-2 text-xs font-medium text-muted-foreground">اشحن رصيدك من نموذج «شحن رصيدك» بالأسفل. يُخصم الرصيد تلقائياً عند الإعلانات المميّزة والمبوّبة وباقات التكرار.</p>
       </div>
 

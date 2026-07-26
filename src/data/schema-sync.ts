@@ -301,6 +301,9 @@ const STATEMENTS: string[] = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* تاريخ التوثيق: متى مُنح العضو شارة موثّق (للتدقيق). */
   `ALTER TABLE users ADD COLUMN verified_at DATETIME NULL`,
+  /* مبلغ محجوز (رصيد مُجمَّد لطلبات الموافقة المدفوعة): يُحسم من المتاح دون خصم من
+     الرصيد، ويُثبَّت خصماً عند الموافقة أو يُعاد للمتاح عند الرفض. */
+  `ALTER TABLE users ADD COLUMN reserved INT NOT NULL DEFAULT 0`,
   /* ---- wallet / credit (رصيد) ---- */
   /* عزل إعلانات المتاجر: علامة store_only تُنشأ مع إعلان المتجر فلا يظهر في قوائم تربح إطلاقاً. */
   `ALTER TABLE ads ADD COLUMN store_only TINYINT NOT NULL DEFAULT 0`,

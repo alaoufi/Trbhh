@@ -69,11 +69,72 @@ export async function buyDupPack(userId: number, count: number, price: number): 
   return { ok: true, balance: paid.balance };
 }
 
-/** Current balance (SAR) for a member. */
+/** Current balance (SAR) for a member — الرصيد الكلي (شامل المحجوز). */
 export async function getBalance(userId: number): Promise<number> {
   await ensure();
   const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } }).catch(() => null);
   return u?.balance ?? 0;
+}
+
+/** الرصيد المتاح للإنفاق = الرصيد الكلي − المحجوز (لطلبات الموافقة المدفوعة المعلّقة). */
+export async function getAvailableBalance(userId: number): Promise<number> {
+  await ensure();
+  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true, reserved: true } }).catch(() => null);
+  return Math.max(0, (u?.balance ?? 0) - (u?.reserved ?? 0));
+}
+
+/** المبلغ المحجوز حالياً (مُجمّد لطلبات موافقة مدفوعة معلّقة). */
+export async function getReserved(userId: number): Promise<number> {
+  await ensure();
+  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { reserved: true } }).catch(() => null);
+  return u?.reserved ?? 0;
+}
+
+/** حجز مبلغ من المتاح دون خصمه — لطلب موافقة مدفوع. يفشل إن كان المتاح لا يكفي
+ *  (فلا يُرسَل الطلب أصلاً). الرصيد الكلي لا يتغيّر؛ يتغيّر المتاح فقط. */
+export async function holdBalance(userId: number, amount: number): Promise<{ ok: boolean; available: number }> {
+  await ensure();
+  const amt = Math.max(0, Math.round(amount || 0));
+  if (amt === 0) return { ok: true, available: await getAvailableBalance(userId) };
+  try {
+    const affected = await prisma.$executeRaw`UPDATE users SET reserved = reserved + ${amt} WHERE id = ${BigInt(userId)} AND balance - reserved >= ${amt}`;
+    return { ok: affected > 0, available: await getAvailableBalance(userId) };
+  } catch {
+    return { ok: false, available: await getAvailableBalance(userId) };
+  }
+}
+
+/** تثبيت الحجز خصماً فعلياً (عند الموافقة): balance −= amount و reserved −= amount،
+ *  مع تسجيل حركة المحفظة (الحسم يُسجَّل الآن). */
+export async function captureHold(userId: number, amount: number, reason: TxnReason, note?: string): Promise<{ ok: boolean; balance: number }> {
+  await ensure();
+  const amt = Math.max(0, Math.round(amount || 0));
+  if (amt === 0) return { ok: true, balance: await getBalance(userId) };
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const affected = await tx.$executeRaw`UPDATE users SET balance = balance - ${amt}, reserved = reserved - ${amt} WHERE id = ${BigInt(userId)} AND reserved >= ${amt} AND balance >= ${amt}`;
+      if (affected === 0) {
+        const cur = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
+        return { ok: false, balance: cur?.balance ?? 0 };
+      }
+      const after = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
+      const next = after?.balance ?? 0;
+      await tx.wallet_txns.create({ data: { user_id: BigInt(userId), amount: -amt, balance_after: next, reason, note: note ? note.slice(0, 200) : null, admin_id: null } });
+      return { ok: true, balance: next };
+    });
+  } catch {
+    return { ok: false, balance: await getBalance(userId) };
+  }
+}
+
+/** إلغاء الحجز وإعادته للمتاح (عند الرفض/الإلغاء): reserved −= amount (الرصيد الكلي ثابت). */
+export async function releaseHold(userId: number, amount: number): Promise<void> {
+  await ensure();
+  const amt = Math.max(0, Math.round(amount || 0));
+  if (amt === 0) return;
+  try {
+    await prisma.$executeRaw`UPDATE users SET reserved = GREATEST(0, reserved - ${amt}) WHERE id = ${BigInt(userId)}`;
+  } catch { /* تجاهل — لا يعطّل قرار الإدارة */ }
 }
 
 /** Atomically change a balance and record a transaction. `amount` is signed
@@ -103,13 +164,12 @@ export async function adjustBalance(
   try {
     return await prisma.$transaction(async (tx) => {
       if (amt < 0) {
-        const r = await tx.users.updateMany({
-          where: { id: BigInt(userId), balance: { gte: -amt } },
-          data: { balance: { decrement: -amt } },
-        });
-        if (r.count === 0) {
+        // الحسم لا يمسّ المبلغ المحجوز: الشرط balance + amt >= reserved (amt سالب) يمنع
+        // النزول تحت المحجوز — حماية ذرّية عبر قفل صف الـ UPDATE نفسه.
+        const affected = await tx.$executeRaw`UPDATE users SET balance = balance + ${amt} WHERE id = ${BigInt(userId)} AND balance + ${amt} >= reserved`;
+        if (affected === 0) {
           const cur = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
-          return { ok: false, balance: cur?.balance ?? 0 }; // insufficient funds
+          return { ok: false, balance: cur?.balance ?? 0 }; // الرصيد المتاح لا يكفي
         }
       } else {
         await tx.users.update({ where: { id: BigInt(userId) }, data: { balance: { increment: amt } } });

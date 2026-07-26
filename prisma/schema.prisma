@@ -1216,6 +1216,7 @@ model users {
   hour_adds                 Int?
   adds_build                Int?
   balance                   Int        @default(0)
+  reserved                  Int        @default(0)
   dup_credit                Int        @default(0)
   verify_note               String?    @db.VarChar(300) // سبب رفض التوثيق (يبقى محفوظاً)
   verified_at               DateTime?  @db.DateTime(0)

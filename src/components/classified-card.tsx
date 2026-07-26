@@ -53,13 +53,13 @@ export function ClassifiedContact({ c }: { c: Classified }) {
   return (
     <div className="flex gap-1.5 p-1.5">
       {wa && (
-        <a href={wa} target="_blank" rel="noopener noreferrer" className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#25D366] py-2.5 text-sm font-bold text-white">
-          <MessageCircle className="h-5 w-5" /> واتساب
+        <a href={wa} target="_blank" rel="noopener noreferrer" className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#25D366] py-1.5 text-xs font-bold text-white">
+          <MessageCircle className="h-3.5 w-3.5" /> واتساب
         </a>
       )}
       {c.phone && (
-        <a href={`tel:${c.phone}`} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-red-600 py-2.5 text-sm font-bold text-white">
-          <Phone className="h-5 w-5" /> اتصال
+        <a href={`tel:${c.phone}`} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-600 py-1.5 text-xs font-bold text-white">
+          <Phone className="h-3.5 w-3.5" /> اتصال
         </a>
       )}
     </div>

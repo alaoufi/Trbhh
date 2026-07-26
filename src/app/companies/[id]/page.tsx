@@ -106,6 +106,12 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary/10 text-primary text-3xl">{pending ? '⏳' : '🚫'}</div>
         <h1 className="text-lg font-extrabold text-primary">{pending ? 'هذا المتجر قيد المراجعة' : 'هذا المتجر غير متاح حالياً'}</h1>
         <p className="text-sm text-muted-foreground">{pending ? 'يخضع المتجر لموافقة الإدارة وسيظهر للعملاء بعد اعتماده.' : subOnly ? 'المتجر غير متاح مؤقتاً. سيعود للظهور قريباً.' : 'تم إيقاف هذا المتجر مؤقتاً من قبل الإدارة.'}</p>
+        {/* تلميح لصاحب المتجر: يرى هذه الرسالة إن لم يكن مسجّلاً دخوله على هذا الجهاز */}
+        {!session && (
+          <p className="text-xs font-bold text-primary">
+            صاحب المتجر؟ <Link href={`/login?next=${encodeURIComponent(`/companies/${storeId}`)}`} className="underline">سجّل الدخول</Link> لعرض متجرك وإدارته{subOnly ? ' وتجديد اشتراكه' : ''}.
+          </p>
+        )}
         <Link href="/" className="mt-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">الصفحة الرئيسية</Link>
       </div>
     );

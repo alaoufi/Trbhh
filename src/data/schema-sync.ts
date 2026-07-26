@@ -580,6 +580,7 @@ const STATEMENTS: string[] = [
   `ALTER TABLE classified_ads ADD COLUMN clicks INT NOT NULL DEFAULT 0`,
   `ALTER TABLE classified_ads ADD COLUMN layout VARCHAR(8) NOT NULL DEFAULT 'auto'`,
   `ALTER TABLE classified_ads ADD COLUMN expires_at DATETIME NULL`,
+  `ALTER TABLE classified_ads ADD COLUMN publish_at DATETIME NULL`,
   `CREATE TABLE IF NOT EXISTS classified_views (
     ad_id BIGINT UNSIGNED NOT NULL,
     viewer VARCHAR(64) NOT NULL,

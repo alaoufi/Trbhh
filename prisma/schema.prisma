@@ -1574,6 +1574,7 @@ model classified_ads {
   clicks      Int       @default(0)
   layout      String    @default("auto") @db.VarChar(8)
   expires_at  DateTime? @db.DateTime(0)
+  publish_at  DateTime? @db.DateTime(0)
 }
 
 model classified_views {

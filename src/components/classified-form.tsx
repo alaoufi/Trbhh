@@ -24,10 +24,11 @@ export type ClassifiedInitial = {
   layout?: 'auto' | 'manual';
 };
 
-export function ClassifiedForm({ action, error, initial, submitLabel, needPrice, needBal, gapWait, dupLeft, durations, balance }: {
+export function ClassifiedForm({ action, error, initial, submitLabel, needPrice, needBal, gapWait, dupLeft, durations, balance, allowSchedule }: {
   action: (fd: FormData) => void | Promise<void>; error?: string; initial?: ClassifiedInitial; submitLabel?: string; needPrice?: string; needBal?: string; gapWait?: string; dupLeft?: string;
   durations?: { w2: number; m1: number; y1: number } | null;
   balance?: number;
+  allowSchedule?: boolean;
 }) {
   const hasBalance = typeof balance === 'number';
   const durationOptions = durations
@@ -291,6 +292,15 @@ export function ClassifiedForm({ action, error, initial, submitLabel, needPrice,
             <label className="mb-1 block text-sm font-medium">رابط يحوّل إليه (اختياري)</label>
             <input name="link" value={link} onChange={(e) => setLink(e.target.value)} maxLength={500} className={field} placeholder="https://…" />
           </div>
+
+          {/* جدولة النشر — يظهر عند تفعيله من الإدارة وللإعلان الجديد فقط */}
+          {allowSchedule && !initial?.id && (
+            <div className="rounded-xl border-2 border-sky-300 bg-sky-50 p-3">
+              <label className="mb-1 block text-sm font-bold text-sky-800">🕒 جدولة النشر (اختياري)</label>
+              <input type="datetime-local" name="publishAt" className="h-11 w-full rounded-lg border border-sky-300 bg-white px-3 text-sm" dir="ltr" />
+              <p className="mt-1 text-xs text-sky-700">حدّد موعداً مستقبلياً (خلال ٣٠ يوماً) لينشر إعلانك تلقائياً في وقته. اتركه فارغاً للنشر الآن.</p>
+            </div>
+          )}
         </fieldset>
 
         {/* شريط ثابت أسفل الشاشة (فوق القائمة السفلية) — لا يضيع بين خيارات التصميم الكثيرة */}

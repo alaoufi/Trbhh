@@ -8,7 +8,7 @@ import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified, reactivateClassified, setClassifiedStatus, getClassifiedOwnerState } from '@/lib/classified';
 import { hasAnyAdmin } from '@/lib/roles';
-import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS, getStrikeBanDays } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS, getStrikeBanDays, getSettingBool } from '@/lib/settings';
 import { charge, consumeDupCredit, addDupCredit, adjustBalance } from '@/lib/wallet';
 import { scanContent } from '@/lib/content-guard';
 import { handleProhibited, logMod, checkFlood, bumpDupAttempts, banUserFor, notifyModBlock, DUP_LIMIT } from '@/lib/moderation';
@@ -220,6 +220,17 @@ export async function createClassifiedAction(formData: FormData) {
     await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مبوّب مسموح (باقة) مع #${dup.id} «${dup.title}»` });
   }
 
+  // جدولة النشر (اختياري، إن فعّلتها الإدارة): موعد مستقبلي خلال ٣٠ يوماً ⇐ يبقى
+  // مخفياً حتى يرقّيه الناشر الكسول في وقته. المدّة/الانتهاء تُحسب من موعد النشر.
+  let publishAt: Date | null = null;
+  const schedOn = await getSettingBool('schedule_on', false).catch(() => false);
+  const rawSched = String(formData.get('publishAt') || '').trim();
+  if (schedOn && rawSched) {
+    const d = new Date(rawSched);
+    if (!isNaN(d.getTime()) && d.getTime() > Date.now() + 60_000 && d.getTime() < Date.now() + 30 * 86400_000) publishAt = d;
+  }
+  const startAt = publishAt ? publishAt.getTime() : Date.now();
+
   // رسوم نشر المبوّب حسب المدّة (إن سُعّرت) — تُخصم من الرصيد ويُضبط انتهاء المبوّب
   let cExpires: Date | null = null;
   let fee = 0;
@@ -237,7 +248,7 @@ export async function createClassifiedAction(formData: FormData) {
         redirect(`/classified/new?error=needcredit&price=${fee}&bal=${paid.balance}`);
       }
     }
-    cExpires = new Date(Date.now() + DUR_DAYS[raw] * 86400000);
+    cExpires = new Date(startAt + DUR_DAYS[raw] * 86400000);
   }
 
   const image = await saveOneImage(img, session.uid);
@@ -246,6 +257,7 @@ export async function createClassifiedAction(formData: FormData) {
     const newId = await createClassified({
       userId: session.uid, title, body, image, phone, whatsapp, link,
       theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent, layout,
+      publishAt,
     });
     if (cExpires && newId) await prisma.classified_ads.updateMany({ where: { id: BigInt(newId) }, data: { expires_at: cExpires } }).catch(() => {});
   } catch {
@@ -256,7 +268,8 @@ export async function createClassifiedAction(formData: FormData) {
   }
   revalidatePath('/');
   revalidatePath('/classified');
-  redirect('/classified?created=1');
+  revalidatePath('/account/classified');
+  redirect(publishAt ? '/account/classified?scheduled=1' : '/classified?created=1');
 }
 
 export async function updateClassifiedAction(formData: FormData) {

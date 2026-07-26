@@ -64,8 +64,23 @@ async function visibilityWhere(): Promise<Prisma.classified_adsWhereInput> {
   return { status: 1, OR: [followsGlobal, { expires_at: { gt: now } }] };
 }
 
+/** ناشر الجدولة الكسول للمبوّبة: يرقّي المبوّبات المجدولة التي حان موعدها (خنق ٦٠ث). */
+let classifiedSchedLastRun = 0;
+export async function promoteScheduledClassifieds(): Promise<void> {
+  const now = Date.now();
+  if (now - classifiedSchedLastRun < 60_000) return;
+  classifiedSchedLastRun = now;
+  try {
+    await prisma.classified_ads.updateMany({
+      where: { status: 0, publish_at: { not: null, lte: new Date() } },
+      data: { status: 1, publish_at: null },
+    });
+  } catch { /* لا يعطّل الصفحة */ }
+}
+
 export async function getClassifieds(limit = 30): Promise<Classified[]> {
   await ensureClassifiedTable();
+  await promoteScheduledClassifieds(); // ينشر المجدول الذي حان وقته قبل عرض القائمة
   await loadBanned();
   const rows = await prisma.classified_ads.findMany({
     where: await visibilityWhere(), orderBy: { id: 'desc' }, take: Math.max(1, Math.min(100, limit)),
@@ -101,7 +116,7 @@ export async function setClassifiedLifetime(id: number, days: number) {
 }
 
 /** A member's own classified ads (for editing/deleting). */
-export type MyClassified = Classified & { expiresAt: string | null };
+export type MyClassified = Classified & { expiresAt: string | null; publishAt: string | null };
 export async function getMyClassifieds(userId: number): Promise<MyClassified[]> {
   await ensureClassifiedTable();
   await loadBanned();
@@ -109,9 +124,11 @@ export async function getMyClassifieds(userId: number): Promise<MyClassified[]> 
     `SELECT * FROM classified_ads WHERE user_id = ? ORDER BY id DESC LIMIT 100`, userId,
   ).catch(() => []);
   return rows.map((r) => {
-    const ex = (r as Row & { expires_at?: Date | string | null }).expires_at;
+    const raw = r as Row & { expires_at?: Date | string | null; publish_at?: Date | string | null };
+    const ex = raw.expires_at;
     const iso = ex ? new Date(ex).toISOString() : null;
-    return { ...toClassified(r), expiresAt: iso && !isNaN(Date.parse(iso)) ? iso : null };
+    const pub = raw.publish_at ? new Date(raw.publish_at).toISOString() : null;
+    return { ...toClassified(r), expiresAt: iso && !isNaN(Date.parse(iso)) ? iso : null, publishAt: pub && !isNaN(Date.parse(pub)) ? pub : null };
   });
 }
 
@@ -226,6 +243,7 @@ export async function createClassified(data: {
   userId: number | null; title: string | null; body: string | null; image: string | null;
   phone: string | null; whatsapp: string | null; link: string | null;
   theme?: number; pos?: string; align?: string; size?: string; bold?: boolean; pattern?: string; accent?: string; layout?: string;
+  publishAt?: Date | null;
 }): Promise<number> {
   await ensureClassifiedTable();
   const theme = typeof data.theme === 'number' && data.theme >= 0
@@ -238,16 +256,19 @@ export async function createClassified(data: {
   const pattern = ['none', 'dots', 'stripes', 'grid', 'rays'].includes(data.pattern || '') ? data.pattern : 'none';
   const accent = ['none', 'bar', 'corner', 'frame'].includes(data.accent || '') ? data.accent : 'none';
   const layout = data.layout === 'manual' ? 'manual' : 'auto';
+  // جدولة النشر: موعد مستقبلي ⇐ يبقى مخفياً (status 0) حتى يرقّيه الناشر الكسول في وقته
+  const sched = data.publishAt && data.publishAt.getTime() > Date.now() ? data.publishAt : null;
+  const status = sched ? 0 : 1;
   try {
     await prisma.$executeRawUnsafe(
-      `INSERT INTO classified_ads (user_id, title, body, image, phone, whatsapp, link, theme, content_pos, text_align, font_size, bold, pattern, accent, layout, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-      data.userId, data.title, data.body, data.image, data.phone, data.whatsapp, data.link, theme, pos, align, size, bold, pattern, accent, layout,
+      `INSERT INTO classified_ads (user_id, title, body, image, phone, whatsapp, link, theme, content_pos, text_align, font_size, bold, pattern, accent, layout, status, publish_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      data.userId, data.title, data.body, data.image, data.phone, data.whatsapp, data.link, theme, pos, align, size, bold, pattern, accent, layout, status, sched,
     );
   } catch {
     // fallback: guarantee the ad persists even if the style columns are unavailable
     await prisma.$executeRawUnsafe(
-      `INSERT INTO classified_ads (user_id, title, body, image, phone, whatsapp, link, theme, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-      data.userId, data.title, data.body, data.image, data.phone, data.whatsapp, data.link, theme,
+      `INSERT INTO classified_ads (user_id, title, body, image, phone, whatsapp, link, theme, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      data.userId, data.title, data.body, data.image, data.phone, data.whatsapp, data.link, theme, status,
     );
   }
   const rows = await prisma.$queryRawUnsafe<{ id: bigint | number }[]>(`SELECT LAST_INSERT_ID() AS id`);

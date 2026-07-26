@@ -98,6 +98,8 @@ const STATEMENTS: string[] = [
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY platform_reviews_viewer (viewer_key)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `ALTER TABLE platform_reviews ADD COLUMN user_id INT NULL`,
+  `ALTER TABLE platform_reviews ADD COLUMN note VARCHAR(500) NULL`,
   `CREATE TABLE IF NOT EXISTS store_sub_reminders (
     store_id INT NOT NULL PRIMARY KEY,
     sub_until DATETIME NULL,

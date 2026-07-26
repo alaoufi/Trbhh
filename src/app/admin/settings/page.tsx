@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Settings, Check, BarChart3, Eye } from 'lucide-react';
+import { Settings, Check, BarChart3, Eye, ChevronDown } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getSettingNum, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig, getAdLifetimeDays, getStrikeBanDays } from '@/lib/settings';
 import { getIdentityPlans, getExemptDays } from '@/lib/identity-plans';
@@ -8,6 +8,20 @@ import { saveSettingsAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الإعدادات' };
+
+/** تبويب إعدادات قابل للطي/التمدد — native <details> فيبقى محتواه (وحقوله) في DOM
+ *  ويُرسَل مع النموذج حتى لو كان مطويّاً (بخلاف الطيّ الذي يُزيل العناصر). */
+function Group({ title, children, open = false }: { title: React.ReactNode; children: React.ReactNode; open?: boolean }) {
+  return (
+    <details open={open} className="group border-t border-primary/15 pt-3 [&_summary::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-primary">
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+        <span className="flex items-center gap-2">{title}</span>
+      </summary>
+      <div className="mt-3 space-y-3">{children}</div>
+    </details>
+  );
+}
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
   await requireAction('users', 'edit');
@@ -22,7 +36,8 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
       {saved === '1' && <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800"><Check className="h-4 w-4" /> تم الحفظ.</div>}
       {saveError === 'save' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر حفظ الإعدادات — سُجِّل الخطأ في «سجل الأخطاء». حاول مجدداً.</div>}
 
-      <form action={saveSettingsAction} className="space-y-4 rounded-xl border border-primary/20 bg-card p-4">
+      <form action={saveSettingsAction} className="space-y-2 rounded-xl border border-primary/20 bg-card p-4">
+        <Group title="المدد والحدود وباقات الهويات" open>
         <div className="text-sm font-bold text-primary">مدة سماح العضو بالتعديل/الحذف على إعلانه</div>
         <p className="text-xs text-muted-foreground">حدّد المدة (بالساعات) التي يُسمح فيها للعضو بتعديل أو حذف إعلانه بعد نشره. اكتب 0 لجعلها دائمة بلا حد.</p>
         <label className="block space-y-1">
@@ -74,9 +89,9 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <span className="block text-[11px] text-muted-foreground">مدة إعفاء الهويات الموجودة من الاشتراك (١٨٠ = ٦ أشهر). تُوضَّح للعضو أثناء الربط.</span>
           </label>
         </div>
+        </Group>
 
-        <div className="border-t border-primary/15 pt-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><BarChart3 className="h-4 w-4" /> إحصائيات الصفحة الرئيسية</div>
+        <Group title={<><BarChart3 className="h-4 w-4" /> إحصائيات الصفحة الرئيسية</>}>
           <p className="mb-2 text-xs text-muted-foreground">اختر البطاقات التي تريد عرضها في الصفحة الرئيسية. إذا لم تختر أي بطاقة، لن يظهر أي شيء.</p>
           <div className="grid grid-cols-2 gap-2">
             {HOME_STAT_KEYS.map((k) => (
@@ -98,11 +113,10 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <input type="checkbox" name="archiveAutodeleteOn" defaultChecked={archiveAutodeleteOn} className="mt-0.5 h-4 w-4 accent-primary" />
             <span><b>الحذف التلقائي للإعلانات المؤرشفة</b> — <b className="text-red-600">معطّل افتراضياً (الحذف يدوي)</b>؛ الإعلانات المؤرشفة تبقى محفوظة ولا تُحذف تلقائياً. عند تفعيله يُحذف نهائياً كل إعلان بقي مؤرشفاً أطول من <b>٦ أشهر</b> فقط (لتوفير المساحة). اتركه معطّلاً لحماية الإعلانات المستوردة القديمة، واحذف ما تريد يدوياً من تبويب «المؤرشفة».</span>
           </label>
-        </div>
+        </Group>
 
         {/* مفاتيح الميزات الحديثة — تفعيل/تعطيل من هنا مباشرة */}
-        <div className="border-t border-primary/15 pt-3">
-          <div className="mb-2 text-sm font-bold text-primary">الميزات التفاعلية</div>
+        <Group title="الميزات التفاعلية">
           <div className="space-y-2">
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" name="pushOn" defaultChecked={pushOn} className="mt-0.5 h-4 w-4 accent-primary" />
@@ -174,10 +188,9 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
               <span><b>قفل اسم العضو 🔒</b> — العضو لا يغيّر اسمه بنفسه: يرسل طلباً بالاسم الجديد والسبب ومستند إثبات، وتراجعه الإدارة من «طلبات تغيير الاسم» (موافقة تُطبّق الاسم فوراً أو رفض بسبب — يصل العضو رسالة بالحالتين). عند إيقافه يعدّل العضو اسمه بحرّية.</span>
             </label>
           </div>
-        </div>
+        </Group>
 
-        <div className="border-t border-primary/15 pt-3">
-          <div className="mb-2 text-sm font-bold text-primary">نشر الإعلانات</div>
+        <Group title="نشر الإعلانات">
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="adsApproval" defaultChecked={adsApproval} className="h-4 w-4 accent-primary" />
             مراجعة الإعلانات قبل النشر (إذا فُعّلت، لا يُنشر الإعلان إلا بموافقة الإدارة)
@@ -206,10 +219,9 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <input name="strikeBanDays" type="number" min={0} defaultValue={strikeBanDays} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </label>
           <p className="mt-1 text-xs text-muted-foreground">تُطبَّق عند بلوغ حدّ المخالفات: <b>٣ إنذارات</b> لتكرار الإعلانات ثم حظر، و<b>إنذاران</b> للمحتوى الممنوع (سياسي/مخدرات/أسلحة/جمعيات) ثم حظر — والمحتوى غير الأخلاقي يُحظر من أول مخالفة. لا تهاون في أي منها.</p>
-        </div>
+        </Group>
 
-        <div className="border-t border-primary/15 pt-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><BarChart3 className="h-4 w-4" /> أرشفة الإعلانات</div>
+        <Group title={<><BarChart3 className="h-4 w-4" /> أرشفة الإعلانات</>}>
           <label className="block space-y-1">
             <span className="text-sm"><b>أرشفة الإعلان تلقائياً بعد (بالأيام)</b> — اكتب 0 لتعطيل الأرشفة التلقائية</span>
             <input name="adLifetimeDays" type="number" min={0} defaultValue={adLifetimeDays} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
@@ -219,10 +231,9 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             رسوم إعادة إظهار الإعلان المؤرشف — ضمن كل التسعير الآن في{' '}
             <Link href="/admin/revenue?tab=pricing#restore-fee" className="font-bold text-primary underline">الإيرادات ← كل التسعير</Link>.
           </p>
-        </div>
+        </Group>
 
-        <div className="border-t border-primary/15 pt-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><BarChart3 className="h-4 w-4" /> الإعلانات المبوّبة</div>
+        <Group title={<><BarChart3 className="h-4 w-4" /> الإعلانات المبوّبة</>}>
           <label className="block space-y-1">
             <span className="text-sm">مدة بقاء الإعلان المبوّب (بالأيام) — اكتب 0 ليبقى دائماً</span>
             <input name="classifiedDays" type="number" min={0} defaultValue={classifiedDays} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
@@ -250,7 +261,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             </label>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">يُعدّ المبوّب مكرّراً إذا تطابق <b>المحتوى</b> (العنوان+النص) أو <b>الصورة</b> (مطابقة إدراكية) مع مبوّب سابق للعضو نفسه بالنسبة المحددة. <b>الخلفية</b> (الثيم+النقشة+الزخرفة) تُحتسب مع تشابه المحتوى ٥٠٪+ فقط، حتى لا تُحجب إعلانات مختلفة تشترك في نفس التصميم. الخلفية ١٠٠٪ = تصميم مطابق تماماً. كما يُفحص تطابق <b>المحتوى نصاً</b> مع مبوّبات أعضاء آخرين (آخر ٣٠ يوماً) — يُمنع فوراً بلا خيار دفع مهما كانت باقة التكرار (المحتوى ليس ملك من نشره).</p>
-        </div>
+        </Group>
 
         {/* كل تسعير في تربح — باقات، اشتراكات، عاجل وتمييز، استعادة المؤرشف… — تبويب واحد */}
         <div className="border-t border-primary/15 pt-3">
@@ -261,8 +272,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
         </div>
 
         {/* التطبيقات (أندرويد/آيفون): المتاجر والتحديث الإجباري */}
-        <div className="card-3d rounded-xl p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary">📱 التطبيقات — التحديث الإجباري وروابط المتاجر</div>
+        <Group title="📱 التطبيقات — التحديث الإجباري وروابط المتاجر">
           <p className="mb-2 text-xs text-muted-foreground">رفع «أدنى نسخة» يجبر كل النسخ الأقدم على التحديث فوراً (تُحجب بشاشة تحديث).</p>
           <label className="mb-2 block space-y-1">
             <span className="text-sm">اسم حزمة أندرويد (Package)</span>
@@ -289,10 +299,9 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <input name="appIosMinBuild" type="number" min={1} defaultValue={appCfg.ios.minBuild} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           </label>
           <p className="mt-1 text-xs text-muted-foreground">بعد انتهاء المدة يختفي الإعلان المبوّب من العرض تلقائياً.</p>
-        </div>
+        </Group>
 
-        <div className="border-t border-primary/15 pt-3">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><Eye className="h-4 w-4" /> إحصائيات الإعلانات المبوّبة (المشاهدات والنقرات)</div>
+        <Group title={<><Eye className="h-4 w-4" /> إحصائيات الإعلانات المبوّبة</>}>
           <label className="block space-y-1">
             <span className="text-sm">من يستطيع رؤيتها؟</span>
             <select name="classifiedStats" defaultValue={statsAudience} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40">
@@ -301,7 +310,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
               <option value="admin">الإدارة فقط</option>
             </select>
           </label>
-        </div>
+        </Group>
 
         <Button>حفظ</Button>
       </form>

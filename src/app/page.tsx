@@ -86,8 +86,9 @@ export default async function HomePage() {
   ]);
   // تقييم المنصة بالنجوم — قابل للإخفاء من التحكم ← الإعدادات
   const platformRatingOn = await getSettingBool('platform_rating_on', true).catch(() => true);
+  // التقييم للمسجّلين فقط: نتحقق من تقييم العضو بمفتاحه (u{id})، لا الزائر
   const [platformRating, platformRated] = platformRatingOn
-    ? await Promise.all([getPlatformRating().catch(() => ({ avg: 0, count: 0 })), hasRatedPlatform(viewerKey).catch(() => false)])
+    ? await Promise.all([getPlatformRating().catch(() => ({ avg: 0, count: 0 })), hasRatedPlatform(session ? `u${session.uid}` : null).catch(() => false)])
     : [{ avg: 0, count: 0 }, false];
 
   return (
@@ -115,7 +116,7 @@ export default async function HomePage() {
       {/* تقييم منصة تربح بالنجوم — للزوّار والأعضاء، مرة واحدة لكل منهما */}
       {platformRatingOn && (
         <div className="-mt-2">
-          <PlatformRatingWidget avg={platformRating.avg} count={platformRating.count} alreadyRated={platformRated} />
+          <PlatformRatingWidget avg={platformRating.avg} count={platformRating.count} alreadyRated={platformRated} isLoggedIn={!!session} />
         </div>
       )}
 

@@ -305,15 +305,21 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
         {meta.status !== 1 && (isOwner || admin) && (
           <div className="rounded-xl border bg-white p-3 text-sm font-bold text-amber-700 shadow-sm">⏳ هذا المتجر {meta.status === 0 ? 'بانتظار موافقة الإدارة' : 'موقوف'} — يظهر لك فقط حالياً.</div>
         )}
-        {/* مهلة السداد: المتجر ما زال ظاهراً للزوار، وصاحبه يُذكَّر بالتجديد قبل انتهائها وإلا يُغلق */}
+        {/* مهلة السداد: المتجر ما زال شغّالاً للزوار والعضو، وصاحبه يُذكَّر بالتجديد قبل انتهائها وإلا يُغلق */}
         {subGrace && isOwner && (
           <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm shadow-sm">
-            <div className="font-extrabold text-amber-800">⏳ انتهى اشتراك متجرك — أنت في مهلة السداد{typeof sub?.graceDaysLeft === 'number' && sub.graceDaysLeft > 0 ? ` (${sub.graceDaysLeft} يوم متبقية)` : ''}.</div>
-            <div className="mt-1 text-xs text-amber-700">متجرك ما زال ظاهراً لعملائك الآن، لكنه سيُغلق تلقائياً بعد انتهاء المهلة حتى تجدّد. بادر بالتجديد.</div>
+            <div className="font-extrabold text-amber-800">⏳ متجرك منتهي الاشتراك وأنت في مهلة السداد — باقٍ{typeof sub?.graceDaysLeft === 'number' && sub.graceDaysLeft > 0 ? ` ${sub.graceDaysLeft} يوم` : ''} على إيقاف متجرك.</div>
+            <div className="mt-1 text-xs text-amber-700">متجرك ما زال شغّالاً وظاهراً لعملائك الآن، وسيُغلق تلقائياً بانتهاء المهلة حتى تسدّد. بادر بالسداد.</div>
             <div className="mt-2 flex flex-wrap gap-2">
               <Link href="/store#sub" className="rounded-lg bg-primary px-4 py-1.5 text-xs font-extrabold text-white">تجديد الاشتراك الآن</Link>
               <Link href="/account/wallet#topup" className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-bold text-primary">شحن الرصيد</Link>
             </div>
+          </div>
+        )}
+        {/* مؤشّر إداري: يوضّح للإدارة ما يراه الزوّار فعلاً (لأن الإدارة تتجاوز الحجب دائماً) */}
+        {admin && !isOwner && (subGrace || subBlocked) && (
+          <div className="rounded-xl border border-sky-300 bg-sky-50 p-3 text-xs font-bold text-sky-800">
+            ℹ️ عرض إداري: {subGrace ? `اشتراك هذا المتجر في مهلة السداد${typeof sub?.graceDaysLeft === 'number' && sub.graceDaysLeft > 0 ? ` (باقٍ ${sub.graceDaysLeft} يوم)` : ''} — لا يزال ظاهراً للزوار عادي.` : 'اشتراك هذا المتجر منتهٍ بعد المهلة — يظهر للزوار «غير نشط مؤقتاً»، وأنت تراه بصلاحية الإدارة.'}
           </div>
         )}
 

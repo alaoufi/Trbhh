@@ -125,6 +125,13 @@ export async function reactivateClassified(id: number, userId: number, days: num
   return true;
 }
 
+/** حالة المبوّب (1 ظاهر · 0 موقوف) ومالكه — لأزرار الإجراءات (المالك/الإدارة). */
+export async function getClassifiedOwnerState(id: number): Promise<{ status: number; userId: number | null } | null> {
+  await ensureClassifiedTable();
+  const r = await prisma.classified_ads.findFirst({ where: { id: BigInt(id) }, select: { status: true, user_id: true } }).catch(() => null);
+  return r ? { status: r.status, userId: r.user_id == null ? null : Number(r.user_id) } : null;
+}
+
 export async function getClassifiedById(id: number): Promise<Classified | null> {
   await ensureClassifiedTable();
   await loadBanned();

@@ -6,7 +6,8 @@ import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
-import { createClassified, getClassifiedById, updateClassified, deleteClassified, reactivateClassified } from '@/lib/classified';
+import { createClassified, getClassifiedById, updateClassified, deleteClassified, reactivateClassified, setClassifiedStatus, getClassifiedOwnerState } from '@/lib/classified';
+import { hasAnyAdmin } from '@/lib/roles';
 import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS, getStrikeBanDays } from '@/lib/settings';
 import { charge, consumeDupCredit, addDupCredit, adjustBalance } from '@/lib/wallet';
 import { scanContent } from '@/lib/content-guard';
@@ -378,6 +379,46 @@ export async function reactivateClassifiedAction(formData: FormData) {
   revalidatePath('/classified');
   revalidatePath('/account/classified');
   redirect('/account/classified?reactivated=1');
+}
+
+/** إيقاف/استئناف مبوّب — للمالك أو الإدارة فقط (يظهر/يُخفى من الموقع). */
+export async function toggleClassifiedStatusAction(formData: FormData) {
+  const session = await requireUser();
+  const id = Number(formData.get('id'));
+  if (!id) redirect('/classified');
+  const st = await getClassifiedOwnerState(id);
+  if (!st) redirect('/classified');
+  const isOwner = st.userId === session.uid;
+  const admin = await hasAnyAdmin(session.uid).catch(() => false);
+  if (!isOwner && !admin) redirect(`/classified/${id}`);
+  await setClassifiedStatus(id, st.status !== 1); // عكس الحالة الحالية
+  revalidatePath(`/classified/${id}`);
+  revalidatePath('/classified');
+  revalidatePath('/');
+  redirect(`/classified/${id}?status=${st.status === 1 ? 'paused' : 'resumed'}`);
+}
+
+/** حذف مبوّب من صفحته — المالك (ضمن مهلة الحذف) أو الإدارة (بلا قيد). */
+export async function deleteClassifiedFromDetailAction(formData: FormData) {
+  const session = await requireUser();
+  const id = Number(formData.get('id'));
+  if (!id) redirect('/classified');
+  const st = await getClassifiedOwnerState(id);
+  if (!st) redirect('/classified');
+  const isOwner = st.userId === session.uid;
+  const admin = await hasAnyAdmin(session.uid).catch(() => false);
+  if (!isOwner && !admin) redirect(`/classified/${id}`);
+  // المالك مقيّد بمهلة الحذف؛ الإدارة بلا قيد
+  if (isOwner && !admin) {
+    const existing = await getClassifiedById(id);
+    const { deleteHours } = await getMemberWindows();
+    if (!withinWindow(existing?.createdAt ?? null, deleteHours)) redirect(`/classified/${id}?error=deleteWindow`);
+  }
+  await deleteClassified(id);
+  revalidatePath('/');
+  revalidatePath('/classified');
+  revalidatePath('/account/classified');
+  redirect(!isOwner && admin ? '/admin/classified?deleted=1' : '/account/classified?deleted=1');
 }
 
 export async function deleteMyClassifiedAction(formData: FormData) {

@@ -47,6 +47,23 @@ jobs:
           fi
           PORT="${VPS_PORT:-22}"
           echo "🔗 الاتصال بـ $VPS_USER@$VPS_HOST:$PORT ..."
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 \
-            -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
-            "set -e; cd /root/trbhh && git fetch origin claude/hostinger-vps-project-amw8vb && git reset --hard origin/claude/hostinger-vps-project-amw8vb && docker compose up -d --build app && docker compose ps"
+          REMOTE_CMD="set -e; cd /root/trbhh && git fetch origin claude/hostinger-vps-project-amw8vb && git reset --hard origin/claude/hostinger-vps-project-amw8vb && docker compose up -d --build app && docker compose ps"
+          # اتصال SSH بالخادم متقطّع أحياناً (Connection timed out) — نعيد المحاولة تلقائياً
+          # حتى ٥ مرات بتراجع تصاعدي بدل فشل النشر على أول انقطاع عابر.
+          n=0
+          until [ "$n" -ge 5 ]; do
+            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                 -o ConnectTimeout=25 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+                 -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" "$REMOTE_CMD"; then
+              echo "✅ تم النشر."
+              exit 0
+            fi
+            n=$((n + 1))
+            if [ "$n" -lt 5 ]; then
+              wait=$((n * 20))
+              echo "⚠️ تعذّر الاتصال (محاولة $n/5) — إعادة بعد ${wait}s ..."
+              sleep "$wait"
+            fi
+          done
+          echo "❌ فشل الاتصال بالخادم بعد ٥ محاولات — الخادم لا يستجيب لـ SSH حالياً."
+          exit 1

@@ -4,8 +4,8 @@ import { cookies } from 'next/headers';
 import { Sparkles, ExternalLink, Eye, MousePointerClick, ArrowRight, Pencil, Trash2, Pause, Play } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
-import { getClassifiedById, recordClassifiedView, getClassifiedOwnerState } from '@/lib/classified';
-import { getClassifiedStatsAudience, getClassifiedLifetimeDays } from '@/lib/settings';
+import { getClassifiedById, recordClassifiedView, getClassifiedOwnerState, classifiedPublicVisible } from '@/lib/classified';
+import { getClassifiedStatsAudience } from '@/lib/settings';
 import { ClassifiedVisual, ClassifiedContact } from '@/components/classified-card';
 import { ShareButtons } from '@/components/share-buttons';
 import { ConfirmSubmit } from '@/components/confirm-submit';
@@ -47,12 +47,10 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
   const shareUrl = `https://${SITE.domain}/classified/${c.id}`;
   const shareText = 'الإعلانات المبوّبة .. منصة تربح الإعلانية';
 
-  // hide expired classifieds from the public (owner/admin can still view)
-  const lifeDays = await getClassifiedLifetimeDays().catch(() => 0);
-  if (lifeDays > 0 && c.createdAt && !isOwner && !admin) {
-    const ageDays = (Date.now() - new Date(c.createdAt).getTime()) / 86400000;
-    if (ageDays > lifeDays) notFound();
-  }
+  // إخفاء المبوّب عن العامة بنفس منطق القائمة تماماً (status + انتهاء/عمر) — المالك
+  // والإدارة يريانه دائماً. سابقاً كان يعتمد عمر الإنشاء فقط ويتجاهل expires_at، فيُرجع
+  // 404 لإعلان مدفوع لا يزال ظاهراً في القائمة → لا تظهر صورته عند مشاركة رابطه.
+  if (!isOwner && !admin && !(await classifiedPublicVisible(numId))) notFound();
   // who may see stats is controlled from the admin control panel
   const audience = await getClassifiedStatsAudience().catch(() => 'owner' as const);
   const canSeeStats = audience === 'all' ? true : audience === 'admin' ? admin : (isOwner || admin);

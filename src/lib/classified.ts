@@ -125,6 +125,17 @@ export async function reactivateClassified(id: number, userId: number, days: num
   return true;
 }
 
+/** هل المبوّب ظاهر للعامة الآن؟ نفس منطق قائمة المبوّبة تماماً (status + انتهاء/عمر)
+ *  — مصدر واحد للحقيقة، فلا تختلف صفحة الإعلان عن ظهوره في القائمة (يمنع 404 لزاحف
+ *  المشاركة على إعلان لا يزال ظاهراً، فتظهر صورته في معاينة الرابط). */
+export async function classifiedPublicVisible(id: number): Promise<boolean> {
+  await ensureClassifiedTable();
+  const row = await prisma.classified_ads
+    .findFirst({ where: { id: BigInt(id), ...(await visibilityWhere()) }, select: { id: true } })
+    .catch(() => null);
+  return !!row;
+}
+
 /** حالة المبوّب (1 ظاهر · 0 موقوف) ومالكه — لأزرار الإجراءات (المالك/الإدارة). */
 export async function getClassifiedOwnerState(id: number): Promise<{ status: number; userId: number | null } | null> {
   await ensureClassifiedTable();

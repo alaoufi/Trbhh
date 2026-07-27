@@ -928,6 +928,7 @@ export async function approveVerifyOrderAction(formData: FormData) {
   if (r.ok && r.order) {
     await sendVerifyMessage(r.order.userId, 'msg_verify_paid_ok', 'تهانينا {name} 🎉 تمت الموافقة على توثيق متجرك وخُصمت الرسوم ({amount} ر.س) من رصيدك — شارة «موثّق» فعّالة الآن لمدة {days} يوماً.', '', { amount: String(r.order.fee), days: String(r.order.days) });
     await logAdmin(session.uid, 'موافقة توثيق مدفوع', `طلب #${id} — العضو #${r.order.userId}`, `${r.order.fee} ر.س / ${r.order.days} يوم`);
+    revalidatePath('/', 'layout'); // يحدّث شريط التنبيه العالمي بعد نقص عدد الطلبات المعلقة
   } else if (r.reason === 'balance' && r.order) {
     await sendVerifyMessage(r.order.userId, 'msg_verify_paid_balance', 'عذراً {name}، وافقت إدارة المتاجر على توثيق متجرك لكن رصيدك ({balance} ر.س) لا يغطي الرسوم ({amount} ر.س) — اشحن رصيدك من «محفظتي» وسيُفعَّل التوثيق فور اكتمال الرصيد وإعادة الموافقة.', '', { amount: String(r.order.fee), balance: String(r.balance ?? 0) });
     await logAdmin(session.uid, 'موافقة توثيق مدفوع (رصيد غير كافٍ)', `طلب #${id} — العضو #${r.order.userId}`, `المطلوب ${r.order.fee} والرصيد ${r.balance ?? 0}`);
@@ -941,8 +942,10 @@ export async function approveVerifyOrderAction(formData: FormData) {
 export async function rejectVerifyOrderAction(formData: FormData) {
   const session = await requireAction('stores', 'edit');
   const id = Number(formData.get('id') || 0);
-  const note = String(formData.get('note') || '').trim().slice(0, 300);
-  if (!id || !note) return;
+  // السبب اختياري: لا نمنع الرفض إن تُرك فارغاً (كان الحقل الإلزامي يحجب الإرسال بصمت
+  // بعد نافذة التأكيد فيبقى الطلب معلقاً دون أن يدري الإداري) — نستخدم سبباً افتراضياً.
+  const note = String(formData.get('note') || '').trim().slice(0, 300) || 'لم تُذكر الإدارة سبباً محدداً.';
+  if (!id) return;
   const { rejectPaidVerification } = await import('@/lib/verify-paid');
   const r = await rejectPaidVerification(id, session.uid, note);
   if (r) {
@@ -950,6 +953,7 @@ export async function rejectVerifyOrderAction(formData: FormData) {
     await logAdmin(session.uid, 'رفض توثيق مدفوع', `طلب #${id} — العضو #${r.userId}`, note);
   }
   revalidatePath('/admin/stores');
+  revalidatePath('/', 'layout'); // يحدّث شريط تنبيه الإدارة العالمي في كل الصفحات فوراً
 }
 
 /** إلغاء توثيق مدفوع نشط بسبب إلزامي + استرداد قيمة الأيام غير المستخدمة للرصيد. */

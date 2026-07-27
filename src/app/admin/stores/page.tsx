@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone, Phone, Mail, Link2, IdCard, CalendarDays, FileCheck2, AlertTriangle, UserCog } from 'lucide-react';
-import { requireAction } from '@/lib/roles';
+import { requireAction, hasAction } from '@/lib/roles';
 import { getPendingStores, adminStoreList, approvedTransfers, platformRequests, type AdminStore } from '@/lib/merchant';
 import { getStoresCommsLog, type StoreComm } from '@/lib/audit';
 import { timeAgo } from '@/lib/utils';
@@ -217,7 +217,10 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
 }
 
 export default async function AdminStores({ searchParams }: { searchParams: Promise<{ msg?: string; vbal?: string; q?: string }> }) {
-  await requireAction('stores', 'view');
+  const session = await requireAction('stores', 'view');
+  // صلاحية التعديل (الموافقة/الرفض/الإلغاء تتطلّب stores:edit) — نُخفي أزرار الإجراء
+  // عمّن يملك العرض فقط بدل إظهار أزرار تُعيده صفحة «لا صلاحية» بصمت عند الضغط.
+  const canEdit = await hasAction(session.uid, 'stores', 'edit').catch(() => false);
   const { msg, vbal, q } = await searchParams;
   const term = (q || '').trim();
   const [pending, stores, transfers, platformReqs, commsByStore] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers(), platformRequests(), getStoresCommsLog().catch(() => new Map<number, StoreComm[]>())]);
@@ -257,21 +260,25 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
                   <span className="mr-auto rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-extrabold text-sky-800">{en(o.fee)} ر.س / {en(o.days)} يوم</span>
                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${o.balance >= o.fee ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-700'}`}>رصيده: {en(o.balance)} ر.س {o.balance >= o.fee ? '✓ يكفي' : '✗ لا يكفي'}</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {o.balance >= o.fee ? (
-                    <form action={approveVerifyOrderAction}>
+                {canEdit ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {o.balance >= o.fee ? (
+                      <form action={approveVerifyOrderAction}>
+                        <input type="hidden" name="id" value={o.id} />
+                        <ConfirmSubmit msg={`تأكيد الموافقة على توثيق «${o.storeName || o.userName}»؟ سيُخصم ${o.fee} ر.س من رصيده فوراً ويُفعَّل التوثيق ${o.days} يوماً.`} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> موافقة وخصم وتفعيل</ConfirmSubmit>
+                      </form>
+                    ) : (
+                      <span className="flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-500" title="رصيد العضو لا يغطي رسوم الباقة — اطلب منه شحن رصيده ثم وافق، أو ارفض الطلب">✗ يتعذّر الخصم — رصيد العضو لا يكفي</span>
+                    )}
+                    <form action={rejectVerifyOrderAction} className="flex min-w-0 flex-1 items-center gap-1">
                       <input type="hidden" name="id" value={o.id} />
-                      <ConfirmSubmit msg={`تأكيد الموافقة على توثيق «${o.storeName || o.userName}»؟ سيُخصم ${o.fee} ر.س من رصيده فوراً ويُفعَّل التوثيق ${o.days} يوماً.`} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> موافقة وخصم وتفعيل</ConfirmSubmit>
+                      <input name="note" maxLength={300} placeholder="سبب الرفض (اختياري — يصل العضو)" className="h-8 min-w-0 flex-1 rounded-lg border border-destructive/30 bg-white px-2 text-xs outline-none" />
+                      <ConfirmSubmit msg="تأكيد رفض طلب التوثيق؟ لا يُخصم شيء ويصل العضو السبب (إن كُتب)." className="flex shrink-0 items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit>
                     </form>
-                  ) : (
-                    <span className="flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-500" title="رصيد العضو لا يغطي رسوم الباقة — اطلب منه شحن رصيده ثم وافق، أو ارفض الطلب">✗ يتعذّر الخصم — رصيد العضو لا يكفي</span>
-                  )}
-                  <form action={rejectVerifyOrderAction} className="flex min-w-0 flex-1 items-center gap-1">
-                    <input type="hidden" name="id" value={o.id} />
-                    <input name="note" required maxLength={300} placeholder="سبب الرفض (إلزامي — يصل العضو)" className="h-8 min-w-0 flex-1 rounded-lg border border-destructive/30 bg-white px-2 text-xs outline-none" />
-                    <ConfirmSubmit msg="تأكيد رفض طلب التوثيق؟ لا يُخصم شيء ويصل العضو السبب." className="flex shrink-0 items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit>
-                  </form>
-                </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">عرض فقط — لا تملك صلاحية «تعديل المتاجر» للموافقة أو الرفض. اطلب من المدير منحك الصلاحية.</div>
+                )}
               </div>
             ))}
             {verifyOrders.active.map((o) => { const rf = refundOf(o); return (

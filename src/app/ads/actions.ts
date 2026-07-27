@@ -20,7 +20,7 @@ import { scanImages, imageModerationEnabled } from '@/lib/nsfw';
 import { parseMapsUrl, type LatLng } from '@/lib/maps';
 import { toInt } from '@/lib/utils';
 import { isApprovedStoreOwner } from '@/lib/merchant';
-import { getActiveProfile, backfillProfileContact } from '@/lib/profiles';
+import { getActiveProfile, ensureDefaultProfile, backfillProfileContact } from '@/lib/profiles';
 import { normalizeAr, similarity, isKeywordStuffing } from '@/domain/text';
 
 /** Resolve coordinates from a pasted maps link — follows shortened goo.gl links. */
@@ -216,10 +216,18 @@ export async function createAdAction(formData: FormData) {
     const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
     if (ll) { lat = String(ll.lat); lng = String(ll.lng); }
   }
-  // هوية النشر الفعّالة: إن كانت «متجراً» فكل إعلان يُنشر داخل المتجر تلقائياً (لا في تربح العام)،
-  // وإلا يُحترم dest القادم من نموذج المتجر.
-  const active = await getActiveProfile(session.uid);
-  const dest = (String(formData.get('dest') || '') === 'store' || active.type === 'store') ? 'store' : '';
+  // هوية النشر: الوجهة تُحسم من اختيار النموذج الصريح فقط («باسمي الشخصي» بلا dest، أو «باسم
+  // متجري» بـ dest=store). لا يُسمح لكوكي الهوية المنزلق (تصفّح سابق بهوية المتجر) بأن يحوّل
+  // «باسمي الشخصي» إلى منتج متجر معزول عن تربح بصمت — هذا الانزلاق كان يُخفي إعلانات الأعضاء
+  // عن تربح العام دون علمهم، ويجعلهم يظنّون أن الإعلان «اختفى».
+  let active = await getActiveProfile(session.uid);
+  const asStore = String(formData.get('dest') || '') === 'store';
+  const dest = asStore ? 'store' : '';
+  // اختير «باسمي الشخصي» بينما الهوية الفعّالة متجر: ثبّت على الهوية الشخصية الافتراضية حتى
+  // يُنشر الإعلان في تربح العام لا داخل المتجر (تصحيح الانزلاق مصدره الكوكي).
+  if (!asStore && active.type === 'store') {
+    active = await ensureDefaultProfile(session.uid);
+  }
   const q = dest ? '&dest=store' : '';
   // متجر موقوف (مؤقتاً أو نهائياً): لا يُسمح بنشر إعلانات منه
   if (dest === 'store') {

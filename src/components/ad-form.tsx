@@ -591,7 +591,6 @@ export function AdForm({
                   {(preview.price > 0 || isReq) && <span className="text-2xl font-bold text-primary">{preview.price > 0 ? formatPrice(preview.price) : 'مطلوب'}</span>}
                   {preview.price > 0 && priceMode === 'rent' && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">🔑 تأجير {(formRef.current?.querySelector('[name="rentPeriod"]') as HTMLSelectElement | null)?.value || 'شهري'}</span>}
                   {preview.price > 0 && priceMode === 'sale' && <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800">💰 بيع</span>}
-                  {!isReq && priceMode === 'som' && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">على السوم</span>}
                   {preview.oldPrice > preview.price && preview.price > 0 && (
                     <>
                       <span className="text-sm text-muted-foreground line-through" dir="ltr">{formatPrice(preview.oldPrice)}</span>

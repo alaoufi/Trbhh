@@ -261,7 +261,8 @@ function normalizeHandle(v: string): string {
 async function handleFree(handle: string, exceptProfileId: number): Promise<boolean> {
   const inProfiles = await prisma.profiles.findFirst({ where: { handle, ...(exceptProfileId ? { id: { not: BigInt(exceptProfileId) } } : {}) }, select: { id: true } }).catch(() => null);
   if (inProfiles) return false;
-  const inStores = await prisma.stores.findFirst({ where: { handle }, select: { id: true } }).catch(() => null);
+  // فضاء معرّفات موحّد: لا يتصادم معرّف الهوية مع معرّف متجر ولا مع اسم دخول متجر (منع الازدواجية)
+  const inStores = await prisma.stores.findFirst({ where: { OR: [{ handle }, { store_username: handle }] }, select: { id: true } }).catch(() => null);
   return !inStores;
 }
 

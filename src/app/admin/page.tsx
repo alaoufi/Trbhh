@@ -64,6 +64,7 @@ export default async function AdminHome() {
     { group: 'safety', label: 'بلاغات الرصد الآلي', icon: ShieldAlert, href: '/admin/reports?tab=auto', perm: 'reports', nav: true },
     { group: 'safety', label: 'مراقبة المراسلات', icon: MessagesSquare, href: '/admin/messages', perm: 'messages', nav: true },
     { group: 'safety', label: 'الكلمات وحارس المحتوى', icon: Ban, href: '/admin/words', perm: 'words', nav: true },
+    { group: 'safety', label: 'نزاهة الهويات (كشف التداخل)', icon: ShieldCheck, href: '/admin/integrity', perm: 'users', nav: true },
     // التسويق والباقات
     { group: 'marketing', label: 'باقات عدد الإعلانات', value: packages.length, icon: Crown, href: '/admin/revenue?tab=pricing#packages', perm: 'packages' },
     { group: 'marketing', label: 'ترويجية بانتظار الموافقة', value: pendingPromos, icon: MonitorPlay, href: '/admin/promos', highlight: true, perm: 'promos' },

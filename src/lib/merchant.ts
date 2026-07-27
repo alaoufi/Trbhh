@@ -502,6 +502,9 @@ export async function setStoreUsername(userId: number, raw: string): Promise<{ o
   if (takenByStore) return { ok: false, msg: 'اسم الدخول مستخدم من متجر آخر — اختر غيره.' };
   const takenByUser = await prisma.users.findFirst({ where: { userName: username, id: { not: BigInt(userId) } }, select: { id: true } }).catch(() => null);
   if (takenByUser) return { ok: false, msg: 'اسم الدخول مستخدم من عضو آخر — اختر غيره.' };
+  // منع الازدواجية عبر فضاء المعرّفات: لا يتصادم اسم دخول المتجر مع معرّف هوية شخصية
+  const takenByProfile = await prisma.profiles.findFirst({ where: { handle: username }, select: { id: true } }).catch(() => null);
+  if (takenByProfile) return { ok: false, msg: 'اسم الدخول مستخدم كمعرّف هوية عضو — اختر غيره.' };
   await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { store_username: username } }).catch(() => {});
   return { ok: true, username, msg: 'تم حفظ اسم دخول المتجر.' };
 }
@@ -578,6 +581,9 @@ export async function setStoreHandle(userId: number, raw: string): Promise<{ ok:
   if (!handle) return { ok: false, msg: 'المعرّف غير صالح (أحرف إنجليزية وأرقام و«-» فقط، ٣ خانات فأكثر، وغير محجوز).' };
   const taken = await prisma.stores.findFirst({ where: { handle, id: { not: BigInt(storeId) } }, select: { id: true } }).catch(() => null);
   if (taken) return { ok: false, msg: 'هذا المعرّف مستخدم من متجر آخر — اختر غيره.' };
+  // منع الازدواجية عبر فضاء المعرّفات: لا يتصادم معرّف المتجر مع معرّف هوية شخصية لعضو
+  const takenByProfile = await prisma.profiles.findFirst({ where: { handle }, select: { id: true } }).catch(() => null);
+  if (takenByProfile) return { ok: false, msg: 'هذا المعرّف مستخدم من هوية عضو آخر — اختر غيره.' };
   await prisma.stores.update({ where: { id: BigInt(storeId) }, data: { handle } }).catch(() => {});
   return { ok: true, handle, msg: 'تم حفظ معرّف المتجر.' };
 }

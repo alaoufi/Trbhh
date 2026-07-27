@@ -2,13 +2,16 @@
 import { useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useFormStatus } from 'react-dom';
-import { Tag, MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck, Eye, X } from 'lucide-react';
+import { Tag, MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck, Eye, X, ArrowLeftRight, Timer, Star, User, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SubmitOverlay } from '@/components/submit-overlay';
 import { RegionCityPicker } from '@/components/region-city-picker';
 import { AudioRecorder } from '@/components/audio-recorder';
 import { ImageUploader } from '@/components/image-uploader';
 import { AdExtraFields } from '@/components/ad-extra-fields';
+import { AdGallery } from '@/components/ad-gallery';
+import { ExpandableDetail } from '@/components/expandable-detail';
+import { formatPrice } from '@/lib/utils';
 import { parseMapsUrl } from '@/lib/maps';
 
 const MAX_VIDEO = 25 * 1024 * 1024; // 25MB
@@ -48,8 +51,18 @@ function Submit({ label }: { label: string }) {
   return <Button size="lg" disabled={pending}>{pending ? 'جارٍ الحفظ...' : label}</Button>;
 }
 
+// عنصر معلومة في شبكة المعاينة — مطابق لبطاقة صفحة الإعلان الحقيقية
+function InfoItem({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 text-primary">
+      <Icon className="h-5 w-5 shrink-0" />
+      <span className="line-clamp-1 text-sm font-medium">{children}</span>
+    </div>
+  );
+}
+
 export function AdForm({
-  action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, scheduleMaxDays = 30, allowOldPrice, allowStock, urgentOffer, featuredOffer,
+  action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, scheduleMaxDays = 30, allowOldPrice, allowStock, urgentOffer, featuredOffer, identity,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   countries: Country[]; cities: City[]; areas?: Area[];
@@ -61,6 +74,8 @@ export function AdForm({
   urgentOffer?: { packs: { hours: number; price: number }[]; balance: number };
   /** عرض تسويقي للتمييز ⭐ عند النشر: المدد المسعّرة ورصيد العضو الحالي */
   featuredOffer?: { options: { key: string; label: string; price: number }[]; balance: number };
+  /** الهوية الفعّالة التي يُنشر باسمها — لعرضها في المعاينة كما ستظهر للزوّار */
+  identity?: { name: string; isStore: boolean };
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه', charity: 'جمع تبرعات أو نشاط جمعية غير مرخّص' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
@@ -111,31 +126,26 @@ export function AdForm({
   const [imgReady, setImgReady] = useState(0);
   const [imgFiles, setImgFiles] = useState<File[]>([]);
 
-  // معاينة الإعلان قبل النشر (حيّة في المتصفح، بلا إنشاء مسودّة على الخادم)
+  // معاينة الإعلان قبل النشر (حيّة في المتصفح، بلا إنشاء مسودّة على الخادم) — مطابِقة تماماً
+  // لتخطيط صفحة الإعلان الحقيقية (نفس المعرض والترتيب والأصناف).
   const formRef = useRef<HTMLFormElement>(null);
   const previewUrlsRef = useRef<string[]>([]);
-  type PreviewData = { title: string; detail: string; priceLabel: string; images: string[]; cityName: string; phone: string; whatsapp: string; urgent: boolean; featured: boolean };
+  type PreviewData = { title: string; detail: string; price: number; oldPrice: number; images: string[]; cityName: string; areaName: string; urgent: boolean; featured: boolean };
   const [preview, setPreview] = useState<PreviewData | null>(null);
   function openPreview() {
     const f = formRef.current;
     if (!f) return;
     const get = (n: string) => ((f.querySelector(`[name="${n}"]`) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null)?.value || '').trim();
-    const priceRaw = get('price');
-    const priceNum = Number(priceRaw);
-    let priceLabel: string;
-    if (isReq) priceLabel = 'طلب — للتواصل';
-    else if (priceMode === 'som') priceLabel = 'على السوم';
-    else if (priceRaw && priceNum > 0) {
-      const money = `${priceNum.toLocaleString('en-US')} ر.س`;
-      priceLabel = priceMode === 'rent' ? `${money} / ${get('rentPeriod') || 'شهري'}` : money;
-    } else priceLabel = 'السعر عند التواصل';
-    const cityName = cities.find((c) => String(c.id) === get('city_id'))?.name || '';
     previewUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
     const urls = imgFiles.slice(0, 10).map((file) => URL.createObjectURL(file));
     previewUrlsRef.current = urls;
     setPreview({
-      title: get('title'), detail: get('detail'), priceLabel, images: urls, cityName,
-      phone: get('phone'), whatsapp: get('whatsapp'), urgent: !!get('urgent'), featured: !!get('featuredDur'),
+      title: get('title'), detail: get('detail'),
+      price: Number(get('price')) || 0, oldPrice: Number(get('old_price')) || 0,
+      images: urls,
+      cityName: cities.find((c) => String(c.id) === get('city_id'))?.name || '',
+      areaName: areas.find((a) => String(a.id) === get('area_id'))?.name || '',
+      urgent: !!get('urgent'), featured: !!get('featuredDur'),
     });
   }
   function closePreview() {
@@ -546,38 +556,60 @@ export function AdForm({
         <Submit label={submitLabel} />
       </div>
 
-      {/* معاينة الإعلان قبل النشر — نافذة حيّة تعرض الإعلان كما سيبدو للزوّار */}
+      {/* معاينة الإعلان قبل النشر — تُطابق تخطيط صفحة الإعلان الحقيقية بالكامل (نفس المعرض والترتيب) */}
       {preview && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 p-4" onClick={closePreview}>
-          <div className="my-6 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b bg-primary/5 px-4 py-2.5">
-              <span className="flex items-center gap-1.5 text-sm font-extrabold text-primary"><Eye className="h-4 w-4" /> معاينة إعلانك قبل النشر</span>
+        <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 p-3" onClick={closePreview}>
+          <div className="my-4 w-full max-w-md overflow-hidden rounded-2xl bg-background shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-primary/5 px-4 py-2.5 backdrop-blur">
+              <span className="flex items-center gap-1.5 text-sm font-extrabold text-primary"><Eye className="h-4 w-4" /> معاينة إعلانك — هكذا سيظهر للزوّار</span>
               <button type="button" onClick={closePreview} aria-label="إغلاق المعاينة" className="rounded-full p-1 text-muted-foreground hover:bg-black/5"><X className="h-5 w-5" /></button>
             </div>
-            <div className="max-h-[68vh] space-y-3 overflow-y-auto p-4">
-              {preview.images.length > 0 ? (
-                <div className="flex gap-2 overflow-x-auto">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {preview.images.map((u, i) => <img key={i} src={u} alt={`صورة ${i + 1}`} className="h-44 w-44 shrink-0 rounded-lg border object-cover" />)}
+
+            {/* نفس ترتيب صفحة الإعلان: المعرض ← العنوان ← بطاقة المعلومات ← السعر+الوصف */}
+            <div className="max-h-[74vh] space-y-4 overflow-y-auto p-4">
+              {preview.images.length > 0
+                ? <AdGallery images={preview.images} title={preview.title || 'إعلانك'} special={preview.featured} adsType={adsType} />
+                : <div className="grid h-48 w-full place-items-center rounded-2xl bg-muted text-sm text-muted-foreground">لم تُضِف صوراً بعد</div>}
+
+              <h1 className="text-xl font-bold text-primary">{preview.title || <span className="text-muted-foreground">عنوان الإعلان…</span>}</h1>
+
+              <div className="card-3d grid grid-cols-2 gap-x-3 gap-y-3 rounded-2xl p-4">
+                <InfoItem icon={ArrowLeftRight}>{isReq ? 'طلب' : 'عرض'}</InfoItem>
+                <InfoItem icon={Timer}>الآن</InfoItem>
+                <InfoItem icon={MapPin}>{preview.areaName ? `${preview.areaName} - ${preview.cityName}` : (preview.cityName || 'غير محدد')}</InfoItem>
+                <div className="flex items-center gap-2 text-primary">
+                  {identity?.isStore ? <Store className="h-5 w-5 shrink-0" /> : <User className="h-5 w-5 shrink-0" />}
+                  <span className="line-clamp-1 text-sm font-medium">{identity?.name || 'باسم هويتك'}{identity?.isStore && <span className="mr-1 rounded bg-primary/10 px-1 text-[10px] font-bold text-primary">متجر</span>}</span>
                 </div>
-              ) : (
-                <div className="grid h-40 w-full place-items-center rounded-lg bg-muted text-sm text-muted-foreground">لم تُضِف صوراً بعد</div>
-              )}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">{isReq ? 'مطلوب' : 'معروض'}</span>
-                {preview.urgent && <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>}
-                {preview.featured && <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-extrabold text-white">⭐ مميّز</span>}
+                <InfoItem icon={Star}>جديد</InfoItem>
+                <InfoItem icon={Eye}>0 مشاهدة</InfoItem>
               </div>
-              <h2 className="text-lg font-extrabold text-foreground">{preview.title || <span className="text-muted-foreground">عنوان الإعلان…</span>}</h2>
-              <div className="text-base font-extrabold text-primary">{preview.priceLabel}</div>
-              {preview.cityName && <div className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5" /> {preview.cityName}</div>}
-              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{preview.detail || <span className="text-muted-foreground">تفاصيل الإعلان…</span>}</p>
-              {(preview.phone || preview.whatsapp) && (
-                <div className="flex items-center gap-1.5 rounded-lg bg-secondary/40 px-3 py-2 text-xs font-bold text-foreground"><Phone className="h-3.5 w-3.5 text-primary" /> {preview.phone || preview.whatsapp}</div>
-              )}
+
+              <div className="card-3d rounded-2xl p-4">
+                {preview.urgent && <span className="mb-2 inline-block animate-pulse rounded-full bg-red-600 px-3 py-1 text-xs font-extrabold text-white shadow">🔥 عاجل</span>}
+                <div className="mb-3 flex flex-wrap items-baseline gap-2">
+                  {(preview.price > 0 || isReq) && <span className="text-2xl font-bold text-primary">{preview.price > 0 ? formatPrice(preview.price) : 'مطلوب'}</span>}
+                  {preview.price > 0 && priceMode === 'rent' && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">🔑 تأجير {(formRef.current?.querySelector('[name="rentPeriod"]') as HTMLSelectElement | null)?.value || 'شهري'}</span>}
+                  {preview.price > 0 && priceMode === 'sale' && <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800">💰 بيع</span>}
+                  {!isReq && priceMode === 'som' && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">على السوم</span>}
+                  {preview.oldPrice > preview.price && preview.price > 0 && (
+                    <>
+                      <span className="text-sm text-muted-foreground line-through" dir="ltr">{formatPrice(preview.oldPrice)}</span>
+                      <span className="rounded bg-rose-600 px-2 py-0.5 text-xs font-extrabold text-white">خصم {Math.round((1 - preview.price / preview.oldPrice) * 100)}٪</span>
+                    </>
+                  )}
+                </div>
+                <ExpandableDetail text={preview.detail || ''} />
+              </div>
             </div>
-            <div className="border-t bg-amber-50 p-3 text-center text-xs font-bold text-amber-800">
-              👁 هذه معاينة فقط — لم يُنشر إعلانك بعد. أغلِق النافذة ثم اضغط «{submitLabel}» للنشر.
+
+            {/* تذييل ثابت: متابعة النشر (يُرسل النموذج مباشرةً) أو الرجوع للتعديل */}
+            <div className="sticky bottom-0 space-y-2 border-t bg-background p-3">
+              <p className="text-center text-[11px] font-bold text-amber-700">👁 معاينة فقط — لم يُنشر إعلانك بعد.</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={closePreview} className="h-11 flex-1 rounded-lg border-2 border-primary/30 bg-white px-4 text-sm font-extrabold text-primary hover:bg-primary/5">✏ رجوع للتعديل</button>
+                <Button type="submit" size="lg" className="flex-1">متابعة النشر ✓</Button>
+              </div>
             </div>
           </div>
         </div>

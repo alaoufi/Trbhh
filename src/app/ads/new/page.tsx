@@ -108,6 +108,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
         needPrice={price}
         needBal={bal}
         dest={publishingAsStore ? 'store' : undefined}
+        identity={active ? { name: publishingAsStore ? (myStore?.name || active.name) : active.name, isStore: publishingAsStore } : undefined}
         limitMax={max}
         gapHours={hours}
         gapWait={wait}

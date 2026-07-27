@@ -22,18 +22,23 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   const session = await getSession();
   if (!session) redirect('/login');
   const { error, left, max, hours, wait, cat, banned, dup, price, bal, dest } = await searchParams;
+  // الهوية الفعّالة الحالية (نفس مصدر createAdAction) — لعرضها صريحةً وتحديد المجال افتراضياً
+  const active = await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).catch(() => null);
+  // الوجهة: المعامل الصريح يفصل (store/personal)، وإلا تُشتقّ من مجال الهوية الفعّالة —
+  // فما تراه في المبدّل هو ما تنشر فيه فعلاً. استقلالية تامّة: هوية تربح ⇐ تربح، هوية متجر ⇐ متجرها.
+  const publishingAsStore = dest === 'store' || (dest !== 'personal' && active?.type === 'store');
   const [countries, cities, areas, user] = await Promise.all([
     getCountries(), getCities(), getAreas(),
     prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true, phone_whatsapp: true } }),
   ]);
   const balance = await import('@/lib/wallet').then((m) => m.getBalance(session.uid)).catch(() => 0);
-  const urgentOffer = extras && extras.urgentPacks.length > 0 && dest !== 'store'
+  const urgentOffer = extras && extras.urgentPacks.length > 0 && !publishingAsStore
     ? { packs: extras.urgentPacks, balance }
     : undefined;
   // التمييز ⭐ — عرض المدد المسعّرة داخل نموذج النشر (لإعلانات تربح فقط)
   const { getServicePricing, DURATIONS } = await import('@/lib/settings');
   const svc = await getServicePricing().catch(() => null);
-  const featuredOpts = svc && dest !== 'store'
+  const featuredOpts = svc && !publishingAsStore
     ? DURATIONS.map((d) => ({ key: d.key, label: d.label, price: svc.featured[d.key] })).filter((o) => o.price > 0)
     : [];
   const featuredOffer = featuredOpts.length ? { options: featuredOpts, balance } : undefined;
@@ -44,18 +49,33 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     const meta = await m.getStoreMeta(sid).catch(() => null);
     return meta && meta.status === 1 ? { id: sid, name: meta.storeName || 'متجري' } : null;
   }).catch(() => null);
-  const publishingAsStore = dest === 'store';
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">أضف إعلاناً جديداً</h1>
+
+      {/* بانر صريح: بأي هوية وفي أي مجال يُنشر هذا الإعلان الآن — يقطع أي التباس/تداخل */}
+      {active && (
+        <div className={`rounded-xl border-2 p-3 text-sm ${publishingAsStore ? 'border-emerald-300 bg-emerald-50' : 'border-sky-300 bg-sky-50'}`}>
+          <div className="font-extrabold">
+            {publishingAsStore
+              ? <>🏬 تنشر الآن داخل متجرك «{myStore?.name || active.name}» فقط</>
+              : <>🟢 تنشر الآن في تربح (إعلانات عامة) باسم «{active.name}»</>}
+          </div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">
+            {publishingAsStore
+              ? 'الإعلان يظهر لزوّار متجرك فقط، لا في قوائم تربح العامة — مستقلّ تماماً عن هويتك الشخصية.'
+              : `الإعلان يظهر في تربح للجميع باسم هذه الهوية · الرقم الداخلي #${active.id} — مستقلّ تماماً عن أي متجر.`}
+          </div>
+        </div>
+      )}
 
       {/* اختيار الهوية: باسمي الشخصي أو باسم متجري — يمنع تداخل النشر بين الهويات */}
       {myStore && (
         <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-3">
           <div className="mb-2 text-sm font-extrabold text-primary">🎭 أنشر باسم</div>
           <div className="grid grid-cols-2 gap-2">
-            <Link href="/ads/new" className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold ${!publishingAsStore ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
-              👤 باسمي الشخصي
+            <Link href="/ads/new?dest=personal" className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold ${!publishingAsStore ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
+              👤 باسمي الشخصي (تربح)
             </Link>
             <Link href="/ads/new?dest=store" className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold ${publishingAsStore ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
               🏬 باسم متجر «{myStore.name}»
@@ -73,7 +93,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
         allowSchedule={allowSchedule}
         scheduleMaxDays={scheduleMaxDays}
         allowOldPrice={dealsOn}
-        allowStock={stockOn && dest === 'store'}
+        allowStock={stockOn && publishingAsStore}
         urgentOffer={urgentOffer}
         featuredOffer={featuredOffer}
         action={createAdAction}
@@ -87,7 +107,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
         dupId={dup}
         needPrice={price}
         needBal={bal}
-        dest={dest === 'store' ? 'store' : undefined}
+        dest={publishingAsStore ? 'store' : undefined}
         limitMax={max}
         gapHours={hours}
         gapWait={wait}

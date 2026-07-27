@@ -8,7 +8,7 @@ import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified, reactivateClassified, setClassifiedStatus, getClassifiedOwnerState } from '@/lib/classified';
 import { hasAnyAdmin } from '@/lib/roles';
-import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS, getStrikeBanDays, getSettingBool } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS, getStrikeBanDays, getSettingBool, getGuardBlockCount } from '@/lib/settings';
 import { charge, consumeDupCredit, addDupCredit, adjustBalance } from '@/lib/wallet';
 import { scanContent, censorGuard, summarizeHits } from '@/lib/content-guard';
 import { handleProhibited, logMod, checkFlood, bumpDupAttempts, banUserFor, notifyModBlock, DUP_LIMIT } from '@/lib/moderation';
@@ -165,11 +165,15 @@ export async function createClassifiedAction(formData: FormData) {
   if (!img && !body && !title) redirect('/classified/new?error=content');
   // جوال أو واتساب إجباري (أحدهما)
   if (!phone && !whatsapp) redirect('/classified/new?error=contact');
-  // فحص المحتوى: بدل الحجب، تُبدَّل الكلمات الممنوعة بنجمات ويُحفظ الإعلان «قيد المراجعة»
-  // (مخفي حتى تعتمده الإدارة أو تحظره) مع إشعار العضو. قائمة السماح تستثني الجُمل المسموحة.
+  // فحص المحتوى: كلمات قليلة مخالفة (حتى الحد) → تُبدَّل بنجمات ويُنشر للعامة؛ ما زاد → يُحظر.
   const cg = await censorGuard(title, body);
   const cTitle = cg.parts[0] || title;
   const cBody = cg.parts[1] || body;
+  const cBlockOver = await getGuardBlockCount().catch(() => 3);
+  if (cBlockOver > 0 && cg.hits.length > cBlockOver) {
+    await notifyModBlock(session.uid, `⛔ لم يُنشر إعلانك المبوّب لاحتوائه ${cg.hits.length} كلمات مخالفة (الحد المسموح ${cBlockOver}). عدّل المحتوى ثم أعد النشر.`, '/classified/new').catch(() => {});
+    redirect(`/classified/new?error=toomany&words=${cg.hits.length}&max=${cBlockOver}`);
+  }
   const flagTerms = cg.hits.length ? summarizeHits(cg.hits) : '';
   // حاجز إغراق صلب — نفس الحاجز المطبَّق على إعلانات تربح، لم يكن مفعّلاً هنا سابقاً
   const flood = await checkFlood(session.uid);
@@ -261,12 +265,12 @@ export async function createClassifiedAction(formData: FormData) {
     const newId = await createClassified({
       userId: session.uid, title: cTitle, body: cBody, image, phone, whatsapp, link,
       theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent, layout,
-      publishAt: flagTerms ? null : publishAt, // المشكوك فيه لا يُجدوَل — يُراجَع الآن
+      publishAt,
     });
     if (newId) {
-      const upd: { expires_at?: Date; status?: number; flag_terms?: string } = {};
+      const upd: { expires_at?: Date; flag_terms?: string } = {};
       if (cExpires) upd.expires_at = cExpires;
-      if (flagTerms) { upd.status = 0; upd.flag_terms = flagTerms; } // مخفي قيد مراجعة الإدارة
+      if (flagTerms) upd.flag_terms = flagTerms; // منشور للعامة مع تسجيل الكلمات المحجوبة
       if (Object.keys(upd).length) await prisma.classified_ads.updateMany({ where: { id: BigInt(newId) }, data: upd }).catch(() => {});
     }
   } catch {
@@ -276,13 +280,13 @@ export async function createClassifiedAction(formData: FormData) {
     redirect('/classified/new?error=save');
   }
   if (flagTerms) {
-    await notifyModBlock(session.uid, `تم استلام إعلانك المبوّب وهو قيد مراجعة الإدارة قبل الظهور — حُجبت كلمات مشكوك فيها بنجمات (${flagTerms}). راجِع محتواك؛ قد تعتمده الإدارة أو تحظره.`, '/account/classified').catch(() => {});
+    await notifyModBlock(session.uid, `نُشر إعلانك المبوّب بعد حجب كلمات مخالفة بنجمات (${flagTerms}). إن رأيت المنع خطأً راسل الإدارة.`, '/account/classified').catch(() => {});
   }
   revalidatePath('/');
   revalidatePath('/classified');
   revalidatePath('/account/classified');
-  if (flagTerms) redirect('/account/classified?review=1');
-  redirect(publishAt ? '/account/classified?scheduled=1' : '/classified?created=1');
+  if (flagTerms && !publishAt) redirect('/account/classified?censored=1');
+  redirect(publishAt ? `/account/classified?scheduled=1${flagTerms ? '&censored=1' : ''}` : '/classified?created=1');
 }
 
 export async function updateClassifiedAction(formData: FormData) {

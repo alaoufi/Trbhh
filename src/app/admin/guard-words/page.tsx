@@ -1,8 +1,9 @@
 import { ShieldAlert, Trash2, Plus } from 'lucide-react';
 import { requirePerm } from '@/lib/roles';
 import { getGuardWords, getAllowedPhrases, BUILTIN, CATEGORY_LABEL, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
+import { getGuardBlockCount } from '@/lib/settings';
 import { Button } from '@/components/ui/button';
-import { addGuardWordAction, deleteGuardWordAction, addAllowedPhraseAction, deleteAllowedPhraseAction } from '../actions';
+import { addGuardWordAction, deleteGuardWordAction, addAllowedPhraseAction, deleteAllowedPhraseAction, saveGuardBlockCountAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ const COLORS: Record<GuardCategory, string> = {
 
 export default async function GuardWordsPage() {
   await requirePerm('words');
-  const [custom, allowed] = await Promise.all([getGuardWords(), getAllowedPhrases()]);
+  const [custom, allowed, blockCount] = await Promise.all([getGuardWords(), getAllowedPhrases(), getGuardBlockCount()]);
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
@@ -26,10 +27,19 @@ export default async function GuardWordsPage() {
         <h1 className="text-xl font-extrabold text-primary">كلمات حارس المحتوى</h1>
       </div>
       <p className="text-sm font-bold text-muted-foreground">
-        عند احتواء الإعلان كلمةً من هذه الفئات، تُبدَّل الكلمة <b className="text-primary">بنجمات</b> ويُنشر الإعلان
-        <b className="text-primary"> «قيد مراجعة الإدارة»</b> (لا يظهر للعامة) مع إشعار صاحبه — ويصلك في قائمة المراجعة لتعتمده
-        (استمرار النشر) أو تحظره. القوائم الأساسية مدمجة، ويمكنك إضافة كلمات مخصّصة لكل فئة.
+        عند احتواء الإعلان كلماتٍ من هذه الفئات: إن كان عددها <b className="text-primary">ضمن الحد المسموح</b> تُبدَّل
+        <b className="text-primary"> بنجمات</b> ويُنشر الإعلان للعامة مع إشعار صاحبه (ويظهر لكم في لوحة الإعلانات بشارة «مشكوك فيه»
+        لتبقوه أو تحظروه). وإن <b className="text-red-700">زاد عددها عن الحد</b> يُحظر الإعلان فلا يُنشر.
       </p>
+
+      {/* حد الحظر: أقصى عدد كلمات مخالفة يُسمح بتشفيرها ونشر الإعلان */}
+      <form action={saveGuardBlockCountAction} className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-amber-300 bg-amber-50/60 p-3">
+        <span className="text-sm font-extrabold text-amber-800">حد الحظر:</span>
+        <span className="text-xs font-bold text-muted-foreground">يُنشر الإعلان مع التشفير حتى</span>
+        <input name="count" type="number" min={0} max={50} defaultValue={blockCount} className="h-9 w-20 rounded-lg border-2 border-amber-300 bg-white px-2 text-center text-sm font-extrabold outline-none" />
+        <span className="text-xs font-bold text-muted-foreground">كلمة مخالفة — وما زاد يُحظر. (0 = لا حظر، تشفير دائماً)</span>
+        <Button size="sm">حفظ</Button>
+      </form>
 
       {/* قائمة السماح: جُمل مسموحة تُستثنى من التشفير رغم احتوائها كلمة ممنوعة */}
       <section className="overflow-hidden rounded-2xl border-2 border-emerald-300 bg-white shadow-sm">

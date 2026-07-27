@@ -162,6 +162,13 @@ export async function deleteGuardWordAction(formData: FormData) {
   revalidatePath('/admin/guard-words');
 }
 
+export async function saveGuardBlockCountAction(formData: FormData) {
+  await requireAction('words', 'edit');
+  const n = Math.max(0, Math.min(50, parseInt(String(formData.get('count') || '3')) || 0));
+  await setSetting('guard_block_count', String(n));
+  revalidatePath('/admin/guard-words');
+}
+
 export async function addAllowedPhraseAction(formData: FormData) {
   await requireAction('words', 'add');
   const phrase = String(formData.get('phrase') || '').trim();

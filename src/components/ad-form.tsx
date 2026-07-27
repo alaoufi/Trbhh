@@ -153,6 +153,11 @@ export function AdForm({
           )}
         </div>
       )}
+      {error === 'toomany' && (
+        <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
+          🚫 لم يُنشر إعلانك لاحتوائه كلماتٍ مخالفةً كثيرة{limitMax ? ` (أكثر من الحد المسموح: ${limitMax})` : ''}. عدّل المحتوى وأزِل الكلمات المخالفة ثم أعد النشر.
+        </div>
+      )}
       {error === 'image' && (
         <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
           🚫 رُفضت إحدى الصور لاشتباه المحتوى بأنه غير لائق. الرجاء رفع صور مناسبة للإعلان فقط. تكرار المحاولة قد يؤدي لحظر الحساب.

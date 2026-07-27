@@ -17,7 +17,7 @@ function isExpired(expiresAt: string | null, createdAt: string | null, days: num
   return (Date.now() - new Date(createdAt).getTime()) / 86400000 > days;
 }
 
-export default async function MyClassifiedPage({ searchParams }: { searchParams: Promise<{ updated?: string; deleted?: string; error?: string; reactivated?: string; price?: string; bal?: string; scheduled?: string; review?: string }> }) {
+export default async function MyClassifiedPage({ searchParams }: { searchParams: Promise<{ updated?: string; deleted?: string; error?: string; reactivated?: string; price?: string; bal?: string; scheduled?: string; censored?: string }> }) {
   const session = await requireUser();
   const [items, sp, lifeDays, pricing, balance] = await Promise.all([getMyClassifieds(session.uid), searchParams, getClassifiedLifetimeDays(), getServicePricing(), getBalance(session.uid)]);
   const classifiedSold = serviceHasPrice(pricing.classified);
@@ -39,7 +39,7 @@ export default async function MyClassifiedPage({ searchParams }: { searchParams:
       {sp.deleted === '1' && <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800"><Check className="h-4 w-4" /> تم حذف الإعلان.</div>}
       {sp.reactivated === '1' && <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800"><Check className="h-4 w-4" /> تمت إعادة تفعيل الإعلان وعاد للعرض.</div>}
       {sp.scheduled === '1' && <div className="flex items-center gap-2 rounded-lg border border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🕒 حُفظ إعلانك المبوّب وسيُنشر تلقائياً في الموعد الذي حددته.</div>}
-      {sp.review === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">🔎 حُفظ إعلانك المبوّب وهو <b>قيد مراجعة الإدارة</b> قبل الظهور — احتوى كلماتٍ مشكوكاً فيها فحُجبت بنجمات. قد تعتمده الإدارة أو تحظره.</div>}
+      {sp.censored === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">✳️ نُشر إعلانك المبوّب بعد حجب كلمات مخالفة بنجمات. إن رأيت المنع خطأً راسل الإدارة.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي لإعادة التفعيل{sp.price ? ` (المطلوب ${sp.price} ر.س)` : ''}. راجع <Link href="/account/wallet" className="underline">محفظتي</Link>.</div>}
       {sp.error === 'deleteWindow' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">انتهت المدة المسموح بها لحذف الإعلان حسب إعدادات الموقع. للحذف تواصل مع الإدارة.</div>}
       {sp.error === 'banned' && <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان المبوّب.</div>}

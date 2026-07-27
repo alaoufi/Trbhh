@@ -10,7 +10,7 @@ import { logClientError } from '@/lib/error-log';
 import { aHash, hashSimilarity } from '@/lib/phash';
 import { bumpDupAttempts, banUserFor, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned, notifyModBlock } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd, logAdPublish } from '@/lib/packages';
-import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getServicePricing, serviceHasPrice, getStrikeBanDays } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getServicePricing, serviceHasPrice, getStrikeBanDays, getGuardBlockCount } from '@/lib/settings';
 import { charge, consumeDupCredit } from '@/lib/wallet';
 import { bustAdCaches } from '@/lib/data';
 import { setAdMedia } from '@/lib/ad-media';
@@ -247,12 +247,16 @@ export async function createAdAction(formData: FormData) {
   // منع حشو الكلمات (تكرار العبارات لخداع محرك البحث)
   if (isKeywordStuffing(title, detail)) redirect('/ads/new?error=repeat');
 
-  // فحص المحتوى: بدل حجب الإعلان، تُبدَّل الكلمات الممنوعة بنجمات ويُنشر «قيد المراجعة»
-  // مع إشعار العضو وتنبيه الإدارة (استمرار النشر / حظر من قائمة المراجعة). قائمة السماح
-  // تستثني الجُمل المسموحة (مثل «وايت سكس») فتُشفَّر الكلمة المفردة فقط.
+  // فحص المحتوى: كلمات قليلة مخالفة (حتى الحد المسموح) → تُبدَّل بنجمات ويُنشر الإعلان للعامة.
+  // ما زاد عن الحد → يُحظر الإعلان (لا يُنشر). قائمة السماح تستثني الجُمل المسموحة (مثل «وايت سكس»).
   const guard = await censorGuard(title, detail);
   const finalTitle = guard.parts[0] || title;
   const finalDetail = guard.parts[1] || detail;
+  const blockOver = await getGuardBlockCount().catch(() => 3);
+  if (blockOver > 0 && guard.hits.length > blockOver) {
+    await notifyModBlock(session.uid, `⛔ لم يُنشر إعلانك لاحتوائه ${guard.hits.length} كلمات مخالفة (الحد المسموح ${blockOver}). عدّل المحتوى وأزل الكلمات المخالفة ثم أعد النشر.`, '/ads/new').catch(() => {});
+    redirect(`/ads/new?error=toomany&words=${guard.hits.length}&max=${blockOver}${q}`);
+  }
   let flagTerms = guard.hits.length ? summarizeHits(guard.hits) : '';
 
   // حاجز إغراق صلب لكل الأعضاء (فوق حدود الباقة): يمنع النشر المتسارع
@@ -399,8 +403,6 @@ export async function createAdAction(formData: FormData) {
   }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
-  // محتوى مشكوك فيه: يُنشر «قيد المراجعة» فوراً (لا جدولة مستقبلية) حتى تبتّ الإدارة.
-  if (flagTerms) scheduledAt = null;
   const ad = await prisma.ads.create({
     data: {
       title: finalTitle, detail: finalDetail, price, adsType,
@@ -418,7 +420,7 @@ export async function createAdAction(formData: FormData) {
       commentAllow: formData.get('commentAllow') ? 1 : 0,
       adsSpecial: 'no',
       state: 'active',
-      status: (requireApproval || flagTerms) ? 0 : 1,
+      status: requireApproval ? 0 : 1,
       flag_terms: flagTerms || null,
       price_type: priceType,
       rent_period: rentPeriod,
@@ -499,15 +501,15 @@ export async function createAdAction(formData: FormData) {
       m.notifyOppositeType(toInt(ad.id), title, Number(catId), Number(cityId || '0'), adsType as 'offer' | 'request', session.uid).catch(() => {});
     }).catch(() => {});
   }
-  // محتوى مشكوك فيه: أعلِم العضو أنه قيد المراجعة (نُشر بكلمات مشفَّرة) — قد تعتمده الإدارة أو تحظره.
+  // كلمات مخالفة قليلة: نُشر الإعلان للعامة بعد حجب تلك الكلمات بنجمات — أعلِم صاحبه بذلك.
   if (flagTerms) {
-    await notifyModBlock(session.uid, `تم استلام إعلانك «${finalTitle.slice(0, 40)}» وهو قيد مراجعة الإدارة قبل الظهور — حُجبت كلمات مشكوك فيها بنجمات (${flagTerms}). راجِع محتواك؛ قد تعتمده الإدارة أو تحظره.`, '/account/ads').catch(() => {});
+    await notifyModBlock(session.uid, `نُشر إعلانك «${finalTitle.slice(0, 40)}» بعد حجب كلمات مخالفة بنجمات (${flagTerms}). إن رأيت المنع خطأً راسل الإدارة.`, `/ads/${toInt(ad.id)}`).catch(() => {});
   }
   // نشر من المتجر: أدرِج الإعلان في واجهة المتجر، ثم انتقل إلى إعلانات المتجر (لا للرجوع لصفحة الإضافة)
   if (dest === 'store') {
     const { addStoreProduct, getActiveStoreId, staffStoreId } = await import('@/lib/merchant');
     await addStoreProduct(session.uid, toInt(ad.id)).catch(() => {});
-    if (requireApproval || flagTerms) redirect(`/store?added=${flagTerms ? 'review' : 'pending'}`); // بانتظار المراجعة → لا يظهر بعد
+    if (requireApproval) redirect('/store?added=pending'); // بانتظار الموافقة → لا يظهر بعد
     // المالك أو الموظف — كلاهما يعود لواجهة المتجر الفعّال نفسه
     const sid = (await getActiveStoreId(session.uid).catch(() => 0)) || (await staffStoreId(session.uid).catch(() => 0));
     redirect(sid ? `/companies/${sid}?added=1` : '/store?added=1');
@@ -519,8 +521,8 @@ export async function createAdAction(formData: FormData) {
   if (featuredState === 'ok') extraFlags.push('featured=1');
   if (featuredState === 'need') extraFlags.push('featuredneed=1');
   const needFlags = extraFlags.filter((f) => f.includes('need')).map((f) => `&${f}`).join('');
-  if (flagTerms) redirect(`/account/ads?review=1${needFlags}`);
-  if (scheduledAt) redirect(`/account/ads?scheduled=1${needFlags}`);
+  if (flagTerms && !scheduledAt) redirect(`/account/ads?censored=1${needFlags}`);
+  if (scheduledAt) redirect(`/account/ads?scheduled=1${flagTerms ? '&censored=1' : ''}${needFlags}`);
   if (requireApproval) redirect(`/account/ads?pending=1${needFlags}`);
   redirect(`/ads/${toInt(ad.id)}${extraFlags.length ? `?${extraFlags.join('&')}` : ''}`);
 }

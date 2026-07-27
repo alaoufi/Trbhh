@@ -160,15 +160,15 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
               <span className="text-xs text-muted-foreground">{timeAgo(a.created_at)}</span>
             </div>
 
-            {/* محتوى مشكوك فيه: نُشر بكلمات مشفَّرة (نجمات) وينتظر قراركم — «وافقوا للنشر» أو احظروه أدناه */}
+            {/* محتوى مشكوك فيه: نُشر للعامة بعد حجب كلماته المخالفة بنجمات — راجِعوه؛ أبقوه أو احظروه */}
             {a.flag_terms && (
-              <p className="rounded-md border-2 border-red-400 bg-red-50 px-2 py-1.5 text-[11px] font-extrabold leading-5 text-red-700">
-                ⚠️ محتوى مشكوك فيه (نُشر مشفَّراً بنجمات — قيد المراجعة، لا يظهر للعامة): {a.flag_terms}. راجِعوا المعاينة، ثم <b>وافقوا للنشر</b> أو احظروا الإعلان.
+              <p className="rounded-md border-2 border-amber-400 bg-amber-50 px-2 py-1.5 text-[11px] font-extrabold leading-5 text-amber-800">
+                ✳️ محتوى مشكوك فيه (منشور بكلمات مشفَّرة بنجمات): {a.flag_terms}. راجِعوا المعاينة — أبقوه أو احظروه أدناه.
               </p>
             )}
 
-            {/* سبب الانتظار — يظهر على كل إعلان منتظر (عدا المشكوك فيه، له تنبيهه أعلاه) */}
-            {pending && !a.flag_terms && (
+            {/* سبب الانتظار — يظهر على كل إعلان منتظر */}
+            {pending && (
               <p className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-bold leading-5 text-amber-800">
                 سبب الانتظار: {a.paused_by_owner
                   ? 'أوقفه صاحبه بنفسه — لا يحتاج موافقتكم؛ التاريخ المعروض هو تاريخ إنشاء الإعلان الأصلي'

@@ -34,6 +34,8 @@ export async function getSettingNum(k: string, fallback = 0): Promise<number> {
 
 /** أقصى مدى مستقبلي (بالأيام) لجدولة نشر الإعلانات والمبوّبة — 0 = بلا حد. */
 export const getScheduleMaxDays = () => getSettingNum('schedule_max_days', 30);
+/** أقصى عدد كلمات مخالفة يُسمح بتشفيرها ونشر الإعلان — ما زاد عنه يُحظر الإعلان. (0 = بلا حد) */
+export const getGuardBlockCount = () => getSettingNum('guard_block_count', 3);
 
 export async function setSetting(k: string, v: string) {
   await ensure();

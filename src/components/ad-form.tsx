@@ -370,6 +370,7 @@ export function AdForm({
 
       <Section icon={Tag} title="تفاصيل إضافية">
         <AdExtraFields
+          hideNegotiable={priceMode === 'som'}
           initial={{
             negotiable: initial?.priceType === 'negotiable',
             condition: (initial?.stockState === 0 ? 'new' : initial?.stockState === 1 ? 'used' : 'refurbished') as 'new' | 'used' | 'refurbished',

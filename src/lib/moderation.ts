@@ -111,12 +111,12 @@ export async function unbanUser(userId: number) {
 }
 
 /**
- * درع المتجر (استقلالية المتجر عن الهوية الشخصية): هل يجب إخفاء متجر مالكه المحظور؟
+ * استقلالية المتجر التامّة عن الهوية الشخصية: هل يجب إخفاء متجر مالكه المحظور؟
  * • غير محظور → لا يُخفى.
- * • درع المتجر مُطفأ → أي حظر يُخفي المتجر (السلوك القديم).
- * • درع المتجر مُفعّل → يُخفى فقط إن كان الحظر إدارياً/جسيماً (ban_source ≠ 'auto').
- *   الحظر الآلي غير الجسيم (تكرار/فئة أقل) لا يُسقط المتجر المعتمد — يبقى ظاهراً.
- * ملاحظة: المالك المحظور مؤقتاً لا يدخل لوحة متجره حتى يرفع الحظر، لكن المتجر لا يُدمَّر.
+ * • الاستقلالية مُفعّلة (الافتراضي) → لا يُخفى إطلاقاً بسبب حظر الهوية الشخصية — المتجر
+ *   كيان مستقل يُدار بحالته الخاصة فقط (معتمد/موقوف). لإسقاط متجرٍ متعمَّدين: أوقِفوه من
+ *   إدارة المتاجر (setStoreStatus) — قرار مستقل لا ينزلق تلقائياً من عقوبة شخصية.
+ * • الاستقلالية مُطفأة → أي حظر لمالكه يُخفي المتجر (السلوك القديم المتداخل).
  */
 export async function storeHiddenByOwnerBan(userId: number): Promise<boolean> {
   const r = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { ban: true, ban_until: true, ban_source: true } }).catch(() => null);
@@ -126,12 +126,12 @@ export async function storeHiddenByOwnerBan(userId: number): Promise<boolean> {
   return storeHiddenByBanState(r.ban, r.ban_until, r.ban_source, shieldOn);
 }
 
-/** المُحدِّد الصافي (بلا استعلام) لدرع المتجر — لإعادة استخدامه في القوائم (getStores) بجلب واحد. */
-export function storeHiddenByBanState(ban: string | null | undefined, banUntil: Date | null | undefined, banSource: string | null | undefined, shieldOn: boolean): boolean {
+/** المُحدِّد الصافي (بلا استعلام) لاستقلالية المتجر — لإعادة استخدامه في القوائم (getStores) بجلب واحد. */
+export function storeHiddenByBanState(ban: string | null | undefined, banUntil: Date | null | undefined, _banSource: string | null | undefined, shieldOn: boolean): boolean {
   if (ban !== 'checked') return false;
   if (banUntil && banUntil.getTime() < Date.now()) return false; // حظر مؤقت انتهت مدّته
-  if (!shieldOn) return true; // الدرع مُطفأ → أي حظر يُخفي المتجر
-  return banSource !== 'auto'; // NULL (حظر قديم) أو 'admin' → يُخفي المتجر
+  if (shieldOn) return false; // استقلالية تامّة: حظر الهوية الشخصية لا يُخفي المتجر إطلاقاً
+  return true; // الاستقلالية مُطفأة → أي حظر لمالكه يُخفي المتجر (السلوك القديم)
 }
 
 /** Is the user currently banned? (auto-lifts an expired temporary ban first.) */
@@ -191,7 +191,8 @@ export async function handleProhibited(
   snippet: string,
 ): Promise<ProhibitedOutcome> {
   if (category === 'immoral') {
-    // محتوى جسيم: حظر بمصدر إداري — يُسقط المتجر أيضاً (سلوك ضارّ حقيقي، لا استثناء بدرع المتجر).
+    // محتوى جسيم: حظر بمصدر إداري (تصنيف للسجل/التدقيق). المتجر مستقل ولا يسقط تلقائياً —
+    // لإسقاط متجر صاحب محتوى جسيم أوقِفوه من إدارة المتاجر (قرار مستقل).
     await banUserFor(userId, await getStrikeBanDays(), 'admin');
     await logMod(userId, { kind: 'content', category, term, snippet, action: 'banned' });
     await notifyModBlock(userId, `🚫 تم حظر حسابك بسبب نشر محتوى غير أخلاقي مخالف — الكلمة/العبارة: «${term}».`);

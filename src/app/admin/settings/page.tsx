@@ -222,8 +222,8 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
 
           <label className="mt-3 flex items-start gap-2 rounded-lg border-2 border-emerald-300 bg-emerald-50/60 p-2.5">
             <input type="checkbox" name="storeShieldOn" defaultChecked={storeShieldOn} className="mt-0.5 h-4 w-4 accent-emerald-600" />
-            <span className="text-xs font-bold text-emerald-900">🛡️ درع المتجر — استقلالية المتجر عن الهوية الشخصية
-              <span className="mt-0.5 block font-normal text-muted-foreground">عند تفعيله: الحظر الآلي غير الجسيم (تكرار الإعلانات أو فئة أقل: سياسي/مخدرات/أسلحة) على الهوية الشخصية <b>لا يُسقط</b> متجر المالك المعتمد ولا يخفيه عن العامة — يبقى المتجر مستقلاً. أما الحظر الإداري المتعمَّد والمحتوى غير الأخلاقي/الصور الإباحية فيُخفيان المتجر أيضاً. عند إيقافه: أي حظر يُخفي متجر صاحبه (السلوك السابق).</span>
+            <span className="text-xs font-bold text-emerald-900">🛡️ استقلالية المتجر التامّة عن الهوية الشخصية
+              <span className="mt-0.5 block font-normal text-muted-foreground">عند تفعيله (الافتراضي): حظر الهوية الشخصية على الحساب <b>لا يُخفي متجر المالك المعتمد إطلاقاً</b> — المتجر كيان مستقل يُدار بحالته الخاصة فقط. لإسقاط متجرٍ متعمَّدين أوقِفوه من «إدارة المتاجر» (قرار مستقل). عند إيقافه: أي حظر لمالكه يُخفي متجره (السلوك المتداخل السابق).</span>
             </span>
           </label>
         </Group>

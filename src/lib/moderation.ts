@@ -92,17 +92,46 @@ export async function liftExpiredBans(force = false) {
   }).catch(() => {});
 }
 
+/** مصدر الحظر: 'auto' حظر آلي غير جسيم (لا يُسقط متجراً معتمداً عند تفعيل درع المتجر) ·
+ *  'admin' حظر إداري متعمَّد أو محتوى جسيم (يُخفي المتجر أيضاً). الافتراضي 'admin' حفاظاً
+ *  على السلوك القائم (أي حظر لم يُحدَّد مصدره يُخفي المتجر كما كان). */
+export type BanSource = 'auto' | 'admin';
+
 /** Ban a user for `days` days, or permanently when days ≤ 0. */
-export async function banUserFor(userId: number, days: number) {
+export async function banUserFor(userId: number, days: number, source: BanSource = 'admin') {
   await ensureBanCol();
   const until = days > 0 ? new Date(Date.now() + Math.min(days, 3650) * 86_400_000) : null;
-  await prisma.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'checked', ban_until: until } }).catch(() => {});
+  await prisma.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'checked', ban_until: until, ban_source: source } }).catch(() => {});
 }
 
 /** Lift a user's ban. */
 export async function unbanUser(userId: number) {
   await ensureBanCol();
-  await prisma.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'no', ban_until: null } }).catch(() => {});
+  await prisma.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'no', ban_until: null, ban_source: null } }).catch(() => {});
+}
+
+/**
+ * درع المتجر (استقلالية المتجر عن الهوية الشخصية): هل يجب إخفاء متجر مالكه المحظور؟
+ * • غير محظور → لا يُخفى.
+ * • درع المتجر مُطفأ → أي حظر يُخفي المتجر (السلوك القديم).
+ * • درع المتجر مُفعّل → يُخفى فقط إن كان الحظر إدارياً/جسيماً (ban_source ≠ 'auto').
+ *   الحظر الآلي غير الجسيم (تكرار/فئة أقل) لا يُسقط المتجر المعتمد — يبقى ظاهراً.
+ * ملاحظة: المالك المحظور مؤقتاً لا يدخل لوحة متجره حتى يرفع الحظر، لكن المتجر لا يُدمَّر.
+ */
+export async function storeHiddenByOwnerBan(userId: number): Promise<boolean> {
+  const r = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { ban: true, ban_until: true, ban_source: true } }).catch(() => null);
+  if (!r) return false;
+  const { getStoreShield } = await import('./settings');
+  const shieldOn = await getStoreShield().catch(() => true);
+  return storeHiddenByBanState(r.ban, r.ban_until, r.ban_source, shieldOn);
+}
+
+/** المُحدِّد الصافي (بلا استعلام) لدرع المتجر — لإعادة استخدامه في القوائم (getStores) بجلب واحد. */
+export function storeHiddenByBanState(ban: string | null | undefined, banUntil: Date | null | undefined, banSource: string | null | undefined, shieldOn: boolean): boolean {
+  if (ban !== 'checked') return false;
+  if (banUntil && banUntil.getTime() < Date.now()) return false; // حظر مؤقت انتهت مدّته
+  if (!shieldOn) return true; // الدرع مُطفأ → أي حظر يُخفي المتجر
+  return banSource !== 'auto'; // NULL (حظر قديم) أو 'admin' → يُخفي المتجر
 }
 
 /** Is the user currently banned? (auto-lifts an expired temporary ban first.) */
@@ -162,14 +191,16 @@ export async function handleProhibited(
   snippet: string,
 ): Promise<ProhibitedOutcome> {
   if (category === 'immoral') {
-    await banUserFor(userId, await getStrikeBanDays());
+    // محتوى جسيم: حظر بمصدر إداري — يُسقط المتجر أيضاً (سلوك ضارّ حقيقي، لا استثناء بدرع المتجر).
+    await banUserFor(userId, await getStrikeBanDays(), 'admin');
     await logMod(userId, { kind: 'content', category, term, snippet, action: 'banned' });
     await notifyModBlock(userId, `🚫 تم حظر حسابك بسبب نشر محتوى غير أخلاقي مخالف — الكلمة/العبارة: «${term}».`);
     return { banned: true, left: 0, category };
   }
   const n = await recordStrike(userId, 'content');
   const banned = n >= CONTENT_STRIKE_LIMIT;
-  if (banned) await banUserFor(userId, await getStrikeBanDays());
+  // فئة أقل خطورة (مخدرات/أسلحة/سياسي): حظر آلي بمصدر 'auto' — لا يُسقط متجراً معتمداً عند تفعيل درع المتجر.
+  if (banned) await banUserFor(userId, await getStrikeBanDays(), 'auto');
   await logMod(userId, { kind: 'content', category, term, snippet, action: banned ? 'banned' : 'blocked' });
   await notifyModBlock(
     userId,

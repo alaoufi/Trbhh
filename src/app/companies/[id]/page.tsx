@@ -13,7 +13,7 @@ import { linkedAccounts } from '@/lib/account-links';
 import { hasAnyAdmin } from '@/lib/roles';
 import { recordStoreVisit, classifySource, getStoreViews } from '@/lib/store-analytics';
 import { getBalance } from '@/lib/wallet';
-import { isUserBanned } from '@/lib/moderation';
+import { storeHiddenByOwnerBan } from '@/lib/moderation';
 import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollowing, storeIdOfUser, isCollaborator, collaboratorAds, storeProductAdIds, storeIdByHandle, parseHiddenFields, adViewCounts, DEFAULT_STORE_WELCOME_MSG } from '@/lib/merchant';
 import { fillTemplate } from '@/lib/settings';
 import { WelcomePopup } from '@/components/welcome-popup';
@@ -146,9 +146,10 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
       </div>
     );
   }
-  // صاحب المتجر محظور: الحظر يجب أن يخفي واجهة متجره عن العامة أيضاً — كان يبقى ظاهراً
-  // وقابلاً للتواصل معه بالكامل (منتجات/واتساب/اتصال) رغم حظر حسابه. المالك والإدارة يريانه.
-  if ((await isUserBanned(s.userId).catch(() => false)) && !isOwner && !admin) {
+  // صاحب المتجر محظور: يُخفى المتجر عن العامة عند الحظر الإداري/الجسيم فقط. أما الحظر الآلي
+  // غير الجسيم (تكرار/فئة أقل) فلا يُسقط متجراً معتمداً عند تفعيل «درع المتجر» (استقلالية المتجر
+  // عن الهوية الشخصية). المالك والإدارة يريانه دائماً.
+  if ((await storeHiddenByOwnerBan(s.userId).catch(() => false)) && !isOwner && !admin) {
     return (
       <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-3 px-6 text-center">
         <div className="grid h-16 w-16 place-items-center rounded-2xl bg-red-100 text-red-600 text-3xl">🚫</div>

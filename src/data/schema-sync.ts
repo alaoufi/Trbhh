@@ -280,6 +280,9 @@ const STATEMENTS: string[] = [
   /* ---- moderation ---- */
   `ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`,
   `CREATE INDEX users_ban ON users (ban, ban_until)`,
+  // مصدر الحظر: 'auto' حظر آلي غير جسيم (تكرار/فئة أقل) — لا يُسقط متجراً معتمداً عند تفعيل درع المتجر ·
+  // 'admin' حظر إداري متعمَّد أو محتوى جسيم (غير أخلاقي/صورة إباحية) — يُخفي المتجر · NULL حظر قديم يُعامَل كإداري.
+  `ALTER TABLE users ADD COLUMN ban_source VARCHAR(10) NULL`,
   `ALTER TABLE users ADD COLUMN verify_note VARCHAR(300) NULL`,
   /* التوثيق المدفوع: طلب صاحب المتجر ← موافقة إدارة المتاجر ← خصم الرسوم وتفعيل لمدة أيام.
      status: 0 معلق، 1 نشط (مدفوع)، 2 مرفوض، 3 ملغى (مع استرداد نسبي)، 4 منتهٍ. */

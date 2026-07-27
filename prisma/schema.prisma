@@ -1187,6 +1187,7 @@ model users {
   type                      users_type
   ban                       users_ban  @default(no)
   ban_until                 DateTime?  @db.DateTime(0) // self-provisioned: temporary-ban expiry
+  ban_source                String?    @db.VarChar(10) // 'auto' | 'admin' | null — درع المتجر: يخفي المتجر للحظر الإداري/الجسيم فقط
   token                     String?    @db.Text
   user_ip                   String?    @db.Text
   country_id                Int?

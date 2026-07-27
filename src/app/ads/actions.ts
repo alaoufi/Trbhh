@@ -346,7 +346,7 @@ export async function createAdAction(formData: FormData) {
     const n = await bumpDupAttempts(session.uid);
     await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مطابق لإعلان عضو آخر #${crossDup.id} «${crossDup.title}» — الجديد: ${title.slice(0, 60)}`, adId: crossDup.id });
     if (n >= DUP_LIMIT) {
-      await banUserFor(session.uid, await getStrikeBanDays());
+      await banUserFor(session.uid, await getStrikeBanDays(), 'auto');
       await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر محتوى مطابق لإعلانات أعضاء آخرين.`);
       redirect('/ads/new?error=banned');
     }
@@ -373,7 +373,7 @@ export async function createAdAction(formData: FormData) {
       // يُسجَّل للإدارة: أي إعلان تطابق معه بالضبط (السجل الرقابي) — مع رقم الإعلان الأصلي لعرضه عند اتخاذ القرار
       await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مكرّر مع #${dup.id} «${dup.title}» — الجديد: ${title.slice(0, 60)}`, adId: dup.id });
       if (n >= DUP_LIMIT) {
-        await banUserFor(session.uid, await getStrikeBanDays());
+        await banUserFor(session.uid, await getStrikeBanDays(), 'auto');
         await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان أكثر من مرة.`);
         redirect('/ads/new?error=banned');
       }

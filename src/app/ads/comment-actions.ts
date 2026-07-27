@@ -33,7 +33,7 @@ export async function addCommentAction(formData: FormData) {
     const n = await bumpDupAttempts(session.uid);
     await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `تعليق مكرّر — إعلان #${Number(adId)}`, adId: Number(adId) });
     if (n >= DUP_LIMIT) {
-      await banUserFor(session.uid, await getStrikeBanDays());
+      await banUserFor(session.uid, await getStrikeBanDays(), 'auto');
       await notifyModBlock(session.uid, '🚫 تم حظر حسابك بعد تكرار نشر نفس التعليق.');
       redirect(`/ads/${Number(adId)}?cbanned=1`);
     }

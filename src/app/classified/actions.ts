@@ -195,7 +195,7 @@ export async function createClassifiedAction(formData: FormData) {
     const n = await bumpDupAttempts(session.uid);
     await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مبوّب مطابق لعضو آخر #${crossDup.id} «${crossDup.title}» — الجديد: ${(title || '').slice(0, 60)}` });
     if (n >= DUP_LIMIT) {
-      await banUserFor(session.uid, await getStrikeBanDays());
+      await banUserFor(session.uid, await getStrikeBanDays(), 'auto');
       await notifyModBlock(session.uid, '🚫 تم حظر حسابك بعد تكرار نشر محتوى مطابق لإعلانات مبوّبة لأعضاء آخرين.');
       redirect('/classified/new?error=banned');
     }
@@ -214,7 +214,7 @@ export async function createClassifiedAction(formData: FormData) {
       const n = await bumpDupAttempts(session.uid);
       await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: n >= DUP_LIMIT ? 'banned' : 'blocked' });
       if (n >= DUP_LIMIT) {
-        await banUserFor(session.uid, await getStrikeBanDays());
+        await banUserFor(session.uid, await getStrikeBanDays(), 'auto');
         await notifyModBlock(session.uid, '🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان المبوّب.');
         redirect('/classified/new?error=banned');
       }
@@ -345,7 +345,7 @@ export async function updateClassifiedAction(formData: FormData) {
     const n = await bumpDupAttempts(session.uid);
     await logMod(session.uid, { kind: 'duplicate_cross', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مبوّب مطابق لعضو آخر #${crossDup.id} «${crossDup.title}» (تعديل) — الجديد: ${(title || '').slice(0, 60)}` });
     if (n >= DUP_LIMIT) {
-      await banUserFor(session.uid, await getStrikeBanDays());
+      await banUserFor(session.uid, await getStrikeBanDays(), 'auto');
       await notifyModBlock(session.uid, '🚫 تم حظر حسابك بعد تكرار نشر محتوى مطابق لإعلانات مبوّبة لأعضاء آخرين.');
       redirect('/account/classified?error=banned');
     }
@@ -363,7 +363,7 @@ export async function updateClassifiedAction(formData: FormData) {
       const n = await bumpDupAttempts(session.uid);
       await logMod(session.uid, { kind: 'content', category: 'spam', term: 'classified-duplicate', snippet: `مبوّب مكرّر مع #${dup.id} «${dup.title}»`, action: n >= DUP_LIMIT ? 'banned' : 'blocked' });
       if (n >= DUP_LIMIT) {
-        await banUserFor(session.uid, await getStrikeBanDays());
+        await banUserFor(session.uid, await getStrikeBanDays(), 'auto');
         await notifyModBlock(session.uid, '🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان المبوّب.');
         redirect('/account/classified?error=banned');
       }

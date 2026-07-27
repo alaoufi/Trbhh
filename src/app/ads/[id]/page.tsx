@@ -113,8 +113,14 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     ? await import('@/lib/chat').then((m) => m.listAdminMessagesTo(ad.seller!.id)).catch(() => [])
     : [];
   if ((ad.status !== 1 || ad.state !== 'active') && !ownerViewing && !admin) notFound();
-  // إعلان عضو محظور: لا يراه الزوّار — يبقى لصاحبه وللإدارة (لرفع الحظر/الحذف)
-  if (ad.seller?.banned && !ownerViewing && !admin) notFound();
+  // إعلان عضو محظور: لا يراه الزوّار — يبقى لصاحبه وللإدارة (لرفع الحظر/الحذف).
+  // درع المتجر: منتج متجرٍ لمالكٍ حظرُه آليٌّ غير جسيم يبقى ظاهراً (استقلالية المتجر عن الهوية الشخصية).
+  if (ad.seller?.banned && !ownerViewing && !admin) {
+    const { storeHiddenByOwnerBan } = await import('@/lib/moderation');
+    const { isStoreProductAd } = await import('@/lib/merchant');
+    const shieldedStoreProduct = !(await storeHiddenByOwnerBan(ad.seller.id).catch(() => true)) && (await isStoreProductAd(Number(ad.id)).catch(() => false));
+    if (!shieldedStoreProduct) notFound();
+  }
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
   if (viewerKey && (!session || session.uid !== ad.seller?.id)) {

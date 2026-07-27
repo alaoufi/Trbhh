@@ -258,6 +258,13 @@ export async function setStoreProducts(userId: number, adIds: number[]) {
   if (valid.length) await prisma.store_products.createMany({ data: valid.map((ad_id) => ({ store_id: storeId, ad_id })), skipDuplicates: true }).catch(() => {});
 }
 
+/** هل هذا الإعلان معروضٌ كمنتج في أي متجر؟ (لعزل منتجات المتجر عن حجب البائع الشخصي). */
+export async function isStoreProductAd(adId: number): Promise<boolean> {
+  await ensure();
+  if (!adId) return false;
+  return (await prisma.store_products.count({ where: { ad_id: adId } }).catch(() => 0)) > 0;
+}
+
 /** Append a single owned ad to the store's showcase (used when publishing from the store). */
 export async function addStoreProduct(userId: number, adId: number) {
   await ensure();

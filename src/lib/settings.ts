@@ -538,6 +538,11 @@ export async function getStrikeBanDays(): Promise<number> {
   return Math.max(0, Math.round(await getSettingNum(SETTING_STRIKE_BAN_DAYS, 0)));
 }
 
+/** درع المتجر: عند تفعيله، الحظر الآلي غير الجسيم (تكرار/فئة أقل) لا يُخفي متجر المالك المعتمد
+ *  ولا يُسقطه — يبقى العزل بين الهوية الشخصية والمتجر. الحظر الإداري والمحتوى الجسيم يُخفيان المتجر. */
+export const SETTING_STORE_SHIELD = 'store_shield_on';
+export const getStoreShield = () => getSettingBool(SETTING_STORE_SHIELD, true);
+
 /** Classified-ad duplicate prevention — a toggle plus three thresholds (percent):
  *  content (title+body text), image (perceptual), and background (theme+pattern+accent design). */
 export const SETTING_CDUP_ON = 'cdup_enabled';

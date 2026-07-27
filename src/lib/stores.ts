@@ -3,6 +3,8 @@ import { cache } from 'react';
 import { prisma } from './prisma';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { toInt } from './utils';
+import { storeHiddenByBanState } from './moderation';
+import { getStoreShield } from './settings';
 
 async function logoUrl(logoId: number | null): Promise<string> {
   if (!logoId) return PLACEHOLDER;
@@ -11,11 +13,15 @@ async function logoUrl(logoId: number | null): Promise<string> {
 }
 
 export async function getStores() {
-  const rows = await prisma.stores.findMany({ orderBy: { id: 'desc' }, take: 60 });
+  const [rows, shieldOn] = await Promise.all([
+    prisma.stores.findMany({ orderBy: { id: 'desc' }, take: 60 }),
+    getStoreShield().catch(() => true),
+  ]);
   const list = await Promise.all(
     rows.map(async (s) => {
-      const owner = await prisma.users.findUnique({ where: { id: BigInt(s.user_id) }, select: { name: true, userName: true, trusted: true, ban: true } });
-      if (owner?.ban === 'checked') return null; // صاحب متجر محظور: لا يظهر متجره في الدليل العام
+      const owner = await prisma.users.findUnique({ where: { id: BigInt(s.user_id) }, select: { name: true, userName: true, trusted: true, ban: true, ban_until: true, ban_source: true } });
+      // صاحب متجر محظور إدارياً/جسيماً: لا يظهر في الدليل. الحظر الآلي غير الجسيم لا يُسقط المتجر (درع المتجر).
+      if (storeHiddenByBanState(owner?.ban, owner?.ban_until, owner?.ban_source, shieldOn)) return null;
       return {
         id: toInt(s.id),
         name: owner?.name || owner?.userName || 'شركة',

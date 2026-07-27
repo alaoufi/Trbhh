@@ -8,7 +8,7 @@ import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified, reactivateClassified, setClassifiedStatus, getClassifiedOwnerState } from '@/lib/classified';
 import { hasAnyAdmin } from '@/lib/roles';
-import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS, getStrikeBanDays, getSettingBool, getGuardBlockCount } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS, getStrikeBanDays, getSettingBool } from '@/lib/settings';
 import { charge, consumeDupCredit, addDupCredit, adjustBalance } from '@/lib/wallet';
 import { scanContent, censorGuard, summarizeHits } from '@/lib/content-guard';
 import { handleProhibited, logMod, checkFlood, bumpDupAttempts, banUserFor, notifyModBlock, DUP_LIMIT } from '@/lib/moderation';
@@ -165,15 +165,11 @@ export async function createClassifiedAction(formData: FormData) {
   if (!img && !body && !title) redirect('/classified/new?error=content');
   // جوال أو واتساب إجباري (أحدهما)
   if (!phone && !whatsapp) redirect('/classified/new?error=contact');
-  // فحص المحتوى: كلمات قليلة مخالفة (حتى الحد) → تُبدَّل بنجمات ويُنشر للعامة؛ ما زاد → يُحظر.
+  // سياسة المحتوى النصّي (متّفق عليها): لا يُحظر الإعلان إطلاقاً — تُشفَّر الكلمات المخالفة بنجوم
+  // ويُنشر دائماً، إلا المستثناة (قائمة السماح) فتبقى كما هي. مهما كثرت الكلمات تُشفَّر جميعها.
   const cg = await censorGuard(title, body);
   const cTitle = cg.parts[0] || title;
   const cBody = cg.parts[1] || body;
-  const cBlockOver = await getGuardBlockCount().catch(() => 3);
-  if (cBlockOver > 0 && cg.hits.length > cBlockOver) {
-    await notifyModBlock(session.uid, `⛔ لم يُنشر إعلانك المبوّب لاحتوائه ${cg.hits.length} كلمات مخالفة (الحد المسموح ${cBlockOver}). عدّل المحتوى ثم أعد النشر.`, '/classified/new').catch(() => {});
-    redirect(`/classified/new?error=toomany&words=${cg.hits.length}&max=${cBlockOver}`);
-  }
   const flagTerms = cg.hits.length ? summarizeHits(cg.hits) : '';
   // حاجز إغراق صلب — نفس الحاجز المطبَّق على إعلانات تربح، لم يكن مفعّلاً هنا سابقاً
   const flood = await checkFlood(session.uid);

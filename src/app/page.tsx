@@ -46,7 +46,8 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
   );
 }
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams?: Promise<{ published?: string }> }) {
+  const sp = (await searchParams) || {};
   // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
   const [featured, latest, mostViewed, stats, homeStats, clsText] = await Promise.all([
@@ -95,6 +96,14 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-4">
+      {/* ✅ تأكيد نشر الإعلان — يظهر بعد النشر الناجح والتحويل للرئيسية */}
+      {sp.published && (
+        <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-center text-sm font-extrabold text-emerald-800 shadow-sm">
+          ✅ تم نشر إعلانك بنجاح ويظهر الآن في تربح.
+          {Number(sp.published) > 0 && <> <Link href={`/ads/${Number(sp.published)}`} className="underline">عرض إعلانك</Link></>}
+        </div>
+      )}
+
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 

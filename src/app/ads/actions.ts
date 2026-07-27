@@ -10,7 +10,7 @@ import { logClientError } from '@/lib/error-log';
 import { aHash, hashSimilarity } from '@/lib/phash';
 import { bumpDupAttempts, banUserFor, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned, notifyModBlock } from '@/lib/moderation';
 import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd, logAdPublish } from '@/lib/packages';
-import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getServicePricing, serviceHasPrice, getStrikeBanDays, getGuardBlockCount } from '@/lib/settings';
+import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getServicePricing, serviceHasPrice, getStrikeBanDays } from '@/lib/settings';
 import { charge, consumeDupCredit } from '@/lib/wallet';
 import { bustAdCaches } from '@/lib/data';
 import { setAdMedia } from '@/lib/ad-media';
@@ -255,16 +255,12 @@ export async function createAdAction(formData: FormData) {
   // منع حشو الكلمات (تكرار العبارات لخداع محرك البحث)
   if (isKeywordStuffing(title, detail)) redirect('/ads/new?error=repeat');
 
-  // فحص المحتوى: كلمات قليلة مخالفة (حتى الحد المسموح) → تُبدَّل بنجمات ويُنشر الإعلان للعامة.
-  // ما زاد عن الحد → يُحظر الإعلان (لا يُنشر). قائمة السماح تستثني الجُمل المسموحة (مثل «وايت سكس»).
+  // سياسة المحتوى النصّي (متّفق عليها): الكلمة المخالفة لا تحجب الإعلان إطلاقاً — تُشفَّر بنجوم
+  // فقط ويُنشر الإعلان، إلا إن كانت من الكلمات المستثناة (قائمة السماح مثل «وايت سكس») فتبقى كما هي.
+  // لا حدّ أقصى للحجب: مهما كثرت الكلمات المخالفة تُشفَّر جميعها ويُنشر الإعلان.
   const guard = await censorGuard(title, detail);
   const finalTitle = guard.parts[0] || title;
   const finalDetail = guard.parts[1] || detail;
-  const blockOver = await getGuardBlockCount().catch(() => 3);
-  if (blockOver > 0 && guard.hits.length > blockOver) {
-    await notifyModBlock(session.uid, `⛔ لم يُنشر إعلانك لاحتوائه ${guard.hits.length} كلمات مخالفة (الحد المسموح ${blockOver}). عدّل المحتوى وأزل الكلمات المخالفة ثم أعد النشر.`, '/ads/new').catch(() => {});
-    redirect(`/ads/new?error=toomany&words=${guard.hits.length}&max=${blockOver}${q}`);
-  }
   let flagTerms = guard.hits.length ? summarizeHits(guard.hits) : '';
 
   // حاجز إغراق صلب لكل الأعضاء (فوق حدود الباقة): يمنع النشر المتسارع
@@ -532,7 +528,10 @@ export async function createAdAction(formData: FormData) {
   if (flagTerms && !scheduledAt) redirect(`/account/ads?censored=1${needFlags}`);
   if (scheduledAt) redirect(`/account/ads?scheduled=1${flagTerms ? '&censored=1' : ''}${needFlags}`);
   if (requireApproval) redirect(`/account/ads?pending=1${needFlags}`);
-  redirect(`/ads/${toInt(ad.id)}${extraFlags.length ? `?${extraFlags.join('&')}` : ''}`);
+  // نجاح فوري بلا رسوم إضافية معلّقة: رسالة «تم نشر إعلانك» + تحويل للصفحة الرئيسية حيث يظهر.
+  if (extraFlags.length === 0) redirect(`/?published=${toInt(ad.id)}`);
+  // شراء «عاجل/مميز» أو نقص رصيدهما: ابقَ على صفحة الإعلان لإتمام/معالجة ذلك قربه.
+  redirect(`/ads/${toInt(ad.id)}?${extraFlags.join('&')}`);
 }
 
 export async function updateAdAction(formData: FormData) {

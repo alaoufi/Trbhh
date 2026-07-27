@@ -10,7 +10,7 @@ import { createClassified, getClassifiedById, updateClassified, deleteClassified
 import { hasAnyAdmin } from '@/lib/roles';
 import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS, getStrikeBanDays, getSettingBool } from '@/lib/settings';
 import { charge, consumeDupCredit, addDupCredit, adjustBalance } from '@/lib/wallet';
-import { scanContent, censorGuard, summarizeHits } from '@/lib/content-guard';
+import { censorGuard, summarizeHits } from '@/lib/content-guard';
 import { handleProhibited, logMod, checkFlood, bumpDupAttempts, banUserFor, notifyModBlock, DUP_LIMIT } from '@/lib/moderation';
 import { checkImageBuffer, imageModerationEnabled } from '@/lib/nsfw';
 import { aHash, hashSimilarity } from '@/lib/phash';
@@ -319,12 +319,12 @@ export async function updateClassifiedAction(formData: FormData) {
 
   if (!img && !existing!.image && !body && !title) redirect(`/classified/${id}/edit?error=content`);
   if (!phone && !whatsapp) redirect(`/classified/${id}/edit?error=contact`);
-  // امنع إدخال محتوى ممنوع عبر التعديل بعد نشر نظيف
-  const eBad = await scanContent(title, body);
-  if (eBad) {
-    const o = await handleProhibited(session.uid, eBad.category, eBad.term, `${title || ''} ${body || ''}`);
-    redirect(`/classified/${id}/edit?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : `&left=${o.left}`}`);
-  }
+  // سياسة موحّدة مع الإنشاء: الكلمات المخالفة تُشفَّر بنجوم ولا تحجب الإعلان ولا تحظر الحساب،
+  // والجُمل المستثناة (قائمة السماح) تمرّ عادية تماماً بلا تشفير ولا وسم.
+  const eg = await censorGuard(title, body);
+  const eTitleC = eg.parts[0] ?? (title || '');
+  const eBodyC = eg.parts[1] ?? (body || '');
+  const eFlag = eg.hits.length ? summarizeHits(eg.hits) : '';
 
   const theme = parseInt(String(formData.get('theme') || ''), 10);
   const pos = String(formData.get('pos') || 'bottom');
@@ -373,9 +373,11 @@ export async function updateClassifiedAction(formData: FormData) {
 
   try {
     await updateClassified(id, {
-      title, body, image: newImage ?? undefined, phone, whatsapp, link,
+      title: eTitleC, body: eBodyC, image: newImage ?? undefined, phone, whatsapp, link,
       theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent, layout,
     });
+    // وسم «مشكوك فيه» للإدارة عند تشفير كلمات مفردة (يُفرَغ إن لم يبقَ شيء) — لا حجب.
+    await prisma.classified_ads.updateMany({ where: { id: BigInt(id) }, data: { flag_terms: eFlag || null } }).catch(() => {});
   } catch {
     // فشل الحفظ بعد خصم رصيد التكرار — استرجاعه بدل خسارته على تعديل لم يُحفظ
     if (dupCreditConsumed) await addDupCredit(session.uid, 1);

@@ -553,12 +553,12 @@ export async function updateAdAction(formData: FormData) {
   const eDetail = String(formData.get('detail') || '').trim();
   if (!phone && !whatsapp) redirect(`/ads/${toInt(adId)}/edit?error=contact`);
   if (isKeywordStuffing(eTitle, eDetail)) redirect(`/ads/${toInt(adId)}/edit?error=repeat`);
-  const eBad = await scanContent(eTitle, eDetail);
-  if (eBad) {
-    const o = await handleProhibited(session.uid, eBad.category, eBad.term, `${eTitle} ${eDetail}`);
-    if (o.banned) redirect('/account/ads?error=blocked');
-    redirect(`/ads/${toInt(adId)}/edit?error=blocked&cat=${o.category}&left=${o.left}`);
-  }
+  // سياسة موحّدة مع الإنشاء: الكلمات المخالفة تُشفَّر بنجوم ولا تحجب الإعلان ولا تحظر الحساب،
+  // والجُمل المستثناة (قائمة السماح) تمرّ عادية تماماً بلا تشفير ولا وسم. لا تصنيف حاجب على النصّ.
+  const eGuard = await censorGuard(eTitle, eDetail);
+  const eFinalTitle = eGuard.parts[0] || eTitle;
+  const eFinalDetail = eGuard.parts[1] || eDetail;
+  const eFlagTerms = eGuard.hits.length ? summarizeHits(eGuard.hits) : '';
   await prisma.users.update({
     where: { id: BigInt(session.uid) },
     data: {
@@ -583,8 +583,9 @@ export async function updateAdAction(formData: FormData) {
   await prisma.ads.update({
     where: { id: adId },
     data: {
-      title: eTitle,
-      detail: eDetail,
+      title: eFinalTitle,
+      detail: eFinalDetail,
+      flag_terms: eFlagTerms || null,
       price: ePriceType === 'som' ? 0 : parseFloat(String(formData.get('price') || '0')) || 0,
       adsType: eType,
       price_type: ePriceType,

@@ -510,6 +510,14 @@ const STATEMENTS: string[] = [
     category VARCHAR(12) NOT NULL,
     word VARCHAR(120) NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* جُمل مسموحة تُستثنى من التشفير رغم احتوائها كلمة ممنوعة (مثل «وايت سكس»). */
+  `CREATE TABLE IF NOT EXISTS allowed_phrases (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    phrase VARCHAR(160) NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* الإعلانات المُشفَّرة (محتوى مشكوك فيه نُشر قيد المراجعة) — نص الكلمات المكشوفة للإدارة. */
+  `ALTER TABLE ads ADD COLUMN flag_terms VARCHAR(400) NULL`,
+  `ALTER TABLE classified_ads ADD COLUMN flag_terms VARCHAR(400) NULL`,
 
   /* ---- member preferences & media ---- */
   `CREATE TABLE IF NOT EXISTS member_interests (

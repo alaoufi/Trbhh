@@ -15,7 +15,7 @@ import { charge, consumeDupCredit } from '@/lib/wallet';
 import { bustAdCaches } from '@/lib/data';
 import { setAdMedia } from '@/lib/ad-media';
 import { setUserArea } from '@/lib/user-location';
-import { scanContent } from '@/lib/content-guard';
+import { scanContent, censorGuard, summarizeHits, CATEGORY_LABEL } from '@/lib/content-guard';
 import { scanImages, imageModerationEnabled } from '@/lib/nsfw';
 import { parseMapsUrl, type LatLng } from '@/lib/maps';
 import { toInt } from '@/lib/utils';
@@ -247,13 +247,13 @@ export async function createAdAction(formData: FormData) {
   // منع حشو الكلمات (تكرار العبارات لخداع محرك البحث)
   if (isKeywordStuffing(title, detail)) redirect('/ads/new?error=repeat');
 
-  // فحص ذكي للمحتوى: يمنع السياسي/المخدرات/الأمني/الأخلاقي.
-  // الأخلاقي يحظر فوراً، والبقية تُسجَّل مخالفة ويُحظر عند التكرار (بدون تردد).
-  const badContent = await scanContent(title, detail);
-  if (badContent) {
-    const o = await handleProhibited(session.uid, badContent.category, badContent.term, `${title} ${detail}`);
-    redirect(`/ads/new?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : `&left=${o.left}`}`);
-  }
+  // فحص المحتوى: بدل حجب الإعلان، تُبدَّل الكلمات الممنوعة بنجمات ويُنشر «قيد المراجعة»
+  // مع إشعار العضو وتنبيه الإدارة (استمرار النشر / حظر من قائمة المراجعة). قائمة السماح
+  // تستثني الجُمل المسموحة (مثل «وايت سكس») فتُشفَّر الكلمة المفردة فقط.
+  const guard = await censorGuard(title, detail);
+  const finalTitle = guard.parts[0] || title;
+  const finalDetail = guard.parts[1] || detail;
+  let flagTerms = guard.hits.length ? summarizeHits(guard.hits) : '';
 
   // حاجز إغراق صلب لكل الأعضاء (فوق حدود الباقة): يمنع النشر المتسارع
   const flood = await checkFlood(session.uid);
@@ -314,8 +314,9 @@ export async function createAdAction(formData: FormData) {
   const mediaName = String((formData.get('video') as File | null)?.name || '');
   const nameHit = await scanContent(images.map((i) => i.name).join(' '), mediaName);
   if (nameHit) {
-    const o = await handleProhibited(session.uid, nameHit.category, nameHit.term, `filename: ${images.map((i) => i.name).join(' ')} ${mediaName}`);
-    redirect(`/ads/new?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : `&left=${o.left}`}`);
+    // اسم ملف مشبوه: لا نحجب — نُعلّم الإعلان «قيد المراجعة» لتراجعه الإدارة.
+    const note = `اسم ملف: ${CATEGORY_LABEL[nameHit.category]}`;
+    flagTerms = flagTerms ? `${flagTerms} — ${note}` : note;
   }
 
   // فحص بصري للصور بالذكاء الاصطناعي: الصور الإباحية = حظر فوري صارم
@@ -398,9 +399,11 @@ export async function createAdAction(formData: FormData) {
   }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
+  // محتوى مشكوك فيه: يُنشر «قيد المراجعة» فوراً (لا جدولة مستقبلية) حتى تبتّ الإدارة.
+  if (flagTerms) scheduledAt = null;
   const ad = await prisma.ads.create({
     data: {
-      title, detail, price, adsType,
+      title: finalTitle, detail: finalDetail, price, adsType,
       category_id: catId,
       subcategory_id: subRaw ? Number(subRaw) : null,
       city_id: BigInt(cityId || '0'),
@@ -415,7 +418,8 @@ export async function createAdAction(formData: FormData) {
       commentAllow: formData.get('commentAllow') ? 1 : 0,
       adsSpecial: 'no',
       state: 'active',
-      status: requireApproval ? 0 : 1,
+      status: (requireApproval || flagTerms) ? 0 : 1,
+      flag_terms: flagTerms || null,
       price_type: priceType,
       rent_period: rentPeriod,
       // عروض اليوم + حالة التوفر (يظهر الحقلان عند تفعيلهما من التحكم)
@@ -495,11 +499,15 @@ export async function createAdAction(formData: FormData) {
       m.notifyOppositeType(toInt(ad.id), title, Number(catId), Number(cityId || '0'), adsType as 'offer' | 'request', session.uid).catch(() => {});
     }).catch(() => {});
   }
+  // محتوى مشكوك فيه: أعلِم العضو أنه قيد المراجعة (نُشر بكلمات مشفَّرة) — قد تعتمده الإدارة أو تحظره.
+  if (flagTerms) {
+    await notifyModBlock(session.uid, `تم استلام إعلانك «${finalTitle.slice(0, 40)}» وهو قيد مراجعة الإدارة قبل الظهور — حُجبت كلمات مشكوك فيها بنجمات (${flagTerms}). راجِع محتواك؛ قد تعتمده الإدارة أو تحظره.`, '/account/ads').catch(() => {});
+  }
   // نشر من المتجر: أدرِج الإعلان في واجهة المتجر، ثم انتقل إلى إعلانات المتجر (لا للرجوع لصفحة الإضافة)
   if (dest === 'store') {
     const { addStoreProduct, getActiveStoreId, staffStoreId } = await import('@/lib/merchant');
     await addStoreProduct(session.uid, toInt(ad.id)).catch(() => {});
-    if (requireApproval) redirect('/store?added=pending'); // بانتظار الموافقة → لا يظهر بعد
+    if (requireApproval || flagTerms) redirect(`/store?added=${flagTerms ? 'review' : 'pending'}`); // بانتظار المراجعة → لا يظهر بعد
     // المالك أو الموظف — كلاهما يعود لواجهة المتجر الفعّال نفسه
     const sid = (await getActiveStoreId(session.uid).catch(() => 0)) || (await staffStoreId(session.uid).catch(() => 0));
     redirect(sid ? `/companies/${sid}?added=1` : '/store?added=1');
@@ -511,6 +519,7 @@ export async function createAdAction(formData: FormData) {
   if (featuredState === 'ok') extraFlags.push('featured=1');
   if (featuredState === 'need') extraFlags.push('featuredneed=1');
   const needFlags = extraFlags.filter((f) => f.includes('need')).map((f) => `&${f}`).join('');
+  if (flagTerms) redirect(`/account/ads?review=1${needFlags}`);
   if (scheduledAt) redirect(`/account/ads?scheduled=1${needFlags}`);
   if (requireApproval) redirect(`/account/ads?pending=1${needFlags}`);
   redirect(`/ads/${toInt(ad.id)}${extraFlags.length ? `?${extraFlags.join('&')}` : ''}`);

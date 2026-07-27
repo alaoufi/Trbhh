@@ -10,7 +10,7 @@ import { createClassified, getClassifiedById, updateClassified, deleteClassified
 import { hasAnyAdmin } from '@/lib/roles';
 import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS, getStrikeBanDays, getSettingBool } from '@/lib/settings';
 import { charge, consumeDupCredit, addDupCredit, adjustBalance } from '@/lib/wallet';
-import { scanContent } from '@/lib/content-guard';
+import { scanContent, censorGuard, summarizeHits } from '@/lib/content-guard';
 import { handleProhibited, logMod, checkFlood, bumpDupAttempts, banUserFor, notifyModBlock, DUP_LIMIT } from '@/lib/moderation';
 import { checkImageBuffer, imageModerationEnabled } from '@/lib/nsfw';
 import { aHash, hashSimilarity } from '@/lib/phash';
@@ -165,12 +165,12 @@ export async function createClassifiedAction(formData: FormData) {
   if (!img && !body && !title) redirect('/classified/new?error=content');
   // جوال أو واتساب إجباري (أحدهما)
   if (!phone && !whatsapp) redirect('/classified/new?error=contact');
-  // فحص ذكي للمحتوى — الأخلاقي يحظر فوراً، والأمني/السياسي/المخدرات يُحظر عند التكرار
-  const bad = await scanContent(title, body);
-  if (bad) {
-    const o = await handleProhibited(session.uid, bad.category, bad.term, `${title || ''} ${body || ''}`);
-    redirect(`/classified/new?error=blocked&cat=${o.category}${o.banned ? '&banned=1' : `&left=${o.left}`}`);
-  }
+  // فحص المحتوى: بدل الحجب، تُبدَّل الكلمات الممنوعة بنجمات ويُحفظ الإعلان «قيد المراجعة»
+  // (مخفي حتى تعتمده الإدارة أو تحظره) مع إشعار العضو. قائمة السماح تستثني الجُمل المسموحة.
+  const cg = await censorGuard(title, body);
+  const cTitle = cg.parts[0] || title;
+  const cBody = cg.parts[1] || body;
+  const flagTerms = cg.hits.length ? summarizeHits(cg.hits) : '';
   // حاجز إغراق صلب — نفس الحاجز المطبَّق على إعلانات تربح، لم يكن مفعّلاً هنا سابقاً
   const flood = await checkFlood(session.uid);
   if (flood.blocked) redirect(`/classified/new?error=flood&wait=${flood.waitSec}`);
@@ -259,20 +259,29 @@ export async function createClassifiedAction(formData: FormData) {
 
   try {
     const newId = await createClassified({
-      userId: session.uid, title, body, image, phone, whatsapp, link,
+      userId: session.uid, title: cTitle, body: cBody, image, phone, whatsapp, link,
       theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent, layout,
-      publishAt,
+      publishAt: flagTerms ? null : publishAt, // المشكوك فيه لا يُجدوَل — يُراجَع الآن
     });
-    if (cExpires && newId) await prisma.classified_ads.updateMany({ where: { id: BigInt(newId) }, data: { expires_at: cExpires } }).catch(() => {});
+    if (newId) {
+      const upd: { expires_at?: Date; status?: number; flag_terms?: string } = {};
+      if (cExpires) upd.expires_at = cExpires;
+      if (flagTerms) { upd.status = 0; upd.flag_terms = flagTerms; } // مخفي قيد مراجعة الإدارة
+      if (Object.keys(upd).length) await prisma.classified_ads.updateMany({ where: { id: BigInt(newId) }, data: upd }).catch(() => {});
+    }
   } catch {
     // فشل الحفظ بعد خصم رصيد التكرار و/أو رسوم النشر — استرجاع كل ما خُصم بدل خسارته على نشر لم يتم
     if (dupCreditConsumed) await addDupCredit(session.uid, 1);
     if (fee > 0) await adjustBalance(session.uid, fee, 'refund', { note: 'استرداد رسوم نشر مبوّب فشل حفظه' });
     redirect('/classified/new?error=save');
   }
+  if (flagTerms) {
+    await notifyModBlock(session.uid, `تم استلام إعلانك المبوّب وهو قيد مراجعة الإدارة قبل الظهور — حُجبت كلمات مشكوك فيها بنجمات (${flagTerms}). راجِع محتواك؛ قد تعتمده الإدارة أو تحظره.`, '/account/classified').catch(() => {});
+  }
   revalidatePath('/');
   revalidatePath('/classified');
   revalidatePath('/account/classified');
+  if (flagTerms) redirect('/account/classified?review=1');
   redirect(publishAt ? '/account/classified?scheduled=1' : '/classified?created=1');
 }
 

@@ -162,6 +162,20 @@ export async function deleteGuardWordAction(formData: FormData) {
   revalidatePath('/admin/guard-words');
 }
 
+export async function addAllowedPhraseAction(formData: FormData) {
+  await requireAction('words', 'add');
+  const phrase = String(formData.get('phrase') || '').trim();
+  if (phrase) { const { addAllowedPhrase } = await import('@/lib/content-guard'); await addAllowedPhrase(phrase); }
+  revalidatePath('/admin/guard-words');
+}
+
+export async function deleteAllowedPhraseAction(formData: FormData) {
+  await requireAction('words', 'delete');
+  const id = Number(formData.get('id'));
+  if (id) { const { deleteAllowedPhrase } = await import('@/lib/content-guard'); await deleteAllowedPhrase(id); }
+  revalidatePath('/admin/guard-words');
+}
+
 /** Enable/disable a classified ad (hidden from the site while disabled). */
 export async function toggleClassifiedAction(formData: FormData) {
   await requireAction('classified', 'suspend');

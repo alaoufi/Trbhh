@@ -112,6 +112,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         <div className="card-3d space-y-3 rounded-2xl border-2 border-teal-300 bg-teal-50/40 p-4">
           {added === '1' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ نُشر المنتج وأُضيف لواجهة المتجر.</div>}
           {added === 'pending' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-700">✓ استُلم المنتج وسيظهر بعد موافقة الإدارة.</div>}
+          {added === 'review' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-700">🔎 استُلم المنتج وهو قيد مراجعة الإدارة — احتوى كلمات مشكوكاً فيها فحُجبت بنجمات.</div>}
           <div className="flex items-center gap-2 font-bold text-teal-800">👤 أنت موظف في متجر «{staffStore.name}»</div>
           <p className="text-xs text-muted-foreground">يمكنك إضافة منتجات تظهر باسم المتجر في واجهته — يديرها صاحب المتجر ويستطيع إزالتك في أي وقت.</p>
           <div className="flex flex-wrap gap-2">

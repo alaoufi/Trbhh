@@ -109,6 +109,126 @@ export async function scanContent(...parts: (string | null | undefined)[]): Prom
   return null;
 }
 
+/* ============================================================================
+   التشفير بدل الإيقاف: بدل حجب الإعلان، تُبدَّل الكلمات الممنوعة بنجمات ويُنشر
+   الإعلان «قيد المراجعة» مع إشعار العضو وتنبيه الإدارة. مع قائمة سماح للجُمل
+   (مثل «وايت سكس») تُستثنى كاملةً بينما تُشفَّر الكلمة المفردة.
+   ============================================================================ */
+
+/* ---- قائمة السماح (جُمل مسموحة رغم احتوائها كلمة ممنوعة) ---- */
+let allowCache: { list: string[]; exp: number } = { list: [], exp: 0 };
+async function loadAllowed(): Promise<string[]> {
+  if (Date.now() < allowCache.exp) return allowCache.list;
+  await ensure();
+  const rows = await prisma.allowed_phrases.findMany({ select: { phrase: true } }).catch(() => []);
+  allowCache = { list: rows.map((r) => r.phrase).filter(Boolean), exp: Date.now() + 60000 };
+  return allowCache.list;
+}
+export async function getAllowedPhrases(): Promise<{ id: number; phrase: string }[]> {
+  await ensure();
+  const rows = await prisma.allowed_phrases.findMany({ orderBy: { id: 'desc' } }).catch(() => []);
+  return rows.map((r) => ({ id: Number(r.id), phrase: r.phrase }));
+}
+export async function addAllowedPhrase(phrase: string) {
+  await ensure();
+  // يقبل الجملة بين قوسين أو دونها — نجرّد الأقواس المحيطة ونحفظ الجملة كما هي
+  const w = phrase.trim().replace(/^[([{（]+/, '').replace(/[)\]}）]+$/, '').trim().slice(0, 120);
+  if (!w) return;
+  await prisma.allowed_phrases.create({ data: { phrase: w } }).catch(() => {});
+  allowCache.exp = 0;
+}
+export async function deleteAllowedPhrase(id: number) {
+  await ensure();
+  await prisma.allowed_phrases.deleteMany({ where: { id } }).catch(() => {});
+  allowCache.exp = 0;
+}
+
+/* ---- بناء تعبير نمطي متسامح مع صيغ الحروف العربية والتباعد ---- */
+const LETTER_VARIANTS: Record<string, string> = {
+  'ا': 'اأإآ', 'أ': 'اأإآ', 'إ': 'اأإآ', 'آ': 'اأإآ', 'ي': 'يى', 'ى': 'يى', 'ه': 'هة', 'ة': 'هة',
+};
+function guardCharClass(ch: string): string {
+  const v = LETTER_VARIANTS[ch];
+  if (v) return `[${v}]`;
+  return ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+/** نمط للكلمة/الجملة: مسافات = فاصل واحد+، وبين حروف الكلمة فواصل اختيارية (كشف التحايل). */
+function guardTermPattern(term: string): string {
+  const chars = [...term.trim()];
+  let out = '';
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
+    if (ch === ' ') { out += '[^\\p{L}\\p{N}]+'; continue; }
+    if (i > 0 && chars[i - 1] !== ' ') out += '[^\\p{L}\\p{N}]*';
+    out += guardCharClass(ch);
+  }
+  return out;
+}
+function makeRe(terms: string[], wholeWord: boolean): RegExp | null {
+  const pats = terms.map((t) => t.trim()).filter(Boolean).map(guardTermPattern);
+  if (!pats.length) return null;
+  const body = `(?:${pats.join('|')})`;
+  const src = wholeWord ? `(?<![\\p{L}\\p{N}])${body}(?![\\p{L}\\p{N}])` : body;
+  try { return new RegExp(src, 'giu'); } catch { return null; }
+}
+const stars = (m: string) => '*'.repeat(Math.max(3, [...m].filter((c) => /[\p{L}\p{N}]/u.test(c)).length));
+
+export type GuardHit = { term: string; category: GuardCategory };
+
+/** يبدّل الكلمات الممنوعة بنجمات في نصٍّ واحد، مع استثناء جُمل قائمة السماح.
+ *  يُرجِع النص المشفَّر وقائمة الكلمات المكشوفة (بفئاتها). */
+function censorOne(text: string, allowRe: RegExp | null, cats: { category: GuardCategory; hardRe: RegExp | null; wordRe: RegExp | null }[]): { text: string; hits: GuardHit[] } {
+  if (!text) return { text: text ?? '', hits: [] };
+  const hits: GuardHit[] = [];
+  // 1) احمِ جُمل السماح بإحلال رموز محايدة (NUL+رقم) لا تطابق أي كلمة ممنوعة
+  const saved: string[] = [];
+  let work = text;
+  if (allowRe) {
+    allowRe.lastIndex = 0;
+    work = work.replace(allowRe, (m) => { const tok = `\uE000${saved.length}\uE001`; saved.push(m); return tok; });
+  }
+  // 2) شفّر لكل فئة: الجذور الصريحة (كجزء من كلمة) ثم الكلمات/الجُمل الكاملة
+  for (const c of cats) {
+    for (const re of [c.hardRe, c.wordRe]) {
+      if (!re) continue;
+      re.lastIndex = 0;
+      work = work.replace(re, (m) => { hits.push({ term: normalize(m).slice(0, 40), category: c.category }); return stars(m); });
+    }
+  }
+  // 3) أعِد جُمل السماح كما كانت
+  work = work.replace(/\uE000(\d+)\uE001/g, (_m, i) => saved[Number(i)] ?? '');
+  return { text: work, hits };
+}
+
+/** يشفّر عدة حقول دفعةً واحدة (عنوان + وصف…) ويجمع الكلمات المكشوفة بفئاتها. */
+export async function censorGuard(...parts: (string | null | undefined)[]): Promise<{ parts: string[]; hits: GuardHit[] }> {
+  await Promise.all([loadGuardWords().catch(() => {}), loadAllowed().catch(() => {})]);
+  const allowed = allowCache.list;
+  const allowRe = makeRe(allowed, true);
+  // فئات المطابقة: الجذور الصريحة (HARD) + الكلمات المبنية والمخصّصة لكل فئة
+  const hardByCat: Record<GuardCategory, string[]> = { immoral: [], drugs: [], weapons: [], political: [], charity: [] };
+  for (const h of HARD) hardByCat[h.cat].push(h.sub);
+  const cats = GUARD_CATEGORIES.map((category) => ({
+    category,
+    hardRe: makeRe(hardByCat[category], false),
+    wordRe: makeRe([...BUILTIN[category], ...custom[category]], true),
+  }));
+  const hits: GuardHit[] = [];
+  const outParts = parts.map((p) => { const r = censorOne(p ?? '', allowRe, cats); hits.push(...r.hits); return r.text; });
+  // إزالة التكرار (كلمة+فئة)
+  const seen = new Set<string>();
+  const uniq = hits.filter((h) => { const k = `${h.category}:${h.term}`; if (seen.has(k)) return false; seen.add(k); return true; });
+  return { parts: outParts, hits: uniq };
+}
+
+/** ملخّص نصّي للكلمات المكشوفة لعرضه للإدارة/العضو. */
+export function summarizeHits(hits: GuardHit[]): string {
+  if (!hits.length) return '';
+  const byCat = new Map<GuardCategory, string[]>();
+  for (const h of hits) { const a = byCat.get(h.category) || []; a.push(h.term); byCat.set(h.category, a); }
+  return [...byCat.entries()].map(([c, ws]) => `${CATEGORY_LABEL[c]}: ${[...new Set(ws)].join('، ')}`).join(' — ').slice(0, 380);
+}
+
 /* ---- admin management ---- */
 export async function getGuardWords(): Promise<{ id: number; category: GuardCategory; word: string }[]> {
   await ensure();

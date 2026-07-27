@@ -69,6 +69,7 @@ model ads {
   start_date_price String?
   expires_at       DateTime? @db.DateTime(0)
   cat_reviewed     Int       @default(1) @db.TinyInt
+  flag_terms       String?   @db.VarChar(400)
   profile_id       BigInt?
 
   @@index([category_id], map: "ads_category_id_foreign")
@@ -1510,6 +1511,11 @@ model guard_words {
   word     String @db.VarChar(120)
 }
 
+model allowed_phrases {
+  id     Int    @id @default(autoincrement())
+  phrase String @db.VarChar(160)
+}
+
 model member_interests {
   user_id     BigInt @db.UnsignedBigInt
   category_id Int
@@ -1566,6 +1572,7 @@ model classified_ads {
   link        String?   @db.VarChar(500)
   theme       Int       @default(0) @db.TinyInt
   status      Int       @default(1) @db.TinyInt
+  flag_terms  String?   @db.VarChar(400)
   created_at  DateTime? @default(now()) @db.Timestamp(0)
   content_pos String    @default("bottom") @db.VarChar(10)
   text_align  String    @default("right") @db.VarChar(10)

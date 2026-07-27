@@ -1,8 +1,8 @@
 import { ShieldAlert, Trash2, Plus } from 'lucide-react';
 import { requirePerm } from '@/lib/roles';
-import { getGuardWords, BUILTIN, CATEGORY_LABEL, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
+import { getGuardWords, getAllowedPhrases, BUILTIN, CATEGORY_LABEL, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { Button } from '@/components/ui/button';
-import { addGuardWordAction, deleteGuardWordAction } from '../actions';
+import { addGuardWordAction, deleteGuardWordAction, addAllowedPhraseAction, deleteAllowedPhraseAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +18,7 @@ const COLORS: Record<GuardCategory, string> = {
 
 export default async function GuardWordsPage() {
   await requirePerm('words');
-  const custom = await getGuardWords();
+  const [custom, allowed] = await Promise.all([getGuardWords(), getAllowedPhrases()]);
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
@@ -26,9 +26,40 @@ export default async function GuardWordsPage() {
         <h1 className="text-xl font-extrabold text-primary">كلمات حارس المحتوى</h1>
       </div>
       <p className="text-sm font-bold text-muted-foreground">
-        الحارس يمنع أي إعلان يحتوي هذه الكلمات ضمن فئته. المحتوى <b className="text-red-700">غير الأخلاقي يحظر الحساب فوراً</b>.
-        القوائم الأساسية مدمجة، ويمكنك إضافة كلمات مخصّصة لكل فئة.
+        عند احتواء الإعلان كلمةً من هذه الفئات، تُبدَّل الكلمة <b className="text-primary">بنجمات</b> ويُنشر الإعلان
+        <b className="text-primary"> «قيد مراجعة الإدارة»</b> (لا يظهر للعامة) مع إشعار صاحبه — ويصلك في قائمة المراجعة لتعتمده
+        (استمرار النشر) أو تحظره. القوائم الأساسية مدمجة، ويمكنك إضافة كلمات مخصّصة لكل فئة.
       </p>
+
+      {/* قائمة السماح: جُمل مسموحة تُستثنى من التشفير رغم احتوائها كلمة ممنوعة */}
+      <section className="overflow-hidden rounded-2xl border-2 border-emerald-300 bg-white shadow-sm">
+        <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 p-3 text-white">
+          <h2 className="font-extrabold drop-shadow">✅ جُمل مسموحة (استثناءات)</h2>
+        </div>
+        <div className="space-y-3 p-3">
+          <p className="text-xs font-bold text-muted-foreground">
+            أضف الجملة المسموحة كاملةً (مثل <b>وايت سكس</b>) فتُقبل كما هي، بينما تبقى الكلمة المفردة (مثل «سكس») مشفَّرة بنجمات.
+            تُقبل الجملة بأقواس أو بدونها.
+          </p>
+          <form action={addAllowedPhraseAction} className="flex gap-2">
+            <input name="phrase" required maxLength={120} placeholder="أضف جملة مسموحة… مثل (وايت سكس)" className="h-10 flex-1 rounded-lg border-2 border-emerald-300 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-400" />
+            <Button size="sm" className="gap-1"><Plus className="h-4 w-4" /> إضافة</Button>
+          </form>
+          {allowed.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {allowed.map((p) => (
+                <span key={p.id} className="flex items-center gap-1.5 rounded-lg border-2 border-emerald-300 bg-emerald-50 px-2.5 py-1 text-sm font-bold text-emerald-800">
+                  {p.phrase}
+                  <form action={deleteAllowedPhraseAction}>
+                    <input type="hidden" name="id" value={p.id} />
+                    <ConfirmSubmit msg={`حذف الجملة المسموحة «${p.phrase}»؟`} title="حذف" className="text-destructive hover:opacity-70"><Trash2 className="h-3.5 w-3.5" /></ConfirmSubmit>
+                  </form>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
       {GUARD_CATEGORIES.map((cat) => {
         const words = custom.filter((w) => w.category === cat);

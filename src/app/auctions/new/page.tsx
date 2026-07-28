@@ -4,7 +4,7 @@ import { Gavel } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { auctionsEnabled } from '@/lib/auctions';
 import { getAuctionConfig } from '@/lib/settings';
-import { getMyAds } from '@/lib/account';
+import { getMyIdentityAds } from '@/lib/account';
 import { getBalance } from '@/lib/wallet';
 import { createAuctionAction } from '../actions';
 
@@ -18,7 +18,7 @@ export default async function NewAuctionPage({ searchParams }: { searchParams: P
   if (!(await auctionsEnabled())) notFound();
   const session = await requireUser();
   const { ad, error } = await searchParams;
-  const [cfg, ads, balance] = await Promise.all([getAuctionConfig(), getMyAds(session.uid), getBalance(session.uid)]);
+  const [cfg, ads, balance] = await Promise.all([getAuctionConfig(), getMyIdentityAds(session.uid), getBalance(session.uid)]);
   const eligible = ads.filter((a) => a.status === 1 && !a.storeOnly);
   if (!eligible.length) redirect('/ads/new');
   const preselect = Number(ad || 0);

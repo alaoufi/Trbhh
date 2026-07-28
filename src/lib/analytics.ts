@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from './prisma';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { toInt } from './utils';
+import { scopeWhere, type MyAdsScope } from './account';
 
 const num = (v: number | bigint | null | undefined): number => (typeof v === 'bigint' ? Number(v) : v || 0);
 
@@ -23,10 +24,9 @@ function isoDay(d: Date): string {
 }
 
 /** Build the full analytics snapshot for one seller (all of their ads). */
-export async function getSellerAnalytics(userId: number): Promise<SellerAnalytics> {
-  const uid = BigInt(userId);
+export async function getSellerAnalytics(userId: number, scope?: MyAdsScope): Promise<SellerAnalytics> {
   const ads = await prisma.ads.findMany({
-    where: { user_id: uid },
+    where: scopeWhere(userId, scope), // معزول بالهوية النشطة — تحليلات هذه الهوية فقط
     select: { id: true, title: true, status: true },
     orderBy: { id: 'desc' },
   });
@@ -46,13 +46,15 @@ export async function getSellerAnalytics(userId: number): Promise<SellerAnalytic
   // Daily views for the last 30 days across all the seller's ads.
   const since = new Date(Date.now() - 29 * 86400000);
   since.setHours(0, 0, 0, 0);
+  // معزول بالهوية: نُرشّح بمعرّفات إعلانات الهوية النشطة (ids) لا بـ user_id كامل الحساب
+  const idNums = ids.map((id) => Number(id));
+  const placeholders = idNums.map(() => '?').join(',');
   const rows = await prisma.$queryRawUnsafe<{ d: Date | string; c: number | bigint }[]>(
     `SELECT DATE(v.created_at) AS d, COUNT(*) AS c
        FROM ads_views v
-       JOIN ads a ON a.id = v.ads_id
-      WHERE a.user_id = ? AND v.created_at IS NOT NULL AND v.created_at >= ?
+      WHERE v.ads_id IN (${placeholders}) AND v.created_at IS NOT NULL AND v.created_at >= ?
       GROUP BY DATE(v.created_at)`,
-    userId,
+    ...idNums,
     since,
   ).catch(() => [] as { d: Date | string; c: number | bigint }[]);
 

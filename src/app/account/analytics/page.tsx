@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { Eye, Megaphone, TrendingUp, CalendarDays, ArrowRight, BarChart3 } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getSellerAnalytics } from '@/lib/analytics';
+import { resolveActiveScope } from '@/lib/account';
 import { ViewsChart } from '@/components/views-chart';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,7 @@ function Tile({ icon: Icon, value, label }: { icon: React.ElementType; value: nu
 
 export default async function AnalyticsPage() {
   const session = await requireUser();
-  const a = await getSellerAnalytics(session.uid);
+  const a = await getSellerAnalytics(session.uid, await resolveActiveScope(session.uid));
 
   return (
     <div className="space-y-5">

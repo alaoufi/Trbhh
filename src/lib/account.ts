@@ -32,7 +32,7 @@ export type MyAdsScope = { type: 'personal' | 'store'; id: number; isDefault: bo
  *  - متجر: إعلانات هذا المتجر تحديداً (بهويته، store_only).
  *  - شخصية رئيسية: إعلاناتها + الإعلانات القديمة بلا هوية (توافق) — بلا إعلانات متاجر.
  *  - شخصية إضافية: إعلاناتها فقط. */
-function scopeWhere(userId: number, scope?: MyAdsScope): Prisma.adsWhereInput {
+export function scopeWhere(userId: number, scope?: MyAdsScope): Prisma.adsWhereInput {
   const where: Prisma.adsWhereInput = { user_id: BigInt(userId) };
   if (!scope) return where;
   if (scope.type === 'store') {
@@ -46,12 +46,21 @@ function scopeWhere(userId: number, scope?: MyAdsScope): Prisma.adsWhereInput {
   return where;
 }
 
-/** إعلانات العضو المقيّدة بهويته الفعّالة (من الكوكي) — لصفحة «إعلاناتي». */
-export async function getMyIdentityAds(userId: number) {
+/** نطاق الهوية الفعّالة (من الكوكي) — لعزل كل أسطح «محتواي» (إعلانات/عدّاد/تحليلات) بالهوية. */
+export async function resolveActiveScope(userId: number): Promise<MyAdsScope | undefined> {
   const { getActiveProfile } = await import('./profiles');
   const active = await getActiveProfile(userId).catch(() => null);
-  const scope: MyAdsScope | undefined = active ? { type: active.type, id: active.id, isDefault: active.isDefault } : undefined;
-  return getMyAds(userId, scope);
+  return active ? { type: active.type, id: active.id, isDefault: active.isDefault } : undefined;
+}
+
+/** إعلانات العضو المقيّدة بهويته الفعّالة (من الكوكي) — لصفحة «إعلاناتي». */
+export async function getMyIdentityAds(userId: number) {
+  return getMyAds(userId, await resolveActiveScope(userId));
+}
+
+/** عدد إعلانات الهوية الفعّالة فقط — لبطاقة «إعلاناتي» في لوحة الحساب (يطابق قائمة إعلاناتي). */
+export async function getMyIdentityAdCount(userId: number): Promise<number> {
+  return prisma.ads.count({ where: scopeWhere(userId, await resolveActiveScope(userId)) });
 }
 
 export async function getMyAds(userId: number, scope?: MyAdsScope) {

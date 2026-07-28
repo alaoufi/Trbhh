@@ -63,6 +63,11 @@ export async function getMyIdentityAdCount(userId: number): Promise<number> {
   return prisma.ads.count({ where: scopeWhere(userId, await resolveActiveScope(userId)) });
 }
 
+/** عدد مفضّلة الهوية الفعّالة فقط — لبطاقة «المفضلة» في لوحة الحساب (يطابق صفحة المفضّلة). */
+export async function getMyIdentityFavCount(userId: number): Promise<number> {
+  return prisma.favorites.count({ where: await favScopeWhere(userId) });
+}
+
 export async function getMyAds(userId: number, scope?: MyAdsScope) {
   const rows = await prisma.ads.findMany({ where: scopeWhere(userId, scope), orderBy: { id: 'desc' } });
   const images = await primaryImages(rows.map((r) => r.id));
@@ -120,8 +125,18 @@ export async function getMyStats(userId: number) {
   return { ads, favorites, unread };
 }
 
+/** فلتر المفضّلة المعزول بالهوية النشطة (القديم بلا profile يتبع الافتراضية). */
+async function favScopeWhere(userId: number): Promise<Prisma.favoritesWhereInput> {
+  const scope = await resolveActiveScope(userId);
+  const base: Prisma.favoritesWhereInput = { user_id: BigInt(userId) };
+  if (!scope) return base;
+  if (scope.isDefault) base.OR = [{ profile_id: BigInt(scope.id) }, { profile_id: null }];
+  else base.profile_id = BigInt(scope.id);
+  return base;
+}
+
 export async function getMyFavorites(userId: number) {
-  const favs = await prisma.favorites.findMany({ where: { user_id: BigInt(userId) }, orderBy: { id: 'desc' } });
+  const favs = await prisma.favorites.findMany({ where: await favScopeWhere(userId), orderBy: { id: 'desc' } });
   const adIds = favs.map((f) => f.ads_id);
   if (!adIds.length) return [];
   const ads = await prisma.ads.findMany({ where: { id: { in: adIds } } });
@@ -144,7 +159,7 @@ export async function getMyFavorites(userId: number) {
 }
 
 export async function isFavorited(userId: number, adId: number) {
-  const f = await prisma.favorites.findFirst({ where: { user_id: BigInt(userId), ads_id: BigInt(adId) } });
+  const f = await prisma.favorites.findFirst({ where: { ...(await favScopeWhere(userId)), ads_id: BigInt(adId) } });
   return !!f;
 }
 

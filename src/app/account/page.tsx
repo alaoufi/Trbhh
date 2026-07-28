@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, LayoutTemplate, Wallet, Users, User, Store, Shield } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
-import { getMyStats, getMyIdentityAdCount } from '@/lib/account';
+import { getMyStats, getMyIdentityAdCount, getMyIdentityFavCount } from '@/lib/account';
 import { getBalance } from '@/lib/wallet';
 import { prisma } from '@/lib/prisma';
 import { getMemberAlerts } from '@/lib/alerts';
@@ -24,8 +24,8 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
   const sp = searchParams ? await searchParams : {};
   // نقطة الزيارة اليومية (إن فُعّلت) — لا تؤخر الصفحة
   import('@/lib/points').then((m) => m.grantDailyVisit(session.uid)).catch(() => {});
-  const [stats, adCount, alerts, rating, balance, newNotifs, refOn, welcomeTpl, welcomeSeconds] = await Promise.all([
-    getMyStats(session.uid), getMyIdentityAdCount(session.uid), getMemberAlerts(session.uid), getSellerRating(session.uid), getBalance(session.uid),
+  const [stats, adCount, favCount, alerts, rating, balance, newNotifs, refOn, welcomeTpl, welcomeSeconds] = await Promise.all([
+    getMyStats(session.uid), getMyIdentityAdCount(session.uid), getMyIdentityFavCount(session.uid), getMemberAlerts(session.uid), getSellerRating(session.uid), getBalance(session.uid),
     prisma.notfications.count({ where: { user_id: String(session.uid), read_at: null } }).catch(() => 0),
     referralEnabled(),
     getSetting(SETTING_WELCOME_MEMBER_TEXT, DEFAULT_WELCOME_MEMBER_TEXT),
@@ -42,7 +42,7 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
   const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
   const cards = [
     { href: '/account/ads', label: 'إعلاناتي', value: adCount, icon: Megaphone },
-    { href: '/account/favorites', label: 'المفضلة', value: stats.favorites, icon: Heart },
+    { href: '/account/favorites', label: 'المفضلة', value: favCount, icon: Heart },
     { href: '/messages', label: 'رسائل غير مقروءة', value: stats.unread, icon: Mail },
     { href: '/notifications', label: 'تنبيهات جديدة', value: newNotifs, icon: Bell },
   ];

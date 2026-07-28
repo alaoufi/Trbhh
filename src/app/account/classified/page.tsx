@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Sparkles, Pencil, Trash2, Plus, Check, ExternalLink, RefreshCw } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyClassifieds } from '@/lib/classified';
+import { resolveActiveScope } from '@/lib/account';
 import { getClassifiedLifetimeDays, getServicePricing, serviceHasPrice, DURATIONS } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
 import { ClassifiedCard } from '@/components/classified-card';
@@ -19,7 +20,8 @@ function isExpired(expiresAt: string | null, createdAt: string | null, days: num
 
 export default async function MyClassifiedPage({ searchParams }: { searchParams: Promise<{ updated?: string; deleted?: string; error?: string; reactivated?: string; price?: string; bal?: string; scheduled?: string; censored?: string }> }) {
   const session = await requireUser();
-  const [items, sp, lifeDays, pricing, balance] = await Promise.all([getMyClassifieds(session.uid), searchParams, getClassifiedLifetimeDays(), getServicePricing(), getBalance(session.uid)]);
+  const scope = await resolveActiveScope(session.uid);
+  const [items, sp, lifeDays, pricing, balance] = await Promise.all([getMyClassifieds(session.uid, scope ? { id: scope.id, isDefault: scope.isDefault } : undefined), searchParams, getClassifiedLifetimeDays(), getServicePricing(), getBalance(session.uid)]);
   const classifiedSold = serviceHasPrice(pricing.classified);
   const pricedDurations = DURATIONS.filter((d) => pricing.classified[d.key] > 0);
   const affordableDurations = pricedDurations.filter((d) => pricing.classified[d.key] <= balance);

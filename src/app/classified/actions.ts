@@ -257,11 +257,13 @@ export async function createClassifiedAction(formData: FormData) {
 
   const image = await saveOneImage(img, session.uid);
 
+  // عزل بالهوية: يُنسب المبوّب لهوية ناشره الفعّالة (كالإعلانات) — يظهر لها وحدها في «مبوّباتي»
+  const activeProfileId = await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).then((p) => p.id).catch(() => null);
   try {
     const newId = await createClassified({
       userId: session.uid, title: cTitle, body: cBody, image, phone, whatsapp, link,
       theme: Number.isFinite(theme) ? theme : undefined, pos, align, size, bold, pattern, accent, layout,
-      publishAt,
+      publishAt, profileId: activeProfileId,
     });
     if (newId) {
       const upd: { expires_at?: Date; flag_terms?: string } = {};

@@ -289,9 +289,14 @@ export async function requestNameChangeAction(formData: FormData) {
 export async function toggleFavoriteAction(formData: FormData) {
   const session = await requireUser();
   const adId = BigInt(String(formData.get('adId')));
-  const existing = await prisma.favorites.findFirst({ where: { user_id: BigInt(session.uid), ads_id: adId } });
+  // عزل بالهوية: كل هوية لها مفضّلتها — التبديل يخصّ الهوية النشطة فقط (الافتراضية تشمل القديمة)
+  const active = await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).catch(() => null);
+  const profileClause = active
+    ? (active.isDefault ? { OR: [{ profile_id: BigInt(active.id) }, { profile_id: null }] } : { profile_id: BigInt(active.id) })
+    : {};
+  const existing = await prisma.favorites.findFirst({ where: { user_id: BigInt(session.uid), ads_id: adId, ...profileClause } });
   if (existing) await prisma.favorites.delete({ where: { id: existing.id } });
-  else await prisma.favorites.create({ data: { user_id: BigInt(session.uid), ads_id: adId } });
+  else await prisma.favorites.create({ data: { user_id: BigInt(session.uid), ads_id: adId, profile_id: active ? BigInt(active.id) : null } });
   revalidatePath(`/ads/${toInt(adId)}`);
   revalidatePath('/account/favorites');
 }

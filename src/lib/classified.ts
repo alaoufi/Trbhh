@@ -117,11 +117,18 @@ export async function setClassifiedLifetime(id: number, days: number) {
 
 /** A member's own classified ads (for editing/deleting). */
 export type MyClassified = Classified & { expiresAt: string | null; publishAt: string | null };
-export async function getMyClassifieds(userId: number): Promise<MyClassified[]> {
+export async function getMyClassifieds(userId: number, scope?: { id: number; isDefault: boolean }): Promise<MyClassified[]> {
   await ensureClassifiedTable();
   await loadBanned();
+  // عزل بالهوية النشطة: مبوّبات هذه الهوية فقط (الافتراضية تشمل القديمة بلا profile)
+  let where = 'user_id = ?';
+  const params: (number | string)[] = [userId];
+  if (scope) {
+    if (scope.isDefault) { where += ' AND (profile_id = ? OR profile_id IS NULL)'; params.push(scope.id); }
+    else { where += ' AND profile_id = ?'; params.push(scope.id); }
+  }
   const rows = await prisma.$queryRawUnsafe<Row[]>(
-    `SELECT * FROM classified_ads WHERE user_id = ? ORDER BY id DESC LIMIT 100`, userId,
+    `SELECT * FROM classified_ads WHERE ${where} ORDER BY id DESC LIMIT 100`, ...params,
   ).catch(() => []);
   return rows.map((r) => {
     const raw = r as Row & { expires_at?: Date | string | null; publish_at?: Date | string | null };
@@ -243,7 +250,7 @@ export async function createClassified(data: {
   userId: number | null; title: string | null; body: string | null; image: string | null;
   phone: string | null; whatsapp: string | null; link: string | null;
   theme?: number; pos?: string; align?: string; size?: string; bold?: boolean; pattern?: string; accent?: string; layout?: string;
-  publishAt?: Date | null;
+  publishAt?: Date | null; profileId?: number | null;
 }): Promise<number> {
   await ensureClassifiedTable();
   const theme = typeof data.theme === 'number' && data.theme >= 0
@@ -259,10 +266,11 @@ export async function createClassified(data: {
   // جدولة النشر: موعد مستقبلي ⇐ يبقى مخفياً (status 0) حتى يرقّيه الناشر الكسول في وقته
   const sched = data.publishAt && data.publishAt.getTime() > Date.now() ? data.publishAt : null;
   const status = sched ? 0 : 1;
+  const profileId = data.profileId != null && data.profileId > 0 ? data.profileId : null;
   try {
     await prisma.$executeRawUnsafe(
-      `INSERT INTO classified_ads (user_id, title, body, image, phone, whatsapp, link, theme, content_pos, text_align, font_size, bold, pattern, accent, layout, status, publish_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      data.userId, data.title, data.body, data.image, data.phone, data.whatsapp, data.link, theme, pos, align, size, bold, pattern, accent, layout, status, sched,
+      `INSERT INTO classified_ads (user_id, title, body, image, phone, whatsapp, link, theme, content_pos, text_align, font_size, bold, pattern, accent, layout, status, publish_at, profile_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      data.userId, data.title, data.body, data.image, data.phone, data.whatsapp, data.link, theme, pos, align, size, bold, pattern, accent, layout, status, sched, profileId,
     );
   } catch {
     // fallback: guarantee the ad persists even if the style columns are unavailable

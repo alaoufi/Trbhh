@@ -298,13 +298,19 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      {/* إضافة هوية جديدة */}
+      {/* إضافة حساب (هوية شخصية) — مطويّة خلف زر، تنفتح حقولها عند الضغط فقط (لا حقول مفتوحة مربكة) */}
       <div className="card-3d rounded-2xl p-4">
-        <h2 className="mb-1 flex items-center gap-1 text-sm font-extrabold text-primary"><Plus className="h-4 w-4" /> إضافة هوية شخصية جديدة</h2>
-        {paidOn
-          ? <p className="mb-3 text-xs text-amber-700">الهويات الإضافية ضمن <b>باقة اشتراك</b> (أدناه) — الحساب الرئيسي مجاني دائماً. {memberSub?.active ? `المتاح لك الآن: ${memberSub.slots >= 999 ? 'غير محدود' : memberSub.slots} هوية.` : 'اشترك بباقة لإضافة هويات.'}</p>
-          : <p className="mb-3 text-xs text-muted-foreground">أضِف هوية للنشر باسمها وأيقونتها ولونها — الجوال للمراسلات فقط.</p>}
-        <ProfileForm />
+        <h2 className="mb-1 flex items-center gap-1 text-sm font-extrabold text-primary"><UserRound className="h-4 w-4" /> الحسابات (الهويات الشخصية)</h2>
+        <p className="mb-3 text-xs text-muted-foreground">هوية للنشر باسمها وأيقونتها ولونها المستقل — الجوال للمراسلات فقط.</p>
+        <details open={['limit', 'handle', 'name', 'needsub'].includes(sp.error || '')}>
+          <summary className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90"><Plus className="h-4 w-4" /> إضافة حساب جديد</summary>
+          <div className="mt-3 rounded-lg border border-primary/15 bg-primary/5 p-3">
+            {paidOn
+              ? <p className="mb-3 text-xs text-amber-700">الهويات الإضافية ضمن <b>باقة اشتراك</b> (أدناه) — الحساب الرئيسي مجاني دائماً. {memberSub?.active ? `المتاح لك الآن: ${memberSub.slots >= 999 ? 'غير محدود' : memberSub.slots} هوية.` : 'اشترك بباقة لإضافة هويات.'}</p>
+              : <p className="mb-3 text-xs text-muted-foreground">أضِف هوية للنشر باسمها وأيقونتها ولونها.</p>}
+            <ProfileForm />
+          </div>
+        </details>
       </div>
 
       {/* المتاجر — فتح متجر (وتعدّد المتاجر) */}

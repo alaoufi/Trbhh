@@ -89,7 +89,7 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
                                 <span className="shrink-0 rounded px-1 text-[9px] font-extrabold text-white" style={{ background: p.type === 'store' ? '#059669' : '#0284c7' }}>{p.type === 'store' ? 'متجر' : 'حساب'}</span>
                                 <span className="truncate">{p.name}</span>
                               </span>
-                              <span className="block text-[11px] text-muted-foreground">{p.type === 'store' ? `🏬 مسجّلة في: متجر «${p.name}» — مستقلّة · الرقم الداخلي #${p.id}` : `🟢 مسجّلة في: تربح (إعلانات عامة) · الرقم الداخلي #${p.id}`}</span>
+                              <span className="block text-[11px] text-muted-foreground">{p.type === 'store' ? `🏬 مسجّلة في: متجر «${p.name}» — مستقلّة` : '🟢 مسجّلة في: تربح (إعلانات عامة)'}</span>
                             </span>
                             {isActive && <Check className="h-4 w-4 shrink-0 text-emerald-600" />}
                           </button>

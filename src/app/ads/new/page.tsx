@@ -64,7 +64,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
           <div className="mt-0.5 text-[11px] text-muted-foreground">
             {publishingAsStore
               ? 'الإعلان يظهر لزوّار متجرك فقط، لا في قوائم تربح العامة — مستقلّ تماماً عن هويتك الشخصية.'
-              : `الإعلان يظهر في تربح للجميع باسم هذه الهوية · الرقم الداخلي #${active.id} — مستقلّ تماماً عن أي متجر.`}
+              : 'الإعلان يظهر في تربح للجميع باسم هذه الهوية — مستقلّ تماماً عن أي متجر.'}
           </div>
         </div>
       )}

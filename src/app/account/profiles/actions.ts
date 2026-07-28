@@ -70,9 +70,30 @@ export async function updateProfileAction(formData: FormData) {
   const avatar = await saveAvatar(formData, session.uid);
   const r = await updatePersonalProfile(session.uid, profileId, { ...fields(formData), avatar });
   if (!r.ok) redirect(`/account/profiles?error=${r.error}`);
-  revalidatePath('/account/profiles');
-  revalidatePath('/');
+  // إن كانت الهوية المعدّلة هي النشطة، طبّق قالبها الجديد فوراً على الموقع (كوكي theme) — تغيير
+  // تلقائي بلا حاجة لتبديل الهوية أو تحديث الصفحة؛ اللوحة الكاملة الجديدة تظهر مباشرةً.
+  const { getActiveProfile, setThemeCookie } = await import('@/lib/profiles');
+  const active = await getActiveProfile(session.uid).catch(() => null);
+  if (active && active.id === profileId) {
+    const { normTheme } = await import('@/lib/identity-themes');
+    await setThemeCookie(normTheme(String(formData.get('theme') || '')));
+  }
+  revalidatePath('/', 'layout'); // يُعيد تصيير القالب (data-theme) في التخطيط بالكامل
   redirect('/account/profiles?saved=1');
+}
+
+/** تطبيق قالب الهوية فوراً عند اختيار اللون (بلا زر حفظ). يُستدعى مباشرةً من منتقي القوالب.
+ *  يحفظ القالب لهذه الهوية، وإن كانت هي النشطة يحدّث كوكي theme فيتغيّر لون الموقع الكامل فوراً. */
+export async function setProfileThemeAction(profileId: number, theme: string) {
+  const session = await requireUser();
+  const { setProfileTheme, getActiveProfile, setThemeCookie } = await import('@/lib/profiles');
+  const { normTheme } = await import('@/lib/identity-themes');
+  const t = normTheme(theme);
+  const ok = await setProfileTheme(session.uid, Number(profileId), t);
+  if (!ok) return;
+  const active = await getActiveProfile(session.uid).catch(() => null);
+  if (active && active.id === Number(profileId)) await setThemeCookie(t);
+  revalidatePath('/', 'layout');
 }
 
 export async function deleteProfileAction(formData: FormData) {

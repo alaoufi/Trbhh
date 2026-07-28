@@ -10,7 +10,7 @@ import { getMemberIdentitySub, getIdentityPlans, planPrice, DURATION_LABEL, type
 import { getMergeCandidates } from '@/lib/account-merge';
 import { linkedAccounts } from '@/lib/account-links';
 import { getBalance } from '@/lib/wallet';
-import { IDENTITY_THEMES } from '@/lib/identity-themes';
+import { IdentityThemePicker } from '@/components/identity-theme-picker';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { switchAccountAction } from '@/app/account/actions';
 import { createNewStoreAction } from '@/app/account/company/actions';
@@ -24,7 +24,7 @@ export const metadata = { title: 'الحسابات الموحدة — حسابا
 const field = 'w-full rounded-lg border-2 border-primary/25 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-primary/40';
 const lbl = 'mb-1 block text-xs font-bold text-foreground/70';
 
-function ProfileForm({ p }: { p?: Profile }) {
+function ProfileForm({ p, activeId }: { p?: Profile; activeId?: number }) {
   const edit = !!p;
   return (
     <form action={edit ? updateProfileAction : addProfileAction} encType="multipart/form-data" className="space-y-3">
@@ -56,18 +56,8 @@ function ProfileForm({ p }: { p?: Profile }) {
         </div>
       </div>
       <div>
-        <label className={lbl}>قالب الهوية (لون الموقع عند تفعيلها — للتفريق بينها)</label>
-        <div className="flex flex-wrap items-center gap-2">
-          {IDENTITY_THEMES.map((t) => (
-            <label key={t.key} className="relative cursor-pointer" title={t.name}>
-              <input type="radio" name="theme" value={t.key} defaultChecked={(p?.theme || '') === t.key} className="peer sr-only" />
-              <span className="flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ring-2 ring-transparent peer-checked:ring-foreground" style={{ borderColor: t.hex, color: t.hex }}>
-                <span className="h-3.5 w-3.5 rounded-full" style={{ background: t.hex }} /> {t.name}
-              </span>
-            </label>
-          ))}
-        </div>
-        <p className="mt-1 text-[11px] text-muted-foreground">عند تفعيل هذه الهوية يتغيّر قالب الموقع للونها لتعرف بأي هوية تعمل.</p>
+        <label className={lbl}>قالب الهوية (لون الموقع الكامل عند تفعيلها — للتفريق بينها)</label>
+        <IdentityThemePicker profileId={p?.id || 0} value={p?.theme || ''} isActive={!!p && activeId === p.id} autosave={edit} />
       </div>
       <button className="flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90">
         {edit ? <><Check className="h-4 w-4" /> حفظ التعديلات</> : <><Plus className="h-4 w-4" /> إضافة الهوية</>}
@@ -238,7 +228,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
               <details className="mt-2">
                 <summary className="cursor-pointer text-xs font-bold text-primary"><Pencil className="mb-0.5 inline h-3 w-3" /> تعديل بيانات هذه الهوية</summary>
                 <div className="mt-3 rounded-lg border border-primary/15 bg-primary/5 p-3">
-                  <ProfileForm p={p} />
+                  <ProfileForm p={p} activeId={active.id} />
                   {!p.isDefault && (
                     <form action={deleteProfileAction} className="mt-3 border-t pt-2">
                       <input type="hidden" name="profileId" value={p.id} />

@@ -245,6 +245,15 @@ export async function updatePersonalProfile(userId: number, profileId: number, d
   return { ok: true };
 }
 
+/** حفظ قالب هوية شخصية فقط (بلا بقية الحقول) — للتطبيق الفوري عند اختيار اللون بلا زر حفظ. */
+export async function setProfileTheme(userId: number, profileId: number, theme: string): Promise<boolean> {
+  await ensure();
+  const p = await ownedPersonalProfile(userId, profileId);
+  if (!p) return false;
+  await prisma.profiles.update({ where: { id: BigInt(profileId) }, data: { theme: normTheme(theme) || null } }).catch(() => {});
+  return true;
+}
+
 /** حذف هوية شخصية غير افتراضية — إعلاناتها تبقى (تُنسب لاحقاً بهويتها المحفوظة). */
 export async function deletePersonalProfile(userId: number, profileId: number): Promise<boolean> {
   await ensure();

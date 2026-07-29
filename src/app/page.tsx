@@ -5,6 +5,7 @@ import {
   getFeaturedAds,
   getHomeLatestAds,
   getMostViewedAds,
+  getTopRatedAds,
   getStats,
   getPersonalizedAds,
 } from '@/lib/data';
@@ -50,10 +51,11 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const sp = (await searchParams) || {};
   // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
-  const [featured, latest, mostViewed, stats, homeStats, clsText] = await Promise.all([
+  const [featured, latest, mostViewed, topRated, stats, homeStats, clsText] = await Promise.all([
     getFeaturedAds(8),
     getHomeLatestAds(),
     getMostViewedAds(8),
+    getTopRatedAds(8),
     getStats(),
     getHomeStats().catch(() => new Set(['ads', 'users', 'views'])),
     getHomeClassifiedText().catch(() => ({ title: 'الإعلانات المبوّبة', sub: 'تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي' })),
@@ -229,6 +231,12 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
       {mostViewed.length > 0 && (
         <Section title={H.mostViewed}>
           <AdGrid ads={mostViewed} />
+        </Section>
+      )}
+
+      {topRated.length > 0 && (
+        <Section title="⭐ الأعلى تقييماً" href="/search">
+          <AdGrid ads={topRated} />
         </Section>
       )}
 

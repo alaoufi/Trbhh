@@ -390,6 +390,23 @@ export async function getMostViewedAds(take = 8) {
   return cached(`ads:mostviewed:${take}`, 120, () => loadMostViewedAds(take));
 }
 
+/** الأعلى تقييماً: إعلانات نالت أعلى متوسط نجوم (بعيّنة كافية ≥3) — يبرزها للزبائن في الرئيسية. */
+export async function getTopRatedAds(take = 8) {
+  return cached(`ads:toprated:${take}`, 180, async () => {
+    const groups = await prisma.review_ads.groupBy({
+      by: ['ads_id'], _avg: { star: true }, _count: { _all: true },
+      orderBy: { _avg: { star: 'desc' } }, take: 80,
+    }).catch(() => [] as { ads_id: bigint; _avg: { star: number | null }; _count: { _all: number } }[]);
+    const top = groups.filter((g) => (g._count._all || 0) >= 3 && (g._avg.star || 0) >= 4).slice(0, take * 2);
+    const ids = top.map((g) => g.ads_id);
+    if (!ids.length) return [];
+    const rows = await prisma.ads.findMany({ where: { id: { in: ids }, ...activeAdWhere() }, select: adSelect });
+    const cards = await toCards(rows);
+    const order = new Map(top.map((g, i) => [toInt(g.ads_id), i]));
+    return cards.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999)).slice(0, take);
+  });
+}
+
 async function loadMostViewedAds(take: number) {
   const groups = await prisma.ads_views.groupBy({
     by: ['ads_id'],

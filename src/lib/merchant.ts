@@ -273,7 +273,24 @@ export async function addStoreProduct(userId: number, adId: number) {
   if (!storeId || !adId) return;
   const owns = await prisma.ads.findFirst({ where: { id: BigInt(adId), user_id: BigInt(userId) }, select: { id: true } }).catch(() => null);
   if (!owns) return;
-  await prisma.store_products.createMany({ data: [{ store_id: storeId, ad_id: adId }], skipDuplicates: true }).catch(() => {});
+  const res = await prisma.store_products.createMany({ data: [{ store_id: storeId, ad_id: adId }], skipDuplicates: true }).catch(() => ({ count: 0 }));
+  // تنبيه متابعي المتجر بالمنتج الجديد («جديد في متجر تتابعه») — فقط عند إضافة حقيقية (لا تكرار)
+  if (res.count > 0) await notifyStoreFollowers(storeId, adId, userId).catch(() => {});
+}
+
+/** يُنبّه متابعي المتجر بمنتج جديد — بإدراج جماعي واحد (كفؤ) مع حدّ أمان للعدد. */
+async function notifyStoreFollowers(storeId: number, adId: number, ownerId: number): Promise<void> {
+  const followers = await prisma.store_follows.findMany({ where: { store_id: storeId, user_id: { not: ownerId } }, select: { user_id: true }, take: 3000 }).catch(() => []);
+  if (!followers.length) return;
+  const [meta, ad] = await Promise.all([
+    getStoreMeta(storeId).catch(() => null),
+    prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { title: true } }).catch(() => null),
+  ]);
+  const storeName = meta?.storeName || 'متجر تتابعه';
+  const title = `🏬 جديد في متجر «${storeName}» الذي تتابعه: ${(ad?.title || 'منتج جديد').slice(0, 70)}`;
+  const route = `/companies/${storeId}`;
+  const data = followers.map((f) => ({ title, route, user_id: String(f.user_id), type: 'other' }));
+  await prisma.notfications.createMany({ data }).catch(() => {});
 }
 
 /* ---- موظفو المتجر (staff_on): يضيفهم المالك برقم الجوال ليضيفوا منتجات باسم المتجر ---- */

@@ -19,6 +19,7 @@ import { getSession } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
 import { AdPixels } from '@/components/ad-pixels';
 import { VerifySeal } from '@/components/verify-seal';
+import { SealReposition } from '@/components/seal-reposition';
 
 const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', display: 'swap' });
 
@@ -155,6 +156,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             ليجد العنصر (المُصيَّر من الخادم) ويرسم الشارة — مطابقةً لكود التضمين الرسمي. */}
         <VerifySeal />
         <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="afterInteractive" />
+        <SealReposition />
       </body>
     </html>
   );

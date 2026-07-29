@@ -18,6 +18,7 @@ import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
 import { AdPixels } from '@/components/ad-pixels';
+import { VerifySeal } from '@/components/verify-seal';
 
 const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', display: 'swap' });
 
@@ -121,8 +122,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       {...(validDesigns.includes(design) ? { 'data-design': design } : {})}
     >
       <body className="min-h-screen font-sans antialiased">
-        {/* ختم التوثيق «متجر موثّق» — يُحمَّل مبكراً ليجد عنصر الختم (في الهيدر) ويرسمه */}
-        <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="beforeInteractive" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         {/* بيكسلات التتبع الإعلاني (Meta/Google Ads/TikTok/Snapchat) — لا تعمل
             إطلاقاً إلا بعد ضبط معرّفاتها الحقيقية في متغيرات البيئة على الخادم. */}
@@ -151,6 +150,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ForceUpdateGate />
         <InstallPrompt />
         <PwaRegister />
+        {/* ختم التوثيق «متجر موثّق» (المركز السعودي للأعمال) — شارة عائمة تُثبَّت أسفل يسار
+            الصفحة. نسخة واحدة على مستوى الموقع، والسكربت الرسمي يُحمَّل async بعد رسم الصفحة
+            ليجد العنصر (المُصيَّر من الخادم) ويرسم الشارة — مطابقةً لكود التضمين الرسمي. */}
+        <VerifySeal />
+        <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="afterInteractive" />
       </body>
     </html>
   );

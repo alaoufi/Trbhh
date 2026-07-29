@@ -94,6 +94,22 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 {timeAgo(ad.createdAt)}
                 {contactStatsOn && (() => { const c = contacts.get(ad.id); return c && (c.whatsapp + c.call) > 0 ? <> • 💬 {c.whatsapp} واتساب • 📞 {c.call} اتصال</> : null; })()}
               </span>
+              {/* نصائح تحسين الإعلان — لزيادة وصوله وجذب العملاء (للإعلانات النشطة في تربح) */}
+              {ad.status === 1 && !ad.storeOnly && (() => {
+                const tips: string[] = [];
+                if (ad.image.includes('placeholder')) tips.push('📷 أضِف صورة — الإعلانات المصوّرة تُشاهد أضعافاً.');
+                if ((ad.title || '').trim().length < 15) tips.push('✍ وسّع العنوان بكلمات يبحث عنها العملاء.');
+                if (ad.adsType !== 'request' && (ad.price ?? 0) <= 0) tips.push('💰 أضِف سعراً واضحاً — يزيد جدّية المشترين.');
+                const v = viewCounts.get(ad.id) || 0;
+                const ageDays = ad.createdAt ? (now - new Date(ad.createdAt).getTime()) / 86400000 : 0;
+                if (ageDays > 3 && v < 20) tips.push('⬆ حدّث إعلانك ليعود لمقدمة القوائم ويزيد ظهوره.');
+                if (!tips.length) return null;
+                return (
+                  <span className="mt-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-bold leading-5 text-sky-800">
+                    💡 لجذب عملاء أكثر: {tips.slice(0, 3).join(' ')}
+                  </span>
+                );
+              })()}
               {ad.status !== 1 && (
                 <span className={`mt-1 rounded-md px-2 py-1 text-[11px] font-bold leading-4 ${ad.hiddenReason ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
                   {ad.hiddenReason

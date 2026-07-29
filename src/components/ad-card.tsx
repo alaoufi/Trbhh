@@ -80,9 +80,12 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
           </h3>
           {ad.storeName && <div className="mt-1 min-w-0"><StoreTag name={ad.storeName} /></div>}
           {(ad.ratingCount ?? 0) > 0 && (
-            <div className="mt-1 flex items-center gap-1 text-xs font-extrabold text-amber-600">
+            <div className="mt-1 flex flex-wrap items-center gap-1 text-xs font-extrabold text-amber-600">
               <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {ad.ratingAvg}
               <span className="font-normal text-muted-foreground">({ad.ratingCount} تقييم)</span>
+              {(ad.ratingAvg ?? 0) >= 4.5 && (ad.ratingCount ?? 0) >= 3 && (
+                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-700">🏆 موصى به</span>
+              )}
             </div>
           )}
         </div>

@@ -27,6 +27,8 @@ import { ExpandableDetail } from '@/components/expandable-detail';
 import { TrackedContact } from '@/components/ad-contact-track';
 import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
+import { getAdRating, getAdReviews, canReviewAd, myAdReview, adReviewsEnabled } from '@/lib/ad-reviews';
+import { AdReviews } from '@/components/ad-reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
 import { buyUrgentAction, featureAdAction, bumpAdAction, deleteAdAction, archiveAdAction, restoreArchivedAdAction } from '@/app/account/actions';
@@ -89,7 +91,7 @@ function fmtAdminMsgDate(iso: string | null) {
   return isNaN(d.getTime()) ? '' : `— ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d)}`;
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string; adshow?: string; dupid?: string; price?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string; adshow?: string; dupid?: string; price?: string; rated?: string; rerror?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -127,12 +129,17 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     await recordView(ad.id, viewerKey);
   }
 
-  const [comments, favorited, similarRaw, sellerAds, sellerRating] = await Promise.all([
+  const [comments, favorited, similarRaw, sellerAds, sellerRating, reviewsOn, adRating, adReviewList, canReviewThis, myReview] = await Promise.all([
     getComments(ad.id),
     session ? isFavorited(session.uid, ad.id) : Promise.resolve(false),
     ad.category ? getSimilarAds(ad.id, ad.category.id, 6) : Promise.resolve([]),
     ad.seller ? getSellerAds(ad.seller.id, ad.id, 6).catch(() => []) : Promise.resolve([]),
     ad.seller ? getSellerRating(ad.seller.id) : Promise.resolve({ avg: 0, count: 0 }),
+    adReviewsEnabled(),
+    getAdRating(ad.id),
+    getAdReviews(ad.id),
+    canReviewAd(ad.id, session?.uid, ad.seller?.id),
+    session ? myAdReview(ad.id, session.uid) : Promise.resolve(null),
   ]);
   // «ذات صلة» لنفس المعلن — و«المشابهة» بلا تكرار لما ظهر في إعلانات المعلن
   const sellerAdIds = new Set(sellerAds.map((a) => a.id));
@@ -659,6 +666,18 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           <FavoriteButton adId={ad.id} active={favorited} disabled={!session} compact />
         </div>
       </div>
+
+      {/* تقييم الإعلان وتجارب العملاء — يظهر لغير صاحب الإعلان عند تفعيله من الإدارة */}
+      {reviewsOn && !ownerViewing && (
+        <AdReviews
+          adId={ad.id}
+          rating={adRating}
+          reviews={adReviewList}
+          canReview={canReviewThis}
+          hasMine={!!myReview}
+          notice={spx.rated === '1' ? 'rated' : spx.rerror}
+        />
+      )}
 
       {/* Comments */}
       {ad.commentAllow && (

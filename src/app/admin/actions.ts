@@ -663,6 +663,8 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('autorenew_on', formData.get('autoRenewOn') !== null ? '1' : '0');
   await setSetting('auction_on', formData.get('auctionOn') !== null ? '1' : '0');
   await setSetting('staff_on', formData.get('staffOn') !== null ? '1' : '0');
+  // تقييم الإعلانات (تجارب العملاء متعدّدة المعايير)
+  await setSetting('ad_reviews_on', formData.get('adReviewsOn') !== null ? '1' : '0');
   // درع المتجر: عزل المتجر المعتمد عن الحظر الآلي غير الجسيم للهوية الشخصية
   await setSetting(SETTING_STORE_SHIELD, formData.get('storeShieldOn') !== null ? '1' : '0');
   // قفل اسم العضو: التغيير عبر طلب بموافقة الإدارة (مستند + سبب)

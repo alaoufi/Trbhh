@@ -675,6 +675,13 @@ const STATEMENTS: string[] = [
   // التعليق/التقييم يحمل هوية كاتبه أيضاً (يُعرض باسمها) — null = هوية افتراضية
   `ALTER TABLE comments ADD COLUMN profile_id BIGINT NULL`,
   `ALTER TABLE reviews ADD COLUMN profile_id BIGINT NULL`,
+  // تقييم متعدّد المعايير لكل إعلان (تجارب العملاء): مطابقة الواقع/المصداقية/الجودة/التواصل
+  `ALTER TABLE review_ads ADD COLUMN star_match TINYINT NULL`,
+  `ALTER TABLE review_ads ADD COLUMN star_trust TINYINT NULL`,
+  `ALTER TABLE review_ads ADD COLUMN star_quality TINYINT NULL`,
+  `ALTER TABLE review_ads ADD COLUMN star_comm TINYINT NULL`,
+  `ALTER TABLE review_ads ADD COLUMN profile_id BIGINT NULL`,
+  `ALTER TABLE review_ads ADD COLUMN recommend TINYINT NULL`,
   // دمج الحسابات: حساب قديم دُمج في حساب موحّد → معرّف الحساب الأساسي (يُمنع دخوله)
   `ALTER TABLE users ADD COLUMN merged_into BIGINT NULL`,
   // توثيق الحساب الرئيسي (تأكيد الجوال برمز) قبل ربط بقية الحسابات — «تم التحقق»

@@ -486,3 +486,15 @@ button:active { }
   backdrop-filter: blur(16px);
   border-top: 1px solid rgba(255,255,255,0.6);
 }
+
+/* ختم التوثيق «متجر موثّق» (المركز السعودي) — شارة عائمة يرسمها سكربتهم.
+   ننزلها إلى مستوى شريط الهويات أعلى الصفحة (الجهة اليسرى الفارغة) بدل زاوية الشاشة،
+   بعيداً عن زر القائمة والشعار. تُطبَّق فقط إن رسم السكربت داخل العنصر الذي نتحكّم فيه. */
+.sbc-verify-seal {
+  position: fixed !important;
+  top: 70px !important;
+  left: 8px !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 35 !important;
+}

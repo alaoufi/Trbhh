@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { Cairo } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
@@ -120,6 +121,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       {...(validDesigns.includes(design) ? { 'data-design': design } : {})}
     >
       <body className="min-h-screen font-sans antialiased">
+        {/* ختم التوثيق «متجر موثّق» — يُحمَّل مبكراً ليجد عنصر الختم (في الهيدر) ويرسمه */}
+        <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="beforeInteractive" />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         {/* بيكسلات التتبع الإعلاني (Meta/Google Ads/TikTok/Snapchat) — لا تعمل
             إطلاقاً إلا بعد ضبط معرّفاتها الحقيقية في متغيرات البيئة على الخادم. */}

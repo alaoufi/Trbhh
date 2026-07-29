@@ -11,6 +11,7 @@ import { HeaderCta } from '@/components/header-cta';
 import { LiveClock } from '@/components/live-clock';
 import { AdminAlertsBanner } from '@/components/admin-alerts-banner';
 import { ProfileSwitcher } from '@/components/profile-switcher';
+import { VerifySeal } from '@/components/verify-seal';
 
 export async function Header() {
   const session = await getSession();
@@ -79,8 +80,12 @@ export async function Header() {
         </Link>
       </div>
     </header>
-    {/* شريط الهوية الفعّالة — يظهر لكل مستخدم مسجّل في كل الصفحات: باسم من يُعلن، مع مبدّل الهويات */}
-    {session && <ProfileBar uid={session.uid} />}
+    {/* شريط الهوية الفعّالة + ختم التوثيق «متجر موثّق» بجانبه — لكل الصفحات. للزائر: الختم وحده. */}
+    {session ? <ProfileBar uid={session.uid} /> : (
+      <div className="relative z-40 border-b bg-white/95">
+        <div className="container flex min-h-9 items-center justify-end py-1"><VerifySeal /></div>
+      </div>
+    )}
     {/* 🔔 تنبيه إداري عالمي: يظهر لأي إداري في كل صفحة حتى تُعالَج الطلبات المعلقة */}
     {admin && <AdminAlertsBanner />}
     </>
@@ -100,8 +105,10 @@ async function ProfileBar({ uid }: { uid: number }) {
   const linkedItems = linked.filter((a) => a.id !== uid).map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName }));
   return (
     <div className="relative z-50 border-b bg-white/95">
-      <div className="container flex h-9 items-center">
+      <div className="container flex min-h-9 items-center justify-between gap-2 py-1">
         <ProfileSwitcher active={toItem(active)} profiles={profiles.map(toItem)} linked={linkedItems} />
+        {/* ختم التوثيق «متجر موثّق» بجانب مبدّل الحسابات */}
+        <VerifySeal className="shrink-0" />
       </div>
     </div>
   );

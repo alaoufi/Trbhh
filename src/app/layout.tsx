@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next';
-import Script from 'next/script';
 import { Cairo } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
@@ -133,10 +132,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           {children}
         </ChromeGate>
-        {/* ختم التوثيق «متجر موثّق» — المركز السعودي للأعمال (رمز الاستجابة السريع): شارة عائمة
-            تؤكّد توثيق المنشأة وتعزّز ثقة العملاء. الرمز (data-token) عامّ بطبيعته في صفحة العميل. */}
-        <div className="sbc-verify-seal" data-token="dklvcSt3ZUxBNGwrRlQ5TTN4SjBxdz09" data-position="bottom-left" />
-        <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="afterInteractive" />
         {/* الثيم التلقائي: يتبع وضع الجهاز قبل الرسم الأول (بلا وميض) ويتابع تغيّره */}
         <script
           dangerouslySetInnerHTML={{

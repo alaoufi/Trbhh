@@ -320,6 +320,17 @@ export async function getHomeLatestAds() {
   });
 }
 
+/** سوق الطلبات العكسي: إعلانات «طلب» النشطة (يبحث العملاء عنها) — يقدّم البائعون عروضهم. */
+export async function getRequestAds(take = 48) {
+  const rows = await prisma.ads.findMany({
+    where: { ...activeAdWhere(), adsType: 'request' },
+    orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+    take,
+    select: adSelect,
+  });
+  return toCards(rows);
+}
+
 /** إعلانات نفس المعلن (ذات صلة): بقية إعلاناته النشطة في تربح عدا الإعلان المفتوح. */
 export async function getSellerAds(sellerId: number, excludeAdId: number, take = 6) {
   const rows = await prisma.ads.findMany({

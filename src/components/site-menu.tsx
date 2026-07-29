@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Menu, X, ChevronDown, Home, User, Heart, Megaphone,
-  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel, Palette, UserPen, ShieldCheck, Users,
+  Building2, Search, Shield, LogIn, LogOut, Share2, PlusCircle, Mail, HelpCircle, FileText, Phone, Sparkles, Crown, BookOpen, Wallet, Info, Store, Clapperboard, MapPin, Bell, Flame, Gavel, Palette, UserPen, ShieldCheck, Users, HandCoins,
 } from 'lucide-react';
 import { ThemePicker } from '@/components/theme-picker';
 import { DesignPicker } from '@/components/design-picker';
@@ -170,6 +170,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
             {/* أهم الروابط أولاً */}
             <Item href="/" icon={Home} onClick={close}>الرئيسية</Item>
             <Item href="/companies" icon={Store} onClick={close}>المتاجر</Item>
+            <Item href="/requests" icon={HandCoins} onClick={close}>سوق الطلبات</Item>
             {isAuthed && (
               <Link href="/account/profiles" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg border-2 border-violet-400/40 bg-violet-500/15 px-3 py-3 text-[15px] font-extrabold text-violet-700 hover:bg-violet-500/25">
                 <Users className="h-5 w-5 shrink-0" /> <span>الحسابات الموحدة</span>

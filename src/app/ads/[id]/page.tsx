@@ -29,6 +29,8 @@ import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
 import { getAdRating, getAdReviews, canReviewAd, myAdReview, adReviewsEnabled, getSellerCredibility } from '@/lib/ad-reviews';
 import { getResponseSpeed } from '@/lib/response-time';
+import { readCompareIds, toggleCompareAction } from '@/app/compare/actions';
+import { Scale } from 'lucide-react';
 import { AdReviews } from '@/components/ad-reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
@@ -144,6 +146,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     ad.seller ? getSellerCredibility(ad.seller.id) : Promise.resolve({ avg: 0, trust: 0, count: 0 }),
     ad.seller ? getResponseSpeed(ad.seller.id) : Promise.resolve(null),
   ]);
+  const compareIds = await readCompareIds().catch(() => [] as number[]);
   // «ذات صلة» لنفس المعلن — و«المشابهة» بلا تكرار لما ظهر في إعلانات المعلن
   const sellerAdIds = new Set(sellerAds.map((a) => a.id));
   const similar = similarRaw.filter((a) => !sellerAdIds.has(a.id));
@@ -653,6 +656,23 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           {adNotice}
         </p>
       )}
+
+      {/* قارن هذا الإعلان — مقارنة جنباً لجنب (حتى ٤ إعلانات) */}
+      {!isAdOwner && (() => {
+        const inCompare = compareIds.includes(ad.id);
+        return (
+          <div className="flex flex-wrap items-center gap-2">
+            <form action={toggleCompareAction} className="flex-1">
+              <input type="hidden" name="adId" value={ad.id} />
+              <input type="hidden" name="back" value={`/ads/${ad.id}`} />
+              <button className={`flex w-full items-center justify-center gap-1.5 rounded-2xl border-2 py-2.5 text-sm font-extrabold ${inCompare ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-primary/30 bg-white text-primary hover:bg-primary/5'}`}>
+                <Scale className="h-4 w-4" /> {inCompare ? '✓ أُضيف للمقارنة' : 'قارن هذا الإعلان ⚖'}
+              </button>
+            </form>
+            {compareIds.length > 0 && <Link href="/compare" className="rounded-2xl bg-primary px-4 py-2.5 text-sm font-extrabold text-white hover:opacity-90">عرض المقارنة ({compareIds.length}) ←</Link>}
+          </div>
+        );
+      })()}
 
       {/* Action tiles: (report + rate تظهر لغير صاحب الإعلان) / share / favorite */}
       <div className={`grid gap-3 ${isAdOwner ? 'grid-cols-2' : 'grid-cols-4'}`}>

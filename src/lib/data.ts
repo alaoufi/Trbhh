@@ -331,6 +331,16 @@ export async function getRequestAds(take = 48) {
   return toCards(rows);
 }
 
+/** جلب إعلانات محدّدة بمعرّفاتها بشكل بطاقة (للمقارنة) — يحافظ على ترتيب المعرّفات. */
+export async function getAdsByIdsCards(ids: number[]) {
+  const clean = [...new Set(ids.filter((n) => n > 0))].slice(0, 4);
+  if (!clean.length) return [];
+  const rows = await prisma.ads.findMany({ where: { id: { in: clean.map((n) => BigInt(n)) } }, select: adSelect });
+  const cards = await toCards(rows);
+  const order = new Map(clean.map((id, i) => [id, i]));
+  return cards.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
+}
+
 /** إعلانات نفس المعلن (ذات صلة): بقية إعلاناته النشطة في تربح عدا الإعلان المفتوح. */
 export async function getSellerAds(sellerId: number, excludeAdId: number, take = 6) {
   const rows = await prisma.ads.findMany({

@@ -580,13 +580,15 @@ export async function updateAdAction(formData: FormData) {
   const ePtRaw = String(formData.get('priceType') || '');
   const ePriceType = eType === 'offer' && ['rent', 'sale', 'som'].includes(ePtRaw) ? ePtRaw : null;
   const eRentPeriod = ePriceType === 'rent' ? String(formData.get('rentPeriod') || '').trim().slice(0, 20) || 'شهري' : null;
+  const newPrice = ePriceType === 'som' ? 0 : parseFloat(String(formData.get('price') || '0')) || 0;
+  const oldPrice = ad.price || 0;
   await prisma.ads.update({
     where: { id: adId },
     data: {
       title: eFinalTitle,
       detail: eFinalDetail,
       flag_terms: eFlagTerms || null,
-      price: ePriceType === 'som' ? 0 : parseFloat(String(formData.get('price') || '0')) || 0,
+      price: newPrice,
       adsType: eType,
       price_type: ePriceType,
       rent_period: eRentPeriod,
@@ -607,6 +609,16 @@ export async function updateAdAction(formData: FormData) {
       ...(formData.get('stock_state') !== null ? { stock_state: [0, 1, 2].includes(Number(formData.get('stock_state'))) ? Number(formData.get('stock_state')) : 0 } : {}),
     },
   });
+
+  // تنبيه هبوط السعر: من أضافوا هذا الإعلان لمفضّلتهم يصلهم تنبيه عند تخفيض سعره (عودة للشراء)
+  if (newPrice > 0 && oldPrice > newPrice) {
+    const favs = await prisma.favorites.findMany({ where: { ads_id: adId, user_id: { not: BigInt(session.uid) } }, select: { user_id: true }, take: 3000 }).catch(() => []);
+    if (favs.length) {
+      const title = `📉 انخفض سعر إعلان في مفضّلتك: «${(eFinalTitle || '').slice(0, 45)}» — الآن ${new Intl.NumberFormat('en-US').format(newPrice)} ر.س`;
+      const route = `/ads/${toInt(adId)}`;
+      await prisma.notfications.createMany({ data: favs.map((f) => ({ title, route, user_id: String(toInt(f.user_id)), type: 'other' })) }).catch(() => {});
+    }
+  }
 
   const images = await readImages(formData);
   if (imageModerationEnabled() && images.length) {

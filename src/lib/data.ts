@@ -28,6 +28,9 @@ export type AdCard = {
   storeId?: number | null;
   /** عروض اليوم: السعر قبل الخصم (يظهر مشطوباً مع نسبة الخصم إن كان أعلى من السعر) */
   oldPrice?: number;
+  /** تقييم الإعلان (تجارب العملاء) — متوسط النجوم وعددها؛ يظهر كدليل اجتماعي على البطاقة */
+  ratingAvg?: number;
+  ratingCount?: number;
 };
 
 async function sellerInfo(ids: bigint[]): Promise<Map<number, { name: string; trusted: boolean; banned: boolean }>> {
@@ -107,13 +110,15 @@ type AdRow = {
 
 async function toCards(rows: AdRow[]): Promise<AdCard[]> {
   const ids = rows.map((r) => r.id);
-  const [images, views, cities, cats, sellers, adMeta] = await Promise.all([
+  const { getAdRatingsBrief } = await import('./ad-reviews');
+  const [images, views, cities, cats, sellers, adMeta, ratings] = await Promise.all([
     primaryImages(ids),
     viewCounts(ids),
     cityNames(rows.map((r) => r.city_id)),
     categoryNames(rows.map((r) => r.category_id)),
     sellerInfo(rows.map((r) => r.user_id)),
     getUsersAdMeta(rows.map((r) => toInt(r.user_id))).catch(() => new Map()),
+    getAdRatingsBrief(rows.map((r) => toInt(r.id))).catch(() => new Map()),
   ]);
   await loadBanned();
   const now = Date.now();
@@ -150,6 +155,8 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         sellerTrusted: s?.trusted ?? false,
         tier: adMeta.get(toInt(r.user_id))?.tier ?? '',
         oldPrice: r.old_price && r.old_price > r.price ? r.old_price : 0,
+        ratingAvg: ratings.get(toInt(r.id))?.avg ?? 0,
+        ratingCount: ratings.get(toInt(r.id))?.count ?? 0,
       };
     });
 }

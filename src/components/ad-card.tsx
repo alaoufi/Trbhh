@@ -79,6 +79,12 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
             {ad.title}
           </h3>
           {ad.storeName && <div className="mt-1 min-w-0"><StoreTag name={ad.storeName} /></div>}
+          {(ad.ratingCount ?? 0) > 0 && (
+            <div className="mt-1 flex items-center gap-1 text-xs font-extrabold text-amber-600">
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {ad.ratingAvg}
+              <span className="font-normal text-muted-foreground">({ad.ratingCount} تقييم)</span>
+            </div>
+          )}
         </div>
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-white">
           <Image src={ad.image} alt={ad.title} fill sizes="96px" className="object-cover" />
@@ -167,6 +173,7 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
         <h3 className="line-clamp-2 min-h-[2.2rem] text-[13px] font-bold leading-snug text-foreground/90">{ad.title}</h3>
         {ad.storeName && <StoreTag name={ad.storeName} />}
         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          {(ad.ratingCount ?? 0) > 0 && <span className="flex items-center gap-0.5 font-extrabold text-amber-600"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {ad.ratingAvg} ({ad.ratingCount})</span>}
           <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" /> {new Intl.NumberFormat('en-US').format(ad.views)}</span>
           {ad.cityName && <span className="flex min-w-0 items-center gap-0.5 truncate"><MapPin className="h-3 w-3 shrink-0" /> <span className="truncate">{ad.cityName}</span></span>}
         </div>
@@ -204,6 +211,7 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
           </div>
         )}
         <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-0.5 pt-1.5 text-[11px] text-muted-foreground">
+          {(ad.ratingCount ?? 0) > 0 && <span className="flex items-center gap-0.5 font-extrabold text-amber-600"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {ad.ratingAvg} ({ad.ratingCount})</span>}
           <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" /> {new Intl.NumberFormat('en-US').format(ad.views)}</span>
           {ad.cityName && <span className="flex min-w-0 items-center gap-0.5"><MapPin className="h-3 w-3 shrink-0" /> <span className="truncate">{ad.cityName}</span></span>}
           <span className="flex items-center gap-0.5"><Timer className="h-3 w-3" /> {timeShort(ad.createdAt)}</span>

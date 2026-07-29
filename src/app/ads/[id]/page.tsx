@@ -28,6 +28,7 @@ import { TrackedContact } from '@/components/ad-contact-track';
 import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
 import { getAdRating, getAdReviews, canReviewAd, myAdReview, adReviewsEnabled, getSellerCredibility } from '@/lib/ad-reviews';
+import { getResponseSpeed } from '@/lib/response-time';
 import { AdReviews } from '@/components/ad-reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
@@ -129,7 +130,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     await recordView(ad.id, viewerKey);
   }
 
-  const [comments, favorited, similarRaw, sellerAds, sellerRating, reviewsOn, adRating, adReviewList, canReviewThis, myReview, sellerCred] = await Promise.all([
+  const [comments, favorited, similarRaw, sellerAds, sellerRating, reviewsOn, adRating, adReviewList, canReviewThis, myReview, sellerCred, respSpeed] = await Promise.all([
     getComments(ad.id),
     session ? isFavorited(session.uid, ad.id) : Promise.resolve(false),
     ad.category ? getSimilarAds(ad.id, ad.category.id, 6) : Promise.resolve([]),
@@ -141,6 +142,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     canReviewAd(ad.id, session?.uid, ad.seller?.id),
     session ? myAdReview(ad.id, session.uid) : Promise.resolve(null),
     ad.seller ? getSellerCredibility(ad.seller.id) : Promise.resolve({ avg: 0, trust: 0, count: 0 }),
+    ad.seller ? getResponseSpeed(ad.seller.id) : Promise.resolve(null),
   ]);
   // «ذات صلة» لنفس المعلن — و«المشابهة» بلا تكرار لما ظهر في إعلانات المعلن
   const sellerAdIds = new Set(sellerAds.map((a) => a.id));
@@ -612,6 +614,13 @@ export default async function AdPage({ params, searchParams }: { params: Promise
 
       {/* Paid banner — inside ad details */}
       <PromoSlot placement="ad_detail" />
+
+      {/* مؤشّر سرعة رد البائع — يحفّز التواصل الفوري (يظهر فقط بعيّنة كافية) */}
+      {respSpeed && !isAdOwner && (
+        <div className="flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-sm font-extrabold text-emerald-700 ring-1 ring-emerald-200">
+          <span>{respSpeed.icon}</span> هذا البائع عادةً {respSpeed.label}
+        </div>
+      )}
 
       {/* Contact tiles — only show channels the seller actually offers */}
       <div className={`grid gap-3 ${contactCols === 3 ? 'grid-cols-3' : contactCols === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>

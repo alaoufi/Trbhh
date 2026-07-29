@@ -27,7 +27,7 @@ import { ExpandableDetail } from '@/components/expandable-detail';
 import { TrackedContact } from '@/components/ad-contact-track';
 import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
-import { getAdRating, getAdReviews, canReviewAd, myAdReview, adReviewsEnabled } from '@/lib/ad-reviews';
+import { getAdRating, getAdReviews, canReviewAd, myAdReview, adReviewsEnabled, getSellerCredibility } from '@/lib/ad-reviews';
 import { AdReviews } from '@/components/ad-reviews';
 import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
@@ -129,7 +129,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     await recordView(ad.id, viewerKey);
   }
 
-  const [comments, favorited, similarRaw, sellerAds, sellerRating, reviewsOn, adRating, adReviewList, canReviewThis, myReview] = await Promise.all([
+  const [comments, favorited, similarRaw, sellerAds, sellerRating, reviewsOn, adRating, adReviewList, canReviewThis, myReview, sellerCred] = await Promise.all([
     getComments(ad.id),
     session ? isFavorited(session.uid, ad.id) : Promise.resolve(false),
     ad.category ? getSimilarAds(ad.id, ad.category.id, 6) : Promise.resolve([]),
@@ -140,6 +140,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     getAdReviews(ad.id),
     canReviewAd(ad.id, session?.uid, ad.seller?.id),
     session ? myAdReview(ad.id, session.uid) : Promise.resolve(null),
+    ad.seller ? getSellerCredibility(ad.seller.id) : Promise.resolve({ avg: 0, trust: 0, count: 0 }),
   ]);
   // «ذات صلة» لنفس المعلن — و«المشابهة» بلا تكرار لما ظهر في إعلانات المعلن
   const sellerAdIds = new Set(sellerAds.map((a) => a.id));
@@ -554,6 +555,16 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <InfoItem icon={Eye}>{ad.views} مشاهدة</InfoItem>
         {distanceLabel && <InfoItem icon={Navigation}>{distanceLabel}</InfoItem>}
       </div>
+
+      {/* مصداقية البائع — إشارة ثقة مجمّعة من تجارب العملاء على كل إعلاناته (تعزّز قرار الشراء) */}
+      {reviewsOn && sellerCred.count > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border-2 border-emerald-200 bg-emerald-50/70 p-3">
+          <span className="flex items-center gap-1.5 text-sm font-extrabold text-emerald-800"><BadgeCheck className="h-5 w-5" /> مصداقية البائع</span>
+          <span className="flex items-center gap-1 text-base font-extrabold text-amber-600"><Star className="h-4 w-4 fill-amber-400 text-amber-400" /> {sellerCred.avg}</span>
+          <span className="text-xs text-muted-foreground">من {sellerCred.count} تجربة عميل على إعلاناته</span>
+          {sellerCred.trust > 0 && <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-emerald-700">🤝 المصداقية {sellerCred.trust}/5</span>}
+        </div>
+      )}
 
       {/* Price + description */}
       <div className="card-3d rounded-2xl p-4">

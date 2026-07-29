@@ -30,23 +30,15 @@ export function SealReposition() {
     const place = (): boolean => {
       const seal = findSeal();
       if (!seal) return false;
-      const slot = document.getElementById('sbc-seal-slot');
-      if (slot) {
-        // داخل المحتوى: عنصر عادي في التدفّق (لا عائم)
-        if (seal.parentElement !== slot) slot.appendChild(seal);
-        seal.style.setProperty('position', 'static', 'important');
-        for (const k of ['top', 'left', 'right', 'bottom']) seal.style.setProperty(k, 'auto', 'important');
-        seal.style.setProperty('margin', '4px auto', 'important');
-        seal.style.setProperty('z-index', 'auto', 'important');
-      } else {
-        // بقية الصفحات: شارة مثبّتة أسفل الهيدر جهة اليسار
-        seal.style.setProperty('position', 'fixed', 'important');
-        seal.style.setProperty('top', '70px', 'important');
-        seal.style.setProperty('left', '8px', 'important');
-        seal.style.setProperty('right', 'auto', 'important');
-        seal.style.setProperty('bottom', 'auto', 'important');
-        seal.style.setProperty('z-index', '35', 'important');
-      }
+      // ختم المركز الرسمي: مثبّت أسفل يسار الشاشة مرفوعاً فوق الشريط السفلي — بعيداً عن
+      // الشعار (أعلى) وعن أزرار التنقّل السفلية. الشارة المدمجة «متجر موثّق» تتكفّل بالظهور
+      // الدائم بجانب مبدّل الحساب، وهذا الختم مصدر التحقّق الرسمي القابل للنقر.
+      seal.style.setProperty('position', 'fixed', 'important');
+      seal.style.setProperty('bottom', '78px', 'important');
+      seal.style.setProperty('left', '8px', 'important');
+      seal.style.setProperty('top', 'auto', 'important');
+      seal.style.setProperty('right', 'auto', 'important');
+      seal.style.setProperty('z-index', '35', 'important');
       return true;
     };
     place();

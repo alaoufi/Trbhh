@@ -118,10 +118,6 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
       {/* بانر عرض الشحن: اشحن بـ100 ونضيف لك 10 — يظهر عند تفعيل مكافآت الشحن من التحكم */}
       <TopupPromoBanner />
 
-      {/* موضع ختم التوثيق «متجر موثّق» داخل المحتوى — سكربت المركز يرسم شارته ثم
-          يلتقطها SealReposition ويضعها هنا (بدل الزاوية العائمة). فارغ = بلا فراغ ظاهر. */}
-      <div id="sbc-seal-slot" className="flex justify-center empty:hidden" />
-
       {/* 🎯 يهمّك الآن — تغذية مخصّصة بدلالة ما تصفّحه وبحث عنه فعلياً،
           تظهر أول محتوى في الصفحة لمن له تصفّح سابق. */}
       {personalizedAds.length > 0 && (

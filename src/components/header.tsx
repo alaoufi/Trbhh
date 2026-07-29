@@ -11,6 +11,7 @@ import { HeaderCta } from '@/components/header-cta';
 import { LiveClock } from '@/components/live-clock';
 import { AdminAlertsBanner } from '@/components/admin-alerts-banner';
 import { ProfileSwitcher } from '@/components/profile-switcher';
+import { VerifiedBadge } from '@/components/verified-badge';
 
 export async function Header() {
   const session = await getSession();
@@ -79,9 +80,12 @@ export async function Header() {
         </Link>
       </div>
     </header>
-    {/* شريط الهوية الفعّالة — يظهر للعضو فقط. ختم التوثيق «متجر موثّق» شارة عائمة على
-        مستوى التخطيط العام (layout) وليس هنا. */}
-    {session && <ProfileBar uid={session.uid} />}
+    {/* شريط الهوية الفعّالة + شارة «متجر موثّق» بجانب مبدّل الحساب. للزائر: الشارة وحدها. */}
+    {session ? <ProfileBar uid={session.uid} /> : (
+      <div className="relative z-40 border-b bg-white/95">
+        <div className="container flex min-h-9 items-center justify-end py-1"><VerifiedBadge /></div>
+      </div>
+    )}
     {/* 🔔 تنبيه إداري عالمي: يظهر لأي إداري في كل صفحة حتى تُعالَج الطلبات المعلقة */}
     {admin && <AdminAlertsBanner />}
     </>
@@ -101,8 +105,10 @@ async function ProfileBar({ uid }: { uid: number }) {
   const linkedItems = linked.filter((a) => a.id !== uid).map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName }));
   return (
     <div className="relative z-50 border-b bg-white/95">
-      <div className="container flex min-h-9 items-center py-1">
+      <div className="container flex min-h-9 items-center justify-between gap-2 py-1">
         <ProfileSwitcher active={toItem(active)} profiles={profiles.map(toItem)} linked={linkedItems} />
+        {/* شارة «متجر موثّق» بجانب مبدّل الحساب — ثابتة وتظهر دائماً */}
+        <VerifiedBadge className="shrink-0" />
       </div>
     </div>
   );

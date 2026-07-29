@@ -728,6 +728,7 @@ model review_ads {
   star_quality Int?      @db.TinyInt
   star_comm    Int?      @db.TinyInt
   recommend    Int?      @db.TinyInt
+  verified_deal Int?     @db.TinyInt
   profile_id   BigInt?
 
   @@index([ads_id], map: "review_ads_ads_id")

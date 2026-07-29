@@ -103,6 +103,10 @@ export function AdReviews({
             <label className="flex items-center gap-1"><input type="radio" name="recommend" value="1" className="accent-emerald-600" /> نعم</label>
             <label className="flex items-center gap-1"><input type="radio" name="recommend" value="0" className="accent-red-600" /> لا</label>
           </div>
+          <label className="flex items-start gap-2 rounded-lg bg-emerald-50 p-2.5 text-sm font-bold text-emerald-800">
+            <input type="checkbox" name="verified" value="1" className="mt-0.5 h-4 w-4 accent-emerald-600" />
+            <span>✅ أؤكّد أنني تعاملت مع البائع فعلاً — يظهر تقييمي بشارة «تعامل موثّق» ليكون أوثق للعملاء.</span>
+          </label>
           <textarea name="comment" rows={3} maxLength={1000} className="w-full rounded-lg border-2 border-primary/25 bg-white p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40" placeholder="اكتب تجربتك: هل طابق الإعلان الواقع؟ كيف كان تعامل صاحبه وجودة المنتج؟ (اختياري)" />
           <button className="flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white hover:opacity-90"><Star className="h-4 w-4" /> {hasMine ? 'حفظ التعديل' : 'نشر تقييمي'}</button>
         </form>
@@ -120,7 +124,10 @@ export function AdReviews({
                     {r.avatarUrl ? <img src={r.avatarUrl} alt="" className="h-full w-full object-cover" /> : (r.author.trim().charAt(0) || '؟')}
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-bold">{r.author}</span>
+                    <span className="flex items-center gap-1.5 truncate text-sm font-bold">
+                      {r.author}
+                      {r.verifiedDeal && <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-extrabold text-emerald-700"><ShieldCheck className="h-2.5 w-2.5" /> تعامل موثّق</span>}
+                    </span>
                     <Stars value={r.star} className="h-3.5 w-3.5" />
                   </span>
                 </div>

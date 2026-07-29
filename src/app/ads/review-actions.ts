@@ -31,13 +31,14 @@ export async function addAdReviewAction(formData: FormData) {
   const star_comm = clampStar(formData.get('star_comm')) || null;
   const recRaw = String(formData.get('recommend') || '');
   const recommend = recRaw === '1' ? 1 : recRaw === '0' ? 0 : null;
+  const verified_deal = String(formData.get('verified') || '') === '1' ? 1 : null;
   const comment = String(formData.get('comment') || '').trim().slice(0, 1000) || null;
 
   // هوية النشر الفعّالة (يُعرض التقييم باسمها كالتعليقات)
   const profileId = await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).then((p) => (p.id ? BigInt(p.id) : null)).catch(() => null);
 
   const existing = await prisma.review_ads.findFirst({ where: { ads_id: BigInt(adId), sender_id: BigInt(session.uid) }, select: { id: true } }).catch(() => null);
-  const data = { star, star_match, star_trust, star_quality, star_comm, recommend, comment, profile_id: profileId };
+  const data = { star, star_match, star_trust, star_quality, star_comm, recommend, verified_deal, comment, profile_id: profileId };
   if (existing) {
     await prisma.review_ads.update({ where: { id: existing.id }, data: { ...data, updated_at: new Date() } }).catch(() => {});
   } else {

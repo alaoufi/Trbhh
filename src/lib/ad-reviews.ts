@@ -21,7 +21,7 @@ export async function adReviewsEnabled(): Promise<boolean> {
 type Row = {
   id: bigint; sender_id: bigint; star: number; comment: string | null;
   star_match: number | null; star_trust: number | null; star_quality: number | null; star_comm: number | null;
-  recommend: number | null; profile_id: bigint | null; created_at: Date | null;
+  recommend: number | null; verified_deal: number | null; profile_id: bigint | null; created_at: Date | null;
 };
 
 const avg = (nums: number[]) => (nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : 0);
@@ -64,7 +64,7 @@ export async function getAdRatingsBrief(adIds: number[]): Promise<Map<number, { 
 
 export type AdReview = {
   id: number; star: number; text: string; author: string; avatarUrl: string;
-  criteria: Record<CriterionKey, number | null>; recommend: number | null; createdAt: string | null;
+  criteria: Record<CriterionKey, number | null>; recommend: number | null; verifiedDeal: boolean; createdAt: string | null;
 };
 
 /** قائمة تجارب العملاء على إعلان (بأسماء هوياتهم، مع تشفير المحتوى المخالف). */
@@ -87,7 +87,7 @@ export async function getAdReviews(adId: number, limit = 50): Promise<AdReview[]
       author: pr?.name || u?.name || u?.userName || 'مستخدم',
       avatarUrl: pr?.avatarUrl || '',
       criteria: { match: r.star_match, trust: r.star_trust, quality: r.star_quality, comm: r.star_comm },
-      recommend: r.recommend, createdAt: r.created_at ? r.created_at.toISOString() : null,
+      recommend: r.recommend, verifiedDeal: r.verified_deal === 1, createdAt: r.created_at ? r.created_at.toISOString() : null,
     };
   });
 }

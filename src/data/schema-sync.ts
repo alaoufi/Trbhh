@@ -682,6 +682,8 @@ const STATEMENTS: string[] = [
   `ALTER TABLE review_ads ADD COLUMN star_comm TINYINT NULL`,
   `ALTER TABLE review_ads ADD COLUMN profile_id BIGINT NULL`,
   `ALTER TABLE review_ads ADD COLUMN recommend TINYINT NULL`,
+  // صفقة موثّقة: أكّد المُقيّم أنه تعامل مع البائع فعلاً
+  `ALTER TABLE review_ads ADD COLUMN verified_deal TINYINT NULL`,
   // دمج الحسابات: حساب قديم دُمج في حساب موحّد → معرّف الحساب الأساسي (يُمنع دخوله)
   `ALTER TABLE users ADD COLUMN merged_into BIGINT NULL`,
   // توثيق الحساب الرئيسي (تأكيد الجوال برمز) قبل ربط بقية الحسابات — «تم التحقق»

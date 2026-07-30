@@ -11,7 +11,6 @@ import { HeaderCta } from '@/components/header-cta';
 import { LiveClock } from '@/components/live-clock';
 import { AdminAlertsBanner } from '@/components/admin-alerts-banner';
 import { ProfileSwitcher } from '@/components/profile-switcher';
-import { VerifiedBadge } from '@/components/verified-badge';
 
 export async function Header() {
   const session = await getSession();
@@ -80,10 +79,11 @@ export async function Header() {
         </Link>
       </div>
     </header>
-    {/* شريط الهوية الفعّالة + شارة «متجر موثّق» بجانب مبدّل الحساب. للزائر: الشارة وحدها. */}
+    {/* شريط الهوية الفعّالة + ختم المركز الرسمي «متجر موثّق» بجانب مبدّل الحساب.
+        للزائر: الختم وحده (ينقله SealReposition إلى #sbc-seal-slot). */}
     {session ? <ProfileBar uid={session.uid} /> : (
       <div className="relative z-40 border-b bg-white/95">
-        <div className="container flex min-h-9 items-center justify-end py-1"><VerifiedBadge /></div>
+        <div className="container flex min-h-9 items-center justify-end py-1"><span id="sbc-seal-slot" className="inline-flex items-center" /></div>
       </div>
     )}
     {/* 🔔 تنبيه إداري عالمي: يظهر لأي إداري في كل صفحة حتى تُعالَج الطلبات المعلقة */}
@@ -107,8 +107,8 @@ async function ProfileBar({ uid }: { uid: number }) {
     <div className="relative z-50 border-b bg-white/95">
       <div className="container flex min-h-9 items-center justify-between gap-2 py-1">
         <ProfileSwitcher active={toItem(active)} profiles={profiles.map(toItem)} linked={linkedItems} />
-        {/* شارة «متجر موثّق» بجانب مبدّل الحساب — ثابتة وتظهر دائماً */}
-        <VerifiedBadge className="shrink-0" />
+        {/* ختم المركز الرسمي «متجر موثّق» بجانب مبدّل الحساب — ينقله SealReposition هنا */}
+        <span id="sbc-seal-slot" className="inline-flex shrink-0 items-center" />
       </div>
     </div>
   );

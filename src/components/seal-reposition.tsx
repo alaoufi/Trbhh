@@ -2,24 +2,21 @@
 import { useEffect } from 'react';
 
 /**
- * يضبط موضع ختم التوثيق «متجر موثّق» (الذي يرسمه سكربت المركز السعودي للأعمال).
+ * يضع ختم التوثيق الرسمي «متجر موثّق» (الذي يرسمه سكربت المركز السعودي للأعمال) في مكانه
+ * المطلوب: بجانب مبدّل الحساب أعلى الصفحة (داخل #sbc-seal-slot).
  *
- * السكربت الرسمي يُنشئ عنصره الخاص المثبّت في زاوية الشاشة (لا يرسم داخل عنصرنا). نلتقط
- * الشارة بعد ظهورها — نعرفها عبر رابط/صورة تشير إلى نطاق المركز — ثم:
- *  • إن وُجد «موضع» داخل المحتوى (#sbc-seal-slot، في الصفحة الرئيسية) ننقلها إليه ونجعلها
- *    عنصراً عادياً في تدفّق الصفحة (لا عائماً) — فتظهر ضمن المحتوى حيث نريد.
- *  • وإلا (بقية الصفحات) نُثبّتها أسفل الهيدر جهة اليسار بدل زاوية الشاشة.
- * نعيد التطبيق دورياً لفترة قصيرة لأن السكربت غير متزامن وقد يُعيد فرض تنسيقه.
+ * السكربت الرسمي يُنشئ عنصره الخاص المثبّت في زاوية الشاشة. نلتقطه بعد ظهوره — نعرفه عبر
+ * رابط/صورة تشير إلى نطاق المركز — ثم ننقله إلى الموضع (#sbc-seal-slot) ونجعله عنصراً
+ * عادياً في تدفّق الشريط (لا عائماً). نعيد التطبيق دورياً لفترة قصيرة لأن السكربت غير متزامن
+ * وقد يُعيد فرض تنسيقه. (ختم واحد فقط على الصفحة — لا نسخة مكرّرة.)
  */
 export function SealReposition() {
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const findSeal = (): HTMLElement | null => {
-      // نستثني شارتنا المدمجة (data-verified-badge) — فهي رابط لنطاق المركز أيضاً، ويجب
-      // ألّا يخلطها السكربت مع ختم المركز الرسمي فيخطفها من مكانها بجانب مبدّل الحساب.
-      const mark = document.querySelector(
-        'a[href*="saudibusiness.gov.sa"]:not([data-verified-badge]), img[src*="saudibusiness.gov.sa"], iframe[src*="saudibusiness.gov.sa"], .sbc-verify-seal > *:not([data-verified-badge])',
-      ) as HTMLElement | null;
+      const mark = document.querySelector<HTMLElement>(
+        'a[href*="saudibusiness.gov.sa"], img[src*="saudibusiness.gov.sa"], iframe[src*="saudibusiness.gov.sa"], .sbc-verify-seal > *',
+      );
       if (!mark) return null;
       // اصعد إلى الحاوية المثبّتة (position:fixed) التي وضعها السكربت، وإلا استعمل العنصر نفسه
       let el: HTMLElement | null = mark;
@@ -32,9 +29,20 @@ export function SealReposition() {
     const place = (): boolean => {
       const seal = findSeal();
       if (!seal) return false;
-      // ختم المركز الرسمي: مثبّت أسفل يسار الشاشة مرفوعاً فوق الشريط السفلي — بعيداً عن
-      // الشعار (أعلى) وعن أزرار التنقّل السفلية. الشارة المدمجة «متجر موثّق» تتكفّل بالظهور
-      // الدائم بجانب مبدّل الحساب، وهذا الختم مصدر التحقّق الرسمي القابل للنقر.
+      const slot = document.getElementById('sbc-seal-slot');
+      if (slot) {
+        // انقل الختم إلى الموضع بجانب مبدّل الحساب واجعله عنصراً عادياً (لا عائماً)
+        if (seal.parentElement !== slot) slot.appendChild(seal);
+        seal.style.setProperty('position', 'static', 'important');
+        seal.style.setProperty('top', 'auto', 'important');
+        seal.style.setProperty('bottom', 'auto', 'important');
+        seal.style.setProperty('left', 'auto', 'important');
+        seal.style.setProperty('right', 'auto', 'important');
+        seal.style.setProperty('margin', '0', 'important');
+        seal.style.setProperty('z-index', 'auto', 'important');
+        return true;
+      }
+      // احتياطي (لو غاب الموضع): تثبيت أسفل يسار مرفوعاً فوق الشريط السفلي
       seal.style.setProperty('position', 'fixed', 'important');
       seal.style.setProperty('bottom', '78px', 'important');
       seal.style.setProperty('left', '8px', 'important');

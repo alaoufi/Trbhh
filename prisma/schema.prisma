@@ -1377,9 +1377,16 @@ model wallet_topups {
   admin_id   BigInt?   @db.UnsignedBigInt
   created_at DateTime? @default(now()) @db.Timestamp(0)
   decided_at DateTime? @db.DateTime(0)
+  // -- الدفع الإلكتروني (بوابات الدفع) --
+  source       String?   @db.VarChar(10)  // 'transfer' (تحويل بنكي + إيصال) | 'online' (بوابة دفع)
+  provider     String?   @db.VarChar(20)  // مزوّد الدفع: moyasar | tap | paytabs | ...
+  provider_ref String?   @db.VarChar(160) // معرّف العملية لدى المزوّد (charge/invoice/tran_ref)
+  method       String?   @db.VarChar(20)  // وسيلة الدفع الفعلية: mada | visa | applepay | stcpay | ...
+  paid_at      DateTime? @db.DateTime(0)  // وقت تأكيد الدفع من البوابة
 
   @@index([user_id], map: "wallet_topups_user")
   @@index([status], map: "wallet_topups_status")
+  @@index([provider_ref], map: "wallet_topups_pref")
 }
 
 model error_log {

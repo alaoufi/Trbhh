@@ -329,6 +329,13 @@ const STATEMENTS: string[] = [
   /* توسيع البصمة إلى بصمة مركّبة أدق (receiptHash: aHash+dHash بدقة 16×16 = 512 بت) —
    *  البصمة القديمة (aHash 8×8 وحدها) كانت تخلط بين مستندات مختلفة بنفس قالب التصميم. */
   `ALTER TABLE wallet_topups MODIFY COLUMN receipt_hash VARCHAR(140) NULL`,
+  /* الدفع الإلكتروني: طلب الشحن قد يكون عبر بوابة دفع (source='online') بدل التحويل + الإيصال. */
+  `ALTER TABLE wallet_topups ADD COLUMN source VARCHAR(10) NULL`,
+  `ALTER TABLE wallet_topups ADD COLUMN provider VARCHAR(20) NULL`,
+  `ALTER TABLE wallet_topups ADD COLUMN provider_ref VARCHAR(160) NULL`,
+  `ALTER TABLE wallet_topups ADD COLUMN method VARCHAR(20) NULL`,
+  `ALTER TABLE wallet_topups ADD COLUMN paid_at DATETIME NULL`,
+  `CREATE INDEX wallet_topups_pref ON wallet_topups (provider_ref)`,
   /* إيقاف من صاحب الإعلان: يميّز الموقوف بإرادته عن المنتظر موافقة الإدارة. */
   `ALTER TABLE ads ADD COLUMN paused_by_owner TINYINT NOT NULL DEFAULT 0`,
   /* جدولة النشر: يبقى مخفياً حتى هذا الموعد ثم يُنشر تلقائياً. */

@@ -294,13 +294,16 @@ export type TopupStatus = 0 | 1 | 2 | 3; // 0 pending, 1 approved, 2 rejected, 3
 export type TopupRow = {
   id: number; userId: number; amount: number; receipt: string | null;
   status: TopupStatus; note: string | null; at: string | null; decidedAt: string | null;
+  source: string | null; provider: string | null; method: string | null; paidAt: string | null;
 };
 
-const topupRow = (r: { id: bigint; user_id: bigint; amount: number; receipt: string | null; status: number; note: string | null; created_at: Date | null; decided_at: Date | null }): TopupRow => ({
+const topupRow = (r: { id: bigint; user_id: bigint; amount: number; receipt: string | null; status: number; note: string | null; created_at: Date | null; decided_at: Date | null; source?: string | null; provider?: string | null; method?: string | null; paid_at?: Date | null }): TopupRow => ({
   id: toInt(r.id), userId: toInt(r.user_id), amount: r.amount, receipt: r.receipt,
   status: (r.status === 1 || r.status === 2 || r.status === 3 ? r.status : 0) as TopupStatus, note: r.note,
   at: r.created_at ? r.created_at.toISOString() : null,
   decidedAt: r.decided_at ? r.decided_at.toISOString() : null,
+  source: r.source ?? null, provider: r.provider ?? null, method: r.method ?? null,
+  paidAt: r.paid_at ? r.paid_at.toISOString() : null,
 });
 
 /** فحص فوري لبصمة إيصال جديد قبل إنشاء الطلب: أعلى نسبة تطابق مع إيصالات سابقة (0 = لا تطابق ≥ العتبة). */
@@ -329,6 +332,67 @@ export async function requestTopup(userId: number, amount: number, receiptRel: s
   } catch {
     return false;
   }
+}
+
+/* ===================== شحن الرصيد عبر بوابة دفع إلكتروني ===================== */
+
+/** ينشئ طلب شحن إلكتروني معلّق (بلا إيصال) ويعيد معرّفه — يُربط لاحقاً بمعرّف عملية المزوّد. */
+export async function createOnlineTopup(userId: number, amount: number, provider: string): Promise<number | null> {
+  await ensure();
+  const amt = Math.round(amount || 0);
+  if (amt <= 0) return null;
+  try {
+    const row = await prisma.wallet_topups.create({
+      data: { user_id: BigInt(userId), amount: amt, source: 'online', provider: provider.slice(0, 20), status: 0 },
+    });
+    return toInt(row.id);
+  } catch {
+    return null;
+  }
+}
+
+/** يربط طلب الشحن الإلكتروني بمعرّف العملية لدى المزوّد (بعد إنشائها). */
+export async function attachProviderRef(topupId: number, providerRef: string): Promise<void> {
+  await ensure();
+  await prisma.wallet_topups.updateMany({ where: { id: BigInt(topupId) }, data: { provider_ref: providerRef.slice(0, 160) } }).catch(() => {});
+}
+
+/** يجلب طلب شحن واحد (للتحقّق/الاعتماد الإلكتروني). */
+export async function getTopupById(topupId: number): Promise<(TopupRow & { userIdNum: number }) | null> {
+  await ensure();
+  const r = await prisma.wallet_topups.findUnique({ where: { id: BigInt(topupId) } }).catch(() => null);
+  if (!r) return null;
+  return { ...topupRow(r), userIdNum: toInt(r.user_id) };
+}
+
+/** يجد طلب شحن إلكتروني بمعرّف عملية المزوّد (للويبهوك). */
+export async function findTopupByProviderRef(provider: string, providerRef: string): Promise<number | null> {
+  await ensure();
+  const r = await prisma.wallet_topups.findFirst({ where: { provider, provider_ref: providerRef }, select: { id: true } }).catch(() => null);
+  return r ? toInt(r.id) : null;
+}
+
+/** اعتماد شحن إلكتروني بعد تأكيد الدفع من البوابة: قلبٌ ذرّي (0→1) يمنع الاحتساب المزدوج،
+ *  ثم إضافة الرصيد ومكافآت الشحن. آمنٌ للاستدعاء المتكرر (ويبهوك + عودة المتصفح معاً). */
+export async function creditOnlineTopup(topupId: number, method?: string | null): Promise<{ ok: boolean; already: boolean }> {
+  await ensure();
+  const req = await prisma.wallet_topups.findUnique({ where: { id: BigInt(topupId) } }).catch(() => null);
+  if (!req) return { ok: false, already: false };
+  if (req.status === 1) return { ok: true, already: true }; // اعتُمد سابقاً
+  if (req.status !== 0) return { ok: false, already: false }; // مرفوض/ملغى
+  // قلب ذرّي للحالة: فقط أول استدعاء ينجح فيضيف الرصيد
+  const flipped = await prisma.wallet_topups.updateMany({
+    where: { id: BigInt(topupId), status: 0 },
+    data: { status: 1, paid_at: new Date(), decided_at: new Date(), method: method ? method.slice(0, 20) : null },
+  }).catch(() => ({ count: 0 }));
+  if (flipped.count === 0) return { ok: true, already: true }; // سبق آخرُ فقلبها
+  const credited = await adjustBalance(toInt(req.user_id), req.amount, 'topup', { note: `شحن إلكتروني #${toInt(req.id)} (${req.provider || 'بوابة'})` });
+  if (!credited.ok) {
+    await prisma.wallet_topups.updateMany({ where: { id: BigInt(topupId), status: 1 }, data: { status: 0, paid_at: null, decided_at: null } }).catch(() => {});
+    return { ok: false, already: false };
+  }
+  await applyTopupBonuses(toInt(req.user_id), req.amount, 0).catch(() => {});
+  return { ok: true, already: false };
 }
 
 /** Member's own top-up requests (newest first). */

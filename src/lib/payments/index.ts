@@ -1,0 +1,115 @@
+import 'server-only';
+import { SITE } from '@/lib/constants';
+import { createOnlineTopup, attachProviderRef, getTopupById, creditOnlineTopup, findTopupByProviderRef } from '@/lib/wallet';
+import { getPaymentConfig, getProviderCreds, isOnlinePayReady } from './config';
+import { providerMeta } from './registry';
+import type { PayProvider, PayProviderId } from './types';
+import { moyasar } from './providers/moyasar';
+import { tap } from './providers/tap';
+import { paytabs } from './providers/paytabs';
+
+export { PROVIDER_META, providerMeta, readyProviders } from './registry';
+export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds } from './config';
+export type { PaymentConfig } from './config';
+
+/** سجلّ مُحوِّلات المزوّدين الجاهزين (لها كود مكتمل). */
+const ADAPTERS: Partial<Record<PayProviderId, PayProvider>> = { moyasar, tap, paytabs };
+
+export function getAdapter(id: string): PayProvider | null {
+  return ADAPTERS[id as PayProviderId] ?? null;
+}
+
+function baseUrl(): string {
+  return `https://${SITE.domain}`;
+}
+
+export type StartResult = { ok: boolean; redirectUrl?: string; error?: string };
+
+/**
+ * يبدأ عملية شحن رصيد إلكتروني: يتحقّق من التهيئة والحدود، ينشئ طلب شحن معلّقاً، ثم عملية دفع
+ * لدى المزوّد الفعّال، ويعيد رابط صفحة الدفع لتوجيه العميل إليه.
+ */
+export async function startTopupPayment(
+  userId: number,
+  amountSar: number,
+  customer?: { name?: string; email?: string; phone?: string },
+): Promise<StartResult> {
+  if (!(await isOnlinePayReady())) return { ok: false, error: 'الدفع الإلكتروني غير مُفعَّل حالياً' };
+  const cfg = await getPaymentConfig();
+  const amt = Math.round(amountSar || 0);
+  if (!Number.isFinite(amt) || amt < cfg.min) return { ok: false, error: `أقل مبلغ للشحن ${cfg.min} ر.س` };
+  if (amt > cfg.max) return { ok: false, error: `أعلى مبلغ للشحن ${cfg.max} ر.س` };
+
+  const adapter = getAdapter(cfg.provider);
+  if (!adapter) return { ok: false, error: 'مزوّد الدفع غير متاح' };
+  const creds = await getProviderCreds(cfg.provider);
+
+  const topupId = await createOnlineTopup(userId, amt, cfg.provider);
+  if (!topupId) return { ok: false, error: 'تعذّر إنشاء طلب الشحن' };
+
+  const res = await adapter.createPayment(
+    {
+      amountSar: amt,
+      topupId,
+      description: `شحن رصيد تربح — ${amt} ر.س (#${topupId})`,
+      callbackUrl: `${baseUrl()}/api/pay/callback/${cfg.provider}?t=${topupId}`,
+      webhookUrl: `${baseUrl()}/api/pay/webhook/${cfg.provider}`,
+      customerName: customer?.name,
+      customerEmail: customer?.email,
+      customerPhone: customer?.phone,
+    },
+    creds,
+    cfg.mode,
+  );
+
+  if (!res.ok || !res.redirectUrl) return { ok: false, error: res.error || 'تعذّر بدء الدفع' };
+  if (res.providerRef) await attachProviderRef(topupId, res.providerRef);
+  return { ok: true, redirectUrl: res.redirectUrl };
+}
+
+/**
+ * يؤكّد طلب شحن بمعرّفه: يسحب حالة العملية من المزوّد (المصدر الموثوق)، ويعتمد الشحن إن اكتمل
+ * الدفع وتطابق المبلغ. آمنٌ للتكرار (عودة المتصفح + الويبهوك). يعيد paid/credited.
+ */
+export async function confirmTopupById(topupId: number): Promise<{ paid: boolean; credited: boolean; reason?: string }> {
+  const row = await getTopupById(topupId);
+  if (!row) return { paid: false, credited: false, reason: 'not_found' };
+  if (row.status === 1) return { paid: true, credited: true }; // اعتُمد سابقاً
+  if (row.source !== 'online' || !row.provider) return { paid: false, credited: false, reason: 'not_online' };
+  const adapter = getAdapter(row.provider);
+  if (!adapter) return { paid: false, credited: false, reason: 'no_adapter' };
+
+  const providerRef = await providerRefOf(topupId);
+  if (!providerRef) return { paid: false, credited: false, reason: 'no_ref' };
+
+  const creds = await getProviderCreds(row.provider);
+  const cfg = await getPaymentConfig();
+  const v = await adapter.verifyByRef(providerRef, creds, cfg.mode);
+  if (!v.paid) return { paid: false, credited: false, reason: v.status };
+  // مطابقة المبلغ حماية من التلاعب
+  if (v.amountSar > 0 && Math.abs(v.amountSar - row.amount) > 0) {
+    return { paid: true, credited: false, reason: 'amount_mismatch' };
+  }
+  const r = await creditOnlineTopup(topupId, v.method || null);
+  return { paid: true, credited: r.ok };
+}
+
+/** يؤكّد شحناً من إشعار ويبهوك: يجد الطلب بمعرّف عملية المزوّد ثم يؤكّده. */
+export async function confirmFromWebhook(provider: string, body: unknown, query: URLSearchParams): Promise<{ handled: boolean }> {
+  const adapter = getAdapter(provider);
+  const meta = providerMeta(provider);
+  if (!adapter || !meta) return { handled: false };
+  const ref = adapter.extractRefFromWebhook(body, query);
+  if (!ref) return { handled: false };
+  const topupId = await findTopupByProviderRef(provider, ref);
+  if (!topupId) return { handled: false };
+  await confirmTopupById(topupId);
+  return { handled: true };
+}
+
+/** يقرأ معرّف عملية المزوّد المخزّن على طلب الشحن. */
+async function providerRefOf(topupId: number): Promise<string | null> {
+  const { prisma } = await import('@/lib/prisma');
+  const r = await prisma.wallet_topups.findUnique({ where: { id: BigInt(topupId) }, select: { provider_ref: true } }).catch(() => null);
+  return r?.provider_ref ?? null;
+}

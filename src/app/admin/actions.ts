@@ -1584,3 +1584,37 @@ export async function unlinkAccountAction(formData: FormData) {
   }
   revalidatePath('/admin/links');
 }
+
+/* ===================== إعدادات الدفع الإلكتروني (بوابات الدفع) ===================== */
+
+/** حفظ الإعدادات العامة للدفع: التفعيل، المزوّد الفعّال، الوضع (تجريبي/مباشر)، وحدّا المبلغ. */
+export async function savePaymentSettingsAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const { savePaymentSettings } = await import('@/lib/payments');
+  await savePaymentSettings({
+    enabled: formData.get('enabled') === 'on' || formData.get('enabled') === '1',
+    provider: String(formData.get('provider') || ''),
+    mode: String(formData.get('mode') || 'test'),
+    min: Number(formData.get('min') || 10),
+    max: Number(formData.get('max') || 5000),
+  });
+  await logAdmin(session.uid, 'حفظ إعدادات الدفع الإلكتروني', String(formData.get('provider') || ''));
+  revalidatePath('/admin/payments');
+  redirect('/admin/payments?saved=1');
+}
+
+/** حفظ بيانات اعتماد مزوّد دفع (المفاتيح السرّية لا تُمحى إن تُركت فارغة). */
+export async function saveProviderCredsAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const provider = String(formData.get('provider') || '');
+  const { saveProviderCreds, providerMeta } = await import('@/lib/payments');
+  const meta = providerMeta(provider);
+  if (meta) {
+    const values: Record<string, string> = {};
+    for (const c of meta.creds) values[c.key] = String(formData.get(c.key) || '');
+    await saveProviderCreds(provider, values);
+    await logAdmin(session.uid, 'حفظ مفاتيح مزوّد دفع', provider);
+  }
+  revalidatePath('/admin/payments');
+  redirect('/admin/payments?saved=1');
+}

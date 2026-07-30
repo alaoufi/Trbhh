@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Megaphone, Flag, ShieldCheck, Copy, Sparkles, Ban,
   Crown, Settings, MonitorPlay, BookOpen, ShieldAlert, DatabaseBackup, KeyRound, MessageSquare, Coins,
   Store, MessagesSquare, FileText, Shield, HandCoins, ScrollText, BellRing, Search as SearchIcon, Link2 as LinkIcon,
-  Archive, AlertTriangle,
+  Archive, AlertTriangle, CreditCard,
 } from 'lucide-react';
 import type { Perm } from '@/lib/roles';
 
@@ -62,6 +62,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
       { href: '/admin/revenue', label: 'الإيرادات (تقارير مالية)', icon: Coins, perm: 'users' },
       { href: '/admin/revenue?tab=pricing', label: 'كل التسعير (باقات وأسعار)', icon: Crown, perm: 'users' },
       { href: '/admin/topups', label: 'طلبات شحن الرصيد', icon: HandCoins, perm: 'users' },
+      { href: '/admin/payments', label: 'وسائل الدفع الإلكتروني', icon: CreditCard, perm: 'users' },
       { href: '/admin/promos', label: 'الإعلانات الترويجية', icon: MonitorPlay, perm: 'promos' },
     ],
   },

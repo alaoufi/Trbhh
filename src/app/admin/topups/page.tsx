@@ -65,6 +65,9 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
             <div className="flex flex-wrap items-center gap-2 border-b border-primary/10 pb-2">
               <Link href={`/users/${r.userId}`} className="flex items-center gap-1.5 font-bold text-primary hover:underline"><User className="h-4 w-4" /> {r.userName}</Link>
               <span className="text-xs text-muted-foreground">#{r.id} • {fmt(r.at)}</span>
+              {r.source === 'online' && (
+                <span className="flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-700">💳 دفع إلكتروني{r.provider ? ` • ${r.provider}` : ''}{r.method ? ` • ${r.method}` : ''}</span>
+              )}
               <span className="mr-auto text-lg font-extrabold text-primary">{r.amount} ر.س</span>
               {r.status === 0 && <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800"><Clock className="h-3.5 w-3.5" /> بانتظار التأكيد</span>}
               {r.status === 1 && <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800"><CheckCircle2 className="h-3.5 w-3.5" /> تم التأكيد{r.decidedAt ? ` • ${fmt(r.decidedAt)}` : ''}</span>}
@@ -77,6 +80,8 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
                 <a href={mediaUrl(r.receipt)} target="_blank" className="flex items-center gap-1.5 rounded-lg border-2 border-primary/25 px-3 py-1.5 text-sm font-bold text-primary hover:bg-primary/5">
                   <Receipt className="h-4 w-4" /> عرض الإيصال
                 </a>
+              ) : r.source === 'online' ? (
+                <span className="text-xs font-bold text-sky-600">دفع إلكتروني مؤكَّد من البوابة — بلا إيصال يدوي</span>
               ) : (
                 <span className="text-xs font-bold text-red-500">لا يوجد إيصال مرفق</span>
               )}

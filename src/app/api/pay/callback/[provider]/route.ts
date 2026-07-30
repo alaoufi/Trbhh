@@ -1,0 +1,44 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { confirmTopupById, confirmFromWebhook } from '@/lib/payments';
+
+export const dynamic = 'force-dynamic';
+
+/**
+ * عودة المتصفح بعد الدفع من بوابة المزوّد. نتحقّق من حالة العملية (سحباً من المزوّد — لا نثق
+ * بمعطيات الرابط) ونعتمد الشحن إن اكتمل، ثم نعيد العضو إلى محفظته برسالة مناسبة.
+ * المزوّدون يعيدون بـ GET غالباً؛ وبعضهم POST — ندعم الاثنين.
+ */
+async function handle(req: NextRequest, provider: string): Promise<NextResponse> {
+  const url = new URL(req.url);
+  const q = url.searchParams;
+  const walletUrl = new URL('/account/wallet', url.origin);
+
+  const topupId = Number(q.get('t') || 0);
+  let paid = false;
+  try {
+    if (topupId > 0) {
+      const r = await confirmTopupById(topupId);
+      paid = r.credited || r.paid;
+    } else {
+      // بلا معرّف طلب في الرابط: نحاول عبر معرّف عملية المزوّد في الاستعلام
+      let body: unknown = null;
+      if (req.method === 'POST') { try { body = await req.json(); } catch { body = Object.fromEntries((await req.formData()).entries()); } }
+      const res = await confirmFromWebhook(provider, body, q);
+      paid = res.handled;
+    }
+  } catch { /* نتعامل مع أي فشل كعدم اكتمال — لا نعتمد بلا تأكيد */ }
+
+  walletUrl.hash = 'topup';
+  walletUrl.searchParams.set(paid ? 'topup' : 'error', paid ? 'paid' : 'payfailed');
+  return NextResponse.redirect(walletUrl, { status: 303 });
+}
+
+export async function GET(req: NextRequest, ctx: { params: Promise<{ provider: string }> }) {
+  const { provider } = await ctx.params;
+  return handle(req, provider);
+}
+
+export async function POST(req: NextRequest, ctx: { params: Promise<{ provider: string }> }) {
+  const { provider } = await ctx.params;
+  return handle(req, provider);
+}

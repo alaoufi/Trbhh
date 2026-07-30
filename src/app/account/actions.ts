@@ -134,6 +134,18 @@ export async function buyDupPackAction(formData: FormData) {
 }
 
 /** طلب شحن رصيد: المبلغ + إيصال التحويل — يُضاف للرصيد بعد تأكيد الإدارة وصول المبلغ. */
+/** بدء شحن رصيد عبر بوابة الدفع الإلكتروني — يوجّه العضو إلى صفحة الدفع المستضافة. */
+export async function startOnlineTopupAction(formData: FormData) {
+  const session = await requireUser();
+  const amount = Math.round(Number(formData.get('amount') || 0));
+  if (!Number.isFinite(amount) || amount <= 0) redirect('/account/wallet?error=topupamount#topup');
+  const { startTopupPayment } = await import('@/lib/payments');
+  const me = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { name: true, userName: true, phoneNumber: true } }).catch(() => null);
+  const res = await startTopupPayment(session.uid, amount, { name: me?.name || me?.userName || undefined, phone: me?.phoneNumber || undefined });
+  if (!res.ok || !res.redirectUrl) redirect(`/account/wallet?error=payfailed#topup`);
+  redirect(res.redirectUrl); // توجيه لصفحة دفع المزوّد (رابط خارجي)
+}
+
 export async function requestTopupAction(formData: FormData) {
   const session = await requireUser();
   const amount = Math.round(Number(formData.get('amount') || 0));

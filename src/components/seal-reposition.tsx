@@ -15,8 +15,10 @@ export function SealReposition() {
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const findSeal = (): HTMLElement | null => {
+      // نستثني شارتنا المدمجة (data-verified-badge) — فهي رابط لنطاق المركز أيضاً، ويجب
+      // ألّا يخلطها السكربت مع ختم المركز الرسمي فيخطفها من مكانها بجانب مبدّل الحساب.
       const mark = document.querySelector(
-        'a[href*="saudibusiness.gov.sa"], img[src*="saudibusiness.gov.sa"], iframe[src*="saudibusiness.gov.sa"], .sbc-verify-seal > *',
+        'a[href*="saudibusiness.gov.sa"]:not([data-verified-badge]), img[src*="saudibusiness.gov.sa"], iframe[src*="saudibusiness.gov.sa"], .sbc-verify-seal > *:not([data-verified-badge])',
       ) as HTMLElement | null;
       if (!mark) return null;
       // اصعد إلى الحاوية المثبّتة (position:fixed) التي وضعها السكربت، وإلا استعمل العنصر نفسه

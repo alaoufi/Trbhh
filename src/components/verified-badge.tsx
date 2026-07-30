@@ -14,8 +14,9 @@ export function VerifiedBadge({ className = '' }: { className?: string }) {
   const openOfficialVerification = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (typeof document === 'undefined') return; // حارس: يُصيَّر على الخادم أولاً
     // رابط ختم المركز الرسمي (يرسمه seal.js) — هو صفحة التحقّق الدقيقة لهذا الختم.
+    // نستثني شارتنا نفسها (data-verified-badge) حتى لا تنقر ذاتها.
     const official = document.querySelector(
-      '.sbc-verify-seal a[href*="saudibusiness.gov.sa"], a[href*="saudibusiness.gov.sa"]',
+      'a[href*="saudibusiness.gov.sa"]:not([data-verified-badge]), .sbc-verify-seal a:not([data-verified-badge])',
     ) as HTMLAnchorElement | null;
     if (official) {
       e.preventDefault();
@@ -29,6 +30,7 @@ export function VerifiedBadge({ className = '' }: { className?: string }) {
       href={SBC_VERIFY_URL}
       target="_blank"
       rel="noopener noreferrer"
+      data-verified-badge="1"
       onClick={openOfficialVerification}
       className={`group inline-flex cursor-pointer items-center gap-2 rounded-full border border-emerald-300 bg-gradient-to-l from-emerald-50 to-white px-4 py-1.5 shadow-sm transition hover:border-emerald-400 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${className}`.trim()}
       title="متجر موثّق لدى المركز السعودي للأعمال — اضغط لعرض معلومات التوثيق الرسمية"

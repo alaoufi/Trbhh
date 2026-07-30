@@ -2,13 +2,13 @@
 import { useEffect } from 'react';
 
 /**
- * يضع ختم التوثيق الرسمي «متجر موثّق» (الذي يرسمه سكربت المركز السعودي للأعمال) في مكانه
- * المطلوب: بجانب مبدّل الحساب أعلى الصفحة (داخل #sbc-seal-slot).
+ * يضع ختم التوثيق الرسمي «متجر موثّق» (الذي يرسمه سكربت المركز السعودي للأعمال) أعلى يسار
+ * الصفحة، عند مستوى مبدّل الحساب.
  *
- * السكربت الرسمي يُنشئ عنصره الخاص المثبّت في زاوية الشاشة. نلتقطه بعد ظهوره — نعرفه عبر
- * رابط/صورة تشير إلى نطاق المركز — ثم ننقله إلى الموضع (#sbc-seal-slot) ونجعله عنصراً
- * عادياً في تدفّق الشريط (لا عائماً). نعيد التطبيق دورياً لفترة قصيرة لأن السكربت غير متزامن
- * وقد يُعيد فرض تنسيقه. (ختم واحد فقط على الصفحة — لا نسخة مكرّرة.)
+ * مهم: نُبقي الختم **عائماً (position:fixed)** كما صمّمه المركز — فنافذته المنبثقة (تفاصيل
+ * التحقّق) تفتح وتُغلق طبيعياً. نغيّر إحداثياته فقط (إلى الأعلى يسار) دون نقله داخل تدفّق
+ * الصفحة أو تغيير نوع تموضعه — لأن ذلك كان يكسر نافذته فتفتح داخل الصفحة بلا إغلاق.
+ * نعيد التطبيق دورياً لفترة قصيرة لأن السكربت غير متزامن وقد يُعيد فرض تنسيقه.
  */
 export function SealReposition() {
   useEffect(() => {
@@ -29,26 +29,13 @@ export function SealReposition() {
     const place = (): boolean => {
       const seal = findSeal();
       if (!seal) return false;
-      const slot = document.getElementById('sbc-seal-slot');
-      if (slot) {
-        // انقل الختم إلى الموضع بجانب مبدّل الحساب واجعله عنصراً عادياً (لا عائماً)
-        if (seal.parentElement !== slot) slot.appendChild(seal);
-        seal.style.setProperty('position', 'static', 'important');
-        seal.style.setProperty('top', 'auto', 'important');
-        seal.style.setProperty('bottom', 'auto', 'important');
-        seal.style.setProperty('left', 'auto', 'important');
-        seal.style.setProperty('right', 'auto', 'important');
-        seal.style.setProperty('margin', '0', 'important');
-        seal.style.setProperty('z-index', 'auto', 'important');
-        return true;
-      }
-      // احتياطي (لو غاب الموضع): تثبيت أسفل يسار مرفوعاً فوق الشريط السفلي
+      // يبقى عائماً (fixed) لتعمل نافذته وتُغلق — نضبط موضعه أعلى يسار عند مستوى شريط الهوية.
       seal.style.setProperty('position', 'fixed', 'important');
-      seal.style.setProperty('bottom', '78px', 'important');
+      seal.style.setProperty('top', '96px', 'important');
       seal.style.setProperty('left', '8px', 'important');
-      seal.style.setProperty('top', 'auto', 'important');
+      seal.style.setProperty('bottom', 'auto', 'important');
       seal.style.setProperty('right', 'auto', 'important');
-      seal.style.setProperty('z-index', '35', 'important');
+      seal.style.setProperty('z-index', '45', 'important');
       return true;
     };
     place();

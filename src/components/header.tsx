@@ -79,13 +79,9 @@ export async function Header() {
         </Link>
       </div>
     </header>
-    {/* شريط الهوية الفعّالة + ختم المركز الرسمي «متجر موثّق» بجانب مبدّل الحساب.
-        للزائر: الختم وحده (ينقله SealReposition إلى #sbc-seal-slot). */}
-    {session ? <ProfileBar uid={session.uid} /> : (
-      <div className="relative z-40 border-b bg-white/95">
-        <div className="container flex min-h-9 items-center justify-end py-1"><span id="sbc-seal-slot" className="inline-flex items-center" /></div>
-      </div>
-    )}
+    {/* شريط الهوية الفعّالة (للعضو). ختم المركز الرسمي «متجر موثّق» عائم أعلى يسار الصفحة
+        (يضعه SealReposition) — يظهر للعضو والزائر، ونافذته تفتح وتُغلق طبيعياً. */}
+    {session && <ProfileBar uid={session.uid} />}
     {/* 🔔 تنبيه إداري عالمي: يظهر لأي إداري في كل صفحة حتى تُعالَج الطلبات المعلقة */}
     {admin && <AdminAlertsBanner />}
     </>
@@ -105,10 +101,8 @@ async function ProfileBar({ uid }: { uid: number }) {
   const linkedItems = linked.filter((a) => a.id !== uid).map((a) => ({ id: a.id, name: a.name, hasStore: a.hasStore, storeName: a.storeName }));
   return (
     <div className="relative z-50 border-b bg-white/95">
-      <div className="container flex min-h-9 items-center justify-between gap-2 py-1">
+      <div className="container flex min-h-9 items-center py-1">
         <ProfileSwitcher active={toItem(active)} profiles={profiles.map(toItem)} linked={linkedItems} />
-        {/* ختم المركز الرسمي «متجر موثّق» بجانب مبدّل الحساب — ينقله SealReposition هنا */}
-        <span id="sbc-seal-slot" className="inline-flex shrink-0 items-center" />
       </div>
     </div>
   );

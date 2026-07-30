@@ -55,6 +55,22 @@ export const PROVIDER_META: ProviderMeta[] = [
     ],
   },
   {
+    id: 'neoleap',
+    name: 'نيوليب',
+    nameEn: 'neoleap',
+    ready: false,
+    kind: 'gateway',
+    methods: ['mada', 'visa', 'mastercard', 'applepay'],
+    docsUrl: 'https://neoleap.com.sa',
+    notes: 'قيد التجهيز — بوابة دفع سعودية (مجموعة الراجحي) تدعم مدى والبطاقات وApple Pay. يُكمَّل مُحوِّلها البرمجي فور استلام حزمة الربط منهم: رابط الـ API وطريقة المصادقة ومعرّفات التاجر/الطرفية. الحقول أدناه مبدئية وتُضبط على وثيقتهم.',
+    creds: [
+      { key: 'merchant_id', label: 'رقم التاجر (Merchant ID)', secret: false, hint: 'من حزمة الربط بعد التعاقد مع نيوليب' },
+      { key: 'terminal_id', label: 'معرّف الطرفية (Terminal ID)', secret: false },
+      { key: 'api_key', label: 'مفتاح الـ API (سرّي)', secret: true },
+      { key: 'api_password', label: 'كلمة مرور الـ API (سرّية)', secret: true, hint: 'إن وُجدت في حزمة الربط' },
+    ],
+  },
+  {
     id: 'hyperpay',
     name: 'هايبر باي',
     nameEn: 'HyperPay',

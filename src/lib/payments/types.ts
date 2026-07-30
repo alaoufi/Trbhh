@@ -7,7 +7,7 @@
  */
 
 /** معرّفات المزوّدين المدعومين/المخطّطين. */
-export type PayProviderId = 'moyasar' | 'tap' | 'paytabs' | 'hyperpay' | 'tabby' | 'tamara';
+export type PayProviderId = 'moyasar' | 'tap' | 'paytabs' | 'neoleap' | 'hyperpay' | 'tabby' | 'tamara';
 
 /** وسائل الدفع الفعلية التي قد تدعمها البوابة. */
 export type PayMethod = 'mada' | 'visa' | 'mastercard' | 'applepay' | 'stcpay' | 'googlepay' | 'tabby' | 'tamara' | 'card';

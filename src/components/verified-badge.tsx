@@ -13,16 +13,24 @@ const SBC_VERIFY_URL = 'https://eauthenticate.saudibusiness.gov.sa/';
 export function VerifiedBadge({ className = '' }: { className?: string }) {
   const openOfficialVerification = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (typeof document === 'undefined') return; // حارس: يُصيَّر على الخادم أولاً
-    // رابط ختم المركز الرسمي (يرسمه seal.js) — هو صفحة التحقّق الدقيقة لهذا الختم.
-    // نستثني شارتنا نفسها (data-verified-badge) حتى لا تنقر ذاتها.
-    const official = document.querySelector(
-      'a[href*="saudibusiness.gov.sa"]:not([data-verified-badge]), .sbc-verify-seal a:not([data-verified-badge])',
-    ) as HTMLAnchorElement | null;
-    if (official) {
+    // نلتقط ختم المركز الرسمي نفسه (الذي يرسمه seal.js) — عبر صورة شعار المركز أو رابطه —
+    // مع استثناء شارتنا (data-verified-badge). الهدف: أن ينفّذ النقر هنا ما ينفّذه النقر على
+    // الختم الرسمي تماماً، مهما كانت طريقة فتحه (href مباشر أو onclick/window.open).
+    const marker = document.querySelector<HTMLElement>(
+      '.sbc-verify-seal a:not([data-verified-badge]), .sbc-verify-seal img, img[src*="saudibusiness"], a[href*="saudibusiness"]:not([data-verified-badge]), iframe[src*="saudibusiness"]',
+    );
+    if (!marker) return; // لم يُرسَم الختم بعد → يُترك الرابط الافتراضي يعمل
+    const anchor = (marker.tagName === 'A' ? marker : marker.closest('a')) as HTMLAnchorElement | null;
+    const raw = anchor?.getAttribute('href') || '';
+    if (anchor && raw && !/^\s*javascript:/i.test(raw)) {
+      // رابط صريح على الختم الرسمي → نفتح نفسه (الرابط الصحيح المنقول من رقم ١)
       e.preventDefault();
-      official.click(); // يفتح تحقّق المركز الرسمي كما لو نُقر الختم مباشرة
+      window.open(anchor.href, '_blank', 'noopener,noreferrer');
+      return;
     }
-    // وإلا: يُترك سلوك الرابط الافتراضي (بديل ثابت لموقع المركز) يعمل.
+    // يفتح عبر onclick/window.open → نطلق نقرة حقيقية على الختم الرسمي فيُنفّذ سلوكه الصحيح
+    e.preventDefault();
+    (anchor || marker).click();
   };
 
   return (

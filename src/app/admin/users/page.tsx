@@ -23,6 +23,7 @@ const FILTERS = [
 ] as const;
 type Filter = typeof FILTERS[number]['k'];
 const fmtDate = (d: Date | null) => (d ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d) : '');
+const fmtDateTime = (d: Date | null) => (d ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d) : '');
 const PAGE_SIZE = 30;
 
 // خامل = غير محظور، حسابه أقدم من سنة، ولم يضف أي إعلان خلال آخر سنة
@@ -30,9 +31,9 @@ const IDLE_COND = `(ban IS NULL OR ban <> 'checked')
   AND users.created_at < (NOW() - INTERVAL 1 YEAR)
   AND NOT EXISTS (SELECT 1 FROM ads a WHERE a.user_id = users.id AND a.created_at > (NOW() - INTERVAL 1 YEAR))`;
 
-export default async function AdminUsers({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string; page?: string }> }) {
+export default async function AdminUsers({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string; page?: string; banerr?: string }> }) {
   await requirePerm('users');
-  const { q, filter: filterRaw, page: pageRaw } = await searchParams;
+  const { q, filter: filterRaw, page: pageRaw, banerr } = await searchParams;
   const term = (q || '').trim();
   const filter: Filter = (FILTERS.some((f) => f.k === filterRaw) ? filterRaw : 'all') as Filter;
   const page = Math.max(1, parseInt(pageRaw || '1', 10) || 1);
@@ -89,6 +90,11 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-4">
+      {banerr && (
+        <div className="rounded-lg border-2 border-destructive/40 bg-destructive/10 px-4 py-2 text-sm font-bold text-destructive">
+          {banerr === 'reason' ? '⛔ لم يُحفظ الحظر: يجب كتابة سبب الحظر.' : '⛔ لم يُحفظ الحظر: يجب تحديد مدة الحظر (عدد الأيام، أو اختر «دائم»).'}
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-bold text-primary">الأعضاء</h1>
         {/* طلبات الأعضاء المعلّقة — وصول مباشر من نفس الصفحة */}
@@ -159,7 +165,8 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
               const role = roleById.get(id);
               const label = role ? ROLE_LABELS[role] : (u.is_admin === 1 ? 'مدير' : null);
               const banned = u.ban === 'checked';
-              const until = banMap.get(id) ?? null; // Date = temporary, null (while banned) = permanent
+              const banInfo = banMap.get(id) ?? null; // تفاصيل الحظر: المدة + السبب + تاريخ/وقت التنفيذ
+              const until = banInfo?.until ?? null; // Date = temporary, null (while banned) = permanent
               return (
               <tr key={id} className="border-b last:border-0">
                 <td className="p-3">
@@ -180,7 +187,12 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                 <td className="p-3" dir="ltr">{u.phoneNumber || '—'}</td>
                 <td className="p-3">
                   {banned
-                    ? <div className="flex flex-col gap-0.5"><Badge variant="muted">محظور</Badge><span className="text-[10px] text-muted-foreground">{until ? `حتى ${fmtDate(until)}` : 'دائم'}</span></div>
+                    ? <div className="flex max-w-[180px] flex-col gap-0.5">
+                        <Badge variant="muted">محظور</Badge>
+                        <span className="text-[10px] font-bold text-muted-foreground">{until ? `المدة: حتى ${fmtDate(until)}` : 'المدة: دائم'}</span>
+                        {banInfo?.at && <span className="text-[10px] text-muted-foreground">🕐 {fmtDateTime(banInfo.at)}</span>}
+                        <span className="text-[10px] leading-4 text-red-700">📝 السبب: {banInfo?.reason || 'غير مسجّل (حظر قديم)'}</span>
+                      </div>
                     : <Badge variant="trusted">نشط</Badge>}
                 </td>
                 <td className="p-3">
@@ -213,14 +225,14 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                     {banned ? (
                       <form action={unbanUserAction}><input type="hidden" name="userId" value={id} /><ConfirmSubmit msg="رفع الحظر عن هذا العضو؟ تعود إعلاناته للظهور فوراً." className="flex items-center gap-1 rounded-md border border-emerald-400 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50"><Ban className="h-3 w-3" /> رفع الحظر</ConfirmSubmit></form>
                     ) : (
-                      <>
-                        <form action={banUserAction} className="flex items-center gap-1 rounded-md border border-destructive/30 p-0.5">
-                          <input type="hidden" name="userId" value={id} />
-                          <input name="days" type="number" min={1} placeholder="أيام" title="مدة الحظر بالأيام" className="w-14 rounded bg-background px-1.5 py-1 text-xs" />
-                          <ConfirmSubmit msg="تأكيد حظر هذا العضو للمدة المدخلة؟ ستختفي كل إعلاناته طوال الحظر." className="flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive"><Ban className="h-3 w-3" /> حظر</ConfirmSubmit>
-                        </form>
-                        <form action={banUserAction}><input type="hidden" name="userId" value={id} /><input type="hidden" name="permanent" value="1" /><ConfirmSubmit msg="تأكيد الحظر الدائم لهذا العضو؟ ستختفي كل إعلاناته حتى رفع الحظر." className="rounded-md border border-destructive/40 px-2 py-1 text-xs font-bold text-destructive hover:bg-destructive/10">دائم</ConfirmSubmit></form>
-                      </>
+                      // حظر يدوي: يلزم سبب مكتوب + مدة (أيام للمؤقت أو زر «دائم») — بلا سبب لا يُحفظ.
+                      <form action={banUserAction} className="flex flex-wrap items-center gap-1 rounded-md border border-destructive/30 p-1">
+                        <input type="hidden" name="userId" value={id} />
+                        <input name="reason" required maxLength={300} placeholder="سبب الحظر (إلزامي)" title="سبب الحظر — إلزامي، يُحفظ ويُعرض مع تاريخ ووقت الحظر" className="w-32 rounded bg-background px-1.5 py-1 text-xs" />
+                        <input name="days" type="number" min={1} placeholder="أيام" title="مدة الحظر بالأيام (للحظر المؤقت)" className="w-14 rounded bg-background px-1.5 py-1 text-xs" />
+                        <ConfirmSubmit msg="تأكيد حظر هذا العضو للمدة المدخلة بالسبب المكتوب؟ ستختفي كل إعلاناته طوال الحظر." className="flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive"><Ban className="h-3 w-3" /> حظر مؤقت</ConfirmSubmit>
+                        <ConfirmSubmit name="permanent" value="1" msg="تأكيد الحظر الدائم لهذا العضو بالسبب المكتوب؟ ستختفي كل إعلاناته حتى رفع الحظر." className="rounded-md border border-destructive/40 px-2 py-1 text-xs font-bold text-destructive hover:bg-destructive/10">دائم</ConfirmSubmit>
+                      </form>
                     )}
                   </div>
                 </td>

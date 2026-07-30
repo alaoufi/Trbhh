@@ -929,6 +929,8 @@ model stores {
   auto_renew       Int       @default(0) @db.TinyInt
   sub_plan         String?   @db.VarChar(10)
   plus_until       DateTime? @db.DateTime(0)
+  suspend_reason   String?   @db.VarChar(300) // سبب إيقاف المتجر (إلزامي عند الإيقاف) — يُعرض للإدارة
+  suspend_at       DateTime? @db.DateTime(0)  // تاريخ ووقت إيقاف المتجر
 }
 
 model auctions {
@@ -1198,6 +1200,8 @@ model users {
   ban                       users_ban  @default(no)
   ban_until                 DateTime?  @db.DateTime(0) // self-provisioned: temporary-ban expiry
   ban_source                String?    @db.VarChar(10) // 'auto' | 'admin' | null — درع المتجر: يخفي المتجر للحظر الإداري/الجسيم فقط
+  ban_reason                String?    @db.VarChar(300) // سبب الحظر (إلزامي للحظر اليدوي) — يبقى محفوظاً ويُعرض للإدارة
+  ban_at                    DateTime?  @db.DateTime(0)  // تاريخ ووقت تنفيذ الحظر
   token                     String?    @db.Text
   user_ip                   String?    @db.Text
   country_id                Int?

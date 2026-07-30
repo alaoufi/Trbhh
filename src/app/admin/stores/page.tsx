@@ -25,6 +25,12 @@ function fmtDate(iso: string | null) {
   return isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d);
 }
 
+function fmtDateTime(iso: string | null) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? '—' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+}
+
 const COMM_META: Record<StoreComm['kind'], { icon: string; label: string; cls: string }> = {
   warn: { icon: '⚠️', label: 'إنذار مخالفة', cls: 'text-red-700' },
   adhide: { icon: '🚫', label: 'إخفاء إعلان + إنذار', cls: 'text-red-700' },
@@ -54,6 +60,14 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
           <div className="text-xs text-muted-foreground">التاجر: {s.ownerName} · فُتح {timeAgo(s.createdAt)}</div>
         </Link>
       </div>
+
+      {/* 🚫 تفاصيل إيقاف المتجر: السبب + تاريخ ووقت الإيقاف — يظهران مع كل إيقاف (مؤقت/نهائي) */}
+      {(s.status === 2 || s.status === 3) && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs">
+          <div className="font-bold text-red-800">🚫 {s.status === 3 ? 'موقوف نهائياً' : 'موقوف مؤقتاً'}{s.suspendAt ? ` · 🕐 ${fmtDateTime(s.suspendAt)}` : ''}</div>
+          <div className="mt-0.5 leading-5 text-red-700">📝 السبب: {s.suspendReason || 'غير مسجّل (إيقاف قديم قبل تفعيل هذه الميزة)'}</div>
+        </div>
+      )}
 
       {/* 📅 تدقيق التواريخ والمميزات: متى فُتح، متى وُثّق صاحبه، وما المدفوع/الممنوح ومتى ينتهي */}
       <div className="grid gap-1.5 rounded-xl border border-primary/15 bg-primary/5 p-3 text-xs sm:grid-cols-2">
@@ -166,8 +180,9 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
         )}
         {s.status === 1 && (
           <>
-            <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend" /><ConfirmSubmit msg="إيقاف مؤقت لهذا المتجر؟ يختفي متجره ومنتجاته ويُمنع النشر منه — من يفتحه يرى «المتجر غير نشط حالياً، أعد المحاولة لاحقاً» حتى إعادة التفعيل." className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف مؤقت</ConfirmSubmit></form>
-            <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend_perm" /><ConfirmSubmit msg="إيقاف نهائي لهذا المتجر؟ يُمنع النشر والتصفّح — من يفتحه يرى «لا يوجد متجر نشط بهذا الاسم». يمكن إعادة تفعيله لاحقاً من هنا." className="flex items-center gap-1 rounded-lg bg-red-800 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف نهائي</ConfirmSubmit></form>
+            {/* الإيقاف لا يُحفظ إلا بسبب مكتوب — يُعرض مع تاريخ ووقت الإيقاف. */}
+            <form action={toggleStoreStatusAction} className="flex items-center gap-1 rounded-lg border border-red-200 p-0.5"><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend" /><input name="reason" required maxLength={300} placeholder="سبب الإيقاف (إلزامي)" title="سبب الإيقاف — إلزامي، يُحفظ ويُعرض مع تاريخ ووقت الإيقاف" className="w-32 rounded bg-background px-1.5 py-1 text-xs" /><ConfirmSubmit msg="إيقاف مؤقت لهذا المتجر بالسبب المكتوب؟ يختفي متجره ومنتجاته ويُمنع النشر منه — من يفتحه يرى «المتجر غير نشط حالياً، أعد المحاولة لاحقاً» حتى إعادة التفعيل." className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف مؤقت</ConfirmSubmit></form>
+            <form action={toggleStoreStatusAction} className="flex items-center gap-1 rounded-lg border border-red-300 p-0.5"><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend_perm" /><input name="reason" required maxLength={300} placeholder="سبب الإيقاف (إلزامي)" title="سبب الإيقاف النهائي — إلزامي، يُحفظ ويُعرض مع تاريخ ووقت الإيقاف" className="w-32 rounded bg-background px-1.5 py-1 text-xs" /><ConfirmSubmit msg="إيقاف نهائي لهذا المتجر بالسبب المكتوب؟ يُمنع النشر والتصفّح — من يفتحه يرى «لا يوجد متجر نشط بهذا الاسم». يمكن إعادة تفعيله لاحقاً من هنا." className="flex items-center gap-1 rounded-lg bg-red-800 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف نهائي</ConfirmSubmit></form>
             <form action={requestStoreHomeAction}><input type="hidden" name="storeId" value={s.id} /><button className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white"><Home className="h-3.5 w-3.5" /> اطلب للرئيسية</button></form>
           </>
         )}
@@ -216,12 +231,12 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
   );
 }
 
-export default async function AdminStores({ searchParams }: { searchParams: Promise<{ msg?: string; vbal?: string; q?: string }> }) {
+export default async function AdminStores({ searchParams }: { searchParams: Promise<{ msg?: string; vbal?: string; q?: string; suspenderr?: string }> }) {
   const session = await requireAction('stores', 'view');
   // صلاحية التعديل (الموافقة/الرفض/الإلغاء تتطلّب stores:edit) — نُخفي أزرار الإجراء
   // عمّن يملك العرض فقط بدل إظهار أزرار تُعيده صفحة «لا صلاحية» بصمت عند الضغط.
   const canEdit = await hasAction(session.uid, 'stores', 'edit').catch(() => false);
-  const { msg, vbal, q } = await searchParams;
+  const { msg, vbal, q, suspenderr } = await searchParams;
   const term = (q || '').trim();
   const [pending, stores, transfers, platformReqs, commsByStore] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers(), platformRequests(), getStoresCommsLog().catch(() => new Map<number, StoreComm[]>())]);
   const { listVerifyOrdersAdmin, refundOf } = await import('@/lib/verify-paid');
@@ -230,6 +245,7 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold text-primary">إدارة المتاجر</h1></div>
+      {suspenderr && <div className="rounded-lg border-2 border-destructive/40 bg-destructive/10 p-3 text-sm font-bold text-destructive">⛔ لم يُحفظ الإيقاف: يجب كتابة سبب الإيقاف.</div>}
       {msg === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ أُرسلت الرسالة الرسمية لصاحب المتجر — تصله في «الرسائل» باسم الإدارة مع تنبيه.</div>}
       <p className="text-sm text-muted-foreground">معلومات كاملة عن كل متجر ونشاطه، مع الاعتماد والإيقاف والإنذار من المنتجات المخالفة. عند تكرار الإنذارات ٣ مرات يُوقف المتجر تلقائياً وتبقى الإنذارات موثّقة.</p>
 

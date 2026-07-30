@@ -277,12 +277,18 @@ const STATEMENTS: string[] = [
   `ALTER TABLE stores ADD COLUMN sub_plan VARCHAR(10) NULL`,
   /* باقة متجر Plus: اشتراك + عرض في تربح + شارة ⭐ حتى هذا التاريخ. */
   `ALTER TABLE stores ADD COLUMN plus_until DATETIME NULL`,
+  /* إيقاف المتجر: السبب وتاريخه/وقته — يُعرضان مع حالة الإيقاف؛ الإيقاف لا يُحفظ بلا سبب. */
+  `ALTER TABLE stores ADD COLUMN suspend_reason VARCHAR(300) NULL`,
+  `ALTER TABLE stores ADD COLUMN suspend_at DATETIME NULL`,
   /* ---- moderation ---- */
   `ALTER TABLE users ADD COLUMN ban_until DATETIME NULL`,
   `CREATE INDEX users_ban ON users (ban, ban_until)`,
   // مصدر الحظر: 'auto' حظر آلي غير جسيم (تكرار/فئة أقل) — لا يُسقط متجراً معتمداً عند تفعيل درع المتجر ·
   // 'admin' حظر إداري متعمَّد أو محتوى جسيم (غير أخلاقي/صورة إباحية) — يُخفي المتجر · NULL حظر قديم يُعامَل كإداري.
   `ALTER TABLE users ADD COLUMN ban_source VARCHAR(10) NULL`,
+  // سبب الحظر وتاريخه/وقته — يُعرضان مع كل حظر (يدوي أو آلي)؛ الحظر اليدوي لا يُحفظ بلا سبب.
+  `ALTER TABLE users ADD COLUMN ban_reason VARCHAR(300) NULL`,
+  `ALTER TABLE users ADD COLUMN ban_at DATETIME NULL`,
   `ALTER TABLE users ADD COLUMN verify_note VARCHAR(300) NULL`,
   /* التوثيق المدفوع: طلب صاحب المتجر ← موافقة إدارة المتاجر ← خصم الرسوم وتفعيل لمدة أيام.
      status: 0 معلق، 1 نشط (مدفوع)، 2 مرفوض، 3 ملغى (مع استرداد نسبي)، 4 منتهٍ. */

@@ -234,16 +234,20 @@ export async function requestStoreHomeAction(formData: FormData) {
   revalidatePath('/admin/stores');
 }
 
-/** Suspend (stop) or reactivate a store. */
+/** Suspend (stop) or reactivate a store.
+ *  الإيقاف (مؤقت/نهائي) لا يُحفظ إلا بسبب مكتوب — يُعرض مع تاريخ ووقت الإيقاف. */
 export async function toggleStoreStatusAction(formData: FormData) {
   const session = await requireAction('stores', 'suspend');
   const id = Number(formData.get('storeId'));
   const action = String(formData.get('action'));
   if (id) {
     const status = action === 'suspend_perm' ? 3 : action === 'suspend' ? 2 : 1;
-    await setStoreStatus(id, status);
+    const reason = String(formData.get('reason') || '').trim();
+    // إلزام سبب الإيقاف — بلا سبب لا يُحفظ (يعود مع رسالة توضيحية).
+    if ((status === 2 || status === 3) && !reason) { redirect(`/admin/stores?suspenderr=${id}`); }
+    await setStoreStatus(id, status, reason || undefined);
     const label = status === 3 ? 'إيقاف نهائي لمتجر' : status === 2 ? 'إيقاف مؤقت لمتجر' : 'إعادة تفعيل متجر';
-    await logAdmin(session.uid, label, `متجر #${id}`);
+    await logAdmin(session.uid, label, `متجر #${id}`, status === 1 ? '' : `السبب: ${reason}`);
   }
   revalidatePath('/admin/stores');
 }
@@ -432,21 +436,29 @@ export async function adminHideStoreAdAction(formData: FormData) {
 }
 
 /** Ban/unban the seller from the ad detail page (admin). Asks for duration:
- *  `permanent` flag → permanent, else `days` (temporary). If already banned → unban. */
+ *  `permanent` flag → permanent, else `days` (temporary). If already banned → unban.
+ *  الحظر لا يُحفظ إلا بسبب مكتوب ومدة محددة (أيام ≥ 1 أو دائم) — يُعرضان مع الحظر. */
 export async function adminBanSellerAction(formData: FormData) {
-  await requireUserBan();
+  const session = await requireUserBan();
   const uid = Number(formData.get('userId'));
+  const adId = String(formData.get('adId') || '');
+  const back = adId ? `/ads/${adId}` : '/';
   const u = await prisma.users.findUnique({ where: { id: BigInt(uid) } });
   if (u) {
     if (u.ban === 'checked') {
       await unbanUser(uid);
+      await logAdmin(session.uid, 'رفع حظر', `العضو #${uid}`, 'من صفحة الإعلان');
     } else {
       const permanent = !!formData.get('permanent');
       const days = Math.max(0, parseInt(String(formData.get('days') || '0')) || 0);
-      await banUserFor(uid, permanent ? 0 : days);
+      const reason = String(formData.get('reason') || '').trim();
+      if (!reason) { redirect(`${back}?banerr=reason`); }
+      if (!permanent && days < 1) { redirect(`${back}?banerr=days`); }
+      await banUserFor(uid, permanent ? 0 : days, 'admin', reason);
+      const dur = permanent ? 'دائم' : `${days} يوم`;
+      await logAdmin(session.uid, 'حظر عضو', `العضو #${uid}`, `المدة: ${dur} · السبب: ${reason} · من صفحة الإعلان`);
     }
   }
-  const adId = String(formData.get('adId') || '');
   if (adId) revalidatePath(`/ads/${adId}`);
 }
 
@@ -500,14 +512,21 @@ export async function dismissDeletionRequestAction(formData: FormData) {
   revalidatePath('/admin/users');
 }
 
-/** Ban a member for a chosen duration (days) or permanently. */
+/** Ban a member for a chosen duration (days) or permanently.
+ *  لا يُحفظ الحظر إلا بعد كتابة سبب الحظر وتحديد مدته (أيام ≥ 1 أو دائم) — يُعرضان
+ *  لاحقاً مع الحظر (السبب + التاريخ والوقت). */
 export async function banUserAction(formData: FormData) {
   const session = await requireUserBan();
   const id = Number(formData.get('userId'));
   const permanent = !!formData.get('permanent');
   const days = Math.max(0, parseInt(String(formData.get('days') || '0')) || 0);
-  await banUserFor(id, permanent ? 0 : days);
-  await logAdmin(session.uid, 'حظر عضو', `العضو #${String(formData.get('userId') || '')}`);
+  const reason = String(formData.get('reason') || '').trim();
+  // إلزام السبب والمدة — بلا أيّهما لا يُحفظ الحظر (يعود مع رسالة توضيحية).
+  if (!reason) { redirect(`/admin/users?banerr=reason&uid=${id}`); }
+  if (!permanent && days < 1) { redirect(`/admin/users?banerr=days&uid=${id}`); }
+  await banUserFor(id, permanent ? 0 : days, 'admin', reason);
+  const dur = permanent ? 'دائم' : `${days} يوم`;
+  await logAdmin(session.uid, 'حظر عضو', `العضو #${id}`, `المدة: ${dur} · السبب: ${reason}`);
   revalidatePath('/admin/users');
 }
 
@@ -1236,7 +1255,7 @@ export async function resolveReportAction(formData: FormData) {
   const ownerId = ad ? toInt(ad.user_id) : 0;
 
   if (action === 'ban' && ownerId) {
-    await banUserFor(ownerId, await getStrikeBanDays());
+    await banUserFor(ownerId, await getStrikeBanDays(), 'admin', `بلاغ على الإعلان «${adTitle}»`);
     await logMod(ownerId, { kind: 'report', category: null, term: null, snippet: `حظر بسبب بلاغ على «${adTitle}»`, action: 'banned', adId: ad ? toInt(ad.id) : null });
   }
   if (action === 'delete' && ad) {

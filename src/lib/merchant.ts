@@ -102,7 +102,7 @@ export async function addStoreWarning(storeId: number, reason: string): Promise<
   await prisma.store_warnings.create({ data: { store_id: storeId, reason: reason.slice(0, 300) || null } }).catch(() => {});
   const count = await warningsCount(storeId);
   let suspended = false;
-  if (count >= 3) { await setStoreStatus(storeId, 2); suspended = true; }
+  if (count >= 3) { await setStoreStatus(storeId, 2, 'إيقاف تلقائي بعد تراكم 3 إنذارات مخالفة'); suspended = true; }
   return { count, suspended };
 }
 
@@ -115,6 +115,7 @@ export type AdminStore = {
   onPlatform: boolean; termsAgreed: boolean; termsAgreedAt: string | null;
   followers: number; ratingAvg: number; ratingCount: number; adsCount: number;
   warnings: { id: number; reason: string | null; at: string | null }[];
+  suspendReason: string | null; suspendAt: string | null;
 };
 
 /** Full oversight list for the admin store manager (all stores, richest first). */
@@ -157,6 +158,7 @@ export async function adminStoreList(): Promise<AdminStore[]> {
       onPlatform: r.show_on_platform === 1, termsAgreed: r.terms_agreed === 1, termsAgreedAt: r.terms_agreed_at ? r.terms_agreed_at.toISOString() : null,
       followers: followsBy.get(id) ?? 0, ratingAvg: rating.avg, ratingCount: rating.count,
       adsCount: adsBy.get(r.user_id) ?? 0, warnings: warnsBy.get(id) ?? [],
+      suspendReason: r.suspend_reason ?? null, suspendAt: r.suspend_at ? r.suspend_at.toISOString() : null,
     };
   });
 }
@@ -376,9 +378,14 @@ export async function markStorePending(userId: number) {
   await prisma.stores.updateMany({ where: { user_id: userId }, data: { status: 0 } }).catch(() => {});
 }
 
-export async function setStoreStatus(storeId: number, status: number) {
+export async function setStoreStatus(storeId: number, status: number, reason?: string) {
   await ensure();
-  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { status } }).catch(() => {});
+  // إيقاف (2 مؤقت / 3 نهائي): يُسجَّل السبب وتاريخ/وقت الإيقاف · إعادة تفعيل (1): يُمسحان.
+  const suspending = status === 2 || status === 3;
+  const data: { status: number; suspend_reason?: string | null; suspend_at?: Date | null } = { status };
+  if (suspending) { data.suspend_reason = reason?.slice(0, 300) ?? null; data.suspend_at = new Date(); }
+  else { data.suspend_reason = null; data.suspend_at = null; }
+  await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data }).catch(() => {});
 }
 
 /** حالة متجر العضو (لأي متجر يملكه): 1 معتمد · 0 بانتظار · 2 موقوف مؤقتاً · 3 موقوف نهائياً · -1 لا متجر. */

@@ -94,7 +94,7 @@ function fmtAdminMsgDate(iso: string | null) {
   return isNaN(d.getTime()) ? '' : `— ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d)}`;
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string; adshow?: string; dupid?: string; price?: string; rated?: string; rerror?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string; adshow?: string; dupid?: string; price?: string; rated?: string; rerror?: string; banerr?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -162,6 +162,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const storeMeta = inStore ? await getStoreMeta(sellerStoreId).catch(() => null) : null;
   // عدّاد إنذارات المتجر — لأدوات إشراف إعلان المتجر (صلاحية محدودة: إخفاء + إنذار)
   const storeWarnCount = inStore && sellerStoreId ? await import('@/lib/merchant').then((m) => m.warningsCount(sellerStoreId)).catch(() => 0) : 0;
+  // تفاصيل حظر البائع (للإدارة): السبب + تاريخ/وقت الحظر — تُعرض عند رفع الحظر
+  const sellerBanInfo = admin && ad.seller?.banned ? await import('@/lib/moderation').then((m) => m.getBanInfo(ad.seller!.id)).catch(() => null) : null;
   // رابط المتجر بالمسار المباشر (النطاق الفرعي يتطلب DNS Wildcard غير مجهز)
   const storeUrl = inStore ? `/companies/${storeMeta?.handle || sellerStoreId}` : '';
 
@@ -905,32 +907,42 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                 </form>
               </div>
             )}
+            {canBanSeller && spx.banerr && (
+              <div className="col-span-2 rounded-lg border-2 border-destructive/40 bg-destructive/10 p-2 text-xs font-bold text-destructive sm:col-span-3">
+                {spx.banerr === 'reason' ? '⛔ لم يُحفظ الحظر: يجب كتابة سبب الحظر.' : '⛔ لم يُحفظ الحظر: يجب تحديد المدة (عدد الأيام) أو اختيار «حظر دائم».'}
+              </div>
+            )}
             {canBanSeller && ad.seller && (
               ad.seller.banned ? (
-                <form action={adminBanSellerAction}>
-                  <input type="hidden" name="userId" value={ad.seller.id} />
-                  <input type="hidden" name="adId" value={ad.id} />
-                  <button className="flex w-full items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50">
-                    <Ban className="h-4 w-4" /> رفع الحظر عن العضو
-                  </button>
-                </form>
+                <div className="col-span-2 space-y-1.5 sm:col-span-3">
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-xs">
+                    <div className="font-bold text-red-800">🚫 العضو محظور{sellerBanInfo?.until ? ` حتى ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(sellerBanInfo.until)}` : ' (دائم)'}{sellerBanInfo?.at ? ` · 🕐 ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(sellerBanInfo.at)}` : ''}</div>
+                    <div className="mt-0.5 leading-5 text-red-700">📝 السبب: {sellerBanInfo?.reason || 'غير مسجّل (حظر قديم)'}</div>
+                  </div>
+                  <form action={adminBanSellerAction}>
+                    <input type="hidden" name="userId" value={ad.seller.id} />
+                    <input type="hidden" name="adId" value={ad.id} />
+                    <button className="flex w-full items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50">
+                      <Ban className="h-4 w-4" /> رفع الحظر عن العضو
+                    </button>
+                  </form>
+                </div>
               ) : (
                 <div className="col-span-2 rounded-lg border border-amber-300 bg-amber-50/50 p-2.5 sm:col-span-3">
-                  <div className="mb-2 flex items-center gap-1 text-xs font-bold text-amber-800"><Ban className="h-3.5 w-3.5" /> حظر العضو — حدّد المدة</div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <form action={adminBanSellerAction} className="flex min-w-0 flex-1 items-center gap-1.5">
-                      <input type="hidden" name="userId" value={ad.seller.id} />
-                      <input type="hidden" name="adId" value={ad.id} />
-                      <input name="days" type="number" min={1} placeholder="عدد الأيام" className="h-9 w-full min-w-0 rounded-md border border-amber-300 bg-white px-2 text-sm" />
-                      <ConfirmSubmit msg="تأكيد الحظر المؤقت لهذا المعلن؟ ستختفي كل إعلاناته من الموقع طوال مدة الحظر." className="h-9 shrink-0 whitespace-nowrap rounded-md bg-amber-600 px-3 text-xs font-bold text-white">حظر مؤقت</ConfirmSubmit>
-                    </form>
-                    <form action={adminBanSellerAction} className="shrink-0">
-                      <input type="hidden" name="userId" value={ad.seller.id} />
-                      <input type="hidden" name="adId" value={ad.id} />
-                      <input type="hidden" name="permanent" value="1" />
-                      <ConfirmSubmit msg="تأكيد الحظر الدائم لهذا المعلن؟ ستختفي كل إعلاناته من الموقع حتى رفع الحظر." className="h-9 w-full whitespace-nowrap rounded-md bg-destructive px-4 text-xs font-bold text-white sm:w-auto">حظر دائم</ConfirmSubmit>
-                    </form>
-                  </div>
+                  <div className="mb-2 flex items-center gap-1 text-xs font-bold text-amber-800"><Ban className="h-3.5 w-3.5" /> حظر العضو — اكتب السبب وحدّد المدة (إلزاميان)</div>
+                  {/* الحظر لا يُحفظ إلا بسبب مكتوب + مدة (أيام أو «دائم») — يُعرضان مع تاريخ ووقت الحظر */}
+                  <form action={adminBanSellerAction} className="flex flex-col gap-2">
+                    <input type="hidden" name="userId" value={ad.seller.id} />
+                    <input type="hidden" name="adId" value={ad.id} />
+                    <input name="reason" required maxLength={300} placeholder="سبب الحظر (إلزامي — يُحفظ ويُعرض للإدارة)" className="h-9 w-full rounded-md border border-amber-300 bg-white px-2 text-sm" />
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                        <input name="days" type="number" min={1} placeholder="عدد الأيام" className="h-9 w-full min-w-0 rounded-md border border-amber-300 bg-white px-2 text-sm" />
+                        <ConfirmSubmit msg="تأكيد الحظر المؤقت لهذا المعلن بالسبب المكتوب؟ ستختفي كل إعلاناته من الموقع طوال مدة الحظر." className="h-9 shrink-0 whitespace-nowrap rounded-md bg-amber-600 px-3 text-xs font-bold text-white">حظر مؤقت</ConfirmSubmit>
+                      </div>
+                      <ConfirmSubmit name="permanent" value="1" msg="تأكيد الحظر الدائم لهذا المعلن بالسبب المكتوب؟ ستختفي كل إعلاناته من الموقع حتى رفع الحظر." className="h-9 w-full whitespace-nowrap rounded-md bg-destructive px-4 text-xs font-bold text-white sm:w-auto">حظر دائم</ConfirmSubmit>
+                    </div>
+                  </form>
                 </div>
               )
             )}

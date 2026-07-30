@@ -71,8 +71,8 @@ export async function recordStrike(userId: number, kind: string): Promise<number
 }
 
 /** Ban a user's account (permanent — used by auto-moderation). */
-export async function banUser(userId: number) {
-  await prisma.users.update({ where: { id: BigInt(userId) }, data: { ban: 'checked' } }).catch(() => {});
+export async function banUser(userId: number, reason?: string) {
+  await prisma.users.update({ where: { id: BigInt(userId) }, data: { ban: 'checked', ban_reason: reason?.slice(0, 300) ?? null, ban_at: new Date() } }).catch(() => {});
 }
 
 /* ---- ban duration (temporary N days / permanent) ---- */
@@ -97,17 +97,19 @@ export async function liftExpiredBans(force = false) {
  *  على السلوك القائم (أي حظر لم يُحدَّد مصدره يُخفي المتجر كما كان). */
 export type BanSource = 'auto' | 'admin';
 
-/** Ban a user for `days` days, or permanently when days ≤ 0. */
-export async function banUserFor(userId: number, days: number, source: BanSource = 'admin') {
+/** Ban a user for `days` days, or permanently when days ≤ 0.
+ *  `reason` سبب الحظر — يُحفظ ويُعرض مع الحظر (إلزامي للحظر اليدوي، ووصف المخالفة للحظر الآلي).
+ *  `ban_at` تاريخ ووقت تنفيذ الحظر. */
+export async function banUserFor(userId: number, days: number, source: BanSource = 'admin', reason?: string) {
   await ensureBanCol();
   const until = days > 0 ? new Date(Date.now() + Math.min(days, 3650) * 86_400_000) : null;
-  await prisma.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'checked', ban_until: until, ban_source: source } }).catch(() => {});
+  await prisma.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'checked', ban_until: until, ban_source: source, ban_reason: reason?.slice(0, 300) ?? null, ban_at: new Date() } }).catch(() => {});
 }
 
-/** Lift a user's ban. */
+/** Lift a user's ban. يمسح السبب والتاريخ معاً. */
 export async function unbanUser(userId: number) {
   await ensureBanCol();
-  await prisma.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'no', ban_until: null, ban_source: null } }).catch(() => {});
+  await prisma.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'no', ban_until: null, ban_source: null, ban_reason: null, ban_at: null } }).catch(() => {});
 }
 
 /**
@@ -143,19 +145,31 @@ export async function isUserBanned(userId: number): Promise<boolean> {
   return true;
 }
 
-/** ban_until (or null=permanent) for currently-banned users among the given ids. */
-export async function getBanMap(ids: number[]): Promise<Map<number, Date | null>> {
+/** تفاصيل حظر عضو محظور حالياً: مدة الحظر (until=null دائم) وسببه وتاريخ/وقت تنفيذه. */
+export type BanInfo = { until: Date | null; reason: string | null; at: Date | null };
+
+/** تفاصيل الحظر (المدة + السبب + التاريخ) للأعضاء المحظورين حالياً ضمن القائمة. */
+export async function getBanMap(ids: number[]): Promise<Map<number, BanInfo>> {
   await liftExpiredBans();
-  const map = new Map<number, Date | null>();
+  const map = new Map<number, BanInfo>();
   if (!ids.length) return map;
   const list = ids.map((n) => Number(n)).filter(Number.isFinite);
   if (!list.length) return map;
   const rows = await prisma.users.findMany({
     where: { ban: 'checked', id: { in: list.map((n) => BigInt(n)) } },
-    select: { id: true, ban_until: true },
+    select: { id: true, ban_until: true, ban_reason: true, ban_at: true },
   }).catch(() => []);
-  for (const r of rows) map.set(Number(r.id), r.ban_until ?? null);
+  for (const r of rows) map.set(Number(r.id), { until: r.ban_until ?? null, reason: r.ban_reason ?? null, at: r.ban_at ?? null });
   return map;
+}
+
+/** تفاصيل حظر عضو واحد (لصفحة العضو / صفحة الإعلان). null إن لم يكن محظوراً. */
+export async function getBanInfo(userId: number): Promise<BanInfo | null> {
+  await ensureBanCol();
+  const r = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { ban: true, ban_until: true, ban_reason: true, ban_at: true } }).catch(() => null);
+  if (!r || r.ban !== 'checked') return null;
+  if (r.ban_until && r.ban_until.getTime() < Date.now()) return null;
+  return { until: r.ban_until ?? null, reason: r.ban_reason ?? null, at: r.ban_at ?? null };
 }
 
 /** Write one moderation event to the audit log (best-effort).
@@ -193,7 +207,7 @@ export async function handleProhibited(
   if (category === 'immoral') {
     // محتوى جسيم: حظر بمصدر إداري (تصنيف للسجل/التدقيق). المتجر مستقل ولا يسقط تلقائياً —
     // لإسقاط متجر صاحب محتوى جسيم أوقِفوه من إدارة المتاجر (قرار مستقل).
-    await banUserFor(userId, await getStrikeBanDays(), 'admin');
+    await banUserFor(userId, await getStrikeBanDays(), 'admin', `محتوى غير أخلاقي مخالف — «${term}»`);
     await logMod(userId, { kind: 'content', category, term, snippet, action: 'banned' });
     await notifyModBlock(userId, `🚫 تم حظر حسابك بسبب نشر محتوى غير أخلاقي مخالف — الكلمة/العبارة: «${term}».`);
     return { banned: true, left: 0, category };
@@ -201,7 +215,7 @@ export async function handleProhibited(
   const n = await recordStrike(userId, 'content');
   const banned = n >= CONTENT_STRIKE_LIMIT;
   // فئة أقل خطورة (مخدرات/أسلحة/سياسي): حظر آلي بمصدر 'auto' — لا يُسقط متجراً معتمداً عند تفعيل درع المتجر.
-  if (banned) await banUserFor(userId, await getStrikeBanDays(), 'auto');
+  if (banned) await banUserFor(userId, await getStrikeBanDays(), 'auto', `تكرار كلمة/عبارة ممنوعة (${CATEGORY_LABEL[category]}) — «${term}»`);
   await logMod(userId, { kind: 'content', category, term, snippet, action: banned ? 'banned' : 'blocked' });
   await notifyModBlock(
     userId,

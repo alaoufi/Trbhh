@@ -1590,13 +1590,15 @@ export async function unlinkAccountAction(formData: FormData) {
 /** حفظ الإعدادات العامة للدفع: التفعيل، المزوّد الفعّال، الوضع (تجريبي/مباشر)، وحدّا المبلغ. */
 export async function savePaymentSettingsAction(formData: FormData) {
   const session = await requireAction('users', 'edit');
-  const { savePaymentSettings } = await import('@/lib/payments');
+  const { savePaymentSettings, CONTROLLABLE_METHODS } = await import('@/lib/payments');
+  const methods = CONTROLLABLE_METHODS.filter((m) => formData.get(`method_${m}`) === 'on');
   await savePaymentSettings({
     enabled: formData.get('enabled') === 'on' || formData.get('enabled') === '1',
     provider: String(formData.get('provider') || ''),
     mode: String(formData.get('mode') || 'test'),
     min: Number(formData.get('min') || 10),
     max: Number(formData.get('max') || 5000),
+    methods,
   });
   await logAdmin(session.uid, 'حفظ إعدادات الدفع الإلكتروني', String(formData.get('provider') || ''));
   revalidatePath('/admin/payments');

@@ -25,6 +25,7 @@ export interface CreatePaymentInput {
   description: string;    // وصف يظهر للعميل وفي لوحة المزوّد
   callbackUrl: string;    // رابط عودة المتصفح بعد الدفع (يتحقّق ويعتمد)
   webhookUrl: string;     // رابط إشعار خادم-لخادم (تأكيد موثوق من المزوّد)
+  methods?: PayMethod[];  // الوسائل المسموح بها (يختارها الأدمن) — تُقيّد صفحة الدفع عليها
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;

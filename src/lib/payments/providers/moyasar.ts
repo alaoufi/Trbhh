@@ -30,6 +30,13 @@ export const moyasar: PayProvider = {
   async createPayment(input: CreatePaymentInput, creds: ProviderCreds): Promise<CreatePaymentResult> {
     const secret = creds.secret_key;
     if (!secret) return { ok: false, error: 'مفتاح ميسّر السرّي غير مُهيّأ' };
+    // تقييد الوسائل على ما اختاره الأدمن. ميسّر يوحّد البطاقات تحت creditcard (مدى/فيزا/
+    // ماستركارد معاً) — الفصل الدقيق بين شبكات البطاقات يكون من لوحة ميسّر لا هنا.
+    const mSet = new Set(input.methods || []);
+    const methods: string[] = [];
+    if (mSet.has('mada') || mSet.has('visa') || mSet.has('mastercard')) methods.push('creditcard');
+    if (mSet.has('applepay')) methods.push('applepay');
+    if (mSet.has('stcpay')) methods.push('stcpay');
     const res = await httpJson(`${BASE}/invoices`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: auth(secret) },
@@ -38,6 +45,7 @@ export const moyasar: PayProvider = {
         currency: 'SAR',
         description: input.description,
         callback_url: input.callbackUrl,
+        ...(methods.length ? { methods } : {}),
         metadata: { topup_id: input.topupId },
       }),
     });

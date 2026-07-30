@@ -15,7 +15,7 @@ import { pointsEnabled, getPoints, getPointsConfig } from '@/lib/points';
 import { mediaUrl } from '@/lib/media';
 import { requestTopupAction, convertPointsAction, startOnlineTopupAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
-import { isOnlinePayReady, getPaymentConfig, providerMeta } from '@/lib/payments';
+import { isOnlinePayReady, getPaymentConfig, getActiveMethods } from '@/lib/payments';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'محفظتي' };
@@ -60,7 +60,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
   // الدفع الإلكتروني: يظهر زرّ «ادفع أونلاين» فقط عند تفعيله واكتمال تهيئة المزوّد
   const payReady = await isOnlinePayReady().catch(() => false);
   const payCfg = payReady ? await getPaymentConfig().catch(() => null) : null;
-  const payMethods = payCfg?.provider ? (providerMeta(payCfg.provider)?.methods ?? []) : [];
+  const payMethods = payCfg?.provider ? await getActiveMethods(payCfg.provider).catch(() => []) : [];
   return (
     <div className="space-y-4">
       <h1 className="flex items-center gap-2 text-xl font-bold text-primary"><Wallet className="h-6 w-6" /> محفظتي</h1>

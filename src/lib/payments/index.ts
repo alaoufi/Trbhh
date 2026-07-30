@@ -1,7 +1,7 @@
 import 'server-only';
 import { SITE } from '@/lib/constants';
 import { createOnlineTopup, attachProviderRef, getTopupById, creditOnlineTopup, findTopupByProviderRef } from '@/lib/wallet';
-import { getPaymentConfig, getProviderCreds, isOnlinePayReady } from './config';
+import { getPaymentConfig, getProviderCreds, isOnlinePayReady, getActiveMethods } from './config';
 import { providerMeta } from './registry';
 import type { PayProvider, PayProviderId } from './types';
 import { moyasar } from './providers/moyasar';
@@ -9,7 +9,7 @@ import { tap } from './providers/tap';
 import { paytabs } from './providers/paytabs';
 
 export { PROVIDER_META, providerMeta, readyProviders } from './registry';
-export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds } from './config';
+export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
 export type { PaymentConfig } from './config';
 
 /** سجلّ مُحوِّلات المزوّدين الجاهزين (لها كود مكتمل). */
@@ -43,6 +43,8 @@ export async function startTopupPayment(
   const adapter = getAdapter(cfg.provider);
   if (!adapter) return { ok: false, error: 'مزوّد الدفع غير متاح' };
   const creds = await getProviderCreds(cfg.provider);
+  const methods = await getActiveMethods(cfg.provider); // الوسائل التي اختارها الأدمن ويدعمها المزوّد
+  if (methods.length === 0) return { ok: false, error: 'لا توجد وسيلة دفع مُفعّلة' };
 
   const topupId = await createOnlineTopup(userId, amt, cfg.provider);
   if (!topupId) return { ok: false, error: 'تعذّر إنشاء طلب الشحن' };
@@ -54,6 +56,7 @@ export async function startTopupPayment(
       description: `شحن رصيد تربح — ${amt} ر.س (#${topupId})`,
       callbackUrl: `${baseUrl()}/api/pay/callback/${cfg.provider}?t=${topupId}`,
       webhookUrl: `${baseUrl()}/api/pay/webhook/${cfg.provider}`,
+      methods,
       customerName: customer?.name,
       customerEmail: customer?.email,
       customerPhone: customer?.phone,

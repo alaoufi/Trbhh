@@ -2,20 +2,19 @@ import { CreditCard, CheckCircle2, Circle, ExternalLink, KeyRound, ShieldCheck, 
 import { requireAction } from '@/lib/roles';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { savePaymentSettingsAction, saveProviderCredsAction } from '../actions';
-import { PROVIDER_META, getPaymentConfig, getProviderCreds, isProviderConfigured } from '@/lib/payments';
+import { PROVIDER_META, providerMeta, getPaymentConfig, getProviderCreds, isProviderConfigured, getEnabledMethods, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from '@/lib/payments';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'وسائل الدفع الإلكتروني' };
 
-const METHOD_LABEL: Record<string, string> = {
-  mada: 'مدى', visa: 'فيزا', mastercard: 'ماستركارد', applepay: 'Apple Pay', stcpay: 'STC Pay',
-  googlepay: 'Google Pay', tabby: 'تابي', tamara: 'تمارا', card: 'بطاقة',
-};
+const METHOD_LABEL = METHOD_LABEL_AR;
 
 export default async function AdminPayments({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
   const { saved } = await searchParams;
   const cfg = await getPaymentConfig();
+  const enabledMethods = await getEnabledMethods();
+  const activeSupported = cfg.provider ? (providerMeta(cfg.provider)?.methods ?? []) : [];
 
   // لكل مزوّد: هل مُهيّأ؟ وأي حقول سرّية مخزَّنة (نمرّر منطقاً فقط — لا نكشف القيم).
   const provState = await Promise.all(
@@ -76,6 +75,26 @@ export default async function AdminPayments({ searchParams }: { searchParams: Pr
             <input name="max" type="number" min={1} defaultValue={cfg.max} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm" />
           </label>
         </div>
+
+        {/* التحكّم بوسائل الدفع المسموح بها (لتفاوت الرسوم) */}
+        <div className="rounded-xl border border-primary/15 bg-primary/5 p-3">
+          <div className="mb-2 text-sm font-bold text-foreground">وسائل الدفع المسموح بها</div>
+          <p className="mb-2 text-xs text-muted-foreground">فعّل ما تريده فقط — تُعطَّل الوسائل ذات الرسوم الأعلى بإلغاء تحديدها فلا تظهر للعضو ولا في صفحة الدفع.</p>
+          <div className="flex flex-wrap gap-2">
+            {CONTROLLABLE_METHODS.map((m) => {
+              const supported = !cfg.provider || activeSupported.includes(m);
+              return (
+                <label key={m} className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-bold ${supported ? 'border-primary/25 bg-white' : 'border-slate-200 bg-slate-50 text-slate-400'}`}>
+                  <input type="checkbox" name={`method_${m}`} defaultChecked={enabledMethods.includes(m)} disabled={!supported} className="h-4 w-4 accent-primary" />
+                  {METHOD_LABEL[m] || m}
+                  {!supported && <span className="text-[10px] font-medium">(لا يدعمها المزوّد الحالي)</span>}
+                </label>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[11px] text-amber-700">⚠ ملاحظة: بعض المزوّدين (مثل ميسّر وتاب) يوحّدون شبكات البطاقات (مدى/فيزا/ماستركارد) في خيار «بطاقة» واحد على صفحة الدفع؛ الفصل الدقيق بين شبكات البطاقات (للرسوم) يُضبط من لوحة المزوّد نفسه. أمّا PayTabs فيفصل مدى عن البطاقات هنا مباشرةً. Apple Pay وSTC Pay يُفعَّلان/يُعطَّلان بدقّة لدى الجميع.</p>
+        </div>
+
         <ConfirmSubmit msg="حفظ إعدادات الدفع العامة؟" className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">حفظ الإعداد العام</ConfirmSubmit>
       </form>
 

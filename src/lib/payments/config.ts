@@ -1,7 +1,7 @@
 import 'server-only';
 import { getSetting, getSettingBool, getSettingNum, setSetting } from '@/lib/settings';
 import { providerMeta, PROVIDER_META } from './registry';
-import type { PayMode, PayProviderId, ProviderCreds } from './types';
+import type { PayMethod, PayMode, PayProviderId, ProviderCreds } from './types';
 
 /**
  * إعدادات الدفع الإلكتروني — كلها من جدول `settings` (قابلة للتحكم من لوحة الإدارة، وخارج
@@ -20,7 +20,16 @@ export const PAY_SETTING = {
   mode: 'pay_mode',
   min: 'pay_min',
   max: 'pay_max',
+  methods: 'pay_methods',
 } as const;
+
+/** الوسائل التي يمكن للأدمن التحكّم بتفعيلها/تعطيلها (لتفاوت الرسوم). */
+export const CONTROLLABLE_METHODS: PayMethod[] = ['mada', 'visa', 'mastercard', 'applepay', 'stcpay'];
+
+export const METHOD_LABEL_AR: Record<string, string> = {
+  mada: 'مدى', visa: 'فيزا', mastercard: 'ماستركارد', applepay: 'Apple Pay', stcpay: 'STC Pay',
+  googlepay: 'Google Pay', tabby: 'تابي', tamara: 'تمارا', card: 'بطاقة',
+};
 
 /** مفتاح إعداد بيانات اعتماد مزوّد. */
 export function credKey(provider: string, field: string): string {
@@ -53,6 +62,28 @@ export async function getPaymentConfig(): Promise<PaymentConfig> {
   };
 }
 
+/** الوسائل المُفعّلة من الأدمن (افتراضياً كلها). قيمة مخزّنة = احترام اختيار الأدمن حرفياً. */
+export async function getEnabledMethods(): Promise<PayMethod[]> {
+  const raw = (await getSetting(PAY_SETTING.methods, '')).trim();
+  if (!raw) return [...CONTROLLABLE_METHODS]; // غير محدّد بعد → الكل مُفعّل
+  const set = raw.split(',').map((s) => s.trim());
+  return CONTROLLABLE_METHODS.filter((m) => set.includes(m));
+}
+
+/** الوسائل الفعّالة فعلاً للمزوّد الحالي = المُفعّلة ∩ ما يدعمه المزوّد. */
+export async function getActiveMethods(provider: string): Promise<PayMethod[]> {
+  const meta = providerMeta(provider);
+  if (!meta) return [];
+  const enabled = await getEnabledMethods();
+  const supported = new Set(meta.methods);
+  return enabled.filter((m) => supported.has(m));
+}
+
+export async function setEnabledMethods(methods: string[]): Promise<void> {
+  const clean = CONTROLLABLE_METHODS.filter((m) => methods.includes(m));
+  await setSetting(PAY_SETTING.methods, clean.join(','));
+}
+
 /** بيانات اعتماد مزوّد (قيَمها الحقيقية — للاستخدام الخادمي فقط). */
 export async function getProviderCreds(provider: string): Promise<ProviderCreds> {
   const meta = providerMeta(provider);
@@ -75,17 +106,19 @@ export async function isProviderConfigured(provider: string): Promise<boolean> {
   return meta.creds.filter((c) => c.secret).every((c) => (creds[c.key] || '').length > 0);
 }
 
-/** هل الدفع الإلكتروني جاهز فعلاً للاستخدام الآن (مفعّل + مزوّد جاهز ومُهيّأ)؟ */
+/** هل الدفع الإلكتروني جاهز فعلاً للاستخدام الآن (مفعّل + مزوّد جاهز ومُهيّأ + وسيلة واحدة على الأقل)؟ */
 export async function isOnlinePayReady(): Promise<boolean> {
   const cfg = await getPaymentConfig();
   if (!cfg.enabled || !cfg.provider) return false;
   const meta = providerMeta(cfg.provider);
   if (!meta || !meta.ready) return false;
-  return isProviderConfigured(cfg.provider);
+  if (!(await isProviderConfigured(cfg.provider))) return false;
+  const active = await getActiveMethods(cfg.provider);
+  return active.length > 0;
 }
 
 /** حفظ الإعدادات العامة للدفع (من لوحة الإدارة). */
-export async function savePaymentSettings(input: { enabled: boolean; provider: string; mode: string; min: number; max: number }): Promise<void> {
+export async function savePaymentSettings(input: { enabled: boolean; provider: string; mode: string; min: number; max: number; methods?: string[] }): Promise<void> {
   const pid = PROVIDER_META.some((p) => p.id === input.provider) ? input.provider : '';
   await Promise.all([
     setSetting(PAY_SETTING.on, input.enabled ? '1' : '0'),
@@ -93,6 +126,7 @@ export async function savePaymentSettings(input: { enabled: boolean; provider: s
     setSetting(PAY_SETTING.mode, input.mode === 'live' ? 'live' : 'test'),
     setSetting(PAY_SETTING.min, String(Math.max(1, Math.round(input.min) || 10))),
     setSetting(PAY_SETTING.max, String(Math.max(1, Math.round(input.max) || 5000))),
+    input.methods ? setEnabledMethods(input.methods) : Promise.resolve(),
   ]);
 }
 

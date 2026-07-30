@@ -25,6 +25,14 @@ export const paytabs: PayProvider = {
     const profileId = creds.profile_id;
     const serverKey = creds.server_key;
     if (!profileId || !serverKey) return { ok: false, error: 'بيانات PayTabs (Profile ID / Server Key) غير مُهيّأة' };
+    // PayTabs يدعم تقييد الوسائل بدقّة: مدى منفصل عن البطاقات، وApple Pay وSTC Pay.
+    const mSet = new Set(input.methods || []);
+    const pmSet = new Set<string>();
+    if (mSet.has('mada')) pmSet.add('mada');
+    if (mSet.has('visa') || mSet.has('mastercard')) pmSet.add('creditcard');
+    if (mSet.has('applepay')) pmSet.add('applepay');
+    if (mSet.has('stcpay')) pmSet.add('stcpay');
+    const payment_methods = [...pmSet];
     const res = await httpJson(`${BASE}/payment/request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', authorization: serverKey },
@@ -36,6 +44,7 @@ export const paytabs: PayProvider = {
         cart_description: input.description,
         cart_currency: 'SAR',
         cart_amount: Math.round(input.amountSar * 100) / 100,
+        ...(payment_methods.length ? { payment_methods } : {}),
         callback: input.webhookUrl,
         return: input.callbackUrl,
         customer_details: input.customerName ? { name: input.customerName, phone: input.customerPhone || '', email: input.customerEmail || '' } : undefined,

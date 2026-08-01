@@ -684,6 +684,9 @@ const STATEMENTS: string[] = [
   `ALTER TABLE users ADD COLUMN identity_plan VARCHAR(24) NULL`,
   // الإعلان يحمل هوية نشره — null = إعلان قديم يُنسب لهوية صاحبه الافتراضية عند العرض
   `ALTER TABLE ads ADD COLUMN profile_id BIGINT NULL`,
+  // كشف العقار: علم يُحسب من نص الإعلان — لإيقاف/إلزام الإعلانات العقارية بالترخيص
+  `ALTER TABLE ads ADD COLUMN is_realestate TINYINT NOT NULL DEFAULT 0`,
+  `CREATE INDEX ads_is_realestate ON ads (is_realestate)`,
   `CREATE INDEX ads_profile_id ON ads (profile_id)`,
   // التعليق/التقييم يحمل هوية كاتبه أيضاً (يُعرض باسمها) — null = هوية افتراضية
   `ALTER TABLE comments ADD COLUMN profile_id BIGINT NULL`,
@@ -755,6 +758,36 @@ async function run(): Promise<void> {
   await backfillAdBanAction();
   await backfillAccountDeletedAction();
   await backfillLegacyReceiptHashes();
+  await backfillRealEstateFlag();
+}
+
+/** ترقيع لمرة واحدة: وسم الإعلانات العقارية القائمة بعد إضافة عمود is_realestate،
+ *  حتى يشملها إيقاف العقار فوراً عند تفعيله من الإدارة. يُنفَّذ مرّة واحدة فقط
+ *  (بعلامة في site_settings) كي لا يُلغي أي تصحيح يدوي لاحق من الإدارة. الكلمات
+ *  ثابتة في الكود (لا مدخلات مستخدم) فاستعمالها في LIKE آمن. */
+async function backfillRealEstateFlag(): Promise<void> {
+  const done = await prisma
+    .$queryRawUnsafe<{ v: string | null }[]>(
+      `SELECT v FROM site_settings WHERE k = 'realestate_backfill_done' LIMIT 1`,
+    )
+    .catch(() => [] as { v: string | null }[]);
+  if (done.length && done[0]?.v === '1') return;
+  // نسخ صريحة للتهجئة (LIKE لا يوحّد الألف/التاء) — تطابق الكلمات القاطعة في src/lib/realestate.ts
+  const kws = [
+    'عقار', 'شقة', 'شقه', 'شقق', 'فيلا', 'فله', 'فلل', 'دوبلكس', 'عمارة', 'عماره',
+    'عمائر', 'تمليك', 'استراحة', 'استراحه', 'شاليه', 'بنتهاوس', 'بيت شعبي', 'دور علوي',
+    'دور ارضي', 'دور أرضي', 'مزرعة', 'مزرعه', 'اراضي', 'أراضي', 'قطعة ارض', 'قطعه ارض',
+    'مخطط سكني', 'غرفة وصالة', 'غرفه وصاله',
+  ];
+  const like = kws.map((k) => `title LIKE '%${k}%' OR detail LIKE '%${k}%'`).join(' OR ');
+  await prisma
+    .$executeRawUnsafe(`UPDATE ads SET is_realestate = 1 WHERE is_realestate = 0 AND (${like})`)
+    .catch(() => {});
+  await prisma
+    .$executeRawUnsafe(
+      `INSERT INTO site_settings (k, v) VALUES ('realestate_backfill_done', '1') ON DUPLICATE KEY UPDATE v = '1'`,
+    )
+    .catch(() => {});
 }
 
 /** ترقيع لمرة واحدة: سجلات التكرار الآلي القديمة (قبل إضافة عمود ad_id) خزّنت

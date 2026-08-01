@@ -22,6 +22,10 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   const session = await getSession();
   if (!session) redirect('/login');
   const { error, left, max, hours, wait, cat, banned, dup, price, bal, dest } = await searchParams;
+  // رسالة إيقاف العقار (من الإعدادات) — تُقرأ فقط عند وقوع هذا الخطأ
+  const realestateMsg = error === 'realestate'
+    ? await import('@/lib/realestate').then((m) => m.realEstateBlockMsg()).catch(() => '')
+    : undefined;
   // الهوية الفعّالة الحالية (نفس مصدر createAdAction) — لعرضها صريحةً وتحديد المجال افتراضياً
   const active = await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).catch(() => null);
   // الوجهة: المعامل الصريح يفصل (store/personal)، وإلا تُشتقّ من مجال الهوية الفعّالة —
@@ -103,6 +107,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
         initial={{ phone: user?.phoneNumber ?? '', whatsapp: user?.phone_whatsapp ?? '' }}
         submitLabel="نشر الإعلان"
         error={error}
+        realestateMsg={realestateMsg}
         dupLeft={left}
         dupId={dup}
         needPrice={price}

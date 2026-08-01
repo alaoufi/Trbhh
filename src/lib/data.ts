@@ -8,6 +8,7 @@ import { sweepExpiredFeatured, getFeaturedTierMap, getUsersAdMeta } from './pack
 import { ensureSaudiAreas } from './seed-areas';
 import { getProfileDisplay } from './profiles';
 import { toInt } from './utils';
+import { realEstateEnabled } from './realestate';
 
 export type AdCard = {
   id: number;
@@ -162,11 +163,16 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
 }
 
 // عزل المتاجر: إعلان المتجر لا يدخل قوائم تربح إلا بعرض مدفوع ساري المفعول (trbhh_until)
-const activeAdWhere = () => ({
-  status: 1,
-  state: 'active' as const,
-  AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }] }],
-});
+// عزل العقار: حين توقفه الإدارة، تُستبعَد كل الإعلانات العقارية من كل القوائم فوراً
+// (فلتر واحد على is_realestate يغطّي جميع القوائم التي تمرّ من هنا).
+async function activeAdWhere() {
+  const base = {
+    status: 1,
+    state: 'active' as const,
+    AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }] }],
+  };
+  return (await realEstateEnabled().catch(() => true)) ? base : { ...base, is_realestate: 0 };
+}
 
 const adSelect = {
   id: true,
@@ -292,7 +298,7 @@ export async function getLatestAds(take = 12) {
     sweepExpiredPaidAds().catch(() => {});
     sweepOldAdsToArchive().catch(() => {});
     // نجلب أكثر ثم نرتب بآخر نشاط فعلياً (القديم المستورد بلا bumped_at يرتَّب بتاريخ نشره)
-    const rows = await prisma.ads.findMany({ where: activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: take * 3, select: adSelect });
+    const rows = await prisma.ads.findMany({ where: await activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: take * 3, select: adSelect });
     rows.sort((a, b) => activityMs(b) - activityMs(a));
     return toCards(rows.slice(0, take));
   });
@@ -307,7 +313,7 @@ export async function getHomeLatestAds() {
     sweepOldAdsToArchive().catch(() => {});
     const since = new Date(Date.now() - 30 * 86400000);
     const rows = await prisma.ads.findMany({
-      where: { ...activeAdWhere(), created_at: { gte: since } },
+      where: { ...(await activeAdWhere()), created_at: { gte: since } },
       orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
       take: 400,
       select: adSelect,
@@ -315,7 +321,7 @@ export async function getHomeLatestAds() {
     // الترتيب الحقيقي بآخر نشاط (نشر أو تحديث ⬆) — يطابق الوقت الظاهر على البطاقة
     rows.sort((a, b) => activityMs(b) - activityMs(a));
     if (rows.length > 0) return toCards(rows);
-    const fallback = await prisma.ads.findMany({ where: activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: 12, select: adSelect });
+    const fallback = await prisma.ads.findMany({ where: await activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: 12, select: adSelect });
     return toCards(fallback);
   });
 }
@@ -323,7 +329,7 @@ export async function getHomeLatestAds() {
 /** سوق الطلبات العكسي: إعلانات «طلب» النشطة (يبحث العملاء عنها) — يقدّم البائعون عروضهم. */
 export async function getRequestAds(take = 48) {
   const rows = await prisma.ads.findMany({
-    where: { ...activeAdWhere(), adsType: 'request' },
+    where: { ...(await activeAdWhere()), adsType: 'request' },
     orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
     take,
     select: adSelect,
@@ -344,7 +350,7 @@ export async function getAdsByIdsCards(ids: number[]) {
 /** إعلانات نفس المعلن (ذات صلة): بقية إعلاناته النشطة في تربح عدا الإعلان المفتوح. */
 export async function getSellerAds(sellerId: number, excludeAdId: number, take = 6) {
   const rows = await prisma.ads.findMany({
-    where: { ...activeAdWhere(), user_id: BigInt(sellerId), id: { not: BigInt(excludeAdId) } },
+    where: { ...(await activeAdWhere()), user_id: BigInt(sellerId), id: { not: BigInt(excludeAdId) } },
     orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
     take,
     select: adSelect,
@@ -371,6 +377,8 @@ export async function getDealAds(take = 60) {
         state: 'active',
         old_price: { gt: 0 },
         AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }, ...(approvedUserIds.length ? [{ user_id: { in: approvedUserIds } }] : [])] }],
+        // عزل العقار عند إيقافه من الإدارة
+        ...((await realEstateEnabled().catch(() => true)) ? {} : { is_realestate: 0 }),
       },
       orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
       take: take * 2,
@@ -384,7 +392,7 @@ export async function getDealAds(take = 60) {
 async function loadFeaturedAds(take: number) {
   await sweepExpiredFeatured().catch(() => {});
   const rows = await prisma.ads.findMany({
-    where: { ...activeAdWhere(), adsSpecial: 'checked' },
+    where: { ...(await activeAdWhere()), adsSpecial: 'checked' },
     orderBy: { id: 'desc' },
     take: take * 3,
     select: adSelect,
@@ -410,7 +418,7 @@ export async function getTopRatedAds(take = 8) {
     const top = groups.filter((g) => (g._count._all || 0) >= 3 && (g._avg.star || 0) >= 4).slice(0, take * 2);
     const ids = top.map((g) => g.ads_id);
     if (!ids.length) return [];
-    const rows = await prisma.ads.findMany({ where: { id: { in: ids }, ...activeAdWhere() }, select: adSelect });
+    const rows = await prisma.ads.findMany({ where: { id: { in: ids }, ...(await activeAdWhere()) }, select: adSelect });
     const cards = await toCards(rows);
     const order = new Map(top.map((g, i) => [toInt(g.ads_id), i]));
     return cards.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999)).slice(0, take);
@@ -426,7 +434,7 @@ async function loadMostViewedAds(take: number) {
   });
   const ids = groups.map((g) => g.ads_id).filter(Boolean) as bigint[];
   if (!ids.length) return [];
-  const rows = await prisma.ads.findMany({ where: { id: { in: ids }, ...activeAdWhere() }, select: adSelect });
+  const rows = await prisma.ads.findMany({ where: { id: { in: ids }, ...(await activeAdWhere()) }, select: adSelect });
   const cards = await toCards(rows);
   const order = new Map(ids.map((id, i) => [toInt(id), i]));
   return cards.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9)).slice(0, take);
@@ -436,7 +444,7 @@ export async function getStats() {
   return cached('stats:home', 120, async () => {
     const [users, ads, cats, views] = await Promise.all([
       prisma.users.count(),
-      prisma.ads.count({ where: activeAdWhere() }),
+      prisma.ads.count({ where: await activeAdWhere() }),
       prisma.categories.count({ where: { is_active: 'yes' } }),
       prisma.ads_views.count(),
     ]);
@@ -456,7 +464,7 @@ export async function getAdsByCategory(categoryId: number, take = 24, skip = 0) 
   // الرئيسية كانت تعيد بناء بطاقات حتى ٦ أقسام من القاعدة مع كل تنقّل.
   return cached(`ads:cat:${categoryId}:${take}:${skip}`, 60, async () => {
     const rows = await prisma.ads.findMany({
-      where: { ...activeAdWhere(), category_id: BigInt(categoryId) },
+      where: { ...(await activeAdWhere()), category_id: BigInt(categoryId) },
       orderBy: [{ adsSpecial: 'desc' }, { bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
       take,
       skip,
@@ -479,7 +487,7 @@ type SearchParamsT = {
   skip?: number;
 };
 
-function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special }: SearchParamsT) {
+async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special }: SearchParamsT) {
   // بحث ذكي: تُقسَّم العبارة كلمات، وكل كلمة تُطابق العنوان أو التفاصيل بأي ترتيب،
   // مع توحيد أشكال الألف (أ إ آ ← ا) والتاء المربوطة (ة/ه) والياء (ى/ي)
   const norm = (w: string) => w.replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه');
@@ -499,12 +507,14 @@ function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, spec
     ...(areaId ? { area_id: areaId } : {}),
     ...(type ? { adsType: type } : {}),
     ...(special ? { adsSpecial: 'checked' as const } : {}),
+    // عزل العقار عند إيقافه من الإدارة (يشمل البحث أيضاً)
+    ...((await realEstateEnabled().catch(() => true)) ? {} : { is_realestate: 0 }),
   };
 }
 
 /** إجمالي نتائج البحث — للترقيم المرقّم. */
 export async function countSearchAds(params: SearchParamsT): Promise<number> {
-  return prisma.ads.count({ where: buildSearchWhere(params) }).catch(() => 0);
+  return prisma.ads.count({ where: await buildSearchWhere(params) }).catch(() => 0);
 }
 
 export async function searchAds(params: SearchParamsT) {
@@ -514,7 +524,7 @@ export async function searchAds(params: SearchParamsT) {
     sort === 'price_desc' ? [{ price: 'desc' as const }] :
     [{ adsSpecial: 'desc' as const }, { bumped_at: { sort: 'desc' as const, nulls: 'last' as const } }, { id: 'desc' as const }];
   const rows = await prisma.ads.findMany({
-    where: buildSearchWhere(params),
+    where: await buildSearchWhere(params),
     skip: Math.max(0, skip),
     orderBy,
     take,
@@ -527,6 +537,8 @@ async function getAdImpl(id: number) {
   if (!Number.isInteger(id) || id <= 0) return null;
   const ad = await prisma.ads.findFirst({ where: { id: BigInt(id) } }).catch(() => null);
   if (!ad) return null;
+  // عزل العقار: أثناء إيقاف الإدارة للعقار، لا يُفتح أي إعلان عقاري بالرابط المباشر أيضاً
+  if (ad.is_realestate === 1 && !(await realEstateEnabled().catch(() => true))) return null;
 
   const [city, area, category, seller, photos, views] = await Promise.all([
     prisma.cities.findUnique({ where: { id: ad.city_id }, select: { name: true } }),
@@ -752,14 +764,14 @@ export async function getSimilarAds(adId: number, categoryId: number, take = 6) 
   const topWords = [...titleTokens].sort((a, b) => b.length - a.length).slice(0, 3);
   const [sameCat, byTitle] = await Promise.all([
     prisma.ads.findMany({
-      where: { ...activeAdWhere(), category_id: BigInt(categoryId), id: { not: BigInt(adId) } },
+      where: { ...(await activeAdWhere()), category_id: BigInt(categoryId), id: { not: BigInt(adId) } },
       orderBy: { id: 'desc' },
       take: 200,
       select: { ...adSelect },
     }),
     topWords.length
       ? prisma.ads.findMany({
-          where: { ...activeAdWhere(), id: { not: BigInt(adId) }, OR: topWords.map((w) => ({ title: { contains: w } })) },
+          where: { ...(await activeAdWhere()), id: { not: BigInt(adId) }, OR: topWords.map((w) => ({ title: { contains: w } })) },
           orderBy: { id: 'desc' },
           take: 100,
           select: { ...adSelect },
@@ -829,7 +841,7 @@ export async function getPersonalizedAds(viewerKey: string | null, userId: numbe
   const excludeIds = viewedAdIds.map((n) => BigInt(n));
   const candidates = await prisma.ads.findMany({
     where: {
-      ...activeAdWhere(),
+      ...(await activeAdWhere()),
       ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
       OR: topWords.map((w) => ({ OR: [{ title: { contains: w } }, { detail: { contains: w } }] })),
     },

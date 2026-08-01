@@ -50,7 +50,7 @@ jobs:
           PORT="${VPS_PORT:-22}"
           DIR="${STAGING_DIR:-/root/trbhh-staging}"
           echo "🔗 نشر التجريب على $VPS_USER@$VPS_HOST:$PORT ($DIR) ..."
-          REMOTE_CMD="set -e; cd '$DIR' && git fetch origin staging && git reset --hard origin/staging && docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis && docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps"
+          REMOTE_CMD="set -e; if [ ! -d '$DIR/.git' ]; then echo '⏭️ بيئة التجريب غير مُجهّزة بعد على الخادم ($DIR) — راجع ops/staging.md لتشغيلها. تخطّي النشر بلا خطأ.'; exit 0; fi; cd '$DIR' && git fetch origin staging && git reset --hard origin/staging && docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis && docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps"
           n=0
           until [ "$n" -ge 5 ]; do
             if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \

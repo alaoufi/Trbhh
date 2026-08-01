@@ -71,6 +71,7 @@ model ads {
   cat_reviewed     Int       @default(1) @db.TinyInt
   flag_terms       String?   @db.VarChar(400)
   profile_id       BigInt?
+  is_realestate    Int       @default(0) @db.TinyInt
 
   @@index([category_id], map: "ads_category_id_foreign")
   @@index([city_id], map: "ads_city_id_foreign")
@@ -80,6 +81,7 @@ model ads {
   @@index([status, state, created_at], map: "ads_listing_created")
   @@index([cat_reviewed], map: "ads_cat_reviewed")
   @@index([profile_id], map: "ads_profile_id")
+  @@index([is_realestate], map: "ads_is_realestate")
 }
 
 model profiles {

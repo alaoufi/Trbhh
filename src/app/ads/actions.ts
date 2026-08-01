@@ -18,6 +18,7 @@ import { setUserArea } from '@/lib/user-location';
 import { scanContent, censorGuard, summarizeHits, CATEGORY_LABEL } from '@/lib/content-guard';
 import { scanImages, imageModerationEnabled } from '@/lib/nsfw';
 import { parseMapsUrl, type LatLng } from '@/lib/maps';
+import { isRealEstateText, realEstateEnabled } from '@/lib/realestate';
 import { toInt } from '@/lib/utils';
 import { isApprovedStoreOwner } from '@/lib/merchant';
 import { getActiveProfile, ensureDefaultProfile, backfillProfileContact } from '@/lib/profiles';
@@ -405,6 +406,12 @@ export async function createAdAction(formData: FormData) {
       if (!isNaN(d.getTime()) && d.getTime() > Date.now() + 60_000 && d.getTime() < maxMs) scheduledAt = d;
     }
   }
+  // كشف العقار: يُحسب من نص الإعلان. أثناء إيقاف الإدارة للعقار، يُرفض النشر برسالة
+  // واضحة بدل ترك الإعلان يُنشر ثم يُخفى (قاعدة 4: التحقّق قبل الخطوة لا بعدها).
+  const isRealEstate = isRealEstateText(finalTitle, finalDetail);
+  if (isRealEstate && !(await realEstateEnabled().catch(() => true))) {
+    redirect(`/ads/new?error=realestate${dest === 'store' ? '&dest=store' : ''}`);
+  }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
   const ad = await prisma.ads.create({
@@ -433,6 +440,7 @@ export async function createAdAction(formData: FormData) {
       stock_state: [0, 1, 2].includes(Number(formData.get('stock_state'))) ? Number(formData.get('stock_state')) : 0,
       store_only: dest === 'store' ? 1 : 0, // عزل تام: إعلان المتجر لا يظهر في تربح
       cat_reviewed: aiClassified ? 0 : 1, // تصنيف آلي؟ ينتظر مراجعة الإدارة
+      is_realestate: isRealEstate ? 1 : 0, // كشف عقاري — لإيقاف/إلزام الترخيص لاحقاً
       bumped_at: new Date(), // ترتيب «الأحدث» يعتمد آخر تحديث (Bump)
       ...(scheduledAt ? { status: 0, publish_at: scheduledAt } : {}),
       created_at: new Date(),
@@ -588,6 +596,7 @@ export async function updateAdAction(formData: FormData) {
       title: eFinalTitle,
       detail: eFinalDetail,
       flag_terms: eFlagTerms || null,
+      is_realestate: isRealEstateText(eFinalTitle, eFinalDetail) ? 1 : 0, // إعادة كشف العقار عند التعديل
       price: newPrice,
       adsType: eType,
       price_type: ePriceType,

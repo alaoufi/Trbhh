@@ -26,6 +26,9 @@ function Group({ title, children, open = false }: { title: React.ReactNode; chil
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
   await requireAction('users', 'edit');
   const [{ saved, error: saveError }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn, scheduleOn, bumpOn, adContactStatsOn, couponsOn, stockOn, hoursOn, dealsOn, autoRenewOn, auctionOn, staffOn, nameLockOn, homeActionsOn, archiveAutodeleteOn, platformRatingOn, adLifetimeDays, strikeBanDays, maxProfiles, identityPlans, identityExemptDays, maxStores, scheduleMaxDays, storeShieldOn, adReviewsOn, requestsMarketOn] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false), getSettingBool('schedule_on', false), getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('coupons_on', false), getSettingBool('stock_on', false), getSettingBool('hours_on', false), getSettingBool('deals_on', false), getSettingBool('autorenew_on', false), getSettingBool('auction_on', false), getSettingBool('staff_on', false), getSettingBool('namelock_on', true), getSettingBool('home_actions_on', true), getSettingBool('archive_autodelete_on', false), getSettingBool('platform_rating_on', true), getAdLifetimeDays(), getStrikeBanDays(), getSettingNum('max_profiles', 5), getIdentityPlans(), getExemptDays(), getSettingNum('max_stores', 3), getSettingNum('schedule_max_days', 30), getStoreShield(), getSettingBool('ad_reviews_on', true), getSettingBool('requests_market_on', true)]);
+  // إيقاف/تفعيل العقار + نص رسالة الإيقاف (وحدة التوثيق العقاري)
+  const reEnabled = await getSettingBool('realestate_enabled', true);
+  const reMsg = await import('@/lib/realestate').then((m) => m.realEstateBlockMsg()).catch(() => '');
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -204,6 +207,23 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             مراجعة الإعلانات قبل النشر (إذا فُعّلت، لا يُنشر الإعلان إلا بموافقة الإدارة)
           </label>
           <p className="mt-1 text-xs text-muted-foreground">افتراضياً يُنشر الإعلان مباشرة ما لم يكن مكرّراً.</p>
+
+          {/* الإعلانات العقارية — إيقاف مؤقت لحين اكتمال وحدة التوثيق العقاري المتوافقة */}
+          <div className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-3">
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="realestateEnabled" defaultChecked={reEnabled} className="mt-0.5 h-4 w-4 accent-primary" />
+              <span>
+                <b>السماح بنشر الإعلانات العقارية 🏢</b> — عند <b>إلغاء</b> التحديد تُوقَف الإعلانات
+                العقارية فوراً: يُرفض نشر أي إعلان عقاري جديد، وتُخفى الإعلانات العقارية القائمة من كل
+                القوائم والبحث والرابط المباشر (بلا حذف — تعود فور إعادة التفعيل). يُكشف الإعلان العقاري
+                آلياً من نصّه. (مفعّل افتراضياً)
+              </span>
+            </label>
+            <label className="mt-2 block space-y-1">
+              <span className="text-xs font-bold">رسالة الإيقاف المعروضة للعضو عند محاولة نشر إعلان عقاري</span>
+              <textarea name="realestateBlockMsg" rows={2} defaultValue={reMsg} className="w-full rounded-lg border border-primary/30 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
+            </label>
+          </div>
 
           {/* حساسية كشف التكرار — لكل حقل نسبته (العنوان/التفاصيل/الصور) */}
           <div className="mt-3 grid grid-cols-3 gap-2">

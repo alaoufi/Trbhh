@@ -62,7 +62,7 @@ function InfoItem({ icon: Icon, children }: { icon: React.ElementType; children:
 }
 
 export function AdForm({
-  action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, scheduleMaxDays = 30, allowOldPrice, allowStock, urgentOffer, featuredOffer, identity,
+  action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, scheduleMaxDays = 30, allowOldPrice, allowStock, urgentOffer, featuredOffer, identity, realestateMsg,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   countries: Country[]; cities: City[]; areas?: Area[];
@@ -76,6 +76,8 @@ export function AdForm({
   featuredOffer?: { options: { key: string; label: string; price: number }[]; balance: number };
   /** الهوية الفعّالة التي يُنشر باسمها — لعرضها في المعاينة كما ستظهر للزوّار */
   identity?: { name: string; isStore: boolean };
+  /** رسالة إيقاف العقار (من لوحة الإدارة) — تظهر عند محاولة نشر إعلان عقاري أثناء الإيقاف */
+  realestateMsg?: string;
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه', charity: 'جمع تبرعات أو نشاط جمعية غير مرخّص' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
@@ -175,6 +177,11 @@ export function AdForm({
       {error === 'missing' && (
         <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">
           أكمل الحقول الإجبارية: <b>العنوان</b> و<b>التفاصيل</b> قبل النشر.
+        </div>
+      )}
+      {error === 'realestate' && (
+        <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          🏢 {realestateMsg || 'الإعلانات العقارية موقوفة مؤقتاً لدى المنصّة لاستكمال متطلبات الترخيص النظامية.'}
         </div>
       )}
       {error === 'contact' && (

@@ -416,6 +416,14 @@ export async function createAdAction(formData: FormData) {
   const rePlot = String(formData.get('re_plot') || '').trim().slice(0, 40) || null;
   const rePlan = String(formData.get('re_plan') || '').trim().slice(0, 60) || null;
   const reDeed = String(formData.get('re_deed') || '').trim().slice(0, 60) || null;
+  const posInt = (k: string): number | null => { const n = parseInt(String(formData.get(k) || ''), 10); return Number.isFinite(n) && n >= 0 ? n : null; };
+  const reBeds = posInt('re_beds');
+  const reBaths = posInt('re_baths');
+  const reAge = posInt('re_age');
+  const reStreet = posInt('re_street');
+  const reFloor = String(formData.get('re_floor') || '').trim().slice(0, 20) || null;
+  const reFacade = String(formData.get('re_facade') || '').trim().slice(0, 20) || null;
+  const reFurnished = formData.get('re_furnished') ? 1 : 0;
   if (!reLicense) {
     redirect(`/ads/new?error=nolicense${dest === 'store' ? '&dest=store' : ''}`);
   }
@@ -454,6 +462,13 @@ export async function createAdAction(formData: FormData) {
       re_plot: rePlot,
       re_plan: rePlan,
       re_deed: reDeed,
+      re_beds: reBeds,
+      re_baths: reBaths,
+      re_floor: reFloor,
+      re_age: reAge,
+      re_facade: reFacade,
+      re_street: reStreet,
+      re_furnished: reFurnished,
       bumped_at: new Date(), // ترتيب «الأحدث» يعتمد آخر تحديث (Bump)
       ...(scheduledAt ? { status: 0, publish_at: scheduledAt } : {}),
       created_at: new Date(),
@@ -620,6 +635,14 @@ export async function updateAdAction(formData: FormData) {
       ...(formData.get('re_plot') !== null ? { re_plot: String(formData.get('re_plot') || '').trim().slice(0, 40) || null } : {}),
       ...(formData.get('re_plan') !== null ? { re_plan: String(formData.get('re_plan') || '').trim().slice(0, 60) || null } : {}),
       ...(formData.get('re_deed') !== null ? { re_deed: String(formData.get('re_deed') || '').trim().slice(0, 60) || null } : {}),
+      ...(formData.get('re_beds') !== null ? { re_beds: (() => { const n = parseInt(String(formData.get('re_beds')), 10); return Number.isFinite(n) && n >= 0 ? n : null; })() } : {}),
+      ...(formData.get('re_baths') !== null ? { re_baths: (() => { const n = parseInt(String(formData.get('re_baths')), 10); return Number.isFinite(n) && n >= 0 ? n : null; })() } : {}),
+      ...(formData.get('re_floor') !== null ? { re_floor: String(formData.get('re_floor') || '').trim().slice(0, 20) || null } : {}),
+      ...(formData.get('re_age') !== null ? { re_age: (() => { const n = parseInt(String(formData.get('re_age')), 10); return Number.isFinite(n) && n >= 0 ? n : null; })() } : {}),
+      ...(formData.get('re_facade') !== null ? { re_facade: String(formData.get('re_facade') || '').trim().slice(0, 20) || null } : {}),
+      ...(formData.get('re_street') !== null ? { re_street: (() => { const n = parseInt(String(formData.get('re_street')), 10); return Number.isFinite(n) && n >= 0 ? n : null; })() } : {}),
+      // مفروش: خانة اختيار — حاضرة في النموذج دائماً، فغيابها يعني إلغاء التأشير
+      re_furnished: formData.get('re_furnished') ? 1 : 0,
       price: newPrice,
       adsType: eType,
       price_type: ePriceType,

@@ -386,6 +386,40 @@ export async function getDealAds(take = 60) {
   });
 }
 
+/**
+ * عقارات لها موقع (lat/lng) — لخريطة التصفّح (المنصّة العقارية). ترجع نقاطاً خفيفة فقط.
+ */
+export async function getMapAds(take = 500) {
+  return cached(`ads:map:${take}`, 60, async () => {
+    const rows = await prisma.ads.findMany({
+      where: {
+        ...(await activeAdWhere()),
+        lat: { not: null },
+        lng: { not: null },
+      },
+      orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+      take,
+      select: { id: true, title: true, price: true, lat: true, lng: true, re_type: true, price_type: true },
+    });
+    const pts = [];
+    for (const r of rows) {
+      const lat = parseFloat(String(r.lat));
+      const lng = parseFloat(String(r.lng));
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) continue;
+      pts.push({
+        id: toInt(r.id),
+        title: r.title ?? '',
+        price: r.price ?? 0,
+        lat,
+        lng,
+        type: r.re_type ?? null,
+        purpose: (r.price_type ?? null) as 'rent' | 'sale' | 'som' | null,
+      });
+    }
+    return pts;
+  });
+}
+
 async function loadFeaturedAds(take: number) {
   await sweepExpiredFeatured().catch(() => {});
   const rows = await prisma.ads.findMany({
@@ -600,6 +634,13 @@ async function getAdImpl(id: number) {
     rePlot: ad.re_plot ?? null,
     rePlan: ad.re_plan ?? null,
     reDeed: ad.re_deed ?? null,
+    reBeds: ad.re_beds ?? null,
+    reBaths: ad.re_baths ?? null,
+    reFloor: ad.re_floor ?? null,
+    reAge: ad.re_age ?? null,
+    reFacade: ad.re_facade ?? null,
+    reStreet: ad.re_street ?? null,
+    reFurnished: ad.re_furnished ?? null,
     special: ad.adsSpecial === 'checked',
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,
@@ -710,6 +751,13 @@ export async function getAdForEdit(id: number, userId: number) {
     rePlot: ad.re_plot ?? null,
     rePlan: ad.re_plan ?? null,
     reDeed: ad.re_deed ?? null,
+    reBeds: ad.re_beds ?? null,
+    reBaths: ad.re_baths ?? null,
+    reFloor: ad.re_floor ?? null,
+    reAge: ad.re_age ?? null,
+    reFacade: ad.re_facade ?? null,
+    reStreet: ad.re_street ?? null,
+    reFurnished: ad.re_furnished ?? null,
   };
 }
 

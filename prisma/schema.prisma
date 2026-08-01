@@ -78,6 +78,13 @@ model ads {
   re_plot          String?   @db.VarChar(40)  // رقم القطعة
   re_plan          String?   @db.VarChar(60)  // رقم المخطط
   re_deed          String?   @db.VarChar(60)  // رقم الصك
+  re_beds          Int?                        // عدد غرف النوم
+  re_baths         Int?                        // عدد دورات المياه
+  re_floor         String?   @db.VarChar(20)  // الطابق/الدور
+  re_age           Int?                        // عمر العقار (سنوات)
+  re_facade        String?   @db.VarChar(20)  // واجهة العقار (شمالية/جنوبية…)
+  re_street        Int?                        // عرض الشارع (م)
+  re_furnished     Int?      @db.TinyInt      // مفروش؟ 1=نعم 0=لا
 
   @@index([category_id], map: "ads_category_id_foreign")
   @@index([city_id], map: "ads_city_id_foreign")

@@ -18,7 +18,6 @@ import { SubmitOverlay } from '@/components/submit-overlay';
 import { RegionCityPicker } from '@/components/region-city-picker';
 import { AudioRecorder } from '@/components/audio-recorder';
 import { ImageUploader } from '@/components/image-uploader';
-import { AdExtraFields } from '@/components/ad-extra-fields';
 import { AdGallery } from '@/components/ad-gallery';
 import { ExpandableDetail } from '@/components/expandable-detail';
 import { formatPrice } from '@/lib/utils';
@@ -53,6 +52,8 @@ type Initial = Partial<{
   priceType: string | null; rentPeriod: string | null;
   reType: string | null; reArea: number | null; reLicense: string | null;
   rePlot: string | null; rePlan: string | null; reDeed: string | null;
+  reBeds: number | null; reBaths: number | null; reFloor: string | null;
+  reAge: number | null; reFacade: string | null; reStreet: number | null; reFurnished: number | null;
 }>;
 
 // مدد التأجير المتاحة عند اختيار «سعر تأجير»
@@ -318,7 +319,7 @@ export function AdForm({
         ))}
       </div>
       <div className={`rounded-lg p-2 text-center text-xs font-bold ${isReq ? 'bg-amber-100 text-amber-900' : 'bg-primary/10 text-primary'}`}>
-        {isReq ? 'إعلان طلب: تصف ما تبحث عنه، والصور والسعر اختيارية.' : 'إعلان عرض: تعرض منتجك أو خدمتك للبيع/الإيجار.'}
+        {isReq ? 'إعلان طلب عقار: صِف العقار الذي تبحث عنه، والصور والسعر اختيارية.' : 'إعلان عرض عقار: تعرض عقاراً للبيع أو الإيجار.'}
       </div>
 
       <Section icon={Tag} title={isReq ? 'بيانات الطلب' : 'بيانات العرض'}>
@@ -373,39 +374,10 @@ export function AdForm({
             )}
           </div>
         )}
-        {allowOldPrice && !isReq && priceMode !== 'som' && (
-          <div>
-            <label className={lbl}>السعر قبل الخصم <span className="font-normal text-muted-foreground">(اختياري — لعروض اليوم)</span></label>
-            <input name="old_price" type="number" min="0" step="any" defaultValue={initial?.oldPrice || ''} className={field} placeholder="إن كان أعلى من السعر يظهر الخصم ويدخل إعلانك «عروض اليوم»" />
-          </div>
-        )}
-        {allowStock && !isReq && (
-          <div>
-            <label className={lbl}>حالة التوفر</label>
-            <select name="stock_state" defaultValue={String(initial?.stockState ?? 0)} className={field}>
-              <option value="0">متوفر</option>
-              <option value="1">نفدت الكمية</option>
-              <option value="2">طلب مسبق</option>
-            </select>
-          </div>
-        )}
         <div>
-          <label className={lbl}>{isReq ? 'تفاصيل الطلب' : 'التفاصيل'}</label>
-          <textarea name="detail" required defaultValue={initial?.detail} rows={6} className="w-full rounded-lg border-2 border-primary/25 bg-white p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40" placeholder={isReq ? 'اكتب تفاصيل ما تبحث عنه بدقّة...' : 'اكتب وصفاً واضحاً للخدمة أو المنتج...'} />
+          <label className={lbl}>{isReq ? 'تفاصيل الطلب' : 'وصف العقار'}</label>
+          <textarea name="detail" required defaultValue={initial?.detail} rows={6} className="w-full rounded-lg border-2 border-primary/25 bg-white p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40" placeholder={isReq ? 'صِف العقار الذي تبحث عنه: الحي، النوع، المساحة التقريبية، الميزانية...' : 'صِف العقار: المميزات، الحي، القرب من الخدمات، حالة العقار...'} />
         </div>
-      </Section>
-
-      <Section icon={Tag} title="تفاصيل إضافية">
-        <AdExtraFields
-          hideNegotiable={priceMode === 'som'}
-          initial={{
-            negotiable: initial?.priceType === 'negotiable',
-            condition: (initial?.stockState === 0 ? 'new' : initial?.stockState === 1 ? 'used' : 'refurbished') as 'new' | 'used' | 'refurbished',
-            delivery: false,
-            warranty: '',
-            quantity: 1,
-          }}
-        />
       </Section>
 
       {/* بيانات العقار — المنصّة العقارية (الغرض «بيع/إيجار» من مُبدّل السعر أعلاه) */}
@@ -423,6 +395,41 @@ export function AdForm({
             <input name="re_area" type="number" min="0" defaultValue={initial?.reArea || ''} className={field} placeholder="مثال: 250" />
           </label>
         </div>
+        {/* خصائص العقار: غرف/دورات مياه/طابق/عمر/واجهة/عرض الشارع/فرش */}
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">غرف النوم</span>
+            <input name="re_beds" type="number" min="0" defaultValue={initial?.reBeds ?? ''} className={field} placeholder="مثال: 3" />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">دورات المياه</span>
+            <input name="re_baths" type="number" min="0" defaultValue={initial?.reBaths ?? ''} className={field} placeholder="مثال: 2" />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">الطابق / الدور</span>
+            <input name="re_floor" defaultValue={initial?.reFloor || ''} maxLength={20} className={field} placeholder="مثال: الأول، أرضي" />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">عمر العقار (سنوات)</span>
+            <input name="re_age" type="number" min="0" defaultValue={initial?.reAge ?? ''} className={field} placeholder="مثال: 5" />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">الواجهة</span>
+            <select name="re_facade" defaultValue={initial?.reFacade || ''} className={field}>
+              <option value="">— اختر —</option>
+              {['شمالية', 'جنوبية', 'شرقية', 'غربية', 'شمالية شرقية', 'شمالية غربية', 'جنوبية شرقية', 'جنوبية غربية', 'ثلاث شوارع', 'أربع شوارع'].map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">عرض الشارع (م)</span>
+            <input name="re_street" type="number" min="0" defaultValue={initial?.reStreet ?? ''} className={field} placeholder="مثال: 20" />
+          </label>
+        </div>
+        {/* مفروش؟ (للإيجار غالباً) */}
+        <label className="mt-3 flex items-center gap-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-3 text-sm font-bold">
+          <input type="checkbox" name="re_furnished" value="1" defaultChecked={initial?.reFurnished === 1} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+          العقار مفروش
+        </label>
         {/* بيانات الصك والمخطط والقطعة — تعريف العقار رسمياً */}
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <label className="block space-y-1">

@@ -109,6 +109,18 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 
+      {/* خريطة العقارات — تصفّح العقارات على الخريطة (صورة جوية + دبابيس الأسعار) */}
+      <Link href="/map" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-emerald-300 bg-gradient-to-l from-emerald-50 to-sky-50 p-4 shadow-sm transition hover:shadow-md">
+        <span className="flex items-center gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white">🗺️</span>
+          <span>
+            <span className="block text-base font-extrabold text-emerald-900">تصفّح العقارات على الخريطة</span>
+            <span className="block text-xs text-emerald-700">صورة جوية للأرض والقطعة · دبابيس بالأسعار · اضغط للفتح</span>
+          </span>
+        </span>
+        <span className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white">افتح الخريطة ←</span>
+      </Link>
+
       {/* سجّل واحصل على رصيد ترحيبي — للزوار فقط وقابل للإغلاق */}
       {!session && welcomeCredit > 0 && <WelcomeBanner amount={welcomeCredit} />}
 

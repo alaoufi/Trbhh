@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, PlusCircle, Mail, Building2, Search, LogIn, Share2, Users, Phone, MessageCircle, Send, type LucideIcon } from 'lucide-react';
+import { Home, PlusCircle, Mail, Building2, MapPin, LogIn, Share2, Users, Phone, MessageCircle, Send, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SITE } from '@/lib/constants';
 
@@ -14,17 +14,17 @@ const shareItem: NavItem = { href: '__share', label: 'مشاركة', icon: Share
 // بنود تتطلّب تسجيل الدخول → تظهر فقط للمسجّل. للزائر بنود عامة فقط.
 const authedItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },
-  { href: '/companies', label: 'المتاجر', icon: Building2 },
+  { href: '/map', label: 'الخريطة', icon: MapPin },
   { href: '/ads/new', label: 'أضف عقار', icon: PlusCircle, primary: true },
   { href: '/account/profiles', label: 'الحسابات', icon: Users },
   { href: '__contact', label: 'تواصل', icon: Mail },
 ];
 const guestItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },
+  { href: '/map', label: 'الخريطة', icon: MapPin },
   { href: '/companies', label: 'المتاجر', icon: Building2 },
   { href: '/login', label: 'الدخول', icon: LogIn, primary: true },
   shareItem,
-  { href: '/search', label: 'بحث', icon: Search },
 ];
 
 export function MobileNav({ unread = 0, isAuthed = false }: { unread?: number; isAuthed?: boolean }) {

@@ -20,6 +20,7 @@ import { SITE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { FavoriteButton } from '@/components/favorite-button';
 import { ShareButtons } from '@/components/share-buttons';
+import { PropertyMapEmbed } from '@/components/maps-embed';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { getAdAddons } from '@/lib/ad-addons';
 import { AdAddonsBox } from '@/components/ad-addons-box';
@@ -570,6 +571,13 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           {ad.priceType === 'rent' && <span className="rounded-full bg-sky-100 px-3 py-1 font-bold text-sky-800">للإيجار</span>}
           {ad.priceType === 'sale' && <span className="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">للبيع</span>}
           {ad.reArea ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">المساحة: {ad.reArea} م²</span> : null}
+          {ad.reBeds != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🛏️ {ad.reBeds} غرف</span> : null}
+          {ad.reBaths != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🚿 {ad.reBaths} دورات مياه</span> : null}
+          {ad.reFloor ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">الدور: {ad.reFloor}</span> : null}
+          {ad.reAge != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">عمر العقار: {ad.reAge} سنة</span> : null}
+          {ad.reFacade ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">الواجهة: {ad.reFacade}</span> : null}
+          {ad.reStreet != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">الشارع: {ad.reStreet} م</span> : null}
+          {ad.reFurnished === 1 ? <span className="rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-800">مفروش</span> : null}
         </div>
         {/* أرقام تعريف العقار الرسمية: القطعة / المخطط / الصك */}
         {(ad.rePlot || ad.rePlan || ad.reDeed) && (
@@ -592,13 +600,12 @@ export default async function AdPage({ params, searchParams }: { params: Promise
               {ad.rePlot && <span className="rounded-full bg-secondary px-2 py-0.5">قطعة {ad.rePlot}</span>}
               {ad.rePlan && <span className="rounded-full bg-secondary px-2 py-0.5">مخطط {ad.rePlan}</span>}
             </div>
-            <iframe
-              title="موقع العقار على الخريطة"
-              className="h-64 w-full rounded-xl border border-primary/20"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              src={`https://www.openstreetmap.org/export/embed.html?bbox=${adLoc.lng - 0.008}%2C${adLoc.lat - 0.006}%2C${adLoc.lng + 0.008}%2C${adLoc.lat + 0.006}&layer=mapnik&marker=${adLoc.lat}%2C${adLoc.lng}`}
-            />
+            <PropertyMapEmbed lat={adLoc.lat} lng={adLoc.lng} plot={ad.rePlot} plan={ad.rePlan} />
+            {/* روابط المصدر الرسمي للمخططات/القطع (حدود المخططات الرسمية بأرقامها لدى بلدي/سهيل) */}
+            <div className="flex flex-wrap gap-2 pt-1 text-[11px]">
+              <a href="https://maps.balady.gov.sa" target="_blank" rel="noopener noreferrer" className="rounded-full bg-secondary px-2.5 py-1 font-bold text-primary hover:underline">🗺️ المخططات المعتمدة (بلدي)</a>
+              <a href={`https://www.openstreetmap.org/?mlat=${adLoc.lat}&mlon=${adLoc.lng}#map=17/${adLoc.lat}/${adLoc.lng}`} target="_blank" rel="noopener noreferrer" className="rounded-full bg-secondary px-2.5 py-1 font-bold text-primary hover:underline">📍 فتح الموقع كاملاً</a>
+            </div>
           </div>
         )}
       </div>

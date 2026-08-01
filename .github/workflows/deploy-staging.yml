@@ -71,11 +71,17 @@ jobs:
               echo "DB_ROOT_PASSWORD=\$DBROOT"
               echo "AUTH_SECRET=\$SECRET"
               echo "COOKIE_SECURE=true"
-              echo "LEGACY_MEDIA_BASE="
+              echo "LEGACY_MEDIA_BASE=https://trbhh.com"
               echo "LEGACY_LOCAL_DIR="
               echo "NEXT_PUBLIC_MEDIA_BASE="
             } > .env
             chmod 600 .env
+          fi
+          # صور الإعلانات القديمة تُجلب من الموقع الحيّ (قراءة فقط) — ملفاتها ليست في التجريب
+          if grep -q '^LEGACY_MEDIA_BASE=' .env; then
+            sed -i 's|^LEGACY_MEDIA_BASE=.*|LEGACY_MEDIA_BASE=https://trbhh.com|' .env
+          else
+            echo 'LEGACY_MEDIA_BASE=https://trbhh.com' >> .env
           fi
           echo "== بناء وتشغيل الحاويات (قد يستغرق دقائق أول مرّة) =="
           \$COMPOSE up -d --build

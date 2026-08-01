@@ -1,0 +1,70 @@
+name: نشر بيئة التجريب (Staging)
+
+# نشر تلقائي لبيئة التجريب المعزولة: عند كل دفع لفرع staging يتّصل GitHub بالخادم عبر SSH
+# ويسحب أحدث كود الفرع في دليل التجريب المنفصل (/root/trbhh-staging) ويعيد بناء الحاوية
+# التجريبية — بمشروع Docker منفصل فلا يمسّ الإنتاج إطلاقاً. يدوياً أيضاً عبر Run workflow.
+#
+# لا يعمل هذا المسار إلا بعد تجهيز الخادم لبيئة التجريب مرّة واحدة (راجع ops/staging.md).
+on:
+  push:
+    branches:
+      - staging
+    paths-ignore:
+      - 'ops/**'
+  workflow_dispatch:
+
+# لا تشغّل نشرين متوازيين لبيئة التجريب
+concurrency:
+  group: vps-deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: النشر عبر SSH (بيئة التجريب)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          # دليل التجريب على الخادم (افتراضي /root/trbhh-staging) — يمكن تغييره بسرّ اختياري
+          STAGING_DIR: ${{ secrets.STAGING_DIR }}
+        run: |
+          set -e
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "❌ السرّ VPS_SSH_KEY غير موجود — أضِفه في إعدادات الأسرار."
+            exit 1
+          fi
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
+            echo "❌ VPS_HOST أو VPS_USER غير مضبوط."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if ! grep -q "PRIVATE KEY" ~/.ssh/deploy_key; then
+            echo "❌ المفتاح غير صالح — تأكد أن VPS_SSH_KEY لصق كاملاً بأسطره."
+            exit 1
+          fi
+          PORT="${VPS_PORT:-22}"
+          DIR="${STAGING_DIR:-/root/trbhh-staging}"
+          echo "🔗 نشر التجريب على $VPS_USER@$VPS_HOST:$PORT ($DIR) ..."
+          REMOTE_CMD="set -e; cd '$DIR' && git fetch origin staging && git reset --hard origin/staging && docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis && docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps"
+          n=0
+          until [ "$n" -ge 5 ]; do
+            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                 -o ConnectTimeout=25 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+                 -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" "$REMOTE_CMD"; then
+              echo "✅ تم نشر بيئة التجريب."
+              exit 0
+            fi
+            n=$((n + 1))
+            if [ "$n" -lt 5 ]; then
+              wait=$((n * 20))
+              echo "⚠️ تعذّر الاتصال (محاولة $n/5) — إعادة بعد ${wait}s ..."
+              sleep "$wait"
+            fi
+          done
+          echo "❌ فشل الاتصال بالخادم بعد ٥ محاولات."
+          exit 1

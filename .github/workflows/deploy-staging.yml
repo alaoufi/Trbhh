@@ -1,10 +1,10 @@
 name: نشر بيئة التجريب (Staging)
 
-# نشر تلقائي لبيئة التجريب المعزولة: عند كل دفع لفرع staging يتّصل GitHub بالخادم عبر SSH
-# ويسحب أحدث كود الفرع في دليل التجريب المنفصل (/root/trbhh-staging) ويعيد بناء الحاوية
-# التجريبية — بمشروع Docker منفصل فلا يمسّ الإنتاج إطلاقاً. يدوياً أيضاً عبر Run workflow.
-#
-# لا يعمل هذا المسار إلا بعد تجهيز الخادم لبيئة التجريب مرّة واحدة (راجع ops/staging.md).
+# نشر تلقائي ذاتي‑التجهيز لبيئة التجريب المعزولة: عند كل دفع لفرع staging يتّصل GitHub
+# بالخادم عبر SSH. في أول مرّة (لا يوجد دليل تجريب) يجهّزه آلياً: استنساخ المستودع في
+# /root/trbhh-staging، توليد .env خاص (منفذ 3081 + قاعدة تجريب MySQL مستقلّة + سرّ جديد)،
+# ثم تشغيل الحاويات. في المرّات التالية يسحب أحدث كود الفرع ويعيد البناء. بمشروع Docker
+# منفصل وقاعدة مستقلّة — لا يمسّ الإنتاج ولا قاعدته إطلاقاً. يدوياً أيضاً عبر Run workflow.
 on:
   push:
     branches:
@@ -13,7 +13,6 @@ on:
       - 'ops/**'
   workflow_dispatch:
 
-# لا تشغّل نشرين متوازيين لبيئة التجريب
 concurrency:
   group: vps-deploy-staging
   cancel-in-progress: false
@@ -22,22 +21,18 @@ jobs:
   deploy-staging:
     runs-on: ubuntu-latest
     steps:
-      - name: النشر عبر SSH (بيئة التجريب)
+      - name: النشر/التجهيز عبر SSH (بيئة التجريب)
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          # دليل التجريب على الخادم (افتراضي /root/trbhh-staging) — يمكن تغييره بسرّ اختياري
           STAGING_DIR: ${{ secrets.STAGING_DIR }}
+          PROD_DIR: ${{ secrets.PROD_DIR }}
         run: |
           set -e
-          if [ -z "$VPS_SSH_KEY" ]; then
-            echo "❌ السرّ VPS_SSH_KEY غير موجود — أضِفه في إعدادات الأسرار."
-            exit 1
-          fi
-          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
-            echo "❌ VPS_HOST أو VPS_USER غير مضبوط."
+          if [ -z "$VPS_SSH_KEY" ] || [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
+            echo "❌ أسرار الخادم (VPS_HOST/VPS_USER/VPS_SSH_KEY) غير مكتملة."
             exit 1
           fi
           mkdir -p ~/.ssh
@@ -49,22 +44,64 @@ jobs:
           fi
           PORT="${VPS_PORT:-22}"
           DIR="${STAGING_DIR:-/root/trbhh-staging}"
-          echo "🔗 نشر التجريب على $VPS_USER@$VPS_HOST:$PORT ($DIR) ..."
-          REMOTE_CMD="set -e; if [ ! -d '$DIR/.git' ]; then echo '⏭️ بيئة التجريب غير مُجهّزة بعد على الخادم ($DIR) — شغّل bootstrap-staging مرة واحدة أو راجع ops/staging.md. تخطّي النشر بلا خطأ.'; exit 0; fi; cd '$DIR' && git fetch origin staging && git reset --hard origin/staging && docker compose --profile localdb -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build && docker compose --profile localdb -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps"
+          PROD="${PROD_DIR:-/root/trbhh}"
+          echo "🔗 التجريب على $VPS_USER@$VPS_HOST:$PORT ($DIR) ..."
+          REMOTE_CMD=$(cat <<REMOTE
+          set -e
+          COMPOSE="docker compose --profile localdb -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml"
+          if [ ! -d "$DIR/.git" ]; then
+            echo "== أول تجهيز: استنساخ المستودع =="
+            ORIGIN=\$(cd "$PROD" && git remote get-url origin)
+            git clone "\$ORIGIN" "$DIR"
+          fi
+          cd "$DIR"
+          git fetch origin staging
+          git checkout -B staging origin/staging
+          git reset --hard origin/staging
+          if [ ! -f .env ]; then
+            echo "== توليد .env للتجريب (قاعدة مستقلّة + سرّ جديد) =="
+            SECRET=\$(openssl rand -hex 32)
+            DBPASS=\$(openssl rand -hex 16)
+            DBROOT=\$(openssl rand -hex 16)
+            {
+              echo "APP_PORT=3081"
+              echo "DB_NAME=trbhhdb"
+              echo "DB_USER=trbhh"
+              echo "DB_PASSWORD=\$DBPASS"
+              echo "DB_ROOT_PASSWORD=\$DBROOT"
+              echo "AUTH_SECRET=\$SECRET"
+              echo "COOKIE_SECURE=true"
+              echo "LEGACY_MEDIA_BASE="
+              echo "LEGACY_LOCAL_DIR="
+              echo "NEXT_PUBLIC_MEDIA_BASE="
+            } > .env
+            chmod 600 .env
+          fi
+          echo "== بناء وتشغيل الحاويات (قد يستغرق دقائق أول مرّة) =="
+          \$COMPOSE up -d --build
+          echo "== الحالة =="
+          \$COMPOSE ps
+          echo "== كشف لوحة تحكّم الخادم (للخطوة اليدوية الأخيرة) =="
+          if command -v clpctl >/dev/null 2>&1; then echo "PANEL_DETECTED=CloudPanel"; fi
+          if [ -d /www/server/panel ]; then echo "PANEL_DETECTED=aaPanel/BT"; fi
+          if command -v caddy >/dev/null 2>&1; then echo "PANEL_DETECTED=Caddy"; fi
+          if [ -d /etc/nginx ]; then echo "NGINX_PRESENT=/etc/nginx"; fi
+          echo "== المنافذ المستمعة =="
+          (ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null) | grep -E ":(80|443|3080|3081)\b" || true
+          echo "✅ التطبيق التجريبي يعمل داخلياً على 127.0.0.1:3081"
+          echo "الخطوة الأخيرة (لوحتك): beta.trbhh.com ← Reverse Proxy إلى http://127.0.0.1:3081 + SSL + Basic Auth"
+          REMOTE
+          )
           n=0
-          until [ "$n" -ge 5 ]; do
+          until [ "$n" -ge 4 ]; do
             if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                 -o ConnectTimeout=25 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+                 -o ConnectTimeout=25 -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
                  -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" "$REMOTE_CMD"; then
-              echo "✅ تم نشر بيئة التجريب."
+              echo "✅ اكتمل نشر/تجهيز بيئة التجريب."
               exit 0
             fi
             n=$((n + 1))
-            if [ "$n" -lt 5 ]; then
-              wait=$((n * 20))
-              echo "⚠️ تعذّر الاتصال (محاولة $n/5) — إعادة بعد ${wait}s ..."
-              sleep "$wait"
-            fi
+            [ "$n" -lt 4 ] && { echo "⚠️ إعادة المحاولة $n/4 بعد $((n*20))s ..."; sleep $((n * 20)); }
           done
-          echo "❌ فشل الاتصال بالخادم بعد ٥ محاولات."
+          echo "❌ فشل الاتصال/التجهيز عبر SSH."
           exit 1

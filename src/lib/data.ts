@@ -594,6 +594,9 @@ async function getAdImpl(id: number) {
     stockState: ad.stock_state ?? 0,
     priceType: ad.price_type ?? null,
     rentPeriod: ad.rent_period ?? null,
+    reType: ad.re_type ?? null,
+    reArea: ad.re_area ?? null,
+    reLicense: ad.re_license ?? null,
     special: ad.adsSpecial === 'checked',
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,
@@ -698,6 +701,9 @@ export async function getAdForEdit(id: number, userId: number) {
     stockState: ad.stock_state ?? 0,
     priceType: ad.price_type ?? null,
     rentPeriod: ad.rent_period ?? null,
+    reType: ad.re_type ?? null,
+    reArea: ad.re_area ?? null,
+    reLicense: ad.re_license ?? null,
   };
 }
 

@@ -2,7 +2,17 @@
 import { useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useFormStatus } from 'react-dom';
-import { Tag, MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck, Eye, X, ArrowLeftRight, Timer, Star, User, Store } from 'lucide-react';
+import { Tag, MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck, Eye, X, ArrowLeftRight, Timer, Star, User, Store, Building2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+// منتقي الخريطة يُحمَّل في المتصفح فقط (Leaflet يتطلّب window)
+const MapPicker = dynamic(() => import('./map-picker').then((m) => m.MapPicker), {
+  ssr: false,
+  loading: () => <div className="grid h-[300px] w-full place-items-center rounded-xl border border-primary/30 text-sm text-muted-foreground">جارٍ تحميل الخريطة…</div>,
+});
+
+// أنواع العقار (المنصّة العقارية)
+const RE_TYPES = ['شقة', 'فيلا', 'دور', 'أرض', 'عمارة', 'استوديو', 'دوبلكس', 'شاليه', 'استراحة', 'مكتب', 'محل تجاري', 'مستودع', 'مزرعة'];
 import { Button } from '@/components/ui/button';
 import { SubmitOverlay } from '@/components/submit-overlay';
 import { RegionCityPicker } from '@/components/region-city-picker';
@@ -41,6 +51,7 @@ type Initial = Partial<{
   lat: string | null; lng: string | null;
   oldPrice: number; stockState: number;
   priceType: string | null; rentPeriod: string | null;
+  reType: string | null; reArea: number | null; reLicense: string | null;
 }>;
 
 // مدد التأجير المتاحة عند اختيار «سعر تأجير»
@@ -182,6 +193,11 @@ export function AdForm({
       {error === 'realestate' && (
         <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
           🏢 {realestateMsg || 'الإعلانات العقارية موقوفة مؤقتاً لدى المنصّة لاستكمال متطلبات الترخيص النظامية.'}
+        </div>
+      )}
+      {error === 'relicense' && (
+        <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          🏢 رقم ترخيص الإعلان العقاري (فال) إلزامي نظاماً — أدخله في «بيانات العقار» قبل نشر العقار.
         </div>
       )}
       {error === 'contact' && (
@@ -388,6 +404,28 @@ export function AdForm({
         />
       </Section>
 
+      {/* بيانات العقار — المنصّة العقارية (الغرض «بيع/إيجار» من مُبدّل السعر أعلاه) */}
+      <Section icon={Building2} title="بيانات العقار">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">نوع العقار</span>
+            <select name="re_type" defaultValue={initial?.reType || ''} className={field}>
+              <option value="">— اختر —</option>
+              {RE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">المساحة (م²)</span>
+            <input name="re_area" type="number" min="0" defaultValue={initial?.reArea || ''} className={field} placeholder="مثال: 250" />
+          </label>
+        </div>
+        <label className="mt-3 block space-y-1">
+          <span className="text-sm font-bold">رقم ترخيص الإعلان العقاري (فال) <span className="text-red-600">*</span></span>
+          <input name="re_license" required defaultValue={initial?.reLicense || ''} maxLength={60} dir="ltr" className={field} placeholder="مثال: 7200xxxxxx" />
+          <span className="block text-[11px] text-muted-foreground">إلزامي نظاماً (الهيئة العامة للعقار) — يظهر على الإعلان، ولا يُنشر العقار بدونه.</span>
+        </label>
+      </Section>
+
       <Section icon={MapPin} title="المكان">
         {/* هل تحديد المكان مطلوب؟ اختيار «غير مطلوب» يطوي الخيارات فلا تزحم النموذج */}
         <div className="flex gap-2">
@@ -427,6 +465,15 @@ export function AdForm({
             </button>
           </div>
           {mapErr && <p className="mt-1 text-xs font-bold text-red-600">{mapErr}</p>}
+          {/* خريطة تفاعلية: انقر أو اسحب الدبّوس لتحديد موقع العقار بدقّة */}
+          <div className="mt-3">
+            <p className="mb-1.5 text-xs font-bold text-primary">أو حدّد الموقع على الخريطة (انقر/اسحب الدبّوس):</p>
+            <MapPicker
+              lat={geo ? Number(geo.lat) : null}
+              lng={geo ? Number(geo.lng) : null}
+              onChange={(la, ln) => setGeo({ lat: la.toFixed(6), lng: ln.toFixed(6) })}
+            />
+          </div>
         </div>
         </>
         )}

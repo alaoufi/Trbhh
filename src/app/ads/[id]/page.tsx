@@ -563,6 +563,31 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         {distanceLabel && <InfoItem icon={Navigation}>{distanceLabel}</InfoItem>}
       </div>
 
+      {/* بيانات العقار + رقم الترخيص + الخريطة (المنصّة العقارية) */}
+      <div className="card-3d space-y-3 rounded-2xl p-4">
+        <div className="flex flex-wrap gap-2 text-sm">
+          {ad.reType && <span className="rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-800">🏢 {ad.reType}</span>}
+          {ad.priceType === 'rent' && <span className="rounded-full bg-sky-100 px-3 py-1 font-bold text-sky-800">للإيجار</span>}
+          {ad.priceType === 'sale' && <span className="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">للبيع</span>}
+          {ad.reArea ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">المساحة: {ad.reArea} م²</span> : null}
+        </div>
+        {ad.reLicense && (
+          <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2.5 text-sm">
+            <span className="font-bold text-emerald-800">رقم ترخيص الإعلان العقاري (فال): </span>
+            <b dir="ltr">{ad.reLicense}</b>
+          </div>
+        )}
+        {adLoc && (
+          <iframe
+            title="موقع العقار على الخريطة"
+            className="h-64 w-full rounded-xl border border-primary/20"
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            src={`https://www.openstreetmap.org/export/embed.html?bbox=${adLoc.lng - 0.008}%2C${adLoc.lat - 0.006}%2C${adLoc.lng + 0.008}%2C${adLoc.lat + 0.006}&layer=mapnik&marker=${adLoc.lat}%2C${adLoc.lng}`}
+          />
+        )}
+      </div>
+
       {/* مصداقية البائع — إشارة ثقة مجمّعة من تجارب العملاء على كل إعلاناته (تعزّز قرار الشراء) */}
       {reviewsOn && sellerCred.count > 0 && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border-2 border-emerald-200 bg-emerald-50/70 p-3">

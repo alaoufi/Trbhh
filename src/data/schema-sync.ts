@@ -687,6 +687,10 @@ const STATEMENTS: string[] = [
   // كشف العقار: علم يُحسب من نص الإعلان — لإيقاف/إلزام الإعلانات العقارية بالترخيص
   `ALTER TABLE ads ADD COLUMN is_realestate TINYINT NOT NULL DEFAULT 0`,
   `CREATE INDEX ads_is_realestate ON ads (is_realestate)`,
+  // بيانات العقار (المنصّة العقارية): النوع + المساحة + رقم ترخيص الإعلان (فال)
+  `ALTER TABLE ads ADD COLUMN re_type VARCHAR(30) NULL`,
+  `ALTER TABLE ads ADD COLUMN re_area INT NULL`,
+  `ALTER TABLE ads ADD COLUMN re_license VARCHAR(60) NULL`,
   `CREATE INDEX ads_profile_id ON ads (profile_id)`,
   // التعليق/التقييم يحمل هوية كاتبه أيضاً (يُعرض باسمها) — null = هوية افتراضية
   `ALTER TABLE comments ADD COLUMN profile_id BIGINT NULL`,

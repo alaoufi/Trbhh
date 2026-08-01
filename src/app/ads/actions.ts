@@ -18,7 +18,6 @@ import { setUserArea } from '@/lib/user-location';
 import { scanContent, censorGuard, summarizeHits, CATEGORY_LABEL } from '@/lib/content-guard';
 import { scanImages, imageModerationEnabled } from '@/lib/nsfw';
 import { parseMapsUrl, type LatLng } from '@/lib/maps';
-import { isRealEstateText, realEstateEnabled } from '@/lib/realestate';
 import { toInt } from '@/lib/utils';
 import { isApprovedStoreOwner } from '@/lib/merchant';
 import { getActiveProfile, ensureDefaultProfile, backfillProfileContact } from '@/lib/profiles';
@@ -408,9 +407,13 @@ export async function createAdAction(formData: FormData) {
   }
   // كشف العقار: يُحسب من نص الإعلان. أثناء إيقاف الإدارة للعقار، يُرفض النشر برسالة
   // واضحة بدل ترك الإعلان يُنشر ثم يُخفى (قاعدة 4: التحقّق قبل الخطوة لا بعدها).
-  const isRealEstate = isRealEstateText(finalTitle, finalDetail);
-  if (isRealEstate && !(await realEstateEnabled().catch(() => true))) {
-    redirect(`/ads/new?error=realestate${dest === 'store' ? '&dest=store' : ''}`);
+  // المنصّة العقارية: كل إعلان عقار. رقم ترخيص الإعلان (فال) إلزامي نظاماً — لا يُنشر بدونه.
+  const reLicense = String(formData.get('re_license') || '').trim().slice(0, 60);
+  const reType = String(formData.get('re_type') || '').trim().slice(0, 30);
+  const reAreaN = parseInt(String(formData.get('re_area') || ''), 10);
+  const reArea = Number.isFinite(reAreaN) && reAreaN > 0 ? reAreaN : null;
+  if (!reLicense) {
+    redirect(`/ads/new?error=relicense${dest === 'store' ? '&dest=store' : ''}`);
   }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
@@ -440,7 +443,10 @@ export async function createAdAction(formData: FormData) {
       stock_state: [0, 1, 2].includes(Number(formData.get('stock_state'))) ? Number(formData.get('stock_state')) : 0,
       store_only: dest === 'store' ? 1 : 0, // عزل تام: إعلان المتجر لا يظهر في تربح
       cat_reviewed: aiClassified ? 0 : 1, // تصنيف آلي؟ ينتظر مراجعة الإدارة
-      is_realestate: isRealEstate ? 1 : 0, // كشف عقاري — لإيقاف/إلزام الترخيص لاحقاً
+      is_realestate: 1, // المنصّة العقارية: كل إعلان عقار
+      re_type: reType || null,
+      re_area: reArea,
+      re_license: reLicense,
       bumped_at: new Date(), // ترتيب «الأحدث» يعتمد آخر تحديث (Bump)
       ...(scheduledAt ? { status: 0, publish_at: scheduledAt } : {}),
       created_at: new Date(),
@@ -596,7 +602,10 @@ export async function updateAdAction(formData: FormData) {
       title: eFinalTitle,
       detail: eFinalDetail,
       flag_terms: eFlagTerms || null,
-      is_realestate: isRealEstateText(eFinalTitle, eFinalDetail) ? 1 : 0, // إعادة كشف العقار عند التعديل
+      is_realestate: 1, // المنصّة العقارية: كل إعلان عقار
+      ...(formData.get('re_type') !== null ? { re_type: String(formData.get('re_type') || '').trim().slice(0, 30) || null } : {}),
+      ...(formData.get('re_area') !== null ? { re_area: (Number.isFinite(parseInt(String(formData.get('re_area')), 10)) && parseInt(String(formData.get('re_area')), 10) > 0 ? parseInt(String(formData.get('re_area')), 10) : null) } : {}),
+      ...(String(formData.get('re_license') || '').trim() ? { re_license: String(formData.get('re_license')).trim().slice(0, 60) } : {}),
       price: newPrice,
       adsType: eType,
       price_type: ePriceType,

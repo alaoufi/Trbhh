@@ -85,6 +85,13 @@ model ads {
   re_facade        String?   @db.VarChar(20)  // واجهة العقار (شمالية/جنوبية…)
   re_street        Int?                        // عرض الشارع (م)
   re_furnished     Int?      @db.TinyInt      // مفروش؟ 1=نعم 0=لا
+  re_use           String?   @db.VarChar(20)  // نوعية/استخدام الأرض (سكني/تجاري/زراعي…)
+  re_streets_count Int?                        // عدد الشوارع المطلّة (للأرض)
+  re_floors        Int?                        // عدد الأدوار (فيلا/عمارة)
+  re_units         Int?                        // عدد الشقق/الوحدات (عمارة)
+  re_shops         Int?                        // عدد المحلات (عمارة)
+  re_halls         Int?                        // عدد الصالات
+  re_pool          Int?      @db.TinyInt      // مسبح؟ 1=نعم 0=لا
 
   @@index([category_id], map: "ads_category_id_foreign")
   @@index([city_id], map: "ads_city_id_foreign")

@@ -641,6 +641,13 @@ async function getAdImpl(id: number) {
     reFacade: ad.re_facade ?? null,
     reStreet: ad.re_street ?? null,
     reFurnished: ad.re_furnished ?? null,
+    reUse: ad.re_use ?? null,
+    reStreetsCount: ad.re_streets_count ?? null,
+    reFloors: ad.re_floors ?? null,
+    reUnits: ad.re_units ?? null,
+    reShops: ad.re_shops ?? null,
+    reHalls: ad.re_halls ?? null,
+    rePool: ad.re_pool ?? null,
     special: ad.adsSpecial === 'checked',
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,
@@ -758,6 +765,13 @@ export async function getAdForEdit(id: number, userId: number) {
     reFacade: ad.re_facade ?? null,
     reStreet: ad.re_street ?? null,
     reFurnished: ad.re_furnished ?? null,
+    reUse: ad.re_use ?? null,
+    reStreetsCount: ad.re_streets_count ?? null,
+    reFloors: ad.re_floors ?? null,
+    reUnits: ad.re_units ?? null,
+    reShops: ad.re_shops ?? null,
+    reHalls: ad.re_halls ?? null,
+    rePool: ad.re_pool ?? null,
   };
 }
 

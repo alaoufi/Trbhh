@@ -571,13 +571,20 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           {ad.priceType === 'rent' && <span className="rounded-full bg-sky-100 px-3 py-1 font-bold text-sky-800">للإيجار</span>}
           {ad.priceType === 'sale' && <span className="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">للبيع</span>}
           {ad.reArea ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">المساحة: {ad.reArea} م²</span> : null}
+          {ad.reUse ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">الاستخدام: {ad.reUse}</span> : null}
+          {ad.reStreetsCount != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🛣️ {ad.reStreetsCount} شوارع</span> : null}
+          {ad.reFloors != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🏢 {ad.reFloors} أدوار</span> : null}
+          {ad.reUnits != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">{ad.reUnits} شقق</span> : null}
+          {ad.reShops != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">{ad.reShops} محلات</span> : null}
           {ad.reBeds != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🛏️ {ad.reBeds} غرف</span> : null}
           {ad.reBaths != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🚿 {ad.reBaths} دورات مياه</span> : null}
+          {ad.reHalls != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🛋️ {ad.reHalls} صالات</span> : null}
           {ad.reFloor ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">الدور: {ad.reFloor}</span> : null}
           {ad.reAge != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">عمر العقار: {ad.reAge} سنة</span> : null}
           {ad.reFacade ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">الواجهة: {ad.reFacade}</span> : null}
           {ad.reStreet != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">الشارع: {ad.reStreet} م</span> : null}
           {ad.reFurnished === 1 ? <span className="rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-800">مفروش</span> : null}
+          {ad.rePool === 1 ? <span className="rounded-full bg-sky-100 px-3 py-1 font-bold text-sky-800">🏊 مسبح</span> : null}
         </div>
         {/* أرقام تعريف العقار الرسمية: القطعة / المخطط / الصك */}
         {(ad.rePlot || ad.rePlan || ad.reDeed) && (

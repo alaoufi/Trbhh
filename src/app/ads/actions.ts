@@ -424,6 +424,13 @@ export async function createAdAction(formData: FormData) {
   const reFloor = String(formData.get('re_floor') || '').trim().slice(0, 20) || null;
   const reFacade = String(formData.get('re_facade') || '').trim().slice(0, 20) || null;
   const reFurnished = formData.get('re_furnished') ? 1 : 0;
+  const reUse = String(formData.get('re_use') || '').trim().slice(0, 20) || null;
+  const reStreetsCount = posInt('re_streets_count');
+  const reFloors = posInt('re_floors');
+  const reUnits = posInt('re_units');
+  const reShops = posInt('re_shops');
+  const reHalls = posInt('re_halls');
+  const rePool = formData.get('re_pool') ? 1 : 0;
   if (!reLicense) {
     redirect(`/ads/new?error=nolicense${dest === 'store' ? '&dest=store' : ''}`);
   }
@@ -469,6 +476,13 @@ export async function createAdAction(formData: FormData) {
       re_facade: reFacade,
       re_street: reStreet,
       re_furnished: reFurnished,
+      re_use: reUse,
+      re_streets_count: reStreetsCount,
+      re_floors: reFloors,
+      re_units: reUnits,
+      re_shops: reShops,
+      re_halls: reHalls,
+      re_pool: rePool,
       bumped_at: new Date(), // ترتيب «الأحدث» يعتمد آخر تحديث (Bump)
       ...(scheduledAt ? { status: 0, publish_at: scheduledAt } : {}),
       created_at: new Date(),
@@ -641,8 +655,15 @@ export async function updateAdAction(formData: FormData) {
       ...(formData.get('re_age') !== null ? { re_age: (() => { const n = parseInt(String(formData.get('re_age')), 10); return Number.isFinite(n) && n >= 0 ? n : null; })() } : {}),
       ...(formData.get('re_facade') !== null ? { re_facade: String(formData.get('re_facade') || '').trim().slice(0, 20) || null } : {}),
       ...(formData.get('re_street') !== null ? { re_street: (() => { const n = parseInt(String(formData.get('re_street')), 10); return Number.isFinite(n) && n >= 0 ? n : null; })() } : {}),
-      // مفروش: خانة اختيار — حاضرة في النموذج دائماً، فغيابها يعني إلغاء التأشير
+      ...(formData.get('re_use') !== null ? { re_use: String(formData.get('re_use') || '').trim().slice(0, 20) || null } : {}),
+      ...(formData.get('re_streets_count') !== null ? { re_streets_count: (() => { const n = parseInt(String(formData.get('re_streets_count')), 10); return Number.isFinite(n) && n >= 0 ? n : null; })() } : {}),
+      ...(formData.get('re_floors') !== null ? { re_floors: (() => { const n = parseInt(String(formData.get('re_floors')), 10); return Number.isFinite(n) && n >= 0 ? n : null; })() } : {}),
+      ...(formData.get('re_units') !== null ? { re_units: (() => { const n = parseInt(String(formData.get('re_units')), 10); return Number.isFinite(n) && n >= 0 ? n : null; })() } : {}),
+      ...(formData.get('re_shops') !== null ? { re_shops: (() => { const n = parseInt(String(formData.get('re_shops')), 10); return Number.isFinite(n) && n >= 0 ? n : null; })() } : {}),
+      ...(formData.get('re_halls') !== null ? { re_halls: (() => { const n = parseInt(String(formData.get('re_halls')), 10); return Number.isFinite(n) && n >= 0 ? n : null; })() } : {}),
+      // مفروش/مسبح: خانتا اختيار تظهران حسب النوع — غيابهما (نوع لا يدعمهما) = 0
       re_furnished: formData.get('re_furnished') ? 1 : 0,
+      re_pool: formData.get('re_pool') ? 1 : 0,
       price: newPrice,
       adsType: eType,
       price_type: ePriceType,

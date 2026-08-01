@@ -702,6 +702,14 @@ const STATEMENTS: string[] = [
   `ALTER TABLE ads ADD COLUMN re_facade VARCHAR(20) NULL`,
   `ALTER TABLE ads ADD COLUMN re_street INT NULL`,
   `ALTER TABLE ads ADD COLUMN re_furnished TINYINT NULL`,
+  // مواصفات حسب نوع العقار: استخدام الأرض/عدد الشوارع/الأدوار/الشقق/المحلات/الصالات/مسبح
+  `ALTER TABLE ads ADD COLUMN re_use VARCHAR(20) NULL`,
+  `ALTER TABLE ads ADD COLUMN re_streets_count INT NULL`,
+  `ALTER TABLE ads ADD COLUMN re_floors INT NULL`,
+  `ALTER TABLE ads ADD COLUMN re_units INT NULL`,
+  `ALTER TABLE ads ADD COLUMN re_shops INT NULL`,
+  `ALTER TABLE ads ADD COLUMN re_halls INT NULL`,
+  `ALTER TABLE ads ADD COLUMN re_pool TINYINT NULL`,
   `CREATE INDEX ads_profile_id ON ads (profile_id)`,
   // التعليق/التقييم يحمل هوية كاتبه أيضاً (يُعرض باسمها) — null = هوية افتراضية
   `ALTER TABLE comments ADD COLUMN profile_id BIGINT NULL`,

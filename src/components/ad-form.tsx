@@ -13,6 +13,20 @@ const MapPicker = dynamic(() => import('./map-picker').then((m) => m.MapPicker),
 
 // أنواع العقار (المنصّة العقارية)
 const RE_TYPES = ['شقة', 'فيلا', 'دور', 'أرض', 'عمارة', 'استوديو', 'دوبلكس', 'شاليه', 'استراحة', 'مكتب', 'محل تجاري', 'مستودع', 'مزرعة'];
+// استخدامات الأرض
+const LAND_USES = ['سكني', 'تجاري', 'سكني تجاري', 'زراعي', 'صناعي'];
+// تصنيف نوع العقار لتحديد حقول المواصفات المناسبة
+function propKind(t: string): 'land' | 'building' | 'residential' | 'commercial' | '' {
+  if (!t) return '';
+  if (['أرض', 'مزرعة'].includes(t)) return 'land';
+  if (t === 'عمارة') return 'building';
+  if (['مكتب', 'محل تجاري', 'مستودع'].includes(t)) return 'commercial';
+  return 'residential'; // شقة/فيلا/دور/استوديو/دوبلكس/شاليه/استراحة
+}
+// أي الأنواع لها مسبح / أدوار متعددة / طابق مفرد
+const POOL_TYPES = ['فيلا', 'شاليه', 'استراحة', 'دوبلكس'];
+const MULTIFLOOR_TYPES = ['فيلا', 'عمارة', 'دوبلكس']; // «عدد الأدوار»
+const FLOORLEVEL_TYPES = ['شقة', 'استوديو', 'مكتب', 'دور']; // «الطابق»
 import { Button } from '@/components/ui/button';
 import { SubmitOverlay } from '@/components/submit-overlay';
 import { RegionCityPicker } from '@/components/region-city-picker';
@@ -54,6 +68,8 @@ type Initial = Partial<{
   rePlot: string | null; rePlan: string | null; reDeed: string | null;
   reBeds: number | null; reBaths: number | null; reFloor: string | null;
   reAge: number | null; reFacade: string | null; reStreet: number | null; reFurnished: number | null;
+  reUse: string | null; reStreetsCount: number | null; reFloors: number | null;
+  reUnits: number | null; reShops: number | null; reHalls: number | null; rePool: number | null;
 }>;
 
 // مدد التأجير المتاحة عند اختيار «سعر تأجير»
@@ -97,6 +113,9 @@ export function AdForm({
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه', charity: 'جمع تبرعات أو نشاط جمعية غير مرخّص' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
   const isReq = adsType === 'request';
+  // نوع العقار المختار — تُعرض حقول المواصفات المناسبة له (أرض/عمارة/شقة/…)
+  const [reType, setReType] = useState(initial?.reType || '');
+  const reKind = propKind(reType); // 'land' | 'building' | 'residential' | 'commercial' | ''
   // نوع السعر للمعروض: تأجير (سعر + مدة) / بيع (سعر) / على السوم (بلا سعر)
   const [priceMode, setPriceMode] = useState<'rent' | 'sale' | 'som'>(
     initial?.priceType === 'rent' || initial?.priceType === 'som' ? initial.priceType
@@ -325,7 +344,7 @@ export function AdForm({
       <Section icon={Building2} title={isReq ? 'بيانات العقار المطلوب' : 'بيانات العقار'}>
         <div>
           <label className={lbl}>نوع العقار</label>
-          <select name="re_type" defaultValue={initial?.reType || ''} className={field}>
+          <select name="re_type" value={reType} onChange={(e) => setReType(e.target.value)} className={field}>
             <option value="">— اختر نوع العقار —</option>
             {RE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
@@ -387,49 +406,139 @@ export function AdForm({
         </div>
       </Section>
 
-      {/* مواصفات العقار — المنصّة العقارية (النوع والغرض في «بيانات العقار» أعلاه) */}
+      {/* مواصفات العقار — حقول متغيّرة حسب نوع العقار (أرض/عمارة/شقة/…) */}
       <Section icon={Building2} title="مواصفات العقار">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block space-y-1">
-            <span className="text-sm font-bold">المساحة (م²)</span>
-            <input name="re_area" type="number" min="0" defaultValue={initial?.reArea || ''} className={field} placeholder="مثال: 250" />
+        {!reType && (
+          <p className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-800">
+            اختر «نوع العقار» في الأعلى لتظهر المواصفات المناسبة له.
+          </p>
+        )}
+        {reType && (
+          <div className="grid gap-3 sm:grid-cols-3">
+            {/* المساحة — لكل الأنواع */}
+            <label className="block space-y-1">
+              <span className="text-sm font-bold">{reKind === 'land' ? 'مساحة الأرض (م²)' : 'المساحة (م²)'}</span>
+              <input name="re_area" type="number" min="0" defaultValue={initial?.reArea ?? ''} className={field} placeholder="مثال: 250" />
+            </label>
+
+            {/* أرض: نوعية الأرض + عدد الشوارع */}
+            {reKind === 'land' && (
+              <>
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold">نوعية الأرض</span>
+                  <select name="re_use" defaultValue={initial?.reUse || ''} className={field}>
+                    <option value="">— اختر —</option>
+                    {LAND_USES.map((u) => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold">عدد الشوارع</span>
+                  <input name="re_streets_count" type="number" min="0" max="4" defaultValue={initial?.reStreetsCount ?? ''} className={field} placeholder="مثال: 2" />
+                </label>
+              </>
+            )}
+
+            {/* سكني (شقة/فيلا/دور/استوديو/دوبلكس/شاليه/استراحة): غرف + دورات مياه + صالات */}
+            {reKind === 'residential' && (
+              <>
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold">غرف النوم</span>
+                  <input name="re_beds" type="number" min="0" defaultValue={initial?.reBeds ?? ''} className={field} placeholder="مثال: 3" />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold">دورات المياه</span>
+                  <input name="re_baths" type="number" min="0" defaultValue={initial?.reBaths ?? ''} className={field} placeholder="مثال: 2" />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold">الصالات</span>
+                  <input name="re_halls" type="number" min="0" defaultValue={initial?.reHalls ?? ''} className={field} placeholder="مثال: 1" />
+                </label>
+              </>
+            )}
+
+            {/* عمارة: عدد الأدوار + عدد الشقق + عدد المحلات */}
+            {reKind === 'building' && (
+              <>
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold">عدد الأدوار</span>
+                  <input name="re_floors" type="number" min="0" defaultValue={initial?.reFloors ?? ''} className={field} placeholder="مثال: 4" />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold">عدد الشقق</span>
+                  <input name="re_units" type="number" min="0" defaultValue={initial?.reUnits ?? ''} className={field} placeholder="مثال: 8" />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold">عدد المحلات</span>
+                  <input name="re_shops" type="number" min="0" defaultValue={initial?.reShops ?? ''} className={field} placeholder="مثال: 2" />
+                </label>
+              </>
+            )}
+
+            {/* تجاري (مكتب/محل/مستودع): دورات المياه */}
+            {reKind === 'commercial' && (
+              <label className="block space-y-1">
+                <span className="text-sm font-bold">دورات المياه</span>
+                <input name="re_baths" type="number" min="0" defaultValue={initial?.reBaths ?? ''} className={field} placeholder="مثال: 1" />
+              </label>
+            )}
+
+            {/* عدد الأدوار — فيلا/دوبلكس (سكني متعدّد الأدوار) */}
+            {reKind === 'residential' && MULTIFLOOR_TYPES.includes(reType) && (
+              <label className="block space-y-1">
+                <span className="text-sm font-bold">عدد الأدوار</span>
+                <input name="re_floors" type="number" min="0" defaultValue={initial?.reFloors ?? ''} className={field} placeholder="مثال: 2" />
+              </label>
+            )}
+
+            {/* الطابق — شقة/استوديو/مكتب/دور */}
+            {FLOORLEVEL_TYPES.includes(reType) && (
+              <label className="block space-y-1">
+                <span className="text-sm font-bold">الطابق / الدور</span>
+                <input name="re_floor" defaultValue={initial?.reFloor || ''} maxLength={20} className={field} placeholder="مثال: الأول، أرضي" />
+              </label>
+            )}
+
+            {/* عمر العقار — لكل ما هو مبنيّ (ليس أرضاً) */}
+            {reKind !== 'land' && (
+              <label className="block space-y-1">
+                <span className="text-sm font-bold">عمر العقار (سنوات)</span>
+                <input name="re_age" type="number" min="0" defaultValue={initial?.reAge ?? ''} className={field} placeholder="مثال: 5" />
+              </label>
+            )}
+
+            {/* الواجهة + عرض الشارع — أرض/عمارة/تجاري/فيلا-دوبلكس */}
+            {(reKind === 'land' || reKind === 'building' || reKind === 'commercial' || MULTIFLOOR_TYPES.includes(reType)) && (
+              <>
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold">الواجهة</span>
+                  <select name="re_facade" defaultValue={initial?.reFacade || ''} className={field}>
+                    <option value="">— اختر —</option>
+                    {['شمالية', 'جنوبية', 'شرقية', 'غربية', 'شمالية شرقية', 'شمالية غربية', 'جنوبية شرقية', 'جنوبية غربية', 'ثلاث شوارع', 'أربع شوارع'].map((f) => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-sm font-bold">عرض الشارع (م)</span>
+                  <input name="re_street" type="number" min="0" defaultValue={initial?.reStreet ?? ''} className={field} placeholder="مثال: 20" />
+                </label>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* مفروش؟ — للوحدات السكنية */}
+        {reKind === 'residential' && (
+          <label className="mt-3 flex items-center gap-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-3 text-sm font-bold">
+            <input type="checkbox" name="re_furnished" value="1" defaultChecked={initial?.reFurnished === 1} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+            العقار مفروش
           </label>
-        </div>
-        {/* خصائص العقار: غرف/دورات مياه/طابق/عمر/واجهة/عرض الشارع/فرش */}
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <label className="block space-y-1">
-            <span className="text-sm font-bold">غرف النوم</span>
-            <input name="re_beds" type="number" min="0" defaultValue={initial?.reBeds ?? ''} className={field} placeholder="مثال: 3" />
+        )}
+        {/* مسبح؟ — فيلا/شاليه/استراحة/دوبلكس */}
+        {POOL_TYPES.includes(reType) && (
+          <label className="mt-3 flex items-center gap-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-3 text-sm font-bold">
+            <input type="checkbox" name="re_pool" value="1" defaultChecked={initial?.rePool === 1} className="h-4 w-4 accent-[hsl(var(--primary))]" />
+            يوجد مسبح
           </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-bold">دورات المياه</span>
-            <input name="re_baths" type="number" min="0" defaultValue={initial?.reBaths ?? ''} className={field} placeholder="مثال: 2" />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-bold">الطابق / الدور</span>
-            <input name="re_floor" defaultValue={initial?.reFloor || ''} maxLength={20} className={field} placeholder="مثال: الأول، أرضي" />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-bold">عمر العقار (سنوات)</span>
-            <input name="re_age" type="number" min="0" defaultValue={initial?.reAge ?? ''} className={field} placeholder="مثال: 5" />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-bold">الواجهة</span>
-            <select name="re_facade" defaultValue={initial?.reFacade || ''} className={field}>
-              <option value="">— اختر —</option>
-              {['شمالية', 'جنوبية', 'شرقية', 'غربية', 'شمالية شرقية', 'شمالية غربية', 'جنوبية شرقية', 'جنوبية غربية', 'ثلاث شوارع', 'أربع شوارع'].map((f) => <option key={f} value={f}>{f}</option>)}
-            </select>
-          </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-bold">عرض الشارع (م)</span>
-            <input name="re_street" type="number" min="0" defaultValue={initial?.reStreet ?? ''} className={field} placeholder="مثال: 20" />
-          </label>
-        </div>
-        {/* مفروش؟ (للإيجار غالباً) */}
-        <label className="mt-3 flex items-center gap-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-3 text-sm font-bold">
-          <input type="checkbox" name="re_furnished" value="1" defaultChecked={initial?.reFurnished === 1} className="h-4 w-4 accent-[hsl(var(--primary))]" />
-          العقار مفروش
-        </label>
+        )}
         {/* بيانات الصك والمخطط والقطعة — تعريف العقار رسمياً */}
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <label className="block space-y-1">

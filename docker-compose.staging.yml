@@ -1,25 +1,34 @@
 # ────────────────────────────────────────────────────────────────────────────
-# بيئة التجريب (Staging) — نسخة تجريب معزولة تعمل بالتوازي مع الإنتاج على نفس الخادم.
+# بيئة التجريب (Staging) — نسخة معزولة كلياً تعمل بالتوازي مع الإنتاج على نفس الخادم.
 #
-# تعمل من دليل منفصل (/root/trbhh-staging) وبمشروع Docker منفصل (-p trbhh-staging)،
-# فلا تتصادم مع حاويات الإنتاج (trbhh-app / trbhh-redis) ولا تمسّ قاعدة بياناته.
-# كل الإعدادات الحسّاسة (قاعدة التجريب، المنفذ، الأسرار) من ملف .env الخاص بالتجريب.
+# دليل منفصل (/root/trbhh-staging) + مشروع Docker منفصل (-p trbhh-staging) +
+# قاعدة بيانات خاصة بها (حاوية MySQL مستقلّة عبر profile «localdb») — لا تلمس
+# قاعدة الإنتاج ولا بياناته إطلاقاً. كل الأسرار من ملف .env الخاص بالتجريب.
 #
-# التشغيل اليدوي (احتياطي — النشر التلقائي عبر deploy-staging.yml):
+# التشغيل (يُبنى تلقائياً عبر deploy-staging.yml؛ يدوياً كاحتياطي):
 #   cd /root/trbhh-staging
-#   docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis
+#   docker compose --profile localdb -p trbhh-staging \
+#     -f docker-compose.yml -f docker-compose.staging.yml up -d --build
 #
-# ملاحظات العزل:
-#   • container_name مختلف هنا → لا تصادم مع حاويات الإنتاج على نفس الخادم.
-#   • المنفذ يأتي من APP_PORT في .env التجريب (ضَع 3081) → منفذ مستقل عن 3080 للإنتاج.
-#   • الحجم (trbhh-storage) يُسبَق باسم المشروع تلقائياً (trbhh-staging_…) → وسائط منفصلة.
-#   • DATABASE_URL في .env التجريب يجب أن يشير لقاعدة تجريب منفصلة (لا قاعدة الإنتاج!).
+# العزل:
+#   • أسماء الحاويات مختلفة (trbhh-staging-*) → لا تصادم مع حاويات الإنتاج.
+#   • المنفذ من APP_PORT في .env التجريب (=3081) → مستقل عن 3080 للإنتاج.
+#   • الحجوم تُسبَق باسم المشروع تلقائياً (trbhh-staging_…) → تخزين منفصل.
+#   • قاعدة التجريب حاوية MySQL خاصة (db) → لا اتصال بقاعدة الإنتاج.
 # ────────────────────────────────────────────────────────────────────────────
 services:
+  # قاعدة التجريب: حاوية MySQL مستقلّة (تُفعّل بـ --profile localdb). DATABASE_URL
+  # في .env التجريب يُترك فارغاً ليعود التطبيق تلقائياً لهذه الحاوية (db:3306).
+  db:
+    container_name: trbhh-staging-db
+
   redis:
     container_name: trbhh-staging-redis
 
   app:
     container_name: trbhh-staging-app
-    # المنفذ يُضبط من APP_PORT في .env التجريب (=3081). لا نضيف ports هنا حتى لا
-    # تُدمَج قائمتا المنافذ فيُفتح منفذ الإنتاج أيضاً بالخطأ.
+    # المنفذ من APP_PORT في .env التجريب (=3081). لا نضيف ports هنا حتى لا تُدمَج
+    # قائمتا المنافذ فيُفتح منفذ الإنتاج بالخطأ.
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }

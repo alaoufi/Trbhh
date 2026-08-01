@@ -8,7 +8,6 @@ import { sweepExpiredFeatured, getFeaturedTierMap, getUsersAdMeta } from './pack
 import { ensureSaudiAreas } from './seed-areas';
 import { getProfileDisplay } from './profiles';
 import { toInt } from './utils';
-import { realEstateEnabled } from './realestate';
 
 export type AdCard = {
   id: number;
@@ -162,16 +161,15 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
     });
 }
 
-// عزل المتاجر: إعلان المتجر لا يدخل قوائم تربح إلا بعرض مدفوع ساري المفعول (trbhh_until)
-// عزل العقار: حين توقفه الإدارة، تُستبعَد كل الإعلانات العقارية من كل القوائم فوراً
-// (فلتر واحد على is_realestate يغطّي جميع القوائم التي تمرّ من هنا).
+// منصّة عقارية مستقلّة (beta): تُعرض الإعلانات العقارية فقط في كل القوائم (فلتر واحد على
+// is_realestate=1 يغطّي جميع القوائم التي تمرّ من هنا). عزل المتاجر كما هو (trbhh_until).
 async function activeAdWhere() {
-  const base = {
+  return {
     status: 1,
     state: 'active' as const,
+    is_realestate: 1,
     AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }] }],
   };
-  return (await realEstateEnabled().catch(() => true)) ? base : { ...base, is_realestate: 0 };
 }
 
 const adSelect = {
@@ -377,8 +375,7 @@ export async function getDealAds(take = 60) {
         state: 'active',
         old_price: { gt: 0 },
         AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }, ...(approvedUserIds.length ? [{ user_id: { in: approvedUserIds } }] : [])] }],
-        // عزل العقار عند إيقافه من الإدارة
-        ...((await realEstateEnabled().catch(() => true)) ? {} : { is_realestate: 0 }),
+        is_realestate: 1, // منصّة عقارية: عقار فقط
       },
       orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
       take: take * 2,
@@ -507,8 +504,7 @@ async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type
     ...(areaId ? { area_id: areaId } : {}),
     ...(type ? { adsType: type } : {}),
     ...(special ? { adsSpecial: 'checked' as const } : {}),
-    // عزل العقار عند إيقافه من الإدارة (يشمل البحث أيضاً)
-    ...((await realEstateEnabled().catch(() => true)) ? {} : { is_realestate: 0 }),
+    is_realestate: 1, // منصّة عقارية: البحث في العقار فقط
   };
 }
 
@@ -537,8 +533,8 @@ async function getAdImpl(id: number) {
   if (!Number.isInteger(id) || id <= 0) return null;
   const ad = await prisma.ads.findFirst({ where: { id: BigInt(id) } }).catch(() => null);
   if (!ad) return null;
-  // عزل العقار: أثناء إيقاف الإدارة للعقار، لا يُفتح أي إعلان عقاري بالرابط المباشر أيضاً
-  if (ad.is_realestate === 1 && !(await realEstateEnabled().catch(() => true))) return null;
+  // منصّة عقارية: لا يُفتح إلا إعلان عقاري (غير العقاري لا يخصّ هذه المنصّة)
+  if (ad.is_realestate !== 1) return null;
 
   const [city, area, category, seller, photos, views] = await Promise.all([
     prisma.cities.findUnique({ where: { id: ad.city_id }, select: { name: true } }),

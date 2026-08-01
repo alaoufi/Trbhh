@@ -15,7 +15,7 @@ const shareItem: NavItem = { href: '__share', label: 'مشاركة', icon: Share
 const authedItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },
   { href: '/companies', label: 'المتاجر', icon: Building2 },
-  { href: '/ads/new', label: 'أضف إعلان', icon: PlusCircle, primary: true },
+  { href: '/ads/new', label: 'أضف عقار', icon: PlusCircle, primary: true },
   { href: '/account/profiles', label: 'الحسابات', icon: Users },
   { href: '__contact', label: 'تواصل', icon: Mail },
 ];

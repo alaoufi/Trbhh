@@ -775,7 +775,34 @@ async function run(): Promise<void> {
   await backfillAdBanAction();
   await backfillAccountDeletedAction();
   await backfillLegacyReceiptHashes();
-  await backfillRealEstateFlag();
+  // المنصّة العقارية المستقلّة (beta): بيئة مخصّصة للعقار فقط — لا نعرض بيانات الأرشيف
+  // العام (سيارات/أجهزة/…). REALESTATE_ONLY=1 يبدأ بصفحة نظيفة: كل الإعلانات القائمة
+  // تُخفى (is_realestate=0) ولا يظهر إلا ما يُضاف عبر نموذج العقار المرخّص. الإنتاج لا
+  // يضبط هذا المتغيّر → يبقى سلوكه كما هو (وسم العقارات القائمة لإيقافها عند الحاجة).
+  if (process.env.REALESTATE_ONLY === '1') {
+    await cleanSlateRealEstate();
+  } else {
+    await backfillRealEstateFlag();
+  }
+}
+
+/** المنصّة العقارية المستقلّة فقط: تنظيف لمرّة واحدة يُخفي كل إعلانات الأرشيف العام
+ *  (is_realestate=0) فلا يظهر إلا العقار المُضاف عبر النموذج المرخّص. مُحصّن بعلامة في
+ *  site_settings كي لا يتكرّر ولا يمسّ العقارات المُضافة لاحقاً. لا يعمل إلا حين
+ *  REALESTATE_ONLY=1 (بيئة beta) — الإنتاج غير متأثّر إطلاقاً. */
+async function cleanSlateRealEstate(): Promise<void> {
+  const done = await prisma
+    .$queryRawUnsafe<{ v: string | null }[]>(
+      `SELECT v FROM site_settings WHERE k = 'realestate_clean_slate_done' LIMIT 1`,
+    )
+    .catch(() => [] as { v: string | null }[]);
+  if (done.length && done[0]?.v === '1') return;
+  await prisma.$executeRawUnsafe(`UPDATE ads SET is_realestate = 0 WHERE is_realestate = 1`).catch(() => {});
+  await prisma
+    .$executeRawUnsafe(
+      `INSERT INTO site_settings (k, v) VALUES ('realestate_clean_slate_done', '1') ON DUPLICATE KEY UPDATE v = '1'`,
+    )
+    .catch(() => {});
 }
 
 /** ترقيع لمرة واحدة: وسم الإعلانات العقارية القائمة بعد إضافة عمود is_realestate،

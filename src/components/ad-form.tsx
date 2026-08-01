@@ -2,7 +2,7 @@
 import { useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useFormStatus } from 'react-dom';
-import { Tag, MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck, Eye, X, ArrowLeftRight, Timer, Star, User, Store, Building2 } from 'lucide-react';
+import { MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck, Eye, X, ArrowLeftRight, Timer, Star, User, Store, Building2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // منتقي الخريطة يُحمَّل في المتصفح فقط (Leaflet يتطلّب window)
@@ -322,9 +322,16 @@ export function AdForm({
         {isReq ? 'إعلان طلب عقار: صِف العقار الذي تبحث عنه، والصور والسعر اختيارية.' : 'إعلان عرض عقار: تعرض عقاراً للبيع أو الإيجار.'}
       </div>
 
-      <Section icon={Tag} title={isReq ? 'بيانات الطلب' : 'بيانات العرض'}>
+      <Section icon={Building2} title={isReq ? 'بيانات العقار المطلوب' : 'بيانات العقار'}>
         <div>
-          <label className={lbl}>{isReq ? 'ماذا تطلب؟' : 'عنوان الإعلان'}</label>
+          <label className={lbl}>نوع العقار</label>
+          <select name="re_type" defaultValue={initial?.reType || ''} className={field}>
+            <option value="">— اختر نوع العقار —</option>
+            {RE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={lbl}>{isReq ? 'عنوان العقار المطلوب' : 'عنوان العقار'}</label>
           <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مثال: مطلوب أرض في حي النرجس' : 'مثال: شقة للإيجار في حي الملقا'} />
         </div>
         {isReq ? (
@@ -380,16 +387,9 @@ export function AdForm({
         </div>
       </Section>
 
-      {/* بيانات العقار — المنصّة العقارية (الغرض «بيع/إيجار» من مُبدّل السعر أعلاه) */}
-      <Section icon={Building2} title="بيانات العقار">
+      {/* مواصفات العقار — المنصّة العقارية (النوع والغرض في «بيانات العقار» أعلاه) */}
+      <Section icon={Building2} title="مواصفات العقار">
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block space-y-1">
-            <span className="text-sm font-bold">نوع العقار</span>
-            <select name="re_type" defaultValue={initial?.reType || ''} className={field}>
-              <option value="">— اختر —</option>
-              {RE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </label>
           <label className="block space-y-1">
             <span className="text-sm font-bold">المساحة (م²)</span>
             <input name="re_area" type="number" min="0" defaultValue={initial?.reArea || ''} className={field} placeholder="مثال: 250" />

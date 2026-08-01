@@ -69,6 +69,9 @@ services:
       SMS_SENDER: ${SMS_SENDER:-SouqAlhafta}
       SMS_UNICODE: ${SMS_UNICODE:-e}
       NODE_ENV: production
+      # المنصّة العقارية المستقلّة (beta): =1 يجعل البيئة عقارية فقط (تنظيف بيانات الأرشيف
+      # العام عند الإقلاع). فارغ في الإنتاج → لا تأثير على الموقع الحيّ.
+      REALESTATE_ONLY: ${REALESTATE_ONLY:-}
       # كل الأوقات والتواريخ بتوقيت الرياض (+3)
       TZ: Asia/Riyadh
       # بيكسلات التتبع الإعلاني — اختيارية، كل منها يعمل فقط عند ضبط معرّفه

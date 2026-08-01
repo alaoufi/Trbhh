@@ -74,8 +74,15 @@ jobs:
               echo "LEGACY_MEDIA_BASE=https://trbhh.com"
               echo "LEGACY_LOCAL_DIR="
               echo "NEXT_PUBLIC_MEDIA_BASE="
+              echo "REALESTATE_ONLY=1"
             } > .env
             chmod 600 .env
+          fi
+          # بيئة عقارية فقط (beta): نضمن وجود REALESTATE_ONLY=1 حتى في .env المولّد سابقاً
+          if grep -q '^REALESTATE_ONLY=' .env; then
+            sed -i 's|^REALESTATE_ONLY=.*|REALESTATE_ONLY=1|' .env
+          else
+            echo 'REALESTATE_ONLY=1' >> .env
           fi
           # صور الإعلانات القديمة تُجلب من الموقع الحيّ (قراءة فقط) — ملفاتها ليست في التجريب
           if grep -q '^LEGACY_MEDIA_BASE=' .env; then

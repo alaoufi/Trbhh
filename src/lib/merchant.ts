@@ -353,7 +353,16 @@ export async function storeCatalogAds(storeId: number, ownerUserId: number) {
   const ids = new Set(await storeProductAdIds(storeId));
   if (!ids.size) return [];
   const { getMyAds } = await import('./account');
-  return (await getMyAds(ownerUserId)).filter((a) => a.status === 1 && ids.has(a.id));
+  let list = (await getMyAds(ownerUserId)).filter((a) => a.status === 1 && ids.has(a.id));
+  // المنصّة العقارية المستقلّة (beta): حتى منتجات المتاجر لا تظهر إلا العقارية منها
+  if (process.env.REALESTATE_ONLY === '1' && list.length) {
+    const reRows = await prisma.ads
+      .findMany({ where: { id: { in: list.map((a) => BigInt(a.id)) }, is_realestate: 1 }, select: { id: true } })
+      .catch(() => [] as { id: bigint }[]);
+    const reIds = new Set(reRows.map((r) => Number(r.id)));
+    list = list.filter((a) => reIds.has(a.id));
+  }
+  return list;
 }
 
 /** Real view counts (from ads_views) for a set of ad ids → Map(adId → count). */

@@ -52,6 +52,7 @@ type Initial = Partial<{
   oldPrice: number; stockState: number;
   priceType: string | null; rentPeriod: string | null;
   reType: string | null; reArea: number | null; reLicense: string | null;
+  rePlot: string | null; rePlan: string | null; reDeed: string | null;
 }>;
 
 // مدد التأجير المتاحة عند اختيار «سعر تأجير»
@@ -73,7 +74,7 @@ function InfoItem({ icon: Icon, children }: { icon: React.ElementType; children:
 }
 
 export function AdForm({
-  action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, scheduleMaxDays = 30, allowOldPrice, allowStock, urgentOffer, featuredOffer, identity, realestateMsg,
+  action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, scheduleMaxDays = 30, allowOldPrice, allowStock, urgentOffer, featuredOffer, identity, realestateMsg, licenseNo,
 }: {
   action: (fd: FormData) => void | Promise<void>;
   countries: Country[]; cities: City[]; areas?: Area[];
@@ -89,6 +90,8 @@ export function AdForm({
   identity?: { name: string; isStore: boolean };
   /** رسالة إيقاف العقار (من لوحة الإدارة) — تظهر عند محاولة نشر إعلان عقاري أثناء الإيقاف */
   realestateMsg?: string;
+  /** رقم ترخيص العقار للعضو (من حسابه، يُدخل مرّة عند التسجيل) — يُعرض ويُرفق تلقائياً بالعقار */
+  licenseNo?: string;
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه', charity: 'جمع تبرعات أو نشاط جمعية غير مرخّص' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
@@ -196,9 +199,9 @@ export function AdForm({
           🏢 {realestateMsg || 'الإعلانات العقارية موقوفة مؤقتاً لدى المنصّة لاستكمال متطلبات الترخيص النظامية.'}
         </div>
       )}
-      {error === 'relicense' && (
+      {error === 'nolicense' && (
         <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
-          🏢 رقم ترخيص الإعلان العقاري (فال) إلزامي نظاماً — أدخله في «بيانات العقار» قبل نشر العقار.
+          🏢 لا يمكن نشر عقار دون رقم ترخيص عقاري (فال) في حسابك — أضِف رقم ترخيصك من حسابك أولاً.
         </div>
       )}
       {error === 'contact' && (
@@ -321,7 +324,7 @@ export function AdForm({
       <Section icon={Tag} title={isReq ? 'بيانات الطلب' : 'بيانات العرض'}>
         <div>
           <label className={lbl}>{isReq ? 'ماذا تطلب؟' : 'عنوان الإعلان'}</label>
-          <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مثال: مطلوب سيارة للشراء' : 'مثال: سيارة للبيع'} />
+          <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مثال: مطلوب أرض في حي النرجس' : 'مثال: شقة للإيجار في حي الملقا'} />
         </div>
         {isReq ? (
           <div>
@@ -420,11 +423,27 @@ export function AdForm({
             <input name="re_area" type="number" min="0" defaultValue={initial?.reArea || ''} className={field} placeholder="مثال: 250" />
           </label>
         </div>
-        <label className="mt-3 block space-y-1">
-          <span className="text-sm font-bold">رقم ترخيص الإعلان العقاري (فال) <span className="text-red-600">*</span></span>
-          <input name="re_license" required defaultValue={initial?.reLicense || ''} maxLength={60} dir="ltr" className={field} placeholder="مثال: 7200xxxxxx" />
-          <span className="block text-[11px] text-muted-foreground">إلزامي نظاماً (الهيئة العامة للعقار) — يظهر على الإعلان، ولا يُنشر العقار بدونه.</span>
-        </label>
+        {/* بيانات الصك والمخطط والقطعة — تعريف العقار رسمياً */}
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">رقم القطعة</span>
+            <input name="re_plot" defaultValue={initial?.rePlot || ''} maxLength={40} dir="ltr" className={field} placeholder="مثال: 123" />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">رقم المخطط</span>
+            <input name="re_plan" defaultValue={initial?.rePlan || ''} maxLength={60} dir="ltr" className={field} placeholder="مثال: 2456/أ" />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">رقم الصك</span>
+            <input name="re_deed" defaultValue={initial?.reDeed || ''} maxLength={60} dir="ltr" className={field} placeholder="اختياري" />
+          </label>
+        </div>
+        {/* رقم الترخيص من حساب العضو (يُدخل مرّة عند التسجيل) — يُعرض هنا ويُرفق تلقائياً بالعقار */}
+        <div className="mt-3 rounded-lg border-2 border-emerald-300 bg-emerald-50 p-3">
+          <div className="text-[11px] font-bold text-emerald-800">رقم ترخيصك العقاري (فال) — الهيئة العامة للعقار</div>
+          <div className="mt-0.5 font-mono text-base font-extrabold tracking-wide text-emerald-900" dir="ltr">{licenseNo || '—'}</div>
+          <div className="mt-1 text-[11px] text-emerald-700">مسجّل في حسابك ويظهر تلقائياً على كل عقار تنشره — لا حاجة لإدخاله في كل إعلان.</div>
+        </div>
       </Section>
 
       <Section icon={MapPin} title="المكان">

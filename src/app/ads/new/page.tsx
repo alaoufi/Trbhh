@@ -33,7 +33,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   const publishingAsStore = dest === 'store' || (dest !== 'personal' && active?.type === 'store');
   const [countries, cities, areas, user] = await Promise.all([
     getCountries(), getCities(), getAreas(),
-    prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true, phone_whatsapp: true } }),
+    prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true, phone_whatsapp: true, re_license: true } }),
   ]);
   const balance = await import('@/lib/wallet').then((m) => m.getBalance(session.uid)).catch(() => 0);
   const urgentOffer = extras && extras.urgentPacks.length > 0 && !publishingAsStore
@@ -53,6 +53,43 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     const meta = await m.getStoreMeta(sid).catch(() => null);
     return meta && meta.status === 1 ? { id: sid, name: meta.storeName || 'متجري' } : null;
   }).catch(() => null);
+  // بوّابة الترخيص: المنصّة عقارية — لا يُفتح نشر العقار إلا لمن سجّل رقم ترخيصه العقاري (فال).
+  const myLicense = String(user?.re_license || '').trim();
+  if (!myLicense) {
+    const { setMyLicenseAction } = await import('../actions');
+    return (
+      <div className="mx-auto max-w-lg space-y-4 py-4">
+        <h1 className="text-xl font-bold text-primary">إضافة عقار — تسجيل الترخيص</h1>
+        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-extrabold">🏢 نشر العقارات مقصور على المرخّصين نظاماً</p>
+          <p className="mt-1 leading-6">
+            وفق أنظمة الهيئة العامة للعقار، لا يُسمح بعرض العقارات إلا لمن يملك رقم ترخيص عقاري (فال).
+            أدخل رقم ترخيصك مرّة واحدة ليُحفظ في حسابك ويُفتح لك نشر العقارات — ويظهر رقمك تلقائياً على كل عقار تنشره.
+          </p>
+        </div>
+        {error === 'badlicense' && (
+          <div className="rounded-lg border-2 border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800">
+            رقم الترخيص غير صحيح — تأكّد من إدخاله كما هو في رخصتك.
+          </div>
+        )}
+        <form action={setMyLicenseAction} className="card-3d space-y-3 rounded-xl p-5">
+          {dest === 'store' && <input type="hidden" name="dest" value="store" />}
+          <label className="block space-y-1">
+            <span className="text-sm font-bold">رقم الترخيص العقاري (فال)</span>
+            <input name="re_license" required maxLength={60} dir="ltr"
+              className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+              placeholder="مثال: 7200xxxxxx" />
+            <span className="block text-[11px] text-muted-foreground">يُحفظ في حسابك ويُشترط لنشر أي عقار — يظهر للزوّار على كل إعلان.</span>
+          </label>
+          <button className="h-11 w-full rounded-lg bg-primary text-sm font-bold text-white">حفظ الترخيص ومتابعة الإضافة</button>
+        </form>
+        <p className="text-center text-xs text-muted-foreground">
+          لا تملك ترخيصاً عقارياً؟ يمكنك تصفّح العقارات دون إضافة، والتقديم على الترخيص عبر الهيئة العامة للعقار.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">أضف إعلاناً جديداً</h1>
@@ -108,6 +145,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
         submitLabel="نشر الإعلان"
         error={error}
         realestateMsg={realestateMsg}
+        licenseNo={myLicense}
         dupLeft={left}
         dupId={dup}
         needPrice={price}

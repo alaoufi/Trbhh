@@ -23,6 +23,14 @@ export default function RegisterPage() {
             className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
           <input name="password" type="password" minLength={4} placeholder="كلمة المرور (4 خانات على الأقل)"
             className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+          {/* المنصّة عقارية: من يملك ترخيص فال يُدخله مرّة هنا ليُفتح له نشر العقارات (اختياري للتصفّح) */}
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+            <input name="re_license" maxLength={60} dir="ltr" placeholder="رقم الترخيص العقاري (فال) — اختياري"
+              className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+            <p className="mt-1.5 text-[11px] leading-5 text-emerald-800">
+              مطلوب لنشر العقارات فقط (أنظمة الهيئة العامة للعقار). للتصفّح دون إضافة اتركه فارغاً — يمكنك إضافته لاحقاً.
+            </p>
+          </div>
           <label className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
             <input type="checkbox" name="agree" required className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]" />
             <span className="text-foreground/90">

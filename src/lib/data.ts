@@ -597,6 +597,9 @@ async function getAdImpl(id: number) {
     reType: ad.re_type ?? null,
     reArea: ad.re_area ?? null,
     reLicense: ad.re_license ?? null,
+    rePlot: ad.re_plot ?? null,
+    rePlan: ad.re_plan ?? null,
+    reDeed: ad.re_deed ?? null,
     special: ad.adsSpecial === 'checked',
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,
@@ -704,6 +707,9 @@ export async function getAdForEdit(id: number, userId: number) {
     reType: ad.re_type ?? null,
     reArea: ad.re_area ?? null,
     reLicense: ad.re_license ?? null,
+    rePlot: ad.re_plot ?? null,
+    rePlan: ad.re_plan ?? null,
+    reDeed: ad.re_deed ?? null,
   };
 }
 

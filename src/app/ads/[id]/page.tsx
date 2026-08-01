@@ -571,6 +571,14 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           {ad.priceType === 'sale' && <span className="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">للبيع</span>}
           {ad.reArea ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">المساحة: {ad.reArea} م²</span> : null}
         </div>
+        {/* أرقام تعريف العقار الرسمية: القطعة / المخطط / الصك */}
+        {(ad.rePlot || ad.rePlan || ad.reDeed) && (
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            {ad.rePlot && <div className="rounded-lg border border-primary/15 bg-secondary/40 p-2 text-center"><div className="text-[11px] text-muted-foreground">رقم القطعة</div><b dir="ltr">{ad.rePlot}</b></div>}
+            {ad.rePlan && <div className="rounded-lg border border-primary/15 bg-secondary/40 p-2 text-center"><div className="text-[11px] text-muted-foreground">رقم المخطط</div><b dir="ltr">{ad.rePlan}</b></div>}
+            {ad.reDeed && <div className="rounded-lg border border-primary/15 bg-secondary/40 p-2 text-center"><div className="text-[11px] text-muted-foreground">رقم الصك</div><b dir="ltr">{ad.reDeed}</b></div>}
+          </div>
+        )}
         {ad.reLicense && (
           <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2.5 text-sm">
             <span className="font-bold text-emerald-800">رقم ترخيص الإعلان العقاري (فال): </span>
@@ -578,13 +586,20 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           </div>
         )}
         {adLoc && (
-          <iframe
-            title="موقع العقار على الخريطة"
-            className="h-64 w-full rounded-xl border border-primary/20"
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            src={`https://www.openstreetmap.org/export/embed.html?bbox=${adLoc.lng - 0.008}%2C${adLoc.lat - 0.006}%2C${adLoc.lng + 0.008}%2C${adLoc.lat + 0.006}&layer=mapnik&marker=${adLoc.lat}%2C${adLoc.lng}`}
-          />
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-primary">
+              <MapPin className="h-4 w-4" /> موقع العقار على الخريطة
+              {ad.rePlot && <span className="rounded-full bg-secondary px-2 py-0.5">قطعة {ad.rePlot}</span>}
+              {ad.rePlan && <span className="rounded-full bg-secondary px-2 py-0.5">مخطط {ad.rePlan}</span>}
+            </div>
+            <iframe
+              title="موقع العقار على الخريطة"
+              className="h-64 w-full rounded-xl border border-primary/20"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=${adLoc.lng - 0.008}%2C${adLoc.lat - 0.006}%2C${adLoc.lng + 0.008}%2C${adLoc.lat + 0.006}&layer=mapnik&marker=${adLoc.lat}%2C${adLoc.lng}`}
+            />
+          </div>
         )}
       </div>
 
@@ -631,12 +646,12 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <p className="mb-3 text-xs text-muted-foreground">فعّل موقعك لعرض المسافة بينك وبين الإعلان.</p>
           )}
           <a
-            href={`https://www.google.com/maps/search/?api=1&query=${adLoc.lat},${adLoc.lng}`}
+            href={`https://www.openstreetmap.org/?mlat=${adLoc.lat}&mlon=${adLoc.lng}#map=17/${adLoc.lat}/${adLoc.lng}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:bg-primary/90"
           >
-            <Navigation className="h-5 w-5" /> افتح في خرائط قوقل
+            <Navigation className="h-5 w-5" /> افتح الموقع على الخريطة
           </a>
         </div>
       )}

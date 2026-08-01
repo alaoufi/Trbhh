@@ -75,6 +75,9 @@ model ads {
   re_type          String?   @db.VarChar(30)  // نوع العقار: شقة/فيلا/أرض/تجاري…
   re_area          Int?                        // المساحة بالمتر المربع
   re_license       String?   @db.VarChar(60)  // رقم ترخيص الإعلان العقاري (فال)
+  re_plot          String?   @db.VarChar(40)  // رقم القطعة
+  re_plan          String?   @db.VarChar(60)  // رقم المخطط
+  re_deed          String?   @db.VarChar(60)  // رقم الصك
 
   @@index([category_id], map: "ads_category_id_foreign")
   @@index([city_id], map: "ads_city_id_foreign")
@@ -1250,6 +1253,7 @@ model users {
   identity_paid_until       DateTime?  @db.DateTime(0) // اشتراك باقات الهويات — نهاية الاشتراك
   identity_accounts         Int        @default(0) // عدد الهويات الممنوحة بالباقة الحالية
   identity_plan             String?    @db.VarChar(24) // اسم الباقة الحالية
+  re_license                String?    @db.VarChar(60) // رقم ترخيص العقار (فال/الهيئة) — يُدخل مرّة عند التسجيل ويُشترط لإضافة عقار
 }
 
 model store_visits {

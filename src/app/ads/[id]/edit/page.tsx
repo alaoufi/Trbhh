@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { getCountries, getCities, getAreas, getAdForEdit } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
 import { updateAdAction } from '../../actions';
@@ -20,6 +21,9 @@ export default async function EditAdPage({ params, searchParams }: { params: Pro
     import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false),
     import('@/lib/store-extras').then((m) => m.stockEnabled()).catch(() => false),
   ]);
+  // رقم الترخيص العقاري من حساب العضو — يُعرض في النموذج (المصدر الوحيد للترخيص الآن الحساب)
+  const licenseNo = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { re_license: true } })
+    .then((u) => String(u?.re_license || '').trim()).catch(() => '');
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold">تعديل الإعلان</h1>
@@ -33,6 +37,7 @@ export default async function EditAdPage({ params, searchParams }: { params: Pro
         initial={initial}
         submitLabel="حفظ التعديلات"
         error={error}
+        licenseNo={licenseNo}
         gapHours={hours}
       />
     </div>

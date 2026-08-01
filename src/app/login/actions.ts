@@ -37,6 +37,10 @@ export async function registerAction(_prev: unknown, formData: FormData) {
   const phoneLocal = toLocalSaudi(phone); // store canonical 05XXXXXXXX
   if (await userExistsByPhone(phone)) return { error: 'رقم الجوال مسجّل مسبقاً' };
 
+  // المنصّة عقارية: رقم الترخيص العقاري (فال) اختياري عند التسجيل — يُشترط فقط لنشر العقارات
+  const reLicenseRaw = String(formData.get('re_license') || '').trim().slice(0, 60);
+  const reLicense = reLicenseRaw.replace(/[\s-]/g, '').length >= 4 ? reLicenseRaw : null;
+
   // الإحالة: كوكي ref يوضع من رابط الدعوة /r/<id>
   const { cookies } = await import('next/headers');
   const refRaw = (await cookies()).get('trbhh_ref')?.value || '';
@@ -57,6 +61,7 @@ export async function registerAction(_prev: unknown, formData: FormData) {
       forget: 0,
       is_admin: 0,
       ...(refBy > 0 ? { ref_by: refBy } : {}),
+      ...(reLicense ? { re_license: reLicense } : {}),
     },
   });
   // رصيد ترحيبي (إن فُعّل) — لا يعطّل التسجيل بأي حال

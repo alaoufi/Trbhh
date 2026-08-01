@@ -691,6 +691,9 @@ const STATEMENTS: string[] = [
   `ALTER TABLE ads ADD COLUMN re_type VARCHAR(30) NULL`,
   `ALTER TABLE ads ADD COLUMN re_area INT NULL`,
   `ALTER TABLE ads ADD COLUMN re_license VARCHAR(60) NULL`,
+  `ALTER TABLE ads ADD COLUMN re_plot VARCHAR(40) NULL`,
+  `ALTER TABLE ads ADD COLUMN re_plan VARCHAR(60) NULL`,
+  `ALTER TABLE ads ADD COLUMN re_deed VARCHAR(60) NULL`,
   `CREATE INDEX ads_profile_id ON ads (profile_id)`,
   // التعليق/التقييم يحمل هوية كاتبه أيضاً (يُعرض باسمها) — null = هوية افتراضية
   `ALTER TABLE comments ADD COLUMN profile_id BIGINT NULL`,
@@ -708,6 +711,8 @@ const STATEMENTS: string[] = [
   `ALTER TABLE users ADD COLUMN merged_into BIGINT NULL`,
   // توثيق الحساب الرئيسي (تأكيد الجوال برمز) قبل ربط بقية الحسابات — «تم التحقق»
   `ALTER TABLE users ADD COLUMN primary_verified TINYINT NOT NULL DEFAULT 0`,
+  // المنصّة العقارية: رقم ترخيص العقار (فال) يُدخل مرّة عند التسجيل ويُشترط لإضافة عقار
+  `ALTER TABLE users ADD COLUMN re_license VARCHAR(60) NULL`,
 ];
 
 let syncPromise: Promise<void> | null = null;

@@ -407,13 +407,17 @@ export async function createAdAction(formData: FormData) {
   }
   // كشف العقار: يُحسب من نص الإعلان. أثناء إيقاف الإدارة للعقار، يُرفض النشر برسالة
   // واضحة بدل ترك الإعلان يُنشر ثم يُخفى (قاعدة 4: التحقّق قبل الخطوة لا بعدها).
-  // المنصّة العقارية: كل إعلان عقار. رقم ترخيص الإعلان (فال) إلزامي نظاماً — لا يُنشر بدونه.
-  const reLicense = String(formData.get('re_license') || '').trim().slice(0, 60);
+  // المنصّة العقارية: كل إعلان عقار. رقم الترخيص (فال) من حساب العضو — يُدخل مرّة عند التسجيل،
+  // ولا يُفتح النشر إلا لمن يملك ترخيصاً. يُرفق تلقائياً بالعقار ويظهر عليه.
+  const reLicense = String(user?.re_license || '').trim().slice(0, 60);
   const reType = String(formData.get('re_type') || '').trim().slice(0, 30);
   const reAreaN = parseInt(String(formData.get('re_area') || ''), 10);
   const reArea = Number.isFinite(reAreaN) && reAreaN > 0 ? reAreaN : null;
+  const rePlot = String(formData.get('re_plot') || '').trim().slice(0, 40) || null;
+  const rePlan = String(formData.get('re_plan') || '').trim().slice(0, 60) || null;
+  const reDeed = String(formData.get('re_deed') || '').trim().slice(0, 60) || null;
   if (!reLicense) {
-    redirect(`/ads/new?error=relicense${dest === 'store' ? '&dest=store' : ''}`);
+    redirect(`/ads/new?error=nolicense${dest === 'store' ? '&dest=store' : ''}`);
   }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
@@ -447,6 +451,9 @@ export async function createAdAction(formData: FormData) {
       re_type: reType || null,
       re_area: reArea,
       re_license: reLicense,
+      re_plot: rePlot,
+      re_plan: rePlan,
+      re_deed: reDeed,
       bumped_at: new Date(), // ترتيب «الأحدث» يعتمد آخر تحديث (Bump)
       ...(scheduledAt ? { status: 0, publish_at: scheduledAt } : {}),
       created_at: new Date(),
@@ -553,6 +560,9 @@ export async function updateAdAction(formData: FormData) {
   const adId = BigInt(String(formData.get('adId')));
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
+  // رقم الترخيص العقاري من حساب العضو — يُزامن مع العقار (المصدر الوحيد للترخيص الآن الحساب)
+  const editorLicense = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { re_license: true } })
+    .then((u) => String(u?.re_license || '').trim().slice(0, 60)).catch(() => '');
 
   // مدة السماح بالتعديل التي تحددها الإدارة — لا تنطبق على إعلانات المتجر:
   // صاحب المتجر يتحكّم بإعلانات متجره كاملاً ويعدّلها في أي وقت.
@@ -605,7 +615,11 @@ export async function updateAdAction(formData: FormData) {
       is_realestate: 1, // المنصّة العقارية: كل إعلان عقار
       ...(formData.get('re_type') !== null ? { re_type: String(formData.get('re_type') || '').trim().slice(0, 30) || null } : {}),
       ...(formData.get('re_area') !== null ? { re_area: (Number.isFinite(parseInt(String(formData.get('re_area')), 10)) && parseInt(String(formData.get('re_area')), 10) > 0 ? parseInt(String(formData.get('re_area')), 10) : null) } : {}),
-      ...(String(formData.get('re_license') || '').trim() ? { re_license: String(formData.get('re_license')).trim().slice(0, 60) } : {}),
+      // رقم الترخيص من حساب العضو (لا من النموذج) — يُزامن مع العقار عند كل تعديل
+      ...(String(editorLicense || '').trim() ? { re_license: String(editorLicense).trim().slice(0, 60) } : {}),
+      ...(formData.get('re_plot') !== null ? { re_plot: String(formData.get('re_plot') || '').trim().slice(0, 40) || null } : {}),
+      ...(formData.get('re_plan') !== null ? { re_plan: String(formData.get('re_plan') || '').trim().slice(0, 60) || null } : {}),
+      ...(formData.get('re_deed') !== null ? { re_deed: String(formData.get('re_deed') || '').trim().slice(0, 60) || null } : {}),
       price: newPrice,
       adsType: eType,
       price_type: ePriceType,
@@ -661,4 +675,20 @@ export async function updateAdAction(formData: FormData) {
   await bustAdCaches().catch(() => {});
   revalidatePath(`/ads/${toInt(adId)}`);
   redirect(`/ads/${toInt(adId)}`);
+}
+
+/**
+ * تسجيل/تحديث رقم الترخيص العقاري (فال) في حساب العضو — المصدر الوحيد للترخيص الآن.
+ * يُستخدم عند التسجيل وأيضاً لمن سجّل قبل إضافة الترخيص، ليُفتح له نشر العقار.
+ */
+export async function setMyLicenseAction(formData: FormData) {
+  const session = await requireUser();
+  const raw = String(formData.get('re_license') || '').trim().slice(0, 60);
+  // أرقام تراخيص الهيئة أرقام/رموز لاتينية — نتحقق من وجود قيمة معقولة فقط
+  if (raw.replace(/[\s-]/g, '').length < 4) {
+    redirect('/ads/new?error=badlicense');
+  }
+  await prisma.users.update({ where: { id: BigInt(session.uid) }, data: { re_license: raw } }).catch(() => {});
+  const dest = String(formData.get('dest') || '') === 'store' ? '?dest=store' : '';
+  redirect(`/ads/new${dest}`);
 }

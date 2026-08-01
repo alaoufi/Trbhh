@@ -108,7 +108,8 @@ export function AdForm({
   const [mapLink, setMapLink] = useState('');
   const [mapErr, setMapErr] = useState('');
   // المكان اختياري بالكامل: افتراضياً «غير مطلوب» (مطوي) إلا عند تعديل إعلان له مكان محدد مسبقاً
-  const [wantLocation, setWantLocation] = useState<boolean>(!!(initial?.cityId));
+  // المنصّة العقارية: الموقع أساسي — تظهر الخريطة وحقول المكان دائماً افتراضياً
+  const [wantLocation, setWantLocation] = useState<boolean>(true);
 
   function applyMapLink() {
     const ll = parseMapsUrl(mapLink);

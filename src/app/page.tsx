@@ -121,6 +121,18 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
         <span className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white">افتح الخريطة ←</span>
       </Link>
 
+      {/* المساعد العقاري الذكي — تقييم مبدئي وتحليل أسعار واقتراح عقارات */}
+      <Link href="/assistant" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-primary/25 bg-gradient-to-l from-primary/5 to-amber-50 p-4 shadow-sm transition hover:shadow-md">
+        <span className="flex items-center gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary text-white">✨</span>
+          <span>
+            <span className="block text-base font-extrabold text-primary">المساعد العقاري الذكي</span>
+            <span className="block text-xs text-muted-foreground">تقييم مبدئي · تحليل أسعار المناطق · اقتراح عقارات يناسب ميزانيتك</span>
+          </span>
+        </span>
+        <span className="shrink-0 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white">جرّبه ←</span>
+      </Link>
+
       {/* سجّل واحصل على رصيد ترحيبي — للزوار فقط وقابل للإغلاق */}
       {!session && welcomeCredit > 0 && <WelcomeBanner amount={welcomeCredit} />}
 

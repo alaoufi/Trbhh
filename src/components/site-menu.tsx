@@ -170,6 +170,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
             {/* أهم الروابط أولاً */}
             <Item href="/" icon={Home} onClick={close}>الرئيسية</Item>
             <Item href="/map" icon={MapPin} onClick={close}>خريطة العقارات</Item>
+            <Item href="/assistant" icon={Sparkles} onClick={close}>المساعد العقاري الذكي</Item>
             <Item href="/projects" icon={Building2} onClick={close}>المشاريع العقارية</Item>
             <Item href="/companies" icon={Store} onClick={close}>المكاتب العقارية</Item>
             <Item href="/requests" icon={HandCoins} onClick={close}>سوق الطلبات</Item>

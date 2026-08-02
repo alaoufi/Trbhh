@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { getSession, requireUser } from '@/lib/auth';
 import { toInt } from '@/lib/utils';
-import { createViewingRequest, setViewingStatus } from '@/lib/viewings';
+import { createViewingRequest, setViewingStatus, setViewingNote } from '@/lib/viewings';
 
 /** طلب معاينة عقار — متاح للزائر والعضو (صفحة العقار عامّة). يصل الطلب لصاحب العقار. */
 export async function requestViewingAction(formData: FormData) {
@@ -41,5 +41,17 @@ export async function setViewingStatusAction(formData: FormData) {
   const status = Number(formData.get('status'));
   if (id) await setViewingStatus(id, session.uid, status);
   revalidatePath('/account/viewings');
-  redirect('/account/viewings');
+  const back = String(formData.get('back') || '').trim();
+  redirect(back.startsWith('/account/viewings') ? back : '/account/viewings');
+}
+
+/** صاحب العقار يحفظ ملاحظة CRM خاصة على الصفقة. */
+export async function setViewingNoteAction(formData: FormData) {
+  const session = await requireUser();
+  const id = Number(formData.get('id')) || 0;
+  const note = String(formData.get('note') || '').trim();
+  if (id) await setViewingNote(id, session.uid, note);
+  revalidatePath('/account/viewings');
+  const back = String(formData.get('back') || '').trim();
+  redirect(back.startsWith('/account/viewings') ? back : '/account/viewings');
 }

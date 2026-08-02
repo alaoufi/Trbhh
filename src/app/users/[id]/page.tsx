@@ -50,6 +50,8 @@ export default async function UserProfilePage({ params, searchParams }: { params
     await markSeen(uid, 'reviews').catch(() => {});
   }
   const active = myAds.filter((a) => a.status === 1);
+  // عدد الصفقات المكتملة — يظهر في بطاقة الوسيط المرخّص فقط
+  const dealsDone = user.re_license ? await import('@/lib/viewings').then((m) => m.dealsCount(uid)).catch(() => 0) : 0;
   // مجموع مشاهدات إعلانات العضو المعروضة في تربح
   const viewsSum = active.length
     ? await prisma.ads_views.count({ where: { ads_id: { in: active.map((a) => BigInt(a.id)) } } }).catch(() => 0)
@@ -119,8 +121,9 @@ export default async function UserProfilePage({ params, searchParams }: { params
               <div className="text-sm font-extrabold text-emerald-900">🏢 وسيط عقاري مرخّص — رخصة فال</div>
               <div className="font-mono text-sm font-extrabold text-emerald-900" dir="ltr">{user.re_license}</div>
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs">
+            <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
               <div className="rounded-lg bg-white/70 p-2"><div className="text-base font-extrabold text-emerald-800">{en(active.length)}</div><div className="text-[11px] text-emerald-700">عقار مسوّق</div></div>
+              <div className="rounded-lg bg-white/70 p-2"><div className="text-base font-extrabold text-emerald-800">{en(dealsDone)}</div><div className="text-[11px] text-emerald-700">صفقة مكتملة</div></div>
               <div className="rounded-lg bg-white/70 p-2"><div className="text-base font-extrabold text-emerald-800">{rating.avg} <span className="text-[11px] font-normal">({en(rating.count)})</span></div><div className="text-[11px] text-emerald-700">تقييم العملاء</div></div>
             </div>
             <div className="mt-1.5 text-[11px] text-emerald-700">مرخّص من الهيئة العامة للعقار — رقم الترخيص يظهر على كل عقاراته.</div>

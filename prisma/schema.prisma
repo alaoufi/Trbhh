@@ -1313,7 +1313,9 @@ model viewing_requests {
   phone      String    @db.VarChar(30)
   preferred  String?   @db.VarChar(60)  // الوقت المفضّل (نص حر)
   message    String?   @db.VarChar(500)
-  status     Int       @default(0) @db.TinyInt // 0 جديد · 1 تم التواصل · 2 تمّت المعاينة · 3 مغلق
+  status     Int       @default(0) @db.TinyInt // مراحل الصفقة: 0 طلب·1 تواصل·2 معاينة·3 تفاوض·4 اتفاق·5 مكتملة·6 ملغى
+  note       String?   @db.VarChar(500)  // ملاحظة الوسيط الخاصة (CRM)
+  updated_at DateTime? @db.Timestamp(0)  // آخر تحديث للمرحلة
   created_at DateTime? @default(now()) @db.Timestamp(0)
 
   @@index([owner_id, status], map: "vreq_owner")

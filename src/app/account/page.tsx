@@ -154,7 +154,7 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
       </Link>
       <Link href="/account/viewings" className="flex items-center gap-3 card-3d rounded-xl border-2 border-primary/25 bg-primary/5 p-4 hover:border-primary">
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-primary/15 text-primary"><CalendarClock className="h-5 w-5" /></span>
-        <div className="flex-1"><div className="font-bold">طلبات المعاينة</div><div className="text-xs text-muted-foreground">طلبات المهتمّين لمعاينة عقاراتك — تواصل ورتّب المواعيد</div></div>
+        <div className="flex-1"><div className="font-bold">متابعة الصفقات (CRM)</div><div className="text-xs text-muted-foreground">طلبات المعاينة ومسار الصفقة من التواصل حتى الإتمام</div></div>
         {newViewings > 0 && <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">{en(newViewings)}</span>}
       </Link>
       <Link href="/account/analytics" className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">

@@ -744,6 +744,9 @@ const STATEMENTS: string[] = [
     INDEX vreq_owner (owner_id, status),
     INDEX vreq_ad (ad_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // CRM: ملاحظة الوسيط الخاصة + وقت آخر تحديث للمرحلة
+  `ALTER TABLE viewing_requests ADD COLUMN note VARCHAR(500) NULL`,
+  `ALTER TABLE viewing_requests ADD COLUMN updated_at TIMESTAMP NULL`,
 ];
 
 let syncPromise: Promise<void> | null = null;

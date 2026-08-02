@@ -386,16 +386,44 @@ export async function getDealAds(take = 60) {
   });
 }
 
+export type RealEstateFilters = {
+  type?: string;                 // نوع العقار (re_type)
+  purpose?: 'rent' | 'sale';     // الغرض (price_type)
+  cityId?: number;               // المدينة
+  priceMin?: number; priceMax?: number;
+  areaMin?: number; areaMax?: number;
+  beds?: number;                 // أقل عدد غرف
+};
+
+/** يبني شرط تصفية العقار المشترك (للخريطة والقوائم) من الفلاتر. */
+export function realEstateFilterWhere(f: RealEstateFilters) {
+  const priceRange = (f.priceMin || f.priceMax)
+    ? { price: { ...(f.priceMin ? { gte: f.priceMin } : {}), ...(f.priceMax ? { lte: f.priceMax } : {}) } }
+    : {};
+  const areaRange = (f.areaMin || f.areaMax)
+    ? { re_area: { ...(f.areaMin ? { gte: f.areaMin } : {}), ...(f.areaMax ? { lte: f.areaMax } : {}) } }
+    : {};
+  return {
+    ...(f.type ? { re_type: f.type } : {}),
+    ...(f.purpose ? { price_type: f.purpose } : {}),
+    ...(f.cityId ? { city_id: BigInt(f.cityId) } : {}),
+    ...(f.beds ? { re_beds: { gte: f.beds } } : {}),
+    ...priceRange,
+    ...areaRange,
+  };
+}
+
 /**
  * عقارات لها موقع (lat/lng) — لخريطة التصفّح (المنصّة العقارية). ترجع نقاطاً خفيفة فقط.
  */
-export async function getMapAds(take = 500) {
-  return cached(`ads:map:${take}`, 60, async () => {
+export async function getMapAds(filters: RealEstateFilters = {}, take = 500) {
+  return cached(`ads:map:${take}:${JSON.stringify(filters)}`, 60, async () => {
     const rows = await prisma.ads.findMany({
       where: {
         ...(await activeAdWhere()),
         lat: { not: null },
         lng: { not: null },
+        ...realEstateFilterWhere(filters),
       },
       orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
       take,
@@ -516,9 +544,15 @@ type SearchParamsT = {
   special?: boolean;
   take?: number;
   skip?: number;
+  // فلاتر عقارية
+  reType?: string;
+  purpose?: 'rent' | 'sale';
+  priceMin?: number; priceMax?: number;
+  areaMin?: number; areaMax?: number;
+  beds?: number;
 };
 
-async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special }: SearchParamsT) {
+async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special, reType, purpose, priceMin, priceMax, areaMin, areaMax, beds }: SearchParamsT) {
   // بحث ذكي: تُقسَّم العبارة كلمات، وكل كلمة تُطابق العنوان أو التفاصيل بأي ترتيب،
   // مع توحيد أشكال الألف (أ إ آ ← ا) والتاء المربوطة (ة/ه) والياء (ى/ي)
   const norm = (w: string) => w.replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه');
@@ -538,6 +572,7 @@ async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type
     ...(areaId ? { area_id: areaId } : {}),
     ...(type ? { adsType: type } : {}),
     ...(special ? { adsSpecial: 'checked' as const } : {}),
+    ...realEstateFilterWhere({ type: reType, purpose, priceMin, priceMax, areaMin, areaMax, beds }),
     is_realestate: 1, // منصّة عقارية: البحث في العقار فقط
   };
 }

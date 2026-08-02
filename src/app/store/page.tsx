@@ -102,8 +102,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
     <div className="space-y-4">
       {!store && !staffStore && (
         <div className="card-3d rounded-xl p-4">
-          <h1 className="text-lg font-extrabold text-primary">افتح متجرك المستقل</h1>
-          <p className="mt-1 text-sm text-muted-foreground">صمّم متجرك، اختر معرّفه (رابطه المستقل)، وابدأ عرض إعلاناتك. يخضع المتجر لموافقة إدارة المتاجر قبل الظهور.</p>
+          <h1 className="text-lg font-extrabold text-primary">افتح مكتبك العقاري المستقل</h1>
+          <p className="mt-1 text-sm text-muted-foreground">صمّم مكتبك العقاري، اختر معرّفه (رابطه المستقل)، واعرض عقاراتك. يشترط رقم ترخيص عقاري (فال) في حسابك، ويخضع المكتب لموافقة الإدارة قبل الظهور.</p>
         </div>
       )}
 
@@ -177,6 +177,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
       {error === 'terms' && (
         <div className="card-3d rounded-xl border-2 border-destructive/40 p-3 text-sm font-bold text-destructive">
           يجب الموافقة على شروط المتجر وتحمّل مسؤولية الإعلانات قبل فتح المتجر.
+        </div>
+      )}
+      {error === 'nolicense' && (
+        <div className="card-3d rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
+          🏢 فتح مكتب عقاري مقصور على المرخّصين نظاماً (الهيئة العامة للعقار). أضِف رقم ترخيصك العقاري (فال) في حسابك أولاً — يمكنك إضافته من صفحة <Link href="/ads/new" className="underline">«أضف عقار»</Link> ثم عُد لفتح مكتبك.
         </div>
       )}
       {error === 'badname' && (

@@ -138,6 +138,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
       {sp.perror === 'nophone' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">لا يوجد رقم جوال في حسابك الرئيسي — أضِفه من الملف الشخصي أولاً.</div>}
       {sp.perror === 'otp' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر إرسال الرمز{sp.omsg ? `: ${sp.omsg}` : ''}.</div>}
       {sp.storerr === 'terms' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">يلزم الموافقة على شروط المتجر لفتح متجر جديد.</div>}
+      {sp.storerr === 'nolicense' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">🏢 فتح مكتب عقاري مقصور على المرخّصين — أضِف رقم ترخيصك العقاري (فال) في حسابك أولاً من صفحة «أضف عقار».</div>}
       {sp.storerr === 'limit' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">بلغت الحد الأقصى لعدد المتاجر{sp.max ? ` (${sp.max})` : ''} — راجع الإدارة لرفع الحد.</div>}
       {sp.storerr === 'badname' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">اسم المتجر يحوي كلمة غير مسموحة — اختر اسماً آخر.</div>}
       {sp.storerr === 'namedup' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">يوجد متجر باسم مشابه{sp.othername ? ` «${sp.othername}»` : ''} — اختر اسماً مميّزاً.</div>}

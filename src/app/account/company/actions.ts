@@ -9,6 +9,14 @@ import { toInt } from '@/lib/utils';
 import { scanContent } from '@/lib/content-guard';
 import { handleProhibited } from '@/lib/moderation';
 
+/** رقم ترخيص العقار (فال) من حساب العضو — يُشترط لفتح مكتب عقاري (كما لإضافة عقار). */
+async function userLicense(uid: number): Promise<string> {
+  return prisma.users
+    .findUnique({ where: { id: BigInt(uid) }, select: { re_license: true } })
+    .then((u) => String(u?.re_license || '').trim())
+    .catch(() => '');
+}
+
 /** شرط اختيار «متجري» = المتجر الفعّال (تعدّد المتاجر)، وإلا أول متجر (توافق). */
 async function myStoreWhereFor(uid: number): Promise<{ id?: bigint; user_id: number }> {
   const { getActiveStoreId } = await import('@/lib/merchant');
@@ -182,6 +190,8 @@ export async function saveCompanyAction(formData: FormData) {
   } else {
     // فتح متجر جديد يتطلب الموافقة على شروط المتجر وتحمّل مسؤولية المنتجات
     if (!agreeTerms) redirect('/store?error=terms');
+    // مكتب عقاري: لا يُفتح إلا لمن يملك ترخيص العقار (فال) في حسابه — كإضافة العقار
+    if (!(await userLicense(session.uid))) redirect('/store?error=nolicense');
     // status: 0 صراحةً هنا — العمود الافتراضي في القاعدة 1 (نشِط)، والاعتماد فقط
     // على استدعاء markStorePending التالي (وهو .catch صامت) قد يترك متجراً
     // معتمَداً وظاهراً للعامة تلقائياً لو فشل ذلك الاستدعاء لأي خلل عابر.
@@ -208,6 +218,8 @@ export async function saveCompanyAction(formData: FormData) {
 export async function createNewStoreAction(formData: FormData) {
   const session = await requireUser();
   if (!formData.get('agreeTerms')) redirect('/account/profiles?storerr=terms#stores');
+  // مكتب عقاري: لا يُفتح إلا لمن يملك ترخيص العقار (فال) في حسابه
+  if (!(await userLicense(session.uid))) redirect('/account/profiles?storerr=nolicense#stores');
   const { storeCountOfUser } = await import('@/lib/merchant');
   const { getSettingNum, getStoreSubPricing } = await import('@/lib/settings');
   const [count, max] = await Promise.all([storeCountOfUser(session.uid), getSettingNum('max_stores', 3)]);

@@ -7,7 +7,7 @@ import { getEmptyText } from '@/lib/settings';
 import { Breadcrumb } from '@/components/breadcrumb';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'المتاجر' };
+export const metadata = { title: 'المكاتب العقارية' };
 
 export default async function CompaniesPage() {
   const [all, approved] = await Promise.all([getStores(), approvedStoreIds()]);
@@ -15,12 +15,12 @@ export default async function CompaniesPage() {
   const emptyStores = await getEmptyText('stores').catch(() => 'لا توجد متاجر معتمدة بعد.');
   return (
     <div className="space-y-4">
-      <Breadcrumb items={[{ label: 'المتاجر' }]} />
+      <Breadcrumb items={[{ label: 'المكاتب العقارية' }]} />
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold">المتاجر</h1></div>
-        <Link href="/account/company" className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white">افتح متجرك</Link>
+        <div className="flex items-center gap-2"><Store className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold">المكاتب العقارية</h1></div>
+        <Link href="/account/company" className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white">افتح مكتبك العقاري</Link>
       </div>
-      {stores.length === 0 && <p className="py-8 text-center text-muted-foreground">{emptyStores} <Link href="/account/company" className="text-primary hover:underline">افتح متجرك الآن</Link></p>}
+      {stores.length === 0 && <p className="py-8 text-center text-muted-foreground">{emptyStores} <Link href="/account/company" className="text-primary hover:underline">افتح مكتبك العقاري الآن</Link></p>}
       {/* شبكة مضغوطة متقاربة بارتفاع قليل */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {stores.map((s) => (

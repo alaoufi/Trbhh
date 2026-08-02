@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, LayoutTemplate, Wallet, Users, User, Store, Shield, CalendarClock } from 'lucide-react';
+import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, LayoutTemplate, Wallet, Users, User, Store, Shield, CalendarClock, Building2 } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyStats, getMyIdentityAdCount, getMyIdentityFavCount } from '@/lib/account';
 import { getBalance } from '@/lib/wallet';
@@ -156,6 +156,10 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-primary/15 text-primary"><CalendarClock className="h-5 w-5" /></span>
         <div className="flex-1"><div className="font-bold">متابعة الصفقات (CRM)</div><div className="text-xs text-muted-foreground">طلبات المعاينة ومسار الصفقة من التواصل حتى الإتمام</div></div>
         {newViewings > 0 && <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">{en(newViewings)}</span>}
+      </Link>
+      <Link href="/account/projects" className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
+        <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><Building2 className="h-5 w-5" /></span>
+        <div><div className="font-bold">مشاريعي العقارية</div><div className="text-xs text-muted-foreground">أضِف وأدِر مشاريعك (للمطوّرين المرخّصين)</div></div>
       </Link>
       <Link href="/account/analytics" className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><BarChart3 className="h-5 w-5" /></span>

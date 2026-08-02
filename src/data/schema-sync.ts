@@ -747,6 +747,28 @@ const STATEMENTS: string[] = [
   // CRM: ملاحظة الوسيط الخاصة + وقت آخر تحديث للمرحلة
   `ALTER TABLE viewing_requests ADD COLUMN note VARCHAR(500) NULL`,
   `ALTER TABLE viewing_requests ADD COLUMN updated_at TIMESTAMP NULL`,
+  /* مشاريع المطوّرين العقاريين */
+  `CREATE TABLE IF NOT EXISTS re_projects (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    developer_id BIGINT UNSIGNED NOT NULL,
+    name VARCHAR(160) NOT NULL,
+    city_id BIGINT UNSIGNED NULL,
+    district VARCHAR(120) NULL,
+    ptype VARCHAR(30) NULL,
+    description TEXT NULL,
+    units INT NULL,
+    price_from INT NULL,
+    delivery VARCHAR(40) NULL,
+    cover INT NULL,
+    lat VARCHAR(32) NULL,
+    lng VARCHAR(32) NULL,
+    re_license VARCHAR(60) NULL,
+    status TINYINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX reproj_status (status),
+    INDEX reproj_dev (developer_id),
+    INDEX reproj_city (city_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 let syncPromise: Promise<void> | null = null;

@@ -169,9 +169,11 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
             )}
             {/* أهم الروابط أولاً */}
             <Item href="/" icon={Home} onClick={close}>الرئيسية</Item>
-            <Item href="/companies" icon={Store} onClick={close}>المتاجر</Item>
+            <Item href="/map" icon={MapPin} onClick={close}>خريطة العقارات</Item>
+            <Item href="/projects" icon={Building2} onClick={close}>المشاريع العقارية</Item>
+            <Item href="/companies" icon={Store} onClick={close}>المكاتب العقارية</Item>
             <Item href="/requests" icon={HandCoins} onClick={close}>سوق الطلبات</Item>
-            <Item href="/compare" icon={Scale} onClick={close}>مقارنة الإعلانات</Item>
+            <Item href="/compare" icon={Scale} onClick={close}>مقارنة العقارات</Item>
             {isAuthed && (
               <Link href="/account/profiles" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg border-2 border-violet-400/40 bg-violet-500/15 px-3 py-3 text-[15px] font-extrabold text-violet-700 hover:bg-violet-500/25">
                 <Users className="h-5 w-5 shrink-0" /> <span>الحسابات الموحدة</span>

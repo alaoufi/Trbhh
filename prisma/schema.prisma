@@ -1303,6 +1303,30 @@ model store_backups {
   @@index([created_at], map: "store_backups_created")
 }
 
+/// مشاريع المطوّرين العقاريين — نوع محتوى مستقل (مجمّعات/مخططات/أبراج)
+model re_projects {
+  id           BigInt    @id @default(autoincrement())
+  developer_id BigInt    @db.UnsignedBigInt // حساب المطوّر (صاحب المشروع)
+  name         String    @db.VarChar(160)
+  city_id      BigInt?   @db.UnsignedBigInt
+  district     String?   @db.VarChar(120) // الحي
+  ptype        String?   @db.VarChar(30)  // نوع المشروع: سكني/تجاري/مختلط…
+  description  String?   @db.Text
+  units        Int?                        // عدد الوحدات
+  price_from   Int?                        // يبدأ السعر من
+  delivery     String?   @db.VarChar(40)  // موعد التسليم (نص حر)
+  cover        Int?                        // uploads.id لصورة الغلاف
+  lat          String?   @db.VarChar(32)
+  lng          String?   @db.VarChar(32)
+  re_license   String?   @db.VarChar(60)  // رقم ترخيص المطوّر (فال/وافي)
+  status       Int       @default(0) @db.TinyInt // 0 بانتظار الاعتماد · 1 معتمد · 2 موقوف
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([status], map: "reproj_status")
+  @@index([developer_id], map: "reproj_dev")
+  @@index([city_id], map: "reproj_city")
+}
+
 /// طلبات معاينة العقار — تربط المهتمّ بصاحب العقار/الوسيط (جوهر الوساطة العقارية)
 model viewing_requests {
   id         BigInt    @id @default(autoincrement())

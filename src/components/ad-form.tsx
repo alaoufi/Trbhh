@@ -329,10 +329,11 @@ export function AdForm({
       )}
 
       <input type="hidden" name="adsType" value={adsType} />
-      <div className="grid grid-cols-2 gap-2">
-        {([{ v: 'offer', l: 'عرض', cls: 'border-primary bg-primary text-white' }, { v: 'request', l: 'طلب', cls: 'border-amber-500 bg-amber-500 text-white' }] as const).map((t) => (
+      {/* مبدّل عرض/طلب — شرائطي أنيق متّسق مع مبدّل السعر */}
+      <div className="flex rounded-xl border-2 border-primary/20 bg-primary/5 p-1">
+        {([{ v: 'offer', l: 'عرض عقار', cls: 'bg-primary text-white shadow-sm' }, { v: 'request', l: 'طلب عقار', cls: 'bg-amber-500 text-white shadow-sm' }] as const).map((t) => (
           <button type="button" key={t.v} onClick={() => setAdsType(t.v)}
-            className={`rounded-lg border-2 p-2.5 text-sm font-extrabold transition ${adsType === t.v ? t.cls : 'border-primary/25 bg-white text-foreground'}`}>
+            className={`flex-1 rounded-lg px-2 py-2 text-sm font-extrabold transition ${adsType === t.v ? t.cls : 'text-foreground/70 hover:text-primary'}`}>
             {t.l}
           </button>
         ))}
@@ -364,11 +365,11 @@ export function AdForm({
           <div className="space-y-2">
             <label className={lbl}>السعر</label>
             <input type="hidden" name="priceType" value={priceMode} />
-            {/* اختيار نوع السعر — والحقول تظهر حسب الاختيار */}
-            <div className="grid grid-cols-3 gap-2">
-              {([['rent', '🔑 سعر تأجير'], ['sale', '💰 سعر بيع'], ['som', '🤝 على السوم']] as const).map(([k, l]) => (
+            {/* اختيار نوع السعر — مبدّل شرائطي أنيق (segmented) والحقول تظهر حسب الاختيار */}
+            <div className="flex rounded-xl border-2 border-primary/20 bg-primary/5 p-1">
+              {([['rent', '🔑 تأجير'], ['sale', '💰 بيع'], ['som', '🤝 على السوم']] as const).map(([k, l]) => (
                 <button key={k} type="button" onClick={() => setPriceMode(k)}
-                  className={`rounded-lg border-2 px-2 py-2.5 text-sm font-bold transition ${priceMode === k ? 'border-primary bg-primary text-white shadow' : 'border-primary/25 bg-white text-foreground/80 hover:border-primary/50'}`}>
+                  className={`flex-1 rounded-lg px-2 py-2 text-sm font-bold transition ${priceMode === k ? 'bg-primary text-white shadow-sm' : 'text-foreground/70 hover:text-primary'}`}>
                   {l}
                 </button>
               ))}

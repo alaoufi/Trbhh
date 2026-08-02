@@ -729,6 +729,21 @@ const STATEMENTS: string[] = [
   `ALTER TABLE users ADD COLUMN primary_verified TINYINT NOT NULL DEFAULT 0`,
   // المنصّة العقارية: رقم ترخيص العقار (فال) يُدخل مرّة عند التسجيل ويُشترط لإضافة عقار
   `ALTER TABLE users ADD COLUMN re_license VARCHAR(60) NULL`,
+  /* طلبات معاينة العقار — تربط المهتمّ بصاحب العقار/الوسيط (جوهر الوساطة) */
+  `CREATE TABLE IF NOT EXISTS viewing_requests (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    ad_id BIGINT UNSIGNED NOT NULL,
+    owner_id BIGINT UNSIGNED NOT NULL,
+    user_id BIGINT UNSIGNED NULL,
+    name VARCHAR(120) NOT NULL,
+    phone VARCHAR(30) NOT NULL,
+    preferred VARCHAR(60) NULL,
+    message VARCHAR(500) NULL,
+    status TINYINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX vreq_owner (owner_id, status),
+    INDEX vreq_ad (ad_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 let syncPromise: Promise<void> | null = null;

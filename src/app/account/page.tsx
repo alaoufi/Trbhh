@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, LayoutTemplate, Wallet, Users, User, Store, Shield } from 'lucide-react';
+import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, LayoutTemplate, Wallet, Users, User, Store, Shield, CalendarClock } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyStats, getMyIdentityAdCount, getMyIdentityFavCount } from '@/lib/account';
 import { getBalance } from '@/lib/wallet';
@@ -33,11 +33,12 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
   ]);
   const welcomeText = fillTemplate(welcomeTpl, { name: session.name });
   // اكتشاف خدمات هذا الحساب — بالتوازي (بدل جولات متتابعة)
-  const [refReward, myStoreId, isAdmin, linkedCount] = await Promise.all([
+  const [refReward, myStoreId, isAdmin, linkedCount, newViewings] = await Promise.all([
     refOn ? getReferralReward() : Promise.resolve(0),
     import('@/lib/merchant').then((m) => m.storeIdOfUser(session.uid)).catch(() => 0),
     import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false),
     import('@/lib/account-links').then((m) => m.linkedAccounts(session.uid)).then((a) => a.length).catch(() => 0),
+    import('@/lib/viewings').then((m) => m.countNewViewings(session.uid)).catch(() => 0),
   ]);
   const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
   const cards = [
@@ -50,6 +51,7 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
   if (alerts.messages > 0) notices.push({ href: '/messages', icon: Mail, text: `لديك ${en(alerts.messages)} رسالة جديدة غير مقروءة` });
   if (alerts.reviews > 0) notices.push({ href: `/users/${session.uid}`, icon: Star, text: `لديك ${en(alerts.reviews)} تقييم جديد` });
   if (alerts.reports > 0) notices.push({ href: '/account/reports', icon: Flag, text: `يوجد ${en(alerts.reports)} بلاغ جديد على إعلاناتك (المُبلِّغ سرّي لدى الإدارة)` });
+  if (newViewings > 0) notices.push({ href: '/account/viewings', icon: CalendarClock, text: `لديك ${en(newViewings)} طلب معاينة جديد على عقاراتك` });
   return (
     <div className="space-y-4">
       {sp.switched === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم التبديل — أنت الآن في حساب «{session.name}».</div>}
@@ -149,6 +151,11 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-emerald-100 text-emerald-700"><Wallet className="h-5 w-5" /></span>
         <div className="flex-1"><div className="font-bold text-emerald-800">شحن رصيدك</div><div className="text-xs text-muted-foreground">أرسل المبلغ وأرفق الإيصال — يُضاف لرصيدك بعد تأكيد الإدارة</div></div>
         <div className="text-left"><div className="text-lg font-extrabold text-emerald-700">{en(balance)}</div><div className="text-[11px] text-muted-foreground">رصيدك (ر.س)</div></div>
+      </Link>
+      <Link href="/account/viewings" className="flex items-center gap-3 card-3d rounded-xl border-2 border-primary/25 bg-primary/5 p-4 hover:border-primary">
+        <span className="grid h-11 w-11 place-items-center rounded-lg bg-primary/15 text-primary"><CalendarClock className="h-5 w-5" /></span>
+        <div className="flex-1"><div className="font-bold">طلبات المعاينة</div><div className="text-xs text-muted-foreground">طلبات المهتمّين لمعاينة عقاراتك — تواصل ورتّب المواعيد</div></div>
+        {newViewings > 0 && <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">{en(newViewings)}</span>}
       </Link>
       <Link href="/account/analytics" className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
         <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><BarChart3 className="h-5 w-5" /></span>

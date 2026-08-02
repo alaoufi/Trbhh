@@ -26,6 +26,7 @@ import { getAdAddons } from '@/lib/ad-addons';
 import { AdAddonsBox } from '@/components/ad-addons-box';
 import { ExpandableDetail } from '@/components/expandable-detail';
 import { TrackedContact } from '@/components/ad-contact-track';
+import { ViewingRequestCard } from '@/components/viewing-request';
 import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
 import { getAdRating, getAdReviews, canReviewAd, myAdReview, adReviewsEnabled, getSellerCredibility } from '@/lib/ad-reviews';
@@ -95,7 +96,7 @@ function fmtAdminMsgDate(iso: string | null) {
   return isNaN(d.getTime()) ? '' : `— ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d)}`;
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string; adshow?: string; dupid?: string; price?: string; rated?: string; rerror?: string; banerr?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string; adshow?: string; dupid?: string; price?: string; rated?: string; rerror?: string; banerr?: string; vreq?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -705,6 +706,16 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           )
         )}
       </div>
+
+      {/* طلب معاينة العقار — يربط المهتمّ بالوسيط/المالك (لا يظهر لصاحب العقار) */}
+      {!isAdOwner && (
+        <ViewingRequestCard
+          adId={ad.id}
+          defaultName={session?.name || ''}
+          done={spx.vreq === 'ok'}
+          error={spx.vreq === 'missing'}
+        />
+      )}
 
       {/* تنويه يظهر في تفاصيل الإعلان فقط */}
       {adNotice && (

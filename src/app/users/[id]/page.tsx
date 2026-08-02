@@ -80,6 +80,7 @@ export default async function UserProfilePage({ params, searchParams }: { params
             <div className="flex items-center gap-1 text-lg font-bold">
               {user.name || user.userName || 'مستخدم'}
               {user.trusted === 1 && <BadgeCheck className="h-5 w-5 text-primary" />}
+              {user.re_license && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">🏢 وسيط مرخّص</span>}
             </div>
             <div className="text-sm text-muted-foreground">عضو منذ {timeAgo(user.created_at)} · {active.length} إعلان نشط</div>
             {rating.count > 0 && (
@@ -110,6 +111,21 @@ export default async function UserProfilePage({ params, searchParams }: { params
             <div className="text-[11px] text-muted-foreground">تقييم ({en(rating.count)})</div>
           </div>
         </div>
+
+        {/* بطاقة الوسيط العقاري المرخّص (فال) — الوساطة العقارية */}
+        {user.re_license && (
+          <div className="mt-3 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-extrabold text-emerald-900">🏢 وسيط عقاري مرخّص — رخصة فال</div>
+              <div className="font-mono text-sm font-extrabold text-emerald-900" dir="ltr">{user.re_license}</div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs">
+              <div className="rounded-lg bg-white/70 p-2"><div className="text-base font-extrabold text-emerald-800">{en(active.length)}</div><div className="text-[11px] text-emerald-700">عقار مسوّق</div></div>
+              <div className="rounded-lg bg-white/70 p-2"><div className="text-base font-extrabold text-emerald-800">{rating.avg} <span className="text-[11px] font-normal">({en(rating.count)})</span></div><div className="text-[11px] text-emerald-700">تقييم العملاء</div></div>
+            </div>
+            <div className="mt-1.5 text-[11px] text-emerald-700">مرخّص من الهيئة العامة للعقار — رقم الترخيص يظهر على كل عقاراته.</div>
+          </div>
+        )}
 
         {/* أزرار سطر واحد بالأيقونات: مراسلة، واتساب، اتصال، مشاركة */}
         <div className="mt-3 flex gap-2">

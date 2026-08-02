@@ -46,7 +46,7 @@ function Section({ icon: Icon, title, hint, children }: { icon: React.ElementTyp
         <Icon className="h-5 w-5 text-primary" />
         <h3 className="text-sm font-extrabold text-primary">{title}</h3>
       </div>
-      <div className="space-y-3 p-4">
+      <div className="space-y-2.5 p-3.5">
         {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
         {children}
       </div>
@@ -200,11 +200,11 @@ export function AdForm({
     setVidErr(''); setVidName(f.name);
   }
 
-  const field = 'h-11 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40';
-  const lbl = 'mb-1 block text-sm font-bold text-foreground';
+  const field = 'h-10 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40';
+  const lbl = 'mb-1 block text-[13px] font-bold text-foreground';
 
   return (
-    <form action={action} ref={formRef} className="max-w-2xl space-y-4">
+    <form action={action} ref={formRef} className="max-w-2xl space-y-3">
       <SubmitOverlay label="جارٍ رفع الإعلان…" />
       {initial?.id && <input type="hidden" name="adId" value={initial.id} />}
       {dest && <input type="hidden" name="dest" value={dest} />}
@@ -342,16 +342,18 @@ export function AdForm({
       </div>
 
       <Section icon={Building2} title={isReq ? 'بيانات العقار المطلوب' : 'بيانات العقار'}>
-        <div>
-          <label className={lbl}>نوع العقار</label>
-          <select name="re_type" value={reType} onChange={(e) => setReType(e.target.value)} className={field}>
-            <option value="">— اختر نوع العقار —</option>
-            {RE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={lbl}>{isReq ? 'عنوان العقار المطلوب' : 'عنوان العقار'}</label>
-          <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مثال: مطلوب أرض في حي النرجس' : 'مثال: شقة للإيجار في حي الملقا'} />
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          <div>
+            <label className={lbl}>نوع العقار</label>
+            <select name="re_type" value={reType} onChange={(e) => setReType(e.target.value)} className={field}>
+              <option value="">— اختر نوع العقار —</option>
+              {RE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className={lbl}>{isReq ? 'عنوان العقار المطلوب' : 'عنوان العقار'}</label>
+            <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مطلوب أرض في حي النرجس' : 'شقة للإيجار في حي الملقا'} />
+          </div>
         </div>
         {isReq ? (
           <div>
@@ -414,25 +416,25 @@ export function AdForm({
           </p>
         )}
         {reType && (
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
             {/* المساحة — لكل الأنواع */}
-            <label className="block space-y-1">
-              <span className="text-sm font-bold">{reKind === 'land' ? 'مساحة الأرض (م²)' : 'المساحة (م²)'}</span>
+            <label className="block space-y-0.5">
+              <span className="text-[13px] font-bold">{reKind === 'land' ? 'مساحة الأرض (م²)' : 'المساحة (م²)'}</span>
               <input name="re_area" type="number" min="0" defaultValue={initial?.reArea ?? ''} className={field} placeholder="مثال: 250" />
             </label>
 
             {/* أرض: نوعية الأرض + عدد الشوارع */}
             {reKind === 'land' && (
               <>
-                <label className="block space-y-1">
-                  <span className="text-sm font-bold">نوعية الأرض</span>
+                <label className="block space-y-0.5">
+                  <span className="text-[13px] font-bold">نوعية الأرض</span>
                   <select name="re_use" defaultValue={initial?.reUse || ''} className={field}>
                     <option value="">— اختر —</option>
                     {LAND_USES.map((u) => <option key={u} value={u}>{u}</option>)}
                   </select>
                 </label>
-                <label className="block space-y-1">
-                  <span className="text-sm font-bold">عدد الشوارع</span>
+                <label className="block space-y-0.5">
+                  <span className="text-[13px] font-bold">عدد الشوارع</span>
                   <input name="re_streets_count" type="number" min="0" max="4" defaultValue={initial?.reStreetsCount ?? ''} className={field} placeholder="مثال: 2" />
                 </label>
               </>
@@ -441,16 +443,16 @@ export function AdForm({
             {/* سكني (شقة/فيلا/دور/استوديو/دوبلكس/شاليه/استراحة): غرف + دورات مياه + صالات */}
             {reKind === 'residential' && (
               <>
-                <label className="block space-y-1">
-                  <span className="text-sm font-bold">غرف النوم</span>
+                <label className="block space-y-0.5">
+                  <span className="text-[13px] font-bold">غرف النوم</span>
                   <input name="re_beds" type="number" min="0" defaultValue={initial?.reBeds ?? ''} className={field} placeholder="مثال: 3" />
                 </label>
-                <label className="block space-y-1">
-                  <span className="text-sm font-bold">دورات المياه</span>
+                <label className="block space-y-0.5">
+                  <span className="text-[13px] font-bold">دورات المياه</span>
                   <input name="re_baths" type="number" min="0" defaultValue={initial?.reBaths ?? ''} className={field} placeholder="مثال: 2" />
                 </label>
-                <label className="block space-y-1">
-                  <span className="text-sm font-bold">الصالات</span>
+                <label className="block space-y-0.5">
+                  <span className="text-[13px] font-bold">الصالات</span>
                   <input name="re_halls" type="number" min="0" defaultValue={initial?.reHalls ?? ''} className={field} placeholder="مثال: 1" />
                 </label>
               </>
@@ -459,16 +461,16 @@ export function AdForm({
             {/* عمارة: عدد الأدوار + عدد الشقق + عدد المحلات */}
             {reKind === 'building' && (
               <>
-                <label className="block space-y-1">
-                  <span className="text-sm font-bold">عدد الأدوار</span>
+                <label className="block space-y-0.5">
+                  <span className="text-[13px] font-bold">عدد الأدوار</span>
                   <input name="re_floors" type="number" min="0" defaultValue={initial?.reFloors ?? ''} className={field} placeholder="مثال: 4" />
                 </label>
-                <label className="block space-y-1">
-                  <span className="text-sm font-bold">عدد الشقق</span>
+                <label className="block space-y-0.5">
+                  <span className="text-[13px] font-bold">عدد الشقق</span>
                   <input name="re_units" type="number" min="0" defaultValue={initial?.reUnits ?? ''} className={field} placeholder="مثال: 8" />
                 </label>
-                <label className="block space-y-1">
-                  <span className="text-sm font-bold">عدد المحلات</span>
+                <label className="block space-y-0.5">
+                  <span className="text-[13px] font-bold">عدد المحلات</span>
                   <input name="re_shops" type="number" min="0" defaultValue={initial?.reShops ?? ''} className={field} placeholder="مثال: 2" />
                 </label>
               </>
@@ -476,32 +478,32 @@ export function AdForm({
 
             {/* تجاري (مكتب/محل/مستودع): دورات المياه */}
             {reKind === 'commercial' && (
-              <label className="block space-y-1">
-                <span className="text-sm font-bold">دورات المياه</span>
+              <label className="block space-y-0.5">
+                <span className="text-[13px] font-bold">دورات المياه</span>
                 <input name="re_baths" type="number" min="0" defaultValue={initial?.reBaths ?? ''} className={field} placeholder="مثال: 1" />
               </label>
             )}
 
             {/* عدد الأدوار — فيلا/دوبلكس (سكني متعدّد الأدوار) */}
             {reKind === 'residential' && MULTIFLOOR_TYPES.includes(reType) && (
-              <label className="block space-y-1">
-                <span className="text-sm font-bold">عدد الأدوار</span>
+              <label className="block space-y-0.5">
+                <span className="text-[13px] font-bold">عدد الأدوار</span>
                 <input name="re_floors" type="number" min="0" defaultValue={initial?.reFloors ?? ''} className={field} placeholder="مثال: 2" />
               </label>
             )}
 
             {/* الطابق — شقة/استوديو/مكتب/دور */}
             {FLOORLEVEL_TYPES.includes(reType) && (
-              <label className="block space-y-1">
-                <span className="text-sm font-bold">الطابق / الدور</span>
+              <label className="block space-y-0.5">
+                <span className="text-[13px] font-bold">الطابق / الدور</span>
                 <input name="re_floor" defaultValue={initial?.reFloor || ''} maxLength={20} className={field} placeholder="مثال: الأول، أرضي" />
               </label>
             )}
 
             {/* عمر العقار — لكل ما هو مبنيّ (ليس أرضاً) */}
             {reKind !== 'land' && (
-              <label className="block space-y-1">
-                <span className="text-sm font-bold">عمر العقار (سنوات)</span>
+              <label className="block space-y-0.5">
+                <span className="text-[13px] font-bold">عمر العقار (سنوات)</span>
                 <input name="re_age" type="number" min="0" defaultValue={initial?.reAge ?? ''} className={field} placeholder="مثال: 5" />
               </label>
             )}
@@ -509,15 +511,15 @@ export function AdForm({
             {/* الواجهة + عرض الشارع — أرض/عمارة/تجاري/فيلا-دوبلكس */}
             {(reKind === 'land' || reKind === 'building' || reKind === 'commercial' || MULTIFLOOR_TYPES.includes(reType)) && (
               <>
-                <label className="block space-y-1">
-                  <span className="text-sm font-bold">الواجهة</span>
+                <label className="block space-y-0.5">
+                  <span className="text-[13px] font-bold">الواجهة</span>
                   <select name="re_facade" defaultValue={initial?.reFacade || ''} className={field}>
                     <option value="">— اختر —</option>
                     {['شمالية', 'جنوبية', 'شرقية', 'غربية', 'شمالية شرقية', 'شمالية غربية', 'جنوبية شرقية', 'جنوبية غربية', 'ثلاث شوارع', 'أربع شوارع'].map((f) => <option key={f} value={f}>{f}</option>)}
                   </select>
                 </label>
-                <label className="block space-y-1">
-                  <span className="text-sm font-bold">عرض الشارع (م)</span>
+                <label className="block space-y-0.5">
+                  <span className="text-[13px] font-bold">عرض الشارع (م)</span>
                   <input name="re_street" type="number" min="0" defaultValue={initial?.reStreet ?? ''} className={field} placeholder="مثال: 20" />
                 </label>
               </>
@@ -527,35 +529,35 @@ export function AdForm({
 
         {/* مفروش؟ — للوحدات السكنية */}
         {reKind === 'residential' && (
-          <label className="mt-3 flex items-center gap-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-3 text-sm font-bold">
+          <label className="flex items-center gap-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-2.5 text-sm font-bold">
             <input type="checkbox" name="re_furnished" value="1" defaultChecked={initial?.reFurnished === 1} className="h-4 w-4 accent-[hsl(var(--primary))]" />
             العقار مفروش
           </label>
         )}
         {/* مسبح؟ — فيلا/شاليه/استراحة/دوبلكس */}
         {POOL_TYPES.includes(reType) && (
-          <label className="mt-3 flex items-center gap-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-3 text-sm font-bold">
+          <label className="flex items-center gap-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-2.5 text-sm font-bold">
             <input type="checkbox" name="re_pool" value="1" defaultChecked={initial?.rePool === 1} className="h-4 w-4 accent-[hsl(var(--primary))]" />
             يوجد مسبح
           </label>
         )}
         {/* بيانات الصك والمخطط والقطعة — تعريف العقار رسمياً */}
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <label className="block space-y-1">
-            <span className="text-sm font-bold">رقم القطعة</span>
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          <label className="block space-y-0.5">
+            <span className="text-[13px] font-bold">رقم القطعة</span>
             <input name="re_plot" defaultValue={initial?.rePlot || ''} maxLength={40} dir="ltr" className={field} placeholder="مثال: 123" />
           </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-bold">رقم المخطط</span>
+          <label className="block space-y-0.5">
+            <span className="text-[13px] font-bold">رقم المخطط</span>
             <input name="re_plan" defaultValue={initial?.rePlan || ''} maxLength={60} dir="ltr" className={field} placeholder="مثال: 2456/أ" />
           </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-bold">رقم الصك</span>
+          <label className="block space-y-0.5">
+            <span className="text-[13px] font-bold">رقم الصك</span>
             <input name="re_deed" defaultValue={initial?.reDeed || ''} maxLength={60} dir="ltr" className={field} placeholder="اختياري" />
           </label>
         </div>
         {/* رقم الترخيص من حساب العضو (يُدخل مرّة عند التسجيل) — يُعرض هنا ويُرفق تلقائياً بالعقار */}
-        <div className="mt-3 rounded-lg border-2 border-emerald-300 bg-emerald-50 p-3">
+        <div className="rounded-lg border-2 border-emerald-300 bg-emerald-50 p-2.5">
           <div className="text-[11px] font-bold text-emerald-800">رقم ترخيصك العقاري (فال) — الهيئة العامة للعقار</div>
           <div className="mt-0.5 font-mono text-base font-extrabold tracking-wide text-emerald-900" dir="ltr">{licenseNo || '—'}</div>
           <div className="mt-1 text-[11px] text-emerald-700">مسجّل في حسابك ويظهر تلقائياً على كل عقار تنشره — لا حاجة لإدخاله في كل إعلان.</div>
@@ -638,7 +640,7 @@ export function AdForm({
 
       <Section icon={Phone} title="وسيلة التواصل">
         <p className="text-xs text-muted-foreground">يجب إدخال رقم الجوال أو الواتساب على الأقل. <span className="font-bold text-red-600">*</span></p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-2.5 sm:grid-cols-2">
           <div>
             <label className={lbl}>رقم الجوال</label>
             <input name="phone" type="tel" inputMode="tel" defaultValue={initial?.phone ?? ''} maxLength={20} className={field} placeholder="05xxxxxxxx" />

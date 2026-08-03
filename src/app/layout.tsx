@@ -25,10 +25,10 @@ const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', di
 
 // عنوان ووصف مشاركة الموقع قابلان للتعديل من الإدارة ← النصوص ← عام
 export async function generateMetadata(): Promise<Metadata> {
-  const [shareTitle, shareDesc] = await Promise.all([
-    import('@/lib/settings').then((m) => m.getSetting(m.SETTING_SITE_SHARE_TITLE, `${SITE.name} | ${SITE.tagline}`)),
-    import('@/lib/settings').then((m) => m.getSetting(m.SETTING_SITE_SHARE_DESC, SITE.description)),
-  ]).catch(() => [`${SITE.name} | ${SITE.tagline}`, SITE.description]);
+  // بطاقة مشاركة «تربح للعقار» المستقلّة — النص ثابت للعلامة العقارية، والصورة تُولَّد
+  // من opengraph-image.tsx (لا نضبط images هنا حتى لا نُلغي الصورة المُولّدة).
+  const shareTitle = 'منصة تربح للعقار';
+  const shareDesc = 'تستقبل عروضكم وطلباتكم';
   return {
     metadataBase: new URL(`https://${SITE.domain}`),
     title: { default: shareTitle, template: `%s | ${SITE.name}` },
@@ -39,13 +39,12 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: SITE.name,
       title: shareTitle,
       description: shareDesc,
-      images: [{ url: '/icon-512.png?v=3', width: 512, height: 512, alt: SITE.name }],
     },
-    twitter: { card: 'summary', title: shareTitle, description: shareDesc, images: ['/icon-512.png?v=3'] },
+    twitter: { card: 'summary_large_image', title: shareTitle, description: shareDesc },
     robots: { index: true, follow: true },
     manifest: '/manifest.webmanifest',
     appleWebApp: { capable: true, statusBarStyle: 'default', title: SITE.name },
-    icons: { icon: '/icon-192.png?v=3', apple: '/apple-icon.png?v=3' },
+    icons: { icon: '/logo-aqar.svg', apple: '/apple-icon.png?v=3' },
   };
 }
 

@@ -123,6 +123,35 @@ jobs:
               echo 'شهادة agar مُركّبة مسبقاً.'
             fi
           fi
+          echo "== إعداد نطاق trbhh.sa (السعودي) → الموقع الرئيسي تربح (127.0.0.1:3080) =="
+          if command -v clpctl >/dev/null 2>&1; then
+            # trbhh.sa (النطاق الجذر) → الموقع الرئيسي على 3080
+            if [ ! -f /root/.trbhh-sa-site-done ]; then
+              SP=\$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 20)
+              clpctl site:add:reverse-proxy --domainName='trbhh.sa' --reverseProxyUrl='http://127.0.0.1:3080' --siteUser='trbhhsa' --siteUserPassword="\$SP" 2>&1 | grep -iv 'password' || true
+              touch /root/.trbhh-sa-site-done
+            fi
+            if [ ! -f /root/.trbhh-sa-ssl-done ]; then
+              if clpctl lets-encrypt:install:certificate --domainName='trbhh.sa' >/tmp/sa-ssl.log 2>&1; then
+                touch /root/.trbhh-sa-ssl-done; echo '✅ شهادة SSL لـ trbhh.sa رُكّبت.'
+              else
+                echo '(SSL trbhh.sa بانتظار سجل DNS — يُركّب تلقائياً في النشر التالي)'; tail -3 /tmp/sa-ssl.log || true
+              fi
+            fi
+            # www.trbhh.sa → الموقع الرئيسي على 3080
+            if [ ! -f /root/.trbhh-sa-www-site-done ]; then
+              SPW=\$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 20)
+              clpctl site:add:reverse-proxy --domainName='www.trbhh.sa' --reverseProxyUrl='http://127.0.0.1:3080' --siteUser='trbhhsawww' --siteUserPassword="\$SPW" 2>&1 | grep -iv 'password' || true
+              touch /root/.trbhh-sa-www-site-done
+            fi
+            if [ ! -f /root/.trbhh-sa-www-ssl-done ]; then
+              if clpctl lets-encrypt:install:certificate --domainName='www.trbhh.sa' >/tmp/sawww-ssl.log 2>&1; then
+                touch /root/.trbhh-sa-www-ssl-done; echo '✅ شهادة SSL لـ www.trbhh.sa رُكّبت.'
+              else
+                echo '(SSL www.trbhh.sa بانتظار سجل DNS)'; tail -3 /tmp/sawww-ssl.log || true
+              fi
+            fi
+          fi
           echo "== كشف لوحة تحكّم الخادم (للخطوة اليدوية الأخيرة) =="
           if command -v clpctl >/dev/null 2>&1; then echo "PANEL_DETECTED=CloudPanel"; fi
           if [ -d /www/server/panel ]; then echo "PANEL_DETECTED=aaPanel/BT"; fi

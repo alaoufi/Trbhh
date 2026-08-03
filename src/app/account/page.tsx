@@ -66,7 +66,7 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
         url={`https://${SITE.domain}`}
         title={SITE.name}
         shareText={`${SITE.name} ${SITE.tagline}`}
-        card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/logo-header.png' }}
+        card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/logo-aqar.svg' }}
       />
 
       {/* 🎭 اكتشاف خدمات هذا الحساب تلقائياً — شريط أفقي منزلق يُظهر الخدمات المخفية بالسحب */}

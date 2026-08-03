@@ -430,7 +430,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
                   text={[`متجر ${name} على تربح`, (meta.about || s.description || '').replace(/\s+/g, ' ').trim().slice(0, 120)].filter(Boolean).join('\n')}
                   compact
                   iconOnly
-                  card={{ url: `https://${SITE.domain}/companies/${storeId}`, title: `متجر ${name}`, city: meta.specialty || '', image: s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '/logo-header.png' }}
+                  card={{ url: `https://${SITE.domain}/companies/${storeId}`, title: `متجر ${name}`, city: meta.specialty || '', image: s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '/logo-aqar.svg' }}
                 />
               </span>
             </div>

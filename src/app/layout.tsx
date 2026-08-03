@@ -44,7 +44,7 @@ export async function generateMetadata(): Promise<Metadata> {
     robots: { index: true, follow: true },
     manifest: '/manifest.webmanifest',
     appleWebApp: { capable: true, statusBarStyle: 'default', title: SITE.name },
-    icons: { icon: '/logo-aqar.svg', apple: '/apple-icon.png?v=3' },
+    icons: { icon: '/logo-aqar-256.png', apple: '/apple-icon.png?v=3' },
   };
 }
 
@@ -97,7 +97,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         name: SITE.name,
         alternateName: SITE.nameEn,
         url: base,
-        logo: `${base}/icon-512.png`,
+        logo: `${base}/logo-aqar-256.png`,
         description: SITE.description,
       },
       {

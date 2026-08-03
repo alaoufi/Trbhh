@@ -31,6 +31,12 @@ export type AdCard = {
   /** تقييم الإعلان (تجارب العملاء) — متوسط النجوم وعددها؛ يظهر كدليل اجتماعي على البطاقة */
   ratingAvg?: number;
   ratingCount?: number;
+  /** مواصفات عقارية للبطاقة بأسلوب عقار (النوع/الغرض/غرف/حمامات/مساحة) */
+  reType?: string | null;
+  purpose?: 'rent' | 'sale' | 'som' | null;
+  reBeds?: number | null;
+  reBaths?: number | null;
+  reArea?: number | null;
 };
 
 async function sellerInfo(ids: bigint[]): Promise<Map<number, { name: string; trusted: boolean; banned: boolean }>> {
@@ -106,6 +112,11 @@ type AdRow = {
   urgent_until?: Date | null;
   old_price?: number;
   expires_at?: Date | null;
+  re_type?: string | null;
+  price_type?: string | null;
+  re_beds?: number | null;
+  re_baths?: number | null;
+  re_area?: number | null;
 };
 
 async function toCards(rows: AdRow[]): Promise<AdCard[]> {
@@ -157,6 +168,11 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         oldPrice: r.old_price && r.old_price > r.price ? r.old_price : 0,
         ratingAvg: ratings.get(toInt(r.id))?.avg ?? 0,
         ratingCount: ratings.get(toInt(r.id))?.count ?? 0,
+        reType: r.re_type ?? null,
+        purpose: (r.price_type ?? null) as 'rent' | 'sale' | 'som' | null,
+        reBeds: r.re_beds ?? null,
+        reBaths: r.re_baths ?? null,
+        reArea: r.re_area ?? null,
       };
     });
 }
@@ -186,6 +202,11 @@ const adSelect = {
   urgent_until: true,
   old_price: true,
   expires_at: true,
+  re_type: true,
+  price_type: true,
+  re_beds: true,
+  re_baths: true,
+  re_area: true,
 } as const;
 
 /** القسم الاحتياطي «عروض أخرى»: يُسنَد لكل إعلان جديد داخلياً (تصنيف آلي بحت

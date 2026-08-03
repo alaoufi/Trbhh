@@ -8,8 +8,11 @@ import {
   getTopRatedAds,
   getStats,
   getPersonalizedAds,
+  getCities,
 } from '@/lib/data';
 import { AdGrid } from '@/components/ad-card';
+import { PropertyHero } from '@/components/property-hero';
+import { PropertyGrid } from '@/components/property-card';
 import { Section } from '@/components/section';
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
@@ -74,6 +77,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
   const personalizedAds = await getPersonalizedAds(viewerKey, session?.uid || 0, 8).catch(() => []);
+  const heroCities = await getCities().catch(() => []);
   const storeAds = await homeFeaturedAds().catch(() => []);
   const feedTexts = await getFeedBannerItems().catch(() => []);
   // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
@@ -105,6 +109,9 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
           {Number(sp.published) > 0 && <> <Link href={`/ads/${Number(sp.published)}`} className="underline">عرض إعلانك</Link></>}
         </div>
       )}
+
+      {/* واجهة البحث العقارية (بأسلوب تطبيقات العقار): غرض + نوع + مدينة + تصنيفات */}
+      <PropertyHero cities={heroCities} />
 
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
@@ -227,7 +234,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
         </Section>
       )}
 
-      <Section title={H.latest} href="/search">
+      <Section title="أحدث العقارات" href="/properties">
         <div className="space-y-4">
           {/* الإعلانات على دفعات: كل دفعة ١٠ أسطر (٢٠ إعلاناً على شبكة عمودين)،
               تليها بانر إعلاني مدفوع، ثم زر "عرض المزيد" يكشف الدفعة التالية. */}
@@ -238,7 +245,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
             if (!groups.length) return null;
             const chunks = groups.map((g, i) => (
               <div key={i} className="space-y-4">
-                <AdGrid ads={g} />
+                <PropertyGrid ads={g} />
                 <PromoSlot placement="feed" />
                 {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
               </div>
@@ -246,8 +253,8 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
             return <ProgressiveReveal chunks={chunks} />;
           })()}
           {/* الرئيسية تعرض كل إعلانات آخر شهر — والأقدم عبر البحث */}
-          <Link href="/search" className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
-            الإعلانات الأقدم من شهر تجدها في البحث — عرض الكل ←
+          <Link href="/properties" className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
+            تصفّح كل العقارات مع الفلاتر — عرض الكل ←
           </Link>
         </div>
       </Section>

@@ -106,6 +106,18 @@ jobs:
           else
             echo 'موقع beta مُهيّأ مسبقاً (أو لا توجد clpctl).'
           fi
+          echo "== إعداد موقع agar.trbhh.com (تربح للعقار) في CloudPanel (مرّة واحدة) =="
+          if [ ! -f /root/.trbhh-agar-site-done ] && command -v clpctl >/dev/null 2>&1; then
+            SITEPASS2=\$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 20)
+            echo "-- إنشاء موقع Reverse Proxy → 127.0.0.1:3081 --"
+            clpctl site:add:reverse-proxy --domainName='agar.trbhh.com' --reverseProxyUrl='http://127.0.0.1:3081' --siteUser='trbhhagar' --siteUserPassword="\$SITEPASS2" 2>&1 | grep -iv 'password' || true
+            echo "-- تركيب شهادة SSL (Let's Encrypt) --"
+            clpctl lets-encrypt:install:certificate --domainName='agar.trbhh.com' 2>&1 | tail -6 || echo '(تعذّر SSL لـ agar — تأكّد من سجل DNS)'
+            touch /root/.trbhh-agar-site-done
+            echo '✅ محاولة إعداد موقع agar اكتملت.'
+          else
+            echo 'موقع agar مُهيّأ مسبقاً (أو لا توجد clpctl).'
+          fi
           echo "== كشف لوحة تحكّم الخادم (للخطوة اليدوية الأخيرة) =="
           if command -v clpctl >/dev/null 2>&1; then echo "PANEL_DETECTED=CloudPanel"; fi
           if [ -d /www/server/panel ]; then echo "PANEL_DETECTED=aaPanel/BT"; fi

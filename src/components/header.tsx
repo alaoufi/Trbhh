@@ -74,8 +74,10 @@ export async function Header() {
             المستضاف ذاتياً سبق أن سبّب اختفاء محتوى كامل لصور أخرى (انظر next.config.js
             تعليق remotePatterns) — نفس فئة العطل هنا (شعار يظهر ثم يختفي فوراً). صورة
             محلية صغيرة من public/ لا تحتاج تحسيناً خادمياً أصلاً. */}
-        <Link href="/" className="shrink-0">
-          <img src="/logo-header.png" alt="تربح" width={256} height={256} className="h-11 w-11 rounded-xl object-cover" />
+        {/* شعار «تربح للعقار» المستقل (SVG محلي) + اسم العلامة */}
+        <Link href="/" className="flex shrink-0 items-center gap-2">
+          <img src="/logo-aqar.svg" alt="تربح للعقار" width={256} height={256} className="h-11 w-11 rounded-xl" />
+          <span className="hidden text-sm font-extrabold leading-tight text-[#f0b429] sm:block">تربح<br /><span className="text-[11px] font-bold text-white/80">للعقار</span></span>
         </Link>
       </div>
     </header>

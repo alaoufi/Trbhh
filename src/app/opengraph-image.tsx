@@ -13,10 +13,10 @@ export default async function OpengraphImage() {
   const src = logo ? `data:image/png;base64,${logo.toString('base64')}` : '';
   return new ImageResponse(
     (
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ffffff' }}>
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000610' }}>
         {src
-          ? <img src={src} width={600} height={600} style={{ objectFit: 'contain' }} />
-          : <div style={{ display: 'flex', fontSize: 64, color: '#1c3560' }}>تربح للعقار</div>}
+          ? <img src={src} width={630} height={630} style={{ objectFit: 'cover' }} />
+          : <div style={{ display: 'flex', fontSize: 64, color: '#f0b429' }}>تربح للعقار</div>}
       </div>
     ),
     { ...size },

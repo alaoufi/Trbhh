@@ -190,7 +190,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
               text={`${SITE.name} ${SITE.tagline}`}
               compact
               iconOnly
-              card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/logo-aqar-256.png' }}
+              card={{ url: `https://${SITE.domain}`, title: SITE.name, desc: SITE.tagline, city: '', image: '/logo-aqar-256.png?v=2' }}
             />
           </span>
         </div>

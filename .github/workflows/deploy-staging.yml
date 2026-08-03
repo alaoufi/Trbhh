@@ -151,6 +151,19 @@ jobs:
                 echo '(SSL www.trbhh.sa بانتظار سجل DNS)'; tail -3 /tmp/sawww-ssl.log || true
               fi
             fi
+            # agar.trbhh.sa → منصّة العقار (127.0.0.1:3081)
+            if [ ! -f /root/.trbhh-agarsa-site-done ]; then
+              SPA=\$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 20)
+              clpctl site:add:reverse-proxy --domainName='agar.trbhh.sa' --reverseProxyUrl='http://127.0.0.1:3081' --siteUser='trbhhagarsa' --siteUserPassword="\$SPA" 2>&1 | grep -iv 'password' || true
+              touch /root/.trbhh-agarsa-site-done
+            fi
+            if [ ! -f /root/.trbhh-agarsa-ssl-done ]; then
+              if clpctl lets-encrypt:install:certificate --domainName='agar.trbhh.sa' >/tmp/agarsa-ssl.log 2>&1; then
+                touch /root/.trbhh-agarsa-ssl-done; echo '✅ شهادة SSL لـ agar.trbhh.sa رُكّبت.'
+              else
+                echo '(SSL agar.trbhh.sa بانتظار سجل DNS)'; tail -3 /tmp/agarsa-ssl.log || true
+              fi
+            fi
           fi
           echo "== كشف لوحة تحكّم الخادم (للخطوة اليدوية الأخيرة) =="
           if command -v clpctl >/dev/null 2>&1; then echo "PANEL_DETECTED=CloudPanel"; fi

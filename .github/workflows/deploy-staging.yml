@@ -94,17 +94,14 @@ jobs:
           \$COMPOSE up -d --build
           echo "== الحالة =="
           \$COMPOSE ps
-          echo "== إعداد موقع beta.trbhh.com في CloudPanel (مرّة واحدة) =="
-          if [ ! -f /root/.trbhh-beta-site-done ] && command -v clpctl >/dev/null 2>&1; then
-            SITEPASS=\$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 20)
-            echo "-- إنشاء موقع Reverse Proxy → 127.0.0.1:3081 --"
-            clpctl site:add:reverse-proxy --domainName='beta.trbhh.com' --reverseProxyUrl='http://127.0.0.1:3081' --siteUser='trbhhbeta' --siteUserPassword="\$SITEPASS" 2>&1 | grep -iv 'password' || true
-            echo "-- تركيب شهادة SSL (Let's Encrypt) --"
-            clpctl lets-encrypt:install:certificate --domainName='beta.trbhh.com' 2>&1 | tail -6 || echo '(تعذّر SSL — سنراجع)'
-            touch /root/.trbhh-beta-site-done
-            echo '✅ محاولة إعداد موقع beta اكتملت.'
+          echo "== إلغاء موقع beta.trbhh.com نهائياً (استُبدل بـ agar) =="
+          if [ ! -f /root/.trbhh-beta-removed ] && command -v clpctl >/dev/null 2>&1; then
+            # حذف أفضل‑جهد لموقع beta من CloudPanel (سجل DNS مُزال أصلاً فالموقع غير قابل للوصول)
+            clpctl site:delete --domainName='beta.trbhh.com' --force >/dev/null 2>&1 || true
+            touch /root/.trbhh-beta-removed
+            echo '✅ أُلغي موقع beta (agar هو النطاق الرسمي الآن).'
           else
-            echo 'موقع beta مُهيّأ مسبقاً (أو لا توجد clpctl).'
+            echo 'beta مُلغى مسبقاً (أو لا توجد clpctl).'
           fi
           echo "== إعداد موقع agar.trbhh.com (تربح للعقار) في CloudPanel =="
           if command -v clpctl >/dev/null 2>&1; then
@@ -133,8 +130,8 @@ jobs:
           if [ -d /etc/nginx ]; then echo "NGINX_PRESENT=/etc/nginx"; fi
           echo "== المنافذ المستمعة =="
           (ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null) | grep -E ":(80|443|3080|3081)\b" || true
-          echo "✅ التطبيق التجريبي يعمل داخلياً على 127.0.0.1:3081"
-          echo "الخطوة الأخيرة (لوحتك): beta.trbhh.com ← Reverse Proxy إلى http://127.0.0.1:3081 + SSL + Basic Auth"
+          echo "✅ تطبيق تربح للعقار يعمل داخلياً على 127.0.0.1:3081"
+          echo "النطاق الرسمي: agar.trbhh.com ← Reverse Proxy إلى http://127.0.0.1:3081 + SSL"
           REMOTE
           )
           n=0

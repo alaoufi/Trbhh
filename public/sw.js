@@ -1,9 +1,15 @@
 // Trbhh service worker — lightweight offline shell + runtime cache.
-const CACHE = 'trbhh-v6';
-const CORE = ['/', '/manifest.webmanifest', '/icon-192.png?v=2', '/placeholder-ad.svg'];
+const CACHE = 'trbhh-v7';
+const CORE = ['/manifest.webmanifest', '/placeholder-ad.svg'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
+  // التثبيت لا يفشل أبداً حتى لو تعذّر جلب أحد أصول CORE (شبكة بطيئة/مورد مفقود)
+  // — كان فشل addAll يمنع تفعيل النسخة الجديدة فيبقى المحتوى القديم عالقاً.
+  e.waitUntil(
+    caches.open(CACHE)
+      .then((c) => Promise.allSettled(CORE.map((u) => c.add(u))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (e) => {

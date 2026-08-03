@@ -154,7 +154,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             الصفحة. نسخة واحدة على مستوى الموقع، والسكربت الرسمي يُحمَّل async بعد رسم الصفحة
             ليجد العنصر (المُصيَّر من الخادم) ويرسم الشارة — مطابقةً لكود التضمين الرسمي. */}
         <VerifySeal />
-        <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="afterInteractive" />
+        <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="lazyOnload" />
         <SealReposition />
       </body>
     </html>

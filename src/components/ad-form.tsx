@@ -483,14 +483,14 @@ export function AdForm({
           </div>
         ) : (
           <div className="space-y-2">
-            <label className={lbl}>السعر</label>
+            <label className={lbl}>حالة العرض</label>
             <input type="hidden" name="priceType" value={priceMode} />
-            {/* اختيار نوع السعر — مبدّل شرائطي أنيق (segmented) والحقول تظهر حسب الاختيار */}
-            <div className="flex rounded-xl border-2 border-primary/20 bg-primary/5 p-1">
-              {([['rent', '🔑 تأجير'], ['sale', '💰 بيع'], ['som', '🤝 على السوم']] as const).map(([k, l]) => (
+            {/* حالة العرض — مبدّل متساوي الأعمدة (أعمدة متساوية، سطر واحد، ارتفاع موحّد) */}
+            <div className="grid grid-cols-3 gap-1 rounded-xl border-2 border-primary/20 bg-primary/5 p-1">
+              {([['sale', '💰', 'بيع'], ['rent', '🔑', 'إيجار'], ['som', '🤝', 'على السوم']] as const).map(([k, emoji, l]) => (
                 <button key={k} type="button" onClick={() => setPriceMode(k)}
-                  className={`flex-1 rounded-lg px-2 py-2 text-sm font-bold transition ${priceMode === k ? 'bg-primary text-white shadow-sm' : 'text-foreground/70 hover:text-primary'}`}>
-                  {l}
+                  className={`flex items-center justify-center gap-1 whitespace-nowrap rounded-lg py-2 text-[13px] font-bold transition ${priceMode === k ? 'bg-primary text-white shadow-sm' : 'text-foreground/70 hover:text-primary'}`}>
+                  <span className="text-sm">{emoji}</span> {l}
                 </button>
               ))}
             </div>

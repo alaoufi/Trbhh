@@ -20,6 +20,7 @@ import { SITE } from '@/lib/constants';
 import { parseFeatures, RE_LISTING_STATUS } from '@/lib/realestate-types';
 import { setListingStatusAction } from '@/app/ads/viewing-actions';
 import { MortgageCalculator } from '@/components/mortgage-calculator';
+import { MarketInsight } from '@/components/market-insight';
 import { Button } from '@/components/ui/button';
 import { FavoriteButton } from '@/components/favorite-button';
 import { ShareButtons } from '@/components/share-buttons';
@@ -576,6 +577,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           {ad.reStatus === 'مؤجر' && <span className="rounded-full bg-slate-600 px-3 py-1 font-extrabold text-white shadow-sm">🔒 مؤجر</span>}
           {ad.reStatus === 'محجوز' && <span className="rounded-full bg-orange-500 px-3 py-1 font-extrabold text-white shadow-sm">⏳ محجوز</span>}
           {ad.reType && <span className="rounded-full bg-emerald-100 px-3 py-1 font-extrabold text-emerald-800">🏢 {ad.reType}</span>}
+          {ad.seller?.trusted && <span className="rounded-full bg-blue-100 px-3 py-1 font-bold text-blue-800">✔ معلن موثّق</span>}
           {ad.priceType === 'rent' && <span className="rounded-full bg-sky-100 px-3 py-1 font-bold text-sky-800">🔑 للإيجار</span>}
           {ad.priceType === 'sale' && <span className="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">💰 للبيع</span>}
           {ad.priceType === 'som' && <span className="rounded-full bg-purple-100 px-3 py-1 font-bold text-purple-800">🤝 على السوم</span>}
@@ -689,6 +691,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           </div>
         </div>
       )}
+
+      {/* مؤشّر السوق — تقدير القيمة ومتوسط سعر المتر (يعيد استخدام محرّك التقدير) */}
+      <MarketInsight cityId={ad.cityId} cityName={ad.city} reType={ad.reType} area={ad.reArea} price={ad.price} priceType={ad.priceType} />
 
       {/* حاسبة التمويل العقاري — تجذب المشتري (تظهر لعروض البيع ذات السعر) */}
       {ad.priceType === 'sale' && ad.price > 0 && <MortgageCalculator price={ad.price} />}

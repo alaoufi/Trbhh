@@ -718,6 +718,7 @@ async function getAdImpl(id: number) {
     images: images.length ? images : [PLACEHOLDER],
     views,
     city: city?.name ?? null,
+    cityId: toInt(ad.city_id),
     area: area?.name ?? null,
     category: category ? { id: toInt(category.id), name: category.name } : null,
     // الهوية الافتراضية تعرض بيانات الحساب الحيّة (فلا يتقادم الاسم بعد تغييره)؛

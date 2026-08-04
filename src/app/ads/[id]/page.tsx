@@ -17,7 +17,9 @@ import { formatPrice, timeAgo } from '@/lib/utils';
 import { waLink } from '@/lib/classified-theme';
 import { getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate, getMemberWindows, adWindowState, DUR_DAYS } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
-import { parseFeatures } from '@/lib/realestate-types';
+import { parseFeatures, RE_LISTING_STATUS } from '@/lib/realestate-types';
+import { setListingStatusAction } from '@/app/ads/viewing-actions';
+import { MortgageCalculator } from '@/components/mortgage-calculator';
 import { Button } from '@/components/ui/button';
 import { FavoriteButton } from '@/components/favorite-button';
 import { ShareButtons } from '@/components/share-buttons';
@@ -570,6 +572,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       <div className="card-3d space-y-3 rounded-2xl p-4">
         {/* رأس البطاقة: نوع العقار + حالة العرض (بيع/إيجار/سوم) */}
         <div className="flex flex-wrap items-center gap-2 text-sm">
+          {ad.reStatus === 'مباع' && <span className="rounded-full bg-red-600 px-3 py-1 font-extrabold text-white shadow-sm">🔴 مباع</span>}
+          {ad.reStatus === 'مؤجر' && <span className="rounded-full bg-slate-600 px-3 py-1 font-extrabold text-white shadow-sm">🔒 مؤجر</span>}
+          {ad.reStatus === 'محجوز' && <span className="rounded-full bg-orange-500 px-3 py-1 font-extrabold text-white shadow-sm">⏳ محجوز</span>}
           {ad.reType && <span className="rounded-full bg-emerald-100 px-3 py-1 font-extrabold text-emerald-800">🏢 {ad.reType}</span>}
           {ad.priceType === 'rent' && <span className="rounded-full bg-sky-100 px-3 py-1 font-bold text-sky-800">🔑 للإيجار</span>}
           {ad.priceType === 'sale' && <span className="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">💰 للبيع</span>}
@@ -663,6 +668,30 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           </div>
         )}
       </div>
+
+      {/* تحكّم المالك بحالة الإعلان (متاح/محجوز/مؤجر/مباع) — يجذب المعلن لإدارة إعلانه */}
+      {isAdOwner && (
+        <div className="card-3d space-y-2 rounded-2xl p-4">
+          <div className="text-sm font-extrabold text-primary">حالة إعلانك <span className="font-normal text-muted-foreground">— تظهر شارتها للزوّار</span></div>
+          <div className="flex flex-wrap gap-2">
+            {RE_LISTING_STATUS.map((s) => {
+              const active = (ad.reStatus || 'متاح') === s;
+              return (
+                <form key={s} action={setListingStatusAction}>
+                  <input type="hidden" name="adId" value={ad.id} />
+                  <input type="hidden" name="status" value={s} />
+                  <button type="submit" className={`rounded-lg border-2 px-3.5 py-1.5 text-[13px] font-bold transition ${active ? 'border-primary bg-primary text-white shadow-sm' : 'border-primary/25 bg-white text-primary hover:bg-primary/5'}`}>
+                    {s}{active ? ' ✓' : ''}
+                  </button>
+                </form>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* حاسبة التمويل العقاري — تجذب المشتري (تظهر لعروض البيع ذات السعر) */}
+      {ad.priceType === 'sale' && ad.price > 0 && <MortgageCalculator price={ad.price} />}
 
       {/* مصداقية البائع — إشارة ثقة مجمّعة من تجارب العملاء على كل إعلاناته (تعزّز قرار الشراء) */}
       {reviewsOn && sellerCred.count > 0 && (

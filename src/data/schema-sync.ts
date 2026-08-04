@@ -715,6 +715,8 @@ const STATEMENTS: string[] = [
   // حالة العقار (جديد/مستعمل/تحت الإنشاء/على الخارطة) والتشطيب (مشطّب/على العظم…)
   `ALTER TABLE ads ADD COLUMN re_condition VARCHAR(20) NULL`,
   `ALTER TABLE ads ADD COLUMN re_finish VARCHAR(20) NULL`,
+  // حالة الإعلان (يتحكم بها المالك): متاح/محجوز/مؤجر/مباع
+  `ALTER TABLE ads ADD COLUMN re_status VARCHAR(10) NULL`,
   `CREATE INDEX ads_profile_id ON ads (profile_id)`,
   // التعليق/التقييم يحمل هوية كاتبه أيضاً (يُعرض باسمها) — null = هوية افتراضية
   `ALTER TABLE comments ADD COLUMN profile_id BIGINT NULL`,

@@ -707,6 +707,7 @@ async function getAdImpl(id: number) {
     reFeatures: ad.re_features ?? null,
     reCondition: ad.re_condition ?? null,
     reFinish: ad.re_finish ?? null,
+    reStatus: ad.re_status ?? null,
     special: ad.adsSpecial === 'checked',
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,

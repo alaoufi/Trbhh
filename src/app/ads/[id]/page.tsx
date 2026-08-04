@@ -17,6 +17,7 @@ import { formatPrice, timeAgo } from '@/lib/utils';
 import { waLink } from '@/lib/classified-theme';
 import { getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate, getMemberWindows, adWindowState, DUR_DAYS } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
+import { parseFeatures } from '@/lib/realestate-types';
 import { Button } from '@/components/ui/button';
 import { FavoriteButton } from '@/components/favorite-button';
 import { ShareButtons } from '@/components/share-buttons';
@@ -567,26 +568,59 @@ export default async function AdPage({ params, searchParams }: { params: Promise
 
       {/* بيانات العقار + رقم الترخيص + الخريطة (المنصّة العقارية) */}
       <div className="card-3d space-y-3 rounded-2xl p-4">
-        <div className="flex flex-wrap gap-2 text-sm">
-          {ad.reType && <span className="rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-800">🏢 {ad.reType}</span>}
-          {ad.priceType === 'rent' && <span className="rounded-full bg-sky-100 px-3 py-1 font-bold text-sky-800">للإيجار</span>}
-          {ad.priceType === 'sale' && <span className="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">للبيع</span>}
-          {ad.reArea ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">المساحة: {ad.reArea} م²</span> : null}
-          {ad.reUse ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">الاستخدام: {ad.reUse}</span> : null}
-          {ad.reStreetsCount != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🛣️ {ad.reStreetsCount} شوارع</span> : null}
-          {ad.reFloors != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🏢 {ad.reFloors} أدوار</span> : null}
-          {ad.reUnits != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">{ad.reUnits} شقق</span> : null}
-          {ad.reShops != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">{ad.reShops} محلات</span> : null}
-          {ad.reBeds != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🛏️ {ad.reBeds} غرف</span> : null}
-          {ad.reBaths != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🚿 {ad.reBaths} دورات مياه</span> : null}
-          {ad.reHalls != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">🛋️ {ad.reHalls} صالات</span> : null}
-          {ad.reFloor ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">الدور: {ad.reFloor}</span> : null}
-          {ad.reAge != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">عمر العقار: {ad.reAge} سنة</span> : null}
-          {ad.reFacade ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">الواجهة: {ad.reFacade}</span> : null}
-          {ad.reStreet != null ? <span className="rounded-full bg-secondary px-3 py-1 font-bold text-foreground/80">الشارع: {ad.reStreet} م</span> : null}
-          {ad.reFurnished === 1 ? <span className="rounded-full bg-emerald-100 px-3 py-1 font-bold text-emerald-800">مفروش</span> : null}
-          {ad.rePool === 1 ? <span className="rounded-full bg-sky-100 px-3 py-1 font-bold text-sky-800">🏊 مسبح</span> : null}
+        {/* رأس البطاقة: نوع العقار + حالة العرض (بيع/إيجار/سوم) */}
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          {ad.reType && <span className="rounded-full bg-emerald-100 px-3 py-1 font-extrabold text-emerald-800">🏢 {ad.reType}</span>}
+          {ad.priceType === 'rent' && <span className="rounded-full bg-sky-100 px-3 py-1 font-bold text-sky-800">🔑 للإيجار</span>}
+          {ad.priceType === 'sale' && <span className="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">💰 للبيع</span>}
+          {ad.priceType === 'som' && <span className="rounded-full bg-purple-100 px-3 py-1 font-bold text-purple-800">🤝 على السوم</span>}
         </div>
+        {/* شبكة المواصفات (نمط تطبيقات العقار): أيقونة + قيمة + وصف لكل خانة */}
+        {(() => {
+          const tiles: { icon: string; value: string; label: string }[] = [];
+          if (ad.reArea) tiles.push({ icon: '📐', value: `${ad.reArea}`, label: 'م² المساحة' });
+          if (ad.reBeds != null) tiles.push({ icon: '🛏️', value: `${ad.reBeds}`, label: 'غرف النوم' });
+          if (ad.reBaths != null) tiles.push({ icon: '🚿', value: `${ad.reBaths}`, label: 'دورات المياه' });
+          if (ad.reHalls != null) tiles.push({ icon: '🛋️', value: `${ad.reHalls}`, label: 'الصالات' });
+          if (ad.reFloors != null) tiles.push({ icon: '🏢', value: `${ad.reFloors}`, label: 'عدد الأدوار' });
+          if (ad.reFloor) tiles.push({ icon: '🧭', value: `${ad.reFloor}`, label: 'الدور' });
+          if (ad.reUnits != null) tiles.push({ icon: '🚪', value: `${ad.reUnits}`, label: 'عدد الشقق' });
+          if (ad.reShops != null) tiles.push({ icon: '🏬', value: `${ad.reShops}`, label: 'عدد المحلات' });
+          if (ad.reStreetsCount != null) tiles.push({ icon: '🛣️', value: `${ad.reStreetsCount}`, label: 'عدد الشوارع' });
+          if (ad.reStreet != null) tiles.push({ icon: '📏', value: `${ad.reStreet} م`, label: 'عرض الشارع' });
+          if (ad.reFacade) tiles.push({ icon: '↗️', value: `${ad.reFacade}`, label: 'الواجهة' });
+          if (ad.reAge != null) tiles.push({ icon: '🗓️', value: `${ad.reAge}`, label: 'سنة — عمر العقار' });
+          if (ad.reUse) tiles.push({ icon: '🏷️', value: `${ad.reUse}`, label: 'الاستخدام' });
+          if (!tiles.length) return null;
+          return (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {tiles.map((t, i) => (
+                <div key={i} className="flex flex-col items-center justify-center gap-0.5 rounded-xl border border-primary/15 bg-secondary/40 px-2 py-2.5 text-center">
+                  <span className="text-lg leading-none">{t.icon}</span>
+                  <b className="text-sm font-extrabold text-primary">{t.value}</b>
+                  <span className="text-[10px] font-medium leading-tight text-muted-foreground">{t.label}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+        {/* مميزات العقار — شارات (المميزات المختارة + مفروش + مسبح) */}
+        {(() => {
+          const feats = parseFeatures(ad.reFeatures);
+          if (!feats.length && ad.reFurnished !== 1 && ad.rePool !== 1) return null;
+          return (
+            <div className="space-y-1.5">
+              <div className="text-[13px] font-extrabold text-primary">✨ مميزات العقار</div>
+              <div className="flex flex-wrap gap-1.5 text-sm">
+                {ad.reFurnished === 1 && <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-bold text-emerald-800">🛋️ مفروش</span>}
+                {ad.rePool === 1 && <span className="inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 font-bold text-sky-800">🏊 مسبح</span>}
+                {feats.map((f) => (
+                  <span key={f.key} className="inline-flex items-center gap-1 rounded-full border border-primary/15 bg-secondary/60 px-3 py-1 font-bold text-foreground/80">{f.icon} {f.label}</span>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         {/* أرقام تعريف العقار الرسمية: القطعة / المخطط / الصك */}
         {(ad.rePlot || ad.rePlan || ad.reDeed) && (
           <div className="grid grid-cols-3 gap-2 text-sm">

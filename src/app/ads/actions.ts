@@ -431,6 +431,8 @@ export async function createAdAction(formData: FormData) {
   const reShops = posInt('re_shops');
   const reHalls = posInt('re_halls');
   const rePool = formData.get('re_pool') ? 1 : 0;
+  // مميزات العقار: قيم متعددة من مربّعات الاختيار — تُجمَّع كمفاتيح مفصولة بفواصل
+  const reFeatures = formData.getAll('re_features').map((v) => String(v).trim()).filter(Boolean).join(',').slice(0, 255) || null;
   if (!reLicense) {
     redirect(`/ads/new?error=nolicense${dest === 'store' ? '&dest=store' : ''}`);
   }
@@ -483,6 +485,7 @@ export async function createAdAction(formData: FormData) {
       re_shops: reShops,
       re_halls: reHalls,
       re_pool: rePool,
+      re_features: reFeatures,
       bumped_at: new Date(), // ترتيب «الأحدث» يعتمد آخر تحديث (Bump)
       ...(scheduledAt ? { status: 0, publish_at: scheduledAt } : {}),
       created_at: new Date(),
@@ -664,6 +667,7 @@ export async function updateAdAction(formData: FormData) {
       // مفروش/مسبح: خانتا اختيار تظهران حسب النوع — غيابهما (نوع لا يدعمهما) = 0
       re_furnished: formData.get('re_furnished') ? 1 : 0,
       re_pool: formData.get('re_pool') ? 1 : 0,
+      re_features: formData.getAll('re_features').map((v) => String(v).trim()).filter(Boolean).join(',').slice(0, 255) || null,
       price: newPrice,
       adsType: eType,
       price_type: ePriceType,

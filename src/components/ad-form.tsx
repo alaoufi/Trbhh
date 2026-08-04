@@ -27,6 +27,7 @@ function propKind(t: string): 'land' | 'building' | 'residential' | 'commercial'
 const POOL_TYPES = ['فيلا', 'شاليه', 'استراحة', 'دوبلكس'];
 const MULTIFLOOR_TYPES = ['فيلا', 'عمارة', 'دوبلكس']; // «عدد الأدوار»
 const FLOORLEVEL_TYPES = ['شقة', 'استوديو', 'مكتب', 'دور']; // «الطابق»
+import { featuresForKind } from '@/lib/realestate-types';
 import { Button } from '@/components/ui/button';
 import { SubmitOverlay } from '@/components/submit-overlay';
 import { RegionCityPicker } from '@/components/region-city-picker';
@@ -70,6 +71,7 @@ type Initial = Partial<{
   reAge: number | null; reFacade: string | null; reStreet: number | null; reFurnished: number | null;
   reUse: string | null; reStreetsCount: number | null; reFloors: number | null;
   reUnits: number | null; reShops: number | null; reHalls: number | null; rePool: number | null;
+  reFeatures: string | null;
 }>;
 
 // مدد التأجير المتاحة عند اختيار «سعر تأجير»
@@ -116,6 +118,16 @@ export function AdForm({
   // نوع العقار المختار — تُعرض حقول المواصفات المناسبة له (أرض/عمارة/شقة/…)
   const [reType, setReType] = useState(initial?.reType || '');
   const reKind = propKind(reType); // 'land' | 'building' | 'residential' | 'commercial' | ''
+  // مميزات العقار المختارة (مفاتيح) — تُعرَض كأزرار تبديل وتُرسَل كمدخلات مخفية
+  const [features, setFeatures] = useState<Set<string>>(
+    () => new Set((initial?.reFeatures || '').split(',').map((s) => s.trim()).filter(Boolean)),
+  );
+  const toggleFeature = (k: string) => setFeatures((prev) => {
+    const next = new Set(prev);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    return next;
+  });
+  const kindFeatures = featuresForKind(reKind);
   // نوع السعر للمعروض: تأجير (سعر + مدة) / بيع (سعر) / على السوم (بلا سعر)
   const [priceMode, setPriceMode] = useState<'rent' | 'sale' | 'som'>(
     initial?.priceType === 'rent' || initial?.priceType === 'som' ? initial.priceType
@@ -473,6 +485,28 @@ export function AdForm({
                 </label>
               )}
             </div>
+            {/* مميزات العقار — أزرار تبديل تتكيّف مع نوع العقار (تُرسل كمدخلات مخفية) */}
+            {kindFeatures.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-[13px] font-extrabold text-primary">مميزات العقار <span className="font-normal text-muted-foreground">(اختياري — اختر ما ينطبق)</span></div>
+                <div className="flex flex-wrap gap-1.5">
+                  {kindFeatures.map((f) => {
+                    const on = features.has(f.key);
+                    return (
+                      <button key={f.key} type="button" onClick={() => toggleFeature(f.key)} aria-pressed={on}
+                        className={`inline-flex items-center gap-1 rounded-full border-2 px-3 py-1.5 text-[13px] font-bold transition ${on ? 'border-primary bg-primary text-white shadow-sm' : 'border-primary/20 bg-white text-foreground/70 hover:border-primary/40'}`}>
+                        <span>{f.icon}</span> {f.label}
+                        {on && <span className="text-[11px]">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* المدخلات المخفية: المميزات المختارة المناسبة للنوع الحالي فقط */}
+                {kindFeatures.filter((f) => features.has(f.key)).map((f) => (
+                  <input key={f.key} type="hidden" name="re_features" value={f.key} />
+                ))}
+              </div>
+            )}
           </div>
         )}
         {/* ٤) السعر */}

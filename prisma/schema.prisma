@@ -92,6 +92,7 @@ model ads {
   re_shops         Int?                        // عدد المحلات (عمارة)
   re_halls         Int?                        // عدد الصالات
   re_pool          Int?      @db.TinyInt      // مسبح؟ 1=نعم 0=لا
+  re_features      String?   @db.VarChar(255) // مميزات: مفاتيح مفصولة بفواصل
 
   @@index([category_id], map: "ads_category_id_foreign")
   @@index([city_id], map: "ads_city_id_foreign")

@@ -712,6 +712,9 @@ const STATEMENTS: string[] = [
   `ALTER TABLE ads ADD COLUMN re_pool TINYINT NULL`,
   // مميزات العقار (قائمة مفاتيح مفصولة بفواصل: مصعد/مواقف/مدخل سيارة/غرفة سائق/كهرباء…)
   `ALTER TABLE ads ADD COLUMN re_features VARCHAR(255) NULL`,
+  // حالة العقار (جديد/مستعمل/تحت الإنشاء/على الخارطة) والتشطيب (مشطّب/على العظم…)
+  `ALTER TABLE ads ADD COLUMN re_condition VARCHAR(20) NULL`,
+  `ALTER TABLE ads ADD COLUMN re_finish VARCHAR(20) NULL`,
   `CREATE INDEX ads_profile_id ON ads (profile_id)`,
   // التعليق/التقييم يحمل هوية كاتبه أيضاً (يُعرض باسمها) — null = هوية افتراضية
   `ALTER TABLE comments ADD COLUMN profile_id BIGINT NULL`,

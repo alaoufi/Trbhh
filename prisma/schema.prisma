@@ -93,6 +93,8 @@ model ads {
   re_halls         Int?                        // عدد الصالات
   re_pool          Int?      @db.TinyInt      // مسبح؟ 1=نعم 0=لا
   re_features      String?   @db.VarChar(255) // مميزات: مفاتيح مفصولة بفواصل
+  re_condition     String?   @db.VarChar(20)  // حالة العقار: جديد/مستعمل/تحت الإنشاء/على الخارطة
+  re_finish        String?   @db.VarChar(20)  // التشطيب: مشطّب/نصف تشطيب/على العظم
 
   @@index([category_id], map: "ads_category_id_foreign")
   @@index([city_id], map: "ads_city_id_foreign")

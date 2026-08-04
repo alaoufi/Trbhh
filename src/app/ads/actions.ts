@@ -433,6 +433,8 @@ export async function createAdAction(formData: FormData) {
   const rePool = formData.get('re_pool') ? 1 : 0;
   // مميزات العقار: قيم متعددة من مربّعات الاختيار — تُجمَّع كمفاتيح مفصولة بفواصل
   const reFeatures = formData.getAll('re_features').map((v) => String(v).trim()).filter(Boolean).join(',').slice(0, 255) || null;
+  const reCondition = String(formData.get('re_condition') || '').trim().slice(0, 20) || null;
+  const reFinish = String(formData.get('re_finish') || '').trim().slice(0, 20) || null;
   if (!reLicense) {
     redirect(`/ads/new?error=nolicense${dest === 'store' ? '&dest=store' : ''}`);
   }
@@ -486,6 +488,8 @@ export async function createAdAction(formData: FormData) {
       re_halls: reHalls,
       re_pool: rePool,
       re_features: reFeatures,
+      re_condition: reCondition,
+      re_finish: reFinish,
       bumped_at: new Date(), // ترتيب «الأحدث» يعتمد آخر تحديث (Bump)
       ...(scheduledAt ? { status: 0, publish_at: scheduledAt } : {}),
       created_at: new Date(),
@@ -668,6 +672,8 @@ export async function updateAdAction(formData: FormData) {
       re_furnished: formData.get('re_furnished') ? 1 : 0,
       re_pool: formData.get('re_pool') ? 1 : 0,
       re_features: formData.getAll('re_features').map((v) => String(v).trim()).filter(Boolean).join(',').slice(0, 255) || null,
+      ...(formData.get('re_condition') !== null ? { re_condition: String(formData.get('re_condition') || '').trim().slice(0, 20) || null } : {}),
+      ...(formData.get('re_finish') !== null ? { re_finish: String(formData.get('re_finish') || '').trim().slice(0, 20) || null } : {}),
       price: newPrice,
       adsType: eType,
       price_type: ePriceType,

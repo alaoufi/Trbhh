@@ -27,7 +27,7 @@ function propKind(t: string): 'land' | 'building' | 'residential' | 'commercial'
 const POOL_TYPES = ['فيلا', 'شاليه', 'استراحة', 'دوبلكس'];
 const MULTIFLOOR_TYPES = ['فيلا', 'عمارة', 'دوبلكس']; // «عدد الأدوار»
 const FLOORLEVEL_TYPES = ['شقة', 'استوديو', 'مكتب', 'دور']; // «الطابق»
-import { featuresForKind } from '@/lib/realestate-types';
+import { featuresForKind, hasCondition, RE_CONDITIONS, RE_FINISHES } from '@/lib/realestate-types';
 import { Button } from '@/components/ui/button';
 import { SubmitOverlay } from '@/components/submit-overlay';
 import { RegionCityPicker } from '@/components/region-city-picker';
@@ -71,7 +71,7 @@ type Initial = Partial<{
   reAge: number | null; reFacade: string | null; reStreet: number | null; reFurnished: number | null;
   reUse: string | null; reStreetsCount: number | null; reFloors: number | null;
   reUnits: number | null; reShops: number | null; reHalls: number | null; rePool: number | null;
-  reFeatures: string | null;
+  reFeatures: string | null; reCondition: string | null; reFinish: string | null;
 }>;
 
 // مدد التأجير المتاحة عند اختيار «سعر تأجير»
@@ -383,6 +383,25 @@ export function AdForm({
                 <span className="text-[13px] font-bold">{reKind === 'land' ? 'مساحة الأرض (م²)' : 'المساحة (م²)'}</span>
                 <input name="re_area" type="number" min="0" defaultValue={initial?.reArea ?? ''} className={field} placeholder="مثال: 250" />
               </label>
+              {/* حالة العقار + التشطيب — للعقارات المبنية (فكرة من تطبيقات العقار السعودية) */}
+              {hasCondition(reKind) && (
+                <>
+                  <label className="block space-y-0.5">
+                    <span className="text-[13px] font-bold">حالة العقار</span>
+                    <select name="re_condition" defaultValue={initial?.reCondition || ''} className={field}>
+                      <option value="">— اختر —</option>
+                      {RE_CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </label>
+                  <label className="block space-y-0.5">
+                    <span className="text-[13px] font-bold">التشطيب</span>
+                    <select name="re_finish" defaultValue={initial?.reFinish || ''} className={field}>
+                      <option value="">— اختر —</option>
+                      {RE_FINISHES.map((f) => <option key={f} value={f}>{f}</option>)}
+                    </select>
+                  </label>
+                </>
+              )}
               {reKind === 'land' && (
                 <>
                   <label className="block space-y-0.5">

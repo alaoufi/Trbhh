@@ -574,6 +574,15 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           {ad.priceType === 'rent' && <span className="rounded-full bg-sky-100 px-3 py-1 font-bold text-sky-800">🔑 للإيجار</span>}
           {ad.priceType === 'sale' && <span className="rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">💰 للبيع</span>}
           {ad.priceType === 'som' && <span className="rounded-full bg-purple-100 px-3 py-1 font-bold text-purple-800">🤝 على السوم</span>}
+          {ad.reCondition && (
+            <span className={`rounded-full px-3 py-1 font-bold ${
+              ad.reCondition === 'جديد' ? 'bg-green-100 text-green-800'
+              : ad.reCondition === 'تحت الإنشاء' ? 'bg-amber-100 text-amber-800'
+              : ad.reCondition === 'على الخارطة' ? 'bg-blue-100 text-blue-800'
+              : 'bg-slate-100 text-slate-700'}`}>
+              {ad.reCondition === 'جديد' ? '✨ ' : ad.reCondition === 'تحت الإنشاء' ? '🏗️ ' : ''}{ad.reCondition}
+            </span>
+          )}
         </div>
         {/* شبكة المواصفات (نمط تطبيقات العقار): أيقونة + قيمة + وصف لكل خانة */}
         {(() => {
@@ -591,6 +600,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           if (ad.reFacade) tiles.push({ icon: '↗️', value: `${ad.reFacade}`, label: 'الواجهة' });
           if (ad.reAge != null) tiles.push({ icon: '🗓️', value: `${ad.reAge}`, label: 'سنة — عمر العقار' });
           if (ad.reUse) tiles.push({ icon: '🏷️', value: `${ad.reUse}`, label: 'الاستخدام' });
+          if (ad.reFinish) tiles.push({ icon: '🎨', value: `${ad.reFinish}`, label: 'التشطيب' });
+          // سعر المتر — يُحسب تلقائياً (فكرة من تطبيقات العقار): السعر ÷ المساحة
+          if (ad.price > 0 && ad.reArea && ad.reArea > 0) tiles.push({ icon: '💵', value: `${Math.round(ad.price / ad.reArea).toLocaleString('en-US')}`, label: 'ر.س/م² سعر المتر' });
           if (!tiles.length) return null;
           return (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">

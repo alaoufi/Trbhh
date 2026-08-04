@@ -705,6 +705,8 @@ async function getAdImpl(id: number) {
     reHalls: ad.re_halls ?? null,
     rePool: ad.re_pool ?? null,
     reFeatures: ad.re_features ?? null,
+    reCondition: ad.re_condition ?? null,
+    reFinish: ad.re_finish ?? null,
     special: ad.adsSpecial === 'checked',
     createdAt: ad.created_at ? ad.created_at.toISOString() : null,
     lat: ad.lat,
@@ -830,6 +832,8 @@ export async function getAdForEdit(id: number, userId: number) {
     reHalls: ad.re_halls ?? null,
     rePool: ad.re_pool ?? null,
     reFeatures: ad.re_features ?? null,
+    reCondition: ad.re_condition ?? null,
+    reFinish: ad.re_finish ?? null,
   };
 }
 

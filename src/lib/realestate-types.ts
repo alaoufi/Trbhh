@@ -16,8 +16,19 @@ export function propKind(t: string | null | undefined): PropKind {
 
 // مميزات العقار (مثل تطبيقات العقار السعودية): كل ميزة لها مفتاح ثابت (يُخزَّن)،
 // وتسمية، وأيقونة، والأنواع التي تظهر لها (kinds). ميزة بلا kinds تظهر لكل الأنواع.
+// حالة العقار (مقتبَس من تطبيقات العقار السعودية) — للعقارات المبنية دون الأرض
+export const RE_CONDITIONS = ['جديد', 'مستعمل', 'تحت الإنشاء', 'على الخارطة'];
+// التشطيب — يُبرز خصوصاً للجديد/تحت الإنشاء
+export const RE_FINISHES = ['مشطّب بالكامل', 'نصف تشطيب', 'على العظم'];
+/** هل يُعرَض حقلا الحالة/التشطيب لهذا النوع؟ (كل الأنواع عدا الأرض/المزرعة) */
+export function hasCondition(kind: PropKind): boolean {
+  return kind === 'residential' || kind === 'building' || kind === 'commercial';
+}
+
 export type ReFeature = { key: string; label: string; icon: string; kinds: PropKind[] };
 export const RE_FEATURES: ReFeature[] = [
+  // تمويل — ميزة سعودية بارزة (يُعرض أولاً)
+  { key: 'mortgage', label: 'قابل للتمويل', icon: '🏦', kinds: ['residential', 'building', 'commercial', 'land'] },
   // سكني (فلل/شقق/أدوار/استراحات…)
   { key: 'driver', label: 'غرفة سائق', icon: '🚘', kinds: ['residential'] },
   { key: 'maid', label: 'غرفة خادمة', icon: '🧹', kinds: ['residential'] },

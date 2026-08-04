@@ -7,11 +7,11 @@
  * العنصر (المُصيَّر من الخادم) ويرسم الشارة فيه. يجب مطابقة كود التضمين الرسمي حرفياً:
  * الكلاس واسم الرمز والموضع كما تعطيها لوحة المركز — أي اختلاف يمنع الرسم.
  */
-export function VerifySeal({ className = '' }: { className?: string }) {
+export function VerifySeal({ token, className = '' }: { token: string; className?: string }) {
   return (
     <div
       className={`sbc-verify-seal ${className}`.trim()}
-      data-token="dklvcSt3ZUxBNGwrRlQ5TTN4SjBxdz09"
+      data-token={token}
       data-position="top-left"
     />
   );

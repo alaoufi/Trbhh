@@ -13,7 +13,7 @@ import { ForceUpdateGate } from '@/components/force-update-gate';
 import { InstallPrompt } from '@/components/install-prompt';
 import { ClassifiedSplash } from '@/components/classified-splash';
 import { getSplashClassifieds } from '@/lib/classified';
-import { getClassifiedSplashSeconds } from '@/lib/settings';
+import { getClassifiedSplashSeconds, getVerifySealToken } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
@@ -71,10 +71,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const ck = await cookies();
   const theme = ck.get('theme')?.value || '';
   const design = ck.get('design')?.value || '';
-  const [unread, isAdminUser, splashSeconds] = await Promise.all([
+  const [unread, isAdminUser, splashSeconds, sealToken] = await Promise.all([
     session ? getMyStats(session.uid).then((s) => s.unread).catch(() => 0) : Promise.resolve(0),
     session ? import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false) : Promise.resolve(false),
     getClassifiedSplashSeconds().catch(() => 5),
+    getVerifySealToken().catch(() => ''),
   ]);
   // شاشة المبوّبات الافتتاحية تُحجب كلياً عن أعضاء الإدارة (لا تعيقهم عن عملهم)
   let splashAds: Awaited<ReturnType<typeof getSplashClassifieds>> = [];
@@ -151,12 +152,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ForceUpdateGate />
         <InstallPrompt />
         <PwaRegister />
-        {/* ختم التوثيق «متجر موثّق» (المركز السعودي للأعمال) — شارة عائمة تُثبَّت أسفل يسار
-            الصفحة. نسخة واحدة على مستوى الموقع، والسكربت الرسمي يُحمَّل async بعد رسم الصفحة
-            ليجد العنصر (المُصيَّر من الخادم) ويرسم الشارة — مطابقةً لكود التضمين الرسمي. */}
-        <VerifySeal />
-        <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="lazyOnload" />
-        <SealReposition />
+        {/* ختم التوثيق «متجر موثّق» (المركز السعودي للأعمال) — لا يظهر إلا عند وجود رمز
+            توثيق مستقل لتربح للعقار في الإعدادات (verify_seal_token). حالياً فارغ =
+            مخفيّ (توثيق الموقع الرئيسي منفصل ولا يخصّ هذه المنصّة). عند صدور توثيق خاص
+            يُضبط الرمز في الإعدادات فيظهر تلقائياً — دون أي تغيير آخر في الكود. */}
+        {sealToken && (
+          <>
+            <VerifySeal token={sealToken} />
+            <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="lazyOnload" />
+            <SealReposition />
+          </>
+        )}
       </body>
     </html>
   );

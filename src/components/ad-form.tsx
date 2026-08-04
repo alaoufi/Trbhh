@@ -127,7 +127,14 @@ export function AdForm({
     if (next.has(k)) next.delete(k); else next.add(k);
     return next;
   });
-  const kindFeatures = featuresForKind(reKind);
+  // حالة العقار والتشطيب — بحالة مُتحكَّم بها لتطبيق منطق: العقار «على العظم» أو
+  // «نصف تشطيب» أو «تحت الإنشاء/على الخارطة» لا يمكن أن يكون مفروشاً ولا فيه مطبخ/مكيّفات.
+  const [reCondition, setReCondition] = useState(initial?.reCondition || '');
+  const [reFinish, setReFinish] = useState(initial?.reFinish || '');
+  const isBare = reFinish === 'على العظم';
+  const canFurnish = !(reFinish === 'على العظم' || reFinish === 'نصف تشطيب' || reCondition === 'تحت الإنشاء' || reCondition === 'على الخارطة');
+  // مميزات مناسبة للنوع، مع إخفاء ما يتعارض منطقياً مع «على العظم» (مطبخ راكب/مكيّفات)
+  const kindFeatures = featuresForKind(reKind).filter((f) => !(isBare && (f.key === 'kitchen' || f.key === 'ac')));
   // نوع السعر للمعروض: تأجير (سعر + مدة) / بيع (سعر) / على السوم (بلا سعر)
   const [priceMode, setPriceMode] = useState<'rent' | 'sale' | 'som'>(
     initial?.priceType === 'rent' || initial?.priceType === 'som' ? initial.priceType
@@ -388,14 +395,14 @@ export function AdForm({
                 <>
                   <label className="block space-y-0.5">
                     <span className="text-[13px] font-bold">حالة العقار</span>
-                    <select name="re_condition" defaultValue={initial?.reCondition || ''} className={field}>
+                    <select name="re_condition" value={reCondition} onChange={(e) => setReCondition(e.target.value)} className={field}>
                       <option value="">— اختر —</option>
                       {RE_CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </label>
                   <label className="block space-y-0.5">
                     <span className="text-[13px] font-bold">التشطيب</span>
-                    <select name="re_finish" defaultValue={initial?.reFinish || ''} className={field}>
+                    <select name="re_finish" value={reFinish} onChange={(e) => setReFinish(e.target.value)} className={field}>
                       <option value="">— اختر —</option>
                       {RE_FINISHES.map((f) => <option key={f} value={f}>{f}</option>)}
                     </select>
@@ -491,11 +498,16 @@ export function AdForm({
             </div>
             {/* مفروش / مسبح حسب النوع */}
             <div className="flex flex-wrap gap-2">
-              {reKind === 'residential' && (
+              {reKind === 'residential' && canFurnish && (
                 <label className="flex flex-1 items-center gap-2 rounded-lg border-2 border-primary/15 bg-white p-2.5 text-sm font-bold">
                   <input type="checkbox" name="re_furnished" value="1" defaultChecked={initial?.reFurnished === 1} className="h-4 w-4 accent-[hsl(var(--primary))]" />
                   العقار مفروش
                 </label>
+              )}
+              {reKind === 'residential' && !canFurnish && (
+                <p className="flex-1 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 p-2.5 text-xs font-bold text-amber-800">
+                  عقار {reFinish || reCondition} — لا ينطبق عليه «مفروش».
+                </p>
               )}
               {POOL_TYPES.includes(reType) && (
                 <label className="flex flex-1 items-center gap-2 rounded-lg border-2 border-primary/15 bg-white p-2.5 text-sm font-bold">

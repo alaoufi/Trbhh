@@ -42,6 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: { card: 'summary_large_image', title: shareTitle, description: shareDesc },
     robots: { index: true, follow: true },
+    verification: { other: { 'domain-verification': '074ed3ec13d8933085b39dd6ff3430877a9e3638ccf57c0e6225a95015627b6e' } },
     manifest: '/manifest.webmanifest',
     appleWebApp: { capable: true, statusBarStyle: 'default', title: SITE.name },
     icons: { icon: '/logo-aqar-256.png?v=3', apple: '/apple-icon.png?v=3' },

@@ -1,9 +1,11 @@
+import Link from 'next/link';
 import { Bell, Trash2 } from 'lucide-react';
 import { searchAds, countSearchAds, getCities, getAreas } from '@/lib/data';
 import { SearchAreaPicker } from '@/components/search-area-picker';
 import { AdminPager } from '@/components/admin-pager';
 import { AdGrid } from '@/components/ad-card';
 import { SearchSuggestInput } from '@/components/search-suggest';
+import { SmartSearch } from '@/components/smart-search';
 import { Breadcrumb } from '@/components/breadcrumb';
 import { getSession } from '@/lib/auth';
 import { listSavedSearches, savedSearchEnabled } from '@/lib/saved-search';
@@ -36,6 +38,13 @@ export default async function SearchPage({
     areaId: sp.area ? Number(sp.area) : undefined,
     type: sp.type === 'offer' || sp.type === 'request' ? (sp.type as 'offer' | 'request') : undefined,
     special: sp.special === '1',
+    // فلاتر عقارية (من البحث الذكي أو الرابط)
+    reType: sp.reType || undefined,
+    purpose: sp.purpose === 'rent' || sp.purpose === 'sale' ? (sp.purpose as 'rent' | 'sale') : undefined,
+    priceMin: sp.priceMin ? Number(sp.priceMin) : undefined,
+    priceMax: sp.priceMax ? Number(sp.priceMax) : undefined,
+    beds: sp.beds ? Number(sp.beds) : undefined,
+    areaMin: sp.areaMin ? Number(sp.areaMin) : undefined,
   };
   const [ads, total] = await Promise.all([
     searchAds({ ...sq, sort, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }),
@@ -48,6 +57,24 @@ export default async function SearchPage({
   return (
     <div className="space-y-4">
       <Breadcrumb items={[{ label: 'بحث متقدم' }]} />
+
+      {/* البحث الذكي بالكلام الطبيعي */}
+      <SmartSearch />
+
+      {/* ملخّص الفلاتر المستخرجة من البحث الذكي (لتوضيح ما فُهم من الجملة) */}
+      {(sq.reType || sq.purpose || sq.priceMin || sq.priceMax || sq.beds || sq.areaMin) && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="font-bold text-muted-foreground">الفلاتر المطبّقة:</span>
+          {sq.reType && <span className="rounded-full bg-primary/10 px-2.5 py-1 font-bold text-primary">🏢 {sq.reType}</span>}
+          {sq.purpose && <span className="rounded-full bg-primary/10 px-2.5 py-1 font-bold text-primary">{sq.purpose === 'rent' ? '🔑 للإيجار' : '💰 للبيع'}</span>}
+          {sq.beds ? <span className="rounded-full bg-primary/10 px-2.5 py-1 font-bold text-primary">🛏️ {sq.beds}+ غرف</span> : null}
+          {sq.areaMin ? <span className="rounded-full bg-primary/10 px-2.5 py-1 font-bold text-primary">📐 {sq.areaMin}+ م²</span> : null}
+          {sq.priceMin ? <span className="rounded-full bg-primary/10 px-2.5 py-1 font-bold text-primary" dir="ltr">≥ {sq.priceMin.toLocaleString('en-US')} ر.س</span> : null}
+          {sq.priceMax ? <span className="rounded-full bg-primary/10 px-2.5 py-1 font-bold text-primary" dir="ltr">≤ {sq.priceMax.toLocaleString('en-US')} ر.س</span> : null}
+          <Link href="/search" className="rounded-full border border-red-200 px-2.5 py-1 font-bold text-red-600 hover:bg-red-50">✕ مسح</Link>
+        </div>
+      )}
+
       <form className="grid gap-3 card-3d rounded-xl p-4 md:grid-cols-6">
         <div className="md:col-span-2">
           <SearchSuggestInput name="q" defaultValue={sp.q || ''} />
@@ -64,6 +91,13 @@ export default async function SearchPage({
           <option value="price_asc">السعر: من الأقل</option>
           <option value="price_desc">السعر: من الأعلى</option>
         </select>
+        {/* الحفاظ على فلاتر البحث الذكي عند إعادة الفلترة اليدوية */}
+        {sq.reType && <input type="hidden" name="reType" value={sq.reType} />}
+        {sq.purpose && <input type="hidden" name="purpose" value={sq.purpose} />}
+        {sq.priceMin ? <input type="hidden" name="priceMin" value={sq.priceMin} /> : null}
+        {sq.priceMax ? <input type="hidden" name="priceMax" value={sq.priceMax} /> : null}
+        {sq.beds ? <input type="hidden" name="beds" value={sq.beds} /> : null}
+        {sq.areaMin ? <input type="hidden" name="areaMin" value={sq.areaMin} /> : null}
         <button className="h-10 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
           بحث
         </button>
@@ -101,7 +135,7 @@ export default async function SearchPage({
       <p className="text-sm text-muted-foreground">النتائج: {total}</p>
       <AdGrid ads={ads} />
 
-      <AdminPager basePath="/search" page={page} pages={pages} total={total} params={{ q: sp.q, category: sp.category, city: sp.city, area: sp.area, type: sp.type, sort: sp.sort, special: sp.special }} />
+      <AdminPager basePath="/search" page={page} pages={pages} total={total} params={{ q: sp.q, category: sp.category, city: sp.city, area: sp.area, type: sp.type, sort: sp.sort, special: sp.special, reType: sp.reType, purpose: sp.purpose, priceMin: sp.priceMin, priceMax: sp.priceMax, beds: sp.beds, areaMin: sp.areaMin }} />
     </div>
   );
 }

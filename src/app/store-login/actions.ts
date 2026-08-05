@@ -4,8 +4,8 @@ import { createSession } from '@/lib/auth';
 import { verifyLogin } from '@/lib/login-core';
 
 /**
- * دخول المتجر بالبيانات الموحّدة (رقم الجوال + كلمة المرور) — نفس حساب تربح
- * ونفس الجلسة: الدخول من هنا يفتح تربح أيضاً، والخروج يخرج من الاثنين.
+ * دخول المتجر بالبيانات الموحّدة (رقم الجوال + كلمة المرور) — نفس حساب عقار تربح
+ * ونفس الجلسة: الدخول من هنا يفتح عقار تربح أيضاً، والخروج يخرج من الاثنين.
  */
 export async function storeLoginAction(formData: FormData) {
   const identifier = String(formData.get('identifier') || '').trim();

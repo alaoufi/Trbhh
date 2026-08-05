@@ -51,7 +51,7 @@ export default async function AdminLinksPage({ searchParams }: { searchParams: P
         <div className="mt-2 space-y-2.5 text-[13px] leading-6 text-foreground/85">
           <div>
             <div className="font-bold text-sky-800">💡 الفكرة</div>
-            بعض الأشخاص يملكون <b>أكثر من حساب</b> في تربح (بأرقام جوال مختلفة) — مثلاً حساب شخصي وحساب لمتجر أو أكثر. هذه الصفحة تربط حسابات الشخص الواحد في <b>«مجموعة نفس المالك»</b>.
+            بعض الأشخاص يملكون <b>أكثر من حساب</b> في عقار تربح (بأرقام جوال مختلفة) — مثلاً حساب شخصي وحساب لمتجر أو أكثر. هذه الصفحة تربط حسابات الشخص الواحد في <b>«مجموعة نفس المالك»</b>.
           </div>
           <div>
             <div className="font-bold text-sky-800">🎯 الهدف</div>

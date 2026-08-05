@@ -10,13 +10,13 @@ type BeforeInstallPromptEvent = Event & {
 
 /**
  * لافتة علوية بلون مميّز: «ثبّت … على جهازك».
- * - scope="site": تطبيق تربح (تُخفى داخل واجهات المتاجر المستقلة).
+ * - scope="site": تطبيق عقار تربح (تُخفى داخل واجهات المتاجر المستقلة).
  * - scope="store": تطبيق متجر مستقل (اسمه/لونه) عبر manifest المتجر.
  * تستخدم beforeinstallprompt (كروم/أندرويد) وإرشادات يدوية على iOS، ومع فشل
  * الإطلاق التلقائي تعرض إرشاد التثبيت من قائمة المتصفح بعد ثوانٍ.
  */
 export function InstallPrompt({
-  scope = 'site', name = 'تربح', brand, storageKey = 'trbhh_install_v2',
+  scope = 'site', name = 'عقار تربح', brand, storageKey = 'trbhh_install_v2',
 }: { scope?: 'site' | 'store'; name?: string; brand?: string; storageKey?: string }) {
   const pathname = usePathname() || '';
   const inStoreCtx = /^\/companies\//.test(pathname) || /^\/store(\/|$|-)/.test(pathname);
@@ -73,7 +73,7 @@ export function InstallPrompt({
 
   if (!show) return null;
   const bg = brand || 'hsl(var(--primary))';
-  const label = scope === 'store' ? `متجر ${name}` : 'تطبيق تربح';
+  const label = scope === 'store' ? `متجر ${name}` : 'تطبيق عقار تربح';
   const mode: 'button' | 'ios' | 'manual' = deferred ? 'button' : ios ? 'ios' : 'manual';
 
   return (

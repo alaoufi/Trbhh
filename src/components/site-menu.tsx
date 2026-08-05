@@ -65,7 +65,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
 
   async function share() {
     const url = typeof window !== 'undefined' ? window.location.origin : '';
-    if (navigator.share) { try { await navigator.share({ title: 'تربح', url }); } catch { /* cancelled */ } return; }
+    if (navigator.share) { try { await navigator.share({ title: 'عقار تربح', url }); } catch { /* cancelled */ } return; }
     let ok = false;
     try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(url); ok = true; } } catch { /* fall through */ }
     if (!ok) {

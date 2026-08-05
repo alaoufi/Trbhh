@@ -82,7 +82,7 @@ export async function createAuction(userId: number, adId: number, startPrice: nu
   const step = Math.max(1, Math.round(minStep) || 1);
   const ad = await prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { user_id: true, status: true, store_only: true, title: true } }).catch(() => null);
   if (!ad || toInt(ad.user_id) !== userId || ad.status !== 1) return { ok: false, error: 'الإعلان غير صالح للمزاد.' };
-  if (ad.store_only === 1) return { ok: false, error: 'المزاد متاح لإعلانات تربح فقط (لا منتجات المتاجر).' };
+  if (ad.store_only === 1) return { ok: false, error: 'المزاد متاح لإعلانات عقار تربح فقط (لا منتجات المتاجر).' };
   const existing = await prisma.auctions.count({ where: { ad_id: BigInt(adId), status: 0 } }).catch(() => 1);
   if (existing > 0) return { ok: false, error: 'يوجد مزاد مفتوح على هذا الإعلان بالفعل.' };
   if (cfg.fee > 0) {

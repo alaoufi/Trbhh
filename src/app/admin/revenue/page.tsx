@@ -568,8 +568,8 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
   return (
     <>
 
-    <p className="text-xs text-muted-foreground">كل تسعير في تربح — مهما كان نوعه — مجمَّع هنا في تبويب واحد بأقسامه؛ وأي تسعير جديد يُضاف مستقبلاً يُلحَق بنفس التبويب.</p>
-    {/* قفزة سريعة بين الأقسام — الصفحة طويلة لأنها تجمع كل تسعير في تربح */}
+    <p className="text-xs text-muted-foreground">كل تسعير في عقار تربح — مهما كان نوعه — مجمَّع هنا في تبويب واحد بأقسامه؛ وأي تسعير جديد يُضاف مستقبلاً يُلحَق بنفس التبويب.</p>
+    {/* قفزة سريعة بين الأقسام — الصفحة طويلة لأنها تجمع كل تسعير في عقار تربح */}
     <div className="flex flex-wrap gap-1.5 rounded-xl border border-primary/15 bg-primary/5 p-2 text-xs font-bold">
       {canPackages && <a href="#packages" className="rounded-lg px-2 py-1 text-primary hover:bg-white">باقات عدد الإعلانات</a>}
       <a href="#store-sub" className="rounded-lg px-2 py-1 text-primary hover:bg-white">اشتراك المتجر والظهور</a>
@@ -607,17 +607,17 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
         </div>
       </div>
 
-      {/* الظهور المدفوع في تربح — عرض المتجر بالمدد + باقات عرض الإعلان (سعر ومدة لكل باقة) */}
+      {/* الظهور المدفوع في عقار تربح — عرض المتجر بالمدد + باقات عرض الإعلان (سعر ومدة لكل باقة) */}
       <div className="rounded-xl border border-sky-300 bg-sky-50/60 p-3">
-        <div className="mb-1 text-xs font-bold text-sky-800">🏪 الظهور في تربح (للمتاجر) — اكتب 0 في السعر لتعطيل الخيار</div>
-        <p className="mb-2 text-[11px] text-muted-foreground">يشتريها التاجر من لوحة متجره وتُخصم من رصيده. عرض المتجر يُظهر المتجر ومنتجاته بقسم المتاجر في الرئيسية، وباقة الإعلان تُظهر إعلاناً محدداً في كل قوائم تربح للمدة المحددة.</p>
-        <div className="mb-1 text-xs font-bold">عرض المتجر في تربح (السعر لكل مدة)</div>
+        <div className="mb-1 text-xs font-bold text-sky-800">🏪 الظهور في عقار تربح (للمتاجر) — اكتب 0 في السعر لتعطيل الخيار</div>
+        <p className="mb-2 text-[11px] text-muted-foreground">يشتريها التاجر من لوحة متجره وتُخصم من رصيده. عرض المتجر يُظهر المتجر ومنتجاته بقسم المتاجر في الرئيسية، وباقة الإعلان تُظهر إعلاناً محدداً في كل قوائم عقار تربح للمدة المحددة.</p>
+        <div className="mb-1 text-xs font-bold">عرض المتجر في عقار تربح (السعر لكل مدة)</div>
         <div className="grid grid-cols-3 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">أسبوعان</span><input name="showStoreW2" type="number" min={0} defaultValue={show.store.w2} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">شهر</span><input name="showStoreM1" type="number" min={0} defaultValue={show.store.m1} className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">سنة</span><input name="showStoreY1" type="number" min={0} defaultValue={show.store.y1} className={num} /></label>
         </div>
-        <div className="mb-1 mt-3 text-xs font-bold">باقات عرض إعلان المتجر في تربح (السعر والمدة لكل باقة)</div>
+        <div className="mb-1 mt-3 text-xs font-bold">باقات عرض إعلان المتجر في عقار تربح (السعر والمدة لكل باقة)</div>
         <div className="space-y-2">
           {show.ads.map((p0) => (
             <div key={p0.key} className="grid grid-cols-3 items-end gap-2">
@@ -684,7 +684,7 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
       {/* باقة متجر Plus + عمولة توصيل عميل */}
       <div className="rounded-xl border border-amber-400 bg-amber-50/60 p-3">
         <div className="mb-1 text-xs font-bold text-amber-800">⭐ باقة متجر Plus + عمولة توصيل عميل</div>
-        <p className="mb-2 text-[11px] text-muted-foreground">باقة Plus صفقة واحدة للتاجر: اشتراك المتجر + عرضه في رئيسية تربح + شارة ⭐ طوال المدة. العمولة رسم صغير يُخصم من رصيد المتجر عن كل عميل جديد يضغط واتساب/اتصال (بسقف يومي) — ولا تمنع التواصل أبداً حتى مع رصيد غير كافٍ.</p>
+        <p className="mb-2 text-[11px] text-muted-foreground">باقة Plus صفقة واحدة للتاجر: اشتراك المتجر + عرضه في رئيسية عقار تربح + شارة ⭐ طوال المدة. العمولة رسم صغير يُخصم من رصيد المتجر عن كل عميل جديد يضغط واتساب/اتصال (بسقف يومي) — ولا تمنع التواصل أبداً حتى مع رصيد غير كافٍ.</p>
         <label className="flex items-center gap-2 text-sm font-bold">
           <input type="checkbox" name="plusOn" defaultChecked={plus.enabled} className="h-4 w-4 accent-[hsl(var(--primary))]" />
           تفعيل باقة متجر Plus (السعر 0 يخفي المدة)

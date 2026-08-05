@@ -145,7 +145,7 @@ export async function runAutoRenewals(): Promise<void> {
 
 /* ===================== باقة متجر Plus ===================== */
 
-/** شراء باقة Plus: اشتراك + عرض المتجر في تربح + شارة ⭐ — دفعة واحدة من الرصيد. */
+/** شراء باقة Plus: اشتراك + عرض المتجر في عقار تربح + شارة ⭐ — دفعة واحدة من الرصيد. */
 export async function buyStorePlus(userId: number, plan: SubPlan): Promise<{ ok: boolean; error?: string }> {
   await ensure();
   const storeId = await getActiveStoreId(userId);
@@ -248,7 +248,7 @@ export async function sendDueSubReminders(): Promise<void> {
 }
 
 /**
- * Notify store owners whose «عرض المتجر في تربح» is approaching expiry — نفس
+ * Notify store owners whose «عرض المتجر في عقار تربح» is approaching expiry — نفس
  * منهجية sendDueSubReminders تماماً (سياسة الأيام/المرّات مشتركة من إعدادات
  * الاشتراك، نص الرسالة مستقل، تشغيل كسول ذاتي الخنق، دفعتر تكرار مستقل).
  */
@@ -305,7 +305,7 @@ export async function sendDueStoreShowReminders(): Promise<void> {
 }
 
 /**
- * نفس الفكرة لكل إعلان معروض مدفوعاً في تربح («عرض إعلان في تربح» — ads.trbhh_until)،
+ * نفس الفكرة لكل إعلان معروض مدفوعاً في عقار تربح («عرض إعلان في عقار تربح» — ads.trbhh_until)،
  * بدفتر تكرار مستقل بمعرّف الإعلان (لا المتجر) لأن كل إعلان له مدّته الخاصة.
  */
 export async function sendDueAdShowReminders(): Promise<void> {
@@ -391,7 +391,7 @@ export async function sendMonthlyStoreReports(): Promise<void> {
         prisma.store_products.count({ where: { store_id: toInt(sid) } }).catch(() => 0),
       ]);
       if (visits === 0 && contacts === 0) continue; // لا يُزعج متجراً بلا نشاط
-      const body = `📊 تقرير متجرك «${st.store_name || ''}» لشهر ${label}:\n👀 الزيارات: ${visits}\n📞 التواصل (واتساب/اتصال): ${contacts}\n🛍️ منتجاتك المعروضة: ${products}\nواصل تحديث منتجاتك ليستمر النمو — تربح`;
+      const body = `📊 تقرير متجرك «${st.store_name || ''}» لشهر ${label}:\n👀 الزيارات: ${visits}\n📞 التواصل (واتساب/اتصال): ${contacts}\n🛍️ منتجاتك المعروضة: ${products}\nواصل تحديث منتجاتك ليستمر النمو — عقار تربح`;
       await sendChat(adminId, uid, body).catch(() => {});
     }
   } catch { /* لا يعطّل شيئاً */ }

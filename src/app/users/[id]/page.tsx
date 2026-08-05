@@ -42,7 +42,7 @@ export default async function UserProfilePage({ params, searchParams }: { params
     getUserReviews(uid),
     canReview(uid, session?.uid),
   ]);
-  // الملف العام يعرض إعلانات تربح النشطة فقط — منتجات المتاجر تبقى داخل متجرها
+  // الملف العام يعرض إعلانات عقار تربح النشطة فقط — منتجات المتاجر تبقى داخل متجرها
   const myAds = myAdsAll.filter((a) => (!a.storeOnly || (a.trbhhUntil && new Date(a.trbhhUntil) > new Date())) && a.status === 1 && a.state === 'active');
   // viewing your OWN profile clears the "new reviews" alert
   if (session && session.uid === uid) {
@@ -52,7 +52,7 @@ export default async function UserProfilePage({ params, searchParams }: { params
   const active = myAds.filter((a) => a.status === 1);
   // عدد الصفقات المكتملة — يظهر في بطاقة الوسيط المرخّص فقط
   const dealsDone = user.re_license ? await import('@/lib/viewings').then((m) => m.dealsCount(uid)).catch(() => 0) : 0;
-  // مجموع مشاهدات إعلانات العضو المعروضة في تربح
+  // مجموع مشاهدات إعلانات العضو المعروضة في عقار تربح
   const viewsSum = active.length
     ? await prisma.ads_views.count({ where: { ads_id: { in: active.map((a) => BigInt(a.id)) } } }).catch(() => 0)
     : 0;
@@ -150,8 +150,8 @@ export default async function UserProfilePage({ params, searchParams }: { params
           <span className="h-11 flex-1 rounded-xl border bg-white text-primary shadow-sm" title="مشاركة">
             <ShareButtons
               url={profileUrl}
-              title={`${displayName} على تربح`}
-              text={[`${displayName} على تربح`, `${active.length} إعلان نشط`].join('\n')}
+              title={`${displayName} على عقار تربح`}
+              text={[`${displayName} على عقار تربح`, `${active.length} إعلان نشط`].join('\n')}
               compact
               iconOnly
               card={{ url: profileUrl, title: displayName, city: '', image: user.photo_path ? mediaUrl(user.photo_path) : '/logo-aqar-256.png?v=3' }}

@@ -158,11 +158,11 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const similar = similarRaw.filter((a) => !sellerAdIds.has(a.id));
 
   // هل هذا إعلان متجر (معروض في واجهة متجر مستقل)؟ إن كان، فالمتجر مستقل:
-  // نمنع ظهور مبوّبات تربح ونعرض رابطاً واضحاً «زيارة المتجر».
+  // نمنع ظهور مبوّبات عقار تربح ونعرض رابطاً واضحاً «زيارة المتجر».
   const { storeIdOfUser, storeProductAdIds, getStoreMeta } = await import('@/lib/merchant');
   const sellerStoreId = ad.seller ? await storeIdOfUser(ad.seller.id).catch(() => 0) : 0;
   const inStore = sellerStoreId ? (await storeProductAdIds(sellerStoreId).catch(() => [] as number[])).includes(ad.id) : false;
-  // عزل تام: منتج المتجر يُعرض داخل متجره فقط — إلا بعرض مدفوع ساري («الظهور في تربح»)
+  // عزل تام: منتج المتجر يُعرض داخل متجره فقط — إلا بعرض مدفوع ساري («الظهور في عقار تربح»)
   const shownInTrbhh = !!(ad.trbhhUntil && new Date(ad.trbhhUntil) > new Date());
   if (inStore && ad.storeOnly && !shownInTrbhh) redirect(`/companies/${sellerStoreId}/p/${ad.id}`);
   const storeMeta = inStore ? await getStoreMeta(sellerStoreId).catch(() => null) : null;
@@ -174,7 +174,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const storeUrl = inStore ? `/companies/${storeMeta?.handle || sellerStoreId}` : '';
 
   const shareUrl = inStore ? (storeUrl.startsWith('http') ? storeUrl : `https://${SITE.domain}/companies/${sellerStoreId}`) : `https://${SITE.domain}/ads/${ad.id}`;
-  // نص واتساب مُعبّأ مسبقاً: نص المتجر إن كان إعلان متجر، وإلا نص تربح لمراسلة صاحب الإعلان
+  // نص واتساب مُعبّأ مسبقاً: نص المتجر إن كان إعلان متجر، وإلا نص عقار تربح لمراسلة صاحب الإعلان
   const [adNotice, adTpls] = await Promise.all([getAdNotice(), getAdMsgTemplates()]);
   const storeTpls = parseTemplates(storeMeta?.msgTemplates);
   const baseTpl = (inStore && storeTpls.length ? storeTpls[0] : adTpls[0]) || '';
@@ -207,7 +207,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         return m.DURATIONS.map((d) => ({ key: d.key, label: d.label, price: svc.featured[d.key] })).filter((o) => o.price > 0);
       }).catch(() => [])
     : [];
-  // «عرض الإعلان في تربح» — لصاحب متجر على منتج متجره فقط (شارة عاجل/تمييز تخص إعلان تربح العادي، وهذه تخص منتج المتجر تحديداً)
+  // «عرض الإعلان في عقار تربح» — لصاحب متجر على منتج متجره فقط (شارة عاجل/تمييز تخص إعلان عقار تربح العادي، وهذه تخص منتج المتجر تحديداً)
   const adShowPkgs = isAdOwner && inStore
     ? await import('@/lib/settings').then((m) => m.getTrbhhShowPricing()).then((p) => p.ads.filter((a) => a.price > 0)).catch(() => [])
     : [];
@@ -274,7 +274,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         </div>
       )}
 
-      {/* إدارة الإعلان العادي (تربح) لصاحبه من أعلى صفحته: تعديل/أرشفة/حذف — بمهل السماح.
+      {/* إدارة الإعلان العادي (عقار تربح) لصاحبه من أعلى صفحته: تعديل/أرشفة/حذف — بمهل السماح.
           إعلان المتجر له مربع منفصل بأسلوب «أدوات الإدارة» بعد التفاصيل (أدناه). */}
       {isAdOwner && !ad.storeOnly && editState && deleteState && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3">
@@ -428,22 +428,22 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         );
       })()}
 
-      {/* نتيجة طلب عرض الإعلان في تربح 📢 */}
-      {spx.adshow === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">📢 أصبح إعلانك معروضاً في قوائم تربح وخُصمت الرسوم من رصيدك.</div>}
+      {/* نتيجة طلب عرض الإعلان في عقار تربح 📢 */}
+      {spx.adshow === '1' && <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">📢 أصبح إعلانك معروضاً في قوائم عقار تربح وخُصمت الرسوم من رصيدك.</div>}
       {spx.adshow === 'needcredit' && (
         <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
-          💳 رصيدك لا يكفي{spx.price ? ` (المطلوب ${spx.price} ر.س)` : ''} لعرض الإعلان في تربح —{' '}
+          💳 رصيدك لا يكفي{spx.price ? ` (المطلوب ${spx.price} ر.س)` : ''} لعرض الإعلان في عقار تربح —{' '}
           <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.
         </div>
       )}
       {spx.adshow === 'dup' && (
         <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">
-          ⛔ تعذّر العرض في تربح — هذا الإعلان يشابه إعلاناً {spx.dupid ? <Link href={`/ads/${spx.dupid}`} className="underline">آخر منشوراً بالفعل</Link> : 'آخر منشوراً بالفعل'} في تربح (فحص التكرار العام يشمل إعلانات المتاجر عند عرضها بالدفع).
+          ⛔ تعذّر العرض في عقار تربح — هذا الإعلان يشابه إعلاناً {spx.dupid ? <Link href={`/ads/${spx.dupid}`} className="underline">آخر منشوراً بالفعل</Link> : 'آخر منشوراً بالفعل'} في عقار تربح (فحص التكرار العام يشمل إعلانات المتاجر عند عرضها بالدفع).
         </div>
       )}
       {spx.adshow === 'err' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر تنفيذ الطلب — حاول مجدداً.</div>}
 
-      {/* عرض الإعلان في تربح 📢 — لمنتج المتجر فقط: يظهر الإعلان في كل قوائم تربح (لا يقتصر على متجرك) */}
+      {/* عرض الإعلان في عقار تربح 📢 — لمنتج المتجر فقط: يظهر الإعلان في كل قوائم عقار تربح (لا يقتصر على متجرك) */}
       {adShowPkgs.length > 0 && (() => {
         const adShowActive = shownInTrbhh;
         const untilLabel = adShowActive ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(new Date(ad.trbhhUntil!)) : '';
@@ -453,9 +453,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <input type="hidden" name="adId" value={ad.id} />
             <input type="hidden" name="back" value="ad" />
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-extrabold text-white">📢 عرض في تربح</span>
+              <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-extrabold text-white">📢 عرض في عقار تربح</span>
               <span className="text-xs font-bold text-sky-800">
-                {adShowActive ? `إعلانك معروض في تربح حتى ${untilLabel} — مدّد المدة` : 'اعرض إعلان متجرك في كل قوائم تربح (الرئيسية/البحث)'}
+                {adShowActive ? `إعلانك معروض في عقار تربح حتى ${untilLabel} — مدّد المدة` : 'اعرض إعلان متجرك في كل قوائم عقار تربح (الرئيسية/البحث)'}
               </span>
             </div>
             {(() => {
@@ -466,7 +466,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                 <p className="rounded-lg border-2 border-red-400 bg-red-50 px-2.5 py-2 text-xs font-bold text-red-700">💳 رصيدك ({ownerBalance} ر.س) لا يكفي لأقل باقة عرض ({minPrice} ر.س) — <Link href="/account/wallet#topup" className="underline">اشحن رصيدك</Link></p>
               ) : (
                 <>
-                  <p className="text-xs font-medium text-muted-foreground">تظهر منتجات متجرك عادة داخل متجرك فقط — هذا يعرضها لكل زوّار تربح. رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
+                  <p className="text-xs font-medium text-muted-foreground">تظهر منتجات متجرك عادة داخل متجرك فقط — هذا يعرضها لكل زوّار عقار تربح. رصيدك: {ownerBalance} ر.س — <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك</Link> إن احتجت.</p>
                   <div className="flex items-center gap-1.5">
                     <select name="pkg" defaultValue={firstAfford} className="h-10 min-w-0 flex-1 rounded-lg border border-sky-300 bg-white px-3 text-sm font-bold">
                       {adShowPkgs.map((p) => (
@@ -474,12 +474,12 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                       ))}
                     </select>
                     <ConfirmSubmit
-                      msg="تأكيد شراء عرض هذا الإعلان في تربح للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً."
+                      msg="تأكيد شراء عرض هذا الإعلان في عقار تربح للباقة المختارة؟ سيُخصم السعر من رصيدك فوراً."
                       extendUntil={adShowActive ? ad.trbhhUntil! : undefined}
                       extendField="pkg"
                       extendUnit="days"
                       extendMap={daysMap}
-                      extendTemplate={`إعلانك معروض في تربح حالياً حتى ${untilLabel} — عند التأكيد سيُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
+                      extendTemplate={`إعلانك معروض في عقار تربح حالياً حتى ${untilLabel} — عند التأكيد سيُمدَّد إلى {date}. سيُخصم السعر من رصيدك.`}
                       className="btn-3d shrink-0 whitespace-nowrap rounded-lg bg-sky-600 px-3 py-2.5 text-sm font-extrabold text-white"
                     >
                       {adShowActive ? 'تمديد العرض' : 'اعرض الآن'}
@@ -522,7 +522,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       {/* اشتراكات هذا الإعلان وباقاتها وتواريخ الانتهاء — لصاحب الإعلان */}
       {ownerViewing && addons && <AdAddonsBox info={addons} title="⭐ اشتراكات هذا الإعلان — الإضافات وباقاتها وتاريخ الانتهاء" />}
 
-      {/* إعلان متجر مستقل: امنع مبوّبات تربح واعرض رابط زيارة المتجر */}
+      {/* إعلان متجر مستقل: امنع مبوّبات عقار تربح واعرض رابط زيارة المتجر */}
       {inStore && <SplashSuppress />}
       {inStore && storeUrl && (
         <a href={storeUrl} className="flex items-center justify-between gap-2 rounded-xl border-2 border-primary/25 bg-primary/5 p-3 text-sm font-bold text-primary">

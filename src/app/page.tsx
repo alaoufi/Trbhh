@@ -63,7 +63,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     getHomeStats().catch(() => new Set(['ads', 'users', 'views'])),
     getHomeClassifiedText().catch(() => ({ title: 'الإعلانات المبوّبة', sub: 'تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي' })),
   ]);
-  const H = await getHomeHeadings().catch(() => ({ stores: 'متاجر تربح', products: 'منتجات المتاجر', featured: 'إعلانات مميّزة', latest: 'أحدث الإعلانات', mostViewed: 'الأكثر مشاهدة' }));
+  const H = await getHomeHeadings().catch(() => ({ stores: 'متاجر عقار تربح', products: 'منتجات المتاجر', featured: 'إعلانات مميّزة', latest: 'أحدث الإعلانات', mostViewed: 'الأكثر مشاهدة' }));
   const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
     { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
     { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
@@ -105,7 +105,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
       {/* ✅ تأكيد نشر الإعلان — يظهر بعد النشر الناجح والتحويل للرئيسية */}
       {sp.published && (
         <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-center text-sm font-extrabold text-emerald-800 shadow-sm">
-          ✅ تم نشر إعلانك بنجاح ويظهر الآن في تربح.
+          ✅ تم نشر إعلانك بنجاح ويظهر الآن في عقار تربح.
           {Number(sp.published) > 0 && <> <Link href={`/ads/${Number(sp.published)}`} className="underline">عرض إعلانك</Link></>}
         </div>
       )}
@@ -157,7 +157,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
         </CollapsibleSection>
       )}
 
-      {/* تقييم منصة تربح بالنجوم — للزوّار والأعضاء، مرة واحدة لكل منهما */}
+      {/* تقييم عقار تربح بالنجوم — للزوّار والأعضاء، مرة واحدة لكل منهما */}
       {platformRatingOn && (
         <div className="-mt-2">
           <PlatformRatingWidget avg={platformRating.avg} count={platformRating.count} alreadyRated={platformRated} isLoggedIn={!!session} myStar={myReview?.star || 0} myNote={myReview?.note || ''} />
@@ -171,19 +171,19 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
         </div>
       )}
 
-      {/* أزرار الموقع بسطر واحد: متابعة تربح، واتساب واتصال بالرقم الرسمي، مشاركة الموقع */}
+      {/* أزرار الموقع بسطر واحد: متابعة عقار تربح، واتساب واتصال بالرقم الرسمي، مشاركة الموقع */}
       {homeActionsOn && (
         <div className="flex gap-2">
-          <Link href={session ? '/notifications' : '/register'} aria-label="تابع تربح" title={session ? 'تابع تربح — تنبيهاتك' : 'تابع تربح — سجّل الآن'} className="grid h-11 flex-1 place-items-center rounded-xl bg-primary text-white shadow-sm">
+          <Link href={session ? '/notifications' : '/register'} aria-label="تابع عقار تربح" title={session ? 'تابع عقار تربح — تنبيهاتك' : 'تابع عقار تربح — سجّل الآن'} className="grid h-11 flex-1 place-items-center rounded-xl bg-primary text-white shadow-sm">
             <Heart className="h-5 w-5 fill-white" />
           </Link>
-          <a href={`https://wa.me/${siteDigits}`} target="_blank" rel="noopener noreferrer" aria-label="واتساب تربح" title="راسلنا واتساب — للاستفسار والملاحظات" className="grid h-11 flex-1 place-items-center rounded-xl bg-[#25D366] text-white shadow-sm">
+          <a href={`https://wa.me/${siteDigits}`} target="_blank" rel="noopener noreferrer" aria-label="واتساب عقار تربح" title="راسلنا واتساب — للاستفسار والملاحظات" className="grid h-11 flex-1 place-items-center rounded-xl bg-[#25D366] text-white shadow-sm">
             <MessageCircle className="h-5 w-5" />
           </a>
-          <a href={`tel:+${siteDigits}`} aria-label="اتصل بتربح" title="اتصل بنا — للاستفسار والملاحظات" className="grid h-11 flex-1 place-items-center rounded-xl border bg-white text-primary shadow-sm">
+          <a href={`tel:+${siteDigits}`} aria-label="اتصل بعقار تربح" title="اتصل بنا — للاستفسار والملاحظات" className="grid h-11 flex-1 place-items-center rounded-xl border bg-white text-primary shadow-sm">
             <Phone className="h-5 w-5" />
           </a>
-          <span className="h-11 flex-1 rounded-xl border bg-white text-primary shadow-sm" title="شارك تربح">
+          <span className="h-11 flex-1 rounded-xl border bg-white text-primary shadow-sm" title="شارك عقار تربح">
             <ShareButtons
               url={`https://${SITE.domain}`}
               title={SITE.name}

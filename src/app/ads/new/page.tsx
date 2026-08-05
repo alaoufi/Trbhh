@@ -17,7 +17,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false),
     import('@/lib/store-extras').then((m) => m.stockEnabled()).catch(() => false),
   ]);
-  // شارة عاجل — عرض تسويقي داخل نموذج النشر (لإعلانات تربح فقط)
+  // شارة عاجل — عرض تسويقي داخل نموذج النشر (لإعلانات عقار تربح فقط)
   const extras = await import('@/lib/settings').then((m) => m.getAdExtras()).catch(() => null);
   const session = await getSession();
   if (!session) redirect('/login');
@@ -29,7 +29,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   // الهوية الفعّالة الحالية (نفس مصدر createAdAction) — لعرضها صريحةً وتحديد المجال افتراضياً
   const active = await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).catch(() => null);
   // الوجهة: المعامل الصريح يفصل (store/personal)، وإلا تُشتقّ من مجال الهوية الفعّالة —
-  // فما تراه في المبدّل هو ما تنشر فيه فعلاً. استقلالية تامّة: هوية تربح ⇐ تربح، هوية متجر ⇐ متجرها.
+  // فما تراه في المبدّل هو ما تنشر فيه فعلاً. استقلالية تامّة: هوية عقار تربح ⇐ عقار تربح، هوية متجر ⇐ متجرها.
   const publishingAsStore = dest === 'store' || (dest !== 'personal' && active?.type === 'store');
   const [countries, cities, areas, user] = await Promise.all([
     getCountries(), getCities(), getAreas(),
@@ -39,7 +39,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   const urgentOffer = extras && extras.urgentPacks.length > 0 && !publishingAsStore
     ? { packs: extras.urgentPacks, balance }
     : undefined;
-  // التمييز ⭐ — عرض المدد المسعّرة داخل نموذج النشر (لإعلانات تربح فقط)
+  // التمييز ⭐ — عرض المدد المسعّرة داخل نموذج النشر (لإعلانات عقار تربح فقط)
   const { getServicePricing, DURATIONS } = await import('@/lib/settings');
   const svc = await getServicePricing().catch(() => null);
   const featuredOpts = svc && !publishingAsStore
@@ -100,12 +100,12 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
           <div className="font-extrabold">
             {publishingAsStore
               ? <>🏬 تنشر الآن داخل متجرك «{myStore?.name || active.name}» فقط</>
-              : <>🟢 تنشر الآن في تربح (إعلانات عامة) باسم «{active.name}»</>}
+              : <>🟢 تنشر الآن في عقار تربح (إعلانات عامة) باسم «{active.name}»</>}
           </div>
           <div className="mt-0.5 text-[11px] text-muted-foreground">
             {publishingAsStore
-              ? 'الإعلان يظهر لزوّار متجرك فقط، لا في قوائم تربح العامة — مستقلّ تماماً عن هويتك الشخصية.'
-              : 'الإعلان يظهر في تربح للجميع باسم هذه الهوية — مستقلّ تماماً عن أي متجر.'}
+              ? 'الإعلان يظهر لزوّار متجرك فقط، لا في قوائم عقار تربح العامة — مستقلّ تماماً عن هويتك الشخصية.'
+              : 'الإعلان يظهر في عقار تربح للجميع باسم هذه الهوية — مستقلّ تماماً عن أي متجر.'}
           </div>
         </div>
       )}
@@ -116,7 +116,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
           <div className="mb-2 text-sm font-extrabold text-primary">🎭 أنشر باسم</div>
           <div className="grid grid-cols-2 gap-2">
             <Link href="/ads/new?dest=personal" className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold ${!publishingAsStore ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
-              👤 باسمي الشخصي (تربح)
+              👤 باسمي الشخصي (عقار تربح)
             </Link>
             <Link href="/ads/new?dest=store" className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold ${publishingAsStore ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
               🏬 باسم متجر «{myStore.name}»
@@ -125,7 +125,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
           <p className="mt-2 text-[11px] text-muted-foreground">
             {publishingAsStore
               ? 'سيظهر هذا الإعلان لزوّار متجرك باسم متجرك ورقمه — لا باسمك الشخصي.'
-              : 'سيظهر هذا الإعلان في تربح باسمك الشخصي. اختر «باسم متجري» لنشره داخل متجرك بهويته.'}
+              : 'سيظهر هذا الإعلان في عقار تربح باسمك الشخصي. اختر «باسم متجري» لنشره داخل متجرك بهويته.'}
           </p>
         </div>
       )}

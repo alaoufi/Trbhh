@@ -23,8 +23,8 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
   const { blockedBetween, hasBlocked } = await import('@/lib/blocks');
   const [blocked, iBlocked] = await Promise.all([blockedBetween(session.uid, otherId), hasBlocked(session.uid, otherId)]);
 
-  // نصوص المراسلة الجاهزة: للإدارة نصوص تربح الإدارية، ولصاحب متجر نصوصه الخاصة
-  // (تظهر لعملائه فقط)، وللمعلن العادي نصوص تربح لمراسلة صاحب الإعلان.
+  // نصوص المراسلة الجاهزة: للإدارة نصوص عقار تربح الإدارية، ولصاحب متجر نصوصه الخاصة
+  // (تظهر لعملائه فقط)، وللمعلن العادي نصوص عقار تربح لمراسلة صاحب الإعلان.
   const adminId = await getPrimaryAdminId().catch(() => 0);
   let templates: string[] = [];
   if (adminId && session.uid === adminId) {

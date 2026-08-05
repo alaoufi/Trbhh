@@ -95,7 +95,7 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
             : <b className="text-muted-foreground">لا اشتراك مسجّل</b>}
         </div>
         <div>
-          <span className="text-muted-foreground">🏠 العرض في رئيسية تربح: </span>
+          <span className="text-muted-foreground">🏠 العرض في رئيسية عقار تربح: </span>
           {s.homeFeatured
             ? <b className="text-amber-700">بقرار إداري (مجاني دائم)</b>
             : s.showUntil
@@ -263,7 +263,7 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
           </span>
         </div>
         {verifyOrders.pending.length === 0 && verifyOrders.active.length === 0 && (
-          <p className="text-xs font-bold text-muted-foreground">لا توجد طلبات توثيق حالياً — يطلبها صاحب المتجر من لوحة متجره (قسم «الظهور في تربح» ← بطاقة «⭐ توثيق المتجر») باختيار باقة والموافقة على التعهد، فتظهر هنا للموافقة (خصم وتفعيل) أو الرفض بسبب.</p>
+          <p className="text-xs font-bold text-muted-foreground">لا توجد طلبات توثيق حالياً — يطلبها صاحب المتجر من لوحة متجره (قسم «الظهور في عقار تربح» ← بطاقة «⭐ توثيق المتجر») باختيار باقة والموافقة على التعهد، فتظهر هنا للموافقة (خصم وتفعيل) أو الرفض بسبب.</p>
         )}
         {(verifyOrders.pending.length > 0 || verifyOrders.active.length > 0) && (
           <div className="space-y-2">
@@ -318,10 +318,10 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
         )}
       </div>
 
-      {/* طلبات عرض المنتجات في منصة تربح — إعلان المتجر يظهر تلقائياً، والمنتجات بموافقة */}
+      {/* طلبات عرض المنتجات في عقار تربح — إعلان المتجر يظهر تلقائياً، والمنتجات بموافقة */}
       {platformReqs.length > 0 && (
         <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 p-3">
-          <div className="mb-2 flex items-center gap-2 font-bold text-emerald-700"><Megaphone className="h-5 w-5" /> طلبات عرض المنتجات في منصة تربح ({en(platformReqs.length)})</div>
+          <div className="mb-2 flex items-center gap-2 font-bold text-emerald-700"><Megaphone className="h-5 w-5" /> طلبات عرض المنتجات في عقار تربح ({en(platformReqs.length)})</div>
           <div className="space-y-2">
             {platformReqs.map((r) => (
               <div key={r.storeId} className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 text-sm shadow-sm">
@@ -329,7 +329,7 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
                   <div className="font-bold text-primary">{r.storeName || `متجر #${r.storeId}`}</div>
                   <div className="text-xs text-muted-foreground">التاجر: {r.ownerName} · طلب {timeAgo(r.at)}</div>
                 </Link>
-                <form action={decidePlatformAction}><input type="hidden" name="storeId" value={r.storeId} /><input type="hidden" name="action" value="approve" /><ConfirmSubmit msg="تأكيد اعتماد عرض منتجات هذا المتجر في تربح؟" className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد العرض</ConfirmSubmit></form>
+                <form action={decidePlatformAction}><input type="hidden" name="storeId" value={r.storeId} /><input type="hidden" name="action" value="approve" /><ConfirmSubmit msg="تأكيد اعتماد عرض منتجات هذا المتجر في عقار تربح؟" className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد العرض</ConfirmSubmit></form>
                 <form action={decidePlatformAction}><input type="hidden" name="storeId" value={r.storeId} /><input type="hidden" name="action" value="reject" /><ConfirmSubmit msg="تأكيد رفض طلب عرض المنتجات؟" className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit></form>
               </div>
             ))}

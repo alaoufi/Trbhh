@@ -14,7 +14,7 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const metadata = {
   title: 'بحث متقدم',
-  description: 'ابحث بين آلاف إعلانات البيع والشراء من متاجر وأفراد — فلترة بالقسم والمدينة والسعر والنوع (عرض/طلب) على منصة تربح.',
+  description: 'ابحث بين آلاف إعلانات البيع والشراء من متاجر وأفراد — فلترة بالقسم والمدينة والسعر والنوع (عرض/طلب) على عقار تربح.',
 };
 
 export default async function SearchPage({

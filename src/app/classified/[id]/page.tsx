@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const c = await getClassifiedById(Number(id));
   const title = c?.title || c?.text?.slice(0, 40) || 'إعلان مبوّب';
-  const desc = 'الإعلانات المبوّبة .. منصة تربح الإعلانية';
+  const desc = 'الإعلانات المبوّبة .. عقار تربح الإعلانية';
   const url = `https://${SITE.domain}/classified/${Number(id)}`;
   // صورة الإعلان في معاينة الرابط (واتساب/تويتر/فيسبوك) — تظهر تلقائياً عند مشاركة الرابط
   const images = c?.image ? [c.image] : undefined;
@@ -45,7 +45,7 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
   const ownerState = (isOwner || admin) ? await getClassifiedOwnerState(numId).catch(() => null) : null;
   const isPaused = ownerState ? ownerState.status !== 1 : false;
   const shareUrl = `https://${SITE.domain}/classified/${c.id}`;
-  const shareText = 'الإعلانات المبوّبة .. منصة تربح الإعلانية';
+  const shareText = 'الإعلانات المبوّبة .. عقار تربح الإعلانية';
 
   // إخفاء المبوّب عن العامة بنفس منطق القائمة تماماً (status + انتهاء/عمر) — المالك
   // والإدارة يريانه دائماً. سابقاً كان يعتمد عمر الإنشاء فقط ويتجاهل expires_at، فيُرجع

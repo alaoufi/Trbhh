@@ -35,7 +35,7 @@ export async function deleteAdAction(formData: FormData) {
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (ad && toInt(ad.user_id) === session.uid) {
     // صاحب المتجر يملك التحكّم الكامل بإعلانات متجره: يحذفها نهائياً في أي وقت
-    // بلا قيد «فترة السماح بالحذف» (تلك تخصّ إعلانات تربح العادية فقط).
+    // بلا قيد «فترة السماح بالحذف» (تلك تخصّ إعلانات عقار تربح العادية فقط).
     const isStoreAd = Number(ad.store_only) === 1;
     if (!isStoreAd) {
       const { deleteHours } = await getMemberWindows();
@@ -102,7 +102,7 @@ export async function restoreArchivedAdAction(formData: FormData) {
   const isArchived = !!(ad.data_archive && ad.data_archive.trim() !== '');
   if (!isArchived) redirect('/account/ads');
   // إعلان المتجر: يعيده صاحب المتجر من الأرشيف مجاناً بلا رسوم استعادة (رسوم
-  // الاستعادة تخصّ إعلانات تربح العادية فقط).
+  // الاستعادة تخصّ إعلانات عقار تربح العادية فقط).
   const isStoreAd = Number(ad.store_only) === 1;
   const fee = isStoreAd ? 0 : await getAdRestoreFee().catch(() => 0);
   if (fee > 0) {

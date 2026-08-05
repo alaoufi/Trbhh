@@ -17,7 +17,7 @@ async function logoUrl(logoId: number | null): Promise<string> {
  * name (owner's choice in store settings). Returns `{ logo?, text? }` for
  * watermarkImage — logo wins when chosen and readable, otherwise the name text.
  * Returns undefined when the user has no store / no usable identity (→ the
- * default "تربح" watermark applies). Never throws.
+ * default "عقار تربح" watermark applies). Never throws.
  */
 export async function getStoreWatermark(userId: number): Promise<{ text?: string; logo?: Buffer } | undefined> {
   try {
@@ -530,7 +530,7 @@ export async function setStoreUsername(userId: number, raw: string): Promise<{ o
   }
   const username = normalizeStoreUsername(raw);
   if (!username) return { ok: false, msg: 'اسم الدخول غير صالح (أحرف إنجليزية وأرقام و«. _ -» فقط، ٣ خانات فأكثر، وغير محجوز).' };
-  // فريد عالمياً: لا يطابق اسم دخول متجر آخر، ولا اسم مستخدم أي عضو آخر في تربح
+  // فريد عالمياً: لا يطابق اسم دخول متجر آخر، ولا اسم مستخدم أي عضو آخر في عقار تربح
   const takenByStore = await prisma.stores.findFirst({ where: { store_username: username, id: { not: BigInt(storeId) } }, select: { id: true } }).catch(() => null);
   if (takenByStore) return { ok: false, msg: 'اسم الدخول مستخدم من متجر آخر — اختر غيره.' };
   const takenByUser = await prisma.users.findFirst({ where: { userName: username, id: { not: BigInt(userId) } }, select: { id: true } }).catch(() => null);

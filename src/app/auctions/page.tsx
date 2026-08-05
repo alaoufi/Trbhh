@@ -6,7 +6,7 @@ import { getSession } from '@/lib/auth';
 import { auctionsEnabled, listAuctions, closeDueAuctions, type AuctionCard } from '@/lib/auctions';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'المزادات', description: 'زايد على أفضل العروض في مزادات تربح' };
+export const metadata = { title: 'المزادات', description: 'زايد على أفضل العروض في مزادات عقار تربح' };
 
 const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
 

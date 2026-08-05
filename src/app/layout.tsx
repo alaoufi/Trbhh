@@ -25,9 +25,9 @@ const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', di
 
 // عنوان ووصف مشاركة الموقع قابلان للتعديل من الإدارة ← النصوص ← عام
 export async function generateMetadata(): Promise<Metadata> {
-  // بطاقة مشاركة «تربح للعقار» المستقلّة — النص ثابت للعلامة العقارية، والصورة تُولَّد
+  // بطاقة مشاركة «عقار تربح» المستقلّة — النص ثابت للعلامة العقارية، والصورة تُولَّد
   // من opengraph-image.tsx (لا نضبط images هنا حتى لا نُلغي الصورة المُولّدة).
-  const shareTitle = 'منصة تربح للعقار';
+  const shareTitle = 'عقار تربح';
   const shareDesc = 'تستقبل عروضكم وطلباتكم';
   return {
     metadataBase: new URL(`https://${SITE.domain}`),
@@ -153,7 +153,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <InstallPrompt />
         <PwaRegister />
         {/* ختم التوثيق «متجر موثّق» (المركز السعودي للأعمال) — لا يظهر إلا عند وجود رمز
-            توثيق مستقل لتربح للعقار في الإعدادات (verify_seal_token). حالياً فارغ =
+            توثيق مستقل لعقار تربح في الإعدادات (verify_seal_token). حالياً فارغ =
             مخفيّ (توثيق الموقع الرئيسي منفصل ولا يخصّ هذه المنصّة). عند صدور توثيق خاص
             يُضبط الرمز في الإعدادات فيظهر تلقائياً — دون أي تغيير آخر في الكود. */}
         {sealToken && (

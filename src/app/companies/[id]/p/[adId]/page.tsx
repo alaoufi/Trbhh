@@ -53,8 +53,8 @@ function InfoItem({ icon: Icon, children, color }: { icon: React.ElementType; ch
 }
 
 /**
- * صفحة إعلان داخل المتجر — مستقلّة تماماً عن تربح: لا شاشة مبوّبات، لا إعلانات
- * مشابهة، لا هوية تربح. تُعرض ضمن هوية المتجر وحدها (ChromeGate يُخفي واجهة تربح
+ * صفحة إعلان داخل المتجر — مستقلّة تماماً عن عقار تربح: لا شاشة مبوّبات، لا إعلانات
+ * مشابهة، لا هوية عقار تربح. تُعرض ضمن هوية المتجر وحدها (ChromeGate يُخفي واجهة عقار تربح
  * على مسار /companies/*). تُفتح مباشرة عند مشاركة إعلان المتجر في واتساب.
  */
 export default async function StoreProductPage({ params }: { params: Promise<{ id: string; adId: string }> }) {
@@ -130,7 +130,7 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
   return (
     <div className="min-h-screen bg-muted/20 pb-24">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml }} />
-      {/* رأس المتجر — رجوع + هوية المتجر (لا هوية تربح) */}
+      {/* رأس المتجر — رجوع + هوية المتجر (لا هوية عقار تربح) */}
       <div className="sticky top-0 z-30 border-b bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-3 py-2">
           <Link href={storeHome} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="رجوع للمتجر">

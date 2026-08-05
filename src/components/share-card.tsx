@@ -63,7 +63,7 @@ export function ShareCardButton({ data, className, label, primary }: { data: Sha
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'right'; ctx.direction = 'rtl';
       ctx.font = 'bold 56px Cairo, Tahoma, sans-serif';
-      ctx.fillText('تربح', W - 48, 90);
+      ctx.fillText('عقار تربح', W - 48, 90);
       ctx.font = 'bold 30px Cairo, Tahoma, sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText('trbhh.com', 48, 88);

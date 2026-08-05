@@ -31,8 +31,8 @@ async function resolveStore(sParam: string) {
 }
 
 /**
- * دخول المتجر — بهوية المتجر ولونه، لكن البيانات موحّدة مع تربح (رقم الجوال
- * وكلمة المرور نفسها): الدخول من هنا أو من تربح يفتح كليهما بجلسة واحدة.
+ * دخول المتجر — بهوية المتجر ولونه، لكن البيانات موحّدة مع عقار تربح (رقم الجوال
+ * وكلمة المرور نفسها): الدخول من هنا أو من عقار تربح يفتح كليهما بجلسة واحدة.
  */
 export default async function StoreLoginPage({ searchParams }: { searchParams: Promise<{ error?: string; s?: string }> }) {
   const { error, s } = await searchParams;
@@ -56,7 +56,7 @@ export default async function StoreLoginPage({ searchParams }: { searchParams: P
           {store ? <>الدخول على متجر {store.name}</> : 'دخول المتاجر'}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          بيانات الدخول موحّدة مع تربح: رقم الجوال وكلمة المرور نفسها — دخولك هنا يفتح تربح ومتجرك معاً.
+          بيانات الدخول موحّدة مع عقار تربح: رقم الجوال وكلمة المرور نفسها — دخولك هنا يفتح عقار تربح ومتجرك معاً.
         </p>
       </div>
 
@@ -78,7 +78,7 @@ export default async function StoreLoginPage({ searchParams }: { searchParams: P
       <Link href="/forgot" className="text-sm font-bold underline" style={{ color: brand }}>نسيت كلمة المرور؟</Link>
 
       <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:underline">
-        <Home className="h-3.5 w-3.5" /> الرجوع لتربح
+        <Home className="h-3.5 w-3.5" /> الرجوع لعقار تربح
       </Link>
     </div>
   );

@@ -15,7 +15,7 @@ export async function loginAction(_prev: unknown, formData: FormData) {
   await createSession({ uid: r.uid, name: r.name, type: r.type });
   const next = String(formData.get('next') || '');
   if (next.startsWith('/') && !next.startsWith('//')) redirect(next);
-  // بيانات الدخول موحّدة: نفس الجلسة تفتح تربح وإدارة متجر العضو (إن كان له متجر).
+  // بيانات الدخول موحّدة: نفس الجلسة تفتح عقار تربح وإدارة متجر العضو (إن كان له متجر).
   redirect('/');
 }
 

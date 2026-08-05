@@ -33,9 +33,9 @@ export async function getAdAddons(adId: number): Promise<AdAddonsInfo | null> {
   if (ad.urgent_until) {
     current.push({ icon: '🔥', label: 'شارة عاجل', until: ad.urgent_until, active: ad.urgent_until.getTime() > now });
   }
-  // عرض منتج المتجر في تربح
+  // عرض منتج المتجر في عقار تربح
   if (ad.trbhh_until) {
-    current.push({ icon: '📣', label: 'عرض في قوائم تربح', until: ad.trbhh_until, active: ad.trbhh_until.getTime() > now });
+    current.push({ icon: '📣', label: 'عرض في قوائم عقار تربح', until: ad.trbhh_until, active: ad.trbhh_until.getTime() > now });
   }
   // آخر تحديث (رفع للأعلى) — معلومة بلا انتهاء
   if (ad.bumped_at) {

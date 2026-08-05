@@ -34,7 +34,7 @@ export async function getSettingNum(k: string, fallback = 0): Promise<number> {
 
 /** أقصى مدى مستقبلي (بالأيام) لجدولة نشر الإعلانات والمبوّبة — 0 = بلا حد. */
 export const getScheduleMaxDays = () => getSettingNum('schedule_max_days', 30);
-/** رمز ختم التوثيق «متجر موثّق» (المركز السعودي للأعمال) الخاص بتربح للعقار.
+/** رمز ختم التوثيق «متجر موثّق» (المركز السعودي للأعمال) الخاص بعقار تربح.
  *  صدر توثيق مستقل للمنصّة → الرمز أدناه هو الافتراضي فيظهر الختم. يبقى قابلاً
  *  للتغيير/الإخفاء من الإعداد verify_seal_token (فراغ = إخفاء). */
 export const getVerifySealToken = () => getSetting('verify_seal_token', 'cmprSGlUN2pHWFVRTkx5cS9lQnBIUT09');
@@ -120,7 +120,7 @@ export const DEFAULT_MSG_TPL_SUPPORT = [
   'أهلاً بك {name} 👋 وصلنا استفسارك وسنرد عليك بالتفصيل خلال وقت قصير.',
   'تم تنفيذ طلبك بنجاح ✓ لا تتردد في مراسلتنا لأي استفسار آخر.',
   'نعتذر عن التأخير — طلبك قيد المعالجة الآن وسنوافيك فور الانتهاء.',
-  'شكراً لتواصلك مع تربح 🌟 سعدنا بخدمتك.',
+  'شكراً لتواصلك مع عقار تربح 🌟 سعدنا بخدمتك.',
 ].join('\n');
 export async function getSupportTemplates(): Promise<string[]> {
   const v = await getSetting(SETTING_MSG_TPL_SUPPORT, '__default__');
@@ -130,7 +130,7 @@ export async function getSupportTemplates(): Promise<string[]> {
 /* رسائل قرارات التوثيق — تُرسل للعضو من الإدارة وتُعدَّل من تبويب النصوص. */
 export const SETTING_MSG_VERIFY_OK = 'msg_verify_ok';
 export const SETTING_MSG_VERIFY_REJECT = 'msg_verify_reject';
-export const DEFAULT_MSG_VERIFY_OK = 'تهانينا {name} 🎉 تم توثيق حسابك في تربح — تظهر الآن شارة «موثّق» على ملفك وإعلاناتك. — الإدارة';
+export const DEFAULT_MSG_VERIFY_OK = 'تهانينا {name} 🎉 تم توثيق حسابك في عقار تربح — تظهر الآن شارة «موثّق» على ملفك وإعلاناتك. — الإدارة';
 export const DEFAULT_MSG_VERIFY_REJECT = 'نعتذر {name}، لم يُقبل طلب توثيق حسابك. السبب: {reason}. يمكنك معالجة السبب وإعادة رفع الوثائق من «توثيق الحساب». — الإدارة';
 
 /* شحن الرصيد — حسابات التحويل (تُدار من الإيرادات) والتعليمات + رسائل قرار الإدارة (من تبويب النصوص). */
@@ -153,7 +153,7 @@ export async function getTopupAccounts(): Promise<TopupAccount[]> {
 export async function setTopupAccounts(accounts: TopupAccount[]): Promise<void> {
   await setSetting(SETTING_TOPUP_ACCOUNTS, JSON.stringify(accounts.slice(0, 20)));
 }
-/* الظهور المدفوع في تربح (للمتاجر) — المدة والسعر لكل باقة من التحكم؛ سعر 0 = تعطيل الباقة. */
+/* الظهور المدفوع في عقار تربح (للمتاجر) — المدة والسعر لكل باقة من التحكم؛ سعر 0 = تعطيل الباقة. */
 export const AD_SHOW_PKG_DEFS = [
   { key: 'gold', label: 'الباقة الذهبية', defDays: 90 },
   { key: 'silver', label: 'الباقة الفضية', defDays: 30 },
@@ -354,7 +354,7 @@ export const DEFAULT_TOPUP_INFO = 'حوّل المبلغ إلى حساب الم�
 export const SETTING_MSG_TOPUP_OK = 'msg_topup_ok';
 export const SETTING_MSG_TOPUP_REJECT = 'msg_topup_reject';
 export const SETTING_MSG_TOPUP_CANCEL = 'msg_topup_cancel';
-export const DEFAULT_MSG_TOPUP_OK = 'تم تأكيد الشحن وإضافة {amount} ر.س إلى رصيدك ✅ شكراً لاختياركم تربح {name}، نتمنى لكم التوفيق 🎉 بإمكانكم استخدام الرصيد بكافة الوسائل لدعم إعلاناتكم. — الإدارة';
+export const DEFAULT_MSG_TOPUP_OK = 'تم تأكيد الشحن وإضافة {amount} ر.س إلى رصيدك ✅ شكراً لاختياركم عقار تربح {name}، نتمنى لكم التوفيق 🎉 بإمكانكم استخدام الرصيد بكافة الوسائل لدعم إعلاناتكم. — الإدارة';
 export const DEFAULT_MSG_TOPUP_CANCEL = 'عذراً {name}، تم إلغاء تأكيد شحن مبلغ {amount} ر.س وخُصم من رصيدك. السبب: {reason} — للاستفسار راسل الإدارة من «الرسائل».';
 export const DEFAULT_MSG_TOPUP_REJECT = 'نعتذر {name}، تم رفض طلب شحن الرصيد بمبلغ {amount} ر.س لعدم وصول المبلغ في الحساب — نأمل التأكد من رقم الحساب والاسم قبل الإرسال. السبب: {reason} — الإدارة';
 
@@ -383,7 +383,7 @@ export async function getWelcomePopupSeconds(): Promise<number> {
 }
 
 export const SETTING_TICKER = 'ticker_note';
-export const DEFAULT_TICKER = 'منصة تربح وسيلة عرض وربط فقط، والتعامل والدفع يتمّ خارج المنصة مباشرة بين الطرفين';
+export const DEFAULT_TICKER = 'عقار تربح وسيلة عرض وربط فقط، والتعامل والدفع يتمّ خارج المنصة مباشرة بين الطرفين';
 export const SETTING_HOME_CLS_TITLE = 'home_cls_title';
 export const DEFAULT_HOME_CLS_TITLE = 'الإعلانات المبوّبة';
 export const SETTING_HOME_CLS_SUB = 'home_cls_sub';
@@ -405,7 +405,7 @@ export const SETTING_HOME_H_PRODUCTS = 'home_h_products';
 export const SETTING_HOME_H_FEATURED = 'home_h_featured';
 export const SETTING_HOME_H_LATEST = 'home_h_latest';
 export const SETTING_HOME_H_MOSTVIEWED = 'home_h_mostviewed';
-export const HOME_HEADING_DEFAULTS = { stores: 'متاجر تربح', products: 'منتجات المتاجر', featured: 'إعلانات مميّزة', latest: 'أحدث الإعلانات', mostViewed: 'الأكثر مشاهدة' };
+export const HOME_HEADING_DEFAULTS = { stores: 'متاجر عقار تربح', products: 'منتجات المتاجر', featured: 'إعلانات مميّزة', latest: 'أحدث الإعلانات', mostViewed: 'الأكثر مشاهدة' };
 export async function getHomeHeadings(): Promise<{ stores: string; products: string; featured: string; latest: string; mostViewed: string }> {
   const [stores, products, featured, latest, mostViewed] = await Promise.all([
     getSetting(SETTING_HOME_H_STORES, HOME_HEADING_DEFAULTS.stores),
@@ -610,7 +610,7 @@ export function subPlanPrice(p: StoreSubPricing, plan: SubPlan): number {
   return plan === 'monthly' ? p.monthly : plan === 'sixmo' ? p.sixmo : p.yearly;
 }
 
-/* ================= باقة متجر Plus: اشتراك + عرض في تربح + شارة ⭐ ================= */
+/* ================= باقة متجر Plus: اشتراك + عرض في عقار تربح + شارة ⭐ ================= */
 
 export type StorePlusPricing = { enabled: boolean; monthly: number; sixmo: number; yearly: number };
 export async function getStorePlusPricing(): Promise<StorePlusPricing> {
@@ -666,7 +666,7 @@ export const DEFAULT_FEED_TEXTS_PROMO = [
   '🔥 شارة «عاجل» تجذب الأنظار لإعلانك لمدة 24 أو 48 ساعة.',
   '📢 أعلن معنا: بانر ترويجي في أبرز أماكن الموقع — من صفحة «أعلن معنا».',
   '🎁 تابع «محفظتي»: حملات شحن بمكافآت تُضاف لرصيدك تلقائياً.',
-  '🏪 افتح متجرك الإلكتروني على تربح بهويتك الخاصة — يبدأ بفترة تجريبية مجانية.',
+  '🏪 افتح متجرك الإلكتروني على عقار تربح بهويتك الخاصة — يبدأ بفترة تجريبية مجانية.',
 ].join('\n');
 export const DEFAULT_FEED_TEXTS_AWARE = [
   '🛡️ تعاملك مباشر مع الطرف الآخر: عاين قبل الدفع ولا تحوّل أي مبلغ قبل التأكد.',
@@ -690,7 +690,7 @@ export async function getFeedBannerItems(): Promise<FeedBannerItem[]> {
 export const SETTING_SUB_REMIND_DAYS = 'sub_remind_days';
 export const SETTING_SUB_REMIND_COUNT = 'sub_remind_count';
 export const SETTING_SUB_REMINDER_MSG = 'sub_reminder_msg';
-export const DEFAULT_SUB_REMINDER_MSG = 'تنبيه من تربح: يقترب انتهاء اشتراك متجرك خلال {days} يوم (بتاريخ {date}). جدّد الاشتراك من لوحة متجرك لتفادي إخفاء المتجر. — الإدارة';
+export const DEFAULT_SUB_REMINDER_MSG = 'تنبيه من عقار تربح: يقترب انتهاء اشتراك متجرك خلال {days} يوم (بتاريخ {date}). جدّد الاشتراك من لوحة متجرك لتفادي إخفاء المتجر. — الإدارة';
 export async function getStoreSubReminderConfig(): Promise<{ days: number; count: number }> {
   const [d, c] = await Promise.all([
     getSettingNum(SETTING_SUB_REMIND_DAYS, 7),
@@ -699,13 +699,13 @@ export async function getStoreSubReminderConfig(): Promise<{ days: number; count
   return { days: Math.max(0, Math.round(d) || 0), count: Math.max(0, Math.round(c) || 0) };
 }
 
-/* تنبيهات قرب انتهاء «عرض المتجر في تربح» و«عرض إعلان في تربح» — تستخدم نفس
+/* تنبيهات قرب انتهاء «عرض المتجر في عقار تربح» و«عرض إعلان في عقار تربح» — تستخدم نفس
    سياسة التوقيت (قبل كم يوم/كم مرة) من إعدادات الاشتراك أعلاه (سياسة موحّدة
    لكل الميزات المنتهية)، لكن بنص رسالة مستقل لكل منها من تبويب «النصوص». */
 export const SETTING_SHOW_REMINDER_MSG = 'show_reminder_msg';
-export const DEFAULT_SHOW_REMINDER_MSG = 'تنبيه من تربح: يقترب انتهاء «عرض متجرك في تربح» خلال {days} يوم (بتاريخ {date}). جدّده من لوحة متجرك ليستمر ظهور متجرك في رئيسية تربح. — الإدارة';
+export const DEFAULT_SHOW_REMINDER_MSG = 'تنبيه من عقار تربح: يقترب انتهاء «عرض متجرك في عقار تربح» خلال {days} يوم (بتاريخ {date}). جدّده من لوحة متجرك ليستمر ظهور متجرك في رئيسية عقار تربح. — الإدارة';
 export const SETTING_ADSHOW_REMINDER_MSG = 'adshow_reminder_msg';
-export const DEFAULT_ADSHOW_REMINDER_MSG = 'تنبيه من تربح: يقترب انتهاء عرض إعلانك «{name}» في تربح خلال {days} يوم (بتاريخ {date}). جدّده من لوحة متجرك ليستمر ظهوره في قوائم تربح. — الإدارة';
+export const DEFAULT_ADSHOW_REMINDER_MSG = 'تنبيه من عقار تربح: يقترب انتهاء عرض إعلانك «{name}» في عقار تربح خلال {days} يوم (بتاريخ {date}). جدّده من لوحة متجرك ليستمر ظهوره في قوائم عقار تربح. — الإدارة';
 
 /** Ad service pricing (SAR) by duration + duplicate tiers. */
 /** Durations are a shared CHOICE (not priced by themselves). Each paid service has a price per duration. */

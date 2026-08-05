@@ -12,7 +12,7 @@ function isoDay(d: Date): string {
 export type VisitSource = 'direct' | 'internal' | 'search' | 'whatsapp' | 'social' | 'external';
 export const SOURCE_LABELS: Record<VisitSource, string> = {
   direct: 'مباشر',
-  internal: 'من داخل تربح',
+  internal: 'من داخل عقار تربح',
   search: 'محركات البحث',
   whatsapp: 'واتساب',
   social: 'تواصل اجتماعي',

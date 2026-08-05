@@ -53,7 +53,7 @@ export async function startTopupPayment(
     {
       amountSar: amt,
       topupId,
-      description: `شحن رصيد تربح — ${amt} ر.س (#${topupId})`,
+      description: `شحن رصيد عقار تربح — ${amt} ر.س (#${topupId})`,
       callbackUrl: `${baseUrl()}/api/pay/callback/${cfg.provider}?t=${topupId}`,
       webhookUrl: `${baseUrl()}/api/pay/webhook/${cfg.provider}`,
       methods,

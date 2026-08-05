@@ -461,7 +461,7 @@ export async function bulkUploadProductsAction(formData: FormData) {
           adsSpecial: 'no',
           state: 'active',
           status: requireApproval ? 0 : 1,
-          store_only: 1, // عزل تام: منتجات المتجر لا تظهر في تربح
+          store_only: 1, // عزل تام: منتجات المتجر لا تظهر في عقار تربح
           bumped_at: now,
           created_at: now,
         },
@@ -484,7 +484,7 @@ export async function bulkUploadProductsAction(formData: FormData) {
 }
 
 
-/** شراء «عرض المتجر في تربح» لمدة محددة — يُخصم من الرصيد ويمدَّد التاريخ الحالي. */
+/** شراء «عرض المتجر في عقار تربح» لمدة محددة — يُخصم من الرصيد ويمدَّد التاريخ الحالي. */
 export async function buyStoreShowAction(formData: FormData) {
   const session = await requireUser();
   const { storeIdOfUser } = await import('@/lib/merchant');
@@ -497,7 +497,7 @@ export async function buyStoreShowAction(formData: FormData) {
   const price = pricing.store[dur];
   if (price <= 0) redirect('/store?show=err');
   const { charge } = await import('@/lib/wallet');
-  const paid = await charge(session.uid, price, 'store_show', `عرض المتجر في تربح — ${DUR_LABEL[dur]}`);
+  const paid = await charge(session.uid, price, 'store_show', `عرض المتجر في عقار تربح — ${DUR_LABEL[dur]}`);
   if (!paid.ok) redirect(`/store?show=needcredit&price=${price}`);
   const st = await prisma.stores.findUnique({ where: { id: BigInt(storeId) }, select: { show_until: true } }).catch(() => null);
   const base = st?.show_until && st.show_until > new Date() ? st.show_until : new Date();
@@ -508,7 +508,7 @@ export async function buyStoreShowAction(formData: FormData) {
   redirect('/store?show=1');
 }
 
-/** شراء «عرض إعلان المتجر في تربح» بباقة (المدة والسعر من التحكم) — يُخصم من الرصيد.
+/** شراء «عرض إعلان المتجر في عقار تربح» بباقة (المدة والسعر من التحكم) — يُخصم من الرصيد.
  *  back=ad: الزر من صفحة الإعلان نفسه (وليس لوحة المتجر) فيعود إليها بنتيجة الشراء. */
 export async function buyAdShowAction(formData: FormData) {
   const session = await requireUser();
@@ -527,7 +527,7 @@ export async function buyAdShowAction(formData: FormData) {
   const productIds = await storeProductAdIds(storeId).catch(() => [] as number[]);
   if (!ad || toInt(ad.user_id) !== session.uid || !productIds.includes(adId)) redirect(back ? `${back}?adshow=err` : '/store?adshow=err');
   // منتجات المتجر معفاة من فحص التكرار عند إنشائها (سياسة المتجر مستقلة)، لكن
-  // عرضها في تربح بالدفع يُخرجها لجمهور تربح — فتخضع لسياسة التكرار هنا فقط،
+  // عرضها في عقار تربح بالدفع يُخرجها لجمهور عقار تربح — فتخضع لسياسة التكرار هنا فقط،
   // حتى لا يصبح الدفع وسيلة لتفادي كشف التكرار بين الأعضاء.
   const { crossUserDuplicateOf } = await import('@/app/ads/actions');
   const dup = await crossUserDuplicateOf(session.uid, ad.title, ad.detail || '');
@@ -598,7 +598,7 @@ export async function toggleAutoRenewAction(formData: FormData) {
   redirect('/store?renew=saved');
 }
 
-/** شراء باقة متجر Plus: اشتراك + عرض في تربح + شارة ⭐ — دفعة واحدة من الرصيد. */
+/** شراء باقة متجر Plus: اشتراك + عرض في عقار تربح + شارة ⭐ — دفعة واحدة من الرصيد. */
 export async function buyStorePlusAction(formData: FormData) {
   const session = await requireUser();
   const raw = String(formData.get('plan') || '');

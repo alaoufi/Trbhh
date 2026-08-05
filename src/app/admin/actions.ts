@@ -783,7 +783,7 @@ export async function saveRevenueAction(formData: FormData) {
   await setSetting('bump_price', nn('bumpPrice'));
   // رسوم إعادة إظهار الإعلان المؤرشف
   await setSetting('ad_restore_fee', nn('adRestoreFee'));
-  // الظهور المدفوع في تربح: عرض المتجر (بالمدد) + باقات عرض الإعلان (السعر والمدة لكل باقة)
+  // الظهور المدفوع في عقار تربح: عرض المتجر (بالمدد) + باقات عرض الإعلان (السعر والمدة لكل باقة)
   await setSetting('show_store_w2', nn('showStoreW2'));
   await setSetting('show_store_m1', nn('showStoreM1'));
   await setSetting('show_store_y1', nn('showStoreY1'));
@@ -1188,7 +1188,7 @@ export async function approveVerificationAction(formData: FormData) {
     await m.grantPoints(id, cfg.verify, 'verify', true);
     await m.rewardReferral(id);
   }).catch(() => {});
-  if (gift > 0) await sendVerifyMessage(id, '__none__', `🎁 أُضيفت هدية التوثيق: ${gift} ر.س إلى رصيدك — استمتع بها في خدمات تربح.`);
+  if (gift > 0) await sendVerifyMessage(id, '__none__', `🎁 أُضيفت هدية التوثيق: ${gift} ر.س إلى رصيدك — استمتع بها في خدمات عقار تربح.`);
   await logAdmin(session.uid, 'قبول توثيق', `العضو #${id}`);
   revalidatePath('/admin/verifications');
   revalidatePath('/admin/users');

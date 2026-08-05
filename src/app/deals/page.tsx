@@ -5,7 +5,7 @@ import { dealsEnabled } from '@/lib/store-extras';
 import { AdGrid } from '@/components/ad-card';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'عروض اليوم', description: 'أقوى التخفيضات والعروض الحالية على منصة تربح' };
+export const metadata = { title: 'عروض اليوم', description: 'أقوى التخفيضات والعروض الحالية على عقار تربح' };
 
 /** عروض اليوم: كل إعلان حدد معلنه «سعراً قبل الخصم» أعلى من سعره الحالي.
  *  تُفعَّل الصفحة من التحكم (الإعدادات ← الميزات التفاعلية). */

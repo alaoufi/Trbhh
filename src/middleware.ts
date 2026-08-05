@@ -37,7 +37,7 @@ export function middleware(req: NextRequest) {
       url.pathname = `/companies/${sub}/p/${pm[1]}`;
       return NextResponse.rewrite(url);
     }
-    // أي صفحة تربح أخرى: عُد للنطاق الرئيسي — نطاق المتجر يخدم متجره فقط
+    // أي صفحة عقار تربح أخرى: عُد للنطاق الرئيسي — نطاق المتجر يخدم متجره فقط
     if (!SUB_ALLOWED.test(path)) {
       const url = req.nextUrl.clone();
       url.hostname = 'trbhh.com';

@@ -4,7 +4,7 @@ import { ensureSchema } from '@/data/schema-sync';
 
 const ensure = ensureSchema;
 
-/** متوسط تقييم منصة تربح ونجومها — للزوّار والأعضاء معاً. */
+/** متوسط تقييم عقار تربح ونجومها — للزوّار والأعضاء معاً. */
 export async function getPlatformRating(): Promise<{ avg: number; count: number }> {
   await ensure();
   const rows = await prisma.platform_reviews.findMany({ select: { star: true } }).catch(() => []);

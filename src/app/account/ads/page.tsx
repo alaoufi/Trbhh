@@ -94,7 +94,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 {timeAgo(ad.createdAt)}
                 {contactStatsOn && (() => { const c = contacts.get(ad.id); return c && (c.whatsapp + c.call) > 0 ? <> • 💬 {c.whatsapp} واتساب • 📞 {c.call} اتصال</> : null; })()}
               </span>
-              {/* نصائح تحسين الإعلان — لزيادة وصوله وجذب العملاء (للإعلانات النشطة في تربح) */}
+              {/* نصائح تحسين الإعلان — لزيادة وصوله وجذب العملاء (للإعلانات النشطة في عقار تربح) */}
               {ad.status === 1 && !ad.storeOnly && (() => {
                 const tips: string[] = [];
                 if (ad.image.includes('placeholder')) tips.push('📷 أضِف صورة — الإعلانات المصوّرة تُشاهد أضعافاً.');

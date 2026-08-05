@@ -81,7 +81,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <PropertyMapEmbed lat={loc.lat} lng={loc.lng} />
         </div>
       )}
-      <p className="pb-2 text-center text-[11px] text-muted-foreground">مشروع عقاري رقم {p.id} — منصّة تربح العقارية.</p>
+      <p className="pb-2 text-center text-[11px] text-muted-foreground">مشروع عقاري رقم {p.id} — منصّة عقار تربح العقارية.</p>
     </div>
   );
 }

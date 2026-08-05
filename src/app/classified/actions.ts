@@ -33,7 +33,7 @@ async function saveOneImage(img: { buf: Buffer; name: string } | null, userId: n
     const ext = (img.name.split('.').pop() || 'jpg').toLowerCase();
     const hash = createHash('sha256').update(new Uint8Array(img.buf)).digest('hex');
     const phash = await aHash(img.buf).catch(() => ''); // بصمة إدراكية لكشف تكرار الصورة
-    const stamped = await watermarkImage(img.buf, ext); // burn "تربح" watermark (also downscales + normalizes format)
+    const stamped = await watermarkImage(img.buf, ext); // burn "عقار تربح" watermark (also downscales + normalizes format)
     // Store with the REAL output extension (HEIC/odd formats become JPEG) so the
     // file is served with a matching Content-Type and always renders.
     const outExt = stamped.ext || 'jpg';
@@ -171,7 +171,7 @@ export async function createClassifiedAction(formData: FormData) {
   const cTitle = cg.parts[0] || title;
   const cBody = cg.parts[1] || body;
   const flagTerms = cg.hits.length ? summarizeHits(cg.hits) : '';
-  // حاجز إغراق صلب — نفس الحاجز المطبَّق على إعلانات تربح، لم يكن مفعّلاً هنا سابقاً
+  // حاجز إغراق صلب — نفس الحاجز المطبَّق على إعلانات عقار تربح، لم يكن مفعّلاً هنا سابقاً
   const flood = await checkFlood(session.uid);
   if (flood.blocked) redirect(`/classified/new?error=flood&wait=${flood.waitSec}`);
 
@@ -185,7 +185,7 @@ export async function createClassifiedAction(formData: FormData) {
   const layout = String(formData.get('layout') || 'auto');
 
   // تكرار عبر أعضاء مختلفين (شبكات سبام) — منع فوري بلا خيار دفع (المحتوى ليس
-  // ملكه أصلاً)، يُفحص قبل التكرار الذاتي عمداً كما في إعلانات تربح تماماً.
+  // ملكه أصلاً)، يُفحص قبل التكرار الذاتي عمداً كما في إعلانات عقار تربح تماماً.
   const crossDup = await crossUserClassifiedDuplicateOf(session.uid, title, body);
   if (crossDup) {
     const n = await bumpDupAttempts(session.uid);

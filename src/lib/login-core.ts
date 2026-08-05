@@ -8,7 +8,7 @@ export type LoginResult = { ok: true; uid: number; name: string; type: string } 
 
 /**
  * التحقق الموحّد من بيانات الدخول (رقم الجوال — ويُقبل اسم المستخدم/البريد
- * للحسابات القديمة — + كلمة المرور). تستخدمه صفحتا دخول تربح ودخول المتجر:
+ * للحسابات القديمة — + كلمة المرور). تستخدمه صفحتا دخول عقار تربح ودخول المتجر:
  * حساب واحد وجلسة واحدة، وأي تعديل لكلمة المرور يسري على البابين معاً.
  */
 export async function verifyLogin(identifier: string, password: string): Promise<LoginResult> {

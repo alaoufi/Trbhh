@@ -96,9 +96,9 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
         <MessageSquare className="h-6 w-6 text-primary" />
-        <h1 className="text-xl font-bold text-primary">النصوص الظاهرة للزوّار (تربح)</h1>
+        <h1 className="text-xl font-bold text-primary">النصوص الظاهرة للزوّار (عقار تربح)</h1>
       </div>
-      <p className="text-sm text-muted-foreground">نصوص تربح مقسّمة حسب مكان ظهورها. (نصوص المتاجر مستقلّة تماماً — يحرّرها كل صاحب متجر من إعدادات متجره).</p>
+      <p className="text-sm text-muted-foreground">نصوص عقار تربح مقسّمة حسب مكان ظهورها. (نصوص المتاجر مستقلّة تماماً — يحرّرها كل صاحب متجر من إعدادات متجره).</p>
 
       {/* تبويبات فرعية حسب مكان النص */}
       <div className="flex flex-wrap gap-1.5 rounded-xl bg-secondary/40 p-1.5">
@@ -240,12 +240,12 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
               <textarea name="subReminderMsg" rows={3} defaultValue={subMsg} className={box} />
             </label>
             <label className="block space-y-1">
-              <span className="flex items-center gap-2 text-sm font-bold text-primary"><BellRing className="h-4 w-4" /> رسالة تنبيه قرب انتهاء «عرض المتجر في تربح»</span>
+              <span className="flex items-center gap-2 text-sm font-bold text-primary"><BellRing className="h-4 w-4" /> رسالة تنبيه قرب انتهاء «عرض المتجر في عقار تربح»</span>
               <span className="block text-xs text-muted-foreground">نفس المتغيّرات أعلاه.</span>
               <textarea name="showReminderMsg" rows={3} defaultValue={showMsg} className={box} />
             </label>
             <label className="block space-y-1">
-              <span className="flex items-center gap-2 text-sm font-bold text-primary"><BellRing className="h-4 w-4" /> رسالة تنبيه قرب انتهاء «عرض إعلان في تربح»</span>
+              <span className="flex items-center gap-2 text-sm font-bold text-primary"><BellRing className="h-4 w-4" /> رسالة تنبيه قرب انتهاء «عرض إعلان في عقار تربح»</span>
               <span className="block text-xs text-muted-foreground">نفس المتغيّرات أعلاه، و<b dir="ltr">{'{name}'}</b> هنا اسم الإعلان نفسه.</span>
               <textarea name="adshowReminderMsg" rows={3} defaultValue={adshowMsg} className={box} />
             </label>

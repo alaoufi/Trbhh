@@ -26,7 +26,7 @@ export const tap: PayProvider = {
   async createPayment(input: CreatePaymentInput, creds: ProviderCreds): Promise<CreatePaymentResult> {
     const secret = creds.secret_key;
     if (!secret) return { ok: false, error: 'مفتاح Tap السرّي غير مُهيّأ' };
-    const [first, ...rest] = (input.customerName || 'عميل تربح').split(' ');
+    const [first, ...rest] = (input.customerName || 'عميل عقار تربح').split(' ');
     const res = await httpJson(`${BASE}/charges`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
@@ -37,7 +37,7 @@ export const tap: PayProvider = {
         threeDSecure: true,
         customer: {
           first_name: first || 'عميل',
-          last_name: rest.join(' ') || 'تربح',
+          last_name: rest.join(' ') || 'عقار تربح',
           email: input.customerEmail || undefined,
           phone: input.customerPhone ? { country_code: '966', number: input.customerPhone.replace(/^0|^966|\D/g, '') } : undefined,
         },

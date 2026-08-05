@@ -15,7 +15,7 @@ export default function RegisterPage() {
     <div className="mx-auto max-w-sm py-8">
       <div className="card-3d rounded-xl p-6">
         <h1 className="mb-1 text-xl font-bold">إنشاء حساب جديد</h1>
-        <p className="mb-5 text-sm text-muted-foreground">انضم إلى منصة تربح للأعمال.</p>
+        <p className="mb-5 text-sm text-muted-foreground">انضم إلى عقار تربح للأعمال.</p>
         <form action={action} className="space-y-3">
           <input name="name" placeholder="الاسم"
             className="h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />

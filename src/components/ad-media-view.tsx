@@ -1,6 +1,6 @@
 import { mediaUrl } from '@/lib/media';
 
-/** فيديو/صوت الإعلان — مكوّن مشترك بين صفحة إعلان تربح وصفحة إعلان المتجر. */
+/** فيديو/صوت الإعلان — مكوّن مشترك بين صفحة إعلان عقار تربح وصفحة إعلان المتجر. */
 export function AdMedia({ videoPath, audioPath }: { videoPath: string | null; audioPath: string | null }) {
   if (!videoPath && !audioPath) return null;
   return (

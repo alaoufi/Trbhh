@@ -36,7 +36,7 @@ const TOPUP_SLIDES: TutorialSlide[] = [
             <span className="tut-copyflash rounded-full border px-2 py-0.5 text-[9px] font-bold">نسخ</span>
             <Tap className="-bottom-4 left-2" />
           </div>
-          <div><b className="text-slate-400">اسم صاحب الحساب:</b> <b>شركة تربح</b>
+          <div><b className="text-slate-400">اسم صاحب الحساب:</b> <b>شركة عقار تربح</b>
             <div className="mt-0.5 text-[10px] font-bold text-amber-700">⚠ تأكد من الاسم قبل التحويل</div>
           </div>
         </div>
@@ -49,7 +49,7 @@ const TOPUP_SLIDES: TutorialSlide[] = [
       <div className="space-y-2">
         <div className="rounded-xl bg-slate-800 p-3 text-white">
           <div className="flex items-center gap-1.5 text-xs font-bold"><Landmark className="h-4 w-4" /> تطبيق البنك</div>
-          <div className="mt-2 rounded-lg bg-slate-700 p-2 text-[11px]">المستفيد: <b>شركة تربح</b></div>
+          <div className="mt-2 rounded-lg bg-slate-700 p-2 text-[11px]">المستفيد: <b>شركة عقار تربح</b></div>
           <div className="mt-1.5 rounded-lg bg-slate-700 p-2 text-[11px]">المبلغ: <b className="text-emerald-300">100 ر.س</b></div>
           <div className="relative mt-2 rounded-lg bg-emerald-500 p-2 text-center text-xs font-extrabold tut-pulse">تحويل ✓<Tap className="-bottom-3 left-10" /></div>
         </div>
@@ -100,7 +100,7 @@ const TOPUP_SLIDES: TutorialSlide[] = [
         </div>
         <div className="tut-rise flex items-start gap-1.5">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-sky-600 text-white"><MessageCircle className="h-4 w-4" /></span>
-          <div className="rounded-2xl rounded-tr-sm bg-sky-50 p-2 text-[10px] font-bold leading-relaxed text-slate-700">شكراً لثقتك في منصة تربح 🎉 تم إضافة رصيد بمبلغ 100 ر.س — يمكنك استخدامه في المدفوعات المختلفة.</div>
+          <div className="rounded-2xl rounded-tr-sm bg-sky-50 p-2 text-[10px] font-bold leading-relaxed text-slate-700">شكراً لثقتك في عقار تربح 🎉 تم إضافة رصيد بمبلغ 100 ر.س — يمكنك استخدامه في المدفوعات المختلفة.</div>
         </div>
       </div>
     ),
@@ -123,7 +123,7 @@ const TOPUP_SLIDES: TutorialSlide[] = [
   },
 ];
 export function TopupTutorial() {
-  return <TutorialPlayer slides={TOPUP_SLIDES} shareTitle="شرح شحن الرصيد — تربح" ctaHref="/account/wallet#topup" ctaLabel="🪙 ابدأ شحن رصيدك الآن" />;
+  return <TutorialPlayer slides={TOPUP_SLIDES} shareTitle="شرح شحن الرصيد — عقار تربح" ctaHref="/account/wallet#topup" ctaLabel="🪙 ابدأ شحن رصيدك الآن" />;
 }
 
 /* ============================ إضافة إعلان ============================ */
@@ -256,7 +256,7 @@ const ADD_AD_SLIDES: TutorialSlide[] = [
   },
 ];
 export function AddAdTutorial() {
-  return <TutorialPlayer slides={ADD_AD_SLIDES} shareTitle="شرح إضافة إعلان — تربح" ctaHref="/ads/new" ctaLabel="📢 أضف إعلانك الآن" />;
+  return <TutorialPlayer slides={ADD_AD_SLIDES} shareTitle="شرح إضافة إعلان — عقار تربح" ctaHref="/ads/new" ctaLabel="📢 أضف إعلانك الآن" />;
 }
 
 /* ============================ إنشاء متجر ============================ */
@@ -326,7 +326,7 @@ const OPEN_STORE_SLIDES: TutorialSlide[] = [
     ),
   },
   {
-    caption: 'أضف منتجاتك داخل متجرك — مستقلة تماماً عن سياسات تربح',
+    caption: 'أضف منتجاتك داخل متجرك — مستقلة تماماً عن سياسات عقار تربح',
     body: () => (
       <div className="space-y-2">
         <div className="flex items-center justify-between rounded-lg bg-teal-600 p-2 text-xs font-extrabold text-white">
@@ -372,7 +372,7 @@ const OPEN_STORE_SLIDES: TutorialSlide[] = [
   },
 ];
 export function OpenStoreTutorial() {
-  return <TutorialPlayer slides={OPEN_STORE_SLIDES} shareTitle="شرح إنشاء متجر — تربح" ctaHref="/store" ctaLabel="🏪 افتح متجرك الآن" />;
+  return <TutorialPlayer slides={OPEN_STORE_SLIDES} shareTitle="شرح إنشاء متجر — عقار تربح" ctaHref="/store" ctaLabel="🏪 افتح متجرك الآن" />;
 }
 
 /* ============================ توثيق الحساب ============================ */
@@ -426,7 +426,7 @@ const VERIFY_SLIDES: TutorialSlide[] = [
         </div>
         <div className="tut-rise flex items-start gap-1.5" style={{ animationDelay: '.4s' }}>
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-sky-600 text-white"><MessageCircle className="h-4 w-4" /></span>
-          <div className="rounded-2xl rounded-tr-sm bg-sky-50 p-2 text-[10px] font-bold leading-relaxed text-slate-700">تهانينا 🎉 تم توثيق حسابك في تربح — تظهر الآن شارة «موثّق» على ملفك وإعلاناتك.</div>
+          <div className="rounded-2xl rounded-tr-sm bg-sky-50 p-2 text-[10px] font-bold leading-relaxed text-slate-700">تهانينا 🎉 تم توثيق حسابك في عقار تربح — تظهر الآن شارة «موثّق» على ملفك وإعلاناتك.</div>
         </div>
         <p className="text-center text-[10px] font-bold text-slate-500">الشارة تزيد ثقة العملاء بك وبإعلاناتك</p>
       </div>
@@ -443,7 +443,7 @@ const VERIFY_SLIDES: TutorialSlide[] = [
   },
 ];
 export function VerifyTutorial() {
-  return <TutorialPlayer slides={VERIFY_SLIDES} shareTitle="شرح توثيق الحساب — تربح" ctaHref="/account/verify" ctaLabel="✅ وثّق حسابك الآن" />;
+  return <TutorialPlayer slides={VERIFY_SLIDES} shareTitle="شرح توثيق الحساب — عقار تربح" ctaHref="/account/verify" ctaLabel="✅ وثّق حسابك الآن" />;
 }
 
 /* ============================ تمييز الإعلان ============================ */
@@ -525,7 +525,7 @@ const FEATURE_AD_SLIDES: TutorialSlide[] = [
   },
 ];
 export function FeatureAdTutorial() {
-  return <TutorialPlayer slides={FEATURE_AD_SLIDES} shareTitle="شرح تمييز الإعلان — تربح" ctaHref="/account/ads" ctaLabel="👑 ميّز إعلانك الآن" />;
+  return <TutorialPlayer slides={FEATURE_AD_SLIDES} shareTitle="شرح تمييز الإعلان — عقار تربح" ctaHref="/account/ads" ctaLabel="👑 ميّز إعلانك الآن" />;
 }
 
 /* ============== مميزات تزيد في تسويق إعلانك ============== */
@@ -616,5 +616,5 @@ const AD_BOOST_SLIDES: TutorialSlide[] = [
   },
 ];
 export function AdBoostTutorial() {
-  return <TutorialPlayer slides={AD_BOOST_SLIDES} shareTitle="مميزات تزيد في تسويق إعلانك — تربح" ctaHref="/ads/new" ctaLabel="🚀 أضف إعلانك وميّزه الآن" />;
+  return <TutorialPlayer slides={AD_BOOST_SLIDES} shareTitle="مميزات تزيد في تسويق إعلانك — عقار تربح" ctaHref="/ads/new" ctaLabel="🚀 أضف إعلانك وميّزه الآن" />;
 }

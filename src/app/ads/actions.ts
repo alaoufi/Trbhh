@@ -83,7 +83,7 @@ async function readImages(formData: FormData): Promise<PreparedImage[]> {
 async function storeOneImage(img: PreparedImage, userId: number, adId: bigint, wm?: WatermarkOptions) {
   try {
     const [stamped, phash] = await Promise.all([
-      watermarkImage(img.buf, img.ext, wm), // burn watermark (store logo/name for store ads, else "تربح"); also downscales + normalizes format
+      watermarkImage(img.buf, img.ext, wm), // burn watermark (store logo/name for store ads, else "عقار تربح"); also downscales + normalizes format
       aHash(img.buf), // بصمة إدراكية للصورة (لكشف التكرار بالنسبة)
     ]);
     // Store with the ACTUAL output extension (watermarkImage re-encodes HEIC/gif/…
@@ -218,13 +218,13 @@ export async function createAdAction(formData: FormData) {
   }
   // هوية النشر: الوجهة تُحسم من اختيار النموذج الصريح فقط («باسمي الشخصي» بلا dest، أو «باسم
   // متجري» بـ dest=store). لا يُسمح لكوكي الهوية المنزلق (تصفّح سابق بهوية المتجر) بأن يحوّل
-  // «باسمي الشخصي» إلى منتج متجر معزول عن تربح بصمت — هذا الانزلاق كان يُخفي إعلانات الأعضاء
-  // عن تربح العام دون علمهم، ويجعلهم يظنّون أن الإعلان «اختفى».
+  // «باسمي الشخصي» إلى منتج متجر معزول عن عقار تربح بصمت — هذا الانزلاق كان يُخفي إعلانات الأعضاء
+  // عن عقار تربح العام دون علمهم، ويجعلهم يظنّون أن الإعلان «اختفى».
   let active = await getActiveProfile(session.uid);
   const asStore = String(formData.get('dest') || '') === 'store';
   const dest = asStore ? 'store' : '';
   // اختير «باسمي الشخصي» بينما الهوية الفعّالة متجر: ثبّت على الهوية الشخصية الافتراضية حتى
-  // يُنشر الإعلان في تربح العام لا داخل المتجر (تصحيح الانزلاق مصدره الكوكي).
+  // يُنشر الإعلان في عقار تربح العام لا داخل المتجر (تصحيح الانزلاق مصدره الكوكي).
   if (!asStore && active.type === 'store') {
     active = await ensureDefaultProfile(session.uid);
   }
@@ -358,8 +358,8 @@ export async function createAdAction(formData: FormData) {
     redirect(`/ads/new?error=crossdup&left=${Math.max(0, DUP_LIMIT - n)}&dup=${crossDup.id}`);
   }
 
-  // المتجر مستقل تماماً: إعلانات المتجر لا تخضع لسياسة تكرار تربح ولا تسعيراتها (سياسة
-  // المتجر مختلفة). أمّا إعلانات تربح فتخضع لكشف التكرار وباقاته. (فحص المحتوى يبقى للجميع.)
+  // المتجر مستقل تماماً: إعلانات المتجر لا تخضع لسياسة تكرار عقار تربح ولا تسعيراتها (سياسة
+  // المتجر مختلفة). أمّا إعلانات عقار تربح فتخضع لكشف التكرار وباقاته. (فحص المحتوى يبقى للجميع.)
   const dup = dest === 'store' ? null : await ownDuplicateOf(session.uid, title, detail, images);
   if (dup) {
     const consumed = await consumeDupCredit(session.uid);
@@ -464,7 +464,7 @@ export async function createAdAction(formData: FormData) {
       // عروض اليوم + حالة التوفر (يظهر الحقلان عند تفعيلهما من التحكم)
       old_price: priceType === 'som' ? 0 : Math.max(0, parseFloat(String(formData.get('old_price') || '0')) || 0),
       stock_state: [0, 1, 2].includes(Number(formData.get('stock_state'))) ? Number(formData.get('stock_state')) : 0,
-      store_only: dest === 'store' ? 1 : 0, // عزل تام: إعلان المتجر لا يظهر في تربح
+      store_only: dest === 'store' ? 1 : 0, // عزل تام: إعلان المتجر لا يظهر في عقار تربح
       cat_reviewed: aiClassified ? 0 : 1, // تصنيف آلي؟ ينتظر مراجعة الإدارة
       is_realestate: 1, // المنصّة العقارية: كل إعلان عقار
       re_type: reType || null,
@@ -496,7 +496,7 @@ export async function createAdAction(formData: FormData) {
     },
   });
 
-  // إعلان المتجر: العلامة المائية هوية المتجر (شعار/اسم حسب اختيار المالك) بدل «تربح»
+  // إعلان المتجر: العلامة المائية هوية المتجر (شعار/اسم حسب اختيار المالك) بدل «عقار تربح»
   const wm = dest === 'store' ? await (await import('@/lib/merchant')).getStoreWatermark(session.uid) : undefined;
   await storeImages(images, session.uid, ad.id, wm);
   const audio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);
@@ -514,7 +514,7 @@ export async function createAdAction(formData: FormData) {
       await m.rewardReferral(session.uid);
     }
   }).catch(() => {});
-  if (dest !== 'store') await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز خاصة بإعلانات تربح
+  if (dest !== 'store') await applyFeaturedToNewAd(session.uid, ad.id, pkg).catch(() => {}); // باقة التميز خاصة بإعلانات عقار تربح
   // التمييز ⭐ المطلوب من نموذج النشر: يغطي الرصيد → خصم وتمييز فوري، لا يغطي → يُنشر الإعلان وتُطلب إعادة الشحن
   let featuredState: '' | 'ok' | 'need' = '';
   const fdur = String(formData.get('featuredDur') || '');
@@ -556,7 +556,7 @@ export async function createAdAction(formData: FormData) {
   }
   await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
   if (!requireApproval && dest !== 'store' && !scheduledAt) {
-    // تنبيهات البحث المحفوظ + مطابقة عرض/طلب — لإعلانات تربح فقط (عزل المتاجر)
+    // تنبيهات البحث المحفوظ + مطابقة عرض/طلب — لإعلانات عقار تربح فقط (عزل المتاجر)
     import('@/lib/saved-search').then((m) => {
       m.notifySavedSearches(toInt(ad.id), title, detail, session.uid).catch(() => {});
       m.notifyOppositeType(toInt(ad.id), title, Number(catId), Number(cityId || '0'), adsType as 'offer' | 'request', session.uid).catch(() => {});
@@ -718,7 +718,7 @@ export async function updateAdAction(formData: FormData) {
       redirect(`/ads/${toInt(adId)}/edit?error=image`);
     }
   }
-  // تعديل إعلان متجر: حافظ على علامة المتجر المائية (شعار/اسم) بدل «تربح»
+  // تعديل إعلان متجر: حافظ على علامة المتجر المائية (شعار/اسم) بدل «عقار تربح»
   const eWm = Number(ad.store_only) === 1 ? await (await import('@/lib/merchant')).getStoreWatermark(session.uid) : undefined;
   if (images.length) await storeImages(images, session.uid, adId, eWm);
   const newVideo = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);

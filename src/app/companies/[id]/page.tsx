@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!s) return { title: 'متجر' };
   const meta = await getStoreMeta(s.id);
   const name = meta.storeName || s.name || 'متجر';
-  const desc = (meta.tagline || meta.about || `متجر ${name} على منصة تربح`).replace(/\s+/g, ' ').trim().slice(0, 160);
+  const desc = (meta.tagline || meta.about || `متجر ${name} على عقار تربح`).replace(/\s+/g, ' ').trim().slice(0, 160);
   // the store's OWN name + logo when shared (WhatsApp/social) — full independence.
   // fall back to a real PNG only when the merchant hasn't uploaded a logo yet.
   const rawLogo = s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '/apple-icon.png';
@@ -270,7 +270,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           </form>
           {!session && (
             <>
-              <Link href="/" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border text-primary" aria-label="الرجوع لتربح"><Home className="h-4 w-4" /></Link>
+              <Link href="/" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border text-primary" aria-label="الرجوع لعقار تربح"><Home className="h-4 w-4" /></Link>
               <Link href={`/store-login?s=${encodeURIComponent(meta.handle || String(storeId))}`} className="btn-3d flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-bold text-white" style={{ background: brand }}>
                 <LogIn className="h-4 w-4" /> دخول
               </Link>
@@ -286,13 +286,13 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
             <Link href="/store" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white" style={{ background: brand }} aria-label="إدارة المتجر"><Building2 className="h-4 w-4" /></Link>
           )}
         </div>
-        {/* شريط التبديل لأي عضو مسجّل: الرجوع لتربح/حساباتك أو التبديل لهوية/متجر آخر */}
+        {/* شريط التبديل لأي عضو مسجّل: الرجوع لعقار تربح/حساباتك أو التبديل لهوية/متجر آخر */}
         {session && viewerActive && (
           <div className="relative z-40 border-t bg-white/95">
             <div className="mx-auto flex max-w-2xl items-center gap-2 px-3 py-1.5">
               <ProfileSwitcher active={toSwItem(viewerActive)} profiles={viewerProfiles.map(toSwItem)} linked={viewerLinkedItems} />
               <Link href="/" className="ms-auto inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold text-primary hover:bg-primary/5">
-                <Home className="h-3.5 w-3.5" /> الرجوع لتربح
+                <Home className="h-3.5 w-3.5" /> الرجوع لعقار تربح
               </Link>
             </div>
           </div>
@@ -427,7 +427,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
                 <ShareButtons
                   url={`https://${SITE.domain}/companies/${storeId}`}
                   title={`متجر ${name}`}
-                  text={[`متجر ${name} على تربح`, (meta.about || s.description || '').replace(/\s+/g, ' ').trim().slice(0, 120)].filter(Boolean).join('\n')}
+                  text={[`متجر ${name} على عقار تربح`, (meta.about || s.description || '').replace(/\s+/g, ' ').trim().slice(0, 120)].filter(Boolean).join('\n')}
                   compact
                   iconOnly
                   card={{ url: `https://${SITE.domain}/companies/${storeId}`, title: `متجر ${name}`, city: meta.specialty || '', image: s.logo && !s.logo.endsWith('placeholder-ad.svg') ? s.logo : '/logo-aqar-256.png?v=3' }}

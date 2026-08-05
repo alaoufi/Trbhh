@@ -5,8 +5,8 @@ const TIMEOUT_MS = 8000; // never let image processing hang a publish request
 export type WatermarkResult = { buf: Buffer; ext: string };
 
 /** Optional custom watermark (store ads use the store's identity instead of
- *  the platform's "تربح"). `logo` wins over `text` when both are given and the
- *  logo decodes; otherwise `text` is burned; otherwise the default "تربح". */
+ *  the platform's "عقار تربح"). `logo` wins over `text` when both are given and the
+ *  logo decodes; otherwise `text` is burned; otherwise the default "عقار تربح". */
 export type WatermarkOptions = { text?: string; logo?: Buffer };
 
 /** Canonical, browser-displayable output format for a given input extension.
@@ -19,7 +19,7 @@ function outFormat(ext: string): 'png' | 'webp' | 'jpg' {
 }
 
 /**
- * Burn a "تربح" watermark into an uploaded image (copyright protection),
+ * Burn a "عقار تربح" watermark into an uploaded image (copyright protection),
  * auto-orient and downscale it. Returns { buf, ext } where `ext` is the ACTUAL
  * format of the returned bytes — callers must store the file with this
  * extension so the served Content-Type matches the bytes. Never hangs/crashes:
@@ -29,7 +29,7 @@ function outFormat(ext: string): 'png' | 'webp' | 'jpg' {
 export async function watermarkImage(buf: Buffer, ext: string, opts?: WatermarkOptions): Promise<WatermarkResult> {
   const target = outFormat(ext);
   const original: WatermarkResult = { buf, ext };
-  const label = (opts?.text || '').trim().slice(0, 40) || 'تربح';
+  const label = (opts?.text || '').trim().slice(0, 40) || 'عقار تربح';
 
   const work = (async (): Promise<WatermarkResult> => {
     // dynamic import so a missing/broken native sharp binary degrades gracefully

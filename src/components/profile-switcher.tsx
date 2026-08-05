@@ -69,7 +69,7 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
                 return (
                   <div key={grp}>
                     <div className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-extrabold ${grp === 'store' ? 'bg-emerald-50 text-emerald-800' : 'bg-sky-50 text-sky-800'}`}>
-                      {grp === 'store' ? <><Store className="h-3.5 w-3.5" /> متاجري</> : <><UserRound className="h-3.5 w-3.5" /> حساباتي في تربح</>}
+                      {grp === 'store' ? <><Store className="h-3.5 w-3.5" /> متاجري</> : <><UserRound className="h-3.5 w-3.5" /> حساباتي في عقار تربح</>}
                     </div>
                     {items.map((p) => {
                       const c = p.color || '#3287da';
@@ -89,7 +89,7 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
                                 <span className="shrink-0 rounded px-1 text-[9px] font-extrabold text-white" style={{ background: p.type === 'store' ? '#059669' : '#0284c7' }}>{p.type === 'store' ? 'متجر' : 'حساب'}</span>
                                 <span className="truncate">{p.name}</span>
                               </span>
-                              <span className="block text-[11px] text-muted-foreground">{p.type === 'store' ? `🏬 مسجّلة في: متجر «${p.name}» — مستقلّة` : '🟢 مسجّلة في: تربح (إعلانات عامة)'}</span>
+                              <span className="block text-[11px] text-muted-foreground">{p.type === 'store' ? `🏬 مسجّلة في: متجر «${p.name}» — مستقلّة` : '🟢 مسجّلة في: عقار تربح (إعلانات عامة)'}</span>
                             </span>
                             {isActive && <Check className="h-4 w-4 shrink-0 text-emerald-600" />}
                           </button>

@@ -107,7 +107,7 @@ export async function smsDiagnose(phone: string): Promise<SmsDiag> {
     return { ok: false, steps };
   }
   try {
-    const ok = await sendLegacyForm(phone, 'رسالة اختبار من منصة تربح', cfg);
+    const ok = await sendLegacyForm(phone, 'رسالة اختبار من عقار تربح', cfg);
     steps.push(ok
       ? '✅ قبِلت البوابة الرسالة — يجب أن تصلك خلال ثوانٍ.'
       : '❌ رفضت البوابة القديمة الرسالة — تحقّق من البيانات والرصيد واسم المرسِل.');
@@ -134,7 +134,7 @@ async function taqnyatDiagnose(phone: string, cfg: MessagingConfig): Promise<Sms
     const res = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': 'Trbhh/1.0' },
-      body: JSON.stringify({ recipients: [normalizeSaudi(phone)], body: 'رسالة اختبار من منصة تربح', sender: cfg.smsSender }),
+      body: JSON.stringify({ recipients: [normalizeSaudi(phone)], body: 'رسالة اختبار من عقار تربح', sender: cfg.smsSender }),
       cache: 'no-store',
     });
     const body = (await res.text().catch(() => '')) || '';
@@ -247,7 +247,7 @@ export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; de
   const code = String(randomInt(1000, 10000)); // رمز تحقّق من ٤ خانات (1000–9999)
   const fresh = { code, expires_at: new Date(Date.now() + 10 * 60_000), attempts: prevAttempts, last_sent: new Date() };
   await prisma.password_otps.upsert({ where: { phone: norm }, create: { phone: norm, ...fresh }, update: fresh });
-  const delivered = await sendVerification(norm, `رمز استعادة كلمة المرور في تربح: ${code}`);
+  const delivered = await sendVerification(norm, `رمز استعادة كلمة المرور في عقار تربح: ${code}`);
   return { ok: true, delivered };
 }
 
@@ -257,7 +257,7 @@ export async function sendNewPasswordToUser(userId: number): Promise<{ ok: boole
   if (!u?.phoneNumber) return { ok: false, error: 'لا يوجد رقم جوال لهذا العضو' };
   const pass = String(randomInt(100000, 1000000));
   await prisma.users.update({ where: { id: BigInt(userId) }, data: { password: await hashPassword(pass) } });
-  const sent = await sendVerification(u.phoneNumber, `كلمة مرورك الجديدة في تربح: ${pass}`);
+  const sent = await sendVerification(u.phoneNumber, `كلمة مرورك الجديدة في عقار تربح: ${pass}`);
   if (!sent) return { ok: false, error: 'حُدّثت كلمة المرور لكن تعذّر إرسال الرسالة (تحقّق من إعداد البوابة)' };
   return { ok: true };
 }

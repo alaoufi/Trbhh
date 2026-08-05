@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 
-/** تقييم منصة تربح بالنجوم — للأعضاء المسجّلين فقط (مرة واحدة)، مع ملاحظة اختيارية. */
+/** تقييم عقار تربح بالنجوم — للأعضاء المسجّلين فقط (مرة واحدة)، مع ملاحظة اختيارية. */
 export async function submitPlatformRatingAction(formData: FormData) {
   const raw = Number(formData.get('star') || 0);
   if (!Number.isInteger(raw) || raw < 1 || raw > 5) return; // لم يختر نجمة فعلياً — لا نسجّل تقييماً تخمينياً

@@ -40,7 +40,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const myStaffStoreId = !store && staffOn ? await (await import('@/lib/merchant')).staffStoreId(session.uid).catch(() => 0) : 0;
   const staffStore = myStaffStoreId ? await (await import('@/lib/merchant')).storeCard(myStaffStoreId).catch(() => null) : null;
   const backups = store ? await (await import('@/lib/store-backup')).listStoreBackups(store.id).catch(() => []) : [];
-  // الظهور المدفوع في تربح: التسعيرات + حالة المتجر + منتجاته وحالات عرضها
+  // الظهور المدفوع في عقار تربح: التسعيرات + حالة المتجر + منتجاته وحالات عرضها
   const showPricing = store ? await (await import('@/lib/settings')).getTrbhhShowPricing().catch(() => null) : null;
   const { prisma: db } = await import('@/lib/prisma');
   const storeShowRow = store ? await db.stores.findUnique({ where: { id: BigInt(store.id) }, select: { show_until: true, show_on_platform: true } }).catch(() => null) : null;
@@ -131,20 +131,20 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </Link>
       )}
 
-      {/* 🚀 تذكير تسويقي دائم: عرض المتجر والإعلانات في تربح مدفوع — يظهر فور دخول التاجر */}
+      {/* 🚀 تذكير تسويقي دائم: عرض المتجر والإعلانات في عقار تربح مدفوع — يظهر فور دخول التاجر */}
       {store && showPricing && (showPricing.store.w2 > 0 || showPricing.store.m1 > 0 || showPricing.store.y1 > 0 || showPricing.ads.some((a) => a.price > 0)) && (
         storeShowActive ? (
           <a href="#trbhh-show" className="card-3d flex items-center gap-3 rounded-2xl !border-emerald-400 bg-emerald-50 p-3 hover:bg-emerald-100">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-500 text-lg text-white">✨</span>
-            <span className="flex-1 text-sm font-bold text-emerald-900">متجرك معروض الآن في رئيسية تربح حتى {fmtD(storeShowRow!.show_until)} — جدّد قبل الانتهاء ليستمر تدفق العملاء، وميّز إعلاناتك بباقات العرض ←</span>
+            <span className="flex-1 text-sm font-bold text-emerald-900">متجرك معروض الآن في رئيسية عقار تربح حتى {fmtD(storeShowRow!.show_until)} — جدّد قبل الانتهاء ليستمر تدفق العملاء، وميّز إعلاناتك بباقات العرض ←</span>
           </a>
         ) : (
           <a href="#trbhh-show" className="card-3d block overflow-hidden rounded-2xl !border-amber-400 p-0 hover:opacity-95">
             <div className="flex items-center gap-3 p-3.5 text-white" style={{ backgroundImage: 'linear-gradient(135deg, #f59e0b, #d97706, #b45309)' }}>
               <span className="grid h-11 w-11 shrink-0 animate-pulse place-items-center rounded-xl bg-white/20 text-xl ring-1 ring-white/30">🚀</span>
               <span className="flex-1">
-                <span className="block text-sm font-extrabold drop-shadow">متجرك غير ظاهر في رئيسية تربح الآن!</span>
-                <span className="block text-xs font-bold text-white/90">آلاف الزوار يتصفحون تربح يومياً — اعرض متجرك ومنتجاتك أمامهم، أو أبرز إعلاناً بعينه بباقة (ذهبية/فضية/عادية) حسب المدة. اضغط للتفعيل ←</span>
+                <span className="block text-sm font-extrabold drop-shadow">متجرك غير ظاهر في رئيسية عقار تربح الآن!</span>
+                <span className="block text-xs font-bold text-white/90">آلاف الزوار يتصفحون عقار تربح يومياً — اعرض متجرك ومنتجاتك أمامهم، أو أبرز إعلاناً بعينه بباقة (ذهبية/فضية/عادية) حسب المدة. اضغط للتفعيل ←</span>
               </span>
             </div>
           </a>
@@ -292,15 +292,15 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </div>
       )}
 
-      {/* باقة متجر Plus ⭐ — اشتراك + عرض في تربح + شارة مميزة، دفعة واحدة */}
+      {/* باقة متجر Plus ⭐ — اشتراك + عرض في عقار تربح + شارة مميزة، دفعة واحدة */}
       {store && plusPricing && plusPricing.enabled && (plusPricing.monthly > 0 || plusPricing.sixmo > 0 || plusPricing.yearly > 0) && (
         <div className="card-3d space-y-3 rounded-2xl border-2 border-amber-300 bg-amber-50/40 p-4">
           <div className="flex items-center gap-2 font-bold text-amber-800">⭐ باقة متجر Plus</div>
-          {plus === '1' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ فُعّلت باقة Plus وخُصم المبلغ من رصيدك — اشتراكك وعرضك في تربح وشارتك ⭐ سارية الآن.</div>}
+          {plus === '1' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ فُعّلت باقة Plus وخُصم المبلغ من رصيدك — اشتراكك وعرضك في عقار تربح وشارتك ⭐ سارية الآن.</div>}
           {plus === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
           {plus === 'err' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">تعذّر التنفيذ — حاول مجدداً.</div>}
           {plusActive && <div className="rounded-lg bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">⭐ باقة Plus مفعّلة حتى: {fmtD(storeXRow!.plus_until)}</div>}
-          <p className="text-xs text-muted-foreground">صفقة واحدة تجمع: <b>اشتراك المتجر</b> + <b>عرض متجرك ومنتجاته في رئيسية تربح</b> + <b>شارة ⭐ Plus</b> على واجهة متجرك طوال المدة — تُخصم من رصيدك.</p>
+          <p className="text-xs text-muted-foreground">صفقة واحدة تجمع: <b>اشتراك المتجر</b> + <b>عرض متجرك ومنتجاته في رئيسية عقار تربح</b> + <b>شارة ⭐ Plus</b> على واجهة متجرك طوال المدة — تُخصم من رصيدك.</p>
           <div className="grid grid-cols-3 gap-2">
             {([['monthly', plusPricing.monthly, 'شهري'], ['sixmo', plusPricing.sixmo, '6 أشهر'], ['yearly', plusPricing.yearly, 'سنوي']] as const).filter(([, p0]) => p0 > 0).map(([plan, p0, label]) => {
               const canAfford = merchBalance >= p0;
@@ -338,7 +338,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           </label>
           <div className="rounded-xl border p-3">
             <b className="flex items-center gap-1 text-sm"><ShieldCheck className="h-4 w-4" /> العلامة المائية على صور إعلاناتك</b>
-            <span className="mt-0.5 block text-xs text-muted-foreground">تُطبع تلقائياً على صور إعلانات متجرك لحماية حقوقك. اختر أن تكون شعار متجرك أو اسمه (بدل «تربح»).</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">تُطبع تلقائياً على صور إعلانات متجرك لحماية حقوقك. اختر أن تكون شعار متجرك أو اسمه (بدل «عقار تربح»).</span>
             <div className="mt-2 flex gap-2">
               <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border p-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/5">
                 <input type="radio" name="watermarkKind" value="name" defaultChecked={(meta?.watermarkKind ?? 'name') !== 'logo'} className="h-4 w-4 accent-[hsl(var(--primary))]" />
@@ -450,10 +450,10 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           <div className="flex items-center gap-2 font-bold text-primary">👥 موظفو المتجر ({en(staffList.length)}/5)</div>
           {staff === '1' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ أُضيف الموظف — يمكنه الآن إضافة منتجات باسم متجرك من «متجري».</div>}
           {staff === 'removed' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ أُزيل الموظف.</div>}
-          {staff === 'notfound' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">لا يوجد عضو مسجّل بهذا الرقم — تأكد أن الموظف سجّل في تربح أولاً.</div>}
+          {staff === 'notfound' && <div className="rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">لا يوجد عضو مسجّل بهذا الرقم — تأكد أن الموظف سجّل في عقار تربح أولاً.</div>}
           {staff === 'cap' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">بلغت الحد الأقصى (5 موظفين) — أزل موظفاً لإضافة آخر.</div>}
           {staff === 'self' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">هذا رقمك أنت — أدخل رقم جوال الموظف.</div>}
-          <p className="text-xs text-muted-foreground">أضف موظفاً برقم جواله (يجب أن يكون عضواً مسجّلاً في تربح) — يظهر له في «متجري» لوحة مصغّرة يضيف منها منتجات تظهر باسم متجرك، ولا يملك أي صلاحية أخرى.</p>
+          <p className="text-xs text-muted-foreground">أضف موظفاً برقم جواله (يجب أن يكون عضواً مسجّلاً في عقار تربح) — يظهر له في «متجري» لوحة مصغّرة يضيف منها منتجات تظهر باسم متجرك، ولا يملك أي صلاحية أخرى.</p>
           <form action={addStoreStaffAction} className="flex gap-2">
             <input name="phone" required inputMode="tel" dir="ltr" placeholder="05xxxxxxxx" className="h-10 min-w-0 flex-1 rounded-lg border bg-white px-3 text-sm" />
             <button className="btn-3d shrink-0 rounded-lg bg-primary px-4 text-sm font-bold text-white">إضافة موظف</button>
@@ -475,11 +475,11 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </div>
       )}
 
-      {/* بيانات الدخول موحّدة: دخولك في تربح (الجوال + كلمة المرور) يفتح إدارة متجرك تلقائياً */}
+      {/* بيانات الدخول موحّدة: دخولك في عقار تربح (الجوال + كلمة المرور) يفتح إدارة متجرك تلقائياً */}
       {store && (
         <div className="card-3d rounded-xl p-3 text-sm">
           <div className="flex items-center gap-2 font-bold text-primary"><KeyRound className="h-5 w-5" /> دخول موحّد</div>
-          <p className="mt-1 text-xs text-muted-foreground">بيانات دخولك موحّدة (رقم الجوال وكلمة المرور) لتربح ومتجرك معاً — دخولك على تربح يفتح إدارة متجرك تلقائياً بلا دخول آخر، والخروج يخرجك من الاثنين.</p>
+          <p className="mt-1 text-xs text-muted-foreground">بيانات دخولك موحّدة (رقم الجوال وكلمة المرور) لعقار تربح ومتجرك معاً — دخولك على عقار تربح يفتح إدارة متجرك تلقائياً بلا دخول آخر، والخروج يخرجك من الاثنين.</p>
         </div>
       )}
 
@@ -532,10 +532,10 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         <span className="text-xs text-muted-foreground">شرح كل ما يخصّ إدارة متجرك ←</span>
       </Link>
 
-      {/* الظهور المدفوع في تربح: عرض المتجر بالمدد + عرض إعلان بباقة — يُخصم من الرصيد */}
+      {/* الظهور المدفوع في عقار تربح: عرض المتجر بالمدد + عرض إعلان بباقة — يُخصم من الرصيد */}
       {store && showPricing && (showPricing.store.w2 > 0 || showPricing.store.m1 > 0 || showPricing.store.y1 > 0 || showPricing.ads.some((a) => a.price > 0)) && (
         <div id="trbhh-show" className="card-3d scroll-mt-20 space-y-3 rounded-2xl p-4">
-          <div className="flex items-center gap-2 font-bold text-primary">📣 الظهور في تربح (مدفوع)</div>
+          <div className="flex items-center gap-2 font-bold text-primary">📣 الظهور في عقار تربح (مدفوع)</div>
 
           {/* لوحة وضوح المدفوعات: الرصيد + حالة كل عرض والمتبقي والعدد — بنظرة واحدة */}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -559,18 +559,18 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
               )}
             </div>
             <div className={`rounded-xl border-2 p-2.5 text-center ${shownAds.length ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-300 bg-amber-50/60'}`}>
-              <div className="text-[11px] font-bold text-muted-foreground">📢 إعلانات معروضة في تربح</div>
+              <div className="text-[11px] font-bold text-muted-foreground">📢 إعلانات معروضة في عقار تربح</div>
               <div className={`text-lg font-extrabold ${shownAds.length ? 'text-emerald-700' : 'text-amber-700'}`}>{shownAds.length} إعلان</div>
               <div className="text-[11px] font-bold text-muted-foreground">{shownAds.length ? `أقربها ينتهي بعد ${Math.min(...shownAds.map((a) => daysLeft(a.trbhh_until)))} يوم` : 'اعرض إعلاناً بباقة بالأسفل'}</div>
             </div>
           </div>
-          {show === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض متجرك في تربح وخُصم المبلغ من رصيدك.</div>}
-          {adshow === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض إعلانك في تربح وخُصم المبلغ من رصيدك.</div>}
+          {show === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض متجرك في عقار تربح وخُصم المبلغ من رصيدك.</div>}
+          {adshow === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-xs font-bold text-emerald-800">✓ فُعّل عرض إعلانك في عقار تربح وخُصم المبلغ من رصيدك.</div>}
           {(show === 'needcredit' || adshow === 'needcredit') && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">💳 رصيدك لا يكفي{price ? ` (المطلوب ${price} ر.س)` : ''} — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
           {(show === 'err' || adshow === 'err') && <div className="rounded-lg border border-red-300 bg-red-50 p-2 text-xs font-bold text-red-700">تعذّر التنفيذ — تأكد من الاختيار وحاول مجدداً.</div>}
           {adshow === 'dup' && (
             <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-2 text-xs font-bold text-amber-900">
-              ⚠️ تعذّر عرض هذا المنتج في تربح — عنوانه/تفاصيله تطابق إعلاناً قائماً{dupid ? <> (<Link href={`/ads/${dupid}`} target="_blank" className="text-primary underline">عرضه</Link>)</> : ''} لعضو آخر. عدّل المحتوى ليكون مميزاً ثم أعد المحاولة — لم يُخصم أي مبلغ.
+              ⚠️ تعذّر عرض هذا المنتج في عقار تربح — عنوانه/تفاصيله تطابق إعلاناً قائماً{dupid ? <> (<Link href={`/ads/${dupid}`} target="_blank" className="text-primary underline">عرضه</Link>)</> : ''} لعضو آخر. عدّل المحتوى ليكون مميزاً ثم أعد المحاولة — لم يُخصم أي مبلغ.
             </div>
           )}
 
@@ -640,7 +640,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
 
           {(showPricing.store.w2 > 0 || showPricing.store.m1 > 0 || showPricing.store.y1 > 0) && (
             <div className="space-y-2 rounded-xl border border-primary/15 bg-primary/5 p-3">
-              <div className="text-sm font-bold">🏪 عرض متجرك في رئيسية تربح</div>
+              <div className="text-sm font-bold">🏪 عرض متجرك في رئيسية عقار تربح</div>
               <p className="text-[11px] text-muted-foreground">يظهر متجرك (ومنتجاته) في قسم المتاجر بالصفحة الرئيسية طوال المدة.</p>
               {storeShowActive && <div className="rounded-lg bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">✅ مفعّل حتى {fmtD(storeShowRow!.show_until)} (باقي {daysLeft(storeShowRow!.show_until)} يوم) — الشراء الآن = <b>تجديد يضيف المدة</b>:</div>}
               <div className="grid grid-cols-3 gap-2">
@@ -650,7 +650,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                   return (
                     <form key={k} action={buyStoreShowAction} className="text-center">
                       <input type="hidden" name="duration" value={k} />
-                      <ConfirmSubmit disabled={!canAfford} msg={`تأكيد شراء عرض المتجر في تربح (${label}) بسعر ${price} ر.س؟ يُخصم من رصيدك فوراً.`} className={`btn-3d w-full rounded-lg px-2 py-2 text-xs font-bold text-white ${canAfford ? 'bg-primary' : 'cursor-not-allowed bg-red-300'}`}>{label}<br /><span className="text-[10px] opacity-90">{price} ر.س{canAfford ? '' : ' — لا يكفي'}</span></ConfirmSubmit>
+                      <ConfirmSubmit disabled={!canAfford} msg={`تأكيد شراء عرض المتجر في عقار تربح (${label}) بسعر ${price} ر.س؟ يُخصم من رصيدك فوراً.`} className={`btn-3d w-full rounded-lg px-2 py-2 text-xs font-bold text-white ${canAfford ? 'bg-primary' : 'cursor-not-allowed bg-red-300'}`}>{label}<br /><span className="text-[10px] opacity-90">{price} ر.س{canAfford ? '' : ' — لا يكفي'}</span></ConfirmSubmit>
                     </form>
                   );
                 })}
@@ -660,8 +660,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
 
           {showPricing.ads.some((a) => a.price > 0) && showProducts.length > 0 && (
             <div className="space-y-2 rounded-xl border border-amber-300 bg-amber-50/50 p-3">
-              <div className="text-sm font-bold">📢 عرض إعلان من متجرك في تربح</div>
-              <p className="text-[11px] text-muted-foreground">يظهر الإعلان المحدد في كل قوائم تربح (الرئيسية/البحث) طوال مدة الباقة، ويُخصم سعرها من رصيدك.</p>
+              <div className="text-sm font-bold">📢 عرض إعلان من متجرك في عقار تربح</div>
+              <p className="text-[11px] text-muted-foreground">يظهر الإعلان المحدد في كل قوائم عقار تربح (الرئيسية/البحث) طوال مدة الباقة، ويُخصم سعرها من رصيدك.</p>
               {(() => {
                 const pkgs = showPricing.ads.filter((a) => a.price > 0);
                 const affordablePkgs = pkgs.filter((a) => a.price <= merchBalance);
@@ -680,13 +680,13 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
                         <option key={a.key} value={a.key} disabled={a.price > merchBalance}>{a.key === 'gold' ? '🥇' : a.key === 'silver' ? '🥈' : '⭐'} {a.label} — {a.days} يوماً — {a.price} ر.س{a.price > merchBalance ? ' (لا يكفي)' : ''}</option>
                       ))}
                     </select>
-                    <ConfirmSubmit msg="تأكيد شراء عرض الإعلان المحدد في تربح للباقة المختارة؟ يُخصم السعر من رصيدك فوراً." className="btn-3d w-full rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white">شراء وعرض الإعلان في تربح</ConfirmSubmit>
+                    <ConfirmSubmit msg="تأكيد شراء عرض الإعلان المحدد في عقار تربح للباقة المختارة؟ يُخصم السعر من رصيدك فوراً." className="btn-3d w-full rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-white">شراء وعرض الإعلان في عقار تربح</ConfirmSubmit>
                   </form>
                 );
               })()}
               {shownAds.length > 0 && (
                 <div className="space-y-1 border-t border-amber-200 pt-2 text-[11px] font-bold">
-                  <div className="text-muted-foreground">المعروض حالياً في تربح ({shownAds.length}):</div>
+                  <div className="text-muted-foreground">المعروض حالياً في عقار تربح ({shownAds.length}):</div>
                   {shownAds.map((a) => (
                     <div key={String(a.id)} className="flex flex-wrap items-center justify-between gap-1 rounded-md bg-white px-2 py-1 shadow-sm ring-1 ring-black/5">
                       <span className="min-w-0 flex-1 truncate">✅ {a.title}</span>
@@ -782,13 +782,13 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </div>
       )}
 
-      {/* طلب عرض الإعلانات في منصة تربح — يعتمده مراقب المتاجر (إعلان المتجر يظهر تلقائياً) */}
+      {/* طلب عرض الإعلانات في عقار تربح — يعتمده مراقب المتاجر (إعلان المتجر يظهر تلقائياً) */}
       {store && (
         <div className="card-3d space-y-2 rounded-2xl p-4">
-          <div className="flex items-center gap-2 font-bold text-primary"><Megaphone className="h-5 w-5" /> عرض إعلاناتي في منصة تربح</div>
-          <p className="text-xs text-muted-foreground">إعلان متجرك يظهر في تربح تلقائياً بعد الاعتماد. أمّا عرض <b>إعلاناتك</b> في صفحة تربح فيحتاج طلباً تعتمده إدارة المتاجر.</p>
+          <div className="flex items-center gap-2 font-bold text-primary"><Megaphone className="h-5 w-5" /> عرض إعلاناتي في عقار تربح</div>
+          <p className="text-xs text-muted-foreground">إعلان متجرك يظهر في عقار تربح تلقائياً بعد الاعتماد. أمّا عرض <b>إعلاناتك</b> في صفحة عقار تربح فيحتاج طلباً تعتمده إدارة المتاجر.</p>
           {platformState === 'approved' ? (
-            <div className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">✓ إعلاناتك معتمدة للعرض في منصة تربح.</div>
+            <div className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">✓ إعلاناتك معتمدة للعرض في عقار تربح.</div>
           ) : platformState === 'pending' ? (
             <div className="rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-700">⏳ طلبك قيد المراجعة لدى إدارة المتاجر.</div>
           ) : (
@@ -936,10 +936,10 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </div>
       )}
 
-      {/* علاقة المتجر بتربح: عبر إدارة المتاجر فقط */}
+      {/* علاقة المتجر بعقار تربح: عبر إدارة المتاجر فقط */}
       <div className="rounded-xl border border-primary/15 bg-primary/5 p-3 text-[11px] leading-5 text-muted-foreground">
-        <span className="flex items-center gap-1.5 font-bold text-primary"><ShieldCheck className="h-3.5 w-3.5" /> علاقة المتجر بمنصة تربح</span>
-        متجرك مستقل بصفحته وإدارته. علاقته بتربح عبر «إدارة المتاجر» فقط: الاعتماد والإيقاف/الحذف، الاشتراكات، نقل الملكية، واعتماد عرض الإعلانات في المنصة.
+        <span className="flex items-center gap-1.5 font-bold text-primary"><ShieldCheck className="h-3.5 w-3.5" /> علاقة المتجر بعقار تربح</span>
+        متجرك مستقل بصفحته وإدارته. علاقته بعقار تربح عبر «إدارة المتاجر» فقط: الاعتماد والإيقاف/الحذف، الاشتراكات، نقل الملكية، واعتماد عرض الإعلانات في المنصة.
       </div>
     </div>
   );

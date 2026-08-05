@@ -366,7 +366,7 @@ export async function getAdsByIdsCards(ids: number[]) {
   return cards.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
 }
 
-/** إعلانات نفس المعلن (ذات صلة): بقية إعلاناته النشطة في تربح عدا الإعلان المفتوح. */
+/** إعلانات نفس المعلن (ذات صلة): بقية إعلاناته النشطة في عقار تربح عدا الإعلان المفتوح. */
 export async function getSellerAds(sellerId: number, excludeAdId: number, take = 6) {
   const rows = await prisma.ads.findMany({
     where: { ...(await activeAdWhere()), user_id: BigInt(sellerId), id: { not: BigInt(excludeAdId) } },
@@ -381,7 +381,7 @@ export async function getFeaturedAds(take = 8) {
   return cached(`ads:featured:${take}`, 60, () => loadFeaturedAds(take));
 }
 
-/** عروض اليوم: إعلانات بسعر مخفّض (old_price أعلى من السعر) — إعلانات تربح، ومنتجات
+/** عروض اليوم: إعلانات بسعر مخفّض (old_price أعلى من السعر) — إعلانات عقار تربح، ومنتجات
  *  المتاجر المعتمدة لعرض إعلاناتها في المنصة فقط (لا يكسر عزل بقية المتاجر). */
 export async function getDealAds(take = 60) {
   return cached(`ads:deals:${take}`, 60, async () => {

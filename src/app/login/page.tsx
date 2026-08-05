@@ -31,7 +31,7 @@ function LoginInner() {
 
       <div className="card-3d rounded-xl p-6">
         <h1 className="mb-1 text-xl font-bold">تسجيل الدخول</h1>
-        <p className="mb-5 text-sm text-muted-foreground">بيانات دخول موحّدة لتربح ومتجرك: رقم الجوال وكلمة المرور.</p>
+        <p className="mb-5 text-sm text-muted-foreground">بيانات دخول موحّدة لعقار تربح ومتجرك: رقم الجوال وكلمة المرور.</p>
         {reset && <p className="mb-3 rounded-lg border border-green-300 bg-green-50 p-2 text-sm font-bold text-green-800">تم تغيير كلمة المرور بنجاح، سجّل الدخول بها الآن.</p>}
         <form action={action} className="space-y-3">
           <input type="hidden" name="next" value={next} />

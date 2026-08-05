@@ -13,7 +13,7 @@ export const metadata = { title: 'افتح مزاداً' };
 
 const field = 'h-11 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/40';
 
-/** فتح مزاد على أحد إعلانات العضو النشطة (إعلانات تربح فقط — لا منتجات المتاجر). */
+/** فتح مزاد على أحد إعلانات العضو النشطة (إعلانات عقار تربح فقط — لا منتجات المتاجر). */
 export default async function NewAuctionPage({ searchParams }: { searchParams: Promise<{ ad?: string; error?: string }> }) {
   if (!(await auctionsEnabled())) notFound();
   const session = await requireUser();

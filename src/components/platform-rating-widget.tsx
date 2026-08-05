@@ -15,7 +15,7 @@ function Submit({ disabled, label }: { disabled: boolean; label: string }) {
   );
 }
 
-/** تقييم منصة تربح بالنجوم — للأعضاء المسجّلين فقط، مع إمكانية تعديل التقييم لاحقاً وملاحظة (تُطلب خاصة عند التقييم المنخفض). */
+/** تقييم عقار تربح بالنجوم — للأعضاء المسجّلين فقط، مع إمكانية تعديل التقييم لاحقاً وملاحظة (تُطلب خاصة عند التقييم المنخفض). */
 export function PlatformRatingWidget({ avg, count, alreadyRated, isLoggedIn, myStar = 0, myNote = '' }: { avg: number; count: number; alreadyRated: boolean; isLoggedIn?: boolean; myStar?: number; myNote?: string }) {
   const [star, setStar] = useState(myStar || 0);
   const [hover, setHover] = useState(0);
@@ -35,7 +35,7 @@ export function PlatformRatingWidget({ avg, count, alreadyRated, isLoggedIn, myS
               <Star key={i} className={cn('h-3.5 w-3.5', i <= Math.round(avg) ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30')} />
             ))}
           </div>
-          <span className="text-xs text-muted-foreground">تقييم منصة تربح{count > 0 ? ` — من ${count} تقييم` : ' — كن أول من يقيّم'}</span>
+          <span className="text-xs text-muted-foreground">تقييم عقار تربح{count > 0 ? ` — من ${count} تقييم` : ' — كن أول من يقيّم'}</span>
         </div>
 
         {!isLoggedIn ? (

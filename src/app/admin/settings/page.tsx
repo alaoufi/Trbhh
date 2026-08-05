@@ -106,11 +106,11 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
           </div>
           <label className="mt-2 flex items-start gap-2 text-sm">
             <input type="checkbox" name="homeActionsOn" defaultChecked={homeActionsOn} className="mt-0.5 h-4 w-4 accent-primary" />
-            <span><b>أزرار تواصل الموقع تحت الإحصائيات</b> — صف أيقونات في الرئيسية: متابعة تربح، واتساب واتصال بالرقم الرسمي، ومشاركة الموقع.</span>
+            <span><b>أزرار تواصل الموقع تحت الإحصائيات</b> — صف أيقونات في الرئيسية: متابعة عقار تربح، واتساب واتصال بالرقم الرسمي، ومشاركة الموقع.</span>
           </label>
           <label className="mt-2 flex items-start gap-2 text-sm">
             <input type="checkbox" name="platformRatingOn" defaultChecked={platformRatingOn} className="mt-0.5 h-4 w-4 accent-primary" />
-            <span><b>تقييم منصة تربح بالنجوم في الرئيسية</b> — يظهر متوسط تقييم الموقع لكل الزوّار والأعضاء، ويقيّم كل زائر/عضو مرة واحدة فقط.</span>
+            <span><b>تقييم عقار تربح بالنجوم في الرئيسية</b> — يظهر متوسط تقييم الموقع لكل الزوّار والأعضاء، ويقيّم كل زائر/عضو مرة واحدة فقط.</span>
           </label>
           <label className="mt-2 flex items-start gap-2 text-sm">
             <input type="checkbox" name="archiveAutodeleteOn" defaultChecked={archiveAutodeleteOn} className="mt-0.5 h-4 w-4 accent-primary" />
@@ -172,7 +172,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             </label>
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" name="dealsOn" defaultChecked={dealsOn} className="mt-0.5 h-4 w-4 accent-primary" />
-              <span><b>عروض اليوم (التخفيضات)</b> — حقل «السعر قبل الخصم» في نموذج الإعلان، وصفحة /deals تجمع كل الإعلانات المخفّضة بنسبة الخصم (تشمل منتجات المتاجر المعتمدة لعرض إعلاناتها في تربح فقط).</span>
+              <span><b>عروض اليوم (التخفيضات)</b> — حقل «السعر قبل الخصم» في نموذج الإعلان، وصفحة /deals تجمع كل الإعلانات المخفّضة بنسبة الخصم (تشمل منتجات المتاجر المعتمدة لعرض إعلاناتها في عقار تربح فقط).</span>
             </label>
             <label className="flex items-start gap-2 text-sm">
               <input type="checkbox" name="autoRenewOn" defaultChecked={autoRenewOn} className="mt-0.5 h-4 w-4 accent-primary" />
@@ -298,7 +298,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
           <p className="mt-1 text-xs text-muted-foreground">يُعدّ المبوّب مكرّراً إذا تطابق <b>المحتوى</b> (العنوان+النص) أو <b>الصورة</b> (مطابقة إدراكية) مع مبوّب سابق للعضو نفسه بالنسبة المحددة. <b>الخلفية</b> (الثيم+النقشة+الزخرفة) تُحتسب مع تشابه المحتوى ٥٠٪+ فقط، حتى لا تُحجب إعلانات مختلفة تشترك في نفس التصميم. الخلفية ١٠٠٪ = تصميم مطابق تماماً. كما يُفحص تطابق <b>المحتوى نصاً</b> مع مبوّبات أعضاء آخرين (آخر ٣٠ يوماً) — يُمنع فوراً بلا خيار دفع مهما كانت باقة التكرار (المحتوى ليس ملك من نشره).</p>
         </Group>
 
-        {/* كل تسعير في تربح — باقات، اشتراكات، عاجل وتمييز، استعادة المؤرشف… — تبويب واحد */}
+        {/* كل تسعير في عقار تربح — باقات، اشتراكات، عاجل وتمييز، استعادة المؤرشف… — تبويب واحد */}
         <div className="border-t border-primary/15 pt-3">
           <Link href="/admin/revenue?tab=pricing" className="flex items-center justify-between gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
             <span>💳 كل التسعير — الباقات والاشتراكات وأرصدة الأعضاء</span>

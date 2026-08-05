@@ -10,7 +10,7 @@ export type StoreCardData = {
 const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
 
 /** Compact store card with key stats — used in collaboration invitations & partners.
- *  compact: نسخة شبكية مضغوطة بارتفاع قليل (لرئيسية تربح) — شعار أصغر وسطر إحصاءات مختصر. */
+ *  compact: نسخة شبكية مضغوطة بارتفاع قليل (لرئيسية عقار تربح) — شعار أصغر وسطر إحصاءات مختصر. */
 export function StoreMiniCard({ s, href, compact }: { s: StoreCardData; href?: string; compact?: boolean }) {
   if (compact) {
     return (

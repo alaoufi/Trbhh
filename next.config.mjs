@@ -9,6 +9,22 @@ const nextConfig = {
   async rewrites() {
     return [{ source: '/.well-known/assetlinks.json', destination: '/api/assetlinks' }];
   },
+  // ترويسات أمنية دفاعية (لا تُخفي شيفرة العميل — فهي منظورة في كل موقع — لكنها
+  // ترفع سقف الحماية: تمنع تضمين/استنساخ الموقع داخل iframe لموقع آخر، وتفرض
+  // HTTPS، وتمنع خداع نوع المحتوى). CSP مقتصرة على frame-ancestors فقط تفادياً
+  // لكسر السكربتات/الوسائط/البكسلات — CSP الكاملة تحتاج ضبطاً واختباراً منفصلاً.
+  async headers() {
+    const security = [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+      { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+      // HSTS يُحترَم فقط عبر HTTPS (يُتجاهَل على http)، فآمن إرساله دائماً.
+      { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+    ];
+    return [{ source: '/:path*', headers: security }];
+  },
   async redirects() {
     const pageAliases = ['about', 'faq', 'privacy', 'terms', 'contact'].map((slug) => ({
       source: `/${slug}`,

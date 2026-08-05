@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { hasAnyAdmin } from '@/lib/roles';
 import { ssoEnabled, verifyServiceToken } from '@/lib/sso';
 import { verifyLoginLocal } from '@/lib/login-core';
-import { toInt } from '@/lib/utils';
 
 /**
  * نقطة تحقّق خادم-لخادم للدخول المباشر الفيدرالي (لا تُستدعى من المتصفح):
@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.users.findUnique({ where: { id: BigInt(r.uid) } });
   if (!user) return NextResponse.json({ ok: false });
-  // الإداري لا يُوحَّد أبداً عبر SSO
-  if (Number(user.is_admin) === 1 || String(user.type) === 'admin') {
+  // أي حساب بصلاحية إدارية لا يُوحَّد أبداً عبر SSO (وليس is_admin فقط)
+  if (await hasAnyAdmin(r.uid)) {
     return NextResponse.json({ ok: false, admin: true });
   }
 

@@ -4,6 +4,7 @@ import { redis } from './redis';
 import { prisma } from './prisma';
 import { toLocalSaudi } from './sms';
 import { isUserBanned } from './moderation';
+import { hasAnyAdmin } from './roles';
 import { toInt } from './utils';
 
 /**
@@ -124,28 +125,32 @@ export async function findUserByPhone(local: string, raw: string) {
 
 export type ResolveResult =
   | { user: { id: bigint; name: string | null; userName: string | null; type: string } }
-  | { blocked: 'admin' | 'merged' | 'banned' };
+  | { blocked: 'admin' | 'merged' | 'banned' | 'exists' };
 
 /**
- * يجد نسخة العضو المحلية أو ينشئها من مطالبات النظير، مع مزامنة بصمة كلمة المرور.
- * الإداري/المدموج/المحظور لا يُقبل (يُوجَّه للدخول المباشر). لا يفتح جلسة —
- * الاستدعاء المسؤول عن ذلك.
+ * يجد نسخة العضو المحلية أو ينشئها من مطالبات النظير. لا يفتح جلسة — الاستدعاء
+ * المسؤول عن ذلك.
+ *
+ * أمان حرج: «نفس الجوال» ليس إثباتاً للهوية عبر حدود الثقة (التسجيل بلا OTP
+ * يسمح لأي أحد بإنشاء حساب بأي جوال). لذلك:
+ *   • حساب محلي قائم: لا نفتح جلسته ولا نعدّله أبداً بناءً على الجوال وحده — نقبل
+ *     فقط إذا كانت بصمة كلمة المرور مطابقة **تماماً** (حساب موحّد أُنشئ من نفس
+ *     المصدر بنسخ البصمة). المهاجم بكلمة مرور مختلفة بصمته مختلفة حتماً (ملح
+ *     bcrypt)، فيُرفض. لا نستبدل بصمة حساب قائم بأي حال.
+ *   • لا حساب محلي: نُنشئ نسخة جديدة (لا ضحية تُنتزَع).
+ * الحسابات ذات أي صلاحية إدارية (وليس is_admin فقط) والمدموج/المحظور لا تُقبل.
  */
 export async function resolveLocalUser(claims: HandoffClaims): Promise<ResolveResult> {
   const local = toLocalSaudi(claims.phone) || claims.phone.trim();
   const existing = await findUserByPhone(local, claims.phone.trim());
 
   if (existing) {
-    // أمان: الإداري لا يُفتح عن بُعد، والمدموج/المحظور يُوجَّه للدخول المباشر
-    if (Number(existing.is_admin) === 1 || String(existing.type) === 'admin') return { blocked: 'admin' };
+    // أي صلاحية إدارية (manager/moderator/monitor…) لا تُوحَّد عبر SSO أبداً
+    if (await hasAnyAdmin(toInt(existing.id))) return { blocked: 'admin' };
     if (existing.merged_into && Number(existing.merged_into) > 0) return { blocked: 'merged' };
     if (await isUserBanned(toInt(existing.id))) return { blocked: 'banned' };
-    // مزامنة بصمة كلمة المرور: أي تغيير على الموقع الآخر يسري هنا للدخول المباشر
-    if (claims.pwhash && claims.pwhash !== existing.password) {
-      await prisma.users
-        .update({ where: { id: existing.id }, data: { password: claims.pwhash } })
-        .catch(() => {});
-    }
+    // إثبات الهوية = تطابق البصمة تماماً؛ لا يُفتح ولا يُعدّل حساب قائم بغيره
+    if (!claims.pwhash || claims.pwhash !== existing.password) return { blocked: 'exists' };
     return { user: existing };
   }
 

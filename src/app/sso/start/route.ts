@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { hasAnyAdmin } from '@/lib/roles';
 import { ssoEnabled, isAllowedPeer, signHandoff } from '@/lib/sso';
 
 /**
@@ -27,8 +28,9 @@ export async function GET(req: NextRequest) {
   const user = await prisma.users.findUnique({ where: { id: BigInt(session.uid) } });
   if (!user) return NextResponse.redirect(new URL('/', req.url));
 
-  // أمان: لا تُسلّم حساباً إدارياً عبر SSO (لا يُصدَّر هاش الإداري ولا تُفتح جلسته عن بُعد)
-  if (Number(user.is_admin) === 1 || String(user.type) === 'admin') {
+  // أمان: أي حساب بصلاحية إدارية (وليس is_admin فقط) لا يُسلَّم عبر SSO —
+  // لا تُصدَّر بصمته ولا تُفتح جلسته عن بُعد.
+  if (await hasAnyAdmin(session.uid)) {
     return NextResponse.redirect(`${to}/`);
   }
 

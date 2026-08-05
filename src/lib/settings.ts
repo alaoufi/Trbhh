@@ -35,8 +35,9 @@ export async function getSettingNum(k: string, fallback = 0): Promise<number> {
 /** أقصى مدى مستقبلي (بالأيام) لجدولة نشر الإعلانات والمبوّبة — 0 = بلا حد. */
 export const getScheduleMaxDays = () => getSettingNum('schedule_max_days', 30);
 /** رمز ختم التوثيق «متجر موثّق» (المركز السعودي للأعمال) الخاص بتربح للعقار.
- *  فارغ = لا توثيق بعد → الختم مخفيّ. عند الحصول على توثيق مستقل يُضبط الرمز هنا فيظهر. */
-export const getVerifySealToken = () => getSetting('verify_seal_token', '');
+ *  صدر توثيق مستقل للمنصّة → الرمز أدناه هو الافتراضي فيظهر الختم. يبقى قابلاً
+ *  للتغيير/الإخفاء من الإعداد verify_seal_token (فراغ = إخفاء). */
+export const getVerifySealToken = () => getSetting('verify_seal_token', 'cmprSGlUN2pHWFVRTkx5cS9lQnBIUT09');
 /** أقصى عدد كلمات مخالفة يُسمح بتشفيرها ونشر الإعلان — ما زاد عنه يُحظر الإعلان. (0 = بلا حد) */
 export const getGuardBlockCount = () => getSettingNum('guard_block_count', 3);
 

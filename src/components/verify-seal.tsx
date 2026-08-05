@@ -12,7 +12,7 @@ export function VerifySeal({ token, className = '' }: { token: string; className
     <div
       className={`sbc-verify-seal ${className}`.trim()}
       data-token={token}
-      data-position="top-left"
+      data-position="bottom-left"
     />
   );
 }

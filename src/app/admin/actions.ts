@@ -533,6 +533,8 @@ export async function saveTextsAction(formData: FormData) {
     await put(SETTING_TICKER, 'ticker');
     await put(SETTING_SITE_SHARE_TITLE, 'shareTitle');
     await put(SETTING_SITE_SHARE_DESC, 'shareDesc');
+    await put('disclaimer_short', 'disclaimerShort');
+    await put('disclaimer_long', 'disclaimerLong');
   } else if (sec === 'home') {
     await put(SETTING_HOME_CLS_TITLE, 'homeClsTitle');
     await put(SETTING_HOME_CLS_SUB, 'homeClsSub');

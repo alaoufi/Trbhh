@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from './prisma';
+import { DISCLAIMER } from './constants';
 import { ensureSchema } from '@/data/schema-sync';
 
 const ensure = ensureSchema;
@@ -60,6 +61,18 @@ export async function getMsgDeleteMinutes(): Promise<number> {
    يتطلّب ضبط بوابة الإرسال (بوابات التحقق) قبل تفعيله وإلا تعذّر التسجيل. */
 export const SETTING_REGISTER_OTP = 'register_otp_on';
 export const registerOtpEnabled = () => getSettingBool(SETTING_REGISTER_OTP, false);
+
+/* نص إخلاء المسؤولية (قابل للتحرير من لوحة الإدارة — لكل نشرة نصّها). قيمة
+   الكود الحالية هي الافتراضي، فلا يتغيّر شيء حتى تُحرَّر من «النصوص». */
+export const SETTING_DISCLAIMER_SHORT = 'disclaimer_short';
+export const SETTING_DISCLAIMER_LONG = 'disclaimer_long';
+export async function getDisclaimer(): Promise<{ short: string; long: string }> {
+  const [short, long] = await Promise.all([
+    getSetting(SETTING_DISCLAIMER_SHORT, DISCLAIMER.short),
+    getSetting(SETTING_DISCLAIMER_LONG, DISCLAIMER.long),
+  ]);
+  return { short: short.trim() || DISCLAIMER.short, long: long.trim() || DISCLAIMER.long };
+}
 
 /* أيقونة/بطاقة الربط بالموقع الشقيق (تربح ⇄ تربح للعقار) تظهر في صفحة الإعلان.
    كل نشرة تضبط في قاعدتها بيانات الموقع الآخر — لا تُكتب روابط ثابتة في الكود. */

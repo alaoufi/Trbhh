@@ -55,6 +55,12 @@ export async function getMsgDeleteMinutes(): Promise<number> {
   return getSettingNum(SETTING_MSG_DELETE_MINUTES, 0);
 }
 
+/* تحقّق OTP عند التسجيل: يُلزِم المُسجِّل بإثبات ملكية رقم الجوال برمز يصله، فيمنع
+   إنشاء حساب بجوال غير مملوك (انتحال هوية / دخول باسم غيره). مطفأ افتراضياً —
+   يتطلّب ضبط بوابة الإرسال (بوابات التحقق) قبل تفعيله وإلا تعذّر التسجيل. */
+export const SETTING_REGISTER_OTP = 'register_otp_on';
+export const registerOtpEnabled = () => getSettingBool(SETTING_REGISTER_OTP, false);
+
 /* Quick-reply message templates (نصوص جاهزة) shown above the chat compose box so
    the sender can pick a ready phrase. Stored one-per-line; blank => hidden.
    Trbhh (platform) owns two sets — messaging an ad owner, and messaging the

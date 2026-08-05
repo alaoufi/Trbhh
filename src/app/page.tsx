@@ -50,6 +50,8 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
 export default async function HomePage() {
   // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
+  // فتح الصفحة الرئيسية يُحتسب مشاهدة (عدّاد سريع، أفضل جهد، لا يعطّل التصيير)
+  import('@/lib/data').then((m0) => m0.recordHomeView()).catch(() => {});
   const [featured, latest, mostViewed, stats, homeStats, clsText] = await Promise.all([
     getFeaturedAds(8),
     getHomeLatestAds(),

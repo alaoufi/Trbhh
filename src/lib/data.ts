@@ -1,7 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import { prisma } from './prisma';
-import { cached, cacheDel, cacheDelPattern } from './redis';
+import { cached, cacheDel, cacheDelPattern, redis } from './redis';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { loadBanned, censorSync } from './censor';
 import { sweepExpiredFeatured, getFeaturedTierMap, getUsersAdMeta } from './packages';
@@ -386,15 +386,32 @@ async function loadMostViewedAds(take: number) {
   return cards.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9)).slice(0, take);
 }
 
+/** يزيد عدّاد مشاهدات الرئيسية (فتح الصفحة الرئيسية يُحتسب مشاهدة). سريع عبر
+ *  Redis بلا كتابة لقاعدة البيانات، ولا يعطّل التصيير (أفضل جهد). */
+export async function recordHomeView(): Promise<void> {
+  try {
+    if (redis) await redis.incr('stats:home_views');
+  } catch {
+    /* أفضل جهد */
+  }
+}
+
 export async function getStats() {
   return cached('stats:home', 120, async () => {
-    const [users, ads, cats, views] = await Promise.all([
+    const [users, ads, cats, adViews] = await Promise.all([
       prisma.users.count(),
       prisma.ads.count({ where: activeAdWhere() }),
       prisma.categories.count({ where: { is_active: 'yes' } }),
       prisma.ads_views.count(),
     ]);
-    return { users, ads, cats, views };
+    // «المشاهدات» = مشاهدات الإعلانات + مشاهدات الصفحة الرئيسية
+    let homeViews = 0;
+    try {
+      if (redis) homeViews = Number(await redis.get('stats:home_views')) || 0;
+    } catch {
+      /* تجاهل */
+    }
+    return { users, ads, cats, views: adViews + homeViews };
   });
 }
 

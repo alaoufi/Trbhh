@@ -1,0 +1,14 @@
+# تخصيص عقار (فرع staging): أسماء حاويات مستقلة عن تربح الإنتاج.
+# تربح وعقار يعملان على نفس الخادم؛ ملف compose الأساسي يستخدم أسماء trbhh-*
+# ثابتة تتعارض إن شُغّلت مرتين. هذا الملف يُلحق تلقائياً (docker compose يدمجه)
+# فيمنح حاويات عقار أسماء trbhh-staging-* — ويأتي مع git reset فلا يُفقد.
+# ملاحظة: منفذ التطبيق يبقى من .env (APP_PORT=3081) الخاص بالخادم.
+services:
+  db:
+    container_name: trbhh-staging-db
+  redis:
+    container_name: trbhh-staging-redis
+  app:
+    container_name: trbhh-staging-app
+  nginx:
+    container_name: trbhh-staging-nginx

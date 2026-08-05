@@ -105,7 +105,7 @@ export async function AdminAlertsBanner() {
         // يظهر فوق كل شيء لأي عضو إدارة حتى تُفصل القاعدة (تحذير فقط، بلا حجب).
         <div className="sticky top-16 z-40 border-b-4 border-black bg-black">
           <div className="container py-2.5 text-center text-sm font-extrabold text-white">
-            ⛔ تحذير فصل: هذه النشرة «{siteLabel(dbMismatch.expected)}» متصلة بقاعدة بيانات «{siteLabel(dbMismatch.owner)}» — البيانات مختلطة (تظهر بيانات الموقع الآخر هنا).
+            ⛔ تحذير فصل: هذه النشرة «{siteLabel(dbMismatch.expected)}» متصلة بقاعدة بيانات «{siteLabel(dbMismatch.owner)}» — البيانات مختلطة، وطابور «بانتظار إجرائكم» مُخفى لأنه يخصّ الموقع الآخر.
             <br />
             <span className="font-bold text-amber-300">
               افصل قاعدة هذه النشرة عن قاعدة الموقع الآخر، ثم شغّلها مرة واحدة بـ SITE_ID_CLAIM=1 لإعادة بصمتها.
@@ -113,7 +113,8 @@ export async function AdminAlertsBanner() {
           </div>
         </div>
       )}
-      {renderAlerts()}
+      {/* عند خلط القاعدة نُخفي طابور الإجراءات كلياً — فهو يخصّ الموقع الآخر */}
+      {!dbMismatch && renderAlerts()}
     </>
   );
 

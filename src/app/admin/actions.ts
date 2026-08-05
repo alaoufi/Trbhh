@@ -774,6 +774,18 @@ export async function saveRolePermsAction(formData: FormData) {
   redirect(`/admin/roles?saved=${role}`);
 }
 
+/** Save a role matrix on the SIBLING deployment (per-site permissions tab). Manager-only. */
+export async function savePeerRolePermsAction(formData: FormData) {
+  await requireManager();
+  const role = String(formData.get('role') || '') as Role;
+  if (!MATRIX_ROLES.includes(role)) return;
+  const keys = formData.getAll('k').map((v) => String(v));
+  const { savePeerRole } = await import('@/lib/sso');
+  const ok = await savePeerRole(role, keys);
+  revalidatePath('/admin/roles');
+  redirect(`/admin/roles?site=peer&saved=${ok ? role : 'err'}`);
+}
+
 /** Save messaging/verification gateway settings (SMS + WhatsApp). */
 export async function saveVerificationAction(formData: FormData) {
   await requireAction('users', 'edit');

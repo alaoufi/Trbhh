@@ -176,21 +176,22 @@ export async function resolveLocalUser(claims: HandoffClaims): Promise<ResolveRe
 
 /* ───────────────────────── الدخول المباشر الفيدرالي (خادم-لخادم) ───────────────────────── */
 
-/** رمز خدمة قصير العمر (٦٠ث) يوثّق طلب `/sso/verify` بين النشرتين. */
-export async function signServiceToken(): Promise<string> {
-  return new SignJWT({ svc: 'verify' })
+/** رمز خدمة قصير العمر (٦٠ث) يوثّق طلبات خادم-لخادم بين النشرتين. النطاق (scope)
+ *  يقيّد الرمز بنقطة بعينها فلا يُعاد استخدام رمز تحقّق لتعديل الصلاحيات. */
+export async function signServiceToken(scope: 'verify' | 'roles' = 'verify'): Promise<string> {
+  return new SignJWT({ svc: scope })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('60s')
     .sign(secretKey());
 }
 
-/** تحقّق من رمز الخدمة الوارد على `/sso/verify`. */
-export async function verifyServiceToken(token: string): Promise<boolean> {
+/** تحقّق من رمز الخدمة الوارد (بمطابقة النطاق المطلوب). */
+export async function verifyServiceToken(token: string, scope: 'verify' | 'roles' = 'verify'): Promise<boolean> {
   if (!token) return false;
   try {
     const { payload } = await jwtVerify(token, secretKey(), { clockTolerance: 5 });
-    return payload.svc === 'verify';
+    return payload.svc === scope;
   } catch {
     return false;
   }
@@ -226,4 +227,49 @@ export async function federatedVerify(identifier: string, password: string): Pro
     }
   }
   return null;
+}
+
+/* ───────────── إدارة صلاحيات الموقع الآخر عن بُعد (تبويب لكل موقع) ───────────── */
+
+/** أصل النظير الأول (الموقع الآخر) إن وُجد. */
+export function peerOrigin(): string {
+  return ssoPeers()[0] || '';
+}
+
+/** اقرأ مصفوفة صلاحيات الأدوار من الموقع الآخر (لعرض تبويبه). null عند التعذّر. */
+export async function fetchPeerRoles(): Promise<Record<string, string[]> | null> {
+  const origin = peerOrigin();
+  if (!ssoEnabled() || !origin) return null;
+  try {
+    const bearer = await signServiceToken('roles');
+    const res = await fetch(`${origin}/sso/roles`, {
+      headers: { authorization: `Bearer ${bearer}` },
+      signal: AbortSignal.timeout(4000),
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { roles?: Record<string, string[]> };
+    return data.roles ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** احفظ صلاحيات دورٍ في الموقع الآخر عبر القناة الموقّعة. */
+export async function savePeerRole(role: string, keys: string[]): Promise<boolean> {
+  const origin = peerOrigin();
+  if (!ssoEnabled() || !origin) return false;
+  try {
+    const bearer = await signServiceToken('roles');
+    const res = await fetch(`${origin}/sso/roles`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
+      body: JSON.stringify({ role, keys }),
+      signal: AbortSignal.timeout(4000),
+      cache: 'no-store',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }

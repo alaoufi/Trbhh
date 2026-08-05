@@ -14,7 +14,8 @@ export async function loginAction(_prev: unknown, formData: FormData) {
 
   await createSession({ uid: r.uid, name: r.name, type: r.type });
   const next = String(formData.get('next') || '');
-  if (next.startsWith('/') && !next.startsWith('//')) redirect(next);
+  // مسار داخلي فقط: يبدأ بـ / وليس // أو /\ (خدعة إعادة توجيه لموقع خارجي)
+  if (next.startsWith('/') && !next.startsWith('//') && !next.includes('\\')) redirect(next);
   // بيانات الدخول موحّدة: نفس الجلسة تفتح تربح وإدارة متجر العضو (إن كان له متجر).
   redirect('/');
 }

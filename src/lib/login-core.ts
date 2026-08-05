@@ -9,6 +9,20 @@ export type LoginResult =
   | { ok: false; error: string; code?: 'empty' | 'rate' | 'bad' | 'banned' };
 
 /**
+ * مفتاح تحديد المعدّل الموحّد: كل صيغ رقم الجوال نفسه (0501… / 501… / 966501…
+ * / 00966501… / +966501…) تُطابَق إلى دلوٍ واحد، فلا يستطيع المهاجم مضاعفة
+ * ميزانية التخمين بتدوير الصيغ. غير الأرقام (بريد/اسم) تُخنق بالنص المطبّع.
+ */
+function rlKeyFor(identifier: string): string {
+  const digits = identifier.replace(/\D/g, '');
+  if (digits.length >= 8) {
+    const sig = digits.replace(/^00/, '').replace(/^966/, '').replace(/^0+/, '');
+    return `rl:login:p:${sig}`;
+  }
+  return `rl:login:s:${identifier.toLowerCase().replace(/\s+/g, '')}`;
+}
+
+/**
  * التحقق المحلي فقط من بيانات الدخول (بلا فيدرالية) — يستخدمه `/sso/verify`
  * وتبني عليه `verifyLogin`. رقم الجوال (ويُقبل اسم المستخدم/البريد للحسابات
  * القديمة) + كلمة المرور.
@@ -18,7 +32,7 @@ export async function verifyLoginLocal(identifier: string, password: string): Pr
 
   // تحديد المعدّل: نمنع تخمين كلمة المرور بعد عدة محاولات فاشلة لنفس المُعرِّف.
   const { rateGet, rateHit, rateReset } = await import('./redis');
-  const rlKey = `rl:login:${identifier.toLowerCase().replace(/\s+/g, '')}`;
+  const rlKey = rlKeyFor(identifier);
   if ((await rateGet(rlKey)) >= 8) {
     return { ok: false, error: 'محاولات دخول كثيرة، انتظر قليلاً ثم أعد المحاولة', code: 'rate' };
   }
@@ -81,7 +95,7 @@ export async function verifyLogin(identifier: string, password: string): Promise
 
   // صفّر عدّاد المحاولات الذي زاده الفشل المحلي قبل نجاح الفيدرالية
   const { rateReset } = await import('./redis');
-  await rateReset(`rl:login:${identifier.toLowerCase().replace(/\s+/g, '')}`).catch(() => {});
+  await rateReset(rlKeyFor(identifier)).catch(() => {});
 
   return {
     ok: true,

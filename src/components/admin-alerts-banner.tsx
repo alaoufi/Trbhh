@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { timeAgo } from '@/lib/utils';
 import { cached } from '@/lib/redis';
+import { checkDbOwnership, siteLabel } from '@/lib/deployment';
 
 type Item = { n: number; label: string; href: string; oldest: Date | null };
 
@@ -12,6 +13,9 @@ type Item = { n: number; label: string; href: string; oldest: Date | null };
  * تُعالَج كل البنود فيختفي تلقائياً.
  */
 export async function AdminAlertsBanner() {
+  // حارس الفصل: هل هذه النشرة متصلة بقاعدتها هي، أم بقاعدة الموقع الآخر/نسخة منها؟
+  const dbOwn = await checkDbOwnership().catch(() => ({ ok: true as const, owner: '' }));
+
   const notArchived = { OR: [{ data_archive: null }, { data_archive: '' }] };
 
   // عدّاد + أقدم طلب لكل بند (لحساب وقت التأخير)
@@ -89,11 +93,33 @@ export async function AdminAlertsBanner() {
     { n: newBans, label: 'حظر آلي جديد (تجاوزات)', href: '/admin/reports?tab=auto', oldest: oldestNewBan },
   ].filter((i) => i.n > 0);
 
-  if (!items.length) return null;
+  const dbMismatch = dbOwn.ok === false ? dbOwn : null;
+  if (!items.length && !dbMismatch) return null;
   const total = items.reduce((s, i) => s + i.n, 0);
   const isLate = (d: Date | null) => !!d && Date.now() - d.getTime() > 24 * 3600_000;
 
   return (
+    <>
+      {dbMismatch && (
+        // تحذير فصل حرج: هذه النشرة تقرأ قاعدة موقع آخر → بياناتها مختلطة.
+        // يظهر فوق كل شيء لأي عضو إدارة حتى تُفصل القاعدة (تحذير فقط، بلا حجب).
+        <div className="sticky top-16 z-40 border-b-4 border-black bg-black">
+          <div className="container py-2.5 text-center text-sm font-extrabold text-white">
+            ⛔ تحذير فصل: هذه النشرة «{siteLabel(dbMismatch.expected)}» متصلة بقاعدة بيانات «{siteLabel(dbMismatch.owner)}» — البيانات مختلطة (تظهر بيانات الموقع الآخر هنا).
+            <br />
+            <span className="font-bold text-amber-300">
+              افصل قاعدة هذه النشرة عن قاعدة الموقع الآخر، ثم شغّلها مرة واحدة بـ SITE_ID_CLAIM=1 لإعادة بصمتها.
+            </span>
+          </div>
+        </div>
+      )}
+      {renderAlerts()}
+    </>
+  );
+
+  function renderAlerts() {
+    if (!items.length) return null;
+    return (
     // sticky top-16 = يلتصق أسفل الهيدر الثابت (h-16) مباشرة فيبقى ظاهراً أثناء
     // التمرير حتى تُعالَج كل البنود؛ ألوان صريحة داكنة تختلف عمداً عن شارات
     // تنبيهات الأعضاء الفاتحة (bg-*-50) حتى يتميّز فوراً كطابور قرارات إدارية.
@@ -116,5 +142,6 @@ export async function AdminAlertsBanner() {
         ))}
       </div>
     </div>
-  );
+    );
+  }
 }

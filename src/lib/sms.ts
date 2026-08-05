@@ -12,11 +12,9 @@ export const MSG_KEYS = {
   channel: 'otp_channel', enabled: 'otp_enabled',
 } as const;
 
-/** jawaly_v1 = current REST API (app_key/app_secret, Basic auth + JSON).
- *  taqnyat   = تقنيات REST API (Bearer token + JSON).
- *  legacy    = old username/password form POST (deprecated on most gateways). */
-export type SmsProvider = 'jawaly_v1' | 'taqnyat' | 'legacy';
-export const JAWALY_V1_URL = 'https://api-sms.4jawaly.com/api/v1/account/area/sms/send';
+/** taqnyat = تقنيات REST API (Bearer token + JSON) — البوابة الافتراضية.
+ *  legacy  = old username/password form POST (deprecated on most gateways). */
+export type SmsProvider = 'taqnyat' | 'legacy';
 export const TAQNYAT_URL = 'https://api.taqnyat.sa/v1/messages';
 
 export type OtpChannel = 'sms' | 'whatsapp' | 'both';
@@ -29,11 +27,11 @@ export type MessagingConfig = {
 /** Load messaging config from the DB (editable in admin), falling back to env. */
 export async function getMessagingConfig(): Promise<MessagingConfig> {
   const [smsProvider, smsUrl, smsUser, smsPass, smsSender, smsUnicode, waUrl, waInstance, waToken, channel, enabled] = await Promise.all([
-    getSetting(MSG_KEYS.smsProvider, process.env.SMS_PROVIDER || 'jawaly_v1'),
-    getSetting(MSG_KEYS.smsUrl, process.env.SMS_URL || JAWALY_V1_URL),
+    getSetting(MSG_KEYS.smsProvider, process.env.SMS_PROVIDER || 'taqnyat'),
+    getSetting(MSG_KEYS.smsUrl, process.env.SMS_URL || TAQNYAT_URL),
     getSetting(MSG_KEYS.smsUser, process.env.SMS_USERNAME || ''),
     getSetting(MSG_KEYS.smsPass, process.env.SMS_PASSWORD || ''),
-    // اسم المرسِل يأتي من إعدادات الإدارة (يجب أن يكون معتمداً من 4jawaly). لا اسم
+    // اسم المرسِل يأتي من إعدادات الإدارة (يجب أن يكون معتمداً في حساب تقنيات). لا اسم
     // افتراضي مكتوب في الكود — يُضبط من لوحة «بوابات التحقق».
     getSetting(MSG_KEYS.smsSender, process.env.SMS_SENDER || ''),
     getSetting(MSG_KEYS.smsUnicode, process.env.SMS_UNICODE || 'e'),
@@ -44,7 +42,8 @@ export async function getMessagingConfig(): Promise<MessagingConfig> {
     getSetting(MSG_KEYS.enabled, '1'),
   ]);
   const ch: OtpChannel = channel === 'whatsapp' || channel === 'both' ? channel : 'sms';
-  const prov: SmsProvider = smsProvider === 'legacy' ? 'legacy' : smsProvider === 'taqnyat' ? 'taqnyat' : 'jawaly_v1';
+  // أي قيمة قديمة مخزّنة (jawaly_v1) تُعامَل كـ«تقنيات» بعد إزالة 4jawaly
+  const prov: SmsProvider = smsProvider === 'legacy' ? 'legacy' : 'taqnyat';
   return { smsProvider: prov, smsUrl, smsUser, smsPass, smsSender, smsUnicode, waUrl, waInstance, waToken, channel: ch, enabled: enabled !== '0' };
 }
 
@@ -71,30 +70,6 @@ export function toLocalSaudi(phone: string): string {
   return (phone || '').trim();
 }
 
-/** Send an SMS via the current 4jawaly REST API (app_key/app_secret). */
-async function sendJawalyV1(phone: string, message: string, cfg: MessagingConfig): Promise<boolean> {
-  const url = cfg.smsUrl || JAWALY_V1_URL;
-  const auth = Buffer.from(`${cfg.smsUser}:${cfg.smsPass}`).toString('base64');
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': 'Trbhh/1.0' },
-      // per 4jawaly v1: number_iso filters recipients by country; globals carry
-      // the default sender/country for any transmission without its own.
-      body: JSON.stringify({
-        messages: [{ text: message, numbers: [normalizeSaudi(phone)], sender: cfg.smsSender, number_iso: 'SA' }],
-        globals: { number_iso: 'SA', sender: cfg.smsSender },
-      }),
-      cache: 'no-store',
-    });
-    const text = await res.text().catch(() => '');
-    if (res.status === 200 && /"(code|status)"\s*:\s*200|"job_id"|"total_success"\s*:\s*[1-9]|"inserted_numbers"\s*:\s*[1-9]/i.test(text)) return true;
-    return false;
-  } catch {
-    return false;
-  }
-}
-
 /** إرسال SMS عبر بوابة «تقنيات» (Taqnyat): POST + Bearer token + JSON.
  *  المستلمون بالصيغة الدولية بلا + أو 00 (9665XXXXXXXX). النجاح = statusCode 201. */
 async function sendTaqnyat(phone: string, message: string, cfg: MessagingConfig): Promise<boolean> {
@@ -119,50 +94,26 @@ async function sendTaqnyat(phone: string, message: string, cfg: MessagingConfig)
 export type SmsDiag = { ok: boolean; steps: string[]; httpStatus?: number; body?: string };
 
 /** Live gateway self-test: reads the saved config, sends ONE real test SMS, and
- *  returns 4jawaly's raw reply + a plain-Arabic diagnosis (admin tester). */
+ *  returns the gateway's raw reply + a plain-Arabic diagnosis (admin tester).
+ *  تقنيات لها تشخيصها الخاص؛ وإلا فبوابة قديمة (اختبار مبسّط). */
 export async function smsDiagnose(phone: string): Promise<SmsDiag> {
   const cfg = await getMessagingConfig();
-  if (cfg.smsProvider === 'taqnyat') return taqnyatDiagnose(phone, cfg);
+  if (cfg.smsProvider !== 'legacy') return taqnyatDiagnose(phone, cfg);
+  // بوابة قديمة (username/password) — اختبار مبسّط
   const steps: string[] = [];
   if (!cfg.enabled) steps.push('⚠️ الخدمة غير مفعّلة — فعّل «تفعيل خدمة استعادة كلمة المرور».');
-  if (!cfg.smsUser) steps.push('⚠️ «المفتاح (app_key)» غير مضبوط.');
-  if (!cfg.smsPass) steps.push('⚠️ «السر (app_secret)» غير مضبوط.');
-  if (!cfg.smsSender) steps.push('⚠️ «اسم المرسِل» غير مضبوط.');
-  if (!cfg.smsUser || !cfg.smsPass || !cfg.smsSender) {
-    steps.push('↩︎ أكمل الحقول الناقصة في الأعلى واحفظ، ثم أعد الاختبار.');
+  if (!smsCredsReady(cfg)) {
+    steps.push('⚠️ أكمل بيانات البوابة القديمة (اسم المستخدم/كلمة المرور/اسم المرسِل) واحفظ ثم أعد الاختبار.');
     return { ok: false, steps };
   }
-  const auth = Buffer.from(`${cfg.smsUser}:${cfg.smsPass}`).toString('base64');
   try {
-    const res = await fetch(cfg.smsUrl || JAWALY_V1_URL, {
-      method: 'POST',
-      headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': 'Trbhh/1.0' },
-      body: JSON.stringify({
-        messages: [{ text: 'رسالة اختبار من منصة تربح', numbers: [normalizeSaudi(phone)], sender: cfg.smsSender, number_iso: 'SA' }],
-        globals: { number_iso: 'SA', sender: cfg.smsSender },
-      }),
-      cache: 'no-store',
-    });
-    const body = (await res.text().catch(() => '')) || '';
-    const ok = res.status === 200 && /"(code|status)"\s*:\s*200|"job_id"|"total_success"\s*:\s*[1-9]|"inserted_numbers"\s*:\s*[1-9]/i.test(body);
-    if (ok) {
-      steps.push('✅ قبِلت البوابة الرسالة — يجب أن تصلك خلال ثوانٍ. لو ظهر تنبيه أصفر في الموقع فالكود المحدَّث لم يُنشر بعد.');
-    } else if (/is_token|"?token"?|منته|مفع|activat|expired|not.?active|disabled/i.test(body)) {
-      steps.push('❌ تطبيق الـAPI في 4jawaly غير مُفعّل أو منتهٍ. ادخل 4jawaly ← تطبيقاتي/API، فعّل التطبيق (أو أنشئ تطبيقاً جديداً وفعّله)، وتأكّد أن وصول API مفعّل لحسابك، ثم انسخ المفتاح والسر الجديدين هنا.');
-    } else if (res.status === 401 || res.status === 403 || /unauthenticated|unauthorized|invalid.?(auth|credential)/i.test(body)) {
-      steps.push('❌ فشلت المصادقة — «المفتاح/السر» (app_key/app_secret) غير صحيحين. انسخهما من جديد من 4jawaly.');
-    } else if (/sender|مرسِل|sender_?name/i.test(body)) {
-      steps.push('❌ مشكلة في «اسم المرسِل» — تأكّد أنه معتمد ومفعّل في حساب 4jawaly (بالضبط كما هو).');
-    } else if (/balance|رصيد|credit|insufficient/i.test(body)) {
-      steps.push('❌ لا يوجد رصيد كافٍ في حساب 4jawaly — اشحن الرصيد.');
-    } else if (res.status === 0 || res.status >= 500) {
-      steps.push('❌ خطأ من خادم 4jawaly — أعد المحاولة بعد قليل.');
-    } else {
-      steps.push('❌ رفضت البوابة الرسالة — اطّلع على الرد الخام أدناه لمعرفة السبب.');
-    }
-    return { ok, steps, httpStatus: res.status, body: body.slice(0, 1000) };
+    const ok = await sendLegacyForm(phone, 'رسالة اختبار من منصة تربح', cfg);
+    steps.push(ok
+      ? '✅ قبِلت البوابة الرسالة — يجب أن تصلك خلال ثوانٍ.'
+      : '❌ رفضت البوابة القديمة الرسالة — تحقّق من البيانات والرصيد واسم المرسِل.');
+    return { ok, steps };
   } catch {
-    steps.push('❌ تعذّر الاتصال ببوابة 4jawaly — تحقّق من «رابط الـAPI» ومن اتصال الخادم بالإنترنت.');
+    steps.push('❌ تعذّر الاتصال بالبوابة القديمة — تحقّق من «رابط الـAPI» واتصال الخادم.');
     return { ok: false, steps };
   }
 }
@@ -232,9 +183,8 @@ export async function sendSms(phone: string, message: string, c?: MessagingConfi
   const cfg = c || (await getMessagingConfig());
   // credentials + an (approved) sender name are all required — set in admin.
   if (!smsCredsReady(cfg)) return false;
-  if (cfg.smsProvider === 'taqnyat') return sendTaqnyat(phone, message, cfg);
   if (cfg.smsProvider === 'legacy') return sendLegacyForm(phone, message, cfg);
-  return sendJawalyV1(phone, message, cfg);
+  return sendTaqnyat(phone, message, cfg);
 }
 
 /** Send a WhatsApp message via the 4whats.net gateway. */

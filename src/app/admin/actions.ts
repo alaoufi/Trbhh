@@ -15,7 +15,7 @@ import { createPackage, updatePackage, deletePackage, assignUserPackage, type Ti
 import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG_DELETE_MINUTES, SETTING_HOME_STATS, HOME_STAT_KEYS, SETTING_CLASSIFIED_STATS, SETTING_CLASSIFIED_DAYS, SETTING_CLASSIFIED_SECONDS, SETTING_ADS_APPROVAL, SETTING_DUP_TITLE_PCT, SETTING_DUP_DETAIL_PCT, SETTING_DUP_IMAGE_PCT, SETTING_STRIKE_BAN_DAYS, SETTING_STORE_SHIELD, getStrikeBanDays, SETTING_CDUP_ON, SETTING_CDUP_CONTENT_PCT, SETTING_CDUP_IMAGE_PCT, SETTING_CDUP_BG_PCT, SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_AD_NOTICE, SETTING_TICKER, SETTING_SITE_SHARE_TITLE, SETTING_SITE_SHARE_DESC, SETTING_WELCOME_GUEST_TEXT, SETTING_WELCOME_MEMBER_TEXT, SETTING_WELCOME_POPUP_SECONDS, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB, SETTING_HOME_H_STORES, SETTING_HOME_H_PRODUCTS, SETTING_HOME_H_FEATURED, SETTING_HOME_H_LATEST, SETTING_HOME_H_MOSTVIEWED, SETTING_EMPTY_ADS, SETTING_EMPTY_CHATS, SETTING_EMPTY_STORES, SETTING_EMPTY_REVIEWS, SETTING_EMPTY_CLASSIFIED, SETTING_MSG_VERIFY_OK, SETTING_MSG_VERIFY_REJECT, SETTING_TOPUP_INFO, SETTING_MSG_TOPUP_OK, SETTING_MSG_TOPUP_REJECT, SETTING_MSG_TOPUP_CANCEL, SETTING_TOPUP_NAME_NOTE, getTopupAccounts, setTopupAccounts, SETTING_SUB_ENABLED, SETTING_SUB_MONTHLY, SETTING_SUB_6MO, SETTING_SUB_YEARLY, SETTING_SUB_GRACE_DAYS, SETTING_SUB_TRIAL_DAYS, SETTING_SUB_REMIND_DAYS, SETTING_SUB_REMIND_COUNT, SETTING_SUB_REMINDER_MSG, SETTING_SHOW_REMINDER_MSG, SETTING_ADSHOW_REMINDER_MSG, servicePriceKey, DURATIONS, type PaidService, APP_KEYS } from '@/lib/settings';
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
-import { MSG_KEYS, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
+import { MSG_KEYS, TAQNYAT_URL, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
 import { hashPassword } from '@/lib/auth';
 import { bustAdCaches } from '@/lib/data';
 import { toInt } from '@/lib/utils';
@@ -842,8 +842,8 @@ export async function saveVerificationAction(formData: FormData) {
   const s = (k: string) => String(formData.get(k) || '').trim();
   const ch = s('channel');
   const channel = ch === 'whatsapp' || ch === 'both' ? ch : 'sms';
-  const provider = s('sms_provider') === 'legacy' ? 'legacy' : 'jawaly_v1';
-  const defUrl = provider === 'legacy' ? '' : 'https://api-sms.4jawaly.com/api/v1/account/area/sms/send';
+  const provider = s('sms_provider') === 'legacy' ? 'legacy' : 'taqnyat';
+  const defUrl = provider === 'legacy' ? '' : TAQNYAT_URL;
   await Promise.all([
     setSetting(MSG_KEYS.smsProvider, provider),
     setSetting(MSG_KEYS.smsUrl, s('sms_url') || defUrl),

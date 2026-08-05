@@ -9,7 +9,7 @@ html { scroll-behavior: smooth; overflow-x: clip; }
   --foreground: 214 60% 21%;
   --card: 206 100% 93%;              /* #def1ff — exact original card blue */
   --card-foreground: 210 60% 27%;
-  --primary: 210 69% 53%;            /* #3287da — exact original brand blue */
+  --primary: 217 91% 60%;            /* #3b82f6 — أزرق الهيدر (موحّد) */
   --primary-foreground: 0 0% 100%;
   --secondary: 206 90% 90%;
   --secondary-foreground: 210 60% 25%;
@@ -23,7 +23,7 @@ html { scroll-behavior: smooth; overflow-x: clip; }
   --new-foreground: 0 0% 100%;
   --border: 210 65% 78%;
   --input: 210 65% 78%;
-  --ring: 210 69% 53%;
+  --ring: 217 91% 60%;
   --radius: 0.9rem;
 }
 

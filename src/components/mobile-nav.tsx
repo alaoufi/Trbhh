@@ -54,7 +54,7 @@ export function MobileNav({ unread = 0, isAuthed = false }: { unread?: number; i
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-black/20 bg-[#1d4ed8] md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-black/20 bg-[#3b82f6] md:hidden">
       <ul className="flex items-stretch justify-around">
         {items.map(({ href, label, icon: Icon, primary, badge }) => {
           const active = path === href;

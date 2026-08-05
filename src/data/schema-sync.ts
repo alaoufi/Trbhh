@@ -836,8 +836,31 @@ async function run(): Promise<void> {
   // يضبط هذا المتغيّر → يبقى سلوكه كما هو (وسم العقارات القائمة لإيقافها عند الحاجة).
   if (process.env.REALESTATE_ONLY === '1') {
     await cleanSlateRealEstate();
+    await bootstrapFirstAdmin();
   } else {
     await backfillRealEstateFlag();
+  }
+}
+
+/** ترقية أول مدير على منصّة العقار المستقلّة (قاعدتها منفصلة وتبدأ بلا أي مدير).
+ *  ذاتيّ التقييد: لا يعمل إلا إذا لم يوجد أي مدير بعد — فبمجرّد وجود مدير لا يمسّ أحداً.
+ *  يمنح صاحب الرقم المحدّد صلاحية المدير الكامل (is_admin=1). لا يعمل إلا في بيئة
+ *  العقار (REALESTATE_ONLY=1) فلا يمسّ الإنتاج إطلاقاً. */
+async function bootstrapFirstAdmin(): Promise<void> {
+  try {
+    const rows = await prisma
+      .$queryRawUnsafe<{ n: bigint }[]>(`SELECT COUNT(*) AS n FROM users WHERE is_admin = 1`)
+      .catch(() => [] as { n: bigint }[]);
+    const count = rows.length ? Number(rows[0].n) : 0;
+    if (count > 0) return; // يوجد مدير بالفعل → لا ترقية
+    // الرقم يُخزَّن بالصيغة المحلّية 05XXXXXXXX؛ نطابق الصيغ الشائعة احتياطاً
+    await prisma
+      .$executeRawUnsafe(
+        `UPDATE users SET is_admin = 1 WHERE phoneNumber IN ('0548999968', '966548999968', '+966548999968', '00966548999968')`,
+      )
+      .catch(() => {});
+  } catch {
+    /* تجاهل — الترقية اختيارية ولا تُعيق الإقلاع */
   }
 }
 

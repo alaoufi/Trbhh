@@ -62,21 +62,26 @@ export default async function VerificationPage({ searchParams }: { searchParams:
         {/* SMS */}
         <section className="overflow-hidden rounded-2xl border-2 border-primary/15 bg-white shadow-sm">
           <div className="flex items-center gap-2 bg-gradient-to-br from-emerald-600 to-emerald-800 p-3 text-white">
-            <Smartphone className="h-5 w-5" /> <h2 className="font-extrabold drop-shadow">بوابة SMS (4jawaly)</h2>
+            <Smartphone className="h-5 w-5" /> <h2 className="font-extrabold drop-shadow">بوابة SMS</h2>
           </div>
           <div className="space-y-3 p-4">
             <L label="نوع الواجهة">
               <select name="sms_provider" defaultValue={c.smsProvider} className={field}>
+                <option value="taqnyat">تقنيات Taqnyat (رمز Bearer)</option>
                 <option value="jawaly_v1">4jawaly الحديثة (app_key / app_secret)</option>
                 <option value="legacy">قديمة (username / password)</option>
               </select>
             </L>
-            <p className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">
-              للواجهة الحديثة: احصل على <b>app_key</b> و<b>app_secret</b> من لوحة تحكّم 4jawaly (الإعدادات ← تطبيقاتي/API)، وضع الـapp_key في «المفتاح» والـapp_secret في «السر».
+            <p className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-800">
+              <b>تقنيات (Taqnyat):</b> من لوحة تقنيات ← «المطوّرون / Applications» أنشئ <b>رمز API (Bearer)</b> وضعه في حقل «السر»، واترك «المفتاح» فارغاً. ضع رابط الـAPI:
+              <span dir="ltr"> https://api.taqnyat.sa/v1/messages</span>، و«اسم المرسِل» يجب أن يكون <b>معتمداً في حسابك</b> بالضبط كما هو.
             </p>
-            <L label="رابط الـAPI"><input name="sms_url" defaultValue={c.smsUrl} className={field} /></L>
-            <L label="المفتاح (app_key / username)"><input name="sms_username" defaultValue={c.smsUser} className={field} /></L>
-            <L label="السر (app_secret / password)"><input name="sms_password" defaultValue={c.smsPass} className={field} /></L>
+            <p className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">
+              <b>4jawaly:</b> ضع الـapp_key في «المفتاح» والـapp_secret في «السر»، ورابط الـAPI الخاص بها.
+            </p>
+            <L label="رابط الـAPI"><input name="sms_url" defaultValue={c.smsUrl} className={field} dir="ltr" /></L>
+            <L label="المفتاح (app_key / username) — يُترك فارغاً مع تقنيات"><input name="sms_username" defaultValue={c.smsUser} className={field} dir="ltr" /></L>
+            <L label="السر (app_secret / رمز تقنيات Bearer)"><input name="sms_password" defaultValue={c.smsPass} className={field} dir="ltr" /></L>
             <L label="اسم المرسِل (sender)"><input name="sms_sender" defaultValue={c.smsSender} className={field} /></L>
             <L label="الترميز (للقديمة فقط)"><input name="sms_unicode" defaultValue={c.smsUnicode} className={field} /></L>
           </div>

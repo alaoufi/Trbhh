@@ -32,6 +32,7 @@ import { addCommentAction } from '@/app/ads/comment-actions';
 import { buyUrgentAction, featureAdAction, bumpAdAction, deleteAdAction, archiveAdAction, restoreArchivedAdAction } from '@/app/account/actions';
 import { buyAdShowAction } from '@/app/account/company/actions';
 import { PromoSlot } from '@/components/promo-slot';
+import { PeerSitePromo } from '@/components/peer-site-promo';
 import { getAdAudio } from '@/lib/ad-media';
 import { mediaUrl } from '@/lib/media';
 import { AdGallery } from '@/components/ad-gallery';
@@ -545,6 +546,9 @@ export default async function AdPage({ params, searchParams }: { params: Promise
 
       {/* Paid banner — inside ad details */}
       <PromoSlot placement="ad_detail" />
+
+      {/* بطاقة الربط بالموقع الشقيق (تربح ⇄ تربح للعقار) — من الإعدادات */}
+      <PeerSitePromo />
 
       {/* Contact tiles — only show channels the seller actually offers */}
       <div className={`grid gap-3 ${contactCols === 3 ? 'grid-cols-3' : contactCols === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>

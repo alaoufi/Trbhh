@@ -61,6 +61,31 @@ export async function getMsgDeleteMinutes(): Promise<number> {
 export const SETTING_REGISTER_OTP = 'register_otp_on';
 export const registerOtpEnabled = () => getSettingBool(SETTING_REGISTER_OTP, false);
 
+/* أيقونة/بطاقة الربط بالموقع الشقيق (تربح ⇄ تربح للعقار) تظهر في صفحة الإعلان.
+   كل نشرة تضبط في قاعدتها بيانات الموقع الآخر — لا تُكتب روابط ثابتة في الكود. */
+export const PEER_SITE_KEYS = {
+  on: 'peer_site_on', url: 'peer_site_url', label: 'peer_site_label',
+  desc: 'peer_site_desc', emoji: 'peer_site_emoji',
+} as const;
+export async function getPeerSite() {
+  const [on, url, label, desc, emoji] = await Promise.all([
+    getSettingBool(PEER_SITE_KEYS.on, false),
+    getSetting(PEER_SITE_KEYS.url, ''),
+    getSetting(PEER_SITE_KEYS.label, ''),
+    getSetting(PEER_SITE_KEYS.desc, ''),
+    getSetting(PEER_SITE_KEYS.emoji, '🏢'),
+  ]);
+  const cleanUrl = url.trim().replace(/\/+$/, '');
+  const valid = /^https?:\/\/[^\s]+$/i.test(cleanUrl);
+  return {
+    on: on && valid,
+    url: valid ? cleanUrl : '',
+    label: label.trim() || 'الموقع الآخر',
+    desc: desc.trim(),
+    emoji: emoji.trim() || '🏢',
+  };
+}
+
 /* Quick-reply message templates (نصوص جاهزة) shown above the chat compose box so
    the sender can pick a ready phrase. Stored one-per-line; blank => hidden.
    Trbhh (platform) owns two sets — messaging an ad owner, and messaging the

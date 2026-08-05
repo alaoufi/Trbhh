@@ -16,6 +16,7 @@ import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, g
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
+import { checkDbOwnership } from '@/lib/deployment';
 import { homeFeaturedAds, homeStoreCards, storeIdOfUser } from '@/lib/merchant';
 import { StoreMiniCard, type StoreCardData } from '@/components/store-mini-card';
 import { OpenStoreBanner } from '@/components/open-store-banner';
@@ -58,11 +59,17 @@ export default async function HomePage() {
     getHomeClassifiedText().catch(() => ({ title: 'الإعلانات المبوّبة', sub: 'تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي' })),
   ]);
   const H = await getHomeHeadings().catch(() => ({ stores: 'متاجر تربح', products: 'منتجات المتاجر', featured: 'إعلانات مميّزة', latest: 'أحدث الإعلانات', mostViewed: 'الأكثر مشاهدة' }));
-  const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
-    { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
-    { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
-    { key: 'views', icon: Eye, value: stats.views, label: 'مشاهدة' },
-  ].filter((s) => homeStats.has(s.key));
+  // أمان الفصل: إن كانت هذه النشرة متصلة بقاعدة موقع آخر (قاعدة مختلطة/مستنسخة)
+  // فإحصاءاتها ليست لها — نُخفيها كي لا يرى الزوّار أرقاماً خاطئة حتى تُفصل القاعدة.
+  const dbOk = (await checkDbOwnership().catch(() => ({ ok: true as const }))).ok;
+  const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = (dbOk
+    ? [
+        { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
+        { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
+        { key: 'views', icon: Eye, value: stats.views, label: 'مشاهدة' },
+      ]
+    : []
+  ).filter((s) => homeStats.has(s.key));
 
   const session = await getSession().catch(() => null);
   // اهتمام الزائر/العضو يُستنتَج بدلالة المحتوى الفعلي الذي تصفّحه وبحث عنه

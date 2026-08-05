@@ -635,6 +635,12 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('namelock_on', formData.get('nameLockOn') !== null ? '1' : '0');
   // تحقّق OTP عند التسجيل (يتطلّب ضبط بوابة الإرسال) — يمنع التسجيل بجوال غير مملوك
   await setSetting('register_otp_on', formData.get('registerOtpOn') !== null ? '1' : '0');
+  // بطاقة الربط بالموقع الشقيق (تظهر في صفحة الإعلان)
+  await setSetting('peer_site_on', formData.get('peerSiteOn') !== null ? '1' : '0');
+  await setSetting('peer_site_url', String(formData.get('peerSiteUrl') || '').trim());
+  await setSetting('peer_site_label', String(formData.get('peerSiteLabel') || '').trim());
+  await setSetting('peer_site_desc', String(formData.get('peerSiteDesc') || '').trim());
+  await setSetting('peer_site_emoji', String(formData.get('peerSiteEmoji') || '').trim());
   // classified duplicate prevention: toggle + content/image/background thresholds
   await setSetting(SETTING_CDUP_ON, formData.get('cdupOn') !== null ? '1' : '0');
   await setSetting(SETTING_CDUP_CONTENT_PCT, String(Math.min(100, Math.max(50, parseInt(String(formData.get('cdupContentPct') || '90')) || 90))));

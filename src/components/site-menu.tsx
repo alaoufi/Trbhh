@@ -274,7 +274,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
 
   return (
     <>
-      <button onClick={() => setOpen(true)} aria-label="القائمة" className="flex items-center gap-0.5 text-[#f0b429]">
+      <button onClick={() => setOpen(true)} aria-label="القائمة" className="flex items-center gap-0.5 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]">
         <Menu className="h-7 w-7" />
         <ChevronDown className="h-3.5 w-3.5" />
       </button>

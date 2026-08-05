@@ -24,7 +24,7 @@ export function HeaderSearch() {
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-label="بحث" className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#f0b429] transition hover:bg-white/10">
+      <button type="button" onClick={() => setOpen(true)} aria-label="بحث" className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.45)] transition hover:bg-white/10">
         <Search className="h-5 w-5" />
       </button>
 

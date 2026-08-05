@@ -54,7 +54,7 @@ export async function Header() {
         {/* جرس الرسائل والتنبيهات + ساعة حية بتوقيت الرياض تحته */}
         <div className="flex shrink-0 flex-col items-center gap-0.5">
           {session && (
-            <Link href="/notifications" aria-label="التنبيهات والرسائل" className="relative text-[#f0b429]">
+            <Link href="/notifications" aria-label="التنبيهات والرسائل" className="relative text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]">
               <Bell className="h-5 w-5" />
               {bellCount > 0 && (
                 <span className="absolute -left-2 -top-1.5 grid min-w-[18px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-extrabold leading-[18px] text-white shadow">

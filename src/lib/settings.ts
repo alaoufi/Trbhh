@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
+import { DISCLAIMER } from './constants';
 
 const ensure = ensureSchema;
 
@@ -369,6 +370,16 @@ export async function getAdNotice(): Promise<string> {
 // نص مشاركة الموقع (يظهر في معاينة الرابط عند مشاركته في واتساب وغيره)
 export const SETTING_SITE_SHARE_TITLE = 'site_share_title';
 export const SETTING_SITE_SHARE_DESC = 'site_share_desc';
+// نص إخلاء المسؤولية (المختصر داخل الصفحات، والكامل في التذييل) — قابل للتعديل من «النصوص».
+export const SETTING_DISCLAIMER_SHORT = 'disclaimer_short';
+export const SETTING_DISCLAIMER_LONG = 'disclaimer_long';
+export async function getDisclaimer(): Promise<{ short: string; long: string }> {
+  const [short, long] = await Promise.all([
+    getSetting(SETTING_DISCLAIMER_SHORT, DISCLAIMER.short),
+    getSetting(SETTING_DISCLAIMER_LONG, DISCLAIMER.long),
+  ]);
+  return { short: short || DISCLAIMER.short, long: long || DISCLAIMER.long };
+}
 
 /* بوب أب الترحيب (بالرئيسية للزائر، وبصفحة الحساب للعضو): نصّاه ومدة ظهوره قبل
    الاختفاء التلقائي — تظهران في «النصوص الظاهرة» ← «رسائل الترحيب». */

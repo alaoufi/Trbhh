@@ -1,8 +1,9 @@
 import { ShieldAlert } from 'lucide-react';
-import { DISCLAIMER } from '@/lib/constants';
+import { getDisclaimer } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 
-export function DisclaimerBar({ variant = 'inline', className }: { variant?: 'inline' | 'full'; className?: string }) {
+export async function DisclaimerBar({ variant = 'inline', className }: { variant?: 'inline' | 'full'; className?: string }) {
+  const d = await getDisclaimer();
   return (
     <div
       className={cn(
@@ -11,7 +12,7 @@ export function DisclaimerBar({ variant = 'inline', className }: { variant?: 'in
       )}
     >
       <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-      <p className="text-xs leading-5">{variant === 'full' ? DISCLAIMER.long : DISCLAIMER.short}</p>
+      <p className="text-xs leading-5">{variant === 'full' ? d.long : d.short}</p>
     </div>
   );
 }

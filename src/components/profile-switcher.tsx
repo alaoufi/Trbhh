@@ -13,9 +13,12 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
   const [open, setOpen] = useState(false);
   const path = usePathname() || '/';
   const multi = profiles.length > 1 || linked.length > 0;
-  const color = active.color || '#3287da';
+  const custom = active.color;                        // لون مخصّص للهوية إن وُجد
+  const color = custom || 'hsl(var(--primary))';      // وإلا لون الثيم الفعّال (يتبع الثيم)
   const btnCls = 'flex max-w-[70vw] items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-bold';
-  const btnStyle = { borderColor: color, background: `${color}1f`, color } as React.CSSProperties;
+  // بلا لون مخصّص: يتبع الثيم عبر أصناف primary؛ ومع لون مخصّص: نمط مضمّن بذلك اللون
+  const btnStyle = custom ? ({ borderColor: custom, background: `${custom}1f`, color: custom } as React.CSSProperties) : undefined;
+  const btnTheme = custom ? '' : 'border-primary bg-primary/10 text-primary';
   const icon = (
     <span className="grid h-5 w-5 shrink-0 place-items-center overflow-hidden rounded-full text-[10px] font-extrabold text-white" style={{ background: color }}>
       {active.avatarUrl && !active.avatarUrl.endsWith('.svg')
@@ -25,7 +28,7 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
   );
   // وسم يميّز نوع الهوية: متجر أو حساب
   const kindBadge = (
-    <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-extrabold text-white" style={{ background: active.type === 'store' ? '#059669' : '#0284c7' }}>
+    <span className="shrink-0 rounded px-1 py-0.5 text-[9px] font-extrabold text-white" style={{ background: active.type === 'store' ? '#059669' : 'hsl(var(--primary))' }}>
       {active.type === 'store' ? 'متجر' : 'حساب'}
     </span>
   );
@@ -33,7 +36,7 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
   // هوية واحدة فقط: المؤشّر رابط لصفحة «هوياتي» لإضافة هويات جديدة.
   if (!multi) {
     return (
-      <Link href="/account/profiles" className={btnCls} style={btnStyle} aria-label="الهوية الفعّالة — إدارة الهويات">
+      <Link href="/account/profiles" className={`${btnCls} ${btnTheme}`} style={btnStyle} aria-label="الهوية الفعّالة — إدارة الهويات">
         {icon}
         {kindBadge}
         <span className="truncate">أنت: {active.name}</span>
@@ -47,7 +50,7 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={btnCls}
+        className={`${btnCls} ${btnTheme}`}
         style={btnStyle}
         aria-label="الهوية الفعّالة"
       >
@@ -68,11 +71,11 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
                 if (!items.length) return null;
                 return (
                   <div key={grp}>
-                    <div className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-extrabold ${grp === 'store' ? 'bg-emerald-50 text-emerald-800' : 'bg-sky-50 text-sky-800'}`}>
+                    <div className={`flex items-center gap-1 px-3 py-1.5 text-[11px] font-extrabold ${grp === 'store' ? 'bg-emerald-50 text-emerald-800' : 'bg-primary/10 text-primary'}`}>
                       {grp === 'store' ? <><Store className="h-3.5 w-3.5" /> متاجري</> : <><UserRound className="h-3.5 w-3.5" /> حساباتي في عقار تربح</>}
                     </div>
                     {items.map((p) => {
-                      const c = p.color || '#3287da';
+                      const c = p.color || 'hsl(var(--primary))';
                       const isActive = p.id === active.id;
                       return (
                         <form key={p.id} action={switchProfileAction}>
@@ -86,7 +89,7 @@ export function ProfileSwitcher({ active, profiles, linked = [] }: { active: Ite
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="flex items-center gap-1 font-bold">
-                                <span className="shrink-0 rounded px-1 text-[9px] font-extrabold text-white" style={{ background: p.type === 'store' ? '#059669' : '#0284c7' }}>{p.type === 'store' ? 'متجر' : 'حساب'}</span>
+                                <span className="shrink-0 rounded px-1 text-[9px] font-extrabold text-white" style={{ background: p.type === 'store' ? '#059669' : 'hsl(var(--primary))' }}>{p.type === 'store' ? 'متجر' : 'حساب'}</span>
                                 <span className="truncate">{p.name}</span>
                               </span>
                               <span className="block text-[11px] text-muted-foreground">{p.type === 'store' ? `🏬 مسجّلة في: متجر «${p.name}» — مستقلّة` : '🟢 مسجّلة في: عقار تربح (إعلانات عامة)'}</span>

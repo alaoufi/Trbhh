@@ -10,9 +10,9 @@ export async function Footer() {
     <footer className="mt-12 border-t border-black/20 bg-primary text-white">
       <div className="container py-10 pb-24 md:pb-10">
         {(creds.cr || creds.fal) && (
-          <div className="mb-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 rounded-xl bg-white/10 px-4 py-3 text-center text-base font-extrabold text-white">
-            {creds.cr && <span>سجل تجاري: <span dir="ltr" className="font-mono">{creds.cr}</span></span>}
+          <div className="mb-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-2 rounded-xl bg-white/15 px-4 py-4 text-center text-lg font-extrabold text-white">
             {creds.fal && <span>رخصة فال: <span dir="ltr" className="font-mono">{creds.fal}</span></span>}
+            {creds.cr && <span>سجل تجاري: <span dir="ltr" className="font-mono">{creds.cr}</span></span>}
           </div>
         )}
         <DisclaimerBar variant="full" className="mb-8" />

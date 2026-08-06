@@ -1,21 +1,21 @@
 {
   "id": "/",
-  "name": "تربح للعقار | Trbhh Aqar",
-  "short_name": "تربح للعقار",
+  "name": "عقار تربح | Trbhh Aqar",
+  "short_name": "عقار تربح",
   "description": "منصّة الوساطة والإعلانات العقارية في السعودية",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#122745",
-  "theme_color": "#122745",
+  "background_color": "#eef1f3",
+  "theme_color": "#3b82f6",
   "lang": "ar",
   "dir": "rtl",
   "orientation": "portrait",
   "categories": ["business", "lifestyle"],
   "icons": [
-    { "src": "/logo-aqar-256.png?v=3", "sizes": "256x256", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-192.png?v=3", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-maskable-512.png?v=3", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/logo-aqar-256.png?v=4", "sizes": "256x256", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192.png?v=4", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png?v=4", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png?v=4", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

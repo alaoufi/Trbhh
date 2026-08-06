@@ -40,9 +40,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const icons: { src: string; sizes: string; type: string; purpose: string }[] = [];
   if (logoAbs) icons.push({ src: logoAbs, sizes: '512x512', type: iconType(logoAbs), purpose: 'any' });
   icons.push(
-    { src: `${base}/icon-192.png?v=3`, sizes: '192x192', type: 'image/png', purpose: 'any' },
-    { src: `${base}/icon-512.png?v=3`, sizes: '512x512', type: 'image/png', purpose: 'any' },
-    { src: `${base}/icon-maskable-512.png?v=3`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    { src: `${base}/icon-192.png?v=4`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: `${base}/icon-512.png?v=4`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+    { src: `${base}/icon-maskable-512.png?v=4`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
   );
   const manifest = {
     id: start,

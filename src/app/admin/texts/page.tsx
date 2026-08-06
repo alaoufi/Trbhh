@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox, Braces, ShieldCheck, HandCoins, Smile } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import {
-  getSetting, getHomeHeadings, getEmptyTexts, getWelcomePopupSeconds,
+  getSetting, getHomeHeadings, getEmptyTexts, getWelcomePopupSeconds, getDisclaimer,
+  SETTING_DISCLAIMER_SHORT, SETTING_DISCLAIMER_LONG,
   SETTING_MSG_TPL_AD, SETTING_MSG_TPL_ADMIN, SETTING_MSG_TPL_SUPPORT, SETTING_AD_NOTICE, SETTING_SUB_REMINDER_MSG,
   SETTING_TICKER, SETTING_HOME_CLS_TITLE, SETTING_HOME_CLS_SUB,
   SETTING_SITE_SHARE_TITLE, SETTING_SITE_SHARE_DESC,
@@ -82,6 +83,7 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
     getSetting(SETTING_SITE_SHARE_TITLE, `${SITE.name} | ${SITE.tagline}`),
     getSetting(SETTING_SITE_SHARE_DESC, SITE.description),
   ]);
+  const disclaimer = await getDisclaimer();
   const [feedPromo, feedAware] = await Promise.all([
     getSetting('feed_texts_promo', DEFAULT_FEED_TEXTS_PROMO),
     getSetting('feed_texts_aware', DEFAULT_FEED_TEXTS_AWARE),
@@ -150,6 +152,16 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
           <label className="block space-y-1">
             <span className="text-sm font-medium">وصف مشاركة الموقع</span>
             <textarea name="shareDesc" rows={2} defaultValue={shareDesc} className={box} />
+          </label>
+          <div className="border-t border-primary/15 pt-3 text-sm font-bold text-primary">إخلاء المسؤولية ⚠️</div>
+          <p className="text-xs text-muted-foreground">تنويه أن المنصّة ليست وسيطاً مالياً. النص الكامل يظهر في تذييل الموقع، والمختصر داخل بعض الصفحات (كصفحة المتجر).</p>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">نص إخلاء المسؤولية الكامل (التذييل)</span>
+            <textarea name="disclaimerLong" rows={4} defaultValue={disclaimer.long} className={box} />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">نص إخلاء المسؤولية المختصر (داخل الصفحات)</span>
+            <textarea name="disclaimerShort" rows={2} defaultValue={disclaimer.short} className={box} />
           </label>
           </>
         )}

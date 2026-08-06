@@ -2,7 +2,7 @@
 import { useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useFormStatus } from 'react-dom';
-import { MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck, Eye, X, ArrowLeftRight, Timer, Star, User, Store, Building2 } from 'lucide-react';
+import { MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck, Eye, X, ArrowLeftRight, Timer, Star, User, Store, Building2, Check } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 // منتقي الخريطة يُحمَّل في المتصفح فقط (Leaflet يتطلّب window)
@@ -133,13 +133,17 @@ export function AdForm({
   const [reFinish, setReFinish] = useState(initial?.reFinish || '');
   const isBare = reFinish === 'على العظم';
   const canFurnish = !(reFinish === 'على العظم' || reFinish === 'نصف تشطيب' || reCondition === 'تحت الإنشاء' || reCondition === 'على الخارطة');
-  // مميزات مناسبة للنوع، مع إخفاء ما يتعارض منطقياً مع «على العظم» (مطبخ راكب/مكيّفات)
-  const kindFeatures = featuresForKind(reKind).filter((f) => !(isBare && (f.key === 'kitchen' || f.key === 'ac')));
   // نوع السعر للمعروض: تأجير (سعر + مدة) / بيع (سعر) / على السوم (بلا سعر)
   const [priceMode, setPriceMode] = useState<'rent' | 'sale' | 'som'>(
     initial?.priceType === 'rent' || initial?.priceType === 'som' ? initial.priceType
       : initial?.priceType === 'sale' || (initial?.price ?? 0) > 0 ? 'sale'
       : initial?.id ? 'som' : 'sale',
+  );
+  // مميزات مناسبة للنوع، مع إخفاء ما يتعارض منطقياً مع «على العظم» (مطبخ راكب/مكيّفات).
+  // «قابل للتمويل» يخصّ البيع فقط — يُخفى في الإيجار/على السوم/طلبات الشراء.
+  const kindFeatures = featuresForKind(reKind).filter((f) =>
+    !(isBare && (f.key === 'kitchen' || f.key === 'ac'))
+    && !(f.key === 'mortgage' && (isReq || priceMode !== 'sale')),
   );
   // الموقع موجّه للسعودية فقط
   const saudiId = useMemo(() => countries.find((c) => /سعود/.test(c.name))?.id ?? countries[0]?.id ?? 1, [countries]);
@@ -520,14 +524,16 @@ export function AdForm({
             {kindFeatures.length > 0 && (
               <div className="space-y-1.5">
                 <div className="text-[13px] font-extrabold text-primary">مميزات العقار <span className="font-normal text-muted-foreground">(اختياري — اختر ما ينطبق)</span></div>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                   {kindFeatures.map((f) => {
                     const on = features.has(f.key);
                     return (
                       <button key={f.key} type="button" onClick={() => toggleFeature(f.key)} aria-pressed={on}
-                        className={`inline-flex items-center gap-1 rounded-full border-2 px-3 py-1.5 text-[13px] font-bold transition ${on ? 'border-primary bg-primary text-white shadow-sm' : 'border-primary/20 bg-white text-foreground/70 hover:border-primary/40'}`}>
-                        <span>{f.icon}</span> {f.label}
-                        {on && <span className="text-[11px]">✓</span>}
+                        className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2.5 text-right text-[13px] font-bold transition ${on ? 'border-primary bg-primary/10 text-primary' : 'border-primary/15 bg-white text-foreground/70 hover:border-primary/40'}`}>
+                        <span className={`grid h-5 w-5 shrink-0 place-items-center rounded border-2 transition ${on ? 'border-primary bg-primary text-white' : 'border-primary/30 bg-white'}`}>
+                          {on && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                        </span>
+                        <span className="flex-1 leading-tight">{f.label}</span>
                       </button>
                     );
                   })}

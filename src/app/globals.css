@@ -498,3 +498,10 @@ button:active { }
   bottom: auto !important;
   z-index: 35 !important;
 }
+/* خلفية الختم تتبع لون الثيم (بدل الكحلي الثابت) — نلوّن العلبة الخارجية التي يرسمها
+   السكربت، ويبقى رمز المركز الأبيض ونصّه الأبيض بالداخل كما هما. */
+.sbc-verify-seal > a,
+.sbc-verify-seal > div,
+.sbc-verify-seal > button {
+  background-color: hsl(var(--primary)) !important;
+}

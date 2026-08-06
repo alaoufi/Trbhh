@@ -35,7 +35,7 @@ export function SealReposition() {
       seal.style.setProperty('left', '8px', 'important');
       seal.style.setProperty('bottom', 'auto', 'important');
       seal.style.setProperty('right', 'auto', 'important');
-      seal.style.setProperty('z-index', '45', 'important');
+      seal.style.setProperty('z-index', '60', 'important');
       return true;
     };
     place();

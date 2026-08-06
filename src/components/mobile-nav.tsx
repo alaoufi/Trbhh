@@ -66,7 +66,7 @@ export function MobileNav({ unread = 0, isAuthed = false }: { unread?: number; i
                 </span>
               ) : (
                 <span className="relative">
-                  <Icon className={cn('h-6 w-6', active ? 'text-[#f0b429]' : 'text-[#f0b429]/70')} />
+                  <Icon className={cn('h-6 w-6', active ? 'text-accent' : 'text-accent/70')} />
                   {badge && unread > 0 && (
                     <span className="absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
                       {unread > 99 ? '99+' : unread}
@@ -80,12 +80,12 @@ export function MobileNav({ unread = 0, isAuthed = false }: { unread?: number; i
           return (
             <li key={href} className="relative flex-1">
               {href === '__share' ? (
-                <button type="button" onClick={sharePage} className="flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] text-[#f0b429]">
+                <button type="button" onClick={sharePage} className="flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] text-accent">
                   {inner}
                 </button>
               ) : href === '__contact' ? (
                 <>
-                  <button type="button" onClick={() => setContactOpen((v) => !v)} className="flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] text-[#f0b429]">
+                  <button type="button" onClick={() => setContactOpen((v) => !v)} className="flex w-full flex-col items-center gap-0.5 py-1.5 text-[11px] text-accent">
                     {inner}
                   </button>
                   {contactOpen && (
@@ -109,7 +109,7 @@ export function MobileNav({ unread = 0, isAuthed = false }: { unread?: number; i
                   )}
                 </>
               ) : (
-                <Link href={href} className="flex flex-col items-center gap-0.5 py-1.5 text-[11px] text-[#f0b429]">
+                <Link href={href} className="flex flex-col items-center gap-0.5 py-1.5 text-[11px] text-accent">
                   {inner}
                 </Link>
               )}

@@ -5,7 +5,7 @@ import { DisclaimerBar } from '@/components/disclaimer';
 
 export function Footer() {
   return (
-    <footer className="mt-12 border-t border-black/20 bg-[#3b82f6] text-white">
+    <footer className="mt-12 border-t border-black/20 bg-primary text-white">
       <div className="container py-10 pb-24 md:pb-10">
         <DisclaimerBar variant="full" className="mb-8" />
         <div className="grid gap-8 md:grid-cols-3">

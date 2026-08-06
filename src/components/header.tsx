@@ -76,7 +76,7 @@ export async function Header() {
             محلية صغيرة من public/ لا تحتاج تحسيناً خادمياً أصلاً. */}
         {/* شعار «عقار تربح» المستقل (الشعار الرسمي الذهبي) */}
         <Link href="/" className="shrink-0">
-          <img src="/logo-aqar-white.png?v=1" alt="عقار تربح" width={256} height={256} className="h-14 w-14 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,.3)]" />
+          <img src="/logo-aqar-white.png?v=2" alt="عقار تربح" width={256} height={256} className="h-14 w-14 object-contain drop-shadow-[0_1px_3px_rgba(0,0,0,.3)]" />
         </Link>
       </div>
     </header>

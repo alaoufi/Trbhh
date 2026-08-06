@@ -31,7 +31,7 @@ export function SealReposition() {
       if (!seal) return false;
       // يبقى عائماً (fixed) لتعمل نافذته وتُغلق — نضبط موضعه أعلى يسار عند مستوى شريط الهوية.
       seal.style.setProperty('position', 'fixed', 'important');
-      seal.style.setProperty('top', '96px', 'important');
+      seal.style.setProperty('top', '68px', 'important');
       seal.style.setProperty('left', '8px', 'important');
       seal.style.setProperty('bottom', 'auto', 'important');
       seal.style.setProperty('right', 'auto', 'important');

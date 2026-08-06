@@ -379,7 +379,55 @@ export function AdForm({
             {RE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        {/* ٣) مواصفات العقار — تظهر مباشرة بعد اختيار النوع */}
+        {/* ٣) حالة العرض والسعر — مباشرة بعد اختيار نوع العقار، والمواصفات بعدها */}
+        {isReq ? (
+          <div>
+            <label className={lbl}>الميزانية المتوقّعة</label>
+            <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="اختياري — إن تركته فارغاً يظهر «مطلوب» فقط" />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label className={lbl}>حالة العرض</label>
+            <input type="hidden" name="priceType" value={priceMode} />
+            {/* حالة العرض — مبدّل متساوي الأعمدة (أعمدة متساوية، سطر واحد، ارتفاع موحّد) */}
+            <div className="grid grid-cols-3 gap-1 rounded-xl border-2 border-primary/20 bg-primary/5 p-1">
+              {([['sale', '💰', 'بيع'], ['rent', '🔑', 'إيجار'], ['som', '🤝', 'على السوم']] as const).map(([k, emoji, l]) => (
+                <button key={k} type="button" onClick={() => setPriceMode(k)}
+                  className={`flex items-center justify-center gap-1 whitespace-nowrap rounded-lg py-2 text-[13px] font-bold transition ${priceMode === k ? 'bg-primary text-white shadow-sm' : 'text-foreground/70 hover:text-primary'}`}>
+                  <span className="text-sm">{emoji}</span> {l}
+                </button>
+              ))}
+            </div>
+            {priceMode === 'rent' && (
+              <div className="space-y-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-3">
+                <span className="block text-xs font-extrabold text-primary">حدد السعر ومدة التأجير <span className="font-normal text-muted-foreground">(كلاهما اختياري)</span></span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="السعر (ر.س) — اختياري" />
+                    <span className="block text-[11px] text-muted-foreground">اختياري — اتركه فارغاً لو تفضّل «على السوم»</span>
+                  </div>
+                  <div className="space-y-1">
+                    <select name="rentPeriod" defaultValue={initial?.rentPeriod || ''} className={field}>
+                      <option value="">مدة التأجير — اختياري</option>
+                      {RENT_PERIODS.map((p0) => <option key={p0} value={p0}>{p0}</option>)}
+                    </select>
+                    <span className="block text-[11px] text-muted-foreground">اختياري — الافتراضي شهري إن لم تحدد</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            {priceMode === 'sale' && (
+              <div className="space-y-1 rounded-lg border-2 border-primary/15 bg-primary/5 p-3">
+                <span className="block text-xs font-extrabold text-primary">حدد سعر البيع</span>
+                <input name="price" type="number" min="0" step="any" required defaultValue={initial?.price || ''} className={field} placeholder="السعر (ر.س)" />
+              </div>
+            )}
+            {priceMode === 'som' && (
+              <p className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-800">🤝 على السوم: لا يظهر سعر على إعلانك — يتفاوض معك المهتمّون مباشرة.</p>
+            )}
+          </div>
+        )}
+        {/* ٤) مواصفات العقار — تظهر مباشرة بعد اختيار النوع */}
         {!reType && (
           <p className="rounded-lg border-2 border-dashed border-primary/25 bg-primary/5 p-3 text-center text-xs font-bold text-primary/80">
             اختر نوع العقار أعلاه لتظهر مواصفاته المناسبة.
@@ -543,54 +591,6 @@ export function AdForm({
                   <input key={f.key} type="hidden" name="re_features" value={f.key} />
                 ))}
               </div>
-            )}
-          </div>
-        )}
-        {/* ٤) السعر */}
-        {isReq ? (
-          <div>
-            <label className={lbl}>الميزانية المتوقّعة</label>
-            <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="اختياري — إن تركته فارغاً يظهر «مطلوب» فقط" />
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <label className={lbl}>حالة العرض</label>
-            <input type="hidden" name="priceType" value={priceMode} />
-            {/* حالة العرض — مبدّل متساوي الأعمدة (أعمدة متساوية، سطر واحد، ارتفاع موحّد) */}
-            <div className="grid grid-cols-3 gap-1 rounded-xl border-2 border-primary/20 bg-primary/5 p-1">
-              {([['sale', '💰', 'بيع'], ['rent', '🔑', 'إيجار'], ['som', '🤝', 'على السوم']] as const).map(([k, emoji, l]) => (
-                <button key={k} type="button" onClick={() => setPriceMode(k)}
-                  className={`flex items-center justify-center gap-1 whitespace-nowrap rounded-lg py-2 text-[13px] font-bold transition ${priceMode === k ? 'bg-primary text-white shadow-sm' : 'text-foreground/70 hover:text-primary'}`}>
-                  <span className="text-sm">{emoji}</span> {l}
-                </button>
-              ))}
-            </div>
-            {priceMode === 'rent' && (
-              <div className="space-y-2 rounded-lg border-2 border-primary/15 bg-primary/5 p-3">
-                <span className="block text-xs font-extrabold text-primary">حدد السعر ومدة التأجير <span className="font-normal text-muted-foreground">(كلاهما اختياري)</span></span>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="السعر (ر.س) — اختياري" />
-                    <span className="block text-[11px] text-muted-foreground">اختياري — اتركه فارغاً لو تفضّل «على السوم»</span>
-                  </div>
-                  <div className="space-y-1">
-                    <select name="rentPeriod" defaultValue={initial?.rentPeriod || ''} className={field}>
-                      <option value="">مدة التأجير — اختياري</option>
-                      {RENT_PERIODS.map((p0) => <option key={p0} value={p0}>{p0}</option>)}
-                    </select>
-                    <span className="block text-[11px] text-muted-foreground">اختياري — الافتراضي شهري إن لم تحدد</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            {priceMode === 'sale' && (
-              <div className="space-y-1 rounded-lg border-2 border-primary/15 bg-primary/5 p-3">
-                <span className="block text-xs font-extrabold text-primary">حدد سعر البيع</span>
-                <input name="price" type="number" min="0" step="any" required defaultValue={initial?.price || ''} className={field} placeholder="السعر (ر.س)" />
-              </div>
-            )}
-            {priceMode === 'som' && (
-              <p className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-800">🤝 على السوم: لا يظهر سعر على إعلانك — يتفاوض معك المهتمّون مباشرة.</p>
             )}
           </div>
         )}

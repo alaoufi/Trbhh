@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { Phone } from 'lucide-react';
 import { SITE } from '@/lib/constants';
 import { DisclaimerBar } from '@/components/disclaimer';
+import { getSiteCreds } from '@/lib/settings';
 
-export function Footer() {
+export async function Footer() {
+  const creds = await getSiteCreds();
   return (
     <footer className="mt-12 border-t border-black/20 bg-primary text-white">
       <div className="container py-10 pb-24 md:pb-10">
@@ -37,6 +39,12 @@ export function Footer() {
           </div>
         </div>
         <div className="mt-8 border-t border-white/15 pt-6 text-center text-xs text-white/60">
+          {(creds.cr || creds.fal) && (
+            <div className="mb-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] text-white/70">
+              {creds.cr && <span>سجل تجاري: <span dir="ltr" className="font-mono font-bold">{creds.cr}</span></span>}
+              {creds.fal && <span>ترخيص فال: <span dir="ltr" className="font-mono font-bold">{creds.fal}</span></span>}
+            </div>
+          )}
           جميع الحقوق محفوظة لمنصة {SITE.name} © 2015
         </div>
       </div>

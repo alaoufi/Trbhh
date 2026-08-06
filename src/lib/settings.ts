@@ -379,6 +379,16 @@ export async function getReTypesDisplay(): Promise<'text' | 'both' | 'icon'> {
   const v = await getSetting(SETTING_RE_TYPES_DISPLAY, 'both');
   return v === 'text' || v === 'icon' ? v : 'both';
 }
+// السجل التجاري ورخصة فال للمنصّة — تظهران في التذييل، قابلتان للتعديل من «النصوص».
+export const SETTING_SITE_CR = 'site_cr_number';
+export const SETTING_SITE_FAL = 'site_fal_license';
+export async function getSiteCreds(): Promise<{ cr: string; fal: string }> {
+  const [cr, fal] = await Promise.all([
+    getSetting(SETTING_SITE_CR, '7053315060'),
+    getSetting(SETTING_SITE_FAL, '1200047912'),
+  ]);
+  return { cr: cr.trim(), fal: fal.trim() };
+}
 export async function getDisclaimer(): Promise<{ short: string; long: string }> {
   const [short, long] = await Promise.all([
     getSetting(SETTING_DISCLAIMER_SHORT, DISCLAIMER.short),

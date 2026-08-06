@@ -556,11 +556,6 @@ export function AdForm({
                   العقار مفروش
                 </label>
               )}
-              {reKind === 'residential' && !canFurnish && (
-                <p className="flex-1 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 p-2.5 text-xs font-bold text-amber-800">
-                  عقار {reFinish || reCondition} — لا ينطبق عليه «مفروش».
-                </p>
-              )}
               {POOL_TYPES.includes(reType) && (
                 <label className="flex flex-1 items-center gap-2 rounded-lg border-2 border-primary/15 bg-white p-2.5 text-sm font-bold">
                   <input type="checkbox" name="re_pool" value="1" defaultChecked={initial?.rePool === 1} className="h-4 w-4 accent-[hsl(var(--primary))]" />

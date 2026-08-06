@@ -665,6 +665,7 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_CLASSIFIED_SECONDS, String(splashSeconds));
   // مفاتيح الميزات: التنبيهات الفورية، اقتراحات البحث، تنبيهات البحث المحفوظ
   await setSetting('home_actions_on', formData.get('homeActionsOn') !== null ? '1' : '0');
+  await setSetting('re_types_display', ['both', 'text', 'icon'].includes(String(formData.get('reTypesDisplay'))) ? String(formData.get('reTypesDisplay')) : 'both');
   await setSetting('archive_autodelete_on', formData.get('archiveAutodeleteOn') !== null ? '1' : '0');
   await setSetting('platform_rating_on', formData.get('platformRatingOn') !== null ? '1' : '0');
   await setSetting('push_on', formData.get('pushOn') !== null ? '1' : '0');

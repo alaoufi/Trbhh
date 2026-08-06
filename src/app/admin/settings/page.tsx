@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Settings, Check, BarChart3, Eye, ChevronDown } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
-import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getSettingNum, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig, getAdLifetimeDays, getStrikeBanDays, getStoreShield } from '@/lib/settings';
+import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getSettingNum, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig, getAdLifetimeDays, getStrikeBanDays, getStoreShield, getReTypesDisplay } from '@/lib/settings';
 import { getIdentityPlans, getExemptDays } from '@/lib/identity-plans';
 import { Button } from '@/components/ui/button';
 import { saveSettingsAction } from '../actions';
@@ -29,6 +29,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
   // إيقاف/تفعيل العقار + نص رسالة الإيقاف (وحدة التوثيق العقاري)
   const reEnabled = await getSettingBool('realestate_enabled', true);
   const reMsg = await import('@/lib/realestate').then((m) => m.realEstateBlockMsg()).catch(() => '');
+  const reTypesDisplay = await getReTypesDisplay(); // أسلوب عرض صف أنواع العقار
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
@@ -107,6 +108,15 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
           <label className="mt-2 flex items-start gap-2 text-sm">
             <input type="checkbox" name="homeActionsOn" defaultChecked={homeActionsOn} className="mt-0.5 h-4 w-4 accent-primary" />
             <span><b>أزرار تواصل الموقع تحت الإحصائيات</b> — صف أيقونات في الرئيسية: متابعة عقار تربح، واتساب واتصال بالرقم الرسمي، ومشاركة الموقع.</span>
+          </label>
+          <label className="mt-2 block space-y-1 text-sm">
+            <span className="font-bold">أسلوب عرض صف أنواع العقار (الرئيسية)</span>
+            <span className="block text-xs text-muted-foreground">صف التصنيفات السريعة (شقة/فيلا/أرض…) أعلى الرئيسية: يعرض الأيقونة والنص، أو أحدهما.</span>
+            <select name="reTypesDisplay" defaultValue={reTypesDisplay} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40">
+              <option value="both">أيقونة + كتابة</option>
+              <option value="text">كتابة فقط</option>
+              <option value="icon">أيقونة فقط</option>
+            </select>
           </label>
           <label className="mt-2 flex items-start gap-2 text-sm">
             <input type="checkbox" name="platformRatingOn" defaultChecked={platformRatingOn} className="mt-0.5 h-4 w-4 accent-primary" />

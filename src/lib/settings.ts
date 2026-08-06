@@ -373,6 +373,12 @@ export const SETTING_SITE_SHARE_DESC = 'site_share_desc';
 // نص إخلاء المسؤولية (المختصر داخل الصفحات، والكامل في التذييل) — قابل للتعديل من «النصوص».
 export const SETTING_DISCLAIMER_SHORT = 'disclaimer_short';
 export const SETTING_DISCLAIMER_LONG = 'disclaimer_long';
+// أسلوب عرض صف أنواع العقار في الرئيسية: كتابة فقط (text) · كتابة+أيقونة (both) · أيقونة فقط (icon)
+export const SETTING_RE_TYPES_DISPLAY = 're_types_display';
+export async function getReTypesDisplay(): Promise<'text' | 'both' | 'icon'> {
+  const v = await getSetting(SETTING_RE_TYPES_DISPLAY, 'both');
+  return v === 'text' || v === 'icon' ? v : 'both';
+}
 export async function getDisclaimer(): Promise<{ short: string; long: string }> {
   const [short, long] = await Promise.all([
     getSetting(SETTING_DISCLAIMER_SHORT, DISCLAIMER.short),

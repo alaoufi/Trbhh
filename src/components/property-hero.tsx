@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Search } from 'lucide-react';
 import { RE_TYPES } from '@/lib/realestate-types';
+import { getReTypesDisplay } from '@/lib/settings';
 
 const CATS: { t: string; e: string }[] = [
   { t: 'شقة', e: '🏢' }, { t: 'فيلا', e: '🏡' }, { t: 'أرض', e: '🗺️' }, { t: 'عمارة', e: '🏬' },
@@ -9,7 +10,8 @@ const CATS: { t: string; e: string }[] = [
 ];
 
 /** واجهة بحث عقارية بأسلوب تطبيقات العقار: غرض + نوع + مدينة + تصنيفات سريعة. */
-export function PropertyHero({ cities }: { cities: { id: number; name: string }[] }) {
+export async function PropertyHero({ cities }: { cities: { id: number; name: string }[] }) {
+  const disp = await getReTypesDisplay(); // كتابة فقط / كتابة+أيقونة / أيقونة فقط
   const field = 'h-10 w-full rounded-lg border-0 bg-white px-2 text-sm font-medium text-foreground outline-none';
   return (
     <div className="space-y-2.5">
@@ -40,8 +42,8 @@ export function PropertyHero({ cities }: { cities: { id: number; name: string }[
         {CATS.map((c) => (
           <Link key={c.t} href={`/properties?type=${encodeURIComponent(c.t)}`}
             className="flex shrink-0 flex-col items-center gap-1 rounded-xl border-2 border-primary/15 bg-white px-3 py-2 text-[11px] font-bold text-foreground/80 shadow-sm transition hover:border-primary hover:text-primary">
-            <span className="text-xl">{c.e}</span>
-            {c.t}
+            {disp !== 'text' && <span className={disp === 'icon' ? 'text-2xl' : 'text-xl'}>{c.e}</span>}
+            {disp !== 'icon' && <span>{c.t}</span>}
           </Link>
         ))}
       </div>

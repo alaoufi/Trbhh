@@ -141,6 +141,8 @@ async function taqnyatDiagnose(phone: string, cfg: MessagingConfig): Promise<Sms
     const ok = (res.status === 201 || res.status === 200) && /"statusCode"\s*:\s*20[01]|"messageId"\s*:\s*\d|"accepted"\s*:\s*"?\[?\s*9\d/i.test(body);
     if (ok) {
       steps.push('✅ قبِلت بوابة تقنيات الرسالة — يجب أن تصلك خلال ثوانٍ.');
+    } else if (/<script|window\.location|<html|<!doctype|dev\.taqnyat/i.test(body)) {
+      steps.push('❌ «رابط الـAPI» غير صحيح — الرد صفحة ويب لا واجهة API. اضبط الحقل بالضبط على https://api.taqnyat.sa/v1/messages ثم احفظ وأعد الاختبار.');
     } else if (res.status === 401 || res.status === 403 || /unauthenticated|unauthorized|invalid.?token|forbidden/i.test(body)) {
       steps.push('❌ فشلت المصادقة — «رمز الـAPI (Bearer)» غير صحيح أو منتهٍ. أنشئ رمزاً جديداً من لوحة تقنيات (المطوّرون ← التطبيقات) وضعه في «السر».');
     } else if (/sender|مرسِل|sender_?name/i.test(body)) {

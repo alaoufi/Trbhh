@@ -9,6 +9,12 @@ export async function Footer() {
   return (
     <footer className="mt-12 border-t border-black/20 bg-primary text-white">
       <div className="container py-10 pb-24 md:pb-10">
+        {(creds.cr || creds.fal) && (
+          <div className="mb-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 rounded-xl bg-white/10 px-4 py-3 text-center text-base font-extrabold text-white">
+            {creds.cr && <span>سجل تجاري: <span dir="ltr" className="font-mono">{creds.cr}</span></span>}
+            {creds.fal && <span>رخصة فال: <span dir="ltr" className="font-mono">{creds.fal}</span></span>}
+          </div>
+        )}
         <DisclaimerBar variant="full" className="mb-8" />
         <div className="grid gap-8 md:grid-cols-3">
           <div>
@@ -39,12 +45,6 @@ export async function Footer() {
           </div>
         </div>
         <div className="mt-8 border-t border-white/15 pt-6 text-center text-xs text-white/60">
-          {(creds.cr || creds.fal) && (
-            <div className="mb-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11px] text-white/70">
-              {creds.cr && <span>سجل تجاري: <span dir="ltr" className="font-mono font-bold">{creds.cr}</span></span>}
-              {creds.fal && <span>ترخيص فال: <span dir="ltr" className="font-mono font-bold">{creds.fal}</span></span>}
-            </div>
-          )}
           جميع الحقوق محفوظة لمنصة {SITE.name} © 2015
         </div>
       </div>

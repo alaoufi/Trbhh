@@ -45,6 +45,6 @@ Backups are platform-scoped and timestamped. A backup manifest records the platf
 
 CI verifies build correctness. Platform smoke checks verify response status, security headers, host routing, and an authenticated administrative path using a staging-only account. Production post-deploy checks verify the expected hostname, release SHA endpoint or container image, and critical public pages without writing user data.
 
-## Migration Constraint
+## Source Mapping
 
-The current repository is confirmed as the Trbhh source. No Agar production source is present in it. Agar receives its own runtime skeleton and operations configuration only after its authoritative source repository or deployment directory is identified; its data and code must not be inferred from Trbhh.
+Trbhh production source is the `claude/hostinger-vps-project-amw8vb` branch. Agar Trbhh source is the `staging` branch, whose configuration identifies `agar.trbhh.sa` and the Trbhh Aqar application. The two branches are checked out locally into separate directories and are never deployed from one another's working tree.

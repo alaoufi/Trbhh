@@ -8,6 +8,24 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: ci
+          MYSQL_USER: ci
+          MYSQL_PASSWORD: ci
+          MYSQL_ROOT_PASSWORD: ci_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uci -pci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      AUTH_SECRET: ci_only_auth_secret_0123456789abcdef0123456789abcdef
+      DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ci
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +44,9 @@ jobs:
           # postinstall runs `prisma generate` — needs a placeholder URL only.
           DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ci
 
+      - name: Create test database schema
+        run: pnpm prisma db push --skip-generate
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -34,3 +55,6 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+
+      - name: Production build
+        run: pnpm build

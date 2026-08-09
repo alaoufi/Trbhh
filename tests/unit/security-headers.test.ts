@@ -13,4 +13,9 @@ describe('production security headers', () => {
     expect(headers.get('Permissions-Policy')).toContain('camera=()');
     expect(headers.get('Content-Security-Policy')).toContain("frame-ancestors 'self'");
   });
+
+  it('does not suppress type failures during production builds', () => {
+    expect('eslint' in nextConfig).toBe(false);
+    expect(nextConfig.typescript?.ignoreBuildErrors).toBe(false);
+  });
 });

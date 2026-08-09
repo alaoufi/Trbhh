@@ -45,9 +45,8 @@ const nextConfig = {
   poweredByHeader: false,
   // keep sharp external so the standalone output traces its native binaries
   serverExternalPackages: ['sharp'],
-  // The app compiles fine; don't let lint/type-check warnings block production builds.
-  eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
+  // Deployment is blocked by TypeScript errors; ESLint runs as a separate CI step.
+  typescript: { ignoreBuildErrors: false },
   images: {
     formats: ['image/avif', 'image/webp'],
     // Allow any host: legacy ad photos may reference old external media hosts.

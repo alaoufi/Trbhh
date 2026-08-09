@@ -260,7 +260,7 @@ model comments {
   sender_id  BigInt          @db.UnsignedBigInt
   ads_id     BigInt          @db.UnsignedBigInt
   comment    String          @db.VarChar(255)
-  report     comments_report @default(dbgenerated("لا"))
+  report     comments_report @default(no)
   active     String          @default("5") @db.VarChar(200)
   hide       String          @default("no") @db.VarChar(225)
   created_at DateTime?       @db.Timestamp(0)
@@ -740,7 +740,7 @@ model reviews {
   reciver_id BigInt         @db.UnsignedBigInt
   review     String         @db.VarChar(255)
   star       Int
-  report     reviews_report @default(dbgenerated("لا"))
+  report     reviews_report @default(no)
   created_at DateTime?      @db.Timestamp(0)
   updated_at DateTime?      @db.Timestamp(0)
   profile_id BigInt?

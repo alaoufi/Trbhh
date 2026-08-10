@@ -12,6 +12,7 @@ describe('production security headers', () => {
     expect(headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
     expect(headers.get('Permissions-Policy')).toContain('camera=()');
     expect(headers.get('Content-Security-Policy')).toContain("frame-ancestors 'self'");
+    expect(headers.get('Content-Security-Policy')).toContain("frame-src 'self' https://eauthenticate.saudibusiness.gov.sa");
   });
 
   it('does not suppress type failures during production builds', () => {

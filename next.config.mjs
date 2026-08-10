@@ -9,7 +9,7 @@ const nextConfig = {
       {
         source: '/:path*',
         headers: [
-          { key: 'Content-Security-Policy', value: "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; object-src 'none'; img-src 'self' data: blob: https: http:; media-src 'self' blob: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline'; font-src 'self' data: https:; connect-src 'self' https: wss:" },
+          { key: 'Content-Security-Policy', value: "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; frame-src 'self' https://eauthenticate.saudibusiness.gov.sa; form-action 'self'; object-src 'none'; img-src 'self' data: blob: https: http:; media-src 'self' blob: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline'; font-src 'self' data: https:; connect-src 'self' https: wss:" },
           { key: 'Permissions-Policy', value: 'camera=(), geolocation=(), microphone=()' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000' },

@@ -1,12 +1,12 @@
 import type { MetadataRoute } from 'next';
 import { prisma } from '@/lib/prisma';
-import { SITE } from '@/lib/constants';
+import { primaryOrigin } from '@/lib/public-origin';
 
 // Rendered on demand so the build never needs a live database.
 export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = `https://${SITE.domain}`;
+  const base = primaryOrigin;
   const [dealsOn, auctionsOn] = await Promise.all([
     import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false),
     import('@/lib/settings').then((m) => m.auctionsEnabled()).catch(() => false),

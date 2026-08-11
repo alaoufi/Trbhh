@@ -1,9 +1,9 @@
 import type { MetadataRoute } from 'next';
-import { SITE } from '@/lib/constants';
+import { primaryOrigin } from '@/lib/public-origin';
 
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: { userAgent: '*', allow: '/', disallow: ['/account', '/admin', '/messages', '/api'] },
-    sitemap: `https://${SITE.domain}/sitemap.xml`,
+    sitemap: `${primaryOrigin}/sitemap.xml`,
   };
 }

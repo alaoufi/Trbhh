@@ -15,6 +15,7 @@ import { ClassifiedSplash } from '@/components/classified-splash';
 import { getSplashClassifieds } from '@/lib/classified';
 import { getClassifiedSplashSeconds } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
+import { primaryOrigin } from '@/lib/public-origin';
 import { getSession } from '@/lib/auth';
 import { getMyStats } from '@/lib/account';
 import { AdPixels } from '@/components/ad-pixels';
@@ -30,7 +31,8 @@ export async function generateMetadata(): Promise<Metadata> {
     import('@/lib/settings').then((m) => m.getSetting(m.SETTING_SITE_SHARE_DESC, SITE.description)),
   ]).catch(() => [`${SITE.name} | ${SITE.tagline}`, SITE.description]);
   return {
-    metadataBase: new URL(`https://${SITE.domain}`),
+    metadataBase: new URL(primaryOrigin),
+    alternates: { canonical: '/' },
     title: { default: shareTitle, template: `%s | ${SITE.name}` },
     description: shareDesc,
     openGraph: {
@@ -89,7 +91,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const validDesigns = ['aurora', 'shop', 'list', 'flat', 'soft', 'sharp'];
   // بيانات منظَّمة (JSON-LD) لمحركات البحث: تعرّف جوجل بهوية الموقع ونوعه
   // وتفعّل صندوق البحث المباشر ضمن نتائج البحث (Sitelinks Search Box).
-  const base = `https://${SITE.domain}`;
+  const base = primaryOrigin;
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [

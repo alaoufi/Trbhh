@@ -18,4 +18,13 @@ describe('public origin', () => {
     expect(middleware).toContain("import { redirectLegacyApex } from '@/lib/public-origin'");
     expect(middleware.indexOf('redirectLegacyApex(req.nextUrl.hostname')).toBeLessThan(middleware.indexOf('storeSubdomain(req.nextUrl.hostname)'));
   });
+
+  it('builds crawler-facing SEO routes from the public-origin policy', () => {
+    const layout = readFileSync(resolve('src/app/layout.tsx'), 'utf8');
+    const sitemap = readFileSync(resolve('src/app/sitemap.ts'), 'utf8');
+    const robots = readFileSync(resolve('src/app/robots.ts'), 'utf8');
+    expect(layout).toContain("from '@/lib/public-origin'");
+    expect(sitemap).toContain("from '@/lib/public-origin'");
+    expect(robots).toContain("from '@/lib/public-origin'");
+  });
 });

@@ -383,6 +383,30 @@ const STATEMENTS: string[] = [
     INDEX wallet_topups_user (user_id),
     INDEX wallet_topups_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* خدمة خاصة ينشئها المدير للعضو؛ يبقى الخصم الفعلي في wallet_txns. */
+  `CREATE TABLE IF NOT EXISTS member_service_orders (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    admin_id BIGINT UNSIGNED NOT NULL,
+    title VARCHAR(160) NOT NULL,
+    description TEXT NULL,
+    amount INT NOT NULL,
+    starts_at DATETIME NOT NULL,
+    ends_at DATETIME NOT NULL,
+    accept_until DATETIME NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending_acceptance',
+    accepted_at DATETIME NULL,
+    execution_confirmed_at DATETIME NULL,
+    cancelled_at DATETIME NULL,
+    cancelled_by VARCHAR(12) NULL,
+    cancel_reason VARCHAR(300) NULL,
+    debit_txn_id BIGINT NULL,
+    refund_txn_id BIGINT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NULL,
+    INDEX member_service_orders_user_status (user_id, status),
+    INDEX member_service_orders_expiry (status, accept_until)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* site running expenses (admin-entered) — feeds the detailed budget view. */
   `CREATE TABLE IF NOT EXISTS site_expenses (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,

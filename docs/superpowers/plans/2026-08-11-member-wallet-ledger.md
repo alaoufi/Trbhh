@@ -13,7 +13,7 @@
 ## File structure
 
 - `prisma/schema.prisma` and `src/data/schema-sync.ts` — service-order model and idempotent production schema.
-- `src/lib/member-service-proration.ts` — pure, halala-safe refund calculation.
+- `src/lib/member-service-proration.ts` — pure, whole-riyal-safe refund calculation matching the existing wallet.
 - `src/lib/member-services.ts` — authenticated lifecycle, search DTOs, atomic balance operations.
 - `src/app/account/wallet/page.tsx`, `src/app/account/actions.ts`, `src/components/mobile-nav.tsx` — member experience.
 - `src/app/admin/revenue/page.tsx`, `src/app/admin/actions.ts`, `src/components/admin-nav-def.ts` — management workspace.
@@ -42,7 +42,7 @@ Expected: FAIL because the model/table is absent.
 
 - [ ] **Step 3: Add model and idempotent table**
 
-Add fields `id`, `user_id`, `admin_id`, `title`, `description`, `amount`, `starts_at`, `ends_at`, `accept_until`, `status`, `accepted_at`, `execution_confirmed_at`, `cancelled_at`, `cancelled_by`, `cancel_reason`, `debit_txn_id`, `refund_txn_id`, `created_at`, and `updated_at`. Amount is an integer in halalas. Create indexes `(user_id,status)` and `(status,accept_until)`.
+Add fields `id`, `user_id`, `admin_id`, `title`, `description`, `amount`, `starts_at`, `ends_at`, `accept_until`, `status`, `accepted_at`, `execution_confirmed_at`, `cancelled_at`, `cancelled_by`, `cancel_reason`, `debit_txn_id`, `refund_txn_id`, `created_at`, and `updated_at`. Amount is an integer in Saudi riyals, matching the current `users.balance` and `wallet_txns.amount` convention. Create indexes `(user_id,status)` and `(status,accept_until)`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS member_service_orders (
@@ -82,8 +82,8 @@ Run: `git add prisma/schema.prisma src/data/schema-sync.ts tests/unit/member-ser
 - [ ] **Step 1: Write failing money tests**
 
 ```ts
-expect(refundableHalalas(2000, new Date('2026-08-01'), new Date('2026-08-11'), new Date('2026-08-06'))).toBe(1000);
-expect(refundableHalalas(2000, new Date('2026-08-01'), new Date('2026-08-11'), new Date('2026-08-20'))).toBe(0);
+expect(refundableRiyals(20, new Date('2026-08-01'), new Date('2026-08-11'), new Date('2026-08-06'))).toBe(10);
+expect(refundableRiyals(20, new Date('2026-08-01'), new Date('2026-08-11'), new Date('2026-08-20'))).toBe(0);
 await expect(acceptMemberServiceOrder(21, 8)).resolves.toMatchObject({ ok: true });
 await expect(acceptMemberServiceOrder(21, 8)).resolves.toMatchObject({ ok: false, code: 'not_pending' });
 ```
@@ -97,7 +97,7 @@ Expected: FAIL because the modules are absent.
 - [ ] **Step 3: Implement the pure proration helper**
 
 ```ts
-export function refundableHalalas(amount: number, startsAt: Date, endsAt: Date, cancelledAt: Date) {
+export function refundableRiyals(amount: number, startsAt: Date, endsAt: Date, cancelledAt: Date) {
   const total = endsAt.getTime() - startsAt.getTime();
   if (!Number.isInteger(amount) || amount <= 0 || total <= 0) return 0;
   const remaining = Math.min(total, Math.max(0, endsAt.getTime() - cancelledAt.getTime()));
@@ -194,7 +194,7 @@ Expected: FAIL because the workspace is absent.
 
 - [ ] **Step 3: Add permission-checked actions**
 
-Add create/cancel service actions using `requireAdmin`. Validate member ID, title, positive halala amount, chronological dates and approval deadline server-side. The administrator ID always comes from session; create never debits balance.
+Add create/cancel service actions using `requireAdmin`. Validate member ID, title, positive whole-riyal amount, chronological dates and approval deadline server-side. The administrator ID always comes from session; create never debits balance.
 
 - [ ] **Step 4: Render financial members, search, detail, and order form**
 

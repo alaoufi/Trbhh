@@ -1,3 +1,5 @@
+import { refundableHalalas as refundableHalalasExact } from '@/lib/money';
+
 /**
  * قيمة الاسترداد للجزء غير المستخدم من خدمة خاصة.
  *
@@ -10,4 +12,9 @@ export function refundableRiyals(amount: number, startsAt: Date, endsAt: Date, c
 
   const remainingDuration = Math.min(totalDuration, Math.max(0, endsAt.getTime() - cancelledAt.getTime()));
   return Math.floor((amount * remainingDuration) / totalDuration);
+}
+
+/** Exact proration for the halala-native wallet migration. */
+export function refundableHalalas(amount: number, startsAt: Date, endsAt: Date, cancelledAt: Date): number {
+  return refundableHalalasExact(amount, startsAt, endsAt, cancelledAt);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { refundableRiyals } from '@/lib/member-service-proration';
+import { refundableHalalas, refundableRiyals } from '@/lib/member-service-proration';
 
 describe('refundableRiyals', () => {
   it('returns half the fee after five of ten days have elapsed', () => {
@@ -18,5 +18,9 @@ describe('refundableRiyals', () => {
 
   it('rounds a fractional riyal down to preserve the existing integer ledger', () => {
     expect(refundableRiyals(20, new Date('2026-08-01'), new Date('2026-08-07'), new Date('2026-08-03'))).toBe(13);
+  });
+
+  it('keeps fractional rights in halalas and rounds the result for the member', () => {
+    expect(refundableHalalas(101, new Date(0), new Date(100), new Date(50))).toBe(51);
   });
 });

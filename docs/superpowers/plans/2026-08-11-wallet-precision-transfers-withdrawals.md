@@ -1,4 +1,4 @@
-# Wallet Precision, Transfers, and Withdrawals Implementation Plan
+﻿# Wallet Precision, Transfers, and Withdrawals Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -12,17 +12,17 @@
 
 ## File structure
 
-- Modify: `prisma/schema.prisma` — parallel halala columns and transfer/withdrawal models.
-- Modify: `src/data/schema-sync.ts` — idempotent columns/tables/indexes only; no silent data conversion.
-- Create: `src/lib/money.ts` — exact decimal parser, formatter, halala conversion, member-favourable proration.
-- Create: `src/lib/wallet-money-migration.ts` — explicit, one-time, checked migration and reconciliation report.
-- Modify: `src/lib/wallet.ts` — halala-native balance, hold, ledger, and summary APIs.
-- Modify: `src/lib/member-services.ts`, `src/lib/member-service-proration.ts` — halala amounts and settings snapshot.
-- Create: `src/lib/wallet-transfers.ts` — internal linked-account transfer transaction.
-- Create: `src/lib/wallet-withdrawals.ts` — bank-account and withdrawal lifecycle.
-- Modify: `src/lib/settings.ts`, `src/app/admin/actions.ts`, `src/app/admin/revenue/page.tsx` — cancellation/refund and withdrawal-fee settings, admin review actions.
-- Modify: `src/app/account/actions.ts`, `src/app/account/wallet/page.tsx` — member actions and operations-first UI.
-- Modify: `src/components/topup-promo-banner.tsx` — hide bonus campaign when rewards are disabled.
+- Modify: `prisma/schema.prisma` â€” parallel halala columns and transfer/withdrawal models.
+- Modify: `src/data/schema-sync.ts` â€” idempotent columns/tables/indexes only; no silent data conversion.
+- Create: `src/lib/money.ts` â€” exact decimal parser, formatter, halala conversion, member-favourable proration.
+- Create: `src/lib/wallet-money-migration.ts` â€” explicit, one-time, checked migration and reconciliation report.
+- Modify: `src/lib/wallet.ts` â€” halala-native balance, hold, ledger, and summary APIs.
+- Modify: `src/lib/member-services.ts`, `src/lib/member-service-proration.ts` â€” halala amounts and settings snapshot.
+- Create: `src/lib/wallet-transfers.ts` â€” internal linked-account transfer transaction.
+- Create: `src/lib/wallet-withdrawals.ts` â€” bank-account and withdrawal lifecycle.
+- Modify: `src/lib/settings.ts`, `src/app/admin/actions.ts`, `src/app/admin/revenue/page.tsx` â€” cancellation/refund and withdrawal-fee settings, admin review actions.
+- Modify: `src/app/account/actions.ts`, `src/app/account/wallet/page.tsx` â€” member actions and operations-first UI.
+- Modify: `src/components/topup-promo-banner.tsx` â€” hide bonus campaign when rewards are disabled.
 - Create/modify: focused `tests/unit/*.test.ts` files listed below.
 
 ### Task 1: Exact-money foundation
@@ -51,7 +51,7 @@ describe('money', () => {
 
 - [ ] **Step 2: Run the failing test**
 
-Run: `pnpm vitest run tests/unit/money.test.ts`  
+Run: `pnpm vitest run tests/unit/money.test.ts`
 Expected: FAIL because `src/lib/money.ts` does not exist.
 
 - [ ] **Step 3: Implement the minimal exact APIs**
@@ -75,10 +75,10 @@ Add `formatHalalas` using integer quotient/remainder, never `Number#toFixed`.
 
 - [ ] **Step 4: Verify and commit**
 
-Run: `pnpm vitest run tests/unit/money.test.ts`  
+Run: `pnpm vitest run tests/unit/money.test.ts`
 Expected: PASS.
 
-Commit: `git add src/lib/money.ts tests/unit/money.test.ts && git commit -m "إضافة حسابات المحفظة بالهللة"`
+Commit: `git add src/lib/money.ts tests/unit/money.test.ts && git commit -m "ط¥ط¶ط§ظپط© ط­ط³ط§ط¨ط§طھ ط§ظ„ظ…ط­ظپط¸ط© ط¨ط§ظ„ظ‡ظ„ظ„ط©"`
 
 ### Task 2: Parallel schema and checked migration
 
@@ -100,7 +100,7 @@ expect(migrationSource).toContain('wallet_money_v1');
 
 - [ ] **Step 2: Run tests and confirm failure**
 
-Run: `pnpm vitest run tests/unit/wallet-money-migration.test.ts`  
+Run: `pnpm vitest run tests/unit/wallet-money-migration.test.ts`
 Expected: FAIL because the columns and migration module do not exist.
 
 - [ ] **Step 3: Add schema without changing legacy values**
@@ -113,10 +113,10 @@ Implement `migrateWalletMoneyV1()` to acquire one MySQL advisory lock, create/re
 
 - [ ] **Step 4: Verify and commit**
 
-Run: `pnpm vitest run tests/unit/wallet-money-migration.test.ts`  
+Run: `pnpm vitest run tests/unit/wallet-money-migration.test.ts`
 Expected: PASS.
 
-Commit: `git add prisma/schema.prisma src/data/schema-sync.ts src/lib/wallet-money-migration.ts tests/unit/wallet-money-migration.test.ts && git commit -m "إضافة ترحيل محفظة آمن للهللات"`
+Commit: `git add prisma/schema.prisma src/data/schema-sync.ts src/lib/wallet-money-migration.ts tests/unit/wallet-money-migration.test.ts && git commit -m "ط¥ط¶ط§ظپط© طھط±ط­ظٹظ„ ظ…ط­ظپط¸ط© ط¢ظ…ظ† ظ„ظ„ظ‡ظ„ظ„ط§طھ"`
 
 ### Task 3: Convert the wallet engine and all charged paths
 
@@ -139,7 +139,7 @@ it('uses halala balance and ledger fields for a 10.25 SAR debit', async () => {
 
 - [ ] **Step 2: Run the test and confirm failure**
 
-Run: `pnpm vitest run tests/unit/wallet-halala-engine.test.ts`  
+Run: `pnpm vitest run tests/unit/wallet-halala-engine.test.ts`
 Expected: FAIL because halala-native APIs do not exist.
 
 - [ ] **Step 3: Implement one compatibility boundary**
@@ -148,10 +148,10 @@ Create halala-native `getBalanceHalalas`, `holdHalalas`, `captureHoldHalalas`, `
 
 - [ ] **Step 4: Verify and commit**
 
-Run: `pnpm vitest run tests/unit/wallet-halala-engine.test.ts tests/unit/member-service-proration.test.ts tests/unit/member-services.test.ts`  
+Run: `pnpm vitest run tests/unit/wallet-halala-engine.test.ts tests/unit/member-service-proration.test.ts tests/unit/member-services.test.ts`
 Expected: PASS.
 
-Commit: `git add src tests/unit && git commit -m "تحويل محرك المحفظة إلى الهللات"`
+Commit: `git add src tests/unit && git commit -m "طھط­ظˆظٹظ„ ظ…ط­ط±ظƒ ط§ظ„ظ…ط­ظپط¸ط© ط¥ظ„ظ‰ ط§ظ„ظ‡ظ„ظ„ط§طھ"`
 
 ### Task 4: Service cancellation policy
 
@@ -172,7 +172,7 @@ expect(refundFor({ allowCancel: true, allowRefund: false, amountHalalas: 2000 })
 
 - [ ] **Step 2: Run and confirm failure**
 
-Run: `pnpm vitest run tests/unit/member-service-cancellation-policy.test.ts`  
+Run: `pnpm vitest run tests/unit/member-service-cancellation-policy.test.ts`
 Expected: FAIL because settings snapshots are absent.
 
 - [ ] **Step 3: Implement snapshots and disclosure**
@@ -181,10 +181,10 @@ Add two admin settings defaulting to cancellation allowed and refund disabled. A
 
 - [ ] **Step 4: Verify and commit**
 
-Run: `pnpm vitest run tests/unit/member-service-cancellation-policy.test.ts tests/unit/member-services.test.ts`  
+Run: `pnpm vitest run tests/unit/member-service-cancellation-policy.test.ts tests/unit/member-services.test.ts`
 Expected: PASS.
 
-Commit: `git add src tests/unit && git commit -m "إضافة سياسة إلغاء واسترداد الخدمات"`
+Commit: `git add src tests/unit && git commit -m "ط¥ط¶ط§ظپط© ط³ظٹط§ط³ط© ط¥ظ„ط؛ط§ط، ظˆط§ط³طھط±ط¯ط§ط¯ ط§ظ„ط®ط¯ظ…ط§طھ"`
 
 ### Task 5: Linked-account internal transfers
 
@@ -210,7 +210,7 @@ it('rejects a target outside the owner linked group', async () => {
 
 - [ ] **Step 2: Run and confirm failure**
 
-Run: `pnpm vitest run tests/unit/wallet-transfers.test.ts`  
+Run: `pnpm vitest run tests/unit/wallet-transfers.test.ts`
 Expected: FAIL because transfer module does not exist.
 
 - [ ] **Step 3: Implement atomic transfer**
@@ -219,10 +219,10 @@ Validate the target with `linkedUserIds(sourceUserId)`, reject self/foreign/insu
 
 - [ ] **Step 4: Verify and commit**
 
-Run: `pnpm vitest run tests/unit/wallet-transfers.test.ts tests/unit/member-wallet-page.test.ts`  
+Run: `pnpm vitest run tests/unit/wallet-transfers.test.ts tests/unit/member-wallet-page.test.ts`
 Expected: PASS.
 
-Commit: `git add src tests/unit && git commit -m "إضافة تحويل الرصيد بين حسابات العضو"`
+Commit: `git add src tests/unit && git commit -m "ط¥ط¶ط§ظپط© طھط­ظˆظٹظ„ ط§ظ„ط±طµظٹط¯ ط¨ظٹظ† ط­ط³ط§ط¨ط§طھ ط§ظ„ط¹ط¶ظˆ"`
 
 ### Task 6: Bank withdrawal requests
 
@@ -243,14 +243,14 @@ it('holds 100.00 and calculates a 93.00 payout after a 7.00 transfer fee', async
   expect(r).toMatchObject({ heldHalalas: 10000, feeHalalas: 700, netHalalas: 9300 });
 });
 it('releases the exact hold when a pending request is rejected or cancelled', async () => {
-  await rejectWithdrawal(adminId, requestId, 'بيانات غير مكتملة');
+  await rejectWithdrawal(adminId, requestId, 'ط¨ظٹط§ظ†ط§طھ ط؛ظٹط± ظ…ظƒطھظ…ظ„ط©');
   expect(member.reserved_halala).toBe(0);
 });
 ```
 
 - [ ] **Step 2: Run and confirm failure**
 
-Run: `pnpm vitest run tests/unit/wallet-withdrawals.test.ts`  
+Run: `pnpm vitest run tests/unit/wallet-withdrawals.test.ts`
 Expected: FAIL because withdrawal module does not exist.
 
 - [ ] **Step 3: Implement lifecycle**
@@ -259,10 +259,10 @@ Implement member bank-account creation/verification with masked IBAN presentatio
 
 - [ ] **Step 4: Verify and commit**
 
-Run: `pnpm vitest run tests/unit/wallet-withdrawals.test.ts`  
+Run: `pnpm vitest run tests/unit/wallet-withdrawals.test.ts`
 Expected: PASS.
 
-Commit: `git add src tests/unit && git commit -m "إضافة طلبات السحب البنكي للمحفظة"`
+Commit: `git add src tests/unit && git commit -m "ط¥ط¶ط§ظپط© ط·ظ„ط¨ط§طھ ط§ظ„ط³ط­ط¨ ط§ظ„ط¨ظ†ظƒظٹ ظ„ظ„ظ…ط­ظپط¸ط©"`
 
 ### Task 7: Operations-first UI and disabled promotions
 
@@ -277,14 +277,14 @@ Commit: `git add src tests/unit && git commit -m "إضافة طلبات السح
 - [ ] **Step 1: Write failing UI contracts**
 
 ```ts
-expect(walletPage).toContain('الحساب النشط');
-expect(walletPage.indexOf('سجل العمليات')).toBeLessThan(walletPage.indexOf('حسابات التحويل'));
+expect(walletPage).toContain('ط§ظ„ط­ط³ط§ط¨ ط§ظ„ظ†ط´ط·');
+expect(walletPage.indexOf('ط³ط¬ظ„ ط§ظ„ط¹ظ…ظ„ظٹط§طھ')).toBeLessThan(walletPage.indexOf('ط­ط³ط§ط¨ط§طھ ط§ظ„طھط­ظˆظٹظ„'));
 expect(promoBanner).toContain('if (!campaign || !rewardsEnabled) return null');
 ```
 
 - [ ] **Step 2: Run and confirm failure**
 
-Run: `pnpm vitest run tests/unit/member-wallet-page.test.ts tests/unit/topup-promo-banner.test.ts`  
+Run: `pnpm vitest run tests/unit/member-wallet-page.test.ts tests/unit/topup-promo-banner.test.ts`
 Expected: FAIL because the contracts are not present.
 
 - [ ] **Step 3: Implement the UI boundaries**
@@ -293,10 +293,10 @@ Move the transaction tabs and lists above top-up/account details. Place balance/
 
 - [ ] **Step 4: Verify and commit**
 
-Run: `pnpm vitest run tests/unit/member-wallet-page.test.ts tests/unit/topup-promo-banner.test.ts tests/unit/admin-member-wallet-page.test.ts`  
+Run: `pnpm vitest run tests/unit/member-wallet-page.test.ts tests/unit/topup-promo-banner.test.ts tests/unit/admin-member-wallet-page.test.ts`
 Expected: PASS.
 
-Commit: `git add src tests/unit && git commit -m "تطوير عمليات المحفظة وتعطيل عروض الشحن"`
+Commit: `git add src tests/unit && git commit -m "طھط·ظˆظٹط± ط¹ظ…ظ„ظٹط§طھ ط§ظ„ظ…ط­ظپط¸ط© ظˆطھط¹ط·ظٹظ„ ط¹ط±ظˆط¶ ط§ظ„ط´ط­ظ†"`
 
 ### Task 8: Full verification, migration rehearsal, and controlled deployment
 
@@ -305,16 +305,16 @@ Commit: `git add src tests/unit && git commit -m "تطوير عمليات الم
 
 - [ ] **Step 1: Run complete local verification**
 
-Run: `pnpm vitest run`  
+Run: `pnpm vitest run`
 Expected: all tests PASS.
 
-Run: `pnpm exec tsc --noEmit`  
+Run: `pnpm exec tsc --noEmit`
 Expected: exit code 0.
 
-Run: `pnpm build`  
+Run: `pnpm build`
 Expected: exit code 0; document existing non-blocking warnings separately.
 
-Run: `git diff --check`  
+Run: `git diff --check`
 Expected: no output.
 
 - [ ] **Step 2: Create production safety point**
@@ -323,7 +323,7 @@ Run the existing `fetch-full-backup.yml` workflow for Trbhh only and wait for su
 
 - [ ] **Step 3: Run migration once and validate reconciliation**
 
-Deploy the compatible schema code, run the explicit locked migration command once through the existing Trbhh deployment path, and require its report to show: all populated parallel values equal legacy value × 100, each member balance reconciles, and no unresolved ledger rows. Abort and roll back if any check fails.
+Deploy the compatible schema code, run the explicit locked migration command once through the existing Trbhh deployment path, and require its report to show: all populated parallel values equal legacy value أ— 100, each member balance reconciles, and no unresolved ledger rows. Abort and roll back if any check fails.
 
 - [ ] **Step 4: Deploy and perform read-only health checks**
 
@@ -331,4 +331,4 @@ Push only the Trbhh deployment branch, wait for its deployment workflow success,
 
 - [ ] **Step 5: Commit documentation**
 
-Commit: `git add docs/superpowers && git commit -m "توثيق ترحيل محفظة الهللات"`
+Commit: `git add docs/superpowers && git commit -m "طھظˆط«ظٹظ‚ طھط±ط­ظٹظ„ ظ…ط­ظپط¸ط© ط§ظ„ظ‡ظ„ظ„ط§طھ"`

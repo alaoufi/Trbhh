@@ -289,7 +289,7 @@ Expected: FAIL because the contracts are not present.
 
 - [ ] **Step 3: Implement the UI boundaries**
 
-Move the transaction tabs and lists above top-up/account details. Place balance/account summary after operational content, with exact formatted amounts. Add transfer and withdrawal sections with clear pending/held/paid state. Add the transfer-fee and service-cancellation settings in the existing money/pricing administration view. Define `rewardsEnabled` as an active campaign with at least one positive bonus and the reward feature enabled; use it in both home and wallet promotion rendering.
+Move the transaction tabs and lists above top-up/account details. Place balance/account summary after operational content, with exact formatted amounts, and reveal secondary account details only when its section is opened. In the administration wallets tab, render a searchable name-only list initially; fetch/render balance, active operations, and detailed ledger only for the explicitly selected member, with a clear return-to-list action. Add transfer and withdrawal sections with clear pending/held/paid state. Add the transfer-fee and service-cancellation settings in the existing money/pricing administration view. Define `rewardsEnabled` as an active campaign with at least one positive bonus and the reward feature enabled; use it in both home and wallet promotion rendering.
 
 - [ ] **Step 4: Verify and commit**
 

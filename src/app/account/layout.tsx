@@ -4,15 +4,21 @@ import { LayoutDashboard, Megaphone, Heart, User, LogOut, UserX, PlusCircle, Bui
 import { getSession } from '@/lib/auth';
 import { AccountNavScroller } from '@/components/account-nav-scroller';
 
-const nav = [
-  { href: '/account', label: 'لوحة التحكم', icon: LayoutDashboard },
-  { href: '/account/identities', label: 'هوياتي', icon: Users },
-  { href: '/account/profile', label: 'الملف الشخصي', icon: User },
-  { href: '/account/ads', label: 'إعلاناتي', icon: Megaphone },
-  { href: '/account/wallet', label: 'محفظتي', icon: Wallet },
-  { href: '/account/favorites', label: 'المفضلة', icon: Heart },
-  { href: '/store', label: 'متجري', icon: Building2 },
-  { href: '/account/verify', label: 'توثيق الحساب', icon: ShieldCheck },
+const navGroups = [
+  { title: 'الحساب والهويات', items: [
+    { href: '/account', label: 'لوحة التحكم', icon: LayoutDashboard },
+    { href: '/account/identities', label: 'هوياتي', icon: Users },
+    { href: '/account/profile', label: 'الملف الشخصي', icon: User },
+    { href: '/account/verify', label: 'توثيق الحساب', icon: ShieldCheck },
+  ] },
+  { title: 'الإعلانات والمتجر', items: [
+    { href: '/account/ads', label: 'إعلاناتي', icon: Megaphone },
+    { href: '/account/favorites', label: 'المفضلة', icon: Heart },
+    { href: '/store', label: 'متجري', icon: Building2 },
+  ] },
+  { title: 'المحفظة والمدفوعات', items: [
+    { href: '/account/wallet', label: 'محفظتي', icon: Wallet },
+  ] },
 ];
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
@@ -32,10 +38,15 @@ export default async function AccountLayout({ children }: { children: React.Reac
           <Link href="/ads/new" className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">
             <PlusCircle className="h-4 w-4" /> أضف إعلان
           </Link>
-          {nav.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm hover:bg-secondary">
-              <Icon className="h-4 w-4" /> {label}
-            </Link>
+          {navGroups.map((group) => (
+            <div key={group.title} className="flex shrink-0 items-center gap-1 md:flex-col md:items-stretch md:border-b md:border-primary/10 md:pb-2">
+              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-1 text-[10px] font-extrabold text-primary md:mr-1 md:bg-transparent md:px-1">{group.title}</span>
+              {group.items.map(({ href, label, icon: Icon }) => (
+                <Link key={href} href={href} className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm hover:bg-secondary">
+                  <Icon className="h-4 w-4" /> {label}
+                </Link>
+              ))}
+            </div>
           ))}
           {/* حذف الحساب — متطلب متاجر التطبيقات (يظهر داخل التطبيق) */}
           <Link href="/delete-account" className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm text-destructive/80 hover:bg-destructive/10">

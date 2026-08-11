@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { toInt } from '@/lib/utils';
 import { refundableRiyals } from '@/lib/member-service-proration';
+import { getSettingBool, SETTING_MEMBER_SERVICE_CANCEL_ENABLED, SETTING_MEMBER_SERVICE_REFUND_ENABLED } from '@/lib/settings';
 
 export const MEMBER_SERVICE_STATUS = {
   pendingAcceptance: 'pending_acceptance',
@@ -17,6 +18,12 @@ export const MEMBER_SERVICE_STATUS = {
 export type MemberServiceStatus = (typeof MEMBER_SERVICE_STATUS)[keyof typeof MEMBER_SERVICE_STATUS];
 export type ServiceActionCode = 'ok' | 'not_found' | 'not_pending' | 'expired' | 'insufficient_balance' | 'not_awaiting_execution' | 'not_active' | 'forbidden';
 export type ServiceActionResult = { ok: boolean; code: ServiceActionCode; balance?: number; refund?: number };
+
+/** The policy is saved with each order so later settings changes cannot alter its rights. */
+export function cancellationOutcome(allowCancel: boolean, allowRefund: boolean, refundableHalalas: number) {
+  if (!allowCancel) return { allowed: false, refundHalalas: 0 };
+  return { allowed: true, refundHalalas: allowRefund ? Math.max(0, refundableHalalas) : 0 };
+}
 
 export type MemberServiceOrder = {
   id: number;
@@ -36,6 +43,8 @@ export type MemberServiceOrder = {
   cancelReason: string | null;
   debitTxnId: number | null;
   refundTxnId: number | null;
+  allowMemberCancel: boolean;
+  allowMemberRefund: boolean;
 };
 
 function asDate(value: Date | null | undefined): string | null {
@@ -46,7 +55,7 @@ function present(row: {
   id: bigint; user_id: bigint; admin_id: bigint; title: string; description: string | null; amount: number;
   starts_at: Date; ends_at: Date; accept_until: Date; status: string; accepted_at: Date | null;
   execution_confirmed_at: Date | null; cancelled_at: Date | null; cancelled_by: string | null;
-  cancel_reason: string | null; debit_txn_id: bigint | null; refund_txn_id: bigint | null;
+  cancel_reason: string | null; debit_txn_id: bigint | null; refund_txn_id: bigint | null; allow_member_cancel: number; allow_member_refund: number;
 }): MemberServiceOrder {
   return {
     id: toInt(row.id), userId: toInt(row.user_id), adminId: toInt(row.admin_id), title: row.title,
@@ -55,6 +64,8 @@ function present(row: {
     executionConfirmedAt: asDate(row.execution_confirmed_at), cancelledAt: asDate(row.cancelled_at),
     cancelledBy: row.cancelled_by, cancelReason: row.cancel_reason, debitTxnId: row.debit_txn_id ? toInt(row.debit_txn_id) : null,
     refundTxnId: row.refund_txn_id ? toInt(row.refund_txn_id) : null,
+    allowMemberCancel: row.allow_member_cancel === 1,
+    allowMemberRefund: row.allow_member_refund === 1,
   };
 }
 
@@ -79,8 +90,13 @@ export async function createMemberServiceOrder(input: {
   const description = input.description?.trim().slice(0, 500) || null;
   const amount = Math.round(input.amount);
   if (!title || !Number.isInteger(amount) || amount <= 0 || input.endsAt <= input.startsAt || input.acceptUntil <= new Date()) return null;
+  const [allowMemberCancel, allowMemberRefund] = await Promise.all([
+    getSettingBool(SETTING_MEMBER_SERVICE_CANCEL_ENABLED, true),
+    getSettingBool(SETTING_MEMBER_SERVICE_REFUND_ENABLED, false),
+  ]);
   const row = await prisma.member_service_orders.create({ data: {
     user_id: BigInt(input.userId), admin_id: BigInt(adminId), title, description, amount,
+    allow_member_cancel: allowMemberCancel ? 1 : 0, allow_member_refund: allowMemberRefund ? 1 : 0,
     starts_at: input.startsAt, ends_at: input.endsAt, accept_until: input.acceptUntil,
   } }).catch(() => null);
   return row ? present(row) : null;
@@ -140,12 +156,13 @@ export async function cancelMemberServiceOrder(orderId: number, userId: number, 
       const order = await tx.member_service_orders.findFirst({ where: { id: BigInt(orderId), user_id: BigInt(userId) } });
       if (!order) return { ok: false, code: 'not_found' };
       if (order.status !== MEMBER_SERVICE_STATUS.active || order.refund_txn_id) return { ok: false, code: 'not_active' };
+      if (order.allow_member_cancel !== 1) return { ok: false, code: 'not_active' };
       const claimed = await tx.member_service_orders.updateMany({
         where: { id: order.id, status: MEMBER_SERVICE_STATUS.active, refund_txn_id: null },
         data: { status: MEMBER_SERVICE_STATUS.cancelledAfterStart, cancelled_at: now, cancelled_by: 'member', cancel_reason: reason.trim().slice(0, 300) || null, updated_at: now },
       });
       if (!claimed.count) return { ok: false, code: 'not_active' };
-      const refund = refundableRiyals(order.amount, order.starts_at, order.ends_at, now);
+      const refund = cancellationOutcome(order.allow_member_cancel === 1, order.allow_member_refund === 1, refundableRiyals(order.amount, order.starts_at, order.ends_at, now)).refundHalalas;
       if (!refund) return { ok: true, code: 'ok', refund: 0 };
       const user = await tx.users.update({ where: { id: BigInt(userId) }, data: { balance: { increment: refund } }, select: { balance: true } });
       const ledger = await tx.wallet_txns.create({ data: {

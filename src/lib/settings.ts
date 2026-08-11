@@ -202,6 +202,8 @@ export async function getAdExtras(): Promise<AdExtras> {
 export const SETTING_TOPUP_BONUS_PCT = 'topup_bonus_pct';
 export const SETTING_TOPUP_BONUS_MIN = 'topup_bonus_min';
 export const SETTING_TOPUP_FIRST_BONUS = 'topup_first_bonus';
+export const SETTING_MEMBER_SERVICE_CANCEL_ENABLED = 'member_service_cancel_enabled';
+export const SETTING_MEMBER_SERVICE_REFUND_ENABLED = 'member_service_refund_enabled';
 export const SETTING_VERIFY_GIFT = 'verify_gift';
 /* التوثيق المدفوع: رسوم ومدة بالأيام — 0 = الخدمة معطلة. */
 export const SETTING_VERIFY_FEE = 'verify_fee';

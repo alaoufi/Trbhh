@@ -21,13 +21,14 @@ The Al Rajhi protocol adapter is isolated from the wallet service. The bank-spec
 - Reuse Trbhh's navy, gold, turquoise, white, rounded-card, and RTL typography styles.
 - The wallet page opens on a focused `شحن الرصيد` card with preset SAR values 10, 50, 100, 500, and 1000 plus a validated custom amount.
 - The primary action is `الدفع الآمن الآن`. Its supporting copy says that card data is entered only on the bank payment page.
+- The member chooses one enabled method: `الدفع الإلكتروني` or `تحويل بنكي`. The electronic method carries the Al Rajhi label only when its live or sandbox configuration is valid. The transfer method retains the current receipt-and-review flow and displays only bank accounts approved by administration.
 - A pending state shows the internal reference, selected amount, and an action to refresh payment status. It does not promise a credit before verification.
 - Success shows the internal reference, paid amount, wallet balance after the ledger commit, and an invoice link. Failure displays a concise Arabic reason without exposing bank credentials or raw errors.
 - The administration area uses the existing navigation and offers a `إدارة المدفوعات` page with search, status/provider/date filters, protected gateway-response inspection, and a `إعادة التحقق` action.
 
 ## Environment configuration
 
-`.env.example` documents every non-secret name. Production secrets exist only in deployment secrets/environment, not the repository or database settings page:
+`.env.example` documents every non-secret name. Al Rajhi production secrets exist only in deployment secrets/environment, not the repository or database settings page. The administration interface never accepts or displays Al Rajhi credentials:
 
 ```dotenv
 PAYMENT_PROVIDER=alrajhi
@@ -66,6 +67,8 @@ Existing `wallet_topups` remains the payment request record and retains compatib
 | `verified_at` | Time the provider query authenticated the final state |
 
 `wallet_txns` remains the financial ledger. A successful online top-up creates one positive `topup` row inside the same MySQL transaction that marks `wallet_topups` successful and adjusts the existing member balance. The amount is stored and compared in halalas where the current wallet money migration has been completed; deployment is blocked if the consistency check fails.
+
+The existing payment-method settings are extended with two independently controlled flags: `payment_electronic_enabled` and `payment_transfer_enabled`. Both default to disabled on migration. These switches are non-secret operational controls held in the existing settings store; Al Rajhi provider selection, credentials, endpoints, and signature settings are environment-only. The member page must have at least one enabled method before it can accept a top-up request. Turning a method off prevents new requests immediately but does not invalidate an already-created pending request; electronic pending requests remain verifiable and transfer receipts remain reviewable.
 
 ## Service boundaries
 
@@ -106,6 +109,13 @@ Al Rajhi hosted checkout and server callback
 - Payment endpoint and callback logs redact Authorization, API keys, passwords, card fields, signatures, and encrypted response contents.
 - Only staff with the payment-management permission can search records, inspect redacted response metadata, trigger re-verification, or initiate a refund.
 - No credentials are stored in source control, client bundles, browser local storage, or application settings tables.
+
+## Method activation and administration
+
+- `إدارة المدفوعات ← وسائل الدفع` contains two explicit switches: `تفعيل الدفع الإلكتروني` and `تفعيل التحويل البنكي`, each with a short confirmation describing the effect on new top-ups.
+- Electronic activation additionally requires a complete, production-valid Al Rajhi configuration. Sandbox credentials are accepted only when `ALRAJHI_ENVIRONMENT=sandbox`; production mode rejects sandbox endpoint values and incomplete credentials.
+- Transfer activation additionally requires at least one active, validated bank account. A member submits a transfer receipt against a server-owned pending request; staff approval uses the existing atomic wallet-credit path.
+- The payment dashboard identifies the method (`alrajhi` or `bank_transfer`), state, member, amount, internal reference, provider reference, timestamps, and a redacted verification outcome.
 
 ## Sandbox and production gate
 

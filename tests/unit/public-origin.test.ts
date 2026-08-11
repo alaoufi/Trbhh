@@ -27,4 +27,10 @@ describe('public origin', () => {
     expect(sitemap).toContain("from '@/lib/public-origin'");
     expect(robots).toContain("from '@/lib/public-origin'");
   });
+
+  it('keeps host diagnostics explicitly opt-in while tracing proxy behavior', () => {
+    const middleware = readFileSync(resolve('src/middleware.ts'), 'utf8');
+    expect(middleware).toContain("x-trbhh-debug-host");
+    expect(middleware).toContain("x-trbhh-observed-host");
+  });
 });

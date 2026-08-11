@@ -19,6 +19,7 @@ function storeSubdomain(hostname: string): string {
 const SUB_ALLOWED = /^\/(companies\/|store-login|store-forgot|login|logout|forgot|media\/|api\/|p\/|_next|play\/|guide\/how)/;
 
 export function middleware(req: NextRequest) {
+  const debugHost = req.headers.get('x-trbhh-debug-host') === '1';
   // The old apex stays reachable for existing links, but the Saudi domain is
   // the single platform URL presented to visitors and search engines.
   const primary = redirectLegacyApex(req.nextUrl.hostname, req.nextUrl.pathname, req.nextUrl.search);
@@ -56,6 +57,13 @@ export function middleware(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-pathname', req.nextUrl.pathname + req.nextUrl.search);
   const res = NextResponse.next({ request: { headers: requestHeaders } });
+  // Temporary, opt-in proxy tracing. It is returned only to a request that
+  // explicitly asks for it and is removed after the origin-host mismatch is fixed.
+  if (debugHost) {
+    res.headers.set('x-trbhh-observed-host', req.nextUrl.hostname);
+    res.headers.set('x-trbhh-host-header', req.headers.get('host') ?? '');
+    res.headers.set('x-trbhh-forwarded-host', req.headers.get('x-forwarded-host') ?? '');
+  }
   if (!req.cookies.get('trbhh_vid')) {
     const vid = crypto.randomUUID();
     res.cookies.set('trbhh_vid', vid, { httpOnly: true, secure: process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE === 'true', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });

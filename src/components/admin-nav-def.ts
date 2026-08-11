@@ -2,11 +2,11 @@ import {
   LayoutDashboard, Users, Megaphone, Flag, ShieldCheck, Copy, Sparkles, Ban,
   Crown, Settings, MonitorPlay, BookOpen, ShieldAlert, DatabaseBackup, KeyRound, MessageSquare, Coins,
   Store, MessagesSquare, FileText, Shield, HandCoins, ScrollText, BellRing, Search as SearchIcon, Link2 as LinkIcon,
-   Archive, AlertTriangle, CreditCard, WalletCards,
+   Archive, AlertTriangle, CreditCard, WalletCards, Landmark,
 } from 'lucide-react';
 import type { Perm } from '@/lib/roles';
 
-export type AdminNavItem = { href: string; label: string; icon: React.ElementType; perm: Perm | null };
+export type AdminNavItem = { href: string; label: string; icon: React.ElementType; perm: Perm | null; description?: string; keywords?: string[] };
 export type AdminNavGroup = { key: string; title: string; icon: React.ElementType; color: string; items: AdminNavItem[] };
 
 /**
@@ -38,6 +38,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
       { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone, perm: 'ads' },
       { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy, perm: 'duplicates' },
       { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles, perm: 'classified' },
+      { href: '/admin/promos', label: 'الإعلانات الترويجية', icon: MonitorPlay, perm: 'promos', description: 'مراجعة ونشر الإعلانات المدفوعة', keywords: ['ترويج', 'إعلان مدفوع', 'بانر عضو'] },
     ],
   },
   {
@@ -61,10 +62,10 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
     items: [
       { href: '/admin/revenue', label: 'الإيرادات (تقارير مالية)', icon: Coins, perm: 'users' },
       { href: '/admin/revenue?tab=wallets', label: 'محافظ الأعضاء', icon: WalletCards, perm: 'users' },
+      { href: '/admin/revenue?tab=accounts', label: 'حسابات الشحن البنكية', icon: Landmark, perm: 'users', description: 'البنوك والآيبان التي يحوّل إليها الأعضاء', keywords: ['الحساب البنكي', 'آيبان', 'بيانات التحويل', 'بنك', 'حساب الشحن'] },
       { href: '/admin/revenue?tab=pricing', label: 'كل التسعير (باقات وأسعار)', icon: Crown, perm: 'users' },
-      { href: '/admin/topups', label: 'طلبات شحن الرصيد', icon: HandCoins, perm: 'users' },
-      { href: '/admin/payments', label: 'وسائل الدفع الإلكتروني', icon: CreditCard, perm: 'users' },
-      { href: '/admin/promos', label: 'الإعلانات الترويجية', icon: MonitorPlay, perm: 'promos' },
+      { href: '/admin/topups', label: 'طلبات شحن الرصيد', icon: HandCoins, perm: 'users', description: 'طلبات الشحن البنكي وإيصالاتها', keywords: ['شحن', 'إيصال', 'تحويل بنكي'] },
+      { href: '/admin/payments', label: 'وسائل الدفع الإلكتروني', icon: CreditCard, perm: 'users', description: 'إعداد بوابات الدفع', keywords: ['دفع', 'بطاقة', 'مدى', 'بوابة دفع'] },
     ],
   },
   {

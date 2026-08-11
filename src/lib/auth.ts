@@ -7,6 +7,11 @@ import bcrypt from 'bcryptjs';
 const COOKIE = 'trbhh_session';
 const INSECURE_DEFAULT = 'dev-insecure-secret-change-me-in-production-please';
 const AUTH_SECRET = process.env.AUTH_SECRET || '';
+
+/** HTTPS is mandatory in production; local development can opt into it explicitly. */
+export function shouldUseSecureCookies(env: { NODE_ENV?: string; COOKIE_SECURE?: string } = process.env): boolean {
+  return env.NODE_ENV === 'production' || env.COOKIE_SECURE === 'true';
+}
 // أمان: لا تُشغّل الإنتاج بمفتاح توقيع افتراضي/ضعيف — وإلا أمكن تزوير الجلسات
 // (بما فيها جلسة إداري) بمفتاح معروف. الفحص عند أول استخدام فعلي للجلسة لا
 // عند استيراد الوحدة — بيئة بناء Docker لا تملك أسرار وقت التشغيل (تُحقن فقط
@@ -48,10 +53,9 @@ export async function createSession(payload: SessionPayload): Promise<void> {
     .sign(secret);
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
-    // Only require HTTPS-only cookies when explicitly behind SSL.
-    // (On a plain http://IP:PORT deployment this must stay false, otherwise
-    // the browser drops the cookie and the user appears logged out.)
-    secure: process.env.COOKIE_SECURE === 'true',
+    // Public production domains are HTTPS-only; local HTTP remains supported
+    // outside production for development and recovery diagnostics.
+    secure: shouldUseSecureCookies(),
     sameSite: 'lax',
     path: '/',
     maxAge: 60 * 60 * 24 * 30,

@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { createReadStream } from 'node:fs';
 import { Readable } from 'node:stream';
 import { statLocal, statInDir } from '@/lib/storage';
+import { isPotentiallyProtectedUploadPath, isProtectedUploadType } from '@/lib/media-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,7 +38,7 @@ function parseRange(range: string | null, size: number): { start: number; end: n
 }
 
 /** Stream a local file with HTTP Range support (needed for video playback). */
-function serveFile(file: { abs: string; size: number }, req: NextRequest, contentType: string): Response {
+function serveFile(file: { abs: string; size: number }, req: NextRequest, contentType: string, cacheControl = 'public, max-age=31536000, immutable'): Response {
   const range = parseRange(req.headers.get('range'), file.size);
   if (range) {
     const { start, end } = range;
@@ -49,7 +50,8 @@ function serveFile(file: { abs: string; size: number }, req: NextRequest, conten
         'Content-Length': String(end - start + 1),
         'Content-Range': `bytes ${start}-${end}/${file.size}`,
         'Accept-Ranges': 'bytes',
-        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Cache-Control': cacheControl,
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   }
@@ -59,9 +61,25 @@ function serveFile(file: { abs: string; size: number }, req: NextRequest, conten
       'Content-Type': contentType,
       'Content-Length': String(file.size),
       'Accept-Ranges': 'bytes',
-      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Cache-Control': cacheControl,
+      'X-Content-Type-Options': 'nosniff',
     },
   });
+}
+
+async function protectedMediaCacheControl(rel: string): Promise<string | null> {
+  if (!isPotentiallyProtectedUploadPath(rel)) return 'public, max-age=31536000, immutable';
+  const { prisma } = await import('@/lib/prisma');
+  const upload = await prisma.uploads.findFirst({ where: { file_name: rel }, select: { type: true, user_id: true } }).catch(() => null);
+  if (!upload || !isProtectedUploadType(upload.type)) return null;
+
+  const { getSession } = await import('@/lib/auth');
+  const session = await getSession();
+  if (!session) return null;
+  if (upload.user_id === session.uid) return 'private, no-store';
+
+  const { hasAction } = await import('@/lib/roles');
+  return (await hasAction(session.uid, 'verifications', 'view').catch(() => false)) ? 'private, no-store' : null;
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
@@ -69,15 +87,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
   const rel = parts.join('/');
   const ext = rel.split('.').pop()?.toLowerCase() || '';
   const contentType = TYPES[ext] || 'application/octet-stream';
+  const cacheControl = await protectedMediaCacheControl(rel);
+  // Return the same response for missing and inaccessible documents so their
+  // existence cannot be inferred from a URL or filename.
+  if (!cacheControl) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
 
   // 1) app storage (newly uploaded media)
   const local = await statLocal(rel);
-  if (local) return serveFile(local, req, contentType);
+  if (local) return serveFile(local, req, contentType, cacheControl);
 
   // 2) mounted legacy media dir (original site's files) — served with Range too
   if (LEGACY_DIR) {
     const legacy = await statInDir(LEGACY_DIR, rel);
-    if (legacy) return serveFile(legacy, req, contentType);
+    if (legacy) return serveFile(legacy, req, contentType, cacheControl);
   }
 
   // 3) legacy URL proxy — forward Range, stream body (skip if unset / would loop)
@@ -93,7 +115,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
           if (v) h.set(k, v);
         }
         if (!h.has('accept-ranges')) h.set('Accept-Ranges', 'bytes');
-        h.set('Cache-Control', 'public, max-age=86400');
+        h.set('Cache-Control', cacheControl === 'private, no-store' ? cacheControl : 'public, max-age=86400');
+        h.set('X-Content-Type-Options', 'nosniff');
         return new Response(upstream.body, { status: upstream.status, headers: h });
       }
     } catch {

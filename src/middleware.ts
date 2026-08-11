@@ -26,7 +26,7 @@ export function middleware(req: NextRequest) {
       url.pathname = `/companies/${sub}`;
       const rw = NextResponse.rewrite(url);
       if (!req.cookies.get('trbhh_vid')) {
-        rw.cookies.set('trbhh_vid', crypto.randomUUID(), { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
+        rw.cookies.set('trbhh_vid', crypto.randomUUID(), { httpOnly: true, secure: process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE === 'true', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
       }
       return rw;
     }
@@ -51,7 +51,7 @@ export function middleware(req: NextRequest) {
   const res = NextResponse.next({ request: { headers: requestHeaders } });
   if (!req.cookies.get('trbhh_vid')) {
     const vid = crypto.randomUUID();
-    res.cookies.set('trbhh_vid', vid, { httpOnly: true, sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
+    res.cookies.set('trbhh_vid', vid, { httpOnly: true, secure: process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE === 'true', sameSite: 'lax', path: '/', maxAge: 60 * 60 * 24 * 365 });
   }
   // A logged-in member must never be served a cached (anonymous) copy of a page.
   // Behind a shared cache (Varnish/CDN) that would show them a login prompt on

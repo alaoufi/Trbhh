@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks, ReceiptText, Trash2, ArrowRight, Scale, Landmark, HandCoins, Star, Settings2 } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks, ReceiptText, Trash2, ArrowRight, Scale, Landmark, HandCoins, Star, Settings2, WalletCards } from 'lucide-react';
 import { requireAction, getUserPerms } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
@@ -11,6 +11,7 @@ import { getPromoPackages, type PromoPackage } from '@/lib/promos';
 import {
   saveRevenueAction, addSiteExpenseAction, deleteSiteExpenseAction, addTopupAccountAction, deleteTopupAccountAction, addTopupCampaignAction, deleteTopupCampaignAction,
   createPackageAction, updatePackageAction, deletePackageAction, createPromoPackageAction, updatePromoPackageAction, deletePromoPackageAction,
+  createMemberServiceOrderAction, cancelPendingMemberServiceOrderAdminAction,
 } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { Collapse } from '@/components/admin-collapse';
@@ -39,6 +40,7 @@ const num = 'h-10 w-full rounded-lg border border-primary/30 bg-white px-2 text-
 const TABS = [
   { key: 'overview', label: 'الميزانية', icon: Coins },
   { key: 'balances', label: 'أرصدة الأعضاء', icon: Users },
+  { key: 'wallets', label: 'محافظ الأعضاء', icon: WalletCards },
   { key: 'expenses', label: 'المصروفات', icon: ReceiptText },
   { key: 'accounts', label: 'حسابات الشحن', icon: Landmark },
   { key: 'campaigns', label: 'الحملات', icon: Megaphone },
@@ -47,10 +49,10 @@ const TABS = [
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
-export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string; user?: string; camp?: string; cat?: string; ppage?: string }> }) {
+export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string; user?: string; camp?: string; cat?: string; ppage?: string; q?: string; wallet?: string }> }) {
   const session = await requireAction('users', 'view');
-  const { saved, tab, user, camp, cat, ppage } = await searchParams;
-  const active: TabKey = tab === 'balances' || tab === 'pricing' || tab === 'expenses' || tab === 'accounts' || tab === 'campaigns' || tab === 'payments' ? tab : 'overview';
+  const { saved, tab, user, camp, cat, ppage, q, wallet } = await searchParams;
+  const active: TabKey = tab === 'balances' || tab === 'wallets' || tab === 'pricing' || tab === 'expenses' || tab === 'accounts' || tab === 'campaigns' || tab === 'payments' ? tab : 'overview';
   const userId = Number(user || 0) || 0;
   const perms = await getUserPerms(session.uid);
 
@@ -70,6 +72,7 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
 
       {active === 'overview' && <OverviewTab />}
       {active === 'balances' && (userId ? <MemberDetailTab userId={userId} /> : <BalancesTab />)}
+      {active === 'wallets' && <MemberWalletsTab userId={userId} query={q || ''} notice={wallet || ''} />}
       {active === 'expenses' && <ExpensesTab />}
       {active === 'accounts' && <AccountsTab />}
       {active === 'campaigns' && <CampaignsTab camp={camp} />}
@@ -77,6 +80,43 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
       {active === 'pricing' && <PricingTab canPackages={perms.has('packages')} canPromos={perms.has('promos')} />}
     </div>
   );
+}
+
+async function MemberWalletsTab({ userId, query, notice }: { userId: number; query: string; notice: string }) {
+  const [txns, orders, topups] = await Promise.all([
+    prisma.wallet_txns.findMany({ orderBy: { id: 'desc' }, take: 800 }).catch(() => []),
+    prisma.member_service_orders.findMany({ orderBy: { id: 'desc' }, take: 400 }).catch(() => []),
+    prisma.wallet_topups.findMany({ orderBy: { id: 'desc' }, take: 400 }).catch(() => []),
+  ]);
+  const financialIds = new Set<number>([...txns.map((row) => toInt(row.user_id)), ...orders.map((row) => toInt(row.user_id)), ...topups.map((row) => toInt(row.user_id))]);
+  const users = financialIds.size ? await prisma.users.findMany({ where: { id: { in: [...financialIds].map((id) => BigInt(id)) } }, select: { id: true, name: true, userName: true, phoneNumber: true, email: true, balance: true } }).catch(() => []) : [];
+  const normalized = query.trim().toLowerCase();
+  const providerUserIds = new Set(topups.filter((row) => (row.provider_ref || '').toLowerCase().includes(normalized)).map((row) => toInt(row.user_id)));
+  const visibleUsers = users.filter((member) => !normalized || [member.name, member.userName, member.phoneNumber, member.email, String(toInt(member.id))].some((value) => (value || '').toLowerCase().includes(normalized)) || providerUserIds.has(toInt(member.id)));
+  const member = userId ? users.find((row) => toInt(row.id) === userId) || null : null;
+  const memberTxns = userId ? txns.filter((row) => toInt(row.user_id) === userId) : [];
+  const memberOrders = userId ? orders.filter((row) => toInt(row.user_id) === userId) : [];
+  const memberTopups = userId ? topups.filter((row) => toInt(row.user_id) === userId) : [];
+  const nameOf = (id: number) => users.find((row) => toInt(row.id) === id)?.name || users.find((row) => toInt(row.id) === id)?.userName || `#${id}`;
+
+  return <div className="space-y-4">
+    {notice && <p className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">تم تحديث أمر الخدمة: {notice}</p>}
+    <section className="card-3d space-y-3 rounded-2xl p-4">
+      <div className="flex items-center gap-2 font-extrabold text-primary"><WalletCards className="h-5 w-5" /> محافظ الأعضاء</div>
+      <form className="flex gap-2" action="/admin/revenue" method="get"><input type="hidden" name="tab" value="wallets" /><input name="q" defaultValue={query} placeholder="بحث ذكي في المحافظ: عضو، جوال، بريد، رقم عملية أو مرجع دفع" className="h-10 min-w-0 flex-1 rounded-lg border border-primary/30 px-3 text-sm" /><button className="rounded-lg bg-primary px-4 text-sm font-bold text-white">بحث</button></form>
+      <p className="text-xs text-muted-foreground">تظهر الأعضاء ذوو تعامل مالي فقط. البحث يشمل الاسم والجوال والبريد ورقم العضو ومرجع الدفع الإلكتروني.</p>
+      <div className="divide-y rounded-xl border border-primary/15">
+        {visibleUsers.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">لا توجد محافظ مطابقة.</p>}
+        {visibleUsers.map((row) => { const id = toInt(row.id); const charged = txns.filter((txn) => toInt(txn.user_id) === id && txn.amount < 0).reduce((sum, txn) => sum + Math.abs(txn.amount), 0); const activeCount = orders.filter((order) => toInt(order.user_id) === id && ['pending_acceptance', 'awaiting_execution', 'active'].includes(order.status)).length; return <Link key={id} href={`/admin/revenue?tab=wallets&user=${id}`} className="flex items-center justify-between gap-3 p-3 hover:bg-primary/5"><span><b className="block">{nameOf(id)}</b><small className="text-muted-foreground">#{id} · خصم {charged} ر.س · خدمات قائمة {activeCount}</small></span><b className="text-emerald-700">{row.balance} ر.س</b></Link>; })}
+      </div>
+    </section>
+    {member && <section className="space-y-3">
+      <div className="card-3d rounded-2xl p-4"><h2 className="font-extrabold text-primary">محفظة {nameOf(userId)} <span className="text-sm text-muted-foreground">#{userId}</span></h2><p className="mt-2 text-2xl font-extrabold text-emerald-700">الرصيد المتاح: {member.balance} ر.س</p></div>
+      <section className="card-3d rounded-2xl p-4"><h3 className="mb-3 font-extrabold">إنشاء خدمة خاصة</h3><form action={createMemberServiceOrderAction} className="grid gap-2 sm:grid-cols-2"><input type="hidden" name="userId" value={userId} /><input name="title" required maxLength={160} placeholder="اسم الخدمة" className={num} /><input name="amount" type="number" min={1} step={1} required placeholder="المبلغ (ر.س)" className={num} /><textarea name="description" maxLength={500} placeholder="وصف الخدمة" className="min-h-20 rounded-lg border border-primary/30 p-2 text-sm sm:col-span-2" /><label className="text-xs font-bold">البداية<input name="startsAt" type="datetime-local" required className={num} /></label><label className="text-xs font-bold">النهاية<input name="endsAt" type="datetime-local" required className={num} /></label><label className="text-xs font-bold sm:col-span-2">مهلة موافقة العضو<input name="acceptUntil" type="datetime-local" required className={num} /></label><button className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white sm:col-span-2">إنشاء مذكرة الخدمة دون خصم</button></form></section>
+      <section className="card-3d rounded-2xl p-4"><h3 className="mb-2 font-extrabold">أوامر الخدمات</h3>{memberOrders.map((order) => <div key={toInt(order.id)} className="mb-2 rounded-lg border border-primary/15 p-3 text-sm"><b>{order.title} — {order.amount} ر.س</b><div className="text-xs text-muted-foreground">{order.status} · {fmt(order.starts_at?.toISOString() || null)} إلى {fmt(order.ends_at?.toISOString() || null)}</div>{order.status === 'pending_acceptance' && <form action={cancelPendingMemberServiceOrderAdminAction} className="mt-2 flex gap-2"><input type="hidden" name="orderId" value={toInt(order.id)} /><input type="hidden" name="userId" value={userId} /><input name="reason" placeholder="سبب الإلغاء" className="rounded border px-2 py-1 text-xs" /><button className="text-xs font-bold text-red-700">إلغاء قبل القبول</button></form>}</div>)}</section>
+      <section className="card-3d rounded-2xl p-4"><h3 className="mb-2 font-extrabold">السجل المالي</h3>{memberTxns.map((txn) => <div key={toInt(txn.id)} className="flex justify-between border-b border-primary/10 py-2 text-sm"><span>{txn.note || txn.reason} <small className="block text-muted-foreground">#{toInt(txn.id)} · {fmt(txn.created_at?.toISOString() || null)}</small></span><b className={txn.amount >= 0 ? 'text-emerald-700' : 'text-red-600'}>{txn.amount >= 0 ? '+' : ''}{txn.amount} ر.س</b></div>)}{memberTopups.map((topup) => <div key={`topup-${toInt(topup.id)}`} className="border-b border-primary/10 py-2 text-xs">شحن #{toInt(topup.id)}: {topup.amount} ر.س — {topup.source === 'online' ? `بطاقة/بوابة ${topup.method || ''}` : 'تحويل بنكي'} {topup.provider_ref ? `· ${topup.provider_ref}` : ''}</div>)}</section>
+    </section>}
+  </div>;
 }
 
 async function OverviewTab() {

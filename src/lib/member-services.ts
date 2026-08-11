@@ -160,11 +160,11 @@ export async function cancelMemberServiceOrder(orderId: number, userId: number, 
   }
 }
 
-export async function cancelPendingMemberServiceOrder(orderId: number, adminId: number, reason: string): Promise<ServiceActionResult> {
+export async function cancelPendingMemberServiceOrder(orderId: number, reason: string): Promise<ServiceActionResult> {
   await ensureSchema();
   const now = new Date();
   const updated = await prisma.member_service_orders.updateMany({
-    where: { id: BigInt(orderId), admin_id: BigInt(adminId), status: MEMBER_SERVICE_STATUS.pendingAcceptance },
+    where: { id: BigInt(orderId), status: MEMBER_SERVICE_STATUS.pendingAcceptance },
     data: { status: MEMBER_SERVICE_STATUS.cancelledBeforeAcceptance, cancelled_at: now, cancelled_by: 'admin', cancel_reason: reason.trim().slice(0, 300) || 'ألغتها الإدارة', updated_at: now },
   }).catch(() => ({ count: 0 }));
   return updated.count ? { ok: true, code: 'ok' } : { ok: false, code: 'not_pending' };

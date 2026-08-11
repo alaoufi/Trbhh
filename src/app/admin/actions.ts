@@ -21,6 +21,41 @@ import { bustAdCaches } from '@/lib/data';
 import { toInt } from '@/lib/utils';
 import { logAdmin } from '@/lib/audit';
 
+export async function createMemberServiceOrderAction(formData: FormData) {
+  const admin = await requireAction('users', 'edit');
+  const userId = Number(formData.get('userId') || 0);
+  const title = String(formData.get('title') || '').trim();
+  const description = String(formData.get('description') || '').trim();
+  const amount = Number(formData.get('amount') || 0);
+  const startsAt = new Date(String(formData.get('startsAt') || ''));
+  const endsAt = new Date(String(formData.get('endsAt') || ''));
+  const acceptUntil = new Date(String(formData.get('acceptUntil') || ''));
+  if (!Number.isSafeInteger(userId) || userId <= 0 || !title || !Number.isInteger(amount) || amount <= 0 || isNaN(startsAt.getTime()) || isNaN(endsAt.getTime()) || isNaN(acceptUntil.getTime()) || endsAt <= startsAt || acceptUntil <= new Date()) {
+    redirect('/admin/revenue?tab=wallets&wallet=invalid');
+  }
+  const { createMemberServiceOrder } = await import('@/lib/member-services');
+  const order = await createMemberServiceOrder({ userId, title, description, amount, startsAt, endsAt, acceptUntil }, admin.uid);
+  if (!order) redirect('/admin/revenue?tab=wallets&wallet=failed');
+  await logAdmin(admin.uid, 'إنشاء خدمة خاصة للمحفظة', `عضو #${userId}`, `${title} — ${amount} ر.س`);
+  revalidatePath('/admin/revenue');
+  revalidatePath('/account/wallet');
+  redirect(`/admin/revenue?tab=wallets&user=${userId}&wallet=created`);
+}
+
+export async function cancelPendingMemberServiceOrderAdminAction(formData: FormData) {
+  const admin = await requireAction('users', 'edit');
+  const orderId = Number(formData.get('orderId') || 0);
+  const userId = Number(formData.get('userId') || 0);
+  const reason = String(formData.get('reason') || '').trim().slice(0, 300);
+  if (!Number.isSafeInteger(orderId) || orderId <= 0 || !Number.isSafeInteger(userId) || userId <= 0) redirect('/admin/revenue?tab=wallets&wallet=invalid');
+  const { cancelPendingMemberServiceOrder } = await import('@/lib/member-services');
+  const result = await cancelPendingMemberServiceOrder(orderId, reason);
+  if (result.ok) await logAdmin(admin.uid, 'إلغاء خدمة خاصة قبل القبول', `عضو #${userId}`, reason || `خدمة #${orderId}`);
+  revalidatePath('/admin/revenue');
+  revalidatePath('/account/wallet');
+  redirect(`/admin/revenue?tab=wallets&user=${userId}&wallet=${result.ok ? 'cancelled' : result.code}`);
+}
+
 function readPromoPkgForm(formData: FormData) {
   return {
     name: String(formData.get('name') || '').trim() || 'باقة',

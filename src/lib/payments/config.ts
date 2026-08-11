@@ -16,12 +16,31 @@ import type { PayMethod, PayMode, PayProviderId, ProviderCreds } from './types';
  */
 export const PAY_SETTING = {
   on: 'pay_online_on',
+  electronicOn: 'payment_electronic_enabled',
+  transferOn: 'payment_transfer_enabled',
   provider: 'pay_provider',
   mode: 'pay_mode',
   min: 'pay_min',
   max: 'pay_max',
   methods: 'pay_methods',
 } as const;
+
+export type PaymentMethodPolicyInput = { electronicEnabled: boolean; transferEnabled: boolean; alrajhiConfigured: boolean };
+export type PaymentMethodPolicy = { electronic: boolean; transfer: boolean; any: boolean };
+
+/** The bank transfer switch is independent; electronic payment also needs a complete bank configuration. */
+export function paymentMethodPolicy(input: PaymentMethodPolicyInput): PaymentMethodPolicy {
+  const electronic = input.electronicEnabled && input.alrajhiConfigured;
+  const transfer = input.transferEnabled;
+  return { electronic, transfer, any: electronic || transfer };
+}
+
+export function alrajhiEnvironmentConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  const mode = env.ALRAJHI_ENVIRONMENT;
+  if (mode !== 'sandbox' && mode !== 'production') return false;
+  return ['ALRAJHI_MERCHANT_ID', 'ALRAJHI_TERMINAL_ID', 'ALRAJHI_USERNAME', 'ALRAJHI_PASSWORD', 'ALRAJHI_SECRET_KEY', 'ALRAJHI_API_KEY', 'ALRAJHI_API_BASE_URL', 'ALRAJHI_HOSTED_PAYMENT_URL', 'DATABASE_PAYMENT_SECRET']
+    .every((key) => (env[key] || '').trim().length > 0);
+}
 
 /** الوسائل التي يمكن للأدمن التحكّم بتفعيلها/تعطيلها (لتفاوت الرسوم). */
 export const CONTROLLABLE_METHODS: PayMethod[] = ['mada', 'visa', 'mastercard', 'applepay', 'stcpay'];

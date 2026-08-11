@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { redirectLegacyApex } from '@/lib/public-origin';
+import { SITE } from '@/lib/constants';
 
 // subdomains that are the platform itself, never a store handle
 const RESERVED_SUB = new Set(['www', 'api', 'm', 'admin', 'mail', 'ftp', 'cdn', 'static', 'assets', 'app', 'apps', 'store', 'stores', 'trbhh', 'ns1', 'ns2', 'blog', 'help', 'support', 'dev', 'test', 'staging']);
@@ -17,6 +19,11 @@ function storeSubdomain(hostname: string): string {
 const SUB_ALLOWED = /^\/(companies\/|store-login|store-forgot|login|logout|forgot|media\/|api\/|p\/|_next|play\/|guide\/how)/;
 
 export function middleware(req: NextRequest) {
+  // The old apex stays reachable for existing links, but the Saudi domain is
+  // the single platform URL presented to visitors and search engines.
+  const primary = redirectLegacyApex(req.nextUrl.hostname, req.nextUrl.pathname, req.nextUrl.search);
+  if (primary) return NextResponse.redirect(primary, 308);
+
   // store subdomains: saud.trbhh.com → render that store at its own domain
   const sub = storeSubdomain(req.nextUrl.hostname);
   if (sub) {
@@ -40,7 +47,7 @@ export function middleware(req: NextRequest) {
     // أي صفحة تربح أخرى: عُد للنطاق الرئيسي — نطاق المتجر يخدم متجره فقط
     if (!SUB_ALLOWED.test(path)) {
       const url = req.nextUrl.clone();
-      url.hostname = 'trbhh.com';
+      url.hostname = SITE.domain;
       return NextResponse.redirect(url, 307);
     }
   }

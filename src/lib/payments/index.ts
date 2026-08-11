@@ -9,7 +9,7 @@ import { tap } from './providers/tap';
 import { paytabs } from './providers/paytabs';
 
 export { PROVIDER_META, providerMeta, readyProviders } from './registry';
-export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
+export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, getTopupMethodAvailability, saveTopupMethodSettings, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
 export type { PaymentConfig } from './config';
 
 /** سجلّ مُحوِّلات المزوّدين الجاهزين (لها كود مكتمل). */

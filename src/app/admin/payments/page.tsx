@@ -1,20 +1,21 @@
 import { CreditCard, CheckCircle2, Circle, ExternalLink, KeyRound, ShieldCheck, Clock } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import { ConfirmSubmit } from '@/components/confirm-submit';
-import { savePaymentSettingsAction, saveProviderCredsAction } from '../actions';
-import { PROVIDER_META, providerMeta, getPaymentConfig, getProviderCreds, isProviderConfigured, getEnabledMethods, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from '@/lib/payments';
+import { savePaymentSettingsAction, saveProviderCredsAction, saveTopupMethodSettingsAction } from '../actions';
+import { PROVIDER_META, providerMeta, getPaymentConfig, getProviderCreds, isProviderConfigured, getEnabledMethods, getTopupMethodAvailability, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from '@/lib/payments';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'وسائل الدفع الإلكتروني' };
 
 const METHOD_LABEL = METHOD_LABEL_AR;
 
-export default async function AdminPayments({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+export default async function AdminPayments({ searchParams }: { searchParams: Promise<{ saved?: string; alrajhi?: string }> }) {
   await requireAction('users', 'edit');
-  const { saved } = await searchParams;
+  const { saved, alrajhi } = await searchParams;
   const cfg = await getPaymentConfig();
   const enabledMethods = await getEnabledMethods();
   const activeSupported = cfg.provider ? (providerMeta(cfg.provider)?.methods ?? []) : [];
+  const [topupMethods, alrajhiReport] = await Promise.all([getTopupMethodAvailability(), Promise.resolve(alrajhiConfigReport())]);
 
   // لكل مزوّد: هل مُهيّأ؟ وأي حقول سرّية مخزَّنة (نمرّر منطقاً فقط — لا نكشف القيم).
   const provState = await Promise.all(
@@ -41,6 +42,15 @@ export default async function AdminPayments({ searchParams }: { searchParams: Pr
       </p>
 
       {saved && <div className="rounded-lg border-2 border-emerald-400 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800">✅ حُفظت الإعدادات.</div>}
+      {alrajhi === 'missing' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-900">لا يمكن تفعيل الدفع الإلكتروني قبل اكتمال إعدادات الراجحي واختبار Sandbox.</div>}
+
+      <form action={saveTopupMethodSettingsAction} className="space-y-3 rounded-2xl border-2 border-primary/25 bg-card p-4">
+        <h2 className="flex items-center gap-2 font-bold text-primary"><ShieldCheck className="h-5 w-5" /> تفعيل وسائل شحن الرصيد</h2>
+        <label className="flex items-start gap-2 text-sm font-bold"><input type="checkbox" name="electronicEnabled" defaultChecked={topupMethods.electronic} disabled={!alrajhiReport.ready} className="mt-0.5 h-4 w-4 accent-primary disabled:opacity-50" /><span>الدفع الإلكتروني عبر مصرف الراجحي {!alrajhiReport.ready && <small className="block font-medium text-amber-700">موقوف حتى تكتمل حقول البيئة ويُنفذ اختبار المصرف.</small>}</span></label>
+        <label className="flex items-start gap-2 text-sm font-bold"><input type="checkbox" name="transferEnabled" defaultChecked={topupMethods.transfer} className="mt-0.5 h-4 w-4 accent-primary" /><span>التحويل البنكي وإرفاق الإيصال <small className="block font-medium text-muted-foreground">مستقل عن الدفع الإلكتروني.</small></span></label>
+        <div className="rounded-xl bg-primary/5 p-3 text-xs"><b className="text-primary">حالة حقول الراجحي ({alrajhiReport.environment}):</b><div className="mt-2 flex flex-wrap gap-1.5">{alrajhiReport.fields.map((field) => <span key={field.key} className={`rounded-full px-2 py-1 font-bold ${field.present ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>{field.present ? '✓' : '!' } {field.key}</span>)}</div><p className="mt-2 text-muted-foreground">القيم لا تظهر هنا ولا تُحفظ في قاعدة البيانات. اختبار الاتصال الحقيقي يُتاح بعد استلام عقد API الرسمي من المصرف.</p></div>
+        <ConfirmSubmit msg="حفظ تفعيل وسائل الشحن؟" className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">حفظ التفعيل والإيقاف</ConfirmSubmit>
+      </form>
 
       {/* الإعدادات العامة */}
       <form action={savePaymentSettingsAction} className="space-y-3 rounded-2xl border border-primary/20 bg-card p-4">

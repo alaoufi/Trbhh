@@ -16,7 +16,7 @@ import { pointsEnabled, getPoints, getPointsConfig } from '@/lib/points';
 import { mediaUrl } from '@/lib/media';
 import { requestTopupAction, convertPointsAction, startOnlineTopupAction, acceptMemberServiceOrderAction, confirmMemberServiceExecutionAction, cancelMemberServiceOrderAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
-import { isOnlinePayReady, getPaymentConfig, getActiveMethods } from '@/lib/payments';
+import { isOnlinePayReady, getPaymentConfig, getActiveMethods, getTopupMethodAvailability } from '@/lib/payments';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'محفظتي' };
@@ -60,7 +60,8 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
   const [pts, ptsCfg] = ptsOn ? await Promise.all([getPoints(session.uid), getPointsConfig()]) : [0, null];
   const hadTopup = topups.some((t) => t.status === 1);
   // الدفع الإلكتروني: يظهر زرّ «ادفع أونلاين» فقط عند تفعيله واكتمال تهيئة المزوّد
-  const payReady = await isOnlinePayReady().catch(() => false);
+  const topupMethods = await getTopupMethodAvailability().catch(() => ({ electronic: false, transfer: true, any: true }));
+  const payReady = topupMethods.electronic && await isOnlinePayReady().catch(() => false);
   const payCfg = payReady ? await getPaymentConfig().catch(() => null) : null;
   const payMethods = payCfg?.provider ? await getActiveMethods(payCfg.provider).catch(() => []) : [];
   const tab = sp.tab === 'active' || sp.tab === 'history' ? sp.tab : 'topups';
@@ -162,7 +163,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
       )}
 
       {/* شحن الرصيد: المبلغ + إيصال التحويل — يُضاف بعد تأكيد الإدارة */}
-      <div id="topup" className="card-3d space-y-3 rounded-2xl p-4">
+      {topupMethods.transfer && <div id="topup" className="card-3d space-y-3 rounded-2xl p-4">
         <div className="flex flex-wrap items-center gap-2 font-bold text-primary">
           <HandCoins className="h-5 w-5" /> {payReady ? 'أو حوّل بنكياً وأرفق الإيصال' : 'شحن رصيدك'}
           <Link href="/guide/how/topup" className="btn-3d mr-auto inline-flex items-center gap-1 rounded-full bg-red-600 px-3.5 py-1.5 text-xs font-extrabold text-white shadow-md hover:bg-red-700">🎬 شاهد طريقة الشحن</Link>
@@ -276,7 +277,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
             })}
           </div>
         )}
-      </div>
+      </div>}
       </>}
 
       {/* أسعار الخدمات — جدول واضح (خدمة × مدّة) مفصول تماماً عن شحن الرصيد */}

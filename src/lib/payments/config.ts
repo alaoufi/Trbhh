@@ -56,6 +56,22 @@ export function alrajhiConfigReport(env: EnvironmentValues = process.env) {
   return { environment, fields, ready: alrajhiEnvironmentConfigured(env) };
 }
 
+export async function getTopupMethodAvailability(): Promise<PaymentMethodPolicy> {
+  const [electronicEnabled, transferEnabled] = await Promise.all([
+    getSettingBool(PAY_SETTING.electronicOn, false),
+    // Preserve the existing live bank-transfer flow until an administrator explicitly turns it off.
+    getSettingBool(PAY_SETTING.transferOn, true),
+  ]);
+  return paymentMethodPolicy({ electronicEnabled, transferEnabled, alrajhiConfigured: alrajhiEnvironmentConfigured() });
+}
+
+export async function saveTopupMethodSettings(input: { electronicEnabled: boolean; transferEnabled: boolean }): Promise<void> {
+  await Promise.all([
+    setSetting(PAY_SETTING.electronicOn, input.electronicEnabled ? '1' : '0'),
+    setSetting(PAY_SETTING.transferOn, input.transferEnabled ? '1' : '0'),
+  ]);
+}
+
 /** الوسائل التي يمكن للأدمن التحكّم بتفعيلها/تعطيلها (لتفاوت الرسوم). */
 export const CONTROLLABLE_METHODS: PayMethod[] = ['mada', 'visa', 'mastercard', 'applepay', 'stcpay'];
 

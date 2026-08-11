@@ -1642,6 +1642,22 @@ export async function savePaymentSettingsAction(formData: FormData) {
   redirect('/admin/payments?saved=1');
 }
 
+/** Enable/disable member top-up methods without ever storing bank credentials in the database. */
+export async function saveTopupMethodSettingsAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const { saveTopupMethodSettings, alrajhiConfigReport } = await import('@/lib/payments');
+  const report = alrajhiConfigReport();
+  const electronicRequested = formData.get('electronicEnabled') === 'on';
+  await saveTopupMethodSettings({
+    electronicEnabled: electronicRequested && report.ready,
+    transferEnabled: formData.get('transferEnabled') === 'on',
+  });
+  await logAdmin(session.uid, 'تحديث تفعيل وسائل شحن الرصيد', `إلكتروني=${electronicRequested && report.ready ? 'مفعّل' : 'موقوف'}، تحويل=${formData.get('transferEnabled') === 'on' ? 'مفعّل' : 'موقوف'}`);
+  revalidatePath('/admin/payments');
+  revalidatePath('/account/wallet');
+  redirect(`/admin/payments?saved=1${electronicRequested && !report.ready ? '&alrajhi=missing' : ''}`);
+}
+
 /** حفظ بيانات اعتماد مزوّد دفع (المفاتيح السرّية لا تُمحى إن تُركت فارغة). */
 export async function saveProviderCredsAction(formData: FormData) {
   const session = await requireAction('users', 'edit');

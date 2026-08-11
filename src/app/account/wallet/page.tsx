@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Wallet, ArrowDownCircle, ArrowUpCircle, Info, Copy, HandCoins, Receipt, Clock, CheckCircle2, XCircle, Send } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getBalance, getReserved, listTxns, countTxns, getDupCredit, listMyTopups } from '@/lib/wallet';
+import { listMyMemberServiceOrders, MEMBER_SERVICE_STATUS } from '@/lib/member-services';
 import { AdminPager } from '@/components/admin-pager';
 import {
   getServicePricing, serviceHasPrice, DURATIONS, getSetting,
@@ -13,7 +14,7 @@ import { CopyChip } from '@/components/copy-chip';
 import { Countdown } from '@/components/countdown';
 import { pointsEnabled, getPoints, getPointsConfig } from '@/lib/points';
 import { mediaUrl } from '@/lib/media';
-import { requestTopupAction, convertPointsAction, startOnlineTopupAction } from '../actions';
+import { requestTopupAction, convertPointsAction, startOnlineTopupAction, acceptMemberServiceOrderAction, confirmMemberServiceExecutionAction, cancelMemberServiceOrderAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { isOnlinePayReady, getPaymentConfig, getActiveMethods } from '@/lib/payments';
 
@@ -35,11 +36,11 @@ const TOPUP_STATUS = {
 
 const TXN_PAGE = 25;
 
-export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string; pts?: string; dupr?: string; dupamt?: string; duprel?: string; duphash?: string }> }) {
+export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string; pts?: string; dupr?: string; dupamt?: string; duprel?: string; duphash?: string; tab?: string; service?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page || '1') || 1);
-  const [balance, txns, pricing, dupCredit, topups, topupInfo, topupAccounts, topupNameNote, promo, txnTotal, ptsOn] = await Promise.all([
+  const [balance, txns, pricing, dupCredit, topups, topupInfo, topupAccounts, topupNameNote, promo, txnTotal, ptsOn, serviceOrders] = await Promise.all([
     getBalance(session.uid), listTxns(session.uid, TXN_PAGE, (page - 1) * TXN_PAGE), getServicePricing(), getDupCredit(session.uid),
     listMyTopups(session.uid), getSetting(SETTING_TOPUP_INFO, DEFAULT_TOPUP_INFO),
     getTopupAccounts(),
@@ -47,6 +48,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
     getTopupPromo(),
     countTxns(session.uid),
     pointsEnabled(),
+    listMyMemberServiceOrders(session.uid),
   ]);
   const reserved = await getReserved(session.uid).catch(() => 0);
   const available = Math.max(0, balance - reserved);
@@ -61,13 +63,21 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
   const payReady = await isOnlinePayReady().catch(() => false);
   const payCfg = payReady ? await getPaymentConfig().catch(() => null) : null;
   const payMethods = payCfg?.provider ? await getActiveMethods(payCfg.provider).catch(() => []) : [];
+  const tab = sp.tab === 'active' || sp.tab === 'history' ? sp.tab : 'topups';
+  const activeOrders = serviceOrders.filter((order) => order.status === MEMBER_SERVICE_STATUS.pendingAcceptance || order.status === MEMBER_SERVICE_STATUS.awaitingExecution || order.status === MEMBER_SERVICE_STATUS.active);
   return (
     <div className="space-y-4">
       <h1 className="flex items-center gap-2 text-xl font-bold text-primary"><Wallet className="h-6 w-6" /> محفظتي</h1>
 
+      <nav aria-label="تبويبات المحفظة" className="grid grid-cols-3 gap-1 rounded-xl bg-primary/10 p-1 text-center text-xs font-extrabold">
+        <Link href="/account/wallet?tab=topups" className={`rounded-lg px-2 py-2 ${tab === 'topups' ? 'bg-primary text-white' : 'text-primary'}`}>سجل شحن الرصيد</Link>
+        <Link href="/account/wallet?tab=active" className={`rounded-lg px-2 py-2 ${tab === 'active' ? 'bg-primary text-white' : 'text-primary'}`}>العمليات النشطة</Link>
+        <Link href="/account/wallet?tab=history" className={`rounded-lg px-2 py-2 ${tab === 'history' ? 'bg-primary text-white' : 'text-primary'}`}>سجل العمليات</Link>
+      </nav>
+
       <div className="card-3d rounded-2xl border-2 border-primary/30 bg-card p-5">
         <div className="text-sm font-bold text-muted-foreground">{reserved > 0 ? 'رصيدك' : 'الرصيد المتاح'}</div>
-        <div className="mt-1 text-4xl font-extrabold text-primary">{balance} <span className="text-lg">ر.س</span></div>
+        <div className="mt-1 text-4xl font-extrabold text-emerald-700">{available} <span className="text-lg">ر.س</span></div>
         {reserved > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold">
             <span className="rounded-lg bg-amber-100 px-2 py-1 text-amber-800">🔒 محجوز: {reserved} ر.س</span>
@@ -77,6 +87,26 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         )}
         <p className="mt-2 text-xs font-medium text-muted-foreground">اشحن رصيدك من نموذج «شحن رصيدك» بالأسفل. يُخصم الرصيد تلقائياً عند الإعلانات المميّزة والمبوّبة وباقات التكرار.</p>
       </div>
+
+      {tab === 'active' && (
+        <section className="space-y-3">
+          <h2 className="text-base font-extrabold text-primary">العمليات النشطة</h2>
+          {activeOrders.length === 0 && <p className="rounded-xl border border-primary/15 p-5 text-center text-sm text-muted-foreground">لا توجد خدمات خاصة نشطة أو معلقة حالياً.</p>}
+          {activeOrders.map((order) => {
+            const accepting = order.status === MEMBER_SERVICE_STATUS.pendingAcceptance;
+            const waitingExecution = order.status === MEMBER_SERVICE_STATUS.awaitingExecution;
+            const active = order.status === MEMBER_SERVICE_STATUS.active;
+            const shortfall = Math.max(0, order.amount - available);
+            return <article key={order.id} className="card-3d space-y-2 rounded-xl border-2 border-primary/20 p-4">
+              <div className="flex items-start justify-between gap-3"><div><h3 className="font-extrabold">{order.title}</h3>{order.description && <p className="mt-1 text-xs text-muted-foreground">{order.description}</p>}</div><b className="text-emerald-700">{order.amount} ر.س</b></div>
+              <div className="grid gap-1 text-xs text-muted-foreground"><span>البداية: {fmt(order.startsAt)}</span><span>النهاية: {fmt(order.endsAt)}</span>{accepting && <span className="font-bold text-amber-700">مهلة القبول: {fmt(order.acceptUntil)}</span>}</div>
+              {accepting && <form action={acceptMemberServiceOrderAction}><input type="hidden" name="orderId" value={order.id} /><button disabled={shortfall > 0} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-400">{shortfall > 0 ? `يلزم شحن ${shortfall} ر.س لقبول الخدمة` : 'أوافق على الخدمة وخصم الرصيد'}</button></form>}
+              {waitingExecution && <form action={confirmMemberServiceExecutionAction}><input type="hidden" name="orderId" value={order.id} /><button className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">تم التنفيذ — ابدأ الخدمة</button></form>}
+              {active && <form action={cancelMemberServiceOrderAction} className="flex flex-wrap gap-2"><input type="hidden" name="orderId" value={order.id} /><input name="reason" maxLength={300} placeholder="سبب الإلغاء (اختياري)" className="rounded-lg border px-3 py-2 text-sm" /><button className="rounded-lg border-2 border-red-300 px-4 py-2 text-sm font-bold text-red-700">إلغاء واسترداد الجزء المتبقي</button></form>}
+            </article>;
+          })}
+        </section>
+      )}
 
       {sp.dup === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تمت إضافة باقة التكرار وخُصمت الرسوم من رصيدك.</div>}
       {sp.pts && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🎯 حُوّلت نقاطك — أُضيف {sp.pts} ر.س لرصيدك.</div>}

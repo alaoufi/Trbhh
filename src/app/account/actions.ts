@@ -12,6 +12,41 @@ import { toInt } from '@/lib/utils';
 import { scanContent } from '@/lib/content-guard';
 import { handleProhibited } from '@/lib/moderation';
 
+function walletResultPath(code: string) {
+  return `/account/wallet?service=${encodeURIComponent(code)}&tab=active`;
+}
+
+export async function acceptMemberServiceOrderAction(formData: FormData) {
+  const session = await requireUser();
+  const orderId = Number(formData.get('orderId') || 0);
+  if (!Number.isSafeInteger(orderId) || orderId <= 0) redirect(walletResultPath('invalid'));
+  const { acceptMemberServiceOrder } = await import('@/lib/member-services');
+  const result = await acceptMemberServiceOrder(orderId, session.uid);
+  revalidatePath('/account/wallet');
+  redirect(walletResultPath(result.ok ? 'accepted' : result.code));
+}
+
+export async function confirmMemberServiceExecutionAction(formData: FormData) {
+  const session = await requireUser();
+  const orderId = Number(formData.get('orderId') || 0);
+  if (!Number.isSafeInteger(orderId) || orderId <= 0) redirect(walletResultPath('invalid'));
+  const { confirmMemberServiceExecution } = await import('@/lib/member-services');
+  const result = await confirmMemberServiceExecution(orderId, session.uid);
+  revalidatePath('/account/wallet');
+  redirect(walletResultPath(result.ok ? 'active' : result.code));
+}
+
+export async function cancelMemberServiceOrderAction(formData: FormData) {
+  const session = await requireUser();
+  const orderId = Number(formData.get('orderId') || 0);
+  if (!Number.isSafeInteger(orderId) || orderId <= 0) redirect(walletResultPath('invalid'));
+  const reason = String(formData.get('reason') || '').trim().slice(0, 300);
+  const { cancelMemberServiceOrder } = await import('@/lib/member-services');
+  const result = await cancelMemberServiceOrder(orderId, session.uid, reason);
+  revalidatePath('/account/wallet');
+  redirect(walletResultPath(result.ok ? `refunded-${result.refund ?? 0}` : result.code));
+}
+
 export async function respondToReportAction(formData: FormData) {
   const session = await requireUser();
   const reportId = Number(formData.get('reportId') || 0);

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, PlusCircle, Mail, Building2, Search, LogIn, Share2, Users, Phone, MessageCircle, Send, type LucideIcon } from 'lucide-react';
+import { Home, PlusCircle, Mail, Building2, Search, LogIn, Share2, Users, Phone, MessageCircle, Send, Wallet, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SITE } from '@/lib/constants';
 
@@ -14,6 +14,7 @@ const shareItem: NavItem = { href: '__share', label: 'مشاركة', icon: Share
 // بنود تتطلّب تسجيل الدخول → تظهر فقط للمسجّل. للزائر بنود عامة فقط.
 const authedItems: NavItem[] = [
   { href: '/', label: 'الرئيسية', icon: Home },
+  { href: '/account/wallet', label: 'محفظتي', icon: Wallet },
   { href: '/companies', label: 'المتاجر', icon: Building2 },
   { href: '/ads/new', label: 'أضف إعلان', icon: PlusCircle, primary: true },
   { href: '/account/profiles', label: 'الحسابات', icon: Users },

@@ -36,7 +36,7 @@ const TOPUP_STATUS = {
 
 const TXN_PAGE = 25;
 
-export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string; pts?: string; dupr?: string; dupamt?: string; duprel?: string; duphash?: string; tab?: string; service?: string }> }) {
+export default async function WalletPage({ searchParams }: { searchParams: Promise<{ dup?: string; topup?: string; error?: string; price?: string; bal?: string; page?: string; pts?: string; dupr?: string; dupamt?: string; duprel?: string; duphash?: string; tab?: string; service?: string; q?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page || '1') || 1);
@@ -64,6 +64,8 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
   const payCfg = payReady ? await getPaymentConfig().catch(() => null) : null;
   const payMethods = payCfg?.provider ? await getActiveMethods(payCfg.provider).catch(() => []) : [];
   const tab = sp.tab === 'active' || sp.tab === 'history' ? sp.tab : 'topups';
+  const query = (sp.q || '').trim().toLowerCase();
+  const filteredTxns = txns.filter((txn) => !query || [String(txn.id), txn.label, txn.note || ''].some((value) => value.toLowerCase().includes(query)));
   const activeOrders = serviceOrders.filter((order) => order.status === MEMBER_SERVICE_STATUS.pendingAcceptance || order.status === MEMBER_SERVICE_STATUS.awaitingExecution || order.status === MEMBER_SERVICE_STATUS.active);
   return (
     <div className="space-y-4">
@@ -136,6 +138,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         </div>
       )}
 
+      {tab === 'topups' && <>
       {/* شحن فوري عبر بوابة الدفع الإلكتروني — يظهر فقط عند تفعيله واكتمال تهيئة المزوّد */}
       {payReady && payCfg && (
         <div id="paynow" className="card-3d space-y-3 rounded-2xl border-2 border-emerald-300 bg-emerald-50/40 p-4">
@@ -274,6 +277,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           </div>
         )}
       </div>
+      </>}
 
       {/* أسعار الخدمات — جدول واضح (خدمة × مدّة) مفصول تماماً عن شحن الرصيد */}
       {(serviceHasPrice(pricing.featured) || serviceHasPrice(pricing.classified) || serviceHasPrice(pricing.dup3) || serviceHasPrice(pricing.dup5)) && (
@@ -308,11 +312,12 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
         </div>
       )}
 
-      <div>
+      {tab === 'history' && <div>
         <div className="mb-2 text-sm font-bold text-muted-foreground">سجلّ العمليات ({txnTotal})</div>
-        {txns.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد عمليات بعد.</p>}
+        <form action="/account/wallet" method="get" className="mb-3 flex gap-2"><input type="hidden" name="tab" value="history" /><input name="q" defaultValue={sp.q} placeholder="بحث باسم الخدمة أو رقم العملية" className="h-10 min-w-0 flex-1 rounded-lg border border-primary/30 px-3 text-sm" /><button className="rounded-lg bg-primary px-4 text-sm font-bold text-white">بحث</button></form>
+        {filteredTxns.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد عمليات مطابقة.</p>}
         <div className="space-y-2">
-          {txns.map((t) => {
+          {filteredTxns.map((t) => {
             const credit = t.amount > 0;
             return (
               <div key={t.id} className="flex items-center gap-3 card-3d rounded-xl p-3">
@@ -331,7 +336,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
           })}
         </div>
         <AdminPager basePath="/account/wallet" page={page} pages={txnPages} total={txnTotal} params={{}} />
-      </div>
+      </div>}
 
       <Link href="/account" className="block text-center text-sm text-muted-foreground hover:text-primary">← لوحة التحكم</Link>
     </div>

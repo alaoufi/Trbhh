@@ -113,6 +113,8 @@ Al Rajhi hosted checkout and server callback
 ## Method activation and administration
 
 - `إدارة المدفوعات ← وسائل الدفع` contains two explicit switches: `تفعيل الدفع الإلكتروني` and `تفعيل التحويل البنكي`, each with a short confirmation describing the effect on new top-ups.
+- The same screen lists every Al Rajhi environment field with a masked `موجود في الاستضافة` or `غير موجود` state, its required/optional role, and no secret value. It contains an explicit `اختبار اتصال الراجحي` action. The action validates the complete environment, uses the adapter's bank-issued Sandbox health/authentication request, stores only a redacted outcome and timestamp, and never turns on electronic payment itself.
+- `تفعيل الدفع الإلكتروني` is enabled only after the most recent successful test matches the selected environment and has not expired. Switching to production invalidates the prior Sandbox test and requires a successful production test before activation.
 - Electronic activation additionally requires a complete, production-valid Al Rajhi configuration. Sandbox credentials are accepted only when `ALRAJHI_ENVIRONMENT=sandbox`; production mode rejects sandbox endpoint values and incomplete credentials.
 - Transfer activation additionally requires at least one active, validated bank account. A member submits a transfer receipt against a server-owned pending request; staff approval uses the existing atomic wallet-credit path.
 - The payment dashboard identifies the method (`alrajhi` or `bank_transfer`), state, member, amount, internal reference, provider reference, timestamps, and a redacted verification outcome.

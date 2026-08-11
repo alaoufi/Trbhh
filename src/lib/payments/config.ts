@@ -35,11 +35,25 @@ export function paymentMethodPolicy(input: PaymentMethodPolicyInput): PaymentMet
   return { electronic, transfer, any: electronic || transfer };
 }
 
-export function alrajhiEnvironmentConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+type EnvironmentValues = Record<string, string | undefined>;
+
+export function alrajhiEnvironmentConfigured(env: EnvironmentValues = process.env): boolean {
   const mode = env.ALRAJHI_ENVIRONMENT;
   if (mode !== 'sandbox' && mode !== 'production') return false;
   return ['ALRAJHI_MERCHANT_ID', 'ALRAJHI_TERMINAL_ID', 'ALRAJHI_USERNAME', 'ALRAJHI_PASSWORD', 'ALRAJHI_SECRET_KEY', 'ALRAJHI_API_KEY', 'ALRAJHI_API_BASE_URL', 'ALRAJHI_HOSTED_PAYMENT_URL', 'DATABASE_PAYMENT_SECRET']
     .every((key) => (env[key] || '').trim().length > 0);
+}
+
+const ALRAJHI_REQUIRED_FIELDS = [
+  'ALRAJHI_MERCHANT_ID', 'ALRAJHI_TERMINAL_ID', 'ALRAJHI_USERNAME', 'ALRAJHI_PASSWORD',
+  'ALRAJHI_SECRET_KEY', 'ALRAJHI_API_KEY', 'ALRAJHI_API_BASE_URL', 'ALRAJHI_HOSTED_PAYMENT_URL', 'DATABASE_PAYMENT_SECRET',
+] as const;
+
+/** Safe for the admin UI: reports configuration presence only, never secret values. */
+export function alrajhiConfigReport(env: EnvironmentValues = process.env) {
+  const environment = env.ALRAJHI_ENVIRONMENT === 'production' ? 'production' : 'sandbox';
+  const fields = ALRAJHI_REQUIRED_FIELDS.map((key) => ({ key, required: true, present: (env[key] || '').trim().length > 0 }));
+  return { environment, fields, ready: alrajhiEnvironmentConfigured(env) };
 }
 
 /** الوسائل التي يمكن للأدمن التحكّم بتفعيلها/تعطيلها (لتفاوت الرسوم). */

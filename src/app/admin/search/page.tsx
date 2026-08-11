@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { Search, Users, Megaphone, Store, Sparkles } from 'lucide-react';
-import { requireAnyAdmin } from '@/lib/roles';
+import { Search, Users, Megaphone, Store, Sparkles, PanelsTopLeft } from 'lucide-react';
+import { getUserPerms, requireAnyAdmin } from '@/lib/roles';
+import { findAdminServices } from '@/lib/admin-service-search';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { AdminSearch } from '@/components/admin-search';
@@ -23,10 +24,12 @@ function adTab(a: { status: number; paused_by_owner: number; adsSpecial: string;
 /** بحث الإدارة: يبحث في حقول الإدارة فقط، وكل نتيجة تعرض مكانها في الإدارة
  *  (الصفحة والتبويب) مع رابط الانتقال إليه، ومكان عرضها في صفحات الموقع. */
 export default async function AdminSearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  await requireAnyAdmin();
+  const session = await requireAnyAdmin();
   const { q: qRaw } = await searchParams;
   const q = (qRaw || '').trim();
   const TAKE = 10;
+  const permissions = await getUserPerms(session.uid);
+  const services = q.length >= 2 ? findAdminServices(q, permissions) : [];
 
   const [users, ads, stores, classifieds] = q.length >= 2
     ? await Promise.all([
@@ -70,6 +73,16 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
 
       {q.length >= 2 && (
         <>
+          {services.length > 0 && <div className={box}>
+            <div className="flex items-center gap-2 text-sm font-bold text-primary"><PanelsTopLeft className="h-4 w-4" /> الخدمات والإعدادات ({services.length})</div>
+            {services.map((service) => (
+              <Link key={service.href} href={service.href} className="block rounded-lg bg-primary/5 px-3 py-2.5 hover:bg-primary/10">
+                <div className="font-bold text-primary">{service.label}</div>
+                {service.description && <div className="mt-0.5 text-xs text-muted-foreground">{service.description}</div>}
+                <div className="mt-1 text-[11px] font-bold text-primary/80">فتح الخدمة مباشرة ←</div>
+              </Link>
+            ))}
+          </div>}
           {users.length > 0 && <div className={box}>
             <div className="flex items-center gap-2 text-sm font-bold text-primary"><Users className="h-4 w-4" /> الأعضاء ({users.length})</div>
             {users.map((u) => (

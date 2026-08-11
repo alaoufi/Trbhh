@@ -35,7 +35,7 @@ export function HeaderSearch() {
               <X className="h-5 w-5" />
             </button>
             <div className="relative flex-1">
-              <input ref={ref} name="q" placeholder={inAdmin ? 'ابحث في الإدارة (عضو، إعلان، متجر…)' : 'أبحث هنا'}
+              <input ref={ref} name="q" placeholder={inAdmin ? 'ابحث عن خدمة أو إعداد أو عضو (آيبان، شحن، متجر…)' : 'أبحث هنا'}
                 className="h-11 w-full rounded-full border border-primary/40 bg-background pr-4 pl-16 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40" />
               <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-2 text-primary">
                 {!inAdmin && <Link href="/search" aria-label="بحث متقدم" onClick={() => setOpen(false)}><SlidersHorizontal className="h-5 w-5" /></Link>}

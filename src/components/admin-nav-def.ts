@@ -60,12 +60,14 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
   {
     key: 'money', title: 'المال والاشتراكات', icon: Coins, color: '#16a34a',
     items: [
-      { href: '/admin/revenue', label: 'الإيرادات (تقارير مالية)', icon: Coins, perm: 'users' },
-      { href: '/admin/revenue?tab=wallets', label: 'محافظ الأعضاء', icon: WalletCards, perm: 'users' },
+      { href: '/admin/revenue', label: 'الميزانية والتقارير المالية', icon: Coins, perm: 'users', description: 'ملخص الدخل والمصروف والميزانية', keywords: ['إيرادات', 'تقرير مالي', 'ميزانية'] },
+      { href: '/admin/revenue?tab=wallets', label: 'محافظ الأعضاء', icon: WalletCards, perm: 'users', description: 'البحث في محافظ الأعضاء وسجل تعاملاتهم', keywords: ['محفظة عضو', 'رصيد عضو', 'سجل مالي'] },
       { href: '/admin/revenue?tab=accounts', label: 'حسابات الشحن البنكية', icon: Landmark, perm: 'users', description: 'البنوك والآيبان التي يحوّل إليها الأعضاء', keywords: ['الحساب البنكي', 'آيبان', 'بيانات التحويل', 'بنك', 'حساب الشحن'] },
-      { href: '/admin/revenue?tab=pricing', label: 'كل التسعير (باقات وأسعار)', icon: Crown, perm: 'users' },
       { href: '/admin/topups', label: 'طلبات شحن الرصيد', icon: HandCoins, perm: 'users', description: 'طلبات الشحن البنكي وإيصالاتها', keywords: ['شحن', 'إيصال', 'تحويل بنكي'] },
       { href: '/admin/payments', label: 'وسائل الدفع الإلكتروني', icon: CreditCard, perm: 'users', description: 'إعداد بوابات الدفع', keywords: ['دفع', 'بطاقة', 'مدى', 'بوابة دفع'] },
+      { href: '/admin/revenue?tab=pricing', label: 'التسعير والباقات', icon: Crown, perm: 'users', description: 'أسعار الخدمات والاشتراكات والباقات', keywords: ['سعر', 'باقة', 'رسوم خدمة'] },
+      { href: '/admin/revenue?tab=campaigns', label: 'حملات ومكافآت الشحن', icon: HandCoins, perm: 'users', description: 'عروض زيادة الرصيد والحملات المجدولة', keywords: ['مكافأة', 'عرض شحن', 'حملة شحن'] },
+      { href: '/admin/revenue?tab=expenses', label: 'مصروفات المنصة', icon: Coins, perm: 'users', description: 'تسجيل ومراجعة المصروفات', keywords: ['مصروف', 'تكلفة', 'نفقة'] },
     ],
   },
   {

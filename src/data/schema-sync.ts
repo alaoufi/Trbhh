@@ -725,6 +725,53 @@ const STATEMENTS: string[] = [
   `ALTER TABLE users ADD COLUMN merged_into BIGINT NULL`,
   // توثيق الحساب الرئيسي (تأكيد الجوال برمز) قبل ربط بقية الحسابات — «تم التحقق»
   `ALTER TABLE users ADD COLUMN primary_verified TINYINT NOT NULL DEFAULT 0`,
+  // Wallet precision is added in parallel; data conversion is explicit in wallet-money-migration.
+  `ALTER TABLE users ADD COLUMN balance_halala INT NULL`,
+  `ALTER TABLE users ADD COLUMN reserved_halala INT NULL`,
+  `ALTER TABLE wallet_txns ADD COLUMN amount_halala INT NULL`,
+  `ALTER TABLE wallet_txns ADD COLUMN balance_after_halala INT NULL`,
+  `ALTER TABLE wallet_txns ADD COLUMN money_ref VARCHAR(80) NULL`,
+  `CREATE INDEX wallet_txns_money_ref ON wallet_txns (money_ref)`,
+  `ALTER TABLE wallet_topups ADD COLUMN amount_halala INT NULL`,
+  `ALTER TABLE member_service_orders ADD COLUMN amount_halala INT NULL`,
+  `ALTER TABLE member_service_orders ADD COLUMN allow_member_cancel TINYINT NOT NULL DEFAULT 1`,
+  `ALTER TABLE member_service_orders ADD COLUMN allow_member_refund TINYINT NOT NULL DEFAULT 0`,
+  `CREATE TABLE IF NOT EXISTS wallet_money_migrations (
+    name VARCHAR(60) PRIMARY KEY,
+    completed_at TIMESTAMP NULL,
+    report TEXT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS wallet_bank_accounts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    holder_name VARCHAR(160) NOT NULL,
+    iban VARCHAR(34) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    verified_at DATETIME NULL,
+    INDEX wallet_bank_accounts_user_status (user_id, status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS wallet_withdrawal_requests (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    bank_account_id BIGINT NOT NULL,
+    amount_halala INT NOT NULL,
+    fee_halala INT NOT NULL,
+    net_halala INT NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    money_ref VARCHAR(80) NOT NULL,
+    bank_ref VARCHAR(160) NULL,
+    proof VARCHAR(255) NULL,
+    admin_id BIGINT UNSIGNED NULL,
+    note VARCHAR(300) NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    decided_at DATETIME NULL,
+    paid_at DATETIME NULL,
+    cancelled_at DATETIME NULL,
+    UNIQUE INDEX wallet_withdrawals_money_ref (money_ref),
+    INDEX wallet_withdrawals_user_status (user_id, status),
+    INDEX wallet_withdrawals_status_created (status, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 ];
 
 let syncPromise: Promise<void> | null = null;

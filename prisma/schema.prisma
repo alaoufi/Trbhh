@@ -1233,6 +1233,8 @@ model users {
   adds_build                Int?
   balance                   Int        @default(0)
   reserved                  Int        @default(0)
+  balance_halala            Int?
+  reserved_halala           Int?
   dup_credit                Int        @default(0)
   verify_note               String?    @db.VarChar(300) // سبب رفض التوثيق (يبقى محفوظاً)
   verified_at               DateTime?  @db.DateTime(0)
@@ -1339,6 +1341,9 @@ model wallet_txns {
   user_id       BigInt    @db.UnsignedBigInt
   amount        Int
   balance_after Int
+  amount_halala Int?
+  balance_after_halala Int?
+  money_ref     String?   @db.VarChar(80)
   reason        String    @db.VarChar(40)
   note          String?   @db.VarChar(200)
   admin_id      BigInt?   @db.UnsignedBigInt
@@ -1346,6 +1351,7 @@ model wallet_txns {
 
   @@index([user_id], map: "wallet_txns_user")
   @@index([created_at], map: "wallet_txns_created")
+  @@index([money_ref], map: "wallet_txns_money_ref")
 }
 
 model verify_orders {
@@ -1370,6 +1376,7 @@ model wallet_topups {
   id         BigInt    @id @default(autoincrement())
   user_id    BigInt    @db.UnsignedBigInt
   amount     Int
+  amount_halala Int?
   receipt    String?   @db.VarChar(255)
   receipt_hash String? @db.VarChar(140)
   status     Int       @default(0) @db.TinyInt
@@ -1397,6 +1404,9 @@ model member_service_orders {
   title                  String    @db.VarChar(160)
   description            String?   @db.Text
   amount                 Int
+  amount_halala          Int?
+  allow_member_cancel    Int        @default(1) @db.TinyInt
+  allow_member_refund    Int        @default(0) @db.TinyInt
   starts_at              DateTime  @db.DateTime(0)
   ends_at                DateTime  @db.DateTime(0)
   accept_until           DateTime  @db.DateTime(0)
@@ -1413,6 +1423,46 @@ model member_service_orders {
 
   @@index([user_id, status], map: "member_service_orders_user_status")
   @@index([status, accept_until], map: "member_service_orders_expiry")
+}
+
+model wallet_money_migrations {
+  name       String    @id @db.VarChar(60)
+  completed_at DateTime? @db.Timestamp(0)
+  report     String?   @db.Text
+}
+
+model wallet_bank_accounts {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt    @db.UnsignedBigInt
+  holder_name String   @db.VarChar(160)
+  iban       String    @db.VarChar(34)
+  status     String    @default("pending") @db.VarChar(16)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  verified_at DateTime? @db.DateTime(0)
+
+  @@index([user_id, status], map: "wallet_bank_accounts_user_status")
+}
+
+model wallet_withdrawal_requests {
+  id              BigInt    @id @default(autoincrement())
+  user_id         BigInt    @db.UnsignedBigInt
+  bank_account_id BigInt
+  amount_halala   Int
+  fee_halala      Int
+  net_halala      Int
+  status          String    @default("pending") @db.VarChar(16)
+  money_ref       String    @unique @db.VarChar(80)
+  bank_ref        String?   @db.VarChar(160)
+  proof           String?   @db.VarChar(255)
+  admin_id        BigInt?   @db.UnsignedBigInt
+  note            String?   @db.VarChar(300)
+  created_at      DateTime? @default(now()) @db.Timestamp(0)
+  decided_at      DateTime? @db.DateTime(0)
+  paid_at         DateTime? @db.DateTime(0)
+  cancelled_at    DateTime? @db.DateTime(0)
+
+  @@index([user_id, status], map: "wallet_withdrawals_user_status")
+  @@index([status, created_at], map: "wallet_withdrawals_status_created")
 }
 
 model error_log {

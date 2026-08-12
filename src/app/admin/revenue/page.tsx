@@ -451,6 +451,7 @@ async function CampaignsTab({ camp }: { camp?: string }) {
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {c.tiers.map((t, i) => <span key={`${t.amount}-${i}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">اشحن {t.amount} تحصل على {t.bonus} ريال</span>)}
+                <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-extrabold text-sky-800">قالب: {c.presentation.template}</span>
               </div>
               {/* 📊 سجل الحملة ونتائجها — لمقارنة الحملات ببعضها */}
               {(() => {

@@ -1577,7 +1577,7 @@ export async function addTopupCampaignAction(formData: FormData) {
   // تحقق فعلي بعد الحفظ: هل الحملة الجديدة موجودة عند القراءة؟ (يكشف البتر الصامت)
   if (saved) {
     const check = await getTopupCampaigns();
-    if (!check.some((c) => c.id === id)) saved = false;
+    if (!check.some((c) => c.id === id && c.presentation.template === presentation.template)) saved = false;
   }
   if (!saved) redirect('/admin/revenue?tab=campaigns&camp=dberr');
   await logAdmin(session.uid, `إضافة حملة شحن (من ${fromRaw} ${fromTime} ${days > 0 ? `لمدة ${days} يوم` : 'مفتوحة'})`);

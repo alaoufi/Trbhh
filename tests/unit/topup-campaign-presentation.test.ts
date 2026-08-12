@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getTopupBannerThemeStyle, TOPUP_BANNER_EFFECTS, TOPUP_BANNER_HEIGHTS, TOPUP_BANNER_TEMPLATES, TOPUP_BANNER_WIDTHS, topupRewardLabel, normalizeTopupCampaignPresentation } from '@/lib/topup-campaign-presentation';
+import { getTopupBannerThemeStyle, TOPUP_BANNER_EFFECTS, TOPUP_BANNER_HEIGHTS, TOPUP_BANNER_TEMPLATES, TOPUP_BANNER_WIDTHS, TOPUP_CAMPAIGN_DESIGN_SCHEDULING_NOTICE, topupRewardLabel, normalizeTopupCampaignPresentation } from '@/lib/topup-campaign-presentation';
 
 describe('top-up campaign presentation', () => {
   it('gives legacy campaigns the established Trbhh banner design', () => {
@@ -44,5 +44,10 @@ describe('top-up campaign presentation', () => {
 
   it('labels the top-up amount and bonus together without ambiguity', () => {
     expect(topupRewardLabel(100, 10)).toBe('اشحن 100 ريال — مكافأة الشحن +10 ريال');
+  });
+
+  it('explains that a new design cannot alter the active campaign', () => {
+    expect(TOPUP_CAMPAIGN_DESIGN_SCHEDULING_NOTICE).toContain('لا يغيّر الحملة النشطة');
+    expect(TOPUP_CAMPAIGN_DESIGN_SCHEDULING_NOTICE).toContain('موعد بدء هذه الحملة');
   });
 });

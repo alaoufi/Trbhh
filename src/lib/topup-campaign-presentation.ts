@@ -8,6 +8,7 @@ export const TOPUP_BANNER_HEIGHTS = [
   { key: 'short', label: 'قصير — 120px' }, { key: 'medium', label: 'متوسط — 190px' }, { key: 'tall', label: 'كبير — 280px' },
 ] as const;
 export const TOPUP_BANNER_EFFECTS = ['animated-gradient', 'sparkles', 'shimmer'] as const;
+export const TOPUP_CAMPAIGN_DESIGN_SCHEDULING_NOTICE = 'هذا التصميم خاص بالحملة الجديدة فقط، ولا يغيّر الحملة النشطة. يظهر للعضو عند موعد بدء هذه الحملة.';
 export type TopupBannerTemplate = typeof TOPUP_BANNER_TEMPLATES[number]['key'];
 export type TopupBannerWidth = typeof TOPUP_BANNER_WIDTHS[number]['key'];
 export type TopupBannerHeight = typeof TOPUP_BANNER_HEIGHTS[number]['key'];

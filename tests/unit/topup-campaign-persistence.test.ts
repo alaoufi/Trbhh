@@ -5,6 +5,15 @@ const actions = readFileSync('src/app/admin/actions.ts', 'utf8');
 const page = readFileSync('src/app/admin/revenue/page.tsx', 'utf8');
 
 describe('top-up campaign design persistence', () => {
+  const studio = readFileSync('src/components/admin/topup-banner-studio.tsx', 'utf8');
+
+  it('submits the three presentation controls as real form fields', () => {
+    expect(studio).toContain('name="bannerTemplate"');
+    expect(studio).toContain('name="bannerWidth"');
+    expect(studio).toContain('name="bannerHeight"');
+    expect(studio).not.toContain('<input type="hidden" name="bannerTemplate"');
+  });
+
   it('rejects a campaign if its selected template is not returned after saving', () => {
     expect(actions).toContain('check.some((c) => c.id === id && c.presentation.template === presentation.template)');
   });

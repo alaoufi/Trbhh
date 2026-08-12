@@ -342,6 +342,16 @@ button:active { }
   animation: star-twinkle 2s ease-in-out infinite;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
 }
+
+/* Top-up campaign banners: visual motion stays decorative and honors reduced motion. */
+.topup-banner-motion { animation: topup-gradient-shift 9s ease-in-out infinite; }
+.topup-star { position: absolute; z-index: 1; color: rgba(255,255,255,.9); text-shadow: 0 0 12px rgba(255,255,255,.9); animation: topup-star-twinkle 2.8s ease-in-out infinite; pointer-events: none; }
+.topup-star-a { top: 12%; right: 8%; font-size: 1.1rem; }
+.topup-star-b { bottom: 16%; left: 12%; font-size: .85rem; animation-delay: .8s; }
+.topup-star-c { top: 44%; left: 6%; font-size: 1.3rem; animation-delay: 1.6s; }
+@keyframes topup-gradient-shift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes topup-star-twinkle { 0%,100% { opacity: .25; transform: scale(.65) rotate(0); } 50% { opacity: 1; transform: scale(1.3) rotate(18deg); } }
+@media (prefers-reduced-motion: reduce) { .topup-banner-motion, .topup-star { animation: none; } .topup-star { opacity: .75; } }
 @keyframes star-twinkle {
   0%, 100% { opacity: 0.15; transform: scale(0.5) rotate(0deg); }
   50%      { opacity: 1;    transform: scale(1.25) rotate(25deg); }

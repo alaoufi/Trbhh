@@ -1569,7 +1569,7 @@ export async function addTopupCampaignAction(formData: FormData) {
   });
   if (clash) redirect('/admin/revenue?tab=campaigns&camp=overlap');
   const id = list.reduce((m, c) => Math.max(m, c.id), 0) + 1;
-  const presentation = normalizeTopupCampaignPresentation({ template: String(formData.get('bannerTemplate') || ''), layout: String(formData.get('bannerLayout') || ''), size: String(formData.get('bannerSize') || '') });
+  const presentation = normalizeTopupCampaignPresentation({ template: String(formData.get('bannerTemplate') || ''), width: String(formData.get('bannerWidth') || ''), height: String(formData.get('bannerHeight') || '') });
   list.push({ id, from: from.toISOString(), to: days > 0 ? new Date(toMs).toISOString() : '', tiers, presentation });
   // فشل التخزين (مثلاً عمود قديم ضيق قبل الترقية) يظهر رسالة واضحة بدل صفحة خطأ
   let saved = true;

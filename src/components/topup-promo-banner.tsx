@@ -1,74 +1,8 @@
-import Link from 'next/link';
-import { HandCoins, ChevronLeft } from 'lucide-react';
 import { getTopupPromo, getActiveTopupCampaign } from '@/lib/settings';
-import { Countdown } from '@/components/countdown';
+import { TopupCampaignBannerView } from '@/components/topup-campaign-banner-view';
 
-/**
- * بانر «عرض» حملة زيادة الشحن المجدولة: يظهر فقط عندما تكون هناك حملة تاريخُها
- * يشمل الآن (تبدأ من تاريخها وتنتهي بتاريخها فيختفي حتى تحين حملة أخرى)،
- * والشرائح بنفس ترتيب إدخالها في التحكم مع عداد تنازلي حتى نهاية الحملة.
- */
 export async function TopupPromoBanner() {
-  const [promo, campaign] = await Promise.all([
-    getTopupPromo().catch(() => ({ pct: 0, min: 0, first: 0 })),
-    getActiveTopupCampaign().catch(() => null),
-  ]);
-  if (!campaign) return null; // لا حملة سارية الآن = لا يظهر العرض
-  const { tiers, until } = campaign;
-  // الأرقام من شرائح لوحة التحكم حرفياً — أول شريحة كما أدخلتها هي المثال الرئيسي
-  const amount = tiers[0].amount;
-  const bonus = tiers[0].bonus;
-  return (
-    <Link
-      href="/account/wallet#topup"
-      className="store-cta-anim relative flex items-center justify-between gap-3 overflow-hidden rounded-2xl p-4 text-white shadow-lg ring-1 ring-white/20 transition hover:-translate-y-0.5"
-      style={{ backgroundImage: 'linear-gradient(110deg,#065f46,#059669,#f59e0b,#10b981,#0d9488,#065f46)' }}
-    >
-      <span className="shimmer-sweep pointer-events-none absolute inset-y-0 -left-1/3 w-1/4 bg-white/30 blur-md" />
-      {/* نجوم متلألئة تملأ البانر */}
-      <span className="star-twinkle right-[6%] top-1 text-base">✨</span>
-      <span className="star-twinkle right-[24%] bottom-1 text-xs" style={{ animationDelay: '0.4s' }}>⭐</span>
-      <span className="star-twinkle right-[45%] top-0.5 text-sm" style={{ animationDelay: '0.9s' }}>✨</span>
-      <span className="star-twinkle left-[30%] bottom-0.5 text-base" style={{ animationDelay: '1.3s' }}>🌟</span>
-      <span className="star-twinkle left-[12%] top-1 text-xs" style={{ animationDelay: '0.6s' }}>⭐</span>
-      <span className="star-twinkle left-[45%] top-2 text-sm" style={{ animationDelay: '1.7s' }}>✨</span>
-      {/* تنسيق تسويقي موسّط: العنوان ← الشرائح ← عداد بمربعات ← الدعوة للفعل */}
-      <span className="relative flex w-full flex-col items-center gap-2 text-center">
-        {/* الشارة والعنوان */}
-        <span className="flex flex-wrap items-center justify-center gap-1.5 text-base font-extrabold drop-shadow">
-          <span className="animate-pulse rounded-full bg-red-600 px-3 py-0.5 text-sm font-black text-white shadow ring-1 ring-white/50">عرض 🔥</span>
-          <HandCoins className="h-5 w-5" />
-          اشحن بـ
-          <span className="rounded-lg bg-white px-2 py-0.5 text-xl font-black leading-6 text-emerald-900 shadow" dir="ltr">{amount}</span>
-          ريال تحصل على
-          <span className="rounded-lg bg-amber-300 px-2 py-0.5 text-xl font-black leading-6 text-amber-950 shadow" dir="ltr">{bonus}</span>
-          ريال
-        </span>
-
-        {/* بقية الشرائح — موسطة */}
-        {tiers.length > 1 && (
-          <span className="flex flex-wrap justify-center gap-1.5">
-            {tiers.slice(1, 6).map((t, i) => (
-              <span key={`${t.amount}-${i}`} className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-emerald-900 shadow ring-1 ring-emerald-200">
-                اشحن <span dir="ltr">{t.amount}</span> تحصل على <span className="text-amber-600" dir="ltr">{t.bonus}</span> ريال ⭐
-              </span>
-            ))}
-          </span>
-        )}
-
-        {/* العداد التنازلي — مربعات موسطة داخل صندوق أنيق */}
-        {until && (
-          <span className="flex flex-col items-center gap-1.5 rounded-2xl bg-black/45 px-5 py-2.5 shadow-lg ring-2 ring-amber-300/80">
-            <span className="animate-pulse text-xs font-black tracking-wide text-amber-200">⏳ ينتهي العرض خلال</span>
-            <Countdown until={until.toISOString()} boxes />
-          </span>
-        )}
-
-        <span className="flex flex-wrap items-center justify-center gap-1.5 text-xs font-bold text-white drop-shadow">
-          تُضاف المكافأة تلقائياً فور تأكيد الشحن{promo.first > 0 ? ` — ومكافأة أول شحن ${promo.first} ر.س إضافية` : ''}
-          <span className="rounded-full bg-white/25 px-2.5 py-0.5 font-black ring-1 ring-white/40">اشحن الآن <ChevronLeft className="inline h-3.5 w-3.5" /></span>
-        </span>
-      </span>
-    </Link>
-  );
+  const [promo, campaign] = await Promise.all([getTopupPromo().catch(() => ({ pct: 0, min: 0, first: 0 })), getActiveTopupCampaign().catch(() => null)]);
+  if (!campaign) return null;
+  return <TopupCampaignBannerView tiers={campaign.tiers} until={campaign.until} presentation={campaign.presentation} firstBonus={promo.first} />;
 }

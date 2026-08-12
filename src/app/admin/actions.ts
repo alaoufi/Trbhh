@@ -1540,6 +1540,7 @@ export async function setUserPasswordAction(formData: FormData) {
 export async function addTopupCampaignAction(formData: FormData) {
   const session = await requireAction('users', 'edit');
   const { getTopupCampaigns, setTopupCampaigns } = await import('@/lib/settings');
+  const { normalizeTopupCampaignPresentation } = await import('@/lib/topup-campaign-presentation');
   const fromRaw = String(formData.get('from') || '').trim();
   const timeRaw = String(formData.get('fromTime') || '').trim();
   const fromTime = /^\d{2}:\d{2}$/.test(timeRaw) ? timeRaw : '00:00';
@@ -1568,7 +1569,8 @@ export async function addTopupCampaignAction(formData: FormData) {
   });
   if (clash) redirect('/admin/revenue?tab=campaigns&camp=overlap');
   const id = list.reduce((m, c) => Math.max(m, c.id), 0) + 1;
-  list.push({ id, from: from.toISOString(), to: days > 0 ? new Date(toMs).toISOString() : '', tiers });
+  const presentation = normalizeTopupCampaignPresentation({ template: String(formData.get('bannerTemplate') || ''), layout: String(formData.get('bannerLayout') || ''), size: String(formData.get('bannerSize') || '') });
+  list.push({ id, from: from.toISOString(), to: days > 0 ? new Date(toMs).toISOString() : '', tiers, presentation });
   // فشل التخزين (مثلاً عمود قديم ضيق قبل الترقية) يظهر رسالة واضحة بدل صفحة خطأ
   let saved = true;
   try { await setTopupCampaigns(list.slice(-30)); } catch { saved = false; }

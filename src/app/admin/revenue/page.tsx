@@ -15,6 +15,7 @@ import {
 } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { Collapse } from '@/components/admin-collapse';
+import { TopupBannerStudio } from '@/components/admin/topup-banner-studio';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الإيرادات' };
@@ -491,6 +492,7 @@ async function CampaignsTab({ camp }: { camp?: string }) {
           <label className="space-y-1"><span className="text-xs font-bold">المدة (أيام) — فارغة = مفتوحة</span><input name="days" type="number" min={0} max={365} placeholder="3 أو اتركها فارغة" className={num} /></label>
         </div>
         {/* شرائح الحملة — حقلان مفصولان وواضحان لكل شريحة: مبلغ الشحن والمكافأة */}
+        <TopupBannerStudio />
         <div className="space-y-1.5">
           <div className="grid grid-cols-2 gap-2 text-center text-xs font-extrabold text-emerald-800">
             <span>💳 مبلغ الشحن (ر.س)</span>

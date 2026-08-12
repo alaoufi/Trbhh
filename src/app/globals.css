@@ -344,13 +344,16 @@ button:active { }
 }
 
 /* Top-up campaign banners: visual motion stays decorative and honors reduced motion. */
-.topup-banner-motion { animation: topup-gradient-shift 9s ease-in-out infinite; }
-.topup-star { position: absolute; z-index: 1; color: rgba(255,255,255,.9); text-shadow: 0 0 12px rgba(255,255,255,.9); animation: topup-star-twinkle 2.8s ease-in-out infinite; pointer-events: none; }
-.topup-star-a { top: 12%; right: 8%; font-size: 1.1rem; }
-.topup-star-b { bottom: 16%; left: 12%; font-size: .85rem; animation-delay: .8s; }
-.topup-star-c { top: 44%; left: 6%; font-size: 1.3rem; animation-delay: 1.6s; }
-@keyframes topup-gradient-shift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
-@keyframes topup-star-twinkle { 0%,100% { opacity: .25; transform: scale(.65) rotate(0); } 50% { opacity: 1; transform: scale(1.3) rotate(18deg); } }
+.topup-banner-motion { animation: topup-gradient-shift 5s ease-in-out infinite; }
+.topup-banner-motion::after { content: ''; position: absolute; z-index: 2; inset: -30% auto -30% -45%; width: 30%; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent); filter: blur(4px); transform: skewX(-18deg); animation: topup-shimmer 3.2s ease-in-out infinite; }
+.topup-star { position: absolute; z-index: 3; color: #fff9bc; text-shadow: 0 0 8px #fff, 0 0 22px rgba(255,235,59,.95); animation: topup-star-twinkle 1.8s ease-in-out infinite; pointer-events: none; }
+.topup-star-a { top: 8%; right: 6%; font-size: 1.8rem; }
+.topup-star-b { bottom: 11%; left: 9%; font-size: 1.35rem; animation-delay: .55s; }
+.topup-star-c { top: 38%; left: 4%; font-size: 2rem; animation-delay: 1.1s; }
+.topup-star-d { bottom: 9%; right: 18%; font-size: 1.15rem; animation-delay: 1.45s; }
+@keyframes topup-gradient-shift { 0%,100% { background-position: 0% 50%; filter: saturate(1); } 50% { background-position: 100% 50%; filter: saturate(1.25) brightness(1.08); } }
+@keyframes topup-shimmer { 0%,35% { transform: translateX(-40%) skewX(-18deg); opacity: 0; } 55% { opacity: .95; } 100% { transform: translateX(550%) skewX(-18deg); opacity: 0; } }
+@keyframes topup-star-twinkle { 0%,100% { opacity: .3; transform: scale(.55) rotate(0); } 50% { opacity: 1; transform: scale(1.5) rotate(30deg); } }
 @media (prefers-reduced-motion: reduce) { .topup-banner-motion, .topup-star { animation: none; } .topup-star { opacity: .75; } }
 @keyframes star-twinkle {
   0%, 100% { opacity: 0.15; transform: scale(0.5) rotate(0deg); }

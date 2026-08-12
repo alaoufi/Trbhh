@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TOPUP_BANNER_HEIGHTS, TOPUP_BANNER_TEMPLATES, TOPUP_BANNER_WIDTHS, normalizeTopupCampaignPresentation } from '@/lib/topup-campaign-presentation';
+import { TOPUP_BANNER_EFFECTS, TOPUP_BANNER_HEIGHTS, TOPUP_BANNER_TEMPLATES, TOPUP_BANNER_WIDTHS, normalizeTopupCampaignPresentation } from '@/lib/topup-campaign-presentation';
 
 describe('top-up campaign presentation', () => {
   it('gives legacy campaigns the established Trbhh banner design', () => {
@@ -32,5 +32,9 @@ describe('top-up campaign presentation', () => {
   it('uses measurable banner dimensions and rejects arbitrary sizing', () => {
     expect(normalizeTopupCampaignPresentation({ width: 'card', height: 'tall' })).toMatchObject({ width: 'card', height: 'tall' });
     expect(normalizeTopupCampaignPresentation({ width: '100vw', height: '9999px' })).toMatchObject({ width: 'full', height: 'medium' });
+  });
+
+  it('ships visible decorative effects without storing arbitrary animation code', () => {
+    expect(TOPUP_BANNER_EFFECTS).toEqual(['animated-gradient', 'sparkles', 'shimmer']);
   });
 });

@@ -43,6 +43,12 @@ model ads {
   status           Int            @default(1) @db.TinyInt
   store_only       Int            @default(0) @db.TinyInt
   trbhh_until      DateTime?      @db.DateTime(0)
+  platform_hidden_at DateTime?    @db.DateTime(0)
+  platform_archived_at DateTime?  @db.DateTime(0)
+  platform_last_expiry_notice_at DateTime? @db.DateTime(0)
+  platform_last_archive_notice_at DateTime? @db.DateTime(0)
+  platform_package String?        @db.VarChar(40)
+  platform_amount  Int?           @default(0)
   urgent_until     DateTime?      @db.DateTime(0)
   bumped_at        DateTime?      @db.DateTime(0)
   publish_at       DateTime?      @db.DateTime(0)
@@ -80,6 +86,7 @@ model ads {
   @@index([status, state, created_at], map: "ads_listing_created")
   @@index([cat_reviewed], map: "ads_cat_reviewed")
   @@index([profile_id], map: "ads_profile_id")
+  @@index([trbhh_until], map: "ads_trbhh_until")
 }
 
 model profiles {

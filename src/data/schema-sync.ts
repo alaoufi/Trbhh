@@ -318,6 +318,14 @@ const STATEMENTS: string[] = [
   `ALTER TABLE ads ADD COLUMN store_only TINYINT NOT NULL DEFAULT 0`,
   /* عرض مدفوع في تربح: إعلان متجر يظهر في قوائم تربح حتى هذا التاريخ. */
   `ALTER TABLE ads ADD COLUMN trbhh_until DATETIME NULL`,
+  /* Public-platform paid placement lifecycle: independent from moderation/archive fields. */
+  `ALTER TABLE ads ADD COLUMN platform_hidden_at DATETIME NULL`,
+  `ALTER TABLE ads ADD COLUMN platform_archived_at DATETIME NULL`,
+  `ALTER TABLE ads ADD COLUMN platform_last_expiry_notice_at DATETIME NULL`,
+  `ALTER TABLE ads ADD COLUMN platform_last_archive_notice_at DATETIME NULL`,
+  `ALTER TABLE ads ADD COLUMN platform_package VARCHAR(40) NULL`,
+  `ALTER TABLE ads ADD COLUMN platform_amount INT NOT NULL DEFAULT 0`,
+  `CREATE INDEX ads_trbhh_until ON ads (trbhh_until)`,
   /* شارة عاجل المدفوعة حتى هذا التاريخ. */
   `ALTER TABLE ads ADD COLUMN urgent_until DATETIME NULL`,
   /* نوع السعر يستخدم عمود price_type القديم (rent/sale/som) — ومدة التأجير عمود جديد. */

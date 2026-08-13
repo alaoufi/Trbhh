@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { getSettingBool } from './settings';
 import { toInt } from './utils';
+import { currentPlatformAdPublicWhere } from './platform-ad-visibility';
 
 const ensure = ensureSchema;
 
@@ -94,10 +95,10 @@ export async function notifyOppositeType(adId: number, title: string, categoryId
     if (!categoryId) return;
     await ensure();
     const opposite = type === 'request' ? 'offer' : 'request';
+    const publicWhere = await currentPlatformAdPublicWhere();
     const rows = await prisma.ads.findMany({
       where: {
-        status: 1, state: 'active', adsType: opposite,
-        AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }] }],
+        ...publicWhere, adsType: opposite,
         category_id: BigInt(categoryId),
         ...(cityId ? { city_id: BigInt(cityId) } : {}),
         user_id: { not: BigInt(authorId) },

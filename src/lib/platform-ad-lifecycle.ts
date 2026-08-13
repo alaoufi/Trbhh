@@ -26,3 +26,14 @@ export function renewalDecision(input: { balance: number; packagePrice: number }
 export function formatSar(amount: number): string {
   return (Math.round(Math.max(0, amount) * 100) / 100).toFixed(2);
 }
+
+export function newPlatformAdDecision(input: { enabled: boolean; storeOnly: boolean; freeUsedToday: number; freeDailyLimit: number; freeDays: number }): { grantFreeDays: number; needsPayment: boolean } {
+  if (!input.enabled) return { grantFreeDays: 0, needsPayment: false };
+  const eligibleForFreePlacement = !input.storeOnly
+    && input.freeDailyLimit > 0
+    && input.freeDays > 0
+    && input.freeUsedToday < input.freeDailyLimit;
+  return eligibleForFreePlacement
+    ? { grantFreeDays: Math.floor(input.freeDays), needsPayment: false }
+    : { grantFreeDays: 0, needsPayment: true };
+}

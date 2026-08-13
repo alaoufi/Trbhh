@@ -23,6 +23,13 @@ describe('top-up campaign design persistence', () => {
     expect(studio).not.toContain('value={presentation.height}');
   });
 
+  it('captures each selected value before the deferred React state update runs', () => {
+    expect(studio).toContain('const template = event.target.value as TopupCampaignPresentation[\'template\'];');
+    expect(studio).toContain('const width = event.target.value as TopupCampaignPresentation[\'width\'];');
+    expect(studio).toContain('const height = event.target.value as TopupCampaignPresentation[\'height\'];');
+    expect(studio).not.toContain('event.currentTarget.value as TopupCampaignPresentation');
+  });
+
   it('rejects a campaign if its selected template is not returned after saving', () => {
     expect(actions).toContain('check.some((c) => c.id === id && c.presentation.template === presentation.template)');
   });

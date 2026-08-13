@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { platformAdPublicWhere } from '@/lib/platform-ad-visibility';
+import { platformAdPublicWhere, platformDealAdPublicWhere } from '@/lib/platform-ad-visibility';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -22,6 +22,16 @@ describe('public ad visibility entitlement', () => {
       state: 'active',
       trbhh_until: { gt: new Date('2026-08-13T12:00:00.000Z') },
     });
+  });
+
+  it('preserves approved-store deal visibility only while enforcement is disabled', () => {
+    const now = new Date('2026-08-13T12:00:00.000Z');
+    expect(platformDealAdPublicWhere(now, false, [42])).toEqual({
+      status: 1,
+      state: 'active',
+      AND: [{ OR: [{ store_only: 0 }, { trbhh_until: { gt: now } }, { user_id: { in: [42] } }] }],
+    });
+    expect(platformDealAdPublicWhere(now, true, [42])).toEqual(platformAdPublicWhere(now, true));
   });
 
   it('keeps lifecycle controls together with revenue pricing', () => {

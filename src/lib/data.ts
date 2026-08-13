@@ -8,7 +8,8 @@ import { sweepExpiredFeatured, getFeaturedTierMap, getUsersAdMeta } from './pack
 import { ensureSaudiAreas } from './seed-areas';
 import { getProfileDisplay } from './profiles';
 import { toInt } from './utils';
-import { currentPlatformAdPublicWhere } from './platform-ad-visibility';
+import { currentPlatformAdPublicWhere, platformDealAdPublicWhere } from './platform-ad-visibility';
+import { getPlatformAdLifecycleConfig } from './settings';
 
 export type AdCard = {
   id: number;
@@ -357,9 +358,14 @@ export async function getFeaturedAds(take = 8) {
  *  المتاجر المعتمدة لعرض إعلاناتها في المنصة فقط (لا يكسر عزل بقية المتاجر). */
 export async function getDealAds(take = 60) {
   return cached(`ads:deals:${take}`, 60, async () => {
+    const approvedStoreUserIds = (await prisma.stores.findMany({
+      where: { status: 1, show_on_platform: 1 },
+      select: { user_id: true },
+    })).map((store) => store.user_id);
+    const { enabled } = await getPlatformAdLifecycleConfig();
     const rows = await prisma.ads.findMany({
       where: {
-        ...(await activeAdWhere()),
+        ...platformDealAdPublicWhere(new Date(), enabled, approvedStoreUserIds),
         old_price: { gt: 0 },
       },
       orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],

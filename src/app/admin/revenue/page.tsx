@@ -4,7 +4,7 @@ import { requireAction, getUserPerms } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
-import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupCampaigns, getActiveTopupCampaign, topupCampaignsHealth, campaignState, DURATIONS, SERVICE_LABELS, servicePriceKey, getAdRestoreFee, type PaidService } from '@/lib/settings';
+import { getStoreSubPricing, getStoreSubReminderConfig, getServicePricing, getTopupAccounts, getTopupPromo, getVerifyGift, getTrbhhShowPricing, getAdExtras, getStorePlusPricing, getLeadConfig, getAuctionConfig, getUrgentPrices, getTopupCampaigns, getActiveTopupCampaign, topupCampaignsHealth, campaignState, DURATIONS, SERVICE_LABELS, servicePriceKey, getAdRestoreFee, getPlatformAdLifecycleConfig, type PaidService } from '@/lib/settings';
 import { pointsEnabled, getPointsConfig, referralEnabled, getReferralReward, getWelcomeCredit } from '@/lib/points';
 import { getPackages, type Package } from '@/lib/packages';
 import { getPromoPackages, type PromoPackage } from '@/lib/promos';
@@ -586,7 +586,7 @@ async function PaymentsTab({ cat, page }: { cat?: string; page: number }) {
 }
 
 async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; canPromos: boolean }) {
-  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction, verifyPkgsAll, restoreFee, acctVerify] = await Promise.all([
+  const [sub, prices, remind, promo, verifyGift, show, extras, ptsOn, ptsCfg, refOn, refReward, welcome, plus, lead, auction, verifyPkgsAll, restoreFee, acctVerify, platformAds] = await Promise.all([
     getStoreSubPricing(), getServicePricing(), getStoreSubReminderConfig(), getTopupPromo(), getVerifyGift(), getTrbhhShowPricing(), getAdExtras(),
     pointsEnabled(), getPointsConfig(), referralEnabled(), getReferralReward(), getWelcomeCredit(),
     getStorePlusPricing(), getLeadConfig(), getAuctionConfig(),
@@ -600,6 +600,7 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
     }),
     getAdRestoreFee(),
     import('@/lib/settings').then((m) => m.getAccountVerifyRenew()),
+    getPlatformAdLifecycleConfig(),
   ]);
   const urgentPrices = await getUrgentPrices();
   const services: { key: PaidService; note?: string }[] = [
@@ -670,6 +671,19 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="rounded-xl border-2 border-indigo-300 bg-indigo-50/70 p-3">
+        <div className="mb-1 text-sm font-extrabold text-indigo-900">نشر الإعلانات في تربح</div>
+        <p className="mb-3 text-[11px] leading-5 text-muted-foreground">لا يؤثر التفعيل على الإعلانات الحالية فوراً. عند التفعيل يصبح ظهور الإعلانات الجديدة حسب الحد المجاني والمدد أدناه، ثم يتطلب تجديداً مدفوعاً من المحفظة.</p>
+        <label className="flex items-center gap-2 text-sm font-bold"><input name="platformAdLifecycleEnabled" type="checkbox" defaultChecked={platformAds.enabled} /> تفعيل رسوم ظهور الإعلانات في تربح</label>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <label className="space-y-1"><span className="text-xs font-bold">إعلانات مجانية جديدة يومياً</span><input name="platformAdMemberFreeDailyLimit" type="number" min={0} defaultValue={platformAds.memberFreeDailyLimit} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">مدة الظهور المجاني (أيام)</span><input name="platformAdMemberFreeDays" type="number" min={0} defaultValue={platformAds.memberFreeDays} className={num} /></label>
+          <label className="space-y-1"><span className="text-xs font-bold">الأرشفة بعد الانتهاء (أيام، 0=إيقاف)</span><input name="platformAdArchiveAfterDays" type="number" min={0} defaultValue={platformAds.archiveAfterDays} className={num} /></label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-4 text-xs font-bold"><label className="flex items-center gap-1"><input name="platformAdLockAdReplies" type="checkbox" defaultChecked={platformAds.lockAdReplies} /> قفل ردود محادثة الإعلان بعد الأرشفة</label><label className="flex items-center gap-1"><input name="platformAdSmsEnabled" type="checkbox" defaultChecked={platformAds.smsEnabled} /> إرسال SMS عند توفر البوابة</label></div>
+        <div className="mt-3 space-y-2">{platformAds.packages.map((p) => <div key={p.key} className="grid grid-cols-3 items-center gap-2 rounded-lg bg-white p-2 text-xs"><label className="flex items-center gap-1 font-bold"><input name={`platformAdPkgActive_${p.key}`} type="checkbox" defaultChecked={p.active} /> {p.label}</label><span>{p.days} يوم · {p.price} ر.س</span><select name={`platformAdPkgAudience_${p.key}`} defaultValue={p.audience} className="rounded border p-1"><option value="both">عضو ومتجر</option><option value="member">عضو فقط</option><option value="store">متجر فقط</option></select></div>)}</div>
       </div>
 
       {/* خدمات الإعلان الإضافية: عاجل (باقتان) + تحديث (Bump) */}

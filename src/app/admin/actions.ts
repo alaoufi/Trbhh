@@ -821,7 +821,16 @@ export async function saveRevenueAction(formData: FormData) {
   for (const k of ['gold', 'silver', 'regular']) {
     await setSetting(`show_ad_${k}`, nn(`showAd_${k}`));
     await setSetting(`show_ad_${k}_days`, String(Math.max(1, parseInt(String(formData.get(`showAdDays_${k}`) || '1')) || 1)));
+    const audience = String(formData.get(`platformAdPkgAudience_${k}`) || 'both');
+    await setSetting(`platform_ad_pkg_${k}_active`, formData.get(`platformAdPkgActive_${k}`) !== null ? '1' : '0');
+    await setSetting(`platform_ad_pkg_${k}_audience`, ['member', 'store', 'both'].includes(audience) ? audience : 'both');
   }
+  await setSetting('platform_ad_lifecycle_enabled', formData.get('platformAdLifecycleEnabled') !== null ? '1' : '0');
+  await setSetting('platform_ad_member_free_daily_limit', nn('platformAdMemberFreeDailyLimit'));
+  await setSetting('platform_ad_member_free_days', nn('platformAdMemberFreeDays'));
+  await setSetting('platform_ad_archive_after_days', nn('platformAdArchiveAfterDays'));
+  await setSetting('platform_ad_lock_ad_replies', formData.get('platformAdLockAdReplies') !== null ? '1' : '0');
+  await setSetting('platform_ad_sms_enabled', formData.get('platformAdSmsEnabled') !== null ? '1' : '0');
   // مصفوفة تسعيرات الخدمات (خدمة × مدّة)
   const services: PaidService[] = ['featured', 'classified', 'dup3', 'dup5'];
   for (const s of services) {

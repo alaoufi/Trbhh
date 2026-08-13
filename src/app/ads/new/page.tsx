@@ -49,6 +49,42 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
     const meta = await m.getStoreMeta(sid).catch(() => null);
     return meta && meta.status === 1 ? { id: sid, name: meta.storeName || 'متجري' } : null;
   }).catch(() => null);
+  const storeSub = publishingAsStore && myStore
+    ? await import('@/lib/subscription').then((m) => m.getStoreSub(myStore.id)).catch(() => null)
+    : null;
+  const storeSubPricing = publishingAsStore && myStore
+    ? await import('@/lib/settings').then((m) => m.getStoreSubPricing()).catch(() => null)
+    : null;
+  const storeSubscriptionBlocked = !!(storeSub?.enabled && storeSub.state === 'suspended');
+  const lowestStorePlanPrice = storeSubPricing
+    ? Math.min(storeSubPricing.monthly, storeSubPricing.sixmo, storeSubPricing.yearly)
+    : null;
+  const subscriptionAccess = storeSubscriptionBlocked && lowestStorePlanPrice !== null
+    ? await import('@/lib/store-subscription-access').then((m) => m.subscriptionAccessMessage({
+      balance,
+      lowestPlanPrice: lowestStorePlanPrice,
+    }))
+    : null;
+  if (storeSubscriptionBlocked && subscriptionAccess) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-5 text-right shadow-sm">
+          <h1 className="text-xl font-extrabold text-red-900">إضافة إعلان المتجر متوقفة مؤقتاً</h1>
+          <p className="mt-2 text-sm font-bold leading-6 text-red-900">{subscriptionAccess.message}</p>
+          <p className="mt-3 rounded-xl bg-white/80 p-3 text-sm text-slate-700">
+            الرصيد المتاح: <b className="text-emerald-700">{balance.toFixed(2)} ر.س</b>
+            {' · '}أقل خطة تجديد: <b>{lowestStorePlanPrice!.toFixed(2)} ر.س</b>.
+          </p>
+          <p className="mt-2 text-xs leading-5 text-slate-600">بيانات المتجر وإعلاناته محفوظة، ويعود النشر فور تجديد الاشتراك.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/store?sub=expired&from=ad#sub" className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">تجديد اشتراك المتجر</Link>
+            {subscriptionAccess.action === 'topup' && <Link href="/account/wallet#topup" className="rounded-lg border-2 border-primary bg-white px-4 py-2 text-sm font-bold text-primary">شحن الرصيد</Link>}
+            <Link href="/ads/new?dest=personal" className="rounded-lg border-2 border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700">إضافة إعلان باسمي الشخصي</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold text-primary">أضف إعلاناً جديداً</h1>

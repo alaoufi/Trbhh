@@ -231,9 +231,16 @@ export async function createAdAction(formData: FormData) {
   const q = dest ? '&dest=store' : '';
   // متجر موقوف (مؤقتاً أو نهائياً): لا يُسمح بنشر إعلانات منه
   if (dest === 'store') {
-    const { storeStatusOfUser } = await import('@/lib/merchant');
+    const { storeStatusOfUser, storeIdOfUser } = await import('@/lib/merchant');
     const st = await storeStatusOfUser(session.uid).catch(() => 1);
     if (st === 2 || st === 3) redirect(st === 3 ? '/store?error=suspended_perm' : '/store?error=suspended');
+    // انتهاء اشتراك المتجر لا يُحوّل العضو إلى شاشة خطأ عامة: يُنقل إلى التجديد
+    // حيث يرى رصيده والخطط وخيار الشحن إن لم يكفِ الرصيد.
+    const storeId = await storeIdOfUser(session.uid).catch(() => 0);
+    if (storeId) {
+      const { isStoreSubBlocked } = await import('@/lib/subscription');
+      if (await isStoreSubBlocked(storeId)) redirect('/store?sub=expired&from=ad#sub');
+    }
   }
   // حقول إجبارية — أظهِر السبب بدل الرجوع الصامت
   if (!title || !detail) redirect(`/ads/new?error=missing${q}`);

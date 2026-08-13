@@ -23,8 +23,8 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة المتجر' };
 
-export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; added?: string; settings?: string; backup?: string; bulk?: string; bulklimit?: string; show?: string; adshow?: string; dupid?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string; areq?: string; vreq?: string; cat?: string; banned?: string; newstore?: string }> }) {
-  const { error, sub, added, settings, backup, bulk, bulklimit, show, adshow, dupid, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq, areq, vreq, cat, banned, newstore } = await searchParams;
+export default async function StoreAdminPage({ searchParams }: { searchParams: Promise<{ error?: string; sub?: string; from?: string; added?: string; settings?: string; backup?: string; bulk?: string; bulklimit?: string; show?: string; adshow?: string; dupid?: string; price?: string; coupon?: string; renew?: string; plus?: string; staff?: string; other?: string; othername?: string; want?: string; exc?: string; mm?: string; nreq?: string; areq?: string; vreq?: string; cat?: string; banned?: string; newstore?: string }> }) {
+  const { error, sub, from, added, settings, backup, bulk, bulklimit, show, adshow, dupid, price, coupon, renew, plus, staff, other, othername, want, exc, mm, nreq, areq, vreq, cat, banned, newstore } = await searchParams;
   const session = await requireUser();
   // تذكيرات قرب انتهاء الاشتراك/عرض المتجر/عرض الإعلان + التجديد التلقائي — تشغيل كسول ذاتي الخنق (لا جدولة خلفية)
   import('@/lib/subscription').then((m) => m.sendDueSubReminders()).catch(() => {});
@@ -239,6 +239,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         <div id="sub" className="card-3d scroll-mt-20 space-y-3 rounded-2xl p-4">
           <div className="flex items-center gap-2 font-bold text-primary"><Crown className="h-5 w-5" /> اشتراك المتجر</div>
           {sub === 'ok' && <div className="rounded-lg bg-emerald-50 p-2 text-xs font-bold text-emerald-700">✓ تم تجديد الاشتراك وخُصمت الرسوم من رصيدك.</div>}
+          {sub === 'expired' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-xs font-bold leading-5 text-red-900">⛔ انتهى اشتراك متجرك، لذلك أُوقف النشر منه مؤقتاً. بياناتك وإعلاناتك محفوظة. اختر خطة التجديد أدناه؛ إن لم يكفِ الرصيد سيظهر زر الشحن. {from === 'ad' ? 'بعد التجديد يمكنك العودة لإضافة الإعلان فوراً.' : ''}</div>}
           {sub === 'nocredit' && <div className="rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-700">الرصيد غير كافٍ — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
           {subState.trial && subState.state === 'active' && (
             <div className="rounded-lg bg-indigo-50 p-2 text-xs font-bold text-indigo-700">

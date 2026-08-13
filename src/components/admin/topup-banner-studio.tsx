@@ -33,20 +33,20 @@ export function TopupBannerStudio() {
       <p className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] font-bold text-amber-900">{TOPUP_CAMPAIGN_DESIGN_SCHEDULING_NOTICE}</p>
       <label className="block text-xs font-bold text-sky-900">
         تصميم البانر
-        <select name="bannerTemplate" value={presentation.template} onChange={(event) => setPresentation((current) => ({ ...current, template: event.target.value as TopupCampaignPresentation['template'] }))} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm">
+        <select name="bannerTemplate" defaultValue="heritage" onChange={(event) => setPresentation((current) => ({ ...current, template: event.currentTarget.value as TopupCampaignPresentation['template'] }))} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm">
           {TOPUP_BANNER_TEMPLATES.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
         </select>
       </label>
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="text-xs font-bold text-sky-900">
           عرض البانر
-          <select name="bannerWidth" value={presentation.width} onChange={(event) => setPresentation((current) => ({ ...current, width: event.target.value as TopupCampaignPresentation['width'] }))} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm">
+          <select name="bannerWidth" defaultValue="full" onChange={(event) => setPresentation((current) => ({ ...current, width: event.currentTarget.value as TopupCampaignPresentation['width'] }))} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm">
             {TOPUP_BANNER_WIDTHS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
           </select>
         </label>
         <label className="text-xs font-bold text-sky-900">
           ارتفاع البانر
-          <select name="bannerHeight" value={presentation.height} onChange={(event) => setPresentation((current) => ({ ...current, height: event.target.value as TopupCampaignPresentation['height'] }))} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm">
+          <select name="bannerHeight" defaultValue="medium" onChange={(event) => setPresentation((current) => ({ ...current, height: event.currentTarget.value as TopupCampaignPresentation['height'] }))} className="mt-1 w-full rounded-lg border bg-white p-2 text-sm">
             {TOPUP_BANNER_HEIGHTS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
           </select>
         </label>

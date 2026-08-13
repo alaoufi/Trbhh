@@ -14,6 +14,15 @@ describe('top-up campaign design persistence', () => {
     expect(studio).not.toContain('<input type="hidden" name="bannerTemplate"');
   });
 
+  it('keeps the three selectors native so a re-render cannot reset them to the first option', () => {
+    expect(studio).toContain('defaultValue="heritage"');
+    expect(studio).toContain('defaultValue="full"');
+    expect(studio).toContain('defaultValue="medium"');
+    expect(studio).not.toContain('value={presentation.template}');
+    expect(studio).not.toContain('value={presentation.width}');
+    expect(studio).not.toContain('value={presentation.height}');
+  });
+
   it('rejects a campaign if its selected template is not returned after saving', () => {
     expect(actions).toContain('check.some((c) => c.id === id && c.presentation.template === presentation.template)');
   });

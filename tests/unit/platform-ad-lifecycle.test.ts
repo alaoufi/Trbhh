@@ -33,4 +33,8 @@ describe('platform ad lifecycle policy', () => {
     expect(newPlatformAdDecision({ enabled: true, storeOnly: false, freeUsedToday: 2, freeDailyLimit: 2, freeDays: 10 })).toEqual({ grantFreeDays: 0, needsPayment: true });
     expect(newPlatformAdDecision({ enabled: true, storeOnly: true, freeUsedToday: 0, freeDailyLimit: 2, freeDays: 10 })).toEqual({ grantFreeDays: 0, needsPayment: true });
   });
+
+  it('does not turn an advertisement published before enforcement into a paid-only item', () => {
+    expect(newPlatformAdDecision({ enabled: false, storeOnly: false, freeUsedToday: 99, freeDailyLimit: 0, freeDays: 0 })).toEqual({ grantFreeDays: 0, needsPayment: false });
+  });
 });

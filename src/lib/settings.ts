@@ -173,6 +173,51 @@ export async function getTrbhhShowPricing(): Promise<TrbhhShowPricing> {
   return { store: { w2: Math.max(0, sw2), m1: Math.max(0, sm1), y1: Math.max(0, sy1) }, ads };
 }
 
+export type PlatformAdPackageAudience = 'member' | 'store' | 'both';
+export type PlatformAdLifecycleConfig = {
+  enabled: boolean;
+  memberFreeDailyLimit: number;
+  memberFreeDays: number;
+  archiveAfterDays: number;
+  lockAdReplies: boolean;
+  smsEnabled: boolean;
+  packages: Array<AdShowPkgFull & { active: boolean; audience: PlatformAdPackageAudience }>;
+};
+
+function platformAudience(raw: string): PlatformAdPackageAudience {
+  return raw === 'member' || raw === 'store' || raw === 'both' ? raw : 'both';
+}
+
+/** Public ad payment lifecycle. Disabled by default so deploying this code never hides live ads. */
+export async function getPlatformAdLifecycleConfig(): Promise<PlatformAdLifecycleConfig> {
+  const pricing = await getTrbhhShowPricing();
+  const [enabled, memberFreeDailyLimit, memberFreeDays, archiveAfterDays, lockAdReplies, smsEnabled, ...packageMeta] = await Promise.all([
+    getSettingBool('platform_ad_lifecycle_enabled', false),
+    getSettingNum('platform_ad_member_free_daily_limit', 0),
+    getSettingNum('platform_ad_member_free_days', 0),
+    getSettingNum('platform_ad_archive_after_days', 0),
+    getSettingBool('platform_ad_lock_ad_replies', false),
+    getSettingBool('platform_ad_sms_enabled', false),
+    ...AD_SHOW_PKG_DEFS.flatMap((pkg) => [
+      getSettingBool(`platform_ad_pkg_${pkg.key}_active`, true),
+      getSetting(`platform_ad_pkg_${pkg.key}_audience`, 'both'),
+    ]),
+  ]);
+  return {
+    enabled,
+    memberFreeDailyLimit: Math.max(0, memberFreeDailyLimit),
+    memberFreeDays: Math.max(0, memberFreeDays),
+    archiveAfterDays: Math.max(0, archiveAfterDays),
+    lockAdReplies,
+    smsEnabled,
+    packages: pricing.ads.map((pkg, index) => ({
+      ...pkg,
+      active: Boolean(packageMeta[index * 2]),
+      audience: platformAudience(String(packageMeta[index * 2 + 1] || 'both')),
+    })),
+  };
+}
+
 /* خدمات الإعلان الإضافية — من الإيرادات والتسعير (0 = تعطيل الخدمة). */
 export type UrgentPack = { hours: 24 | 48; price: number };
 export type AdExtras = { urgentPacks: UrgentPack[]; bumpFreeDays: number; bumpPrice: number };

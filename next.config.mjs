@@ -7,6 +7,12 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+        ],
+      },
+      {
         source: '/:path*',
         headers: [
           { key: 'Content-Security-Policy', value: "default-src 'self'; base-uri 'self'; frame-ancestors 'self'; frame-src 'self' https://eauthenticate.saudibusiness.gov.sa; form-action 'self'; object-src 'none'; img-src 'self' data: blob: https: http:; media-src 'self' blob: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline'; font-src 'self' data: https:; connect-src 'self' https: wss:" },

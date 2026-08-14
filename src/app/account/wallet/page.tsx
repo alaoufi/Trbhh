@@ -16,6 +16,7 @@ import { pointsEnabled, getPoints, getPointsConfig } from '@/lib/points';
 import { mediaUrl } from '@/lib/media';
 import { requestTopupAction, convertPointsAction, startOnlineTopupAction, acceptMemberServiceOrderAction, confirmMemberServiceExecutionAction, cancelMemberServiceOrderAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
+import { WalletOnlineTopup } from '@/components/wallet-online-topup';
 import { isOnlinePayReady, getPaymentConfig, getActiveMethods, getTopupMethodAvailability } from '@/lib/payments';
 
 export const dynamic = 'force-dynamic';
@@ -141,26 +142,7 @@ export default async function WalletPage({ searchParams }: { searchParams: Promi
 
       {tab === 'topups' && <>
       {/* شحن فوري عبر بوابة الدفع الإلكتروني — يظهر فقط عند تفعيله واكتمال تهيئة المزوّد */}
-      {payReady && payCfg && (
-        <div id="paynow" className="card-3d space-y-3 rounded-2xl border-2 border-emerald-300 bg-emerald-50/40 p-4">
-          <div className="flex flex-wrap items-center gap-2 font-bold text-emerald-800">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-emerald-100 text-lg">💳</span>
-            شحن فوري بالبطاقة — يُضاف لرصيدك مباشرةً
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {payMethods.map((mm) => <span key={mm} className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-200">{({ mada: 'مدى', visa: 'فيزا', mastercard: 'ماستركارد', applepay: 'Apple Pay', stcpay: 'STC Pay' } as Record<string, string>)[mm] || mm}</span>)}
-          </div>
-          <form action={startOnlineTopupAction} className="flex flex-wrap items-end gap-2">
-            <label className="flex-1">
-              <span className="mb-1 block text-sm font-medium text-foreground/80">المبلغ (ر.س) — من {payCfg.min} إلى {payCfg.max}</span>
-              <input name="amount" type="number" min={payCfg.min} max={payCfg.max} required placeholder={`مثال: ${payCfg.min}`} className="h-11 w-full rounded-lg border border-emerald-300 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-400" />
-            </label>
-            <ConfirmSubmit msg="الانتقال لصفحة الدفع الآمنة لإتمام الشحن؟" className="btn-3d h-11 rounded-lg bg-emerald-600 px-5 text-sm font-bold text-white">ادفع الآن</ConfirmSubmit>
-          </form>
-          {payCfg.mode === 'test' && <p className="text-[11px] font-bold text-amber-700">⚠ وضع تجريبي — لأغراض الاختبار فقط.</p>}
-          <p className="text-[11px] text-muted-foreground">دفع آمن عبر بوابة معتمدة. لا تُخزَّن بيانات بطاقتك لدينا.</p>
-        </div>
-      )}
+      {payReady && payCfg && <WalletOnlineTopup action={startOnlineTopupAction} min={payCfg.min} max={payCfg.max} methods={payMethods} mode={payCfg.mode} />}
 
       {/* شحن الرصيد: المبلغ + إيصال التحويل — يُضاف بعد تأكيد الإدارة */}
       {topupMethods.transfer && <div id="topup" className="card-3d space-y-3 rounded-2xl p-4">

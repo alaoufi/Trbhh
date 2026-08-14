@@ -1,6 +1,6 @@
 import 'server-only';
 import { SITE } from '@/lib/constants';
-import { createOnlineTopup, attachProviderRef, getTopupById, creditOnlineTopup, findTopupByProviderRef } from '@/lib/wallet';
+import { createOnlineTopup, attachProviderRef, getTopupById, creditOnlineTopupAtomically, findTopupByProviderRef, applyTopupBonuses } from '@/lib/wallet';
 import { getPaymentConfig, getProviderCreds, isOnlinePayReady, getActiveMethods } from './config';
 import { providerMeta } from './registry';
 import type { PayProvider, PayProviderId } from './types';
@@ -93,7 +93,8 @@ export async function confirmTopupById(topupId: number): Promise<{ paid: boolean
   if (v.amountSar > 0 && Math.abs(v.amountSar - row.amount) > 0) {
     return { paid: true, credited: false, reason: 'amount_mismatch' };
   }
-  const r = await creditOnlineTopup(topupId, v.method || null);
+  const r = await creditOnlineTopupAtomically(topupId, v.method || null);
+  if (r.ok && !r.already && r.userId && r.amount) await applyTopupBonuses(r.userId, r.amount, 0).catch(() => {});
   return { paid: true, credited: r.ok };
 }
 

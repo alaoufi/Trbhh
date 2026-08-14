@@ -396,6 +396,45 @@ export async function creditOnlineTopup(topupId: number, method?: string | null)
   return { ok: true, already: false };
 }
 
+/**
+ * Financial core for an online top-up. The payment status, member balance and
+ * ledger row are committed together so a repeated callback cannot create a
+ * second credit and a partial failure cannot leave a paid row without money.
+ */
+export async function creditOnlineTopupAtomically(topupId: number, method?: string | null): Promise<{ ok: boolean; already: boolean; userId?: number; amount?: number }> {
+  await ensure();
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const req = await tx.wallet_topups.findUnique({ where: { id: BigInt(topupId) } });
+      if (!req) return { ok: false, already: false };
+      if (req.status === 1) return { ok: true, already: true, userId: toInt(req.user_id), amount: req.amount };
+      if (req.status !== 0) return { ok: false, already: false };
+
+      const flipped = await tx.wallet_topups.updateMany({
+        where: { id: BigInt(topupId), status: 0 },
+        data: { status: 1, paid_at: new Date(), decided_at: new Date(), method: method ? method.slice(0, 20) : null },
+      });
+      if (flipped.count === 0) return { ok: true, already: true, userId: toInt(req.user_id), amount: req.amount };
+
+      await tx.users.update({ where: { id: req.user_id }, data: { balance: { increment: req.amount } } });
+      const member = await tx.users.findUnique({ where: { id: req.user_id }, select: { balance: true } });
+      const balanceAfter = member?.balance ?? 0;
+      await tx.wallet_txns.create({
+        data: {
+          user_id: req.user_id,
+          amount: req.amount,
+          balance_after: balanceAfter,
+          reason: 'topup',
+          note: `شحن إلكتروني #${toInt(req.id)} (${req.provider || 'بوابة'})`.slice(0, 200),
+        },
+      });
+      return { ok: true, already: false, userId: toInt(req.user_id), amount: req.amount };
+    });
+  } catch {
+    return { ok: false, already: false };
+  }
+}
+
 /** Member's own top-up requests (newest first). */
 export async function listMyTopups(userId: number, limit = 20): Promise<TopupRow[]> {
   await ensure();
@@ -541,7 +580,7 @@ export async function countPendingDupTopups(): Promise<number> {
 
 /** مكافآت الشحن (من التسعيرات): شرائح حملة الشحن كما هي في لوحة التحكم حرفياً —
  *  تُطبَّق أعلى شريحة يبلغها المبلغ + مكافأة أول شحن. */
-async function applyTopupBonuses(userId: number, amount: number, adminId: number): Promise<void> {
+export async function applyTopupBonuses(userId: number, amount: number, adminId: number): Promise<void> {
   const { getTopupPromo, matchTopupTier, getActiveTopupCampaign } = await import('./settings');
   const promo = await getTopupPromo();
   const campaign = await getActiveTopupCampaign();

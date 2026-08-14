@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 async function handle(req: NextRequest, provider: string): Promise<NextResponse> {
   const url = new URL(req.url);
   const q = url.searchParams;
-  const walletUrl = new URL('/account/wallet', url.origin);
+  const resultUrl = new URL('/payment/result', url.origin);
 
   const topupId = Number(q.get('t') || 0);
   let paid = false;
@@ -28,9 +28,9 @@ async function handle(req: NextRequest, provider: string): Promise<NextResponse>
     }
   } catch { /* نتعامل مع أي فشل كعدم اكتمال — لا نعتمد بلا تأكيد */ }
 
-  walletUrl.hash = 'topup';
-  walletUrl.searchParams.set(paid ? 'topup' : 'error', paid ? 'paid' : 'payfailed');
-  return NextResponse.redirect(walletUrl, { status: 303 });
+  if (topupId > 0) resultUrl.searchParams.set('t', String(topupId));
+  if (!paid) resultUrl.searchParams.set('state', 'unverified');
+  return NextResponse.redirect(resultUrl, { status: 303 });
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ provider: string }> }) {

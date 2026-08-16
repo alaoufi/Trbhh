@@ -1672,6 +1672,11 @@ export async function saveTopupMethodSettingsAction(formData: FormData) {
 
 /** حفظ بيانات اعتماد مزوّد دفع (المفاتيح السرّية لا تُمحى إن تُركت فارغة). */
 /** Starts a private ARB Sandbox checkout. It never writes wallet or revenue tables. */
+function safeGatewayReason(value: string | undefined): string {
+  const code = (value || '').match(/IPAY\d{7}/i)?.[0];
+  return code ? code.toUpperCase() : 'unknown';
+}
+
 export async function startAlrajhiSandboxAction(formData: FormData) {
   const admin = await requireAction('users', 'edit');
   const amount = Math.max(1, Math.min(100, Math.round(Number(formData.get('amount') || 10))));
@@ -1688,7 +1693,7 @@ export async function startAlrajhiSandboxAction(formData: FormData) {
   const rawIp = (requestHeaders.get('cf-connecting-ip') || requestHeaders.get('x-forwarded-for') || '').split(',')[0]?.trim();
   const customerIp = rawIp && /^[0-9a-f:.]{3,45}$/i.test(rawIp) ? rawIp : undefined;
   const result = await alrajhiArb.createPayment({ amountSar: amount, topupId: Number(trackId.slice(-15)), description: 'اختبار خاص لبوابة الراجحي — لا شحن رصيد', callbackUrl, webhookUrl: callbackUrl, customerIp }, await getProviderCreds('alrajhi_arb'), 'test');
-  if (!result.ok || !result.redirectUrl) redirect('/admin/payments/sandbox?state=failed');
+  if (!result.ok || !result.redirectUrl) redirect(`/admin/payments/sandbox?state=failed&reason=${encodeURIComponent(safeGatewayReason(result.error))}`);
   redirect(result.redirectUrl);
 }
 

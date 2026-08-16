@@ -5,12 +5,12 @@ import { startAlrajhiSandboxAction } from '../../actions';
 export const dynamic = 'force-dynamic';
 export const metadata = { robots: { index: false, follow: false }, title: 'اختبار الراجحي الخاص' };
 
-export default async function AlrajhiSandboxPage({ searchParams }: { searchParams: Promise<{ state?: string; result?: string }> }) {
+export default async function AlrajhiSandboxPage({ searchParams }: { searchParams: Promise<{ state?: string; result?: string; reason?: string }> }) {
   await requireAction('users', 'edit');
   const [report, params] = await Promise.all([Promise.resolve(alrajhiConfigReport()), searchParams]);
   const message = params.result === 'captured' ? 'نجح البنك في عملية الاختبار. لم يُضف أي رصيد.'
     : params.result ? `نتيجة البنك: ${params.result}`
-      : params.state === 'notready' ? 'أكمل متغيرات Sandbox أولاً.' : params.state === 'failed' ? 'رفض البنك إنشاء جلسة الاختبار.' : '';
+      : params.state === 'notready' ? 'أكمل متغيرات Sandbox أولاً.' : params.state === 'failed' ? `رفض البنك إنشاء جلسة الاختبار${params.reason ? ` (${params.reason})` : ''}.` : '';
   return <div className="mx-auto max-w-xl space-y-4" dir="rtl">
     <h1 className="text-xl font-bold text-primary">اختبار خاص — بوابة الراجحي Sandbox</h1>
     <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">هذه الصفحة للإدارة فقط، غير مفهرسة، ولا تنشئ شحناً أو رصيداً أو إيراداً.</p>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeArbCallback, decryptArbTrandata, encryptArbTrandata, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
+import { buildArbPurchaseTrandata, decodeArbCallback, decryptArbTrandata, encryptArbTrandata, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
 import { providerMeta } from '@/lib/payments/registry';
 
 const resourceKey = '12345678901234567890123456789012';
@@ -19,6 +19,15 @@ describe('Al Rajhi ARB bank-hosted provider', () => {
       paymentId: '100201931620827468',
       redirectUrl: 'https://securepayments.alrajhibank.com.sa/pg/paymentpage.htm?PaymentID=100201931620827468',
     });
+  });
+
+  it('leaves optional user-defined fields out of the initial bank-hosted request', () => {
+    const payload = JSON.parse(buildArbPurchaseTrandata({ amountSar: 10, topupId: 1700000000000123, callbackUrl: 'https://trbhh.sa/callback' }, {
+      tranportal_id: 'portal-id', tranportal_password: 'portal-password',
+    }));
+
+    expect(payload[0]).toMatchObject({ trackId: '1700000000000123', amt: '10.00' });
+    expect(payload[0]).not.toHaveProperty('udf1');
   });
 
   it('accepts a callback only when its encrypted payment id and track id agree', () => {

@@ -63,6 +63,28 @@ function numberString(amount: number): string { return amount.toFixed(2); }
 function gatewayUrl(creds: ProviderCreds): string { return creds.gateway_url || DEFAULT_GATEWAY_URL; }
 function hostedUrl(creds: ProviderCreds): string { return creds.hosted_payment_url || DEFAULT_HOSTED_URL; }
 
+/**
+ * Build the initial Bank Hosted request exactly as ARB expects it.
+ * Optional UDF fields are intentionally omitted: ARB rejects values that do
+ * not match its per-terminal validation rules (IPAY0100028).
+ */
+export function buildArbPurchaseTrandata(
+  input: Pick<CreatePaymentInput, 'amountSar' | 'topupId' | 'callbackUrl'>,
+  creds: Pick<ProviderCreds, 'tranportal_id' | 'tranportal_password'>,
+): string {
+  return JSON.stringify([{
+    amt: numberString(input.amountSar),
+    action: '1',
+    password: creds.tranportal_password,
+    id: creds.tranportal_id,
+    currencyCode: '682',
+    trackId: String(input.topupId),
+    responseURL: input.callbackUrl,
+    errorURL: input.callbackUrl,
+    langid: 'ar',
+  }]);
+}
+
 async function gatewayRequest(url: string, payload: unknown, customerIp?: string): Promise<{ ok: boolean; data: unknown; error?: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
@@ -94,7 +116,7 @@ export const alrajhiArb: PayProvider = {
       const password = creds.tranportal_password;
       const resourceKey = creds.terminal_resource_key;
       if (!id || !password || !resourceKey) return { ok: false, error: 'حقول الراجحي المطلوبة غير مكتملة في بيئة الخادم' };
-      const plain = JSON.stringify([{ amt: numberString(input.amountSar), action: '1', password, id, currencyCode: '682', trackId: String(input.topupId), responseURL: input.callbackUrl, errorURL: input.callbackUrl, langid: 'ar', udf1: `topup:${input.topupId}` }]);
+      const plain = buildArbPurchaseTrandata(input, { tranportal_id: id, tranportal_password: password });
       const result = await gatewayRequest(gatewayUrl(creds), [{ id, trandata: encryptArbTrandata(plain, resourceKey), responseURL: input.callbackUrl, errorURL: input.callbackUrl }], input.customerIp);
       const parsed = result.ok ? parseArbInitialResponse(result.data) : null;
       if (!parsed) {

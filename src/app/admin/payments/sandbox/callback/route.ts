@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAction } from '@/lib/roles';
 import { decodeArbCallback } from '@/lib/payments/providers/alrajhi-arb';
 import { readSandboxTicket } from '@/lib/payments/alrajhi-sandbox';
+import { readAlrajhiCallbackBody } from '@/lib/payments/alrajhi-callback';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ function resultOf(body: unknown, data: ReturnType<typeof ticket>) {
 
 export async function POST(req: NextRequest) {
   const url = new URL(req.url); const data = ticket(url);
-  let body: unknown = null; try { body = await req.json(); } catch { body = Object.fromEntries((await req.formData()).entries()); }
+  const body = await readAlrajhiCallbackBody(req);
   if (!resultOf(body, data)) return NextResponse.json([{ status: '2', errorText: 'sandbox notification validation failed' }], { status: 400 });
   return NextResponse.json([{ status: '1', result: `${url.origin}${url.pathname}?ticket=${encodeURIComponent(ticketOf(url))}` }]);
 }

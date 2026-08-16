@@ -1,5 +1,6 @@
 'use server';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAction, requireUserBan, requireManager, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
@@ -1670,6 +1671,27 @@ export async function saveTopupMethodSettingsAction(formData: FormData) {
 }
 
 /** حفظ بيانات اعتماد مزوّد دفع (المفاتيح السرّية لا تُمحى إن تُركت فارغة). */
+/** Starts a private ARB Sandbox checkout. It never writes wallet or revenue tables. */
+export async function startAlrajhiSandboxAction(formData: FormData) {
+  const admin = await requireAction('users', 'edit');
+  const amount = Math.max(1, Math.min(100, Math.round(Number(formData.get('amount') || 10))));
+  const { alrajhiConfigReport, getProviderCreds } = await import('@/lib/payments');
+  const report = alrajhiConfigReport();
+  if (!report.ready || report.environment !== 'sandbox') redirect('/admin/payments/sandbox?state=notready');
+  const { createSandboxTicket } = await import('@/lib/payments/alrajhi-sandbox');
+  const { alrajhiArb } = await import('@/lib/payments/providers/alrajhi-arb');
+  const { SITE } = await import('@/lib/constants');
+  const trackId = `${Date.now()}${Math.floor(Math.random() * 900 + 100)}`;
+  const ticket = createSandboxTicket({ adminId: admin.uid, trackId, amountSar: amount, secret: process.env.DATABASE_PAYMENT_SECRET || '' });
+  const callbackUrl = `https://${SITE.domain}/admin/payments/sandbox/callback?ticket=${encodeURIComponent(ticket)}`;
+  const requestHeaders = await headers();
+  const rawIp = (requestHeaders.get('cf-connecting-ip') || requestHeaders.get('x-forwarded-for') || '').split(',')[0]?.trim();
+  const customerIp = rawIp && /^[0-9a-f:.]{3,45}$/i.test(rawIp) ? rawIp : undefined;
+  const result = await alrajhiArb.createPayment({ amountSar: amount, topupId: Number(trackId.slice(-15)), description: 'اختبار خاص لبوابة الراجحي — لا شحن رصيد', callbackUrl, webhookUrl: callbackUrl, customerIp }, await getProviderCreds('alrajhi_arb'), 'test');
+  if (!result.ok || !result.redirectUrl) redirect('/admin/payments/sandbox?state=failed');
+  redirect(result.redirectUrl);
+}
+
 export async function saveProviderCredsAction(formData: FormData) {
   const session = await requireAction('users', 'edit');
   const provider = String(formData.get('provider') || '');

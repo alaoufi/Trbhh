@@ -1,0 +1,36 @@
+import { describe, expect, it } from 'vitest';
+import { decodeArbCallback, decryptArbTrandata, encryptArbTrandata, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
+import { providerMeta } from '@/lib/payments/registry';
+
+const resourceKey = '12345678901234567890123456789012';
+
+describe('Al Rajhi ARB bank-hosted provider', () => {
+  it('encrypts and decrypts the bank trandata with the documented resource key', () => {
+    const plain = JSON.stringify({ amt: '10.00', action: '1', trackId: '42' });
+    const encrypted = encryptArbTrandata(plain, resourceKey);
+
+    expect(encrypted).not.toContain('10.00');
+    expect(encrypted).toMatch(/^[0-9A-F]+$/);
+    expect(decryptArbTrandata(encrypted, resourceKey)).toBe(plain);
+  });
+
+  it('uses the payment id and hosted page URL returned by the bank', () => {
+    expect(parseArbInitialResponse([{ status: '1', result: '100201931620827468:https://securepayments.alrajhibank.com.sa/pg/paymentpage.htm' }])).toEqual({
+      paymentId: '100201931620827468',
+      redirectUrl: 'https://securepayments.alrajhibank.com.sa/pg/paymentpage.htm?PaymentID=100201931620827468',
+    });
+  });
+
+  it('accepts a callback only when its encrypted payment id and track id agree', () => {
+    const trandata = encryptArbTrandata(JSON.stringify({ paymentId: '123', trackId: '42', result: 'CAPTURED' }), resourceKey);
+    expect(decodeArbCallback({ paymentId: '123', trandata }, resourceKey)).toMatchObject({ paymentId: '123', trackId: '42', result: 'CAPTURED' });
+    expect(decodeArbCallback({ paymentId: '124', trandata }, resourceKey)).toBeNull();
+  });
+
+  it('keeps exactly the field names supplied by the bank', () => {
+    expect(providerMeta('alrajhi_arb')?.creds.map((field) => field.label)).toEqual([
+      'Terminal ID', 'Terminal Name', 'Merchant ID', 'Terminal Alias Name',
+      'Tranportal ID', 'Tranportal Password', 'Terminal Resource Key',
+    ]);
+  });
+});

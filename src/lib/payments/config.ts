@@ -40,13 +40,14 @@ type EnvironmentValues = Record<string, string | undefined>;
 export function alrajhiEnvironmentConfigured(env: EnvironmentValues = process.env): boolean {
   const mode = env.ALRAJHI_ENVIRONMENT;
   if (mode !== 'sandbox' && mode !== 'production') return false;
-  return ['ALRAJHI_MERCHANT_ID', 'ALRAJHI_TERMINAL_ID', 'ALRAJHI_USERNAME', 'ALRAJHI_PASSWORD', 'ALRAJHI_SECRET_KEY', 'ALRAJHI_API_KEY', 'ALRAJHI_API_BASE_URL', 'ALRAJHI_HOSTED_PAYMENT_URL', 'DATABASE_PAYMENT_SECRET']
+  return ALRAJHI_REQUIRED_FIELDS
     .every((key) => (env[key] || '').trim().length > 0);
 }
 
 const ALRAJHI_REQUIRED_FIELDS = [
-  'ALRAJHI_MERCHANT_ID', 'ALRAJHI_TERMINAL_ID', 'ALRAJHI_USERNAME', 'ALRAJHI_PASSWORD',
-  'ALRAJHI_SECRET_KEY', 'ALRAJHI_API_KEY', 'ALRAJHI_API_BASE_URL', 'ALRAJHI_HOSTED_PAYMENT_URL', 'DATABASE_PAYMENT_SECRET',
+  'ALRAJHI_TERMINAL_ID', 'ALRAJHI_TERMINAL_NAME', 'ALRAJHI_MERCHANT_ID', 'ALRAJHI_TERMINAL_ALIAS_NAME',
+  'ALRAJHI_TRANPORTAL_ID', 'ALRAJHI_TRANPORTAL_PASSWORD', 'ALRAJHI_TERMINAL_RESOURCE_KEY',
+  'ALRAJHI_PAYMENT_GATEWAY_URL', 'DATABASE_PAYMENT_SECRET',
 ] as const;
 
 /** Safe for the admin UI: reports configuration presence only, never secret values. */
@@ -135,6 +136,19 @@ export async function setEnabledMethods(methods: string[]): Promise<void> {
 
 /** بيانات اعتماد مزوّد (قيَمها الحقيقية — للاستخدام الخادمي فقط). */
 export async function getProviderCreds(provider: string): Promise<ProviderCreds> {
+  if (provider === 'alrajhi_arb') {
+    return {
+      terminal_id: process.env.ALRAJHI_TERMINAL_ID || '',
+      terminal_name: process.env.ALRAJHI_TERMINAL_NAME || '',
+      merchant_id: process.env.ALRAJHI_MERCHANT_ID || '',
+      terminal_alias_name: process.env.ALRAJHI_TERMINAL_ALIAS_NAME || '',
+      tranportal_id: process.env.ALRAJHI_TRANPORTAL_ID || '',
+      tranportal_password: process.env.ALRAJHI_TRANPORTAL_PASSWORD || '',
+      terminal_resource_key: process.env.ALRAJHI_TERMINAL_RESOURCE_KEY || '',
+      gateway_url: process.env.ALRAJHI_PAYMENT_GATEWAY_URL || '',
+      hosted_payment_url: process.env.ALRAJHI_HOSTED_PAYMENT_URL || '',
+    };
+  }
   const meta = providerMeta(provider);
   if (!meta) return {};
   const out: ProviderCreds = {};
@@ -148,6 +162,7 @@ export async function getProviderCreds(provider: string): Promise<ProviderCreds>
 
 /** هل المزوّد مُهيّأ (كل الحقول السرّية المطلوبة مُدخَلة)؟ */
 export async function isProviderConfigured(provider: string): Promise<boolean> {
+  if (provider === 'alrajhi_arb') return alrajhiEnvironmentConfigured();
   const meta = providerMeta(provider);
   if (!meta || !meta.ready) return false;
   const creds = await getProviderCreds(provider);

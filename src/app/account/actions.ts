@@ -1,6 +1,7 @@
 'use server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { getMemberWindows, withinWindow, getServicePricing, DUR_DAYS, DUR_LABEL, DUP_PACK_COUNT, isDur, getAdRestoreFee } from '@/lib/settings';
@@ -176,7 +177,11 @@ export async function startOnlineTopupAction(formData: FormData) {
   if (!Number.isFinite(amount) || amount <= 0) redirect('/account/wallet?error=topupamount#topup');
   const { startTopupPayment } = await import('@/lib/payments');
   const me = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { name: true, userName: true, phoneNumber: true } }).catch(() => null);
-  const res = await startTopupPayment(session.uid, amount, { name: me?.name || me?.userName || undefined, phone: me?.phoneNumber || undefined });
+  const requestHeaders = await headers();
+  const forwarded = requestHeaders.get('x-forwarded-for') || requestHeaders.get('cf-connecting-ip') || '';
+  const ip = forwarded.split(',')[0]?.trim();
+  const safeIp = ip && /^[0-9a-f:.]{3,45}$/i.test(ip) ? ip : undefined;
+  const res = await startTopupPayment(session.uid, amount, { name: me?.name || me?.userName || undefined, phone: me?.phoneNumber || undefined, ip: safeIp });
   if (!res.ok || !res.redirectUrl) redirect(`/account/wallet?error=payfailed#topup`);
   redirect(res.redirectUrl); // توجيه لصفحة دفع المزوّد (رابط خارجي)
 }

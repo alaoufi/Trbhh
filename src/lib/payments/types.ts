@@ -7,7 +7,7 @@
  */
 
 /** معرّفات المزوّدين المدعومين/المخطّطين. */
-export type PayProviderId = 'moyasar' | 'tap' | 'paytabs' | 'neoleap' | 'hyperpay' | 'tabby' | 'tamara';
+export type PayProviderId = 'moyasar' | 'tap' | 'paytabs' | 'alrajhi_arb' | 'neoleap' | 'hyperpay' | 'tabby' | 'tamara';
 
 /** وسائل الدفع الفعلية التي قد تدعمها البوابة. */
 export type PayMethod = 'mada' | 'visa' | 'mastercard' | 'applepay' | 'stcpay' | 'googlepay' | 'tabby' | 'tamara' | 'card';
@@ -29,6 +29,7 @@ export interface CreatePaymentInput {
   customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
+  customerIp?: string;   // ARB mandates the customer's address in X-FORWARDED-FOR.
 }
 
 /** نتيجة إنشاء عملية الدفع. */
@@ -54,7 +55,7 @@ export interface PayProvider {
   /** ينشئ عملية دفع ويعيد رابط صفحة الدفع المستضافة. */
   createPayment(input: CreatePaymentInput, creds: ProviderCreds, mode: PayMode): Promise<CreatePaymentResult>;
   /** يتحقّق من حالة عملية بمعرّفها لدى المزوّد (المصدر الموثوق للتأكيد). */
-  verifyByRef(providerRef: string, creds: ProviderCreds, mode: PayMode): Promise<VerifyResult>;
+  verifyByRef(providerRef: string, creds: ProviderCreds, mode: PayMode, expectedAmountSar?: number): Promise<VerifyResult>;
   /** يستخرج معرّف العملية من جسم إشعار الويبهوك (لإعادة التحقّق منه). */
   extractRefFromWebhook(body: unknown, query: URLSearchParams): string | null;
 }

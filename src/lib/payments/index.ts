@@ -7,13 +7,15 @@ import type { PayProvider, PayProviderId } from './types';
 import { moyasar } from './providers/moyasar';
 import { tap } from './providers/tap';
 import { paytabs } from './providers/paytabs';
+import { alrajhiArb } from './providers/alrajhi-arb';
+import { decodeArbCallback } from './providers/alrajhi-arb';
 
 export { PROVIDER_META, providerMeta, readyProviders } from './registry';
 export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, getTopupMethodAvailability, saveTopupMethodSettings, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
 export type { PaymentConfig } from './config';
 
 /** سجلّ مُحوِّلات المزوّدين الجاهزين (لها كود مكتمل). */
-const ADAPTERS: Partial<Record<PayProviderId, PayProvider>> = { moyasar, tap, paytabs };
+const ADAPTERS: Partial<Record<PayProviderId, PayProvider>> = { moyasar, tap, paytabs, alrajhi_arb: alrajhiArb };
 
 export function getAdapter(id: string): PayProvider | null {
   return ADAPTERS[id as PayProviderId] ?? null;
@@ -32,7 +34,7 @@ export type StartResult = { ok: boolean; redirectUrl?: string; error?: string };
 export async function startTopupPayment(
   userId: number,
   amountSar: number,
-  customer?: { name?: string; email?: string; phone?: string },
+  customer?: { name?: string; email?: string; phone?: string; ip?: string },
 ): Promise<StartResult> {
   if (!(await isOnlinePayReady())) return { ok: false, error: 'الدفع الإلكتروني غير مُفعَّل حالياً' };
   const cfg = await getPaymentConfig();
@@ -60,6 +62,7 @@ export async function startTopupPayment(
       customerName: customer?.name,
       customerEmail: customer?.email,
       customerPhone: customer?.phone,
+      customerIp: customer?.ip,
     },
     creds,
     cfg.mode,
@@ -87,7 +90,7 @@ export async function confirmTopupById(topupId: number): Promise<{ paid: boolean
 
   const creds = await getProviderCreds(row.provider);
   const cfg = await getPaymentConfig();
-  const v = await adapter.verifyByRef(providerRef, creds, cfg.mode);
+  const v = await adapter.verifyByRef(providerRef, creds, cfg.mode, row.amount);
   if (!v.paid) return { paid: false, credited: false, reason: v.status };
   // مطابقة المبلغ حماية من التلاعب
   if (v.amountSar > 0 && Math.abs(v.amountSar - row.amount) > 0) {
@@ -109,6 +112,22 @@ export async function confirmFromWebhook(provider: string, body: unknown, query:
   if (!topupId) return { handled: false };
   await confirmTopupById(topupId);
   return { handled: true };
+}
+
+/**
+ * ARB requires a positive acknowledgement before it settles a Bank Hosted payment.
+ * We only acknowledge an encrypted notification when it binds to the pending top-up
+ * through both the bank Payment ID and our Track ID. Credit still happens only after
+ * the later server-to-server inquiry.
+ */
+export async function validateAlrajhiCallback(topupId: number, body: unknown): Promise<boolean> {
+  const row = await getTopupById(topupId);
+  if (!row || row.source !== 'online' || row.provider !== 'alrajhi_arb') return false;
+  const providerRef = await providerRefOf(topupId);
+  if (!providerRef) return false;
+  const creds = await getProviderCreds('alrajhi_arb');
+  const data = decodeArbCallback(body, creds.terminal_resource_key || '');
+  return !!data && String(data.paymentId || '') === providerRef && String(data.trackId || '') === String(topupId);
 }
 
 /** يقرأ معرّف عملية المزوّد المخزّن على طلب الشحن. */

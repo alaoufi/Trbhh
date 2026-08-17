@@ -1,5 +1,16 @@
 export const INITIAL_ENTITY_KEYS = ['vehicle', 'property', 'livestock', 'product', 'service', 'equipment', 'other'] as const;
 export type InitialEntityKey = typeof INITIAL_ENTITY_KEYS[number];
+type DefaultField = Pick<DynamicField, 'key' | 'label' | 'type' | 'options' | 'searchable'> & { groupKey?: string };
+const f = (key: string, label: string, type: DynamicFieldType = 'text', options: string[] = [], groupKey = 'specs'): DefaultField => ({ key, label, type, options, searchable: true, groupKey });
+/** Seed catalogue only: values remain in dynamic_ad_values, never fixed ad columns. */
+export const DEFAULT_ENTITY_FIELDS: Record<InitialEntityKey, DefaultField[]> = {
+  vehicle: [f('vehicle_type','نوع المركبة','select',['سيارة','دراجة','شاحنة','مركبة أخرى']),f('manufacturer','الشركة المصنعة'),f('model','الموديل'),f('trim','الفئة'),f('year','سنة الصنع','number'),f('condition','الحالة','select',['جديد','مستعمل']),f('mileage','العداد','number'),f('fuel','الوقود','select',['بنزين','ديزل','كهرباء','هجين']),f('transmission','ناقل الحركة','select',['أوتوماتيك','عادي']),f('drive_system','نظام الدفع'),f('color','اللون'),f('seats','عدد المقاعد','number'),f('country_of_origin','بلد الصنع'),f('warranty','الضمان','boolean'),f('accidents','الحوادث','boolean'),f('maintenance','الصيانة','textarea'),f('notes','ملاحظات','textarea')],
+  property: [f('property_type','نوع العقار','select',['شقة','فيلا','أرض','عمارة','مكتب','محل']),f('offer_type','نوع العرض','select',['بيع','إيجار']),f('area_sqm','المساحة','number'),f('region','المنطقة','text',[],'location'),f('city','المدينة','text',[],'location'),f('district','الحي','text',[],'location'),f('map_location','الموقع على الخريطة','location',[],'location'),f('rooms','عدد الغرف','number'),f('bathrooms','عدد دورات المياه','number'),f('floor','الدور','number'),f('property_age','عمر العقار','number'),f('finishing','التشطيب'),f('parking','المواقف','number'),f('nearby_services','الخدمات القريبة','textarea'),f('direction','اتجاه العقار'),f('facade','الواجهة')],
+  livestock: [f('livestock_type','النوع','select',['إبل','غنم','ماعز','أبقار']),f('breed','السلالة'),f('gender','الجنس','select',['ذكر','أنثى']),f('age','العمر'),f('color','اللون'),f('weight','الوزن','decimal'),f('health_status','الحالة الصحية'),f('vaccinations','التحصينات','textarea'),f('production','الإنتاج'),f('sire','الأب'),f('dam','الأم'),f('stud','الفحل'),f('lineage','النسب'),f('notes','الملاحظات','textarea')],
+  product: [f('product_type','نوع المنتج'),f('brand','الماركة'),f('model','الموديل'),f('condition','الحالة','select',['جديد','مستعمل']),f('color','اللون'),f('warranty','الضمان','boolean'),f('country_of_origin','بلد الصنع'),f('specifications','المواصفات','textarea'),f('notes','الملاحظات','textarea')],
+  service: [f('service_type','نوع الخدمة'),f('service_field','مجال الخدمة'),f('region','المنطقة','text',[],'location'),f('experience','الخبرة'),f('delivery_duration','مدة التنفيذ'),f('estimated_price','السعر التقريبي','decimal'),f('service_description','الوصف','textarea'),f('notes','الملاحظات','textarea')],
+  equipment: [], other: [],
+};
 export type DynamicFieldType = 'text' | 'textarea' | 'number' | 'decimal' | 'select' | 'multiselect' | 'boolean' | 'date' | 'location' | 'media' | 'file' | 'url';
 
 export type DynamicField = {

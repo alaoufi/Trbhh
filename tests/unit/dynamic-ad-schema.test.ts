@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { INITIAL_ENTITY_KEYS, normalizeDynamicFieldLayout, validateDynamicValues } from '@/lib/dynamic-ads/schema';
+import { DEFAULT_ENTITY_FIELDS, INITIAL_ENTITY_KEYS, normalizeDynamicFieldLayout, validateDynamicValues } from '@/lib/dynamic-ads/schema';
 
 describe('dynamic advertisement schema', () => {
   it('ships the seven initial entity templates', () => {
@@ -41,5 +41,11 @@ describe('dynamic advertisement schema', () => {
 
   it('normalises independent input and display ordering for a field', () => {
     expect(normalizeDynamicFieldLayout({ groupId: 3, inputOrder: 20, displayOrder: 5, inputVisible: true, displayVisible: false })).toEqual({ groupId: 3, inputOrder: 20, displayOrder: 5, inputVisible: true, displayVisible: false });
+  });
+
+  it('defines the required default field catalogue without fixed advertisement columns', () => {
+    expect(DEFAULT_ENTITY_FIELDS.vehicle.map((field) => field.key)).toEqual(expect.arrayContaining(['vehicle_type', 'manufacturer', 'model', 'year', 'fuel', 'transmission', 'notes']));
+    expect(DEFAULT_ENTITY_FIELDS.property.map((field) => field.key)).toEqual(expect.arrayContaining(['property_type', 'offer_type', 'area_sqm', 'city', 'district', 'map_location', 'rooms']));
+    expect(DEFAULT_ENTITY_FIELDS.livestock.map((field) => field.key)).toEqual(expect.arrayContaining(['livestock_type', 'breed', 'health_status', 'vaccinations', 'sire', 'dam']));
   });
 });

@@ -2,7 +2,7 @@ import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { prisma } from '@/lib/prisma';
-import type { DynamicField } from './schema';
+import { DEFAULT_ENTITY_FIELDS, type DynamicField } from './schema';
 import type { DynamicAdDraft, DynamicAnalysis, DynamicEntity, DynamicFieldGroup } from './types';
 
 type EntityRow = { id: bigint; entity_key: string; name_ar: string; icon: string; is_active: number; display_order: number };
@@ -21,6 +21,11 @@ export function ensureDynamicAdsSchema(): Promise<void> {
     const source = await readFile(path.join(process.cwd(), 'database/2026-08-17-dynamic-ads.sql'), 'utf8');
     for (const statement of source.split(/;\s*(?:\r?\n|$)/).map((s) => s.replace(/--[^\n]*/g, '').trim()).filter(Boolean)) {
       await prisma.$executeRawUnsafe(statement);
+    }
+    const entityRows = await prisma.$queryRawUnsafe<{ id: bigint; entity_key: keyof typeof DEFAULT_ENTITY_FIELDS }[]>('SELECT id, entity_key FROM dynamic_entities');
+    for (const entity of entityRows) for (const [index, preset] of DEFAULT_ENTITY_FIELDS[entity.entity_key].entries()) {
+      const groups = await prisma.$queryRawUnsafe<{ id: bigint }[]>('SELECT id FROM dynamic_entity_groups WHERE entity_id=? AND group_key=? LIMIT 1', scalar(entity.id), preset.groupKey || 'specs');
+      await createDynamicField({ entityId: scalar(entity.id), groupId: groups[0] ? scalar(groups[0].id) : null, key: preset.key, label: preset.label, type: preset.type, required: false, searchable: preset.searchable, options: preset.options, inputOrder: (index + 1) * 10, displayOrder: (index + 1) * 10, inputVisible: true, displayVisible: true, skipEnsure: true });
     }
   })().catch((error) => { schemaReady = null; throw error; });
   return schemaReady;
@@ -98,10 +103,10 @@ export async function createDynamicEntity(input: { key: string; name: string; ic
   await prisma.$executeRawUnsafe('INSERT INTO dynamic_entities (entity_key, name_ar, icon, display_order) VALUES (?, ?, ?, 999) ON DUPLICATE KEY UPDATE name_ar=VALUES(name_ar), icon=VALUES(icon), is_active=1', input.key, input.name.slice(0, 120), input.icon.slice(0, 16) || '📦');
 }
 
-export async function createDynamicField(input: { entityId: number; key: string; label: string; type: DynamicField['type']; required: boolean; searchable: boolean; options: string[] }) {
-  await ensureDynamicAdsSchema();
+export async function createDynamicField(input: { entityId: number; groupId?: number | null; key: string; label: string; type: DynamicField['type']; required: boolean; searchable: boolean; options: string[]; inputOrder?: number; displayOrder?: number; inputVisible?: boolean; displayVisible?: boolean; placeholder?: string; skipEnsure?: boolean }) {
+  if (!input.skipEnsure) await ensureDynamicAdsSchema();
   if (!/^[a-z][a-z0-9_]{1,63}$/.test(input.key)) throw new Error('invalid_field_key');
-  await prisma.$executeRawUnsafe('INSERT INTO dynamic_entity_fields (entity_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, 999) ON DUPLICATE KEY UPDATE label_ar=VALUES(label_ar), field_type=VALUES(field_type), required_flag=VALUES(required_flag), searchable_flag=VALUES(searchable_flag), options_json=VALUES(options_json), is_active=1', input.entityId, input.key, input.label.slice(0, 120), input.type, input.required ? 1 : 0, input.searchable ? 1 : 0, JSON.stringify(input.options.slice(0, 30).map((option) => option.slice(0, 80))));
+  await prisma.$executeRawUnsafe('INSERT INTO dynamic_entity_fields (entity_id, group_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, placeholder_ar, input_order, display_order, input_visible_flag, display_visible_flag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE group_id=VALUES(group_id), label_ar=VALUES(label_ar), field_type=VALUES(field_type), required_flag=VALUES(required_flag), searchable_flag=VALUES(searchable_flag), options_json=VALUES(options_json), placeholder_ar=VALUES(placeholder_ar), input_order=VALUES(input_order), display_order=VALUES(display_order), input_visible_flag=VALUES(input_visible_flag), display_visible_flag=VALUES(display_visible_flag), is_active=1', input.entityId, input.groupId ?? null, input.key, input.label.slice(0, 120), input.type, input.required ? 1 : 0, input.searchable ? 1 : 0, JSON.stringify(input.options.slice(0, 30).map((option) => option.slice(0, 80))), input.placeholder?.slice(0, 255) || null, input.inputOrder ?? 999, input.displayOrder ?? 999, input.inputVisible === false ? 0 : 1, input.displayVisible === false ? 0 : 1);
 }
 
 export async function setDynamicEntityActive(id: number, active: boolean) {

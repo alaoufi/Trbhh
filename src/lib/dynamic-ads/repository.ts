@@ -3,10 +3,11 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { prisma } from '@/lib/prisma';
 import type { DynamicField } from './schema';
-import type { DynamicAdDraft, DynamicAnalysis, DynamicEntity } from './types';
+import type { DynamicAdDraft, DynamicAnalysis, DynamicEntity, DynamicFieldGroup } from './types';
 
 type EntityRow = { id: bigint; entity_key: string; name_ar: string; icon: string; is_active: number; display_order: number };
-type FieldRow = { id: bigint; entity_id: bigint; field_key: string; label_ar: string; field_type: DynamicField['type']; required_flag: number; searchable_flag: number; options_json: unknown; display_order: number };
+type FieldRow = { id: bigint; entity_id: bigint; group_id: bigint | null; field_key: string; label_ar: string; field_type: DynamicField['type']; required_flag: number; searchable_flag: number; options_json: unknown; placeholder_ar: string | null; input_order: number; display_order: number; input_visible_flag: number; display_visible_flag: number };
+type GroupRow = { id: bigint; entity_id: bigint; group_key: string; label_ar: string; input_order: number; display_order: number };
 type DraftRow = { id: bigint; entity_id: bigint | null; title: string; description: string; price: unknown; location_text: string | null; status: 'draft' | 'analysed' | 'ready'; extracted_json: unknown; missing_json: unknown; suggestions_json: unknown; values_json: unknown; detected_entity_key: string | null; confidence: unknown; quality_score: number };
 
 let schemaReady: Promise<void> | null = null;
@@ -26,14 +27,17 @@ export function ensureDynamicAdsSchema(): Promise<void> {
 }
 
 function field(row: FieldRow): DynamicField {
-  return { key: row.field_key, label: row.label_ar, type: row.field_type, required: !!row.required_flag, searchable: !!row.searchable_flag, options: json<string[]>(row.options_json, []) };
+  return { id: scalar(row.id), key: row.field_key, label: row.label_ar, type: row.field_type, required: !!row.required_flag, searchable: !!row.searchable_flag, options: json<string[]>(row.options_json, []), placeholder: row.placeholder_ar || undefined, groupId: row.group_id === null ? null : scalar(row.group_id), inputOrder: row.input_order, displayOrder: row.display_order, inputVisible: !!row.input_visible_flag, displayVisible: !!row.display_visible_flag };
 }
 
 export async function listDynamicEntities(includeInactive = false): Promise<DynamicEntity[]> {
   await ensureDynamicAdsSchema();
   const entities = await prisma.$queryRawUnsafe<EntityRow[]>(`SELECT id, entity_key, name_ar, icon, is_active, display_order FROM dynamic_entities ${includeInactive ? '' : 'WHERE is_active=1'} ORDER BY display_order, id`);
-  const fields = await prisma.$queryRawUnsafe<FieldRow[]>('SELECT id, entity_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, display_order FROM dynamic_entity_fields WHERE is_active=1 ORDER BY display_order, id');
-  return entities.map((row) => ({ id: scalar(row.id), key: row.entity_key, name: row.name_ar, icon: row.icon, active: !!row.is_active, order: row.display_order, fields: fields.filter((f) => scalar(f.entity_id) === scalar(row.id)).map(field) }));
+  const [fields, groups] = await Promise.all([
+    prisma.$queryRawUnsafe<FieldRow[]>('SELECT id, entity_id, group_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, placeholder_ar, input_order, display_order, input_visible_flag, display_visible_flag FROM dynamic_entity_fields WHERE is_active=1 ORDER BY input_order, display_order, id'),
+    prisma.$queryRawUnsafe<GroupRow[]>('SELECT id, entity_id, group_key, label_ar, input_order, display_order FROM dynamic_entity_groups WHERE is_active=1 ORDER BY input_order, display_order, id'),
+  ]);
+  return entities.map((row) => ({ id: scalar(row.id), key: row.entity_key, name: row.name_ar, icon: row.icon, active: !!row.is_active, order: row.display_order, groups: groups.filter((g) => scalar(g.entity_id) === scalar(row.id)).map((g): DynamicFieldGroup => ({ id: scalar(g.id), key: g.group_key, label: g.label_ar, inputOrder: g.input_order, displayOrder: g.display_order })), fields: fields.filter((f) => scalar(f.entity_id) === scalar(row.id)).map(field) }));
 }
 
 export async function dynamicEntityByKey(key: string): Promise<DynamicEntity | null> {
@@ -50,13 +54,13 @@ export async function saveDynamicDraft(input: { userId: number; entityId: number
   ) as unknown as { insertId: bigint | number };
   const adId = scalar(result.insertId);
   if (input.entityId && Object.keys(input.values).length) {
-    const fields = await prisma.$queryRawUnsafe<FieldRow[]>('SELECT id, entity_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, display_order FROM dynamic_entity_fields WHERE entity_id=? AND is_active=1', input.entityId);
+    const fields = await prisma.$queryRawUnsafe<FieldRow[]>('SELECT id, entity_id, group_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, placeholder_ar, input_order, display_order, input_visible_flag, display_visible_flag FROM dynamic_entity_fields WHERE entity_id=? AND is_active=1', input.entityId);
     for (const row of fields) {
       const value = input.values[row.field_key];
       if (value === undefined) continue;
       const numeric = typeof value === 'number' ? value : null;
       const boolean = typeof value === 'boolean' ? (value ? 1 : 0) : null;
-      const text = numeric === null && boolean === null ? String(value).slice(0, 1024) : null;
+      const text = numeric === null && boolean === null ? (Array.isArray(value) ? JSON.stringify(value) : String(value)).slice(0, 1024) : null;
       await prisma.$executeRawUnsafe('INSERT INTO dynamic_ad_values (advertisement_id, field_id, value_text, value_number, value_boolean) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE value_text=VALUES(value_text), value_number=VALUES(value_number), value_boolean=VALUES(value_boolean)', adId, scalar(row.id), text, numeric, boolean);
     }
   }

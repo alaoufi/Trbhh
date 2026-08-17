@@ -1,6 +1,8 @@
 import type { DynamicField } from './schema';
 
-export type DynamicEntity = { id: number; key: string; name: string; icon: string; active: boolean; order: number; fields: DynamicField[] };
+export type DynamicFieldGroup = { id: number; key: string; label: string; inputOrder: number; displayOrder: number };
+
+export type DynamicEntity = { id: number; key: string; name: string; icon: string; active: boolean; order: number; groups: DynamicFieldGroup[]; fields: DynamicField[] };
 export type DynamicAnalysis = {
   entityKey: string | null;
   confidence: number;

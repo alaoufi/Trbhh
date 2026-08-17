@@ -13,6 +13,22 @@ CREATE TABLE IF NOT EXISTS dynamic_entities (
   KEY dynamic_entity_active_order (is_active, display_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS dynamic_entity_groups (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  entity_id BIGINT UNSIGNED NOT NULL,
+  group_key VARCHAR(64) NOT NULL,
+  label_ar VARCHAR(120) NOT NULL,
+  input_order INT NOT NULL DEFAULT 0,
+  display_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY dynamic_entity_group_key (entity_id, group_key),
+  KEY dynamic_entity_group_order (entity_id, is_active, input_order, display_order),
+  CONSTRAINT dynamic_entity_groups_entity_fk FOREIGN KEY (entity_id) REFERENCES dynamic_entities(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS dynamic_entity_fields (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   entity_id BIGINT UNSIGNED NOT NULL,
@@ -31,6 +47,13 @@ CREATE TABLE IF NOT EXISTS dynamic_entity_fields (
   KEY dynamic_entity_field_order (entity_id, is_active, display_order),
   CONSTRAINT dynamic_entity_fields_entity_fk FOREIGN KEY (entity_id) REFERENCES dynamic_entities(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS group_id BIGINT UNSIGNED NULL AFTER entity_id;
+ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS placeholder_ar VARCHAR(255) NULL AFTER options_json;
+ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS input_order INT NOT NULL DEFAULT 0 AFTER display_order;
+ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS input_visible_flag TINYINT NOT NULL DEFAULT 1 AFTER input_order;
+ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS display_visible_flag TINYINT NOT NULL DEFAULT 1 AFTER input_visible_flag;
+CREATE INDEX IF NOT EXISTS dynamic_entity_field_group_order ON dynamic_entity_fields (entity_id, group_id, is_active, input_order, display_order);
 
 CREATE TABLE IF NOT EXISTS dynamic_advertisements (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -93,6 +116,17 @@ INSERT INTO dynamic_entities (entity_key, name_ar, icon, display_order) VALUES
   ('vehicle', 'مركبة', '🚗', 10), ('property', 'عقار', '🏠', 20), ('livestock', 'حلال', '🐪', 30),
   ('product', 'أجهزة ومنتجات', '📱', 40), ('service', 'خدمات', '🛠️', 50), ('equipment', 'معدات', '🚜', 60), ('other', 'أخرى', '📦', 70)
 ON DUPLICATE KEY UPDATE name_ar=VALUES(name_ar), icon=VALUES(icon), display_order=VALUES(display_order);
+
+INSERT INTO dynamic_entity_groups (entity_id, group_key, label_ar, input_order, display_order)
+SELECT id, 'basic', 'البيانات الأساسية', 10, 10 FROM dynamic_entities
+ON DUPLICATE KEY UPDATE label_ar=VALUES(label_ar);
+INSERT INTO dynamic_entity_groups (entity_id, group_key, label_ar, input_order, display_order)
+SELECT id, 'specs', 'المواصفات والتفاصيل', 20, 20 FROM dynamic_entities
+ON DUPLICATE KEY UPDATE label_ar=VALUES(label_ar);
+INSERT INTO dynamic_entity_groups (entity_id, group_key, label_ar, input_order, display_order)
+SELECT id, 'location', 'الموقع', 30, 30 FROM dynamic_entities
+ON DUPLICATE KEY UPDATE label_ar=VALUES(label_ar);
+UPDATE dynamic_entity_fields f JOIN dynamic_entity_groups g ON g.entity_id=f.entity_id AND g.group_key='specs' SET f.group_id=g.id, f.input_order=CASE WHEN f.input_order=0 THEN f.display_order ELSE f.input_order END WHERE f.group_id IS NULL;
 
 INSERT INTO dynamic_entity_fields (entity_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, display_order)
 SELECT id, 'manufacturer', 'الشركة المصنعة', 'text', 0, 1, NULL, 10 FROM dynamic_entities WHERE entity_key='vehicle'

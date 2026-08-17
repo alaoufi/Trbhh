@@ -65,7 +65,8 @@ async function ensure() {
       active TINYINT NOT NULL DEFAULT 1
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
-  await prisma.$executeRawUnsafe(`ALTER TABLE packages ADD COLUMN ad_days INT NOT NULL DEFAULT 0`).catch(() => {});
+  const adDays = await prisma.$queryRawUnsafe<{ count: bigint }[]>(`SELECT COUNT(*) AS count FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'packages' AND column_name = 'ad_days'`);
+  if (!adDays[0] || Number(adDays[0].count) === 0) await prisma.$executeRawUnsafe(`ALTER TABLE packages ADD COLUMN ad_days INT NOT NULL DEFAULT 0`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS user_packages (
       user_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,

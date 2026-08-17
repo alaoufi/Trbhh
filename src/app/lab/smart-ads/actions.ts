@@ -14,7 +14,8 @@ export async function analyseSmartAdAction(formData: FormData) {
   const requestedKey = String(formData.get('entity_key') || '').trim();
   const selected = requestedKey && requestedKey !== 'auto' ? await dynamicEntityByKey(requestedKey) : null;
   if (requestedKey && requestedKey !== 'auto' && !selected?.active) redirect('/lab/smart-ads?error=entity');
-  const rawValues = Object.fromEntries([...formData.entries()].filter(([key]) => key.startsWith('dynamic_')).map(([key, value]) => [key.slice(8), value]));
+  const rawValues: Record<string, string | string[]> = {};
+  for (const [key, value] of formData.entries()) if (key.startsWith('dynamic_')) { const field = key.slice(8); const current = rawValues[field]; rawValues[field] = current === undefined ? String(value) : Array.isArray(current) ? [...current, String(value)] : [current, String(value)]; }
   const validation = selected ? validateDynamicValues(selected.fields, rawValues) : { ok: true, values: {}, errors: {} };
   if (!validation.ok) redirect(`/lab/smart-ads?error=fields&entity=${encodeURIComponent(requestedKey)}`);
   const analysis = analyseDynamicAd({ title, description });

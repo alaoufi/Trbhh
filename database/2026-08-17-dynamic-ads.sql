@@ -48,11 +48,6 @@ CREATE TABLE IF NOT EXISTS dynamic_entity_fields (
   CONSTRAINT dynamic_entity_fields_entity_fk FOREIGN KEY (entity_id) REFERENCES dynamic_entities(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS group_id BIGINT UNSIGNED NULL AFTER entity_id;
-ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS placeholder_ar VARCHAR(255) NULL AFTER options_json;
-ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS input_order INT NOT NULL DEFAULT 0 AFTER display_order;
-ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS input_visible_flag TINYINT NOT NULL DEFAULT 1 AFTER input_order;
-ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS display_visible_flag TINYINT NOT NULL DEFAULT 1 AFTER input_visible_flag;
 
 CREATE TABLE IF NOT EXISTS dynamic_advertisements (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -125,7 +120,6 @@ ON DUPLICATE KEY UPDATE label_ar=VALUES(label_ar);
 INSERT INTO dynamic_entity_groups (entity_id, group_key, label_ar, input_order, display_order)
 SELECT id, 'location', 'الموقع', 30, 30 FROM dynamic_entities
 ON DUPLICATE KEY UPDATE label_ar=VALUES(label_ar);
-UPDATE dynamic_entity_fields f JOIN dynamic_entity_groups g ON g.entity_id=f.entity_id AND g.group_key='specs' SET f.group_id=g.id, f.input_order=CASE WHEN f.input_order=0 THEN f.display_order ELSE f.input_order END WHERE f.group_id IS NULL;
 
 INSERT INTO dynamic_entity_fields (entity_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, display_order)
 SELECT id, 'manufacturer', 'الشركة المصنعة', 'text', 0, 1, NULL, 10 FROM dynamic_entities WHERE entity_key='vehicle'

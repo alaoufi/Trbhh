@@ -13,6 +13,12 @@ type DraftRow = { id: bigint; entity_id: bigint | null; title: string; descripti
 let schemaReady: Promise<void> | null = null;
 function scalar(value: unknown) { return typeof value === 'bigint' ? Number(value) : Number(value); }
 function json<T>(value: unknown, fallback: T): T { try { return typeof value === 'string' ? JSON.parse(value) as T : (value as T) ?? fallback; } catch { return fallback; } }
+async function ensureDynamicFieldColumns() {
+  const columns = await prisma.$queryRawUnsafe<{ column_name: string }[]>(`SELECT column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='dynamic_entity_fields'`);
+  const have = new Set(columns.map((column) => column.column_name));
+  const additions: [string, string][] = [['group_id','BIGINT UNSIGNED NULL AFTER entity_id'],['placeholder_ar','VARCHAR(255) NULL AFTER options_json'],['input_order','INT NOT NULL DEFAULT 0 AFTER display_order'],['input_visible_flag','TINYINT NOT NULL DEFAULT 1 AFTER input_order'],['display_visible_flag','TINYINT NOT NULL DEFAULT 1 AFTER input_visible_flag']];
+  for (const [name, definition] of additions) if (!have.has(name)) await prisma.$executeRawUnsafe(`ALTER TABLE dynamic_entity_fields ADD COLUMN ${name} ${definition}`);
+}
 
 /** Executes only idempotent pilot DDL, once per application process. */
 export function ensureDynamicAdsSchema(): Promise<void> {
@@ -22,6 +28,8 @@ export function ensureDynamicAdsSchema(): Promise<void> {
     for (const statement of source.split(/;\s*(?:\r?\n|$)/).map((s) => s.replace(/--[^\n]*/g, '').trim()).filter(Boolean)) {
       await prisma.$executeRawUnsafe(statement);
     }
+    await ensureDynamicFieldColumns();
+    await prisma.$executeRawUnsafe(`UPDATE dynamic_entity_fields f JOIN dynamic_entity_groups g ON g.entity_id=f.entity_id AND g.group_key='specs' SET f.group_id=g.id, f.input_order=CASE WHEN f.input_order=0 THEN f.display_order ELSE f.input_order END WHERE f.group_id IS NULL`);
     const entityRows = await prisma.$queryRawUnsafe<{ id: bigint; entity_key: keyof typeof DEFAULT_ENTITY_FIELDS }[]>('SELECT id, entity_key FROM dynamic_entities');
     for (const entity of entityRows) for (const [index, preset] of DEFAULT_ENTITY_FIELDS[entity.entity_key].entries()) {
       const groups = await prisma.$queryRawUnsafe<{ id: bigint }[]>('SELECT id FROM dynamic_entity_groups WHERE entity_id=? AND group_key=? LIMIT 1', scalar(entity.id), preset.groupKey || 'specs');

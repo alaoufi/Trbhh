@@ -26,8 +26,9 @@ describe('dynamic advertisement schema', () => {
     expect(sql).toContain('UNIQUE KEY dynamic_entity_key');
     expect(sql).toContain('UNIQUE KEY dynamic_entity_field_key');
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS dynamic_entity_groups');
-    expect(sql).toContain('input_visible_flag');
-    expect(sql).toContain('display_visible_flag');
+    const repository = fs.readFileSync(path.join(process.cwd(), 'src/lib/dynamic-ads/repository.ts'), 'utf8');
+    expect(repository).toContain("'input_visible_flag'");
+    expect(repository).toContain("'display_visible_flag'");
   });
 
   it('validates selected multiple options and preserves their order', () => {

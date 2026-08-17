@@ -21,14 +21,5 @@ jobs:
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/deploy_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" '
             set -e
             cd /root/trbhh
-            docker compose exec -T app sh -lc "test -r /app/database/2026-08-17-dynamic-ads.sql && echo SQL_FILE=present || echo SQL_FILE=missing"
-            docker compose exec -T app node - <<"NODE"
-            const { PrismaClient } = require("@prisma/client");
-            const prisma = new PrismaClient();
-            (async () => {
-              const rows = await prisma.$queryRawUnsafe("SHOW TABLES LIKE \\"dynamic_%\\"");
-              console.log("DYNAMIC_TABLES=" + JSON.stringify(rows));
-              await prisma.$disconnect();
-            })().catch((error) => { console.error("DIAGNOSTIC_ERROR=" + error.message); process.exit(1); });
-            NODE
+            docker compose exec -T app sh -lc "test -r /app/database/2026-08-17-dynamic-ads.sql && echo SQL_FILE=present || (echo SQL_FILE=missing; exit 1)"
           '

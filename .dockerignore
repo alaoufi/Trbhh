@@ -6,5 +6,6 @@ node_modules
 docker/mysql-data
 docker/redis-data
 database/*.sql
+!database/2026-08-17-dynamic-ads.sql
 npm-debug.log
 README*.md

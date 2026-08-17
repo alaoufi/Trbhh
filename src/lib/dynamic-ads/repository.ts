@@ -48,7 +48,19 @@ export async function saveDynamicDraft(input: { userId: number; entityId: number
     input.userId, input.entityId, input.title.slice(0, 255), input.description.slice(0, 10_000), input.price, input.locationText?.slice(0, 255) || null,
     'analysed', input.analysis.entityKey, input.analysis.confidence, input.analysis.quality, JSON.stringify(input.analysis.extracted), JSON.stringify(input.analysis.missing), JSON.stringify(input.analysis.suggestions), JSON.stringify(input.values), input.fingerprint,
   ) as unknown as { insertId: bigint | number };
-  return scalar(result.insertId);
+  const adId = scalar(result.insertId);
+  if (input.entityId && Object.keys(input.values).length) {
+    const fields = await prisma.$queryRawUnsafe<FieldRow[]>('SELECT id, entity_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, display_order FROM dynamic_entity_fields WHERE entity_id=? AND is_active=1', input.entityId);
+    for (const row of fields) {
+      const value = input.values[row.field_key];
+      if (value === undefined) continue;
+      const numeric = typeof value === 'number' ? value : null;
+      const boolean = typeof value === 'boolean' ? (value ? 1 : 0) : null;
+      const text = numeric === null && boolean === null ? String(value).slice(0, 1024) : null;
+      await prisma.$executeRawUnsafe('INSERT INTO dynamic_ad_values (advertisement_id, field_id, value_text, value_number, value_boolean) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE value_text=VALUES(value_text), value_number=VALUES(value_number), value_boolean=VALUES(value_boolean)', adId, scalar(row.id), text, numeric, boolean);
+    }
+  }
+  return adId;
 }
 
 export async function dynamicDraftById(id: number, userId: number): Promise<DynamicAdDraft | null> {
@@ -79,13 +91,13 @@ export async function listDynamicAdminDrafts(limit = 40): Promise<DynamicAdDraft
 export async function createDynamicEntity(input: { key: string; name: string; icon: string }) {
   await ensureDynamicAdsSchema();
   if (!/^[a-z][a-z0-9_]{1,63}$/.test(input.key)) throw new Error('invalid_entity_key');
-  await prisma.$executeRawUnsafe('INSERT INTO dynamic_entities (entity_key, name_ar, icon, display_order) VALUES (?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM (SELECT display_order FROM dynamic_entities) AS ordered_entities)) ON DUPLICATE KEY UPDATE name_ar=VALUES(name_ar), icon=VALUES(icon), is_active=1', input.key, input.name.slice(0, 120), input.icon.slice(0, 16) || '📦');
+  await prisma.$executeRawUnsafe('INSERT INTO dynamic_entities (entity_key, name_ar, icon, display_order) VALUES (?, ?, ?, 999) ON DUPLICATE KEY UPDATE name_ar=VALUES(name_ar), icon=VALUES(icon), is_active=1', input.key, input.name.slice(0, 120), input.icon.slice(0, 16) || '📦');
 }
 
 export async function createDynamicField(input: { entityId: number; key: string; label: string; type: DynamicField['type']; required: boolean; searchable: boolean; options: string[] }) {
   await ensureDynamicAdsSchema();
   if (!/^[a-z][a-z0-9_]{1,63}$/.test(input.key)) throw new Error('invalid_field_key');
-  await prisma.$executeRawUnsafe('INSERT INTO dynamic_entity_fields (entity_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM (SELECT display_order FROM dynamic_entity_fields WHERE entity_id=?) AS ordered_fields)) ON DUPLICATE KEY UPDATE label_ar=VALUES(label_ar), field_type=VALUES(field_type), required_flag=VALUES(required_flag), searchable_flag=VALUES(searchable_flag), options_json=VALUES(options_json), is_active=1', input.entityId, input.key, input.label.slice(0, 120), input.type, input.required ? 1 : 0, input.searchable ? 1 : 0, JSON.stringify(input.options.slice(0, 30).map((option) => option.slice(0, 80))), input.entityId);
+  await prisma.$executeRawUnsafe('INSERT INTO dynamic_entity_fields (entity_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, 999) ON DUPLICATE KEY UPDATE label_ar=VALUES(label_ar), field_type=VALUES(field_type), required_flag=VALUES(required_flag), searchable_flag=VALUES(searchable_flag), options_json=VALUES(options_json), is_active=1', input.entityId, input.key, input.label.slice(0, 120), input.type, input.required ? 1 : 0, input.searchable ? 1 : 0, JSON.stringify(input.options.slice(0, 30).map((option) => option.slice(0, 80))));
 }
 
 export async function setDynamicEntityActive(id: number, active: boolean) {

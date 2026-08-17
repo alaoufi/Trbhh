@@ -17,7 +17,10 @@ async function ensureDynamicFieldColumns() {
   const columns = await prisma.$queryRawUnsafe<{ column_name: string }[]>(`SELECT column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='dynamic_entity_fields'`);
   const have = new Set(columns.map((column) => column.column_name));
   const additions: [string, string][] = [['group_id','BIGINT UNSIGNED NULL AFTER entity_id'],['placeholder_ar','VARCHAR(255) NULL AFTER options_json'],['input_order','INT NOT NULL DEFAULT 0 AFTER display_order'],['input_visible_flag','TINYINT NOT NULL DEFAULT 1 AFTER input_order'],['display_visible_flag','TINYINT NOT NULL DEFAULT 1 AFTER input_visible_flag']];
-  for (const [name, definition] of additions) if (!have.has(name)) await prisma.$executeRawUnsafe(`ALTER TABLE dynamic_entity_fields ADD COLUMN ${name} ${definition}`);
+  for (const [name, definition] of additions) if (!have.has(name)) {
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE dynamic_entity_fields ADD COLUMN ${name} ${definition}`); }
+    catch (error) { if (!String(error).includes(`Duplicate column name '${name}'`)) throw error; }
+  }
 }
 
 /** Executes only idempotent pilot DDL, once per application process. */

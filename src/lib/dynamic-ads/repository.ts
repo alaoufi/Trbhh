@@ -69,3 +69,36 @@ export async function searchDynamicDrafts(input: { userId: number; entityId?: nu
   const rows = await prisma.$queryRawUnsafe<DraftRow[]>(`SELECT id, entity_id, title, description, price, location_text, status, detected_entity_key, confidence, quality_score, extracted_json, missing_json, suggestions_json, values_json FROM dynamic_advertisements WHERE ${filters.join(' AND ')} ORDER BY updated_at DESC LIMIT ${limit}`, ...params);
   return rows.map((row) => ({ id: scalar(row.id), entityId: row.entity_id === null ? null : scalar(row.entity_id), title: row.title, description: row.description, price: row.price === null ? null : scalar(row.price), locationText: row.location_text, values: json(row.values_json, {}), status: row.status, analysis: { entityKey: row.detected_entity_key, confidence: scalar(row.confidence), quality: row.quality_score, extracted: json(row.extracted_json, {}), missing: json(row.missing_json, []), suggestions: json(row.suggestions_json, []) } }));
 }
+
+export async function listDynamicAdminDrafts(limit = 40): Promise<DynamicAdDraft[]> {
+  await ensureDynamicAdsSchema();
+  const rows = await prisma.$queryRawUnsafe<DraftRow[]>(`SELECT id, entity_id, title, description, price, location_text, status, detected_entity_key, confidence, quality_score, extracted_json, missing_json, suggestions_json, values_json FROM dynamic_advertisements ORDER BY updated_at DESC LIMIT ${Math.max(1, Math.min(100, limit))}`);
+  return rows.map((row) => ({ id: scalar(row.id), entityId: row.entity_id === null ? null : scalar(row.entity_id), title: row.title, description: row.description, price: row.price === null ? null : scalar(row.price), locationText: row.location_text, values: json(row.values_json, {}), status: row.status, analysis: { entityKey: row.detected_entity_key, confidence: scalar(row.confidence), quality: row.quality_score, extracted: json(row.extracted_json, {}), missing: json(row.missing_json, []), suggestions: json(row.suggestions_json, []) } }));
+}
+
+export async function createDynamicEntity(input: { key: string; name: string; icon: string }) {
+  await ensureDynamicAdsSchema();
+  if (!/^[a-z][a-z0-9_]{1,63}$/.test(input.key)) throw new Error('invalid_entity_key');
+  await prisma.$executeRawUnsafe('INSERT INTO dynamic_entities (entity_key, name_ar, icon, display_order) VALUES (?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM (SELECT display_order FROM dynamic_entities) AS ordered_entities)) ON DUPLICATE KEY UPDATE name_ar=VALUES(name_ar), icon=VALUES(icon), is_active=1', input.key, input.name.slice(0, 120), input.icon.slice(0, 16) || '📦');
+}
+
+export async function createDynamicField(input: { entityId: number; key: string; label: string; type: DynamicField['type']; required: boolean; searchable: boolean; options: string[] }) {
+  await ensureDynamicAdsSchema();
+  if (!/^[a-z][a-z0-9_]{1,63}$/.test(input.key)) throw new Error('invalid_field_key');
+  await prisma.$executeRawUnsafe('INSERT INTO dynamic_entity_fields (entity_id, field_key, label_ar, field_type, required_flag, searchable_flag, options_json, display_order) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM (SELECT display_order FROM dynamic_entity_fields WHERE entity_id=?) AS ordered_fields)) ON DUPLICATE KEY UPDATE label_ar=VALUES(label_ar), field_type=VALUES(field_type), required_flag=VALUES(required_flag), searchable_flag=VALUES(searchable_flag), options_json=VALUES(options_json), is_active=1', input.entityId, input.key, input.label.slice(0, 120), input.type, input.required ? 1 : 0, input.searchable ? 1 : 0, JSON.stringify(input.options.slice(0, 30).map((option) => option.slice(0, 80))), input.entityId);
+}
+
+export async function setDynamicEntityActive(id: number, active: boolean) {
+  await ensureDynamicAdsSchema();
+  await prisma.$executeRawUnsafe('UPDATE dynamic_entities SET is_active=? WHERE id=?', active ? 1 : 0, id);
+}
+
+/** Explicit corrections are the only training signal retained by the pilot. */
+export async function confirmDynamicDraftEntity(input: { draftId: number; userId: number; entityId: number }) {
+  await ensureDynamicAdsSchema();
+  const entities = await prisma.$queryRawUnsafe<{ entity_key: string }[]>('SELECT entity_key FROM dynamic_entities WHERE id=? AND is_active=1 LIMIT 1', input.entityId);
+  if (!entities[0]) throw new Error('entity_not_found');
+  const changed = await prisma.$executeRawUnsafe('UPDATE dynamic_advertisements SET entity_id=? WHERE id=? AND user_id=?', input.entityId, input.draftId, input.userId) as unknown as { affectedRows: number };
+  if (!changed.affectedRows) throw new Error('draft_not_found');
+  await prisma.$executeRawUnsafe('INSERT INTO dynamic_analysis_feedback (advertisement_id, user_id, selected_entity_id, detected_entity_key, feedback_type, payload_json) VALUES (?, ?, ?, ?, ?, ?)', input.draftId, input.userId, input.entityId, entities[0].entity_key, 'entity_confirmed', JSON.stringify({ source: 'lab' }));
+}

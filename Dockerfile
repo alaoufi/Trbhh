@@ -45,6 +45,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # schema kept for reference / optional CLI use
 COPY --from=builder /app/prisma ./prisma
+# Kept in the runtime image for the idempotent, admin-only dynamic-ads lab bootstrap.
+COPY --from=builder /app/database ./database
 
 # Writable, persistent upload dir owned by the runtime user. A named volume
 # mounted here inherits this ownership, so uploads (ad/classified/promo images)

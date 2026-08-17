@@ -1,0 +1,17 @@
+name: Diagnose app logs (read-only)
+on: { workflow_dispatch: {} }
+jobs:
+  logs:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/key
+          chmod 600 ~/.ssh/key
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose logs --tail 180 app'

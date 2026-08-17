@@ -53,7 +53,6 @@ ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS placeholder_ar VARCHA
 ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS input_order INT NOT NULL DEFAULT 0 AFTER display_order;
 ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS input_visible_flag TINYINT NOT NULL DEFAULT 1 AFTER input_order;
 ALTER TABLE dynamic_entity_fields ADD COLUMN IF NOT EXISTS display_visible_flag TINYINT NOT NULL DEFAULT 1 AFTER input_visible_flag;
-CREATE INDEX IF NOT EXISTS dynamic_entity_field_group_order ON dynamic_entity_fields (entity_id, group_id, is_active, input_order, display_order);
 
 CREATE TABLE IF NOT EXISTS dynamic_advertisements (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

@@ -49,4 +49,9 @@ describe('dynamic advertisement schema', () => {
     expect(DEFAULT_ENTITY_FIELDS.property.map((field) => field.key)).toEqual(expect.arrayContaining(['property_type', 'offer_type', 'area_sqm', 'city', 'district', 'map_location', 'rooms']));
     expect(DEFAULT_ENTITY_FIELDS.livestock.map((field) => field.key)).toEqual(expect.arrayContaining(['livestock_type', 'breed', 'health_status', 'vaccinations', 'sire', 'dam']));
   });
+
+  it('keeps interactive entity selection out of the server-rendered admin page', () => {
+    const page = fs.readFileSync(path.join(process.cwd(), 'src/app/admin/smart-ads/page.tsx'), 'utf8');
+    expect(page).not.toContain('onChange=');
+  });
 });

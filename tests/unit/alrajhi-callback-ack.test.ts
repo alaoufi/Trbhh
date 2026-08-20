@@ -9,4 +9,10 @@ describe('Al Rajhi callback acknowledgement', () => {
     expect(source).toContain("status: '1'");
     expect(source).toContain('validateAlrajhiCallback');
   });
+
+  it('reads the ARB POST body once before validating the acknowledgement', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
+    expect(source).toContain("import { readAlrajhiCallbackBody } from '@/lib/payments/alrajhi-callback'");
+    expect(source).toContain('const body = await readAlrajhiCallbackBody(req);');
+  });
 });

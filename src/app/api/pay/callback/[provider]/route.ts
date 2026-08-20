@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { confirmTopupById, confirmFromWebhook, validateAlrajhiCallback } from '@/lib/payments';
+import { readAlrajhiCallbackBody } from '@/lib/payments/alrajhi-callback';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,8 +44,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ provider: 
   if (provider === 'alrajhi_arb') {
     const url = new URL(req.url);
     const topupId = Number(url.searchParams.get('t') || 0);
-    let body: unknown = null;
-    try { body = await req.json(); } catch { body = Object.fromEntries((await req.formData()).entries()); }
+    const body = await readAlrajhiCallbackBody(req);
     if (!topupId || !(await validateAlrajhiCallback(topupId, body))) {
       return NextResponse.json([{ status: '2', errorText: 'notification validation failed' }], { status: 400 });
     }

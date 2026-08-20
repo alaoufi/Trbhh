@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SITE } from '@/lib/constants';
 import { confirmTopupById, confirmFromWebhook, inspectAlrajhiCallback } from '@/lib/payments';
 import { readAlrajhiCallbackBody } from '@/lib/payments/alrajhi-callback';
 import { attachProviderRef } from '@/lib/wallet';
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ provider: 
     }
     await attachProviderRef(topupId, validation.providerRef);
     // The bank redirects the browser to this same URL as a GET after the acknowledgement.
-    return NextResponse.json([{ status: '1', result: `${url.origin}${url.pathname}?t=${topupId}` }]);
+    return NextResponse.json([{ status: '1', result: `https://${SITE.domain}${url.pathname}?t=${topupId}` }]);
   }
   return handle(req, provider);
 }

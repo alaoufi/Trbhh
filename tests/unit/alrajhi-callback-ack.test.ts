@@ -20,4 +20,9 @@ describe('Al Rajhi callback acknowledgement', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
     expect(source).toContain('await attachProviderRef(topupId, validation.providerRef);');
   });
+
+  it('returns the public Trbhh callback URL to ARB instead of the internal container host', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
+    expect(source).toContain("`https://${SITE.domain}${url.pathname}?t=${topupId}`");
+  });
 });

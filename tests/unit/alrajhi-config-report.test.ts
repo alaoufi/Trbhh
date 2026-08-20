@@ -11,17 +11,25 @@ describe('Al Rajhi configuration report', () => {
   });
 
   it('is ready only when every required value is present', () => {
-    const env = Object.fromEntries(['ALRAJHI_TERMINAL_ID', 'ALRAJHI_TERMINAL_NAME', 'ALRAJHI_MERCHANT_ID', 'ALRAJHI_TERMINAL_ALIAS_NAME', 'ALRAJHI_TRANPORTAL_ID', 'ALRAJHI_TRANPORTAL_PASSWORD', 'ALRAJHI_TERMINAL_RESOURCE_KEY', 'ALRAJHI_PAYMENT_GATEWAY_URL', 'DATABASE_PAYMENT_SECRET'].map((key) => [key, 'configured']));
+    const env = Object.fromEntries(['ALRAJHI_TERMINAL_ID', 'ALRAJHI_TERMINAL_NAME', 'ALRAJHI_MERCHANT_ID', 'ALRAJHI_TERMINAL_ALIAS_NAME', 'ALRAJHI_TRANPORTAL_ID', 'ALRAJHI_TRANPORTAL_PASSWORD', 'ALRAJHI_TERMINAL_RESOURCE_KEY', 'ALRAJHI_PAYMENT_GATEWAY_URL', 'ALRAJHI_TRANPORTAL_GATEWAY_URL', 'DATABASE_PAYMENT_SECRET'].map((key) => [key, 'configured']));
     expect(alrajhiConfigReport({ ...env, ALRAJHI_ENVIRONMENT: 'production' }).ready).toBe(true);
   });
 
   it('accepts the exact sandbox field names issued by the ARB gateway', () => {
     const env = Object.fromEntries([
       'ALRAJHI_TERMINAL_ID', 'ALRAJHI_TERMINAL_NAME', 'ALRAJHI_MERCHANT_ID', 'ALRAJHI_TERMINAL_ALIAS_NAME',
-      'ALRAJHI_TRANPORTAL_ID', 'ALRAJHI_TRANPORTAL_PASSWORD', 'ALRAJHI_TERMINAL_RESOURCE_KEY', 'ALRAJHI_PAYMENT_GATEWAY_URL', 'DATABASE_PAYMENT_SECRET',
+      'ALRAJHI_TRANPORTAL_ID', 'ALRAJHI_TRANPORTAL_PASSWORD', 'ALRAJHI_TERMINAL_RESOURCE_KEY', 'ALRAJHI_PAYMENT_GATEWAY_URL', 'ALRAJHI_TRANPORTAL_GATEWAY_URL', 'DATABASE_PAYMENT_SECRET',
     ].map((key) => [key, 'configured']));
     const report = alrajhiConfigReport({ ...env, ALRAJHI_ENVIRONMENT: 'sandbox' });
     expect(report.ready).toBe(true);
     expect(report.fields.map((field) => field.key)).toContain('ALRAJHI_TERMINAL_RESOURCE_KEY');
+  });
+
+  it('does not accept a checkout endpoint without the separate supporting-transactions endpoint', () => {
+    const env = Object.fromEntries([
+      'ALRAJHI_TERMINAL_ID', 'ALRAJHI_TERMINAL_NAME', 'ALRAJHI_MERCHANT_ID', 'ALRAJHI_TERMINAL_ALIAS_NAME',
+      'ALRAJHI_TRANPORTAL_ID', 'ALRAJHI_TRANPORTAL_PASSWORD', 'ALRAJHI_TERMINAL_RESOURCE_KEY', 'ALRAJHI_PAYMENT_GATEWAY_URL', 'DATABASE_PAYMENT_SECRET',
+    ].map((key) => [key, 'configured']));
+    expect(alrajhiConfigReport({ ...env, ALRAJHI_ENVIRONMENT: 'production' }).ready).toBe(false);
   });
 });

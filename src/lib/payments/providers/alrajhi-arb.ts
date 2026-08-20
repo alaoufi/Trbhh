@@ -61,6 +61,7 @@ export function decodeArbCallback(payload: unknown, resourceKey: string): Record
 
 function numberString(amount: number): string { return amount.toFixed(2); }
 function gatewayUrl(creds: ProviderCreds): string { return creds.gateway_url || DEFAULT_GATEWAY_URL; }
+function tranportalGatewayUrl(creds: ProviderCreds): string { return creds.tranportal_gateway_url || ''; }
 function hostedUrl(creds: ProviderCreds): string { return creds.hosted_payment_url || DEFAULT_HOSTED_URL; }
 
 /**
@@ -82,6 +83,27 @@ export function buildArbPurchaseTrandata(
     responseURL: input.callbackUrl,
     errorURL: input.callbackUrl,
     langid: 'ar',
+  }]);
+}
+
+/**
+ * Build the ARB supporting-transactions inquiry by bank PaymentID.
+ * `trackId` remains Trbhh's original merchant identifier; ARB uses `udf5`
+ * to select the lookup key held in `transId`.
+ */
+export function buildArbInquiryTrandata(
+  input: { amountSar: number; paymentId: string; trackId: string },
+  creds: Pick<ProviderCreds, 'tranportal_id' | 'tranportal_password'>,
+): string {
+  return JSON.stringify([{
+    id: creds.tranportal_id,
+    password: creds.tranportal_password,
+    action: '8',
+    amt: numberString(input.amountSar),
+    currencyCode: '682',
+    trackId: input.trackId,
+    udf5: 'PaymentID',
+    transId: input.paymentId,
   }]);
 }
 
@@ -127,20 +149,24 @@ export const alrajhiArb: PayProvider = {
       return { ok: true, providerRef: parsed.paymentId, redirectUrl: parsed.redirectUrl || `${hostedUrl(creds)}?PaymentID=${encodeURIComponent(parsed.paymentId)}` };
     } catch { return { ok: false, error: 'تعذر تجهيز عملية الراجحي؛ تحقق من Terminal Resource Key' }; }
   },
-  async verifyByRef(providerRef: string, creds: ProviderCreds, _mode, expectedAmountSar = 0): Promise<VerifyResult> {
+  async verifyByRef(providerRef: string, creds: ProviderCreds, _mode, expectedAmountSar = 0, expectedTrackId = ''): Promise<VerifyResult> {
     try {
       const id = creds.tranportal_id;
       const password = creds.tranportal_password;
       const resourceKey = creds.terminal_resource_key;
-      if (!id || !password || !resourceKey) return { paid: false, amountSar: 0, providerRef, status: 'configuration_missing' };
-      const plain = JSON.stringify([{ id, password, action: '8', amt: numberString(expectedAmountSar), currencyCode: '682', trackId: providerRef, udf5: 'PaymentID', transId: providerRef }]);
-      const result = await gatewayRequest(gatewayUrl(creds), [{ id, trandata: encryptArbTrandata(plain, resourceKey) }]);
+      const supportingUrl = tranportalGatewayUrl(creds);
+      if (!id || !password || !resourceKey || !supportingUrl || !expectedTrackId) return { paid: false, amountSar: 0, providerRef, status: 'configuration_missing' };
+      const plain = buildArbInquiryTrandata({ amountSar: expectedAmountSar, paymentId: providerRef, trackId: expectedTrackId }, { tranportal_id: id, tranportal_password: password });
+      const result = await gatewayRequest(supportingUrl, [{ id, trandata: encryptArbTrandata(plain, resourceKey) }]);
       const response = firstResponse(result.data);
       if (!result.ok || String(response.status) !== '1' || !response.trandata) return { paid: false, amountSar: 0, providerRef, status: response.error || response.errorText || result.error || 'inquiry_failed' };
       const data = firstData(JSON.parse(decryptArbTrandata(response.trandata, resourceKey)));
       const amountSar = Number(data.amt || 0);
-      const paid = String(data.result || '').toUpperCase() === 'CAPTURED' && String(data.paymentId || '') === providerRef;
-      return { paid, amountSar, providerRef, method: paymentMethod(data.cardType), status: String(data.result || 'unknown') };
+      const merchantTrackId = String(data.trackId || '');
+      const paid = String(data.result || '').toUpperCase() === 'CAPTURED'
+        && String(data.paymentId || '') === providerRef
+        && merchantTrackId === expectedTrackId;
+      return { paid, amountSar, providerRef, merchantTrackId, method: paymentMethod(data.cardType), status: String(data.result || 'unknown') };
     } catch { return { paid: false, amountSar: 0, providerRef, status: 'inquiry_invalid' }; }
   },
   extractRefFromWebhook(_body, query): string | null { return query.get('paymentId') || query.get('PaymentID') || null; },

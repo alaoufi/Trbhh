@@ -90,8 +90,11 @@ export async function confirmTopupById(topupId: number): Promise<{ paid: boolean
 
   const creds = await getProviderCreds(row.provider);
   const cfg = await getPaymentConfig();
-  const v = await adapter.verifyByRef(providerRef, creds, cfg.mode, row.amount);
+  const v = await adapter.verifyByRef(providerRef, creds, cfg.mode, row.amount, String(topupId));
   if (!v.paid) return { paid: false, credited: false, reason: v.status };
+  if (row.provider === 'alrajhi_arb' && v.merchantTrackId !== String(topupId)) {
+    return { paid: false, credited: false, reason: 'track_mismatch' };
+  }
   // مطابقة المبلغ حماية من التلاعب
   if (v.amountSar > 0 && Math.abs(v.amountSar - row.amount) > 0) {
     return { paid: true, credited: false, reason: 'amount_mismatch' };

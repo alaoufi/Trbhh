@@ -45,6 +45,8 @@ export interface VerifyResult {
   paid: boolean;          // هل اكتمل الدفع فعلاً؟
   amountSar: number;      // المبلغ المدفوع فعلاً (للمطابقة مع الطلب)
   providerRef: string;
+  /** رقم تتبّع التاجر الذي أعاده المزوّد، عند توفره. */
+  merchantTrackId?: string;
   method?: PayMethod | null;
   status: string;         // حالة المزوّد الخام (للسجل)
 }
@@ -55,7 +57,7 @@ export interface PayProvider {
   /** ينشئ عملية دفع ويعيد رابط صفحة الدفع المستضافة. */
   createPayment(input: CreatePaymentInput, creds: ProviderCreds, mode: PayMode): Promise<CreatePaymentResult>;
   /** يتحقّق من حالة عملية بمعرّفها لدى المزوّد (المصدر الموثوق للتأكيد). */
-  verifyByRef(providerRef: string, creds: ProviderCreds, mode: PayMode, expectedAmountSar?: number): Promise<VerifyResult>;
+  verifyByRef(providerRef: string, creds: ProviderCreds, mode: PayMode, expectedAmountSar?: number, expectedTrackId?: string): Promise<VerifyResult>;
   /** يستخرج معرّف العملية من جسم إشعار الويبهوك (لإعادة التحقّق منه). */
   extractRefFromWebhook(body: unknown, query: URLSearchParams): string | null;
 }

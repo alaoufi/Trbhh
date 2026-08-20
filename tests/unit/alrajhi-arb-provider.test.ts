@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildArbPurchaseTrandata, decodeArbCallback, decryptArbTrandata, encryptArbTrandata, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
+import { buildArbInquiryTrandata, buildArbPurchaseTrandata, decodeArbCallback, decryptArbTrandata, encryptArbTrandata, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
 import { providerMeta } from '@/lib/payments/registry';
 
 const resourceKey = '12345678901234567890123456789012';
@@ -28,6 +28,23 @@ describe('Al Rajhi ARB bank-hosted provider', () => {
 
     expect(payload[0]).toMatchObject({ trackId: '1700000000000123', amt: '10.00' });
     expect(payload[0]).not.toHaveProperty('udf1');
+  });
+
+  it('keeps the original merchant TrackID when it inquires by bank PaymentID', () => {
+    const payload = JSON.parse(buildArbInquiryTrandata({
+      amountSar: 10,
+      paymentId: '100201931620827468',
+      trackId: '1700000000000123',
+    }, { tranportal_id: 'portal-id', tranportal_password: 'portal-password' }));
+
+    expect(payload[0]).toMatchObject({
+      action: '8',
+      amt: '10.00',
+      currencyCode: '682',
+      trackId: '1700000000000123',
+      udf5: 'PaymentID',
+      transId: '100201931620827468',
+    });
   });
 
   it('accepts a callback only when its encrypted payment id and track id agree', () => {

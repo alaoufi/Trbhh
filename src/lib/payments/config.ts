@@ -47,7 +47,7 @@ export function alrajhiEnvironmentConfigured(env: EnvironmentValues = process.en
 const ALRAJHI_REQUIRED_FIELDS = [
   'ALRAJHI_TERMINAL_ID', 'ALRAJHI_TERMINAL_NAME', 'ALRAJHI_MERCHANT_ID', 'ALRAJHI_TERMINAL_ALIAS_NAME',
   'ALRAJHI_TRANPORTAL_ID', 'ALRAJHI_TRANPORTAL_PASSWORD', 'ALRAJHI_TERMINAL_RESOURCE_KEY',
-  'ALRAJHI_PAYMENT_GATEWAY_URL', 'DATABASE_PAYMENT_SECRET',
+  'ALRAJHI_PAYMENT_GATEWAY_URL', 'ALRAJHI_TRANPORTAL_GATEWAY_URL', 'DATABASE_PAYMENT_SECRET',
 ] as const;
 
 /** Safe for the admin UI: reports configuration presence only, never secret values. */
@@ -146,6 +146,7 @@ export async function getProviderCreds(provider: string): Promise<ProviderCreds>
       tranportal_password: process.env.ALRAJHI_TRANPORTAL_PASSWORD || '',
       terminal_resource_key: process.env.ALRAJHI_TERMINAL_RESOURCE_KEY || '',
       gateway_url: process.env.ALRAJHI_PAYMENT_GATEWAY_URL || '',
+      tranportal_gateway_url: process.env.ALRAJHI_TRANPORTAL_GATEWAY_URL || '',
       hosted_payment_url: process.env.ALRAJHI_HOSTED_PAYMENT_URL || '',
     };
   }

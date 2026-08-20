@@ -1697,6 +1697,52 @@ export async function startAlrajhiSandboxAction(formData: FormData) {
   redirect(result.redirectUrl);
 }
 
+/**
+ * Starts one real, admin-only Al Rajhi top-up. It deliberately bypasses the
+ * public-payment switch, but it still uses the normal pending top-up and
+ * server-to-server confirmation flow before any wallet credit is possible.
+ */
+export async function startAlrajhiPrivateTopupAction(formData: FormData) {
+  const admin = await requireAction('users', 'edit');
+  const { alrajhiConfigReport, getProviderCreds, getPaymentConfig } = await import('@/lib/payments');
+  const report = alrajhiConfigReport();
+  if (!report.ready || report.environment !== 'production') redirect('/admin/payments/private-topup?state=notready');
+
+  const cfg = await getPaymentConfig();
+  const amount = Math.round(Number(formData.get('amount') || 0));
+  if (!Number.isFinite(amount) || amount < cfg.min || amount > cfg.max) {
+    redirect(`/admin/payments/private-topup?state=amount&min=${cfg.min}&max=${cfg.max}`);
+  }
+
+  const { createOnlineTopup, attachProviderRef, rejectTopup } = await import('@/lib/wallet');
+  const { alrajhiArb } = await import('@/lib/payments/providers/alrajhi-arb');
+  const { SITE } = await import('@/lib/constants');
+  const topupId = await createOnlineTopup(admin.uid, amount, 'alrajhi_arb');
+  if (!topupId) redirect('/admin/payments/private-topup?state=failed&reason=topup');
+
+  const requestHeaders = await headers();
+  const rawIp = (requestHeaders.get('cf-connecting-ip') || requestHeaders.get('x-forwarded-for') || '').split(',')[0]?.trim();
+  const customerIp = rawIp && /^[0-9a-f:.]{3,45}$/i.test(rawIp) ? rawIp : undefined;
+  const callbackUrl = `https://${SITE.domain}/api/pay/callback/alrajhi_arb?t=${topupId}`;
+  const result = await alrajhiArb.createPayment({
+    amountSar: amount,
+    topupId,
+    description: `شحن رصيد خاص — ${amount} ر.س (#${topupId})`,
+    callbackUrl,
+    webhookUrl: callbackUrl,
+    customerIp,
+  }, await getProviderCreds('alrajhi_arb'), 'live');
+
+  if (!result.ok || !result.redirectUrl || !result.providerRef) {
+    await rejectTopup(topupId, admin.uid, `تعذر إنشاء جلسة الراجحي الخاصة: ${safeGatewayReason(result.error)}`);
+    await logAdmin(admin.uid, 'فشل بدء شحن خاص بالراجحي', `طلب #${topupId}`, safeGatewayReason(result.error));
+    redirect(`/admin/payments/private-topup?state=failed&reason=${encodeURIComponent(safeGatewayReason(result.error))}`);
+  }
+  await attachProviderRef(topupId, result.providerRef);
+  await logAdmin(admin.uid, 'بدء شحن خاص بالراجحي', `طلب #${topupId}`, `${amount} ر.س`);
+  redirect(result.redirectUrl);
+}
+
 export async function saveProviderCredsAction(formData: FormData) {
   const session = await requireAction('users', 'edit');
   const provider = String(formData.get('provider') || '');

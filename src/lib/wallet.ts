@@ -467,7 +467,9 @@ export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 2
 export async function approveTopup(id: number, adminId: number): Promise<TopupRow | null> {
   await ensure();
   const req = await prisma.wallet_topups.findUnique({ where: { id: BigInt(id) } }).catch(() => null);
-  if (!req || req.status !== 0) return null;
+  // Online top-ups are credited only by the provider inquiry path. A staff
+  // click must never be able to turn a pending card payment into balance.
+  if (!req || req.status !== 0 || req.source === 'online') return null;
   // atomic status flip so a double-click can't credit twice
   const flipped = await prisma.wallet_topups.updateMany({ where: { id: BigInt(id), status: 0 }, data: { status: 1, admin_id: BigInt(adminId), decided_at: new Date() } }).catch(() => ({ count: 0 }));
   if (flipped.count === 0) return null;

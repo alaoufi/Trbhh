@@ -142,7 +142,11 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
               </details>
             )}
 
-            {r.status === 0 && (
+            {r.status === 0 && r.source === 'online' && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 p-2 text-xs font-bold text-sky-800">هذه عملية إلكترونية معلّقة؛ لا تعتمد يدوياً. لا يُضاف الرصيد إلا بعد تحقق مصرفي ناجح.</div>
+            )}
+
+            {r.status === 0 && r.source !== 'online' && (
               <div className="space-y-2 border-t border-primary/10 pt-2">
                 <form action={approveTopupAction}>
                   <input type="hidden" name="id" value={r.id} />

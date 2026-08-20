@@ -25,4 +25,9 @@ describe('Al Rajhi callback acknowledgement', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
     expect(source).toContain("`https://${SITE.domain}${url.pathname}?t=${topupId}`");
   });
+
+  it('redirects the payment result page to the public Trbhh domain', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
+    expect(source).toContain("new URL('/payment/result', `https://${SITE.domain}`)");
+  });
 });

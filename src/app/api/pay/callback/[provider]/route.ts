@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 async function handle(req: NextRequest, provider: string): Promise<NextResponse> {
   const url = new URL(req.url);
   const q = url.searchParams;
-  const resultUrl = new URL('/payment/result', url.origin);
+  const resultUrl = new URL('/payment/result', `https://${SITE.domain}`);
 
   const topupId = Number(q.get('t') || 0);
   let paid = false;

@@ -7,7 +7,7 @@ describe('Al Rajhi callback acknowledgement', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
     expect(source).toContain("provider === 'alrajhi_arb'");
     expect(source).toContain("status: '1'");
-    expect(source).toContain('validateAlrajhiCallback');
+    expect(source).toContain('inspectAlrajhiCallback');
   });
 
   it('reads the ARB POST body once before validating the acknowledgement', () => {

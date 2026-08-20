@@ -128,14 +128,32 @@ export async function confirmFromWebhook(provider: string, body: unknown, query:
  * through both the bank Payment ID and our Track ID. Credit still happens only after
  * the later server-to-server inquiry.
  */
-export async function validateAlrajhiCallback(topupId: number, body: unknown): Promise<boolean> {
+export type AlrajhiCallbackValidation = {
+  valid: boolean;
+  reason: 'missing_topup_id' | 'topup_not_found' | 'not_alrajhi_topup' | 'missing_provider_ref' | 'invalid_encrypted_payload' | 'payment_id_mismatch' | 'track_id_mismatch' | 'valid';
+};
+
+/**
+ * Safe diagnostic used only for the bank acknowledgement path.  It never logs
+ * the encrypted payload, payment reference, or customer data.
+ */
+export async function inspectAlrajhiCallback(topupId: number, body: unknown): Promise<AlrajhiCallbackValidation> {
+  if (!topupId) return { valid: false, reason: 'missing_topup_id' };
   const row = await getTopupById(topupId);
-  if (!row || row.source !== 'online' || row.provider !== 'alrajhi_arb') return false;
+  if (!row) return { valid: false, reason: 'topup_not_found' };
+  if (row.source !== 'online' || row.provider !== 'alrajhi_arb') return { valid: false, reason: 'not_alrajhi_topup' };
   const providerRef = await providerRefOf(topupId);
-  if (!providerRef) return false;
+  if (!providerRef) return { valid: false, reason: 'missing_provider_ref' };
   const creds = await getProviderCreds('alrajhi_arb');
   const data = decodeArbCallback(body, creds.terminal_resource_key || '');
-  return !!data && String(data.paymentId || '') === providerRef && String(data.trackId || '') === String(topupId);
+  if (!data) return { valid: false, reason: 'invalid_encrypted_payload' };
+  if (String(data.paymentId || '') !== providerRef) return { valid: false, reason: 'payment_id_mismatch' };
+  if (String(data.trackId || '') !== String(topupId)) return { valid: false, reason: 'track_id_mismatch' };
+  return { valid: true, reason: 'valid' };
+}
+
+export async function validateAlrajhiCallback(topupId: number, body: unknown): Promise<boolean> {
+  return (await inspectAlrajhiCallback(topupId, body)).valid;
 }
 
 /** يقرأ معرّف عملية المزوّد المخزّن على طلب الشحن. */

@@ -1,0 +1,48 @@
+name: Diagnose Al Rajhi runtime credentials (read-only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      ALRAJHI_TERMINAL_ID: ${{ secrets.ALRAJHI_TERMINAL_ID }}
+      ALRAJHI_TRANPORTAL_ID: ${{ secrets.ALRAJHI_TRANPORTAL_ID }}
+      ALRAJHI_TRANPORTAL_PASSWORD: ${{ secrets.ALRAJHI_TRANPORTAL_PASSWORD }}
+      ALRAJHI_TERMINAL_RESOURCE_KEY: ${{ secrets.ALRAJHI_TERMINAL_RESOURCE_KEY }}
+    steps:
+      - name: Compare hashes only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/key
+          chmod 600 ~/.ssh/key
+          remote="$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" 'python3 - <<'"'"'PY'"'"'
+          import hashlib, pathlib
+          keys = ["ALRAJHI_TERMINAL_ID", "ALRAJHI_TRANPORTAL_ID", "ALRAJHI_TRANPORTAL_PASSWORD", "ALRAJHI_TERMINAL_RESOURCE_KEY"]
+          values = {}
+          for line in pathlib.Path("/root/trbhh/.env").read_text().splitlines():
+              if "=" in line:
+                  key, value = line.split("=", 1)
+                  values[key] = value
+          for key in keys:
+              value = values.get(key, "")
+              print(f"ENV:{key}:{hashlib.sha256(value.encode()).hexdigest() if value else 'MISSING'}")
+          PY
+          ')"
+          for key in ALRAJHI_TERMINAL_ID ALRAJHI_TRANPORTAL_ID ALRAJHI_TRANPORTAL_PASSWORD ALRAJHI_TERMINAL_RESOURCE_KEY; do
+            local_hash="$(printf '%s' "${!key}" | sha256sum | awk '{print $1}')"
+            remote_hash="$(printf '%s\n' "$remote" | awk -F: -v k="$key" '$2 == k { print $3 }')"
+            if [[ -n "$remote_hash" && "$local_hash" == "$remote_hash" ]]; then
+              echo "$key: MATCH"
+            else
+              echo "$key: MISMATCH"
+              exit 1
+            fi
+          done

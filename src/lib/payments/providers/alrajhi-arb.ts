@@ -45,17 +45,23 @@ export function parseArbInitialResponse(payload: unknown): { paymentId: string; 
   return { paymentId, redirectUrl: `${pageUrl}?PaymentID=${encodeURIComponent(paymentId)}` };
 }
 
-/** Decrypt the bank notification and reject mismatched outer/inner payment IDs. */
+/** Read the payment ID that ARB sends outside its encrypted transaction data. */
+export function extractArbCallbackPaymentId(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const body = firstResponse(payload);
+  const paymentId = String(body.paymentId || body.PaymentID || '');
+  return paymentId || null;
+}
+
+/** Decrypt the bank notification. ARB documents distinct outer and inner payment IDs. */
 export function decodeArbCallback(payload: unknown, resourceKey: string): Record<string, unknown> | null {
   if (!payload || typeof payload !== 'object') return null;
   // ARB documents its merchant notification as a one-item JSON array.
   const body = firstResponse(payload);
-  const outerPaymentId = String(body.paymentId || body.PaymentID || '');
   const encrypted = typeof body.trandata === 'string' ? body.trandata : '';
-  if (!outerPaymentId || !encrypted) return null;
+  if (!encrypted) return null;
   try {
     const data = firstData(JSON.parse(decryptArbTrandata(encrypted, resourceKey)));
-    if (String(data.paymentId || '') !== outerPaymentId) return null;
     return data;
   } catch { return null; }
 }

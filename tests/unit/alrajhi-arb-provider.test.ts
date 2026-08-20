@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildArbInquiryTrandata, buildArbPurchaseTrandata, decodeArbCallback, decryptArbTrandata, encryptArbTrandata, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
+import { buildArbInquiryTrandata, buildArbPurchaseTrandata, decodeArbCallback, decryptArbTrandata, encryptArbTrandata, extractArbCallbackPaymentId, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
 import { providerMeta } from '@/lib/payments/registry';
 
 const resourceKey = '12345678901234567890123456789012';
@@ -47,10 +47,13 @@ describe('Al Rajhi ARB bank-hosted provider', () => {
     });
   });
 
-  it('accepts a callback only when its encrypted payment id and track id agree', () => {
+  it('accepts a callback when the outer notification id differs from the encrypted transaction id', () => {
     const trandata = encryptArbTrandata(JSON.stringify({ paymentId: '123', trackId: '42', result: 'CAPTURED' }), resourceKey);
     expect(decodeArbCallback({ paymentId: '123', trandata }, resourceKey)).toMatchObject({ paymentId: '123', trackId: '42', result: 'CAPTURED' });
-    expect(decodeArbCallback({ paymentId: '124', trandata }, resourceKey)).toBeNull();
+    // ARB's Bank Hosted notification sample uses different outer and inner payment IDs.
+    // The encrypted transaction id is verified later through the server-to-server inquiry.
+    expect(decodeArbCallback({ paymentId: '124', trandata }, resourceKey)).toMatchObject({ paymentId: '123', trackId: '42', result: 'CAPTURED' });
+    expect(extractArbCallbackPaymentId({ paymentId: '124', trandata })).toBe('124');
   });
 
   it('accepts the documented array-shaped merchant notification from ARB', () => {

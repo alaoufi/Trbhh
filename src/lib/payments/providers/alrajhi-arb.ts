@@ -163,10 +163,11 @@ export const alrajhiArb: PayProvider = {
       const data = firstData(JSON.parse(decryptArbTrandata(response.trandata, resourceKey)));
       const amountSar = Number(data.amt || 0);
       const merchantTrackId = String(data.trackId || '');
+      const rawStatus = String(data.errorText || data.error || data.result || 'unknown');
       const paid = String(data.result || '').toUpperCase() === 'CAPTURED'
         && String(data.paymentId || '') === providerRef
         && merchantTrackId === expectedTrackId;
-      return { paid, amountSar, providerRef, merchantTrackId, method: paymentMethod(data.cardType), status: String(data.result || 'unknown') };
+      return { paid, amountSar, providerRef, merchantTrackId, method: paymentMethod(data.cardType), status: rawStatus };
     } catch { return { paid: false, amountSar: 0, providerRef, status: 'inquiry_invalid' }; }
   },
   extractRefFromWebhook(_body, query): string | null { return query.get('paymentId') || query.get('PaymentID') || null; },

@@ -1,6 +1,7 @@
 import 'server-only';
 import { SITE } from '@/lib/constants';
-import { createOnlineTopup, attachProviderRef, getTopupById, creditOnlineTopupAtomically, findTopupByProviderRef, applyTopupBonuses } from '@/lib/wallet';
+import { createOnlineTopup, attachProviderRef, getTopupById, creditOnlineTopupAtomically, findTopupByProviderRef, applyTopupBonuses, rejectOnlineTopup } from '@/lib/wallet';
+import { classifyPaymentRejection } from './rejection';
 import { getPaymentConfig, getProviderCreds, isOnlinePayReady, getActiveMethods } from './config';
 import { providerMeta } from './registry';
 import type { PayProvider, PayProviderId } from './types';
@@ -91,7 +92,11 @@ export async function confirmTopupById(topupId: number): Promise<{ paid: boolean
   const creds = await getProviderCreds(row.provider);
   const cfg = await getPaymentConfig();
   const v = await adapter.verifyByRef(providerRef, creds, cfg.mode, row.amount, String(topupId));
-  if (!v.paid) return { paid: false, credited: false, reason: v.status };
+  if (!v.paid) {
+    const rejected = classifyPaymentRejection(v.status);
+    if (rejected.final) await rejectOnlineTopup(topupId, rejected.message);
+    return { paid: false, credited: false, reason: rejected.code };
+  }
   if (row.provider === 'alrajhi_arb' && v.merchantTrackId !== String(topupId)) {
     return { paid: false, credited: false, reason: 'track_mismatch' };
   }

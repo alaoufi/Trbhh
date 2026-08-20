@@ -655,6 +655,16 @@ export async function rejectTopup(id: number, adminId: number, reason: string): 
   return flipped.count > 0 ? topupRow({ ...req, status: 2, note: reason.slice(0, 300) }) : null;
 }
 
+/** A gateway-declined online payment is terminal and can never be manually approved. */
+export async function rejectOnlineTopup(id: number, reason: string): Promise<boolean> {
+  await ensure();
+  const flipped = await prisma.wallet_topups.updateMany({
+    where: { id: BigInt(id), source: 'online', status: 0 },
+    data: { status: 2, note: reason.slice(0, 300), decided_at: new Date() },
+  }).catch(() => ({ count: 0 }));
+  return flipped.count > 0;
+}
+
 /** إجمالي حركات محفظة العضو (للترقيم). */
 export async function countTxns(userId: number): Promise<number> {
   await ensure();

@@ -14,4 +14,15 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/key
           chmod 600 ~/.ssh/key
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose logs --tail 180 app'
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose exec -T app node' <<'NODE'
+          const { PrismaClient } = require('@prisma/client');
+          const prisma = new PrismaClient();
+          (async () => {
+            const topup = await prisma.wallet_topups.findUnique({
+              where: { id: 60n },
+              select: { id: true, amount: true, status: true, source: true, provider: true, provider_ref: true, method: true, paid_at: true, note: true, created_at: true, decided_at: true },
+            });
+            console.log(JSON.stringify(topup, (key, value) => typeof value === 'bigint' ? value.toString() : value));
+            await prisma.$disconnect();
+          })().catch(async (error) => { console.error('TOPUP_QUERY_FAILED', error.message); await prisma.$disconnect(); process.exit(1); });
+          NODE

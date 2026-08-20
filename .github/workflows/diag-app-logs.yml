@@ -16,13 +16,41 @@ jobs:
           chmod 600 ~/.ssh/key
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose exec -T app node' <<'NODE'
           const { PrismaClient } = require('@prisma/client');
+          const { createCipheriv, createDecipheriv } = require('node:crypto');
           const prisma = new PrismaClient();
           (async () => {
             const topup = await prisma.wallet_topups.findUnique({
               where: { id: 60n },
               select: { id: true, amount: true, status: true, source: true, provider: true, provider_ref: true, method: true, paid_at: true, note: true, created_at: true, decided_at: true },
             });
-            console.log(JSON.stringify(topup, (key, value) => typeof value === 'bigint' ? value.toString() : value));
+            if (!topup?.provider_ref) throw new Error('TOPUP_REFERENCE_MISSING');
+            const key = Buffer.from(process.env.ALRAJHI_TERMINAL_RESOURCE_KEY, 'utf8');
+            const iv = Buffer.from('PGKEYENCDECIVSPC', 'utf8');
+            const encrypt = (value) => {
+              const cipher = createCipheriv('aes-256-cbc', key, iv);
+              return Buffer.concat([cipher.update(encodeURIComponent(value), 'utf8'), cipher.final()]).toString('hex').toUpperCase();
+            };
+            const decrypt = (value) => {
+              const decipher = createDecipheriv('aes-256-cbc', key, iv);
+              return JSON.parse(decodeURIComponent(Buffer.concat([decipher.update(Buffer.from(value, 'hex')), decipher.final()]).toString('utf8')))[0];
+            };
+            const inquiry = [{
+              id: process.env.ALRAJHI_TRANPORTAL_ID,
+              trandata: encrypt(JSON.stringify([{
+                id: process.env.ALRAJHI_TRANPORTAL_ID,
+                password: process.env.ALRAJHI_TRANPORTAL_PASSWORD,
+                action: '8', amt: Number(topup.amount).toFixed(2), currencyCode: '682',
+                trackId: String(topup.id), udf5: 'PaymentID', transId: topup.provider_ref,
+              }])),
+            }];
+            const response = await fetch(process.env.ALRAJHI_TRANPORTAL_GATEWAY_URL, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(inquiry) });
+            const raw = (await response.json())[0] || {};
+            let transaction = null;
+            try {
+              const data = raw.trandata ? decrypt(raw.trandata) : null;
+              transaction = data ? { result: data.result || null, error: data.error || null, errorText: data.errorText || null, paymentIdMatches: String(data.paymentId || '') === topup.provider_ref, trackIdMatches: String(data.trackId || '') === String(topup.id), amountMatches: Number(data.amt || 0) === Number(topup.amount), hasTransId: Boolean(data.transId) } : null;
+            } catch { transaction = { decrypt: 'failed' }; }
+            console.log(JSON.stringify({ topup: { id: topup.id, status: topup.status, source: topup.source, provider: topup.provider, hasProviderRef: Boolean(topup.provider_ref) }, inquiry: { httpStatus: response.status, status: raw.status || null, error: raw.error || null, errorText: raw.errorText || null, hasTrandata: Boolean(raw.trandata), transaction } }, (key, value) => typeof value === 'bigint' ? value.toString() : value));
             await prisma.$disconnect();
           })().catch(async (error) => { console.error('TOPUP_QUERY_FAILED', error.message); await prisma.$disconnect(); process.exit(1); });
           NODE

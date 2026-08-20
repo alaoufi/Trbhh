@@ -12,6 +12,7 @@ describe('private live Al Rajhi top-up', () => {
     expect(source).toContain("requireAction('users', 'edit')");
     expect(source).toContain('index: false');
     expect(source).toContain('startAlrajhiPrivateTopupAction');
+    expect(source).toContain('dir="ltr"');
   });
 
   it('never allows a staff member to manually approve an online top-up', () => {

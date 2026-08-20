@@ -1,0 +1,54 @@
+name: Configure private Al Rajhi production checkout
+
+on:
+  workflow_dispatch:
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      ALRAJHI_TERMINAL_ID: ${{ secrets.ALRAJHI_TERMINAL_ID }}
+      ALRAJHI_TERMINAL_NAME: ${{ secrets.ALRAJHI_TERMINAL_NAME }}
+      ALRAJHI_MERCHANT_ID: ${{ secrets.ALRAJHI_MERCHANT_ID }}
+      ALRAJHI_TERMINAL_ALIAS_NAME: ${{ secrets.ALRAJHI_TERMINAL_ALIAS_NAME }}
+      ALRAJHI_TRANPORTAL_ID: ${{ secrets.ALRAJHI_TRANPORTAL_ID }}
+      ALRAJHI_TRANPORTAL_PASSWORD: ${{ secrets.ALRAJHI_TRANPORTAL_PASSWORD }}
+      ALRAJHI_TERMINAL_RESOURCE_KEY: ${{ secrets.ALRAJHI_TERMINAL_RESOURCE_KEY }}
+      ALRAJHI_PAYMENT_GATEWAY_URL: ${{ secrets.ALRAJHI_PAYMENT_GATEWAY_URL }}
+      ALRAJHI_TRANPORTAL_GATEWAY_URL: ${{ secrets.ALRAJHI_TRANPORTAL_GATEWAY_URL }}
+      DATABASE_PAYMENT_SECRET: ${{ secrets.DATABASE_PAYMENT_SECRET }}
+    steps:
+      - name: Validate and apply private production settings only
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in VPS_HOST VPS_USER VPS_SSH_KEY ALRAJHI_TERMINAL_ID ALRAJHI_TERMINAL_NAME ALRAJHI_MERCHANT_ID ALRAJHI_TERMINAL_ALIAS_NAME ALRAJHI_TRANPORTAL_ID ALRAJHI_TRANPORTAL_PASSWORD ALRAJHI_TERMINAL_RESOURCE_KEY ALRAJHI_PAYMENT_GATEWAY_URL ALRAJHI_TRANPORTAL_GATEWAY_URL DATABASE_PAYMENT_SECRET; do
+            if [ -z "${!key:-}" ]; then echo "Missing required secret: $key"; exit 1; fi
+          done
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          python3 - <<'PY' | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" "python3 -c \"import base64,json,pathlib,sys; values=json.loads(base64.b64decode(sys.stdin.read()).decode()); path=pathlib.Path('/root/trbhh/.env'); lines=path.read_text().splitlines() if path.exists() else []; exec(\\\"for key, value in values.items():\\n    lines[:] = [line for line in lines if not line.startswith(key + '=')]\\n    lines.append(key + '=' + value)\\\"); path.write_text('\\n'.join(lines) + '\\n')\""
+          import base64, json, os
+          values = {
+            'PAYMENT_PROVIDER': 'alrajhi_arb',
+            'ALRAJHI_ENVIRONMENT': 'production',
+            'ALRAJHI_TERMINAL_ID': os.environ['ALRAJHI_TERMINAL_ID'],
+            'ALRAJHI_TERMINAL_NAME': os.environ['ALRAJHI_TERMINAL_NAME'],
+            'ALRAJHI_MERCHANT_ID': os.environ['ALRAJHI_MERCHANT_ID'],
+            'ALRAJHI_TERMINAL_ALIAS_NAME': os.environ['ALRAJHI_TERMINAL_ALIAS_NAME'],
+            'ALRAJHI_TRANPORTAL_ID': os.environ['ALRAJHI_TRANPORTAL_ID'],
+            'ALRAJHI_TRANPORTAL_PASSWORD': os.environ['ALRAJHI_TRANPORTAL_PASSWORD'],
+            'ALRAJHI_TERMINAL_RESOURCE_KEY': os.environ['ALRAJHI_TERMINAL_RESOURCE_KEY'],
+            'ALRAJHI_PAYMENT_GATEWAY_URL': os.environ['ALRAJHI_PAYMENT_GATEWAY_URL'],
+            'ALRAJHI_TRANPORTAL_GATEWAY_URL': os.environ['ALRAJHI_TRANPORTAL_GATEWAY_URL'],
+            'DATABASE_PAYMENT_SECRET': os.environ['DATABASE_PAYMENT_SECRET'],
+          }
+          print(base64.b64encode(json.dumps(values).encode()).decode())
+          PY
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose up -d --force-recreate app && docker compose ps app'

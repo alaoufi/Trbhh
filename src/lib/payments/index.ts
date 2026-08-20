@@ -9,7 +9,7 @@ import { moyasar } from './providers/moyasar';
 import { tap } from './providers/tap';
 import { paytabs } from './providers/paytabs';
 import { alrajhiArb } from './providers/alrajhi-arb';
-import { decodeArbCallback, extractArbCallbackPaymentId } from './providers/alrajhi-arb';
+import { decodeArbCallback } from './providers/alrajhi-arb';
 
 export { PROVIDER_META, providerMeta, readyProviders } from './registry';
 export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, getTopupMethodAvailability, saveTopupMethodSettings, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
@@ -125,13 +125,12 @@ export async function confirmFromWebhook(provider: string, body: unknown, query:
 /**
  * ARB requires a positive acknowledgement before it settles a Bank Hosted payment.
  * We only acknowledge an encrypted notification when it binds to the pending top-up
- * through both the bank Payment ID and our Track ID. Credit still happens only after
- * the later server-to-server inquiry.
+ * through its encrypted final payment ID and our Track ID. Credit still happens only
+ * after the later server-to-server inquiry.
  */
-export type AlrajhiCallbackValidation = {
-  valid: boolean;
-  reason: 'missing_topup_id' | 'topup_not_found' | 'not_alrajhi_topup' | 'missing_provider_ref' | 'invalid_encrypted_payload' | 'payment_id_mismatch' | 'track_id_mismatch' | 'valid';
-};
+export type AlrajhiCallbackValidation =
+  | { valid: false; reason: 'missing_topup_id' | 'topup_not_found' | 'not_alrajhi_topup' | 'missing_provider_ref' | 'invalid_encrypted_payload' | 'transaction_payment_id_missing' | 'track_id_mismatch' }
+  | { valid: true; reason: 'valid'; providerRef: string };
 
 /**
  * Safe diagnostic used only for the bank acknowledgement path.  It never logs
@@ -142,14 +141,13 @@ export async function inspectAlrajhiCallback(topupId: number, body: unknown): Pr
   const row = await getTopupById(topupId);
   if (!row) return { valid: false, reason: 'topup_not_found' };
   if (row.source !== 'online' || row.provider !== 'alrajhi_arb') return { valid: false, reason: 'not_alrajhi_topup' };
-  const providerRef = await providerRefOf(topupId);
-  if (!providerRef) return { valid: false, reason: 'missing_provider_ref' };
-  if (extractArbCallbackPaymentId(body) !== providerRef) return { valid: false, reason: 'payment_id_mismatch' };
   const creds = await getProviderCreds('alrajhi_arb');
   const data = decodeArbCallback(body, creds.terminal_resource_key || '');
   if (!data) return { valid: false, reason: 'invalid_encrypted_payload' };
+  const providerRef = String(data.paymentId || '');
+  if (!providerRef) return { valid: false, reason: 'transaction_payment_id_missing' };
   if (String(data.trackId || '') !== String(topupId)) return { valid: false, reason: 'track_id_mismatch' };
-  return { valid: true, reason: 'valid' };
+  return { valid: true, reason: 'valid', providerRef };
 }
 
 export async function validateAlrajhiCallback(topupId: number, body: unknown): Promise<boolean> {

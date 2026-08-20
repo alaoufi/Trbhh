@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { confirmTopupById, confirmFromWebhook, inspectAlrajhiCallback } from '@/lib/payments';
 import { readAlrajhiCallbackBody } from '@/lib/payments/alrajhi-callback';
+import { attachProviderRef } from '@/lib/wallet';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ provider: 
       console.warn('[alrajhi-callback] notification validation failed', { reason: validation.reason, topupId });
       return NextResponse.json([{ status: '2', errorText: 'notification validation failed', errorCode: validation.reason }], { status: 400 });
     }
+    await attachProviderRef(topupId, validation.providerRef);
     // The bank redirects the browser to this same URL as a GET after the acknowledgement.
     return NextResponse.json([{ status: '1', result: `${url.origin}${url.pathname}?t=${topupId}` }]);
   }

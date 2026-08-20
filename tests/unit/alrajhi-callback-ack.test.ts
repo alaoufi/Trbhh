@@ -15,4 +15,9 @@ describe('Al Rajhi callback acknowledgement', () => {
     expect(source).toContain("import { readAlrajhiCallbackBody } from '@/lib/payments/alrajhi-callback'");
     expect(source).toContain('const body = await readAlrajhiCallbackBody(req);');
   });
+
+  it('stores the final encrypted transaction payment id before acknowledging ARB', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
+    expect(source).toContain('await attachProviderRef(topupId, validation.providerRef);');
+  });
 });

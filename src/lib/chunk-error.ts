@@ -4,6 +4,16 @@ const isChunkLoadError = (error: Error) =>
   error.name === 'ChunkLoadError' || /Loading chunk [\w.-]+ failed/i.test(error.message || '');
 
 /**
+ * Next.js gives every Server Action a build-specific identifier. A form left
+ * open during deployment can therefore post an identifier the new server no
+ * longer knows. This has the same recovery as a stale chunk: fetch the new
+ * document once, rather than showing the visitor an unrelated generic error.
+ */
+export function isStaleServerActionError(error: Error): boolean {
+  return /Failed to find Server Action/i.test(error?.message || '');
+}
+
+/**
  * أخطاء تحميل الحزمات (chunk) تظهر لزائر فتح الموقع في تبويب قديم بعد نشر إصدار
  * جديد — لم يعد ملف الحزمة الذي يطلبه المتصفح موجوداً على الخادم. لا يصلحها
  * `reset()` لأنه يعيد عرض React فقط دون تحميل قائمة الحزم الجديدة؛ الحل الوحيد
@@ -17,8 +27,8 @@ const isChunkLoadError = (error: Error) =>
 const RELOAD_COOLDOWN_MS = 15000;
 
 export function reloadOnChunkError(error: Error): boolean {
-  if (typeof window === 'undefined' || !isChunkLoadError(error)) return false;
-  const key = 'trbhh_chunk_reload_at';
+  if (typeof window === 'undefined' || (!isChunkLoadError(error) && !isStaleServerActionError(error))) return false;
+  const key = 'trbhh_asset_or_action_reload_at';
   let last = 0;
   try { last = parseInt(sessionStorage.getItem(key) || '0', 10) || 0; } catch { /* storage محجوب */ }
   const now = Date.now();

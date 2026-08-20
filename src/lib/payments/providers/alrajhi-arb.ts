@@ -66,6 +66,17 @@ export function decodeArbCallback(payload: unknown, resourceKey: string): Record
   } catch { return null; }
 }
 
+/**
+ * Failure text from ARB is not safe to show wholesale: it can vary by bank
+ * channel. Keep only the documented IPAY code for support diagnostics.
+ */
+export function extractArbFailureCode(data: Record<string, unknown>): string | null {
+  const match = [data.error, data.errorText, data.result]
+    .map((value) => String(value || '').match(/\bIPAY\d{7}\b/i)?.[0])
+    .find(Boolean);
+  return match ? match.toUpperCase() : null;
+}
+
 function numberString(amount: number): string { return amount.toFixed(2); }
 function gatewayUrl(creds: ProviderCreds): string { return creds.gateway_url || DEFAULT_GATEWAY_URL; }
 function tranportalGatewayUrl(creds: ProviderCreds): string { return creds.tranportal_gateway_url || ''; }

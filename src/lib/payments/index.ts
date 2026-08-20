@@ -8,8 +8,7 @@ import type { PayProvider, PayProviderId } from './types';
 import { moyasar } from './providers/moyasar';
 import { tap } from './providers/tap';
 import { paytabs } from './providers/paytabs';
-import { alrajhiArb } from './providers/alrajhi-arb';
-import { decodeArbCallback } from './providers/alrajhi-arb';
+import { alrajhiArb, decodeArbCallback, extractArbFailureCode } from './providers/alrajhi-arb';
 
 export { PROVIDER_META, providerMeta, readyProviders } from './registry';
 export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, getTopupMethodAvailability, saveTopupMethodSettings, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
@@ -129,7 +128,7 @@ export async function confirmFromWebhook(provider: string, body: unknown, query:
  * after the later server-to-server inquiry.
  */
 export type AlrajhiCallbackValidation =
-  | { valid: false; reason: 'missing_topup_id' | 'topup_not_found' | 'not_alrajhi_topup' | 'missing_provider_ref' | 'invalid_encrypted_payload' | 'transaction_id_missing' | 'track_id_mismatch' }
+  | { valid: false; reason: 'missing_topup_id' | 'topup_not_found' | 'not_alrajhi_topup' | 'missing_provider_ref' | 'invalid_encrypted_payload' | 'transaction_id_missing' | 'track_id_mismatch'; gatewayCode?: string }
   | { valid: true; reason: 'valid'; providerRef: string };
 
 /**
@@ -145,7 +144,7 @@ export async function inspectAlrajhiCallback(topupId: number, body: unknown): Pr
   const data = decodeArbCallback(body, creds.terminal_resource_key || '');
   if (!data) return { valid: false, reason: 'invalid_encrypted_payload' };
   const providerRef = String(data.transId || '');
-  if (!providerRef) return { valid: false, reason: 'transaction_id_missing' };
+  if (!providerRef) return { valid: false, reason: 'transaction_id_missing', gatewayCode: extractArbFailureCode(data) || undefined };
   if (String(data.trackId || '') !== String(topupId)) return { valid: false, reason: 'track_id_mismatch' };
   return { valid: true, reason: 'valid', providerRef };
 }

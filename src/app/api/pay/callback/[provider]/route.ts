@@ -49,8 +49,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ provider: 
     const body = await readAlrajhiCallbackBody(req);
     const validation = await inspectAlrajhiCallback(topupId, body);
     if (!validation.valid) {
-      console.warn('[alrajhi-callback] notification validation failed', { reason: validation.reason, topupId });
-      return NextResponse.json([{ status: '2', errorText: 'notification validation failed', errorCode: validation.reason }], { status: 400 });
+      console.warn('[alrajhi-callback] notification validation failed', { reason: validation.reason, gatewayCode: validation.gatewayCode, topupId });
+      return NextResponse.json([{ status: '2', errorText: 'notification validation failed', errorCode: validation.gatewayCode || validation.reason }], { status: 400 });
     }
     await attachProviderRef(topupId, validation.providerRef);
     // The bank redirects the browser to this same URL as a GET after the acknowledgement.

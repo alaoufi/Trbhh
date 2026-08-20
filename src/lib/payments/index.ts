@@ -125,11 +125,11 @@ export async function confirmFromWebhook(provider: string, body: unknown, query:
 /**
  * ARB requires a positive acknowledgement before it settles a Bank Hosted payment.
  * We only acknowledge an encrypted notification when it binds to the pending top-up
- * through its encrypted final payment ID and our Track ID. Credit still happens only
+ * through its encrypted final transaction ID and our Track ID. Credit still happens only
  * after the later server-to-server inquiry.
  */
 export type AlrajhiCallbackValidation =
-  | { valid: false; reason: 'missing_topup_id' | 'topup_not_found' | 'not_alrajhi_topup' | 'missing_provider_ref' | 'invalid_encrypted_payload' | 'transaction_payment_id_missing' | 'track_id_mismatch' }
+  | { valid: false; reason: 'missing_topup_id' | 'topup_not_found' | 'not_alrajhi_topup' | 'missing_provider_ref' | 'invalid_encrypted_payload' | 'transaction_id_missing' | 'track_id_mismatch' }
   | { valid: true; reason: 'valid'; providerRef: string };
 
 /**
@@ -144,8 +144,8 @@ export async function inspectAlrajhiCallback(topupId: number, body: unknown): Pr
   const creds = await getProviderCreds('alrajhi_arb');
   const data = decodeArbCallback(body, creds.terminal_resource_key || '');
   if (!data) return { valid: false, reason: 'invalid_encrypted_payload' };
-  const providerRef = String(data.paymentId || '');
-  if (!providerRef) return { valid: false, reason: 'transaction_payment_id_missing' };
+  const providerRef = String(data.transId || '');
+  if (!providerRef) return { valid: false, reason: 'transaction_id_missing' };
   if (String(data.trackId || '') !== String(topupId)) return { valid: false, reason: 'track_id_mismatch' };
   return { valid: true, reason: 'valid', providerRef };
 }

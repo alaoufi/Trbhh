@@ -30,10 +30,10 @@ describe('Al Rajhi ARB bank-hosted provider', () => {
     expect(payload[0]).not.toHaveProperty('udf1');
   });
 
-  it('keeps the original merchant TrackID when it inquires by bank PaymentID', () => {
+  it('keeps the original merchant TrackID when it inquires by ARB transaction ID', () => {
     const payload = JSON.parse(buildArbInquiryTrandata({
       amountSar: 10,
-      paymentId: '100201931620827468',
+      transactionId: '201931951332346',
       trackId: '1700000000000123',
     }, { tranportal_id: 'portal-id', tranportal_password: 'portal-password' }));
 
@@ -42,8 +42,8 @@ describe('Al Rajhi ARB bank-hosted provider', () => {
       amt: '10.00',
       currencyCode: '682',
       trackId: '1700000000000123',
-      udf5: 'PaymentID',
-      transId: '100201931620827468',
+      udf5: 'TRANID',
+      transId: '201931951332346',
     });
   });
 

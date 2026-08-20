@@ -17,8 +17,10 @@ describe('Al Rajhi callback acknowledgement', () => {
   });
 
   it('stores the final encrypted transaction payment id before acknowledging ARB', () => {
-    const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
-    expect(source).toContain('await attachProviderRef(topupId, validation.providerRef);');
+    const callback = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
+    const payments = fs.readFileSync(path.join(process.cwd(), 'src/lib/payments/index.ts'), 'utf8');
+    expect(callback).toContain('await attachProviderRef(topupId, validation.providerRef);');
+    expect(payments).toContain("const providerRef = String(data.transId || '');");
   });
 
   it('returns the public Trbhh callback URL to ARB instead of the internal container host', () => {

@@ -94,12 +94,12 @@ export function buildArbPurchaseTrandata(
 }
 
 /**
- * Build the ARB supporting-transactions inquiry by bank PaymentID.
+ * Build the ARB supporting-transactions inquiry by the bank transaction ID.
  * `trackId` remains Trbhh's original merchant identifier; ARB uses `udf5`
  * to select the lookup key held in `transId`.
  */
 export function buildArbInquiryTrandata(
-  input: { amountSar: number; paymentId: string; trackId: string },
+  input: { amountSar: number; transactionId: string; trackId: string },
   creds: Pick<ProviderCreds, 'tranportal_id' | 'tranportal_password'>,
 ): string {
   return JSON.stringify([{
@@ -109,8 +109,8 @@ export function buildArbInquiryTrandata(
     amt: numberString(input.amountSar),
     currencyCode: '682',
     trackId: input.trackId,
-    udf5: 'PaymentID',
-    transId: input.paymentId,
+    udf5: 'TRANID',
+    transId: input.transactionId,
   }]);
 }
 
@@ -163,7 +163,7 @@ export const alrajhiArb: PayProvider = {
       const resourceKey = creds.terminal_resource_key;
       const supportingUrl = tranportalGatewayUrl(creds);
       if (!id || !password || !resourceKey || !supportingUrl || !expectedTrackId) return { paid: false, amountSar: 0, providerRef, status: 'configuration_missing' };
-      const plain = buildArbInquiryTrandata({ amountSar: expectedAmountSar, paymentId: providerRef, trackId: expectedTrackId }, { tranportal_id: id, tranportal_password: password });
+      const plain = buildArbInquiryTrandata({ amountSar: expectedAmountSar, transactionId: providerRef, trackId: expectedTrackId }, { tranportal_id: id, tranportal_password: password });
       const result = await gatewayRequest(supportingUrl, [{ id, trandata: encryptArbTrandata(plain, resourceKey) }]);
       const response = firstResponse(result.data);
       if (!result.ok || String(response.status) !== '1' || !response.trandata) return { paid: false, amountSar: 0, providerRef, status: response.error || response.errorText || result.error || 'inquiry_failed' };
@@ -172,7 +172,7 @@ export const alrajhiArb: PayProvider = {
       const merchantTrackId = String(data.trackId || '');
       const rawStatus = String(data.errorText || data.error || data.result || 'unknown');
       const paid = String(data.result || '').toUpperCase() === 'CAPTURED'
-        && String(data.paymentId || '') === providerRef
+        && String(data.transId || '') === providerRef
         && merchantTrackId === expectedTrackId;
       return { paid, amountSar, providerRef, merchantTrackId, method: paymentMethod(data.cardType), status: rawStatus };
     } catch { return { paid: false, amountSar: 0, providerRef, status: 'inquiry_invalid' }; }

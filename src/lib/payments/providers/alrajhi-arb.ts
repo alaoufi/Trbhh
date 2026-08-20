@@ -25,7 +25,7 @@ export function decryptArbTrandata(encrypted: string, resourceKey: string): stri
   return decodeURIComponent(Buffer.concat([decipher.update(Buffer.from(encrypted, 'hex')), decipher.final()]).toString('utf8'));
 }
 
-type ArbResponse = { status?: string | number; result?: string; error?: string; errorText?: string; trandata?: string };
+type ArbResponse = { status?: string | number; result?: string; error?: string; errorText?: string; trandata?: string; paymentId?: string | number; PaymentID?: string | number };
 
 function firstResponse(payload: unknown): ArbResponse {
   return (Array.isArray(payload) ? payload[0] : payload) as ArbResponse || {};
@@ -48,7 +48,8 @@ export function parseArbInitialResponse(payload: unknown): { paymentId: string; 
 /** Decrypt the bank notification and reject mismatched outer/inner payment IDs. */
 export function decodeArbCallback(payload: unknown, resourceKey: string): Record<string, unknown> | null {
   if (!payload || typeof payload !== 'object') return null;
-  const body = payload as Record<string, unknown>;
+  // ARB documents its merchant notification as a one-item JSON array.
+  const body = firstResponse(payload);
   const outerPaymentId = String(body.paymentId || body.PaymentID || '');
   const encrypted = typeof body.trandata === 'string' ? body.trandata : '';
   if (!outerPaymentId || !encrypted) return null;

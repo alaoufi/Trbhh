@@ -53,6 +53,11 @@ describe('Al Rajhi ARB bank-hosted provider', () => {
     expect(decodeArbCallback({ paymentId: '124', trandata }, resourceKey)).toBeNull();
   });
 
+  it('accepts the documented array-shaped merchant notification from ARB', () => {
+    const trandata = encryptArbTrandata(JSON.stringify([{ paymentId: '123', trackId: '42', result: 'CAPTURED' }]), resourceKey);
+    expect(decodeArbCallback([{ paymentId: '123', trandata }], resourceKey)).toMatchObject({ paymentId: '123', trackId: '42', result: 'CAPTURED' });
+  });
+
   it('keeps exactly the field names supplied by the bank', () => {
     expect(providerMeta('alrajhi_arb')?.creds.map((field) => field.label)).toEqual([
       'Terminal ID', 'Terminal Name', 'Merchant ID', 'Terminal Alias Name',

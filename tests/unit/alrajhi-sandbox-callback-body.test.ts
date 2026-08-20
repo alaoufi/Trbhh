@@ -11,4 +11,14 @@ describe('Al Rajhi sandbox callback body', () => {
 
     await expect(readAlrajhiCallbackBody(request)).resolves.toEqual({ paymentId: '123', trandata: 'encrypted-data' });
   });
+
+  it('preserves the documented JSON-array notification payload', async () => {
+    const request = new Request('https://trbhh.sa/api/pay/callback/alrajhi_arb', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify([{ paymentId: '123', trandata: 'encrypted-data' }]),
+    });
+
+    await expect(readAlrajhiCallbackBody(request)).resolves.toEqual([{ paymentId: '123', trandata: 'encrypted-data' }]);
+  });
 });

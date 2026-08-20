@@ -7,7 +7,10 @@ export const STORAGE_DIR = process.env.STORAGE_DIR || path.join(process.cwd(), '
 
 /** True only when a relative path resolves inside the given storage directory. */
 export function isSafeStoragePath(baseDir: string, relPath: string): boolean {
-  if (!relPath || path.isAbsolute(relPath)) return false;
+  // Uploaded paths may originate from a Windows client while the production
+  // container runs Linux. Check both path syntaxes so `C:/...` and UNC paths
+  // can never be treated as relative merely because of the host OS.
+  if (!relPath || path.isAbsolute(relPath) || path.posix.isAbsolute(relPath) || path.win32.isAbsolute(relPath)) return false;
   const resolvedBase = path.resolve(baseDir);
   const resolvedPath = path.resolve(resolvedBase, relPath);
   const relative = path.relative(resolvedBase, resolvedPath);

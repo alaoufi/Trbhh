@@ -46,7 +46,7 @@ const TABS = [
   { key: 'accounts', label: 'حسابات الشحن', icon: Landmark },
   { key: 'campaigns', label: 'الحملات', icon: Megaphone },
   { key: 'payments', label: 'المدفوعات', icon: HandCoins },
-  { key: 'pricing', label: 'كل التسعير', icon: ListChecks },
+  { key: 'pricing', label: 'الباقات والخدمات', icon: ListChecks },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
@@ -866,6 +866,7 @@ function PackageFields({ p }: { p?: Package }) {
         <PkgField label="عدد إعلانات التميز بالأعلى" name="featuredSlots" defaultValue={p?.featuredSlots} />
         <PkgField label="أيام البقاء بالأعلى" name="featuredDays" defaultValue={p?.featuredDays} />
         <PkgField label="مدة بقاء الإعلان (أيام، 0=دائم)" name="adDays" defaultValue={p?.adDays} />
+        <PkgField label="مدة الاشتراك (أيام)" name="durationDays" defaultValue={p?.durationDays ?? 30} min={1} />
         <PkgTierSelect value={p?.tier} />
         <PkgField label="الترتيب" name="sort" defaultValue={p?.sort} />
       </div>

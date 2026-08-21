@@ -13,6 +13,7 @@ export type Package = {
   featuredSlots: number;// how many of the member's ads are pinned to the top (0 => none)
   featuredDays: number; // how many days each featured ad stays on top
   adDays: number;       // how long the member's regular ads stay visible (0 => unlimited)
+  durationDays: number; // subscription duration when bought by the member
   tier: Tier;           // ذهبي / فضي — shows a gold/silver star on the member's ads
   isDefault: boolean;   // the free plan applied to members without a subscription
   sort: number;         // ranking / order of the package
@@ -22,12 +23,12 @@ export type Package = {
 /** Permissive fallback used when no package is configured/assigned — never blocks posting. */
 export const FREE_FALLBACK: Package = {
   id: 0, name: 'مجانية', price: 0, adsPerDay: 0, gapHours: 0,
-  featuredSlots: 0, featuredDays: 0, adDays: 0, tier: '', isDefault: true, sort: 0, active: true,
+  featuredSlots: 0, featuredDays: 0, adDays: 0, durationDays: 30, tier: '', isDefault: true, sort: 0, active: true,
 };
 
 type Row = {
   id: number; name: string; price: unknown; ads_per_day: number; gap_hours: number;
-  featured_slots: number; featured_days: number; ad_days?: number; tier: string; is_default: number; sort: number; active: number;
+  featured_slots: number; featured_days: number; ad_days?: number; duration_days?: number; tier: string; is_default: number; sort: number; active: number;
 };
 
 function toPackage(r: Row): Package {
@@ -40,6 +41,7 @@ function toPackage(r: Row): Package {
     featuredSlots: Number(r.featured_slots) || 0,
     featuredDays: Number(r.featured_days) || 0,
     adDays: Number(r.ad_days) || 0,
+    durationDays: Math.max(1, Number(r.duration_days) || 30),
     tier: (r.tier === 'gold' || r.tier === 'silver' ? r.tier : '') as Tier,
     isDefault: r.is_default === 1,
     sort: Number(r.sort) || 0,
@@ -67,6 +69,8 @@ async function ensure() {
   `);
   const adDays = await prisma.$queryRawUnsafe<{ count: bigint }[]>(`SELECT COUNT(*) AS count FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'packages' AND column_name = 'ad_days'`);
   if (!adDays[0] || Number(adDays[0].count) === 0) await prisma.$executeRawUnsafe(`ALTER TABLE packages ADD COLUMN ad_days INT NOT NULL DEFAULT 0`);
+  const durationDays = await prisma.$queryRawUnsafe<{ count: bigint }[]>(`SELECT COUNT(*) AS count FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'packages' AND column_name = 'duration_days'`);
+  if (!durationDays[0] || Number(durationDays[0].count) === 0) await prisma.$executeRawUnsafe(`ALTER TABLE packages ADD COLUMN duration_days INT NOT NULL DEFAULT 30`);
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS user_packages (
       user_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
@@ -103,9 +107,9 @@ export async function createPackage(p: Omit<Package, 'id'>) {
   await ensure();
   if (p.isDefault) await prisma.$executeRawUnsafe(`UPDATE packages SET is_default = 0`);
   await prisma.$executeRawUnsafe(
-    `INSERT INTO packages (name, price, ads_per_day, gap_hours, featured_slots, featured_days, ad_days, tier, is_default, sort, active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    p.name, p.price, p.adsPerDay, p.gapHours, p.featuredSlots, p.featuredDays, p.adDays, p.tier, p.isDefault ? 1 : 0, p.sort, p.active ? 1 : 0,
+    `INSERT INTO packages (name, price, ads_per_day, gap_hours, featured_slots, featured_days, ad_days, duration_days, tier, is_default, sort, active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    p.name, p.price, p.adsPerDay, p.gapHours, p.featuredSlots, p.featuredDays, p.adDays, p.durationDays, p.tier, p.isDefault ? 1 : 0, p.sort, p.active ? 1 : 0,
   );
 }
 
@@ -113,8 +117,8 @@ export async function updatePackage(id: number, p: Omit<Package, 'id'>) {
   await ensure();
   if (p.isDefault) await prisma.$executeRawUnsafe(`UPDATE packages SET is_default = 0 WHERE id <> ?`, id);
   await prisma.$executeRawUnsafe(
-    `UPDATE packages SET name = ?, price = ?, ads_per_day = ?, gap_hours = ?, featured_slots = ?, featured_days = ?, ad_days = ?, tier = ?, is_default = ?, sort = ?, active = ? WHERE id = ?`,
-    p.name, p.price, p.adsPerDay, p.gapHours, p.featuredSlots, p.featuredDays, p.adDays, p.tier, p.isDefault ? 1 : 0, p.sort, p.active ? 1 : 0, id,
+    `UPDATE packages SET name = ?, price = ?, ads_per_day = ?, gap_hours = ?, featured_slots = ?, featured_days = ?, ad_days = ?, duration_days = ?, tier = ?, is_default = ?, sort = ?, active = ? WHERE id = ?`,
+    p.name, p.price, p.adsPerDay, p.gapHours, p.featuredSlots, p.featuredDays, p.adDays, p.durationDays, p.tier, p.isDefault ? 1 : 0, p.sort, p.active ? 1 : 0, id,
   );
 }
 
@@ -195,6 +199,37 @@ export async function assignUserPackage(userId: number, packageId: number | 0, d
      ON DUPLICATE KEY UPDATE package_id = VALUES(package_id), expires_at = VALUES(expires_at), assigned_at = CURRENT_TIMESTAMP`,
     userId, packageId, expires,
   );
+}
+
+/** Subscription purchases extend an existing active package rather than removing paid time. */
+export function packagePurchaseExpiry(days: number, currentExpiry: Date | null, now = new Date()): Date {
+  const safeDays = Math.max(1, Math.floor(days || 30));
+  const start = currentExpiry && currentExpiry.getTime() > now.getTime() ? currentExpiry : now;
+  return new Date(start.getTime() + safeDays * 86400000);
+}
+
+/** Debit and activate a member package in one database transaction. */
+export async function buyMemberPackage(userId: number, packageId: number): Promise<{ ok: boolean; balance: number; reason?: 'invalid' | 'insufficient' }> {
+  await ensure();
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRawUnsafe<Row[]>(`SELECT * FROM packages WHERE id = ? AND active = 1 LIMIT 1`, packageId);
+      const p = rows[0] ? toPackage(rows[0]) : null;
+      if (!p || p.price <= 0) return { ok: false, balance: 0, reason: 'invalid' as const };
+      const price = Math.round(p.price);
+      const affected = await tx.$executeRawUnsafe(`UPDATE users SET balance = balance - ? WHERE id = ? AND balance - ? >= reserved`, price, userId, price);
+      if (!affected) {
+        const member = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
+        return { ok: false, balance: member?.balance ?? 0, reason: 'insufficient' as const };
+      }
+      const member = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { balance: true } });
+      const old = await tx.$queryRawUnsafe<{ expires_at: Date | null }[]>(`SELECT expires_at FROM user_packages WHERE user_id = ? LIMIT 1`, userId);
+      const expiry = packagePurchaseExpiry(p.durationDays, old[0]?.expires_at || null);
+      await tx.$executeRawUnsafe(`INSERT INTO user_packages (user_id, package_id, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE package_id = VALUES(package_id), expires_at = VALUES(expires_at), assigned_at = CURRENT_TIMESTAMP`, userId, packageId, expiry);
+      await tx.wallet_txns.create({ data: { user_id: BigInt(userId), amount: -price, balance_after: member?.balance ?? 0, reason: 'subscription', note: `اشتراك باقة ${p.name} لمدة ${p.durationDays} يوم` } });
+      return { ok: true, balance: member?.balance ?? 0 };
+    });
+  } catch { return { ok: false, balance: 0, reason: 'invalid' }; }
 }
 
 /** Un-feature ads whose spotlight period elapsed. Call before reading featured ads. */

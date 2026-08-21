@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { getMemberWindows, withinWindow, getServicePricing, DUR_DAYS, DUR_LABEL, DUP_PACK_COUNT, isDur, getAdRestoreFee } from '@/lib/settings';
 import { charge, buyDupPack } from '@/lib/wallet';
+import { buyMemberPackage } from '@/lib/packages';
 import { setUserArea } from '@/lib/user-location';
 import { toLocalSaudi } from '@/lib/sms';
 import { respondToReport } from '@/lib/alerts';
@@ -167,6 +168,16 @@ export async function buyDupPackAction(formData: FormData) {
   revalidatePath('/account/wallet');
   if (!r.ok) redirect(`/account/wallet?error=needcredit&price=${price}&bal=${r.balance}`);
   redirect('/account/wallet?dup=1');
+}
+
+export async function buyMemberPackageAction(formData: FormData) {
+  const session = await requireUser();
+  const packageId = Number(formData.get('packageId') || 0);
+  const result = await buyMemberPackage(session.uid, packageId);
+  revalidatePath('/packages');
+  revalidatePath('/account/wallet');
+  if (!result.ok) redirect(`/packages?error=${result.reason === 'insufficient' ? 'needcredit' : 'unavailable'}`);
+  redirect('/packages?success=1');
 }
 
 /** طلب شحن رصيد: المبلغ + إيصال التحويل — يُضاف للرصيد بعد تأكيد الإدارة وصول المبلغ. */

@@ -197,6 +197,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
             {/* المتشابهات في قوائم فرعية */}
             {isAuthed && (
               <Section title="حسابي" icon={User}>
+                <Item href="/packages" icon={Crown} onClick={close}>الباقات المتاحة</Item>
                 <Item href="/account" icon={User} onClick={close}>لوحة حسابي</Item>
                 <Item href="/account/profile" icon={UserPen} onClick={close}>الملف الشخصي</Item>
                 <Item href="/account/profiles" icon={Users} onClick={close}>الحسابات الموحدة</Item>
@@ -216,7 +217,6 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
               {isAuthed && <Item href="/ads/new" icon={PlusCircle} onClick={close}>أضف إعلان</Item>}
               {isAuthed && <Item href="/classified/new" icon={Sparkles} onClick={close}>المصمم الذكي (إعلان مبوّب)</Item>}
               <Item href="/promote" icon={Megaphone} onClick={close}>أعلن معنا</Item>
-              <Item href="/packages" icon={Crown} onClick={close}>الباقات</Item>
             </Section>
 
             <Section title="تصفّح" icon={Search}>

@@ -116,6 +116,7 @@ function readPackageForm(formData: FormData) {
     featuredSlots: Math.max(0, parseInt(String(formData.get('featuredSlots') || '0')) || 0),
     featuredDays: Math.max(0, parseInt(String(formData.get('featuredDays') || '0')) || 0),
     adDays: Math.max(0, parseInt(String(formData.get('adDays') || '0')) || 0),
+    durationDays: Math.max(1, parseInt(String(formData.get('durationDays') || '30')) || 30),
     tier: (t === 'gold' || t === 'silver' ? t : '') as Tier,
     isDefault: !!formData.get('isDefault'),
     sort: parseInt(String(formData.get('sort') || '0')) || 0,

@@ -279,7 +279,7 @@ export async function createAdAction(formData: FormData) {
   if (pkg.adsPerDay > 0 && (await countAdsToday(session.uid)) >= pkg.adsPerDay) {
     await logMod(session.uid, { kind: 'limit', action: 'blocked', snippet: `تجاوز الحد اليومي (${pkg.adsPerDay}/يوم) — العنوان: ${title.slice(0, 60)}` });
     await notifyModBlock(session.uid, `⚠️ لقد تجاوزت الحد المسموح لك من الإعلانات اليوم (${pkg.adsPerDay}/يوم). هل ترغب بالترقية إلى باقة أفضل للحصول على عدد إعلانات أكبر يومياً؟`, '/packages');
-    redirect(`/ads/new?error=limit&max=${pkg.adsPerDay}`);
+    redirect(`/packages?reason=limit&max=${pkg.adsPerDay}`);
   }
   if (pkg.gapHours > 0) {
     const last = await lastAdAt(session.uid);
@@ -289,7 +289,7 @@ export async function createAdAction(formData: FormData) {
         const wait = Math.max(1, Math.ceil(pkg.gapHours - elapsedH));
         await logMod(session.uid, { kind: 'limit', action: 'blocked', snippet: `تجاوز الفاصل الزمني (${pkg.gapHours} ساعة) — العنوان: ${title.slice(0, 60)}` });
         await notifyModBlock(session.uid, `⚠️ يجب الانتظار ${pkg.gapHours} ساعة بين كل إعلان وآخر حسب باقتك. هل ترغب بالترقية إلى باقة أفضل لتقليل الفاصل الزمني؟`, '/packages');
-        redirect(`/ads/new?error=gap&hours=${pkg.gapHours}&wait=${wait}`);
+        redirect(`/packages?reason=gap&hours=${pkg.gapHours}&wait=${wait}`);
       }
     }
   }

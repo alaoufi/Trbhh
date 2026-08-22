@@ -599,6 +599,36 @@ const STATEMENTS: string[] = [
     attempts INT NOT NULL DEFAULT 0,
     last_sent DATETIME NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  /* Public registration is deliberately separate from password reset: no user
+     exists until this short-lived intent has passed OTP verification. */
+  `CREATE TABLE IF NOT EXISTS registration_intents (
+    phone VARCHAR(20) NOT NULL PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    ref_by BIGINT UNSIGNED NULL,
+    code VARCHAR(6) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    last_sent DATETIME NOT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS international_registration_requests (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    country VARCHAR(100) NOT NULL,
+    name VARCHAR(120) NOT NULL,
+    phone VARCHAR(40) NOT NULL,
+    email VARCHAR(160) NOT NULL,
+    reason VARCHAR(500) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    review_note VARCHAR(300) NULL,
+    reviewed_by BIGINT UNSIGNED NULL,
+    reviewed_at DATETIME NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX international_registration_status_created (status, created_at),
+    INDEX international_registration_phone (phone),
+    INDEX international_registration_email (email)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS chat_typing (
     user_id INT NOT NULL,
     peer_id INT NOT NULL,

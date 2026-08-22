@@ -30,6 +30,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
       { href: '/admin/roles', label: 'الأدوار والصلاحيات', icon: KeyRound, perm: 'users' },
       { href: '/admin/links', label: 'ربط الأعضاء', icon: LinkIcon, perm: 'users' },
       { href: '/admin/verifications', label: 'طلبات التوثيق', icon: ShieldCheck, perm: 'verifications' },
+      { href: '/admin/international-registrations', label: 'طلبات التسجيل الدولي', icon: Shield, perm: 'users', description: 'مراجعة التسجيلات من خارج المملكة', keywords: ['تسجيل دولي', 'دولة', 'رقم دولي'] },
     ],
   },
   {

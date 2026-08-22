@@ -22,6 +22,38 @@ import { bustAdCaches } from '@/lib/data';
 import { toInt } from '@/lib/utils';
 import { logAdmin } from '@/lib/audit';
 
+export async function reviewInternationalRegistrationAction(formData: FormData) {
+  const admin = await requireAction('users', 'edit');
+  const id = Number(formData.get('id') || 0);
+  const decision = String(formData.get('decision') || '');
+  const note = String(formData.get('note') || '').trim().slice(0, 300);
+  if (!Number.isSafeInteger(id) || id <= 0 || (decision !== 'approve' && decision !== 'reject')) redirect('/admin/international-registrations?error=invalid');
+  await prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRawUnsafe<{ country: string; name: string; phone: string; email: string; password_hash: string; status: string }[]>(
+      'SELECT country,name,phone,email,password_hash,status FROM international_registration_requests WHERE id = ? FOR UPDATE', id,
+    );
+    const r = rows[0];
+    if (!r || r.status !== 'pending') throw new Error('request unavailable');
+    if (decision === 'approve') {
+      const existing = await tx.users.findFirst({ where: { OR: [{ phoneNumber: r.phone }, { email: r.email }] }, select: { id: true } });
+      if (existing) throw new Error('contact already registered');
+      await tx.users.create({ data: { name: r.name, userName: r.phone, phoneNumber: r.phone, email: r.email, password: r.password_hash, type: 'user', ban: 'no', trusted: 0, allow_phone: 0, whatsapp: 0, step: 0, forget: 0, is_admin: 0 } });
+    }
+    await tx.$executeRawUnsafe('UPDATE international_registration_requests SET status=?, review_note=?, reviewed_by=?, reviewed_at=NOW() WHERE id=?', decision === 'approve' ? 'approved' : 'rejected', note || null, admin.uid, id);
+  });
+  await logAdmin(admin.uid, decision === 'approve' ? 'موافقة تسجيل دولي' : 'رفض تسجيل دولي', `طلب #${id}`, note);
+  revalidatePath('/admin/international-registrations');
+  redirect('/admin/international-registrations?done=1');
+}
+
+export async function deleteInternationalRegistrationAction(formData: FormData) {
+  await requireAction('users', 'edit');
+  const id = Number(formData.get('id') || 0);
+  if (Number.isSafeInteger(id) && id > 0) await prisma.$executeRawUnsafe('DELETE FROM international_registration_requests WHERE id=? AND status <> \'approved\'', id);
+  revalidatePath('/admin/international-registrations');
+  redirect('/admin/international-registrations?deleted=1');
+}
+
 export async function createMemberServiceOrderAction(formData: FormData) {
   const admin = await requireAction('users', 'edit');
   const userId = Number(formData.get('userId') || 0);

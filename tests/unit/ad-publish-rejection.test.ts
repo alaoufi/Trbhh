@@ -20,4 +20,12 @@ describe('ad publish rejection guidance', () => {
   it('sends free duplicate attempts to packages instead of treating them as spam', () => {
     expect(adPublishRejection('free-duplicate')).toMatchObject({ actionHref: '/packages' });
   });
+
+  it('never suggests payment or support as a way around safety and moderation blocks', () => {
+    for (const code of ['blocked', 'toomany', 'image', 'flood', 'repeat', 'crossdup', 'banned', 'editWindow'] as const) {
+      const message = adPublishRejection(code);
+      expect(message.actionHref).toBeUndefined();
+      expect(message.nextStep).not.toMatch(/اشترك|اشحن|تواصل مع الإدارة|للاعتراض/);
+    }
+  });
 });

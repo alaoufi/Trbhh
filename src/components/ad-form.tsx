@@ -193,7 +193,7 @@ export function AdForm({
         <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
           🚫 <b>{rejection?.title}:</b> {rejection?.reason} المحتوى المصنّف: <b>{catLabel}</b>.
           {banned ? (
-            <div className="mt-1">وتم <b>حظر حسابك فوراً</b> لمخالفة سياسة المحتوى. للاعتراض تواصل مع الإدارة.</div>
+            <div className="mt-1">وتم <b>إيقاف النشر للحساب</b> لمخالفة سياسة المحتوى. لا يمكن نشر إعلان جديد أثناء مدة الإيقاف.</div>
           ) : (
             <div className="mt-1">هذه <b>مخالفة مسجّلة</b> على حسابك. تكرار المحاولة يؤدي إلى <b>حظر الحساب فوراً</b>{dupLeft ? ` (تبقّى ${dupLeft})` : ''}.</div>
           )}

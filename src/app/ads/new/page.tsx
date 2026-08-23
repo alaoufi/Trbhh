@@ -27,6 +27,9 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   // الوجهة: المعامل الصريح يفصل (store/personal)، وإلا تُشتقّ من مجال الهوية الفعّالة —
   // فما تراه في المبدّل هو ما تنشر فيه فعلاً. استقلالية تامّة: هوية تربح ⇐ تربح، هوية متجر ⇐ متجرها.
   const publishingAsStore = dest === 'store' || (dest !== 'personal' && active?.type === 'store');
+  const quota = !publishingAsStore
+    ? await import('@/lib/packages').then(async (m) => m.adQuota((await m.getUserPackage(session.uid)).adsPerDay, await m.countAdsToday(session.uid))).catch(() => null)
+    : null;
   const [countries, cities, areas, user] = await Promise.all([
     getCountries(), getCities(), getAreas(),
     prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { phoneNumber: true, phone_whatsapp: true } }),
@@ -122,6 +125,16 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
               ? 'سيظهر هذا الإعلان لزوّار متجرك باسم متجرك ورقمه — لا باسمك الشخصي.'
               : 'سيظهر هذا الإعلان في تربح باسمك الشخصي. اختر «باسم متجري» لنشره داخل متجرك بهويته.'}
           </p>
+        </div>
+      )}
+
+      {!publishingAsStore && quota && (
+        <div className={`rounded-2xl border-2 p-3 text-sm ${quota.unlimited ? 'border-emerald-300 bg-emerald-50' : quota.remaining === 0 ? 'border-red-300 bg-red-50' : 'border-primary/25 bg-primary/5'}`}>
+          <div className="font-extrabold text-primary">📊 رصيد إعلاناتك اليوم</div>
+          {quota.unlimited
+            ? <p className="mt-1">نشرت اليوم <b>{quota.used}</b> إعلاناً — باقتك لا تضع حداً يومياً.</p>
+            : <p className="mt-1">المتاح لك اليوم: <b>{quota.remaining}</b> من <b>{quota.limit}</b> إعلاناً <span className="text-muted-foreground">(استخدمت {quota.used})</span>.</p>}
+          <p className="mt-1 text-xs text-muted-foreground">الباقة المدفوعة تسمح بتكرار إعلانك ضمن هذا الرصيد؛ المجانية لا تسمح بتكرار الإعلان أو النص.</p>
         </div>
       )}
 

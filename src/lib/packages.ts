@@ -32,6 +32,14 @@ export function canRepeatOwnAdWithPackage(pkg: Pick<Package, 'price' | 'isDefaul
   return pkg.price > 0 && !pkg.isDefault;
 }
 
+export function adQuota(limit: number, used: number): { limit: number; used: number; remaining: number | null; unlimited: boolean } {
+  const safeLimit = Math.max(0, Math.floor(limit));
+  const safeUsed = Math.max(0, Math.floor(used));
+  return safeLimit === 0
+    ? { limit: 0, used: safeUsed, remaining: null, unlimited: true }
+    : { limit: safeLimit, used: safeUsed, remaining: Math.max(0, safeLimit - safeUsed), unlimited: false };
+}
+
 type Row = {
   id: number; name: string; price: unknown; ads_per_day: number; gap_hours: number;
   featured_slots: number; featured_days: number; ad_days?: number; duration_days?: number; tier: string; is_default: number; sort: number; active: number;

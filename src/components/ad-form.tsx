@@ -219,7 +219,7 @@ export function AdForm({
       )}
       {error === 'duplicate' && (
         <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-medium text-red-800">
-          ⚠️ لا تُكرّر نفس الإعلان. هذا الإعلان مطابق لإعلان سابق لك ولم يُنشر.
+          ⚠️ لم يُقبل الإعلان لأن باقتك مجانية ولا تسمح بتكرار إعلانك أو النص المطابق لإعلان سابق لك. اشترك في باقة مدفوعة للاستفادة من عدد إعلاناتك اليومي.
           {dupId && Number(dupId) > 0 && (
             <span> الإعلان المطابق: <a href={`/ads/${dupId}`} target="_blank" rel="noopener noreferrer" className="font-bold underline">افتح الإعلان رقم {dupId}</a>.</span>
           )}

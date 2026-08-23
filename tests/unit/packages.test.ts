@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canRepeatOwnAdWithPackage, packagePurchaseExpiry } from '@/lib/packages';
+import { adQuota, canRepeatOwnAdWithPackage, packagePurchaseExpiry } from '@/lib/packages';
 
 describe('member package purchase policy', () => {
   it('extends an active package from its current expiry', () => {
@@ -16,5 +16,10 @@ describe('member package purchase policy', () => {
   it('allows own-ad repeats only for paid packages', () => {
     expect(canRepeatOwnAdWithPackage({ price: 50, isDefault: false })).toBe(true);
     expect(canRepeatOwnAdWithPackage({ price: 0, isDefault: true })).toBe(false);
+  });
+
+  it('shows exact remaining daily ads for a limited package', () => {
+    expect(adQuota(3, 1)).toEqual({ limit: 3, used: 1, remaining: 2, unlimited: false });
+    expect(adQuota(0, 9)).toEqual({ limit: 0, used: 9, remaining: null, unlimited: true });
   });
 });

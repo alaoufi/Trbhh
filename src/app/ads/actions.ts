@@ -278,7 +278,7 @@ export async function createAdAction(formData: FormData) {
   if (pkg.adsPerDay > 0 && (await countAdsToday(session.uid)) >= pkg.adsPerDay) {
     await logMod(session.uid, { kind: 'limit', action: 'blocked', snippet: `تجاوز الحد اليومي (${pkg.adsPerDay}/يوم) — العنوان: ${title.slice(0, 60)}` });
     await notifyModBlock(session.uid, `⚠️ لقد تجاوزت الحد المسموح لك من الإعلانات اليوم (${pkg.adsPerDay}/يوم). هل ترغب بالترقية إلى باقة أفضل للحصول على عدد إعلانات أكبر يومياً؟`, '/packages');
-    redirect(`/packages?reason=limit&max=${pkg.adsPerDay}`);
+    redirect(`/ads/new?error=limit&max=${pkg.adsPerDay}`);
   }
   if (pkg.gapHours > 0) {
     const last = await lastAdAt(session.uid);
@@ -288,7 +288,7 @@ export async function createAdAction(formData: FormData) {
         const wait = Math.max(1, Math.ceil(pkg.gapHours - elapsedH));
         await logMod(session.uid, { kind: 'limit', action: 'blocked', snippet: `تجاوز الفاصل الزمني (${pkg.gapHours} ساعة) — العنوان: ${title.slice(0, 60)}` });
         await notifyModBlock(session.uid, `⚠️ يجب الانتظار ${pkg.gapHours} ساعة بين كل إعلان وآخر حسب باقتك. هل ترغب بالترقية إلى باقة أفضل لتقليل الفاصل الزمني؟`, '/packages');
-        redirect(`/packages?reason=gap&hours=${pkg.gapHours}&wait=${wait}`);
+        redirect(`/ads/new?error=gap&hours=${pkg.gapHours}&wait=${wait}`);
       }
     }
   }
@@ -367,15 +367,11 @@ export async function createAdAction(formData: FormData) {
   // المتجر مختلفة). أمّا إعلانات تربح فتخضع لكشف التكرار وباقاته. (فحص المحتوى يبقى للجميع.)
   const dup = dest === 'store' || canRepeatOwnAdWithPackage(pkg) ? null : await ownDuplicateOf(session.uid, title, detail, images);
   if (dup) {
-    const n = await bumpDupAttempts(session.uid);
-    await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مكرّر مع #${dup.id} «${dup.title}» — الجديد: ${title.slice(0, 60)}`, adId: dup.id });
-    if (n >= DUP_LIMIT) {
-      await banUserFor(session.uid, await getStrikeBanDays(), 'auto', 'تكرار نشر نفس الإعلان أكثر من مرة');
-      await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان أكثر من مرة.`);
-      redirect('/ads/new?error=banned');
-    }
-    await notifyModBlock(session.uid, `⚠️ رُفض نشر إعلانك لأنه مطابق لإعلان سابق لك — إنذار (${DUP_LIMIT - n} متبقية)، التكرار يؤدي للحظر.`, '/ads/new');
-    redirect(`/ads/new?error=duplicate&left=${Math.max(0, DUP_LIMIT - n)}&dup=${dup.id}`);
+    // تكرار الإعلان الذاتي مع الباقة المجانية سياسة استحقاق، وليس مخالفة سبام:
+    // لا نسجل إنذاراً ولا نحظر الحساب؛ نوضح الباقة المطلوبة فقط.
+    await logMod(session.uid, { kind: 'duplicate', action: 'blocked', snippet: `مكرّر مع #${dup.id} «${dup.title}» — الباقة المجانية لا تسمح بالتكرار`, adId: dup.id });
+    await notifyModBlock(session.uid, 'لم يُنشر الإعلان لأنه مكرر وباقتك المجانية لا تسمح بالتكرار. اشترك في باقة مدفوعة للاستفادة من رصيد الإعلانات اليومي.', '/packages');
+    redirect(`/ads/new?error=free-duplicate&dup=${dup.id}`);
   }
 
   // النشر الفوري ما لم تُفعّل الإدارة «مراجعة الإعلانات قبل النشر».

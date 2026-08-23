@@ -13,6 +13,7 @@ import { AdGallery } from '@/components/ad-gallery';
 import { ExpandableDetail } from '@/components/expandable-detail';
 import { formatPrice } from '@/lib/utils';
 import { parseMapsUrl } from '@/lib/maps';
+import { adPublishRejection, type AdPublishRejectionCode } from '@/lib/ad-publish-rejection';
 
 const MAX_VIDEO = 25 * 1024 * 1024; // 25MB
 
@@ -78,6 +79,7 @@ export function AdForm({
   identity?: { name: string; isStore: boolean };
 }) {
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه', charity: 'جمع تبرعات أو نشاط جمعية غير مرخّص' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
+  const rejection = error ? adPublishRejection(error as AdPublishRejectionCode) : null;
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
   const isReq = adsType === 'request';
   // نوع السعر للمعروض: تأجير (سعر + مدة) / بيع (سعر) / على السوم (بلا سعر)
@@ -174,22 +176,22 @@ export function AdForm({
 
       {error === 'missing' && (
         <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">
-          أكمل الحقول الإجبارية: <b>العنوان</b> و<b>التفاصيل</b> قبل النشر.
+          <b>{rejection?.title}:</b> {rejection?.reason} {rejection?.nextStep}
         </div>
       )}
       {error === 'contact' && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-          يجب إدخال رقم الجوال أو الواتساب قبل نشر الإعلان.
+          <b>{rejection?.title}:</b> {rejection?.reason} {rejection?.nextStep}
         </div>
       )}
       {error === 'pledge' && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-          يجب الموافقة على التعهّد بصحة الإعلان وتحمّل المسؤولية قبل النشر.
+          <b>{rejection?.title}:</b> {rejection?.reason} {rejection?.nextStep}
         </div>
       )}
       {error === 'blocked' && (
         <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
-          🚫 رُفض هذا الإعلان لاحتوائه على <b>{catLabel}</b> — النشر ممنوع منعاً باتاً.
+          🚫 <b>{rejection?.title}:</b> {rejection?.reason} المحتوى المصنّف: <b>{catLabel}</b>.
           {banned ? (
             <div className="mt-1">وتم <b>حظر حسابك فوراً</b> لمخالفة سياسة المحتوى. للاعتراض تواصل مع الإدارة.</div>
           ) : (
@@ -199,38 +201,36 @@ export function AdForm({
       )}
       {error === 'toomany' && (
         <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
-          🚫 لم يُنشر إعلانك لاحتوائه كلماتٍ مخالفةً كثيرة{limitMax ? ` (أكثر من الحد المسموح: ${limitMax})` : ''}. عدّل المحتوى وأزِل الكلمات المخالفة ثم أعد النشر.
+          🚫 <b>{rejection?.title}:</b> {rejection?.reason}{limitMax ? ` (أكثر من الحد المسموح: ${limitMax})` : ''} {rejection?.nextStep}
         </div>
       )}
       {error === 'image' && (
         <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
-          🚫 رُفضت إحدى الصور لاشتباه المحتوى بأنه غير لائق. الرجاء رفع صور مناسبة للإعلان فقط. تكرار المحاولة قد يؤدي لحظر الحساب.
+          🚫 <b>{rejection?.title}:</b> {rejection?.reason} {rejection?.nextStep}
         </div>
       )}
       {error === 'flood' && (
         <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
-          ⏳ أنت تنشر بسرعة كبيرة (إغراق). الرجاء الانتظار{gapWait ? ` نحو ${gapWait} ثانية` : ' قليلاً'} قبل نشر إعلان آخر.
+          ⏳ <b>{rejection?.title}:</b> {rejection?.reason} الرجاء الانتظار{gapWait ? ` نحو ${gapWait} ثانية` : ' قليلاً'} ثم أعد المحاولة.
         </div>
       )}
       {error === 'repeat' && (
         <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-          يوجد تكرار مبالغ فيه للعبارات أو الكلمات في العنوان/التفاصيل. الرجاء كتابة وصف طبيعي دون تكرار الكلمات لأغراض محركات البحث.
+          <b>{rejection?.title}:</b> {rejection?.reason} {rejection?.nextStep}
         </div>
       )}
-      {error === 'duplicate' && (
+      {(error === 'free-duplicate' || error === 'duplicate') && (
         <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-medium text-red-800">
-          ⚠️ لم يُقبل الإعلان لأن باقتك مجانية ولا تسمح بتكرار إعلانك أو النص المطابق لإعلان سابق لك. اشترك في باقة مدفوعة للاستفادة من عدد إعلاناتك اليومي.
+          ⚠️ <b>{adPublishRejection('free-duplicate').title}:</b> {adPublishRejection('free-duplicate').reason} {adPublishRejection('free-duplicate').nextStep}
           {dupId && Number(dupId) > 0 && (
             <span> الإعلان المطابق: <a href={`/ads/${dupId}`} target="_blank" rel="noopener noreferrer" className="font-bold underline">افتح الإعلان رقم {dupId}</a>.</span>
           )}
-          {dupLeft && Number(dupLeft) > 0
-            ? ` تبقّى لك ${dupLeft} ${Number(dupLeft) === 1 ? 'محاولة' : 'محاولات'} قبل حظر حسابك.`
-            : ' هذه محاولتك الأخيرة قبل الحظر.'}
+          <Link href="/packages" className="mt-2 inline-flex rounded-lg bg-primary px-3 py-1.5 font-extrabold text-white">عرض الباقات المتاحة</Link>
         </div>
       )}
       {error === 'crossdup' && (
         <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-medium text-red-800">
-          ⚠️ هذا الإعلان مطابق لإعلان منشور من عضو آخر ولم يُنشر — لا يُسمح بنسخ نفس النص.
+          ⚠️ <b>{rejection?.title}:</b> {rejection?.reason} {rejection?.nextStep}
           {dupId && Number(dupId) > 0 && (
             <span> الإعلان المطابق: <a href={`/ads/${dupId}`} target="_blank" rel="noopener noreferrer" className="font-bold underline">افتح الإعلان رقم {dupId}</a>.</span>
           )}
@@ -241,12 +241,12 @@ export function AdForm({
       )}
       {error === 'needdup' && (
         <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
-          🔁 هذا الإعلان مكرّر. لنشره عدّة مرّات اشترِ <b>باقة تكرار</b> (مكرّر 3 أو مكرّر 5) من <Link href="/account/wallet" className="underline">محفظتي</Link>، ثم أعد النشر.
+          🔁 <b>{rejection?.title}:</b> {rejection?.reason} {rejection?.nextStep} <Link href="/packages" className="underline">عرض الباقات المتاحة</Link>.
         </div>
       )}
       {error === 'needcredit' && (
         <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">
-          💳 رصيدك لا يكفي لإتمام العملية.
+          💳 <b>{rejection?.title}:</b> {rejection?.reason}
           {needPrice && <span> المطلوب: <b>{needPrice} ر.س</b>.</span>}
           {needBal !== undefined && <span> رصيدك الحالي: <b>{needBal} ر.س</b>.</span>}
           <span> <Link href="/account/wallet#topup" className="font-bold text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</span>
@@ -254,20 +254,20 @@ export function AdForm({
       )}
       {error === 'banned' && (
         <div className="rounded-lg border-2 border-red-500 bg-red-100 p-3 text-sm font-bold text-red-900">
-          🚫 تم حظر حسابك بسبب تكرار نشر إعلانات مكرّرة. للتواصل مع الإدارة راسلنا.
+          🚫 <b>{rejection?.title}:</b> {rejection?.reason} {rejection?.nextStep}
         </div>
       )}
       {error === 'editWindow' && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          انتهت المدة المسموح بها لتعديل هذا الإعلان{gapHours ? ` (${gapHours} ساعة من النشر)` : ''} حسب إعدادات الموقع. يمكنك التواصل مع الإدارة.
+          <b>{rejection?.title}:</b> {rejection?.reason}{gapHours ? ` (${gapHours} ساعة من النشر)` : ''}. {rejection?.nextStep}
         </div>
       )}
       {error === 'limit' && (
         <div className="rounded-xl border-2 border-red-400 bg-red-50 p-4 text-red-900">
-          <div className="flex items-center gap-2 text-base font-extrabold">🚫 لقد تجاوزت حدك اليومي</div>
+          <div className="flex items-center gap-2 text-base font-extrabold">🚫 {rejection?.title}</div>
           <p className="mt-1 text-sm font-medium">
-            {limitMax ? `باقتك تسمح بـ ${limitMax} إعلان في اليوم، وقد استوفيت هذا العدد.` : 'لقد بلغت الحد اليومي المسموح به لعدد إعلاناتك.'}
-            {' '}لم يُنشر إعلانك — يمكنك النشر مجدداً غداً.
+            {rejection?.reason} {limitMax ? `باقتك تسمح بـ ${limitMax} إعلان في اليوم، وقد استوفيت هذا العدد.` : ''}
+            {' '}{rejection?.nextStep}
           </p>
           <p className="mt-2 text-sm font-bold">هل ترغب بالاشتراك في باقة للحصول على عدد إعلانات أكبر؟</p>
           <Link href="/packages" className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-extrabold text-white shadow-sm transition hover:opacity-90">
@@ -277,7 +277,7 @@ export function AdForm({
       )}
       {error === 'gap' && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          يجب الانتظار{gapHours ? ` ${gapHours} ساعة` : ''} بين كل إعلان وآخر في باقتك{gapWait ? ` — تبقّى نحو ${gapWait} ساعة` : ''}. للترقية طالع صفحة <Link href="/packages" className="font-bold underline">الباقات</Link>.
+          <b>{rejection?.title}:</b> {rejection?.reason} يجب الانتظار{gapHours ? ` ${gapHours} ساعة` : ''} بين كل إعلان وآخر في باقتك{gapWait ? ` — تبقّى نحو ${gapWait} ساعة` : ''}. {rejection?.nextStep} <Link href="/packages" className="font-bold underline">الباقات</Link>.
         </div>
       )}
 

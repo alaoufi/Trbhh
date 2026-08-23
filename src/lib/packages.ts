@@ -26,6 +26,12 @@ export const FREE_FALLBACK: Package = {
   featuredSlots: 0, featuredDays: 0, adDays: 0, durationDays: 30, tier: '', isDefault: true, sort: 0, active: true,
 };
 
+/** A paid, active subscription pays for its daily ad allowance, including
+ * reposting the member's own identical listing. Anti-spam rules stay separate. */
+export function canRepeatOwnAdWithPackage(pkg: Pick<Package, 'price' | 'isDefault'>): boolean {
+  return pkg.price > 0 && !pkg.isDefault;
+}
+
 type Row = {
   id: number; name: string; price: unknown; ads_per_day: number; gap_hours: number;
   featured_slots: number; featured_days: number; ad_days?: number; duration_days?: number; tier: string; is_default: number; sort: number; active: number;

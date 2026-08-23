@@ -8,10 +8,9 @@ import { saveUpload } from '@/lib/storage';
 import { watermarkImage, type WatermarkOptions } from '@/lib/watermark';
 import { logClientError } from '@/lib/error-log';
 import { aHash, hashSimilarity } from '@/lib/phash';
-import { bumpDupAttempts, banUserFor, resetDupAttempts, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned, notifyModBlock } from '@/lib/moderation';
-import { getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd, logAdPublish } from '@/lib/packages';
-import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getServicePricing, serviceHasPrice, getStrikeBanDays } from '@/lib/settings';
-import { charge, consumeDupCredit } from '@/lib/wallet';
+import { bumpDupAttempts, banUserFor, DUP_LIMIT, handleProhibited, checkFlood, logMod, isUserBanned, notifyModBlock } from '@/lib/moderation';
+import { canRepeatOwnAdWithPackage, getUserPackage, countAdsToday, lastAdAt, applyFeaturedToNewAd, logAdPublish } from '@/lib/packages';
+import { getMemberWindows, withinWindow, getSettingBool, SETTING_ADS_APPROVAL, getDupThresholds, getStrikeBanDays } from '@/lib/settings';
 import { bustAdCaches } from '@/lib/data';
 import { setAdMedia } from '@/lib/ad-media';
 import { setUserArea } from '@/lib/user-location';
@@ -350,8 +349,7 @@ export async function createAdAction(formData: FormData) {
   // تكرار عبر أعضاء مختلفين (شبكات سبام تنشر نفس النص بأرقام/حسابات متعددة —
   // مثل إعلانات "دينا" المتكررة). منع فوري دون خيار الدفع (المحتوى ليس ملكه
   // أصلاً)، مع نفس نظام المخالفات المتدرّج قبل الحظر.
-  // يُفحص قبل التكرار الذاتي عمداً: هذا الفحص لا يقبل شراء باقة لتجاوزه إطلاقاً،
-  // فلا داعي لاستهلاك رصيد تكرار (consumeDupCredit) هنا فقط لينتهي الأمر بحظر لاحق.
+  // يُفحص قبل التكرار الذاتي عمداً: هذا الفحص لا تقبل الباقة المدفوعة تجاوزه إطلاقاً.
   const crossDup = dest === 'store' ? null : await crossUserDuplicateOf(session.uid, title, detail);
   if (crossDup) {
     const n = await bumpDupAttempts(session.uid);
@@ -367,30 +365,17 @@ export async function createAdAction(formData: FormData) {
 
   // المتجر مستقل تماماً: إعلانات المتجر لا تخضع لسياسة تكرار تربح ولا تسعيراتها (سياسة
   // المتجر مختلفة). أمّا إعلانات تربح فتخضع لكشف التكرار وباقاته. (فحص المحتوى يبقى للجميع.)
-  const dup = dest === 'store' ? null : await ownDuplicateOf(session.uid, title, detail, images);
+  const dup = dest === 'store' || canRepeatOwnAdWithPackage(pkg) ? null : await ownDuplicateOf(session.uid, title, detail, images);
   if (dup) {
-    const consumed = await consumeDupCredit(session.uid);
-    if (consumed) {
-      await resetDupAttempts(session.uid);
-      await logMod(session.uid, { kind: 'duplicate', action: 'charged', snippet: `تكرار مسموح (باقة) مع #${dup.id} «${dup.title}»`, adId: dup.id });
-    } else {
-      const svc = await getServicePricing();
-      if (serviceHasPrice(svc.dup3) || serviceHasPrice(svc.dup5)) {
-        // باقات التكرار مُفعّلة والرصيد نفد → يُطلب شراء باقة (لا حظر)
-        await logMod(session.uid, { kind: 'duplicate', action: 'blocked', snippet: `تكرار مع #${dup.id} «${dup.title}» — يلزم باقة تكرار`, adId: dup.id });
-        redirect(`/ads/new?error=needdup&dup=${dup.id}`);
-      }
-      const n = await bumpDupAttempts(session.uid);
-      // يُسجَّل للإدارة: أي إعلان تطابق معه بالضبط (السجل الرقابي) — مع رقم الإعلان الأصلي لعرضه عند اتخاذ القرار
-      await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مكرّر مع #${dup.id} «${dup.title}» — الجديد: ${title.slice(0, 60)}`, adId: dup.id });
-      if (n >= DUP_LIMIT) {
-        await banUserFor(session.uid, await getStrikeBanDays(), 'auto', 'تكرار نشر نفس الإعلان أكثر من مرة');
-        await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان أكثر من مرة.`);
-        redirect('/ads/new?error=banned');
-      }
-      await notifyModBlock(session.uid, `⚠️ رُفض نشر إعلانك لأنه مطابق لإعلان سابق لك — إنذار (${DUP_LIMIT - n} متبقية)، التكرار يؤدي للحظر.`, '/ads/new');
-      redirect(`/ads/new?error=duplicate&left=${Math.max(0, DUP_LIMIT - n)}&dup=${dup.id}`);
+    const n = await bumpDupAttempts(session.uid);
+    await logMod(session.uid, { kind: 'duplicate', action: n >= DUP_LIMIT ? 'banned' : 'blocked', snippet: `مكرّر مع #${dup.id} «${dup.title}» — الجديد: ${title.slice(0, 60)}`, adId: dup.id });
+    if (n >= DUP_LIMIT) {
+      await banUserFor(session.uid, await getStrikeBanDays(), 'auto', 'تكرار نشر نفس الإعلان أكثر من مرة');
+      await notifyModBlock(session.uid, `🚫 تم حظر حسابك بعد تكرار نشر نفس الإعلان أكثر من مرة.`);
+      redirect('/ads/new?error=banned');
     }
+    await notifyModBlock(session.uid, `⚠️ رُفض نشر إعلانك لأنه مطابق لإعلان سابق لك — إنذار (${DUP_LIMIT - n} متبقية)، التكرار يؤدي للحظر.`, '/ads/new');
+    redirect(`/ads/new?error=duplicate&left=${Math.max(0, DUP_LIMIT - n)}&dup=${dup.id}`);
   }
 
   // النشر الفوري ما لم تُفعّل الإدارة «مراجعة الإعلانات قبل النشر».

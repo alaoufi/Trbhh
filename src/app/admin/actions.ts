@@ -1155,6 +1155,56 @@ export async function approveTopupAction(formData: FormData) {
   revalidatePath('/account/wallet');
 }
 
+/**
+ * إعادة الاستعلام عن عملية بطاقة معلّقة من مصدرها المصرفي.
+ * لا يوجد اعتماد يدوي هنا: confirmTopupById لا يضيف الرصيد إلا بعد استعلام
+ * ناجح ومطابقة المبلغ عبر المسار الذرّي نفسه المستخدم في Callback.
+ */
+export async function verifyOnlineTopupAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const id = Number(formData.get('id') || 0);
+  if (!Number.isSafeInteger(id) || id <= 0) redirect('/admin/topups?tab=pending&check=invalid');
+
+  const { getTopupById } = await import('@/lib/wallet');
+  const before = await getTopupById(id);
+  if (!before || before.source !== 'online' || before.status !== 0) redirect('/admin/topups?tab=pending&check=unavailable');
+
+  const { confirmTopupById } = await import('@/lib/payments');
+  const { onlineTopupVerificationOutcome } = await import('@/lib/payments/admin-verification');
+  const result = await confirmTopupById(id);
+  const after = await getTopupById(id);
+  const outcome = onlineTopupVerificationOutcome({ status: after?.status ?? 3, paid: result.paid, credited: result.credited });
+  await logAdmin(session.uid, 'تحقق مصرفي لطلب شحن إلكتروني', `طلب #${id}`, `النتيجة: ${outcome}${result.reason ? ` (${result.reason})` : ''}`);
+  revalidatePath('/admin/topups');
+  revalidatePath('/account/wallet');
+  redirect(`/admin/topups?tab=${outcome === 'approved' ? 'approved' : outcome === 'rejected' ? 'rejected' : 'pending'}&check=${outcome}&id=${id}`);
+}
+
+/** Check the online pending rows currently shown to the administrator (max 20). */
+export async function verifyVisibleOnlineTopupsAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const ids = String(formData.get('ids') || '')
+    .split(',').map((v) => Number(v)).filter((id) => Number.isSafeInteger(id) && id > 0).slice(0, 20);
+  if (!ids.length) redirect('/admin/topups?tab=pending&batch=empty');
+
+  const { getTopupById } = await import('@/lib/wallet');
+  const { confirmTopupById } = await import('@/lib/payments');
+  const { onlineTopupVerificationOutcome } = await import('@/lib/payments/admin-verification');
+  const totals = { approved: 0, rejected: 0, pending: 0, unresolved: 0 };
+  for (const id of ids) {
+    const before = await getTopupById(id);
+    if (!before || before.source !== 'online' || before.status !== 0) continue;
+    const result = await confirmTopupById(id);
+    const after = await getTopupById(id);
+    const outcome = onlineTopupVerificationOutcome({ status: after?.status ?? 3, paid: result.paid, credited: result.credited });
+    totals[outcome] += 1;
+  }
+  await logAdmin(session.uid, 'تحقق مصرفي جماعي لطلبات الشحن الإلكتروني', `${ids.length} عملية`, `مقبول=${totals.approved}، مرفوض=${totals.rejected}، معلق=${totals.pending}، غير محسوم=${totals.unresolved}`);
+  revalidatePath('/admin/topups');
+  revalidatePath('/account/wallet');
+  redirect(`/admin/topups?tab=pending&batch=done&a=${totals.approved}&r=${totals.rejected}&p=${totals.pending}&u=${totals.unresolved}`);
+}
+
 /** إضافة حساب تحويل (بنك/رقم/اسم) يظهر للأعضاء في «محفظتي». */
 export async function addTopupAccountAction(formData: FormData) {
   const session = await requireAction('users', 'edit');

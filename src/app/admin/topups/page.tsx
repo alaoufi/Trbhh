@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { HandCoins, Receipt, Clock, CheckCircle2, XCircle, User, ShieldAlert, Undo2 } from 'lucide-react';
+import { HandCoins, Receipt, Clock, CheckCircle2, XCircle, User, ShieldAlert, Undo2, Landmark } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
 import { listTopupsAdmin, findReceiptMatches } from '@/lib/wallet';
 import { mediaUrl } from '@/lib/media';
-import { approveTopupAction, rejectTopupAction, cancelTopupAction } from '../actions';
+import { approveTopupAction, rejectTopupAction, cancelTopupAction, verifyOnlineTopupAction, verifyVisibleOnlineTopupsAction } from '../actions';
 import { AdminPager } from '@/components/admin-pager';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
@@ -28,15 +28,16 @@ function fmt(iso: string | null) {
 
 const PAGE_SIZE = 20;
 
-export default async function AdminTopups({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string }> }) {
+export default async function AdminTopups({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string; check?: string; id?: string; batch?: string; a?: string; r?: string; p?: string; u?: string }> }) {
   await requireAction('users', 'edit');
-  const { tab: tabRaw, page: pageRaw } = await searchParams;
+  const { tab: tabRaw, page: pageRaw, check, id: checkedId, batch, a, r, p, u } = await searchParams;
   const tab: Tab = (TABS.some((t) => t.key === tabRaw) ? tabRaw : 'pending') as Tab;
   const page = Math.max(1, parseInt(pageRaw || '1') || 1);
   const { rows, counts } = await listTopupsAdmin(STATUS_OF[tab], PAGE_SIZE, (page - 1) * PAGE_SIZE);
   const countOf: Record<Tab, number> = { all: counts.all, pending: counts.pending, approved: counts.approved, rejected: counts.rejected, cancelled: counts.cancelled };
   // ⚠️ كشف السند المكرر: مقارنة بصمة إيصال كل طلب معلق مع كل الإيصالات السابقة
   const dupMatches = await findReceiptMatches(rows.filter((r) => r.status === 0 && r.receipt).map((r) => r.id)).catch(() => new Map());
+  const visibleOnlinePending = rows.filter((r) => r.status === 0 && r.source === 'online');
   const pages = Math.max(1, Math.ceil(countOf[tab] / PAGE_SIZE));
 
   return (
@@ -45,7 +46,14 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
         <HandCoins className="h-6 w-6 text-primary" />
         <h1 className="text-xl font-bold text-primary">طلبات شحن الرصيد</h1>
       </div>
-      <p className="text-sm text-muted-foreground">يرسل العضو المبلغ مع إيصال التحويل من «محفظتي». بعد تأكيد وصول المبلغ يُضاف لرصيده تلقائياً وتصله رسالة (نصوصها من «النصوص الظاهرة» ← المحفظة).</p>
+      <p className="text-sm text-muted-foreground">التحويل البنكي يعتمد يدوياً بعد مطابقة الإيصال. أمّا الدفع الإلكتروني فلا يعتمد يدوياً إطلاقاً: استخدم «تحقق مع البنك»، ويُضاف الرصيد فقط إذا أعاد البنك نتيجة دفع ناجحة.</p>
+
+      {check === 'approved' && <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">✓ تم التحقق من البنك واعتماد عملية الدفع الإلكتروني #{checkedId}. أُضيف الرصيد تلقائياً.</div>}
+      {check === 'rejected' && <div className="rounded-xl border-2 border-red-300 bg-red-50 p-3 text-sm font-bold text-red-900">✕ رفض البنك عملية الدفع الإلكتروني #{checkedId}. لم يُضف أي رصيد.</div>}
+      {check === 'pending' && <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⌛ لم يعطِ البنك نتيجة نهائية لعملية #{checkedId} بعد؛ بقيت معلّقة ولم يُضف أي رصيد. يمكن إعادة التحقق لاحقاً.</div>}
+      {(check === 'unresolved' || check === 'unavailable' || check === 'invalid') && <div className="rounded-xl border-2 border-slate-300 bg-slate-50 p-3 text-sm font-bold text-slate-800">تعذر تنفيذ التحقق لهذه العملية. لم يتغير الرصيد ولم يتم اعتماد الطلب يدوياً.</div>}
+      {batch === 'done' && <div className="rounded-xl border-2 border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-900">تم الاستعلام من البنك للعمليات الظاهرة: تم الاعتماد {a || 0}، تم الرفض {r || 0}، ما زال معلقاً {p || 0}، وغير محسوم {u || 0}. لا يُضاف الرصيد إلا للعمليات المعتمدة مصرفياً.</div>}
+      {batch === 'empty' && <div className="rounded-xl border-2 border-slate-300 bg-slate-50 p-3 text-sm font-bold text-slate-800">لا توجد عمليات إلكترونية معلقة ظاهرة للتحقق منها.</div>}
 
       {/* تبويبات بحسب الحالة مع عدّاداتها */}
       <div className="flex flex-wrap gap-1.5 rounded-xl bg-secondary/40 p-1.5">
@@ -56,6 +64,16 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
           </Link>
         ))}
       </div>
+
+      {tab === 'pending' && visibleOnlinePending.length > 0 && (
+        <form action={verifyVisibleOnlineTopupsAction} className="rounded-xl border-2 border-sky-300 bg-sky-50 p-3">
+          <input type="hidden" name="ids" value={visibleOnlinePending.map((r) => r.id).join(',')} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-bold text-sky-900">يوجد {visibleOnlinePending.length} دفع إلكتروني معلّق ظاهر في هذه الصفحة. الاستعلام يطلب قرار البنك فقط ولا يعتمد أي مبلغ يدوياً.</p>
+            <ConfirmSubmit msg={`إرسال استعلام تحقق إلى البنك للعمليات الإلكترونية المعلّقة الظاهرة (${visibleOnlinePending.length})؟ لا يُضاف الرصيد إلا بعد تأكيد مصرفي.`} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-sky-800"><Landmark className="h-4 w-4" /> تحقق من الدفعات الظاهرة</ConfirmSubmit>
+          </div>
+        </form>
+      )}
 
       {rows.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد طلبات في هذا التصنيف.</p>}
 
@@ -81,7 +99,7 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
                   <Receipt className="h-4 w-4" /> عرض الإيصال
                 </a>
               ) : r.source === 'online' ? (
-                <span className="text-xs font-bold text-sky-600">دفع إلكتروني مؤكَّد من البوابة — بلا إيصال يدوي</span>
+                <span className="text-xs font-bold text-sky-600">دفع إلكتروني — لا يحتاج إيصالاً يدوياً</span>
               ) : (
                 <span className="text-xs font-bold text-red-500">لا يوجد إيصال مرفق</span>
               )}
@@ -143,7 +161,13 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
             )}
 
             {r.status === 0 && r.source === 'online' && (
-              <div className="rounded-lg border border-sky-200 bg-sky-50 p-2 text-xs font-bold text-sky-800">هذه عملية إلكترونية معلّقة؛ لا تعتمد يدوياً. لا يُضاف الرصيد إلا بعد تحقق مصرفي ناجح.</div>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs font-bold text-sky-800">
+                <span>هذه عملية إلكترونية معلّقة؛ لا تعتمد يدوياً. تحقق من البنك ليعتمدها أو يرفضها تلقائياً. لا يُضاف الرصيد إلا بعد نتيجة مصرفية ناجحة.</span>
+                <form action={verifyOnlineTopupAction}>
+                  <input type="hidden" name="id" value={r.id} />
+                  <ConfirmSubmit msg={`إرسال استعلام تحقق إلى البنك للعملية #${r.id}؟ لن يُضاف أي رصيد إلا إذا أكد البنك الدفع.`} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-3 py-2 text-xs font-extrabold text-white hover:bg-sky-800"><Landmark className="h-4 w-4" /> تحقق مع البنك</ConfirmSubmit>
+                </form>
+              </div>
             )}
 
             {r.status === 0 && r.source !== 'online' && (

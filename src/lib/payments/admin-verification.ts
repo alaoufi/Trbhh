@@ -11,3 +11,8 @@ export function onlineTopupVerificationOutcome(input: { status: number; paid: bo
   if (input.status === 0) return 'pending';
   return 'unresolved';
 }
+
+/** A test record is disposable only before any bank confirmation or credit. */
+export function canDeleteTestOnlineTopup(input: { source: string | null; status: number }): boolean {
+  return input.source === 'online' && input.status === 0;
+}

@@ -3,7 +3,7 @@ import { HandCoins, Receipt, Clock, CheckCircle2, XCircle, User, ShieldAlert, Un
 import { requireAction } from '@/lib/roles';
 import { listTopupsAdmin, findReceiptMatches } from '@/lib/wallet';
 import { mediaUrl } from '@/lib/media';
-import { approveTopupAction, rejectTopupAction, cancelTopupAction, verifyOnlineTopupAction, verifyVisibleOnlineTopupsAction } from '../actions';
+import { approveTopupAction, rejectTopupAction, cancelTopupAction, verifyOnlineTopupAction, verifyVisibleOnlineTopupsAction, deleteOnlineTopupTestsAction } from '../actions';
 import { AdminPager } from '@/components/admin-pager';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
@@ -28,9 +28,9 @@ function fmt(iso: string | null) {
 
 const PAGE_SIZE = 20;
 
-export default async function AdminTopups({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string; check?: string; id?: string; batch?: string; a?: string; r?: string; p?: string; u?: string }> }) {
+export default async function AdminTopups({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string; check?: string; id?: string; batch?: string; a?: string; r?: string; p?: string; u?: string; tests?: string; count?: string }> }) {
   await requireAction('users', 'edit');
-  const { tab: tabRaw, page: pageRaw, check, id: checkedId, batch, a, r, p, u } = await searchParams;
+  const { tab: tabRaw, page: pageRaw, check, id: checkedId, batch, a, r, p, u, tests, count } = await searchParams;
   const tab: Tab = (TABS.some((t) => t.key === tabRaw) ? tabRaw : 'pending') as Tab;
   const page = Math.max(1, parseInt(pageRaw || '1') || 1);
   const { rows, counts } = await listTopupsAdmin(STATUS_OF[tab], PAGE_SIZE, (page - 1) * PAGE_SIZE);
@@ -54,6 +54,8 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
       {(check === 'unresolved' || check === 'unavailable' || check === 'invalid') && <div className="rounded-xl border-2 border-slate-300 bg-slate-50 p-3 text-sm font-bold text-slate-800">تعذر تنفيذ التحقق لهذه العملية. لم يتغير الرصيد ولم يتم اعتماد الطلب يدوياً.</div>}
       {batch === 'done' && <div className="rounded-xl border-2 border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-900">تم الاستعلام من البنك للعمليات الظاهرة: تم الاعتماد {a || 0}، تم الرفض {r || 0}، ما زال معلقاً {p || 0}، وغير محسوم {u || 0}. لا يُضاف الرصيد إلا للعمليات المعتمدة مصرفياً.</div>}
       {batch === 'empty' && <div className="rounded-xl border-2 border-slate-300 bg-slate-50 p-3 text-sm font-bold text-slate-800">لا توجد عمليات إلكترونية معلقة ظاهرة للتحقق منها.</div>}
+      {tests === 'deleted' && <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">✓ حُذف {count || 0} طلب دفع إلكتروني تجريبي معلّق. لم يُمس أي رصيد.</div>}
+      {tests === 'empty' && <div className="rounded-xl border-2 border-slate-300 bg-slate-50 p-3 text-sm font-bold text-slate-800">لا توجد طلبات إلكترونية معلقة ظاهرة للحذف كتجارب.</div>}
 
       {/* تبويبات بحسب الحالة مع عدّاداتها */}
       <div className="flex flex-wrap gap-1.5 rounded-xl bg-secondary/40 p-1.5">
@@ -66,13 +68,19 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
       </div>
 
       {tab === 'pending' && visibleOnlinePending.length > 0 && (
-        <form action={verifyVisibleOnlineTopupsAction} className="rounded-xl border-2 border-sky-300 bg-sky-50 p-3">
-          <input type="hidden" name="ids" value={visibleOnlinePending.map((r) => r.id).join(',')} />
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-bold text-sky-900">يوجد {visibleOnlinePending.length} دفع إلكتروني معلّق ظاهر في هذه الصفحة. الاستعلام يطلب قرار البنك فقط ولا يعتمد أي مبلغ يدوياً.</p>
-            <ConfirmSubmit msg={`إرسال استعلام تحقق إلى البنك للعمليات الإلكترونية المعلّقة الظاهرة (${visibleOnlinePending.length})؟ لا يُضاف الرصيد إلا بعد تأكيد مصرفي.`} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-sky-800"><Landmark className="h-4 w-4" /> تحقق من الدفعات الظاهرة</ConfirmSubmit>
+        <div className="space-y-2 rounded-xl border-2 border-sky-300 bg-sky-50 p-3">
+          <p className="text-sm font-bold text-sky-900">يوجد {visibleOnlinePending.length} دفع إلكتروني معلّق ظاهر في هذه الصفحة. للدفعات الحقيقية استخدم التحقق المصرفي فقط. أمّا التجارب التي لم يتم الدفع بها فيمكن حذفها بلا أثر مالي.</p>
+          <div className="flex flex-wrap gap-2">
+            <form action={verifyVisibleOnlineTopupsAction}>
+              <input type="hidden" name="ids" value={visibleOnlinePending.map((r) => r.id).join(',')} />
+              <ConfirmSubmit msg={`إرسال استعلام تحقق إلى البنك للعمليات الإلكترونية المعلّقة الظاهرة (${visibleOnlinePending.length})؟ لا يُضاف الرصيد إلا بعد تأكيد مصرفي.`} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-700 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-sky-800"><Landmark className="h-4 w-4" /> تحقق من الدفعات الحقيقية</ConfirmSubmit>
+            </form>
+            <form action={deleteOnlineTopupTestsAction}>
+              <input type="hidden" name="ids" value={visibleOnlinePending.map((r) => r.id).join(',')} />
+              <ConfirmSubmit msg={`حذف ${visibleOnlinePending.length} عملية دفع إلكتروني معلّقة باعتبارها تجارب غير مدفوعة؟ سيُحذف السجل فقط؛ لا يمكن حذف عملية معتمدة أو أي رصيد.`} className="inline-flex items-center gap-1.5 rounded-lg border-2 border-red-500 bg-white px-4 py-2.5 text-sm font-extrabold text-red-700 hover:bg-red-50"><XCircle className="h-4 w-4" /> حذف التجارب الظاهرة</ConfirmSubmit>
+            </form>
           </div>
-        </form>
+        </div>
       )}
 
       {rows.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد طلبات في هذا التصنيف.</p>}

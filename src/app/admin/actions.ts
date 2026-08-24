@@ -1205,6 +1205,21 @@ export async function verifyVisibleOnlineTopupsAction(formData: FormData) {
   redirect(`/admin/topups?tab=pending&batch=done&a=${totals.approved}&r=${totals.rejected}&p=${totals.pending}&u=${totals.unresolved}`);
 }
 
+/** Delete selected pending online rows that an administrator explicitly marks as tests. */
+export async function deleteOnlineTopupTestsAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const ids = String(formData.get('ids') || '')
+    .split(',').map((v) => Number(v)).filter((id) => Number.isSafeInteger(id) && id > 0).slice(0, 20);
+  if (!ids.length) redirect('/admin/topups?tab=pending&tests=empty');
+  const { deletePendingOnlineTopupTest } = await import('@/lib/wallet');
+  let deleted = 0;
+  for (const id of ids) if (await deletePendingOnlineTopupTest(id)) deleted += 1;
+  await logAdmin(session.uid, 'حذف طلبات دفع إلكتروني تجريبية', `${deleted}/${ids.length} طلب`, 'حُذفت طلبات معلقة فقط ولم يُمس أي رصيد');
+  revalidatePath('/admin/topups');
+  revalidatePath('/account/wallet');
+  redirect(`/admin/topups?tab=pending&tests=deleted&count=${deleted}`);
+}
+
 /** إضافة حساب تحويل (بنك/رقم/اسم) يظهر للأعضاء في «محفظتي». */
 export async function addTopupAccountAction(formData: FormData) {
   const session = await requireAction('users', 'edit');

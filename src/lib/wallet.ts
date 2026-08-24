@@ -373,6 +373,20 @@ export async function findTopupByProviderRef(provider: string, providerRef: stri
   return r ? toInt(r.id) : null;
 }
 
+/**
+ * Deletes an explicitly marked test payment attempt. The query itself enforces
+ * pending-online only, so it can never remove a credited payment or a manual
+ * transfer request.
+ */
+export async function deletePendingOnlineTopupTest(topupId: number): Promise<boolean> {
+  await ensure();
+  if (!Number.isSafeInteger(topupId) || topupId <= 0) return false;
+  const deleted = await prisma.wallet_topups.deleteMany({
+    where: { id: BigInt(topupId), source: 'online', status: 0 },
+  }).catch(() => ({ count: 0 }));
+  return deleted.count === 1;
+}
+
 /** اعتماد شحن إلكتروني بعد تأكيد الدفع من البوابة: قلبٌ ذرّي (0→1) يمنع الاحتساب المزدوج،
  *  ثم إضافة الرصيد ومكافآت الشحن. آمنٌ للاستدعاء المتكرر (ويبهوك + عودة المتصفح معاً). */
 export async function creditOnlineTopup(topupId: number, method?: string | null): Promise<{ ok: boolean; already: boolean }> {

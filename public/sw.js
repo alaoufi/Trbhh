@@ -1,6 +1,6 @@
 // Trbhh service worker — lightweight offline shell + runtime cache.
-const CACHE = 'trbhh-v7';
-const CORE = ['/', '/manifest.webmanifest', '/icon-192.png?v=2', '/placeholder-ad.svg'];
+const CACHE = 'trbhh-v8';
+const CORE = ['/manifest.webmanifest', '/icon-192.png?v=2', '/placeholder-ad.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
@@ -17,6 +17,10 @@ self.addEventListener('fetch', (e) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // Never substitute an offline public shell for a navigation. A cached
+  // anonymous home page looks exactly like a member has been signed out;
+  // leaving navigations to the browser preserves the real session cookie.
+  if (request.mode === 'navigate') return;
   // Bundles must be network-first: deployments replace their content while a
   // fixed URL can otherwise remain trapped in a user's old runtime cache.
   if (url.pathname.startsWith('/_next/static/')) {
@@ -36,7 +40,7 @@ self.addEventListener('fetch', (e) => {
     }).catch(() => hit)));
     return;
   }
-  e.respondWith(fetch(request).catch(() => caches.match(request).then((hit) => hit || caches.match('/'))));
+  e.respondWith(fetch(request).catch(() => caches.match(request)));
 });
 
 // --- التنبيهات الفورية (Web Push) ---

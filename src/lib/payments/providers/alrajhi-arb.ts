@@ -77,6 +77,20 @@ export function extractArbFailureCode(data: Record<string, unknown>): string | n
   return match ? match.toUpperCase() : null;
 }
 
+/**
+ * A bank-hosted notification can explicitly say that the issuer rejected the
+ * payment (for example after OTP). That is final: leaving it pending would
+ * incorrectly ask the member or admin to confirm a rejected payment.
+ * Unknown notifications stay pending for the server-to-server inquiry.
+ */
+export function isArbFinalDecline(data: Record<string, unknown>): boolean {
+  const status = [data.errorText, data.error, data.result, data.responseText]
+    .map((value) => String(value || ''))
+    .join(' ')
+    .toUpperCase();
+  return /DECLIN|DENIED|REJECT|NOT\s*CAPTURED|SECURITY|3D\s*SECURE|3DS|AUTHENTICATION|OTP|INSUFFICIENT|NO\s*FUNDS|INVALID|EXPIRED|CANCEL|إعدادات?\s*الأمان|اعدادات?\s*الامان/.test(status);
+}
+
 function numberString(amount: number): string { return amount.toFixed(2); }
 function gatewayUrl(creds: ProviderCreds): string { return creds.gateway_url || DEFAULT_GATEWAY_URL; }
 function tranportalGatewayUrl(creds: ProviderCreds): string { return creds.tranportal_gateway_url || ''; }

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SITE } from '@/lib/constants';
 import { confirmTopupById, confirmFromWebhook, inspectAlrajhiCallback } from '@/lib/payments';
 import { readAlrajhiCallbackBody } from '@/lib/payments/alrajhi-callback';
-import { attachProviderRef } from '@/lib/wallet';
+import { attachProviderRef, rejectOnlineTopup } from '@/lib/wallet';
+import { classifyPaymentRejection } from '@/lib/payments/rejection';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +54,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ provider: 
       return NextResponse.json([{ status: '2', errorText: 'notification validation failed', errorCode: validation.gatewayCode || validation.reason }], { status: 400 });
     }
     await attachProviderRef(topupId, validation.providerRef);
+    if (validation.finalDecline) {
+      const rejection = classifyPaymentRejection(validation.finalDecline);
+      await rejectOnlineTopup(topupId, rejection.message);
+    }
     // The bank redirects the browser to this same URL as a GET after the acknowledgement.
     return NextResponse.json([{ status: '1', result: `https://${SITE.domain}${url.pathname}?t=${topupId}` }]);
   }

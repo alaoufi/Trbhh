@@ -23,6 +23,13 @@ describe('Al Rajhi callback acknowledgement', () => {
     expect(payments).toContain("const providerRef = String(data.transId || '');");
   });
 
+  it('marks an explicit final bank decline rejected before returning the browser URL', () => {
+    const callback = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
+    expect(callback).toContain('validation.finalDecline');
+    expect(callback).toContain('rejectOnlineTopup');
+    expect(callback).toContain('classifyPaymentRejection');
+  });
+
   it('returns the public Trbhh callback URL to ARB instead of the internal container host', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
     expect(source).toContain("`https://${SITE.domain}${url.pathname}?t=${topupId}`");

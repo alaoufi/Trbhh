@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildArbInquiryTrandata, buildArbPurchaseTrandata, decodeArbCallback, decryptArbTrandata, encryptArbTrandata, extractArbCallbackPaymentId, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
+import { buildArbInquiryTrandata, buildArbPurchaseTrandata, decodeArbCallback, decryptArbTrandata, encryptArbTrandata, extractArbCallbackPaymentId, isArbFinalDecline, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
 import { providerMeta } from '@/lib/payments/registry';
 
 const resourceKey = '12345678901234567890123456789012';
@@ -59,6 +59,12 @@ describe('Al Rajhi ARB bank-hosted provider', () => {
   it('accepts the documented array-shaped merchant notification from ARB', () => {
     const trandata = encryptArbTrandata(JSON.stringify([{ paymentId: '123', trackId: '42', result: 'CAPTURED' }]), resourceKey);
     expect(decodeArbCallback([{ paymentId: '123', trandata }], resourceKey)).toMatchObject({ paymentId: '123', trackId: '42', result: 'CAPTURED' });
+  });
+
+  it('recognizes an explicit issuer security decline as final, but not a captured payment', () => {
+    expect(isArbFinalDecline({ errorText: 'Transaction declined: security settings' })).toBe(true);
+    expect(isArbFinalDecline({ errorText: 'عملية مرفوضة بسبب اعدادات الامان' })).toBe(true);
+    expect(isArbFinalDecline({ result: 'CAPTURED' })).toBe(false);
   });
 
   it('keeps exactly the field names supplied by the bank', () => {

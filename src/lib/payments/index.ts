@@ -8,7 +8,7 @@ import type { PayProvider, PayProviderId } from './types';
 import { moyasar } from './providers/moyasar';
 import { tap } from './providers/tap';
 import { paytabs } from './providers/paytabs';
-import { alrajhiArb, decodeArbCallback, extractArbFailureCode } from './providers/alrajhi-arb';
+import { alrajhiArb, decodeArbCallback, extractArbFailureCode, isArbFinalDecline } from './providers/alrajhi-arb';
 
 export { PROVIDER_META, providerMeta, readyProviders } from './registry';
 export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, getTopupMethodAvailability, saveTopupMethodSettings, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
@@ -129,7 +129,7 @@ export async function confirmFromWebhook(provider: string, body: unknown, query:
  */
 export type AlrajhiCallbackValidation =
   | { valid: false; reason: 'missing_topup_id' | 'topup_not_found' | 'not_alrajhi_topup' | 'missing_provider_ref' | 'invalid_encrypted_payload' | 'transaction_id_missing' | 'track_id_mismatch'; gatewayCode?: string }
-  | { valid: true; reason: 'valid'; providerRef: string };
+  | { valid: true; reason: 'valid'; providerRef: string; finalDecline?: string };
 
 /**
  * Safe diagnostic used only for the bank acknowledgement path.  It never logs
@@ -146,7 +146,10 @@ export async function inspectAlrajhiCallback(topupId: number, body: unknown): Pr
   const providerRef = String(data.transId || '');
   if (!providerRef) return { valid: false, reason: 'transaction_id_missing', gatewayCode: extractArbFailureCode(data) || undefined };
   if (String(data.trackId || '') !== String(topupId)) return { valid: false, reason: 'track_id_mismatch' };
-  return { valid: true, reason: 'valid', providerRef };
+  const finalDecline = isArbFinalDecline(data)
+    ? [data.errorText, data.error, data.result, data.responseText].map((value) => String(value || '')).find(Boolean) || 'DECLINED'
+    : undefined;
+  return { valid: true, reason: 'valid', providerRef, finalDecline };
 }
 
 export async function validateAlrajhiCallback(topupId: number, body: unknown): Promise<boolean> {

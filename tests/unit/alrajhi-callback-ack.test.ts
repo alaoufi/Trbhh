@@ -39,4 +39,11 @@ describe('Al Rajhi callback acknowledgement', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
     expect(source).toContain("new URL('/payment/result', `https://${SITE.domain}`)");
   });
+
+  it('returns the result page to a browser POST while retaining a JSON acknowledgement for the bank', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
+    expect(source).toContain('isBrowserNavigation(req)');
+    expect(source).toContain("new URL('/payment/result', `https://${SITE.domain}`)");
+    expect(source).toContain("return NextResponse.json([{ status: '1'");
+  });
 });

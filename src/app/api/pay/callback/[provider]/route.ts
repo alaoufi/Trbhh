@@ -7,6 +7,12 @@ import { classifyPaymentRejection } from '@/lib/payments/rejection';
 
 export const dynamic = 'force-dynamic';
 
+/** ARB can POST either server-to-server or as the member's browser navigation. */
+function isBrowserNavigation(req: NextRequest): boolean {
+  const accept = req.headers.get('accept') || '';
+  return req.headers.get('sec-fetch-dest') === 'document' || accept.includes('text/html');
+}
+
 /**
  * عودة المتصفح بعد الدفع من بوابة المزوّد. نتحقّق من حالة العملية (سحباً من المزوّد — لا نثق
  * بمعطيات الرابط) ونعتمد الشحن إن اكتمل، ثم نعيد العضو إلى محفظته برسالة مناسبة.
@@ -57,6 +63,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ provider: 
     if (validation.finalDecline) {
       const rejection = classifyPaymentRejection(validation.finalDecline);
       await rejectOnlineTopup(topupId, rejection.message);
+    }
+    // A browser POST would otherwise render ARB's JSON acknowledgement to the
+    // member. The bank's server call continues to receive that acknowledgement.
+    if (isBrowserNavigation(req)) {
+      const resultUrl = new URL('/payment/result', `https://${SITE.domain}`);
+      resultUrl.searchParams.set('t', String(topupId));
+      return NextResponse.redirect(resultUrl, { status: 303 });
     }
     // The bank redirects the browser to this same URL as a GET after the acknowledgement.
     return NextResponse.json([{ status: '1', result: `https://${SITE.domain}${url.pathname}?t=${topupId}` }]);

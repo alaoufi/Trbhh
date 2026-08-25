@@ -33,7 +33,8 @@ describe('wallet top-up presentation policy', () => {
     expect(existsSync(file)).toBe(true);
     const source = readFileSync(file, 'utf8');
     expect(source).toContain('getTopupById');
-    expect(source).toContain('تم الدفع بنجاح');
+    expect(source).toContain('تم شحن الرصيد بنجاح');
+    expect(source).toContain('تم رفض شحن الرصيد');
   });
 
   it('does not ask a member or an administrator to confirm a pending electronic payment manually', () => {

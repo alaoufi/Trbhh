@@ -1,0 +1,55 @@
+name: Activate Al Rajhi production payments
+
+on:
+  workflow_dispatch:
+
+jobs:
+  activate:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Enable only the verified Al Rajhi production method
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in VPS_HOST VPS_USER VPS_SSH_KEY; do
+            if [ -z "${!key:-}" ]; then echo "Missing required secret: $key"; exit 1; fi
+          done
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          cat > /tmp/activate-alrajhi.js <<'NODE'
+          const { PrismaClient } = require('@prisma/client');
+          const prisma = new PrismaClient();
+          const values = {
+            pay_online_on: '1',
+            payment_electronic_enabled: '1',
+            pay_provider: 'alrajhi_arb',
+            pay_mode: 'live',
+          };
+          (async () => {
+            for (const [k, v] of Object.entries(values)) {
+              await prisma.site_settings.upsert({ where: { k }, create: { k, v }, update: { v } });
+            }
+            const saved = await prisma.site_settings.findMany({
+              where: { k: { in: Object.keys(values) } },
+              select: { k: true, v: true },
+              orderBy: { k: 'asc' },
+            });
+            if (saved.length !== Object.keys(values).length || saved.some((row) => values[row.k] !== row.v)) {
+              throw new Error('Payment activation settings verification failed');
+            }
+            console.log(JSON.stringify({ activated: true, settings: saved.map(({ k, v }) => ({ k, v })) }));
+          })().finally(async () => { await prisma.$disconnect(); });
+          NODE
+          PORT="${VPS_PORT:-22}"
+          SCP_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -P $PORT"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -p $PORT"
+          scp $SCP_OPTS /tmp/activate-alrajhi.js "$VPS_USER@$VPS_HOST:/tmp/activate-alrajhi.js"
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" \
+            'docker cp /tmp/activate-alrajhi.js trbhh-app:/tmp/activate-alrajhi.js && docker exec trbhh-app node /tmp/activate-alrajhi.js && rm -f /tmp/activate-alrajhi.js'

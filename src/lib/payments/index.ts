@@ -8,7 +8,7 @@ import type { PayProvider, PayProviderId } from './types';
 import { moyasar } from './providers/moyasar';
 import { tap } from './providers/tap';
 import { paytabs } from './providers/paytabs';
-import { alrajhiArb, arbPaymentMethod, decodeArbCallback, extractArbFailureCode, isArbCaptured, isArbFinalDecline, mergeArbCallbackOutcome } from './providers/alrajhi-arb';
+import { alrajhiArb, arbPaymentMethod, arbStatusText, decodeArbCallback, extractArbFailureCode, isArbCaptured, isArbFinalDecline, mergeArbCallbackOutcome } from './providers/alrajhi-arb';
 
 export { PROVIDER_META, providerMeta, readyProviders } from './registry';
 export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, getTopupMethodAvailability, saveTopupMethodSettings, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
@@ -155,9 +155,7 @@ export async function inspectAlrajhiCallback(topupId: number, body: unknown): Pr
   const providerRef = String(data.transId || '');
   if (!providerRef) return { valid: false, reason: 'transaction_id_missing', gatewayCode: extractArbFailureCode(data) || undefined };
   if (String(data.trackId || '') !== String(topupId)) return { valid: false, reason: 'track_id_mismatch' };
-  const finalDecline = isArbFinalDecline(data)
-    ? [data.errorText, data.error, data.result, data.responseText, data.responseCode, data.authRespCode, data.status].map((value) => String(value || '')).filter(Boolean).join(' ') || 'DECLINED'
-    : undefined;
+  const finalDecline = isArbFinalDecline(data) ? arbStatusText(data) || 'DECLINED' : undefined;
   return { valid: true, reason: 'valid', providerRef, finalDecline, captured: isArbCaptured(data), amountSar: Number(data.amt || 0), method: arbPaymentMethod(data.cardType) };
 }
 

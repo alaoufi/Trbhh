@@ -35,6 +35,24 @@ function firstData(payload: unknown): Record<string, unknown> {
   return (Array.isArray(payload) ? payload[0] : payload) as Record<string, unknown> || {};
 }
 
+const ARB_STATUS_FIELDS = new Set([
+  'error', 'errortext', 'errorcode', 'response', 'responsetext', 'responsecode',
+  'respcode', 'authrespcode', 'actioncode', 'result', 'status', 'reason', 'message',
+]);
+
+function isArbStatusField(key: string): boolean {
+  return ARB_STATUS_FIELDS.has(key.replace(/[^a-z]/gi, '').toLowerCase());
+}
+
+/** Only bank outcome fields are retained; transaction, card and customer data never are. */
+export function arbStatusText(data: Record<string, unknown>): string {
+  return Object.entries(data)
+    .filter(([key, value]) => isArbStatusField(key) && ['string', 'number'].includes(typeof value))
+    .map(([, value]) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
 export function parseArbInitialResponse(payload: unknown): { paymentId: string; redirectUrl: string } | null {
   const response = firstResponse(payload);
   if (String(response.status) !== '1' || !response.result) return null;
@@ -74,8 +92,10 @@ export function decodeArbCallback(payload: unknown, resourceKey: string): Record
 export function mergeArbCallbackOutcome(data: Record<string, unknown>, payload: unknown): Record<string, unknown> {
   const outer = firstData(payload);
   const merged: Record<string, unknown> = { ...data };
-  for (const key of ['error', 'errorText', 'responseText', 'responseCode', 'authRespCode', 'status', 'result']) {
-    if (!merged[key] && outer[key]) merged[key] = outer[key];
+  for (const [key, value] of Object.entries(outer)) {
+    if (!isArbStatusField(key) || !value) continue;
+    const exists = Object.keys(merged).some((existing) => existing.toLowerCase() === key.toLowerCase() && merged[existing]);
+    if (!exists) merged[key] = value;
   }
   return merged;
 }
@@ -98,10 +118,7 @@ export function extractArbFailureCode(data: Record<string, unknown>): string | n
  * Unknown notifications stay pending for the server-to-server inquiry.
  */
 export function isArbFinalDecline(data: Record<string, unknown>): boolean {
-  const status = [data.errorText, data.error, data.result, data.responseText, data.responseCode, data.authRespCode, data.status]
-    .map((value) => String(value || ''))
-    .join(' ')
-    .toUpperCase();
+  const status = arbStatusText(data).toUpperCase();
   return /DECLIN|DENIED|REJECT|NOT\s*CAPTURED|SECURITY|3D\s*SECURE|3DS|AUTHENTICATION|OTP|INSUFFICIENT|NO\s*FUNDS|INVALID|EXPIRED|CANCEL|إعدادات?\s*الأمان|اعدادات?\s*الامان/.test(status);
 }
 
@@ -230,10 +247,7 @@ export const alrajhiArb: PayProvider = {
       // The browser final response may only say "DECLINED".  The server-side
       // inquiry often carries the issuer response code (for example 51), so
       // preserve every documented status field for the member-facing reason.
-      const rawStatus = [data.errorText, data.error, data.result, data.responseText, data.responseCode, data.authRespCode, data.actionCode, data.status]
-        .map((value) => String(value || ''))
-        .filter(Boolean)
-        .join(' ') || 'unknown';
+      const rawStatus = arbStatusText(data) || 'unknown';
       const paid = isArbCaptured(data)
         && (String(data.paymentId || '') === providerRef || String(data.transId || '') === providerRef)
         && merchantTrackId === expectedTrackId;

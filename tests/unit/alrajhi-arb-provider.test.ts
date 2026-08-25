@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildArbInquiryTrandata, buildArbPurchaseTrandata, decodeArbCallback, decryptArbTrandata, encryptArbTrandata, extractArbCallbackPaymentId, isArbFinalDecline, mergeArbCallbackOutcome, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
+import { arbStatusText, buildArbInquiryTrandata, buildArbPurchaseTrandata, decodeArbCallback, decryptArbTrandata, encryptArbTrandata, extractArbCallbackPaymentId, isArbFinalDecline, mergeArbCallbackOutcome, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
 import { providerMeta } from '@/lib/payments/registry';
 
 const resourceKey = '12345678901234567890123456789012';
@@ -74,6 +74,14 @@ describe('Al Rajhi ARB bank-hosted provider', () => {
     );
     expect(isArbFinalDecline(outcome)).toBe(true);
     expect(outcome.errorText).toBe('Transaction declined: security settings');
+  });
+
+  it('preserves alternate ARB issuer-code field names for the member rejection message', () => {
+    const outcome = mergeArbCallbackOutcome(
+      { paymentId: '1001', transId: '2001', trackId: '93', result: 'DECLINED' },
+      [{ paymentId: '1001', ErrorCode: '51', RespCode: '51' }],
+    );
+    expect(arbStatusText(outcome)).toContain('51');
   });
 
   it('keeps exactly the field names supplied by the bank', () => {

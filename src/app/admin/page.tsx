@@ -32,7 +32,7 @@ export default async function AdminHome() {
   const [s, perms, role, packages, pendingPromos, adminUnread, primaryAdminId, pendingTopups, pendingVerifyOrders] = await Promise.all([
     adminStats(), getUserPerms(session.uid), getUserRole(session.uid), getPackages().catch(() => []),
     countPendingPromos().catch(() => 0), countAdminUnread().catch(() => 0), getPrimaryAdminId().catch(() => 0),
-    import('@/lib/prisma').then(({ prisma }) => prisma.wallet_topups.count({ where: { status: 0 } })).catch(() => 0),
+    import('@/lib/prisma').then(({ prisma }) => prisma.wallet_topups.count({ where: { status: 0, NOT: { source: 'online' } } })).catch(() => 0),
     import('@/lib/verify-paid').then((m) => m.countPendingVerifyOrders().then((r) => r.n)).catch(() => 0),
   ]);
   const isPrimaryAdmin = primaryAdminId === session.uid;

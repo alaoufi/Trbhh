@@ -35,4 +35,11 @@ describe('wallet top-up presentation policy', () => {
     expect(source).toContain('getTopupById');
     expect(source).toContain('تم الدفع بنجاح');
   });
+
+  it('does not ask a member or an administrator to confirm a pending electronic payment manually', () => {
+    const file = resolve(import.meta.dirname, '../../src/app/payment/result/page.tsx');
+    const source = readFileSync(file, 'utf8');
+    expect(source).toContain('التحقق آلياً');
+    expect(source).toContain('httpEquiv="refresh"');
+  });
 });

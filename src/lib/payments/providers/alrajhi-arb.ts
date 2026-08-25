@@ -84,11 +84,20 @@ export function extractArbFailureCode(data: Record<string, unknown>): string | n
  * Unknown notifications stay pending for the server-to-server inquiry.
  */
 export function isArbFinalDecline(data: Record<string, unknown>): boolean {
-  const status = [data.errorText, data.error, data.result, data.responseText]
+  const status = [data.errorText, data.error, data.result, data.responseText, data.responseCode, data.authRespCode, data.status]
     .map((value) => String(value || ''))
     .join(' ')
     .toUpperCase();
   return /DECLIN|DENIED|REJECT|NOT\s*CAPTURED|SECURITY|3D\s*SECURE|3DS|AUTHENTICATION|OTP|INSUFFICIENT|NO\s*FUNDS|INVALID|EXPIRED|CANCEL|إعدادات?\s*الأمان|اعدادات?\s*الامان/.test(status);
+}
+
+/** A captured result in ARB's encrypted final response is the bank's settlement decision. */
+export function isArbCaptured(data: Record<string, unknown>): boolean {
+  const result = data.result;
+  const status = Array.isArray(result)
+    ? String((result[0] as Record<string, unknown> | undefined)?.status || '')
+    : String(result || data.status || '');
+  return status.trim().toUpperCase() === 'CAPTURED';
 }
 
 function numberString(amount: number): string { return amount.toFixed(2); }
@@ -126,6 +135,7 @@ export function buildArbPurchaseTrandata(
 export function buildArbInquiryTrandata(
   input: { amountSar: number; transactionId: string; trackId: string },
   creds: Pick<ProviderCreds, 'tranportal_id' | 'tranportal_password'>,
+  lookup: 'PaymentID' | 'TRANID' = 'PaymentID',
 ): string {
   return JSON.stringify([{
     id: creds.tranportal_id,
@@ -134,7 +144,7 @@ export function buildArbInquiryTrandata(
     amt: numberString(input.amountSar),
     currencyCode: '682',
     trackId: input.trackId,
-    udf5: 'TRANID',
+    udf5: lookup,
     transId: input.transactionId,
   }]);
 }
@@ -154,7 +164,7 @@ async function gatewayRequest(url: string, payload: unknown, customerIp?: string
   finally { clearTimeout(timeout); }
 }
 
-function paymentMethod(cardType: unknown): PayMethod | null {
+export function arbPaymentMethod(cardType: unknown): PayMethod | null {
   const card = String(cardType || '').toLowerCase();
   if (card.includes('mada')) return 'mada';
   if (card.includes('visa')) return 'visa';
@@ -188,18 +198,26 @@ export const alrajhiArb: PayProvider = {
       const resourceKey = creds.terminal_resource_key;
       const supportingUrl = tranportalGatewayUrl(creds);
       if (!id || !password || !resourceKey || !supportingUrl || !expectedTrackId) return { paid: false, amountSar: 0, providerRef, status: 'configuration_missing' };
-      const plain = buildArbInquiryTrandata({ amountSar: expectedAmountSar, transactionId: providerRef, trackId: expectedTrackId }, { tranportal_id: id, tranportal_password: password });
-      const result = await gatewayRequest(supportingUrl, [{ id, trandata: encryptArbTrandata(plain, resourceKey) }]);
-      const response = firstResponse(result.data);
+      const inquire = async (lookup: 'PaymentID' | 'TRANID') => {
+        const plain = buildArbInquiryTrandata({ amountSar: expectedAmountSar, transactionId: providerRef, trackId: expectedTrackId }, { tranportal_id: id, tranportal_password: password }, lookup);
+        const result = await gatewayRequest(supportingUrl, [{ id, trandata: encryptArbTrandata(plain, resourceKey) }]);
+        return { result, response: firstResponse(result.data) };
+      };
+      // New transactions retain ARB's original PaymentID.  The legacy fallback
+      // supports attempts created before that correction, where this column was
+      // overwritten with the later TransID.
+      let inquiry = await inquire('PaymentID');
+      if ((!inquiry.result.ok || String(inquiry.response.status) !== '1' || !inquiry.response.trandata)) inquiry = await inquire('TRANID');
+      const { result, response } = inquiry;
       if (!result.ok || String(response.status) !== '1' || !response.trandata) return { paid: false, amountSar: 0, providerRef, status: response.error || response.errorText || result.error || 'inquiry_failed' };
       const data = firstData(JSON.parse(decryptArbTrandata(response.trandata, resourceKey)));
       const amountSar = Number(data.amt || 0);
       const merchantTrackId = String(data.trackId || '');
       const rawStatus = String(data.errorText || data.error || data.result || 'unknown');
-      const paid = String(data.result || '').toUpperCase() === 'CAPTURED'
-        && String(data.transId || '') === providerRef
+      const paid = isArbCaptured(data)
+        && (String(data.paymentId || '') === providerRef || String(data.transId || '') === providerRef)
         && merchantTrackId === expectedTrackId;
-      return { paid, amountSar, providerRef, merchantTrackId, method: paymentMethod(data.cardType), status: rawStatus };
+      return { paid, amountSar, providerRef, merchantTrackId, method: arbPaymentMethod(data.cardType), status: rawStatus };
     } catch { return { paid: false, amountSar: 0, providerRef, status: 'inquiry_invalid' }; }
   },
   extractRefFromWebhook(_body, query): string | null { return query.get('paymentId') || query.get('PaymentID') || null; },

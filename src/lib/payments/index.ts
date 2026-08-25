@@ -8,7 +8,7 @@ import type { PayProvider, PayProviderId } from './types';
 import { moyasar } from './providers/moyasar';
 import { tap } from './providers/tap';
 import { paytabs } from './providers/paytabs';
-import { alrajhiArb, decodeArbCallback, extractArbFailureCode, isArbFinalDecline } from './providers/alrajhi-arb';
+import { alrajhiArb, arbPaymentMethod, decodeArbCallback, extractArbFailureCode, isArbCaptured, isArbFinalDecline } from './providers/alrajhi-arb';
 
 export { PROVIDER_META, providerMeta, readyProviders } from './registry';
 export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, getTopupMethodAvailability, saveTopupMethodSettings, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
@@ -129,7 +129,7 @@ export async function confirmFromWebhook(provider: string, body: unknown, query:
  */
 export type AlrajhiCallbackValidation =
   | { valid: false; reason: 'missing_topup_id' | 'topup_not_found' | 'not_alrajhi_topup' | 'missing_provider_ref' | 'invalid_encrypted_payload' | 'transaction_id_missing' | 'track_id_mismatch'; gatewayCode?: string }
-  | { valid: true; reason: 'valid'; providerRef: string; finalDecline?: string };
+  | { valid: true; reason: 'valid'; providerRef: string; finalDecline?: string; captured: boolean; amountSar: number; method: string | null };
 
 /**
  * Safe diagnostic used only for the bank acknowledgement path.  It never logs
@@ -147,9 +147,42 @@ export async function inspectAlrajhiCallback(topupId: number, body: unknown): Pr
   if (!providerRef) return { valid: false, reason: 'transaction_id_missing', gatewayCode: extractArbFailureCode(data) || undefined };
   if (String(data.trackId || '') !== String(topupId)) return { valid: false, reason: 'track_id_mismatch' };
   const finalDecline = isArbFinalDecline(data)
-    ? [data.errorText, data.error, data.result, data.responseText].map((value) => String(value || '')).find(Boolean) || 'DECLINED'
+    ? [data.errorText, data.error, data.result, data.responseText, data.responseCode, data.authRespCode, data.status].map((value) => String(value || '')).find(Boolean) || 'DECLINED'
     : undefined;
-  return { valid: true, reason: 'valid', providerRef, finalDecline };
+  return { valid: true, reason: 'valid', providerRef, finalDecline, captured: isArbCaptured(data), amountSar: Number(data.amt || 0), method: arbPaymentMethod(data.cardType) };
+}
+
+/**
+ * Handles ARB's second, encrypted final response.  Notification acknowledgement
+ * and final settlement are deliberately separate endpoints in ARB's protocol;
+ * this function makes the member outcome automatic and never creates a manual
+ * approval task for an electronic card payment.
+ */
+export async function resolveAlrajhiFinalResult(topupId: number, body: unknown): Promise<{ valid: boolean; settled: boolean; credited: boolean; reason?: string }> {
+  const validation = await inspectAlrajhiCallback(topupId, body);
+  if (!validation.valid) return { valid: false, settled: false, credited: false, reason: validation.reason };
+  const row = await getTopupById(topupId);
+  if (!row) return { valid: false, settled: false, credited: false, reason: 'topup_not_found' };
+
+  if (validation.captured) {
+    if (!(validation.amountSar > 0) || validation.amountSar !== row.amount) {
+      return { valid: true, settled: false, credited: false, reason: 'amount_mismatch' };
+    }
+    const credited = await creditOnlineTopupAtomically(topupId, validation.method);
+    if (credited.ok && !credited.already && credited.userId && credited.amount) await applyTopupBonuses(credited.userId, credited.amount, 0).catch(() => {});
+    return { valid: true, settled: credited.ok, credited: credited.ok };
+  }
+
+  if (validation.finalDecline) {
+    const rejection = classifyPaymentRejection(validation.finalDecline);
+    await rejectOnlineTopup(topupId, rejection.message);
+    return { valid: true, settled: true, credited: false, reason: rejection.code };
+  }
+
+  // A non-final response remains server-side only; the result page retries the
+  // bank inquiry automatically and is never presented as a manual approval.
+  const checked = await confirmTopupById(topupId);
+  return { valid: true, settled: checked.paid || checked.credited, credited: checked.credited, reason: checked.reason };
 }
 
 export async function validateAlrajhiCallback(topupId: number, body: unknown): Promise<boolean> {

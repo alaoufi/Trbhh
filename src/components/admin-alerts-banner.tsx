@@ -31,8 +31,9 @@ export async function AdminAlertsBanner() {
   ] = await Promise.all([
     prisma.ads.count({ where: { status: 0, publish_at: null, paused_by_owner: 0, ...notArchived } }).catch(() => 0),
     prisma.ads.findFirst({ where: { status: 0, publish_at: null, paused_by_owner: 0, ...notArchived }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
-    prisma.wallet_topups.count({ where: { status: 0 } }).catch(() => 0),
-    prisma.wallet_topups.findFirst({ where: { status: 0 }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
+    // Electronic payments settle from the bank only; they are never an admin task.
+    prisma.wallet_topups.count({ where: { status: 0, NOT: { source: 'online' } } }).catch(() => 0),
+    prisma.wallet_topups.findFirst({ where: { status: 0, NOT: { source: 'online' } }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
     // نفس تعريف تبويب «بانتظار الموافقة» في صفحة التوثيق — المرفوض (step=2) ليس طلباً معلقاً
     prisma.users.count({ where: { trusted: { not: 1 }, step: { not: 2 }, OR: [{ step: 1 }, { national_identity: { gt: 0 } }, { commercial_register: { gt: 0 } }, { work_permit: { gt: 0 } }] } }).catch(() => 0),
     prisma.name_requests.count({ where: { status: 0, kind: 'user' } }).catch(() => 0),

@@ -16,23 +16,23 @@ describe('Al Rajhi callback acknowledgement', () => {
     expect(source).toContain('const body = await readAlrajhiCallbackBody(req);');
   });
 
-  it('stores the final encrypted transaction payment id before acknowledging ARB', () => {
-    const callback = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
+  it('validates the encrypted final transaction id before acknowledging ARB', () => {
     const payments = fs.readFileSync(path.join(process.cwd(), 'src/lib/payments/index.ts'), 'utf8');
-    expect(callback).toContain('await attachProviderRef(topupId, validation.providerRef);');
     expect(payments).toContain("const providerRef = String(data.transId || '');");
+    expect(payments).toContain('String(data.trackId || \'\')');
   });
 
-  it('marks an explicit final bank decline rejected before returning the browser URL', () => {
-    const callback = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
-    expect(callback).toContain('validation.finalDecline');
-    expect(callback).toContain('rejectOnlineTopup');
-    expect(callback).toContain('classifyPaymentRejection');
+  it('marks an explicit final bank decline rejected in the final-settlement path', () => {
+    const payments = fs.readFileSync(path.join(process.cwd(), 'src/lib/payments/index.ts'), 'utf8');
+    expect(payments).toContain('validation.finalDecline');
+    expect(payments).toContain('rejectOnlineTopup');
+    expect(payments).toContain('classifyPaymentRejection');
   });
 
-  it('returns the public Trbhh callback URL to ARB instead of the internal container host', () => {
+  it('returns a dedicated public final-result URL to ARB instead of looping back into the acknowledgement endpoint', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
-    expect(source).toContain("`https://${SITE.domain}${url.pathname}?t=${topupId}`");
+    expect(source).toContain("new URL(`/api/pay/final/${provider}`, `https://${SITE.domain}`)");
+    expect(source).toContain("resultUrl.searchParams.set('t', String(topupId));");
   });
 
   it('redirects the payment result page to the public Trbhh domain', () => {
@@ -40,10 +40,18 @@ describe('Al Rajhi callback acknowledgement', () => {
     expect(source).toContain("new URL('/payment/result', `https://${SITE.domain}`)");
   });
 
-  it('returns the result page to a browser POST while retaining a JSON acknowledgement for the bank', () => {
-    const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
-    expect(source).toContain('isBrowserNavigation(req)');
+  it('returns a JSON acknowledgement to the bank and lets the distinct final endpoint redirect the browser', () => {
+    const callback = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
+    const finalRoute = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/final/[provider]/route.ts'), 'utf8');
+    expect(callback).toContain("return NextResponse.json([{ status: '1'");
+    expect(finalRoute).toContain("new URL('/payment/result', `https://${SITE.domain}`)");
+  });
+
+  it('has a separate final-result endpoint which settles or rejects the encrypted bank result automatically', () => {
+    const finalRoute = path.join(process.cwd(), 'src/app/api/pay/final/[provider]/route.ts');
+    expect(fs.existsSync(finalRoute)).toBe(true);
+    const source = fs.readFileSync(finalRoute, 'utf8');
+    expect(source).toContain('resolveAlrajhiFinalResult');
     expect(source).toContain("new URL('/payment/result', `https://${SITE.domain}`)");
-    expect(source).toContain("return NextResponse.json([{ status: '1'");
   });
 });

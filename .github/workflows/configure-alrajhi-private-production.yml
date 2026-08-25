@@ -91,5 +91,5 @@ jobs:
             PORT="${VPS_PORT:-22}"
             scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -P "$PORT" /tmp/activate-alrajhi.js "$VPS_USER@$VPS_HOST:/tmp/activate-alrajhi.js"
             ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
-              'docker cp /tmp/activate-alrajhi.js trbhh-app:/tmp/activate-alrajhi.js && docker exec trbhh-app node /tmp/activate-alrajhi.js && rm -f /tmp/activate-alrajhi.js'
+              'docker cp /tmp/activate-alrajhi.js trbhh-app:/app/activate-alrajhi.js && docker exec -u 0 trbhh-app node /app/activate-alrajhi.js && docker exec -u 0 trbhh-app rm -f /app/activate-alrajhi.js && rm -f /tmp/activate-alrajhi.js'
           fi

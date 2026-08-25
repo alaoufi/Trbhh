@@ -34,7 +34,7 @@ describe('Al Rajhi callback acknowledgement', () => {
   it('checks the bank inquiry once before storing a generic final decline', () => {
     const payments = fs.readFileSync(path.join(process.cwd(), 'src/lib/payments/index.ts'), 'utf8');
     const provider = fs.readFileSync(path.join(process.cwd(), 'src/lib/payments/providers/alrajhi-arb.ts'), 'utf8');
-    expect(payments).toContain('const inquiry = await confirmTopupById(topupId);');
+    expect(payments).toContain('const inquiry = await confirmTopupById(topupId, validation.providerRef);');
     expect(provider).toContain('data.authRespCode, data.actionCode, data.status');
   });
 

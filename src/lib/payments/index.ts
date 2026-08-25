@@ -83,7 +83,7 @@ export async function startTopupPayment(
  * يؤكّد طلب شحن بمعرّفه: يسحب حالة العملية من المزوّد (المصدر الموثوق)، ويعتمد الشحن إن اكتمل
  * الدفع وتطابق المبلغ. آمنٌ للتكرار (عودة المتصفح + الويبهوك). يعيد paid/credited.
  */
-export async function confirmTopupById(topupId: number): Promise<{ paid: boolean; credited: boolean; reason?: string }> {
+export async function confirmTopupById(topupId: number, trustedProviderRef?: string): Promise<{ paid: boolean; credited: boolean; reason?: string }> {
   const row = await getTopupById(topupId);
   if (!row) return { paid: false, credited: false, reason: 'not_found' };
   if (row.status === 1) return { paid: true, credited: true }; // اعتُمد سابقاً
@@ -91,7 +91,10 @@ export async function confirmTopupById(topupId: number): Promise<{ paid: boolean
   const adapter = getAdapter(row.provider);
   if (!adapter) return { paid: false, credited: false, reason: 'no_adapter' };
 
-  const providerRef = await providerRefOf(topupId);
+  // The optional override is accepted only from ARB's already decrypted and
+  // TrackID-validated final response. It is the bank's TransID, which can
+  // expose a more precise issuer rejection than the initial PaymentID.
+  const providerRef = trustedProviderRef || await providerRefOf(topupId);
   if (!providerRef) return { paid: false, credited: false, reason: 'no_ref' };
 
   const creds = await getProviderCreds(row.provider);
@@ -179,9 +182,9 @@ export async function resolveAlrajhiFinalResult(topupId: number, body: unknown):
 
   if (validation.finalDecline) {
     // A Bank Hosted browser response may identify only a generic decline.
-    // Ask ARB once using the original PaymentID before storing that generic
-    // outcome; the authenticated inquiry can carry the issuer reason/code.
-    const inquiry = await confirmTopupById(topupId);
+    // Ask ARB by the encrypted, TrackID-validated final TransID before storing
+    // a generic outcome; that inquiry carries the issuer reason/code.
+    const inquiry = await confirmTopupById(topupId, validation.providerRef);
     const afterInquiry = await getTopupById(topupId);
     if (afterInquiry?.status === 1) return { valid: true, settled: true, credited: inquiry.credited };
     if (afterInquiry?.status === 2) return { valid: true, settled: true, credited: false, reason: inquiry.reason };

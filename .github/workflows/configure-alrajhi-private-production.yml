@@ -2,6 +2,12 @@ name: Configure private Al Rajhi production checkout
 
 on:
   workflow_dispatch:
+    inputs:
+      activate_payments:
+        description: 'Enable the verified Al Rajhi production method for members'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   configure:
@@ -22,6 +28,7 @@ jobs:
       ALRAJHI_PAYMENT_GATEWAY_URL: ${{ secrets.ALRAJHI_PAYMENT_GATEWAY_URL }}
       ALRAJHI_TRANPORTAL_GATEWAY_URL: ${{ secrets.ALRAJHI_TRANPORTAL_GATEWAY_URL }}
       DATABASE_PAYMENT_SECRET: ${{ secrets.DATABASE_PAYMENT_SECRET }}
+      ACTIVATE_PAYMENTS: ${{ inputs.activate_payments }}
     steps:
       - name: Validate and apply private production settings only
         shell: bash
@@ -52,3 +59,33 @@ jobs:
           print(base64.b64encode(json.dumps(values).encode()).decode())
           PY
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose up -d --force-recreate app && docker compose ps app'
+          if [ "${ACTIVATE_PAYMENTS:-false}" = "true" ]; then
+            cat > /tmp/activate-alrajhi.js <<'NODE'
+            const { PrismaClient } = require('@prisma/client');
+            const prisma = new PrismaClient();
+            const values = {
+              pay_online_on: '1',
+              payment_electronic_enabled: '1',
+              pay_provider: 'alrajhi_arb',
+              pay_mode: 'live',
+            };
+            (async () => {
+              for (const [k, v] of Object.entries(values)) {
+                await prisma.site_settings.upsert({ where: { k }, create: { k, v }, update: { v } });
+              }
+              const saved = await prisma.site_settings.findMany({
+                where: { k: { in: Object.keys(values) } },
+                select: { k: true, v: true },
+                orderBy: { k: 'asc' },
+              });
+              if (saved.length !== Object.keys(values).length || saved.some((row) => values[row.k] !== row.v)) {
+                throw new Error('Payment activation settings verification failed');
+              }
+              console.log(JSON.stringify({ activated: true, settings: saved.map(({ k, v }) => ({ k, v })) }));
+            })().finally(async () => { await prisma.$disconnect(); });
+            NODE
+            PORT="${VPS_PORT:-22}"
+            scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -P "$PORT" /tmp/activate-alrajhi.js "$VPS_USER@$VPS_HOST:/tmp/activate-alrajhi.js"
+            ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \
+              'docker cp /tmp/activate-alrajhi.js trbhh-app:/tmp/activate-alrajhi.js && docker exec trbhh-app node /tmp/activate-alrajhi.js && rm -f /tmp/activate-alrajhi.js'
+          fi

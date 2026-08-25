@@ -11,6 +11,15 @@ describe('payment rejection messages', () => {
     expect(classifyPaymentRejection('INVALID CARD NUMBER')).toMatchObject({ final: true, code: 'invalid_card', message: 'بيانات البطاقة غير صحيحة. تحقق من الرقم وتاريخ الانتهاء ورمز الأمان.' });
   });
 
+  it('explains issuer security restrictions after OTP without blaming the platform', () => {
+    expect(classifyPaymentRejection('Transaction declined: security settings')).toMatchObject({
+      final: true,
+      code: 'security_restricted',
+      message: 'رفض البنك العملية بسبب إعدادات الأمان للبطاقة أو عدم السماح بالشراء الإلكتروني. فعّل الشراء الإلكتروني من تطبيق البنك أو استخدم بطاقة أخرى.',
+    });
+    expect(classifyPaymentRejection('عملية مرفوضة بسبب اعدادات الامان')).toMatchObject({ code: 'security_restricted' });
+  });
+
   it('keeps temporary verification failures pending instead of rejecting or crediting', () => {
     expect(classifyPaymentRejection('inquiry_failed')).toMatchObject({ final: false, code: 'verification_pending' });
     expect(classifyPaymentRejection('CAPTURED')).toMatchObject({ final: false, code: 'verification_pending' });

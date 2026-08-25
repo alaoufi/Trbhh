@@ -1,5 +1,5 @@
 export type PaymentRejection = {
-  code: 'insufficient_funds' | 'card_blocked' | 'invalid_card' | 'cancelled' | 'declined' | 'verification_pending';
+  code: 'insufficient_funds' | 'card_blocked' | 'security_restricted' | 'invalid_card' | 'cancelled' | 'declined' | 'verification_pending';
   message: string;
   final: boolean;
 };
@@ -15,6 +15,9 @@ export function classifyPaymentRejection(rawStatus: string | null | undefined): 
   }
   if (/BLOCK|CLOSED|RESTRICT|SUSPEND|INACTIVE/.test(status)) {
     return { code: 'card_blocked', final: true, message: 'البطاقة موقوفة أو غير مسموح لها بالدفع الإلكتروني. تواصل مع البنك.' };
+  }
+  if (/SECURITY|3D\s*SECURE|3DS|AUTHENTICATION|OTP|ECOMMERCE|E-?COMMERCE|ONLINE PAYMENT|NOT PERMITTED|إعدادات?\s*الأمان|اعدادات?\s*الامان/.test(status)) {
+    return { code: 'security_restricted', final: true, message: 'رفض البنك العملية بسبب إعدادات الأمان للبطاقة أو عدم السماح بالشراء الإلكتروني. فعّل الشراء الإلكتروني من تطبيق البنك أو استخدم بطاقة أخرى.' };
   }
   if (/INVALID|WRONG|EXPIRED|CVV|CVC|CARD NUMBER/.test(status)) {
     return { code: 'invalid_card', final: true, message: 'بيانات البطاقة غير صحيحة. تحقق من الرقم وتاريخ الانتهاء ورمز الأمان.' };

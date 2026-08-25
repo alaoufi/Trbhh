@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildArbInquiryTrandata, buildArbPurchaseTrandata, decodeArbCallback, decryptArbTrandata, encryptArbTrandata, extractArbCallbackPaymentId, isArbFinalDecline, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
+import { buildArbInquiryTrandata, buildArbPurchaseTrandata, decodeArbCallback, decryptArbTrandata, encryptArbTrandata, extractArbCallbackPaymentId, isArbFinalDecline, mergeArbCallbackOutcome, parseArbInitialResponse } from '@/lib/payments/providers/alrajhi-arb';
 import { providerMeta } from '@/lib/payments/registry';
 
 const resourceKey = '12345678901234567890123456789012';
@@ -65,6 +65,15 @@ describe('Al Rajhi ARB bank-hosted provider', () => {
     expect(isArbFinalDecline({ errorText: 'Transaction declined: security settings' })).toBe(true);
     expect(isArbFinalDecline({ errorText: 'عملية مرفوضة بسبب اعدادات الامان' })).toBe(true);
     expect(isArbFinalDecline({ result: 'CAPTURED' })).toBe(false);
+  });
+
+  it('uses a final rejection returned in the outer ARB response envelope even when encrypted data has no error text', () => {
+    const outcome = mergeArbCallbackOutcome(
+      { paymentId: '1001', transId: '2001', trackId: '93', result: 'NOT CAPTURED' },
+      [{ paymentId: '1001', errorText: 'Transaction declined: security settings', error: 'IPAY0200001' }],
+    );
+    expect(isArbFinalDecline(outcome)).toBe(true);
+    expect(outcome.errorText).toBe('Transaction declined: security settings');
   });
 
   it('keeps exactly the field names supplied by the bank', () => {

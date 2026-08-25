@@ -67,6 +67,20 @@ export function decodeArbCallback(payload: unknown, resourceKey: string): Record
 }
 
 /**
+ * ARB can put the issuer's final error in the outer response envelope while
+ * retaining the transaction identifiers in encrypted trandata.  Preserve both
+ * sources so a documented final decline is not mistaken for an unknown state.
+ */
+export function mergeArbCallbackOutcome(data: Record<string, unknown>, payload: unknown): Record<string, unknown> {
+  const outer = firstData(payload);
+  const merged: Record<string, unknown> = { ...data };
+  for (const key of ['error', 'errorText', 'responseText', 'responseCode', 'authRespCode', 'status', 'result']) {
+    if (!merged[key] && outer[key]) merged[key] = outer[key];
+  }
+  return merged;
+}
+
+/**
  * Failure text from ARB is not safe to show wholesale: it can vary by bank
  * channel. Keep only the documented IPAY code for support diagnostics.
  */

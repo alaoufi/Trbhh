@@ -8,7 +8,7 @@ import type { PayProvider, PayProviderId } from './types';
 import { moyasar } from './providers/moyasar';
 import { tap } from './providers/tap';
 import { paytabs } from './providers/paytabs';
-import { alrajhiArb, arbPaymentMethod, decodeArbCallback, extractArbFailureCode, isArbCaptured, isArbFinalDecline } from './providers/alrajhi-arb';
+import { alrajhiArb, arbPaymentMethod, decodeArbCallback, extractArbFailureCode, isArbCaptured, isArbFinalDecline, mergeArbCallbackOutcome } from './providers/alrajhi-arb';
 
 export { PROVIDER_META, providerMeta, readyProviders } from './registry';
 export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, getTopupMethodAvailability, saveTopupMethodSettings, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
@@ -141,8 +141,9 @@ export async function inspectAlrajhiCallback(topupId: number, body: unknown): Pr
   if (!row) return { valid: false, reason: 'topup_not_found' };
   if (row.source !== 'online' || row.provider !== 'alrajhi_arb') return { valid: false, reason: 'not_alrajhi_topup' };
   const creds = await getProviderCreds('alrajhi_arb');
-  const data = decodeArbCallback(body, creds.terminal_resource_key || '');
-  if (!data) return { valid: false, reason: 'invalid_encrypted_payload' };
+  const decrypted = decodeArbCallback(body, creds.terminal_resource_key || '');
+  if (!decrypted) return { valid: false, reason: 'invalid_encrypted_payload' };
+  const data = mergeArbCallbackOutcome(decrypted, body);
   const providerRef = String(data.transId || '');
   if (!providerRef) return { valid: false, reason: 'transaction_id_missing', gatewayCode: extractArbFailureCode(data) || undefined };
   if (String(data.trackId || '') !== String(topupId)) return { valid: false, reason: 'track_id_mismatch' };

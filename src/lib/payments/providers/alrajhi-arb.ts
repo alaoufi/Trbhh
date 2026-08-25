@@ -197,6 +197,7 @@ async function gatewayRequest(url: string, payload: unknown, customerIp?: string
 
 export function arbPaymentMethod(cardType: unknown): PayMethod | null {
   const card = String(cardType || '').toLowerCase();
+  if (card.includes('stc')) return 'stcpay';
   if (card.includes('mada')) return 'mada';
   if (card.includes('visa')) return 'visa';
   if (card.includes('master')) return 'mastercard';

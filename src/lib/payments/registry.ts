@@ -60,9 +60,9 @@ export const PROVIDER_META: ProviderMeta[] = [
     nameEn: 'Al Rajhi Bank ARB',
     ready: true,
     kind: 'gateway',
-    methods: ['mada', 'visa', 'mastercard', 'applepay'],
+    methods: ['mada', 'visa', 'mastercard', 'applepay', 'stcpay'],
     docsUrl: 'https://securepayments.alrajhibank.com.sa/mrchptl/merchant.htm',
-    notes: 'Bank Hosted: بيانات البطاقة لا تدخل إلى تربح. تُقرأ الحقول من متغيرات الخادم فقط وبالمسميات الواردة من المصرف.',
+    notes: 'Bank Hosted: بيانات البطاقة لا تدخل إلى تربح. يدعم مدى/البطاقات/Apple Pay/STC Pay عند تفعيلها في Terminal المصرف. تُقرأ الحقول من متغيرات الخادم فقط وبالمسميات الواردة من المصرف.',
     creds: [
       { key: 'terminal_id', label: 'Terminal ID', secret: false },
       { key: 'terminal_name', label: 'Terminal Name', secret: false },

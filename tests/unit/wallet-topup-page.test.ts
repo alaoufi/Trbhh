@@ -66,6 +66,18 @@ describe('wallet top-up presentation policy', () => {
     expect(admin).toContain('source=online');
   });
 
+  it('supports STC Pay in the Al Rajhi hosted payment terminal and explains final electronic records', () => {
+    const registry = readFileSync(resolve(import.meta.dirname, '../../src/lib/payments/registry.ts'), 'utf8');
+    const admin = readFileSync(resolve(import.meta.dirname, '../../src/app/admin/topups/page.tsx'), 'utf8');
+    const alrajhi = registry.slice(registry.indexOf("id: 'alrajhi_arb'"), registry.indexOf("id: 'neoleap'"));
+    expect(alrajhi).toContain("methods: ['mada', 'visa', 'mastercard', 'applepay', 'stcpay']");
+    const arb = readFileSync(resolve(import.meta.dirname, '../../src/lib/payments/providers/alrajhi-arb.ts'), 'utf8');
+    expect(arb).toContain("card.includes('stc')");
+    expect(admin).toContain('تحفظ عمليات الرفض الإلكتروني لمدة 7 أيام');
+    expect(admin).toContain('الرصيد الحالي للعضو الآن');
+    expect(admin).toContain('وقت الشحن');
+  });
+
   it('takes a successful member directly to the wallet from the final payment result', () => {
     const result = readFileSync(resolve(import.meta.dirname, '../../src/app/payment/result/page.tsx'), 'utf8');
     expect(result).toContain('>محفظتي</Link>');

@@ -298,6 +298,9 @@ export type TopupRow = {
   source: string | null; provider: string | null; method: string | null; paidAt: string | null;
 };
 
+/** Rejected card attempts are operational diagnostics only, not accounting records. */
+export const REJECTED_ONLINE_TOPUP_RETENTION_DAYS = 7;
+
 const topupRow = (r: { id: bigint; user_id: bigint; amount: number; receipt: string | null; status: number; note: string | null; created_at: Date | null; decided_at: Date | null; source?: string | null; provider?: string | null; method?: string | null; paid_at?: Date | null }): TopupRow => ({
   id: toInt(r.id), userId: toInt(r.user_id), amount: r.amount, receipt: r.receipt,
   status: (r.status === 1 || r.status === 2 || r.status === 3 ? r.status : 0) as TopupStatus, note: r.note,
@@ -340,6 +343,7 @@ export async function requestTopup(userId: number, amount: number, receiptRel: s
 /** ينشئ طلب شحن إلكتروني معلّق (بلا إيصال) ويعيد معرّفه — يُربط لاحقاً بمعرّف عملية المزوّد. */
 export async function createOnlineTopup(userId: number, amount: number, provider: string): Promise<number | null> {
   await ensure();
+  await purgeExpiredRejectedOnlineTopups().catch(() => 0);
   const amt = Math.round(amount || 0);
   if (amt <= 0) return null;
   try {
@@ -385,6 +389,19 @@ export async function deletePendingOnlineTopupTest(topupId: number): Promise<boo
     where: { id: BigInt(topupId), source: 'online', status: 0 },
   }).catch(() => ({ count: 0 }));
   return deleted.count === 1;
+}
+
+/**
+ * Removes old rejected gateway attempts. Successful credits, manual transfers,
+ * and unresolved attempts are deliberately outside this query and remain intact.
+ */
+export async function purgeExpiredRejectedOnlineTopups(now = new Date()): Promise<number> {
+  await ensure();
+  const cutoff = new Date(now.getTime() - REJECTED_ONLINE_TOPUP_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const deleted = await prisma.wallet_topups.deleteMany({
+    where: { source: 'online', status: 2, decided_at: { lt: cutoff } },
+  }).catch(() => ({ count: 0 }));
+  return deleted.count;
 }
 
 /** اعتماد شحن إلكتروني بعد تأكيد الدفع من البوابة: قلبٌ ذرّي (0→1) يمنع الاحتساب المزدوج،
@@ -471,8 +488,11 @@ export async function listMyTopups(userId: number, limit = 20): Promise<TopupRow
 }
 
 /** Admin listing with per-status counts. */
-export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 200, offset = 0, source: 'transfer' | 'online' = 'transfer'): Promise<{ rows: (TopupRow & { userName: string })[]; counts: { all: number; pending: number; approved: number; rejected: number; cancelled: number } }> {
+export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 200, offset = 0, source: 'transfer' | 'online' = 'transfer'): Promise<{ rows: (TopupRow & { userName: string; userBalance: number })[]; counts: { all: number; pending: number; approved: number; rejected: number; cancelled: number } }> {
   await ensure();
+  // Every electronic-payment operation and every review of its log enforces
+  // the seven-day retention rule without touching manual-transfer evidence.
+  if (source === 'online') await purgeExpiredRejectedOnlineTopups();
   // الحوالات اليدوية منفصلة عن البطاقة: لا يُعرض أي دفع إلكتروني معلّق في
   // قائمة عمل الموظف، بينما سجل الدفع الإلكتروني يعرض النتائج النهائية فقط.
   // Legacy transfer requests predate the `source` column and therefore have
@@ -495,10 +515,15 @@ export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 2
     prisma.wallet_topups.findMany({ where: rowsWhere, orderBy: { id: 'desc' }, skip: Math.max(0, offset), take: limit }).catch(() => []),
   ]);
   const uids = [...new Set(rows.map((r) => toInt(r.user_id)))];
-  const users = uids.length ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }).catch(() => []) : [];
+  const users = uids.length ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true, balance: true } }).catch(() => []) : [];
   const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
+  const balanceById = new Map(users.map((u) => [toInt(u.id), u.balance ?? 0]));
   return {
-    rows: rows.map((r) => ({ ...topupRow(r), userName: nameById.get(toInt(r.user_id)) || `#${toInt(r.user_id)}` })),
+    rows: rows.map((r) => ({
+      ...topupRow(r),
+      userName: nameById.get(toInt(r.user_id)) || `#${toInt(r.user_id)}`,
+      userBalance: balanceById.get(toInt(r.user_id)) ?? 0,
+    })),
     counts: { all, pending, approved, rejected, cancelled },
   };
 }

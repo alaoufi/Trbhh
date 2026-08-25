@@ -47,6 +47,7 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
         <h1 className="text-xl font-bold text-primary">طلبات شحن الرصيد</h1>
       </div>
       <p className="text-sm text-muted-foreground">التحويل البنكي يعتمد يدوياً بعد مطابقة الإيصال. أمّا الدفع الإلكتروني فيُحسم آلياً من بوابة البنك فقط: نجاح موثّق يضيف الرصيد، ورفض موثّق يرفض العملية مع السبب. لا توجد موافقة أو رفض يدويان للدفع الإلكتروني.</p>
+      {source === 'online' && <p className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-bold text-sky-900">تحفظ عمليات الرفض الإلكتروني لمدة 7 أيام للمراجعة، مع اسم العضو وسبب الرفض، ثم تُحذف تلقائياً. لا تُحذف أي عملية شحن ناجحة أو حوالة بنكية.</p>}
 
       {check === 'approved' && <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">✓ تم التحقق من البنك واعتماد عملية الدفع الإلكتروني #{checkedId}. أُضيف الرصيد تلقائياً.</div>}
       {check === 'rejected' && <div className="rounded-xl border-2 border-red-300 bg-red-50 p-3 text-sm font-bold text-red-900">✕ رفض البنك عملية الدفع الإلكتروني #{checkedId}. لم يُضف أي رصيد.</div>}
@@ -104,6 +105,12 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
 
             {r.status === 2 && r.note && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm font-bold text-red-700">سبب الرفض: {r.note}</div>
+            )}
+            {r.source === 'online' && r.status === 1 && (
+              <div className="grid gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-sm font-bold text-emerald-900 sm:grid-cols-2">
+                <span>وقت الشحن: {fmt(r.paidAt || r.decidedAt || r.at)}</span>
+                <span>الرصيد الحالي للعضو الآن: {r.userBalance} ر.س</span>
+              </div>
             )}
             {r.status === 3 && r.note && (
               <div className="rounded-lg border border-slate-300 bg-slate-100 p-2.5 text-sm font-bold text-slate-700">سبب الإلغاء (خُصم {r.amount} ر.س من رصيد العضو): {r.note}</div>

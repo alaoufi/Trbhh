@@ -10,7 +10,9 @@ export function classifyPaymentRejection(rawStatus: string | null | undefined): 
   if (/CAPTURED|TRACK_MISMATCH|AMOUNT_MISMATCH|INQUIRY|CONFIGURATION|TIMEOUT|NETWORK|UNVERIFIED|UNKNOWN/.test(status)) {
     return { code: 'verification_pending', final: false, message: 'تعذر التحقق من العملية مؤقتاً. لم يُضف أي رصيد؛ أعد المحاولة بعد قليل.' };
   }
-  if (/INSUFFICIENT|NOT SUFFICIENT|LOW BALANCE|NO FUNDS/.test(status)) {
+  // ISO 8583 code 51 is the issuer response for insufficient funds. ARB may
+  // send it separately from the generic "DECLINED" result.
+  if (/INSUFFICIENT|NOT SUFFICIENT|LOW BALANCE|NO FUNDS|\b51\b/.test(status)) {
     return { code: 'insufficient_funds', final: true, message: 'تم رفض شحن الرصيد بسبب عدم كفاية الرصيد في البطاقة.' };
   }
   if (/BLOCK|CLOSED|RESTRICT|SUSPEND|INACTIVE/.test(status)) {

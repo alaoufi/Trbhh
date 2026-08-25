@@ -153,7 +153,7 @@ export async function inspectAlrajhiCallback(topupId: number, body: unknown): Pr
   if (!providerRef) return { valid: false, reason: 'transaction_id_missing', gatewayCode: extractArbFailureCode(data) || undefined };
   if (String(data.trackId || '') !== String(topupId)) return { valid: false, reason: 'track_id_mismatch' };
   const finalDecline = isArbFinalDecline(data)
-    ? [data.errorText, data.error, data.result, data.responseText, data.responseCode, data.authRespCode, data.status].map((value) => String(value || '')).find(Boolean) || 'DECLINED'
+    ? [data.errorText, data.error, data.result, data.responseText, data.responseCode, data.authRespCode, data.status].map((value) => String(value || '')).filter(Boolean).join(' ') || 'DECLINED'
     : undefined;
   return { valid: true, reason: 'valid', providerRef, finalDecline, captured: isArbCaptured(data), amountSar: Number(data.amt || 0), method: arbPaymentMethod(data.cardType) };
 }

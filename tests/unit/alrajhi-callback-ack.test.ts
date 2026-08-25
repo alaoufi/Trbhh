@@ -28,6 +28,7 @@ describe('Al Rajhi callback acknowledgement', () => {
     expect(payments).toContain('validation.finalDecline');
     expect(payments).toContain('rejectOnlineTopup');
     expect(payments).toContain('classifyPaymentRejection');
+    expect(payments).toContain(".filter(Boolean).join(' ')");
   });
 
   it('uses the public final-result endpoint as ARB responseURL so a browser never renders an acknowledgement JSON', () => {

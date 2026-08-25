@@ -4,6 +4,8 @@ import { classifyPaymentRejection } from '@/lib/payments/rejection';
 describe('payment rejection messages', () => {
   it('explains insufficient card balance without exposing the bank response', () => {
     expect(classifyPaymentRejection('INSUFFICIENT FUNDS')).toMatchObject({ final: true, code: 'insufficient_funds', message: 'تم رفض شحن الرصيد بسبب عدم كفاية الرصيد في البطاقة.' });
+    expect(classifyPaymentRejection('Transaction declined: insufficient balance')).toMatchObject({ final: true, code: 'insufficient_funds', message: 'تم رفض شحن الرصيد بسبب عدم كفاية الرصيد في البطاقة.' });
+    expect(classifyPaymentRejection('DECLINED 51')).toMatchObject({ final: true, code: 'insufficient_funds', message: 'تم رفض شحن الرصيد بسبب عدم كفاية الرصيد في البطاقة.' });
   });
 
   it('explains a bank-blocked card and invalid card data distinctly', () => {

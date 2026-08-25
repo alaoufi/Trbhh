@@ -56,7 +56,11 @@ jobs:
             'ALRAJHI_TRANPORTAL_GATEWAY_URL': os.environ['ALRAJHI_TRANPORTAL_GATEWAY_URL'],
             'DATABASE_PAYMENT_SECRET': os.environ['DATABASE_PAYMENT_SECRET'],
           }
-          print(base64.b64encode(json.dumps(values).encode()).decode())
+          # Docker Compose interpolates a single "$" in .env. Escape it here
+          # so credentials such as a Tranportal password arrive unchanged inside
+          # the app container (Compose converts "$$" back to a literal "$" ).
+          compose_values = {key: value.replace('$', '$$') for key, value in values.items()}
+          print(base64.b64encode(json.dumps(compose_values).encode()).decode())
           PY
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose up -d --force-recreate app && docker compose ps app'
           if [ "${ACTIVATE_PAYMENTS:-false}" = "true" ]; then
@@ -83,7 +87,7 @@ jobs:
               }
               console.log(JSON.stringify({ activated: true, settings: saved.map(({ k, v }) => ({ k, v })) }));
             })().finally(async () => { await prisma.$disconnect(); });
-            NODE
+          NODE
             PORT="${VPS_PORT:-22}"
             scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -P "$PORT" /tmp/activate-alrajhi.js "$VPS_USER@$VPS_HOST:/tmp/activate-alrajhi.js"
             ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" \

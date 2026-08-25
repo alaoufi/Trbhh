@@ -38,11 +38,11 @@ describe('wallet top-up presentation policy', () => {
     expect(source).toContain('تم رفض شحن الرصيد');
   });
 
-  it('does not ask a member or an administrator to confirm a pending electronic payment manually', () => {
+  it('does not ask a member or an administrator to confirm an electronic payment manually', () => {
     const file = resolve(import.meta.dirname, '../../src/app/payment/result/page.tsx');
     const source = readFileSync(file, 'utf8');
-    expect(source).toContain('التحقق آلياً');
-    expect(source).toContain('httpEquiv="refresh"');
+    expect(source).toContain('const failed = !success');
+    expect(source).not.toContain('httpEquiv="refresh"');
   });
 
   it('keeps unresolved electronic payments out of the manual top-up administration queue', () => {
@@ -68,6 +68,20 @@ describe('wallet top-up presentation policy', () => {
 
   it('takes a successful member directly to the wallet from the final payment result', () => {
     const result = readFileSync(resolve(import.meta.dirname, '../../src/app/payment/result/page.tsx'), 'utf8');
-    expect(result).toContain("success ? 'محفظتي'");
+    expect(result).toContain('>محفظتي</Link>');
+  });
+
+  it('never presents a third pending-confirmation outcome for electronic payments', () => {
+    const result = readFileSync(resolve(import.meta.dirname, '../../src/app/payment/result/page.tsx'), 'utf8');
+    expect(result).not.toContain('جار التحقق من الدفع آلياً');
+    expect(result).not.toContain('httpEquiv="refresh"');
+    expect(result).toContain("const failed = !success");
+  });
+
+  it('gives a declined card payment the three next actions requested by the member', () => {
+    const result = readFileSync(resolve(import.meta.dirname, '../../src/app/payment/result/page.tsx'), 'utf8');
+    expect(result).toContain('تجربة بطاقة أخرى');
+    expect(result).toContain('التحويل البنكي');
+    expect(result).toContain('الصفحة الرئيسية');
   });
 });

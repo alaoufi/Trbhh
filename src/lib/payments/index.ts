@@ -56,7 +56,13 @@ export async function startTopupPayment(
       amountSar: amt,
       topupId,
       description: `شحن رصيد تربح — ${amt} ر.س (#${topupId})`,
-      callbackUrl: `${baseUrl()}/api/pay/callback/${cfg.provider}?t=${topupId}`,
+      // ARB Bank Hosted returns the encrypted final result to responseURL in
+      // this merchant configuration. Route it straight to the final handler;
+      // returning a bank acknowledgement JSON here would be rendered by the
+      // member's browser instead of showing the payment outcome.
+      callbackUrl: cfg.provider === 'alrajhi_arb'
+        ? `${baseUrl()}/api/pay/final/${cfg.provider}?t=${topupId}`
+        : `${baseUrl()}/api/pay/callback/${cfg.provider}?t=${topupId}`,
       webhookUrl: `${baseUrl()}/api/pay/webhook/${cfg.provider}`,
       methods,
       customerName: customer?.name,
@@ -122,17 +128,16 @@ export async function confirmFromWebhook(provider: string, body: unknown, query:
 }
 
 /**
- * ARB requires a positive acknowledgement before it settles a Bank Hosted payment.
- * We only acknowledge an encrypted notification when it binds to the pending top-up
- * through its encrypted final transaction ID and our Track ID. Credit still happens only
- * after the later server-to-server inquiry.
+ * Validates ARB's encrypted final Bank Hosted response against the pending
+ * top-up. In this merchant configuration ARB redirects the member browser to
+ * responseURL with that final response, then the result is settled atomically.
  */
 export type AlrajhiCallbackValidation =
   | { valid: false; reason: 'missing_topup_id' | 'topup_not_found' | 'not_alrajhi_topup' | 'missing_provider_ref' | 'invalid_encrypted_payload' | 'transaction_id_missing' | 'track_id_mismatch'; gatewayCode?: string }
   | { valid: true; reason: 'valid'; providerRef: string; finalDecline?: string; captured: boolean; amountSar: number; method: string | null };
 
 /**
- * Safe diagnostic used only for the bank acknowledgement path.  It never logs
+ * Safe diagnostic for the final bank response. It never logs
  * the encrypted payload, payment reference, or customer data.
  */
 export async function inspectAlrajhiCallback(topupId: number, body: unknown): Promise<AlrajhiCallbackValidation> {
@@ -154,10 +159,8 @@ export async function inspectAlrajhiCallback(topupId: number, body: unknown): Pr
 }
 
 /**
- * Handles ARB's second, encrypted final response.  Notification acknowledgement
- * and final settlement are deliberately separate endpoints in ARB's protocol;
- * this function makes the member outcome automatic and never creates a manual
- * approval task for an electronic card payment.
+ * Settles ARB's encrypted final response. This function makes the member
+ * outcome automatic and never creates a manual approval task for a card payment.
  */
 export async function resolveAlrajhiFinalResult(topupId: number, body: unknown): Promise<{ valid: boolean; settled: boolean; credited: boolean; reason?: string }> {
   const validation = await inspectAlrajhiCallback(topupId, body);
@@ -180,7 +183,7 @@ export async function resolveAlrajhiFinalResult(topupId: number, body: unknown):
     return { valid: true, settled: true, credited: false, reason: rejection.code };
   }
 
-  // A non-final response remains server-side only; the result page retries the
+  // An unknown response remains server-side only; the result page retries the
   // bank inquiry automatically and is never presented as a manual approval.
   const checked = await confirmTopupById(topupId);
   return { valid: true, settled: checked.paid || checked.credited, credited: checked.credited, reason: checked.reason };

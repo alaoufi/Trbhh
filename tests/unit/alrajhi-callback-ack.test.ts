@@ -3,14 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 describe('Al Rajhi callback acknowledgement', () => {
-  it('acknowledges the bank notification before browser redirection', () => {
+  it('settles a legacy browser callback rather than rendering an acknowledgement JSON', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
     expect(source).toContain("provider === 'alrajhi_arb'");
-    expect(source).toContain("status: '1'");
-    expect(source).toContain('inspectAlrajhiCallback');
+    expect(source).toContain('resolveAlrajhiFinalResult');
+    expect(source).toContain('return NextResponse.redirect(resultUrl, { status: 303 });');
+    expect(source).not.toContain("return NextResponse.json([{ status: '1'");
   });
 
-  it('reads the ARB POST body once before validating the acknowledgement', () => {
+  it('reads the ARB POST body once before settling the final response', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
     expect(source).toContain("import { readAlrajhiCallbackBody } from '@/lib/payments/alrajhi-callback'");
     expect(source).toContain('const body = await readAlrajhiCallbackBody(req);');
@@ -29,10 +30,10 @@ describe('Al Rajhi callback acknowledgement', () => {
     expect(payments).toContain('classifyPaymentRejection');
   });
 
-  it('returns a dedicated public final-result URL to ARB instead of looping back into the acknowledgement endpoint', () => {
-    const source = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
-    expect(source).toContain("new URL(`/api/pay/final/${provider}`, `https://${SITE.domain}`)");
-    expect(source).toContain("resultUrl.searchParams.set('t', String(topupId));");
+  it('uses the public final-result endpoint as ARB responseURL so a browser never renders an acknowledgement JSON', () => {
+    const payments = fs.readFileSync(path.join(process.cwd(), 'src/lib/payments/index.ts'), 'utf8');
+    expect(payments).toContain("cfg.provider === 'alrajhi_arb'");
+    expect(payments).toContain('`${baseUrl()}/api/pay/final/${cfg.provider}?t=${topupId}`');
   });
 
   it('redirects the payment result page to the public Trbhh domain', () => {
@@ -40,10 +41,10 @@ describe('Al Rajhi callback acknowledgement', () => {
     expect(source).toContain("new URL('/payment/result', `https://${SITE.domain}`)");
   });
 
-  it('returns a JSON acknowledgement to the bank and lets the distinct final endpoint redirect the browser', () => {
-    const callback = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/callback/[provider]/route.ts'), 'utf8');
+  it('settles the browser final response and redirects it to the member result page', () => {
     const finalRoute = fs.readFileSync(path.join(process.cwd(), 'src/app/api/pay/final/[provider]/route.ts'), 'utf8');
-    expect(callback).toContain("return NextResponse.json([{ status: '1'");
+    expect(finalRoute).toContain('await resolveAlrajhiFinalResult(topupId, body);');
+    expect(finalRoute).toContain('return resultRedirect(topupId);');
     expect(finalRoute).toContain("new URL('/payment/result', `https://${SITE.domain}`)");
   });
 

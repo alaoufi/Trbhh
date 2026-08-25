@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SITE } from '@/lib/constants';
-import { confirmTopupById, confirmFromWebhook, inspectAlrajhiCallback } from '@/lib/payments';
+import { confirmTopupById, confirmFromWebhook, resolveAlrajhiFinalResult } from '@/lib/payments';
 import { readAlrajhiCallbackBody } from '@/lib/payments/alrajhi-callback';
-import { rejectOnlineTopup } from '@/lib/wallet';
-import { classifyPaymentRejection } from '@/lib/payments/rejection';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,24 +46,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ provider: 
     const url = new URL(req.url);
     const topupId = Number(url.searchParams.get('t') || 0);
     const body = await readAlrajhiCallbackBody(req);
-    const validation = await inspectAlrajhiCallback(topupId, body);
-    if (!validation.valid) {
-      console.warn('[alrajhi-callback] notification validation failed', { reason: validation.reason, gatewayCode: validation.gatewayCode, topupId });
-      return NextResponse.json([{ status: '2', errorText: 'notification validation failed', errorCode: validation.gatewayCode || validation.reason }], { status: 400 });
-    }
-    // A final issuer refusal can be returned in this first notification.  It is
-    // terminal and must be shown to the member immediately, never as an admin
-    // confirmation request.  The later final URL remains idempotent.
-    if (validation.finalDecline) {
-      const rejection = classifyPaymentRejection(validation.finalDecline);
-      await rejectOnlineTopup(topupId, rejection.message);
-    }
-    // ARB makes a second request after this acknowledgement.  It must have a
-    // distinct URL, otherwise the final result is mistaken for another ack and
-    // a card refusal stays pending forever.
-    const resultUrl = new URL(`/api/pay/final/${provider}`, `https://${SITE.domain}`);
-    resultUrl.searchParams.set('t', String(topupId));
-    return NextResponse.json([{ status: '1', result: resultUrl.toString() }]);
+    // Legacy transactions were created with this route as responseURL. The
+    // bank sends their encrypted final result in the member's browser; settle
+    // it here and redirect instead of rendering an ARB protocol JSON.
+    if (Number.isSafeInteger(topupId) && topupId > 0) await resolveAlrajhiFinalResult(topupId, body).catch(() => {});
+    const resultUrl = new URL('/payment/result', `https://${SITE.domain}`);
+    if (topupId > 0) resultUrl.searchParams.set('t', String(topupId));
+    return NextResponse.redirect(resultUrl, { status: 303 });
   }
   return handle(req, provider);
 }

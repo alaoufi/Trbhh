@@ -42,4 +42,11 @@ describe('wallet top-up presentation policy', () => {
     expect(source).toContain('التحقق آلياً');
     expect(source).toContain('httpEquiv="refresh"');
   });
+
+  it('keeps unresolved electronic payments out of the manual top-up administration queue', () => {
+    const wallet = readFileSync(resolve(import.meta.dirname, '../../src/lib/wallet.ts'), 'utf8');
+    const admin = readFileSync(resolve(import.meta.dirname, '../../src/app/admin/topups/page.tsx'), 'utf8');
+    expect(wallet).toContain("NOT: { source: 'online', status: 0 }");
+    expect(admin).not.toContain('visibleOnlinePending');
+  });
 });

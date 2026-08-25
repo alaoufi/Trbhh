@@ -37,7 +37,6 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
   const countOf: Record<Tab, number> = { all: counts.all, pending: counts.pending, approved: counts.approved, rejected: counts.rejected, cancelled: counts.cancelled };
   // ⚠️ كشف السند المكرر: مقارنة بصمة إيصال كل طلب معلق مع كل الإيصالات السابقة
   const dupMatches = await findReceiptMatches(rows.filter((r) => r.status === 0 && r.receipt).map((r) => r.id)).catch(() => new Map());
-  const visibleOnlinePending = rows.filter((r) => r.status === 0 && r.source === 'online');
   const pages = Math.max(1, Math.ceil(countOf[tab] / PAGE_SIZE));
 
   return (
@@ -63,12 +62,6 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
         ))}
       </div>
 
-      {tab === 'pending' && visibleOnlinePending.length > 0 && (
-        <div className="space-y-2 rounded-xl border-2 border-sky-300 bg-sky-50 p-3">
-          <p className="text-sm font-bold text-sky-900">يوجد {visibleOnlinePending.length} دفع إلكتروني ظاهر قيد التحقق الآلي. هذه ليست طلبات موافقة للإدارة ولا يظهر لها زر اعتماد أو رفض؛ يقتصر دور الإدارة على المتابعة، وتُحسم تلقائياً من رد البنك النهائي.</p>
-        </div>
-      )}
-
       {rows.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد طلبات في هذا التصنيف.</p>}
 
       <div className="space-y-3">
@@ -81,7 +74,7 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
                 <span className="flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-700">💳 دفع إلكتروني{r.provider ? ` • ${r.provider}` : ''}{r.method ? ` • ${r.method}` : ''}</span>
               )}
               <span className="mr-auto text-lg font-extrabold text-primary">{r.amount} ر.س</span>
-              {r.status === 0 && <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800"><Clock className="h-3.5 w-3.5" /> {r.source === 'online' ? 'قيد التحقق الآلي' : 'بانتظار التأكيد'}</span>}
+              {r.status === 0 && <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800"><Clock className="h-3.5 w-3.5" /> بانتظار التأكيد</span>}
               {r.status === 1 && <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800"><CheckCircle2 className="h-3.5 w-3.5" /> تم التأكيد{r.decidedAt ? ` • ${fmt(r.decidedAt)}` : ''}</span>}
               {r.status === 2 && <span className="flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700"><XCircle className="h-3.5 w-3.5" /> مرفوض{r.decidedAt ? ` • ${fmt(r.decidedAt)}` : ''}</span>}
               {r.status === 3 && <span className="flex items-center gap-1 rounded-full bg-slate-700 px-2.5 py-1 text-[11px] font-bold text-white"><Undo2 className="h-3.5 w-3.5" /> ملغى بعد التأكيد{r.decidedAt ? ` • ${fmt(r.decidedAt)}` : ''}</span>}
@@ -143,7 +136,7 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
               </div>
             ); })()}
 
-            {r.status === 1 && (
+            {r.status === 1 && r.source !== 'online' && (
               <details className="rounded-lg border border-slate-300">
                 <summary className="cursor-pointer list-none px-3 py-2 text-sm font-bold text-slate-700">↩ إلغاء التأكيد (سند مكرر/خطأ) — مع سبب…</summary>
                 <form action={cancelTopupAction} className="space-y-2 p-3">
@@ -153,8 +146,6 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
                 </form>
               </details>
             )}
-
-            {r.status === 0 && r.source === 'online' && <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs font-bold text-sky-800">هذه عملية إلكترونية قيد التحقق الآلي من البنك. لا تعتمد أو ترفض يدوياً، ولا يُضاف الرصيد إلا بعد نتيجة مصرفية ناجحة وموثقة.</div>}
 
             {r.status === 0 && r.source !== 'online' && (
               <div className="space-y-2 border-t border-primary/10 pt-2">

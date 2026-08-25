@@ -459,13 +459,21 @@ export async function listMyTopups(userId: number, limit = 20): Promise<TopupRow
 /** Admin listing with per-status counts. */
 export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 200, offset = 0): Promise<{ rows: (TopupRow & { userName: string })[]; counts: { all: number; pending: number; approved: number; rejected: number; cancelled: number } }> {
   await ensure();
+  // صفحة الإدارة هذه مخصّصة لمراجعة الحوالات اليدوية. الدفع الإلكتروني لا
+  // يدخل قائمة العمل إلا بعد أن تحسمه البوابة آلياً (ناجح أو مرفوض).
+  const completedOrManual = { NOT: { source: 'online', status: 0 } };
+  const rowsWhere = status === 'all'
+    ? completedOrManual
+    : status === 0
+      ? { status: 0, NOT: { source: 'online' } }
+      : { status };
   const [all, pending, approved, rejected, cancelled, rows] = await Promise.all([
-    prisma.wallet_topups.count().catch(() => 0),
-    prisma.wallet_topups.count({ where: { status: 0 } }).catch(() => 0),
+    prisma.wallet_topups.count({ where: completedOrManual }).catch(() => 0),
+    prisma.wallet_topups.count({ where: { status: 0, NOT: { source: 'online' } } }).catch(() => 0),
     prisma.wallet_topups.count({ where: { status: 1 } }).catch(() => 0),
     prisma.wallet_topups.count({ where: { status: 2 } }).catch(() => 0),
     prisma.wallet_topups.count({ where: { status: 3 } }).catch(() => 0),
-    prisma.wallet_topups.findMany({ where: status === 'all' ? {} : { status }, orderBy: { id: 'desc' }, skip: Math.max(0, offset), take: limit }).catch(() => []),
+    prisma.wallet_topups.findMany({ where: rowsWhere, orderBy: { id: 'desc' }, skip: Math.max(0, offset), take: limit }).catch(() => []),
   ]);
   const uids = [...new Set(rows.map((r) => toInt(r.user_id)))];
   const users = uids.length ? await prisma.users.findMany({ where: { id: { in: uids.map((u) => BigInt(u)) } }, select: { id: true, name: true, userName: true } }).catch(() => []) : [];

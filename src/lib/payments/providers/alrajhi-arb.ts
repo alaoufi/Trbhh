@@ -227,7 +227,13 @@ export const alrajhiArb: PayProvider = {
       const data = firstData(JSON.parse(decryptArbTrandata(response.trandata, resourceKey)));
       const amountSar = Number(data.amt || 0);
       const merchantTrackId = String(data.trackId || '');
-      const rawStatus = String(data.errorText || data.error || data.result || 'unknown');
+      // The browser final response may only say "DECLINED".  The server-side
+      // inquiry often carries the issuer response code (for example 51), so
+      // preserve every documented status field for the member-facing reason.
+      const rawStatus = [data.errorText, data.error, data.result, data.responseText, data.responseCode, data.authRespCode, data.actionCode, data.status]
+        .map((value) => String(value || ''))
+        .filter(Boolean)
+        .join(' ') || 'unknown';
       const paid = isArbCaptured(data)
         && (String(data.paymentId || '') === providerRef || String(data.transId || '') === providerRef)
         && merchantTrackId === expectedTrackId;

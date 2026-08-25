@@ -178,6 +178,16 @@ export async function resolveAlrajhiFinalResult(topupId: number, body: unknown):
   }
 
   if (validation.finalDecline) {
+    // A Bank Hosted browser response may identify only a generic decline.
+    // Ask ARB once using the original PaymentID before storing that generic
+    // outcome; the authenticated inquiry can carry the issuer reason/code.
+    const inquiry = await confirmTopupById(topupId);
+    const afterInquiry = await getTopupById(topupId);
+    if (afterInquiry?.status === 1) return { valid: true, settled: true, credited: inquiry.credited };
+    if (afterInquiry?.status === 2) return { valid: true, settled: true, credited: false, reason: inquiry.reason };
+
+    // The final browser response is still authoritative if the supporting
+    // inquiry is temporarily unavailable, so it must not become an admin task.
     const rejection = classifyPaymentRejection(validation.finalDecline);
     await rejectOnlineTopup(topupId, rejection.message);
     return { valid: true, settled: true, credited: false, reason: rejection.code };

@@ -31,6 +31,13 @@ describe('Al Rajhi callback acknowledgement', () => {
     expect(payments).toContain(".filter(Boolean).join(' ')");
   });
 
+  it('checks the bank inquiry once before storing a generic final decline', () => {
+    const payments = fs.readFileSync(path.join(process.cwd(), 'src/lib/payments/index.ts'), 'utf8');
+    const provider = fs.readFileSync(path.join(process.cwd(), 'src/lib/payments/providers/alrajhi-arb.ts'), 'utf8');
+    expect(payments).toContain('const inquiry = await confirmTopupById(topupId);');
+    expect(provider).toContain('data.authRespCode, data.actionCode, data.status');
+  });
+
   it('uses the public final-result endpoint as ARB responseURL so a browser never renders an acknowledgement JSON', () => {
     const payments = fs.readFileSync(path.join(process.cwd(), 'src/lib/payments/index.ts'), 'utf8');
     expect(payments).toContain("cfg.provider === 'alrajhi_arb'");

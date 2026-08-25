@@ -1,6 +1,6 @@
 import 'server-only';
 import { SITE } from '@/lib/constants';
-import { createOnlineTopup, attachProviderRef, getTopupById, creditOnlineTopupAtomically, findTopupByProviderRef, applyTopupBonuses, rejectOnlineTopup } from '@/lib/wallet';
+import { createOnlineTopup, attachProviderRef, getTopupById, creditOnlineTopupAtomically, findTopupByProviderRef, applyTopupBonuses, rejectOnlineTopup, sendTopupSuccessSms } from '@/lib/wallet';
 import { classifyPaymentRejection } from './rejection';
 import { getPaymentConfig, getProviderCreds, isOnlinePayReady, getActiveMethods } from './config';
 import { providerMeta } from './registry';
@@ -113,7 +113,10 @@ export async function confirmTopupById(topupId: number, trustedProviderRef?: str
     return { paid: true, credited: false, reason: 'amount_mismatch' };
   }
   const r = await creditOnlineTopupAtomically(topupId, v.method || null);
-  if (r.ok && !r.already && r.userId && r.amount) await applyTopupBonuses(r.userId, r.amount, 0).catch(() => {});
+  if (r.ok && !r.already && r.userId && r.amount) {
+    await applyTopupBonuses(r.userId, r.amount, 0).catch(() => {});
+    await sendTopupSuccessSms(r.userId, r.amount).catch(() => {});
+  }
   return { paid: true, credited: r.ok };
 }
 
@@ -174,7 +177,10 @@ export async function resolveAlrajhiFinalResult(topupId: number, body: unknown):
       return { valid: true, settled: false, credited: false, reason: 'amount_mismatch' };
     }
     const credited = await creditOnlineTopupAtomically(topupId, validation.method);
-    if (credited.ok && !credited.already && credited.userId && credited.amount) await applyTopupBonuses(credited.userId, credited.amount, 0).catch(() => {});
+    if (credited.ok && !credited.already && credited.userId && credited.amount) {
+      await applyTopupBonuses(credited.userId, credited.amount, 0).catch(() => {});
+      await sendTopupSuccessSms(credited.userId, credited.amount).catch(() => {});
+    }
     return { valid: true, settled: credited.ok, credited: credited.ok };
   }
 

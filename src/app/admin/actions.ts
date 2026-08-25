@@ -1144,11 +1144,10 @@ export async function approveTopupAction(formData: FormData) {
   const session = await requireAction('users', 'edit');
   const id = Number(formData.get('id') || 0);
   if (!id) return;
-  const { approveTopup } = await import('@/lib/wallet');
+  const { approveTopup, sendTopupSuccessSms } = await import('@/lib/wallet');
   const req = await approveTopup(id, session.uid);
   if (req) {
-    const { SETTING_MSG_TOPUP_OK: k, DEFAULT_MSG_TOPUP_OK } = await import('@/lib/settings');
-    await sendVerifyMessage(req.userId, k, DEFAULT_MSG_TOPUP_OK, '', { amount: String(req.amount) });
+    await sendTopupSuccessSms(req.userId, req.amount).catch(() => {});
     await logAdmin(session.uid, 'تأكيد شحن رصيد', `طلب #${id}`, `${req.amount} ر.س للعضو #${req.userId}`);
   }
   revalidatePath('/admin/topups');

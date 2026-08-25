@@ -199,6 +199,8 @@ export async function startOnlineTopupAction(formData: FormData) {
 
 export async function requestTopupAction(formData: FormData) {
   const session = await requireUser();
+  const { getTopupMethodAvailability } = await import('@/lib/payments');
+  if (!(await getTopupMethodAvailability()).transfer) redirect('/account/wallet?tab=topups&error=transferoff');
   const amount = Math.round(Number(formData.get('amount') || 0));
   if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) redirect('/account/wallet?error=topupamount');
 

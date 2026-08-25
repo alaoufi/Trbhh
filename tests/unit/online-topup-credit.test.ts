@@ -15,4 +15,16 @@ describe('online top-up credit contract', () => {
     expect(block).toContain('tx.users.update');
     expect(block).toContain('tx.wallet_txns.create');
   });
+
+  it('sends a single success SMS only after the atomic credit succeeds', () => {
+    const payments = readFileSync(resolve(import.meta.dirname, '../../src/lib/payments/index.ts'), 'utf8');
+    expect(payments).toContain('sendTopupSuccessSms');
+    expect(payments).toContain('r.ok && !r.already');
+    expect(payments).toContain('credited.ok && !credited.already');
+  });
+
+  it('uses the member-facing success wording with amount and date', () => {
+    expect(source).toContain('تم إضافة رصيد بمبلغ');
+    expect(source).toContain('في تاريخ');
+  });
 });

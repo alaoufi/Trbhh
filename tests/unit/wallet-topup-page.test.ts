@@ -26,6 +26,7 @@ describe('wallet top-up presentation policy', () => {
     const source = readFileSync(file, 'utf8');
     expect(source).toContain('WALLET_TOPUP_QUICK_AMOUNTS');
     expect(source).toContain('الدفع الآمن الآن');
+    expect(source).toContain('الدفع الإلكتروني أولاً');
   });
 
   it('has a separate payment result page rather than trusting the browser callback', () => {
@@ -47,7 +48,26 @@ describe('wallet top-up presentation policy', () => {
   it('keeps unresolved electronic payments out of the manual top-up administration queue', () => {
     const wallet = readFileSync(resolve(import.meta.dirname, '../../src/lib/wallet.ts'), 'utf8');
     const admin = readFileSync(resolve(import.meta.dirname, '../../src/app/admin/topups/page.tsx'), 'utf8');
-    expect(wallet).toContain("NOT: { source: 'online', status: 0 }");
+    expect(wallet).toContain("source === 'online'");
+    expect(wallet).toContain('completedForSource');
     expect(admin).not.toContain('visibleOnlinePending');
+  });
+
+  it('keeps bank transfers server-side disabled when the administrator turns them off', () => {
+    const actions = readFileSync(resolve(import.meta.dirname, '../../src/app/account/actions.ts'), 'utf8');
+    expect(actions).toContain('getTopupMethodAvailability');
+    expect(actions).toContain("error=transferoff");
+  });
+
+  it('separates confirmed transfers from electronic top-ups in the administration view', () => {
+    const admin = readFileSync(resolve(import.meta.dirname, '../../src/app/admin/topups/page.tsx'), 'utf8');
+    expect(admin).toContain('الحوالات المؤكدة');
+    expect(admin).toContain('عمليات الشحن الإلكتروني');
+    expect(admin).toContain('source=online');
+  });
+
+  it('takes a successful member directly to the wallet from the final payment result', () => {
+    const result = readFileSync(resolve(import.meta.dirname, '../../src/app/payment/result/page.tsx'), 'utf8');
+    expect(result).toContain("success ? 'محفظتي'");
   });
 });

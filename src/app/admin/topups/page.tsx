@@ -28,12 +28,13 @@ function fmt(iso: string | null) {
 
 const PAGE_SIZE = 20;
 
-export default async function AdminTopups({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string; check?: string; id?: string; batch?: string; a?: string; r?: string; p?: string; u?: string; tests?: string; count?: string }> }) {
+export default async function AdminTopups({ searchParams }: { searchParams: Promise<{ tab?: string; source?: string; page?: string; check?: string; id?: string; batch?: string; a?: string; r?: string; p?: string; u?: string; tests?: string; count?: string }> }) {
   await requireAction('users', 'edit');
-  const { tab: tabRaw, page: pageRaw, check, id: checkedId } = await searchParams;
+  const { tab: tabRaw, source: sourceRaw, page: pageRaw, check, id: checkedId } = await searchParams;
   const tab: Tab = (TABS.some((t) => t.key === tabRaw) ? tabRaw : 'pending') as Tab;
+  const source = sourceRaw === 'online' ? 'online' : 'transfer';
   const page = Math.max(1, parseInt(pageRaw || '1') || 1);
-  const { rows, counts } = await listTopupsAdmin(STATUS_OF[tab], PAGE_SIZE, (page - 1) * PAGE_SIZE);
+  const { rows, counts } = await listTopupsAdmin(STATUS_OF[tab], PAGE_SIZE, (page - 1) * PAGE_SIZE, source);
   const countOf: Record<Tab, number> = { all: counts.all, pending: counts.pending, approved: counts.approved, rejected: counts.rejected, cancelled: counts.cancelled };
   // ⚠️ كشف السند المكرر: مقارنة بصمة إيصال كل طلب معلق مع كل الإيصالات السابقة
   const dupMatches = await findReceiptMatches(rows.filter((r) => r.status === 0 && r.receipt).map((r) => r.id)).catch(() => new Map());
@@ -52,10 +53,19 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
       {check === 'pending' && <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⌛ لم تصل نتيجة نهائية من البنك لعملية #{checkedId} بعد؛ يعاد التحقق منها آلياً ولم يُضف أي رصيد.</div>}
       {(check === 'unresolved' || check === 'unavailable' || check === 'invalid') && <div className="rounded-xl border-2 border-slate-300 bg-slate-50 p-3 text-sm font-bold text-slate-800">تعذر تنفيذ التحقق لهذه العملية. لم يتغير الرصيد ولم يتم اعتماد الطلب يدوياً.</div>}
 
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Link href="/admin/topups?source=transfer&tab=approved" className={`rounded-xl border-2 p-3 text-sm font-extrabold ${source === 'transfer' ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-card text-primary hover:bg-primary/5'}`}>
+          <span className="block">الحوالات المؤكدة</span><span className="mt-1 block text-xs font-medium opacity-80">مراجعة التحويلات البنكية والإيصالات فقط</span>
+        </Link>
+        <Link href="/admin/topups?source=online&tab=all" className={`rounded-xl border-2 p-3 text-sm font-extrabold ${source === 'online' ? 'border-sky-600 bg-sky-600 text-white' : 'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100'}`}>
+          <span className="block">عمليات الشحن الإلكتروني</span><span className="mt-1 block text-xs font-medium opacity-80">نتائج البنك النهائية — بلا تدخل يدوي</span>
+        </Link>
+      </div>
+
       {/* تبويبات بحسب الحالة مع عدّاداتها */}
       <div className="flex flex-wrap gap-1.5 rounded-xl bg-secondary/40 p-1.5">
         {TABS.map((t) => (
-          <Link key={t.key} href={`/admin/topups?tab=${t.key}`} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold ${tab === t.key ? 'bg-primary text-white shadow' : 'text-muted-foreground hover:bg-white/60'}`}>
+          <Link key={t.key} href={`/admin/topups?source=${source}&tab=${t.key}`} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold ${tab === t.key ? 'bg-primary text-white shadow' : 'text-muted-foreground hover:bg-white/60'}`}>
             {t.label}
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold text-white ${t.cls}`}>{countOf[t.key]}</span>
           </Link>
@@ -167,7 +177,7 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
         ))}
       </div>
 
-      <AdminPager basePath="/admin/topups" page={page} pages={pages} total={countOf[tab]} params={{ tab }} />
+      <AdminPager basePath="/admin/topups" page={page} pages={pages} total={countOf[tab]} params={{ tab, source }} />
     </div>
   );
 }

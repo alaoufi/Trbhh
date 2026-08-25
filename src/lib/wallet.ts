@@ -449,6 +449,20 @@ export async function creditOnlineTopupAtomically(topupId: number, method?: stri
   }
 }
 
+/** A successful card top-up gets one direct SMS after the money transaction commits.
+ *  This deliberately stays outside the database transaction: a temporary SMS-gateway
+ *  outage must never reverse a bank-confirmed balance credit. Callers invoke it only
+ *  when `already === false`, which prevents browser/webhook retries from duplicating it. */
+export async function sendTopupSuccessSms(userId: number, amount: number, paidAt = new Date()): Promise<boolean> {
+  const member = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { phoneNumber: true } }).catch(() => null);
+  if (!member?.phoneNumber) return false;
+  const date = new Intl.DateTimeFormat('ar-SA-u-ca-gregory', {
+    dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Riyadh',
+  }).format(paidAt);
+  const { sendSms } = await import('./sms');
+  return sendSms(member.phoneNumber, `تم إضافة رصيد بمبلغ ${amount} ر.س في تاريخ ${date}.`).catch(() => false);
+}
+
 /** Member's own top-up requests (newest first). */
 export async function listMyTopups(userId: number, limit = 20): Promise<TopupRow[]> {
   await ensure();
@@ -457,22 +471,27 @@ export async function listMyTopups(userId: number, limit = 20): Promise<TopupRow
 }
 
 /** Admin listing with per-status counts. */
-export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 200, offset = 0): Promise<{ rows: (TopupRow & { userName: string })[]; counts: { all: number; pending: number; approved: number; rejected: number; cancelled: number } }> {
+export async function listTopupsAdmin(status: 'all' | TopupStatus = 0, limit = 200, offset = 0, source: 'transfer' | 'online' = 'transfer'): Promise<{ rows: (TopupRow & { userName: string })[]; counts: { all: number; pending: number; approved: number; rejected: number; cancelled: number } }> {
   await ensure();
-  // صفحة الإدارة هذه مخصّصة لمراجعة الحوالات اليدوية. الدفع الإلكتروني لا
-  // يدخل قائمة العمل إلا بعد أن تحسمه البوابة آلياً (ناجح أو مرفوض).
-  const completedOrManual = { NOT: { source: 'online', status: 0 } };
+  // الحوالات اليدوية منفصلة عن البطاقة: لا يُعرض أي دفع إلكتروني معلّق في
+  // قائمة عمل الموظف، بينما سجل الدفع الإلكتروني يعرض النتائج النهائية فقط.
+  // Legacy transfer requests predate the `source` column and therefore have
+  // NULL here; keep them in the bank-transfer list instead of losing history.
+  const sourceWhere = source === 'online'
+    ? { source: 'online' }
+    : { OR: [{ source: { not: 'online' } }, { source: null }] };
+  const completedForSource = source === 'online' ? { AND: [sourceWhere, { NOT: { status: 0 } }] } : sourceWhere;
   const rowsWhere = status === 'all'
-    ? completedOrManual
+    ? completedForSource
     : status === 0
-      ? { status: 0, NOT: { source: 'online' } }
-      : { status };
+      ? (source === 'online' ? { AND: [sourceWhere, { status: 0 }, { id: BigInt(-1) }] } : { ...sourceWhere, status: 0 })
+      : { ...sourceWhere, status };
   const [all, pending, approved, rejected, cancelled, rows] = await Promise.all([
-    prisma.wallet_topups.count({ where: completedOrManual }).catch(() => 0),
-    prisma.wallet_topups.count({ where: { status: 0, NOT: { source: 'online' } } }).catch(() => 0),
-    prisma.wallet_topups.count({ where: { status: 1 } }).catch(() => 0),
-    prisma.wallet_topups.count({ where: { status: 2 } }).catch(() => 0),
-    prisma.wallet_topups.count({ where: { status: 3 } }).catch(() => 0),
+    prisma.wallet_topups.count({ where: completedForSource }).catch(() => 0),
+    source === 'online' ? Promise.resolve(0) : prisma.wallet_topups.count({ where: { ...sourceWhere, status: 0 } }).catch(() => 0),
+    prisma.wallet_topups.count({ where: { ...sourceWhere, status: 1 } }).catch(() => 0),
+    prisma.wallet_topups.count({ where: { ...sourceWhere, status: 2 } }).catch(() => 0),
+    prisma.wallet_topups.count({ where: { ...sourceWhere, status: 3 } }).catch(() => 0),
     prisma.wallet_topups.findMany({ where: rowsWhere, orderBy: { id: 'desc' }, skip: Math.max(0, offset), take: limit }).catch(() => []),
   ]);
   const uids = [...new Set(rows.map((r) => toInt(r.user_id)))];

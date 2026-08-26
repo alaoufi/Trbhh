@@ -21,6 +21,8 @@ import { hashPassword } from '@/lib/auth';
 import { bustAdCaches } from '@/lib/data';
 import { toInt } from '@/lib/utils';
 import { logAdmin } from '@/lib/audit';
+import { archiveMemberAccount, dispositionFor, inspectMemberDependencies } from '@/lib/member-disposition';
+import { unlinkAccount } from '@/lib/account-links';
 
 export async function reviewInternationalRegistrationAction(formData: FormData) {
   const admin = await requireAction('users', 'edit');
@@ -1766,6 +1768,44 @@ export async function saveTopupMethodSettingsAction(formData: FormData) {
   revalidatePath('/admin/payments');
   revalidatePath('/account/wallet');
   redirect(`/admin/payments?saved=1${electronicRequested && !report.ready ? '&alrajhi=missing' : ''}`);
+}
+
+/** Remove one account from unified login only; its advertisements, wallet and history stay untouched. */
+export async function unlinkMemberAccountAction(formData: FormData) {
+  const admin = await requireAction('users', 'edit');
+  const uid = Number(formData.get('userId') || 0);
+  if (!Number.isSafeInteger(uid) || uid <= 0) redirect('/admin/users');
+  await unlinkAccount(uid);
+  await logAdmin(admin.uid, 'فك ارتباط دخول موحّد', `العضو #${uid}`, 'لم تُنقل أو تُحذف أي بيانات');
+  revalidatePath(`/admin/users/${uid}`);
+  revalidatePath('/admin/users');
+  redirect(`/admin/users/${uid}?linked=unlinked`);
+}
+
+/** Archive records safely; permanent deletion is intentionally possible only for an empty account and a second explicit confirmation. */
+export async function disposeMemberAccountAction(formData: FormData) {
+  const admin = await requireAction('users', 'delete');
+  const uid = Number(formData.get('userId') || 0);
+  const decision = String(formData.get('decision') || '');
+  const confirmation = String(formData.get('confirmation') || '');
+  const reason = String(formData.get('reason') || '').trim().slice(0, 300);
+  if (!Number.isSafeInteger(uid) || uid <= 0) redirect('/admin/users');
+  const deps = await inspectMemberDependencies(uid);
+  const required = dispositionFor(deps);
+  if (decision === 'archive' && confirmation === 'ARCHIVE') {
+    await archiveMemberAccount(uid, admin.uid, reason || 'أرشفة حساب مرتبط أو ذي متعلقات');
+    await logAdmin(admin.uid, 'أرشفة عضو', `العضو #${uid}`, reason || 'حُفظت الحقوق والسجل، وأُلغي ارتباط الدخول الموحد.');
+    revalidatePath('/admin/users');
+    redirect('/admin/users?archived=1');
+  }
+  if (decision === 'delete' && required === 'delete' && confirmation === 'DELETE') {
+    await unlinkAccount(uid);
+    await deleteAccountNow(uid);
+    await logAdmin(admin.uid, 'حذف عضو فارغ', `العضو #${uid}`, 'تأكيد ثانٍ مكتمل؛ لم توجد إعلانات أو متجر أو رصيد أو مدفوعات أو رسائل.');
+    revalidatePath('/admin/users');
+    redirect('/admin/users?deleted=1');
+  }
+  redirect(`/admin/users/${uid}?error=${encodeURIComponent(required === 'archive' ? 'لا يمكن حذف هذا الحساب لأنه يملك بيانات أو حقوقاً؛ استخدم الأرشفة الآمنة.' : 'لم يكتمل التأكيد الثاني للحذف.')}`);
 }
 
 /** Saves the manual transfer switch without touching electronic-payment settings. */

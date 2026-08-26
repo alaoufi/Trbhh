@@ -11,6 +11,9 @@ import { AdminPager } from '@/components/admin-pager';
 import { banUserAction, unbanUserAction, trustUserAction, untrustUserAction, assignUserPackageAction, executeDeletionRequestAction, dismissDeletionRequestAction } from '../actions';
 import { listDeletionRequests } from '@/lib/account-delete';
 import { ConfirmSubmit } from '@/components/confirm-submit';
+import { memberSearchSql, maskMemberPhone } from '@/lib/member-admin-search';
+import { linkedAccountCounts } from '@/lib/account-links';
+import { ensureSchema } from '@/data/schema-sync';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إدارة الأعضاء' };
@@ -33,6 +36,7 @@ const IDLE_COND = `(ban IS NULL OR ban <> 'checked')
 
 export default async function AdminUsers({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string; page?: string; banerr?: string }> }) {
   await requirePerm('users');
+  await ensureSchema();
   const { q, filter: filterRaw, page: pageRaw, banerr } = await searchParams;
   const term = (q || '').trim();
   const filter: Filter = (FILTERS.some((f) => f.k === filterRaw) ? filterRaw : 'all') as Filter;
@@ -44,17 +48,12 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
 
   // بحث + تصنيف + ترقيم صفحات — استعلام موحّد
   // الحسابات المحذوفة (مموَّهة باسم deleted_<id>) تُستبعد من القائمة الحيّة — تُراجَع من الأرشيف
-  const conds: string[] = [`(userName IS NULL OR userName NOT LIKE 'deleted\\_%')`];
+  const conds: string[] = [`(userName IS NULL OR userName NOT LIKE 'deleted\\_%')`, 'archived_at IS NULL'];
   const args: unknown[] = [];
   if (term) {
-    const like = `%${term}%`;
-    const digits = term.replace(/\D/g, '');
-    let sig = digits.startsWith('966') ? digits.slice(3) : digits;
-    sig = sig.replace(/^0+/, '');
-    const phoneLike = `%${sig || digits || term}%`;
-    conds.push(`(name LIKE ? OR userName LIKE ? OR email LIKE ?
-      OR REPLACE(REPLACE(REPLACE(IFNULL(phoneNumber,''),'+',''),' ',''),'-','') LIKE ?)`);
-    args.push(like, like, like, phoneLike);
+    const search = memberSearchSql(term);
+    conds.push(`(${search.sql})`);
+    args.push(...search.args);
   }
   if (filter === 'banned') conds.push(`ban = 'checked'`);
   else if (filter === 'idle') conds.push(IDLE_COND);
@@ -78,7 +77,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
     const srows = await prisma.stores.findMany({ where: { user_id: { in: ids } }, select: { id: true, user_id: true, store_name: true, status: true } }).catch(() => []);
     for (const s of srows) storeByUser.set(s.user_id, { id: toInt(s.id), name: s.store_name || 'متجر', status: s.status });
   }
-  const [packages, pkgMap, roleById, banMap, pendingVerify, pendingNames] = await Promise.all([
+  const [packages, pkgMap, roleById, banMap, pendingVerify, pendingNames, linkedCounts] = await Promise.all([
     getPackages(),
     getUserPackageMap(ids),
     getUserRolesMap(ids),
@@ -86,6 +85,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
     // نفس تعريف «بانتظار الموافقة» في صفحة التوثيق — المرفوض (step=2) لا يُعدّ معلقاً
     prisma.users.count({ where: { trusted: { not: 1 }, step: { not: 2 }, OR: [{ step: 1 }, { national_identity: { gt: 0 } }, { commercial_register: { gt: 0 } }, { work_permit: { gt: 0 } }] } }).catch(() => 0),
     prisma.name_requests.count({ where: { status: 0 } }).catch(() => 0),
+    linkedAccountCounts(ids),
   ]);
 
   return (
@@ -156,10 +156,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
 
       {users.length === 0 && <p className="py-8 text-center text-muted-foreground">لا يوجد مستخدمون في هذا التصنيف.</p>}
 
-      <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-secondary/50 text-right"><tr><th className="p-3">الاسم</th><th className="p-3">الجوال</th><th className="p-3">الحالة</th><th className="p-3">الصلاحيات</th><th className="p-3">الباقة</th><th className="p-3">إجراءات</th></tr></thead>
-          <tbody>
+      <div className="grid gap-3 md:grid-cols-2">
             {users.map((u) => {
               const id = toInt(u.id);
               const role = roleById.get(id);
@@ -168,10 +165,10 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
               const banInfo = banMap.get(id) ?? null; // تفاصيل الحظر: المدة + السبب + تاريخ/وقت التنفيذ
               const until = banInfo?.until ?? null; // Date = temporary, null (while banned) = permanent
               return (
-              <tr key={id} className="border-b last:border-0">
-                <td className="p-3">
+              <article key={id} className="card-3d space-y-3 rounded-2xl p-4">
+                <div>
                   <Link href={`/admin/users/${id}`} className="flex items-center gap-1 font-medium text-primary hover:underline">{u.name || u.userName || '—'}{u.trusted === 1 && <BadgeCheck className="h-4 w-4 text-primary" />}</Link>
-                  <div className="text-xs text-muted-foreground">{timeAgo(u.created_at)}</div>
+                  <div className="text-xs text-muted-foreground">عضو #{id} · {timeAgo(u.created_at)}</div>
                   {/* 🎭 صفات العضو (مشاهدة فقط للإدارة — لا تدخّل): عضو دائماً، متجر إن ملك، إدارة إن كان مشرفاً + مراسلة */}
                   <div className="mt-1 flex flex-wrap items-center gap-1">
                     <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">عضو</span>
@@ -183,9 +180,9 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                     )}
                     <Link href={`/messages/${id}`} className="rounded-full border border-primary/30 px-1.5 py-0.5 text-[10px] font-bold text-primary hover:bg-accent">✉ مراسلة</Link>
                   </div>
-                </td>
-                <td className="p-3" dir="ltr">{u.phoneNumber || '—'}</td>
-                <td className="p-3">
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs"><span dir="ltr">{maskMemberPhone(u.phoneNumber)}</span><span>الحسابات الموحدة: {linkedCounts.get(id) ?? 1}</span></div>
+                <div>
                   {banned
                     ? <div className="flex max-w-[180px] flex-col gap-0.5">
                         <Badge variant="muted">محظور</Badge>
@@ -194,13 +191,13 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                         <span className="text-[10px] leading-4 text-red-700">📝 السبب: {banInfo?.reason || 'غير مسجّل (حظر قديم)'}</span>
                       </div>
                     : <Badge variant="trusted">نشط</Badge>}
-                </td>
-                <td className="p-3">
+                </div>
+                <div>
                   <Link href={`/admin/users/${id}/permissions`} className="inline-flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1 text-xs text-primary hover:bg-accent">
                     <ShieldCheck className="h-3.5 w-3.5" /> {label || 'الصلاحيات'}
                   </Link>
-                </td>
-                <td className="p-3">
+                </div>
+                <div>
                   <form action={assignUserPackageAction} className="flex items-center gap-1">
                     <input type="hidden" name="userId" value={id} />
                     <select name="packageId" defaultValue={pkgMap.get(id) ?? 0} className="rounded-md border bg-background px-1.5 py-1 text-xs">
@@ -210,8 +207,12 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                     <input name="days" type="number" min={0} placeholder="أيام" title="مدة الاشتراك بالأيام (0 = دائم)" className="w-14 rounded-md border bg-background px-1.5 py-1 text-xs" />
                     <ConfirmSubmit msg="تأكيد تغيير باقة هذا العضو بالاختيار والمدة المحددين؟" className="rounded-md border px-2 py-1 text-xs hover:bg-secondary">حفظ</ConfirmSubmit>
                   </form>
-                </td>
-                <td className="p-3">
+                </div>
+                <div className="flex flex-wrap gap-2 border-t pt-3">
+                  <Link href={`/admin/users/${id}`} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white">فتح ملف العضو</Link>
+                  <Link href={`/admin/users/${id}#wallet`} className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-bold text-primary">فتح المحفظة</Link>
+                </div>
+                <div>
                   <div className="flex flex-wrap items-center gap-1">
                     {u.trusted === 1 ? (
                       <form action={untrustUserAction} className="flex items-center gap-1 rounded-md border border-slate-300 p-0.5">
@@ -235,12 +236,10 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                       </form>
                     )}
                   </div>
-                </td>
-              </tr>
+                </div>
+              </article>
               );
             })}
-          </tbody>
-        </table>
       </div>
 
       <AdminPager basePath="/admin/users" page={cur} pages={pages} total={total} params={{ q: term || undefined, filter: filter !== 'all' ? filter : undefined }} />

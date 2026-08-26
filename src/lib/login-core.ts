@@ -13,6 +13,8 @@ export type LoginResult = { ok: true; uid: number; name: string; type: string } 
  */
 export async function verifyLogin(identifier: string, password: string): Promise<LoginResult> {
   if (!identifier || !password) return { ok: false, error: 'أدخل بيانات الدخول كاملة' };
+  const { ensureSchema } = await import('@/data/schema-sync');
+  await ensureSchema();
 
   // تحديد المعدّل: نمنع تخمين كلمة المرور بعد عدة محاولات فاشلة لنفس المُعرِّف.
   const { rateGet, rateHit, rateReset } = await import('./redis');
@@ -47,6 +49,7 @@ export async function verifyLogin(identifier: string, password: string): Promise
     return { ok: false, error: 'بيانات الدخول غير صحيحة' };
   }
   const uid = toInt(user.id);
+  if (user.archived_at) return { ok: false, error: 'هذا الحساب مؤرشف ولا يمكن تسجيل الدخول به. راجع الإدارة عند الحاجة.' };
   // حساب دُمج في حساب موحّد: يُمنع دخوله — يدخل صاحبه بالحساب الأساسي
   if (user.merged_into && Number(user.merged_into) > 0) {
     return { ok: false, error: 'هذا الحساب مدموج في حسابك الموحّد — ادخل بالحساب الأساسي.' };

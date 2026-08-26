@@ -3,7 +3,7 @@ import { ScrollTop } from '@/components/scroll-top';
 
 export type GuideSection = {
   id: string; title: string; icon: React.ElementType; from: string; to: string;
-  goal: string; steps: string[];
+  goal: string; steps: string[]; links?: { href: string; label: string }[];
 };
 
 /** Shared rich guide renderer: gradient header, index, and per-section goal + numbered steps. */
@@ -73,6 +73,9 @@ export function GuideView({
                 ))}
               </ol>
             </div>
+            {s.links && s.links.length > 0 && <div className="flex flex-wrap gap-2 border-t border-primary/10 pt-3">
+              {s.links.map((link) => <a key={link.href} href={link.href} className="rounded-lg bg-primary px-3 py-2 text-xs font-extrabold text-white hover:bg-primary/90">{link.label} ←</a>)}
+            </div>}
           </div>
         </section>
       ))}

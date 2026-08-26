@@ -108,6 +108,14 @@ export async function requireUser() {
     const { redirect } = await import('next/navigation');
     redirect('/login?banned=1');
   }
+  const { ensureSchema } = await import('@/data/schema-sync');
+  await ensureSchema();
+  const { prisma } = await import('./prisma');
+  const current = await prisma.users.findUnique({ where: { id: BigInt(session!.uid) }, select: { archived_at: true } }).catch(() => null);
+  if (!current || current.archived_at) {
+    const { redirect } = await import('next/navigation');
+    redirect('/login?archived=1');
+  }
   return session!;
 }
 

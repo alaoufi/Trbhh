@@ -1250,10 +1250,15 @@ model users {
   points                    Int        @default(0)
   ref_by                    Int?
   merged_into               BigInt?    // حساب مدموج في حساب موحّد (يُمنع دخوله المستقل)
+  archived_at               DateTime?  @db.DateTime(0) // أرشفة إدارية: يختفي الحساب مع حفظ الحقوق والسجل
+  archived_by               BigInt?    @db.UnsignedBigInt
+  archive_reason            String?    @db.VarChar(300)
   primary_verified          Int        @default(0) @db.TinyInt // تأكيد جوال الحساب الرئيسي برمز
   identity_paid_until       DateTime?  @db.DateTime(0) // اشتراك باقات الهويات — نهاية الاشتراك
   identity_accounts         Int        @default(0) // عدد الهويات الممنوحة بالباقة الحالية
   identity_plan             String?    @db.VarChar(24) // اسم الباقة الحالية
+
+  @@index([archived_at], map: "users_archived_at")
 }
 
 model store_visits {

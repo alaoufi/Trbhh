@@ -35,6 +35,25 @@ export async function linkedAccounts(userId: number): Promise<LinkedAccount[]> {
   }));
 }
 
+/** Batched summary for administration cards; no credentials, tokens or private data. */
+export async function linkedAccountCounts(userIds: number[]): Promise<Map<number, number>> {
+  await ensure();
+  const result = new Map(userIds.map((id) => [id, 1]));
+  if (!userIds.length) return result;
+  const links = await prisma.account_links.findMany({
+    where: { user_id: { in: userIds.map((id) => BigInt(id)) } },
+    select: { user_id: true, group_id: true },
+  }).catch(() => [] as { user_id: bigint; group_id: bigint }[]);
+  if (!links.length) return result;
+  const groups = [...new Set(links.map((link) => link.group_id.toString()))].map((id) => BigInt(id));
+  const grouped = await prisma.account_links.groupBy({
+    by: ['group_id'], where: { group_id: { in: groups } }, _count: { user_id: true },
+  }).catch(() => [] as { group_id: bigint; _count: { user_id: number } }[]);
+  const countByGroup = new Map(grouped.map((group) => [group.group_id.toString(), group._count.user_id]));
+  for (const link of links) result.set(toInt(link.user_id), countByGroup.get(link.group_id.toString()) ?? 1);
+  return result;
+}
+
 /** تفضيل التبديل لحساب مرتبط ('direct' | 'confirm'). الافتراضي 'confirm'. */
 export async function getLinkMode(userId: number): Promise<'direct' | 'confirm'> {
   await ensure();

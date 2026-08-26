@@ -761,6 +761,11 @@ const STATEMENTS: string[] = [
   `ALTER TABLE review_ads ADD COLUMN verified_deal TINYINT NULL`,
   // دمج الحسابات: حساب قديم دُمج في حساب موحّد → معرّف الحساب الأساسي (يُمنع دخوله)
   `ALTER TABLE users ADD COLUMN merged_into BIGINT NULL`,
+  // أرشفة الحساب تحفظ حقوقه وسجله وتمنع ظهوره/دخوله دون خلطها بالحظر.
+  `ALTER TABLE users ADD COLUMN archived_at DATETIME NULL`,
+  `ALTER TABLE users ADD COLUMN archived_by BIGINT UNSIGNED NULL`,
+  `ALTER TABLE users ADD COLUMN archive_reason VARCHAR(300) NULL`,
+  `CREATE INDEX users_archived_at ON users (archived_at)`,
   // توثيق الحساب الرئيسي (تأكيد الجوال برمز) قبل ربط بقية الحسابات — «تم التحقق»
   `ALTER TABLE users ADD COLUMN primary_verified TINYINT NOT NULL DEFAULT 0`,
   // Wallet precision is added in parallel; data conversion is explicit in wallet-money-migration.

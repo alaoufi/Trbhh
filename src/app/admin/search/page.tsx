@@ -5,6 +5,9 @@ import { findAdminServices } from '@/lib/admin-service-search';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { AdminSearch } from '@/components/admin-search';
+import { memberSearchSql, maskMemberPhone } from '@/lib/member-admin-search';
+import { linkedAccountCounts } from '@/lib/account-links';
+import { ensureSchema } from '@/data/schema-sync';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'بحث الإدارة' };
@@ -25,19 +28,21 @@ function adTab(a: { status: number; paused_by_owner: number; adsSpecial: string;
  *  (الصفحة والتبويب) مع رابط الانتقال إليه، ومكان عرضها في صفحات الموقع. */
 export default async function AdminSearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const session = await requireAnyAdmin();
+  await ensureSchema();
   const { q: qRaw } = await searchParams;
   const q = (qRaw || '').trim();
   const TAKE = 10;
   const permissions = await getUserPerms(session.uid);
   const services = q.length >= 2 ? findAdminServices(q, permissions) : [];
 
+  type MemberRow = { id: bigint; name: string | null; userName: string | null; phoneNumber: string | null; ban: string | null };
+  const memberWhere = memberSearchSql(q);
   const [users, ads, stores, classifieds] = q.length >= 2
     ? await Promise.all([
-        prisma.users.findMany({
-          where: { OR: [{ name: { contains: q } }, { userName: { contains: q } }, { phoneNumber: { contains: q } }] },
-          select: { id: true, name: true, userName: true, phoneNumber: true, ban: true },
-          orderBy: { id: 'desc' }, take: TAKE,
-        }).catch(() => []),
+        prisma.$queryRawUnsafe<MemberRow[]>(
+          `SELECT id, name, userName, phoneNumber, ban FROM users WHERE archived_at IS NULL AND (${memberWhere.sql}) ORDER BY id DESC LIMIT ${TAKE}`,
+          ...memberWhere.args,
+        ).catch(() => [] as MemberRow[]),
         prisma.ads.findMany({
           where: { OR: [{ title: { contains: q } }, ...(/^\d+$/.test(q) ? [{ id: BigInt(q) }] : [])] },
           select: { id: true, title: true, status: true, paused_by_owner: true, adsSpecial: true, data_archive: true },
@@ -55,6 +60,7 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
         }).catch(() => []),
       ])
     : [[], [], [], []];
+  const linkedCounts = await linkedAccountCounts(users.map((u) => toInt(u.id)));
 
   const box = 'card-3d space-y-2 rounded-2xl p-3';
   const row = 'space-y-1 rounded-lg bg-secondary/30 px-2.5 py-2 text-sm';
@@ -89,10 +95,12 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
               <div key={toInt(u.id)} className={row}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-bold">{u.name || u.userName}{u.ban === 'checked' && <span className="mr-1 text-[10px] font-bold text-red-600">· محظور</span>}</span>
-                  <span className="text-xs text-muted-foreground" dir="ltr">{u.phoneNumber}</span>
+                  <span className="text-xs text-muted-foreground" dir="ltr">{maskMemberPhone(u.phoneNumber)}</span>
                 </div>
+                <div className="text-[11px] text-muted-foreground">عضو #{toInt(u.id)} · الحسابات الموحدة: {linkedCounts.get(toInt(u.id)) ?? 1}</div>
                 <div className="flex flex-wrap gap-1.5">
-                  <Link href={`/admin/users?q=${encodeURIComponent(u.userName || u.name || '')}`} className={chipAdmin}>📌 في الإدارة: الأعضاء ← بطاقة العضو</Link>
+                  <Link href={`/admin/users/${toInt(u.id)}`} className={chipAdmin}>📌 فتح ملف العضو</Link>
+                  <Link href={`/admin/users/${toInt(u.id)}#wallet`} className={chipAdmin}>💳 فتح المحفظة</Link>
                   <Link href={`/users/${toInt(u.id)}`} className={chipSite}>🌐 في الموقع: صفحة العضو</Link>
                 </div>
               </div>

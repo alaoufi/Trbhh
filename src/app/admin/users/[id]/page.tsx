@@ -10,8 +10,10 @@ import { getUserAdminLog } from '@/lib/audit';
 import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { updateUserAction, sendUserPasswordAction, setUserPasswordAction, adjustUserBalanceAction } from '../../actions';
+import { updateUserAction, sendUserPasswordAction, setUserPasswordAction, adjustUserBalanceAction, unlinkMemberAccountAction, disposeMemberAccountAction } from '../../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
+import { linkedAccounts } from '@/lib/account-links';
+import { dispositionFor, inspectMemberDependencies } from '@/lib/member-disposition';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'بيانات العضو' };
@@ -26,12 +28,12 @@ const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
   account: { label: 'حذف حساب', icon: Trash2 },
 };
 
-export default async function AdminUserDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; sent?: string; error?: string; setpass?: string; bal?: string }> }) {
+export default async function AdminUserDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; sent?: string; error?: string; setpass?: string; bal?: string; linked?: string }> }) {
   await requireAction('users', 'view');
   const { id } = await params;
-  const { saved, sent, error, setpass, bal } = await searchParams;
+  const { saved, sent, error, setpass, bal, linked } = await searchParams;
   const uid = Number(id);
-  const [u, adsCount, balance, txns, modLog, adminLog, strikes, dupRow] = await Promise.all([
+  const [u, adsCount, balance, txns, modLog, adminLog, strikes, dupRow, linkedMembers, dependencies] = await Promise.all([
     prisma.users.findUnique({ where: { id: BigInt(uid) } }).catch(() => null),
     prisma.ads.count({ where: { user_id: BigInt(uid) } }).catch(() => 0),
     getBalance(uid),
@@ -40,6 +42,8 @@ export default async function AdminUserDetail({ params, searchParams }: { params
     getUserAdminLog(uid, 200).catch(() => []),
     prisma.user_strikes.findMany({ where: { user_id: BigInt(uid) } }).catch(() => []),
     prisma.dup_attempts.findUnique({ where: { user_id: BigInt(uid) } }).catch(() => null),
+    linkedAccounts(uid),
+    inspectMemberDependencies(uid),
   ]);
   if (!u) notFound();
   const field = 'h-10 w-full rounded-lg border bg-background px-3 text-sm';
@@ -108,6 +112,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
       {sent === '1' && <Banner ok>تم إرسال كلمة مرور جديدة للعضو عبر رسالة نصية.</Banner>}
       {setpass === '1' && <Banner ok>تم تعيين كلمة المرور. أبلغ العضو بها ليدخل.</Banner>}
       {bal === '1' && <Banner ok>تم تحديث رصيد العضو.</Banner>}
+      {linked === 'unlinked' && <Banner ok>تم فك الحساب من الدخول الموحّد فقط. بقيت الإعلانات والمحفظة والسجل كما هي.</Banner>}
       {error && <Banner>{decodeURIComponent(error)}</Banner>}
 
       {/* quick facts */}
@@ -120,6 +125,26 @@ export default async function AdminUserDetail({ params, searchParams }: { params
           {u.is_admin === 1 && <Badge>مدير</Badge>}
         </div>
       </div>
+
+      <section className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
+        <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><User className="h-4 w-4" /> الحسابات الموحّدة</div>
+        {linkedMembers.length === 0 ? <p className="text-xs text-muted-foreground">هذا الحساب غير مرتبط حالياً بحسابات أخرى.</p> : (
+          <div className="space-y-2">
+            {linkedMembers.map((member) => <div key={member.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-secondary/35 p-2 text-xs">
+              <span><b>{member.name}</b> · #{member.id}{member.hasStore ? ` · متجر: ${member.storeName}` : ''}</span>
+              {member.id !== uid && <Link href={`/admin/users/${member.id}`} className="font-bold text-primary underline">فتح الملف</Link>}
+            </div>)}
+            <form action={unlinkMemberAccountAction}><input type="hidden" name="userId" value={uid} /><ConfirmSubmit msg="فكّ ارتباط هذا الحساب من الدخول الموحد فقط؟ لن تُحذف الإعلانات ولا الرصيد ولا الرسائل." className="rounded-lg border border-amber-400 px-3 py-2 text-xs font-bold text-amber-800">فك الارتباط فقط</ConfirmSubmit></form>
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3 rounded-2xl border-2 border-amber-300 bg-amber-50/50 p-4">
+        <div className="flex items-center gap-2 text-sm font-extrabold text-amber-900"><Trash2 className="h-4 w-4" /> فحص الأرشفة والحذف</div>
+        <p className="text-xs font-bold text-amber-900">قبل أي إجراء يُعاد فحص الحقوق. الإعلانات، المتجر، الرصيد، عمليات الشحن أو الرسائل تمنع الحذف الدائم وتحفظ بالأرشفة.</p>
+        <div className="grid grid-cols-2 gap-2 text-xs"><span>إعلانات: <b>{dependencies.advertisements}</b></span><span>متاجر: <b>{dependencies.stores}</b></span><span>رصيد محجوز/متاح: <b>{dependencies.balanceHalala / 100} ر.س</b></span><span>شحن/حركات: <b>{dependencies.topups + dependencies.walletTransactions}</b></span><span className="col-span-2">رسائل: <b>{dependencies.messages}</b></span></div>
+        {dispositionFor(dependencies) === 'archive' ? <form action={disposeMemberAccountAction} className="space-y-2"><input type="hidden" name="userId" value={uid} /><input type="hidden" name="decision" value="archive" /><input type="hidden" name="confirmation" value="ARCHIVE" /><input name="reason" maxLength={300} required placeholder="سبب الأرشفة (إلزامي)" className={field} /><ConfirmSubmit msg="تأكيد أرشفة الحساب؟ سيختفي من الموقع ومن البحث، وتبقى جميع الحقوق والسجلات محفوظة." className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">أرشفة آمنة وإخفاء الحساب</ConfirmSubmit></form> : <form action={disposeMemberAccountAction} className="space-y-2"><input type="hidden" name="userId" value={uid} /><input type="hidden" name="decision" value="delete" /><input type="hidden" name="confirmation" value="DELETE" /><ConfirmSubmit msg="التأكيد الثاني: الحساب فارغ فعلاً. حذف الهوية نهائياً بعد فك الارتباط؟ لا يمكن التراجع." className="rounded-lg bg-destructive px-3 py-2 text-xs font-bold text-white">حذف الحساب الفارغ نهائياً</ConfirmSubmit></form>}
+      </section>
 
       {/* سجل المخالفات: عدد مرات الحظر + الإنذارات النشطة الآن — نظرة سريعة قبل السجل الكامل */}
       <div className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
@@ -175,7 +200,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
       </form>
 
       {/* المحفظة / الرصيد */}
-      <div className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
+      <div id="wallet" className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><Wallet className="h-4 w-4" /> رصيد العضو</div>
           <div className="text-lg font-extrabold text-primary">{balance} ر.س</div>

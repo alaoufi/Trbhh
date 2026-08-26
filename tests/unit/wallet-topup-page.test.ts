@@ -25,8 +25,13 @@ describe('wallet top-up presentation policy', () => {
     expect(existsSync(file)).toBe(true);
     const source = readFileSync(file, 'utf8');
     expect(source).toContain('WALLET_TOPUP_QUICK_AMOUNTS');
-    expect(source).toContain('الدفع الآمن الآن');
-    expect(source).toContain('الدفع الإلكتروني أولاً');
+    expect(source).toContain('اشحن رصيدك الآن');
+    expect(source).toContain('إتمام الدفع وشحن الرصيد');
+    expect(source).toContain('payment-card-symbolic.webp');
+    expect(source).toContain('بطاقة صراف الراجحي مدى رمزية');
+    expect(source).toContain('Apple Pay');
+    expect(source).toContain('STC Pay');
+    expect(source).not.toContain('الدفع الآمن الآن');
   });
 
   it('has a separate payment result page rather than trusting the browser callback', () => {

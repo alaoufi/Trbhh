@@ -21,6 +21,7 @@ import { getMyStats } from '@/lib/account';
 import { AdPixels } from '@/components/ad-pixels';
 import { VerifySeal } from '@/components/verify-seal';
 import { SealReposition } from '@/components/seal-reposition';
+import { NavigationProgress } from '@/components/navigation-progress';
 
 const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', display: 'swap' });
 
@@ -125,6 +126,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       {...(validDesigns.includes(design) ? { 'data-design': design } : {})}
     >
       <body className="min-h-screen font-sans antialiased">
+        <NavigationProgress />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         {/* بيكسلات التتبع الإعلاني (Meta/Google Ads/TikTok/Snapchat) — لا تعمل
             إطلاقاً إلا بعد ضبط معرّفاتها الحقيقية في متغيرات البيئة على الخادم. */}

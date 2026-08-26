@@ -298,8 +298,9 @@ export async function getLatestAds(take = 12) {
 
 /** أحدث الإعلانات للرئيسية: كل إعلانات آخر ٣٠ يوماً — الأقدم يبقى في البحث والأقسام.
  *  عند خلوّ الشهر من إعلانات نعرض أحدث ١٢ حتى لا تبدو الرئيسية فارغة. */
-export async function getHomeLatestAds() {
-  return cached('ads:home-latest:30d', 60, async () => {
+export async function getHomeLatestAds(take = 20) {
+  const safeTake = Math.min(Math.max(Math.floor(take) || 20, 1), 60);
+  return cached(`ads:home-latest:30d:${safeTake}`, 60, async () => {
     sweepExpiredArchived().catch(() => {});
     sweepExpiredPaidAds().catch(() => {});
     sweepOldAdsToArchive().catch(() => {});
@@ -307,14 +308,16 @@ export async function getHomeLatestAds() {
     const rows = await prisma.ads.findMany({
       where: { ...(await activeAdWhere()), created_at: { gte: since } },
       orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
-      take: 400,
+      // بطاقة الإعلانات تحمل بيانات وصوراً كثيرة؛ الرئيسية تحتاج أول دفعة فقط.
+      // نقرأ هامشاً صغيراً لإعادة ترتيب آخر نشاط ثم نرسل العدد المطلوب للعميل.
+      take: Math.min(safeTake * 3, 180),
       select: adSelect,
     });
     // الترتيب الحقيقي بآخر نشاط (نشر أو تحديث ⬆) — يطابق الوقت الظاهر على البطاقة
     rows.sort((a, b) => activityMs(b) - activityMs(a));
-    if (rows.length > 0) return toCards(rows);
+    if (rows.length > 0) return toCards(rows.slice(0, safeTake));
     const fallback = await prisma.ads.findMany({ where: await activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: 12, select: adSelect });
-    return toCards(fallback);
+    return toCards(fallback.slice(0, safeTake));
   });
 }
 

@@ -25,7 +25,6 @@ import { GuestWelcomeBanner } from '@/components/guest-welcome-banner';
 import { TopupPromoBanner } from '@/components/topup-promo-banner';
 import { FeedTextBanner } from '@/components/feed-text-banner';
 import { getFeedBannerItems } from '@/lib/settings';
-import { ProgressiveReveal } from '@/components/progressive-reveal';
 import { PlatformRatingWidget } from '@/components/platform-rating-widget';
 import { getPlatformRating, getMyPlatformReview } from '@/lib/platform-rating';
 
@@ -53,7 +52,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
   const [featured, latest, mostViewed, topRated, stats, homeStats, clsText] = await Promise.all([
     getFeaturedAds(8),
-    getHomeLatestAds(),
+    getHomeLatestAds(20),
     getMostViewedAds(8),
     getTopRatedAds(8),
     getStats(),
@@ -205,25 +204,12 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
 
       <Section title={H.latest} href="/search">
         <div className="space-y-4">
-          {/* الإعلانات على دفعات: كل دفعة ١٠ أسطر (٢٠ إعلاناً على شبكة عمودين)،
-              تليها بانر إعلاني مدفوع، ثم زر "عرض المزيد" يكشف الدفعة التالية. */}
-          {(() => {
-            const BATCH = 20;
-            const groups: typeof latest[] = [];
-            for (let i = 0; i < latest.length; i += BATCH) groups.push(latest.slice(i, i + BATCH));
-            if (!groups.length) return null;
-            const chunks = groups.map((g, i) => (
-              <div key={i} className="space-y-4">
-                <AdGrid ads={g} />
-                <PromoSlot placement="feed" />
-                {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
-              </div>
-            ));
-            return <ProgressiveReveal chunks={chunks} />;
-          })()}
-          {/* الرئيسية تعرض كل إعلانات آخر شهر — والأقدم عبر البحث */}
+          <AdGrid ads={latest} />
+          <PromoSlot placement="feed" />
+          {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
+          {/* تُعرض أحدث دفعة بسرعة؛ البحث يبقى السجل الكامل دون تحميله مسبقاً في الرئيسية. */}
           <Link href="/search" className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
-            الإعلانات الأقدم من شهر تجدها في البحث — عرض الكل ←
+            عرض جميع الإعلانات في البحث ←
           </Link>
         </div>
       </Section>

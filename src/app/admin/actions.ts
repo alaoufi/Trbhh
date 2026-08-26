@@ -1754,17 +1754,30 @@ export async function savePaymentSettingsAction(formData: FormData) {
 /** Enable/disable member top-up methods without ever storing bank credentials in the database. */
 export async function saveTopupMethodSettingsAction(formData: FormData) {
   const session = await requireAction('users', 'edit');
-  const { saveTopupMethodSettings, alrajhiConfigReport } = await import('@/lib/payments');
+  const { saveTopupMethodSettings, getTopupMethodAvailability, alrajhiConfigReport } = await import('@/lib/payments');
   const report = alrajhiConfigReport();
   const electronicRequested = formData.get('electronicEnabled') === 'on';
+  const currentMethods = await getTopupMethodAvailability();
   await saveTopupMethodSettings({
     electronicEnabled: electronicRequested && report.ready,
-    transferEnabled: formData.get('transferEnabled') === 'on',
+    transferEnabled: currentMethods.transfer,
   });
-  await logAdmin(session.uid, 'تحديث تفعيل وسائل شحن الرصيد', `إلكتروني=${electronicRequested && report.ready ? 'مفعّل' : 'موقوف'}، تحويل=${formData.get('transferEnabled') === 'on' ? 'مفعّل' : 'موقوف'}`);
+  await logAdmin(session.uid, 'تحديث تفعيل الدفع الإلكتروني', `إلكتروني=${electronicRequested && report.ready ? 'مفعّل' : 'موقوف'}`);
   revalidatePath('/admin/payments');
   revalidatePath('/account/wallet');
   redirect(`/admin/payments?saved=1${electronicRequested && !report.ready ? '&alrajhi=missing' : ''}`);
+}
+
+/** Saves the manual transfer switch without touching electronic-payment settings. */
+export async function saveBankTransferSettingAction(formData: FormData) {
+  const session = await requireAction('users', 'edit');
+  const enabled = formData.get('transferEnabled') === 'on';
+  const { saveBankTransferSetting } = await import('@/lib/payments');
+  await saveBankTransferSetting(enabled);
+  await logAdmin(session.uid, 'تحديث تفعيل الحوالات البنكية', enabled ? 'مفعّلة' : 'موقوفة');
+  revalidatePath('/admin/payments');
+  revalidatePath('/account/wallet');
+  redirect('/admin/payments?saved=1');
 }
 
 /** حفظ بيانات اعتماد مزوّد دفع (المفاتيح السرّية لا تُمحى إن تُركت فارغة). */

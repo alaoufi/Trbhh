@@ -11,7 +11,7 @@ import { paytabs } from './providers/paytabs';
 import { alrajhiArb, arbPaymentMethod, arbStatusText, decodeArbCallback, extractArbFailureCode, isArbCaptured, isArbFinalDecline, mergeArbCallbackOutcome } from './providers/alrajhi-arb';
 
 export { PROVIDER_META, providerMeta, readyProviders } from './registry';
-export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, getTopupMethodAvailability, saveTopupMethodSettings, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
+export { getPaymentConfig, getProviderCreds, isOnlinePayReady, isProviderConfigured, savePaymentSettings, saveProviderCreds, getEnabledMethods, getActiveMethods, setEnabledMethods, getTopupMethodAvailability, saveTopupMethodSettings, saveBankTransferSetting, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from './config';
 export type { PaymentConfig } from './config';
 
 /** سجلّ مُحوِّلات المزوّدين الجاهزين (لها كود مكتمل). */

@@ -73,6 +73,11 @@ export async function saveTopupMethodSettings(input: { electronicEnabled: boolea
   ]);
 }
 
+/** Keeps the manual bank-transfer switch independent from electronic payment configuration. */
+export async function saveBankTransferSetting(transferEnabled: boolean): Promise<void> {
+  await setSetting(PAY_SETTING.transferOn, transferEnabled ? '1' : '0');
+}
+
 /** الوسائل التي يمكن للأدمن التحكّم بتفعيلها/تعطيلها (لتفاوت الرسوم). */
 export const CONTROLLABLE_METHODS: PayMethod[] = ['mada', 'visa', 'mastercard', 'applepay', 'stcpay'];
 

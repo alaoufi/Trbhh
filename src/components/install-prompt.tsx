@@ -26,7 +26,6 @@ export function InstallPrompt({
   const [manual, setManual] = useState(false);
 
   const neverKey = storageKey;
-  const sessionKey = `${storageKey}_s`;
 
   useEffect(() => {
     if (scope === 'site' && inStoreCtx) return;
@@ -35,7 +34,6 @@ export function InstallPrompt({
     if (standalone) return; // مثبّت بالفعل
     try {
       if (localStorage.getItem(neverKey) === '1') return;
-      if (sessionStorage.getItem(sessionKey) === '1') return;
     } catch { /* ignore */ }
 
     const w = window as unknown as { __bipEvent?: BeforeInstallPromptEvent | null };
@@ -58,9 +56,10 @@ export function InstallPrompt({
     const onInstalled = () => setShow(false);
     window.addEventListener('appinstalled', onInstalled);
     return () => { window.removeEventListener('bipready', pick); window.removeEventListener('beforeinstallprompt', onPrompt); window.removeEventListener('appinstalled', onInstalled); timers.forEach(clearTimeout); };
-  }, [inStoreCtx, scope, storageKey, neverKey, sessionKey]);
+  }, [inStoreCtx, scope, storageKey, neverKey]);
 
-  const close = () => { setShow(false); try { sessionStorage.setItem(sessionKey, '1'); } catch { /* ignore */ } };
+  // الإغلاق قرار دائم لهذا الجهاز: لا نعيد الرسالة بعد تحديث التطبيق أو زيارة جديدة.
+  const close = () => { setShow(false); try { localStorage.setItem(neverKey, '1'); } catch { /* ignore */ } };
   const never = () => { setShow(false); try { localStorage.setItem(neverKey, '1'); } catch { /* ignore */ } };
   const install = async () => {
     if (!deferred) return;

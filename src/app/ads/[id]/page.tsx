@@ -533,12 +533,6 @@ export default async function AdPage({ params, searchParams }: { params: Promise
 
       <h1 className="text-xl font-bold text-primary">{ad.title}</h1>
 
-      {/* Share buttons */}
-      <ShareButtons 
-        url={`https://${SITE.domain}/ads/${ad.id}`} 
-        title={ad.title} 
-      />
-
       {/* Info grid card */}
       <div className="card-3d grid grid-cols-2 gap-x-3 gap-y-3 rounded-2xl p-4">
         <InfoItem icon={ArrowLeftRight}>{ad.adsType === 'offer' ? 'عرض' : 'طلب'}</InfoItem>

@@ -6,7 +6,8 @@ import { prisma } from '@/lib/prisma';
 import { requireAction, requireUserBan, requireManager, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
 import { findDuplicateAds, findCrossUserDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
-import { adminDeleteMessage } from '@/lib/chat';
+import { adminDeleteMessage, archiveAdminThread, restoreAdminThread, deleteArchivedAdminThread } from '@/lib/chat';
+import { getPrimaryAdminId } from '@/lib/admin-inbox';
 import { setStoreStatus, adminRequestHome, addStoreWarning, deleteStore, completeStoreTransfer, decidePlatformRequest } from '@/lib/merchant';
 import { banUserFor, unbanUser, logMod, notifyModBlock, reviewAutoBan } from '@/lib/moderation';
 import { listDeletionRequests, closeDeletionRequest, findUserByPhone, deleteAccountNow } from '@/lib/account-delete';
@@ -403,6 +404,43 @@ export async function adminDeleteMessageAction(formData: FormData) {
   const id = Number(formData.get('messageId'));
   if (id) await adminDeleteMessage(id);
   revalidatePath('/admin/messages');
+}
+
+/** Archive a resolved member-to-administration conversation without deleting it. */
+export async function archiveAdminMessageThreadAction(formData: FormData) {
+  const session = await requireAction('messages', 'edit');
+  const memberId = Number(formData.get('memberId') || 0);
+  const adminId = await getPrimaryAdminId();
+  if (Number.isSafeInteger(memberId) && memberId > 0 && adminId) {
+    await archiveAdminThread(adminId, memberId, session.uid);
+    await logAdmin(session.uid, 'أرشفة مراسلة إدارة', `عضو #${memberId}`);
+  }
+  revalidatePath('/admin/messages');
+  revalidatePath('/');
+}
+
+/** Restore an archived support conversation to the actionable inbox. */
+export async function restoreAdminMessageThreadAction(formData: FormData) {
+  const session = await requireAction('messages', 'edit');
+  const memberId = Number(formData.get('memberId') || 0);
+  const adminId = await getPrimaryAdminId();
+  if (Number.isSafeInteger(memberId) && memberId > 0 && adminId && await restoreAdminThread(adminId, memberId)) {
+    await logAdmin(session.uid, 'استعادة مراسلة إدارة', `عضو #${memberId}`);
+  }
+  revalidatePath('/admin/messages');
+  revalidatePath('/');
+}
+
+/** Final deletion is intentionally limited to conversations already archived. */
+export async function deleteArchivedAdminMessageThreadAction(formData: FormData) {
+  const session = await requireAction('messages', 'delete');
+  const memberId = Number(formData.get('memberId') || 0);
+  const adminId = await getPrimaryAdminId();
+  if (Number.isSafeInteger(memberId) && memberId > 0 && adminId && await deleteArchivedAdminThread(adminId, memberId)) {
+    await logAdmin(session.uid, 'حذف نهائي لمراسلة إدارة مؤرشفة', `عضو #${memberId}`);
+  }
+  revalidatePath('/admin/messages');
+  revalidatePath('/');
 }
 
 /** Delete an ad from its detail page (admin), then go home. */

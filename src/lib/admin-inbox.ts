@@ -15,7 +15,16 @@ export async function getPrimaryAdminId(): Promise<number> {
 export async function countAdminUnread(): Promise<number> {
   const adminId = await getPrimaryAdminId();
   if (!adminId) return 0;
-  return prisma.chats.count({ where: { reciver_id: adminId, is_read: 0 } }).catch(() => 0);
+  const unread = await prisma.chats.findMany({ where: { reciver_id: adminId, is_read: 0 }, select: { sender_id: true } }).catch(() => []);
+  if (!unread.length) return 0;
+  const memberIds = [...new Set(unread.map((m) => m.sender_id).filter((id) => id !== adminId))];
+  if (!memberIds.length) return 0;
+  const archived = await prisma.admin_message_threads.findMany({
+    where: { admin_id: adminId, member_id: { in: memberIds }, status: 'archived' },
+    select: { member_id: true },
+  }).catch(() => []);
+  const archivedIds = new Set(archived.map((t) => t.member_id));
+  return memberIds.filter((id) => !archivedIds.has(id)).length;
 }
 
 /** Normalize Arabic for keyword intent matching. */

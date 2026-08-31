@@ -77,7 +77,7 @@ export async function AdminAlertsBanner() {
     { n: dupTopups, label: '⚠️ سند شحن مكرَّر يحتاج مطابقة', href: '/admin/topups', oldest: dupTopups > 0 ? new Date(0) : null },
     { n: pendingTopups, label: 'تأكيد شحن رصيد', href: '/admin/topups', oldest: oldestTopup },
     { n: pendingAds, label: 'إعلان بانتظار الموافقة', href: '/admin/ads?view=pending', oldest: oldestAd },
-    { n: adminUnread, label: 'مراسلة للإدارة بلا رد (أعضاء وتجار)', href: '/messages', oldest: oldestAdminMsg },
+    { n: adminUnread, label: 'مراسلة للإدارة تحتاج إجراء', href: '/admin/messages?tab=open', oldest: oldestAdminMsg },
     { n: reports, label: 'بلاغ/شكوى جديدة', href: '/admin/reports', oldest: oldestReport },
     { n: userNameReqs, label: 'طلب تغيير اسم عضو', href: '/admin/name-requests', oldest: oldestUserName },
     { n: storeNameReqs, label: 'طلب اسم متجر', href: '/admin/name-requests', oldest: oldestStoreName },

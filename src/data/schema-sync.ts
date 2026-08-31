@@ -19,6 +19,19 @@ import { prisma } from '@/lib/prisma';
  */
 
 const STATEMENTS: string[] = [
+  /* ---- administration message inbox: archive state per member thread ---- */
+  `CREATE TABLE IF NOT EXISTS admin_message_threads (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT NOT NULL,
+    member_id INT NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'open',
+    archived_at TIMESTAMP NULL,
+    archived_by INT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_admin_message_thread (admin_id, member_id),
+    KEY admin_message_thread_status (admin_id, status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   /* ---- stores: merchant branding & business metadata ---- */
   `ALTER TABLE stores ADD COLUMN store_name VARCHAR(120) NULL`,
   `ALTER TABLE stores ADD COLUMN brand_color VARCHAR(9) NULL`,

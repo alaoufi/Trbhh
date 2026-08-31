@@ -38,6 +38,20 @@ export async function sendChat(fromId: number, toId: number, message: string): P
       type_from_user: 'user', type_to_user: 'user', created_at: now, updated_at: now,
     },
   });
+  // أي رسالة جديدة من عضو إلى الحساب الإداري الرئيسي تعيد فتح التذكرة التي
+  // أُرشفت سابقاً؛ رسالة الإدارة نفسها لا تغيّر حالة المعالجة.
+  const { getPrimaryAdminId } = await import('./admin-inbox');
+  const primaryAdminId = await getPrimaryAdminId().catch(() => 0);
+  if (primaryAdminId === toId && fromId !== toId) {
+    const sender = await prisma.users.findUnique({ where: { id: BigInt(fromId) }, select: { is_admin: true } }).catch(() => null);
+    if (sender?.is_admin !== 1) {
+      await prisma.admin_message_threads.upsert({
+        where: { admin_id_member_id: { admin_id: toId, member_id: fromId } },
+        create: { admin_id: toId, member_id: fromId, status: 'open', created_at: now, updated_at: now },
+        update: { status: 'open', archived_at: null, archived_by: null, updated_at: now },
+      }).catch(() => {});
+    }
+  }
   await prisma.chat_typing.deleteMany({ where: { user_id: fromId, peer_id: toId } }).catch(() => {});
   // تنبيه فوري للمستلم (إن فعّلته الإدارة واشترك جهازه) — لا يعطّل الإرسال بأي حال
   import('./push').then(async ({ sendPushToUser }) => {
@@ -80,6 +94,84 @@ export async function deleteChatMessage(userId: number, messageId: number, windo
 export async function adminDeleteMessage(messageId: number): Promise<boolean> {
   const res = await prisma.chats.deleteMany({ where: { id: BigInt(messageId) } });
   return res.count > 0;
+}
+
+export type AdminThreadStatus = 'open' | 'archived';
+export type AdminInboxThread = {
+  adminId: number;
+  memberId: number;
+  memberName: string;
+  last: string;
+  at: string | null;
+  count: number;
+  unread: number;
+};
+
+/** Actionable conversations sent to the primary administration account. */
+export async function listAdminInboxThreads(adminId: number, status: AdminThreadStatus): Promise<AdminInboxThread[]> {
+  const rows = await prisma.chats.findMany({
+    where: { OR: [{ sender_id: adminId }, { reciver_id: adminId }] },
+    orderBy: { id: 'desc' },
+    take: 1500,
+  });
+  const states = await prisma.admin_message_threads.findMany({ where: { admin_id: adminId }, select: { member_id: true, status: true } }).catch(() => []);
+  const stateByMember = new Map(states.map((s) => [s.member_id, s.status]));
+  const byMember = new Map<number, { last: string; at: string | null; count: number; unread: number }>();
+  for (const row of rows) {
+    const memberId = row.sender_id === adminId ? row.reciver_id : row.sender_id;
+    if (!memberId || memberId === adminId) continue;
+    const rowStatus = stateByMember.get(memberId) || 'open';
+    if (rowStatus !== status) continue;
+    const current = byMember.get(memberId);
+    if (current) {
+      current.count += 1;
+      if (row.reciver_id === adminId && row.is_read === 0) current.unread += 1;
+      continue;
+    }
+    byMember.set(memberId, {
+      last: row.message,
+      at: row.created_at ? row.created_at.toISOString() : null,
+      count: 1,
+      unread: row.reciver_id === adminId && row.is_read === 0 ? 1 : 0,
+    });
+  }
+  const memberIds = [...byMember.keys()];
+  const members = memberIds.length ? await prisma.users.findMany({ where: { id: { in: memberIds.map((id) => BigInt(id)) } }, select: { id: true, name: true, userName: true } }) : [];
+  const memberName = new Map(members.map((m) => [toInt(m.id), m.name || m.userName || `#${toInt(m.id)}`]));
+  return [...byMember.entries()].map(([memberId, t]) => ({ adminId, memberId, memberName: memberName.get(memberId) || `#${memberId}`, ...t }));
+}
+
+export async function archiveAdminThread(adminId: number, memberId: number, actorId: number): Promise<boolean> {
+  if (!adminId || !memberId || !actorId) return false;
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.admin_message_threads.upsert({
+      where: { admin_id_member_id: { admin_id: adminId, member_id: memberId } },
+      create: { admin_id: adminId, member_id: memberId, status: 'archived', archived_at: now, archived_by: actorId, created_at: now, updated_at: now },
+      update: { status: 'archived', archived_at: now, archived_by: actorId, updated_at: now },
+    }),
+    prisma.chats.updateMany({ where: { sender_id: memberId, reciver_id: adminId, is_read: 0 }, data: { is_read: 1 } }),
+  ]);
+  return true;
+}
+
+export async function restoreAdminThread(adminId: number, memberId: number): Promise<boolean> {
+  const result = await prisma.admin_message_threads.updateMany({
+    where: { admin_id: adminId, member_id: memberId, status: 'archived' },
+    data: { status: 'open', archived_at: null, archived_by: null, updated_at: new Date() },
+  });
+  return result.count > 0;
+}
+
+/** Permanent removal is intentionally possible only after the thread is archived. */
+export async function deleteArchivedAdminThread(adminId: number, memberId: number): Promise<boolean> {
+  const state = await prisma.admin_message_threads.findUnique({ where: { admin_id_member_id: { admin_id: adminId, member_id: memberId } }, select: { status: true } });
+  if (state?.status !== 'archived') return false;
+  await prisma.$transaction([
+    prisma.chats.deleteMany({ where: { OR: [{ sender_id: adminId, reciver_id: memberId }, { sender_id: memberId, reciver_id: adminId }] } }),
+    prisma.admin_message_threads.delete({ where: { admin_id_member_id: { admin_id: adminId, member_id: memberId } } }),
+  ]);
+  return true;
 }
 
 /** Recent conversations across the whole site (for admin monitoring). */

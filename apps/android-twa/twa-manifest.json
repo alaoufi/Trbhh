@@ -20,8 +20,8 @@
     "path": "./android.keystore",
     "alias": "trbhh"
   },
-  "appVersionName": "3.0.0",
-  "appVersionCode": 3,
+  "appVersionName": "8.0.1",
+  "appVersionCode": 9,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "https://trbhh.com/manifest.webmanifest",

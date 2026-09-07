@@ -1,23 +1,21 @@
 name: التقاط لقطات شاشة لعقار تربح (agar.trbhh.com)
 
-# يلتقط لقطات حقيقية من agar.trbhh.com (التصميم الجديد) عبر متصفح يعمل على الخادم،
-# بمقاسات متجر Play، ثم يرفعها كمخرجات ويحفظها في المستودع على فرع staging.
+# يلتقط لقطات حقيقية من agar.trbhh.com (التصميم الجديد) عبر متصفح يعمل على الخادم
+# (لا بروكسي هناك)، بمقاسات متجر Play، ثم يرفعها كمخرجات (artifact) فقط — بلا كتابة
+# في المستودع وبلا أي نشر. يعمل عند الدفع لفرع claude-capture-run أو يدوياً.
 on:
   workflow_dispatch:
+  push:
+    branches: [claude-capture-run]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   capture:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: سحب المستودع (staging)
-        uses: actions/checkout@v4
-        with:
-          ref: staging
-
       - name: التقاط عبر SSH
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -94,19 +92,3 @@ jobs:
           name: aqar-play-screenshots
           path: out/*
           if-no-files-found: error
-
-      - name: حفظ الصور في المستودع (staging)
-        run: |
-          set -e
-          mkdir -p public/play/screenshots
-          rm -f public/play/screenshots/*.png
-          cp out/*.png public/play/screenshots/
-          git config user.name "trbhh-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add public/play/screenshots
-          if git diff --cached --quiet; then
-            echo "لا تغييرات"
-          else
-            git commit -m "لقطات شاشة محدّثة لعقار تربح (آلي عبر capture-aqar-screenshots)"
-            git push origin HEAD:staging
-          fi

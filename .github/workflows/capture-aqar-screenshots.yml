@@ -1,0 +1,112 @@
+name: التقاط لقطات شاشة لعقار تربح (agar.trbhh.com)
+
+# يلتقط لقطات حقيقية من agar.trbhh.com (التصميم الجديد) عبر متصفح يعمل على الخادم،
+# بمقاسات متجر Play، ثم يرفعها كمخرجات ويحفظها في المستودع على فرع staging.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: سحب المستودع (staging)
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+
+      - name: التقاط عبر SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${VPS_PORT:-22}"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -o ServerAliveInterval=30 -i ~/.ssh/deploy_key -p $PORT"
+          SCP_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/deploy_key -P $PORT"
+
+          echo "📦 تجهيز Playwright..."
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" \
+            "npm i -g playwright@1.49.1 >/dev/null 2>&1; NODE_PATH=\$(npm root -g) npx --yes playwright@1.49.1 install --with-deps chromium"
+
+          echo "📸 التقاط الصفحات..."
+          ssh $SSH_OPTS "$VPS_USER@$VPS_HOST" bash -s <<'REMOTE_SCRIPT'
+          set -e
+          rm -rf /root/aqar-shots
+          mkdir -p /root/aqar-shots
+          NODE_PATH="$(npm root -g)" node -e '
+          const { chromium } = require("playwright");
+          (async () => {
+            const b = await chromium.launch();
+            const SITE = "https://agar.trbhh.com";
+            const shotWith = async (ctx, prefix) => {
+              const p = await ctx.newPage();
+              const shot = async (url, name) => {
+                try {
+                  await p.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+                  await p.waitForTimeout(700);
+                  await p.click("[aria-label=\"إغلاق\"]", { timeout: 1500 }).catch(() => {});
+                  await p.waitForTimeout(500);
+                  await p.screenshot({ path: `/root/aqar-shots/${prefix}-${name}.png` });
+                  console.log("OK", prefix, name, url);
+                } catch (e) { console.log("SKIP", prefix, name, url, e.message); }
+              };
+              await shot(SITE + "/", "01-home");
+              await shot(SITE + "/companies", "02-companies");
+              await shot(SITE + "/deals", "03-deals");
+              const adHref = await p.evaluate(() => {
+                const a = document.querySelector("a[href*=\"/ads/\"]");
+                return a ? a.getAttribute("href") : null;
+              }).catch(() => null);
+              if (adHref) await shot(new URL(adHref, SITE).href, "04-ad-detail");
+              await p.close();
+            };
+            await shotWith(await b.newContext({
+              viewport: { width: 412, height: 915 }, deviceScaleFactor: 3,
+              userAgent: "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36",
+            }), "phone");
+            await shotWith(await b.newContext({
+              viewport: { width: 800, height: 1280 }, deviceScaleFactor: 2,
+              userAgent: "Mozilla/5.0 (Linux; Android 13; SM-T870) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            }), "tablet");
+            await b.close();
+          })();
+          '
+          ls -la /root/aqar-shots
+          REMOTE_SCRIPT
+
+          echo "📥 تنزيل الصور..."
+          mkdir -p out
+          scp $SCP_OPTS "$VPS_USER@$VPS_HOST:/root/aqar-shots/*.png" out/
+          ls -la out/
+
+      - name: رفع الصور كمخرجات
+        uses: actions/upload-artifact@v4
+        with:
+          name: aqar-play-screenshots
+          path: out/*
+          if-no-files-found: error
+
+      - name: حفظ الصور في المستودع (staging)
+        run: |
+          set -e
+          mkdir -p public/play/screenshots
+          rm -f public/play/screenshots/*.png
+          cp out/*.png public/play/screenshots/
+          git config user.name "trbhh-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add public/play/screenshots
+          if git diff --cached --quiet; then
+            echo "لا تغييرات"
+          else
+            git commit -m "لقطات شاشة محدّثة لعقار تربح (آلي عبر capture-aqar-screenshots)"
+            git push origin HEAD:staging
+          fi

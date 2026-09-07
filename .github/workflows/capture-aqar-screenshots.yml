@@ -49,10 +49,27 @@ jobs:
               const p = await ctx.newPage();
               const shot = async (url, name) => {
                 try {
-                  await p.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-                  await p.waitForTimeout(700);
+                  await p.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
+                  await p.waitForTimeout(2200);
                   await p.click("[aria-label=\"إغلاق\"]", { timeout: 1500 }).catch(() => {});
-                  await p.waitForTimeout(500);
+                  await p.waitForTimeout(600);
+                  // تعتيم خصوصية: صور الإعلانات الكبيرة (قد تحمل أرقاماً مطبوعة) + أرقام الجوال/الواتساب النصّية
+                  await p.evaluate(() => {
+                    const rx = /(?:\+?966|0)?5\d{8}/;
+                    document.querySelectorAll("img,video").forEach((el) => {
+                      const r = el.getBoundingClientRect();
+                      if (r.width >= 160 || r.height >= 160) el.style.filter = "blur(20px)";
+                    });
+                    document.querySelectorAll("a,span,div,p,h1,h2,h3,b,strong,li,td").forEach((el) => {
+                      const href = el.getAttribute && el.getAttribute("href");
+                      if (href && (href.indexOf("tel:") === 0 || href.indexOf("wa.me") >= 0)) { el.style.filter = "blur(9px)"; return; }
+                      if (el.children.length === 0) {
+                        const t = (el.textContent || "").replace(/[\s\-]/g, "");
+                        if (rx.test(t)) el.style.filter = "blur(9px)";
+                      }
+                    });
+                  });
+                  await p.waitForTimeout(400);
                   await p.screenshot({ path: `/root/sa-shots/${prefix}-${name}.png` });
                   console.log("OK", prefix, name, url);
                 } catch (e) { console.log("SKIP", prefix, name, url, e.message); }

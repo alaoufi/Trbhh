@@ -12,7 +12,7 @@
   "navigationDividerColorDark": "#16213b",
   "backgroundColor": "#ffffff",
   "enableNotifications": true,
-  "startUrl": "/?app=android&v=3",
+  "startUrl": "/?app=android&v=9",
   "iconUrl": "https://trbhh.com/play/store-icon-1024.png",
   "maskableIconUrl": "https://trbhh.com/icon-maskable-512.png",
   "splashScreenFadeOutDuration": 300,

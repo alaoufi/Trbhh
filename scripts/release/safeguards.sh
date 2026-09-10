@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Private, fail-closed production backup and post-release preservation checks.
-set -euo pipefail
+set -Eeuo pipefail
+trap 'printf "Safeguard stopped at line %s. Production deployment has not been performed by this workflow.\\n" "$LINENO" >&2' ERR
 umask 077
 phase=${1:?before or after}
 backup_id=${2:?numeric backup run id}
@@ -11,15 +12,19 @@ prod=/root/trbhh
 base=/root/trbhh-release-backups
 backup="$base/audit-$backup_id"
 tools_dir=$(cd "$(dirname "$0")" && pwd -P)
-[[ "$(realpath "$prod")" == "$prod" && ! -L "$base" ]] || exit 1
+[[ "$(realpath "$prod")" == "$prod" && ! -L "$base" ]] || { echo 'Unexpected production or backup path; review required'; exit 1; }
 mkdir -p "$base"
 chmod 700 "$base"
 [[ "$(realpath "$base")" == "$base" ]] || exit 1
 cd "$prod"
-git diff --quiet
-git diff --cached --quiet
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo 'Production has tracked local changes; preserved for review before release.'
+  git diff --stat
+  git diff --cached --stat
+  exit 1
+fi
 container=$(docker compose ps -q app)
-[[ -n "$container" && "$(docker inspect -f '{{.State.Running}}' "$container")" == true ]] || exit 1
+[[ -n "$container" && "$(docker inspect -f '{{.State.Running}}' "$container")" == true ]] || { echo 'Production app container is not running'; exit 1; }
 current_commit=$(git rev-parse HEAD)
 current_image=$(docker inspect -f '{{.Image}}' "$container")
 

@@ -1,0 +1,89 @@
+services:
+  preview-db:
+    image: mysql:8.0
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 1.0
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --innodb-buffer-pool-size=128M
+    environment:
+      MYSQL_DATABASE: trbhh_preview_audit
+      MYSQL_USER: preview
+      MYSQL_PASSWORD: ${PREVIEW_DB_PASSWORD:?required}
+      MYSQL_ROOT_PASSWORD: ${PREVIEW_DB_ROOT_PASSWORD:?required}
+    volumes:
+      - preview-db:/var/lib/mysql
+      - ./bootstrap.sql:/docker-entrypoint-initdb.d/preview.sql:ro
+    networks: [isolated]
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$${MYSQL_PASSWORD}" mysql -h127.0.0.1 -upreview -e "SELECT 1" trbhh_preview_audit']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  preview-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 96m
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
+    networks: [isolated]
+
+  preview-app:
+    image: trbhh-preview-audit:${PREVIEW_REV:?required}
+    build:
+      context: ./releases/${PREVIEW_REV}
+      dockerfile: Dockerfile.preview
+    restart: unless-stopped
+    mem_limit: 1024m
+    cpus: 1.0
+    depends_on:
+      preview-db: { condition: service_healthy }
+      preview-redis: { condition: service_started }
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=768
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      TZ: Asia/Riyadh
+      DATABASE_URL: mysql://preview:${PREVIEW_DB_PASSWORD}@preview-db:3306/trbhh_preview_audit?connection_limit=5
+      REDIS_URL: redis://preview-redis:6379
+      AUTH_SECRET: ${PREVIEW_AUTH_SECRET:?required}
+      COOKIE_SECURE: 'true'
+      STORAGE_DIR: /app/storage
+      LEGACY_MEDIA_BASE: ''
+      LEGACY_LOCAL_DIR: ''
+      NEXT_PUBLIC_MEDIA_BASE: ''
+      NEXT_TELEMETRY_DISABLED: '1'
+    volumes: [preview-storage:/app/storage]
+    networks: [isolated]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 8s
+      retries: 30
+      start_period: 30s
+
+  preview-proxy:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    mem_limit: 64m
+    volumes: [./nginx.conf:/etc/nginx/conf.d/default.conf:ro]
+    depends_on:
+      preview-app: { condition: service_healthy }
+    networks: [isolated]
+
+  preview-tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    mem_limit: 128m
+    command: tunnel --no-autoupdate --url http://preview-proxy:8080
+    depends_on: [preview-proxy]
+    networks: [isolated, tunnel-egress]
+
+volumes:
+  preview-db:
+  preview-storage:
+
+networks:
+  isolated:
+    internal: true
+  tunnel-egress:

@@ -1,0 +1,88 @@
+name: معاينة مستقلة لفرع مراجعة تربح
+on:
+  push:
+    branches: [codex/trbhh-audit-fixes-20260910]
+    paths: ['scripts/preview/**', '.github/workflows/preview-audit.yml']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: trbhh-preview-audit
+  cancel-in-progress: false
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: trbhh_preview_audit
+          MYSQL_USER: preview
+          MYSQL_PASSWORD: preview_ci_only
+          MYSQL_ROOT_PASSWORD: preview_ci_root_only
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -upreview -ppreview_ci_only"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      DATABASE_URL: mysql://preview:preview_ci_only@127.0.0.1:3306/trbhh_preview_audit
+      AUTH_SECRET: isolated_preview_build_only_0123456789abcdef0123456789abcdef
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Create synthetic preview database
+        run: |
+          pnpm prisma db push --skip-generate
+          node scripts/preview/seed.mjs
+        env:
+          PREVIEW_LOGIN_PASSWORD: ${{ secrets.TRBHH_PREVIEW_PASSWORD }}
+      - name: Build reviewed app
+        run: pnpm build
+      - name: Wait for this commit's full CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in $(seq 1 90); do
+            result=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$GITHUB_SHA" --json status,conclusion --jq '.[0] | [.status, .conclusion] | @tsv')
+            if [[ "$result" == $'completed\tsuccess' ]]; then exit 0; fi
+            if [[ "$result" == completed* ]]; then echo "CI did not pass: $result"; exit 1; fi
+            sleep 10
+          done
+          echo 'CI has not completed successfully'; exit 1
+      - name: Package standalone app and synthetic database
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+        run: |
+          mkdir -p bundle/app/.next
+          cp -a .next/standalone/. bundle/app/
+          cp -a .next/static bundle/app/.next/static
+          cp -a public bundle/app/public
+          cp scripts/preview/{Dockerfile.preview,compose.yml,nginx.conf,deploy.sh} bundle/
+          docker exec -e MYSQL_PWD=preview_ci_only "$MYSQL_CONTAINER" \
+            mysqldump --no-tablespaces --set-gtid-purged=OFF -upreview trbhh_preview_audit > bundle/preview.sql
+          tar -czf preview-bundle.tgz -C bundle .
+      - name: Deploy only the isolated preview
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/preview_key
+          port=${VPS_PORT:-22}
+          ssh-keyscan -p "$port" "$VPS_HOST" > ~/.ssh/known_hosts
+          ssh_args=(-i ~/.ssh/preview_key -p "$port" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -o ServerAliveInterval=15)
+          target="$VPS_USER@$VPS_HOST"
+          ssh "${ssh_args[@]}" "$target" 'set -eu; p=/root/trbhh-preview-audit; test ! -L "$p"; if test -e "$p"; then test -f "$p/.preview-only" && test "$(cat "$p/.preview-only")" = trbhh-preview-audit; else mkdir -m 700 "$p"; printf "trbhh-preview-audit\n" > "$p/.preview-only"; fi; test "$(realpath "$p")" = "$p"; mkdir -p "$p/releases"'
+          scp -i ~/.ssh/preview_key -P "$port" -o StrictHostKeyChecking=yes preview-bundle.tgz "$target:/root/trbhh-preview-audit/incoming-$GITHUB_SHA.tgz"
+          ssh "${ssh_args[@]}" "$target" "set -eu; cd /root/trbhh-preview-audit; mkdir -p releases/$GITHUB_SHA; tar -xzf incoming-$GITHUB_SHA.tgz -C releases/$GITHUB_SHA; bash releases/$GITHUB_SHA/deploy.sh $GITHUB_SHA" | tee preview-deploy.log
+          url=$(sed -n 's/^PREVIEW_URL=//p' preview-deploy.log | tail -1)
+          test -n "$url"
+          printf '### معاينة الفرع\n\n[%s](%s)\n\nCommit: `%s`\n\nبيانات تجريبية مستقلة؛ رابط مؤقت يتغير إذا أعيد تشغيل النفق.\n' "$url" "$url" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

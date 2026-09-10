@@ -245,7 +245,7 @@ async function operationalControls(tx, names, byColumn) {
     if (out.adLifetimeDays === 0) out.oldAdArchiveCandidates = 0;
     else {
       const cutoff = new Date(Date.now() - out.adLifetimeDays * 86400000);
-      const [row] = await tx.$queryRawUnsafe("SELECT COUNT(*) AS n FROM ads WHERE status=1 AND state='active' AND store_only=0 AND (data_archive IS NULL OR data_archive='') AND (bumped_at < ? OR bumped_at IS NULL) AND (created_at < ? OR created_at IS NULL)", cutoff, cutoff);
+      const [row] = await tx.$queryRawUnsafe("SELECT COUNT(*) AS n FROM ads WHERE status=1 AND state='1' AND store_only=0 AND (data_archive IS NULL OR data_archive='') AND (bumped_at < ? OR bumped_at IS NULL) AND (created_at < ? OR created_at IS NULL)", cutoff, cutoff);
       out.oldAdArchiveCandidates = safeCount(row.n);
     }
   }

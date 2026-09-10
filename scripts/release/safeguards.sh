@@ -17,8 +17,10 @@ mkdir -p "$base"
 chmod 700 "$base"
 [[ "$(realpath "$base")" == "$base" ]] || exit 1
 cd "$prod"
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  echo 'Production has tracked local changes; preserved for review before release.'
+runtime_manifest=apps/android-twa/twa-manifest.json
+changed_files=$(git diff --name-only)
+if ! git diff --cached --quiet || [[ -n "$changed_files" && "$changed_files" != "$runtime_manifest" ]]; then
+  echo 'Production has unexpected tracked local changes; preserved for review before release.'
   git diff --stat
   git diff --cached --stat
   exit 1
@@ -32,6 +34,9 @@ if [[ "$phase" == after ]]; then
   [[ -f "$backup/VERIFIED" && ! -L "$backup" ]] || exit 1
   [[ "$current_commit" == "$candidate" ]] || { echo 'Candidate is not checked out on production'; exit 1; }
   [[ "$current_image" != "$(cat "$backup/image-id.txt")" ]] || { echo 'Production is still running the old image'; exit 1; }
+  [[ ! -L "$runtime_manifest" && -f "$backup/runtime-twa-manifest.json" ]] || exit 1
+  cp "$backup/runtime-twa-manifest.json" "$runtime_manifest"
+  cmp --silent "$runtime_manifest" "$backup/runtime-twa-manifest.json"
   cmp --silent .env "$backup/environment.env"
   cmp --silent docker-compose.yml "$backup/docker-compose.yml"
   docker compose exec -T app node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/after.json"
@@ -59,6 +64,9 @@ printf '%s\n' "$candidate" > "$backup/candidate.txt"
 docker inspect "$container" > "$backup/container-before.json"
 cp .env "$backup/environment.env"
 cp docker-compose.yml "$backup/docker-compose.yml"
+[[ -f "$runtime_manifest" && ! -L "$runtime_manifest" ]] || exit 1
+cp "$runtime_manifest" "$backup/runtime-twa-manifest.json"
+git diff --binary -- "$runtime_manifest" > "$backup/runtime-twa-manifest.patch"
 docker compose config > "$backup/compose-resolved.yml"
 git archive --format=tar "$current_commit" | gzip > "$backup/code.tar.gz"
 docker tag "$current_image" "trbhh-rollback:audit-$backup_id"

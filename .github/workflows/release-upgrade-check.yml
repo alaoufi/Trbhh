@@ -1,0 +1,66 @@
+name: Verify baseline database upgrade preserves data
+on:
+  push:
+    branches: [codex/trbhh-audit-fixes-20260910]
+    paths:
+      - tests/integration/auth-upgrade.test.ts
+      - .github/workflows/release-upgrade-check.yml
+permissions:
+  contents: read
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: trbhh_upgrade_test
+          MYSQL_USER: upgrade
+          MYSQL_PASSWORD: isolated_upgrade_only
+          MYSQL_ROOT_PASSWORD: isolated_upgrade_root_only
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uupgrade -pisolated_upgrade_only"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      DATABASE_URL: mysql://upgrade:isolated_upgrade_only@127.0.0.1:3306/trbhh_upgrade_test
+      UPGRADE_TEST_DATABASE_URL: mysql://upgrade:isolated_upgrade_only@127.0.0.1:3306/trbhh_upgrade_test
+      UPGRADE_DB_TESTS: '1'
+      AUTH_SECRET: isolated_upgrade_test_only_0123456789abcdef0123456789abcdef
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install candidate dependencies and Prisma client
+        run: pnpm install --frozen-lockfile
+      - name: Create the historical baseline schema in the isolated database
+        run: |
+          mkdir -p .release-upgrade
+          git show 27b804d13ba884fb7cd3704356eb38c5faa29ab4:prisma/schema.prisma > .release-upgrade/baseline.prisma
+          git show 27b804d13ba884fb7cd3704356eb38c5faa29ab4:src/data/schema-sync.ts > .release-upgrade/schema-sync-baseline.ts
+          pnpm exec prisma db push --skip-generate --schema .release-upgrade/baseline.prisma
+      - name: Verify two candidate boots preserve historical data and sessions
+        run: |
+          cat > .release-upgrade/vitest.config.ts <<'CONFIG'
+          import { defineConfig } from 'vitest/config';
+          import { resolve } from 'node:path';
+          export default defineConfig({
+            resolve: { alias: {
+              'server-only': resolve('tests/stubs/empty.ts'),
+              'client-only': resolve('tests/stubs/empty.ts'),
+              '@': resolve('src'),
+            } },
+            test: {
+              environment: 'node',
+              include: ['tests/integration/auth-upgrade.test.ts'],
+              maxWorkers: 1,
+            },
+          });
+          CONFIG
+          pnpm exec vitest run --config .release-upgrade/vitest.config.ts

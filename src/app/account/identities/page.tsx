@@ -137,6 +137,7 @@ export default async function IdentitiesPage({ searchParams }: { searchParams?: 
         <form action={linkOwnAccountAction} className="space-y-2">
           <input name="identifier" required placeholder="الجوال أو اسم المستخدم للحساب الآخر" className="w-full rounded-lg border border-primary/20 bg-background px-3 py-2.5 text-sm" />
           <input name="password" type="password" required placeholder="كلمة مرور الحساب الآخر" className="w-full rounded-lg border border-primary/20 bg-background px-3 py-2.5 text-sm" />
+          <label className="block text-sm">رمز التحقق للحساب المفعّل<input name="factorCode" type="text" dir="ltr" autoComplete="one-time-code" placeholder="رمز التطبيق أو رمز استرداد" className="w-full rounded-lg border border-primary/20 bg-background px-3 py-2.5 text-sm" /></label>
           <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-700">
             <LogIn className="h-4 w-4" /> الدخول وإضافة الحساب
           </button>

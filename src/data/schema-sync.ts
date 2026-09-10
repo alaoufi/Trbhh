@@ -19,6 +19,23 @@ import { prisma } from '@/lib/prisma';
  */
 
 const STATEMENTS: string[] = [
+  `ALTER TABLE users ADD COLUMN auth_session_version VARCHAR(64) NOT NULL DEFAULT '0'`,
+  /* Authentication: encrypted confirmed TOTP credentials and durable attempt limits. */
+  `CREATE TABLE IF NOT EXISTS auth_mfa (
+    user_id BIGINT UNSIGNED PRIMARY KEY,
+    secret TEXT NOT NULL,
+    recovery_hashes TEXT NOT NULL,
+    last_step BIGINT NOT NULL DEFAULT -1,
+    version VARCHAR(64) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS auth_security_limits (
+    k VARCHAR(128) PRIMARY KEY,
+    hits INT NOT NULL DEFAULT 0,
+    expires_at DATETIME NOT NULL,
+    INDEX auth_security_limits_expires_at_idx (expires_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   /* ---- administration message inbox: archive state per member thread ---- */
   `CREATE TABLE IF NOT EXISTS admin_message_threads (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

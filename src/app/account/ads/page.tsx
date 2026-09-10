@@ -3,9 +3,9 @@ import Image from 'next/image';
 import { Pencil, Trash2, Eye, EyeOff, Wallet, Archive } from 'lucide-react';
 import { AdStatsCard } from '@/components/ad-stats-card';
 import { requireUser } from '@/lib/auth';
-import { getMyIdentityAds, adContactCounts } from '@/lib/account';
+import { getMyIdentityAds } from '@/lib/account';
 import { getActiveProfile } from '@/lib/profiles';
-import { adViewCounts } from '@/lib/merchant';
+import { getAdPeriodStats } from '@/lib/analytics';
 import { getServicePricing, serviceHasPrice, DURATIONS, DUR_DAYS, getAdExtras, getSettingBool, getAdRestoreFee, getMemberWindows, adWindowState } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
@@ -19,13 +19,12 @@ export const metadata = { title: 'إعلاناتي' };
 export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string; censored?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
-  const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee, memberWindows, active] = await Promise.all([
+  const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee, memberWindows, active, lifecycleOn] = await Promise.all([
     getMyIdentityAds(session.uid), getServicePricing(), getBalance(session.uid), getAdExtras(),
     getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('auction_on', false),
-    getAdRestoreFee(), getMemberWindows(), getActiveProfile(session.uid).catch(() => null),
+    getAdRestoreFee(), getMemberWindows(), getActiveProfile(session.uid).catch(() => null), getSettingBool('platform_ad_lifecycle_enabled', false),
   ]);
-  const contacts = contactStatsOn ? await adContactCounts(ads.map((a) => a.id)) : new Map<number, { whatsapp: number; call: number }>();
-  const viewCounts = contactStatsOn ? await adViewCounts(ads.map((a) => a.id)) : new Map<number, number>();
+  const periodStats = await getAdPeriodStats(contactStatsOn ? ads.map((a) => a.id) : []);
   const now = Date.now();
   const featuredSold = serviceHasPrice(servicePricing.featured);
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
@@ -92,17 +91,17 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
               <span className="text-sm font-bold text-primary">{formatPrice(ad.price, 'ر.س', ad.adsType)}</span>
               <span className="text-xs text-muted-foreground">
                 {timeAgo(ad.createdAt)}
-                {contactStatsOn && (() => { const c = contacts.get(ad.id); return c && (c.whatsapp + c.call) > 0 ? <> • 💬 {c.whatsapp} واتساب • 📞 {c.call} اتصال</> : null; })()}
+
               </span>
               {/* نصائح تحسين الإعلان — لزيادة وصوله وجذب العملاء (للإعلانات النشطة في تربح) */}
               {ad.status === 1 && !ad.storeOnly && (() => {
                 const tips: string[] = [];
-                if (ad.image.includes('placeholder')) tips.push('📷 أضِف صورة — الإعلانات المصوّرة تُشاهد أضعافاً.');
-                if ((ad.title || '').trim().length < 15) tips.push('✍ وسّع العنوان بكلمات يبحث عنها العملاء.');
-                if (ad.adsType !== 'request' && (ad.price ?? 0) <= 0) tips.push('💰 أضِف سعراً واضحاً — يزيد جدّية المشترين.');
-                const v = viewCounts.get(ad.id) || 0;
+                if (!editState.expired && ad.image.includes('placeholder')) tips.push('📷 أضِف صورة — الإعلانات المصوّرة تُشاهد أضعافاً.');
+                if (!editState.expired && (ad.title || '').trim().length < 15) tips.push('✍ وسّع العنوان بكلمات يبحث عنها العملاء.');
+                if (!editState.expired && ad.adsType !== 'request' && (ad.price ?? 0) <= 0) tips.push('💰 أضِف سعراً واضحاً — يزيد جدّية المشترين.');
+                const v = periodStats.get(ad.id)?.periods.all.views;
                 const ageDays = ad.createdAt ? (now - new Date(ad.createdAt).getTime()) / 86400000 : 0;
-                if (ageDays > 3 && v < 20) tips.push('⬆ حدّث إعلانك ليعود لمقدمة القوائم ويزيد ظهوره.');
+                if (bumpOn && ageDays > 3 && v !== undefined && v < 20) tips.push('⬆ حدّث إعلانك ليعود لمقدمة القوائم ويزيد ظهوره.');
                 if (!tips.length) return null;
                 return (
                   <span className="mt-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-bold leading-5 text-sky-800">
@@ -126,12 +125,10 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
               {contactStatsOn && (
                 <AdStatsCard
                   stats={{
-                    views: viewCounts.get(ad.id) || 0,
-                    contacts: (contacts.get(ad.id)?.whatsapp || 0) + (contacts.get(ad.id)?.call || 0),
-                    messages: 0, // TODO: add messages count
-                    favorites: 0, // TODO: add favorites count
-                    createdAt: ad.createdAt || '',
-                    expiresAt: ad.expiresAt || ad.createdAt || '',
+                    ...periodStats.get(ad.id)!,
+                    createdAt: ad.createdAt,
+                    platformUntil: lifecycleOn || ad.storeOnly ? ad.trbhhUntil : null,
+                    featuredUntil: ad.special ? ad.expiresAt : null,
                   }}
                 />
               )}
@@ -174,9 +171,9 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
               })()}
               <div className="mt-auto flex flex-wrap gap-2 pt-2">
                 {editState.expired ? (
-                  <span className="flex items-center gap-1 rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-xs text-muted-foreground" title="تجاوز الإعلان مدة السماح بالتعديل">
-                    <Pencil className="h-3 w-3" /> انتهت مهلة السماح
-                  </span>
+                  <Link href="/messages/admin" className="flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1 text-xs text-primary" title="انتهت مهلة التعديل؛ اطلب المساعدة من الإدارة مع رقم الإعلان">
+                    <Pencil className="h-3 w-3" /> طلب تعديل من الإدارة
+                  </Link>
                 ) : (
                   <Link href={`/ads/${ad.id}/edit`} className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary">
                     <Pencil className="h-3 w-3" /> تعديل{editState.label ? ` (${editState.label})` : ''}
@@ -268,9 +265,9 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                   </>
                 )}
                 {(!ad.storeOnly && deleteState.expired) ? (
-                  <span className="flex items-center gap-1 rounded-md border border-border/50 bg-secondary/30 px-2 py-1 text-xs text-muted-foreground" title="تجاوز الإعلان مدة السماح بالحذف">
-                    <Trash2 className="h-3 w-3" /> انتهت مهلة السماح
-                  </span>
+                  <Link href="/messages/admin" className="flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1 text-xs text-primary" title="انتهت مهلة الحذف؛ راسل الإدارة مع رقم الإعلان أو أوقفه مؤقتاً">
+                    <Trash2 className="h-3 w-3" /> طلب حذف من الإدارة
+                  </Link>
                 ) : (
                   <form action={deleteAdAction}>
                     <input type="hidden" name="adId" value={ad.id} />

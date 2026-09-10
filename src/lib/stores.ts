@@ -4,7 +4,8 @@ import { prisma } from './prisma';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { toInt } from './utils';
 import { storeHiddenByBanState } from './moderation';
-import { getStoreShield } from './settings';
+import { getStoreShield, getStoreSubPricing } from './settings';
+import { publicStoreWhere } from './store-subscription-access';
 
 async function logoUrl(logoId: number | null): Promise<string> {
   if (!logoId) return PLACEHOLDER;
@@ -14,7 +15,7 @@ async function logoUrl(logoId: number | null): Promise<string> {
 
 export async function getStores() {
   const [rows, shieldOn] = await Promise.all([
-    prisma.stores.findMany({ orderBy: { id: 'desc' }, take: 60 }),
+    getStoreSubPricing().then((pricing) => prisma.stores.findMany({ where: publicStoreWhere(pricing), orderBy: { id: 'desc' }, take: 60 })),
     getStoreShield().catch(() => true),
   ]);
   const list = await Promise.all(

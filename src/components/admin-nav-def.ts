@@ -75,6 +75,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
     key: 'system', title: 'النظام والإعدادات', icon: Settings, color: '#64748b',
     items: [
       { href: '/admin/texts', label: 'النصوص الظاهرة', icon: FileText, perm: 'users' },
+      { href: '/admin/security', label: 'أمان الحساب والتحقق الإضافي', icon: ShieldCheck, perm: null },
       { href: '/admin/verification', label: 'بوابات التحقق (SMS/واتساب)', icon: MessageSquare, perm: 'users' },
       { href: '/admin/settings', label: 'الإعدادات', icon: Settings, perm: 'users' },
       { href: '/admin/audit', label: 'سجل نشاط الإدارة', icon: ScrollText, perm: 'users' },

@@ -1,50 +1,42 @@
 'use client';
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 
-/**
- * يضع ختم التوثيق الرسمي «متجر موثّق» (الذي يرسمه سكربت المركز السعودي للأعمال) أعلى يسار
- * الصفحة، عند مستوى مبدّل الحساب.
- *
- * مهم: نُبقي الختم **عائماً (position:fixed)** كما صمّمه المركز — فنافذته المنبثقة (تفاصيل
- * التحقّق) تفتح وتُغلق طبيعياً. نغيّر إحداثياته فقط (إلى الأعلى يسار) دون نقله داخل تدفّق
- * الصفحة أو تغيير نوع تموضعه — لأن ذلك كان يكسر نافذته فتفتح داخل الصفحة بلا إغلاق.
- * نعيد التطبيق دورياً لفترة قصيرة لأن السكربت غير متزامن وقد يُعيد فرض تنسيقه.
- */
+/** Keep the provider's fixed popup behavior, but anchor its badge to reserved footer space. */
 export function SealReposition() {
+  const pathname = usePathname();
   useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const findSeal = (): HTMLElement | null => {
-      const mark = document.querySelector<HTMLElement>(
-        'a[href*="saudibusiness.gov.sa"], img[src*="saudibusiness.gov.sa"], iframe[src*="saudibusiness.gov.sa"], .sbc-verify-seal > *',
-      );
-      if (!mark) return null;
-      // اصعد إلى الحاوية المثبّتة (position:fixed) التي وضعها السكربت، وإلا استعمل العنصر نفسه
-      let el: HTMLElement | null = mark;
-      for (let i = 0; i < 6 && el && el !== document.body; i++) {
-        if (getComputedStyle(el).position === 'fixed') return el;
-        el = el.parentElement;
+    const place = () => {
+      const slot = document.querySelector<HTMLElement>('[data-verify-seal-slot]');
+      const root = slot?.querySelector<HTMLElement>('.sbc-verify-seal');
+      if (!slot || !root) return;
+      const mark = root.querySelector<HTMLElement>('a, img, iframe') || root.firstElementChild as HTMLElement | null;
+      let seal = root;
+      let current = mark;
+      for (let i = 0; i < 6 && current && current !== root; i++, current = current.parentElement) {
+        if (getComputedStyle(current).position === 'fixed') { seal = current; break; }
       }
-      return mark;
-    };
-    const place = (): boolean => {
-      const seal = findSeal();
-      if (!seal) return false;
-      // يبقى عائماً (fixed) لتعمل نافذته وتُغلق — نضبط موضعه أعلى يسار عند مستوى شريط الهوية.
+      // The outer wrapper is hidden until its reserved slot is on screen, preventing flashes over controls.
+      const rect = slot.getBoundingClientRect();
+      const visible = rect.top >= 64 && rect.bottom <= window.innerHeight - (window.innerWidth < 768 ? 80 : 0);
+      root.style.setProperty('visibility', visible ? 'visible' : 'hidden', 'important');
+      seal.style.setProperty('visibility', visible ? 'visible' : 'hidden', 'important');
       seal.style.setProperty('position', 'fixed', 'important');
-      seal.style.setProperty('top', '96px', 'important');
-      seal.style.setProperty('left', '8px', 'important');
+      seal.style.setProperty('top', `${Math.max(0, rect.top + 8)}px`, 'important');
+      seal.style.setProperty('left', `${rect.left + 12}px`, 'important');
       seal.style.setProperty('bottom', 'auto', 'important');
       seal.style.setProperty('right', 'auto', 'important');
-      seal.style.setProperty('z-index', '45', 'important');
-      return true;
+      seal.style.setProperty('z-index', '20', 'important');
+      const height = seal.getBoundingClientRect().height;
+      if (height > 64 && height < 160) slot.style.minHeight = `${height + 16}px`;
     };
     place();
-    const obs = new MutationObserver(() => place());
-    obs.observe(document.body, { childList: true, subtree: true });
-    // إعادة تطبيق دورية لفترة قصيرة (السكربت غير متزامن وقد يُعيد فرض تنسيقه)
-    let n = 0;
-    const iv = setInterval(() => { place(); if (++n > 48) { clearInterval(iv); obs.disconnect(); } }, 250);
-    return () => { obs.disconnect(); clearInterval(iv); };
-  }, []);
+    const observer = new MutationObserver(place);
+    observer.observe(document.body, { childList: true, subtree: true });
+    const timer = setTimeout(() => observer.disconnect(), 12000);
+    window.addEventListener('scroll', place, { passive: true });
+    window.addEventListener('resize', place);
+    return () => { observer.disconnect(); clearTimeout(timer); window.removeEventListener('scroll', place); window.removeEventListener('resize', place); };
+  }, [pathname]);
   return null;
 }

@@ -20,7 +20,7 @@ const PRESETS: { role: Role | 'none'; label: string }[] = [
 
 export default async function UserPermissionsPage({
   params, searchParams,
-}: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string }> }) {
+}: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; mfa?: string }> }) {
   await requireAction('users', 'edit');
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const uid = Number(id);
@@ -43,6 +43,7 @@ export default async function UserPermissionsPage({
         <br />ملاحظة: <b>الإعلانات</b> لا تتضمّن «تعديل» — يُسمح فقط بالأرشفة أو الحذف حفاظاً على خصوصية الأعضاء.
       </p>
 
+      {sp.mfa === 'required' && <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">لم تُغيّر الصلاحيات. اطلب من العضو ربط تطبيق التحقق وحفظ رموز الاسترداد من صفحة أمان الحساب (/account/security)، ثم أعد تعيين الصلاحيات.</p>}
       {sp.saved === '1' && (
         <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800"><Check className="h-4 w-4" /> تم حفظ الصلاحيات.</div>
       )}

@@ -72,10 +72,10 @@ export async function setLinkMode(ownerId: number, targetId: number, mode: 'dire
 
 /** ربط ذاتي: العضو يثبت ملكية حساب آخر ببياناته (اسم الدخول + كلمة المرور) ثم يُضمّ
  *  لمجموعته. لا يُدمج شيء ولا يُحذف — فقط علاقة «نفس المالك» للتبديل بينهما. */
-export async function verifyAndLinkOwn(ownerId: number, identifier: string, password: string): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+export async function verifyAndLinkOwn(ownerId: number, identifier: string, password: string, factorCode = ''): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
   await ensure();
   const { verifyLogin } = await import('./login-core');
-  const res = await verifyLogin((identifier || '').trim(), password || '');
+  const res = await verifyLogin((identifier || '').trim(), password || '', factorCode);
   if (!res.ok) return { ok: false, error: res.error };
   if (res.uid === ownerId) return { ok: false, error: 'هذا هو حسابك الحالي — اختر حساباً آخر لك.' };
   // إن كان الحساب الهدف مرتبطاً بمجموعة أخرى (لمالك مختلف) لا تُدمج المجموعات تلقائياً

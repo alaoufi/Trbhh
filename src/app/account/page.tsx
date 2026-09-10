@@ -56,6 +56,7 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
       {sp.error === 'notlinked' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">تعذّر التبديل: هذا الحساب غير مرتبط بحسابك.</div>}
       {sp.error === 'switchbanned' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر التبديل: الحساب المطلوب محظور.</div>}
       {sp.error === 'switchadmin' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">لأمان الإدارة: ادخل إلى حساب الإدارة بكلمة مروره مباشرةً — لا يُتاح التبديل إليه بلا كلمة مرور.</div>}
+      <Link href="/account/security" className="inline-flex rounded-lg border px-3 py-2 text-sm font-bold text-primary">أمان الحساب وكلمة المرور</Link>
       <h1 className="text-xl font-bold text-primary">مرحباً {session.name} 👋</h1>
       {/* ترحيب بالعضو عند دخوله حسابه + دعوة لمشاركة المنصة — أول زيارة في الجلسة فقط */}
       <AccountWelcomeCard

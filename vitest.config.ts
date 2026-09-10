@@ -1,6 +1,14 @@
 import { defineConfig } from 'vitest/config';
 import path from 'node:path';
 
+const authDbTests = process.env.AUTH_DB_TESTS === '1';
+const authTestUrl = process.env.AUTH_TEST_DATABASE_URL || '';
+if (authDbTests) {
+  const url = new URL(authTestUrl);
+  if (url.protocol !== 'mysql:' || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) || !['/ci', '/trbhh_auth_test'].includes(url.pathname)) {
+    throw new Error('AUTH_DB_TESTS requires an explicit disposable MySQL database on loopback');
+  }
+}
 export default defineConfig({
   resolve: {
     alias: {
@@ -12,11 +20,13 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/unit/**/*.test.ts'],
+    // Never import database integration modules during the default unit run.
+    include: authDbTests ? ['tests/integration/**/*.test.ts'] : ['tests/unit/**/*.test.ts'],
     env: {
       // Pure-logic tests never query the DB, but some modules construct a
       // Prisma client at import time — give it a harmless URL.
-      DATABASE_URL: 'mysql://test:test@127.0.0.1:3306/test',
+      DATABASE_URL: authDbTests ? authTestUrl : 'mysql://test:test@127.0.0.1:3306/test',
     },
   },
 });
+

@@ -224,15 +224,25 @@ export async function isManager(userId: number): Promise<boolean> {
   return (await getUserPermKeys(userId)).size >= ALL_KEYS.length;
 }
 
+export class AdminMfaEnrollmentRequired extends Error {
+  constructor() { super('يجب أن يربط العضو تطبيق التحقق من أمان الحساب قبل منحه صلاحيات الإدارة.'); }
+}
+
 /** Replace a user's granular permissions with the given key list. */
 export async function setUserPerms(userId: number, keys: string[]) {
   await ensureTables();
   const valid = [...new Set(keys.filter((k) => KEY_SET.has(k)))];
-  await prisma.admin_perms.deleteMany({ where: { user_id: BigInt(userId) } });
-  await prisma.admin_roles.deleteMany({ where: { user_id: BigInt(userId) } }).catch(() => {});
-  if (valid.length) {
-    await prisma.admin_perms.createMany({ data: valid.map((perm) => ({ user_id: BigInt(userId), perm })), skipDuplicates: true });
-  }
+  const { lockAuthPolicy } = await import('./auth-security');
+  await prisma.$transaction(async (tx) => {
+    const enforced = await lockAuthPolicy(tx);
+    if (enforced && valid.length) {
+      const credential = await tx.auth_mfa.findUnique({ where: { user_id: BigInt(userId) }, select: { version: true } });
+      if (!credential) throw new AdminMfaEnrollmentRequired();
+    }
+    await tx.admin_perms.deleteMany({ where: { user_id: BigInt(userId) } });
+    await tx.admin_roles.deleteMany({ where: { user_id: BigInt(userId) } });
+    if (valid.length) await tx.admin_perms.createMany({ data: valid.map((perm) => ({ user_id: BigInt(userId), perm })), skipDuplicates: true });
+  });
 }
 
 export async function applyRolePreset(userId: number, role: Role | 'none') {

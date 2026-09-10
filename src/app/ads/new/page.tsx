@@ -20,7 +20,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   // شارة عاجل — عرض تسويقي داخل نموذج النشر (لإعلانات تربح فقط)
   const extras = await import('@/lib/settings').then((m) => m.getAdExtras()).catch(() => null);
   const session = await getSession();
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?next=%2Fads%2Fnew');
   const { error, left, max, hours, wait, cat, banned, dup, price, bal, dest } = await searchParams;
   // الهوية الفعّالة الحالية (نفس مصدر createAdAction) — لعرضها صريحةً وتحديد المجال افتراضياً
   const active = await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).catch(() => null);

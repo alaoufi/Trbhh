@@ -1,9 +1,10 @@
 'use server';
+import { AUDIT_UX_FLAGS, AUDIT_UX_TEXTS } from '@/lib/ux-settings';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requireAction, requireUserBan, requireManager, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
+import { requireAction, requireUserBan, requireManager, AdminMfaEnrollmentRequired, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
 import { findDuplicateAds, findCrossUserDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
 import { adminDeleteMessage, archiveAdminThread, restoreAdminThread, deleteArchivedAdminThread } from '@/lib/chat';
@@ -18,7 +19,7 @@ import { setSetting, SETTING_AD_EDIT_HOURS, SETTING_AD_DELETE_HOURS, SETTING_MSG
 import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromoPackage, deletePromoPackage } from '@/lib/promos';
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, TAQNYAT_URL, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword, newPasswordError } from '@/lib/auth';
 import { bustAdCaches } from '@/lib/data';
 import { toInt } from '@/lib/utils';
 import { logAdmin } from '@/lib/audit';
@@ -657,7 +658,10 @@ export async function setUserPermsAction(formData: FormData) {
   const id = Number(formData.get('userId'));
   if (!id) redirect('/admin/users');
   const keys = formData.getAll('perm').map((v) => String(v)).filter((k) => ALL_KEYS.includes(k));
-  await setUserPerms(id, keys);
+  try { await setUserPerms(id, keys); } catch (error) {
+    if (error instanceof AdminMfaEnrollmentRequired) redirect(`/admin/users/${id}/permissions?mfa=required`);
+    throw error;
+  }
   revalidatePath('/admin/users');
   redirect(`/admin/users/${id}/permissions?saved=1`);
 }
@@ -667,7 +671,12 @@ export async function applyPresetAction(formData: FormData) {
   await requireManager();
   const id = Number(formData.get('userId'));
   const role = String(formData.get('role') || 'none') as Role | 'none';
-  if (id) await applyRolePreset(id, role);
+  if (id) {
+    try { await applyRolePreset(id, role); } catch (error) {
+      if (error instanceof AdminMfaEnrollmentRequired) redirect(`/admin/users/${id}/permissions?mfa=required`);
+      throw error;
+    }
+  }
   revalidatePath('/admin/users');
   redirect(`/admin/users/${id}/permissions?saved=1`);
 }
@@ -773,6 +782,8 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting('ad_lifetime_days', String(Math.max(0, parseInt(String(formData.get('adLifetimeDays') || '0')) || 0)));
   await setSetting(SETTING_CLASSIFIED_SECONDS, String(splashSeconds));
   // مفاتيح الميزات: التنبيهات الفورية، اقتراحات البحث، تنبيهات البحث المحفوظ
+  for (const [key] of AUDIT_UX_FLAGS) await setSetting(key, formData.has(key) ? '1' : '0');
+  for (const [key, , fallback] of AUDIT_UX_TEXTS) await setSetting(key, String(formData.get(key) || fallback).trim().slice(0, 1000));
   await setSetting('home_actions_on', formData.get('homeActionsOn') !== null ? '1' : '0');
   await setSetting('archive_autodelete_on', formData.get('archiveAutodeleteOn') !== null ? '1' : '0');
   await setSetting('platform_rating_on', formData.get('platformRatingOn') !== null ? '1' : '0');
@@ -1677,8 +1688,9 @@ export async function setUserPasswordAction(formData: FormData) {
   await requireAction('users', 'edit');
   const uid = Number(formData.get('userId'));
   const pass = String(formData.get('password') || '');
-  if (pass.length < 4) redirect(`/admin/users/${uid}?error=${encodeURIComponent('كلمة المرور 4 خانات على الأقل')}`);
-  await prisma.users.update({ where: { id: BigInt(uid) }, data: { password: await hashPassword(pass) } }).catch(() => {});
+  const passwordError = await newPasswordError(pass);
+  if (passwordError) redirect(`/admin/users/${uid}?error=${encodeURIComponent(passwordError)}`);
+  await prisma.users.update({ where: { id: BigInt(uid) }, data: { password: await hashPassword(pass), auth_session_version: crypto.randomUUID() } });
   redirect(`/admin/users/${uid}?setpass=1`);
 }
 

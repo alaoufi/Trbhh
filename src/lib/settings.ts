@@ -660,7 +660,7 @@ export async function getStoreSubPricing(): Promise<StoreSubPricing> {
     getSettingNum(SETTING_SUB_GRACE_DAYS, 10),
     getSettingNum(SETTING_SUB_TRIAL_DAYS, 10),
   ]);
-  return { enabled: en, monthly: nn(m), sixmo: nn(s), yearly: nn(y), graceDays: Math.max(0, Math.round(g) || 10), trialDays: Math.max(0, Math.round(t)) };
+  return { enabled: en, monthly: nn(m), sixmo: nn(s), yearly: nn(y), graceDays: nn(g), trialDays: Math.max(0, Math.round(t)) };
 }
 export function subPlanPrice(p: StoreSubPricing, plan: SubPlan): number {
   return plan === 'monthly' ? p.monthly : plan === 'sixmo' ? p.sixmo : p.yearly;
@@ -844,4 +844,25 @@ export async function getAppConfig(): Promise<AppConfig> {
     },
     ios: { storeUrl: iStore, minBuild: iMin },
   };
+}
+
+/* Authentication policy: read directly, never use the best-effort presentation cache.
+   A database error must not silently disable an enforced security policy. */
+export const AUTH_REQUIRE_ADMIN_MFA = 'auth_require_admin_mfa';
+export const AUTH_PASSWORD_MIN = 'auth_password_min';
+export async function getAuthSecuritySettings(): Promise<{ requireAdminMfa: boolean; passwordMinimum: number }> {
+  await ensure();
+  const rows = await prisma.site_settings.findMany({ where: { k: { in: [AUTH_REQUIRE_ADMIN_MFA, AUTH_PASSWORD_MIN] } } });
+  const values = new Map(rows.map((r) => [r.k, r.v]));
+  const minimum = Number(values.get(AUTH_PASSWORD_MIN) || 12);
+  return { requireAdminMfa: values.get(AUTH_REQUIRE_ADMIN_MFA) === '1', passwordMinimum: Math.max(12, Math.min(64, Number.isFinite(minimum) ? Math.floor(minimum) : 12)) };
+}
+
+
+/** Values for the audit UX controls, all editable in admin settings. */
+export async function getAuditUxSettings() {
+  const { AUDIT_UX_FLAGS, AUDIT_UX_TEXTS } = await import('./ux-settings');
+  const flags = Object.fromEntries(await Promise.all(AUDIT_UX_FLAGS.map(async ([key]) => [key, await getSettingBool(key, true)] as const)));
+  const texts = Object.fromEntries(await Promise.all(AUDIT_UX_TEXTS.map(async ([key, , fallback]) => [key, await getSetting(key, fallback)] as const)));
+  return { flags, texts };
 }

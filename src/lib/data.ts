@@ -9,12 +9,18 @@ import { ensureSaudiAreas } from './seed-areas';
 import { getProfileDisplay } from './profiles';
 import { toInt } from './utils';
 import { currentPlatformAdPublicWhere, platformDealAdPublicWhere } from './platform-ad-visibility';
-import { getPlatformAdLifecycleConfig } from './settings';
+import { getPlatformAdLifecycleConfig, getStoreSubPricing } from './settings';
+import { publicStoreWhere } from './store-subscription-access';
+import { equivalentAreaIds, normalizePriceRange } from './search-filters';
+import { compactAdTitle } from './ad-presentation';
+import { searchCardVisibility } from './search-card-visibility';
 
 export type AdCard = {
   id: number;
   title: string;
   price: number;
+  priceType?: string | null;
+  rentPeriod?: string | null;
   adsType: string;
   image: string;
   cityName: string | null;
@@ -98,6 +104,9 @@ type AdRow = {
   id: bigint;
   title: string;
   price: number;
+  price_type?: string | null;
+  rent_period?: string | null;
+  area_id?: number | null;
   adsType: string;
   adsSpecial: string;
   user_id: bigint;
@@ -113,7 +122,7 @@ type AdRow = {
 async function toCards(rows: AdRow[]): Promise<AdCard[]> {
   const ids = rows.map((r) => r.id);
   const { getAdRatingsBrief } = await import('./ad-reviews');
-  const [images, views, cities, cats, sellers, adMeta, ratings] = await Promise.all([
+  const [images, views, cities, cats, sellers, adMeta, ratings, areas] = await Promise.all([
     primaryImages(ids),
     viewCounts(ids),
     cityNames(rows.map((r) => r.city_id)),
@@ -121,7 +130,9 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
     sellerInfo(rows.map((r) => r.user_id)),
     getUsersAdMeta(rows.map((r) => toInt(r.user_id))).catch(() => new Map()),
     getAdRatingsBrief(rows.map((r) => toInt(r.id))).catch(() => new Map()),
+    prisma.areas.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.area_id || 0).filter(Boolean))] } }, select: { id: true, name: true } }).catch(() => []),
   ]);
+  const areaNames = new Map(areas.map((area) => [Number(area.id), area.name]));
   await loadBanned();
   const now = Date.now();
   return rows
@@ -142,11 +153,13 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
       const s = sellers.get(toInt(r.user_id));
       return {
         id: toInt(r.id),
-        title: censorSync(r.title),
+        title: compactAdTitle(censorSync(r.title)),
         price: r.price,
+        priceType: r.price_type ?? null,
+        rentPeriod: r.rent_period ?? null,
         adsType: r.adsType,
         image: images.get(toInt(r.id)) ?? PLACEHOLDER,
-        cityName: cities.get(toInt(r.city_id)) ?? null,
+        cityName: areaNames.get(r.area_id || 0) || cities.get(toInt(r.city_id)) || null,
         categoryName: cats.get(toInt(r.category_id)) ?? null,
         // الوقت الظاهر على البطاقة = آخر نشاط (التحديث ⬆ إن كان أحدث من النشر) ليطابق الترتيب
         createdAt: (r.bumped_at && r.created_at && r.bumped_at > r.created_at ? r.bumped_at : r.created_at)?.toISOString() ?? null,
@@ -170,6 +183,9 @@ const adSelect = {
   id: true,
   title: true,
   price: true,
+  price_type: true,
+  rent_period: true,
+  area_id: true,
   adsType: true,
   adsSpecial: true,
   user_id: true,
@@ -333,10 +349,11 @@ export async function getRequestAds(take = 48) {
 }
 
 /** جلب إعلانات محدّدة بمعرّفاتها بشكل بطاقة (للمقارنة) — يحافظ على ترتيب المعرّفات. */
-export async function getAdsByIdsCards(ids: number[]) {
-  const clean = [...new Set(ids.filter((n) => n > 0))].slice(0, 4);
+export async function getAdsByIdsCards(ids: number[], limit = 4) {
+  const unique = [...new Set(ids.filter((n) => Number.isSafeInteger(n) && n > 0))];
+  const clean = limit > 0 ? unique.slice(0, limit) : unique;
   if (!clean.length) return [];
-  const rows = await prisma.ads.findMany({ where: { id: { in: clean.map((n) => BigInt(n)) } }, select: adSelect });
+  const rows = await prisma.ads.findMany({ where: { id: { in: clean.map((n) => BigInt(n)) }, status: 1, state: 'active', OR: [{ data_archive: null }, { data_archive: '' }] }, select: adSelect });
   const cards = await toCards(rows);
   const order = new Map(clean.map((id, i) => [id, i]));
   return cards.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
@@ -362,7 +379,7 @@ export async function getFeaturedAds(take = 8) {
 export async function getDealAds(take = 60) {
   return cached(`ads:deals:${take}`, 60, async () => {
     const approvedStoreUserIds = (await prisma.stores.findMany({
-      where: { status: 1, show_on_platform: 1 },
+      where: { AND: [publicStoreWhere(await getStoreSubPricing()), { show_on_platform: 1 }] },
       select: { user_id: true },
     })).map((store) => store.user_id);
     const { enabled } = await getPlatformAdLifecycleConfig();
@@ -476,9 +493,34 @@ type SearchParamsT = {
   special?: boolean;
   take?: number;
   skip?: number;
+  minPrice?: number;
+  maxPrice?: number;
 };
 
-async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special }: SearchParamsT) {
+const getSearchCardVisibility = cache(async () => {
+  const now = new Date();
+  const { getPackages, getDefaultPackage, FREE_FALLBACK } = await import('./packages');
+  const [plans, defaultPlan, banned] = await Promise.all([
+    getPackages(true).catch(() => []),
+    getDefaultPackage().catch(() => FREE_FALLBACK),
+    prisma.users.findMany({ where: { ban: 'checked' }, select: { id: true } }),
+  ]);
+  const subscriptions = await prisma.$queryRaw<{ user_id: bigint; package_id: number }[]>`
+    SELECT user_id, package_id FROM user_packages WHERE expires_at IS NULL OR expires_at > ${now}
+  `.catch(() => []);
+  return searchCardVisibility({ plans, defaultDays: defaultPlan.adDays, bannedIds: banned.map((row) => row.id), now,
+    subscriptions: subscriptions.map((row) => ({ userId: Number(row.user_id), packageId: Number(row.package_id) })),
+  });
+});
+
+const getSearchAreaIds = cache(async (areaId: number, cityId: number) => {
+  const areas = await prisma.areas.findMany({ where: { city_id: cityId }, select: { id: true, name: true, city_id: true } });
+  return equivalentAreaIds(areas.map((area) => ({ id: toInt(area.id), name: area.name, cityId: area.city_id })), areaId, cityId);
+});
+
+async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special, minPrice, maxPrice }: SearchParamsT) {
+  const range = normalizePriceRange(minPrice, maxPrice);
+  const visibility = await activeAdWhere();
   // بحث ذكي: تُقسَّم العبارة كلمات، وكل كلمة تُطابق العنوان أو التفاصيل بأي ترتيب،
   // مع توحيد أشكال الألف (أ إ آ ← ا) والتاء المربوطة (ة/ه) والياء (ى/ي)
   const norm = (w: string) => w.replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه');
@@ -489,14 +531,17 @@ async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type
     return { OR: variants.flatMap((v) => [{ title: { contains: v } }, { detail: { contains: v } }]) };
   });
   return {
-    ...(await activeAdWhere()),
-    AND: [...((await activeAdWhere()).AND || []), ...textClauses],
+    ...visibility,
+    AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textClauses],
     ...(categoryId ? { category_id: BigInt(categoryId) } : {}),
     ...(countryId ? { country_id: countryId } : {}),
     ...(cityId ? { city_id: BigInt(cityId) } : {}),
-    ...(areaId ? { area_id: areaId } : {}),
+    ...(areaId ? { area_id: cityId ? { in: await getSearchAreaIds(areaId, cityId) } : areaId } : {}),
     ...(type ? { adsType: type } : {}),
     ...(special ? { adsSpecial: 'checked' as const } : {}),
+    ...(range.minPrice !== undefined || range.maxPrice !== undefined ? {
+      price: { gt: 0, ...(range.minPrice !== undefined ? { gte: range.minPrice } : {}), ...(range.maxPrice !== undefined ? { lte: range.maxPrice } : {}) },
+    } : {}),
   };
 }
 
@@ -508,8 +553,8 @@ export async function countSearchAds(params: SearchParamsT): Promise<number> {
 export async function searchAds(params: SearchParamsT) {
   const { sort = 'newest', take = 48, skip = 0 } = params;
   const orderBy =
-    sort === 'price_asc' ? [{ price: 'asc' as const }] :
-    sort === 'price_desc' ? [{ price: 'desc' as const }] :
+    sort === 'price_asc' ? [{ price: 'asc' as const }, { id: 'desc' as const }] :
+    sort === 'price_desc' ? [{ price: 'desc' as const }, { id: 'desc' as const }] :
     [{ adsSpecial: 'desc' as const }, { bumped_at: { sort: 'desc' as const, nulls: 'last' as const } }, { id: 'desc' as const }];
   const rows = await prisma.ads.findMany({
     where: await buildSearchWhere(params),
@@ -568,7 +613,7 @@ async function getAdImpl(id: number) {
   await loadBanned();
   return {
     id: toInt(ad.id),
-    title: censorSync(ad.title),
+    title: compactAdTitle(censorSync(ad.title)),
     detail: censorSync(ad.detail),
     price: ad.price,
     adsType: ad.adsType,

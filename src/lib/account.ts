@@ -1,5 +1,6 @@
 import 'server-only';
 import { Prisma } from '@prisma/client';
+import { cache } from 'react';
 import { prisma } from './prisma';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { toInt } from './utils';
@@ -65,7 +66,7 @@ export async function getMyIdentityAdCount(userId: number): Promise<number> {
 
 /** عدد مفضّلة الهوية الفعّالة فقط — لبطاقة «المفضلة» في لوحة الحساب (يطابق صفحة المفضّلة). */
 export async function getMyIdentityFavCount(userId: number): Promise<number> {
-  return prisma.favorites.count({ where: await favScopeWhere(userId) });
+  return (await getMyFavorites(userId)).length;
 }
 
 export async function getMyAds(userId: number, scope?: MyAdsScope) {
@@ -76,6 +77,8 @@ export async function getMyAds(userId: number, scope?: MyAdsScope) {
     title: r.title,
     price: r.price,
     adsType: r.adsType,
+    priceType: r.price_type,
+    rentPeriod: r.rent_period,
     status: r.status,
     state: r.state,
     storeOnly: r.store_only === 1,
@@ -107,6 +110,8 @@ export async function getAdsByIds(ids: number[]) {
     title: r.title,
     price: r.price,
     adsType: r.adsType,
+    priceType: r.price_type,
+    rentPeriod: r.rent_period,
     status: r.status,
     special: r.adsSpecial === 'checked',
     image: images.get(toInt(r.id)) ?? PLACEHOLDER,
@@ -135,29 +140,11 @@ async function favScopeWhere(userId: number): Promise<Prisma.favoritesWhereInput
   return base;
 }
 
-export async function getMyFavorites(userId: number) {
+export const getMyFavorites = cache(async (userId: number) => {
   const favs = await prisma.favorites.findMany({ where: await favScopeWhere(userId), orderBy: { id: 'desc' } });
-  const adIds = favs.map((f) => f.ads_id);
-  if (!adIds.length) return [];
-  const ads = await prisma.ads.findMany({ where: { id: { in: adIds } } });
-  const byId = new Map(ads.map((a) => [toInt(a.id), a]));
-  const images = await primaryImages(ads.map((a) => a.id));
-  const out = [];
-  for (const f of favs) {
-    const a = byId.get(toInt(f.ads_id));
-    if (!a) continue;
-    out.push({
-      id: toInt(a.id),
-      title: a.title,
-      price: a.price,
-      adsType: a.adsType,
-      image: images.get(toInt(a.id)) ?? PLACEHOLDER,
-      createdAt: a.created_at ? a.created_at.toISOString() : null,
-    });
-  }
-  return out;
-}
-
+  const { getAdsByIdsCards } = await import('./data');
+  return getAdsByIdsCards(favs.map((f) => toInt(f.ads_id)), 0);
+});
 export async function isFavorited(userId: number, adId: number) {
   const f = await prisma.favorites.findFirst({ where: { ...(await favScopeWhere(userId)), ads_id: BigInt(adId) } });
   return !!f;

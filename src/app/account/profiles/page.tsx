@@ -434,6 +434,7 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
             <div>
               <label className={lbl}>كلمة مرور الحساب الآخر</label>
               <input name="password" type="password" required className={field} placeholder="••••••••" dir="ltr" autoComplete="off" />
+              <label className={lbl}>رمز التحقق للحساب المفعّل<input name="factorCode" type="text" dir="ltr" autoComplete="one-time-code" placeholder="رمز التطبيق أو رمز استرداد" className={field} /></label>
             </div>
             <div className="sm:col-span-2">
               <button className="inline-flex items-center gap-1 rounded-lg bg-amber-700 px-4 py-2 text-sm font-extrabold text-white hover:opacity-90">

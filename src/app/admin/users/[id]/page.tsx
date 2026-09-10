@@ -187,7 +187,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
         <input type="hidden" name="userId" value={uid} />
         <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><KeyRound className="h-4 w-4" /> تعيين كلمة مرور يدوياً</div>
         <p className="text-xs font-bold text-muted-foreground">اكتب كلمة مرور جديدة للعضو مباشرة (بلا رسالة)، ثم أبلغه بها. يحلّ أي مشكلة دخول فوراً.</p>
-        <input name="password" type="text" minLength={4} required placeholder="كلمة المرور الجديدة (4 خانات فأكثر)" className={field} />
+        <input name="password" type="text" minLength={12} required placeholder="كلمة المرور الجديدة (12 حرفاً فأكثر)" className={field} />
         <ConfirmSubmit msg="تعيين كلمة المرور المكتوبة لهذا العضو؟ تحلّ محل كلمته الحالية فوراً." className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground hover:bg-primary/90"><Save className="h-4 w-4" /> تعيين كلمة المرور</ConfirmSubmit>
       </form>
 

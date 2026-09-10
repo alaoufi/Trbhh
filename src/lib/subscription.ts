@@ -5,10 +5,11 @@ import { getStoreSubPricing, subPlanPrice, SUB_PLAN_MONTHS, SUB_PLAN_LABELS, get
 import { charge } from './wallet';
 import { getActiveStoreId } from './merchant';
 import { toInt } from './utils';
+import { storeSubscriptionState, type SubState } from './store-subscription-access';
+export type { SubState } from './store-subscription-access';
 
 const ensure = ensureSchema;
 
-export type SubState = 'off' | 'none' | 'active' | 'grace' | 'suspended';
 export type StoreSub = {
   state: SubState;
   until: Date | null;
@@ -32,12 +33,7 @@ export async function getStoreSub(storeId: number): Promise<StoreSub> {
   const daysLeft = until ? Math.ceil((until.getTime() - now) / 86400000) : 0;
   const graceDaysLeft = graceUntil ? Math.ceil((graceUntil.getTime() - now) / 86400000) : 0;
 
-  let state: SubState;
-  if (!pricing.enabled) state = 'off';
-  else if (!until) state = 'none';
-  else if (until.getTime() >= now) state = 'active';
-  else if (graceUntil && graceUntil.getTime() >= now) state = 'grace';
-  else state = 'suspended';
+  const state = storeSubscriptionState(until, pricing, new Date(now));
 
   // "على تجربة" = ما زال ضمن الفترة المجانية ولم يدفع بعد
   const trial = (row?.on_trial ?? 0) === 1 && (state === 'active' || state === 'grace');

@@ -1,9 +1,13 @@
+import Link from 'next/link';
+import { normalizeSearchParams, positiveSearchId } from '@/lib/search-filters';
+import { getSettingBool } from '@/lib/settings';
+import { PublicSearchForm } from '@/components/public-search-form';
 import { Bell, Trash2 } from 'lucide-react';
 import { searchAds, countSearchAds, getCities, getAreas } from '@/lib/data';
-import { SearchAreaPicker } from '@/components/search-area-picker';
+
 import { AdminPager } from '@/components/admin-pager';
 import { AdGrid } from '@/components/ad-card';
-import { SearchSuggestInput } from '@/components/search-suggest';
+
 import { Breadcrumb } from '@/components/breadcrumb';
 import { getSession } from '@/lib/auth';
 import { listSavedSearches, savedSearchEnabled } from '@/lib/saved-search';
@@ -12,7 +16,7 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const metadata = {
   title: 'بحث متقدم',
-  description: 'ابحث بين آلاف إعلانات البيع والشراء من متاجر وأفراد — فلترة بالقسم والمدينة والسعر والنوع (عرض/طلب) على منصة تربح.',
+  description: 'ابحث بين آلاف إعلانات البيع والشراء من متاجر وأفراد — فلترة بالمنطقة والمدينة والسعر والنوع (عرض/طلب) على منصة تربح.',
 };
 
 export default async function SearchPage({
@@ -25,50 +29,31 @@ export default async function SearchPage({
     getCities(), getAreas(), getSession(), savedSearchEnabled(),
   ]);
   const saved = session && alertsOn ? await listSavedSearches(session.uid) : [];
-  const sort = (sp.sort as 'newest' | 'price_asc' | 'price_desc') || 'newest';
-
-  const page = Math.max(1, parseInt(sp.page || '1') || 1);
+  const priceOn = await getSettingBool('search_price_filter_on', true);
+  const sq = normalizeSearchParams(priceOn ? sp : { ...sp, minPrice: undefined, maxPrice: undefined });
+  // Accept only Saudi regions and a city belonging to that region.
+  const cityId = cities.some((item) => item.countryId === 1 && item.id === sq.cityId) ? sq.cityId : undefined;
+  const areaId = cityId && areas.some((item) => item.cityId === cityId && item.id === sq.areaId) ? sq.areaId : undefined;
+  const query = { ...sq, cityId, areaId };
   const PAGE_SIZE = 48;
-  const sq = {
-    q: sp.q,
-    categoryId: sp.category ? Number(sp.category) : undefined,
-    cityId: sp.city ? Number(sp.city) : undefined,
-    areaId: sp.area ? Number(sp.area) : undefined,
-    type: sp.type === 'offer' || sp.type === 'request' ? (sp.type as 'offer' | 'request') : undefined,
-    special: sp.special === '1',
-  };
-  const [ads, total] = await Promise.all([
-    searchAds({ ...sq, sort, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE }),
-    countSearchAds(sq),
-  ]);
+  const total = await countSearchAds(query);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  const sel = 'h-10 rounded-lg border bg-background px-3 text-sm';
-
+  const page = Math.min(positiveSearchId(sp.page) || 1, pages);
+  const ads = await searchAds({ ...query, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE });
+  const params = {
+    q: query.q, city: cityId?.toString(), area: areaId?.toString(), type: query.type,
+    sort: query.sort, special: query.special ? '1' : undefined,
+    minPrice: query.minPrice?.toString(), maxPrice: query.maxPrice?.toString(),
+  };
+  const hasFilters = !!(query.q || cityId || query.type || query.special || query.minPrice !== undefined || query.maxPrice !== undefined);
   return (
     <div className="space-y-4">
       <Breadcrumb items={[{ label: 'بحث متقدم' }]} />
-      <form className="grid gap-3 card-3d rounded-xl p-4 md:grid-cols-6">
-        <div className="md:col-span-2">
-          <SearchSuggestInput name="q" defaultValue={sp.q || ''} />
-        </div>
-        {/* المنطقة ثم المدينة — اختيار المنطقة يحدّث المدن فوراً */}
-        <SearchAreaPicker regions={cities} areas={areas} region={sp.city || ''} area={sp.area || ''} className={sel} />
-        <select name="type" defaultValue={sp.type} className={sel}>
-          <option value="">عرض وطلب</option>
-          <option value="offer">عروض</option>
-          <option value="request">طلبات</option>
-        </select>
-        <select name="sort" defaultValue={sort} className={sel}>
-          <option value="newest">الأحدث</option>
-          <option value="price_asc">السعر: من الأقل</option>
-          <option value="price_desc">السعر: من الأعلى</option>
-        </select>
-        <button className="h-10 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-          بحث
-        </button>
-      </form>
-
+      <section className="rounded-xl border bg-card p-4 shadow-sm">
+        <h1 className="mb-3 text-xl font-bold text-foreground">البحث في الإعلانات</h1>
+        <PublicSearchForm key={JSON.stringify(params)} regions={cities} areas={areas} params={params} priceOn={priceOn} />
+        {hasFilters && <Link href="/search" className="mt-3 inline-block text-sm font-semibold text-primary underline underline-offset-4">مسح الفلاتر</Link>}
+      </section>
       {/* تنبيهات البحث المحفوظ — للأعضاء وعند تفعيلها من الإدارة */}
       {session && alertsOn && (
         <div className="card-3d space-y-2 rounded-xl p-3">
@@ -99,9 +84,9 @@ export default async function SearchPage({
       )}
 
       <p className="text-sm text-muted-foreground">النتائج: {total}</p>
-      <AdGrid ads={ads} />
+      {ads.length > 0 ? <AdGrid ads={ads} /> : <div className="rounded-xl border border-dashed p-8 text-center"><p className="font-semibold">لا توجد إعلانات تطابق بحثك.</p><Link href="/search" className="mt-3 inline-block text-sm text-primary underline">امسح الفلاتر لتصفح جميع الإعلانات</Link></div>}
 
-      <AdminPager basePath="/search" page={page} pages={pages} total={total} params={{ q: sp.q, category: sp.category, city: sp.city, area: sp.area, type: sp.type, sort: sp.sort, special: sp.special }} />
+      <AdminPager basePath="/search" page={page} pages={pages} total={total} params={params} />
     </div>
   );
 }

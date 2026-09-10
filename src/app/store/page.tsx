@@ -10,7 +10,7 @@ import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
 import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction, addStoreStaffAction, removeStoreStaffAction, requestStoreNameExceptionAction, storeMessageMemberAction, requestVerifyPaidAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
-import { getStoreSubPricing } from '@/lib/settings';
+import { getStoreSubPricing, getSettingBool, getSetting } from '@/lib/settings';
 import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen, DatabaseBackup } from 'lucide-react';
 import { mediaUrl } from '@/lib/media';
 import { SITE } from '@/lib/constants';
@@ -58,6 +58,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   const storeHours = store && hoursOn ? await xtr.getStoreHours(store.id).catch(() => ({ from: null, to: null, days: [] as number[] })) : { from: null, to: null, days: [] as number[] };
   const subState = store ? await getStoreSub(store.id) : null;
   const subPricing = await getStoreSubPricing();
+  const guidedSetup = await getSettingBool('store_onboarding_on', true);
+  const stepLabels = await Promise.all([getSetting('store_step_basics', 'البيانات الأساسية'), getSetting('store_step_contact', 'التواصل'), getSetting('store_step_design', 'التصميم'), getSetting('store_step_preview', 'المعاينة')]);
   // التجديد التلقائي + باقة Plus (تفعيلهما العام من التحكم)
   const autoRenewOn = store ? await (await import('@/lib/settings')).autoRenewEnabled().catch(() => false) : false;
   const plusPricing = store ? await (await import('@/lib/settings')).getStorePlusPricing().catch(() => null) : null;
@@ -859,12 +861,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </div>
       )}
 
-      <form action={saveCompanyAction} className="space-y-4 card-3d rounded-xl p-5">
-        <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><Palette className="h-5 w-5" /> مصمّم المتجر الذكي</div>
-        <StoreDesigner initial={{ storeName: meta?.storeName, color: meta?.color, banner: meta?.banner, tagline: meta?.tagline, about: meta?.about, layout: meta?.layout, catalog: meta?.catalog, fields: meta?.fields, handle: meta?.handle, logoUrl }} />
-        <div><label className="mb-1 block text-sm font-medium">شعار المتجر (صورة)</label><input name="logo" type="file" accept="image/*" className="w-full rounded-lg border bg-background p-2 text-sm" /></div>
-
-        {/* بيانات النشاط التجاري */}
+      <StoreDesigner initial={{ storeName: meta?.storeName, color: meta?.color, banner: meta?.banner, tagline: meta?.tagline, about: meta?.about, layout: meta?.layout, catalog: meta?.catalog, fields: meta?.fields, handle: meta?.handle, logoUrl }} action={saveCompanyAction} guided={guidedSetup} stepLabels={stepLabels} submitLabel={store ? 'حفظ المتجر' : 'إنشاء المتجر'}
+        basics={<>        {/* بيانات النشاط التجاري */}
         <div className="space-y-3 rounded-xl border-2 border-primary/15 bg-secondary/20 p-3">
           <div className="text-sm font-extrabold text-primary">بيانات النشاط التجاري</div>
           <div>
@@ -882,7 +880,7 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           </div>
         </div>
 
-        {/* بيانات التواصل والهوية */}
+</>} contact={<>        {/* بيانات التواصل والهوية */}
         <div className="space-y-3 rounded-xl border-2 border-primary/15 bg-secondary/20 p-3">
           <div className="text-sm font-extrabold text-primary">بيانات التواصل والهوية</div>
           <div>
@@ -906,6 +904,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         <div><label className="mb-1 block text-sm font-medium">وصف النشاط / ملف الأعمال</label><textarea name="description" defaultValue={store?.description ?? ''} rows={4} className="w-full rounded-lg border bg-background p-3 text-sm" placeholder="نبذة عن نشاط المتجر والخدمات المقدمة" /></div>
         <div><label className="mb-1 block text-sm font-medium">العنوان</label><input name="address" defaultValue={store?.address ?? ''} className={field} /></div>
 
+</>} finish={<>        <div><label className="mb-1 block text-sm font-medium">شعار المتجر (صورة)</label><input name="logo" type="file" accept="image/*" className="w-full rounded-lg border bg-background p-2 text-sm" /></div>
+
         {/* الموافقة على شروط المتجر — إلزامية عند فتح متجر جديد */}
         {!store && (
           <label className="flex items-start gap-2 rounded-xl border-2 border-primary/25 bg-primary/5 p-3 text-sm">
@@ -914,8 +914,8 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
           </label>
         )}
 
-        <Button>{store ? 'حفظ المتجر' : 'إنشاء المتجر'}</Button>
-      </form>
+</>}
+      />
 
       {store && (
         <div className="space-y-3 card-3d rounded-xl p-5">

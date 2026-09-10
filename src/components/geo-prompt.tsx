@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useAutomaticPrompt } from '@/components/use-automatic-prompt';
 import { useRouter } from 'next/navigation';
 import { MapPin, X } from 'lucide-react';
 
@@ -12,10 +13,12 @@ export function GeoPrompt() {
   const router = useRouter();
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
+  const invitation = useAutomaticPrompt('geo_dismissed', show, 30000);
 
   useEffect(() => {
     const hasCookie = document.cookie.includes('trbhh_geo=');
-    const dismissed = localStorage.getItem('geo_dismissed') === '1';
+    let dismissed = false;
+    try { dismissed = localStorage.getItem('geo_dismissed') === '1'; } catch { /* Private browsing. */ }
     if (!hasCookie && !dismissed && typeof navigator !== 'undefined' && navigator.geolocation) {
       setShow(true);
     }
@@ -34,7 +37,7 @@ export function GeoPrompt() {
         router.refresh();
       },
       () => {
-        localStorage.setItem('geo_dismissed', '1');
+        invitation.dismiss();
         setShow(false);
         setBusy(false);
       },
@@ -43,13 +46,13 @@ export function GeoPrompt() {
   }
 
   function dismiss() {
-    localStorage.setItem('geo_dismissed', '1');
+    invitation.dismiss();
     setShow(false);
   }
 
-  if (!show) return null;
+  if (!show || !invitation.open) return null;
   return (
-    <div className="fixed inset-x-3 bottom-20 z-40 mx-auto flex max-w-md items-center gap-3 rounded-xl border border-primary/30 bg-card p-3 shadow-lg md:bottom-4">
+    <div className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[60] mx-auto flex max-w-md items-center gap-3 rounded-xl border border-primary/30 bg-card p-3 shadow-lg md:bottom-4">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
         <MapPin className="h-5 w-5" />
       </span>
@@ -57,7 +60,7 @@ export function GeoPrompt() {
       <button onClick={enable} disabled={busy} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60">
         {busy ? '...' : 'تفعيل'}
       </button>
-      <button onClick={dismiss} aria-label="إغلاق" className="text-muted-foreground hover:text-foreground">
+      <button onClick={dismiss} aria-label="إغلاق" className="grid h-10 w-10 shrink-0 place-items-center text-muted-foreground hover:text-foreground">
         <X className="h-4 w-4" />
       </button>
     </div>

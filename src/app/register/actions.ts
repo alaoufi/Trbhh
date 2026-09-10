@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
-import { createSession, hashPassword } from '@/lib/auth';
+import { createSession, hashPassword, newPasswordError } from '@/lib/auth';
 import { containsBannedName } from '@/lib/censor';
 import { normalizeSaudiRegistrationPhone } from '@/lib/phone-registration';
 import { consumeSaudiRegistrationIntent, startSaudiRegistrationIntent } from '@/lib/registration-otp';
@@ -14,7 +14,9 @@ const v = (form: FormData, key: string) => String(form.get(key) || '').trim();
 
 export async function startRegistrationAction(_previous: RegistrationState, form: FormData): Promise<RegistrationState> {
   const name = v(form, 'name'); const rawPhone = v(form, 'phone'); const password = String(form.get('password') || '');
-  if (!name || !rawPhone || password.length < 4 || !form.get('agree')) return { error: 'أكمل البيانات ووافق على الشروط (كلمة المرور 4 خانات على الأقل).' };
+  if (!name || !rawPhone || !form.get('agree')) return { error: 'أكمل البيانات ووافق على الشروط.' };
+  const passwordError = await newPasswordError(password);
+  if (passwordError) return { error: passwordError };
   if (await containsBannedName(name)) return { error: 'الاسم يحتوي كلمة غير مسموحة — اختر اسماً آخر.' };
   const phone = normalizeSaudiRegistrationPhone(rawPhone);
   if (!phone) redirect(`/register/international?phone=${encodeURIComponent(rawPhone)}`);
@@ -29,14 +31,16 @@ export async function confirmSaudiRegistrationAction(_previous: RegistrationStat
   const result = await consumeSaudiRegistrationIntent(phone, code);
   if (!result.ok) return { step: 'otp', phone, error: result.error };
   import('@/lib/points').then((m) => m.grantWelcome(toInt(result.user.id))).catch(() => {});
-  await createSession({ uid: toInt(result.user.id), name: result.user.name || phone, type: 'user' });
+  await createSession({ uid: toInt(result.user.id), name: result.user.name || phone, type: 'user', authVersion: result.user.auth_session_version });
   redirect('/');
 }
 
 export async function submitInternationalRegistrationAction(_previous: RegistrationState, form: FormData): Promise<RegistrationState> {
   const country = v(form, 'country'); const name = v(form, 'name'); const phone = v(form, 'phone').replace(/\s+/g, '');
   const email = v(form, 'email').toLowerCase(); const reason = v(form, 'reason'); const password = String(form.get('password') || '');
-  if (!country || !name || !phone || !email || !reason || password.length < 4 || !form.get('agree')) return { error: 'أكمل الدولة وبيانات التواصل والسبب وكلمة المرور ووافق على الشروط.' };
+  if (!country || !name || !phone || !email || !reason || !form.get('agree')) return { error: 'أكمل الدولة وبيانات التواصل والسبب وكلمة المرور ووافق على الشروط.' };
+  const passwordError = await newPasswordError(password);
+  if (passwordError) return { error: passwordError };
   if (normalizeSaudiRegistrationPhone(phone)) return { error: 'رقمك سعودي؛ استخدم التسجيل برمز التحقق.' };
   if (await containsBannedName(name)) return { error: 'الاسم يحتوي كلمة غير مسموحة — اختر اسماً آخر.' };
   await ensureSchema();

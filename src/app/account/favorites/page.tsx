@@ -7,12 +7,7 @@ export const metadata = { title: 'المفضلة' };
 
 export default async function FavoritesPage() {
   const session = await requireUser();
-  const favs = await getMyFavorites(session.uid);
-  const ads = favs.map((f) => ({
-    ...f, image: f.image, cityName: null, categoryName: null, special: false,
-        urgent: false, views: 0,
-    sellerName: null, sellerTrusted: false,
-  }));
+  const ads = await getMyFavorites(session.uid);
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-bold">المفضلة ({ads.length})</h1>

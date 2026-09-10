@@ -12,8 +12,8 @@ export async function storeLoginAction(formData: FormData) {
   const password = String(formData.get('password') || '');
   const s = String(formData.get('s') || '').trim();
   const back = `/store-login?error=1${s ? `&s=${encodeURIComponent(s)}` : ''}`;
-  const r = await verifyLogin(identifier, password);
+  const r = await verifyLogin(identifier, password, String(formData.get('factorCode') || ''));
   if (!r.ok) redirect(back);
-  await createSession({ uid: r.uid, name: r.name, type: r.type });
+  await createSession({ uid: r.uid, name: r.name, type: r.type, mfaVersion: r.mfaVersion, authVersion: r.authVersion });
   redirect('/store');
 }

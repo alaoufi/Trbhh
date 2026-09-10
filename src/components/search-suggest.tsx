@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Search as SearchIcon } from 'lucide-react';
 
 /** حقل بحث باقتراحات فورية أثناء الكتابة (يُعطَّل من الإعدادات فيصبح حقلاً عادياً). */
@@ -8,22 +9,26 @@ export function SearchSuggestInput({ name = 'q', defaultValue = '', placeholder 
   const [items, setItems] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const requestVersion = useRef(0);
   const t = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    const versionRef = requestVersion;
     const onDoc = (e: MouseEvent) => { if (box.current && !box.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    return () => { document.removeEventListener('mousedown', onDoc); if (t.current) clearTimeout(t.current); versionRef.current++; };
   }, []);
 
   function onChange(next: string) {
     setV(next);
+    const version = ++requestVersion.current;
     if (t.current) clearTimeout(t.current);
     if (next.trim().length < 2) { setItems([]); setOpen(false); return; }
     t.current = setTimeout(async () => {
       try {
         const r = await fetch(`/api/search/suggest?q=${encodeURIComponent(next.trim())}`).then((x) => x.json());
-        setItems(r.items || []);
+        if (version !== requestVersion.current) return;
+        setItems(Array.isArray(r.items) ? r.items.filter((item: unknown) => typeof item === 'string') : []);
         setOpen((r.items || []).length > 0);
       } catch { /* ignore */ }
     }, 250);
@@ -39,15 +44,16 @@ export function SearchSuggestInput({ name = 'q', defaultValue = '', placeholder 
         onFocus={() => items.length > 0 && setOpen(true)}
         placeholder={placeholder}
         autoComplete="off"
-        className="h-10 w-full rounded-lg border bg-background pr-10 pl-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+        aria-label={placeholder}
+        className="h-11 w-full rounded-lg border bg-background pr-10 pl-3 text-sm outline-none focus:ring-2 focus:ring-ring"
       />
       {open && (
-        <div className="absolute inset-x-0 top-11 z-30 overflow-hidden rounded-xl border-2 border-primary/20 bg-card shadow-xl">
+        <div className="absolute inset-x-0 top-12 z-30 overflow-hidden rounded-xl border-2 border-primary/20 bg-card shadow-xl">
           {items.map((s) => (
             <button
               key={s}
-              type="submit"
-              onClick={() => { setV(s); setOpen(false); }}
+              type="button"
+              onClick={() => { flushSync(() => { setV(s); setOpen(false); }); box.current?.closest('form')?.requestSubmit(); }}
               className="block w-full truncate px-3 py-2.5 text-right text-sm font-medium hover:bg-accent"
             >
               🔎 {s}

@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { deleteStore, storeIdOfUser } from './merchant';
 import { logMod } from './moderation';
+import { randomBytes } from 'node:crypto';
 import { hashPassword } from './auth';
 import { toInt } from './utils';
 import { scanContent } from './content-guard';
@@ -72,7 +73,7 @@ export async function deleteAccountNow(userId: number): Promise<void> {
       userName: `deleted_${userId}`,
       phoneNumber: `deleted_${userId}`,
       email: null,
-      password: await hashPassword(`deleted-${userId}-${Math.random().toString(36).slice(2)}`),
+      password: await hashPassword('A-' + randomBytes(31).toString('hex')),
       photo_path: null,
       phone_whatsapp: null,
       trusted: 0,

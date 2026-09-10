@@ -1,101 +1,112 @@
 import 'server-only';
 import { prisma } from './prisma';
-import { mediaUrl, PLACEHOLDER } from './media';
+import { PLACEHOLDER } from './media';
 import { toInt } from './utils';
-import { scopeWhere, type MyAdsScope } from './account';
-
-const num = (v: number | bigint | null | undefined): number => (typeof v === 'bigint' ? Number(v) : v || 0);
+import { primaryImages, scopeWhere, type MyAdsScope } from './account';
 
 export type DailyPoint = { date: string; views: number };
 export type AdPerf = { id: number; title: string | null; status: number; views: number; image: string };
 export type SellerAnalytics = {
-  totalAds: number;
-  activeAds: number;
-  totalViews: number;
-  views7: number;
-  views30: number;
-  daily: DailyPoint[]; // last 30 days, one entry per day (zero-filled)
-  topAds: AdPerf[]; // seller's ads sorted by all-time views
+  totalAds: number; activeAds: number; totalViews: number; views7: number; views30: number;
+  daily: DailyPoint[]; topAds: AdPerf[];
+};
+export type AdPeriod = '7d' | '30d' | 'all';
+export type AdPeriodStats = {
+  periods: Record<AdPeriod, { views: number; contacts: number }>;
+  /** The legacy favorites table has no date: this is a current count, not a period metric. */
+  favorites: number;
 };
 
-/** yyyy-mm-dd for a Date in the server's local zone (dates come back already truncated). */
-function isoDay(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const DAY_MS = 86400000;
+const RIYADH_OFFSET_MS = 3 * 60 * 60 * 1000;
+const isoDay = (d: Date): string => new Date(d.getTime() + RIYADH_OFFSET_MS).toISOString().slice(0, 10);
+function periodBounds(now: Date) {
+  const today = new Date(`${isoDay(now)}T00:00:00+03:00`);
+  return { since7: new Date(+today - 6 * DAY_MS), since30: new Date(+today - 29 * DAY_MS), before: new Date(+today + DAY_MS) };
+}
+function emptyDaily(now: Date): DailyPoint[] {
+  const { since30 } = periodBounds(now);
+  return Array.from({ length: 30 }, (_, i) => ({ date: isoDay(new Date(+since30 + i * DAY_MS)), views: 0 }));
 }
 
-/** Build the full analytics snapshot for one seller (all of their ads). */
+/** One source for per-ad cards and the seller dashboard. Undated legacy views
+ * count in all-time only; date windows cover calendar days in Asia/Riyadh (UTC+3, no DST) on both pages. */
+async function adViewAnalytics(ids: number[], now: Date) {
+  const bounds = periodBounds(now);
+  const byAd = new Map(ids.map((id) => [id, { all: 0, views7: 0, views30: 0 }]));
+  const daily = emptyDaily(now);
+  if (!ids.length) return { byAd, daily };
+  const [all, rows] = await Promise.all([
+    prisma.ads_views.groupBy({ by: ['ads_id'], where: { ads_id: { in: ids.map(BigInt) } }, _count: true }),
+    prisma.$queryRawUnsafe<{ ads_id: bigint; d: string; c: number | bigint }[]>(
+      `SELECT v.ads_id, DATE_FORMAT(DATE_ADD(v.created_at, INTERVAL 3 HOUR), '%Y-%m-%d') AS d, COUNT(*) AS c
+       FROM ads_views v WHERE v.ads_id IN (${ids.map(() => '?').join(',')})
+       AND v.created_at >= ? AND v.created_at < ?
+       GROUP BY v.ads_id, DATE_FORMAT(DATE_ADD(v.created_at, INTERVAL 3 HOUR), '%Y-%m-%d')`,
+      ...ids, bounds.since30, bounds.before,
+    ),
+  ]);
+  for (const row of all) {
+    const count = byAd.get(toInt(row.ads_id));
+    if (count) count.all = Number(row._count);
+  }
+  const dayMap = new Map(daily.map((p) => [p.date, p]));
+  const start7 = isoDay(bounds.since7);
+  for (const row of rows) {
+    const count = byAd.get(toInt(row.ads_id));
+    const point = dayMap.get(row.d);
+    if (!count || !point) continue;
+    const value = Number(row.c);
+    count.views30 += value;
+    if (row.d >= start7) count.views7 += value;
+    point.views += value;
+  }
+  return { byAd, daily };
+}
+
+/** Bulk metrics scoped to the ads already authorized by the account page. */
+export async function getAdPeriodStats(adIds: number[]): Promise<Map<number, AdPeriodStats>> {
+  const ids = [...new Set(adIds.filter((id) => Number.isSafeInteger(id) && id > 0))];
+  if (!ids.length) return new Map();
+  const now = new Date();
+  const { since7, since30, before } = periodBounds(now);
+  const bigIds = ids.map(BigInt);
+  const periods = ['7d', '30d', 'all'] as const;
+  const [views, favorites, ...contacts] = await Promise.all([
+    adViewAnalytics(ids, now),
+    prisma.favorites.groupBy({ by: ['ads_id'], where: { ads_id: { in: bigIds } }, _count: { _all: true } }),
+    ...periods.map((period) => prisma.ad_contacts.groupBy({
+      by: ['ad_id'],
+      where: { ad_id: { in: bigIds }, ...(period === 'all' ? {} : { created_at: { gte: period === '7d' ? since7 : since30, lt: before } }) },
+      _count: { _all: true },
+    })),
+  ]);
+  const contactMaps = contacts.map((rows) => new Map(rows.map((r) => [toInt(r.ad_id), r._count._all])));
+  const favoriteMap = new Map(favorites.map((r) => [toInt(r.ads_id), r._count._all]));
+  return new Map(ids.map((id) => {
+    const v = views.byAd.get(id)!;
+    return [id, {
+      periods: {
+        '7d': { views: v.views7, contacts: contactMaps[0].get(id) ?? 0 },
+        '30d': { views: v.views30, contacts: contactMaps[1].get(id) ?? 0 },
+        all: { views: v.all, contacts: contactMaps[2].get(id) ?? 0 },
+      },
+      favorites: favoriteMap.get(id) ?? 0,
+    }];
+  }));
+}
+
 export async function getSellerAnalytics(userId: number, scope?: MyAdsScope): Promise<SellerAnalytics> {
   const ads = await prisma.ads.findMany({
-    where: scopeWhere(userId, scope), // معزول بالهوية النشطة — تحليلات هذه الهوية فقط
-    select: { id: true, title: true, status: true },
-    orderBy: { id: 'desc' },
+    where: scopeWhere(userId, scope), select: { id: true, title: true, status: true }, orderBy: { id: 'desc' },
   });
-  const totalAds = ads.length;
-  const activeAds = ads.filter((a) => a.status === 1).length;
-  if (!totalAds) {
-    return { totalAds: 0, activeAds: 0, totalViews: 0, views7: 0, views30: 0, daily: emptyDaily(30), topAds: [] };
-  }
-  const ids = ads.map((a) => a.id);
-
-  // All-time views per ad (works even for legacy rows with null created_at).
-  const perAd = await prisma.ads_views.groupBy({ by: ['ads_id'], where: { ads_id: { in: ids } }, _count: true });
-  const viewsByAd = new Map<number, number>();
-  for (const g of perAd) viewsByAd.set(toInt(g.ads_id), num(g._count as unknown as number));
-  const totalViews = [...viewsByAd.values()].reduce((s, n) => s + n, 0);
-
-  // Daily views for the last 30 days across all the seller's ads.
-  const since = new Date(Date.now() - 29 * 86400000);
-  since.setHours(0, 0, 0, 0);
-  // معزول بالهوية: نُرشّح بمعرّفات إعلانات الهوية النشطة (ids) لا بـ user_id كامل الحساب
-  const idNums = ids.map((id) => Number(id));
-  const placeholders = idNums.map(() => '?').join(',');
-  const rows = await prisma.$queryRawUnsafe<{ d: Date | string; c: number | bigint }[]>(
-    `SELECT DATE(v.created_at) AS d, COUNT(*) AS c
-       FROM ads_views v
-      WHERE v.ads_id IN (${placeholders}) AND v.created_at IS NOT NULL AND v.created_at >= ?
-      GROUP BY DATE(v.created_at)`,
-    ...idNums,
-    since,
-  ).catch(() => [] as { d: Date | string; c: number | bigint }[]);
-
-  const byDay = new Map<string, number>();
-  for (const r of rows) {
-    const key = typeof r.d === 'string' ? r.d.slice(0, 10) : isoDay(r.d);
-    byDay.set(key, num(r.c));
-  }
-  const daily: DailyPoint[] = [];
-  for (let i = 29; i >= 0; i--) {
-    const day = new Date(Date.now() - i * 86400000);
-    const key = isoDay(day);
-    daily.push({ date: key, views: byDay.get(key) || 0 });
-  }
-  const views30 = daily.reduce((s, p) => s + p.views, 0);
-  const views7 = daily.slice(-7).reduce((s, p) => s + p.views, 0);
-
-  // Per-ad performance table (top by views), with primary image.
-  const ranked = [...ads].sort((a, b) => (viewsByAd.get(toInt(b.id)) || 0) - (viewsByAd.get(toInt(a.id)) || 0));
-  const topAds: AdPerf[] = await Promise.all(
-    ranked.slice(0, 20).map(async (a) => ({
-      id: toInt(a.id),
-      title: a.title,
-      status: a.status,
-      views: viewsByAd.get(toInt(a.id)) || 0,
-      image: await primaryImage(a.id),
-    })),
-  );
-
-  return { totalAds, activeAds, totalViews, views7, views30, daily, topAds };
-}
-
-function emptyDaily(n: number): DailyPoint[] {
-  const out: DailyPoint[] = [];
-  for (let i = n - 1; i >= 0; i--) out.push({ date: isoDay(new Date(Date.now() - i * 86400000)), views: 0 });
-  return out;
-}
-
-async function primaryImage(adId: bigint): Promise<string> {
-  const ph = await prisma.photos.findFirst({ where: { other_id: adId }, orderBy: { id: 'asc' } });
-  if (!ph) return PLACEHOLDER;
-  const up = await prisma.uploads.findUnique({ where: { id: BigInt(parseInt(ph.photo_path, 10) || 0) } });
-  return up?.file_name ? mediaUrl(up.file_name) : PLACEHOLDER;
+  const { byAd, daily } = await adViewAnalytics(ads.map((ad) => toInt(ad.id)), new Date());
+  const totalViews = [...byAd.values()].reduce((sum, a) => sum + a.all, 0);
+  const ranked = [...ads].sort((a, b) => (byAd.get(toInt(b.id))?.all ?? 0) - (byAd.get(toInt(a.id))?.all ?? 0)).slice(0, 20);
+  const images = await primaryImages(ranked.map((a) => a.id));
+  return {
+    totalAds: ads.length, activeAds: ads.filter((a) => a.status === 1).length,
+    totalViews, views7: daily.slice(-7).reduce((sum, d) => sum + d.views, 0), views30: daily.reduce((sum, d) => sum + d.views, 0), daily,
+    topAds: ranked.map((ad) => ({ id: toInt(ad.id), title: ad.title, status: ad.status, views: byAd.get(toInt(ad.id))?.all ?? 0, image: images.get(toInt(ad.id)) ?? PLACEHOLDER })),
+  };
 }

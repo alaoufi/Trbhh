@@ -3,7 +3,8 @@ import Image from 'next/image';
 import { cookies } from 'next/headers';
 import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown, Store } from 'lucide-react';
 import type { AdCard as AdCardType } from '@/lib/data';
-import { timeAgo, formatPrice, cn } from '@/lib/utils';
+import { adPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
+import { timeAgo, cn } from '@/lib/utils';
 
 function timeShort(iso: string | null) {
   const s = timeAgo(iso); // e.g. "قبل 3 يوم"
@@ -30,9 +31,9 @@ function OldPrice({ ad }: { ad: AdCardType }) {
 
 // Premium (paid) look per tier — attention-grabbing frame, glow, accent + ribbon.
 const PREMIUM = {
-  gold: { border: '!border-amber-400', ring: 'ring-2 ring-amber-400/70', glow: 'shadow-[0_14px_36px_-8px_rgba(245,158,11,0.55)]', tint: '!bg-gradient-to-b !from-amber-50 !to-white', bar: 'from-amber-400 to-amber-600', chip: 'bg-gradient-to-l from-amber-500 to-amber-600', label: 'إعلان ذهبي مميّز' },
-  silver: { border: '!border-slate-400', ring: 'ring-2 ring-slate-300', glow: 'shadow-[0_12px_30px_-8px_rgba(100,116,139,0.45)]', tint: '!bg-gradient-to-b !from-slate-50 !to-white', bar: 'from-slate-300 to-slate-500', chip: 'bg-gradient-to-l from-slate-500 to-slate-600', label: 'إعلان فضي مميّز' },
-  special: { border: '', ring: 'ring-2 ring-primary/45', glow: 'shadow-[0_12px_30px_-8px_hsl(var(--primary)/0.5)]', tint: '', bar: 'from-primary to-[hsl(var(--primary)/0.55)]', chip: 'bg-primary', label: 'إعلان مميّز' },
+  gold: { border: '!border-amber-400', ring: 'ring-2 ring-amber-400/70', glow: 'shadow-sm', tint: '!bg-gradient-to-b !from-amber-50 !to-white', bar: 'from-amber-400 to-amber-600', chip: 'bg-gradient-to-l from-amber-500 to-amber-600', label: 'إعلان ذهبي مميّز' },
+  silver: { border: '!border-slate-400', ring: 'ring-2 ring-slate-300', glow: 'shadow-sm', tint: '!bg-gradient-to-b !from-slate-50 !to-white', bar: 'from-slate-300 to-slate-500', chip: 'bg-gradient-to-l from-slate-500 to-slate-600', label: 'إعلان فضي مميّز' },
+  special: { border: '', ring: 'ring-2 ring-primary/45', glow: 'shadow-sm', tint: '', bar: 'from-primary to-[hsl(var(--primary)/0.55)]', chip: 'bg-primary', label: 'إعلان مميّز' },
 } as const;
 
 export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: 'raised' | 'inset' }) {
@@ -46,10 +47,10 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
       className={cn(
         'card-3d relative block overflow-hidden rounded-2xl',
         // المدفوع أولاً: إطار فاخر وتوهّج جذّاب
-        P && ['z-20', P.border, P.ring, P.glow, P.tint],
+        P && [ P.border, P.ring, P.glow, P.tint],
         // العادي: تناوب بارز/غائر لإعطاء إيقاع بصري
-        !P && !inset && 'z-10 ring-2 ring-primary/20',
-        !P && inset && 'scale-[0.965] !border-primary/20 bg-secondary/50 !shadow-[inset_0_2px_12px_rgba(0,0,0,0.10)]',
+        !P && !inset && 'ring-1 ring-primary/10',
+        !P && inset && '!border-primary/20 bg-secondary/20',
         !P && isReq && '!border-amber-400 bg-amber-50',
       )}
     >
@@ -73,11 +74,12 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
             <span className={cn('rounded px-2 py-0.5 text-[10px] font-extrabold text-white', isReq ? 'bg-amber-500' : 'bg-primary')}>
               {isReq ? 'طلب' : 'عرض'}
             </span>
-            <DiscountChip ad={ad} />
+
           </span>
-          <h3 className="line-clamp-3 break-words text-right text-base font-bold leading-7 text-primary">
-            {ad.title}
+          <h3 className="line-clamp-2 break-words text-right text-base font-bold leading-6 text-primary">
+            {compactAdTitle(ad.title)}
           </h3>
+          <CardPrice ad={ad} />
           {ad.storeName && <div className="mt-1 min-w-0"><StoreTag name={ad.storeName} /></div>}
           {(ad.ratingCount ?? 0) > 0 && (
             <div className="mt-1 flex flex-wrap items-center gap-1 text-xs font-extrabold text-amber-600">
@@ -90,7 +92,7 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
           )}
         </div>
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-white">
-          <Image src={ad.image} alt={ad.title} fill sizes="96px" className="object-cover" />
+          <Image src={ad.image} alt={compactAdTitle(ad.title)} fill sizes="96px" className="object-cover" />
           {ad.special && (
             <span className="absolute right-1 top-1 rounded bg-[hsl(var(--new))] px-1.5 py-0.5 text-[10px] font-bold text-white">
               مميّز
@@ -129,11 +131,18 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
         </Cell>
         <Cell>
           <MapPin className="icon-badge mx-auto h-6 w-6 text-primary" />
-          <span className="mt-1 line-clamp-1 text-xs text-primary/90">{ad.cityName || '—'}</span>
+          <span className="mt-1 line-clamp-1 text-xs text-primary/90">{ad.cityName || 'الموقع غير محدد'}</span>
         </Cell>
       </div>
     </Link>
   );
+}
+
+function CardPrice({ ad }: { ad: AdCardType }) {
+  return <div className="mt-1 flex flex-wrap items-baseline gap-1.5">
+    <span className={cn('text-sm font-extrabold', ad.price > 0 ? 'text-primary' : 'text-muted-foreground')}>{adPriceLabel(ad)}</span>
+    <OldPrice ad={ad} /><DiscountChip ad={ad} />
+  </div>;
 }
 
 function Cell({ children }: { children: React.ReactNode }) {
@@ -160,7 +169,7 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
   return (
     <Link href={`/ads/${ad.id}`} className="card-3d group flex flex-col overflow-hidden rounded-2xl">
       <div className="relative aspect-square w-full overflow-hidden bg-white">
-        <Image src={ad.image} alt={ad.title} fill sizes="(max-width:640px) 50vw, 33vw" className="object-cover transition group-hover:scale-105" />
+        <Image src={ad.image} alt={compactAdTitle(ad.title)} fill sizes="(max-width:640px) 50vw, 33vw" className="object-cover transition group-hover:scale-105" />
         {/* شارات فوق الصورة */}
         <span className={cn('absolute right-0 top-2 rounded-l-full px-2 py-0.5 text-[10px] font-extrabold text-white shadow', isReq ? 'bg-amber-500' : 'bg-primary')}>
           {isReq ? 'طلب' : 'عرض'}
@@ -173,7 +182,7 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
         )}
       </div>
       <div className="flex flex-1 flex-col gap-0.5 p-2">
-        <h3 className="line-clamp-2 min-h-[2.2rem] text-[13px] font-bold leading-snug text-foreground/90">{ad.title}</h3>
+        <h3 className="line-clamp-2 min-h-[2.2rem] text-[13px] font-bold leading-snug text-foreground/90">{compactAdTitle(ad.title)}</h3>
         {ad.storeName && <StoreTag name={ad.storeName} />}
         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
           {(ad.ratingCount ?? 0) > 0 && <span className="flex items-center gap-0.5 font-extrabold text-amber-600"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {ad.ratingAvg} ({ad.ratingCount})</span>}
@@ -181,9 +190,7 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
           {ad.cityName && <span className="flex min-w-0 items-center gap-0.5 truncate"><MapPin className="h-3 w-3 shrink-0" /> <span className="truncate">{ad.cityName}</span></span>}
         </div>
         <div className="mt-auto flex items-end justify-between gap-1 pt-0.5">
-          {ad.price > 0
-            ? <span className="flex min-w-0 items-baseline gap-1"><span className="truncate text-[15px] font-extrabold text-red-600">{new Intl.NumberFormat('en-US').format(ad.price)} <span className="text-[11px] font-bold">ر.س</span></span><OldPrice ad={ad} /><DiscountChip ad={ad} /></span>
-            : <span />}
+          <CardPrice ad={ad} />
           <span className="shrink-0 text-[9px] text-muted-foreground">{timeShort(ad.createdAt)}</span>
         </div>
       </div>
@@ -207,12 +214,8 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
           {ad.special && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">مميّز</span>}
           {ad.storeName && <StoreTag name={ad.storeName} />}
         </div>
-        <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground/90">{ad.title}</h3>
-        {(ad.price > 0 || isReq) && (
-          <div className="mt-1 flex items-baseline gap-1.5 text-base font-extrabold text-red-600">
-            {ad.price > 0 ? <>{new Intl.NumberFormat('en-US').format(ad.price)} <span className="text-[11px] font-bold">ر.س</span> <OldPrice ad={ad} /> <DiscountChip ad={ad} /></> : <span className="text-sm font-bold text-muted-foreground">مطلوب</span>}
-          </div>
-        )}
+        <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground/90">{compactAdTitle(ad.title)}</h3>
+        <CardPrice ad={ad} />
         <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-0.5 pt-1.5 text-[11px] text-muted-foreground">
           {(ad.ratingCount ?? 0) > 0 && <span className="flex items-center gap-0.5 font-extrabold text-amber-600"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {ad.ratingAvg} ({ad.ratingCount})</span>}
           <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" /> {new Intl.NumberFormat('en-US').format(ad.views)}</span>
@@ -228,7 +231,7 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
       {/* برواز على الصورة — إطار أبيض بحدّ ملوّن وظلّ (يسار RTL) */}
       <div className="shrink-0 self-center rounded-2xl border-2 border-primary/30 bg-white p-1 shadow-md">
         <div className="relative aspect-square w-24 overflow-hidden rounded-xl sm:w-32">
-          <Image src={ad.image} alt={ad.title} fill sizes="(max-width:640px) 96px, 128px" className="object-cover" />
+          <Image src={ad.image} alt={compactAdTitle(ad.title)} fill sizes="(max-width:640px) 96px, 128px" className="object-cover" />
           {tier && (
             <span className={cn('absolute left-1 top-1 grid h-6 w-6 place-items-center rounded-full shadow', tier === 'gold' ? 'bg-amber-400' : 'bg-slate-300')}>
               <Star className={cn('h-3.5 w-3.5', tier === 'gold' ? 'fill-amber-700 text-amber-700' : 'fill-slate-600 text-slate-600')} />
@@ -249,20 +252,20 @@ export async function AdGrid({ ads, className }: { ads: AdCardType[]; className?
   const design = (await cookies()).get('design')?.value || '';
   if (design === 'shop') {
     return (
-      <div className={cn('grid grid-cols-2 gap-2.5 sm:grid-cols-3', className)}>
+      <div className={cn('grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4', className)}>
         {ads.map((ad) => <AdCardShop key={ad.id} ad={ad} />)}
       </div>
     );
   }
   if (design === 'list') {
     return (
-      <div className={cn('space-y-3', className)}>
+      <div className={cn('grid gap-3 lg:grid-cols-2', className)}>
         {ads.map((ad) => <AdCardList key={ad.id} ad={ad} />)}
       </div>
     );
   }
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('grid gap-3 lg:grid-cols-2', className)}>
       {ads.map((ad, i) => (
         <AdCard key={ad.id} ad={ad} variant={i % 2 === 0 ? 'raised' : 'inset'} />
       ))}

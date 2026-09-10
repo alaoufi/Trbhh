@@ -1,4 +1,5 @@
 'use server';
+import { newPasswordError } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { createAndSendOtp, verifyOtp, resetPasswordByPhone, userExistsByPhone } from '@/lib/sms';
 
@@ -24,7 +25,8 @@ export async function resetAction(formData: FormData) {
   const base = `/forgot?phone=${enc(phone)}&sent=1`;
 
   if (!phone || !code) redirect(`${base}&error=${enc('أدخل الرمز')}`);
-  if (password.length < 4) redirect(`${base}&error=${enc('كلمة المرور 4 خانات على الأقل')}`);
+  const passwordError = await newPasswordError(password);
+  if (passwordError) redirect(`${base}&error=${enc(passwordError)}`);
 
   if (!(await verifyOtp(phone, code))) {
     redirect(`${base}&error=${enc('الرمز غير صحيح أو منتهي الصلاحية')}`);

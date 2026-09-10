@@ -1,5 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useFormStatus } from 'react-dom';
+import { SITE } from '@/lib/constants';
 import { Store, Check, Users, Star, Palette, LayoutTemplate, Sparkles, LayoutGrid, SlidersHorizontal, Eye, Globe } from 'lucide-react';
 import { STORE_COLORS, BANNERS, STORE_TEMPLATES, STORE_LAYOUTS, CATALOG_STYLES, CATALOG_FIELDS, DEFAULT_CATALOG_FIELDS, bannerBackground, layoutTokens, isCatalogStyle } from '@/lib/store-style';
 import { StoreCatalog, type CatalogAd } from '@/components/store-catalog';
@@ -12,11 +14,43 @@ const SAMPLE_ADS: CatalogAd[] = [
 ];
 
 /**
- * Smart store designer with a full library: choose a LAYOUT template (قالب),
- * a color THEME (تيم) or a custom color + banner, then name it — all with a
- * live hero preview. Inputs carry their form `name` so they submit in the parent.
+ * Four-step setup keeps every panel mounted so back/next preserve input values.
+ * Final submit validates every panel and focuses the first invalid field.
  */
-export function StoreDesigner({ initial }: { initial: Initial }) {
+function SubmitStore({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+  return <button type="submit" disabled={pending} className="rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50">{pending ? 'جارٍ الحفظ…' : label}</button>;
+}
+
+export function StoreDesigner({ initial, action, basics, contact, finish, guided = true, submitLabel, stepLabels }: {
+  initial: Initial; action: (data: FormData) => void | Promise<void>; basics: ReactNode; contact: ReactNode; finish: ReactNode; guided?: boolean; submitLabel: string; stepLabels: string[];
+}) {
+  const [step, setStep] = useState(0);
+  const [review, setReview] = useState<Record<string, string>>({});
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState(initial.logoUrl || '');
+  useEffect(() => {
+    if (!logoFile) return;
+    const url = URL.createObjectURL(logoFile); setLogoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [logoFile]);
+  const formRef = useRef<HTMLFormElement>(null);
+  const move = (next: number) => {
+    if (next > step) {
+      const inputs = formRef.current?.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(`[data-store-step="${step}"] input, [data-store-step="${step}"] textarea, [data-store-step="${step}"] select`);
+      if (inputs) for (const input of inputs) if (!input.reportValidity()) return;
+    }
+    if (next === 3 && formRef.current) {
+      const data = new FormData(formRef.current);
+      setReview(Object.fromEntries(['storeName', 'specialty', 'phone', 'email', 'address'].map(key => [key, String(data.get(key) || '')])));
+    }
+    setStep(next);
+    requestAnimationFrame(() => {
+      const panel = formRef.current?.querySelector<HTMLElement>(`[data-store-step="${next}"]`);
+      panel?.focus();
+      panel?.scrollIntoView({ block: 'start' });
+    });
+  };
   const [name, setName] = useState(initial.storeName || '');
   const [tagline, setTagline] = useState(initial.tagline || '');
   const [color, setColor] = useState(initial.color || '#3287da');
@@ -34,7 +68,61 @@ export function StoreDesigner({ initial }: { initial: Initial }) {
   const catalogStyle = isCatalogStyle(catalog) ? catalog : 'tiles';
 
   return (
-    <div className="space-y-4">
+    <form ref={formRef} action={action} noValidate onChangeCapture={(event) => {
+      const input = event.target;
+      if (input instanceof HTMLInputElement && input.name === 'logo') {
+        setLogoFile(input.files?.[0] || null);
+        if (!input.files?.length) setLogoPreview(initial.logoUrl || '');
+      }
+    }} onSubmit={(event) => {
+      if (guided && step < 3) { event.preventDefault(); move(step + 1); return; }
+      for (const el of Array.from(event.currentTarget.elements)) {
+        if ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) && !el.checkValidity()) {
+          event.preventDefault();
+          const target = Number(el.closest('[data-store-step]')?.getAttribute('data-store-step') || 0);
+          setStep(target);
+          requestAnimationFrame(() => { el.focus(); el.reportValidity(); });
+          return;
+        }
+      }
+    }} className="space-y-5 rounded-xl border bg-card p-4 sm:p-5">
+      {guided && <ol aria-label="خطوات إعداد المتجر" className="grid grid-cols-4 gap-2">{stepLabels.map((label, index) => <li key={index} aria-current={step === index ? 'step' : undefined} className={`rounded-lg p-2 text-center text-xs ${step === index ? 'bg-primary font-bold text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>{index + 1}. {label}</li>)}</ol>}
+      <section data-store-step="0" hidden={guided && step !== 0} tabIndex={-1} className="space-y-4 scroll-mt-24">
+        <h2 className="font-bold text-primary">{stepLabels[0]}</h2>
+      <div><label className="mb-1 block text-sm font-bold" htmlFor="store-name">اسم المتجر</label>
+        <input id="store-name" name="storeName" required minLength={2} maxLength={120} value={name} onChange={(e) => setName(e.target.value)} className="h-11 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm" placeholder="اسم متجرك التجاري" /></div>
+
+      <div><label className="mb-1 block text-sm font-bold" htmlFor="store-tagline">الشعار/الوصف القصير</label>
+        <input id="store-tagline" name="tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={160} className="h-11 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm" placeholder="مثال: كل ما تحتاجه لمشروعك بأفضل الأسعار" /></div>
+
+      {/* ===== معرّف المتجر (الرابط المستقل / النطاق الفرعي) ===== */}
+      <div className="rounded-2xl border-2 border-primary/25 bg-gradient-to-l from-primary/10 to-transparent p-4">
+        <span className="flex items-center gap-1.5 text-sm font-extrabold text-primary"><Globe className="h-4 w-4" /> معرّف المتجر (رابط مستقل)</span>
+        <span className="mt-1 mb-2 block text-xs leading-5 text-muted-foreground">اختر معرّفاً بالإنجليزية ليكون رابط متجرك المستقل. أحرف إنجليزية وأرقام و«-» فقط (٣ خانات فأكثر).</span>
+        <div className="flex items-center gap-1 rounded-lg border-2 border-primary/25 bg-white px-2 text-sm" dir="ltr">
+          <input
+            aria-label="معرّف المتجر" name="handle" minLength={3} maxLength={32} pattern="[a-z0-9][a-z0-9-]{1,30}[a-z0-9]"
+            value={handle}
+            onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32))}
+            placeholder="mystore"
+            className="h-11 min-w-0 flex-1 bg-transparent text-left outline-none"
+          />
+          <span className="shrink-0 whitespace-nowrap text-muted-foreground">{SITE.domain}</span>
+        </div>
+        {handle && <div className="mt-1.5 text-xs text-muted-foreground" dir="ltr">رابطك: <b className="text-primary">https://{SITE.domain}/companies/{handle}</b></div>}
+      </div>
+
+      <div><label className="mb-1 block text-sm font-bold" htmlFor="store-about">نبذة عن المتجر</label>
+        <textarea id="store-about" name="about" defaultValue={initial.about || ''} rows={3} className="w-full rounded-lg border-2 border-primary/25 bg-white p-3 text-sm" placeholder="تعريف جذّاب بمتجرك وخدماتك" /></div>
+
+        {basics}
+      </section>
+      <section data-store-step="1" hidden={guided && step !== 1} tabIndex={-1} className="space-y-4 scroll-mt-24">
+        <h2 className="font-bold text-primary">{stepLabels[1]}</h2>
+        {contact}
+      </section>
+      <section data-store-step="2" hidden={guided && step !== 2} tabIndex={-1} className="space-y-4 scroll-mt-24">
+        <h2 className="font-bold text-primary">{stepLabels[2]}</h2>
       {/* ===== المكتبة: قوالب + تيمات ===== */}
       <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-3">
         <div className="mb-2 flex items-center gap-1.5 text-sm font-extrabold text-primary">
@@ -86,35 +174,6 @@ export function StoreDesigner({ initial }: { initial: Initial }) {
           ))}
         </div>
       </div>
-
-      {/* ===== معاينة حيّة تعكس القالب ===== */}
-      <div className={`overflow-hidden shadow-md ring-1 ring-black/5 ${tk.card}`}>
-        <div className={`relative ${tk.hero}`} style={{ background: bannerBackground(banner, color) }}>
-          <div className={`absolute inset-0 flex p-3 text-white drop-shadow ${tk.align === 'center' ? 'flex-col items-center justify-center gap-1 text-center' : 'items-end gap-3'}`}>
-            <span className={`grid ${tk.align === 'center' ? 'h-14 w-14' : 'h-16 w-16'} shrink-0 place-items-center overflow-hidden border-4 border-white bg-white/90 text-primary shadow ${tk.logo}`}>
-              {initial.logoUrl
-                ? // eslint-disable-next-line @next/next/no-img-element
-                  <img src={initial.logoUrl} alt="" className="h-full w-full object-cover" />
-                : <Store className="h-7 w-7" />}
-            </span>
-            <div className={tk.align === 'center' ? '' : 'min-w-0 pb-1'}>
-              <div className={`truncate font-extrabold ${tk.title}`}>{name || 'اسم متجرك'}</div>
-              <div className="truncate text-xs opacity-90">{tagline || 'شعار أو وصف قصير لمتجرك'}</div>
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-2 bg-white p-2 text-center">
-          {[{ i: Users, l: 'متابع' }, { i: Star, l: 'تقييم' }, { i: LayoutGrid, l: 'إعلان' }].map((s, k) => (
-            <div key={k} className="rounded-lg bg-secondary/40 py-1.5"><s.i className="mx-auto h-4 w-4" style={{ color }} /><div className="text-[10px] text-muted-foreground">{s.l}</div></div>
-          ))}
-        </div>
-      </div>
-
-      <div><label className="mb-1 block text-sm font-bold">اسم المتجر</label>
-        <input name="storeName" value={name} onChange={(e) => setName(e.target.value)} className="h-11 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm" placeholder="اسم متجرك التجاري" /></div>
-
-      <div><label className="mb-1 block text-sm font-bold">الشعار/الوصف القصير (Tagline)</label>
-        <input name="tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={160} className="h-11 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm" placeholder="مثال: كل ما تحتاجه لمشروعك بأفضل الأسعار" /></div>
 
       {/* color palette */}
       <div>
@@ -184,32 +243,50 @@ export function StoreDesigner({ initial }: { initial: Initial }) {
         {/* معاينة حيّة للكتالوج */}
         <div className="mt-3 rounded-xl bg-white p-2">
           <div className="mb-1.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground"><Eye className="h-3.5 w-3.5" /> معاينة العرض</div>
-          <StoreCatalog ads={SAMPLE_ADS} style={catalogStyle} fields={fields} brand={color} />
+          <div inert><StoreCatalog ads={SAMPLE_ADS} style={catalogStyle} fields={fields} brand={color} /></div>
         </div>
 
         <input type="hidden" name="catalog" value={catalog} />
         <input type="hidden" name="fields" value={[...fields].join(',')} />
       </div>
 
-      {/* ===== معرّف المتجر (الرابط المستقل / النطاق الفرعي) ===== */}
-      <div className="rounded-2xl border-2 border-primary/25 bg-gradient-to-l from-primary/10 to-transparent p-4">
-        <span className="flex items-center gap-1.5 text-sm font-extrabold text-primary"><Globe className="h-4 w-4" /> معرّف المتجر (رابط مستقل)</span>
-        <span className="mt-1 mb-2 block text-xs leading-5 text-muted-foreground">اختر معرّفاً بالإنجليزية ليكون رابط متجرك المستقل. أحرف إنجليزية وأرقام و«-» فقط (٣ خانات فأكثر).</span>
-        <div className="flex items-center gap-1 rounded-lg border-2 border-primary/25 bg-white px-2 text-sm" dir="ltr">
-          <input
-            name="handle"
-            value={handle}
-            onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32))}
-            placeholder="mystore"
-            className="h-11 min-w-0 flex-1 bg-transparent text-left outline-none"
-          />
-          <span className="shrink-0 whitespace-nowrap text-muted-foreground">.trbhh.com</span>
+
+      </section>
+      <section data-store-step="3" hidden={guided && step !== 3} tabIndex={-1} className="space-y-4 scroll-mt-24">
+        <h2 className="font-bold text-primary">{stepLabels[3]}</h2>
+      {/* ===== معاينة حيّة تعكس القالب ===== */}
+      <div className={`overflow-hidden shadow-md ring-1 ring-black/5 ${tk.card}`}>
+        <div className={`relative ${tk.hero}`} style={{ background: bannerBackground(banner, color) }}>
+          <div className={`absolute inset-0 flex p-3 text-white drop-shadow ${tk.align === 'center' ? 'flex-col items-center justify-center gap-1 text-center' : 'items-end gap-3'}`}>
+            <span className={`grid ${tk.align === 'center' ? 'h-14 w-14' : 'h-16 w-16'} shrink-0 place-items-center overflow-hidden border-4 border-white bg-white/90 text-primary shadow ${tk.logo}`}>
+              {logoPreview
+                ? // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoPreview} alt="" className="h-full w-full object-cover" />
+                : <Store className="h-7 w-7" />}
+            </span>
+            <div className={tk.align === 'center' ? '' : 'min-w-0 pb-1'}>
+              <div className={`truncate font-extrabold ${tk.title}`}>{name || 'اسم متجرك'}</div>
+              <div className="truncate text-xs opacity-90">{tagline || 'شعار أو وصف قصير لمتجرك'}</div>
+            </div>
+          </div>
         </div>
-        {handle && <div className="mt-1.5 text-xs text-muted-foreground" dir="ltr">رابطك: <b className="text-primary">https://{handle}.trbhh.com</b></div>}
+        <div className="grid grid-cols-3 gap-2 bg-white p-2 text-center">
+          {[{ i: Users, l: 'متابع' }, { i: Star, l: 'تقييم' }, { i: LayoutGrid, l: 'إعلان' }].map((s, k) => (
+            <div key={k} className="rounded-lg bg-secondary/40 py-1.5"><s.i className="mx-auto h-4 w-4" style={{ color }} /><div className="text-[10px] text-muted-foreground">{s.l}</div></div>
+          ))}
+        </div>
       </div>
 
-      <div><label className="mb-1 block text-sm font-bold">نبذة عن المتجر</label>
-        <textarea name="about" defaultValue={initial.about || ''} rows={3} className="w-full rounded-lg border-2 border-primary/25 bg-white p-3 text-sm" placeholder="تعريف جذّاب بمتجرك وخدماتك" /></div>
-    </div>
+
+<div inert><StoreCatalog ads={SAMPLE_ADS} style={catalogStyle} fields={fields} brand={color} /></div>
+        {guided && <dl className="grid gap-2 rounded-lg bg-muted p-3 text-sm">{[['storeName', 'اسم المتجر'], ['specialty', 'النشاط'], ['phone', 'الجوال'], ['email', 'البريد الإلكتروني'], ['address', 'العنوان']].map(([key, label]) => review[key] ? <div key={key} className="flex flex-wrap gap-2"><dt className="font-bold">{label}:</dt><dd className="break-all">{review[key]}</dd></div> : null)}</dl>}
+        <p className="text-xs text-muted-foreground">المعاينة توضيحية. لن يُنشأ المتجر حتى تضغط زر الحفظ، ويظهر للعملاء بعد اعتماد الإدارة.</p>
+        {finish}
+      </section>
+      <div className="flex items-center justify-between gap-3 border-t pt-4">
+        {guided && step > 0 ? <button type="button" onClick={() => move(step - 1)} className="rounded-lg border px-5 py-3 text-sm">السابق</button> : <span />}
+        {guided && step < 3 ? <button type="button" onClick={() => move(step + 1)} className="rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground">التالي</button> : <SubmitStore label={submitLabel} />}
+      </div>
+    </form>
   );
 }

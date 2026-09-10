@@ -62,14 +62,16 @@ export default async function StoreLoginPage({ searchParams }: { searchParams: P
 
       {error === '1' && (
         <div className="w-full rounded-lg border-2 border-red-300 bg-red-50 p-3 text-center text-sm font-bold text-red-700">
-          بيانات الدخول غير صحيحة.
+          بيانات الدخول أو رمز التحقق غير صحيحة. استخدم رمزاً جديداً للحساب المفعّل، وانتظر عشر دقائق بعد المحاولات المتكررة.
         </div>
       )}
 
       <form action={storeLoginAction} className="w-full space-y-3">
         {s ? <input type="hidden" name="s" value={s} /> : null}
-        <input name="identifier" type="tel" required dir="ltr" inputMode="tel" autoComplete="tel" placeholder="رقم الجوال (05xxxxxxxx)" className={`${field} text-left`} style={{ borderColor: `${brand}40` }} />
-        <input name="password" type="password" required autoComplete="current-password" placeholder="كلمة المرور" className={field} style={{ borderColor: `${brand}40` }} />
+        <input name="identifier" type="text" required dir="ltr" autoComplete="username" autoCapitalize="none" spellCheck={false} aria-label="اسم المستخدم أو رقم الجوال" placeholder="اسم المستخدم أو رقم الجوال" className={`${field} text-left`} style={{ borderColor: `${brand}40` }} />
+        <input name="password" aria-label="كلمة المرور" type="password" required autoComplete="current-password" placeholder="كلمة المرور" className={field} style={{ borderColor: `${brand}40` }} />
+        <label htmlFor="store-factor" className="block text-sm">رمز التحقق للحساب المفعّل</label>
+        <input id="store-factor" name="factorCode" type="text" dir="ltr" autoComplete="one-time-code" placeholder="رمز التطبيق أو رمز استرداد" className={field} />
         <button className="btn-3d flex h-12 w-full items-center justify-center gap-2 rounded-lg text-sm font-extrabold" style={{ background: brand, color: onBrand }}>
           <LogIn className="h-4 w-4" /> {store ? `دخول متجر ${store.name}` : 'دخول المتجر'}
         </button>

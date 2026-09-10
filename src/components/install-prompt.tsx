@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useAutomaticPrompt } from '@/components/use-automatic-prompt';
 import { usePathname } from 'next/navigation';
 import { Download, X, Share, Plus, MoreVertical } from 'lucide-react';
 
@@ -26,6 +27,7 @@ export function InstallPrompt({
   const [manual, setManual] = useState(false);
 
   const neverKey = storageKey;
+  const invitation = useAutomaticPrompt(storageKey, show && !(scope === 'site' && inStoreCtx), 45000);
 
   useEffect(() => {
     if (scope === 'site' && inStoreCtx) return;
@@ -53,31 +55,32 @@ export function InstallPrompt({
       timers.push(setTimeout(() => { if (!w.__bipEvent) { setManual(true); setShow(true); } }, 4000));
     }
 
-    const onInstalled = () => setShow(false);
+    const onInstalled = () => { setShow(false); try { localStorage.setItem(neverKey, '1'); } catch { /* ignore */ } };
     window.addEventListener('appinstalled', onInstalled);
     return () => { window.removeEventListener('bipready', pick); window.removeEventListener('beforeinstallprompt', onPrompt); window.removeEventListener('appinstalled', onInstalled); timers.forEach(clearTimeout); };
   }, [inStoreCtx, scope, storageKey, neverKey]);
 
   // الإغلاق قرار دائم لهذا الجهاز: لا نعيد الرسالة بعد تحديث التطبيق أو زيارة جديدة.
-  const close = () => { setShow(false); try { localStorage.setItem(neverKey, '1'); } catch { /* ignore */ } };
-  const never = () => { setShow(false); try { localStorage.setItem(neverKey, '1'); } catch { /* ignore */ } };
+  const close = () => { invitation.dismiss(); setShow(false); try { localStorage.setItem(neverKey, '1'); } catch { /* ignore */ } };
+  const never = () => { invitation.dismiss(); setShow(false); try { localStorage.setItem(neverKey, '1'); } catch { /* ignore */ } };
   const install = async () => {
     if (!deferred) return;
     try { await deferred.prompt(); await deferred.userChoice; } catch { /* ignore */ }
     try { (window as unknown as { __bipEvent?: unknown }).__bipEvent = null; } catch { /* ignore */ }
+    invitation.dismiss();
     setDeferred(null);
     setShow(false);
     try { localStorage.setItem(neverKey, '1'); } catch { /* ignore */ }
   };
 
-  if (!show) return null;
+  if (!show || !invitation.open) return null;
   const bg = brand || 'hsl(var(--primary))';
   const label = scope === 'store' ? `متجر ${name}` : 'تطبيق تربح';
   const mode: 'button' | 'ios' | 'manual' = deferred ? 'button' : ios ? 'ios' : 'manual';
 
   return (
-    <div className="fixed inset-x-0 top-0 z-[200] px-2 pt-[max(0.4rem,env(safe-area-inset-top))]">
-      <div className="mx-auto flex max-w-2xl items-center gap-2.5 rounded-b-2xl px-3 py-2 text-white shadow-xl ring-1 ring-black/10" style={{ background: bg }}>
+    <div className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[60] md:bottom-4">
+      <div className="mx-auto flex max-w-2xl items-center gap-2.5 rounded-2xl px-3 py-2 text-white shadow-xl ring-1 ring-black/10" style={{ background: bg }}>
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/20"><Download className="h-5 w-5" /></span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-extrabold">ثبّت {label} على جهازك</div>
@@ -90,14 +93,14 @@ export function InstallPrompt({
           {mode === 'button' && (
             <p className="truncate text-[11px] opacity-90">وصول أسرع من سطح المكتب/الشاشة الرئيسية.</p>
           )}
-          <button onClick={never} className="mt-0.5 text-[10px] font-medium text-white/75 underline underline-offset-2 hover:text-white">لا تظهر لاحقاً</button>
+          <button onClick={never} className="mt-0.5 text-[10px] font-medium text-white underline underline-offset-2 hover:text-white">لا تظهر لاحقاً</button>
         </div>
         {mode === 'button' && (
           <button onClick={install} className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-extrabold shadow" style={{ color: bg }}>
             تثبيت
           </button>
         )}
-        <button onClick={close} aria-label="إغلاق" className="shrink-0 rounded-lg p-1 text-white/90 hover:bg-white/15"><X className="h-4 w-4" /></button>
+        <button onClick={close} aria-label="إغلاق" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-white hover:bg-white/15"><X className="h-4 w-4" /></button>
       </div>
     </div>
   );

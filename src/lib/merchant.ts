@@ -1,10 +1,13 @@
 import 'server-only';
 import { cache } from 'react';
+import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { toInt } from './utils';
 import { ensureSchema } from '@/data/schema-sync';
 import { cached } from './redis';
+import { getStoreSubPricing } from './settings';
+import { publicStoreWhere } from './store-subscription-access';
 
 async function logoUrl(logoId: number | null): Promise<string> {
   if (!logoId) return PLACEHOLDER;
@@ -467,7 +470,7 @@ export async function getStoreReviews(storeId: number) {
 /** Approved store ids (for filtering the public list). */
 export async function approvedStoreIds(): Promise<Set<number>> {
   await ensure();
-  const rows = await prisma.stores.findMany({ where: { status: 1 }, select: { id: true } }).catch(() => []);
+  const rows = await prisma.stores.findMany({ where: publicStoreWhere(await getStoreSubPricing()), select: { id: true } }).catch(() => []);
   return new Set(rows.map((r) => toInt(r.id)));
 }
 
@@ -490,7 +493,7 @@ export function normalizeHandle(raw: string): string {
 /* ---- independent store login (separate credentials → store dashboard) ---- */
 
 /** Minimum length for the dedicated store password (kept short by request). */
-export const STORE_PW_MIN = 4;
+export const STORE_PW_MIN = 12;
 
 /** Normalize a store login username (separate from the subdomain handle). */
 export function normalizeStoreUsername(raw: string): string {
@@ -503,7 +506,8 @@ export function normalizeStoreUsername(raw: string): string {
 export async function setStorePassword(userId: number, plain: string): Promise<boolean> {
   await ensure();
   const storeId = await getActiveStoreId(userId);
-  if (!storeId || !plain || plain.length < STORE_PW_MIN) return false;
+  const { newPasswordError } = await import('./auth');
+  if (!storeId || await newPasswordError(plain)) return false;
   const { hashPassword } = await import('./auth');
   const hash = await hashPassword(plain);
   await prisma.stores.updateMany({ where: { id: BigInt(storeId) }, data: { store_password: hash } }).catch(() => {});
@@ -550,9 +554,9 @@ export async function resetStoreCredentialsByPhone(phone: string): Promise<{ use
     username = `store${toInt(store.id)}`;
     await prisma.stores.updateMany({ where: { id: store.id }, data: { store_username: username } }).catch(() => {});
   }
-  // generate a fresh 4-digit password and store it hashed
-  const { randomInt } = await import('crypto');
-  const password = String(randomInt(1000, 10000));
+  // Match the strongest configurable minimum without weak numeric defaults.
+  const { randomBytes } = await import('crypto');
+  const password = 'A-' + randomBytes(31).toString('hex');
   const { hashPassword } = await import('./auth');
   const hash = await hashPassword(password);
   await prisma.stores.updateMany({ where: { id: store.id }, data: { store_password: hash } }).catch(() => {});
@@ -720,11 +724,11 @@ export async function isCollaborator(aStore: number, bStore: number): Promise<bo
 export async function collaboratorAds(storeId: number) {
   const ids = await collaboratorStoreIds(storeId);
   if (!ids.length) return [];
-  const stores = await prisma.stores.findMany({ where: { id: { in: ids.map((n) => BigInt(n)) } }, select: { id: true, user_id: true } });
-  const out: { id: number; title: string; price: number; adsType: string; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; urgent: boolean; views: number; sellerName: null; sellerTrusted: boolean }[] = [];
+  const stores = await prisma.stores.findMany({ where: { AND: [publicStoreWhere(await getStoreSubPricing()), { id: { in: ids.map((n) => BigInt(n)) } }] }, select: { id: true, user_id: true } });
+  const out: { id: number; title: string; price: number; adsType: string; priceType: string | null; rentPeriod: string | null; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; urgent: boolean; views: number; sellerName: null; sellerTrusted: boolean }[] = [];
   for (const s of stores) {
     const a = (await storeCatalogAds(toInt(s.id), Number(s.user_id))).slice(0, 4);
-    for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special,
+    for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, priceType: x.priceType, rentPeriod: x.rentPeriod, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special,
       urgent: false, views: 0, sellerName: null, sellerTrusted: false });
   }
   const vc = await adViewCounts(out.map((o) => o.id));
@@ -732,12 +736,29 @@ export async function collaboratorAds(storeId: number) {
   return out.slice(0, 12);
 }
 
+/** Placement grants apply only while the store is approved and its subscription permits display. */
+async function platformStoreWhere(products: boolean): Promise<Prisma.storesWhereInput> {
+  const now = new Date();
+  return { AND: [publicStoreWhere(await getStoreSubPricing(), now), {
+    OR: [{ home_featured: 1 }, { show_until: { gt: now }, ...(products ? { show_on_platform: 1 } : {}) }],
+  }] };
+}
+
+/** Revalidate inexpensive eligibility fields even when the rich cards came from Redis. */
+async function visiblePlacementIds(ids: number[], products: boolean): Promise<Set<number>> {
+  const clean = [...new Set(ids.filter((id) => Number.isSafeInteger(id) && id > 0))];
+  if (!clean.length) return new Set();
+  const rows = await prisma.stores.findMany({
+    where: { AND: [await platformStoreWhere(products), { id: { in: clean.map(BigInt) } }] }, select: { id: true },
+  });
+  return new Set(rows.map((row) => toInt(row.id)));
+}
 /** Owners of stores shown on the Trbhh platform: admin-featured OR merchant
  *  opted-in — both only once the store itself is approved. */
 export async function homeFeaturedOwnerIds(limit = 12): Promise<number[]> {
   await ensure();
   const rows = await prisma.stores.findMany({
-    where: { status: 1, OR: [{ home_featured: 1 }, { AND: [{ show_on_platform: 1 }, { OR: [{ show_until: null }, { show_until: { gt: new Date() } }] }] }] },
+    where: await platformStoreWhere(true),
     orderBy: [{ home_featured: 'desc' }, { id: 'desc' }], take: limit,
     select: { user_id: true },
   }).catch(() => []);
@@ -750,7 +771,7 @@ export async function homeFeaturedStores(limit = 6): Promise<{ userId: number; s
   // مدفوعات صارمة: المنتجات تظهر فقط لمتجر معتمد المحتوى (show_on_platform)
   // ودفَع «عرض المتجر» ساري المفعول (show_until > الآن) أو منحته الإدارة (home_featured)
   const rows = await prisma.stores.findMany({
-    where: { status: 1, OR: [{ home_featured: 1 }, { AND: [{ show_on_platform: 1 }, { show_until: { gt: new Date() } }] }] },
+    where: await platformStoreWhere(true),
     orderBy: [{ home_featured: 'desc' }, { id: 'desc' }], take: limit,
     select: { user_id: true, id: true, store_name: true },
   }).catch(() => []);
@@ -760,17 +781,27 @@ export async function homeFeaturedStores(limit = 6): Promise<{ userId: number; s
 /** Active ads from platform stores, shaped for AdGrid + labelled "من متجر …". */
 export async function homeFeaturedAds() {
   // one getMyAds round per merchant — cache the assembled showcase briefly
-  return cached('stores:home-ads', 120, () => loadHomeFeaturedAds());
+  const ads = await cached('stores:home-ads', 120, () => loadHomeFeaturedAds());
+  const visible = await visiblePlacementIds(ads.map((ad) => ad.storeId), true);
+  const eligible = ads.filter((ad) => visible.has(ad.storeId));
+  if (!eligible.length) return [];
+  const [currentAds, products] = await Promise.all([
+    prisma.ads.findMany({ where: { id: { in: eligible.map((ad) => BigInt(ad.id)) }, status: 1, state: 'active', OR: [{ data_archive: null }, { data_archive: '' }] }, select: { id: true } }),
+    prisma.store_products.findMany({ where: { OR: eligible.map((ad) => ({ store_id: ad.storeId, ad_id: ad.id })) }, select: { store_id: true, ad_id: true } }),
+  ]);
+  const activeIds = new Set(currentAds.map((ad) => toInt(ad.id)));
+  const memberships = new Set(products.map((product) => `${product.store_id}:${product.ad_id}`));
+  return eligible.filter((ad) => activeIds.has(ad.id) && memberships.has(`${ad.storeId}:${ad.id}`));
 }
 
 async function loadHomeFeaturedAds() {
   const stores = await homeFeaturedStores(6);
   if (!stores.length) return [];
-  const out: { id: number; title: string; price: number; adsType: string; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; urgent: boolean; views: number; sellerName: null; sellerTrusted: boolean; storeName: string | null; storeId: number }[] = [];
+  const out: { id: number; title: string; price: number; adsType: string; priceType: string | null; rentPeriod: string | null; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; urgent: boolean; views: number; sellerName: null; sellerTrusted: boolean; storeName: string | null; storeId: number }[] = [];
   for (const st of stores) {
     const label = st.storeName || (await getStoreMeta(st.storeId)).storeName;
     const a = (await storeCatalogAds(st.storeId, st.userId)).slice(0, 4);
-    for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, urgent: false, views: 0, sellerName: null, sellerTrusted: false, storeName: label, storeId: st.storeId });
+    for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, priceType: x.priceType, rentPeriod: x.rentPeriod, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special, urgent: false, views: 0, sellerName: null, sellerTrusted: false, storeName: label, storeId: st.storeId });
   }
   const vc = await adViewCounts(out.map((o) => o.id));
   for (const o of out) o.views = vc.get(o.id) ?? 0;
@@ -834,14 +865,16 @@ export async function decidePlatformRequest(storeId: number, approve: boolean) {
  *  independent of the products feed, which needs a separate approval).
  *  Cached briefly: each card is several queries and the home page is dynamic. */
 export async function homeStoreCards(limit = 12) {
-  return cached(`stores:cards:${limit}`, 120, () => loadHomeStoreCards(limit));
+  const cards = await cached(`stores:cards:${limit}`, 120, () => loadHomeStoreCards(limit));
+  const visible = await visiblePlacementIds(cards.map((card) => card?.id ?? 0), false);
+  return cards.filter((card): card is NonNullable<typeof card> => card !== null && visible.has(card.id));
 }
 async function loadHomeStoreCards(limit: number) {
   await ensure();
   // مدفوعات صارمة: بطاقة المتجر بالرئيسية لمن دفع «عرض المتجر» (show_until ساري)
   // أو منحته الإدارة (home_featured) فقط — لا عرض مجاني إطلاقاً
   const rows = await prisma.stores.findMany({
-    where: { status: 1, OR: [{ home_featured: 1 }, { show_until: { gt: new Date() } }] },
+    where: await platformStoreWhere(false),
     orderBy: [{ home_featured: 'desc' }, { id: 'desc' }], take: limit, select: { id: true },
   }).catch(() => []);
   const cards = await Promise.all(rows.map((r) => storeCard(toInt(r.id))));

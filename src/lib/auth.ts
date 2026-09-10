@@ -3,6 +3,7 @@ import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
+import { passwordPolicyError } from './password-policy';
 
 const COOKIE = 'trbhh_session';
 const INSECURE_DEFAULT = 'dev-insecure-secret-change-me-in-production-please';
@@ -23,7 +24,7 @@ function assertSecureSecret(): void {
 }
 const secret = new TextEncoder().encode(AUTH_SECRET || INSECURE_DEFAULT);
 
-export type SessionPayload = { uid: number; name: string; type: string; scope?: string };
+export type SessionPayload = { uid: number; name: string; type: string; scope?: string; mfaVersion?: string; authVersion: string };
 
 /**
  * Verify a plaintext password against the stored bcrypt hash.
@@ -40,12 +41,23 @@ export async function verifyPassword(plain: string, hash: string | null): Promis
   }
 }
 
+export async function newPasswordError(plain: string): Promise<string | null> {
+  const { getAuthSecuritySettings } = await import('./settings');
+  return passwordPolicyError(plain, (await getAuthSecuritySettings()).passwordMinimum);
+}
+
 export async function hashPassword(plain: string): Promise<string> {
+  const error = await newPasswordError(plain);
+  if (error) throw new Error(error);
   return bcrypt.hash(plain, 10);
 }
 
 export async function createSession(payload: SessionPayload): Promise<void> {
   assertSecureSecret();
+  const { sessionMeetsAuthPolicy } = await import('./auth-security');
+  // Keep the version that was actually authenticated. A concurrent reset must
+  // invalidate this proof, never silently upgrade it to the new version.
+  if (!(await sessionMeetsAuthPolicy(payload))) throw new Error('يلزم تسجيل الدخول برمز التحقق لهذا الحساب.');
   const token = await new SignJWT(payload as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -68,7 +80,11 @@ async function getSessionImpl(): Promise<SessionPayload | null> {
   assertSecureSecret();
   try {
     const { payload } = await jwtVerify(token, secret);
-    return payload as unknown as SessionPayload;
+    const session = { ...payload, authVersion: typeof payload.authVersion === 'string' ? payload.authVersion : '0' } as unknown as SessionPayload;
+    if (!Number.isSafeInteger(session.uid) || session.uid <= 0) return null;
+    const { sessionMeetsAuthPolicy } = await import('./auth-security');
+    if (!(await sessionMeetsAuthPolicy(session))) return null;
+    return session;
   } catch {
     return null;
   }

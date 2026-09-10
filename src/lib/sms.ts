@@ -1,5 +1,5 @@
 import 'server-only';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomBytes, randomUUID } from 'node:crypto';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { hashPassword } from './auth';
@@ -260,8 +260,8 @@ export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; de
 export async function sendNewPasswordToUser(userId: number): Promise<{ ok: boolean; error?: string }> {
   const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { phoneNumber: true } }).catch(() => null);
   if (!u?.phoneNumber) return { ok: false, error: 'لا يوجد رقم جوال لهذا العضو' };
-  const pass = String(randomInt(100000, 1000000));
-  await prisma.users.update({ where: { id: BigInt(userId) }, data: { password: await hashPassword(pass) } });
+  const pass = 'A-' + randomBytes(31).toString('hex');
+  await prisma.users.update({ where: { id: BigInt(userId) }, data: { password: await hashPassword(pass), auth_session_version: randomUUID() } });
   const sent = await sendVerification(u.phoneNumber, `كلمة مرورك الجديدة في تربح: ${pass}`);
   if (!sent) return { ok: false, error: 'حُدّثت كلمة المرور لكن تعذّر إرسال الرسالة (تحقّق من إعداد البوابة)' };
   return { ok: true };
@@ -296,7 +296,7 @@ export async function resetPasswordByPhone(phone: string, newPassword: string): 
   const ids = [...new Set(rows.map((r) => r.id.toString()))];
   if (ids.length !== 1) return false; // لا تطابق أو تطابق متعدّد غامض
   const hash = await hashPassword(newPassword);
-  await prisma.users.update({ where: { id: BigInt(ids[0]) }, data: { password: hash } });
+  await prisma.users.update({ where: { id: BigInt(ids[0]) }, data: { password: hash, auth_session_version: randomUUID() } });
   await prisma.password_otps.deleteMany({ where: { phone: norm } }).catch(() => {});
   return true;
 }

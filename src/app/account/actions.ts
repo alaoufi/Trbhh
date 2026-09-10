@@ -438,7 +438,7 @@ export async function switchAccountAction(formData: FormData) {
   const { linkedUserIds, getLinkMode } = await import('@/lib/account-links');
   const linked = await linkedUserIds(session.uid).catch(() => [session.uid]);
   if (!linked.includes(target)) redirect('/account?error=notlinked');
-  const u = await prisma.users.findUnique({ where: { id: BigInt(target) }, select: { id: true, name: true, userName: true, ban: true } }).catch(() => null);
+  const u = await prisma.users.findUnique({ where: { id: BigInt(target) }, select: { id: true, name: true, userName: true, ban: true, auth_session_version: true } }).catch(() => null);
   if (!u) redirect('/account');
   if (u.ban === 'checked') redirect('/account?error=switchbanned');
   // أمان: يُمنع تصعيد الصلاحية — لا تبديل بلا كلمة مرور من حساب عادي إلى حساب إدارة.
@@ -453,8 +453,10 @@ export async function switchAccountAction(formData: FormData) {
     const mode = await getLinkMode(target).catch(() => 'confirm' as const);
     if (mode === 'confirm') redirect(`/account/switch?to=${target}`);
   }
+  const { getMfaCredential } = await import('@/lib/auth-security');
+  if (await getMfaCredential(target)) redirect('/login?next=/account');
   const { createSession } = await import('@/lib/auth');
-  await createSession({ uid: toInt(u.id), name: u.name || u.userName || 'مستخدم', type: 'user' });
+  await createSession({ uid: toInt(u.id), name: u.name || u.userName || 'مستخدم', type: 'user', authVersion: u.auth_session_version });
   // طبّق قالب الحساب الهدف (هويته الافتراضية) وامسح الهوية الفعّالة القديمة
   const { setThemeCookie, defaultProfileTheme, setActiveProfileCookie, ensureDefaultProfile } = await import('@/lib/profiles');
   await setThemeCookie(await defaultProfileTheme(toInt(u.id)).catch(() => ''));
@@ -471,7 +473,7 @@ export async function linkOwnAccountAction(formData: FormData) {
   const password = String(formData.get('password') || '');
   if (!identifier || !password) redirect('/account/identities?error=empty');
   const { verifyAndLinkOwn } = await import('@/lib/account-links');
-  const res = await verifyAndLinkOwn(session.uid, identifier, password).catch(() => ({ ok: false as const, error: 'تعذّر الربط' }));
+  const res = await verifyAndLinkOwn(session.uid, identifier, password, String(formData.get('factorCode') || '')).catch(() => ({ ok: false as const, error: 'تعذّر الربط' }));
   revalidatePath('/account/identities');
   if (!res.ok) redirect(`/account/identities?error=link&msg=${encodeURIComponent(res.error || 'تعذّر الربط')}`);
   redirect(`/account/identities?linked=${encodeURIComponent(res.name || 'الحساب')}`);

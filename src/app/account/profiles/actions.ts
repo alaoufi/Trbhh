@@ -186,7 +186,7 @@ export async function linkAccountAction(formData: FormData) {
   const password = String(formData.get('password') || '');
   if (!identifier || !password) redirect('/account/profiles?merror=creds#merge');
   const { verifyAndLinkOwn } = await import('@/lib/account-links');
-  const res = await verifyAndLinkOwn(session.uid, identifier, password);
+  const res = await verifyAndLinkOwn(session.uid, identifier, password, String(formData.get('factorCode') || ''));
   if (!res.ok) redirect(`/account/profiles?merror=verify&omsg=${encodeURIComponent(res.error || '')}#merge`);
   revalidatePath('/account/profiles');
   revalidatePath('/');

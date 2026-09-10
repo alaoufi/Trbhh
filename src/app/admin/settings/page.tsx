@@ -1,3 +1,5 @@
+import { getAuditUxSettings } from '@/lib/settings';
+import { AUDIT_UX_FLAGS, AUDIT_UX_TEXTS } from '@/lib/ux-settings';
 import Link from 'next/link';
 import { Settings, Check, BarChart3, Eye, ChevronDown } from 'lucide-react';
 import { requireAction } from '@/lib/roles';
@@ -25,6 +27,7 @@ function Group({ title, children, open = false }: { title: React.ReactNode; chil
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
   await requireAction('users', 'edit');
+  const auditUx = await getAuditUxSettings();
   const [{ saved, error: saveError }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn, scheduleOn, bumpOn, adContactStatsOn, couponsOn, stockOn, hoursOn, dealsOn, autoRenewOn, auctionOn, staffOn, nameLockOn, homeActionsOn, archiveAutodeleteOn, platformRatingOn, adLifetimeDays, strikeBanDays, maxProfiles, identityPlans, identityExemptDays, maxStores, scheduleMaxDays, storeShieldOn, adReviewsOn, requestsMarketOn] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false), getSettingBool('schedule_on', false), getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('coupons_on', false), getSettingBool('stock_on', false), getSettingBool('hours_on', false), getSettingBool('deals_on', false), getSettingBool('autorenew_on', false), getSettingBool('auction_on', false), getSettingBool('staff_on', false), getSettingBool('namelock_on', true), getSettingBool('home_actions_on', true), getSettingBool('archive_autodelete_on', false), getSettingBool('platform_rating_on', true), getAdLifetimeDays(), getStrikeBanDays(), getSettingNum('max_profiles', 5), getIdentityPlans(), getExemptDays(), getSettingNum('max_stores', 3), getSettingNum('schedule_max_days', 30), getStoreShield(), getSettingBool('ad_reviews_on', true), getSettingBool('requests_market_on', true)]);
   return (
     <div className="max-w-lg space-y-4">
@@ -37,6 +40,10 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
       {saveError === 'save' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر حفظ الإعدادات — سُجِّل الخطأ في «سجل الأخطاء». حاول مجدداً.</div>}
 
       <form action={saveSettingsAction} className="space-y-2 rounded-xl border border-primary/20 bg-card p-4">
+        <Group title="البحث وتجربة الزائر وإعداد المتجر">
+          {AUDIT_UX_FLAGS.map(([key, label]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" name={key} defaultChecked={auditUx.flags[key]} className="h-4 w-4 accent-primary" />{label}</label>)}
+          {AUDIT_UX_TEXTS.map(([key, label]) => <label key={key} className="block space-y-1 text-sm"><span>{label}</span><textarea name={key} defaultValue={auditUx.texts[key]} rows={key === 'store_landing_features' ? 4 : 2} maxLength={1000} className="w-full rounded-lg border bg-background p-2" /></label>)}
+        </Group>
         <Group title="المدد والحدود وباقات الهويات" open>
         <div className="text-sm font-bold text-primary">مدة سماح العضو بالتعديل/الحذف على إعلانه</div>
         <p className="text-xs text-muted-foreground">حدّد المدة (بالساعات) التي يُسمح فيها للعضو بتعديل أو حذف إعلانه بعد نشره. اكتب 0 لجعلها دائمة بلا حد.</p>

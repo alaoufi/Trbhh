@@ -135,7 +135,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             the shared header/menu/footer, even across client-side navigation. */}
         <ChromeGate
           header={<Header />}
-          footer={<><Footer /><MobileNav unread={unread} isAuthed={!!session} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
+          footer={<><VerifySeal /><Footer /><MobileNav unread={unread} isAuthed={!!session} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
         >
           {children}
         </ChromeGate>
@@ -158,7 +158,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* ختم التوثيق «متجر موثّق» (المركز السعودي للأعمال) — شارة عائمة تُثبَّت أسفل يسار
             الصفحة. نسخة واحدة على مستوى الموقع، والسكربت الرسمي يُحمَّل async بعد رسم الصفحة
             ليجد العنصر (المُصيَّر من الخادم) ويرسم الشارة — مطابقةً لكود التضمين الرسمي. */}
-        <VerifySeal />
+
         <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="afterInteractive" />
         <SealReposition />
       </body>

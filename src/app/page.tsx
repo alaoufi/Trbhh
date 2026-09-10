@@ -3,12 +3,15 @@ import { cookies } from 'next/headers';
 import { Users, Megaphone, Eye, Sparkles, ChevronLeft, Heart, MessageCircle, Phone } from 'lucide-react';
 import {
   getFeaturedAds,
+  getCities,
+  getAreas,
   getHomeLatestAds,
   getMostViewedAds,
   getTopRatedAds,
   getStats,
   getPersonalizedAds,
 } from '@/lib/data';
+import { PublicSearchForm } from '@/components/public-search-form';
 import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { CollapsibleSection } from '@/components/collapsible-section';
@@ -52,7 +55,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
   const [featured, latest, mostViewed, topRated, stats, homeStats, clsText] = await Promise.all([
     getFeaturedAds(8),
-    getHomeLatestAds(20),
+    getHomeLatestAds(8),
     getMostViewedAds(8),
     getTopRatedAds(8),
     getStats(),
@@ -94,6 +97,15 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     ? await Promise.all([getPlatformRating().catch(() => ({ avg: 0, count: 0 })), getMyPlatformReview(myViewerKey).catch(() => null)])
     : [{ avg: 0, count: 0 }, null];
   const platformRated = !!myReview;
+  const [discoveryOn, discoveryTitle, discoverySubtitle, discoveryPlaceholder, discoveryAddLabel, priceOn, cities, areas] = await Promise.all([
+    getSettingBool('home_discovery_on', true),
+    getSetting('home_discovery_title', 'تربح — إعلانات ومتاجر قريبة منك'),
+    getSetting('home_discovery_subtitle', 'ابحث عن عرضك القادم أو أضف إعلانك وتواصل مباشرة مع المعلن.'),
+    getSetting('home_discovery_search_placeholder', 'ماذا تبحث عنه؟'),
+    getSetting('home_discovery_add_label', 'أضف إعلانك'),
+    getSettingBool('search_price_filter_on', true),
+    getCities(), getAreas(),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -105,8 +117,40 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
         </div>
       )}
 
+      {discoveryOn && (
+        <section aria-labelledby="discovery-title" className="overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#16294a] px-4 py-4 text-white sm:px-6">
+            <div className="min-w-0 flex-1">
+              <h1 id="discovery-title" className="text-xl font-extrabold leading-relaxed sm:text-2xl">{discoveryTitle}</h1>
+              <p className="mt-1 text-sm leading-6 text-slate-100">{discoverySubtitle}</p>
+            </div>
+            <Link href="/ads/new" className="flex h-11 shrink-0 items-center gap-2 rounded-xl bg-[#f0b429] px-4 text-sm font-extrabold text-[#16294a] hover:bg-[#f8c955]">
+              <Megaphone className="h-4 w-4" /> {discoveryAddLabel}
+            </Link>
+          </div>
+          <div className="p-4 sm:px-6"><PublicSearchForm regions={cities} areas={areas} priceOn={priceOn} placeholder={discoveryPlaceholder} compact /></div>
+        </section>
+      )}
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
+
+      {featured.length > 0 && (
+        <Section title={H.featured} href="/search?special=1">
+          <AdGrid ads={featured} />
+        </Section>
+      )}
+
+      <Section title={H.latest} href="/search">
+        <div className="space-y-4">
+          <AdGrid ads={latest} />
+          <PromoSlot placement="feed" />
+          {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
+          {/* تُعرض أحدث دفعة بسرعة؛ البحث يبقى السجل الكامل دون تحميله مسبقاً في الرئيسية. */}
+          <Link href="/search" className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
+            عرض جميع الإعلانات في البحث ←
+          </Link>
+        </div>
+      </Section>
 
       {/* سجّل واحصل على رصيد ترحيبي — للزوار فقط وقابل للإغلاق */}
       {!session && welcomeCredit > 0 && <WelcomeBanner amount={welcomeCredit} />}
@@ -195,24 +239,6 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
           <AdGrid ads={storeAds} />
         </Section>
       )}
-
-      {featured.length > 0 && (
-        <Section title={H.featured} href="/search?special=1">
-          <AdGrid ads={featured} />
-        </Section>
-      )}
-
-      <Section title={H.latest} href="/search">
-        <div className="space-y-4">
-          <AdGrid ads={latest} />
-          <PromoSlot placement="feed" />
-          {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
-          {/* تُعرض أحدث دفعة بسرعة؛ البحث يبقى السجل الكامل دون تحميله مسبقاً في الرئيسية. */}
-          <Link href="/search" className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
-            عرض جميع الإعلانات في البحث ←
-          </Link>
-        </div>
-      </Section>
 
       {mostViewed.length > 0 && (
         <Section title={H.mostViewed}>

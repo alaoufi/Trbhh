@@ -56,5 +56,11 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Authentication transactions on isolated MySQL
+        run: pnpm exec vitest run tests/integration/auth-mysql.test.ts --maxWorkers=1
+        env:
+          AUTH_DB_TESTS: '1'
+          AUTH_TEST_DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ci
+
       - name: Production build
         run: pnpm build

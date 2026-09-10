@@ -13,9 +13,10 @@ import { adminArchiveAdAction, adminBanAdAction, adminBanSellerAction, adminDele
 import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
+import { adPriceLabel } from '@/lib/ad-presentation';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { waLink } from '@/lib/classified-theme';
-import { getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate, getMemberWindows, adWindowState, DUR_DAYS } from '@/lib/settings';
+import { getSettingBool, getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate, getMemberWindows, adWindowState, DUR_DAYS } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { FavoriteButton } from '@/components/favorite-button';
@@ -188,6 +189,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const isAdOwner = !!(session && ad.seller && session.uid === ad.seller.id);
   // "مراسلة" available to non-owners; WhatsApp/call only when provided
   const contactCols = (isAdOwner ? 0 : 1) + (waNumber ? 1 : 0) + (callPhone ? 1 : 0);
+  const mobileContactOn = !isAdOwner && !inStore && await getSettingBool('ad_mobile_contact_on', true);
 
   // شارة عاجل لصاحب الإعلان: زر تفعيل مباشر — يغطي الرصيد → خصم، لا يغطي → دعوة لشحن الرصيد
   const urgentActive = !!(ad.urgentUntil && new Date(ad.urgentUntil) > new Date());
@@ -253,7 +255,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     .replace(/\u2029/g, '\\u2029');
 
   return (
-    <div className="space-y-4 pb-16 md:pb-4">
+    <div className="space-y-4 pb-20 md:pb-4">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml }} />
       <Breadcrumb items={[{ label: ad.title }]} />
 
@@ -573,7 +575,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           <span className="mb-2 inline-block animate-pulse rounded-full bg-red-600 px-3 py-1 text-xs font-extrabold text-white shadow">🔥 عاجل</span>
         )}
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          {(ad.price > 0 || ad.adsType === 'request') && <span className="text-2xl font-bold text-primary">{ad.price > 0 ? formatPrice(ad.price) : 'مطلوب'}</span>}
+          <span className="text-2xl font-bold text-primary">{adPriceLabel(ad)}</span>
           {/* نوع السعر: تأجير بمدته أو بيع */}
           {ad.price > 0 && ad.priceType === 'rent' && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">🔑 تأجير {ad.rentPeriod || ''}</span>}
           {ad.price > 0 && ad.priceType === 'sale' && <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800">💰 بيع</span>}
@@ -621,10 +623,19 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         </div>
       )}
 
+      {mobileContactOn && contactCols > 0 && (
+        <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 border-t bg-card/95 px-3 py-2 shadow-sm backdrop-blur md:hidden" aria-label="التواصل مع المعلن">
+          <div className="mx-auto flex max-w-2xl items-center gap-2">
+            {waNumber && <TrackedContact adId={ad.id} kind="whatsapp" href={waNumber} target="_blank" className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white"><MessageCircle className="h-5 w-5" /> واتساب</TrackedContact>}
+            {callPhone && <TrackedContact adId={ad.id} kind="call" href={`tel:${callPhone}`} className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground"><Phone className="h-5 w-5" /> اتصال</TrackedContact>}
+            {!waNumber && !callPhone && <Link href={session && ad.seller ? `/messages/${ad.seller.id}` : `/login?next=${encodeURIComponent(`/ads/${ad.id}`)}`} className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground"><Send className="h-5 w-5" /> مراسلة المعلن</Link>}
+          </div>
+        </div>
+      )}
       {/* Contact tiles — only show channels the seller actually offers */}
       <div className={`grid gap-3 ${contactCols === 3 ? 'grid-cols-3' : contactCols === 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
         {waNumber && (
-          <TrackedContact adId={ad.id} kind="whatsapp" href={waNumber} target="_blank" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-[#25D366]">
+          <TrackedContact adId={ad.id} kind="whatsapp" href={waNumber} target="_blank" className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-emerald-700">
             <MessageCircle className="h-6 w-6" /> واتساب
           </TrackedContact>
         )}

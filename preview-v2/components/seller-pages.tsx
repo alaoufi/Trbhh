@@ -272,5 +272,3 @@ export function SellerDashboard() {
     <Modal open={deleteDraftOpen} onClose={() => setDeleteDraftOpen(false)} title="حذف المسودة؟"><p>ستُحذف هذه المسودة من المتصفح. الإعلانات المحفوظة في لوحتك ستبقى كما هي.</p><div className="seller-modal-actions"><button className="button secondary" type="button" onClick={() => setDeleteDraftOpen(false)}>احتفظ بها</button><button className="button primary" type="button" onClick={deleteDraft}>حذف المسودة</button></div></Modal>
   </div>;
 }
-
-

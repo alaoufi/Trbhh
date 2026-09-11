@@ -1,0 +1,23 @@
+name: TRBHH V2 preview
+on:
+  push:
+    branches: [codex/trbhh-v2-preview]
+    paths: ['preview-v2/**', '.github/workflows/trbhh-v2-preview.yml']
+  pull_request:
+    paths: ['preview-v2/**', '.github/workflows/trbhh-v2-preview.yml']
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: preview-v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: preview-v2/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm run typecheck

@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone, Phone, Mail, Link2, IdCard, CalendarDays, FileCheck2, AlertTriangle, UserCog } from 'lucide-react';
 import { requireAction, hasAction } from '@/lib/roles';
-import { getPendingStores, adminStoreList, approvedTransfers, platformRequests, type AdminStore } from '@/lib/merchant';
+import { getPendingStores, adminStoreList, approvedTransfers, type AdminStore } from '@/lib/merchant';
 import { getStoresCommsLog, type StoreComm } from '@/lib/audit';
 import { timeAgo } from '@/lib/utils';
-import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, completeStoreTransferAction, decidePlatformAction, grantStoreDaysAction, adminMessageStoreOwnerAction, approveVerifyOrderAction, rejectVerifyOrderAction, cancelVerifyOrderAction, storeUntrustAction } from '../actions';
+import { approveStoreAction, requestStoreHomeAction, toggleStoreStatusAction, warnStoreAction, completeStoreTransferAction, grantStoreDaysAction, adminMessageStoreOwnerAction, approveVerifyOrderAction, rejectVerifyOrderAction, cancelVerifyOrderAction, storeUntrustAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { AdminSearch } from '@/components/admin-search';
 
@@ -238,7 +238,7 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
   const canEdit = await hasAction(session.uid, 'stores', 'edit').catch(() => false);
   const { msg, vbal, q, suspenderr } = await searchParams;
   const term = (q || '').trim();
-  const [pending, stores, transfers, platformReqs, commsByStore] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers(), platformRequests(), getStoresCommsLog().catch(() => new Map<number, StoreComm[]>())]);
+  const [pending, stores, transfers, commsByStore] = await Promise.all([getPendingStores(), adminStoreList(), approvedTransfers(), getStoresCommsLog().catch(() => new Map<number, StoreComm[]>())]);
   const { listVerifyOrdersAdmin, refundOf } = await import('@/lib/verify-paid');
   const verifyOrders = await listVerifyOrdersAdmin().catch(() => ({ pending: [], active: [] }));
   const verifyPkgs = await import('@/lib/settings').then((m) => m.getVerifyPackages()).catch(() => []);
@@ -318,24 +318,8 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
         )}
       </div>
 
-      {/* طلبات عرض المنتجات في منصة تربح — إعلان المتجر يظهر تلقائياً، والمنتجات بموافقة */}
-      {platformReqs.length > 0 && (
-        <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 p-3">
-          <div className="mb-2 flex items-center gap-2 font-bold text-emerald-700"><Megaphone className="h-5 w-5" /> طلبات عرض المنتجات في منصة تربح ({en(platformReqs.length)})</div>
-          <div className="space-y-2">
-            {platformReqs.map((r) => (
-              <div key={r.storeId} className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 text-sm shadow-sm">
-                <Link href={`/companies/${r.storeId}`} className="min-w-0 flex-1">
-                  <div className="font-bold text-primary">{r.storeName || `متجر #${r.storeId}`}</div>
-                  <div className="text-xs text-muted-foreground">التاجر: {r.ownerName} · طلب {timeAgo(r.at)}</div>
-                </Link>
-                <form action={decidePlatformAction}><input type="hidden" name="storeId" value={r.storeId} /><input type="hidden" name="action" value="approve" /><ConfirmSubmit msg="تأكيد اعتماد عرض منتجات هذا المتجر في تربح؟" className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد العرض</ConfirmSubmit></form>
-                <form action={decidePlatformAction}><input type="hidden" name="storeId" value={r.storeId} /><input type="hidden" name="action" value="reject" /><ConfirmSubmit msg="تأكيد رفض طلب عرض المنتجات؟" className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit></form>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* عرض منتجات المتجر في منصة تربح صار مدفوعاً بالكامل (يُخصم من رصيد التاجر أو
+          يُطلب منه الشحن) بلا موافقة إدارية — فلا طابور هنا. */}
 
       {/* نقل الملكية — بعد طلب المنقول له وموافقة الصاحب الأول، تنفّذ الإدارة النقل */}
       {transfers.length > 0 && (

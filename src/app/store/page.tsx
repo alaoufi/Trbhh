@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { getStoreByUser } from '@/lib/stores';
-import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, platformRequestState, STORE_HIDE_FIELDS, parseHiddenFields } from '@/lib/merchant';
+import { getStoreMeta, followersCount, getStoreRating, incomingOffers, collaboratorStoreIds, storeCard, getStoreWarnings, storeProductAdIds, pendingTransferForOwner, STORE_HIDE_FIELDS, parseHiddenFields } from '@/lib/merchant';
 import { getMyAds } from '@/lib/account';
 import { getStoreVisitorStats, getStoreViews } from '@/lib/store-analytics';
 import { StoreDesigner } from '@/components/store-designer';
 import { StoreMiniCard } from '@/components/store-mini-card';
 import { CopyLink } from '@/components/copy-link';
 import { respondOfferAction, respondTransferAction } from '@/app/companies/actions';
-import { setStoreProductsAction, requestPlatformAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction, addStoreStaffAction, removeStoreStaffAction, requestStoreNameExceptionAction, storeMessageMemberAction, requestVerifyPaidAction } from '@/app/account/company/actions';
+import { setStoreProductsAction, saveCompanyAction, addBranchAction, saveStoreSettingsAction, subscribeStoreAction, storeBackupNowAction, storeRestoreAction, storeRestoreFileAction, bulkUploadProductsAction, buyStoreShowAction, buyAdShowAction, addStoreCouponAction, deleteStoreCouponAction, toggleStoreCouponAction, toggleAutoRenewAction, buyStorePlusAction, addStoreStaffAction, removeStoreStaffAction, requestStoreNameExceptionAction, storeMessageMemberAction, requestVerifyPaidAction } from '@/app/account/company/actions';
 import { getStoreSub } from '@/lib/subscription';
 import { getStoreSubPricing, getSettingBool, getSetting } from '@/lib/settings';
 import { Palette, Handshake, Home, PackageOpen, UserCog, Globe, Megaphone, ShieldCheck, PlusCircle, MessageSquare, SlidersHorizontal, KeyRound, BarChart3, Crown, BookOpen, DatabaseBackup } from 'lucide-react';
@@ -96,7 +96,6 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
   // مشاهدات المتجر = عدد مرّات دخول/تحديث صفحة المتجر (مشاهدة واحدة لكل زيارة)
   const totalAdViews = store ? await getStoreViews(store.id) : 0;
   const pendingTransfer = store ? await pendingTransferForOwner(session.uid) : null;
-  const platformState = store ? await platformRequestState(store.id) : 'none';
   const fmtDate = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'medium' }).format(d); };
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const field = 'h-11 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring';
@@ -780,22 +779,9 @@ export default async function StoreAdminPage({ searchParams }: { searchParams: P
         </div>
       )}
 
-      {/* طلب عرض الإعلانات في منصة تربح — يعتمده مراقب المتاجر (إعلان المتجر يظهر تلقائياً) */}
-      {store && (
-        <div className="card-3d space-y-2 rounded-2xl p-4">
-          <div className="flex items-center gap-2 font-bold text-primary"><Megaphone className="h-5 w-5" /> عرض إعلاناتي في منصة تربح</div>
-          <p className="text-xs text-muted-foreground">إعلان متجرك يظهر في تربح تلقائياً بعد الاعتماد. أمّا عرض <b>إعلاناتك</b> في صفحة تربح فيحتاج طلباً تعتمده إدارة المتاجر.</p>
-          {platformState === 'approved' ? (
-            <div className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">✓ إعلاناتك معتمدة للعرض في منصة تربح.</div>
-          ) : platformState === 'pending' ? (
-            <div className="rounded-xl bg-amber-50 p-3 text-sm font-bold text-amber-700">⏳ طلبك قيد المراجعة لدى إدارة المتاجر.</div>
-          ) : (
-            <form action={requestPlatformAction}>
-              <Button size="sm"><Megaphone className="h-4 w-4" /> إرسال طلب عرض الإعلانات</Button>
-            </form>
-          )}
-        </div>
-      )}
+      {/* عرض إعلانات المتجر في منصة تربح صار مدفوعاً بالكامل عبر قسم «📣 الظهور في تربح
+          (مدفوع)» أعلاه — يُخصم من الرصيد فوراً (أو يُطلب شحن الرصيد إن لم يكفِ) بلا أي
+          موافقة إدارية. لا تدخّل للإدارة إلا في التحقق من الحوالات والمحتوى المحظور. */}
 
       {/* طلب نقل ملكية وارد — يحتاج موافقة الصاحب الأول قبل تنفيذ الإدارة */}
       {store && pendingTransfer && (

@@ -483,6 +483,7 @@ export async function getAdsByCategory(categoryId: number, take = 24, skip = 0) 
 }
 
 type SearchParamsT = {
+  subcategoryId?: number;
   q?: string;
   categoryId?: number;
   countryId?: number;
@@ -518,7 +519,7 @@ const getSearchAreaIds = cache(async (areaId: number, cityId: number) => {
   return equivalentAreaIds(areas.map((area) => ({ id: toInt(area.id), name: area.name, cityId: area.city_id })), areaId, cityId);
 });
 
-async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special, minPrice, maxPrice }: SearchParamsT) {
+async function buildSearchWhere({ q, categoryId, subcategoryId, countryId, cityId, areaId, type, special, minPrice, maxPrice }: SearchParamsT) {
   const range = normalizePriceRange(minPrice, maxPrice);
   const visibility = await activeAdWhere();
   // بحث ذكي: تُقسَّم العبارة كلمات، وكل كلمة تُطابق العنوان أو التفاصيل بأي ترتيب،
@@ -534,6 +535,7 @@ async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type
     ...visibility,
     AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textClauses],
     ...(categoryId ? { category_id: BigInt(categoryId) } : {}),
+    ...(subcategoryId ? { subcategory_id: subcategoryId } : {}),
     ...(countryId ? { country_id: countryId } : {}),
     ...(cityId ? { city_id: BigInt(cityId) } : {}),
     ...(areaId ? { area_id: cityId ? { in: await getSearchAreaIds(areaId, cityId) } : areaId } : {}),

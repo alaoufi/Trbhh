@@ -6,8 +6,8 @@
  *           PREVIEW_LOGIN_PASSWORD (a new strong, preview-only password).
  * Run: node scripts/preview/seed.mjs
  *
- * Accounts: preview (member) and preview-store (merchant), same supplied password.
- * Both are ordinary members. No administrator, financial transaction, message,
+ * Accounts: preview (member), preview-store (merchant) and preview-admin (administrator), same supplied password.
+ * No financial transaction, message,
  * notification, external contact detail, payment credential or MFA secret is seeded.
  * Images use the repository's own public/placeholder-ad.svg; no media is fetched.
  * Re-runs only recognize this exact seed marker and make no changes.
@@ -21,6 +21,32 @@ const MARKER = 'preview_audit_seed';
 const VERSION = '2026-09-10-v1';
 const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', 'preview-db']);
 const DAY = 86_400_000;
+
+const PREVIEW_CATEGORIES = [
+  { id: 1n, name: 'عقارات', subs: ['شقق وفلل', 'أراضي', 'مكاتب ومستودعات'] },
+  { id: 2n, name: 'سيارات ومستلزماتها', subs: ['سيارات', 'قطع غيار', 'إكسسوارات وخدمات سيارات'] },
+  { id: 3n, name: 'نقليات ومعدات ثقيلة', subs: ['شاحنات', 'رافعات', 'معدات إنشائية', 'نقل وخدمات لوجستية'] },
+  { id: 4n, name: 'زراعة ومشاتل وأعلاف', subs: ['مشاتل', 'أعلاف', 'معدات زراعية'] },
+  { id: 5n, name: 'مواشي ومستلزماتها', subs: ['مواشي', 'طيور', 'مستلزمات وتغذية'] },
+  { id: 6n, name: 'أواني منزلية', subs: ['أواني ومطابخ', 'أدوات منزلية'] },
+  { id: 7n, name: 'ديكورات منزلية', subs: ['إضاءة', 'أثاث وديكور', 'ستائر وسجاد'] },
+  { id: 8n, name: 'مواد بناء ومقاولات', subs: ['مواد بناء', 'تشطيبات', 'مقاولات وصيانة'] },
+  { id: 9n, name: 'وظائف', subs: ['دوام كامل', 'دوام جزئي', 'عمل حر'] },
+  { id: 10n, name: 'خدمات', subs: ['خدمات منزلية', 'نقل وتوصيل', 'خدمات أعمال'] },
+  { id: 11n, name: 'فرص تجارية', subs: ['شراكات', 'امتيازات', 'مشاريع'] },
+  { id: 12n, name: 'منتجات', subs: ['إلكترونيات', 'ملابس', 'متنوع'] },
+  { id: 13n, name: 'أخرى', subs: [] },
+];
+
+function previewCategoryFor(title) {
+  const t = String(title || '');
+  if (t.includes('أوان')) return 6n;
+  if (t.includes('إضاءة') || t.includes('رفوف')) return 7n;
+  if (t.includes('معدات')) return 3n;
+  if (t.includes('دراجة')) return 2n;
+  if (t.includes('حاسب') || t.includes('شاشة')) return 12n;
+  return 13n;
+}
 
 class PreviewGuardError extends Error {}
 function guard(condition, message) {
@@ -76,6 +102,7 @@ async function seed() {
         site_share_title: 'تربح — معاينة مستقلة ببيانات تجريبية',
         site_share_desc: 'هذه نسخة معاينة مستقلة؛ جميع الحسابات والإعلانات والأسعار والإحصاءات تجريبية.',
         home_discovery_on: '1', search_price_filter_on: '1', ad_mobile_contact_on: '1',
+        categories_v2_on: '1',
         store_landing_on: '1', store_onboarding_on: '1',
         home_discovery_title: 'تربح — معاينة تجريبية',
         home_discovery_subtitle: 'جرّب التصميم والبحث والمتاجر. جميع البيانات هنا تجريبية وليست عروضًا للبيع.',
@@ -102,6 +129,24 @@ async function seed() {
         created_at: now, updated_at: now,
       } });
       await db.countries.create({ data: { id: 1, name: 'المملكة العربية السعودية', key: '966', send_sms: 0 } });
+      await db.categories.createMany({ data: PREVIEW_CATEGORIES.map((cat, index) => ({
+        id: cat.id, name: cat.name, photo_path: '', is_active: 'yes', ordered: PREVIEW_CATEGORIES.length - index,
+        created_at: now, updated_at: now,
+      })) });
+      const subRows = [];
+      let subId = 100n;
+      for (const cat of PREVIEW_CATEGORIES) for (const name of cat.subs) {
+        subRows.push({ id: ++subId, category_id: Number(cat.id), name, order: subRows.length, active: 1, created_at: now, updated_at: now });
+      }
+      if (subRows.length) await db.sub_categories.createMany({ data: subRows });
+      await db.category_field_defs.createMany({ data: [
+        { category_id: 1n, field_key: 'property_type', label: 'نوع العقار', field_type: 'select', options: 'شقة|فيلا|أرض|مكتب|مستودع', required: 0, ordered: 1 },
+        { category_id: 2n, field_key: 'vehicle_make', label: 'الماركة أو النوع', field_type: 'text', required: 0, ordered: 1 },
+        { category_id: 3n, field_key: 'capacity', label: 'السعة أو الحمولة', field_type: 'text', required: 0, ordered: 1 },
+        { category_id: 4n, field_key: 'agriculture_kind', label: 'نوع المنتج الزراعي', field_type: 'text', required: 0, ordered: 1 },
+        { category_id: 5n, field_key: 'livestock_kind', label: 'نوع الماشية أو المستلزم', field_type: 'text', required: 0, ordered: 1 },
+        { category_id: 8n, field_key: 'contract_type', label: 'نوع العمل أو المادة', field_type: 'text', required: 0, ordered: 1 },
+      ] });
       const regions = ['الرياض', 'مكة المكرمة', 'المدينة المنورة', 'القصيم', 'المنطقة الشرقية', 'عسير', 'تبوك', 'حائل', 'الحدود الشمالية', 'جازان', 'نجران', 'الباحة', 'الجوف'];
       await db.cities.createMany({ data: regions.map((name, i) => ({ id: BigInt(i + 1), name, country_id: 1, ordered: i + 1 })) });
       // cities = regions, areas = cities. The app fills the remaining Saudi cities itself.
@@ -113,7 +158,8 @@ async function seed() {
       await db.users.createMany({ data: [
         { id: member, userName: 'preview', name: 'عضو المعاينة', email: 'member@example.test', city_id: 1n },
         { id: merchant, userName: 'preview-store', name: 'تاجر المعاينة', email: 'merchant@example.test', city_id: 2n },
-      ].map((user) => ({ ...user, password: hash, type: 'user', is_admin: 0, country_id: 1,
+        { id: 1003n, userName: 'preview-admin', name: 'مدير المعاينة', email: 'admin@example.test', city_id: 1n, is_admin: 1 },
+      ].map((user) => ({ ...user, password: hash, type: 'user', is_admin: user.is_admin || 0, country_id: 1,
         auth_session_version: randomUUID(), created_at: before(90), updated_at: now,
         allow_phone: 0, whatsapp: 0, phoneNumber: null, balance: 0, balance_halala: 0,
       })) });
@@ -158,7 +204,7 @@ async function seed() {
       ];
       await db.ads.createMany({ data: fixtures.map((ad, index) => {
         const storeId = ad.id === 401n ? 2 : ad.id === 402n ? 3 : ad.id >= 201n && ad.id <= 204n ? 1 : 0;
-        return { adsType: 'offer', adsSpecial: 'no', state: 'active', status: 1, category_id: 0n,
+        return { adsType: 'offer', adsSpecial: 'no', state: 'active', status: 1, category_id: previewCategoryFor(ad.title),
           country_id: 1, user_id: storeId ? merchant : member, profile_id: storeId ? BigInt(1002 + storeId) : memberProfile,
           store_only: storeId ? 1 : 0, trbhh_until: storeId ? after(60) : null,
           title: ad.title, detail: 'إعلان تجريبي في نسخة معاينة مستقلة. لا يمثل منتجًا حقيقيًا أو عرض بيع. يمكنك استكشاف عرض السعر والفلاتر والمفضلة والإحصاءات.',
@@ -190,7 +236,7 @@ async function seed() {
       // Historical event counters only; this does not create or send any messages.
       await db.ad_contacts.createMany({ data: contacts });
     }, { timeout: 60_000, maxWait: 10_000 });
-    console.info('[preview-seed] Created synthetic member preview and merchant preview-store; no admin accounts.');
+    console.info('[preview-seed] Created synthetic preview member, merchant and preview-only administrator.');
     console.info('[preview-seed] Public preview: 10 ads, 1 eligible store (/companies/preview-shop), 3 visible member favorites.');
     console.info('[preview-seed] Seed complete. Password was read only from PREVIEW_LOGIN_PASSWORD and is not printed.');
   } finally {

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CategoryDirectory } from '@/components/category-directory';
 import { cookies } from 'next/headers';
 import { Users, Megaphone, Eye, Sparkles, ChevronLeft, Heart, MessageCircle, Phone } from 'lucide-react';
 import {
@@ -109,6 +110,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
 
   return (
     <div className="space-y-4">
+      <CategoryDirectory />
       {/* ✅ تأكيد نشر الإعلان — يظهر بعد النشر الناجح والتحويل للرئيسية */}
       {sp.published && (
         <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-center text-sm font-extrabold text-emerald-800 shadow-sm">

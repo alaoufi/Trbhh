@@ -41,6 +41,7 @@ import { PromoSlot } from '@/components/promo-slot';
 import { getAdAudio } from '@/lib/ad-media';
 import { mediaUrl } from '@/lib/media';
 import { AdGallery } from '@/components/ad-gallery';
+import { AdCategoryDetails } from '@/components/ad-category-details';
 import { Breadcrumb } from '@/components/breadcrumb';
 
 export const dynamic = 'force-dynamic';
@@ -529,6 +530,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
 
       {/* Gallery with tap-to-zoom lightbox */}
       <AdGallery images={ad.images} title={ad.title} special={ad.special} adsType={ad.adsType} />
+      <AdCategoryDetails adId={ad.id}/>
 
       {/* Video / audio — shown prominently right below the images */}
       <AdMedia videoPath={ad.videoPath} audioPath={await getAdAudio(ad.id).catch(() => null)} />

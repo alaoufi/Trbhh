@@ -187,6 +187,67 @@ model categories {
   ordered    Int       @default(0)
 }
 
+model category_field_defs {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  category_id BigInt   @db.UnsignedBigInt
+  field_key   String   @db.VarChar(64)
+  label       String   @db.VarChar(120)
+  field_type  String   @default("text") @db.VarChar(16)
+  options     String?  @db.Text
+  required    Int      @default(0) @db.TinyInt
+  active      Int      @default(1) @db.TinyInt
+  ordered     Int      @default(0)
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  updated_at  DateTime? @db.Timestamp(0)
+
+  @@unique([category_id, field_key], map: "uniq_category_field_key")
+  @@index([category_id, active, ordered], map: "category_field_listing")
+}
+
+model ad_category_field_values {
+  ad_id       BigInt   @db.UnsignedBigInt
+  field_id    BigInt   @db.UnsignedBigInt
+  value_text  String?  @db.Text
+  updated_at  DateTime? @default(now()) @db.Timestamp(0)
+
+  @@id([ad_id, field_id])
+  @@index([field_id], map: "ad_category_field_values_field")
+}
+
+model category_migration_batches {
+  id           BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  status       String   @default("draft") @db.VarChar(16)
+  total_count  Int      @default(0)
+  applied_count Int     @default(0)
+  rejected_count Int    @default(0)
+  created_by   BigInt?  @db.UnsignedBigInt
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+  applied_at   DateTime? @db.Timestamp(0)
+}
+
+model category_migration_suggestions {
+  id           BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  batch_id     BigInt   @db.UnsignedBigInt
+  ad_id        BigInt   @db.UnsignedBigInt
+  category_id  BigInt?  @db.UnsignedBigInt
+  subcategory_id Int?
+  confidence   Float    @default(0)
+  matched      String?  @db.Text
+  status       String   @default("pending") @db.VarChar(16)
+  reviewed_by  BigInt?  @db.UnsignedBigInt
+  reviewed_at  DateTime? @db.Timestamp(0)
+  previous_category_id BigInt? @db.UnsignedBigInt
+  previous_subcategory_id Int?
+  previous_reviewed Int?
+  applied_category_id BigInt? @db.UnsignedBigInt
+  applied_subcategory_id Int?
+  applied_updated_at DateTime? @db.Timestamp(0)
+
+  @@unique([batch_id, ad_id], map: "uniq_category_migration_ad")
+  @@index([batch_id, status], map: "category_migration_review")
+  @@index([ad_id], map: "category_migration_ad")
+}
+
 model category__users {
   id          BigInt    @id @db.UnsignedBigInt
   user_id     BigInt    @db.UnsignedBigInt

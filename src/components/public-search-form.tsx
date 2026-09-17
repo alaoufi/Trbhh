@@ -5,12 +5,14 @@ import { Search } from 'lucide-react';
 type Region = { id: number; name: string; countryId?: number };
 type Area = { id: number; name: string; cityId: number };
 
-export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, placeholder = 'ماذا تبحث عنه؟', compact = false }: {
+export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, placeholder = 'ماذا تبحث عنه؟', compact = false, categories=[] }: {
+  categories?: {id:number;name:string}[];
   regions: Region[]; areas: Area[]; params?: Record<string, string | undefined>;
   priceOn?: boolean; placeholder?: string; compact?: boolean;
 }) {
   const field = 'h-11 min-w-0 w-full rounded-lg border bg-background px-3 text-sm text-foreground';
   const filters = <>
+    {categories.length>0&&<label className="space-y-1 text-xs font-semibold">القسم<select name="category" defaultValue={params.category||''} className={field}><option value="">كل الأقسام</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
     <SearchAreaPicker regions={regions} areas={areas} region={params.city || ''} area={params.area || ''} className={field} />
     <label className="space-y-1 text-xs font-semibold text-foreground">نوع الإعلان
       <select name="type" defaultValue={params.type || ''} className={field}>

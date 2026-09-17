@@ -1,0 +1,516 @@
+[
+  {
+    "key": "cat-1",
+    "name": "عقارات",
+    "icon": "🏠",
+    "branches": [
+      "شقق وفلل",
+      "أراضي",
+      "مكاتب ومستودعات"
+    ],
+    "keywords": [
+      "شقة",
+      "فيلا",
+      "أرض",
+      "عقارات",
+      "مستودع"
+    ],
+    "fields": [
+      {
+        "key": "area",
+        "label": "المساحة بالمتر",
+        "type": "number",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "rooms",
+        "label": "عدد الغرف",
+        "type": "number",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "property_type",
+        "label": "نوع العقار",
+        "type": "select",
+        "options": "شقة|فيلا|أرض|مكتب|مستودع",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-2",
+    "name": "سيارات ومستلزماتها",
+    "icon": "🚗",
+    "branches": [
+      "سيارات",
+      "دراجات",
+      "قطع غيار",
+      "إكسسوارات وخدمات سيارات"
+    ],
+    "keywords": [
+      "سيارة",
+      "تويوتا",
+      "كامري",
+      "سيارات",
+      "قطع غيار",
+      "هيونداي"
+    ],
+    "fields": [
+      {
+        "key": "make",
+        "label": "الماركة",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "model",
+        "label": "الموديل",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "year",
+        "label": "سنة الصنع",
+        "type": "number",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "mileage",
+        "label": "العداد بالكيلومتر",
+        "type": "number",
+        "options": "",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-3",
+    "name": "نقليات ومعدات ثقيلة",
+    "icon": "🚜",
+    "branches": [
+      "شاحنات",
+      "رافعات",
+      "معدات إنشائية",
+      "نقل وخدمات لوجستية"
+    ],
+    "keywords": [
+      "رافعة",
+      "فوركلفت",
+      "سيزر",
+      "كرين",
+      "حفار",
+      "شيول",
+      "شاحنة",
+      "ونش",
+      "مان لفت"
+    ],
+    "fields": [
+      {
+        "key": "equipment_type",
+        "label": "نوع المعدة",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "capacity",
+        "label": "الحمولة بالطن",
+        "type": "number",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "hours",
+        "label": "ساعات التشغيل",
+        "type": "number",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "service_area",
+        "label": "نطاق الخدمة",
+        "type": "text",
+        "options": "",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-4",
+    "name": "زراعة ومشاتل وأعلاف",
+    "icon": "🌱",
+    "branches": [
+      "مشاتل ونباتات",
+      "أعلاف",
+      "معدات زراعية",
+      "بذور وأسمدة"
+    ],
+    "keywords": [
+      "مشتل",
+      "شتلات",
+      "أعلاف",
+      "برسيم",
+      "بذور",
+      "سماد"
+    ],
+    "fields": [
+      {
+        "key": "plant_type",
+        "label": "نوع النبات أو المنتج",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "quantity",
+        "label": "الكمية",
+        "type": "number",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "unit",
+        "label": "وحدة القياس",
+        "type": "select",
+        "options": "حبة|كيس|كيلوجرام|طن",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-5",
+    "name": "مواشي ومستلزماتها",
+    "icon": "🐑",
+    "branches": [
+      "أغنام وماعز",
+      "إبل وأبقار",
+      "طيور",
+      "مستلزمات"
+    ],
+    "keywords": [
+      "غنم",
+      "أغنام",
+      "ماعز",
+      "مواشي",
+      "نعيمي",
+      "حري",
+      "إبل",
+      "أبقار"
+    ],
+    "fields": [
+      {
+        "key": "breed",
+        "label": "السلالة",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "age",
+        "label": "العمر بالأشهر",
+        "type": "number",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "count",
+        "label": "العدد",
+        "type": "number",
+        "options": "",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-6",
+    "name": "أواني منزلية",
+    "icon": "🍽️",
+    "branches": [
+      "أواني طبخ",
+      "أدوات تقديم",
+      "أدوات منزلية"
+    ],
+    "keywords": [
+      "أواني",
+      "قدور",
+      "صحون",
+      "طقم سفرة"
+    ],
+    "fields": [
+      {
+        "key": "material",
+        "label": "الخامة",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "pieces",
+        "label": "عدد القطع",
+        "type": "number",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "condition",
+        "label": "الحالة",
+        "type": "select",
+        "options": "جديد|مستعمل",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-7",
+    "name": "ديكورات منزلية",
+    "icon": "🛋️",
+    "branches": [
+      "أثاث وديكور",
+      "إضاءة",
+      "ستائر وسجاد"
+    ],
+    "keywords": [
+      "كنب",
+      "أثاث",
+      "ديكور",
+      "ستائر",
+      "سجاد",
+      "إضاءة",
+      "رفوف"
+    ],
+    "fields": [
+      {
+        "key": "material",
+        "label": "الخامة",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "dimensions",
+        "label": "الأبعاد",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "condition",
+        "label": "الحالة",
+        "type": "select",
+        "options": "جديد|مستعمل",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-8",
+    "name": "مواد بناء ومقاولات",
+    "icon": "🧱",
+    "branches": [
+      "مواد بناء",
+      "تشطيبات",
+      "مقاولات وصيانة"
+    ],
+    "keywords": [
+      "أسمنت",
+      "بلوك",
+      "حديد بناء",
+      "مقاولات",
+      "سيراميك",
+      "رخام"
+    ],
+    "fields": [
+      {
+        "key": "material",
+        "label": "نوع المادة أو العمل",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "quantity",
+        "label": "الكمية",
+        "type": "number",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "service_area",
+        "label": "نطاق العمل",
+        "type": "text",
+        "options": "",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-9",
+    "name": "وظائف",
+    "icon": "💼",
+    "branches": [
+      "دوام كامل",
+      "دوام جزئي",
+      "عمل حر"
+    ],
+    "keywords": [
+      "وظيفة",
+      "توظيف",
+      "مطلوب موظف",
+      "راتب",
+      "سيرة ذاتية"
+    ],
+    "fields": [
+      {
+        "key": "job_title",
+        "label": "المسمى الوظيفي",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "experience",
+        "label": "سنوات الخبرة",
+        "type": "number",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "work_mode",
+        "label": "نظام العمل",
+        "type": "select",
+        "options": "حضوري|عن بعد|هجين",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-10",
+    "name": "خدمات",
+    "icon": "🛠️",
+    "branches": [
+      "خدمات منزلية",
+      "خدمات أعمال",
+      "تعليم وتدريب"
+    ],
+    "keywords": [
+      "تنظيف",
+      "صيانة",
+      "خدمات",
+      "تصميم",
+      "سباك"
+    ],
+    "fields": [
+      {
+        "key": "service_type",
+        "label": "نوع الخدمة",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "service_area",
+        "label": "نطاق الخدمة",
+        "type": "text",
+        "options": "",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-11",
+    "name": "فرص تجارية",
+    "icon": "🤝",
+    "branches": [
+      "شراكات",
+      "امتيازات",
+      "مشاريع"
+    ],
+    "keywords": [
+      "شراكة",
+      "امتياز تجاري",
+      "مشروع",
+      "شريك"
+    ],
+    "fields": [
+      {
+        "key": "activity",
+        "label": "النشاط",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "capital",
+        "label": "رأس المال المطلوب",
+        "type": "number",
+        "options": "",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-12",
+    "name": "منتجات",
+    "icon": "📦",
+    "branches": [
+      "إلكترونيات",
+      "ملابس",
+      "رياضة وترفيه",
+      "منتجات متنوعة"
+    ],
+    "keywords": [
+      "حاسب",
+      "جوال",
+      "شاشة",
+      "لابتوب",
+      "ملابس",
+      "دراجة"
+    ],
+    "fields": [
+      {
+        "key": "brand",
+        "label": "العلامة التجارية",
+        "type": "text",
+        "options": "",
+        "required": false
+      },
+      {
+        "key": "condition",
+        "label": "الحالة",
+        "type": "select",
+        "options": "جديد|مستعمل",
+        "required": false
+      },
+      {
+        "key": "quantity",
+        "label": "الكمية",
+        "type": "number",
+        "options": "",
+        "required": false
+      }
+    ]
+  },
+  {
+    "key": "cat-13",
+    "name": "أخرى",
+    "icon": "✨",
+    "branches": [
+      "متنوع"
+    ],
+    "keywords": [],
+    "fields": [
+      {
+        "key": "notes",
+        "label": "مواصفات إضافية",
+        "type": "text",
+        "options": "",
+        "required": false
+      }
+    ]
+  }
+]

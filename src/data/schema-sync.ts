@@ -19,7 +19,62 @@ import { prisma } from '@/lib/prisma';
  */
 
 const STATEMENTS: string[] = [
+  /* ---- category fields and safe bulk classification workflow ---- */
+  `CREATE TABLE IF NOT EXISTS category_field_defs (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    category_id BIGINT UNSIGNED NOT NULL,
+    field_key VARCHAR(64) NOT NULL,
+    label VARCHAR(120) NOT NULL,
+    field_type VARCHAR(16) NOT NULL DEFAULT 'text',
+    options TEXT NULL,
+    required TINYINT NOT NULL DEFAULT 0,
+    active TINYINT NOT NULL DEFAULT 1,
+    ordered INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_category_field_key (category_id, field_key),
+    KEY category_field_listing (category_id, active, ordered)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS ad_category_field_values (
+    ad_id BIGINT UNSIGNED NOT NULL,
+    field_id BIGINT UNSIGNED NOT NULL,
+    value_text TEXT NULL,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (ad_id, field_id),
+    KEY ad_category_field_values_field (field_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS category_migration_batches (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    status VARCHAR(16) NOT NULL DEFAULT 'draft',
+    total_count INT NOT NULL DEFAULT 0,
+    applied_count INT NOT NULL DEFAULT 0,
+    rejected_count INT NOT NULL DEFAULT 0,
+    created_by BIGINT UNSIGNED NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    applied_at TIMESTAMP NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS category_migration_suggestions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    batch_id BIGINT UNSIGNED NOT NULL,
+    ad_id BIGINT UNSIGNED NOT NULL,
+    category_id BIGINT UNSIGNED NULL,
+    subcategory_id INT NULL,
+    confidence DOUBLE NOT NULL DEFAULT 0,
+    matched TEXT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    reviewed_by BIGINT UNSIGNED NULL,
+    reviewed_at TIMESTAMP NULL,
+    UNIQUE KEY uniq_category_migration_ad (batch_id, ad_id),
+    KEY category_migration_review (batch_id, status),
+    KEY category_migration_ad (ad_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `ALTER TABLE users ADD COLUMN auth_session_version VARCHAR(64) NOT NULL DEFAULT '0'`,
+  `ALTER TABLE category_migration_suggestions ADD COLUMN previous_category_id BIGINT UNSIGNED NULL`,
+  `ALTER TABLE category_migration_suggestions ADD COLUMN previous_subcategory_id INT NULL`,
+  `ALTER TABLE category_migration_suggestions ADD COLUMN previous_reviewed INT NULL`,
+  `ALTER TABLE category_migration_suggestions ADD COLUMN applied_category_id BIGINT UNSIGNED NULL`,
+  `ALTER TABLE category_migration_suggestions ADD COLUMN applied_subcategory_id INT NULL`,
+  `ALTER TABLE category_migration_suggestions ADD COLUMN applied_updated_at TIMESTAMP NULL`,
   /* Authentication: encrypted confirmed TOTP credentials and durable attempt limits. */
   `CREATE TABLE IF NOT EXISTS auth_mfa (
     user_id BIGINT UNSIGNED PRIMARY KEY,

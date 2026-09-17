@@ -1,4 +1,5 @@
 'use server';
+import { validateAdCategory } from '@/lib/categories-v2';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createHash } from 'crypto';
@@ -201,8 +202,10 @@ export async function createAdAction(formData: FormData) {
   const priceType = adsType === 'offer' && ['rent', 'sale', 'som'].includes(ptRaw) ? ptRaw : null;
   const rentPeriod = priceType === 'rent' ? String(formData.get('rentPeriod') || '').trim().slice(0, 20) || 'شهري' : null;
   const price = priceType === 'som' ? 0 : parseFloat(String(formData.get('price') || '0')) || 0;
-  const category_id = BigInt(String(formData.get('category_id') || '0'));
-  const subRaw = String(formData.get('subcategory_id') || '');
+  let categoryData: Awaited<ReturnType<typeof validateAdCategory>>;
+  try { categoryData=await validateAdCategory(formData); } catch { redirect('/ads/new?error=category'); }
+  const category_id = categoryData?.category_id || 0n;
+  const subRaw = categoryData?.subcategory_id ? String(categoryData.subcategory_id) : '';
   const cityId = String(formData.get('city_id') || '0');
   const areaRaw = String(formData.get('area_id') || '');
   const countryRaw = String(formData.get('country_id') || '');
@@ -395,7 +398,8 @@ export async function createAdAction(formData: FormData) {
   }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
-  const ad = await prisma.ads.create({
+  const ad = await prisma.$transaction(async tx => {
+  const created = await tx.ads.create({
     data: {
       title: finalTitle, detail: finalDetail, price, adsType,
       category_id: catId,
@@ -427,6 +431,9 @@ export async function createAdAction(formData: FormData) {
     },
   });
 
+  if(categoryData?.values.length) await tx.ad_category_field_values.createMany({data:categoryData.values.map(v=>({...v,ad_id:created.id}))});
+  return created;
+  });
   // إعلان المتجر: العلامة المائية هوية المتجر (شعار/اسم حسب اختيار المالك) بدل «تربح»
   const wm = dest === 'store' ? await (await import('@/lib/merchant')).getStoreWatermark(session.uid) : undefined;
   await storeImages(images, session.uid, ad.id, wm);
@@ -527,6 +534,8 @@ export async function updateAdAction(formData: FormData) {
   const adId = BigInt(String(formData.get('adId')));
   const ad = await prisma.ads.findUnique({ where: { id: adId } });
   if (!ad || toInt(ad.user_id) !== session.uid) redirect('/account/ads');
+  let categoryData: Awaited<ReturnType<typeof validateAdCategory>>;
+  try { categoryData=await validateAdCategory(formData,ad); } catch { redirect(`/ads/${adId}/edit?error=category`); }
 
   // مدة السماح بالتعديل التي تحددها الإدارة — لا تنطبق على إعلانات المتجر:
   // صاحب المتجر يتحكّم بإعلانات متجره كاملاً ويعدّلها في أي وقت.
@@ -570,7 +579,8 @@ export async function updateAdAction(formData: FormData) {
   const eRentPeriod = ePriceType === 'rent' ? String(formData.get('rentPeriod') || '').trim().slice(0, 20) || 'شهري' : null;
   const newPrice = ePriceType === 'som' ? 0 : parseFloat(String(formData.get('price') || '0')) || 0;
   const oldPrice = ad.price || 0;
-  await prisma.ads.update({
+  await prisma.$transaction(async tx => {
+  await tx.ads.update({
     where: { id: adId },
     data: {
       title: eFinalTitle,
@@ -583,8 +593,8 @@ export async function updateAdAction(formData: FormData) {
       ...(ePriceType === 'som' ? { old_price: 0 } : {}),
       // الأقسام مخفية؟ لا حقل قسم مُرسل — نبقي قسم الإعلان الحالي دون أي تغيير.
       // اختيار العضو صراحةً لقسم = لا حاجة لمراجعة إدارية (ليس تصنيفاً آلياً).
-      ...(Number(formData.get('category_id') || 0) > 0
-        ? { category_id: BigInt(String(formData.get('category_id'))), subcategory_id: formData.get('subcategory_id') ? Number(formData.get('subcategory_id')) : null, cat_reviewed: 1 }
+      ...(categoryData
+        ? { category_id: categoryData.category_id, subcategory_id: categoryData.subcategory_id, cat_reviewed: 1 }
         : {}),
       city_id: BigInt(String(formData.get('city_id') || '0')),
       area_id: formData.get('area_id') ? Number(formData.get('area_id')) : null,
@@ -598,6 +608,12 @@ export async function updateAdAction(formData: FormData) {
     },
   });
 
+  if(categoryData){
+    for(const value of categoryData.values) await tx.ad_category_field_values.upsert({where:{ad_id_field_id:{ad_id:adId,field_id:value.field_id}},create:{...value,ad_id:adId},update:{value_text:value.value_text}});
+    // Clear only submitted, empty fields; retain other categories' historical values.
+    for(const [key,value] of formData.entries()) if(key.startsWith('category_field_')&&!String(value).trim()&&/^\d+$/.test(key.slice(15))) await tx.ad_category_field_values.deleteMany({where:{ad_id:adId,field_id:BigInt(key.slice(15))}});
+  }
+  });
   // تنبيه هبوط السعر: من أضافوا هذا الإعلان لمفضّلتهم يصلهم تنبيه عند تخفيض سعره (عودة للشراء)
   if (newPrice > 0 && oldPrice > newPrice) {
     const favs = await prisma.favorites.findMany({ where: { ads_id: adId, user_id: { not: BigInt(session.uid) } }, select: { user_id: true }, take: 3000 }).catch(() => []);

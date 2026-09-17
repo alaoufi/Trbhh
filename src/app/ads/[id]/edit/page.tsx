@@ -1,4 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
+import { categoryFormData } from '@/lib/categories-v2';
 import { getSession } from '@/lib/auth';
 import { getCountries, getCities, getAreas, getAdForEdit } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
@@ -24,6 +25,7 @@ export default async function EditAdPage({ params, searchParams }: { params: Pro
     <div className="space-y-4">
       <h1 className="text-xl font-bold">تعديل الإعلان</h1>
       <AdForm
+        categoryData={await categoryFormData(Number(id))}
         allowOldPrice={dealsOn}
         allowStock={stockOn}
         action={updateAdAction}

@@ -7,6 +7,7 @@ import { getSetting, setSetting } from './settings';
 import { ensureSchema } from '@/data/schema-sync';
 
 export type Service =
+  | 'categories'
   | 'users' | 'ads' | 'duplicates' | 'classified'
   | 'words' | 'reports' | 'verifications' | 'comments' | 'packages' | 'promos' | 'backup' | 'messages' | 'stores';
 export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive' | 'suspend' | 'ban';
@@ -20,6 +21,7 @@ export type Perm = Service;
  * delete an ad but must never edit a member's ad content (privacy).
  */
 export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
+  { key:'categories',label:'الأقسام والتصنيف',actions:['view','add','edit'] },
   { key: 'users',         label: 'الأعضاء',         actions: ['view', 'edit', 'ban', 'delete'] },
   { key: 'ads',           label: 'الإعلانات',          actions: ['view', 'archive', 'delete'] },
   { key: 'duplicates',    label: 'الإعلانات المكررة',   actions: ['view', 'delete'] },

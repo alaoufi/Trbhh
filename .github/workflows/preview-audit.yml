@@ -1,8 +1,7 @@
 name: معاينة مستقلة لفرع مراجعة تربح
 on:
   push:
-    branches: [codex/trbhh-audit-fixes-20260910]
-    paths: ['scripts/preview/**', '.github/workflows/preview-audit.yml']
+    branches: [codex/trbhh-categories-preview-20260917]
 permissions:
   contents: read
   actions: read
@@ -80,9 +79,9 @@ jobs:
           ssh-keyscan -p "$port" "$VPS_HOST" > ~/.ssh/known_hosts
           ssh_args=(-i ~/.ssh/preview_key -p "$port" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -o ServerAliveInterval=15)
           target="$VPS_USER@$VPS_HOST"
-          ssh "${ssh_args[@]}" "$target" 'set -eu; p=/root/trbhh-preview-audit; test ! -L "$p"; if test -e "$p"; then test -f "$p/.preview-only" && test "$(cat "$p/.preview-only")" = trbhh-preview-audit; else mkdir -m 700 "$p"; printf "trbhh-preview-audit\n" > "$p/.preview-only"; fi; test "$(realpath "$p")" = "$p"; mkdir -p "$p/releases"'
-          scp -i ~/.ssh/preview_key -P "$port" -o StrictHostKeyChecking=yes preview-bundle.tgz "$target:/root/trbhh-preview-audit/incoming-$GITHUB_SHA.tgz"
-          ssh "${ssh_args[@]}" "$target" "set -eu; cd /root/trbhh-preview-audit; mkdir -p releases/$GITHUB_SHA; tar -xzf incoming-$GITHUB_SHA.tgz -C releases/$GITHUB_SHA; bash releases/$GITHUB_SHA/deploy.sh $GITHUB_SHA" | tee preview-deploy.log
+          ssh "${ssh_args[@]}" "$target" 'set -eu; p=/root/trbhh-categories-preview; test ! -L "$p"; if test -e "$p"; then test -f "$p/.preview-only" && test "$(cat "$p/.preview-only")" = trbhh-categories-preview; else mkdir -m 700 "$p"; printf "trbhh-categories-preview\n" > "$p/.preview-only"; fi; test "$(realpath "$p")" = "$p"; mkdir -p "$p/releases"'
+          scp -i ~/.ssh/preview_key -P "$port" -o StrictHostKeyChecking=yes preview-bundle.tgz "$target:/root/trbhh-categories-preview/incoming-$GITHUB_SHA.tgz"
+          ssh "${ssh_args[@]}" "$target" "set -eu; cd /root/trbhh-categories-preview; mkdir -p releases/$GITHUB_SHA; tar -xzf incoming-$GITHUB_SHA.tgz -C releases/$GITHUB_SHA; bash releases/$GITHUB_SHA/deploy.sh $GITHUB_SHA" | tee preview-deploy.log
           url=$(sed -n 's/^PREVIEW_URL=//p' preview-deploy.log | tail -1)
           test -n "$url"
           printf '### معاينة الفرع\n\n[%s](%s)\n\nCommit: `%s`\n\nبيانات تجريبية مستقلة؛ رابط مؤقت يتغير إذا أعيد تشغيل النفق.\n' "$url" "$url" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

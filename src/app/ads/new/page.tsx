@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { categoryFormData } from '@/lib/categories-v2';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -139,6 +140,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
       )}
 
       <AdForm
+        categoryData={await categoryFormData()}
         allowSchedule={allowSchedule}
         scheduleMaxDays={scheduleMaxDays}
         allowOldPrice={dealsOn}

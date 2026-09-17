@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { categoriesOn, categoryOptions } from '@/lib/categories-v2';
 import { normalizeSearchParams, positiveSearchId } from '@/lib/search-filters';
 import { getSettingBool } from '@/lib/settings';
 import { PublicSearchForm } from '@/components/public-search-form';
@@ -34,13 +35,17 @@ export default async function SearchPage({
   // Accept only Saudi regions and a city belonging to that region.
   const cityId = cities.some((item) => item.countryId === 1 && item.id === sq.cityId) ? sq.cityId : undefined;
   const areaId = cityId && areas.some((item) => item.cityId === cityId && item.id === sq.areaId) ? sq.areaId : undefined;
-  const query = { ...sq, cityId, areaId };
+  const categories = await categoriesOn() ? await categoryOptions() : [];
+  const selectedCategory = categories.find(c=>c.id===positiveSearchId(sp.category));
+  const selectedBranch = selectedCategory?.branches.find(s=>s.id===positiveSearchId(sp.branch));
+  const query = { ...sq, cityId, areaId, categoryId:selectedCategory?.id, subcategoryId:selectedBranch?.id };
   const PAGE_SIZE = 48;
   const total = await countSearchAds(query);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(positiveSearchId(sp.page) || 1, pages);
   const ads = await searchAds({ ...query, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE });
   const params = {
+    category:selectedCategory?String(selectedCategory.id):undefined,branch:selectedBranch?String(selectedBranch.id):undefined,
     q: query.q, city: cityId?.toString(), area: areaId?.toString(), type: query.type,
     sort: query.sort, special: query.special ? '1' : undefined,
     minPrice: query.minPrice?.toString(), maxPrice: query.maxPrice?.toString(),
@@ -51,7 +56,7 @@ export default async function SearchPage({
       <Breadcrumb items={[{ label: 'بحث متقدم' }]} />
       <section className="rounded-xl border bg-card p-4 shadow-sm">
         <h1 className="mb-3 text-xl font-bold text-foreground">البحث في الإعلانات</h1>
-        <PublicSearchForm key={JSON.stringify(params)} regions={cities} areas={areas} params={params} priceOn={priceOn} />
+        <PublicSearchForm key={JSON.stringify(params)} regions={cities} areas={areas} params={params} priceOn={priceOn} categories={categories} />
         {hasFilters && <Link href="/search" className="mt-3 inline-block text-sm font-semibold text-primary underline underline-offset-4">مسح الفلاتر</Link>}
       </section>
       {/* تنبيهات البحث المحفوظ — للأعضاء وعند تفعيلها من الإدارة */}

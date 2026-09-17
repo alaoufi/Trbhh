@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-preview_root=/root/trbhh-preview-audit
+preview_root=/root/trbhh-categories-preview
 revision=${1:?commit required}
 [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid revision'; exit 1; }
 [[ ! -L "$preview_root" && "$(realpath "$preview_root")" == "$preview_root" ]] || exit 1
 cd "$preview_root"
-[[ -f .preview-only && "$(cat .preview-only)" == 'trbhh-preview-audit' ]] || exit 1
+[[ -f .preview-only && "$(cat .preview-only)" == 'trbhh-categories-preview' ]] || exit 1
 [[ -f "releases/$revision/preview.sql" ]] || exit 1
 
 # Only this dedicated project's state is read or changed. Existing site directories,
@@ -24,7 +24,7 @@ else
   cp .env "backups/$stamp.env"
   cp compose.yml "backups/$stamp.compose.yml"
   cp nginx.conf "backups/$stamp.nginx.conf"
-  docker compose -p trbhh-preview-audit -f compose.yml exec -T preview-db \
+  docker compose -p trbhh-categories-preview -f compose.yml exec -T preview-db \
     sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" mysqldump --no-tablespaces -upreview trbhh_preview_audit' \
     > "backups/$stamp.sql"
 fi
@@ -32,11 +32,11 @@ sed -i '/^PREVIEW_REV=/d' .env
 printf 'PREVIEW_REV=%s\n' "$revision" >> .env
 cp "releases/$revision/compose.yml" compose.yml
 cp "releases/$revision/nginx.conf" nginx.conf
-docker compose -p trbhh-preview-audit -f compose.yml config --quiet
-docker compose -p trbhh-preview-audit -f compose.yml up -d --build --wait --wait-timeout 360
+docker compose -p trbhh-categories-preview -f compose.yml config --quiet
+docker compose -p trbhh-categories-preview -f compose.yml up -d --build --wait --wait-timeout 360
 
 for attempt in $(seq 1 36); do
-  preview_url=$(docker compose -p trbhh-preview-audit -f compose.yml logs --no-color preview-tunnel 2>&1 \
+  preview_url=$(docker compose -p trbhh-categories-preview -f compose.yml logs --no-color preview-tunnel 2>&1 \
     | grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' | tail -1 || true)
   if [[ -n "$preview_url" ]] && curl -fsS --max-time 20 "$preview_url/login" -o /dev/null; then
     printf '%s\n' "$preview_url" > preview-url.txt

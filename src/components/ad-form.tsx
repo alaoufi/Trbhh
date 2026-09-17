@@ -1,4 +1,6 @@
 'use client';
+import { CategoryPicker } from '@/components/category-picker';
+import type { CategoryOption } from '@/domain/category-fields';
 import { useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useFormStatus } from 'react-dom';
@@ -63,8 +65,10 @@ function InfoItem({ icon: Icon, children }: { icon: React.ElementType; children:
 }
 
 export function AdForm({
+  categoryData,
   action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, scheduleMaxDays = 30, allowOldPrice, allowStock, urgentOffer, featuredOffer, identity,
 }: {
+  categoryData?: {options:CategoryOption[];labels:{category:string;branch:string;details:string};values:Record<string,string>};
   action: (fd: FormData) => void | Promise<void>;
   countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string; dupId?: string;
@@ -170,6 +174,8 @@ export function AdForm({
 
   return (
     <form action={action} ref={formRef} className="max-w-2xl space-y-4">
+      {error==='category'&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">تحقق من القسم والفرع والحقول المطلوبة، ثم أعد المحاولة.</p>}
+      {categoryData&&<CategoryPicker {...categoryData} initialCategory={initial?.categoryId} initialBranch={initial?.subcategoryId}/>}
       <SubmitOverlay label="جارٍ رفع الإعلان…" />
       {initial?.id && <input type="hidden" name="adId" value={initial.id} />}
       {dest && <input type="hidden" name="dest" value={dest} />}

@@ -37,6 +37,8 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
     key: 'content', title: 'الإعلانات والمحتوى', icon: Megaphone, color: '#0ea5e9',
     items: [
       { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone, perm: 'ads' },
+      { href: '/admin/categories', label: 'الأقسام والحقول', icon: Megaphone, perm: 'categories' },
+      { href: '/admin/categories/review', label: 'التصنيف الجماعي', icon: SearchIcon, perm: 'categories' },
       { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy, perm: 'duplicates' },
       { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles, perm: 'classified' },
       { href: '/admin/promos', label: 'الإعلانات الترويجية', icon: MonitorPlay, perm: 'promos', description: 'مراجعة ونشر الإعلانات المدفوعة', keywords: ['ترويج', 'إعلان مدفوع', 'بانر عضو'] },

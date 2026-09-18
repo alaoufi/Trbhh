@@ -7,23 +7,30 @@ import { categories, cities, listings, money } from '../lib/demo-data';
 import { notify, readLocal, writeLocal } from '../lib/preview';
 import { Modal } from './ui';
 import './seller.css';
+import './category-details.css';
+import { CategoryDetails } from './category-details';
+import { catalog, getProfile as baseProfile, cleanDetails, displayDetails, validateDetails, changeClassification, normalizeNumber, updateDetail, type Details } from '../lib/category-fields';
 
+import { FIELD_SETTINGS_KEY, applyFieldSettings, type FieldSettings, preserveStoredDetails } from '../lib/field-settings';
+function getProfile(category: string, subcategory: string, forStorage = false) {
+  const settings = typeof window === 'undefined' ? {} : readLocal<FieldSettings>(FIELD_SETTINGS_KEY, {});
+  const config = settings && typeof settings === 'object' ? settings[`${category}/${subcategory}`] : undefined;
+  const storageConfig = forStorage ? { ...config, enabled: true, fields: Object.fromEntries(Object.entries(config?.fields || {}).map(([id, value]) => [id, { ...value, hidden: false }])) } : config;
+  return applyFieldSettings(baseProfile(category, subcategory), storageConfig);
+}
 // Shared local preview contract. Helpers add the `trbhh-v2-` prefix.
 export const SELLER_ADS_KEY = 'seller-ads-v1';
 export const AD_DRAFT_KEY = 'ad-draft-v1';
 type Intent = 'offer' | 'wanted';
 type AdStatus = 'active' | 'paused' | 'sold';
-type AdForm = { intent: Intent; category: string; subcategory: string; title: string; description: string; price: string; city: string; condition: string; images: string[]; spec1: string; spec2: string };
+type AdForm = { intent: Intent; category: string; subcategory: string; title: string; description: string; price: string; city: string; condition: string; images: string[]; spec1: string; spec2: string; details: Details };
 export type SellerAd = AdForm & { id: string; status: AdStatus; createdAt: string; sourceId?: string };
 type AdDraft = { version: 1; form: AdForm; step: number; editingId: string | null; savedAt: number };
-type Errors = Partial<Record<keyof AdForm, string>>;
-const emptyForm: AdForm = { intent: 'offer', category: '', subcategory: '', title: '', description: '', price: '', city: '', condition: '', images: [], spec1: '', spec2: '' };
+type Errors = Record<string, string | undefined>;
+const emptyForm: AdForm = { intent: 'offer', category: '', subcategory: '', title: '', description: '', price: '', city: '', condition: '', images: [], spec1: '', spec2: '', details: {} };
 const steps = ['نوع الإعلان', 'التفاصيل', 'الصور', 'المراجعة'];
 const categoryIcons = { عقارات: Building2, سيارات: Car, 'معدات وآليات': Truck, 'مواشي وزراعة': Wheat, إلكترونيات: Smartphone, 'منزل وأثاث': Armchair, خدمات: Wrench, 'شركات وموردون': Factory, وظائف: BriefcaseBusiness, أخرى: MoreHorizontal };
-const subcategories: Record<string, string[]> = { عقارات: ['شقق', 'فلل ومنازل', 'أراضٍ', 'محلات ومكاتب', 'عقارات أخرى'], سيارات: ['سيارات', 'دراجات نارية', 'قطع غيار', 'إكسسوارات'], 'معدات وآليات': ['معدات ثقيلة', 'معدات ورش', 'معدات زراعية', 'معدات أخرى'], 'مواشي وزراعة': ['أغنام', 'إبل', 'خيول', 'مستلزمات زراعية', 'أخرى'], إلكترونيات: ['جوالات', 'كمبيوتر ولابتوب', 'كاميرات', 'أجهزة ألعاب', 'أجهزة أخرى'], 'منزل وأثاث': ['أثاث منزلي', 'أثاث مكتبي', 'أجهزة منزلية', 'ديكور'], خدمات: ['صيانة وتركيب', 'نقل وتوصيل', 'تصميم وتقنية', 'خدمات أخرى'], 'شركات وموردون': ['توريد منتجات', 'تصنيع', 'تجارة بالجملة', 'أخرى'], وظائف: ['دوام كامل', 'دوام جزئي', 'عمل عن بُعد', 'تدريب'], أخرى: ['رياضة وهوايات', 'مستلزمات شخصية', 'كتب', 'أخرى'] };
-const specLabels: Record<string, [string, string]> = { عقارات: ['المساحة (م²)', 'عدد الغرف'], سيارات: ['سنة الصنع', 'الممشى (كم)'], 'معدات وآليات': ['الماركة', 'ساعات التشغيل'], 'مواشي وزراعة': ['النوع أو السلالة', 'العدد'], إلكترونيات: ['الماركة', 'الموديل'], 'منزل وأثاث': ['الخامة', 'المقاس'], خدمات: ['التخصص', 'نطاق الخدمة'], 'شركات وموردون': ['مجال التوريد', 'الحد الأدنى للطلب'], وظائف: ['المسمى الوظيفي', 'سنوات الخبرة'], أخرى: ['الماركة أو النوع', 'تفصيل إضافي'] };
-const physicalCategories = ['سيارات', 'معدات وآليات', 'إلكترونيات', 'منزل وأثاث', 'أخرى'];
-const optionalPriceCategories = ['خدمات', 'شركات وموردون', 'وظائف'];
+const subcategories = Object.fromEntries(Object.entries(catalog).map(([name, branches]) => [name, Object.keys(branches)]));
 const statusLabels: Record<AdStatus, string> = { active: 'نشط', paused: 'متوقف', sold: 'مكتمل' };
 
 function isForm(value: unknown): value is AdForm {
@@ -31,9 +38,17 @@ function isForm(value: unknown): value is AdForm {
   const v = value as AdForm;
   return ['offer', 'wanted'].includes(v.intent) && ['category', 'subcategory', 'title', 'description', 'price', 'city', 'condition', 'spec1', 'spec2'].every(k => typeof v[k as keyof AdForm] === 'string') && Array.isArray(v.images) && v.images.every(image => typeof image === 'string' && (image.startsWith('/images/') || /^data:image\/(jpeg|png|webp);base64,/.test(image)));
 }
+function normalizeForm(form: AdForm): AdForm {
+  const profile = getProfile(form.category, form.subcategory, true);
+  // Preserve old draft text and photos. Never guess the meaning of the old two generic specs.
+  const details = preserveStoredDetails(form.details);
+  for (const field of profile?.fields || []) if (field.type === 'number' && typeof details[field.id] === 'string') details[field.id] = normalizeNumber(details[field.id] as string);
+  if (profile?.pricing === 'salary' && !details.salaryMin && form.price) details.salaryMin = form.price;
+  return { ...form, details, condition: profile?.condition ? form.condition : '', price: profile?.pricing === 'salary' ? '' : form.price };
+}
 function getDraft(): AdDraft | null {
   const value = readLocal<AdDraft | null>(AD_DRAFT_KEY, null);
-  return value?.version === 1 && isForm(value.form) && Number.isFinite(value.savedAt) ? value : null;
+  return value?.version === 1 && isForm(value.form) && Number.isFinite(value.savedAt) ? { ...value, form: normalizeForm(value.form) } : null;
 }
 function initialAds(): SellerAd[] {
   return [listings[6], listings[2], listings[7]].map((listing, index) => ({ ...emptyForm, id: `demo-${listing.id}`, sourceId: listing.id, title: listing.title, description: listing.description, price: String(listing.price), city: listing.city, category: listing.category, subcategory: listing.category === 'منزل وأثاث' ? (index === 0 ? 'أثاث مكتبي' : 'أثاث منزلي') : 'رياضة وهوايات', condition: listing.condition, images: listing.images, status: index === 2 ? 'paused' : 'active', createdAt: '2026-09-09T10:00:00.000Z' }));
@@ -41,17 +56,25 @@ function initialAds(): SellerAd[] {
 function getAds(): SellerAd[] {
   const stored = readLocal<unknown>(SELLER_ADS_KEY, null);
   if (!Array.isArray(stored)) return initialAds();
-  return stored.filter((ad): ad is SellerAd => isForm(ad) && typeof (ad as SellerAd).id === 'string' && ['active', 'paused', 'sold'].includes((ad as SellerAd).status));
+  return stored.filter((ad): ad is SellerAd => isForm(ad) && typeof (ad as SellerAd).id === 'string' && ['active', 'paused', 'sold'].includes((ad as SellerAd).status)).map(ad => ({ ...ad, details: preserveStoredDetails(ad.details) }));
 }
 function priceText(form: AdForm) {
-  return form.price ? `${money(Number(form.price))} ر.س` : form.intent === 'wanted' ? 'الميزانية قابلة للنقاش' : 'السعر عند التواصل';
+  const profile = getProfile(form.category, form.subcategory);
+  const details = cleanDetails(profile, form.details);
+  if (profile?.pricing === 'salary') {
+    const range = [details.salaryMin, details.salaryMax].filter(value => value !== undefined).map(value => money(Number(value))).join(' – ');
+    return range ? `الراتب ${range} ر.س${details.salaryPeriod ? ` / ${details.salaryPeriod}` : ''}` : 'الراتب يحدد عند التواصل';
+  }
+  const period = details.purpose === 'للإيجار' ? details.rentPeriod || details.rentalUnit : '';
+  const suffix = period ? ` / ${period}` : details.priceBasis ? ` / ${details.priceBasis}` : profile?.pricing === 'supplier' && details.unit ? ` / ${details.unit}` : '';
+  return form.price ? `${money(Number(normalizeNumber(form.price)))} ر.س${suffix}` : form.intent === 'wanted' ? 'الميزانية قابلة للنقاش' : 'السعر عند التواصل';
 }
 function AdPicture({ ad, className = '' }: { ad: AdForm; className?: string }) {
   return ad.images.length ? <img className={className} src={ad.images[0]} alt={ad.title || 'صورة الإعلان'} /> : <div className={`seller-empty-image ${className}`}><Camera size={32} /><span>{ad.intent === 'wanted' ? 'طلب شراء' : 'بدون صورة'}</span></div>;
 }
 function AdPreview({ ad }: { ad: AdForm }) {
-  const labels = specLabels[ad.category] || specLabels['أخرى'];
-  return <article className="seller-ad-preview"><AdPicture ad={ad} className="seller-preview-cover" /><div className="seller-preview-body"><div className="seller-inline"><span className="seller-pill gold">{ad.intent === 'wanted' ? 'مطلوب' : 'معروض'}</span><span className="seller-muted">{ad.category} · {ad.subcategory}</span></div><h2>{ad.title || 'عنوان إعلانك'}</h2><strong className="seller-preview-price">{priceText(ad)}</strong><p className="seller-inline seller-muted"><MapPin size={16} />{ad.city || 'المدينة'}{ad.condition && <> · {ad.condition}</>}</p><p className="seller-description">{ad.description}</p>{(ad.spec1 || ad.spec2) && <dl className="seller-specs">{ad.spec1 && <div><dt>{labels[0]}</dt><dd>{ad.spec1}</dd></div>}{ad.spec2 && <div><dt>{labels[1]}</dt><dd>{ad.spec2}</dd></div>}</dl>}{ad.images.length > 1 && <div className="seller-preview-thumbs">{ad.images.slice(1).map((src, index) => <img key={index} src={src} alt={`صورة إضافية ${index + 2}`} />)}</div>}<div className="seller-preview-owner"><span className="seller-avatar small">د</span><div><strong>متجرك التجريبي</strong><span className="seller-muted">سيظهر الإعلان هنا داخل المعاينة</span></div><ShieldCheck size={21} /></div></div></article>;
+  const specs = displayDetails(getProfile(ad.category, ad.subcategory), ad.details);
+  return <article className="seller-ad-preview"><AdPicture ad={ad} className="seller-preview-cover" /><div className="seller-preview-body"><div className="seller-inline"><span className="seller-pill gold">{ad.category === 'وظائف' ? (ad.intent === 'wanted' ? 'باحث عن عمل' : 'فرصة عمل') : ad.intent === 'wanted' ? 'مطلوب' : 'معروض'}</span><span className="seller-muted">{ad.category} · {ad.subcategory}</span></div><h2>{ad.title || 'عنوان إعلانك'}</h2><strong className="seller-preview-price">{priceText(ad)}</strong><p className="seller-inline seller-muted"><MapPin size={16} />{ad.city || 'المدينة'}{getProfile(ad.category, ad.subcategory)?.condition && ad.condition && <> · {ad.condition}</>}</p><p className="seller-description">{ad.description}</p>{specs.length > 0 && <dl className="seller-specs">{specs.map(([label, value], index) => <div key={`${label}-${index}`}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}{ad.images.length > 1 && <div className="seller-preview-thumbs">{ad.images.slice(1).map((src, index) => <img key={index} src={src} alt={`صورة إضافية ${index + 2}`} />)}</div>}<div className="seller-preview-owner"><span className="seller-avatar small">د</span><div><strong>متجرك التجريبي</strong><span className="seller-muted">سيظهر الإعلان هنا داخل المعاينة</span></div><ShieldCheck size={21} /></div></div></article>;
 }
 
 export function NewAdPage() {
@@ -71,8 +94,10 @@ export function NewAdPage() {
   const photoInput = useRef<HTMLInputElement>(null);
   const latestDraft = useRef<AdDraft | null>(null);
   const hasContent = Boolean(form.category || form.title || form.description || form.images.length);
-  const optionalPrice = form.intent === 'wanted' || optionalPriceCategories.includes(form.category);
-  const showCondition = physicalCategories.includes(form.category);
+  const profile = getProfile(form.category, form.subcategory);
+  const optionalPrice = form.intent === 'wanted' || ['service', 'supplier', 'salary'].includes(profile?.pricing || '');
+  const showCondition = profile?.condition === true;
+  const showPrice = profile?.pricing !== 'salary';
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
@@ -81,7 +106,7 @@ export function NewAdPage() {
     if (requestedEdit) {
       const ad = getAds().find(item => item.id === requestedEdit);
       if (draft?.editingId === requestedEdit) { setForm(draft.form); setStep(Math.max(0, Math.min(3, draft.step || 0))); setEditingId(requestedEdit); setRestored(true); }
-      else if (ad) { setForm({ intent: ad.intent, category: ad.category, subcategory: ad.subcategory, title: ad.title, description: ad.description, price: ad.price, city: ad.city, condition: ad.condition, images: ad.images, spec1: ad.spec1, spec2: ad.spec2 }); setEditingId(requestedEdit); }
+      else if (ad) { setForm(normalizeForm(ad)); setEditingId(requestedEdit); }
       else notify('لم نجد الإعلان المطلوب. يمكنك إنشاء إعلان تجريبي جديد.');
     } else if (draft) { setForm(draft.form); setStep(Math.max(0, Math.min(3, draft.step || 0))); setEditingId(draft.editingId || null); setRestored(true); }
     else if (query.get('intent') === 'wanted' || query.get('type') === 'wanted') setForm({ ...emptyForm, intent: 'wanted' });
@@ -112,21 +137,32 @@ export function NewAdPage() {
     setPublishError('');
   }
   function chooseCategory(category: string) {
-    setForm(current => ({ ...current, category, subcategory: '', condition: '', spec1: '', spec2: '' }));
+    setForm(current => changeClassification(current, category));
     setErrors({});
     setSaveStatus('saving');
+  }
+  function chooseSubcategory(subcategory: string) {
+    setForm(current => changeClassification(current, current.category, subcategory));
+    setErrors({}); setSaveStatus('saving'); setPublishError('');
+  }
+  function detail(id: string, value: string | string[]) {
+    setForm(current => ({ ...current, details: updateDetail(profile, current.details, id, value) }));
+    setErrors(current => ({ ...current, [`detail.${id}`]: undefined }));
+    setSaveStatus('saving'); setPublishError('');
   }
   function validate(targetStep: number): Errors {
     const result: Errors = {};
     if (targetStep === 0) {
       if (!subcategories[form.category]) result.category = 'اختر القسم الأقرب لإعلانك.';
-      if (!subcategories[form.category]?.includes(form.subcategory)) result.subcategory = 'اختر التصنيف الفرعي.';
+      if (!getProfile(form.category, form.subcategory)) result.subcategory = 'اختر التصنيف الفرعي.';
     }
     if (targetStep === 1) {
+      if (!profile) result.subcategory = 'هذا الفرع غير متاح. ارجع واختر فرعاً مفعلاً.';
       if (form.title.trim().length < 10) result.title = 'أضف عنوانًا واضحًا من 10 أحرف على الأقل.';
       if (form.description.trim().length < 30) result.description = 'اكتب وصفًا من 30 حرفًا على الأقل يساعد الآخرين على فهم إعلانك.';
       if (!cities.slice(1).includes(form.city)) result.city = 'اختر المدينة.';
-      if ((!optionalPrice && !form.price) || (form.price && (!Number.isFinite(Number(form.price)) || Number(form.price) <= 0 || Number(form.price) > 100000000))) result.price = optionalPrice ? 'أدخل مبلغًا أكبر من صفر، أو اترك الحقل فارغًا.' : 'أدخل سعرًا أكبر من صفر وحتى 100,000,000 ر.س.';
+      if (showPrice && ((!optionalPrice && !form.price) || (form.price && (!Number.isFinite(Number(normalizeNumber(form.price))) || Number(normalizeNumber(form.price)) <= 0 || Number(normalizeNumber(form.price)) > 100000000)))) result.price = optionalPrice ? 'أدخل مبلغًا أكبر من صفر، أو اترك الحقل فارغًا.' : 'أدخل سعرًا أكبر من صفر وحتى 100,000,000 ر.س.';
+      Object.entries(validateDetails(profile, form.details, form.intent)).forEach(([key, message]) => { result[`detail.${key}`] = message; });
       if (showCondition && form.intent === 'offer' && !['جديد', 'مستعمل'].includes(form.condition)) result.condition = 'حدد حالة المنتج.';
     }
     return result;
@@ -181,7 +217,7 @@ export function NewAdPage() {
     }
     const ads = getAds();
     const existing = ads.find(ad => ad.id === editingId);
-    const savedAd: SellerAd = { ...form, title: form.title.trim(), description: form.description.trim(), id: existing?.id || `local-${Date.now()}`, status: existing?.status || 'active', createdAt: existing?.createdAt || new Date().toISOString() };
+    const savedAd: SellerAd = { ...form, details: preserveStoredDetails(form.details), price: showPrice ? normalizeNumber(form.price) : '', condition: showCondition ? form.condition : '', title: form.title.trim(), description: form.description.trim(), id: existing?.id || `local-${Date.now()}`, status: existing?.status || 'active', createdAt: existing?.createdAt || new Date().toISOString() };
     const updated = existing ? ads.map(ad => ad.id === existing.id ? savedAd : ad) : [savedAd, ...ads];
     // Free the duplicate image payload while moving a draft into saved ads.
     writeLocal(AD_DRAFT_KEY, null);
@@ -205,7 +241,7 @@ export function NewAdPage() {
     window.history.replaceState(null, '', '/ads/new/');
     notify('بدأت مسودة جديدة.');
   }
-  const labels = specLabels[form.category] || specLabels['أخرى'];
+
   const error = (name: keyof AdForm) => errors[name] ? <span className="seller-field-error" id={`error-${name}`} role="alert">{errors[name]}</span> : null;
 
   if (complete) return <div className="container seller-page seller-complete"><div className="seller-success-icon"><CheckCircle2 size={44} /></div><span className="seller-eyebrow">تجربة مكتملة</span><h1>{editingId ? 'حُفظت تعديلات إعلانك' : 'إعلانك التجريبي جاهز'}</h1><p>أُضيف إلى لوحة البائع في هذا المتصفح. يمكنك معاينته وتعديله وتجربة إدارة حالته.</p><div className="seller-demo-note"><ShieldCheck size={20} /><span>هذه معاينة محلية؛ لم يُنشر الإعلان للعموم.</span></div><div className="seller-inline seller-complete-actions"><Link className="button primary" href="/seller/">الذهاب إلى لوحة البائع<ArrowLeft size={18} /></Link><button type="button" className="button secondary" onClick={() => { resetDraft(); setComplete(false); }}>إضافة إعلان آخر</button></div></div>;
@@ -219,14 +255,23 @@ export function NewAdPage() {
       <section className="seller-form-panel" aria-busy={!hydrated || uploading}>
         <div className="seller-step-heading"><span className="seller-eyebrow">الخطوة {step + 1} من 4</span><h2 ref={stepTitle} tabIndex={-1}>{['ماذا تود أن تضيف؟', 'التفاصيل تصنع الفرق', 'دع الصور تتحدث', 'نظرة أخيرة قبل الإضافة'][step]}</h2><p>{['اختر نوع الإعلان والقسم المناسب ليسهل العثور عليه.', 'اكتب أهم المعلومات التي يحتاجها المهتم بإعلانك.', 'الصور اختيارية في هذه التجربة. الصورة الأولى هي الغلاف.', 'راجع المعلومات والصور، ثم أضف إعلانك إلى لوحتك التجريبية.'][step]}</p></div>
         {!hydrated ? <p className="seller-loading">جارٍ تجهيز مسودتك…</p> : <>
-          {step === 0 && <div className="seller-fields"><div className="seller-intents" aria-label="نوع الإعلان"><button type="button" aria-pressed={form.intent === 'offer'} className={form.intent === 'offer' ? 'selected' : ''} onClick={() => field('intent', 'offer')}><span className="seller-intent-icon"><Tag size={24} /></span><span><strong>أعرض للبيع أو أقدّم خدمة</strong><small>لدي منتج أو عقار أو خدمة</small></span><span className="seller-radio">{form.intent === 'offer' && <span />}</span></button><button type="button" aria-pressed={form.intent === 'wanted'} className={form.intent === 'wanted' ? 'selected' : ''} onClick={() => field('intent', 'wanted')}><span className="seller-intent-icon"><Search size={24} /></span><span><strong>أبحث عن شيء</strong><small>أنشر طلبًا ويصلني العرض المناسب</small></span><span className="seller-radio">{form.intent === 'wanted' && <span />}</span></button></div><fieldset className="seller-fieldset"><legend>القسم الرئيسي <span>*</span></legend><div className="seller-category-grid">{categories.slice(1).map(category => { const Icon = categoryIcons[category.name as keyof typeof categoryIcons]; return <button key={category.name} type="button" className={form.category === category.name ? 'selected' : ''} aria-pressed={form.category === category.name} onClick={() => chooseCategory(category.name)}><Icon size={25} /><span>{category.name}</span>{form.category === category.name && <Check size={13} className="seller-category-check" />}</button>; })}</div>{error('category')}</fieldset>{form.category && <label className="seller-field">التصنيف الفرعي <span className="seller-required">*</span><select value={form.subcategory} onChange={event => field('subcategory', event.target.value)} aria-invalid={Boolean(errors.subcategory)} aria-describedby={errors.subcategory ? 'error-subcategory' : undefined}><option value="">اختر التصنيف الأنسب</option>{subcategories[form.category]?.map(sub => <option key={sub}>{sub}</option>)}</select>{error('subcategory')}</label>}</div>}
-          {step === 1 && <div className="seller-fields"><label className="seller-field"><span>عنوان الإعلان <span className="seller-required">*</span></span><input value={form.title} maxLength={90} placeholder={form.intent === 'wanted' ? 'مثال: مطلوب أثاث مكتبي لفريق من 6 أشخاص' : 'مثال: كنبة مودرن 3 مقاعد بحالة ممتازة'} onChange={event => field('title', event.target.value)} aria-invalid={Boolean(errors.title)} aria-describedby={errors.title ? 'error-title' : undefined} /><span className="seller-field-foot"><small>عنوان محدد يجعل إعلانك أوضح.</small><small>{form.title.length}/90</small></span>{error('title')}</label><label className="seller-field"><span>وصف الإعلان <span className="seller-required">*</span></span><textarea value={form.description} maxLength={1200} rows={5} placeholder="اكتب الحالة والمميزات والتفاصيل المهمة وطريقة المعاينة أو الاستلام…" onChange={event => field('description', event.target.value)} aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? 'error-description' : undefined} /><span className="seller-field-foot"><small>لا تضف معلوماتك الشخصية؛ التواصل عبر الرسائل.</small><small>{form.description.length}/1200</small></span>{error('description')}</label><div className="seller-field-row"><label className="seller-field"><span>{form.intent === 'wanted' ? 'الميزانية' : form.category === 'وظائف' ? 'الراتب المتوقع' : 'السعر'} {optionalPrice ? <small>(اختياري)</small> : <span className="seller-required">*</span>}</span><span className="seller-money-input"><input type="number" min="1" max="100000000" step="any" inputMode="decimal" value={form.price} placeholder={optionalPrice ? 'حسب الاتفاق' : '0'} onChange={event => field('price', event.target.value)} aria-invalid={Boolean(errors.price)} aria-describedby={errors.price ? 'error-price' : undefined} /><span>ر.س</span></span>{error('price')}</label><label className="seller-field"><span>المدينة <span className="seller-required">*</span></span><select value={form.city} onChange={event => field('city', event.target.value)} aria-invalid={Boolean(errors.city)} aria-describedby={errors.city ? 'error-city' : undefined}><option value="">اختر المدينة</option>{cities.slice(1).map(city => <option key={city}>{city}</option>)}</select>{error('city')}</label></div>{showCondition && <fieldset className="seller-fieldset"><legend>{form.intent === 'wanted' ? 'الحالة المفضّلة (اختياري)' : 'حالة المنتج *'}</legend><div className="seller-condition-options">{['جديد', 'مستعمل', ...(form.intent === 'wanted' ? ['أي حالة'] : [])].map(condition => <button type="button" key={condition} className={form.condition === condition ? 'selected' : ''} aria-pressed={form.condition === condition} onClick={() => field('condition', condition)}>{form.condition === condition && <Check size={16} />}{condition}</button>)}</div>{error('condition')}</fieldset>}<div className="seller-spec-fields"><h3>تفاصيل إضافية <small>(اختياري)</small></h3><div className="seller-field-row"><label className="seller-field">{labels[0]}<input value={form.spec1} maxLength={70} placeholder="أضف تفصيلًا مفيدًا" onChange={event => field('spec1', event.target.value)} /></label><label className="seller-field">{labels[1]}<input value={form.spec2} maxLength={70} placeholder="أضف تفصيلًا مفيدًا" onChange={event => field('spec2', event.target.value)} /></label></div></div></div>}
+          {step === 0 && <div className="seller-fields"><div className="seller-intents" aria-label="نوع الإعلان"><button type="button" aria-pressed={form.intent === 'offer'} className={form.intent === 'offer' ? 'selected' : ''} onClick={() => field('intent', 'offer')}><span className="seller-intent-icon"><Tag size={24} /></span><span><strong>أعرض منتجاً أو خدمة أو فرصة عمل</strong><small>بيع، إيجار، خدمات أو توظيف</small></span><span className="seller-radio">{form.intent === 'offer' && <span />}</span></button><button type="button" aria-pressed={form.intent === 'wanted'} className={form.intent === 'wanted' ? 'selected' : ''} onClick={() => field('intent', 'wanted')}><span className="seller-intent-icon"><Search size={24} /></span><span><strong>أبحث عن شيء</strong><small>أنشر طلبًا ويصلني العرض المناسب</small></span><span className="seller-radio">{form.intent === 'wanted' && <span />}</span></button></div><fieldset className="seller-fieldset"><legend>القسم الرئيسي <span>*</span></legend><div className="seller-category-grid">{categories.slice(1).map(category => { const Icon = categoryIcons[category.name as keyof typeof categoryIcons]; return <button key={category.name} type="button" className={form.category === category.name ? 'selected' : ''} aria-pressed={form.category === category.name} onClick={() => chooseCategory(category.name)}><Icon size={25} /><span>{category.name}</span>{form.category === category.name && <Check size={13} className="seller-category-check" />}</button>; })}</div>{error('category')}</fieldset>{form.category && <label className="seller-field">التصنيف الفرعي <span className="seller-required">*</span><select value={form.subcategory} onChange={event => chooseSubcategory(event.target.value)} aria-invalid={Boolean(errors.subcategory)} aria-describedby={errors.subcategory ? 'error-subcategory' : undefined}><option value="">اختر التصنيف الأنسب</option>{subcategories[form.category]?.filter(sub => getProfile(form.category, sub)).map(sub => <option key={sub}>{sub}</option>)}</select>{error('subcategory')}</label>}</div>}
+          {step === 1 && !profile && <div className="seller-fields"><p role="alert">هذا الفرع غير متاح. ارجع واختر فرعاً مفعلاً.</p><button className="button secondary" onClick={() => goTo(0)}>اختيار الفرع</button></div>}
+          {step === 1 && profile && <div className="seller-fields">
+            <div className="category-context"><Link href="/field-settings/">إعدادات الحقول التجريبية</Link><strong>{form.category} / {form.subcategory}</strong><button type="button" className="category-change-button" onClick={() => goTo(0)}>تغيير الفرع</button></div>
+            <label className="seller-field"><span>عنوان الإعلان <span className="seller-required">*</span></span><input value={form.title} maxLength={90} placeholder={profile.example} onChange={event => field('title', event.target.value)} aria-invalid={Boolean(errors.title)} /><small>{form.title.length}/90</small>{error('title')}</label>
+            <label className="seller-field"><span>وصف الإعلان <span className="seller-required">*</span></span><textarea value={form.description} maxLength={1200} rows={5} placeholder={profile.pricing === 'salary' ? 'وضّح المسؤوليات ومتطلبات الوظيفة وطريقة التقديم، دون بيانات شخصية حساسة.' : 'أضف التفاصيل التي لم تغطّها الحقول، وأي عيوب أو شروط مهمة.'} onChange={event => field('description', event.target.value)} aria-invalid={Boolean(errors.description)} /><small>لا تضع أرقام الهوية أو مستندات شخصية هنا · {form.description.length}/1200</small>{error('description')}</label>
+            <label className="seller-field"><span>المدينة <span className="seller-required">*</span></span><select value={form.city} onChange={event => field('city', event.target.value)} aria-invalid={Boolean(errors.city)}><option value="">اختر المدينة</option>{cities.slice(1).map(city => <option key={city}>{city}</option>)}</select>{error('city')}</label>
+            {showCondition && <fieldset className="seller-fieldset"><legend>{form.intent === 'wanted' ? 'الحالة المفضّلة (اختياري)' : 'حالة المعروض *'}</legend><div className="seller-condition-options">{['جديد', 'مستعمل', ...(form.intent === 'wanted' ? ['أي حالة'] : [])].map(condition => <button type="button" key={condition} className={form.condition === condition ? 'selected' : ''} aria-pressed={form.condition === condition} onClick={() => field('condition', condition)}>{form.condition === condition && <Check size={16} />}{condition}</button>)}</div>{error('condition')}</fieldset>}
+            <CategoryDetails profile={profile} values={form.details} errors={errors} intent={form.intent} onChange={detail} />
+            {showPrice && <label className="seller-field"><span>{form.intent === 'wanted' ? 'الميزانية' : form.details.purpose === 'للإيجار' ? 'قيمة الإيجار للدورية المختارة' : profile.pricing === 'property' ? 'سعر العقار الإجمالي' : profile.pricing === 'service' ? 'تكلفة الخدمة التقديرية' : profile.pricing === 'supplier' ? 'سعر وحدة البيع' : 'السعر'} {optionalPrice ? <small>(اختياري)</small> : <span className="seller-required">*</span>}</span><span className="seller-money-input"><input type="text" maxLength={16} inputMode="decimal" value={form.price} placeholder={optionalPrice ? 'حسب الاتفاق' : 'أدخل المبلغ'} onChange={event => field('price', event.target.value)} aria-invalid={Boolean(errors.price)} /><span>ر.س</span></span>{error('price')}</label>}
+          </div>}
           {step === 2 && <div className="seller-fields"><input ref={photoInput} id="ad-photo-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={event => { void uploadPhotos(event.target.files); }} /><button type="button" className="seller-upload" disabled={uploading || form.images.length >= 3} onClick={() => photoInput.current?.click()}><span><ImagePlus size={31} /></span><strong>{uploading ? 'جارٍ قراءة الصور…' : form.images.length >= 3 ? 'أضفت الحد الأقصى من الصور' : 'اختر صور إعلانك'}</strong><small>JPG، PNG، WebP · حتى 1 ميجابايت للصورة</small><b>{form.images.length} / 3 صور</b></button>{uploadError && <div className="seller-inline-error" role="alert">{uploadError}</div>}{Boolean(form.images.length) && <div className="seller-upload-grid">{form.images.map((src, index) => <div key={`${index}-${src.slice(-20)}`}><img src={src} alt={`صورة الإعلان ${index + 1}`} /><span>{index === 0 ? 'صورة الغلاف' : `صورة ${index + 1}`}</span><button type="button" disabled={uploading} title="حذف الصورة" aria-label={`حذف الصورة ${index + 1}`} onClick={() => field('images', form.images.filter((_, imageIndex) => imageIndex !== index))}><X size={17} /></button></div>)}</div>}<div className="seller-photo-tip"><Camera size={21} /><p>صوّر المنتج بإضاءة طبيعية ومن أكثر من زاوية، وأظهر حالته بوضوح. صورك تبقى في هذا المتصفح ضمن التجربة.</p></div></div>}
           {step === 3 && <div className="seller-review"><AdPreview ad={form} /><div className="seller-review-edits"><button type="button" onClick={() => goTo(0)}><Pencil size={15} />تعديل القسم</button><button type="button" onClick={() => goTo(1)}><Pencil size={15} />تعديل التفاصيل</button><button type="button" onClick={() => goTo(2)}><Pencil size={15} />تعديل الصور</button></div><div className="seller-demo-note"><ShieldCheck size={21} /><span>بالضغط على «{editingId ? 'حفظ التعديلات التجريبية' : 'نشر تجريبي'}»، سيُحفظ الإعلان محليًا في لوحة البائع. لا توجد عملية نشر عامة أو دفع.</span></div>{publishError && <div className="seller-inline-error" role="alert">{publishError}</div>}</div>}
         </>}
         <div className="seller-form-footer"><button type="button" className="button secondary" onClick={() => step > 0 ? goTo(step - 1) : saveNow()} disabled={!hydrated || uploading}>{step > 0 ? <><ArrowRight size={17} />السابق</> : <><FilePenLine size={17} />حفظ المسودة</>}</button><span className="seller-save-state" aria-live="polite">{saveStatus === 'saved' ? <><CheckCircle2 size={15} />المسودة محفوظة</> : saveStatus === 'saving' ? 'جارٍ حفظ المسودة…' : saveStatus === 'failed' ? <button type="button" onClick={saveNow}>تعذر الحفظ · إعادة المحاولة</button> : 'تُحفظ مسودتك تلقائيًا'}</span><button type="button" className="button primary" disabled={!hydrated || uploading} onClick={step === 3 ? publish : next}>{step === 3 ? <>{editingId ? 'حفظ التعديلات التجريبية' : 'نشر تجريبي'}<Check size={18} /></> : <>التالي<ArrowLeft size={18} /></>}</button></div>
       </section>
-    </div><aside className="seller-form-aside"><div className="seller-help-card"><span className="seller-help-icon"><Sparkles size={24} /></span><span className="seller-eyebrow">إعلان أفضل، فرص أكثر</span><h3>خلّ إعلانك يلفت النظر</h3><ul><li><CheckCircle2 size={18} /><span><strong>عنوان واضح ومختصر</strong>اذكر المنتج وأهم ما يميّزه.</span></li><li><CheckCircle2 size={18} /><span><strong>تفاصيل من واقع المنتج</strong>وضّح الحالة والمقاس والملحقات.</span></li><li><CheckCircle2 size={18} /><span><strong>صور حقيقية وواضحة</strong>صورة جيدة تختصر الكثير من الأسئلة.</span></li><li><CheckCircle2 size={18} /><span><strong>سعر مناسب وواضح</strong>يساعد المهتم على اتخاذ قراره.</span></li></ul></div><div className="seller-privacy-card"><ShieldCheck size={23} /><h3>تعامل بوعي</h3><p>عاين المنتج وتحقق من تفاصيله قبل الاتفاق. لا تشارك رموز التحقق أو معلوماتك البنكية.</p><Link href="/#trust">نصائح البيع والشراء الآمن<ArrowLeft size={16} /></Link></div><div className="seller-local-note"><Clock3 size={17} /><p>تحتاج وقتًا أكثر؟ مسودتك تُحفظ في هذا المتصفح لتعود إليها متى أردت.</p></div></aside></div>
+    </div><aside className="seller-form-aside"><div className="seller-help-card"><span className="seller-help-icon"><Sparkles size={24} /></span><span className="seller-eyebrow">إعلان أفضل، فرص أكثر</span><h3>خلّ إعلانك يلفت النظر</h3><ul><li><CheckCircle2 size={18} /><span><strong>عنوان واضح ومختصر</strong>صف المعروض أو الفرصة وأهم ما يميّزها.</span></li><li><CheckCircle2 size={18} /><span><strong>تفاصيل خاصة بالفرع</strong>أكمل المواصفات المناسبة للمجال.</span></li><li><CheckCircle2 size={18} /><span><strong>صور حقيقية وواضحة</strong>أضف صوراً مناسبة إن كان نوع الإعلان يحتاجها.</span></li><li><CheckCircle2 size={18} /><span><strong>{profile?.pricing === 'salary' ? 'راتب ودورية واضحان' : 'سعر مناسب وواضح'}</strong>يساعد المهتم على اتخاذ قراره.</span></li></ul></div><div className="seller-privacy-card"><ShieldCheck size={23} /><h3>تعامل بوعي</h3><p>عاين المنتج وتحقق من تفاصيله قبل الاتفاق. لا تشارك رموز التحقق أو معلوماتك البنكية.</p><Link href="/#trust">نصائح البيع والشراء الآمن<ArrowLeft size={16} /></Link></div><div className="seller-local-note"><Clock3 size={17} /><p>تحتاج وقتًا أكثر؟ مسودتك تُحفظ في هذا المتصفح لتعود إليها متى أردت.</p></div></aside></div>
     <Modal open={discardOpen} onClose={() => setDiscardOpen(false)} title="بدء إعلان جديد؟"><p>سيتم استبدال المسودة الحالية بمسودة فارغة. الإعلان السابق المحفوظ في لوحة البائع لن يتأثر.</p><div className="seller-modal-actions"><button className="button secondary" type="button" onClick={() => setDiscardOpen(false)}>العودة للمسودة</button><button className="button primary" type="button" onClick={resetDraft}>بدء إعلان جديد</button></div></Modal>
   </div>;
 }

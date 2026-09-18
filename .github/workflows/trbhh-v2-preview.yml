@@ -19,5 +19,6 @@ jobs:
           cache: npm
           cache-dependency-path: preview-v2/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - run: npm test
       - run: npm run build
       - run: npm run typecheck

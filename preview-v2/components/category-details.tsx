@@ -1,0 +1,17 @@
+'use client';
+
+import { visibleFields, type Details, type Profile } from '../lib/category-fields';
+
+export function CategoryDetails({ profile, values, errors, intent, onChange }: { profile: Profile; values: Details; errors: Record<string, string | undefined>; intent: 'offer' | 'wanted'; onChange: (id: string, value: string | string[]) => void }) {
+  const fields = visibleFields(profile, values);
+  const groups = [...new Set(fields.map(field => field.group))];
+  return <div className="category-details"><div className="seller-demo-note"><span>حقول مخصصة لهذا الفرع · {intent === 'wanted' ? 'حدد المواصفات التي تبحث عنها؛ التفاصيل اختيارية للطلبات.' : 'النجمة تعني أن الحقل مطلوب. بقية الحقول اختيارية ولن تظهر فارغة في الإعلان.'}</span></div>{groups.map(group => <fieldset key={group} className="category-field-group"><legend>{group}</legend><div className="category-field-grid">{fields.filter(field => field.group === group).map(field => {
+    const id = `detail-${field.id}`;
+    const error = errors[`detail.${field.id}`];
+    const required = Boolean(field.required && intent === 'offer');
+    const value = values[field.id];
+    const scalar = typeof value === 'string' ? value : '';
+    const shared = { id, 'aria-invalid': Boolean(error), 'aria-describedby': error ? `${id}-error` : undefined, 'aria-required': required };
+    return <div className={`seller-field ${field.type === 'multi' ? 'category-wide' : ''}`} key={field.id}><label htmlFor={id}>{field.label}{field.unit && <small> ({field.unit})</small>} {required ? <span className="seller-required">*</span> : <small>(اختياري)</small>}</label>{field.type === 'select' ? <select {...shared} value={scalar} onChange={e => onChange(field.id, e.target.value)}><option value="">اختر {field.label}</option>{scalar && !field.options?.includes(scalar) && <option value={scalar} disabled>قيمة محفوظة تحتاج مراجعة: {scalar}</option>}{field.options?.map(option => <option key={option}>{option}</option>)}</select> : field.type === 'multi' ? <div id={id} role="group" aria-label={field.label} className="category-checks">{field.options?.map(option => <label key={option}><input type="checkbox" checked={Array.isArray(value) && value.includes(option)} onChange={e => { const selected = Array.isArray(value) ? value : []; onChange(field.id, e.target.checked ? [...selected, option] : selected.filter(item => item !== option)); }} />{option}</label>)}</div> : <input {...shared} type={field.type === 'date' ? 'date' : 'text'} inputMode={field.type === 'number' ? (field.integer ? 'numeric' : 'decimal') : undefined} value={scalar} maxLength={field.type === 'number' ? 18 : 300} placeholder={field.type === 'number' ? `من ${field.min ?? 0} إلى ${field.max ?? 1000000}` : field.label} onChange={e => onChange(field.id, e.target.value)} />}{field.type === 'multi' && Array.isArray(value) && value.some(item => !field.options?.includes(item)) && <div className="category-retired"><small role="alert">خيارات محفوظة لم تعد متاحة: {value.filter(item => !field.options?.includes(item)).join("، ")}. لا تزال محفوظة حتى تزيلها بنفسك.</small><button type="button" className="category-change-button" onClick={() => onChange(field.id, value.filter(item => field.options?.includes(item)))}>إزالة الخيارات غير المتاحة من {field.label}</button></div>}{field.hint && <small>{field.hint}</small>}{error && <span className="seller-field-error" id={`${id}-error`} role="alert">{error}</span>}</div>;
+  })}</div></fieldset>)}</div>;
+}

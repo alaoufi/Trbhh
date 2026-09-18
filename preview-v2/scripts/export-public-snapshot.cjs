@@ -13,8 +13,8 @@ function mediaUrl(raw){
   }catch{return null;}
 }
 function publicAd(row,images){
-  const revision=createHash('sha256').update(JSON.stringify([String(row.id),row.updated_at,row.title,row.detail,row.price,String(row.category_id),row.subcategory_id,images])).digest('hex');
-  return {id:String(row.id),title:row.title,description:row.detail,price:Number(row.price),city:row.city||'',seller:row.seller||'معلن',verified:Number(row.trusted)===1,condition:'',specs:[],category:'',subcategory:'',classificationRevision:revision,sourceUrl:ORIGIN+'/ads/'+String(row.id),time:row.created_at?new Date(row.created_at).toISOString().slice(0,10):'',images,image:images[0]||'/placeholder-ad.svg',intent:row.adsType==='request'?'wanted':'offer',sourceCategoryId:String(row.category_id),sourceSubcategoryId:row.subcategory_id==null?null:String(row.subcategory_id)};
+  const revision=createHash('sha256').update(JSON.stringify([String(row.id),row.updated_at,row.title,row.detail,row.price,row.price_type,row.rent_period,String(row.category_id),row.subcategory_id,images])).digest('hex');
+  return {id:String(row.id),title:row.title,description:row.detail,price:Number(row.price),priceType:row.price_type??null,rentPeriod:row.rent_period??null,city:row.city||'',seller:row.seller||'معلن',verified:Number(row.trusted)===1,condition:'',specs:[],category:'',subcategory:'',classificationRevision:revision,sourceUrl:ORIGIN+'/ads/'+String(row.id),time:row.created_at?new Date(row.created_at).toISOString().slice(0,10):'',images,image:images[0]||'/placeholder-ad.svg',intent:row.adsType==='request'?'wanted':'offer',sourceCategoryId:String(row.category_id),sourceSubcategoryId:row.subcategory_id==null?null:String(row.subcategory_id)};
 }
 function censorPattern(words){
   const parts=words.map(word=>String(word).trim()).filter(Boolean).map(word=>[...word].map(ch=>ch.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('[^\\p{L}\\p{N}]*'));
@@ -43,7 +43,7 @@ async function exportSnapshot(){
       const redact=value=>pattern?value.replace(pattern,match=>'█'.repeat(Math.max(3,[...match].length))):value;
       const result=[];let cursor=0n;
       for(;;){
-        const rows=await tx.$queryRawUnsafe(`SELECT a.id,a.title,a.detail,a.price,a.adsType,a.category_id,a.subcategory_id,a.created_at,a.updated_at,
+        const rows=await tx.$queryRawUnsafe(`SELECT a.id,a.title,a.detail,a.price,a.price_type,a.rent_period,a.adsType,a.category_id,a.subcategory_id,a.created_at,a.updated_at,
           COALESCE(c.name,'') AS city,COALESCE(NULLIF(u.name,''),NULLIF(u.userName,''),'معلن') AS seller,u.trusted
           FROM ads a CROSS JOIN (SELECT ? AS now) clock JOIN users u ON u.id=a.user_id LEFT JOIN cities c ON c.id=a.city_id
           LEFT JOIN user_packages up ON up.user_id=a.user_id AND (up.expires_at IS NULL OR up.expires_at>clock.now)

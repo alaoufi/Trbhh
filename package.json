@@ -25,6 +25,7 @@
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "heic-convert": "2.1.0",
     "ioredis": "^5.4.2",
     "jose": "^5.9.6",
     "lucide-react": "^0.469.0",
@@ -38,6 +39,7 @@
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/heic-convert": "^2.1.1",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",

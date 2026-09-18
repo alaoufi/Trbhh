@@ -60,8 +60,9 @@ export function alrajhiConfigReport(env: EnvironmentValues = process.env) {
 export async function getTopupMethodAvailability(): Promise<PaymentMethodPolicy> {
   const [electronicEnabled, transferEnabled] = await Promise.all([
     getSettingBool(PAY_SETTING.electronicOn, false),
-    // Preserve the existing live bank-transfer flow until an administrator explicitly turns it off.
-    getSettingBool(PAY_SETTING.transferOn, true),
+    // الافتراضي: الشحن ببطاقة مدى (الدفع الإلكتروني) هو الأساس، والتحويل البنكي اليدوي
+    // (الذي يستدعي مراجعة الإدارة) موقوف افتراضياً — يبقى قابلاً لإعادة التفعيل من الإدارة.
+    getSettingBool(PAY_SETTING.transferOn, false),
   ]);
   return paymentMethodPolicy({ electronicEnabled, transferEnabled, alrajhiConfigured: alrajhiEnvironmentConfigured() });
 }

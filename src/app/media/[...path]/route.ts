@@ -1,7 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { createReadStream } from 'node:fs';
+import { open, readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { statLocal, statInDir } from '@/lib/storage';
+import { isHeicBytes, heicBytesToJpeg } from '@/lib/upload-normalize';
 import { isPotentiallyProtectedUploadPath, isProtectedUploadType } from '@/lib/media-access';
 
 export const runtime = 'nodejs';
@@ -82,6 +84,36 @@ async function protectedMediaCacheControl(rel: string): Promise<string | null> {
   return (await hasAction(session.uid, 'verifications', 'view').catch(() => false)) ? 'private, no-store' : null;
 }
 
+const IMG_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp', 'tif', 'tiff']);
+
+/**
+ * شبكة أمان للصور القديمة: صور آيفون رُفعت قبل الإصلاح فحُفظت **ببايتات HEIC**
+ * تحت امتداد `.jpg` (لا يعرضها أي متصفّح). نكتشفها وقت التقديم من البصمة ونحوّلها
+ * إلى JPEG آنيّاً — تُخزَّن مؤقتاً (immutable) فيتم التحويل مرّة واحدة لكل ملف.
+ * غير HEIC يمرّ فوراً (قراءة ١٢ بايت فقط) دون أي تكلفة تُذكر.
+ */
+async function serveConvertedHeic(abs: string, ext: string, cacheControl: string): Promise<Response | null> {
+  if (!IMG_EXT.has(ext)) return null;
+  let head: Buffer;
+  try {
+    const fh = await open(abs, 'r');
+    try { head = Buffer.alloc(12); await fh.read(head, 0, 12, 0); } finally { await fh.close(); }
+  } catch { return null; }
+  if (!isHeicBytes(head)) return null;
+  try {
+    const jpg = await heicBytesToJpeg(await readFile(abs));
+    if (!jpg) return null;
+    return new Response(new Uint8Array(jpg), {
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'Content-Length': String(jpg.length),
+        'Cache-Control': cacheControl,
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  } catch { return null; }
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: parts } = await params;
   const rel = parts.join('/');
@@ -94,7 +126,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
 
   // 1) app storage (newly uploaded media)
   const local = await statLocal(rel);
-  if (local) return serveFile(local, req, contentType, cacheControl);
+  if (local) {
+    const heic = await serveConvertedHeic(local.abs, ext, cacheControl);
+    if (heic) return heic;
+    return serveFile(local, req, contentType, cacheControl);
+  }
 
   // 2) mounted legacy media dir (original site's files) — served with Range too
   if (LEGACY_DIR) {

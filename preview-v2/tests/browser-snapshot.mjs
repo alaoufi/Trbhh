@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const origin=process.env.PREVIEW_URL||'http://127.0.0.1:4188';
+assert.match(origin,/^http:\/\/(127\.0\.0\.1|localhost):\d+$/);
+const browser=await chromium.launch({channel:'msedge',headless:true});
+try{
+ const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ await page.goto(origin+'/');await page.getByText(/لقطة عامة/).first().waitFor();
+ assert.equal(await page.getByText('سيارة دفع رباعي، استخدام نظيف',{exact:true}).count(),0);
+ await page.goto(origin+'/search/');assert.equal(await page.locator('.listing-card').count(),48);
+ await page.getByLabel('البحث في الإعلانات').fill('عرض 54');assert.equal(await page.locator('.listing-card').count(),1);
+ await page.goto(origin+'/search/?intent=wanted');assert.equal(await page.locator('.listing-card').count(),1);
+ await page.goto(origin+'/ads/9000/');await page.getByRole('link',{name:'الإعلان الأصلي',exact:true}).first().waitFor();
+ assert.equal(await page.getByText('سعر توضيحي',{exact:true}).count(),0);
+ await page.getByText('السعر غير محدد',{exact:true}).first().waitFor();
+ assert.equal(await page.locator('.buyer-listing-badges .badge').count(),0);
+ assert.equal(await page.getByRole('heading',{name:'المواصفات',exact:true}).count(),0);
+ assert.equal(await page.locator('.buyer-main-image').isDisabled(),true);
+ assert.equal(await page.locator('.buyer-image-count').count(),0);
+ await page.goto(origin+'/classification/');await page.locator('[data-ad-key="market:9000"]').waitFor();
+ assert.equal(await page.locator('tbody tr').count(),48);
+ await page.getByLabel('تحديد جميع الإعلانات الظاهرة').check();
+ await page.getByRole('button',{name:'تحويل المحدد (48)',exact:true}).click();await page.getByRole('button',{name:'تأكيد التحويل',exact:true}).click();
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'تنزيل التصنيفات المراجعة JSON'}).click();
+ const stream=await (await download).createReadStream();let json='';for await(const chunk of stream)json+=chunk;
+ const exported=JSON.parse(json);assert.equal(exported.assignments.length,48);assert.equal(exported.assignments[0].classificationRevision,'b'.repeat(64));
+ await page.getByRole('button',{name:'الصفحة التالية',exact:true}).click();assert.equal(await page.locator('tbody tr').count(),7);
+ assert.deepEqual(errors,[]);console.log('PASS live snapshot browsing, pagination, original links and reviewed download');
+}finally{await browser.close();}

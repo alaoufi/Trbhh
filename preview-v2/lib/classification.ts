@@ -10,8 +10,8 @@ const rules: [RegExp,string,string][]=[
   [/دراجة نارية|دباب/,'سيارات','دراجات نارية'],
   [/شقة|شقه/,'عقارات','شقق'],[/فيلا|فله|فيلا|فلل/,'عقارات','فلل ومنازل'],
   [/أرض|ارض/,'عقارات','أراضٍ'],
-  [/حفار|معدات حفر|شيول|بلدوزر/,'معدات وآليات','معدات ثقيلة'],
-  [/فوركلفت|رافعة شوكية/,'معدات وآليات','رافعات شوكية'],
+  [/حفار|معدات حفر|شيول|بلدوزر|سيزر لفت|سيزر ليفت|سيزرلفت|سيزرات لفت|رافعة مقصية|رافعات مقصية|بوم لفت|بوم ليفت|Scissor Lift|Boom Lift/,'معدات وآليات','معدات ثقيلة'],
+  [/فوركلفت|رافعة شوكية|رافعات شوكية|رفعات شوكية|forklift/,'معدات وآليات','رافعات شوكية'],
   [/لابتوب|كمبيوتر/,'إلكترونيات','كمبيوتر ولابتوب'],
   [/كاميرا/,'إلكترونيات','كاميرات'],[/جوال|ايفون|آيفون/,'إلكترونيات','جوالات'],
   [/كنبة|كنبه|كنب|سرير/,'منزل وأثاث','أثاث منزلي'],
@@ -29,7 +29,7 @@ export function validTarget(value: unknown): value is Target {
 export function classify(ad:Classifiable):Classified {
   if(validTarget(ad)) return {category:ad.category!,subcategory:ad.subcategory!,review:ad.classificationReview===true || (ad.category==='أخرى' && ad.subcategory==='أخرى'),source:'existing'};
   // Use only the title; incidental words in descriptions must not silently move ads.
-  const matches=rules.filter(([pattern])=>new RegExp('(?:^|[^\\p{L}\\p{N}])(?:'+pattern.source+')(?=$|[^\\p{L}\\p{N}])','u').test(ad.title));
+  const matches=rules.filter(([pattern])=>new RegExp('(?:^|[^\\p{L}\\p{N}])(?:'+pattern.source+')(?=$|[^\\p{L}\\p{N}])','iu').test(ad.title));
   const targets=[...new Map(matches.map(([,category,subcategory])=>[category+'/'+subcategory,{category,subcategory}])).values()];
   return targets.length===1 ? {...targets[0],review:false,source:'auto'} : {...FALLBACK};
 }

@@ -1,7 +1,8 @@
 'use client';
 import {useEffect,useState} from 'react';
 import Link from 'next/link';
-import {listings} from '../lib/demo-data';
+import {isOriginalMedia,reviewExport} from '../lib/snapshot';
+import {listings,isLive,snapshot} from '../lib/demo-data';
 import {catalog,getProfile} from '../lib/category-fields';
 import {CLASSIFICATION_KEY,type Target} from '../lib/classification';
 import {resolveAd,readAssignments,CLASSIFICATION_EVENT,type Assignments} from '../lib/classification-store';
@@ -20,6 +21,7 @@ function rowsFrom(overrides:Assignments):Row[]{
 }
 export function ClassificationManager(){
   const [rows,setRows]=useState<Row[]>([]);
+  const [page,setPage]=useState(1);
   const [ready,setReady]=useState(false);
   const [filter,setFilter]=useState('all');
   const [query,setQuery]=useState('');
@@ -32,7 +34,16 @@ export function ClassificationManager(){
   const [undo,setUndo]=useState<{before:Assignments;after:Assignments;rows:Row[]}|null>(null);
   function refresh(){setRows(rowsFrom(readAssignments()));setSettings(readLocal(FIELD_SETTINGS_KEY,{}));setSelected([]);setReady(true);}
   useEffect(()=>{refresh();window.addEventListener('storage',refresh);return()=>window.removeEventListener('storage',refresh);},[]);
-  const visible=rows.filter(row=>(filter==='all'||row.ad.classificationReview) && (row.raw.title+' '+row.raw.id).includes(query.trim()));
+  const matched=rows.filter(row=>(filter==='all'||row.ad.classificationReview) && (row.raw.title+' '+row.raw.id).includes(query.trim()));
+  const pages=Math.max(1,Math.ceil(matched.length/48));const currentPage=Math.min(page,pages);
+  const visible=matched.slice((currentPage-1)*48,currentPage*48);
+  useEffect(()=>{setPage(1);setSelected([]);},[filter,query]);
+  function downloadReviews(){
+    const value=reviewExport(snapshot,readAssignments());
+    const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));
+    const link=document.createElement('a');link.href=url;link.download='trbhh-reviewed-classifications.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    setMessage(`تم تنزيل ${value.assignments.length} تصنيف مراجع من جميع الصفحات؛ لا تشمل التصنيفات التلقائية أو المراجعات القديمة.`);
+  }
   const selectedRows=rows.filter(row=>selected.includes(row.key));
   const enabled=(cat:string,sub:string)=>Boolean(applyFieldSettings(getProfile(cat,sub),settings?.[cat+'/'+sub]));
   const allChecked=visible.length>0 && visible.every(row=>selected.includes(row.key));
@@ -69,14 +80,16 @@ export function ClassificationManager(){
   }
   return <div className="container seller-page compact-fields">
     <div className="seller-page-head"><div><h1>تصنيف الإعلانات</h1><p>مراجعة التصنيفات وتعديلها فردياً أو دفعة واحدة.</p></div><Link href="/field-settings/" className="button secondary">إعدادات الحقول</Link></div>
-    <div className="seller-demo-note">تجربة محلية فقط: تشمل أمثلة السوق والإعلانات المحفوظة في هذا المتصفح، ولا تتصل بالإعلانات الحية. العناوين الواضحة تُصنف تلقائياً، وما لم يتضح يوضع في «أخرى / أخرى» للمراجعة. التصنيفات الصحيحة الموجودة لا تستبدل تلقائياً.</div>
+    <div className="seller-demo-note">{isLive?'مراجعة محلية للقطة الإعلانات العامة والإعلانات المحلية؛ لا تكتب أي تغييرات للموقع الأصلي.':'تجربة محلية فقط: تشمل أمثلة السوق والإعلانات المحفوظة في هذا المتصفح، ولا تتصل بالإعلانات الحية.'} العناوين الواضحة تُصنف تلقائياً، وما لم يتضح يوضع في «أخرى / أخرى» للمراجعة. التصنيفات الصحيحة الموجودة لا تستبدل تلقائياً.</div>
     <div className="classification-stats"><span>جميع الإعلانات: {rows.length}</span><span>بحاجة لتصنيف: {rows.filter(row=>row.ad.classificationReview).length}</span><span>المحدد: {selected.length}</span></div>
     <div className="classification-tools"><label className="seller-field">عرض الإعلانات<select aria-label="عرض الإعلانات" value={filter} onChange={e=>{setFilter(e.target.value);setSelected([]);}}><option value="all">جميع الإعلانات</option><option value="review">غير مصنفة / أخرى للمراجعة</option></select></label><label className="seller-field">البحث بالعنوان أو الرقم<input value={query} onChange={e=>{setQuery(e.target.value);setSelected([]);}} /></label><button className="button secondary" onClick={()=>{refresh();setMessage('تم تحديث القائمة.');}}>تحديث القائمة</button></div>
     <section className="classification-batch"><strong>وجهة التحويل</strong><div className="classification-tools"><label className="seller-field">القسم المستهدف<select value={category} onChange={e=>{setCategory(e.target.value);setSubcategory('');}}>{Object.keys(catalog).map(c=><option key={c}>{c}</option>)}</select></label><label className="seller-field">الفرع المستهدف<select value={subcategory} onChange={e=>setSubcategory(e.target.value)}><option value="">اختر الفرع</option>{Object.keys(catalog[category]).filter(sub=>enabled(category,sub)).map(sub=><option key={sub}>{sub}</option>)}</select></label><button className="button primary" disabled={!ready||!selected.length||!enabled(category,subcategory)} onClick={()=>prepare(selectedRows,{category,subcategory})}>تحويل المحدد ({selected.length})</button><button className="button secondary" disabled={!selected.length} onClick={()=>prepare(selectedRows,{category:'أخرى',subcategory:'أخرى'})}>وضع المحدد في أخرى</button><button className="button secondary" disabled={!undo} onClick={rollback}>تراجع عن آخر دفعة</button></div><small>راجع العدد والوجهة قبل التأكيد. عند تغيير الفرع تُؤرشف المواصفات القديمة ولا تُعرض كأنها تخص الفرع الجديد، وتبقى الصور والوصف والسعر دون تغيير.</small></section>
+    {isLive&&<button className="button secondary" onClick={downloadReviews}>تنزيل التصنيفات المراجعة JSON</button>}
+    <nav aria-label="صفحات التصنيف"><button className="button secondary" disabled={currentPage===1} onClick={()=>{setPage(currentPage-1);setSelected([]);}}>الصفحة السابقة</button><span> الصفحة {currentPage} / {pages} · نتائج البحث {matched.length} </span><button className="button secondary" disabled={currentPage===pages} onClick={()=>{setPage(currentPage+1);setSelected([]);}}>الصفحة التالية</button></nav>
     <p role="status" className="classification-notice">{message}</p>
     <div className="classification-table-wrap"><table className="classification-table"><caption>الإعلانات الظاهرة ({visible.length}) — التحديد الجماعي يشمل الصفوف الظاهرة فقط</caption><thead><tr><th><input type="checkbox" aria-label="تحديد جميع الإعلانات الظاهرة" checked={allChecked} disabled={!visible.length} onChange={e=>setSelected(e.target.checked?visible.map(row=>row.key):[])} /></th><th>الإعلان</th><th>التصنيف الحالي</th><th>حالة التصنيف</th><th>تعديل</th></tr></thead><tbody>{visible.map(row=>{
       const src=row.raw.image||row.raw.images?.[0];
-      return <tr key={row.key} data-ad-key={row.key}><td><input type="checkbox" aria-label={`تحديد ${row.raw.title}`} checked={selected.includes(row.key)} onChange={e=>setSelected(value=>e.target.checked?[...value,row.key]:value.filter(id=>id!==row.key))}/></td><td><div className="classification-title">{src && (src.startsWith('/images/')||/^data:image\/(jpeg|png|webp);base64,/.test(src)) && <img src={src} alt="" loading="lazy"/>}<div><strong>{row.raw.title}</strong><small>#{row.raw.id} · {row.source==='market'?'مثال السوق':'إعلان محلي'}</small><Link href={row.source==='market'?`/ads/${row.raw.id}/`:`/ads/new/?edit=${encodeURIComponent(row.raw.id)}`}>معاينة / تعديل الإعلان</Link></div></div></td><td>{row.ad.category}<br/><small>{row.ad.subcategory}</small></td><td>{row.ad.classificationReview?'بحاجة لمراجعة':row.ad.classificationSource==='auto'?'تلقائي واضح':row.ad.classificationSource==='manual'?'تعديل يدوي':'مصنف'}</td><td><button type="button" onClick={()=>{setSelected([row.key]);setCategory(row.ad.category);setSubcategory(row.ad.subcategory);document.querySelector('.classification-batch')?.scrollIntoView({block:'center'});setMessage('اختر الوجهة ثم اضغط تحويل المحدد.');}}>تعديل القسم</button></td></tr>;
+      return <tr key={row.key} data-ad-key={row.key}><td><input type="checkbox" aria-label={`تحديد ${row.raw.title}`} checked={selected.includes(row.key)} onChange={e=>setSelected(value=>e.target.checked?[...value,row.key]:value.filter(id=>id!==row.key))}/></td><td><div className="classification-title">{src && (src.startsWith('/images/')||src==='/placeholder-ad.svg'||isOriginalMedia(src)||/^data:image\/(jpeg|png|webp);base64,/.test(src)) && <img src={src} alt="" loading="lazy"/>}<div><strong>{row.raw.title}</strong><small>#{row.raw.id} · {row.source==='market'?(isLive?'إعلان من اللقطة':'مثال السوق'):'إعلان محلي'}</small><Link href={row.source==='market'?`/ads/${row.raw.id}/`:`/ads/new/?edit=${encodeURIComponent(row.raw.id)}`}>معاينة / تعديل الإعلان</Link></div></div></td><td>{row.ad.category}<br/><small>{row.ad.subcategory}</small></td><td>{row.ad.classificationReview?'بحاجة لمراجعة':row.ad.classificationSource==='auto'?'تلقائي واضح':row.ad.classificationSource==='manual'?'تعديل يدوي':'مصنف'}</td><td><button type="button" onClick={()=>{setSelected([row.key]);setCategory(row.ad.category);setSubcategory(row.ad.subcategory);document.querySelector('.classification-batch')?.scrollIntoView({block:'center'});setMessage('اختر الوجهة ثم اضغط تحويل المحدد.');}}>تعديل القسم</button></td></tr>;
     })}</tbody></table>{ready&&!visible.length&&<p className="seller-fields">لا توجد إعلانات ضمن هذا المرشح. لا توجد بيانات حية مخفية خلف هذه القائمة.</p>}</div>
     <Modal open={Boolean(pending)} onClose={()=>setPending(null)} title="تأكيد تحويل الإعلانات">{pending&&<><p>تحويل {pending.rows.length} إعلان إلى <strong>{pending.target.category} / {pending.target.subcategory}</strong>؟</p><ul className="classification-confirm-list">{pending.rows.map(row=><li key={row.key}>{row.raw.title}</li>)}</ul><p>لن تتغير الصور والنصوص. يمكنك التراجع عن آخر دفعة خلال هذه الجلسة.</p><div className="seller-modal-actions"><button className="button primary" onClick={save}>تأكيد التحويل</button><button className="button secondary" onClick={()=>setPending(null)}>إلغاء</button></div></>}</Modal>
   </div>;

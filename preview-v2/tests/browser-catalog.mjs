@@ -46,6 +46,7 @@ try{
  await page.screenshot({path:output+'/category-dropdown-desktop.png',fullPage:false});
  await page.goto(origin+'/search/?category='+encodeURIComponent('منزل وأثاث')+'&subcategory='+encodeURIComponent('أثاث مكتبي'));
  await page.locator('.search-listings .listing-card').first().waitFor();
+ await page.locator('.search-listings .listing-card').first().waitFor();
  assert.equal(await page.locator('.search-listings .listing-card').count(),1);
  assert.match(await page.locator('.search-listings').innerText(),/كرسي مكتب/);
  await page.goto(origin+'/classification/');
@@ -79,8 +80,10 @@ try{
  await page.getByRole('button',{name:'تأكيد التحويل',exact:true}).click();
  await page.getByText(/تم تحويل 1 إعلان/).waitFor();
  await page.goto(origin+'/ads/101/');
+ await page.locator('.buyer-breadcrumbs').getByRole('link',{name:'أخرى',exact:true}).waitFor();
  assert.equal(await page.locator('.buyer-breadcrumbs').getByRole('link',{name:'أخرى',exact:true}).count(),1);
  await page.goto(origin+'/search/?category='+encodeURIComponent('أخرى')+'&subcategory='+encodeURIComponent('أخرى'));
+ await page.locator('.search-listings .listing-card').first().waitFor();
  assert.equal(await page.locator('.search-listings .listing-card').count(),1);
  for(const path of ['/','/classification/','/field-settings/','/ads/new/']){
   await page.setViewportSize({width:390,height:844});await page.goto(origin+path);

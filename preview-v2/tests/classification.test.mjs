@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 const path=new URL('../lib/classification.ts',import.meta.url);
 const api=existsSync(path)?await import(path.href):{};
+test('clear lift titles classify but mixed equipment offers and unrelated words stay for review',()=>{
+  for(const title of ['سيزر لفت للإيجار','رافعة مقصية كهربائية','Scissor Lift rental','بوم لفت للإيجار'])assert.equal(api.classify({title}).subcategory,'معدات ثقيلة',title);
+  assert.equal(api.classify({title:'رافعات شوكية للإيجار'}).subcategory,'رافعات شوكية');
+  assert.equal(api.classify({title:'سيزرات لفت رفعات شوكية'}).review,true);
+  assert.equal(api.classify({title:'سلطة سيزر'}).review,true);
+});
 test('classifies clear titles, leaves ambiguity for review and preserves explicit branches',()=>{
   assert.equal(typeof api.classify,'function');
   assert.deepEqual(api.classify({title:'كنبة قماش بلون محايد'}),{category:'منزل وأثاث',subcategory:'أثاث منزلي',review:false,source:'auto'});

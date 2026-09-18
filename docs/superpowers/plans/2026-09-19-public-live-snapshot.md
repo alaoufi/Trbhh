@@ -28,3 +28,7 @@ git diff --check
 ```
 
 Expected: sanitizer tests fail before exporter implementation then pass; full fixture suite remains green. Actual snapshot must have unique IDs, count equal to array length, valid ISO time, original HTTPS media links only, and no forbidden top-level/private columns. Review exported metadata before publication. Real-data browser QA must show count matching the snapshot, working details/photos, local-only bulk changes and undo, and no mutation requests to the production origin.
+
+## Execution evidence
+
+Exporter/schema mapping and frontend spec/quality gates reviewed. Successful extraction run `35405115631`: 120 eligible ads, 685 image references, one future-scheduled candidate excluded without source modification. SHA-256 and refresh/activation details are in `docs/trbhh-v2/07-public-snapshot-preview.md`. Thirty-five unit tests, static live build and TypeScript passed. Real-data browser tests passed for all generated original-ID route files and sampled rendered galleries, local review export/undo and mobile. Publication remains the final handoff step; no production merge or DB write is part of this plan.

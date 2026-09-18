@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Armchair, BadgeCheck, BriefcaseBusiness, Building2, Camera, Car, Check, CheckCircle2, ChevronLeft, CircleHelp, ClipboardList, Clock3, Eye, Factory, FilePenLine, ImagePlus, LayoutDashboard, MapPin, MessageCircle, MoreHorizontal, Package, Pause, Pencil, Play, Plus, Search, ShieldCheck, Smartphone, Sparkles, Store, Tag, Trash2, TrendingUp, Truck, Wallet, Wheat, Wrench, X } from 'lucide-react';
-import { categories, cities, listings, money } from '../lib/demo-data';
+import { categories, cities, listings, money, isLive } from '../lib/demo-data';
 import { notify, readLocal, writeLocal } from '../lib/preview';
 import { Modal } from './ui';
 import './seller.css';
@@ -78,6 +78,7 @@ function restoreDraftForm(draft: AdDraft): AdForm {
   return draft.form;
 }
 function initialAds(): SellerAd[] {
+  if(isLive)return [];
   return [listings[6], listings[2], listings[7]].map((listing, index) => ({ ...emptyForm, id: `demo-${listing.id}`, sourceId: listing.id, title: listing.title, description: listing.description, price: String(listing.price), city: listing.city, category: listing.category, subcategory: listing.category === 'منزل وأثاث' ? (index === 0 ? 'أثاث مكتبي' : 'أثاث منزلي') : 'رياضة وهوايات', condition: listing.condition, images: listing.images, status: index === 2 ? 'paused' : 'active', createdAt: '2026-09-09T10:00:00.000Z' }));
 }
 function getAds(): SellerAd[] {

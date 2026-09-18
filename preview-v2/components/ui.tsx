@@ -2,16 +2,17 @@
 import Link from 'next/link';
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {ArrowLeft,Check,Heart,MapPin,ShieldCheck,X} from 'lucide-react';
-import {money,type Listing} from '@/lib/demo-data';
+import {publicPriceLabel} from '@/lib/price-label';
+import {money,isLive,type Listing} from '@/lib/demo-data';
 import {notify,readLocal,writeLocal} from '@/lib/preview';
 
-export function Price({value}:{value:number}){return <span className="price"><bdi>{money(value)}</bdi><small>ر.س</small></span>}
+export function Price({value,listing}:{value:number;listing?:Listing}){return isLive?<span className="price"><bdi>{publicPriceLabel(listing||{price:value})}</bdi></span>:<span className="price"><bdi>{money(value)}</bdi><small>ر.س</small></span>}
 export function FavoriteButton({id}:{id:string}){
  const [saved,setSaved]=useState(false);
  useEffect(()=>{const sync=()=>setSaved(readLocal<string[]>('favorites',[]).includes(id));sync();window.addEventListener('trbhh-favorites',sync);return()=>window.removeEventListener('trbhh-favorites',sync)},[id]);
  return <button className={`favorite-button ${saved?'is-saved':''}`} aria-label={saved?'إزالة من المفضلة':'حفظ في المفضلة'} aria-pressed={saved} onClick={e=>{e.preventDefault();e.stopPropagation();const all=readLocal<string[]>('favorites',[]);writeLocal('favorites',saved?all.filter(x=>x!==id):[...all,id]);window.dispatchEvent(new Event('trbhh-favorites'));notify(saved?'أُزيل الإعلان من المفضلة':'حُفظ الإعلان في مفضلتك التجريبية');}}><Heart size={19} fill={saved?'currentColor':'none'}/></button>
 }
-export function ListingCard({listing}:{listing:Listing}){return <article className="listing-card"><div className="listing-photo"><Link href={`/ads/${listing.id}/`} aria-label={listing.title}><img src={listing.image} alt={listing.title} loading="lazy" width="640" height="460"/></Link>{listing.featured&&<span className="featured-label">إعلان مميز</span>}<FavoriteButton id={listing.id}/></div><Link className="listing-body" href={`/ads/${listing.id}/`}><Price value={listing.price}/><h3>{listing.title}</h3><div className="listing-meta"><span><MapPin size={13}/>{listing.city}</span><span>{listing.time}</span></div><div className="listing-bottom"><span className="condition">{listing.condition}</span><span className="seller-name">{listing.verified&&<ShieldCheck size={14}/>} {listing.seller}</span></div></Link></article>}
+export function ListingCard({listing}:{listing:Listing}){return <article className="listing-card"><div className="listing-photo"><Link href={`/ads/${listing.id}/`} aria-label={listing.title}><img src={listing.image} alt={listing.title} loading="lazy" width="640" height="460"/></Link>{listing.featured&&<span className="featured-label">إعلان مميز</span>}<FavoriteButton id={listing.id}/></div><Link className="listing-body" href={`/ads/${listing.id}/`}>{listing.intent==='wanted'&&<span className="badge wanted-badge">مطلوب</span>}<Price value={listing.price} listing={listing}/><h3>{listing.title}</h3><div className="listing-meta"><span><MapPin size={13}/>{listing.city}</span><span>{listing.time}</span></div><div className="listing-bottom"><span className="condition">{listing.condition}</span><span className="seller-name">{listing.verified&&<ShieldCheck size={14}/>} {listing.seller}</span></div></Link>{listing.sourceUrl&&<a className="button ghost" href={listing.sourceUrl} target="_blank" rel="noopener noreferrer">الإعلان الأصلي</a>}</article>}
 export function SectionHeading({title,subtitle,href,linkText='عرض الكل'}:{title:string;subtitle?:string;href?:string;linkText?:string}){return <div className="section-heading"><div><h2>{title}</h2>{subtitle&&<p>{subtitle}</p>}</div>{href&&<Link href={href}>{linkText}<ArrowLeft size={17}/></Link>}</div>}
 export function Modal({open,onClose,title,children}:{open:boolean;onClose:()=>void;title:string;children:ReactNode}){
  const ref=useRef<HTMLDivElement>(null);const closeRef=useRef(onClose);closeRef.current=onClose;

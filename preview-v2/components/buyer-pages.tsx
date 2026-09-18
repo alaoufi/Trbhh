@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, BadgeCheck, Bell, Check, ChevronLeft, Clock3, Copy, Flag, ImageIcon, MapPin, Maximize2, MessageCircle, Phone, Search, ShieldCheck, SlidersHorizontal, Star, Store, X } from 'lucide-react';
-import { stores } from '../lib/demo-data';
+import { stores,isLive } from '../lib/demo-data';
 import { useMarketListings } from '../lib/classification-store';
 import { notify, readLocal, writeLocal } from '../lib/preview';
 import { FavoriteButton, ListingCard, Price, PreviewAction, SectionHeading } from './ui';
@@ -36,6 +36,7 @@ function Modal({ title, children, onClose, large = false }: { title: string; chi
 }
 
 function Verification({ business, verified = true }: { business: boolean; verified?: boolean }) {
+  if(isLive)return verified?<span className="buyer-verified">موثق بحسب المصدر</span>:null;
   if (!verified) return <span className="buyer-unverified">التوثيق غير معروض في هذا المثال</span>;
   return <span className="buyer-verified"><BadgeCheck size={17} />{business ? 'توثيق منشأة · مثال' : 'توثيق هوية · مثال'}</span>;
 }
@@ -77,7 +78,8 @@ export function ListingPage({ listingId }: { listingId: string }) {
   const [reportOpen, setReportOpen] = useState(false);
   if (!listing) return <div className="container buyer-empty-page"><h1>الإعلان غير موجود في المعاينة</h1><Link href="/search/" className="button primary">تصفح الإعلانات</Link></div>;
   const businessIndex = stores.findIndex((store) => store.name === listing.seller);
-  const related = [...listings.filter((item) => item.id !== listing.id && item.category === listing.category), ...listings.filter((item) => item.id !== listing.id && item.category !== listing.category)].slice(0, 4);
+  const sameIntentListings = listings.filter(item=>(item.intent||'offer')===(listing.intent||'offer'));
+  const related = [...sameIntentListings.filter((item) => item.id !== listing.id && item.category === listing.category), ...sameIntentListings.filter((item) => item.id !== listing.id && item.category !== listing.category)].slice(0, 4);
   const shareListing = async () => {
     try { await navigator.clipboard.writeText(window.location.href); notify('تم نسخ رابط الإعلان التجريبي.'); }
     catch { notify('تعذر نسخ الرابط تلقائيًا. يمكنك نسخه من شريط عنوان المتصفح.'); }
@@ -88,40 +90,40 @@ export function ListingPage({ listingId }: { listingId: string }) {
       <div className="buyer-listing-layout">
         <div className="buyer-listing-main">
           <section className="buyer-gallery" aria-label="صور الإعلان">
-            <button className="buyer-main-image" onClick={() => setGalleryOpen(true)} aria-label={`تكبير صورة ${listing.title}`}><img src={listing.images[activeImage]} alt={listing.title} fetchPriority="high" /><span className="buyer-enlarge"><Maximize2 size={17} />تكبير الصورة</span><span className="buyer-image-count"><ImageIcon size={16} />{activeImage + 1} / {listing.images.length}</span></button>
-            <div className="buyer-gallery-strip"><div className="buyer-thumbnails">{listing.images.map((src, index) => <button key={`${src}-${index}`} onClick={() => setActiveImage(index)} className={activeImage === index ? 'active' : ''} aria-label={`عرض الصورة ${index + 1}`} aria-pressed={activeImage === index}><img src={src} alt="" /></button>)}</div><p>صور توضيحية للإعلان التجريبي</p></div>
+            <button className="buyer-main-image" disabled={!listing.images.length} onClick={() => setGalleryOpen(true)} aria-label={`تكبير صورة ${listing.title}`}><img src={listing.images[activeImage]||listing.image} alt={listing.title} fetchPriority="high" />{listing.images.length>0&&<><span className="buyer-enlarge"><Maximize2 size={17} />تكبير الصورة</span><span className="buyer-image-count"><ImageIcon size={16} />{activeImage + 1} / {listing.images.length}</span></>}</button>
+            <div className="buyer-gallery-strip"><div className="buyer-thumbnails">{listing.images.map((src, index) => <button key={`${src}-${index}`} onClick={() => setActiveImage(index)} className={activeImage === index ? 'active' : ''} aria-label={`عرض الصورة ${index + 1}`} aria-pressed={activeImage === index}><img src={src} alt="" /></button>)}</div><p>{isLive?(listing.images.length?'صور الإعلان الأصلي':'لا توجد صور في المصدر'):'صور توضيحية للإعلان التجريبي'}</p></div>
           </section>
           <section className="buyer-info-card">
-            <div className="buyer-title-toolbar"><div className="buyer-listing-badges"><span className="badge">{listing.condition}</span>{listing.featured && <span className="buyer-gold-badge"><Star size={13} />مميز · معاينة</span>}</div><div className="buyer-toolbar-actions"><FavoriteButton id={listing.id} /><button className="buyer-icon-button" onClick={shareListing} aria-label="نسخ رابط الإعلان"><Copy size={18} /></button></div></div>
-            <h1>{listing.title}</h1>
-            <div className="buyer-listing-meta"><span><MapPin size={16} />{listing.city}</span><span><Clock3 size={16} />{listing.time} · وقت توضيحي</span><span>رقم الإعلان <bdi>#{listing.id}</bdi></span></div>
-            <div className="buyer-price"><Price value={listing.price} /><span>سعر توضيحي</span></div>
+            <div className="buyer-title-toolbar"><div className="buyer-listing-badges">{listing.intent==='wanted'&&<span className="badge wanted-badge">مطلوب</span>}{listing.condition&&<span className="badge">{listing.condition}</span>}{listing.featured && <span className="buyer-gold-badge"><Star size={13} />مميز · معاينة</span>}</div><div className="buyer-toolbar-actions"><FavoriteButton id={listing.id} /><button className="buyer-icon-button" onClick={shareListing} aria-label="نسخ رابط الإعلان"><Copy size={18} /></button></div></div>
+            <h1>{listing.title}</h1>{listing.sourceUrl&&<a className="button primary" href={listing.sourceUrl} target="_blank" rel="noopener noreferrer">الإعلان الأصلي</a>}
+            <div className="buyer-listing-meta"><span><MapPin size={16} />{listing.city}</span><span><Clock3 size={16} />{listing.time}{!isLive&&' · وقت توضيحي'}</span><span>رقم الإعلان <bdi>#{listing.id}</bdi></span></div>
+            <div className="buyer-price"><Price value={listing.price} listing={listing} />{!isLive&&<span>سعر توضيحي</span>}</div>
             <div className="buyer-description"><h2>تفاصيل تستحق تعرفها</h2><p>{listing.description}</p></div>
-            <h2 className="buyer-specs-heading">المواصفات</h2>
-            <dl className="buyer-specs">{listing.specs.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-            <div className="buyer-info-footer"><span>آخر تحديث: {listing.time} · مثال</span><button onClick={() => setReportOpen(true)}><Flag size={15} />الإبلاغ عن الإعلان</button></div>
+            {listing.specs.length>0&&<><h2 className="buyer-specs-heading">المواصفات</h2>
+            <dl className="buyer-specs">{listing.specs.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></>}
+            <div className="buyer-info-footer"><span>{isLive?'تاريخ الإعلان:':'آخر تحديث:'} {listing.time}{!isLive&&' · مثال'}</span><button onClick={() => setReportOpen(true)}><Flag size={15} />الإبلاغ عن الإعلان</button></div>
           </section>
           <section className="buyer-safety"><ShieldCheck size={26} /><div><h2>خذ وقتك، وتأكد قبل الاتفاق</h2><p>عاين السلعة وتحقق من تفاصيلها قبل الدفع. شارة التوثيق تعرّف بنوع التحقق ولا تضمن جودة السلعة أو إتمام الصفقة.</p></div></section>
         </div>
         <aside className="buyer-seller-column" aria-label="صاحب الإعلان">
           <section className="buyer-seller-card">
-            <div className="buyer-seller-topline"><span className="eyebrow">صاحب الإعلان</span><span className="buyer-account-type">{businessIndex >= 0 ? 'متجر' : 'فرد'}</span></div>
+            <div className="buyer-seller-topline"><span className="eyebrow">صاحب الإعلان</span><span className="buyer-account-type">{isLive?'صاحب الإعلان':businessIndex >= 0 ? 'متجر' : 'فرد'}</span></div>
             <div className="buyer-seller-avatar" aria-hidden="true">{listing.seller.slice(0, 1)}</div>
             <h2>{listing.seller}</h2>
             <Verification business={businessIndex >= 0} verified={listing.verified} />
             <div className="buyer-seller-location"><MapPin size={15} />{listing.city}</div>
-            <div className="buyer-seller-facts"><div><span>نوع العضوية</span><strong>{businessIndex >= 0 ? 'متجر تجريبي' : 'عضو تجريبي'}</strong></div><div><span>الإعلانات في المعاينة</span><strong>{listings.filter((item) => item.seller === listing.seller).length} إعلان</strong></div></div>
-            <ContactActions />
+            {!isLive&&<div className="buyer-seller-facts"><div><span>نوع العضوية</span><strong>{businessIndex >= 0 ? 'متجر تجريبي' : 'عضو تجريبي'}</strong></div><div><span>الإعلانات في المعاينة</span><strong>{listings.filter((item) => item.seller === listing.seller).length} إعلان</strong></div></div>}
+            {!isLive&&<ContactActions />}
             <p className="buyer-contact-note">تجربة تواصل توضيحية؛ لا تُرسل رسائل فعلية.</p>
             {businessIndex >= 0 && <Link href={`/store/${storeSlugs[businessIndex]}/`} className="buyer-visit-store"><Store size={17} />زيارة المتجر<ArrowLeft size={17} /></Link>}
           </section>
-          <div className="buyer-help-card"><ShieldCheck size={20} /><div><strong>معنى التوثيق واضح</strong><p>الهوية للأفراد وسجل المنشأة للمتاجر. جميع الشارات في هذه النسخة أمثلة عرض.</p></div></div>
+          {!isLive&&<div className="buyer-help-card"><ShieldCheck size={20} /><div><strong>معنى التوثيق واضح</strong><p>الهوية للأفراد وسجل المنشأة للمتاجر. جميع الشارات في هذه النسخة أمثلة عرض.</p></div></div>}
         </aside>
       </div>
       <section className="section buyer-related"><SectionHeading title="قد يناسبك أيضًا" subtitle="خيارات أخرى من إعلانات المعاينة" href={`/search/?category=${encodeURIComponent(listing.category)}`} linkText="تصفح القسم" /><div className="buyer-related-grid">{related.map((item) => <ListingCard key={item.id} listing={item} />)}</div></section>
     </div>
-    <ContactActions mobile />
-    {galleryOpen && <Modal title="صور الإعلان" onClose={() => setGalleryOpen(false)} large><img className="buyer-dialog-image" src={listing.images[activeImage]} alt={listing.title} /><p className="buyer-gallery-caption">{listing.title} · الصورة {activeImage + 1} من {listing.images.length}</p></Modal>}
+    {!isLive&&<ContactActions mobile />}
+    {galleryOpen && listing.images.length>0 && <Modal title="صور الإعلان" onClose={() => setGalleryOpen(false)} large><img className="buyer-dialog-image" src={listing.images[activeImage]} alt={listing.title} /><p className="buyer-gallery-caption">{listing.title} · الصورة {activeImage + 1} من {listing.images.length}</p></Modal>}
     {reportOpen && <Modal title="الإبلاغ عن الإعلان" onClose={() => setReportOpen(false)}><ReportForm listingId={listing.id} onClose={() => setReportOpen(false)} /></Modal>}
   </div>;
 }
@@ -141,6 +143,7 @@ export function StorePage({ storeSlug }: { storeSlug: string }) {
   const [condition, setCondition] = useState('الكل');
   const [sort, setSort] = useState('newest');
   useEffect(() => { setFollowing(readLocal<string[]>('following-stores', []).includes(storeSlug)); }, [storeSlug]);
+  if(isLive)return <div className="container buyer-empty-page"><h1>محاكاة المتجر غير متاحة مع اللقطة العامة</h1><Link href="/search/">تصفح الإعلانات الأصلية</Link></div>;
   if (!store) return <div className="container buyer-empty-page"><h1>المتجر غير موجود في المعاينة</h1><Link className="button primary" href="/#stores">تصفح المتاجر</Link></div>;
   const catalog = listings.filter((listing) => listing.seller === store.name);
   const filtered = catalog.filter((listing) => (!query.trim() || `${listing.title} ${listing.description}`.includes(query.trim())) && (condition === 'الكل' || listing.condition === condition)).sort((a, b) => sort === 'low' ? a.price - b.price : sort === 'high' ? b.price - a.price : Number(b.id) - Number(a.id));

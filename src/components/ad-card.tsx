@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { cookies } from 'next/headers';
+import { getSiteDesignConfig } from '@/lib/site-design-server';
+import { resolveSiteDesign } from '@/lib/site-design';
 import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown, Store } from 'lucide-react';
 import type { AdCard as AdCardType } from '@/lib/data';
 import { adPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
@@ -243,13 +245,60 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
   );
 }
 
+/** Optional public presentation; every displayed value comes from the existing ad projection. */
+export function AdCardV2({ ad }: { ad: AdCardType }) {
+  const tier = ad.tier === 'gold' || ad.tier === 'silver' ? ad.tier : null;
+  const premium = tier ? PREMIUM[tier] : ad.special ? PREMIUM.special : null;
+  return (
+    <Link href={`/ads/${ad.id}`} className="ad-card-v2">
+      <div className="ad-card-v2-photo">
+        <Image src={ad.image} alt={ad.title} fill sizes="(max-width: 1023px) 50vw, 25vw" className="object-cover" />
+        {(premium || ad.urgent) && (
+          <div className="ad-card-v2-badges">
+            {premium && <span className={cn('rounded-full px-2 py-1 text-[10px] font-bold text-white', premium.chip)}>{premium.label}</span>}
+            {ad.urgent && <span className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-bold text-white">عاجل</span>}
+          </div>
+        )}
+      </div>
+      <div className="ad-card-v2-body">
+        {ad.adsType === 'request' && <span className="ad-card-v2-intent">مطلوب</span>}
+        <div className="ad-card-v2-price">
+          {adPriceLabel(ad)}
+          <OldPrice ad={ad} />
+          <DiscountChip ad={ad} />
+        </div>
+        <h3>{ad.title}</h3>
+        {ad.storeName && <StoreTag name={ad.storeName} />}
+        {ad.sellerName && (
+          <div className="ad-card-v2-seller">
+            <span>{ad.sellerName}</span>
+            {ad.sellerTrusted && <span className="inline-flex items-center gap-1"><BadgeCheck size={14} />موثق</span>}
+          </div>
+        )}
+        <div className="ad-card-v2-meta">
+          {ad.cityName && <span><MapPin size={13} />{ad.cityName}</span>}
+          {ad.createdAt && <time dateTime={ad.createdAt}>{timeShort(ad.createdAt)}</time>}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 export async function AdGrid({ ads, className }: { ads: AdCardType[]; className?: string }) {
   if (!ads.length) {
     const { getEmptyText } = await import('@/lib/settings');
     const msg = await getEmptyText('ads').catch(() => 'لا توجد إعلانات لعرضها حالياً.');
     return <p className="py-12 text-center text-muted-foreground">{msg}</p>;
   }
-  const design = (await cookies()).get('design')?.value || '';
+  const config = await getSiteDesignConfig();
+  const design = resolveSiteDesign((await cookies()).get('design')?.value, config.enabled);
+  if (design === 'v2') {
+    return (
+      <div className={cn('ad-grid-v2 grid grid-cols-2 gap-3 lg:grid-cols-4', className)}>
+        {ads.map(ad => <AdCardV2 key={ad.id} ad={ad} />)}
+      </div>
+    );
+  }
   if (design === 'shop') {
     return (
       <div className={cn('grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4', className)}>

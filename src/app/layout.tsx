@@ -3,6 +3,10 @@ import Script from 'next/script';
 import { Cairo } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
+import './v2-design.css';
+import { getSiteDesignConfig } from '@/lib/site-design-server';
+import { resolveSiteDesign } from '@/lib/site-design';
+import { SiteDesignProvider } from '@/components/site-design-provider';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { MobileNav } from '@/components/mobile-nav';
@@ -73,7 +77,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // (كانت ~٦ جولات متتابعة تُضاف لكل صفحة في الموقع لأنه التخطيط الجذري).
   const ck = await cookies();
   const theme = ck.get('theme')?.value || '';
-  const design = ck.get('design')?.value || '';
+  const designConfig = await getSiteDesignConfig();
+  const design = resolveSiteDesign(ck.get('design')?.value, designConfig.enabled);
   const [unread, isAdminUser, splashSeconds] = await Promise.all([
     session ? getMyStats(session.uid).then((s) => s.unread).catch(() => 0) : Promise.resolve(0),
     session ? import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false) : Promise.resolve(false),
@@ -89,7 +94,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     }
   }
   const validThemes = ['desert', 'agri', 'spring', 'mint', 'lavender', 'sea', 'snow', 'mountain', 'sunset', 'night'];
-  const validDesigns = ['aurora', 'shop', 'list', 'flat', 'soft', 'sharp'];
   // بيانات منظَّمة (JSON-LD) لمحركات البحث: تعرّف جوجل بهوية الموقع ونوعه
   // وتفعّل صندوق البحث المباشر ضمن نتائج البحث (Sitelinks Search Box).
   const base = primaryOrigin;
@@ -123,7 +127,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       dir="rtl"
       className={cairo.variable}
       {...(validThemes.includes(theme) ? { 'data-theme': theme } : {})}
-      {...(validDesigns.includes(design) ? { 'data-design': design } : {})}
+      {...(design ? { 'data-design': design } : {})}
     >
       <body className="min-h-screen font-sans antialiased">
         <NavigationProgress />
@@ -133,12 +137,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <AdPixels />
         {/* Storefront (/companies/[id]) = fully independent site: ChromeGate hides
             the shared header/menu/footer, even across client-side navigation. */}
-        <ChromeGate
-          header={<Header />}
-          footer={<><VerifySeal /><Footer /><MobileNav unread={unread} isAuthed={!!session} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
-        >
-          {children}
-        </ChromeGate>
+        <SiteDesignProvider config={designConfig} selected={design}>
+          <ChromeGate
+            header={<Header />}
+            footer={<><VerifySeal /><Footer /><MobileNav unread={unread} isAuthed={!!session} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
+          >
+            {children}
+          </ChromeGate>
+        </SiteDesignProvider>
         {/* الثيم التلقائي: يتبع وضع الجهاز قبل الرسم الأول (بلا وميض) ويتابع تغيّره */}
         <script
           dangerouslySetInnerHTML={{

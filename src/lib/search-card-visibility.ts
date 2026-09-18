@@ -17,6 +17,11 @@ export function searchCardVisibility({ plans, defaultDays, subscriptions, banned
     assigned.push(id);
     groups.set(days, [...(groups.get(days) || []), id]);
   }
+  // Prisma ignores an empty object inside OR. An unlimited default with no
+  // assigned plans must instead impose only the top-level banned-user filter.
+  if (defaultDays <= 0 && assigned.length === 0) {
+    return bannedIds.length ? { user_id: { notIn: bannedIds } } : {};
+  }
   const age = (days: number): Prisma.adsWhereInput => days > 0 ? { created_at: { gte: new Date(now.getTime() - days * 86400000) } } : {};
   const regular: Prisma.adsWhereInput[] = [
     { ...(assigned.length ? { user_id: { notIn: assigned } } : {}), ...age(defaultDays) },

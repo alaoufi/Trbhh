@@ -1,5 +1,6 @@
 'use client';
 import { usePathname } from 'next/navigation';
+import { isPublicDesignPath } from '@/lib/site-design';
 
 /**
  * Decides whether the main site chrome (top bar, header, footer, mobile nav)
@@ -19,10 +20,10 @@ export function ChromeGate({ header, footer, children }: { header: React.ReactNo
     return <main className="min-h-screen">{children}</main>;
   }
   return (
-    <>
+    <div className={isPublicDesignPath(pathname) ? 'public-site-shell' : undefined}>
       {header}
       <main className="container min-h-[60vh] pb-24 pt-3 md:pb-8">{children}</main>
       {footer}
-    </>
+    </div>
   );
 }

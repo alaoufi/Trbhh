@@ -1,0 +1,56 @@
+/* Only ChromeGate's public shell receives V2. No global variables or element rules. */
+html[data-design="v2"] .public-site-shell {
+  --v2-paper: #f7f8f5;
+  --v2-ink: #17202d;
+  --v2-gold: #b58738;
+  --v2-gold-text: #806020;
+  --v2-on-gold: #17202d;
+  --v2-card: #fff;
+  --v2-muted: #647064;
+  --v2-border: #e3e6df;
+  min-height: 100vh;
+  background: var(--v2-paper);
+  color: var(--v2-ink);
+}
+html[data-design="v2"][data-theme="night"] .public-site-shell {
+  --v2-paper: #141c28;
+  --v2-ink: #edf0eb;
+  --v2-gold: #dbb56d;
+  --v2-gold-text: #dbb56d;
+  --v2-card: #1d2938;
+  --v2-muted: #b1bcb5;
+  --v2-border: #344252;
+}
+html[data-design="v2"] .public-site-shell > main { padding-top: 1.5rem; }
+html[data-design="v2"] .public-site-shell .ad-grid-v2 { gap: 1rem; }
+html[data-design="v2"] .public-site-shell .ad-card-v2 {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--v2-border);
+  border-radius: 1.15rem;
+  background: var(--v2-card);
+  color: var(--v2-ink);
+  box-shadow: 0 3px 16px #17202d06;
+  text-decoration: none;
+}
+html[data-design="v2"] .public-site-shell .ad-card-v2:focus-visible { outline: 3px solid var(--v2-gold); outline-offset: 3px; }
+html[data-design="v2"] .public-site-shell .ad-card-v2-photo { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: var(--v2-paper); }
+html[data-design="v2"] .public-site-shell .ad-card-v2-badges { position: absolute; inset: .6rem .6rem auto; display: flex; flex-wrap: wrap; gap: .35rem; }
+html[data-design="v2"] .public-site-shell .ad-card-v2-seller { display: flex; flex-wrap: wrap; gap: .4rem; font-size: .75rem; color: var(--v2-muted); overflow-wrap: anywhere; }
+html[data-design="v2"] .public-site-shell .ad-card-v2-body { display: flex; flex: 1; flex-direction: column; gap: .55rem; padding: 1rem; }
+html[data-design="v2"] .public-site-shell .ad-card-v2-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem; font-size: .95rem; font-weight: 800; color: var(--v2-ink); overflow-wrap: anywhere; }
+html[data-design="v2"] .public-site-shell .ad-card-v2 h3 { font-size: .95rem; line-height: 1.7; font-weight: 700; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html[data-design="v2"] .public-site-shell .ad-card-v2-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-top: auto; padding-top: .5rem; font-size: .72rem; color: var(--v2-muted); }
+html[data-design="v2"] .public-site-shell .ad-card-v2-meta span { display: inline-flex; align-items: center; gap: .2rem; }
+html[data-design="v2"] .public-site-shell .ad-card-v2-intent { width: fit-content; font-size: .72rem; color: var(--v2-gold-text); }
+html[data-design="v2"] .public-site-shell .home-discovery { border: 1px solid var(--v2-border); border-radius: 1.5rem; background: var(--v2-card); box-shadow: none; }
+html[data-design="v2"] .public-site-shell .home-discovery-heading { padding: 2rem 1.5rem; background: var(--v2-paper); color: var(--v2-ink); gap: 1.5rem; }
+html[data-design="v2"] .public-site-shell .home-discovery-heading h1 { font-size: clamp(1.4rem, 3vw, 2.2rem); line-height: 1.7; }
+html[data-design="v2"] .public-site-shell .home-discovery-heading p { color: var(--v2-muted); }
+html[data-design="v2"] .public-site-shell .home-discovery-heading > a { background: var(--v2-gold); color: var(--v2-on-gold); }
+@media (max-width: 480px) {
+  html[data-design="v2"] .public-site-shell .ad-grid-v2 { gap: .65rem; }
+  html[data-design="v2"] .public-site-shell .ad-card-v2-body { padding: .7rem; }
+}

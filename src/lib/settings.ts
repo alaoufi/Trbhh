@@ -862,7 +862,7 @@ export async function getAuthSecuritySettings(): Promise<{ requireAdminMfa: bool
 /** Values for the audit UX controls, all editable in admin settings. */
 export async function getAuditUxSettings() {
   const { AUDIT_UX_FLAGS, AUDIT_UX_TEXTS } = await import('./ux-settings');
-  const flags = Object.fromEntries(await Promise.all(AUDIT_UX_FLAGS.map(async ([key]) => [key, await getSettingBool(key, true)] as const)));
+  const flags = Object.fromEntries(await Promise.all(AUDIT_UX_FLAGS.map(async ([key, , fallback]) => [key, await getSettingBool(key, fallback)] as const)));
   const texts = Object.fromEntries(await Promise.all(AUDIT_UX_TEXTS.map(async ([key, , fallback]) => [key, await getSetting(key, fallback)] as const)));
   return { flags, texts };
 }

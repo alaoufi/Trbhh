@@ -1,12 +1,29 @@
 'use client';
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Check, LayoutTemplate, ArrowRight, Megaphone } from 'lucide-react';
-import { DESIGNS, applyDesign } from '@/components/design-picker';
+import { availableDesigns } from '@/components/design-picker';
+
+import { useSiteDesign } from '@/components/site-design-provider';
 
 // A small live sample rendered inside a data-design wrapper so its identity
 // shows exactly as it would site-wide — a real preview before adopting.
 function Preview({ id }: { id: string }) {
+  if (id === 'v2') {
+    return (
+      <div aria-hidden="true" className="grid grid-cols-2 gap-2 rounded-2xl bg-[#f7f8f5] p-3">
+        {[0, 1].map(i => (
+          <div key={i} className="overflow-hidden rounded-xl border border-[#17202d]/10 bg-white">
+            <div className="aspect-[4/3] bg-[#17202d]/10" />
+            <div className="space-y-2 p-3">
+              <div className="h-3 w-1/2 rounded bg-[#b58738]/40" />
+              <div className="h-2 w-full rounded bg-[#17202d]/15" />
+              <div className="h-2 w-2/3 rounded bg-[#17202d]/10" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
   if (id === 'list') {
     return (
       <div data-design="list" className="rounded-2xl bg-background p-3">
@@ -66,8 +83,7 @@ function Preview({ id }: { id: string }) {
 }
 
 export default function DesignGalleryPage() {
-  const [current, setCurrent] = useState('');
-  useEffect(() => { setCurrent(document.documentElement.getAttribute('data-design') || ''); }, []);
+  const { config, selected: current, selectDesign } = useSiteDesign();
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -78,7 +94,7 @@ export default function DesignGalleryPage() {
       <p className="text-sm text-muted-foreground">اختر الهوية البصرية التي تناسبك. المعاينة أدناه تُظهر شكل البطاقات فعلياً قبل الاعتماد، ويبقى «ثلاثي الأبعاد» هو الافتراضي.</p>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {DESIGNS.map((d) => {
+        {availableDesigns(config).map((d) => {
           const active = current === d.id;
           return (
             <div key={d.id || 'default'} className={`card-3d space-y-3 rounded-2xl p-3 ${active ? 'ring-2 ring-primary' : ''}`}>
@@ -88,7 +104,7 @@ export default function DesignGalleryPage() {
               </div>
               <Preview id={d.id} />
               <button
-                onClick={() => { applyDesign(d.id); setCurrent(d.id); }}
+                onClick={() => selectDesign(d.id)}
                 disabled={active}
                 className="w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white disabled:opacity-50"
               >
@@ -99,7 +115,7 @@ export default function DesignGalleryPage() {
         })}
       </div>
 
-      <p className="text-center text-xs text-muted-foreground">يُطبَّق القالب على الموقع كله فور الاعتماد، ويمكنك تغييره في أي وقت من هنا أو من القائمة.</p>
+      <p className="text-center text-xs text-muted-foreground">يُطبَّق القالب على واجهة التصفح فور الاعتماد، ويمكنك تغييره في أي وقت من هنا أو من القائمة.</p>
     </div>
   );
 }

@@ -118,8 +118,8 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
       )}
 
       {discoveryOn && (
-        <section aria-labelledby="discovery-title" className="overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#16294a] px-4 py-4 text-white sm:px-6">
+        <section aria-labelledby="discovery-title" className="home-discovery overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-sm">
+          <div className="home-discovery-heading flex flex-wrap items-center justify-between gap-3 bg-[#16294a] px-4 py-4 text-white sm:px-6">
             <div className="min-w-0 flex-1">
               <h1 id="discovery-title" className="text-xl font-extrabold leading-relaxed sm:text-2xl">{discoveryTitle}</h1>
               <p className="mt-1 text-sm leading-6 text-slate-100">{discoverySubtitle}</p>

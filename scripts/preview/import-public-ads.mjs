@@ -17,16 +17,14 @@ try {
   if (!['localhost', '127.0.0.1', 'preview-db'].includes(previewUrl.hostname) || previewUrl.pathname !== '/trbhh_preview_audit') {
     throw new Error('Refusing to import outside the isolated preview database.');
   }
-  const data = rows.flatMap((row, index) => {
-    if (!/^\d+$/.test(String(row.id || ''))) return [];
-    const title = redact(row.title).slice(0, 255);
-    if (!title) return [];
+  const data = rows.map((row, index) => {
+    const title = redact(row.title).slice(0, 255) || 'إعلان منشور من لقطة المعاينة';
     const price = Number(row.price);
-    return [{ id: BigInt(3_000_000_000 + index), adsType: 'offer', adsSpecial: 'no', state: 'active', status: 1,
+    return { id: BigInt(3_000_000_000 + index), adsType: 'offer', adsSpecial: 'no', state: 'active', status: 1,
       category_id: 13n, cat_reviewed: 0, country_id: 1, user_id: 1001n, profile_id: 1001n,
       city_id: 1n, area_id: 1, title, detail: redact(row.detail) || 'إعلان منشور في المعاينة.',
       video_path: '', phoneAllow: 0, commentAllow: 0, price: Number.isFinite(price) && price >= 0 ? Math.min(price, 99_999_999) : 0,
-      price_type: 'fixed', store_only: 0, created_at: new Date(), updated_at: new Date() }];
+      price_type: 'fixed', store_only: 0, created_at: new Date(), updated_at: new Date() };
   });
   if (data.length) await prisma.ads.createMany({ data, skipDuplicates: true });
   console.info(`[preview-public-import] Received ${rows.length} published rows; imported ${data.length} sanitized ads into preview.`);

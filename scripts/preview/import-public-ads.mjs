@@ -19,7 +19,7 @@ try {
   }
   const data = rows.flatMap((row) => {
     const id = Number(row.id);
-    if (!Number.isSafeInteger(id) || id < 1 || id > 9_000_000_000) return [];
+    if (!Number.isSafeInteger(id) || id < 1 || id > 9_000_000_000_000) return [];
     const title = redact(row.title).slice(0, 255);
     if (!title) return [];
     const price = Number(row.price);
@@ -30,7 +30,7 @@ try {
       price_type: 'fixed', store_only: 0, created_at: new Date(), updated_at: new Date() }];
   });
   if (data.length) await prisma.ads.createMany({ data, skipDuplicates: true });
-  console.info(`[preview-public-import] Imported ${data.length} sanitized published ads into preview.`);
+  console.info(`[preview-public-import] Received ${rows.length} published rows; imported ${data.length} sanitized ads into preview.`);
 } finally {
   await prisma.$disconnect();
 }

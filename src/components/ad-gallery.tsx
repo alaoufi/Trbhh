@@ -38,7 +38,7 @@ export function AdGallery({
           onTouchEnd={onTouchEnd}
           className="relative block aspect-[4/3] w-full overflow-hidden rounded-2xl border-2 border-primary/20 bg-secondary shadow-sm"
         >
-          <Image src={images[active]} alt={title} fill sizes="(max-width:1024px) 100vw, 66vw" className="object-contain" priority />
+          <Image src={images[active]} alt={title} fill sizes="(max-width:1024px) 100vw, 66vw" unoptimized={images[active].startsWith('http')} className="object-contain" priority />
           <div className="absolute right-3 top-3 flex gap-1">
             {special && <span className="rounded bg-[hsl(var(--new))] px-2 py-0.5 text-xs font-bold text-white">مميّز</span>}
             {adsType && <span className="rounded bg-primary px-2 py-0.5 text-xs font-bold text-white">{adsType === 'offer' ? 'عرض' : 'طلب'}</span>}
@@ -70,7 +70,7 @@ export function AdGallery({
               onClick={() => setActive(i)}
               className={`relative aspect-square overflow-hidden rounded-lg border-2 bg-secondary transition hover:-translate-y-0.5 ${i === active ? 'border-primary ring-2 ring-primary/40' : 'border-primary/20 hover:border-primary/50'}`}
             >
-              <Image src={img} alt={`${title} ${i + 1}`} fill sizes="20vw" className="object-cover" />
+          <Image src={img} alt={`${title} ${i + 1}`} fill sizes="20vw" unoptimized={img.startsWith('http')} className="object-cover" />
             </button>
           ))}
         </div>
@@ -98,7 +98,7 @@ export function AdGallery({
             onTouchStart={onTouchStart}
             onTouchEnd={onTouchEnd}
           >
-            <Image src={images[active]} alt={title} fill sizes="92vw" className="object-contain" />
+            <Image src={images[active]} alt={title} fill sizes="92vw" unoptimized={images[active].startsWith('http')} className="object-contain" />
           </div>
           <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/15 px-3 py-1 text-sm text-white">{active + 1} / {n}</span>
         </div>

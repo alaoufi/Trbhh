@@ -66,7 +66,7 @@ export function StoreCatalog({ ads, style, fields, brand, linkBase = '/ads' }: {
         {ads.map((ad) => (
           <Link key={ad.id} href={href(ad.id)} className="card-3d group flex flex-col overflow-hidden rounded-2xl">
             <div className="relative aspect-square w-full overflow-hidden bg-white">
-              <Image src={ad.image} alt={ad.title} fill sizes="(max-width:640px) 50vw, 33vw" className="object-cover transition group-hover:scale-105" />
+              <Image src={ad.image} alt={ad.title} fill sizes="(max-width:640px) 50vw, 33vw" unoptimized={ad.image.startsWith('http')} className="object-cover transition group-hover:scale-105" />
               {has('type') && <span className="absolute right-0 top-2">{typeBadge(ad)}</span>}
               {has('special') && ad.special ? <span className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow">مميّز</span> : null}
               <span className="absolute bottom-2 left-2">{tierBadge(ad)}</span>
@@ -98,7 +98,7 @@ export function StoreCatalog({ ads, style, fields, brand, linkBase = '/ads' }: {
         {ads.map((ad) => (
           <Link key={ad.id} href={href(ad.id)} className="card-3d block overflow-hidden rounded-2xl">
             <div className="relative aspect-[16/10] w-full overflow-hidden bg-white">
-              <Image src={ad.image} alt={ad.title} fill sizes="(max-width:768px) 100vw, 640px" className="object-cover" />
+              <Image src={ad.image} alt={ad.title} fill sizes="(max-width:768px) 100vw, 640px" unoptimized={ad.image.startsWith('http')} className="object-cover" />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 text-white">
                 <div className="mb-1 flex items-center gap-1.5">
                   {has('type') && typeBadge(ad)}
@@ -138,7 +138,7 @@ export function StoreCatalog({ ads, style, fields, brand, linkBase = '/ads' }: {
                 {has('price') && <div className="mt-1">{priceEl(ad)}</div>}
               </div>
               <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-white">
-                <Image src={ad.image} alt={ad.title} fill sizes="96px" className="object-cover" />
+              <Image src={ad.image} alt={ad.title} fill sizes="96px" unoptimized={ad.image.startsWith('http')} className="object-cover" />
                 <span className="absolute left-1 top-1">{tierBadge(ad)}</span>
               </div>
             </div>
@@ -180,7 +180,7 @@ export function StoreCatalog({ ads, style, fields, brand, linkBase = '/ads' }: {
           <span className="w-px self-stretch bg-primary/15" />
           <div className="shrink-0 self-center rounded-2xl border-2 p-1 shadow-md" style={{ borderColor: `${brand}55` }}>
             <div className="relative aspect-square w-24 overflow-hidden rounded-xl sm:w-28">
-              <Image src={ad.image} alt={ad.title} fill sizes="(max-width:640px) 96px, 112px" className="object-cover" />
+              <Image src={ad.image} alt={ad.title} fill sizes="(max-width:640px) 96px, 112px" unoptimized={ad.image.startsWith('http')} className="object-cover" />
               <span className="absolute left-1 top-1">{tierBadge(ad)}</span>
             </div>
           </div>

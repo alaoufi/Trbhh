@@ -37,6 +37,7 @@ jobs:
         run: |
           pnpm prisma db push --skip-generate
           node scripts/preview/seed.mjs
+          node scripts/preview/upgrade-category-fields.mjs
         env:
           PREVIEW_LOGIN_PASSWORD: ${{ secrets.TRBHH_PREVIEW_PASSWORD }}
       - name: Import a sanitized published-ad snapshot

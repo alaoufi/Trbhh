@@ -53,7 +53,7 @@ jobs:
           port=${VPS_PORT:-22}
           ssh-keyscan -p "$port" "$VPS_HOST" > ~/.ssh/known_hosts
           ssh -i ~/.ssh/preview_read_key -p "$port" -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" \
-            'cd /root/trbhh && docker compose exec -T db sh -lc '\''MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -N -B -uroot "$MYSQL_DATABASE" -e "SELECT JSON_OBJECT('\''id'\'',id,'\''title'\'',title,'\''detail'\'',detail,'\''price'\'',price) FROM ads WHERE status=1 AND COALESCE(LENGTH(data_archive),0)=0 ORDER BY id DESC LIMIT 120"'\''' > public-ads.jsonl
+            'cd /root/trbhh && docker compose exec -T db sh -lc '\''MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -N -B -uroot "$MYSQL_DATABASE" -e "SELECT JSON_OBJECT('\''id'\'',a.id,'\''title'\'',a.title,'\''detail'\'',a.detail,'\''price'\'',a.price,'\''image'\'',COALESCE((SELECT CONCAT('\''https://trbhh.com/media/'\'',TRIM(LEADING '\''/'\'' FROM u.file_name)) FROM photos p JOIN uploads u ON u.id=CAST(p.photo_path AS UNSIGNED) WHERE p.other_id=a.id ORDER BY p.id LIMIT 1),'\'''\'')) FROM ads a WHERE a.status=1 AND COALESCE(LENGTH(a.data_archive),0)=0 ORDER BY a.id DESC LIMIT 120"'\''' > public-ads.jsonl
           test -s public-ads.jsonl
           node scripts/preview/import-public-ads.mjs public-ads.jsonl
           rm -f public-ads.jsonl ~/.ssh/preview_read_key

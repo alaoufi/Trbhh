@@ -24,9 +24,15 @@ try {
       category_id: 13n, cat_reviewed: 0, country_id: 1, user_id: 1001n, profile_id: 1001n,
       city_id: 1n, area_id: 1, title, detail: redact(row.detail) || 'إعلان منشور في المعاينة.',
       video_path: '', phoneAllow: 0, commentAllow: 0, price: Number.isFinite(price) && price >= 0 ? Math.min(price, 99_999_999) : 0,
-      price_type: 'fixed', store_only: 0, created_at: new Date(), updated_at: new Date() };
+      price_type: 'fixed', store_only: 0, created_at: new Date(), updated_at: new Date(), image: redact(row.image).slice(0, 1_000) };
   });
-  if (data.length) await prisma.ads.createMany({ data, skipDuplicates: true });
+  const adData = data.map(({ image: _image, ...ad }) => ad);
+  if (adData.length) await prisma.ads.createMany({ data: adData, skipDuplicates: true });
+  const withImages = data.filter((row) => /^https:\/\//.test(row.image));
+  if (withImages.length) {
+    await prisma.uploads.createMany({ data: withImages.map((row, index) => ({ id: BigInt(4_000_000_000 + index), file_original_name: 'public-preview-image', file_name: row.image, extension: 'jpg', type: 'image', user_id: 1001, created_at: new Date(), updated_at: new Date() })), skipDuplicates: true });
+    await prisma.photos.createMany({ data: withImages.map((row, index) => ({ other_id: row.id, photo_path: String(4_000_000_000 + index), created_at: new Date(), updated_at: new Date() })), skipDuplicates: true });
+  }
   console.info(`[preview-public-import] Received ${rows.length} published rows; imported ${data.length} sanitized ads into preview.`);
 } finally {
   await prisma.$disconnect();

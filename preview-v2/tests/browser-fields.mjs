@@ -23,7 +23,6 @@ async function fresh() {
 async function selectBranch(category, branch) {
   await page.getByRole('button',{name:category,exact:true}).click();
   await page.getByLabel('التصنيف الفرعي').selectOption(branch);
-  await page.getByRole('button',{name:'التالي',exact:true}).click();
   await page.locator('.category-details').waitFor();
 }
 try {
@@ -72,7 +71,7 @@ try {
   await page.locator('#detail-qualification').selectOption('بكالوريوس');
   await page.locator('#detail-salaryMin').fill('٩٠٠٠');
   await page.locator('#detail-salaryMax').fill('٥٠٠٠');
-  await page.getByRole('button',{name:'التالي',exact:true}).click();
+  await page.getByRole('button',{name:'نشر تجريبي',exact:true}).click();
   assert.match(await page.locator('#detail-salaryMax-error').innerText(),/الحد الأعلى/);
   await page.locator('#detail-salaryMax').fill('١٢٠٠٠');
   await page.locator('#detail-salaryPeriod').selectOption('شهري');
@@ -84,8 +83,6 @@ try {
   await page.setViewportSize({width:390,height:844});
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),true,'mobile overflow');
   await page.screenshot({path:`${output}/jobs-mobile.png`,fullPage:true});
-  await page.getByRole('button',{name:'التالي',exact:true}).click();
-  await page.getByRole('button',{name:'التالي',exact:true}).click();
   const review = await page.locator('.seller-ad-preview').innerText();
   assert.match(review,/9,000 – 12,000 ر.س \/ شهري/);
   assert.ok(!review.includes('جديد') && !review.includes('مستعمل') && !review.includes('المهارات المطلوبة'));
@@ -94,7 +91,6 @@ try {
   await page.getByRole('heading',{name:'إعلانك التجريبي جاهز'}).waitFor();
   const id=await page.evaluate(() => JSON.parse(localStorage.getItem('trbhh-v2-seller-ads-v1'))[0].id);
   await page.goto(`${origin}/ads/new/?edit=${id}`);
-  await page.getByRole('button',{name:'التالي',exact:true}).click();
   assert.equal(await page.locator('#detail-salaryMin').inputValue(),'9000');
   console.log('PASS: conditional fields, switching, Arabic numbers, validation, draft reload, mobile, publish and edit');
   await page.goto(`${origin}/field-settings/`);
@@ -105,8 +101,8 @@ try {
   await page.getByRole('button',{name:'حفظ إعدادات الحقول',exact:true}).click();
   await page.getByText('حُفظت إعدادات الحقول في هذا المتصفح فقط.').waitFor();
   await page.goto(`${origin}/ads/new/`);
-  await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'التالي' && !b.disabled));
-  console.log('Restored step after settings:',await page.locator('.seller-step-heading h2').innerText());
+  await page.locator('#ad-classification').waitFor();
+  assert.equal(await page.locator('.ad-page-section').count(),4);
   if (await page.getByRole('button',{name:'تغيير الفرع',exact:true}).count()) await page.getByRole('button',{name:'تغيير الفرع',exact:true}).click();
   await selectBranch('عقارات','أراضٍ');
   assert.equal(await page.getByLabel('تقرير فحص التربة').getAttribute('aria-required'),'true');
@@ -133,17 +129,14 @@ try {
   const afterStatus=await page.evaluate(() => JSON.parse(localStorage.getItem('trbhh-v2-seller-ads-v1')).find(ad=>ad.id==='local-preservation-a').details);
   assert.equal(afterStatus.landUse,'تجاري');assert.equal(afterStatus.district,'النخيل');
   await page.goto(`${origin}/ads/new/?edit=local-preservation-a`);
-  await page.getByRole('button',{name:'التالي',exact:true}).click();
   assert.equal(await page.locator('#detail-district').count(),0);
   assert.equal(await page.locator('#detail-landUse').inputValue(),'تجاري');
-  await page.getByRole('button',{name:'التالي',exact:true}).click();
+  await page.getByRole('button',{name:'حفظ التعديلات التجريبية',exact:true}).click();
   await page.locator('#detail-landUse-error').waitFor();
   assert.equal(await page.getByRole('button',{name:'إزالة الخيارات غير المتاحة من الخدمات المتوفرة',exact:true}).count(),1,'retired multi-select needs a removal control');
   await page.getByRole('button',{name:'إزالة الخيارات غير المتاحة من الخدمات المتوفرة',exact:true}).click();
   await page.locator('#detail-landUse').selectOption('سكني');
   await page.locator('#detail-plotArea').fill('650');
-  await page.getByRole('button',{name:'التالي',exact:true}).click();
-  await page.getByRole('button',{name:'التالي',exact:true}).click();
   await page.getByRole('button',{name:'حفظ التعديلات التجريبية',exact:true}).click();
   await page.getByRole('heading',{name:'حُفظت تعديلات إعلانك'}).waitFor();
   const afterEdit=await page.evaluate(() => JSON.parse(localStorage.getItem('trbhh-v2-seller-ads-v1')).find(ad=>ad.id==='local-preservation-a').details);

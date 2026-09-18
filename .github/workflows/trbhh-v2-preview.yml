@@ -1,5 +1,12 @@
 name: TRBHH V2 preview
 on:
+  workflow_dispatch:
+    inputs:
+      live_snapshot:
+        description: 'Export public production ads read-only (no deploy or database writes)'
+        required: true
+        default: false
+        type: boolean
   push:
     branches: [codex/trbhh-v2-preview]
     paths: ['preview-v2/**', '.github/workflows/trbhh-v2-preview.yml']
@@ -22,3 +29,40 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run typecheck
+  public-snapshot:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/trbhh-v2-preview' && inputs.live_snapshot
+    needs: preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read only public ads from the existing production app
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/snapshot-ssh" "$RUNNER_TEMP/public-snapshot"
+          key="$RUNNER_TEMP/snapshot-ssh/key"
+          known="$RUNNER_TEMP/snapshot-ssh/known_hosts"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$key"
+          port="${VPS_PORT:-22}"
+          ssh-keyscan -T 10 -p "$port" "$VPS_HOST" > "$known" 2>/dev/null
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known" -o ConnectTimeout=20 \
+            -i "$key" -p "$port" "$VPS_USER@$VPS_HOST" \
+            'cd /root/trbhh && docker compose exec -T -e SNAPSHOT_SOURCE_COMMIT="$(git rev-parse HEAD)" app node' \
+            < preview-v2/scripts/export-public-snapshot.cjs > "$RUNNER_TEMP/public-snapshot/public-snapshot.json"
+          node -e 'const fs=require("fs");const p=process.argv[1];const d=JSON.parse(fs.readFileSync(p,"utf8"));if(d.mode!=="live"||!d.complete||d.count!==d.listings.length||!d.count)process.exit(1);console.log("Read-only snapshot validated:",d.count,"public ads; captured",d.capturedAt);' "$RUNNER_TEMP/public-snapshot/public-snapshot.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: public-ads-snapshot
+          path: ${{ runner.temp }}/public-snapshot/public-snapshot.json
+          retention-days: 1
+          if-no-files-found: error

@@ -38,6 +38,22 @@ async function exportSnapshot(){
       const lifecycle=value!=='0'&&value!==''&&String(value).toLowerCase()!=='false';
       const packages=await tx.$queryRawUnsafe('SELECT id, price, ad_days, is_default FROM packages WHERE active = 1 ORDER BY sort ASC, price ASC, id ASC');
       const defaultDays=Number((packages.find(p=>Number(p.is_default)===1)||packages.find(p=>Number(p.price)===0))?.ad_days||0);
+      // Aggregate-only reconciliation with public search. Never log row contents.
+      const reconciliation=await tx.$queryRawUnsafe(`SELECT COUNT(*) AS public_candidates,
+        SUM(u.id IS NULL) AS missing_owner,
+        SUM(a.paused_by_owner<>0) AS paused,
+        SUM(a.publish_at>clock.now) AS future,
+        SUM(a.data_archive IS NOT NULL AND TRIM(a.data_archive)<>'') AS archived,
+        SUM(a.data_delete IS NOT NULL AND TRIM(a.data_delete)<>'') AS deleted
+        FROM ads a CROSS JOIN (SELECT ? AS now) clock LEFT JOIN users u ON u.id=a.user_id
+        LEFT JOIN user_packages up ON up.user_id=a.user_id AND (up.expires_at IS NULL OR up.expires_at>clock.now)
+        LEFT JOIN packages p ON p.id=up.package_id AND p.active=1
+        WHERE a.status=1 AND a.state='1' AND COALESCE(u.ban,'')<>'checked'
+        AND ((?=1 AND a.trbhh_until>clock.now) OR (?=0 AND (a.store_only=0 OR a.trbhh_until>clock.now)))
+        AND ((a.adsSpecial='checked' AND a.expires_at>clock.now) OR a.urgent_until>clock.now
+          OR COALESCE(p.ad_days,?)=0 OR a.created_at IS NULL OR DATE_ADD(a.created_at, INTERVAL COALESCE(p.ad_days,?) DAY)>=clock.now)`,
+        new Date(capturedAt),lifecycle?1:0,lifecycle?1:0,defaultDays,defaultDays);
+      console.error('Public visibility reconciliation:',JSON.stringify(Object.fromEntries(Object.entries(reconciliation[0]).map(([key,value])=>[key,Number(value||0)]))));
       const banned=await tx.$queryRawUnsafe('SELECT word FROM banned_words');
       const pattern=censorPattern(banned.map(row=>row.word));
       const redact=value=>pattern?value.replace(pattern,match=>'█'.repeat(Math.max(3,[...match].length))):value;

@@ -62,7 +62,9 @@ export async function saveField(f:FormData){
   const options=val(f,'options').split('|').map(s=>s.trim()).filter(Boolean).slice(0,100).join('|');
   if(options.length>5000||(type==='select'&&!options))redirect('/admin/categories?error=field');
   await prisma.$transaction(async tx=>{
-    const data={label,field_type:type,options,unit:val(f,'unit').slice(0,32)||null,subcategory_id:subcategoryId||null,searchable:f.get('searchable')?1:0,required:f.get('required')?1:0,active:f.get('active')?1:0,ordered:num(f,'ordered'),archived_at:null};
+    const visibilityField=val(f,'visibilityField'), visibilityValue=val(f,'visibilityValue');
+    const visibility_rule=visibilityField&&visibilityValue?JSON.stringify({field:visibilityField.slice(0,64),value:visibilityValue.slice(0,120)}):null;
+    const data={label,field_type:type,options,unit:val(f,'unit').slice(0,32)||null,subcategory_id:subcategoryId||null,visibility_rule,searchable:f.get('searchable')?1:0,required:f.get('required')?1:0,active:f.get('active')?1:0,ordered:num(f,'ordered'),archived_at:null};
     if(id)await tx.category_field_defs.updateMany({where:{id:BigInt(id),category_id:BigInt(categoryId)},data});
     else await tx.category_field_defs.upsert({where:{category_id_field_key:{category_id:BigInt(categoryId),field_key:key}},create:{...data,category_id:BigInt(categoryId),field_key:key},update:data});
     await audit(tx,session.uid,'category_field_save',String(categoryId));
@@ -73,6 +75,12 @@ export async function archiveField(f:FormData){
   const id=num(f,'id');const session=await requireAction('categories','edit');
   await prisma.category_field_defs.update({where:{id:BigInt(id)},data:{active:0,archived_at:new Date()}});
   await prisma.admin_log.create({data:{admin_id:BigInt(session.uid),action:'category_field_archive',target:String(id)}}); await refresh();
+}
+
+export async function restoreField(f:FormData){
+  const id=num(f,'id');const session=await requireAction('categories','edit');
+  await prisma.category_field_defs.update({where:{id:BigInt(id)},data:{active:1,archived_at:null}});
+  await prisma.admin_log.create({data:{admin_id:BigInt(session.uid),action:'category_field_restore',target:String(id)}}); await refresh();
 }
 
 export async function prepareClassification(f:FormData){

@@ -18,6 +18,14 @@ test('visibility uses one bound millisecond timestamp and direct expiry, not rou
   assert.match(source,/DATE_ADD\(a\.created_at, INTERVAL COALESCE\(p\.ad_days,\?\) DAY\)>=clock\.now/);
   assert.doesNotMatch(source,/TIMESTAMPDIFF|UTC_TIMESTAMP\(\)/);
 });
+test('raw SQL and public intent honor the legacy Prisma enum storage mappings',()=>{
+  const source=readFileSync(new URL('../scripts/export-public-snapshot.cjs',import.meta.url),'utf8');
+  const schema=readFileSync(new URL('../../prisma/schema.prisma',import.meta.url),'utf8');
+  assert.match(schema,/active\s+@map\("1"\)/);assert.match(schema,/request\s+@map\("طلب"\)/);
+  assert.match(source,/a\.state='1'/);assert.doesNotMatch(source,/a\.state='active'/);
+  assert.equal(api.publicAd({id:1n,title:'طلب',detail:'',price:0,category_id:0n,adsType:'طلب'},[]).intent,'wanted');
+  assert.equal(api.publicAd({id:1n,title:'عرض',detail:'',price:0,category_id:0n,adsType:'عرض'},[]).intent,'offer');
+});
 test('public media URLs reject foreign hosts, credentials, traversal and non-media paths',()=>{
   assert.equal(typeof api.mediaUrl,'function');
   assert.equal(api.mediaUrl('uploads/a.jpg'),'https://trbhh.sa/media/uploads/a.jpg');

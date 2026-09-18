@@ -65,7 +65,7 @@ jobs:
             -i "$key" -p "$port" "$VPS_USER@$VPS_HOST" \
             'cd /root/trbhh && docker compose exec -T -e SNAPSHOT_SOURCE_COMMIT="$(git rev-parse HEAD)" app node' \
             < preview-v2/scripts/export-public-snapshot.cjs > "$RUNNER_TEMP/public-snapshot/public-snapshot.json"
-          node -e 'const fs=require("fs");const p=process.argv[1];const d=JSON.parse(fs.readFileSync(p,"utf8"));if(d.mode!=="live"||!d.complete||d.count!==d.listings.length||!d.count)process.exit(1);console.log("Read-only snapshot validated:",d.count,"public ads; captured",d.capturedAt);' "$RUNNER_TEMP/public-snapshot/public-snapshot.json"
+          node -e 'const fs=require("fs");const p=process.argv[1];const d=JSON.parse(fs.readFileSync(p,"utf8"));console.log("Read-only snapshot metadata:",d.count,"public ads; captured",d.capturedAt);if(d.mode!=="live"||!d.complete||d.count!==d.listings.length||!d.count)throw new Error("Public snapshot metadata/empty-result gate failed");' "$RUNNER_TEMP/public-snapshot/public-snapshot.json"
       - uses: actions/upload-artifact@v4
         with:
           name: public-ads-snapshot

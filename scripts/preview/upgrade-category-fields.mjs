@@ -21,7 +21,7 @@ try {
   if (!['localhost','127.0.0.1','preview-db'].includes(url.hostname) || url.pathname !== '/trbhh_preview_audit') throw new Error('Refusing a non-preview database.');
   const subs = await db.sub_categories.findMany({ select: { id: true, category_id: true, name: true } });
   const rows = subs.flatMap((sub) => (specs[sub.name] || []).map(([field_key,label,field_type,options,unit], ordered) => ({
-    category_id: BigInt(sub.category_id), subcategory_id: sub.id, field_key, label, field_type, options, unit: unit || null,
+    category_id: BigInt(sub.category_id), subcategory_id: Number(sub.id), field_key, label, field_type, options, unit: unit || null,
     required: 0, active: 1, searchable: 1, ordered,
   })));
   if (rows.length) await db.category_field_defs.createMany({ data: rows, skipDuplicates: true });

@@ -19,12 +19,14 @@ try {
   }
   const data = rows.map((row, index) => {
     const title = redact(row.title).slice(0, 255) || 'إعلان منشور من لقطة المعاينة';
+    const sourceImage = String(row.image || '').trim().replace(/^\//, '');
+    const image = sourceImage.startsWith('http') ? sourceImage : (sourceImage ? `https://trbhh.com/media/${sourceImage}` : '');
     const price = Number(row.price);
     return { id: BigInt(3_000_000_000 + index), adsType: 'offer', adsSpecial: 'no', state: 'active', status: 1,
       category_id: 13n, cat_reviewed: 0, country_id: 1, user_id: 1001n, profile_id: 1001n,
       city_id: 1n, area_id: 1, title, detail: redact(row.detail) || 'إعلان منشور في المعاينة.',
       video_path: '', phoneAllow: 0, commentAllow: 0, price: Number.isFinite(price) && price >= 0 ? Math.min(price, 99_999_999) : 0,
-      price_type: 'fixed', store_only: 0, created_at: new Date(), updated_at: new Date(), image: redact(row.image).slice(0, 1_000) };
+      price_type: 'fixed', store_only: 0, created_at: new Date(), updated_at: new Date(), image: image.slice(0, 1_000) };
   });
   const adData = data.map(({ image: _image, ...ad }) => ad);
   if (adData.length) await prisma.ads.createMany({ data: adData, skipDuplicates: true });

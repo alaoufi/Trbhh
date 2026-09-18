@@ -14,4 +14,5 @@
 .ad-error-summary a{color:#922a2a;line-height:1.9;text-decoration:underline}
 .seller-create-page .seller-form-main{min-width:0}
 .seller-create-page .seller-form-footer{flex-wrap:wrap;gap:12px}
+.seller-create-page .ad-section-heading{padding:16px 18px}.seller-create-page .ad-page-section{margin-bottom:16px}.seller-create-page .seller-field textarea{line-height:1.6}
 @media(max-width:600px){.ad-section-nav{grid-template-columns:repeat(2,minmax(0,1fr))}.ad-section-heading{padding:20px 16px}.ad-section-heading h2{font-size:19px}.ad-page-section{scroll-margin-top:88px}.ad-error-summary{padding:16px}.seller-create-page .seller-form-footer .seller-save-state{width:100%;order:3;text-align:center}}

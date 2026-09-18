@@ -9,6 +9,8 @@ import { Modal } from './ui';
 import './seller.css';
 import './category-details.css';
 import './single-page-ad.css';
+import {resolveAd,readAssignments} from '../lib/classification-store';
+import {assign,validTarget} from '../lib/classification';
 import { CategoryDetails } from './category-details';
 import { catalog, getProfile as baseProfile, cleanDetails, displayDetails, validateDetails, changeClassification, normalizeNumber, updateDetail, type Details } from '../lib/category-fields';
 
@@ -25,7 +27,7 @@ export const AD_DRAFT_KEY = 'ad-draft-v1';
 type Intent = 'offer' | 'wanted';
 type AdStatus = 'active' | 'paused' | 'sold';
 type AdForm = { intent: Intent; category: string; subcategory: string; title: string; description: string; price: string; city: string; condition: string; images: string[]; spec1: string; spec2: string; details: Details };
-export type SellerAd = AdForm & { id: string; status: AdStatus; createdAt: string; sourceId?: string };
+export type SellerAd = AdForm & { id: string; status: AdStatus; createdAt: string; sourceId?: string; classificationRevision?: string };
 type AdDraft = { version: 1; form: AdForm; step: number; editingId: string | null; savedAt: number };
 type Errors = Record<string, string | undefined>;
 const emptyForm: AdForm = { intent: 'offer', category: '', subcategory: '', title: '', description: '', price: '', city: '', condition: '', images: [], spec1: '', spec2: '', details: {} };
@@ -66,13 +68,22 @@ function getDraft(): AdDraft | null {
   const value = readLocal<AdDraft | null>(AD_DRAFT_KEY, null);
   return value?.version === 1 && isForm(value.form) && Number.isFinite(value.savedAt) ? { ...value, form: normalizeForm(value.form) } : null;
 }
+function restoreDraftForm(draft: AdDraft): AdForm {
+  if (!draft.editingId) return draft.form;
+  const assignment=readAssignments()[`local:${draft.editingId}`];
+  if (validTarget(assignment) && assignment.updatedAt && assignment.updatedAt>draft.savedAt &&
+    getAds().find(ad=>ad.id===draft.editingId)?.classificationRevision===assignment.fromRevision) {
+    return normalizeForm(assign([{...draft.form,id:draft.editingId}],[draft.editingId],assignment)[0]);
+  }
+  return draft.form;
+}
 function initialAds(): SellerAd[] {
   return [listings[6], listings[2], listings[7]].map((listing, index) => ({ ...emptyForm, id: `demo-${listing.id}`, sourceId: listing.id, title: listing.title, description: listing.description, price: String(listing.price), city: listing.city, category: listing.category, subcategory: listing.category === 'منزل وأثاث' ? (index === 0 ? 'أثاث مكتبي' : 'أثاث منزلي') : 'رياضة وهوايات', condition: listing.condition, images: listing.images, status: index === 2 ? 'paused' : 'active', createdAt: '2026-09-09T10:00:00.000Z' }));
 }
 function getAds(): SellerAd[] {
   const stored = readLocal<unknown>(SELLER_ADS_KEY, null);
-  if (!Array.isArray(stored)) return initialAds();
-  return stored.filter((ad): ad is SellerAd => isForm(ad) && typeof (ad as SellerAd).id === 'string' && ['active', 'paused', 'sold'].includes((ad as SellerAd).status)).map(ad => ({ ...ad, details: preserveStoredDetails(ad.details) }));
+  if (!Array.isArray(stored)) return initialAds().map(ad => resolveAd(ad,'local',readAssignments()));
+  return stored.filter((ad): ad is SellerAd => isForm(ad) && typeof (ad as SellerAd).id === 'string' && ['active', 'paused', 'sold'].includes((ad as SellerAd).status)).map(ad => resolveAd({ ...ad, details: preserveStoredDetails(ad.details) },'local',readAssignments()));
 }
 function priceText(form: AdForm) {
   const profile = getProfile(form.category, form.subcategory);
@@ -120,10 +131,12 @@ export function NewAdPage() {
     const draft = getDraft();
     if (requestedEdit) {
       const ad = getAds().find(item => item.id === requestedEdit);
-      if (draft?.editingId === requestedEdit) { setForm(draft.form); setEditingId(requestedEdit); setRestored(true); }
+      if (draft?.editingId === requestedEdit) {
+        setForm(restoreDraftForm(draft)); setEditingId(requestedEdit); setRestored(true);
+      }
       else if (ad) { setForm(normalizeForm(ad)); setEditingId(requestedEdit); }
       else notify('لم نجد الإعلان المطلوب. يمكنك إنشاء إعلان تجريبي جديد.');
-    } else if (draft) { setForm(draft.form); setEditingId(draft.editingId || null); setRestored(true); }
+    } else if (draft) { setForm(restoreDraftForm(draft)); setEditingId(draft.editingId || null); setRestored(true); }
     else if (query.get('intent') === 'wanted' || query.get('type') === 'wanted') setForm({ ...emptyForm, intent: 'wanted' });
     setHydrated(true);
   }, []);
@@ -229,7 +242,7 @@ export function NewAdPage() {
     setErrors({});
     const ads = getAds();
     const existing = ads.find(ad => ad.id === editingId);
-    const savedAd: SellerAd = { ...form, details: preserveStoredDetails(form.details), price: showPrice ? normalizeNumber(form.price) : '', condition: showCondition ? form.condition : '', title: form.title.trim(), description: form.description.trim(), id: existing?.id || `local-${Date.now()}`, status: existing?.status || 'active', createdAt: existing?.createdAt || new Date().toISOString() };
+    const savedAd: SellerAd = { ...form, classificationRevision: crypto.randomUUID(), details: preserveStoredDetails(form.details), price: showPrice ? normalizeNumber(form.price) : '', condition: showCondition ? form.condition : '', title: form.title.trim(), description: form.description.trim(), id: existing?.id || `local-${Date.now()}`, status: existing?.status || 'active', createdAt: existing?.createdAt || new Date().toISOString() };
     const updated = existing ? ads.map(ad => ad.id === existing.id ? savedAd : ad) : [savedAd, ...ads];
     // Free the duplicate image payload while moving a draft into saved ads.
     writeLocal(AD_DRAFT_KEY, null);

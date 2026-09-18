@@ -2,3 +2,14 @@
 @media(max-width:600px){.category-field-grid{grid-template-columns:1fr}.category-field-group{padding:16px 12px}.category-field-group legend{font-size:16px}.category-checks label{font-size:14px}.category-checks{gap:8px}}
 .category-admin-list{display:grid;gap:16px}.category-admin-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;padding:18px;border:1px solid #e7e8e2;border-radius:10px}.category-admin-controls{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.category-admin-controls label,.category-settings-check{display:flex;gap:8px;align-items:center}.category-admin-controls button{border:0;background:transparent;color:#8d483c;text-decoration:underline}.category-admin-controls input,.category-settings-check input{accent-color:#a47e34}.category-settings-check{margin-top:20px}@media(max-width:600px){.category-admin-row{grid-template-columns:1fr}.seller-page-head{flex-wrap:wrap}}
 .category-change-button{border:0;background:transparent;text-decoration:underline;color:#7e602b;padding:8px;font-size:14px}
+.seller-create-page .seller-fields,.compact-fields .seller-fields{gap:14px;padding:18px}
+.seller-create-page .seller-field,.compact-fields .seller-field{gap:5px;line-height:1.5}
+.seller-create-page .category-details,.compact-fields .category-admin-list{gap:12px}
+.seller-create-page .category-field-grid,.compact-fields .category-field-grid{gap:12px 16px}
+.seller-create-page .category-field-group,.compact-fields .category-field-group{padding:14px}
+.seller-create-page .seller-field input,.seller-create-page .seller-field select,.compact-fields .seller-field input,.compact-fields .seller-field select{min-height:44px;padding:8px 10px}
+.seller-create-page .category-checks input,.compact-fields input[type=checkbox]{min-height:0;width:18px;height:18px}
+.seller-create-page .category-checks label{padding:7px 10px;min-height:40px}
+.compact-fields .category-admin-row{gap:10px;padding:12px}
+.compact-fields .category-settings-check{margin-top:0}
+.choice-editor{display:grid;gap:8px}.choice-editor small{color:#737975}.choice-row{display:flex;gap:8px;align-items:center}.choice-row input{min-width:0;flex:1;border:1px solid #dfe3e8;border-radius:8px;padding:9px;font:inherit;min-height:44px}.choice-row button{min-height:40px;border:0;background:#f7f0ed;border-radius:8px;padding:8px 14px;color:#8d483c}.choice-editor>.button{justify-self:start}

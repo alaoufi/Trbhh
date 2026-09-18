@@ -50,3 +50,11 @@ test('custom options are trimmed and deduplicated before use', () => {
   const p=settings.applyFieldSettings(getProfile('عقارات','أراضٍ'),{added:[{id:'custom2',type:'select',label:'فحص',options:[' ممتاز ','ممتاز','','جيد'],group:'إضافية'}]});
   assert.deepEqual(p.fields.find(f=>f.id==='custom2').options,['ممتاز','جيد']);
 });
+
+test('custom multi-choice is retained, required, validated and displayed', () => {
+  const p=settings.applyFieldSettings(getProfile('عقارات','أراضٍ'),{added:[{id:'custom3',type:'multi',label:'مميزات إضافية',required:true,options:['سور','بئر','سور'],group:'إضافية'}]});
+  assert.deepEqual(p.fields.find(f=>f.id==='custom3')?.options,['سور','بئر']);
+  assert.ok(validateDetails(p,{},'offer').custom3);
+  assert.ok(validateDetails(p,{custom3:['مجهول']},'offer').custom3);
+  assert.ok(displayDetails(p,{custom3:['سور','بئر']}).some(([k,v])=>k==='مميزات إضافية' && v==='سور، بئر'));
+});

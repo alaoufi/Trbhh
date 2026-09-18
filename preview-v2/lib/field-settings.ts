@@ -25,7 +25,7 @@ export function settingsErrors(profile: Profile, settings: BranchSettings): stri
 }
 export function applyFieldSettings(profile: Profile | undefined, settings: BranchSettings = {}): Profile | undefined {
   if (!profile || settings?.enabled === false) return undefined;
-  const added = Array.isArray(settings?.added) ? settings.added.slice(0, 30).filter(f => f && /^custom[0-9]+$/.test(f.id) && typeof f.label === 'string' && f.label.trim().length > 0 && f.label.length <= 80 && ['text','number','select','date'].includes(f.type)).map(f => ({ id:f.id, label:f.label, type:f.type, group:'تفاصيل إضافية', required:f.required === true, ...(f.type === 'number' ? {min:0,max:1000000} : {}), ...(f.type === 'select' ? {options:normalizeOptions(f.options)} : {}) } as Field)).filter(f => f.type !== 'select' || f.options?.length) : [];
+  const added = Array.isArray(settings?.added) ? settings.added.slice(0, 30).filter(f => f && /^custom[0-9]+$/.test(f.id) && typeof f.label === 'string' && f.label.trim().length > 0 && f.label.length <= 80 && ['text','number','select','multi','date'].includes(f.type)).map(f => ({ id:f.id, label:f.label, type:f.type, group:'تفاصيل إضافية', required:f.required === true, ...(f.type === 'number' ? {min:0,max:1000000} : {}), ...(['select','multi'].includes(f.type) ? {options:normalizeOptions(f.options)} : {}) } as Field)).filter(f => !['select','multi'].includes(f.type) || f.options?.length) : [];
   const seen = new Set<string>();
   let fields = [...profile.fields, ...added].filter(f => { if (seen.has(f.id)) return false; seen.add(f.id); return true; }).flatMap(f => {
     const override = settings?.fields && Object.hasOwn(settings.fields, f.id) ? settings.fields[f.id] : undefined;

@@ -19,6 +19,7 @@ Open http://127.0.0.1:4186. Run `npm run typecheck` and `npm run build` before p
 - `/ads/101/` through `/ads/108/`: illustrative listing details.
 - `/ads/new/`: single-page form with four visible sections (classification, specialized details, photos, live preview/publish), in-page navigation, linked validation summary and backward-compatible local drafts.
 - `/field-settings/`: local-only field editor (labels, options, required/hidden, archive, custom fields and branch visibility). Public demo, not a production admin surface.
+- `/classification/`: non-destructive local category assignments for market fixtures and saved browser ads; review queue, selected-row batches, confirmation and guarded session undo.
 - `/guide/`, `/guide/store/`, `/admin/guide/`: field and draft guides for members, stores and preview administration.
 - `/store/dar/`, `/store/tech/`, `/store/equipment/`: store profiles and catalog.
 - `/seller/`: local listing management, pause/reactivate/edit and promotion preview.
@@ -43,5 +44,9 @@ The schema in `lib/category-fields.ts` covers 56 leaves with conditional fields,
 Run `npm test`, `npm run typecheck` and `npm run build` before publishing. Browser regression is `node tests/browser-fields.mjs` against localhost; install Playwright or set `PLAYWRIGHT_MODULE` to an existing package path. `PREVIEW_URL`, `BROWSER_CHANNEL`, and `QA_OUTPUT` are optional. Browser tests never point to a live site. CI uses Node 24 for native TypeScript test imports.
 
 The public design review export is hosted separately through Sites; the Vercel preview and the live Trbhh application are not changed by that static publication.
+
+Custom fields support single choice and multiple choices with an option-row editor. Forms use compact spacing while keeping touch targets. The home category dropdown links to main/leaf search filters. All eight market fixtures have clear inferred leaf categories. Ambiguous/unrecognized titles use other/other; no production ads are accessed. Classification overrides store source revisions; later seller saves win over stale overrides. Changed local leaf details are archived, never relabelled as new leaf specifications.
+
+Run `node tests/browser-catalog.mjs` and `node tests/browser-classification-persistence.mjs` against the local static export at port 4187 (same Playwright configuration). They test custom choices, mobile layout, all fixture classifications, batch selection/undo, retained photos/text, market search, seller precedence and unsafe undo rejection.
 
 Single-page regression: `node tests/browser-one-page.mjs` (default local exported page at port 4187; `PREVIEW_URL` accepts a full local page URL). Covers old step-based draft restoration, all sections visible, no Next/Previous buttons, error-summary focus and mobile width. Use the same `PLAYWRIGHT_MODULE` setting as the field regression.

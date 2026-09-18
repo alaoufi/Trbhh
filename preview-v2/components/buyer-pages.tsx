@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft, BadgeCheck, Bell, Check, ChevronLeft, Clock3, Copy, Flag, ImageIcon, MapPin, Maximize2, MessageCircle, Phone, Search, ShieldCheck, SlidersHorizontal, Star, Store, X } from 'lucide-react';
-import { listings, stores } from '../lib/demo-data';
+import { stores } from '../lib/demo-data';
+import { useMarketListings } from '../lib/classification-store';
 import { notify, readLocal, writeLocal } from '../lib/preview';
 import { FavoriteButton, ListingCard, Price, PreviewAction, SectionHeading } from './ui';
 import './buyer.css';
@@ -69,6 +70,7 @@ function ReportForm({ listingId, onClose }: { listingId: string; onClose: () => 
 }
 
 export function ListingPage({ listingId }: { listingId: string }) {
+  const listings = useMarketListings();
   const listing = listings.find((item) => item.id === listingId);
   const [activeImage, setActiveImage] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -82,7 +84,7 @@ export function ListingPage({ listingId }: { listingId: string }) {
   };
   return <div className="buyer-page buyer-listing-page">
     <div className="container">
-      <nav className="buyer-breadcrumbs" aria-label="مسار التنقل"><Link href="/">الرئيسية</Link><ChevronLeft size={14} /><Link href={`/search/?category=${encodeURIComponent(listing.category)}`}>{listing.category}</Link><ChevronLeft size={14} /><span>{listing.title}</span></nav>
+      <nav className="buyer-breadcrumbs" aria-label="مسار التنقل"><Link href="/">الرئيسية</Link><ChevronLeft size={14} /><Link href={`/search/?category=${encodeURIComponent(listing.category)}`}>{listing.category}</Link><ChevronLeft size={14} /><span>{listing.subcategory}</span><ChevronLeft size={14} /><span>{listing.title}</span></nav>
       <div className="buyer-listing-layout">
         <div className="buyer-listing-main">
           <section className="buyer-gallery" aria-label="صور الإعلان">
@@ -130,6 +132,7 @@ const demoReviews = [
 ];
 
 export function StorePage({ storeSlug }: { storeSlug: string }) {
+  const listings = useMarketListings();
   const storeIndex = storeSlugs.indexOf(storeSlug);
   const store = stores[storeIndex];
   const [following, setFollowing] = useState(false);

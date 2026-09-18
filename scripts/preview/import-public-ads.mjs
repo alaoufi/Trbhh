@@ -35,7 +35,7 @@ try {
     await prisma.uploads.createMany({ data: withImages.map((row, index) => ({ id: BigInt(4_000_000_000 + index), file_original_name: 'public-preview-image', file_name: row.image, extension: 'jpg', type: 'image', user_id: 1001, created_at: new Date(), updated_at: new Date() })), skipDuplicates: true });
     await prisma.photos.createMany({ data: withImages.map((row, index) => ({ other_id: row.id, photo_path: String(4_000_000_000 + index), created_at: new Date(), updated_at: new Date() })), skipDuplicates: true });
   }
-  console.info(`[preview-public-import] Received ${rows.length} published rows; imported ${data.length} sanitized ads into preview.`);
+  console.info(`[preview-public-import] Received ${rows.length} published rows; imported ${data.length} sanitized ads and ${withImages.length} public images into preview.`);
 } finally {
   await prisma.$disconnect();
 }

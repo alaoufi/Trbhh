@@ -81,7 +81,8 @@ export async function prepareClassification(f:FormData){
   const fallback=cats.find(c=>['أخرى','عروض أخرى'].includes(c.name));
   if(!fallback)redirect('/admin/categories?error=initialize');
   const after=num(f,'after');
-  const ads=await prisma.ads.findMany({where:{id:{gt:BigInt(after)}},orderBy:{id:'asc'},take:100,select:{id:true,title:true,detail:true,category_id:true,subcategory_id:true,cat_reviewed:true}});
+  const legacyOnly=f.get('legacyOnly')==='1';
+  const ads=await prisma.ads.findMany({where:{id:{gt:BigInt(after)},...(legacyOnly?{OR:[{cat_reviewed:0},{subcategory_id:null}]}:{})},orderBy:{id:'asc'},take:100,select:{id:true,title:true,detail:true,category_id:true,subcategory_id:true,cat_reviewed:true}});
   const candidates=cats.filter(c=>c.active).map(c=>({id:c.id,name:c.name,keywords:catalog.find(x=>x.name===c.name)?.keywords||[c.name]}));
   const batch=await prisma.$transaction(async tx=>{
     const b=await tx.category_migration_batches.create({data:{created_by:BigInt(session.uid),total_count:ads.length}});

@@ -1,5 +1,14 @@
-export type CategoryField = { id: number; key: string; label: string; type: string; options: string[]; required: boolean };
+export type FieldVisibility = { kind: 'always' } | { kind: 'equals'; field: string; value: string };
+export type CategoryField = { id: number; key: string; label: string; type: string; options: string[]; required: boolean; unit?: string; subcategoryId?: number | null; visibility?: FieldVisibility };
 export type CategoryOption = { id: number; name: string; active: boolean; branches: { id: number; name: string; active: boolean }[]; fields: CategoryField[] };
+
+export function applicableCategoryFields(fields: CategoryField[], subcategoryId: number | null, input: Record<string, string>) {
+  return fields.filter((field) => {
+    if (field.subcategoryId != null && field.subcategoryId !== subcategoryId) return false;
+    const rule = field.visibility;
+    return !rule || rule.kind === 'always' || input[rule.field] === rule.value;
+  });
+}
 
 export function validateCategoryValues(fields: CategoryField[], input: Record<string, string>, existing = false) {
   const values: { field_id: bigint; value_text: string }[] = [];

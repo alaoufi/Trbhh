@@ -139,6 +139,22 @@ async function seed() {
         subRows.push({ id: ++subId, category_id: Number(cat.id), name, order: subRows.length, active: 1, created_at: now, updated_at: now });
       }
       if (subRows.length) await db.sub_categories.createMany({ data: subRows });
+      const subIdFor = (categoryId, name) => Number(subRows.find((row) => row.category_id === categoryId && row.name === name)?.id || 0) || null;
+      const specialized = [
+        [1, 'أراضي', [['land_use','الاستخدام','select','سكني|تجاري|زراعي|صناعي','متر مربع'],['level','مستوى الأرض','select','مستوية|منحدرة|مردومة',''],['frontages','عدد الواجهات','number','','واجهة'],['street_width','عرض الشارع','number','','متر'],['utilities','الخدمات المتوفرة','select','كهرباء|ماء|صرف صحي|كاملة|غير متوفرة','']]],
+        [1, 'شقق وفلل', [['property_kind','نوع العقار','select','شقة|فيلا|دور|دوبلكس',''],['built_area','مساحة البناء','number','','متر مربع'],['bedrooms','غرف النوم','number','','غرفة'],['bathrooms','دورات المياه','number','','دورة'],['finishing','التشطيب','select','عادي|متوسط|فاخر|سوبر ديلوكس',''],['rent_price','سعر الإيجار','number','','ريال']]],
+        [2, 'سيارات', [['make','الماركة','text','',''],['model','الموديل','text','',''],['year','سنة الموديل','number','',''],['mileage','العداد','number','','كم'],['fuel','الوقود','select','بنزين|ديزل|هجين|كهرباء',''],['transmission','القير','select','أوتوماتيك|عادي|CVT',''],['drive','الدفع','select','أمامي|خلفي|رباعي','']]],
+        [3, 'شاحنات', [['equipment_type','نوع المعدة','text','',''],['load_capacity','الحمولة','number','','طن'],['manufacture_year','سنة الصنع','number','',''],['operating_hours','ساعات التشغيل','number','','ساعة'],['condition','الحالة','select','جديد|مستعمل|مجدد','']]],
+        [4, 'مشاتل', [['plant_type','نوع النبات','text','',''],['age','عمر النبات','number','','شهر'],['quantity','الكمية','number','','حبة'],['irrigation','طريقة الري','select','تنقيط|رش|يدوي|أخرى','']]],
+        [5, 'مواشي', [['animal_species','النوع','select','أغنام|ماعز|إبل|أبقار',''],['breed','السلالة','text','',''],['age','العمر','number','','شهر'],['count','العدد','number','','رأس'],['health','الحالة الصحية','select','سليمة|تحتاج فحصاً|مريضة','']]],
+        [6, 'أواني ومطابخ', [['material','الخامة','select','ستانلس ستيل|ألمنيوم|زجاج|سيراميك|بلاستيك',''],['pieces','عدد القطع','number','','قطعة'],['condition','الحالة','select','جديد|مستعمل','']]],
+        [7, 'أثاث وديكور', [['material','الخامة','text','',''],['dimensions','الأبعاد','text','',''],['color','اللون','text','',''],['condition','الحالة','select','جديد|مستعمل|مصمم حسب الطلب','']]],
+        [8, 'مواد بناء', [['material','نوع المادة','text','',''],['quantity','الكمية','number','',''],['unit','وحدة القياس','select','قطعة|متر|كيس|طن|متر مربع',''],['brand','الشركة المصنعة','text','','']]],
+        [9, 'دوام كامل', [['job_title','المسمى الوظيفي','text','',''],['experience','سنوات الخبرة','number','','سنة'],['salary','الراتب','number','','ريال'],['work_mode','نظام العمل','select','حضوري|عن بعد|هجين','']]],
+        [10, 'خدمات منزلية', [['service_type','نوع الخدمة','text','',''],['service_area','نطاق الخدمة','text','',''],['price_mode','طريقة التسعير','select','بالساعة|بالمهمة|عرض سعر','']]],
+        [11, 'مشاريع', [['activity','النشاط','text','',''],['capital','رأس المال المطلوب','number','','ريال'],['partner_role','نوع الشريك','text','','']]],
+        [12, 'إلكترونيات', [['product_brand','العلامة التجارية','text','',''],['product_model','الموديل','text','',''],['product_condition','الحالة','select','جديد|مستعمل|مجدد',''],['product_quantity','الكمية','number','','قطعة']]],
+      ].flatMap(([categoryId, subName, specs]) => specs.map(([field_key,label,field_type,options,unit], index) => ({ category_id: BigInt(categoryId), subcategory_id: subIdFor(categoryId, subName), field_key, label, field_type, options, unit: unit || null, required: 0, active: 1, searchable: 1, ordered: index })));
       await db.category_field_defs.createMany({ data: [
         { category_id: 1n, field_key: 'property_type', label: 'نوع العقار', field_type: 'select', options: 'شقة|فيلا|أرض|مكتب|مستودع', required: 0, ordered: 1 },
         { category_id: 2n, field_key: 'vehicle_make', label: 'الماركة أو النوع', field_type: 'text', required: 0, ordered: 1 },
@@ -146,6 +162,7 @@ async function seed() {
         { category_id: 4n, field_key: 'agriculture_kind', label: 'نوع المنتج الزراعي', field_type: 'text', required: 0, ordered: 1 },
         { category_id: 5n, field_key: 'livestock_kind', label: 'نوع الماشية أو المستلزم', field_type: 'text', required: 0, ordered: 1 },
         { category_id: 8n, field_key: 'contract_type', label: 'نوع العمل أو المادة', field_type: 'text', required: 0, ordered: 1 },
+        ...specialized,
       ] });
       const regions = ['الرياض', 'مكة المكرمة', 'المدينة المنورة', 'القصيم', 'المنطقة الشرقية', 'عسير', 'تبوك', 'حائل', 'الحدود الشمالية', 'جازان', 'نجران', 'الباحة', 'الجوف'];
       await db.cities.createMany({ data: regions.map((name, i) => ({ id: BigInt(i + 1), name, country_id: 1, ordered: i + 1 })) });

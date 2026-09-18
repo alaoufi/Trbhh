@@ -23,17 +23,22 @@ const STATEMENTS: string[] = [
   `CREATE TABLE IF NOT EXISTS category_field_defs (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     category_id BIGINT UNSIGNED NOT NULL,
+    subcategory_id INT NULL,
     field_key VARCHAR(64) NOT NULL,
     label VARCHAR(120) NOT NULL,
     field_type VARCHAR(16) NOT NULL DEFAULT 'text',
     options TEXT NULL,
+    unit VARCHAR(32) NULL,
+    visibility_rule VARCHAR(255) NULL,
+    searchable TINYINT NOT NULL DEFAULT 0,
     required TINYINT NOT NULL DEFAULT 0,
     active TINYINT NOT NULL DEFAULT 1,
+    archived_at TIMESTAMP NULL,
     ordered INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uniq_category_field_key (category_id, field_key),
-    KEY category_field_listing (category_id, active, ordered)
+    KEY category_field_listing (category_id, subcategory_id, active, ordered)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS ad_category_field_values (
     ad_id BIGINT UNSIGNED NOT NULL,
@@ -75,6 +80,11 @@ const STATEMENTS: string[] = [
   `ALTER TABLE category_migration_suggestions ADD COLUMN applied_category_id BIGINT UNSIGNED NULL`,
   `ALTER TABLE category_migration_suggestions ADD COLUMN applied_subcategory_id INT NULL`,
   `ALTER TABLE category_migration_suggestions ADD COLUMN applied_updated_at TIMESTAMP NULL`,
+  `ALTER TABLE category_field_defs ADD COLUMN subcategory_id INT NULL`,
+  `ALTER TABLE category_field_defs ADD COLUMN unit VARCHAR(32) NULL`,
+  `ALTER TABLE category_field_defs ADD COLUMN visibility_rule VARCHAR(255) NULL`,
+  `ALTER TABLE category_field_defs ADD COLUMN searchable TINYINT NOT NULL DEFAULT 0`,
+  `ALTER TABLE category_field_defs ADD COLUMN archived_at TIMESTAMP NULL`,
   /* Authentication: encrypted confirmed TOTP credentials and durable attempt limits. */
   `CREATE TABLE IF NOT EXISTS auth_mfa (
     user_id BIGINT UNSIGNED PRIMARY KEY,

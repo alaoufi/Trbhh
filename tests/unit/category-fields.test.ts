@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateCategoryValues, chooseCategory } from '@/domain/category-fields';
+import { validateCategoryValues, chooseCategory, applicableCategoryFields } from '@/domain/category-fields';
 const fields = [{ id: 1, key: 'capacity', label: 'الحمولة', type: 'number', options: [], required: true }];
 describe('category-specific values', () => {
   it('rejects missing, negative, nonnumeric and foreign fields', () => {
@@ -16,4 +16,15 @@ describe('category-specific values', () => {
     expect(chooseCategory('رافعة','',cats,13).confidence).toBeLessThan(0.8);
     expect(chooseCategory('غير معروف','',cats,13).categoryId).toBe(13);
   });
+  it('selects only fields for the chosen subcategory and matching condition', () => {
+    const fields = [
+      {...fieldsBase('land'), subcategoryId: 2, visibility: {kind:'always' as const}},
+      {...fieldsBase('rent'), subcategoryId: 2, visibility: {kind:'equals' as const, field:'deal_type', value:'rent'}},
+      {...fieldsBase('villa'), subcategoryId: 3, visibility: {kind:'always' as const}},
+    ];
+    expect(applicableCategoryFields(fields, 2, {deal_type:'sale'}).map(f=>f.key)).toEqual(['land']);
+    expect(applicableCategoryFields(fields, 2, {deal_type:'rent'}).map(f=>f.key)).toEqual(['land','rent']);
+  });
 });
+
+function fieldsBase(key:string) { return {id:key.length, key, label:key, type:'text', options:[], required:false}; }

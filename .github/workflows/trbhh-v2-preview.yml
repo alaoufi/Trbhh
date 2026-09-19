@@ -152,6 +152,12 @@ jobs:
           url=$(sed -n 's/^PREVIEW_URL=//p' "$RUNNER_TEMP/sandbox-deploy.log" | tail -1)
           test -n "$url"
           printf '### معاينة مستقلة قابلة للحفظ\n\n[%s](%s)\n\nبيانات عامة من لقطة مؤرخة؛ حسابات اختبار فقط.\n' "$url" "$url" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify external HTTPS preview without modifying saved data
+        env:
+          PREVIEW_LOGIN_PASSWORD: ${{ secrets.TRBHH_PREVIEW_PASSWORD }}
+        run: |
+          export PREVIEW_VERIFY_URL="$(sed -n 's/^PREVIEW_URL=//p' "$RUNNER_TEMP/sandbox-deploy.log" | tail -1)/"
+          node tests/browser/preview-sandbox-external.mjs
   inspect-live:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/trbhh-v2-preview' && inputs.inspect_live
     runs-on: ubuntu-latest

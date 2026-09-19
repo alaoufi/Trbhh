@@ -26,4 +26,11 @@ describe('production backup gates', () => {
     expect(script).toContain('verify-restore-full "$backup/full-before.json" "$backup/full-current.json"');
     expect(script).toContain('--volumes-from "$container:ro"');
   });
+  it('seals the capture and resumes before costly isolated restore', () => {
+    expect(script).toContain('CAPTURE_VERIFIED');
+    expect(script.indexOf('> "$backup/CAPTURE_VERIFIED"')).toBeLessThan(script.indexOf('restore_name='));
+    expect(script).toContain('reuse_legacy=${4:-}');
+    expect(script).toContain('legacy-reuse-origin.txt');
+    expect(script).toContain('result.added !== 0');
+  });
 });

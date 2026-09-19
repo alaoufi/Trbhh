@@ -13,6 +13,9 @@ on:
       backup_id:
         description: Previous successful safeguards run ID (required for after)
         type: string
+      reuse_legacy_backup:
+        description: Optional completed attempt whose legacy archive will be independently reverified
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -29,6 +32,7 @@ jobs:
         env:
           PHASE: ${{ inputs.phase || 'before' }}
           BACKUP_ID: ${{ inputs.backup_id || github.run_id }}
+          REUSE_LEGACY: ${{ inputs.reuse_legacy_backup }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
@@ -39,6 +43,7 @@ jobs:
           umask 077
           [[ "$BACKUP_ID" =~ ^[0-9]+$ ]]
           [[ "$PHASE" == before || "$PHASE" == after ]]
+          [[ -z "$REUSE_LEGACY" || "$REUSE_LEGACY" =~ ^[0-9]+$ ]]
           mkdir -p ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/release_key
           port=${VPS_PORT:-22}
@@ -49,4 +54,4 @@ jobs:
           remote_tools="/root/trbhh-release-tools/$GITHUB_SHA"
           ssh "${ssh_args[@]}" "$target" "set -eu; test ! -L /root/trbhh-release-tools; mkdir -p '$remote_tools'; chmod 700 /root/trbhh-release-tools '$remote_tools'"
           scp -i ~/.ssh/release_key -P "$port" -o StrictHostKeyChecking=yes scripts/release/{safeguards.sh,database-proof.cjs,verify-runtime.cjs,media-proof.cjs} "$target:$remote_tools/"
-          ssh "${ssh_args[@]}" "$target" "bash '$remote_tools/safeguards.sh' '$PHASE' '$BACKUP_ID' '$GITHUB_SHA'"
+          ssh "${ssh_args[@]}" "$target" "bash '$remote_tools/safeguards.sh' '$PHASE' '$BACKUP_ID' '$GITHUB_SHA' '$REUSE_LEGACY'"

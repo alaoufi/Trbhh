@@ -6,6 +6,8 @@ umask 077
 phase=${1:?before or after}
 backup_id=${2:?numeric backup run id}
 candidate=${3:?candidate commit}
+reuse_legacy=${4:-}
+[[ -z "$reuse_legacy" || "$reuse_legacy" =~ ^[0-9]+$ ]] || exit 1
 [[ "$phase" == before || "$phase" == after ]] || exit 1
 [[ "$backup_id" =~ ^[0-9]+$ && "$candidate" =~ ^[0-9a-f]{40}$ ]] || exit 1
 prod=/root/trbhh
@@ -73,6 +75,23 @@ docker tag "$current_image" "trbhh-rollback:audit-$backup_id"
 docker image save "$current_image" | gzip > "$backup/image.tar.gz"
 gzip -t "$backup/code.tar.gz" "$backup/image.tar.gz"
 
+verify_media_exact() {
+  node -e 'try { const fs=require("fs"),p=require(process.argv[1]); const result=p.verify(JSON.parse(fs.readFileSync(process.argv[2])),JSON.parse(fs.readFileSync(process.argv[3]))); if(!result.ok || result.added !== 0)process.exit(1); console.log(JSON.stringify(result)); } catch { console.error("Exact media proof failed");process.exit(1); }' "$tools_dir/media-proof.cjs" "$1" "$2"
+}
+if [[ -n "$reuse_legacy" ]]; then
+  old_backup="$base/audit-$reuse_legacy"
+  [[ "$reuse_legacy" != "$backup_id" && "$(realpath "$old_backup")" == "$old_backup" && ! -L "$old_backup" ]] || exit 1
+  ! docker inspect "trbhh-backup-reader-$reuse_legacy" >/dev/null 2>&1 || { echo 'Source backup is still active'; exit 1; }
+  for item in legacy.tar.gz legacy-before.json legacy-current.json; do [[ -f "$old_backup/$item" && ! -L "$old_backup/$item" ]] || exit 1; done
+  gzip -t "$old_backup/legacy.tar.gz"
+  verify_media_exact "$old_backup/legacy-before.json" "$old_backup/legacy-current.json"
+  # Immutable completed artifacts only; no live files are linked or modified.
+  ln "$old_backup/legacy.tar.gz" "$backup/legacy.tar.gz"
+  cp "$old_backup/legacy-before.json" "$backup/legacy-before.json"
+  printf '%s\n' "$reuse_legacy" > "$backup/legacy-reuse-origin.txt"
+  sha256sum "$old_backup/legacy.tar.gz" "$old_backup/legacy-before.json" > "$backup/legacy-reuse-sha256.txt"
+fi
+
 reader="trbhh-backup-reader-$backup_id"
 watchdog="trbhh-backup-resume-$backup_id"
 paused=0
@@ -113,14 +132,29 @@ for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
   [[ -n "$media_path" ]] || continue
   [[ "$media_path" == /app/storage || "$media_path" == /app/legacy ]] || { echo 'Unexpected media path; review before backup'; exit 1; }
   printf '%s\n' "$media_path" > "$backup/$label.path"
-  docker exec -u 0 "$reader" tar -czf - -C "$media_path" . > "$backup/$label.tar.gz"
-  gzip -t "$backup/$label.tar.gz"
-  mkdir -m 700 "$backup/$label-extracted"
-  tar -xzf "$backup/$label.tar.gz" -C "$backup/$label-extracted" --no-same-owner
-  node "$tools_dir/media-proof.cjs" snapshot "$backup/$label-extracted" > "$backup/$label-before.json"
+  if [[ "$label" != legacy || -z "$reuse_legacy" ]]; then
+    docker exec -u 0 "$reader" tar -cf - -C "$media_path" . | gzip -1 > "$backup/$label.tar.gz"
+    gzip -t "$backup/$label.tar.gz"
+    mkdir -m 700 "$backup/$label-extracted"
+    tar -xzf "$backup/$label.tar.gz" -C "$backup/$label-extracted" --no-same-owner
+    node "$tools_dir/media-proof.cjs" snapshot "$backup/$label-extracted" > "$backup/$label-before.json"
+  fi
   docker exec -i -u 0 "$reader" node - snapshot "$media_path" < "$tools_dir/media-proof.cjs" > "$backup/$label-current.json"
-  node "$tools_dir/media-proof.cjs" verify "$backup/$label-before.json" "$backup/$label-current.json"
+  verify_media_exact "$backup/$label-before.json" "$backup/$label-current.json"
 done
+
+[[ "$(docker inspect -f '{{.State.Paused}}' "$container")" == true ]] || exit 1
+docker exec -i "$reader" node - snapshot-full < "$tools_dir/database-proof.cjs" > "$backup/full-current.json"
+node "$tools_dir/database-proof.cjs" verify-restore-full "$backup/full-before.json" "$backup/full-current.json"
+[[ ! -e "$backup/WATCHDOG_FIRED" && "$(docker inspect -f '{{.State.Paused}}' "$container")" == true ]] || exit 1
+docker unpause "$container" >/dev/null
+[[ "$(docker inspect -f '{{.State.Running}} {{.State.Paused}}' "$container")" == 'true false' ]] || exit 1
+paused=0
+systemctl stop "$watchdog.timer"
+systemctl stop "$watchdog.service" >/dev/null 2>&1 || true
+[[ ! -e "$backup/WATCHDOG_FIRED" ]] || exit 1
+printf '%s\n' "$current_commit" > "$backup/CAPTURE_VERIFIED"
+echo 'Coherent capture sealed; production resumed before isolated restore.'
 
 # Restore into a disposable database with no production network or exposed ports.
 restore_name="trbhh-restore-$backup_id"
@@ -158,17 +192,7 @@ docker run --rm -i --network "$restore_network" --memory=768m --cpus=1 \
   -e "DATABASE_URL=mysql://root:$restore_password@$restore_name:3306/$restore_database" \
   --entrypoint node "$current_image" - snapshot-full < "$tools_dir/database-proof.cjs" > "$backup/full-restored.json"
 node "$tools_dir/database-proof.cjs" verify-restore-full "$backup/full-before.json" "$backup/full-restored.json"
-# Reject concurrent external writers or a watchdog-resumed app; never weaken proof.
-[[ "$(docker inspect -f '{{.State.Paused}}' "$container")" == true ]] || exit 1
-docker exec -i "$reader" node - snapshot-full < "$tools_dir/database-proof.cjs" > "$backup/full-current.json"
-node "$tools_dir/database-proof.cjs" verify-restore-full "$backup/full-before.json" "$backup/full-current.json"
-[[ ! -e "$backup/WATCHDOG_FIRED" && "$(docker inspect -f '{{.State.Paused}}' "$container")" == true ]] || exit 1
-docker unpause "$container" >/dev/null
-[[ "$(docker inspect -f '{{.State.Running}} {{.State.Paused}}' "$container")" == 'true false' ]] || exit 1
-paused=0
-systemctl stop "$watchdog.timer"
-systemctl stop "$watchdog.service" >/dev/null 2>&1 || true
-[[ ! -e "$backup/WATCHDOG_FIRED" ]] || exit 1
+[[ -f "$backup/CAPTURE_VERIFIED" ]] || exit 1
 (cd "$backup" && sha256sum database.sql.gz *.tar.gz > SHA256SUMS)
 printf '%s\n' "$current_commit" > "$backup/VERIFIED"
 printf 'BACKUP_ID=%s\nROLLBACK_COMMIT=%s\nPrivate backup restored and verified successfully.\n' "$backup_id" "$current_commit"

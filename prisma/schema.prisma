@@ -3,6 +3,233 @@ generator client {
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
+model supplier_integration_profiles {
+  oauth_generation Int @default(0)
+  supplier_id BigInt @id  @db.UnsignedBigInt
+  provider String  @db.VarChar(16)
+  maintenance Int @default(0) @db.TinyInt
+  sync_enabled Int @default(0) @db.TinyInt
+  auto_orders_enabled Int @default(0) @db.TinyInt
+  mode String @default("development") @db.VarChar(16)
+  last_sync_at DateTime?  @db.DateTime(3)
+  last_error String @default("") @db.VarChar(80)
+  relation_supplier_id commerce_suppliers @relation("supplier_profile_supplier_fk", fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_profile_supplier_fk")
+
+
+}
+
+model supplier_connections {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  supplier_id BigInt  @db.UnsignedBigInt
+  provider String  @db.VarChar(16)
+  external_store_id String  @db.VarChar(191)
+  status String @default("disconnected") @db.VarChar(24)
+  encrypted_tokens String?  @db.Text
+  expires_at DateTime?  @db.DateTime(3)
+  refresh_claim String?  @db.Char(36)
+  refresh_claimed_at DateTime?  @db.DateTime(3)
+  sync_claim String?  @db.Char(36)
+  sync_claimed_at DateTime?  @db.DateTime(3)
+  version Int @default(0)
+  created_at DateTime @default(now()) @db.DateTime(3)
+  updated_at DateTime @default(now()) @db.DateTime(3)
+  relation_supplier_id commerce_suppliers @relation("supplier_connection_supplier_fk", fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_connection_supplier_fk")
+  supplier_products supplier_products[] @relation("supplier_product_connection_fk")
+  supplier_orders supplier_orders[] @relation("supplier_order_connection_fk")
+  supplier_webhook_events supplier_webhook_events[] @relation("supplier_webhook_connection_fk")
+  @@unique([provider, external_store_id], map: "supplier_connection_store")
+  @@index([supplier_id, id], map: "supplier_connection_supplier")
+  @@index([status, expires_at], map: "supplier_connection_refresh")
+  @@index([sync_claimed_at, id], map: "supplier_connection_sync")
+}
+
+model supplier_oauth_states {
+  oauth_generation Int @default(0)
+  state_hash String @id  @db.Char(64)
+  browser_hash String  @db.Char(64)
+  admin_id BigInt  @db.UnsignedBigInt
+  supplier_id BigInt  @db.UnsignedBigInt
+  expires_at DateTime  @db.DateTime(3)
+  consumed_at DateTime?  @db.DateTime(3)
+  relation_supplier_id commerce_suppliers @relation("supplier_oauth_supplier_fk", fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_oauth_supplier_fk")
+
+  @@index([expires_at], map: "supplier_oauth_expiry")
+}
+
+model supplier_products {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  connection_id BigInt  @db.UnsignedBigInt
+  supplier_id BigInt  @db.UnsignedBigInt
+  external_id String  @db.VarChar(191)
+  sku String @default("") @db.VarChar(191)
+  name String  @db.VarChar(255)
+  description String  @db.Text
+  images Json
+  variants Json
+  options Json
+  categories Json
+  brand String @default("") @db.VarChar(255)
+  public_price_minor Int
+  currency String @default("SAR") @db.VarChar(3)
+  quantity Int?
+  available Int @default(0) @db.TinyInt
+  source_updated_at DateTime?  @db.DateTime(3)
+  last_sync_at DateTime?  @db.DateTime(3)
+  sync_error String @default("") @db.VarChar(80)
+  active Int @default(0) @db.TinyInt
+  visible Int @default(0) @db.TinyInt
+  featured Int @default(0) @db.TinyInt
+  unit_cost_minor Int?
+  selling_price_minor Int?
+  pricing_policy String @default("manual") @db.VarChar(24)
+  discount_minor Int @default(0)
+  discount_bps Int @default(0)
+  minimum_price_minor Int @default(0)
+  minimum_margin_minor Int @default(0)
+  commerce_product_id BigInt?  @db.UnsignedBigInt
+  revision Int @default(0)
+  relation_connection_id supplier_connections @relation("supplier_product_connection_fk", fields: [connection_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_product_connection_fk")
+  relation_supplier_id commerce_suppliers @relation("supplier_product_supplier_fk", fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_product_supplier_fk")
+  relation_commerce_product_id commerce_products? @relation("supplier_product_commerce_fk", fields: [commerce_product_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_product_commerce_fk")
+  supplier_price_history supplier_price_history[] @relation("supplier_price_history_product_fk")
+  supplier_price_tiers supplier_price_tiers[] @relation("supplier_tier_product_fk")
+  supplier_stock_reservations supplier_stock_reservations[] @relation("supplier_reservation_product_fk")
+  @@unique([connection_id, external_id], map: "supplier_product_external")
+  @@unique([commerce_product_id], map: "supplier_product_commerce")
+  @@index([supplier_id, id], map: "supplier_product_catalog")
+  @@index([active, visible, id], map: "supplier_product_public")
+}
+
+model supplier_price_history {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  supplier_product_id BigInt  @db.UnsignedBigInt
+  actor_id BigInt?  @db.UnsignedBigInt
+  kind String  @db.VarChar(16)
+  old_public_minor Int?
+  new_public_minor Int?
+  old_cost_minor Int?
+  new_cost_minor Int?
+  old_selling_minor Int?
+  new_selling_minor Int?
+  created_at DateTime @default(now()) @db.DateTime(3)
+  relation_supplier_product_id supplier_products @relation("supplier_price_history_product_fk", fields: [supplier_product_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_price_history_product_fk")
+
+  @@index([supplier_product_id, id], map: "supplier_price_history_product")
+}
+
+model supplier_price_tiers {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  supplier_product_id BigInt  @db.UnsignedBigInt
+  min_quantity Int
+  unit_cost_minor Int
+  active Int @default(0) @db.TinyInt
+  created_at DateTime @default(now()) @db.DateTime(3)
+  relation_supplier_product_id supplier_products @relation("supplier_tier_product_fk", fields: [supplier_product_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_tier_product_fk")
+  @@unique([supplier_product_id, min_quantity], map: "supplier_tier_quantity")
+  @@index([supplier_product_id, active, min_quantity], map: "supplier_tier_active")
+}
+
+model supplier_stock_reservations {
+  submission_key String @unique(map: "supplier_reservation_submission") @db.Char(36)
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  supplier_product_id BigInt  @db.UnsignedBigInt
+  kind String  @db.VarChar(16)
+  quantity Int
+  remaining_quantity Int
+  held_quantity Int @default(0)
+  unit_cost_minor Int
+  active Int @default(0) @db.TinyInt
+  priority Int @default(0)
+  created_at DateTime @default(now()) @db.DateTime(3)
+  relation_supplier_product_id supplier_products @relation("supplier_reservation_product_fk", fields: [supplier_product_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_reservation_product_fk")
+  supplier_reservation_allocations supplier_reservation_allocations[] @relation("supplier_allocation_reservation_fk")
+
+  @@index([supplier_product_id, active, priority, id], map: "supplier_reservation_available")
+}
+
+model supplier_reservation_allocations {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  reservation_id BigInt  @db.UnsignedBigInt
+  order_id BigInt  @db.UnsignedBigInt
+  commerce_product_id BigInt  @db.UnsignedBigInt
+  quantity Int
+  status String @default("held") @db.VarChar(16)
+  relation_reservation_id supplier_stock_reservations @relation("supplier_allocation_reservation_fk", fields: [reservation_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_allocation_reservation_fk")
+  relation_order_id commerce_orders @relation("supplier_allocation_order_fk", fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_allocation_order_fk")
+  relation_commerce_product_id commerce_products @relation("supplier_allocation_product_fk", fields: [commerce_product_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_allocation_product_fk")
+  @@unique([reservation_id, order_id, commerce_product_id], map: "supplier_allocation_once")
+  @@index([order_id, status, id], map: "supplier_allocation_order")
+}
+
+model supplier_orders {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id BigInt  @db.UnsignedBigInt
+  connection_id BigInt  @db.UnsignedBigInt
+  supplier_id BigInt  @db.UnsignedBigInt
+  external_order_id String?  @db.VarChar(191)
+  idempotency_key String  @db.VarChar(191)
+  status String @default("pending") @db.VarChar(24)
+  selling_minor Int
+  payable_minor Int
+  profit_minor Int
+  shipping_minor Int @default(0)
+  currency String @default("SAR") @db.VarChar(3)
+  payment_status String @default("unknown") @db.VarChar(32)
+  request_snapshot Json
+  claim_token String?  @db.Char(36)
+  attempts Int @default(0)
+  last_error String @default("") @db.VarChar(80)
+  created_at DateTime @default(now()) @db.DateTime(3)
+  updated_at DateTime @default(now()) @db.DateTime(3)
+  relation_order_id commerce_orders @relation("supplier_order_order_fk", fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_order_order_fk")
+  relation_connection_id supplier_connections @relation("supplier_order_connection_fk", fields: [connection_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_order_connection_fk")
+  relation_supplier_id commerce_suppliers @relation("supplier_order_supplier_fk", fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_order_supplier_fk")
+  supplier_shipments supplier_shipments[] @relation("supplier_shipment_order_fk")
+  @@unique([idempotency_key], map: "supplier_order_idempotency")
+  @@unique([order_id, connection_id], map: "supplier_order_connection")
+  @@unique([connection_id, external_order_id], map: "supplier_order_external")
+  @@index([status, updated_at, id], map: "supplier_order_jobs")
+  @@index([supplier_id, id], map: "supplier_order_supplier")
+}
+
+model supplier_shipments {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  supplier_order_id BigInt  @db.UnsignedBigInt
+  external_id String  @db.VarChar(191)
+  carrier String @default("") @db.VarChar(120)
+  tracking_number String @default("") @db.VarChar(191)
+  status String @default("") @db.VarChar(40)
+  fulfillment_status String @default("") @db.VarChar(40)
+  source_updated_at DateTime?  @db.DateTime(3)
+  created_at DateTime @default(now()) @db.DateTime(3)
+  updated_at DateTime @default(now()) @db.DateTime(3)
+  relation_supplier_order_id supplier_orders @relation("supplier_shipment_order_fk", fields: [supplier_order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_shipment_order_fk")
+  @@unique([supplier_order_id, external_id], map: "supplier_shipment_external")
+
+}
+
+model supplier_webhook_events {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  connection_id BigInt  @db.UnsignedBigInt
+  event_key String  @db.VarChar(191)
+  event_type String  @db.VarChar(80)
+  resource_id String @default("") @db.VarChar(191)
+  payload Json
+  status String @default("pending") @db.VarChar(16)
+  attempts Int @default(0)
+  next_attempt_at DateTime @default(now()) @db.DateTime(3)
+  claim_token String?  @db.Char(36)
+  claimed_at DateTime?  @db.DateTime(3)
+  last_error String @default("") @db.VarChar(80)
+  created_at DateTime @default(now()) @db.DateTime(3)
+  processed_at DateTime?  @db.DateTime(3)
+  relation_connection_id supplier_connections @relation("supplier_webhook_connection_fk", fields: [connection_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_webhook_connection_fk")
+  @@unique([event_key], map: "supplier_webhook_event")
+  @@index([status, next_attempt_at, id], map: "supplier_webhook_jobs")
+  @@index([status, claimed_at, id], map: "supplier_webhook_claim")
+  @@index([connection_id, id], map: "supplier_webhook_connection")
+}
+
 model ad_category_definitions {
   subcategory_id BigInt @id @db.UnsignedBigInt
   version Int @default(1)
@@ -31,6 +258,11 @@ model ad_category_audit {
 // Approved goods only. Independent from member ads, wallet top-ups and supplier payouts.
 // MySQL binary identifier collations and readiness indexes are enforced by commerce/schema.ts.
 model commerce_suppliers {
+  supplier_integration_profiles supplier_integration_profiles? @relation("supplier_profile_supplier_fk")
+  supplier_connections supplier_connections[] @relation("supplier_connection_supplier_fk")
+  supplier_oauth_states supplier_oauth_states[] @relation("supplier_oauth_supplier_fk")
+  supplier_products supplier_products[] @relation("supplier_product_supplier_fk")
+  supplier_orders supplier_orders[] @relation("supplier_order_supplier_fk")
   product_mappings commerce_product_suppliers[]
   order_snapshots commerce_order_suppliers[]
   accruals commerce_supplier_accruals[]
@@ -100,6 +332,8 @@ model commerce_supplier_accruals {
 }
 
 model commerce_products {
+  supplier_products supplier_products? @relation("supplier_product_commerce_fk")
+  supplier_reservation_allocations supplier_reservation_allocations[] @relation("supplier_allocation_product_fk")
   supplier_mapping commerce_product_suppliers?
   id              BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
   ad_id           BigInt?  @db.UnsignedBigInt
@@ -119,6 +353,8 @@ model commerce_products {
 }
 
 model commerce_orders {
+  supplier_reservation_allocations supplier_reservation_allocations[] @relation("supplier_allocation_order_fk")
+  supplier_orders supplier_orders[] @relation("supplier_order_order_fk")
   receipt commerce_receipts?
   id                  BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
   member_id           BigInt   @db.UnsignedBigInt

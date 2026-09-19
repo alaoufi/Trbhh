@@ -60,6 +60,7 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
   ]);
   return <div className="space-y-4">
     <h1 className="text-xl font-bold text-primary">الموردون وربط السلع</h1>
+    <Link href="/admin/suppliers/integrations" className="inline-block rounded-lg bg-primary px-4 py-2 text-white">تكامل Salla وكتالوج الموردين</Link>
     <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">الموردون جهات داخلية لتربح. التنفيذ والتسوية خارج الموقع. لا تحويل أموال ولا اتصال API من هذه الصفحة.</p>
     <nav className="flex flex-wrap gap-4 text-primary underline"><Link href="/admin/commerce">السلع والطلبات</Link><Link href="/admin/commerce/accounts">الإيصالات والاستحقاقات</Link></nav>
     {query.saved === '1' && <p role="status" className="text-emerald-700">تم الحفظ.</p>}

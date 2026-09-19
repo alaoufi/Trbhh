@@ -3,6 +3,8 @@ import {createHash, randomUUID} from 'node:crypto';
 import type {Prisma} from '@prisma/client';
 import {checkedMoney, lineTotal, sumMoney, MAX_MONEY_MINOR} from './money';
 import {assertCommerceSchemaReady} from './schema';
+import {reserveSupplierCost,finishSupplierReservations,capReleasedSupplierStock,type CostLine} from '@/lib/suppliers/reservations';
+import {snapshotSupplierOrders} from '@/lib/suppliers/orders';
 import type {AttemptStatus, CommerceDb, CreateOrderInput, ExpectedPayment, NotificationChannel, NotificationTarget, OrderLineInput, OrderPolicy, OrderSnapshot, OrderStatus, PaymentAttempt, PaymentClaim, ShippingSnapshot, VerifiedPayment} from './types';
 
 type Tx = Prisma.TransactionClient;
@@ -83,6 +85,7 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
     if(!row||row.request_fingerprint!==fingerprint) throw new Error('request_conflict');
     if(row.status!=='building') return readOrder(tx,row);
     const totals:number[]=[];
+    const supplierCostLines=new Map<string,CostLine[]>();
     for(const item of items) {
       const [product]=await tx.$queryRaw<{id:bigint;title:string;price_minor:number;currency:string;stock_available:number;stock_reserved:number;approved:number;visible:number;enabled:number}[]>`SELECT id,title,price_minor,currency,stock_available,stock_reserved,approved,visible,enabled FROM commerce_products WHERE id=${item.productId} FOR UPDATE`;
       if(!product||product.approved!==1||product.visible!==1||product.enabled!==1||product.currency!=='SAR'||product.price_minor<=0||product.stock_available<item.quantity) throw new Error('product_unavailable');
@@ -97,12 +100,14 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
         const [supplier]=await tx.$queryRaw<{name:string;active:number}[]>`SELECT name,active FROM commerce_suppliers WHERE id=${mapping.supplier_id} FOR SHARE`;
         if(!supplier||supplier.active!==1) throw new Error('supplier_unavailable');
         if(mapping.currency!=='SAR') throw new Error('supplier_currency_invalid');
-        const cost=lineTotal(mapping.unit_cost_minor,item.quantity);
-        await tx.$executeRaw`INSERT INTO commerce_order_suppliers (order_id,product_id,supplier_id,supplier_name,supplier_sku,quantity,unit_cost_minor,total_cost_minor) VALUES (${row.id},${item.productId},${mapping.supplier_id},${supplier.name},${mapping.supplier_sku},${item.quantity},${mapping.unit_cost_minor},${cost})`;
+        const cost=await reserveSupplierCost(tx,row.id,item.productId,mapping.supplier_id,item.quantity,mapping.unit_cost_minor,product.price_minor);
+        supplierCostLines.set(String(item.productId),cost.lines);
+        await tx.$executeRaw`INSERT INTO commerce_order_suppliers (order_id,product_id,supplier_id,supplier_name,supplier_sku,quantity,unit_cost_minor,total_cost_minor) VALUES (${row.id},${item.productId},${mapping.supplier_id},${supplier.name},${mapping.supplier_sku},${item.quantity},${cost.unitCostMinor},${cost.totalCostMinor})`;
       }
     }
     const subtotal=sumMoney(totals), total=sumMoney([subtotal,shippingFeeMinor]);
     await tx.$executeRaw`UPDATE commerce_orders SET status='awaiting_payment',subtotal_minor=${subtotal},shipping_fee_minor=${shippingFeeMinor},total_minor=${total} WHERE id=${row.id}`;
+    await snapshotSupplierOrders(tx,row.id,shipping,supplierCostLines);
     await tx.$executeRaw`INSERT INTO commerce_audit_events (order_id,event,payload) VALUES (${row.id},'order_created',${JSON.stringify({memberId:input.memberId.toString(),totalMinor:total,currency:'SAR'})})`;
     return readOrder(tx,{...row,status:'awaiting_payment',subtotal_minor:subtotal,shipping_fee_minor:shippingFeeMinor,total_minor:total});
   },transactionOptions);
@@ -128,8 +133,11 @@ export async function cancelUnstartedOrder(db:CommerceDb,input:{memberId:bigint;
       const limit=MAX_MONEY_MINOR-item.quantity;
       const changed=await tx.$executeRaw`UPDATE commerce_products SET stock_reserved=stock_reserved-${item.quantity},stock_available=stock_available+${item.quantity},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${item.product_id} AND stock_reserved>=${item.quantity} AND stock_available<=${limit}`;
       if(changed!==1) throw new Error('reservation_mismatch');
+      await capReleasedSupplierStock(tx,item.product_id);
     }
     await tx.$executeRaw`UPDATE commerce_orders SET status='cancelled',fulfillment_status='cancelled' WHERE id=${order.id}`;
+    await finishSupplierReservations(tx,order.id,false);
+    await tx.$executeRaw`UPDATE supplier_orders SET status='cancelled',updated_at=CURRENT_TIMESTAMP(3) WHERE order_id=${order.id} AND status='awaiting_payment'`;
     await tx.$executeRaw`INSERT INTO commerce_audit_events (order_id,event,payload) VALUES (${order.id},'order_cancelled',${JSON.stringify({memberId:input.memberId.toString()})})`;
     return {orderId:order.id,alreadyCancelled:false};
   },transactionOptions);
@@ -217,6 +225,8 @@ export async function settleVerifiedPayment(db:CommerceDb,evidence:VerifiedPayme
     await tx.$executeRaw`UPDATE commerce_payment_attempts SET status='paid',paid_at=CURRENT_TIMESTAMP(3) WHERE id=${attempt.id}`;
     await tx.$executeRaw`UPDATE commerce_orders SET status='paid',fulfillment_status='offline_pending',paid_at=CURRENT_TIMESTAMP(3) WHERE id=${order.id}`;
     await tx.$executeRaw`INSERT INTO commerce_receipts (order_id,provider,provider_ref,amount_minor,currency) VALUES (${order.id},${attempt.provider},${attempt.provider_ref},${attempt.amount_minor},'SAR')`;
+    await finishSupplierReservations(tx,order.id,true);
+    await tx.$executeRaw`UPDATE supplier_orders SET status='pending',payment_status='paid',updated_at=CURRENT_TIMESTAMP(3) WHERE order_id=${order.id} AND status='awaiting_payment'`;
     // Only immutable order snapshots feed the subledger: a later supplier disable
     // or product remapping must not prevent receipt of a verified historical payment.
     await tx.$executeRaw`INSERT INTO commerce_supplier_accruals (order_id,product_id,supplier_id,amount_minor,currency,status) SELECT order_id,product_id,supplier_id,total_cost_minor,'SAR','offline_pending' FROM commerce_order_suppliers WHERE order_id=${order.id}`;

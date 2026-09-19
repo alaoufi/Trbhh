@@ -162,12 +162,13 @@ node "$tools_dir/database-proof.cjs" verify-restore-full "$backup/full-before.js
 [[ "$(docker inspect -f '{{.State.Paused}}' "$container")" == true ]] || exit 1
 docker exec -i "$reader" node - snapshot-full < "$tools_dir/database-proof.cjs" > "$backup/full-current.json"
 node "$tools_dir/database-proof.cjs" verify-restore-full "$backup/full-before.json" "$backup/full-current.json"
-systemctl stop "$watchdog.timer"
-systemctl stop "$watchdog.service" >/dev/null 2>&1 || true
 [[ ! -e "$backup/WATCHDOG_FIRED" && "$(docker inspect -f '{{.State.Paused}}' "$container")" == true ]] || exit 1
 docker unpause "$container" >/dev/null
 [[ "$(docker inspect -f '{{.State.Running}} {{.State.Paused}}' "$container")" == 'true false' ]] || exit 1
 paused=0
+systemctl stop "$watchdog.timer"
+systemctl stop "$watchdog.service" >/dev/null 2>&1 || true
+[[ ! -e "$backup/WATCHDOG_FIRED" ]] || exit 1
 (cd "$backup" && sha256sum database.sql.gz *.tar.gz > SHA256SUMS)
 printf '%s\n' "$current_commit" > "$backup/VERIFIED"
 printf 'BACKUP_ID=%s\nROLLBACK_COMMIT=%s\nPrivate backup restored and verified successfully.\n' "$backup_id" "$current_commit"

@@ -46,7 +46,7 @@ it('uses default feed when categories are disabled',async()=>{
 it('does not fall back to unrelated ads for an empty active category',async()=>{
  state.search.mockResolvedValue([]);
  const tree=elements(await HomePage({searchParams:Promise.resolve({category:'90'})}));
- expect(tree.filter(e=>e.type===AdGrid).map(e=>e.props.ads)).toEqual([[]]);
+ expect(tree.filter(e=>e.type===AdGrid)).toHaveLength(0);
  expect(tree.some(e=>e.props.children===CATEGORY_LABELS.emptyText)).toBe(true);
 });
 it('retains only the validated category in the homepage search form',async()=>{

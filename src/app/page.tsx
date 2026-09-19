@@ -143,8 +143,9 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
 
       <div>
         <div className="space-y-4">
-          <AdGrid ads={feedAds} />
-          {selectedCategory && !feedAds.length && <p className="text-sm text-muted-foreground">{categoryConfig?.labels.emptyText}</p>}
+          {selectedCategory && !feedAds.length
+            ? <p className="text-sm text-muted-foreground">{categoryConfig?.labels.emptyText}</p>
+            : <AdGrid ads={feedAds} />}
           <PromoSlot placement="feed" />
           {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
           {/* تُعرض أحدث دفعة بسرعة؛ البحث يبقى السجل الكامل دون تحميله مسبقاً في الرئيسية. */}

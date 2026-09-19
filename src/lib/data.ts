@@ -14,6 +14,7 @@ import { publicStoreWhere } from './store-subscription-access';
 import { equivalentAreaIds, normalizePriceRange } from './search-filters';
 import { compactAdTitle } from './ad-presentation';
 import { searchCardVisibility } from './search-card-visibility';
+import { featuredSearchPage } from './featured-search-page';
 import { getPublicCategories, getCategoryEditValues, type PublicCategory } from './ad-categories/service';
 
 export type AdCard = {
@@ -558,12 +559,26 @@ export async function countSearchAds(params: SearchParamsT): Promise<number> {
 
 export async function searchAds(params: SearchParamsT) {
   const { sort = 'newest', take = 48, skip = 0 } = params;
+  const where = await buildSearchWhere(params);
+  if (sort === 'newest') {
+    // Flags are not a sortable priority: legacy values include 'no' and ''.
+    // Keep every visibility/category/price predicate in both partitions.
+    const featuredWhere = { AND: [where, { adsSpecial: 'checked' as const }] };
+    const ordinaryWhere = { AND: [where, { adsSpecial: { not: 'checked' as const } }] };
+    const rows = await featuredSearchPage(take, skip,
+      () => prisma.ads.count({ where: featuredWhere }),
+      (featured, pageSkip, pageTake) => prisma.ads.findMany({
+        where: featured ? featuredWhere : ordinaryWhere,
+        orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
+        skip: pageSkip, take: pageTake, select: adSelect,
+      }));
+    return toCards(rows);
+  }
   const orderBy =
     sort === 'price_asc' ? [{ price: 'asc' as const }, { id: 'desc' as const }] :
-    sort === 'price_desc' ? [{ price: 'desc' as const }, { id: 'desc' as const }] :
-    [{ adsSpecial: 'desc' as const }, { bumped_at: { sort: 'desc' as const, nulls: 'last' as const } }, { id: 'desc' as const }];
+    [{ price: 'desc' as const }, { id: 'desc' as const }];
   const rows = await prisma.ads.findMany({
-    where: await buildSearchWhere(params),
+    where,
     skip: Math.max(0, skip),
     orderBy,
     take,

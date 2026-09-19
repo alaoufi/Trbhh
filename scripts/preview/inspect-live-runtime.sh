@@ -7,6 +7,11 @@ docker compose ps --format '{{.Service}} {{.State}} {{.Health}}'
 printf 'AVAILABLE_MEMORY_MB='; awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo
 printf 'AVAILABLE_DISK_KB='; df -Pk /root | awk 'NR==2 {print $4}'
 printf 'HOST_MYSQL_CLIENT='; command -v mysql >/dev/null && echo yes || echo no
+if mysql --protocol=socket --batch --skip-column-names -e 'SHOW GRANTS FOR CURRENT_USER' 2>/dev/null | grep -q 'ALL PRIVILEGES ON \*\.\*.*WITH GRANT OPTION'; then
+  echo 'HOST_SOCKET_PROVISIONING=yes'
+else
+  echo 'HOST_SOCKET_PROVISIONING=no'
+fi
 docker compose exec -T app node <<'NODE'
 const {PrismaClient}=require('@prisma/client');
 const db=new PrismaClient();

@@ -1,5 +1,8 @@
 name: Read-only release backup status
 on:
+  push:
+    branches: [codex/trbhh-v2-preview]
+    paths: ['.github/workflows/release-status.yml']
   workflow_dispatch:
     inputs:
       backup_id:
@@ -14,7 +17,7 @@ jobs:
     steps:
       - name: Read artifact sizes and app state only
         env:
-          BACKUP_ID: ${{ inputs.backup_id }}
+          BACKUP_ID: ${{ inputs.backup_id || '35452145683' }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}

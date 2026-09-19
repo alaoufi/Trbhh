@@ -5,14 +5,14 @@ mode=${1:-audit}
 if [[ "$mode" == cleanup ]]; then
   # Fixed inventory reviewed on 2026-09-19; never auto-select delete targets.
   base=/root/trbhh-release-backups
-  keep=/root/trbhh-release-backups/audit-35459832130
+  keep=/root/trbhh-release-backups/audit-35465592273
   legacy_base=/root/trbhh/backups
   for parent in "$base" "$keep" "$legacy_base"; do
     [[ -d "$parent" && ! -L "$parent" && "$(realpath "$parent")" == "$parent" ]] || exit 1
   done
   [[ -f "$keep/VERIFIED" && ! -L "$keep/VERIFIED" && ! -e "$keep/WATCHDOG_FIRED" ]] || exit 1
-  [[ "$(cat "$keep/VERIFIED")" == ec75f2862079107c742d8b8d903c24c5da5748da ]] || exit 1
-  [[ "$(cat "$keep/DEPLOYMENT_VERIFIED")" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || exit 1
+  [[ "$(cat "$keep/VERIFIED")" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || exit 1
+  [[ "$(cat "$keep/DEPLOYMENT_VERIFIED")" == ab5a641580e00678f66b071a576676ea7adfb191 ]] || exit 1
   [[ -f "$keep/SHA256SUMS" && ! -L "$keep/SHA256SUMS" ]] || exit 1
   # Five self-contained archives; retained media must not depend on older dirs.
   expected=$(printf '%s\n' code.tar.gz database.sql.gz image.tar.gz legacy.tar.gz storage.tar.gz | sort)
@@ -32,19 +32,7 @@ if [[ "$mode" == cleanup ]]; then
     echo 'A backup process is still active; refusing cleanup'; exit 1
   fi
   targets=(
-    /root/trbhh-release-backups/audit-34534817972
-    /root/trbhh-release-backups/audit-35452145683
-    /root/trbhh-release-backups/audit-35453078005
-    /root/trbhh-release-backups/audit-35458433720
-    /root/trbhh-release-backups/audit-35464508812
-    /root/trbhh/backups/تربح-20260826-2015.zip
-    /root/trbhh/backups/تربح-20260826-2023.zip
-    /root/trbhh/backups/تربح-20260826-2131.zip
-    /root/trbhh/backups/تربح-20260827-0743.zip
-    /root/trbhh/backups/تربح-20260830-0300.zip
-    /root/trbhh/backups/تربح-20260831-0633.zip
-    /root/trbhh/backups/تربح-20260906-0300.zip
-    /root/trbhh/backups/تربح-20260913-0300.zip
+    /root/trbhh-release-backups/audit-35459832130
   )
   # Validate every exact target and all mounts before the first deletion.
   mounts=$(findmnt -rn -o TARGET)

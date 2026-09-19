@@ -17,8 +17,8 @@ if test -r /etc/mysql/debian.cnf && mysql --defaults-file=/etc/mysql/debian.cnf 
 else
   echo 'HOST_DEFAULTS_PROVISIONING=no'
 fi
-app_uuid=$(docker compose exec -T app node -e 'const {PrismaClient}=require("@prisma/client");const p=new PrismaClient();p.$queryRawUnsafe("SELECT @@server_uuid AS id").then(r=>console.log(r[0].id)).finally(()=>p.$disconnect())')
-db_uuid=$(docker compose exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot --batch --skip-column-names -e "SELECT @@server_uuid"' 2>/dev/null || true)
+app_uuid=$(docker compose exec -T app node -e 'const {PrismaClient}=require("@prisma/client");const p=new PrismaClient();p.$queryRawUnsafe("SELECT @@server_uuid AS id").then(r=>console.log(r[0].id)).finally(()=>p.$disconnect())' </dev/null)
+db_uuid=$(docker compose exec -T db sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot --batch --skip-column-names -e "SELECT @@server_uuid"' </dev/null 2>/dev/null || true)
 if test -n "$db_uuid" && test "$app_uuid" = "$db_uuid"; then
   echo 'BUNDLED_DB_MATCHES_PRODUCTION=yes'
 else

@@ -62,4 +62,12 @@ describe('homepage category discovery', () => {
     expect(html.match(/<form[^>]*>/)?.[0]).toContain('flex-wrap');
     expect(html.match(/<label[^>]*>/)?.[0]).toContain('basis-full');
   });
+  it('remounts the uncontrolled form when the canonical category changes or clears', async () => {
+    const selected = await HomeCategoryNavigation({ selectedCategory: '12' });
+    const cleared = await HomeCategoryNavigation({});
+    const invalid = await HomeCategoryNavigation({ selectedCategory: '999' });
+    expect(selected!.props.children[0].key).toBe('12');
+    expect(cleared!.props.children[0].key).toBe('');
+    expect(invalid!.props.children[0].key).toBe(cleared!.props.children[0].key);
+  });
 });

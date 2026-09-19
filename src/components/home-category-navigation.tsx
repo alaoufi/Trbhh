@@ -14,7 +14,7 @@ export async function HomeCategoryNavigation({ selectedCategory }: { selectedCat
     ? categories.find(category => String(category.id) === selectedCategory) : undefined;
   const ads = selected ? await searchAds({ categoryId: selected.id, take: 24, skip: 0 }) : [];
   return <section data-testid="home-category-navigation" aria-label={config.labels.category} className="card-3d space-y-3 rounded-xl p-3">
-    <form action="/" method="get" className="flex flex-wrap items-end gap-2">
+    <form key={selected?.id.toString() || ''} action="/" method="get" className="flex flex-wrap items-end gap-2">
       <label className="min-w-0 basis-full space-y-1 text-xs font-semibold text-foreground sm:flex-1 sm:basis-auto">{config.labels.category}
         <select name="category" defaultValue={selected?.id.toString() || ''} className="h-11 w-full rounded-lg border bg-background px-3 text-sm text-foreground">
           <option value="">{config.labels.choose}</option>

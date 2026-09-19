@@ -19,6 +19,12 @@ function matches(row: Record<string, unknown>, where: Record<string, unknown>): 
 }
 
 describe('search counts and pages use card visibility before pagination', () => {
+  it('never emits an empty OR branch for unlimited defaults with no subscriptions', () => {
+    const predicate = searchCardVisibility({ now: new Date(), defaultDays: 0, bannedIds: [9n], plans: [], subscriptions: [] });
+    expect(predicate.OR ?? []).not.toContainEqual({});
+    expect(matches({ user_id: 1n, created_at: new Date(0) }, predicate)).toBe(true);
+    expect(matches({ user_id: 9n, created_at: new Date(0) }, predicate)).toBe(false);
+  });
   const now = new Date('2026-09-10T12:00:00Z');
   const where = searchCardVisibility({ now, defaultDays: 7, bannedIds: [9n], plans: [{ id: 1, adDays: 30 }, { id: 2, adDays: 0 }], subscriptions: [{ userId: 2, packageId: 1 }, { userId: 3, packageId: 2 }, { userId: 4, packageId: 99 }] });
   const ad = (user: number, daysAgo: number, extras = {}) => ({ user_id: BigInt(user), created_at: new Date(now.getTime() - daysAgo * 86400000), expires_at: null, urgent_until: null, adsSpecial: '', ...extras });

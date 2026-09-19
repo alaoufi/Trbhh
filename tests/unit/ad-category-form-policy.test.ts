@@ -42,3 +42,28 @@ it('preservation does not expose editable generic prices even if an inactive opt
   const html=form({...cfg,subcategories:[{...cfg.subcategories[0],active:false,kind:'goods',priceEnabled:true,goodsEnabled:true}]});
   expect(html).toContain('value="preserve"');expect(html).not.toContain('name="price"');expect(html).not.toContain('name="stock_state"');
 });
+const choiceConfig:CategoryFormConfig={
+  ...cfg,
+  categories:[...cfg.categories,{id:90,name:'عروض أخرى',active:true,order:1},{id:91,name:'غير مفعّل',active:false,order:2}],
+  subcategories:[...cfg.subcategories,
+    {...cfg.subcategories[0],id:35,name:'بلا تعريف',version:0},
+    {...cfg.subcategories[0],id:36,name:'فرعي مخفي',active:false},
+    {...cfg.subcategories[0],id:37,categoryId:90,name:'احتياطي بلا تعريف',version:0},
+    {...cfg.subcategories[0],id:38,categoryId:91,name:'فرعي لأب مخفي'},
+  ],
+};
+it('offers only active categories with an active configured child and only eligible dependent options',()=>{
+  const html=form(choiceConfig);
+  const category=html.match(/<select[^>]*name="category_id"[^>]*>([\s\S]*?)<\/select>/)?.[1]||'';
+  const subcategory=html.match(/<select[^>]*name="subcategory_id"[^>]*>([\s\S]*?)<\/select>/)?.[1]||'';
+  expect(category).toContain('الوظائف');
+  expect(category).not.toContain('عروض أخرى');expect(category).not.toContain('غير مفعّل');
+  expect(subcategory).toContain('وظائف إدارية');
+  expect(subcategory).not.toContain('بلا تعريف');expect(subcategory).not.toContain('فرعي مخفي');
+});
+it('preserves legacy fallback editing without forcing an empty required subcategory',()=>{
+  const html=renderToStaticMarkup(React.createElement(AdForm,{action:async()=>{},countries:[],cities:[],submitLabel:'حفظ',initial:{id:1,categoryId:90,subcategoryId:37},categoryConfig:choiceConfig}));
+  expect(html).toContain('value="preserve"');
+  expect(html).not.toContain('name="category_id"');expect(html).not.toContain('name="subcategory_id"');
+  expect(html).not.toContain('name="category_version"');
+});

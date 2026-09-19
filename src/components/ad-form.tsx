@@ -92,7 +92,9 @@ export function AdForm({
   const [categoryId, setCategoryId] = useState(String(initial?.categoryId || ''));
   const [subcategoryId, setSubcategoryId] = useState(String(initial?.subcategoryId || ''));
   const [categoryValues, setCategoryValues] = useState<CategoryValues>(initial?.categoryValues || {});
-  const selectedSub = categoryConfig?.subcategories.find(s => String(s.id) === subcategoryId && String(s.categoryId) === categoryId);
+  const eligibleSubs = categoryConfig?.subcategories.filter(s => s.active && s.version > 0 && categoryConfig.categories.some(c => c.id === s.categoryId && c.active)) || [];
+  const eligibleCategories = categoryConfig?.categories.filter(c => c.active && eligibleSubs.some(s => s.categoryId === c.id)) || [];
+  const selectedSub = eligibleSubs.find(s => String(s.id) === subcategoryId && String(s.categoryId) === categoryId);
   const categoryOn = categoryConfig?.enabled === true;
   const canPreserveCategory = !!initial?.id && !categoryConfig?.subcategories.some(s => s.id === initial.subcategoryId && s.categoryId === initial.categoryId && s.active && s.version > 0 && categoryConfig.categories.some(c => c.id === s.categoryId && c.active));
   const [categoryMode, setCategoryMode] = useState(canPreserveCategory ? 'preserve' : 'select');
@@ -320,10 +322,10 @@ export function AdForm({
           </select></label>}
           {!preservingCategory && <><div className="grid gap-2 sm:grid-cols-2">
             <label className={lbl}>{categoryConfig.labels.category}<select className={field} name="category_id" required value={categoryId} onChange={e=>{setCategoryId(e.target.value);setSubcategoryId('');setCategoryValues({});}}>
-              <option value="">{categoryConfig.labels.choose}</option>{categoryConfig.categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="">{categoryConfig.labels.choose}</option>{eligibleCategories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
             </select></label>
             <label className={lbl}>{categoryConfig.labels.subcategory}<select className={field} name="subcategory_id" required value={subcategoryId} onChange={e=>{setSubcategoryId(e.target.value);setCategoryValues({});}}>
-              <option value="">{categoryConfig.labels.choose}</option>{categoryConfig.subcategories.filter(s=>String(s.categoryId)===categoryId).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+              <option value="">{categoryConfig.labels.choose}</option>{eligibleSubs.filter(s=>String(s.categoryId)===categoryId).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
             </select></label>
           </div>
           <input type="hidden" name="category_version" value={selectedSub?.version || ''}/>

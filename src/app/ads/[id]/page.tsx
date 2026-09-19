@@ -18,6 +18,7 @@ import { formatPrice, timeAgo } from '@/lib/utils';
 import { waLink } from '@/lib/classified-theme';
 import { getSettingBool, getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate, getMemberWindows, adWindowState, DUR_DAYS } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
+import { isPreviewSandbox } from '@/lib/preview-sandbox';
 import { Button } from '@/components/ui/button';
 import { FavoriteButton } from '@/components/favorite-button';
 import { ShareButtons } from '@/components/share-buttons';
@@ -693,7 +694,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <Star className="h-5 w-5" /> تقييم
           </Link>
         )}
-        <div className="card-3d flex items-center justify-center rounded-2xl py-3 text-primary">
+        {!isPreviewSandbox() && <div className="card-3d flex items-center justify-center rounded-2xl py-3 text-primary">
           <ShareButtons
             url={shareUrl}
             title={ad.title}
@@ -708,7 +709,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
               image: ad.images?.[0],
             }}
           />
-        </div>
+        </div>}
         <div className="card-3d flex items-center justify-center rounded-2xl py-1">
           <FavoriteButton adId={ad.id} active={favorited} disabled={!session} compact />
         </div>

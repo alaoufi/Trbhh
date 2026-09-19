@@ -1,4 +1,5 @@
 import { isPreviewReadOnly } from '@/lib/preview-mode';
+import { isPreviewSandbox } from '@/lib/preview-sandbox';
 import Redis from 'ioredis';
 
 const globalForRedis = globalThis as unknown as { redis?: Redis | null };
@@ -10,7 +11,7 @@ const globalForRedis = globalThis as unknown as { redis?: Redis | null };
  *   (which would take down the whole Node process)
  */
 function createRedis(): Redis | null {
-  if (isPreviewReadOnly()) return null;
+  if (isPreviewReadOnly() || isPreviewSandbox()) return null;
   const url = process.env.REDIS_URL;
   if (!url) return null;
   const client = new Redis(url, {
@@ -27,7 +28,9 @@ function createRedis(): Redis | null {
   return client;
 }
 
-export const redis: Redis | null = isPreviewReadOnly() ? null : globalForRedis.redis ?? createRedis();
+// Sandbox must neither connect to an inherited production URL nor reuse a
+// cached client. Rate limiting and caching keep their in-process fallbacks.
+export const redis: Redis | null = isPreviewReadOnly() || isPreviewSandbox() ? null : globalForRedis.redis ?? createRedis();
 
 if (process.env.NODE_ENV !== 'production') globalForRedis.redis = redis;
 

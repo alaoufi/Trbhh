@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Phone } from 'lucide-react';
 import { SITE } from '@/lib/constants';
+import { isPreviewSandbox } from '@/lib/preview-sandbox';
 import { DisclaimerBar } from '@/components/disclaimer';
 
 export function Footer() {
@@ -30,10 +31,13 @@ export function Footer() {
           </div>
           <div>
             <h4 className="mb-3 font-extrabold text-[#f0b429]">تواصل معنا</h4>
-            <a href={`tel:${SITE.phone}`} className="flex items-center gap-1.5 text-sm text-white/70 hover:text-[#f0b429]">
+            {isPreviewSandbox() ? <span aria-disabled="true" className="flex items-center gap-1.5 text-sm text-white/70">
               <Phone className="h-4 w-4 shrink-0" />
               <span dir="ltr">{SITE.phone}</span>
-            </a>
+            </span> : <a href={`tel:${SITE.phone}`} className="flex items-center gap-1.5 text-sm text-white/70 hover:text-[#f0b429]">
+              <Phone className="h-4 w-4 shrink-0" />
+              <span dir="ltr">{SITE.phone}</span>
+            </a>}
           </div>
         </div>
         <div className="mt-8 border-t border-white/15 pt-6 text-center text-xs text-white/60">

@@ -1,0 +1,154 @@
+// Component-level browser integration with an in-memory API; no database or production requests.
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {resolve} from 'node:path';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+const root=fileURLToPath(new URL('../../',import.meta.url));
+const require=createRequire(import.meta.url);
+const viteRequire=createRequire(require.resolve('vitest/package.json'));
+const {createServer}=await import(pathToFileURL(viteRequire.resolve('vite')).href);
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const entry='/__sandbox-form-test.tsx';
+const server=await createServer({root,configFile:false,logLevel:'error',define:{'process.env':JSON.stringify({NODE_ENV:'development'})},
+  resolve:{alias:Object.fromEntries(['react','react-dom','next','lucide-react'].map(name=>[name,resolve(root,'node_modules',name)])),dedupe:['react','react-dom']},
+  server:{host:'127.0.0.1',port:4203,strictPort:true},
+  plugins:[{name:'sandbox-storage-harness',resolveId(id){if(id===entry)return '\0'+entry;},load(id){if(id==='\0'+entry)return `import React from 'react'; import {createRoot} from 'react-dom/client'; import {PreviewSandboxNewAd,PreviewSandboxSeller,PreviewLocalNewAd,PreviewSandboxFields} from '/src/components/preview-local-entry.tsx'; const root=createRoot(document.getElementById('root')); let generation=0; window.remountPreview=()=>root.render(React.createElement(location.search==='?local=1'?PreviewLocalNewAd:location.pathname==='/field-settings/'?PreviewSandboxFields:location.pathname==='/seller/'?PreviewSandboxSeller:PreviewSandboxNewAd,{key:++generation})); window.remountPreview();`;},
+    configureServer(dev){dev.middlewares.use(async(req,res,next)=>{if(!['/ads/new/','/seller/','/field-settings/'].includes(req.url?.split('?')[0]))return next();res.setHeader('Content-Type','text/html');res.end(await dev.transformIndexHtml(req.url,`<!doctype html><html dir="rtl"><head><meta name="viewport" content="width=device-width, initial-scale=1"/></head><body><div id="root"></div><script type="module" src="${entry}"></script></body></html>`));});}}],
+});
+let browser;
+try {
+  await server.listen();
+  browser=await chromium.launch({channel:'msedge',headless:true});
+  const context=await browser.newContext();
+  const form={intent:'wanted',category:'أخرى',subcategory:'كتب',title:'مسودة محفوظة على الخادم',description:'وصف تجريبي طويل محفوظ على خادم التجربة لاختبار الحفظ المؤكد.',region:'الرياض',city:'الرياض',price:'',condition:'',images:[],spec1:'',spec2:'',details:{}};
+  const values={'ad-draft-v1':{version:1,form,step:0,editingId:null,savedAt:1}};
+  const revisions={'ad-draft-v1':1};
+  let sessionOwner=11;
+  let puts=0, gets=0, failNext=0, getStatus=200, holdKey='', release;
+  async function waitForHeldWrite() {for(let i=0;!release&&i<500;i++)await new Promise(resolve=>setTimeout(resolve,10));assert.ok(release,'Expected delayed server write');}
+  const errors=[];
+  await context.addInitScript(()=>localStorage.setItem('trbhh-v2-ad-draft-v1',JSON.stringify({poison:'browser-only'})));
+  await context.route('**/api/preview-state',async route=>{
+    const request=route.request();
+    if(request.method()==='GET'){gets++;return route.fulfill({status:getStatus,contentType:'application/json',body:JSON.stringify({ownerId:sessionOwner,values,revisions})});}
+    assert.equal(request.method(),'PUT'); puts++;
+    const {ownerId,key,value,revision}=request.postDataJSON();
+    if(ownerId!==sessionOwner)return route.fulfill({status:403,body:'{}'});
+    assert.equal(request.headers().origin,'http://127.0.0.1:4203');
+    if(failNext){const status=failNext;failNext=0;return route.fulfill({status,body:'{}'});}
+    if(key===holdKey){holdKey='';await new Promise(resolve=>{release=resolve;});}
+    if(revision!==(revisions[key]||0))return route.fulfill({status:409,body:'{}'});
+    values[key]=value; revisions[key]=revision+1;
+    return route.fulfill({contentType:'application/json',body:JSON.stringify({revision:revision+1})});
+  });
+  const page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',error=>{errors.push(error.message);console.error(error.message);});
+  await page.goto('http://127.0.0.1:4203/ads/new/');
+  await page.locator('.seller-photo-tip').waitFor();
+  assert.match(await page.locator('.seller-photo-tip').innerText(), /عند حفظ المسودة أو الإعلان، تُحفظ صورك في حسابك على خادم التجربة المعزول\./);
+  assert.doesNotMatch(await page.locator('.seller-photo-tip').innerText(), /هذا المتصفح/);
+  const title=page.getByLabel('عنوان الإعلان'); await title.waitFor();
+  assert.equal(await title.inputValue(),form.title);
+  await title.fill('تغيير ينتظر تأكيد الخادم');
+  await page.waitForTimeout(700); assert.equal(puts,0,'Server mode must not autosave');
+  holdKey='ad-draft-v1';
+  await page.getByRole('button',{name:'حفظ المسودة',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.seller-create-page')?.getAttribute('aria-busy')==='true');
+  assert.equal(await page.getByText('المسودة محفوظة',{exact:true}).count(),0);
+  assert.equal(await title.isDisabled(),true);
+  await waitForHeldWrite();release();release=undefined;
+  await page.getByText('المسودة محفوظة',{exact:true}).waitFor();
+  await page.reload();await title.waitFor();assert.equal(await title.inputValue(),'تغيير ينتظر تأكيد الخادم');
+  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('trbhh-v2-ad-draft-v1'))),{poison:'browser-only'});
+  sessionOwner=22;
+  await title.fill('تعديلات الحساب السابق');
+  await page.getByRole('button',{name:'حفظ المسودة',exact:true}).click();
+  await page.getByText('تعذر الحفظ · إعادة المحاولة',{exact:true}).waitFor();
+  assert.equal(values['ad-draft-v1'].form.title,'تغيير ينتظر تأكيد الخادم');
+  assert.equal(await title.inputValue(),'تعديلات الحساب السابق');
+  sessionOwner=11;
+  await title.fill('تعديل غير محفوظ بعد خطأ'); failNext=503;
+  await page.getByRole('button',{name:'حفظ المسودة',exact:true}).click();
+  await page.getByText('تعذر الحفظ · إعادة المحاولة',{exact:true}).waitFor();
+  assert.equal(await title.inputValue(),'تعديل غير محفوظ بعد خطأ');
+  assert.equal(values['ad-draft-v1'].form.title,'تغيير ينتظر تأكيد الخادم');
+  failNext=401;await page.getByRole('button',{name:'حفظ المسودة',exact:true}).click();
+  await page.getByRole('link',{name:'تسجيل الدخول',exact:true}).waitFor();
+  assert.match(await page.getByRole('link',{name:'تسجيل الدخول',exact:true}).getAttribute('href'),/^\/preview-login\?next=/);
+  assert.equal(await title.inputValue(),'تعديل غير محفوظ بعد خطأ');
+  failNext=409;await page.getByRole('button',{name:'نشر تجريبي',exact:true}).click();
+  await page.getByText('لن نكتب فوق التغييرات الأحدث. انسخ تعديلاتك قبل إعادة تحميل الصفحة.').waitFor();
+  assert.equal(await page.locator('.seller-complete').count(),0);
+  holdKey='seller-ads-v1';await page.getByRole('button',{name:'نشر تجريبي',exact:true}).click();
+  await waitForHeldWrite();
+  assert.equal(await page.locator('.seller-complete').count(),0,'No publish success before seller data persisted');
+  release();release=undefined;
+  await page.locator('.seller-complete').waitFor();
+  assert.equal(values['seller-ads-v1'].length,1);assert.equal(values['ad-draft-v1'],null);
+  await page.goto('http://127.0.0.1:4203/seller/');
+  await page.getByRole('button',{name:'إيقاف تعديل غير محفوظ بعد خطأ',exact:true}).waitFor();
+  failNext=503;await page.getByRole('button',{name:'إيقاف تعديل غير محفوظ بعد خطأ',exact:true}).click();
+  await page.locator('.seller-dashboard .seller-inline-error').waitFor();assert.equal(values['seller-ads-v1'][0].status,'active');
+  await page.getByRole('button',{name:'إيقاف تعديل غير محفوظ بعد خطأ',exact:true}).click();
+  await page.getByRole('button',{name:'إعادة تنشيط تعديل غير محفوظ بعد خطأ',exact:true}).waitFor();
+  await page.reload();await page.getByRole('button',{name:'إعادة تنشيط تعديل غير محفوظ بعد خطأ',exact:true}).waitFor();
+  getStatus=401;await page.reload();await page.getByRole('link',{name:'تسجيل الدخول',exact:true}).waitFor();
+  assert.equal(await page.locator('.seller-dashboard').count(),0,'Do not mount before authenticated hydration');
+  const previousPuts=puts,previousGets=gets;
+  await page.goto('http://127.0.0.1:4203/ads/new/?local=1');
+  await page.getByLabel('القسم الرئيسي').selectOption('أخرى');
+  await page.getByLabel('التصنيف الفرعي').selectOption('كتب');
+  assert.match(await page.locator('.seller-photo-tip').innerText(), /صورك تبقى في هذا المتصفح ضمن التجربة\./);
+  await title.fill('مسودة محلية دون طلب خادم');
+  await page.getByRole('button',{name:'حفظ المسودة',exact:true}).click();
+  await page.getByText('المسودة محفوظة',{exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('trbhh-v2-ad-draft-v1')).form.title),'مسودة محلية دون طلب خادم');
+  assert.equal(puts,previousPuts);assert.equal(gets,previousGets,'Local mode never contacts the server');
+  getStatus=200;
+  await page.goto('http://127.0.0.1:4203/field-settings/');
+  await page.getByLabel('القسم الرئيسي').selectOption('أخرى');
+  await page.getByLabel('القسم الفرعي').selectOption('كتب');
+  assert.equal(await page.locator('a[href*="/classification"]').count(),0);
+  await page.getByLabel('اسم الحقل الجديد').fill('خيارات تجربة الخادم');
+  await page.getByLabel('نوع الحقل',{exact:true}).selectOption('multi');
+  await page.getByLabel('الخيار 1',{exact:true}).fill('أول');
+  await page.getByLabel('الخيار 2',{exact:true}).fill('ثان');
+  await page.getByRole('button',{name:'إضافة الحقل',exact:true}).click();
+  holdKey='field-settings-v1';
+  await page.getByRole('button',{name:'حفظ إعدادات الحقول',exact:true}).click();
+  await waitForHeldWrite();
+  assert.equal(await page.getByLabel('اسم خيارات تجربة الخادم',{exact:true}).isDisabled(),true);
+  assert.equal(await page.getByText('حُفظت إعدادات الحقول لحسابك على خادم التجربة.',{exact:true}).count(),0);
+  release();release=undefined;
+  await page.getByText('حُفظت إعدادات الحقول لحسابك على خادم التجربة.',{exact:true}).waitFor();
+  await page.reload();
+  await page.getByLabel('القسم الرئيسي').selectOption('أخرى');
+  await page.getByLabel('القسم الفرعي').selectOption('كتب');
+  assert.equal(await page.getByLabel('اسم خيارات تجربة الخادم',{exact:true}).inputValue(),'خيارات تجربة الخادم');
+  await page.getByLabel('اسم خيارات تجربة الخادم',{exact:true}).fill('تعديل ينتظر إعادة المحاولة');
+  failNext=503;await page.getByRole('button',{name:'حفظ إعدادات الحقول',exact:true}).click();
+  await page.locator('.preview-local-server-error').waitFor();
+  assert.equal(await page.getByLabel('اسم خيارات تجربة الخادم',{exact:true}).inputValue(),'تعديل ينتظر إعادة المحاولة');
+  assert.equal(values['field-settings-v1']['أخرى/كتب'].fields[values['field-settings-v1']['أخرى/كتب'].added[0].id].label,undefined);
+  await page.goto('http://127.0.0.1:4203/ads/new/');
+  await page.getByLabel('القسم الرئيسي').selectOption('أخرى');
+  await page.getByLabel('التصنيف الفرعي').selectOption('كتب');
+  await page.getByRole('group',{name:'خيارات تجربة الخادم',exact:true}).waitFor();
+  // Replace the provider while the real publish handler awaits its first write.
+  values['ad-draft-v1']={version:1,form,step:0,editingId:null,savedAt:1};
+  await page.reload(); await title.waitFor();
+  holdKey='ad-draft-v1';
+  const beforeReplacementPuts=puts;
+  await page.getByRole('button',{name:'نشر تجريبي',exact:true}).click();
+  await waitForHeldWrite();
+  const beforeReplacementGets=gets;
+  await page.evaluate(()=>window.remountPreview());
+  for(let i=0;gets===beforeReplacementGets&&i<500;i++)await new Promise(resolve=>setTimeout(resolve,10));
+  assert.ok(gets>beforeReplacementGets,'Replacement provider hydrated');
+  await title.waitFor();
+  release(); release=undefined;
+  await page.waitForTimeout(500);
+  assert.equal(puts,beforeReplacementPuts+1,'Disposed publish must not save ads or clear the replacement draft');
+  assert.equal(await page.locator('.seller-complete').count(),0);
+  assert.deepEqual(errors,[]);
+  console.log('PASS sandbox hydration, no local fallback/autosave, awaited save/publish/status, reload persistence, 401 login, 409 conflict, failure retains input, server field controls and local mode');
+} finally {await browser?.close();await server.close();}

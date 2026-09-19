@@ -1627,6 +1627,15 @@ model site_settings {
   v String? @db.Text
 }
 
+// Used only by PREVIEW_SANDBOX; never populated by the normal application.
+model preview_states {
+  owner_id Int
+  key String @db.VarChar(64)
+  value String @db.LongText
+  revision Int @default(0)
+  @@id([owner_id, key])
+}
+
 model banned_words {
   id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
   word       String    @db.VarChar(100)

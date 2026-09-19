@@ -1,4 +1,11 @@
 import { PrismaClient } from '@prisma/client';
+import { assertSandboxDatabase, isPreviewSandbox } from './preview-sandbox';
+
+// Validate before constructing any client, including imports before instrumentation.
+if (isPreviewSandbox()) {
+  assertSandboxDatabase(process.env.DATABASE_URL || '');
+  if (process.env.PREVIEW_READ_ONLY === 'true') throw new Error('Conflicting preview modes');
+}
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 

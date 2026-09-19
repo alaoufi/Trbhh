@@ -251,7 +251,7 @@ export default async function GuidePage() {
       title="دليل المستخدم"
       subtitle="للزوّار والأعضاء فقط: كل ما تحتاجه لتنشر وتبيع وتتواصل — بالهدف والخطوات."
       fromColor="#3287da" toColor="#1b4f8a"
-      sections={process.env.PREVIEW_READ_ONLY === 'true' ? [previewGuideSection, ...SECTIONS] : SECTIONS}
+      sections={process.env.PREVIEW_READ_ONLY === 'true' || process.env.PREVIEW_SANDBOX === 'true' ? [previewGuideSection, ...SECTIONS] : SECTIONS}
     >
       {/* بدء سريع */}
       <section className="card-3d overflow-hidden rounded-2xl">

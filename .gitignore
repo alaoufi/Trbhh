@@ -44,3 +44,6 @@ next-env.d.ts
 !/storage/uploads/.gitkeep
 scratchpad/
 .worktrees/
+
+# Downloaded public snapshot photos belong in the private deployment bundle only.
+/public/snapshot-media/

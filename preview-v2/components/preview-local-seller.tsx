@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Armchair, BadgeCheck, BriefcaseBusiness, Buildin
 const money = (amount: number) => new Intl.NumberFormat('en-US').format(amount);
 import { RegionCityPicker } from './region-city-picker';
 import { citiesForRegion, inferRegion } from '../lib/saudi-locations';
-import { notify, readLocal, writeLocal } from '../lib/preview';
+import { notify, readLocal, writeLocal, persistLocal, capturePreviewStorage, type PreviewStorageMode } from '../lib/preview';
 import { Modal } from './preview-local-modal';
 import {resolveAd,readAssignments} from './preview-local-classification';
 import {assign,validTarget} from './preview-local-classification';
@@ -103,10 +103,13 @@ function AdPreview({ ad, demo = false }: { ad: AdForm; demo?: boolean }) {
 }
 
 const EMPTY_ADS: SellerAd[] = [];
-type LocalSellerProps = { seedAds?: SellerAd[]; demo?: boolean };
+type LocalSellerProps = { seedAds?: SellerAd[]; demo?: boolean; storageMode?: PreviewStorageMode };
+const saveFailure = (error: unknown) => error instanceof Error ? error.message : 'تعذر تأكيد الحفظ. احتفظ بهذه الصفحة وأعد المحاولة.';
 
-export function NewAdPage({ seedAds = EMPTY_ADS, demo = false }: LocalSellerProps = {}) {
+export function NewAdPage({ seedAds = EMPTY_ADS, demo = false, storageMode = 'local' }: LocalSellerProps = {}) {
   const [form, setForm] = useState<AdForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [submittedErrors, setErrors] = useState<Errors>({});
   const [hydrated, setHydrated] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -143,7 +146,7 @@ export function NewAdPage({ seedAds = EMPTY_ADS, demo = false }: LocalSellerProp
   }, []);
 
   useEffect(() => {
-    if (!hydrated || complete || !hasContent) { latestDraft.current = null; return; }
+    if (storageMode === 'server' || !hydrated || complete || !hasContent) { latestDraft.current = null; return; }
     const snapshot: AdDraft = { version: 1, form, step: 0, editingId, savedAt: Date.now() };
     latestDraft.current = snapshot;
     const timer = window.setTimeout(() => {
@@ -151,33 +154,34 @@ export function NewAdPage({ seedAds = EMPTY_ADS, demo = false }: LocalSellerProp
       setSaveStatus(getDraft()?.savedAt === snapshot.savedAt ? 'saved' : 'failed');
     }, 550);
     return () => window.clearTimeout(timer);
-  }, [form, editingId, hydrated, complete, hasContent]);
+  }, [form, editingId, hydrated, complete, hasContent, storageMode]);
 
   useEffect(() => {
+    if (storageMode === 'server') return;
     const flushDraft = () => { if (latestDraft.current) writeLocal(AD_DRAFT_KEY, latestDraft.current); };
     window.addEventListener('pagehide', flushDraft);
     return () => { window.removeEventListener('pagehide', flushDraft); flushDraft(); };
-  }, []);
+  }, [storageMode]);
 
   function field<K extends keyof AdForm>(key: K, value: AdForm[K]) {
     setForm(current => ({ ...current, [key]: value }));
     setErrors(current => ({ ...current, [key]: undefined }));
-    setSaveStatus('saving');
+    setSaveStatus(storageMode === 'server' ? 'idle' : 'saving');
     setPublishError('');
   }
   function chooseCategory(category: string) {
     setForm(current => changeClassification(current, category));
     setErrors({});
-    setSaveStatus('saving');
+    setSaveStatus(storageMode === 'server' ? 'idle' : 'saving');
   }
   function chooseSubcategory(subcategory: string) {
     setForm(current => changeClassification(current, current.category, subcategory));
-    setErrors({}); setSaveStatus('saving'); setPublishError('');
+    setErrors({}); setSaveStatus(storageMode === 'server' ? 'idle' : 'saving'); setPublishError('');
   }
   function detail(id: string, value: string | string[]) {
     setForm(current => ({ ...current, details: updateDetail(profile, current.details, id, value) }));
     setErrors(current => ({ ...current, [`detail.${id}`]: undefined }));
-    setSaveStatus('saving'); setPublishError('');
+    setSaveStatus(storageMode === 'server' ? 'idle' : 'saving'); setPublishError('');
   }
   function validate(targetStep: number): Errors {
     const result: Errors = {};
@@ -197,8 +201,18 @@ export function NewAdPage({ seedAds = EMPTY_ADS, demo = false }: LocalSellerProp
     }
     return result;
   }
-  function saveNow() {
+  async function saveNow() {
+    if (savingRef.current) return;
     const snapshot: AdDraft = { version: 1, form, step: 0, editingId, savedAt: Date.now() };
+    if (storageMode === 'server') {
+      savingRef.current = true; setSaving(true); setSaveStatus('saving'); setPublishError('');
+      try {
+        await persistLocal(AD_DRAFT_KEY, snapshot, storageMode);
+        setSaveStatus('saved'); notify('حُفظت المسودة على خادم التجربة.');
+      } catch (error) { setSaveStatus('failed'); setPublishError(saveFailure(error)); }
+      finally { savingRef.current = false; setSaving(false); }
+      return;
+    }
     writeLocal(AD_DRAFT_KEY, snapshot);
     const success = getDraft()?.savedAt === snapshot.savedAt;
     setSaveStatus(success ? 'saved' : 'failed');
@@ -227,11 +241,12 @@ export function NewAdPage({ seedAds = EMPTY_ADS, demo = false }: LocalSellerProp
         reader.readAsDataURL(file);
       })));
       setForm(current => ({ ...current, images: [...current.images, ...images].slice(0, 3) }));
-      setSaveStatus('saving');
+      setSaveStatus(storageMode === 'server' ? 'idle' : 'saving');
     } catch { setUploadError('تعذرت قراءة إحدى الصور. تأكد من صلاحيتها وجرّب مرة أخرى.'); }
     finally { setUploading(false); if (photoInput.current) photoInput.current.value = ''; }
   }
-  function publish() {
+  async function publish() {
+    if (savingRef.current) return;
     const found = { ...validate(0), ...validate(1) };
     if (Object.keys(found).length) {
       setErrors(found);
@@ -246,6 +261,29 @@ export function NewAdPage({ seedAds = EMPTY_ADS, demo = false }: LocalSellerProp
     const existing = ads.find(ad => ad.id === editingId);
     const savedAd: SellerAd = { ...form, classificationRevision: crypto.randomUUID(), details: preserveStoredDetails(form.details), price: showPrice ? normalizeNumber(form.price) : '', condition: showCondition ? form.condition : '', title: form.title.trim(), description: form.description.trim(), id: existing?.id || `local-${Date.now()}`, status: existing?.status || 'active', createdAt: existing?.createdAt || new Date().toISOString() };
     const updated = existing ? ads.map(ad => ad.id === existing.id ? savedAd : ad) : [savedAd, ...ads];
+    if (storageMode === 'server') {
+      savingRef.current = true; setSaving(true); setPublishError('');
+      let adPersisted = false;
+      try {
+        const operation = capturePreviewStorage(storageMode);
+        // Preserve a resumable draft before saving the ad. If draft cleanup later
+        // fails, its editingId still points at this ad instead of creating a duplicate.
+        await operation.write(AD_DRAFT_KEY, {version:1, form, step:0, editingId:savedAd.id, savedAt:Date.now()});
+        setEditingId(savedAd.id); setSaveStatus('saved');
+        await operation.write(SELLER_ADS_KEY, updated);
+        adPersisted = true;
+        await operation.write(AD_DRAFT_KEY, null);
+      } catch (error) {
+        setPublishError(adPersisted ? 'حُفظ الإعلان، لكن تعذر حذف مسودته: ' + saveFailure(error) : saveFailure(error));
+      } finally {
+        if (adPersisted) {
+          latestDraft.current = null; setComplete(true); setRestored(false);
+          window.dispatchEvent(new Event('trbhh-seller-updated'));
+        }
+        savingRef.current = false; setSaving(false);
+      }
+      return;
+    }
     // Free the duplicate image payload while moving a draft into saved ads.
     writeLocal(AD_DRAFT_KEY, null);
     writeLocal(SELLER_ADS_KEY, updated);
@@ -262,11 +300,18 @@ export function NewAdPage({ seedAds = EMPTY_ADS, demo = false }: LocalSellerProp
     setComplete(true); setRestored(false);
     window.dispatchEvent(new Event('trbhh-seller-updated'));
   }
-  function resetDraft() {
-    latestDraft.current = null;
-    writeLocal(AD_DRAFT_KEY, null); setForm(emptyForm); setEditingId(null); setRestored(false); setErrors({}); setSaveStatus('idle'); setDiscardOpen(false); setUploadError('');
+  async function resetDraft() {
+    if (savingRef.current) return false;
+    if (storageMode === 'server') {
+      savingRef.current = true; setSaving(true);
+      try { await persistLocal(AD_DRAFT_KEY, null, storageMode); }
+      catch (error) { setPublishError(saveFailure(error)); return false; }
+      finally { savingRef.current = false; setSaving(false); }
+    } else writeLocal(AD_DRAFT_KEY, null);
+    latestDraft.current = null; setPublishError(''); setForm(emptyForm); setEditingId(null); setRestored(false); setErrors({}); setSaveStatus('idle'); setDiscardOpen(false); setUploadError('');
     window.history.replaceState(null, '', '/ads/new/');
     notify('بدأت مسودة جديدة.');
+    return true;
   }
 
   // Only retain attempted errors that still apply to the current intent and visible fields.
@@ -276,9 +321,9 @@ export function NewAdPage({ seedAds = EMPTY_ADS, demo = false }: LocalSellerProp
     .map(key => [key, currentValidation[key]]));
   const error = (name: keyof AdForm) => errors[name] ? <span className="seller-field-error" id={`error-${name}`} role="alert">{errors[name]}</span> : null;
 
-  if (complete) return <div className="container seller-page seller-complete"><div className="seller-success-icon"><CheckCircle2 size={44} /></div><span className="seller-eyebrow">تجربة مكتملة</span><h1>{editingId ? 'حُفظت تعديلات إعلانك' : 'إعلانك التجريبي جاهز'}</h1><p>أُضيف إلى لوحة البائع في هذا المتصفح. يمكنك معاينته وتعديله وتجربة إدارة حالته.</p><div className="seller-demo-note"><ShieldCheck size={20} /><span>هذه معاينة محلية؛ لم يُنشر الإعلان للعموم.</span></div><div className="seller-inline seller-complete-actions"><Link className="button primary" href="/seller/">الذهاب إلى لوحة البائع<ArrowLeft size={18} /></Link><button type="button" className="button secondary" onClick={() => { resetDraft(); setComplete(false); }}>إضافة إعلان آخر</button></div></div>;
+  if (complete) return <div className="container seller-page seller-complete"><div className="seller-success-icon"><CheckCircle2 size={44} /></div><span className="seller-eyebrow">تجربة مكتملة</span><h1>{editingId ? 'حُفظت تعديلات إعلانك' : 'إعلانك التجريبي جاهز'}</h1><p>{storageMode === 'server' ? 'حُفظ إعلانك في حسابك على خادم التجربة. يمكنك معاينته وتعديله.' : 'أُضيف إلى لوحة البائع في هذا المتصفح. يمكنك معاينته وتعديله وتجربة إدارة حالته.'}</p><div className="seller-demo-note"><ShieldCheck size={20} /><span>{storageMode === 'server' ? 'هذه تجربة معزولة؛ لم يُنشر الإعلان في الموقع الفعلي.' : 'هذه معاينة محلية؛ لم يُنشر الإعلان للعموم.'}</span></div>{publishError && <p role="alert" className="seller-inline-error">{publishError}</p>}<div className="seller-inline seller-complete-actions"><Link className="button primary" href="/seller/">الذهاب إلى لوحة البائع<ArrowLeft size={18} /></Link><button type="button" className="button secondary" disabled={saving} onClick={async () => { if (await resetDraft()) setComplete(false); }}>إضافة إعلان آخر</button></div></div>;
 
-  return <div className="container seller-page seller-create-page">
+  return <div className="container seller-page seller-create-page" aria-busy={saving}><fieldset disabled={saving} style={{display:'contents'}}>
     <div className="seller-breadcrumb"><Link href="/">الرئيسية</Link><ChevronLeft size={14} /><Link href="/seller/">لوحة البائع</Link><ChevronLeft size={14} /><span>{editingId ? 'تعديل إعلان' : 'إضافة إعلان'}</span></div>
     <div className="seller-page-head"><div><span className="seller-eyebrow">ابدأ حكاية بيع جديدة</span><h1>{editingId ? 'عدّل إعلانك' : 'إعلانك يبدأ من هنا'}</h1><p>كل بيانات إعلانك في صفحة واحدة. اختر الفرع ثم أكمل الأقسام بالترتيب الذي يناسبك.</p></div><Link href="/seller/" className="seller-text-link">لوحة البائع<ArrowLeft size={18} /></Link></div>
     {restored && <div className="seller-restored"><div><FilePenLine size={20} /><span>استعدنا مسودتك السابقة. أكمل من حيث توقفت.</span></div><button type="button" onClick={() => setDiscardOpen(true)}>بدء إعلان جديد</button></div>}
@@ -294,23 +339,26 @@ export function NewAdPage({ seedAds = EMPTY_ADS, demo = false }: LocalSellerProp
             <div className="category-context"><Link href="/field-settings/">إعدادات الحقول التجريبية</Link><strong>{form.category} / {form.subcategory}</strong><button type="button" className="category-change-button" onClick={() => jumpToSection('classification')}>تغيير الفرع</button></div>
             <label className="seller-field"><span>عنوان الإعلان <span className="seller-required">*</span></span><input value={form.title} maxLength={90} placeholder={profile.example} onChange={event => field('title', event.target.value)} aria-invalid={Boolean(errors.title)} /><small>{form.title.length}/90</small>{error('title')}</label>
             <label className="seller-field"><span>وصف الإعلان <span className="seller-required">*</span></span><textarea value={form.description} maxLength={1200} rows={5} placeholder={profile.pricing === 'salary' ? 'وضّح المسؤوليات ومتطلبات الوظيفة وطريقة التقديم، دون بيانات شخصية حساسة.' : 'أضف التفاصيل التي لم تغطّها الحقول، وأي عيوب أو شروط مهمة.'} onChange={event => field('description', event.target.value)} aria-invalid={Boolean(errors.description)} /><small>لا تضع أرقام الهوية أو مستندات شخصية هنا · {form.description.length}/1200</small>{error('description')}</label>
-            <RegionCityPicker region={form.region || ''} city={form.city} regionError={errors.region} cityError={errors.city} onChange={(region, city) => { setForm(current => ({...current, region, city})); setErrors(current => ({...current, region: undefined, city: undefined})); setSaveStatus('saving'); setPublishError(''); }} />
+            <RegionCityPicker region={form.region || ''} city={form.city} regionError={errors.region} cityError={errors.city} onChange={(region, city) => { setForm(current => ({...current, region, city})); setErrors(current => ({...current, region: undefined, city: undefined})); setSaveStatus(storageMode === 'server' ? 'idle' : 'saving'); setPublishError(''); }} />
             {showCondition && <fieldset className="seller-fieldset"><legend>{form.intent === 'wanted' ? 'الحالة المفضّلة (اختياري)' : 'حالة المعروض *'}</legend><div className="seller-condition-options">{['جديد', 'مستعمل', ...(form.intent === 'wanted' ? ['أي حالة'] : [])].map(condition => <button type="button" key={condition} className={form.condition === condition ? 'selected' : ''} aria-pressed={form.condition === condition} onClick={() => field('condition', condition)}>{form.condition === condition && <Check size={16} />}{condition}</button>)}</div>{error('condition')}</fieldset>}
             <CategoryDetails profile={profile} values={form.details} errors={errors} intent={form.intent} onChange={detail} />
             {showPrice && <label className="seller-field"><span>{form.intent === 'wanted' ? 'الميزانية' : form.details.purpose === 'للإيجار' ? 'قيمة الإيجار للدورية المختارة' : profile.pricing === 'property' ? 'سعر العقار الإجمالي' : profile.pricing === 'service' ? 'تكلفة الخدمة التقديرية' : profile.pricing === 'supplier' ? 'سعر وحدة البيع' : 'السعر'} {optionalPrice ? <small>(اختياري)</small> : <span className="seller-required">*</span>}</span><span className="seller-money-input"><input type="text" maxLength={16} inputMode="decimal" value={form.price} placeholder={optionalPrice ? 'حسب الاتفاق' : 'أدخل المبلغ'} onChange={event => field('price', event.target.value)} aria-invalid={Boolean(errors.price)} /><span>ر.س</span></span>{error('price')}</label>}
           </div>}
         </section>
-        <section id="ad-photos" className="seller-form-panel ad-page-section" tabIndex={-1} aria-labelledby="ad-photos-heading" aria-busy={uploading}><SectionHeading index={2} /><div className="seller-fields"><input ref={photoInput} id="ad-photo-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={event => { void uploadPhotos(event.target.files); }} /><button type="button" className="seller-upload" disabled={uploading || form.images.length >= 3} onClick={() => photoInput.current?.click()}><span><ImagePlus size={31} /></span><strong>{uploading ? 'جارٍ قراءة الصور…' : form.images.length >= 3 ? 'أضفت الحد الأقصى من الصور' : 'اختر صور إعلانك'}</strong><small>JPG، PNG، WebP · حتى 1 ميجابايت للصورة</small><b>{form.images.length} / 3 صور</b></button>{uploadError && <div className="seller-inline-error" role="alert">{uploadError}</div>}{Boolean(form.images.length) && <div className="seller-upload-grid">{form.images.map((src, index) => <div key={`${index}-${src.slice(-20)}`}><img src={src} alt={`صورة الإعلان ${index + 1}`} /><span>{index === 0 ? 'صورة الغلاف' : `صورة ${index + 1}`}</span><button type="button" disabled={uploading} title="حذف الصورة" aria-label={`حذف الصورة ${index + 1}`} onClick={() => field('images', form.images.filter((_, imageIndex) => imageIndex !== index))}><X size={17} /></button></div>)}</div>}<div className="seller-photo-tip"><Camera size={21} /><p>صوّر المنتج بإضاءة طبيعية ومن أكثر من زاوية، وأظهر حالته بوضوح. صورك تبقى في هذا المتصفح ضمن التجربة.</p></div></div></section>
-        <section id="ad-review" className="seller-form-panel ad-page-section" tabIndex={-1} aria-labelledby="ad-review-heading"><SectionHeading index={3} /><div className="seller-review"><AdPreview ad={form} demo={demo} /><div className="seller-review-edits"><button type="button" onClick={() => jumpToSection('classification')}><Pencil size={15} />تعديل القسم</button><button type="button" onClick={() => jumpToSection('details')}><Pencil size={15} />تعديل التفاصيل</button><button type="button" onClick={() => jumpToSection('photos')}><Pencil size={15} />تعديل الصور</button></div><div className="seller-demo-note"><ShieldCheck size={21} /><span>بالضغط على «{editingId ? 'حفظ التعديلات التجريبية' : 'نشر تجريبي'}»، سيُحفظ الإعلان محليًا في لوحة البائع. لا توجد عملية نشر عامة أو دفع.</span></div>{publishError && <div className="seller-inline-error" role="alert">{publishError}</div>}</div>
-        <div className="seller-form-footer"><button type="button" className="button secondary" onClick={saveNow} disabled={uploading}><FilePenLine size={17} />حفظ المسودة</button><span className="seller-save-state" aria-live="polite">{saveStatus === 'saved' ? <><CheckCircle2 size={15} />المسودة محفوظة</> : saveStatus === 'saving' ? 'جارٍ حفظ المسودة…' : saveStatus === 'failed' ? <button type="button" onClick={saveNow}>تعذر الحفظ · إعادة المحاولة</button> : 'تُحفظ مسودتك تلقائيًا'}</span><button type="button" className="button primary" disabled={uploading} onClick={publish}>{editingId ? 'حفظ التعديلات التجريبية' : 'نشر تجريبي'}<Check size={18} /></button></div>
+        <section id="ad-photos" className="seller-form-panel ad-page-section" tabIndex={-1} aria-labelledby="ad-photos-heading" aria-busy={uploading}><SectionHeading index={2} /><div className="seller-fields"><input ref={photoInput} id="ad-photo-input" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={event => { void uploadPhotos(event.target.files); }} /><button type="button" className="seller-upload" disabled={uploading || form.images.length >= 3} onClick={() => photoInput.current?.click()}><span><ImagePlus size={31} /></span><strong>{uploading ? 'جارٍ قراءة الصور…' : form.images.length >= 3 ? 'أضفت الحد الأقصى من الصور' : 'اختر صور إعلانك'}</strong><small>JPG، PNG، WebP · حتى 1 ميجابايت للصورة</small><b>{form.images.length} / 3 صور</b></button>{uploadError && <div className="seller-inline-error" role="alert">{uploadError}</div>}{Boolean(form.images.length) && <div className="seller-upload-grid">{form.images.map((src, index) => <div key={`${index}-${src.slice(-20)}`}><img src={src} alt={`صورة الإعلان ${index + 1}`} /><span>{index === 0 ? 'صورة الغلاف' : `صورة ${index + 1}`}</span><button type="button" disabled={uploading || saving} title="حذف الصورة" aria-label={`حذف الصورة ${index + 1}`} onClick={() => field('images', form.images.filter((_, imageIndex) => imageIndex !== index))}><X size={17} /></button></div>)}</div>}<div className="seller-photo-tip"><Camera size={21} /><p>صوّر المنتج بإضاءة طبيعية ومن أكثر من زاوية، وأظهر حالته بوضوح. {storageMode === 'server' ? 'عند حفظ المسودة أو الإعلان، تُحفظ صورك في حسابك على خادم التجربة المعزول.' : 'صورك تبقى في هذا المتصفح ضمن التجربة.'}</p></div></div></section>
+        <section id="ad-review" className="seller-form-panel ad-page-section" tabIndex={-1} aria-labelledby="ad-review-heading"><SectionHeading index={3} /><div className="seller-review"><AdPreview ad={form} demo={demo} /><div className="seller-review-edits"><button type="button" onClick={() => jumpToSection('classification')}><Pencil size={15} />تعديل القسم</button><button type="button" onClick={() => jumpToSection('details')}><Pencil size={15} />تعديل التفاصيل</button><button type="button" onClick={() => jumpToSection('photos')}><Pencil size={15} />تعديل الصور</button></div><div className="seller-demo-note"><ShieldCheck size={21} /><span>بالضغط على «{editingId ? 'حفظ التعديلات التجريبية' : 'نشر تجريبي'}»، {storageMode === 'server' ? 'سيُحفظ الإعلان على خادم التجربة في حسابك.' : 'سيُحفظ الإعلان محليًا في لوحة البائع.'} لا توجد عملية نشر عامة أو دفع.</span></div>{publishError && <div className="seller-inline-error" role="alert">{publishError}</div>}</div>
+        <div className="seller-form-footer"><button type="button" className="button secondary" onClick={saveNow} disabled={uploading || saving}><FilePenLine size={17} />حفظ المسودة</button><span className="seller-save-state" aria-live="polite">{saveStatus === 'saved' ? <><CheckCircle2 size={15} />المسودة محفوظة</> : saveStatus === 'saving' ? 'جارٍ حفظ المسودة…' : saveStatus === 'failed' ? <button type="button" onClick={saveNow}>تعذر الحفظ · إعادة المحاولة</button> : storageMode === 'server' ? 'تغييرات غير محفوظة · اضغط حفظ المسودة' : 'تُحفظ مسودتك تلقائيًا'}</span><button type="button" className="button primary" disabled={uploading || saving} onClick={publish}>{editingId ? 'حفظ التعديلات التجريبية' : 'نشر تجريبي'}<Check size={18} /></button></div>
         </section>
       </>}
-    </div><aside className="seller-form-aside"><div className="seller-help-card"><span className="seller-help-icon"><Sparkles size={24} /></span><span className="seller-eyebrow">إعلان أفضل، فرص أكثر</span><h3>خلّ إعلانك يلفت النظر</h3><ul><li><CheckCircle2 size={18} /><span><strong>عنوان واضح ومختصر</strong>صف المعروض أو الفرصة وأهم ما يميّزها.</span></li><li><CheckCircle2 size={18} /><span><strong>تفاصيل خاصة بالفرع</strong>أكمل المواصفات المناسبة للمجال.</span></li><li><CheckCircle2 size={18} /><span><strong>صور حقيقية وواضحة</strong>أضف صوراً مناسبة إن كان نوع الإعلان يحتاجها.</span></li><li><CheckCircle2 size={18} /><span><strong>{profile?.pricing === 'salary' ? 'راتب ودورية واضحان' : 'سعر مناسب وواضح'}</strong>يساعد المهتم على اتخاذ قراره.</span></li></ul></div><div className="seller-privacy-card"><ShieldCheck size={23} /><h3>تعامل بوعي</h3><p>عاين المنتج وتحقق من تفاصيله قبل الاتفاق. لا تشارك رموز التحقق أو معلوماتك البنكية.</p><Link href="/#trust">نصائح البيع والشراء الآمن<ArrowLeft size={16} /></Link></div><div className="seller-local-note"><Clock3 size={17} /><p>تحتاج وقتًا أكثر؟ مسودتك تُحفظ في هذا المتصفح لتعود إليها متى أردت.</p></div></aside></div>
+    </div><aside className="seller-form-aside"><div className="seller-help-card"><span className="seller-help-icon"><Sparkles size={24} /></span><span className="seller-eyebrow">إعلان أفضل، فرص أكثر</span><h3>خلّ إعلانك يلفت النظر</h3><ul><li><CheckCircle2 size={18} /><span><strong>عنوان واضح ومختصر</strong>صف المعروض أو الفرصة وأهم ما يميّزها.</span></li><li><CheckCircle2 size={18} /><span><strong>تفاصيل خاصة بالفرع</strong>أكمل المواصفات المناسبة للمجال.</span></li><li><CheckCircle2 size={18} /><span><strong>صور حقيقية وواضحة</strong>أضف صوراً مناسبة إن كان نوع الإعلان يحتاجها.</span></li><li><CheckCircle2 size={18} /><span><strong>{profile?.pricing === 'salary' ? 'راتب ودورية واضحان' : 'سعر مناسب وواضح'}</strong>يساعد المهتم على اتخاذ قراره.</span></li></ul></div><div className="seller-privacy-card"><ShieldCheck size={23} /><h3>تعامل بوعي</h3><p>عاين المنتج وتحقق من تفاصيله قبل الاتفاق. لا تشارك رموز التحقق أو معلوماتك البنكية.</p><Link href="/#trust">نصائح البيع والشراء الآمن<ArrowLeft size={16} /></Link></div><div className="seller-local-note"><Clock3 size={17} /><p>{storageMode === 'server' ? 'اضغط حفظ المسودة قبل مغادرة الصفحة لتعود إليها لاحقاً.' : 'تحتاج وقتًا أكثر؟ مسودتك تُحفظ في هذا المتصفح لتعود إليها متى أردت.'}</p></div></aside></div>
     <Modal open={discardOpen} onClose={() => setDiscardOpen(false)} title="بدء إعلان جديد؟"><p>سيتم استبدال المسودة الحالية بمسودة فارغة. الإعلان السابق المحفوظ في لوحة البائع لن يتأثر.</p><div className="seller-modal-actions"><button className="button secondary" type="button" onClick={() => setDiscardOpen(false)}>العودة للمسودة</button><button className="button primary" type="button" onClick={resetDraft}>بدء إعلان جديد</button></div></Modal>
-  </div>;
+  </fieldset></div>;
 }
 
-export function SellerDashboard({ seedAds = EMPTY_ADS, demo = false }: LocalSellerProps = {}) {
+export function SellerDashboard({ seedAds = EMPTY_ADS, demo = false, storageMode = 'local' }: LocalSellerProps = {}) {
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [saveError, setSaveError] = useState('');
   const [tab, setTab] = useState<'overview' | 'ads' | 'drafts'>(demo ? 'overview' : 'ads');
   const [ads, setAds] = useState<SellerAd[]>(() => seedAds);
   const [draft, setDraft] = useState<AdDraft | null>(null);
@@ -324,30 +372,47 @@ export function SellerDashboard({ seedAds = EMPTY_ADS, demo = false }: LocalSell
   const active = ads.filter(ad => ad.status === 'active').length;
   const completed = ads.filter(ad => ad.status === 'sold').length;
   const filtered = ads.filter(ad => (filter === 'all' || ad.status === filter) && `${ad.title} ${ad.category} ${ad.city}`.includes(query.trim()));
-  function updateStatus(ad: SellerAd, status: AdStatus) {
+  async function updateStatus(ad: SellerAd, status: AdStatus) {
+    if (savingRef.current) return;
     const updated = ads.map(item => item.id === ad.id ? { ...item, status } : item);
-    writeLocal(SELLER_ADS_KEY, updated);
+    if (storageMode === 'server') {
+      savingRef.current = true; setSaving(true); setSaveError('');
+      try { await persistLocal(SELLER_ADS_KEY, updated, storageMode); }
+      catch (error) { setSaveError(saveFailure(error)); return; }
+      finally { savingRef.current = false; setSaving(false); }
+    } else writeLocal(SELLER_ADS_KEY, updated);
     const stored = getAds(seedAds).find(item => item.id === ad.id);
     if (stored?.status !== status) { notify('تعذر حفظ التغيير. جرّب مرة أخرى.'); return; }
     setAds(updated);
     notify(status === 'paused' ? 'أوقفت الإعلان في المعاينة. يمكنك إعادة تنشيطه.' : status === 'sold' ? 'وُضع الإعلان ضمن الإعلانات المكتملة.' : 'أُعيد تنشيط الإعلان التجريبي.');
   }
-  function deleteDraft() { writeLocal(AD_DRAFT_KEY, null); if (!getDraft()) { setDraft(null); setDeleteDraftOpen(false); notify('حُذفت المسودة من هذا المتصفح.'); } }
+  async function deleteDraft() {
+    if (savingRef.current) return;
+    if (storageMode === 'server') {
+      savingRef.current = true; setSaving(true); setSaveError('');
+      try { await persistLocal(AD_DRAFT_KEY, null, storageMode); }
+      catch (error) { setSaveError(saveFailure(error)); return; }
+      finally { savingRef.current = false; setSaving(false); }
+    } else writeLocal(AD_DRAFT_KEY, null);
+    if (!getDraft()) { setDraft(null); setDeleteDraftOpen(false); notify(storageMode === 'server' ? 'حُذفت المسودة من خادم التجربة.' : 'حُذفت المسودة من هذا المتصفح.'); }
+  }
   function adRows(items: SellerAd[]) {
     if (!items.length) return <div className="seller-empty-state"><Package size={34} /><h3>لا توجد إعلانات هنا بعد</h3><p>{query || filter !== 'all' ? 'جرّب كلمة بحث أخرى أو اعرض جميع الحالات.' : 'ابدأ بإعلانك الأول، وستجده في هذه المساحة.'}</p>{query || filter !== 'all' ? <button className="button secondary" type="button" onClick={() => { setQuery(''); setFilter('all'); }}>عرض جميع الإعلانات</button> : <Link href="/ads/new/" className="button primary"><Plus size={17} />أضف إعلانًا</Link>}</div>;
-    return <div className="seller-ad-list">{items.map(ad => <article key={ad.id} className="seller-ad-row"><button className="seller-row-picture" type="button" onClick={() => setPreview(ad)} aria-label={`معاينة ${ad.title}`}><AdPicture ad={ad} /></button><div className="seller-row-info"><div className="seller-inline"><span className={`seller-pill ${ad.status}`}><span />{statusLabels[ad.status]}</span><span className="seller-muted seller-row-kind">{ad.intent === 'wanted' ? 'طلب شراء' : ad.category}</span></div><button className="seller-ad-title" type="button" onClick={() => setPreview(ad)}>{ad.title}</button><strong>{priceText(ad)}</strong><span className="seller-inline seller-row-location"><MapPin size={14} />{ad.city}<span>·</span>{ad.id.startsWith('local-') ? 'أُضيف محليًا' : 'إعلان توضيحي'}</span></div><div className="seller-row-actions"><div><Link href={`/ads/new/?edit=${encodeURIComponent(ad.id)}`} className="seller-icon-button" title="تعديل الإعلان" aria-label={`تعديل ${ad.title}`}><Pencil size={17} /></Link><button type="button" className="seller-icon-button" title="معاينة الإعلان" aria-label={`فتح معاينة ${ad.title}`} onClick={() => setPreview(ad)}><Eye size={18} /></button><button type="button" disabled={!hydrated} className="seller-icon-button" title={ad.status === 'active' ? 'إيقاف الإعلان' : 'إعادة التنشيط'} aria-label={`${ad.status === 'active' ? 'إيقاف' : 'إعادة تنشيط'} ${ad.title}`} onClick={() => updateStatus(ad, ad.status === 'active' ? 'paused' : 'active')}>{ad.status === 'active' ? <Pause size={17} /> : <Play size={17} />}</button></div>{demo && ad.status === 'active' ? <button type="button" className="seller-promote-button" onClick={() => setPromotion(ad)}><Sparkles size={15} />تمييز الإعلان</button> : ad.status !== 'active' ? <span className="seller-muted seller-row-status-note">{ad.status === 'sold' ? 'اكتمل هذا الإعلان' : 'يمكنك تفعيله مجددًا'}</span> : null}{ad.status !== 'sold' && <button type="button" disabled={!hydrated} className="seller-complete-ad" onClick={() => updateStatus(ad, 'sold')}>{ad.intent === 'wanted' ? 'تم العثور على المطلوب' : 'تم البيع / اكتمل'}</button>}</div></article>)}</div>;
+    return <div className="seller-ad-list">{items.map(ad => <article key={ad.id} className="seller-ad-row"><button className="seller-row-picture" type="button" onClick={() => setPreview(ad)} aria-label={`معاينة ${ad.title}`}><AdPicture ad={ad} /></button><div className="seller-row-info"><div className="seller-inline"><span className={`seller-pill ${ad.status}`}><span />{statusLabels[ad.status]}</span><span className="seller-muted seller-row-kind">{ad.intent === 'wanted' ? 'طلب شراء' : ad.category}</span></div><button className="seller-ad-title" type="button" onClick={() => setPreview(ad)}>{ad.title}</button><strong>{priceText(ad)}</strong><span className="seller-inline seller-row-location"><MapPin size={14} />{ad.city}<span>·</span>{storageMode === 'server' ? 'إعلان في حساب التجربة' : ad.id.startsWith('local-') ? 'أُضيف محليًا' : 'إعلان توضيحي'}</span></div><div className="seller-row-actions"><div><Link href={`/ads/new/?edit=${encodeURIComponent(ad.id)}`} className="seller-icon-button" title="تعديل الإعلان" aria-label={`تعديل ${ad.title}`}><Pencil size={17} /></Link><button type="button" className="seller-icon-button" title="معاينة الإعلان" aria-label={`فتح معاينة ${ad.title}`} onClick={() => setPreview(ad)}><Eye size={18} /></button><button type="button" disabled={!hydrated || saving} className="seller-icon-button" title={ad.status === 'active' ? 'إيقاف الإعلان' : 'إعادة التنشيط'} aria-label={`${ad.status === 'active' ? 'إيقاف' : 'إعادة تنشيط'} ${ad.title}`} onClick={() => updateStatus(ad, ad.status === 'active' ? 'paused' : 'active')}>{ad.status === 'active' ? <Pause size={17} /> : <Play size={17} />}</button></div>{demo && ad.status === 'active' ? <button type="button" className="seller-promote-button" onClick={() => setPromotion(ad)}><Sparkles size={15} />تمييز الإعلان</button> : ad.status !== 'active' ? <span className="seller-muted seller-row-status-note">{ad.status === 'sold' ? 'اكتمل هذا الإعلان' : 'يمكنك تفعيله مجددًا'}</span> : null}{ad.status !== 'sold' && <button type="button" disabled={!hydrated || saving} className="seller-complete-ad" onClick={() => updateStatus(ad, 'sold')}>{ad.intent === 'wanted' ? 'تم العثور على المطلوب' : 'تم البيع / اكتمل'}</button>}</div></article>)}</div>;
   }
-  return <div className="container seller-page seller-dashboard">
+  return <div className="container seller-page seller-dashboard" aria-busy={saving}>
+    {saveError && <p role="alert" className="seller-inline-error">{saveError}</p>}
+    {saving && <p role="status">جارٍ الحفظ على خادم التجربة…</p>}
     <div className="seller-breadcrumb"><Link href="/">الرئيسية</Link><ChevronLeft size={14} /><span>لوحة البائع</span></div>
     <div className="seller-dashboard-layout"><aside className="seller-sidebar">{demo && <div className="seller-shop-profile"><span className="seller-avatar">د</span><h2>دار الأثاث<BadgeCheck size={19} /></h2><p>حساب بائع تجريبي</p><Link href="/store/dar/">معاينة المتجر<ArrowLeft size={15} /></Link></div>}<nav aria-label="أقسام لوحة البائع">{demo && <button type="button" className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}><LayoutDashboard size={19} />نظرة عامة</button>}<button type="button" className={tab === 'ads' ? 'active' : ''} onClick={() => setTab('ads')}><ClipboardList size={19} />إعلاناتي<span>{ads.length}</span></button><button type="button" className={tab === 'drafts' ? 'active' : ''} onClick={() => setTab('drafts')}><FilePenLine size={19} />المسودات<span>{draft ? 1 : 0}</span></button>{demo && <><Link href="/messages/"><MessageCircle size={19} />الرسائل</Link><Link href="/account/credit/"><Wallet size={19} />الرصيد</Link><Link href="/store/dar/"><Store size={19} />متجري</Link></>}</nav><div className="seller-sidebar-help"><CircleHelp size={23} /><strong>كل بداية تستحق الدعم</strong><p>تعرّف على خطوات البيع وأهم النصائح.</p><Link href="/#trust">نصائح البيع الآمن<ArrowLeft size={15} /></Link></div></aside>
-      <div className="seller-dashboard-main"><div className="seller-page-head"><div><span className="seller-eyebrow">مساحة عملك في تربح</span><h1>{tab === 'overview' ? 'أهلًا بك، دار الأثاث' : tab === 'ads' ? 'إعلاناتك، في مكان واحد' : 'أكملها على مهلك'}</h1><p>{tab === 'overview' ? 'تابع إعلاناتك، وابقَ قريبًا من فرصتك القادمة.' : tab === 'ads' ? 'راجع إعلاناتك وعدّل تفاصيلها وتحكّم في حالتها.' : 'نحفظ آخر مسودة في هذا المتصفح لتعود إليها.'}</p></div><Link href="/ads/new/" className="button primary"><Plus size={19} />أضف إعلانًا</Link></div>
+      <div className="seller-dashboard-main"><div className="seller-page-head"><div><span className="seller-eyebrow">مساحة عملك في تربح</span><h1>{tab === 'overview' ? 'أهلًا بك، دار الأثاث' : tab === 'ads' ? 'إعلاناتك، في مكان واحد' : 'أكملها على مهلك'}</h1><p>{tab === 'overview' ? 'تابع إعلاناتك، وابقَ قريبًا من فرصتك القادمة.' : tab === 'ads' ? 'راجع إعلاناتك وعدّل تفاصيلها وتحكّم في حالتها.' : storageMode === 'server' ? 'آخر مسودة محفوظة في حسابك على خادم التجربة.' : 'نحفظ آخر مسودة في هذا المتصفح لتعود إليها.'}</p></div><Link href="/ads/new/" className="button primary"><Plus size={19} />أضف إعلانًا</Link></div>
         {demo && tab === 'overview' && <><div className="seller-metrics"><div><span className="seller-metric-icon"><ClipboardList size={21} /></span><span className="seller-muted">إعلانات نشطة</span><strong>{active}</strong><small>داخل المعاينة المحلية</small></div><div><span className="seller-metric-icon"><Eye size={21} /></span><span className="seller-muted">مشاهدات الإعلانات</span><strong>1,248</strong><small><TrendingUp size={13} />مؤشر توضيحي · ليس قياسًا فعليًا</small></div><div><span className="seller-metric-icon"><MessageCircle size={21} /></span><span className="seller-muted">محادثات جديدة</span><strong>12</strong><small>بيانات توضيحية للتصميم</small></div><div><span className="seller-metric-icon"><CheckCircle2 size={21} /></span><span className="seller-muted">إعلانات مكتملة</span><strong>{completed}</strong><small>حسب تغييراتك المحلية</small></div></div><div className="seller-dashboard-banner"><div><span className="seller-banner-eyebrow"><Sparkles size={17} />فرصة لتظهر بصورة أفضل</span><h2>إعلان مرتب. انطباع يدوم.</h2><p>حدّث صورك وتفاصيلك لتجعل قرار المشتري أسهل.</p><button type="button" onClick={() => setTab('ads')}>راجع إعلاناتك<ArrowLeft size={16} /></button></div><div className="seller-banner-art" aria-hidden="true"><span><Armchair size={66} strokeWidth={1.2} /></span><i><Check size={18} /></i><b><Sparkles size={21} /></b></div></div><div className="seller-content-heading"><div><h2>آخر إعلاناتك</h2><p>نظرة سريعة على ما تعرضه الآن.</p></div><button type="button" onClick={() => setTab('ads')}>عرض الكل<ArrowLeft size={16} /></button></div><section className="seller-list-card">{adRows(ads.slice(0, 3))}</section><div className="seller-bottom-cards"><Link href="/messages/"><span><MessageCircle size={23} /></span><div><h3>كل اتفاق يبدأ بمحادثة</h3><p>اطّلع على صندوق الرسائل التجريبي.</p></div><ArrowLeft size={19} /></Link><Link href="/store/dar/"><span><Store size={23} /></span><div><h3>متجرك، واجهتك الخاصة</h3><p>شاهد كيف تظهر إعلاناتك للزوار.</p></div><ArrowLeft size={19} /></Link></div></>}
         {tab === 'ads' && <section className="seller-list-card"><div className="seller-list-toolbar"><div className="seller-status-filters" aria-label="تصفية حالات الإعلان">{(['all', 'active', 'paused', 'sold'] as const).map(value => <button type="button" key={value} className={filter === value ? 'active' : ''} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? 'الكل' : statusLabels[value]}<span>{value === 'all' ? ads.length : ads.filter(ad => ad.status === value).length}</span></button>)}</div><label className="seller-ad-search"><Search size={18} /><input aria-label="البحث في إعلاناتي" value={query} placeholder="ابحث في إعلاناتك…" onChange={event => setQuery(event.target.value)} />{query && <button type="button" aria-label="مسح البحث" onClick={() => setQuery('')}><X size={15} /></button>}</label></div>{adRows(filtered)}</section>}
         {tab === 'drafts' && <section className="seller-list-card">{draft ? <div className="seller-draft-card"><AdPicture ad={draft.form} className="seller-draft-cover" /><div><span className="seller-pill gold"><FilePenLine size={13} />مسودة محفوظة</span><h2>{draft.form.title || 'إعلان جديد بانتظار التفاصيل'}</h2><p>{draft.form.category || 'لم يُحدد القسم بعد'} · أكمل البيانات في صفحة واحدة</p><span className="seller-muted">آخر حفظ: {new Date(draft.savedAt).toLocaleString('ar-SA', { dateStyle: 'medium', timeStyle: 'short' })}</span><div className="seller-modal-actions"><Link href={draft.editingId ? `/ads/new/?edit=${encodeURIComponent(draft.editingId)}` : '/ads/new/'} className="button primary">إكمال المسودة<ArrowLeft size={16} /></Link><button type="button" className="button secondary" onClick={() => setDeleteDraftOpen(true)}><Trash2 size={16} />حذف</button></div></div></div> : <div className="seller-empty-state"><FilePenLine size={37} /><h3>مساحتك للأفكار القادمة</h3><p>ابدأ إعلانًا وسيُحفظ تلقائيًا هنا حتى تكون جاهزًا لإكماله.</p><Link href="/ads/new/" className="button primary"><Plus size={17} />ابدأ إعلانًا</Link></div>}</section>}
-        <p className="seller-dashboard-note"><ShieldCheck size={16} />{demo ? 'حساب وبيانات تجريبية. ' : ''}تغييرات الإعلانات والمسودات تُحفظ على هذا المتصفح فقط.</p>
+        <p className="seller-dashboard-note"><ShieldCheck size={16} />{demo ? 'حساب وبيانات تجريبية. ' : ''}{storageMode === 'server' ? 'تغييرات الإعلانات والمسودات تُحفظ على خادم التجربة فقط.' : 'تغييرات الإعلانات والمسودات تُحفظ على هذا المتصفح فقط.'}</p>
       </div></div>
     <Modal open={Boolean(preview)} onClose={() => setPreview(null)} title="معاينة الإعلان التجريبي">{preview && <><AdPreview ad={preview} demo={demo} /><div className="seller-modal-actions"><Link className="button primary" href={`/ads/new/?edit=${encodeURIComponent(preview.id)}`}>تعديل الإعلان<Pencil size={16} /></Link><button className="button secondary" type="button" onClick={() => setPreview(null)}>إغلاق المعاينة</button></div></>}</Modal>
     <Modal open={Boolean(promotion)} onClose={() => setPromotion(null)} title="تمييز الإعلان"><div className="seller-promotion-modal"><span><Sparkles size={31} /></span><h3>امنح إعلانك ظهورًا إضافيًا</h3><p>ستتيح هذه المساحة اختيار مدة التمييز ومواضع الظهور. تفاصيل الباقات والأسعار تُضبط لاحقًا قبل إطلاق الخدمة.</p>{promotion && <div className="seller-promotion-item"><AdPicture ad={promotion} /><strong>{promotion.title}</strong></div>}<div className="seller-demo-note"><ShieldCheck size={19} /><span>معاينة للميزة؛ لا توجد رسوم أو عملية دفع أو تفعيل تمييز.</span></div><button type="button" className="button primary" onClick={() => setPromotion(null)}>فهمت، العودة لإعلاناتي</button></div></Modal>
-    <Modal open={deleteDraftOpen} onClose={() => setDeleteDraftOpen(false)} title="حذف المسودة؟"><p>ستُحذف هذه المسودة من المتصفح. الإعلانات المحفوظة في لوحتك ستبقى كما هي.</p><div className="seller-modal-actions"><button className="button secondary" type="button" onClick={() => setDeleteDraftOpen(false)}>احتفظ بها</button><button className="button primary" type="button" onClick={deleteDraft}>حذف المسودة</button></div></Modal>
+    <Modal open={deleteDraftOpen} onClose={() => setDeleteDraftOpen(false)} title="حذف المسودة؟"><p>{storageMode === 'server' ? 'ستُحذف هذه المسودة من خادم التجربة.' : 'ستُحذف هذه المسودة من المتصفح.'} الإعلانات المحفوظة في لوحتك ستبقى كما هي.</p><div className="seller-modal-actions"><button className="button secondary" type="button" onClick={() => setDeleteDraftOpen(false)}>احتفظ بها</button><button className="button primary" type="button" disabled={saving} onClick={deleteDraft}>حذف المسودة</button></div></Modal>
   </div>;
 }

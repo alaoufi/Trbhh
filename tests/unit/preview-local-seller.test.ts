@@ -15,6 +15,7 @@ function route(file: string) {
   const requireStub = (id: string) => {
     if (id === 'react/jsx-runtime') return { jsx: (type: unknown) => type, jsxs: (type: unknown) => type };
     if (id.includes('preview-local-entry')) return { PreviewLocalNewAd: 'local-form', PreviewLocalSeller: 'local-dashboard' };
+    if (id.includes('preview-sandbox')) return { isPreviewSandbox: () => process.env.PREVIEW_SANDBOX === 'true' };
     if (id === 'next/navigation') return { notFound: () => { throw new Error('not-found'); }, redirect: forbidden };
     return new Proxy({}, { get: () => forbidden });
   };

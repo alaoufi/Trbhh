@@ -6,6 +6,11 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    if (process.env.PREVIEW_SANDBOX === 'true') {
+      const { prisma } = await import('@/lib/prisma');
+      const marker = await prisma.site_settings.findUnique({where:{k:'preview_v2_seed'}});
+      if (marker?.v !== '2026-09-19-v1') throw new Error('Sandbox seed marker missing');
+    }
     if (process.env.PREVIEW_READ_ONLY === 'true') {
       const { prisma } = await import('@/lib/prisma');
       const { assertSelectOnlyGrants } = await import('@/lib/preview-grants');

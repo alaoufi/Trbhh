@@ -19,6 +19,7 @@ import { PromoSlot } from '@/components/promo-slot';
 import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, getSetting, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
+import { isPreviewSandbox } from '@/lib/preview-sandbox';
 import { getSession } from '@/lib/auth';
 import { homeFeaturedAds, homeStoreCards, storeIdOfUser } from '@/lib/merchant';
 import { StoreMiniCard, type StoreCardData } from '@/components/store-mini-card';
@@ -79,7 +80,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const storeAds = await homeFeaturedAds().catch(() => []);
   const feedTexts = await getFeedBannerItems().catch(() => []);
   // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
-  const homeActionsOn = await getSettingBool('home_actions_on', true).catch(() => true);
+  const homeActionsOn = !isPreviewSandbox() && await getSettingBool('home_actions_on', true).catch(() => true);
   const siteDigits = SITE.phone.replace(/\D/g, '').replace(/^00/, '');
   const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
   const myStore = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;

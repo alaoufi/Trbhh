@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { redirectLegacyApex, requestHostname } from '@/lib/public-origin';
 import { SITE } from '@/lib/constants';
 import { isPreviewReadOnly, previewRequestAllowed } from '@/lib/preview-mode';
+import { isPreviewSandbox, sandboxRequestAllowed } from '@/lib/preview-sandbox';
 
 // subdomains that are the platform itself, never a store handle
 const RESERVED_SUB = new Set(['www', 'api', 'm', 'admin', 'mail', 'ftp', 'cdn', 'static', 'assets', 'app', 'apps', 'store', 'stores', 'trbhh', 'ns1', 'ns2', 'blog', 'help', 'support', 'dev', 'test', 'staging']);
@@ -20,6 +21,22 @@ function storeSubdomain(hostname: string): string {
 const SUB_ALLOWED = /^\/(companies\/|store-login|store-forgot|login|logout|forgot|media\/|api\/|p\/|_next|play\/|guide\/how)/;
 
 export function middleware(req: NextRequest) {
+  if (isPreviewSandbox()) {
+    const target = req.nextUrl.pathname + req.nextUrl.search;
+    if (!sandboxRequestAllowed(req.method, target) || req.headers.has('next-action')) {
+      return new NextResponse('Sandbox route unavailable', {status: ['GET','HEAD'].includes(req.method) ? 404 : 405});
+    }
+    if (req.nextUrl.pathname === '/login') {
+      const url = req.nextUrl.clone(); url.pathname = '/preview-login';
+      return NextResponse.redirect(url);
+    }
+    const headers = new Headers(req.headers);
+    headers.set('x-pathname', target);
+    const response = NextResponse.next({request: {headers}});
+    response.headers.set('Cache-Control', 'private, no-store');
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+    return response;
+  }
   if (isPreviewReadOnly()) {
     // Do not apply production/store redirects or issue a visitor cookie.
     const target = req.nextUrl.pathname + req.nextUrl.search;

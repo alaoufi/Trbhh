@@ -1,0 +1,9 @@
+FROM node:24-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates fonts-kacst fontconfig tzdata \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --chown=node:node app/ ./
+RUN mkdir -p /app/storage/uploads && chown -R node:node /app/storage
+USER node
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
+CMD ["node", "server.js"]

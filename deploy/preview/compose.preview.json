@@ -1,0 +1,38 @@
+{
+  "name": "trbhh-preview",
+  "services": {
+    "app": {
+      "image": "${TRBHH_PREVIEW_IMAGE:?Provide an immutable tested preview image}",
+      "restart": "no",
+      "user": "1001:1001",
+      "read_only": true,
+      "cap_drop": ["ALL"],
+      "security_opt": ["no-new-privileges:true"],
+      "mem_limit": "1g",
+      "cpus": 1,
+      "pids_limit": 128,
+      "ports": ["127.0.0.1:4188:3000"],
+      "extra_hosts": ["host.docker.internal:host-gateway"],
+      "environment": {
+        "NODE_ENV": "production",
+        "NEXT_TELEMETRY_DISABLED": "1",
+        "PREVIEW_READ_ONLY": "true",
+        "DATABASE_URL": "${TRBHH_PREVIEW_DATABASE_URL:?Provide a SELECT-only preview database URL}",
+        "AUTH_SECRET": "${TRBHH_PREVIEW_AUTH_SECRET:?Provide an independent preview secret}",
+        "REDIS_URL": "",
+        "COOKIE_SECURE": "true",
+        "TZ": "Asia/Riyadh",
+        "HOSTNAME": "0.0.0.0",
+        "PORT": "3000"
+      },
+      "tmpfs": [
+        "/tmp:rw,noexec,nosuid,size=64m,uid=1001,gid=1001",
+        "/app/.next/cache:rw,noexec,nosuid,size=128m,uid=1001,gid=1001"
+      ],
+      "logging": {
+        "driver": "json-file",
+        "options": {"max-size": "10m", "max-file": "3"}
+      }
+    }
+  }
+}

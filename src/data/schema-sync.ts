@@ -1,6 +1,7 @@
 import { isPreviewReadOnly } from '@/lib/preview-mode';
 import 'server-only';
 import { prisma } from '@/lib/prisma';
+import { isPreviewSandbox } from '@/lib/preview-sandbox';
 
 /**
  * Single source of truth for every column/table the app self-provisions on the
@@ -20,6 +21,11 @@ import { prisma } from '@/lib/prisma';
  */
 
 const STATEMENTS: string[] = [
+  ...(isPreviewSandbox() ? [`CREATE TABLE IF NOT EXISTS preview_states (
+    owner_id INT NOT NULL, \`key\` VARCHAR(64) NOT NULL,
+    value LONGTEXT NOT NULL, revision INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (owner_id, \`key\`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`] : []),
   `ALTER TABLE users ADD COLUMN auth_session_version VARCHAR(64) NOT NULL DEFAULT '0'`,
   /* Authentication: encrypted confirmed TOTP credentials and durable attempt limits. */
   `CREATE TABLE IF NOT EXISTS auth_mfa (

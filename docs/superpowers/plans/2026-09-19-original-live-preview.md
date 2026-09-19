@@ -38,4 +38,12 @@
 
 Approved by user: original design default, live public reads, experimental additions/edits isolated. Infrastructure provisioning is limited to this separate preview; no production UI/data/payment activation.
 
+## Follow-up verification and scope update — 2026-09-19
+
+- User explicitly deferred processing old advertisements in «أخرى» until after a future production migration. Do not reclassify them now or require an export of the user's browser assignments to continue unrelated work. This deferral is not authorization to deploy production.
+- Confirmed GitHub runs 35431579832 (CI) and 35431579775 (TRBHH V2 preview) both completed successfully.
+- Fresh targeted verification: 33 tests passed across the five root preview isolation, middleware, grant, media and local-seller suites; all 37 standalone preview tests passed.
+- These checks cover category-dependent fields, job salary instead of sale price/condition, conditional and empty-field handling, configurable required/hidden fields, custom multiple choice, category dropdown, public snapshot boundaries and isolated local form dependencies. They do not establish a live database connection or deployment.
+- The outstanding deployment gate below remains unresolved. No production ad classification, database credentials, payment behavior or public preview deployment was changed by this follow-up.
+
 Provisioning blocked by verified missing administrative database channel (run 35431110401). Application account lacks CREATE USER/GRANT OPTION; host socket/defaults access is unavailable; bundled Docker database is a different server. User input requested to open the correct database management panel or have the hosting administrator create the restricted principal. No production credentials reused, no production writes, no replacement deployment performed.

@@ -48,9 +48,10 @@ for (const [file, name, result] of guards) {
     const declaration = source.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name) as ts.FunctionDeclaration;
     const statement = declaration.body!.statements[0].getText(source);
     expect(statement).toContain('isPreviewReadOnly()');
-    const run = new Function('isPreviewReadOnly', `return (async () => { ${statement}; return 'production'; })()`);
-    expect(await run(() => true)).toBe(result);
-    expect(await run(() => false)).toBe('production');
+    const run = new Function('isPreviewReadOnly', 'isPreviewSandbox', `return (async () => { ${statement}; return 'production'; })()`);
+    expect(await run(() => true, () => false)).toBe(result);
+    expect(await run(() => false, () => false)).toBe('production');
+    if (file === 'lib/redis.ts') expect(await run(() => false, () => true)).toBeNull();
   });
 }
 

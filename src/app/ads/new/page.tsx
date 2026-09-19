@@ -6,13 +6,15 @@ import { getCountries, getCities, getAreas } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
 import { getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { createAdAction } from '../actions';
-import { PreviewLocalNewAd } from '@/components/preview-local-entry';
+import { PreviewLocalNewAd, PreviewSandboxNewAd } from '@/components/preview-local-entry';
+import { isPreviewSandbox } from '@/lib/preview-sandbox';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'أضف إعلان' };
 
 export default async function NewAdPage({ searchParams }: { searchParams: Promise<{ error?: string; left?: string; max?: string; hours?: string; wait?: string; cat?: string; banned?: string; dup?: string; price?: string; bal?: string; dest?: string }> }) {
   if (process.env.PREVIEW_READ_ONLY === 'true') return <PreviewLocalNewAd />;
+  if (isPreviewSandbox()) return <PreviewSandboxNewAd />;
 
   const allowSchedule = (await getSettingBool('schedule_on', false).catch(() => false)) && !(await getSettingBool(SETTING_ADS_APPROVAL, false).catch(() => false));
   const scheduleMaxDays = await import('@/lib/settings').then((m) => m.getScheduleMaxDays()).catch(() => 30);

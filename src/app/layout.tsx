@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
+import Link from 'next/link';
 import { Cairo } from 'next/font/google';
 import { cookies } from 'next/headers';
 import './globals.css';
@@ -26,6 +27,7 @@ import { AdPixels } from '@/components/ad-pixels';
 import { VerifySeal } from '@/components/verify-seal';
 import { SealReposition } from '@/components/seal-reposition';
 import { NavigationProgress } from '@/components/navigation-progress';
+import { isPreviewSandbox } from '@/lib/preview-sandbox';
 
 const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', display: 'swap' });
 
@@ -49,8 +51,8 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [{ url: '/icon-512.png?v=3', width: 512, height: 512, alt: SITE.name }],
     },
     twitter: { card: 'summary', title: shareTitle, description: shareDesc, images: ['/icon-512.png?v=3'] },
-    robots: { index: process.env.PREVIEW_READ_ONLY !== 'true', follow: process.env.PREVIEW_READ_ONLY !== 'true' },
-    ...(process.env.PREVIEW_READ_ONLY === 'true' ? {} : {
+    robots: { index: process.env.PREVIEW_READ_ONLY !== 'true' && !isPreviewSandbox(), follow: process.env.PREVIEW_READ_ONLY !== 'true' && !isPreviewSandbox() },
+    ...(process.env.PREVIEW_READ_ONLY === 'true' || isPreviewSandbox() ? {} : {
       manifest: '/manifest.webmanifest',
       appleWebApp: { capable: true, statusBarStyle: 'default' as const, title: SITE.name },
     }),
@@ -74,7 +76,8 @@ export async function generateViewport(): Promise<Viewport> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const preview = process.env.PREVIEW_READ_ONLY === 'true';
+  const sandbox = isPreviewSandbox();
+  const preview = process.env.PREVIEW_READ_ONLY === 'true' || sandbox;
   const session = await getSession();
   // اقرأ الكوكيز مرة واحدة، وشغّل الاستعلامات المستقلّة بالتوازي بدل التسلسل
   // (كانت ~٦ جولات متتابعة تُضاف لكل صفحة في الموقع لأنه التخطيط الجذري).
@@ -138,7 +141,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* بيكسلات التتبع الإعلاني (Meta/Google Ads/TikTok/Snapchat) — لا تعمل
             إطلاقاً إلا بعد ضبط معرّفاتها الحقيقية في متغيرات البيئة على الخادم. */}
         {!preview && <AdPixels />}
-        {preview && <aside className="border-b bg-amber-50 p-2 text-center text-sm text-slate-900">معاينة مستقلة — عرض البيانات العامة الحية فقط. إضافة الإعلانات وتعديلها محفوظان في هذا المتصفح ولا يغيّران الموقع الأصلي.</aside>}
+        {preview && <aside className="border-b bg-amber-50 p-2 text-center text-sm text-slate-900">{sandbox ? <>بيئة اختبار مستقلة — الإعلانات العامة نسخة مؤرخة وليست اتصالًا حيًا. الحفظ التجريبي منفصل عن الموقع الأصلي. لا دفع ولا تواصل حقيقي. <Link href="/ads/new">إضافة إعلان</Link> · <Link href="/seller">إعلانات التجربة</Link> · <Link href="/field-settings">إعدادات الحقول التجريبية</Link></> : 'معاينة مستقلة — عرض البيانات العامة الحية فقط. إضافة الإعلانات وتعديلها محفوظان في هذا المتصفح ولا يغيّران الموقع الأصلي.'}</aside>}
         {/* Storefront (/companies/[id]) = fully independent site: ChromeGate hides
             the shared header/menu/footer, even across client-side navigation. */}
         <SiteDesignProvider config={designConfig} selected={design}>

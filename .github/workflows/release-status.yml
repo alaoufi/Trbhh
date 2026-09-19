@@ -1,0 +1,44 @@
+name: Read-only release backup status
+on:
+  workflow_dispatch:
+    inputs:
+      backup_id:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Read artifact sizes and app state only
+        env:
+          BACKUP_ID: ${{ inputs.backup_id }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$BACKUP_ID" =~ ^[0-9]+$ ]]
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/status_key
+          test -n "$VPS_KNOWN_HOSTS"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/status_key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" bash -s -- "$BACKUP_ID" <<'SH'
+          set -eu
+          [[ "$1" =~ ^[0-9]+$ ]]
+          cd /root/trbhh
+          printf 'HEAD='; git rev-parse HEAD
+          container=$(docker compose ps -aq app)
+          docker inspect -f 'running={{.State.Running}} paused={{.State.Paused}} image={{.Image}}' "$container"
+          df -Pk /root | awk 'NR==2 {print "free_kb=" $4}'
+          dir="/root/trbhh-release-backups/audit-$1"
+          for item in code.tar.gz image.tar.gz before.json full-before.json database.sql.gz storage.tar.gz legacy.tar.gz restored.json full-restored.json full-current.json VERIFIED WATCHDOG_FIRED; do
+            if test -f "$dir/$item"; then printf '%s bytes=' "$item"; stat -c %s "$dir/$item"; fi
+          done
+          SH

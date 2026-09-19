@@ -1,0 +1,40 @@
+name: Stop incomplete home release backup safely
+on:
+  push:
+    branches: [codex/home-feed-release-20260919]
+    paths: ['.github/workflows/stop-home-backup.yml']
+permissions:
+  contents: read
+jobs:
+  stop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Stop only this run's read-only backup helper
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/key
+          test -n "$VPS_KNOWN_HOSTS"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" bash -s <<'SH'
+          set -euo pipefail
+          reader=trbhh-backup-reader-35464508812
+          if docker inspect "$reader" >/dev/null 2>&1; then
+            test "$(docker inspect -f '{{index .Config.Labels "trbhh.backup-reader"}}' "$reader")" = 35464508812
+            docker stop --time 5 "$reader"
+          fi
+          cd /root/trbhh
+          app=$(docker compose ps -q app)
+          test -n "$app"
+          docker inspect -f 'running={{.State.Running}} paused={{.State.Paused}}' "$app"
+          test "$(docker inspect -f '{{.State.Running}} {{.State.Paused}}' "$app")" = 'true false'
+          df -Pk /root | awk 'NR==2 {print "free_kb=" $4}'
+          SH

@@ -1,0 +1,46 @@
+name: Read-only backup progress
+on:
+  push:
+    branches: [codex/home-feed-release-20260919]
+    paths: [.github/workflows/backup-progress.yml]
+  workflow_dispatch:
+    inputs:
+      backup_id:
+        description: Numeric backup run ID
+        type: string
+        default: '35465592273'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - env:
+          BACKUP_ID: ${{ inputs.backup_id || '35465592273' }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$BACKUP_ID" =~ ^[0-9]+$ ]]
+          test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" bash -s -- "$BACKUP_ID" <<'READONLY'
+          set -euo pipefail
+          [[ "$1" =~ ^[0-9]+$ ]]
+          backup="/root/trbhh-release-backups/audit-$1"
+          [[ -d "$backup" && ! -L "$backup" && "$(realpath "$backup")" == "$backup" ]]
+          df -h /
+          find "$backup" -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
+          ps -eo comm,etimes,pcpu --sort=-pcpu | head -15 || true
+          docker ps --filter "label=trbhh.release-verification=$1" --format '{{.Names}} {{.Status}}'
+          cd /root/trbhh
+          container=$(docker compose ps -q app)
+          docker inspect --format 'APP_RUNNING={{.State.Running}} APP_PAUSED={{.State.Paused}}' "$container"
+          READONLY

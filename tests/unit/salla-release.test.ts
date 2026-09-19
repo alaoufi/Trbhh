@@ -1,8 +1,34 @@
 import {createRequire} from 'node:module';
-import {readFileSync} from 'node:fs';
+import {readFileSync,mkdtempSync,writeFileSync,existsSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {spawnSync} from 'node:child_process';
 import {describe,it,expect} from 'vitest';
 const require=createRequire(import.meta.url);
 describe('Salla release environment preparation',()=>{
+ it('executes the remote eval/stdin diagnostic contract without creating a stage or modifying input',()=>{
+  const directory=mkdtempSync(join(tmpdir(),'salla-diagnose-'));
+  try{
+   const before=join(directory,'before.env'),stage=join(directory,'stage.env');
+   const original='AUTH_SECRET=private-preserved\nSUPPLIER_RECONCILE_SECRET=\n';writeFileSync(before,original);
+   const source64=Buffer.from(readFileSync('scripts/release/salla-environment.cjs')).toString('base64');
+   const result=spawnSync(process.execPath,['-e',`eval(Buffer.from('${source64}','base64').toString())`,'salla-environment-diagnose','diagnose',before,stage],{encoding:'utf8',input:JSON.stringify({SALLA_CLIENT_ID:'id',SALLA_CLIENT_SECRET:'private$secret',SALLA_WEBHOOK_SECRET:'safe'})});
+   expect(result.status).toBe(0);expect(result.stderr).toBe('');
+   expect(JSON.parse(result.stdout).codes).toEqual(['invalid_secret','invalid_persistent_key']);
+   expect(result.stdout).not.toMatch(/private-preserved|private\$secret/);
+   expect(existsSync(stage)).toBe(false);expect(readFileSync(before,'utf8')).toBe(original);
+  }finally{rmSync(directory,{recursive:true,force:true});}
+ });
+ it('diagnoses rejected inputs with fixed codes and booleans, never secret values',()=>{
+  const {diagnoseEnvironment}=require('../../scripts/release/salla-environment.cjs');
+  expect(typeof diagnoseEnvironment).toBe('function');
+  const result=diagnoseEnvironment('SUPPLIER_TOKEN_ENCRYPTION_KEY=\nSUPPLIER_RECONCILE_SECRET=bad-private-key\n', {SALLA_CLIENT_ID:'id',SALLA_CLIENT_SECRET:'private$secret',SALLA_WEBHOOK_SECRET:'safe'});
+  expect(result.secrets.SALLA_CLIENT_SECRET).toEqual({present:true,sizeValid:true,charactersValid:false});
+  expect(result.persistent.SUPPLIER_TOKEN_ENCRYPTION_KEY).toEqual({present:true,blank:true,formatValid:false});
+  expect(result.codes).toEqual(['invalid_secret','invalid_persistent_key']);
+  expect(JSON.stringify(result)).not.toMatch(/private\$secret|bad-private-key/);
+  expect(diagnoseEnvironment('SALLA_CLIENT_ID=x\nSALLA_CLIENT_ID=y\n',{}).codes).toContain('duplicate_key');
+ });
  it('preserves every unrelated setting and existing persistent keys',()=>{
   const {prepareEnvironment,verifyEnvironment}=require('../../scripts/release/salla-environment.cjs');
   const before=`DATABASE_URL=private\nAUTH_SECRET=unchanged\nSUPPLIER_TOKEN_ENCRYPTION_KEY=${'a'.repeat(64)}\nSUPPLIER_RECONCILE_SECRET=${'b'.repeat(64)}\n`;

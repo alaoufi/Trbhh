@@ -4,10 +4,46 @@ on:
     branches: [codex/home-feed-release-20260919]
     paths: ['.github/workflows/integration-readiness.yml', 'scripts/release/integration-readiness.cjs']
   workflow_dispatch:
+    inputs:
+      phase:
+        type: choice
+        options: [readiness, salla_environment_diagnose]
+        default: readiness
 permissions:
   contents: read
 jobs:
+  environment_diagnose:
+    if: github.event_name == 'workflow_dispatch' && inputs.phase == 'salla_environment_diagnose' && github.ref == 'refs/heads/codex/salla-environment-diagnose-20260920'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: salla-release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Read-only diagnosis against original verified backup
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          SALLA_CLIENT_ID: ${{ secrets.SALLA_CLIENT_ID }}
+          SALLA_CLIENT_SECRET: ${{ secrets.SALLA_CLIENT_SECRET }}
+          SALLA_WEBHOOK_SECRET: ${{ secrets.SALLA_WEBHOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/key
+          test -n "$VPS_KNOWN_HOSTS"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # Source code only in argv; secrets travel solely over encrypted stdin. No remote upload.
+          source64=$(base64 -w0 scripts/release/salla-environment.cjs)
+          remote="set -eu; b=/root/trbhh-release-backups/audit-35471003685; test ! -L /root/trbhh-release-backups; test ! -L \"\$b\"; test ! -L /root/trbhh; test \"\$(cat \"\$b/VERIFIED\")\" = eda1e8cb400a90418b57ad5d0b5f97bc3e8fee96; test \"\$(cat \"\$b/candidate.txt\")\" = 8e3b1738d8086111b334150d16a7bdaa9c11cc9d; test \"\$(git -C /root/trbhh rev-parse HEAD)\" = eda1e8cb400a90418b57ad5d0b5f97bc3e8fee96; cmp --silent /root/trbhh/.env \"\$b/environment.env\"; node -e \"eval(Buffer.from('$source64','base64').toString())\" salla-environment-diagnose diagnose \"\$b/environment.env\" \"\$b/salla-staged.env\""
+          node -e 'const keys=["SALLA_CLIENT_ID","SALLA_CLIENT_SECRET","SALLA_WEBHOOK_SECRET"];process.stdout.write(JSON.stringify(Object.fromEntries(keys.map(k=>[k,process.env[k]]))))' | ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" "$remote"
   inspect:
+    if: github.event_name != 'workflow_dispatch' || inputs.phase != 'salla_environment_diagnose'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

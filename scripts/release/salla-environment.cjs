@@ -32,14 +32,36 @@ function verifyCompose(before,after){
  const strip=raw=>raw.replace(/\r\n/g,'\n').split('\n').filter(line=>!keys.some(key=>line===`      ${key}: \${${key}:-${key==='SUPPLIER_ALLOW_LIVE_ORDERS'?'false':''}}`)).join('\n');
  if(strip(before)!==strip(after))throw Error('unrelated_compose_changed');
 }
-module.exports={prepareEnvironment,verifyEnvironment,verifyCompose};
-if(require.main===module){
+function diagnoseEnvironment(before,input){
+ const result={codes:[],secrets:{},persistent:{}};
+ let parsed;
+ try{parsed=parse(before);}catch(error){result.codes.push(['duplicate_key','unsupported_assignment'].includes(error.message)?error.message:'parse_failed');}
+ for(const key of keys.slice(0,3)){
+  const value=input?.[key];const present=typeof value==='string'&&value.length>0;
+  const flags={present,sizeValid:present&&value.length<=4096,charactersValid:present&&/^[A-Za-z0-9._~:/+=-]+$/.test(value)};
+  result.secrets[key]=flags;
+  if(!Object.values(flags).every(Boolean)&&!result.codes.includes('invalid_secret'))result.codes.push('invalid_secret');
+ }
+ if(parsed)for(const key of keys.slice(3,5)){
+  const present=parsed.values.has(key),value=parsed.values.get(key);
+  result.persistent[key]={present,blank:present&&value==='',formatValid:present&&/^[a-fA-F0-9]{64}$/.test(value)};
+  if(present&&!result.persistent[key].formatValid&&!result.codes.includes('invalid_persistent_key'))result.codes.push('invalid_persistent_key');
+ }
+ return result;
+}
+module.exports={prepareEnvironment,verifyEnvironment,verifyCompose,diagnoseEnvironment};
+if(require.main===module||process.argv[1]==='salla-environment-diagnose'){
  try{
   const [mode,beforePath,afterPath]=process.argv.slice(2);
-  if(!['prepare','verify'].includes(mode))throw Error('mode');
+  if(!['prepare','verify','diagnose'].includes(mode))throw Error('mode');
   for(const path of [beforePath,...(mode==='verify'?[afterPath]:[])])if(!fs.lstatSync(path).isFile()||fs.lstatSync(path).isSymbolicLink())throw Error('unsafe_path');
   const before=fs.readFileSync(beforePath,'utf8');
-  if(mode==='prepare'){
+  if(mode==='diagnose'){
+   const result=diagnoseEnvironment(before,JSON.parse(fs.readFileSync(0,'utf8')));
+   result.stageExists=fs.existsSync(afterPath);
+   result.stageRegular=result.stageExists&&fs.lstatSync(afterPath).isFile()&&!fs.lstatSync(afterPath).isSymbolicLink();
+   console.info(JSON.stringify(result));
+  }else if(mode==='prepare'){
    const input=JSON.parse(fs.readFileSync(0,'utf8')),after=prepareEnvironment(before,input);verifyEnvironment(before,after);
    const fd=fs.openSync(afterPath,'wx',0o600);try{fs.writeFileSync(fd,after);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
   }else {
@@ -48,6 +70,6 @@ if(require.main===module){
    if(!oldCompose||!newCompose)throw Error('compose_required');
    verifyCompose(fs.readFileSync(oldCompose,'utf8'),fs.readFileSync(newCompose,'utf8'));
   }
-  console.info('Salla-only environment preservation verified; values withheld.');
+  if(mode!=='diagnose')console.info('Salla-only environment preservation verified; values withheld.');
  }catch{console.error('Salla environment preparation/verification failed; values withheld.');process.exitCode=1;}
 }

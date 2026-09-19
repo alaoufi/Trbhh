@@ -28,6 +28,8 @@ try {
   await page.getByLabel('القسم الرئيسي').waitFor();
   const state=await page.evaluate(async()=>{const r=await fetch('/api/preview-state');const b=await r.json();return {status:r.status,ownerId:b.ownerId};});
   assert.equal(state.status,200); assert.ok(Number.isSafeInteger(state.ownerId));
-  assert.ok((await context.cookies()).filter(cookie=>cookie.name==='trbhh_session').every(cookie=>cookie.secure&&cookie.httpOnly));
+  const sessionCookies=(await context.cookies()).filter(cookie=>cookie.name==='trbhh_session');
+  assert.equal(sessionCookies.length,1);
+  assert.ok(sessionCookies.every(cookie=>cookie.secure&&cookie.httpOnly));
   console.log('PASS: external HTTPS guest browsing, original photo, blocked admin, real sandbox login and authenticated state read. No data written.');
 } finally {await browser.close();}

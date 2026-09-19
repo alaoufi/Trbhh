@@ -11,9 +11,14 @@ settings, not a full copy of production configuration.
 
 Only manually dispatch `trbhh-v2-preview.yml` on `codex/trbhh-v2-preview` with
 `sandbox_deploy=true`. Full exact-commit CI and browser gates must pass before SSH
-deployment. The job uses existing SSH credentials and `TRBHH_PREVIEW_PASSWORD`
+deployment. The job uses existing SSH credentials and `TRBHH_V2_SANDBOX_PASSWORD`
 for users `preview` and `preview-store`; neither is an administrator. Credentials
 stay in GitHub Secrets and private server files, never this repository.
+
+The separate `sandbox_access=true` dispatch backs up this sandbox database and
+synchronizes only its two synthetic passwords to `TRBHH_V2_SANDBOX_PASSWORD`,
+invalidating their existing sessions. It does not deploy, reset production
+accounts or touch the older preview's `TRBHH_PREVIEW_PASSWORD` secret.
 
 `VPS_KNOWN_HOSTS` is mandatory. Its initial host key was accepted through a local
 trust-on-first-use connection, not independently fingerprint-verified. Future

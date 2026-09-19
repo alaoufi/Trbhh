@@ -2,6 +2,11 @@ name: TRBHH V2 preview
 on:
   workflow_dispatch:
     inputs:
+      sandbox_access:
+        description: 'Synchronize only the two synthetic V2 sandbox logins, with a backup'
+        required: true
+        default: false
+        type: boolean
       sandbox_deploy:
         description: 'Deploy isolated writable sandbox with public snapshot; never production'
         required: true
@@ -23,6 +28,65 @@ on:
   pull_request:
     paths: ['preview-v2/**', '.github/workflows/trbhh-v2-preview.yml']
 jobs:
+  sandbox-access:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/trbhh-v2-preview' && inputs.sandbox_access && !inputs.sandbox_deploy
+    concurrency:
+      group: trbhh-preview-v2-sandbox
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions: {contents: read, actions: read}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: pnpm}
+      - run: pnpm install --frozen-lockfile
+        env:
+          DATABASE_URL: mysql://preview:unused@127.0.0.1:3306/trbhh_preview_v2
+      - name: Require exact-commit CI before changing sandbox access
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in $(seq 1 60); do
+            result=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$GITHUB_SHA" --json status,conclusion --jq '.[0] | [.status, .conclusion] | @tsv')
+            if [[ "$result" == $'completed\tsuccess' ]]; then exit 0; fi
+            if [[ "$result" == completed* ]]; then echo 'CI did not pass'; exit 1; fi
+            sleep 10
+          done
+          exit 1
+      - name: Back up and synchronize only synthetic sandbox accounts
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          PREVIEW_LOGIN_PASSWORD: ${{ secrets.TRBHH_V2_SANDBOX_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          key="$RUNNER_TEMP/sandbox-key"
+          known="$RUNNER_TEMP/sandbox-known"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$key"
+          test -n "$VPS_KNOWN_HOSTS"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$known"
+          port="${VPS_PORT:-22}"
+          ssh_args=(-i "$key" -p "$port" -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known" -o ConnectTimeout=25)
+          target="$VPS_USER@$VPS_HOST"
+          hash=$(node -e 'const b=require("bcryptjs"),p=process.env.PREVIEW_LOGIN_PASSWORD;if(!p||p.length<12||Buffer.byteLength(p)>72)process.exit(1);b.hash(p,12).then(h=>process.stdout.write(h));')
+          echo "::add-mask::$hash"
+          ssh "${ssh_args[@]}" "$target" "set -eu; umask 077; cd /root/trbhh-preview-v2; test ! -L /root/trbhh-preview-v2; test \"\$(cat .preview-only)\" = trbhh-preview-v2; test ! -L backups; mkdir -p backups; test ! -e backups/access-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.sql; docker compose -p trbhh-preview-v2 -f compose.yml exec -T preview-db sh -c 'MYSQL_PWD=\"\$MYSQL_PASSWORD\" mysqldump --single-transaction --no-tablespaces -upreview trbhh_preview_v2' > backups/access-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.sql"
+          ssh "${ssh_args[@]}" "$target" "set -eu; cd /root/trbhh-preview-v2; test \"\$(cat .preview-only)\" = trbhh-preview-v2; docker compose -p trbhh-preview-v2 -f compose.yml exec -T -e PREVIEW_LOGIN_HASH='$hash' preview-app node -" < scripts/preview-v2/reset-login.cjs
+          ssh "${ssh_args[@]}" "$target" 'cat /root/trbhh-preview-v2/preview-url.txt' > "$RUNNER_TEMP/sandbox-access-url"
+      - name: Verify saved login through external HTTPS
+        env:
+          PREVIEW_LOGIN_PASSWORD: ${{ secrets.TRBHH_V2_SANDBOX_PASSWORD }}
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          export PREVIEW_VERIFY_URL="$(cat "$RUNNER_TEMP/sandbox-access-url")/"
+          node tests/browser/preview-sandbox-external.mjs
   sandbox:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/trbhh-v2-preview' && inputs.sandbox_deploy
     needs: preview
@@ -78,7 +142,7 @@ jobs:
             < preview-v2/scripts/export-public-snapshot.cjs > "$RUNNER_TEMP/sandbox-data/public-snapshot.json"
       - name: Prepare isolated database and local public photos
         env:
-          PREVIEW_LOGIN_PASSWORD: ${{ secrets.TRBHH_PREVIEW_PASSWORD }}
+          PREVIEW_LOGIN_PASSWORD: ${{ secrets.TRBHH_V2_SANDBOX_PASSWORD }}
         run: |
           set -euo pipefail
           export TRBHH_SNAPSHOT_FILE="$RUNNER_TEMP/sandbox-data/public-snapshot.json"
@@ -97,7 +161,7 @@ jobs:
           PREVIEW_SANDBOX: 'true'
       - name: Verify database-backed sandbox in browser
         env:
-          PREVIEW_LOGIN_PASSWORD: ${{ secrets.TRBHH_PREVIEW_PASSWORD }}
+          PREVIEW_LOGIN_PASSWORD: ${{ secrets.TRBHH_V2_SANDBOX_PASSWORD }}
         run: |
           set -euo pipefail
           pnpm exec playwright install --with-deps chromium
@@ -154,7 +218,7 @@ jobs:
           printf '### معاينة مستقلة قابلة للحفظ\n\n[%s](%s)\n\nبيانات عامة من لقطة مؤرخة؛ حسابات اختبار فقط.\n' "$url" "$url" >> "$GITHUB_STEP_SUMMARY"
       - name: Verify external HTTPS preview without modifying saved data
         env:
-          PREVIEW_LOGIN_PASSWORD: ${{ secrets.TRBHH_PREVIEW_PASSWORD }}
+          PREVIEW_LOGIN_PASSWORD: ${{ secrets.TRBHH_V2_SANDBOX_PASSWORD }}
         run: |
           export PREVIEW_VERIFY_URL="$(sed -n 's/^PREVIEW_URL=//p' "$RUNNER_TEMP/sandbox-deploy.log" | tail -1)/"
           node tests/browser/preview-sandbox-external.mjs

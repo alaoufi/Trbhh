@@ -12,6 +12,7 @@ import {
   getPersonalizedAds,
 } from '@/lib/data';
 import { PublicSearchForm } from '@/components/public-search-form';
+import { HomeCategoryNavigation } from '@/components/home-category-navigation';
 import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
 import { CollapsibleSection } from '@/components/collapsible-section';
@@ -49,7 +50,7 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
   );
 }
 
-export default async function HomePage({ searchParams }: { searchParams?: Promise<{ published?: string }> }) {
+export default async function HomePage({ searchParams }: { searchParams?: Promise<{ published?: string; category?: string | string[] }> }) {
   const sp = (await searchParams) || {};
   // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
@@ -131,6 +132,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
           <div className="p-4 sm:px-6"><PublicSearchForm regions={cities} areas={areas} priceOn={priceOn} placeholder={discoveryPlaceholder} compact /></div>
         </section>
       )}
+      <HomeCategoryNavigation selectedCategory={sp.category} />
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 

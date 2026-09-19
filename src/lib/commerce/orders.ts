@@ -1,0 +1,233 @@
+import 'server-only';
+import {createHash, randomUUID} from 'node:crypto';
+import type {Prisma} from '@prisma/client';
+import {checkedMoney, lineTotal, sumMoney, MAX_MONEY_MINOR} from './money';
+import {assertCommerceSchemaReady} from './schema';
+import type {AttemptStatus, CommerceDb, CreateOrderInput, ExpectedPayment, NotificationChannel, NotificationTarget, OrderLineInput, OrderPolicy, OrderSnapshot, OrderStatus, PaymentAttempt, PaymentClaim, ShippingSnapshot, VerifiedPayment} from './types';
+
+type Tx = Prisma.TransactionClient;
+type OrderRow = {id:bigint;member_id:bigint;request_fingerprint:string;status:OrderStatus;currency:'SAR';subtotal_minor:number;shipping_fee_minor:number;total_minor:number;shipping:ShippingSnapshot|string};
+type AttemptRow = {id:bigint;order_id:bigint;provider:string;provider_ref:string|null;redirect_url:string|null;merchant_order_id:string;claim_token:string;amount_minor:number;currency:'SAR';status:AttemptStatus};
+const transactionOptions={maxWait:10000,timeout:20000};
+function id(value:bigint):void {
+  if(typeof value!=='bigint'||value<=0n||value>18446744073709551615n) throw new Error('invalid_id');
+}
+function identifier(value:string,max:number):void {
+  if(typeof value!=='string'||!value.length||value.length>max||!/^[\x21-\x7e]+$/.test(value)) throw new Error('invalid_identifier');
+}
+export function normalizeOrderRequest(input:readonly unknown[]):OrderLineInput[] {
+  if(!Array.isArray(input)||!input.length||input.length>100) throw new Error('invalid_items');
+  const quantities=new Map<bigint,number>();
+  for(const raw of input) {
+    if(!raw||typeof raw!=='object'||Object.keys(raw).sort().join(',')!=='productId,quantity') throw new Error('invalid_items');
+    const item=raw as OrderLineInput;
+    id(item.productId);lineTotal(0,item.quantity);
+    const quantity=(quantities.get(item.productId)||0)+item.quantity;
+    lineTotal(0,quantity);quantities.set(item.productId,quantity);
+  }
+  return [...quantities].map(([productId,quantity])=>({productId,quantity})).sort((a,b)=>a.productId<b.productId?-1:a.productId>b.productId?1:0);
+}
+function shippingSnapshot(input:ShippingSnapshot):ShippingSnapshot {
+  if(!input||typeof input!=='object'||Object.keys(input).sort().join(',')!=='addressLine,city,country,name,phone,postalCode') throw new Error('invalid_shipping');
+  for(const [key,max] of [['name',100],['addressLine',300],['city',100],['postalCode',10],['phone',16]] as const) {
+    const value=input[key];
+    if(typeof value!=='string'||!value.trim()||value!==value.trim()||value.length>max||/[\u0000-\u001f\u007f]/.test(value)) throw new Error('invalid_shipping');
+  }
+  if(input.country!=='SA'||!/^\+9665\d{8}$/.test(input.phone)||!/^\d{5}$/.test(input.postalCode)) throw new Error('invalid_shipping');
+  return {name:input.name,phone:input.phone,addressLine:input.addressLine,city:input.city,postalCode:input.postalCode,country:'SA'};
+}
+export function requestFingerprint(items:readonly OrderLineInput[],shipping?:ShippingSnapshot):string {
+  const normalized=normalizeOrderRequest(items).map(item=>({productId:item.productId.toString(),quantity:item.quantity}));
+  return createHash('sha256').update(JSON.stringify({version:1,items:normalized,shipping:shipping?shippingSnapshot(shipping):null})).digest('hex');
+}
+export function paymentMatches(expected:ExpectedPayment,evidence:VerifiedPayment):boolean {
+  return evidence.verified===true && evidence.status==='paid'
+    && Number.isSafeInteger(evidence.amountMinor) && evidence.amountMinor>0
+    && evidence.amountMinor===expected.amountMinor && evidence.currency==='SAR' && expected.currency==='SAR'
+    && !!expected.reference && evidence.reference===expected.reference
+    && !!expected.merchantOrderId && evidence.merchantOrderId===expected.merchantOrderId
+    && !!expected.provider && evidence.provider===expected.provider;
+}
+export function normalizeRecipients(input:readonly {recipient:string;channel:string}[]):NotificationTarget[] {
+  if(!Array.isArray(input)||input.length>50) throw new Error('invalid_recipients');
+  const output=new Map<string,NotificationTarget>();
+  for(const target of input) {
+    if(!target||!['in_app','sms','whatsapp','email','push'].includes(target.channel)||typeof target.recipient!=='string'||!target.recipient.trim()||target.recipient!==target.recipient.trim()||target.recipient.length>191||/[\u0000-\u001f\u007f]/.test(target.recipient)) throw new Error('invalid_recipients');
+    output.set(JSON.stringify([target.channel,target.recipient]),{recipient:target.recipient,channel:target.channel as NotificationChannel});
+  }
+  return [...output.values()];
+}
+async function readOrder(tx:Tx,row:OrderRow):Promise<OrderSnapshot> {
+  const items=await tx.$queryRaw<{product_id:bigint;title:string;quantity:number;unit_price_minor:number;total_minor:number}[]>`SELECT product_id,title,quantity,unit_price_minor,total_minor FROM commerce_order_items WHERE order_id=${row.id} ORDER BY product_id`;
+  return {id:row.id,memberId:row.member_id,status:row.status,currency:row.currency,subtotalMinor:row.subtotal_minor,shippingFeeMinor:row.shipping_fee_minor,totalMinor:row.total_minor,shipping:typeof row.shipping==='string'?JSON.parse(row.shipping):row.shipping,items:items.map(item=>({productId:item.product_id,title:item.title,quantity:item.quantity,unitPriceMinor:item.unit_price_minor,totalMinor:item.total_minor}))};
+}
+function attemptView(row:AttemptRow):PaymentAttempt {
+  return {id:row.id,orderId:row.order_id,provider:row.provider,reference:row.provider_ref,redirectUrl:row.redirect_url,merchantOrderId:row.merchant_order_id,amountMinor:row.amount_minor,currency:row.currency,status:row.status};
+}
+
+/** Auth/RBAC and fail-closed feature policy belong at the request boundary.
+ * Caller supplies only trusted member ID and trusted server shipping policy.
+ * Stock is reserved at order creation; no automatic expiry is inferred here. */
+export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:OrderPolicy):Promise<OrderSnapshot> {
+  id(input.memberId);identifier(input.requestKey,80);
+  if(input.requestKey.length<16) throw new Error('invalid_request_key');
+  const items=normalizeOrderRequest(input.items), shipping=shippingSnapshot(input.shipping);
+  const shippingFeeMinor=checkedMoney(policy.shippingFeeMinor);
+  const fingerprint=requestFingerprint(items,shipping);
+  await assertCommerceSchemaReady(db);
+  return db.$transaction(async tx=>{
+    // Unique member/request key serializes concurrent replays. Building rows
+    // never commit: any stock or insert failure rolls the whole transaction back.
+    await tx.$executeRaw`INSERT INTO commerce_orders (member_id,request_key,request_fingerprint,shipping) VALUES (${input.memberId},${input.requestKey},${fingerprint},${JSON.stringify(shipping)}) ON DUPLICATE KEY UPDATE id=id`;
+    const [row]=await tx.$queryRaw<OrderRow[]>`SELECT * FROM commerce_orders WHERE member_id=${input.memberId} AND request_key=${input.requestKey} FOR UPDATE`;
+    if(!row||row.request_fingerprint!==fingerprint) throw new Error('request_conflict');
+    if(row.status!=='building') return readOrder(tx,row);
+    const totals:number[]=[];
+    for(const item of items) {
+      const [product]=await tx.$queryRaw<{id:bigint;title:string;price_minor:number;currency:string;stock_available:number;stock_reserved:number;approved:number;visible:number;enabled:number}[]>`SELECT id,title,price_minor,currency,stock_available,stock_reserved,approved,visible,enabled FROM commerce_products WHERE id=${item.productId} FOR UPDATE`;
+      if(!product||product.approved!==1||product.visible!==1||product.enabled!==1||product.currency!=='SAR'||product.price_minor<=0||product.stock_available<item.quantity) throw new Error('product_unavailable');
+      checkedMoney(product.stock_available);checkedMoney(product.stock_reserved+item.quantity);
+      const total=lineTotal(product.price_minor,item.quantity);totals.push(total);
+      await tx.$executeRaw`UPDATE commerce_products SET stock_available=stock_available-${item.quantity},stock_reserved=stock_reserved+${item.quantity},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${item.productId}`;
+      await tx.$executeRaw`INSERT INTO commerce_order_items (order_id,product_id,title,quantity,unit_price_minor,total_minor) VALUES (${row.id},${item.productId},${product.title},${item.quantity},${product.price_minor},${total})`;
+      // Lock mapping (including its absent-key gap) and profile while snapshotting.
+      // Never accept supplier identity/cost from checkout input.
+      const [mapping]=await tx.$queryRaw<{supplier_id:bigint;supplier_sku:string;unit_cost_minor:number;currency:string}[]>`SELECT supplier_id,supplier_sku,unit_cost_minor,currency FROM commerce_product_suppliers WHERE product_id=${item.productId} FOR UPDATE`;
+      if(mapping) {
+        const [supplier]=await tx.$queryRaw<{name:string;active:number}[]>`SELECT name,active FROM commerce_suppliers WHERE id=${mapping.supplier_id} FOR SHARE`;
+        if(!supplier||supplier.active!==1) throw new Error('supplier_unavailable');
+        if(mapping.currency!=='SAR') throw new Error('supplier_currency_invalid');
+        const cost=lineTotal(mapping.unit_cost_minor,item.quantity);
+        await tx.$executeRaw`INSERT INTO commerce_order_suppliers (order_id,product_id,supplier_id,supplier_name,supplier_sku,quantity,unit_cost_minor,total_cost_minor) VALUES (${row.id},${item.productId},${mapping.supplier_id},${supplier.name},${mapping.supplier_sku},${item.quantity},${mapping.unit_cost_minor},${cost})`;
+      }
+    }
+    const subtotal=sumMoney(totals), total=sumMoney([subtotal,shippingFeeMinor]);
+    await tx.$executeRaw`UPDATE commerce_orders SET status='awaiting_payment',subtotal_minor=${subtotal},shipping_fee_minor=${shippingFeeMinor},total_minor=${total} WHERE id=${row.id}`;
+    await tx.$executeRaw`INSERT INTO commerce_audit_events (order_id,event,payload) VALUES (${row.id},'order_created',${JSON.stringify({memberId:input.memberId.toString(),totalMinor:total,currency:'SAR'})})`;
+    return readOrder(tx,{...row,status:'awaiting_payment',subtotal_minor:subtotal,shipping_fee_minor:shippingFeeMinor,total_minor:total});
+  },transactionOptions);
+}
+
+/** Only orders that have NEVER attempted payment can release reserved stock.
+ * Lock order then attempt, matching payment creation and settlement. Unknown
+ * gateway results are not evidence that a payment failed. */
+export async function cancelUnstartedOrder(db:CommerceDb,input:{memberId:bigint;orderId:bigint}):Promise<{orderId:bigint;alreadyCancelled:boolean}> {
+  id(input.memberId);id(input.orderId);
+  await assertCommerceSchemaReady(db);
+  return db.$transaction(async tx=>{
+    const [order]=await tx.$queryRaw<OrderRow[]>`SELECT * FROM commerce_orders WHERE id=${input.orderId} AND member_id=${input.memberId} FOR UPDATE`;
+    if(!order) throw new Error('order_not_found');
+    const attempts=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM commerce_payment_attempts WHERE order_id=${order.id} FOR UPDATE`;
+    if(attempts.length) throw new Error('payment_attempt_exists');
+    if(order.status==='cancelled') return {orderId:order.id,alreadyCancelled:true};
+    if(order.status!=='awaiting_payment') throw new Error('order_not_cancellable');
+    const items=await tx.$queryRaw<{product_id:bigint;quantity:number}[]>`SELECT product_id,quantity FROM commerce_order_items WHERE order_id=${order.id} ORDER BY product_id`;
+    if(!items.length) throw new Error('order_items_missing');
+    for(const item of items) {
+      lineTotal(0,item.quantity);
+      const limit=MAX_MONEY_MINOR-item.quantity;
+      const changed=await tx.$executeRaw`UPDATE commerce_products SET stock_reserved=stock_reserved-${item.quantity},stock_available=stock_available+${item.quantity},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${item.product_id} AND stock_reserved>=${item.quantity} AND stock_available<=${limit}`;
+      if(changed!==1) throw new Error('reservation_mismatch');
+    }
+    await tx.$executeRaw`UPDATE commerce_orders SET status='cancelled',fulfillment_status='cancelled' WHERE id=${order.id}`;
+    await tx.$executeRaw`INSERT INTO commerce_audit_events (order_id,event,payload) VALUES (${order.id},'order_cancelled',${JSON.stringify({memberId:input.memberId.toString()})})`;
+    return {orderId:order.id,alreadyCancelled:false};
+  },transactionOptions);
+}
+
+/** A true result is a one-use permission to create externally. On timeout/crash,
+ * the persisted attempt stays creating/uncertain; NEVER call create again. */
+export async function claimPaymentAttempt(db:CommerceDb,input:{memberId:bigint;orderId:bigint;provider:string}):Promise<PaymentClaim> {
+  id(input.memberId);id(input.orderId);identifier(input.provider,40);
+  await assertCommerceSchemaReady(db);
+  return db.$transaction(async tx=>{
+    const [order]=await tx.$queryRaw<OrderRow[]>`SELECT * FROM commerce_orders WHERE id=${input.orderId} AND member_id=${input.memberId} FOR UPDATE`;
+    if(!order) throw new Error('order_not_found');
+    const [existing]=await tx.$queryRaw<AttemptRow[]>`SELECT * FROM commerce_payment_attempts WHERE order_id=${order.id} FOR UPDATE`;
+    if(existing) return {claimed:false,attempt:attemptView(existing)};
+    if(order.status!=='awaiting_payment') throw new Error('order_not_payable');
+    checkedMoney(order.total_minor);if(order.total_minor<=0||order.currency!=='SAR') throw new Error('order_not_payable');
+    const token=randomUUID(),merchantOrderId=`commerce:${order.id}:${randomUUID()}`;
+    await tx.$executeRaw`INSERT INTO commerce_payment_attempts (order_id,provider,merchant_order_id,claim_token,amount_minor,currency) VALUES (${order.id},${input.provider},${merchantOrderId},${token},${order.total_minor},'SAR')`;
+    const [attempt]=await tx.$queryRaw<AttemptRow[]>`SELECT * FROM commerce_payment_attempts WHERE order_id=${order.id}`;
+    return {claimed:true,claimToken:token,attempt:attemptView(attempt)};
+  },transactionOptions);
+}
+async function lockAttempt(tx:Tx,attemptId:bigint):Promise<AttemptRow> {
+  const [lookup]=await tx.$queryRaw<{order_id:bigint}[]>`SELECT order_id FROM commerce_payment_attempts WHERE id=${attemptId}`;
+  if(!lookup) throw new Error('attempt_not_found');
+  // All payment paths lock order then attempt, avoiding inverse lock ordering.
+  await tx.$queryRaw`SELECT id FROM commerce_orders WHERE id=${lookup.order_id} FOR UPDATE`;
+  const [attempt]=await tx.$queryRaw<AttemptRow[]>`SELECT * FROM commerce_payment_attempts WHERE id=${attemptId} FOR UPDATE`;
+  if(!attempt) throw new Error('attempt_not_found');
+  return attempt;
+}
+export async function recordPaymentReference(db:CommerceDb,input:{attemptId:bigint;claimToken:string;reference:string;redirectUrl?:string}):Promise<void> {
+  id(input.attemptId);identifier(input.reference,160);identifier(input.claimToken,36);
+  if(input.redirectUrl!==undefined) {
+    let url:URL;
+    try {url=new URL(input.redirectUrl);} catch {throw new Error('invalid_redirect');}
+    if(typeof input.redirectUrl!=='string'||input.redirectUrl.length>2048||input.redirectUrl!==input.redirectUrl.trim()||url.protocol!=='https:'||!url.hostname||url.username||url.password||url.hash||/[\u0000-\u0020\u007f]/.test(input.redirectUrl)) throw new Error('invalid_redirect');
+  }
+  await assertCommerceSchemaReady(db);
+  await db.$transaction(async tx=>{
+    const attempt=await lockAttempt(tx,input.attemptId);
+    if(attempt.claim_token!==input.claimToken) throw new Error('claim_mismatch');
+    if(attempt.provider_ref && attempt.provider_ref!==input.reference) throw new Error('reference_conflict');
+    if(attempt.redirect_url && input.redirectUrl!==undefined && attempt.redirect_url!==input.redirectUrl) throw new Error('redirect_conflict');
+    if(attempt.status==='paid') return;
+    await tx.$executeRaw`UPDATE commerce_payment_attempts SET provider_ref=${input.reference},redirect_url=${input.redirectUrl??attempt.redirect_url},status='pending' WHERE id=${attempt.id}`;
+  },transactionOptions);
+}
+export async function markPaymentUncertain(db:CommerceDb,input:{attemptId:bigint;claimToken:string}):Promise<void> {
+  id(input.attemptId);identifier(input.claimToken,36);
+  await assertCommerceSchemaReady(db);
+  await db.$transaction(async tx=>{
+    const attempt=await lockAttempt(tx,input.attemptId);
+    if(attempt.claim_token!==input.claimToken) throw new Error('claim_mismatch');
+    if(attempt.status==='paid') return;
+    await tx.$executeRaw`UPDATE commerce_payment_attempts SET status='uncertain' WHERE id=${attempt.id}`;
+    await tx.$executeRaw`UPDATE commerce_orders SET fulfillment_status='action_required' WHERE id=${attempt.order_id}`;
+  },transactionOptions);
+}
+
+/** Never pass browser-return/query/body fields directly. Authenticate/re-query
+ * the provider in a separate adapter first. This service performs NO network I/O.
+ * Unknown references stay unpaid until independently bound/reconciled. */
+export async function settleVerifiedPayment(db:CommerceDb,evidence:VerifiedPayment,recipients:readonly NotificationTarget[]):Promise<{orderId:bigint;alreadyPaid:boolean}> {
+  identifier(evidence.provider,40);identifier(evidence.reference,160);identifier(evidence.merchantOrderId,100);
+  checkedMoney(evidence.amountMinor);
+  if(evidence.verified!==true||evidence.status!=='paid'||evidence.currency!=='SAR') throw new Error('payment_mismatch');
+  const targets=normalizeRecipients(recipients);
+  await assertCommerceSchemaReady(db);
+  return db.$transaction(async tx=>{
+    const [lookup]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM commerce_payment_attempts WHERE merchant_order_id=${evidence.merchantOrderId}`;
+    if(!lookup) throw new Error('attempt_not_found');
+    const attempt=await lockAttempt(tx,lookup.id);
+    const [order]=await tx.$queryRaw<OrderRow[]>`SELECT * FROM commerce_orders WHERE id=${attempt.order_id} FOR UPDATE`;
+    if(!order||!paymentMatches({provider:attempt.provider,reference:attempt.provider_ref||'',merchantOrderId:attempt.merchant_order_id,amountMinor:attempt.amount_minor,currency:attempt.currency},evidence)||order.total_minor!==attempt.amount_minor||order.currency!==attempt.currency) throw new Error('payment_mismatch');
+    if(attempt.status==='paid' && order.status==='paid') return {orderId:order.id,alreadyPaid:true};
+    if(order.status!=='awaiting_payment'||!['pending','uncertain'].includes(attempt.status)) throw new Error('payment_state_conflict');
+    const items=await tx.$queryRaw<{product_id:bigint;quantity:number}[]>`SELECT product_id,quantity FROM commerce_order_items WHERE order_id=${order.id} ORDER BY product_id`;
+    if(!items.length) throw new Error('order_items_missing');
+    for(const item of items) {
+      const changed=await tx.$executeRaw`UPDATE commerce_products SET stock_reserved=stock_reserved-${item.quantity},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${item.product_id} AND stock_reserved>=${item.quantity}`;
+      if(changed!==1) throw new Error('reservation_mismatch');
+    }
+    await tx.$executeRaw`UPDATE commerce_payment_attempts SET status='paid',paid_at=CURRENT_TIMESTAMP(3) WHERE id=${attempt.id}`;
+    await tx.$executeRaw`UPDATE commerce_orders SET status='paid',fulfillment_status='offline_pending',paid_at=CURRENT_TIMESTAMP(3) WHERE id=${order.id}`;
+    await tx.$executeRaw`INSERT INTO commerce_receipts (order_id,provider,provider_ref,amount_minor,currency) VALUES (${order.id},${attempt.provider},${attempt.provider_ref},${attempt.amount_minor},'SAR')`;
+    // Only immutable order snapshots feed the subledger: a later supplier disable
+    // or product remapping must not prevent receipt of a verified historical payment.
+    await tx.$executeRaw`INSERT INTO commerce_supplier_accruals (order_id,product_id,supplier_id,amount_minor,currency,status) SELECT order_id,product_id,supplier_id,total_cost_minor,'SAR','offline_pending' FROM commerce_order_suppliers WHERE order_id=${order.id}`;
+    const payload=JSON.stringify({orderId:order.id.toString(),amountMinor:attempt.amount_minor,currency:'SAR',providerReference:attempt.provider_ref});
+    await tx.$executeRaw`INSERT INTO commerce_audit_events (order_id,event,payload) VALUES (${order.id},'payment_paid',${payload})`;
+    // The caller's 50-target limit was already validated and deduplicated.
+    // The mandatory internal delivery is additional, not another caller target.
+    const memberRecipient=`member:${order.member_id}`;
+    const deliveries:NotificationTarget[]=targets.some(target=>target.channel==='in_app' && target.recipient===memberRecipient)
+      ? targets : [...targets,{recipient:memberRecipient,channel:'in_app'}];
+    for(const target of deliveries) await tx.$executeRaw`INSERT INTO commerce_notifications (order_id,event,channel,recipient,payload) VALUES (${order.id},'payment_paid',${target.channel},${target.recipient},${payload})`;
+    return {orderId:order.id,alreadyPaid:false};
+  },transactionOptions);
+}

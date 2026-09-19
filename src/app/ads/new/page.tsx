@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCountries, getCities, getAreas } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
+import { getCategoryFormConfig } from '@/lib/ad-categories/service';
 import { getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { createAdAction } from '../actions';
 
@@ -139,6 +140,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
       )}
 
       <AdForm
+        categoryConfig={await getCategoryFormConfig()}
         allowSchedule={allowSchedule}
         scheduleMaxDays={scheduleMaxDays}
         allowOldPrice={dealsOn}

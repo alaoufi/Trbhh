@@ -8,7 +8,7 @@ import { ensureSchema } from '@/data/schema-sync';
 
 export type Service =
   | 'users' | 'ads' | 'duplicates' | 'classified'
-  | 'words' | 'reports' | 'verifications' | 'comments' | 'packages' | 'promos' | 'backup' | 'messages' | 'stores';
+  | 'words' | 'reports' | 'verifications' | 'comments' | 'packages' | 'promos' | 'backup' | 'messages' | 'stores' | 'commerce' | 'categories' | 'suppliers';
 export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive' | 'suspend' | 'ban';
 
 /** Backward-compat alias: a "Perm" is a service (page-level access). */
@@ -33,6 +33,9 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
   { key: 'promos',        label: 'الإعلانات الترويجية',  actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'backup',        label: 'النسخ الاحتياطي',      actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'stores',        label: 'المتاجر',            actions: ['view', 'edit', 'suspend', 'delete'] },
+  { key: 'commerce',      label: 'السلع والطلبات',      actions: ['view', 'add', 'edit', 'suspend'] },
+  { key: 'suppliers',     label: 'الموردون وربط السلع', actions: ['view', 'add', 'edit'] },
+  { key: 'categories',    label: 'الأقسام وحقولها',      actions: ['view', 'add', 'edit', 'delete', 'suspend'] },
 ];
 
 export const ACTION_LABELS: Record<Action, string> = {

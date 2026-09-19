@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AdCategorySummary } from '@/components/ad-category-summary';
 import Image from 'next/image';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
@@ -90,8 +91,8 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
   // حالة التوفر + السعر قبل الخصم (تفعيلهما العام من التحكم)
   const xtr = await import('@/lib/store-extras');
   const [stockOn, dealsOn] = await Promise.all([xtr.stockEnabled(), xtr.dealsEnabled()]);
-  const stockBadge = stockOn ? xtr.STOCK_BADGE[ad.stockState ?? 0] : undefined;
-  const showOld = dealsOn && ad.oldPrice > ad.price && ad.price > 0;
+  const stockBadge = stockOn && ad.goodsEnabled ? xtr.STOCK_BADGE[ad.stockState ?? 0] : undefined;
+  const showOld = ad.goodsEnabled && ad.priceEnabled && dealsOn && ad.oldPrice > ad.price && ad.price > 0;
   const dealPct = showOld ? Math.round((1 - ad.price / ad.oldPrice) * 100) : 0;
 
   const jsonLd = {
@@ -102,7 +103,7 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
     image: ad.images,
     url: shareUrl,
     ...(ad.createdAt ? { datePosted: ad.createdAt } : {}),
-    ...(ad.price > 0
+    ...(ad.priceEnabled && ad.price > 0
       ? { offers: { '@type': 'Offer', price: ad.price, priceCurrency: 'SAR', availability: 'https://schema.org/InStock', url: shareUrl, seller: { '@type': 'Organization', name } } }
       : {}),
   };
@@ -155,11 +156,13 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
         {/* السعر والوصف */}
         <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5">
           <div className="mb-3 flex flex-wrap items-baseline gap-2">
-            {(ad.price > 0 || ad.adsType === 'request') && <span className="text-2xl font-bold" style={{ color: brand }}>{ad.price > 0 ? formatPrice(ad.price) : 'مطلوب'}</span>}
+            {ad.priceEnabled && (ad.price > 0 || ad.adsType === 'request') && <span className="text-2xl font-bold" style={{ color: brand }}>{ad.price > 0 ? formatPrice(ad.price) : 'مطلوب'}</span>}
             {showOld && <span className="text-sm text-muted-foreground line-through" dir="ltr">{formatPrice(ad.oldPrice)}</span>}
             {dealPct > 0 && <span className="rounded bg-rose-600 px-2 py-0.5 text-xs font-extrabold text-white">خصم {dealPct}٪</span>}
             {stockBadge && <span className={`rounded px-2 py-0.5 text-xs font-extrabold ${stockBadge.cls}`}>{stockBadge.label}</span>}
           </div>
+          {ad.subcategoryName && <p className="mb-2 text-sm font-bold">{ad.subcategoryName}</p>}
+          <AdCategorySummary fields={ad.categoryFields}/>
           <p className="whitespace-pre-line leading-7 text-foreground/90">{ad.detail}</p>
         </div>
 

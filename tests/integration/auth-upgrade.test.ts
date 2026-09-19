@@ -8,6 +8,24 @@ import type { PrismaClient } from '@prisma/client';
 
 const BASELINE = '27b804d13ba884fb7cd3704356eb38c5faa29ab4';
 const DATABASE = 'trbhh_upgrade_test';
+// Explicit release allowlist, checked against commerce/schema.ts, ad-categories/schema.ts
+// and Prisma. Do not derive this from the observed database: extra/missing columns must fail.
+const ADDITIVE_TABLE_COLUMNS: Record<string, string[]> = {
+  ad_category_definitions: ['subcategory_id', 'version', 'kind', 'price_enabled', 'goods_enabled', 'fields_json'],
+  ad_category_values: ['ad_id', 'subcategory_id', 'definition_version', 'values_json'],
+  ad_category_audit: ['id', 'actor_id', 'action', 'payload', 'created_at'],
+  commerce_products: ['id', 'ad_id', 'title', 'price_minor', 'currency', 'stock_available', 'stock_reserved', 'approved', 'visible', 'enabled', 'created_at', 'updated_at'],
+  commerce_orders: ['id', 'member_id', 'request_key', 'request_fingerprint', 'status', 'currency', 'subtotal_minor', 'shipping_fee_minor', 'total_minor', 'shipping', 'fulfillment_status', 'created_at', 'paid_at'],
+  commerce_order_items: ['id', 'order_id', 'product_id', 'title', 'quantity', 'unit_price_minor', 'total_minor'],
+  commerce_payment_attempts: ['id', 'order_id', 'provider', 'provider_ref', 'redirect_url', 'merchant_order_id', 'claim_token', 'amount_minor', 'currency', 'status', 'created_at', 'paid_at'],
+  commerce_notifications: ['id', 'order_id', 'event', 'channel', 'recipient', 'payload', 'status', 'claim_token', 'last_error', 'created_at', 'claimed_at', 'sent_at'],
+  commerce_audit_events: ['id', 'order_id', 'event', 'payload', 'created_at'],
+  commerce_suppliers: ['id', 'name', 'contact_name', 'phone', 'email', 'address', 'registration_number', 'tax_number', 'settlement_terms', 'notes', 'api_base_url', 'api_credential_ref', 'active', 'api_enabled', 'created_at', 'updated_at'],
+  commerce_product_suppliers: ['product_id', 'supplier_id', 'supplier_sku', 'unit_cost_minor', 'currency'],
+  commerce_order_suppliers: ['order_id', 'product_id', 'supplier_id', 'supplier_name', 'supplier_sku', 'quantity', 'unit_cost_minor', 'total_cost_minor'],
+  commerce_receipts: ['id', 'order_id', 'provider', 'provider_ref', 'amount_minor', 'currency', 'recorded_at'],
+  commerce_supplier_accruals: ['id', 'order_id', 'product_id', 'supplier_id', 'amount_minor', 'currency', 'status', 'created_at'],
+};
 const request = vi.hoisted(() => ({ token: '' }));
 // Only the HTTP cookie boundary is mocked. Schema, data, JWT and bcrypt are real.
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => ({ value: request.token }) }) }));
@@ -150,6 +168,7 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
     const added = (await columns()).filter((c) => !baselineColumns.some((old) => old.table_name === c.table_name && old.column_name === c.column_name));
     expect(added.map((c) => `${c.table_name}.${c.column_name}`).sort()).toEqual([
       'users.auth_session_version', 'auth_mfa.user_id', 'auth_mfa.secret', 'auth_mfa.recovery_hashes', 'auth_mfa.last_step', 'auth_mfa.version', 'auth_mfa.created_at', 'auth_security_limits.k', 'auth_security_limits.hits', 'auth_security_limits.expires_at',
+      ...Object.entries(ADDITIVE_TABLE_COLUMNS).flatMap(([table, names]) => names.map((name) => `${table}.${name}`)),
     ].sort());
     expect(added.find((c) => c.table_name === 'users')).toMatchObject({ column_type: 'varchar(64)', is_nullable: 'NO', column_default: '0' });
     expect(added.find((c) => c.table_name === 'auth_mfa' && c.column_name === 'last_step')).toMatchObject({ column_type: 'bigint', is_nullable: 'NO', column_default: '-1' });

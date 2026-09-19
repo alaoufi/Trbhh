@@ -14,8 +14,12 @@ import { publicStoreWhere } from './store-subscription-access';
 import { equivalentAreaIds, normalizePriceRange } from './search-filters';
 import { compactAdTitle } from './ad-presentation';
 import { searchCardVisibility } from './search-card-visibility';
+import { getPublicCategories, getCategoryEditValues, type PublicCategory } from './ad-categories/service';
 
 export type AdCard = {
+  priceEnabled?: boolean;
+  goodsEnabled?: boolean;
+  categoryFields?: PublicCategory['categoryFields'];
   id: number;
   title: string;
   price: number;
@@ -121,6 +125,7 @@ type AdRow = {
 
 async function toCards(rows: AdRow[]): Promise<AdCard[]> {
   const ids = rows.map((r) => r.id);
+  const categoryData = await getPublicCategories(ids);
   const { getAdRatingsBrief } = await import('./ad-reviews');
   const [images, views, cities, cats, sellers, adMeta, ratings, areas] = await Promise.all([
     primaryImages(ids),
@@ -153,6 +158,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
       const s = sellers.get(toInt(r.user_id));
       return {
         id: toInt(r.id),
+        ...categoryData.get(toInt(r.id)),
         title: compactAdTitle(censorSync(r.title)),
         price: r.price,
         priceType: r.price_type ?? null,
@@ -169,7 +175,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         sellerName: s?.name ?? null,
         sellerTrusted: s?.trusted ?? false,
         tier: adMeta.get(toInt(r.user_id))?.tier ?? '',
-        oldPrice: r.old_price && r.old_price > r.price ? r.old_price : 0,
+        oldPrice: categoryData.get(toInt(r.id))?.goodsEnabled === false ? 0 : (r.old_price && r.old_price > r.price ? r.old_price : 0),
         ratingAvg: ratings.get(toInt(r.id))?.avg ?? 0,
         ratingCount: ratings.get(toInt(r.id))?.count ?? 0,
       };
@@ -609,10 +615,15 @@ async function getAdImpl(id: number) {
   // هوية النشر: إن نُشر الإعلان بهوية شخصية (profile_id) تُعرض بياناتها (اسم/صورة/تواصل/لون)
   // بدل بيانات الحساب الأساسي. إعلانات المتجر تبقى بعرض المتجر كما هو.
   const pubProfile = ad.profile_id ? await getProfileDisplay(toInt(ad.profile_id)).catch(() => null) : null;
+  const categoryData = (await getPublicCategories([ad.id])).get(toInt(ad.id));
 
   await loadBanned();
   return {
     id: toInt(ad.id),
+    priceEnabled: categoryData?.priceEnabled ?? true,
+    goodsEnabled: categoryData?.goodsEnabled ?? true,
+    categoryFields: categoryData?.categoryFields ?? [],
+    subcategoryName: categoryData?.subcategoryName,
     title: compactAdTitle(censorSync(ad.title)),
     detail: censorSync(ad.detail),
     price: ad.price,
@@ -713,6 +724,7 @@ export async function getAdForEdit(id: number, userId: number) {
   if (!ad || toInt(ad.user_id) !== userId) return null;
   const owner = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { phoneNumber: true, phone_whatsapp: true } });
   return {
+    categoryValues: await getCategoryEditValues(ad.id),
     id: toInt(ad.id),
     title: ad.title,
     detail: ad.detail,

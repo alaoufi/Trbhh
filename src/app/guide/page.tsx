@@ -3,6 +3,9 @@ import {
   Flag, ShieldCheck, Crown, MonitorPlay, BarChart3, ShieldAlert, Rocket, Wallet, UserPen, Users,
 } from 'lucide-react';
 import { GuideView, type GuideSection } from '@/components/guide-view';
+import { getCommerceConfig } from '@/lib/commerce/settings';
+import { getSetting } from '@/lib/settings';
+import { CATEGORY_LABELS } from '@/lib/ad-categories/contracts';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'دليل المستخدم' };
@@ -242,6 +245,32 @@ const SECTIONS: GuideSection[] = [
 ];
 
 export default async function GuidePage() {
+  const [commerce, categoriesOn, categoryTitle] = await Promise.all([
+    getCommerceConfig().catch(() => null),
+    getSetting('categories_v2_enabled', '0').catch(() => '0'),
+    getSetting('categories_v2_label_section', CATEGORY_LABELS.section).catch(() => CATEGORY_LABELS.section),
+  ]);
+  const sections: GuideSection[] = [...SECTIONS];
+  if (categoriesOn === '1') sections.push({
+    id: 'category-fields', title: categoryTitle, icon: ShieldCheck, from: '#142b45', to: '#234768',
+    goal: 'إكمال مواصفات الإعلان بحسب القسم المتاح عند الإضافة أو التعديل.',
+    steps: [
+      'اختر القسم ثم القسم الفرعي، وأكمل الحقول المطلوبة فقط. الحقول الاختيارية الفارغة لا تظهر في التفاصيل.',
+      'الحقول تتبع نوع الإعلان؛ الوظائف لا تعرض حقول حالة السلعة أو سعر البيع غير المناسب لها. إذا تغيّر تعريف القسم أعد تحميل النموذج قبل الحفظ.',
+      'اختيار القسم لا يحوّل الإعلان إلى سلعة معتمدة للشراء المباشر؛ الإعلانات العادية تبقى للتواصل والاتفاق والدفع خارج المنصة.',
+    ],
+  });
+  if (commerce?.enabled) sections.push({
+    id: 'approved-commerce', title: commerce.text.title, icon: ShieldCheck, from: '#142b45', to: '#234768',
+    goal: commerce.text.description,
+    steps: [
+      'الإعلانات العادية تبقى للتواصل والاتفاق والدفع خارج المنصة. في السلع المعتمدة للشراء المباشر تشتري من تربح، لا من الموردين.',
+      'وجود الكتالوج لا يعني تفعيل الدفع. الدفع المباشر مشروط بإعدادات الإدارة وجاهزية البنك؛ تكامل البنك الحالي غير مسجّل للتشغيل، ولم تُفعّل الخدمة الحية ضمن هذا العمل.',
+      'عند إتاحة الخدمة راجع الكمية والعنوان ورقم الجوال ورسوم الشحن والإجمالي قبل المتابعة. رسوم الشحن تضبطها الإدارة، بما فيها الصفر الصريح؛ ليست رسوماً يضيفها المتصفح.',
+      'لا يتأكد الدفع إلا بعد تحقق خادم تربح من البنك. إذا بقيت النتيجة معلّقة أو غير محسومة فلا تبدأ محاولة دفع جديدة؛ احتفظ برقم الطلب وتواصل مع الدعم. الرجوع من صفحة البنك وحده ليس إثباتاً للدفع.',
+      'رسالة الطلب للتنبيه فقط؛ تأخرها أو فشلها لا يعني فشل الدفع، وإرسال الإشعارات لا يعيد الخصم.',
+    ],
+  });
   return (
     <GuideView
       topId="guide-top"
@@ -249,7 +278,7 @@ export default async function GuidePage() {
       title="دليل المستخدم"
       subtitle="للزوّار والأعضاء فقط: كل ما تحتاجه لتنشر وتبيع وتتواصل — بالهدف والخطوات."
       fromColor="#3287da" toColor="#1b4f8a"
-      sections={SECTIONS}
+      sections={sections}
     >
       {/* بدء سريع */}
       <section className="card-3d overflow-hidden rounded-2xl">

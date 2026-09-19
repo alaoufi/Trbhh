@@ -3,6 +3,207 @@ generator client {
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
+model ad_category_definitions {
+  subcategory_id BigInt @id @db.UnsignedBigInt
+  version Int @default(1)
+  kind String @default("other") @db.VarChar(16)
+  price_enabled Int @default(1) @db.TinyInt
+  goods_enabled Int @default(0) @db.TinyInt
+  fields_json Json
+}
+
+model ad_category_values {
+  ad_id BigInt @id @db.UnsignedBigInt
+  subcategory_id BigInt @db.UnsignedBigInt
+  definition_version Int
+  values_json Json
+  @@index([subcategory_id], map: "ad_category_values_sub")
+}
+
+model ad_category_audit {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  actor_id BigInt @db.UnsignedBigInt
+  action String @db.VarChar(40)
+  payload Json
+  created_at DateTime @default(now()) @db.DateTime(3)
+}
+
+// Approved goods only. Independent from member ads, wallet top-ups and supplier payouts.
+// MySQL binary identifier collations and readiness indexes are enforced by commerce/schema.ts.
+model commerce_suppliers {
+  product_mappings commerce_product_suppliers[]
+  order_snapshots commerce_order_suppliers[]
+  accruals commerce_supplier_accruals[]
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  name String @db.VarChar(200)
+  contact_name String @default("") @db.VarChar(200)
+  phone String @default("") @db.VarChar(40)
+  email String @default("") @db.VarChar(254)
+  address String @default("") @db.VarChar(500)
+  registration_number String @default("") @db.VarChar(100)
+  tax_number String @default("") @db.VarChar(100)
+  settlement_terms String @default("") @db.VarChar(2000)
+  notes String @default("") @db.VarChar(2000)
+  api_base_url String @default("") @db.VarChar(2048)
+  api_credential_ref String @default("") @db.VarChar(128)
+  active Int @default(0) @db.TinyInt
+  api_enabled Int @default(0) @db.TinyInt
+  created_at DateTime @default(now()) @db.DateTime(3)
+  updated_at DateTime @default(now()) @db.DateTime(3)
+}
+model commerce_product_suppliers {
+  product commerce_products @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_product_supplier_product_fk")
+  supplier commerce_suppliers @relation(fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_product_supplier_supplier_fk")
+  product_id BigInt @id @db.UnsignedBigInt
+  supplier_id BigInt @db.UnsignedBigInt
+  supplier_sku String @default("") @db.VarChar(200)
+  unit_cost_minor Int
+  currency String @default("SAR") @db.VarChar(3)
+}
+model commerce_order_suppliers {
+  item commerce_order_items @relation(fields: [order_id, product_id], references: [order_id, product_id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_order_supplier_item_fk")
+  supplier commerce_suppliers @relation(fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_order_supplier_supplier_fk")
+  accrual commerce_supplier_accruals?
+  order_id BigInt @db.UnsignedBigInt
+  product_id BigInt @db.UnsignedBigInt
+  supplier_id BigInt @db.UnsignedBigInt
+  supplier_name String @db.VarChar(200)
+  supplier_sku String @default("") @db.VarChar(200)
+  quantity Int
+  unit_cost_minor Int
+  total_cost_minor Int
+  @@id([order_id, product_id])
+}
+model commerce_receipts {
+  order commerce_orders @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_receipt_order_fk")
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id BigInt @unique(map: "commerce_receipt_order") @db.UnsignedBigInt
+  provider String @db.VarChar(40)
+  provider_ref String @db.VarChar(160)
+  amount_minor Int
+  currency String @default("SAR") @db.VarChar(3)
+  recorded_at DateTime @default(now()) @db.DateTime(3)
+  @@unique([provider, provider_ref], map: "commerce_receipt_reference")
+}
+model commerce_supplier_accruals {
+  snapshot commerce_order_suppliers @relation(fields: [order_id, product_id], references: [order_id, product_id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_accrual_snapshot_fk")
+  supplier commerce_suppliers @relation(fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_accrual_supplier_fk")
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id BigInt @db.UnsignedBigInt
+  product_id BigInt @db.UnsignedBigInt
+  supplier_id BigInt @db.UnsignedBigInt
+  amount_minor Int
+  currency String @default("SAR") @db.VarChar(3)
+  status String @default("offline_pending") @db.VarChar(32)
+  created_at DateTime @default(now()) @db.DateTime(3)
+  @@unique([order_id, product_id], map: "commerce_accrual_item")
+}
+
+model commerce_products {
+  supplier_mapping commerce_product_suppliers?
+  id              BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  ad_id           BigInt?  @db.UnsignedBigInt
+  title           String   @db.VarChar(200)
+  price_minor     Int
+  currency        String   @default("SAR") @db.VarChar(3)
+  stock_available Int      @default(0)
+  stock_reserved  Int      @default(0)
+  approved        Int      @default(0) @db.TinyInt
+  visible         Int      @default(0) @db.TinyInt
+  enabled         Int      @default(0) @db.TinyInt
+  created_at      DateTime @default(now()) @db.DateTime(3)
+  updated_at      DateTime @default(now()) @db.DateTime(3)
+  items           commerce_order_items[]
+
+  @@index([ad_id], map: "commerce_products_ad")
+}
+
+model commerce_orders {
+  receipt commerce_receipts?
+  id                  BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  member_id           BigInt   @db.UnsignedBigInt
+  request_key         String   @db.VarChar(80)
+  request_fingerprint String   @db.Char(64)
+  status              String   @default("building") @db.VarChar(24)
+  currency            String   @default("SAR") @db.VarChar(3)
+  subtotal_minor      Int      @default(0)
+  shipping_fee_minor  Int      @default(0)
+  total_minor         Int      @default(0)
+  shipping            Json
+  fulfillment_status  String   @default("awaiting_payment") @db.VarChar(32)
+  created_at          DateTime @default(now()) @db.DateTime(3)
+  paid_at             DateTime? @db.DateTime(3)
+  items               commerce_order_items[]
+  attempt             commerce_payment_attempts?
+  notifications       commerce_notifications[]
+  audit_events        commerce_audit_events[]
+
+  @@unique([member_id, request_key], map: "commerce_orders_request")
+}
+
+model commerce_order_items {
+  supplier_snapshot commerce_order_suppliers?
+  id               BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id         BigInt @db.UnsignedBigInt
+  product_id       BigInt @db.UnsignedBigInt
+  title            String @db.VarChar(200)
+  quantity         Int
+  unit_price_minor Int
+  total_minor      Int
+  order            commerce_orders @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_items_order_fk")
+  product          commerce_products @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_items_product_fk")
+
+  @@unique([order_id, product_id], map: "commerce_items_product")
+}
+
+model commerce_payment_attempts {
+  id                BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id          BigInt @unique(map: "commerce_attempt_order") @db.UnsignedBigInt
+  provider          String @db.VarChar(40)
+  provider_ref      String? @db.VarChar(160)
+  redirect_url      String? @db.Text
+  merchant_order_id String @unique(map: "commerce_attempt_merchant") @db.VarChar(100)
+  claim_token       String @db.Char(36)
+  amount_minor      Int
+  currency          String @default("SAR") @db.VarChar(3)
+  status            String @default("creating") @db.VarChar(24)
+  created_at        DateTime @default(now()) @db.DateTime(3)
+  paid_at           DateTime? @db.DateTime(3)
+  order             commerce_orders @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_attempt_order_fk")
+
+  @@unique([provider, provider_ref], map: "commerce_attempt_reference")
+}
+
+model commerce_notifications {
+  id          BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id    BigInt @db.UnsignedBigInt
+  event       String @db.VarChar(40)
+  channel     String @db.VarChar(16)
+  recipient   String @db.VarChar(191)
+  payload     Json
+  status      String @default("pending") @db.VarChar(16)
+  claim_token String? @db.VarChar(36)
+  last_error  String? @db.VarChar(300)
+  created_at  DateTime @default(now()) @db.DateTime(3)
+  claimed_at  DateTime? @db.DateTime(3)
+  sent_at     DateTime? @db.DateTime(3)
+  order       commerce_orders @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_notifications_order_fk")
+
+  @@unique([order_id, event, channel, recipient], map: "commerce_notifications_delivery")
+  @@index([status, id], map: "commerce_notifications_status")
+}
+
+model commerce_audit_events {
+  id         BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id   BigInt @db.UnsignedBigInt
+  event      String @db.VarChar(40)
+  payload    Json
+  created_at DateTime @default(now()) @db.DateTime(3)
+  order      commerce_orders @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_audit_order_fk")
+
+  @@unique([order_id, event], map: "commerce_audit_event")
+}
+
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")

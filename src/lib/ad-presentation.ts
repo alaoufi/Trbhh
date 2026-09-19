@@ -1,6 +1,7 @@
-type PriceData = { price: number; adsType?: string; priceType?: string | null; rentPeriod?: string | null };
+type PriceData = { price: number; adsType?: string; priceType?: string | null; rentPeriod?: string | null; priceEnabled?:boolean };
 
 export function adPriceLabel(ad: PriceData): string {
+  if(ad.priceEnabled === false) return '';
   if (!Number.isFinite(ad.price) || ad.price <= 0) {
     if (ad.priceType === 'som') return 'على السوم';
     if (ad.priceType === 'negotiable') return 'السعر قابل للتفاوض';

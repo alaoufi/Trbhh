@@ -2,9 +2,25 @@ name: تشخيص - فحص أدوات البناء على الخادم
 
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        default: diagnose
+        options: [diagnose, activate_categories]
+        description: Diagnosis or post-deployment category activation
+      backup_id:
+        type: string
+        description: Verified numeric release backup run ID (activation only)
+
+permissions:
+  contents: read
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
 
 jobs:
   check:
+    if: inputs.action == 'diagnose'
     runs-on: ubuntu-latest
     steps:
       - name: فحص عبر SSH
@@ -32,3 +48,117 @@ jobs:
              echo '--- busy process names only ---'; ps -eo comm,etimes,pcpu --sort=-pcpu | head -12
              echo '--- isolated restore status ---'; docker ps --filter label=trbhh.release-verification=34534817972 --format '{{.Names}} {{.Status}}'
              echo '--- internet test (github release) ---'; curl -sS -o /dev/null -w '%{http_code}\n' https://github.com/gradle/gradle-distributions/releases/download/v8.11.1/gradle-8.11.1-bin.zip || echo CURL_FAIL"
+
+  activate_categories:
+    if: inputs.action == 'activate_categories' && github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build payload from pinned real templates
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          corepack enable
+          pnpm install --frozen-lockfile --ignore-scripts
+          node node_modules/vitest/vitest.mjs run tests/unit/activate-categories.test.ts
+          node scripts/release/activate-categories.cjs build > "$RUNNER_TEMP/category-seeds.json"
+      - name: Activate only after deployment preservation proof
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          BACKUP_ID: ${{ inputs.backup_id }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ && "$BACKUP_ID" =~ ^[0-9]+$ ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          PORT="${VPS_PORT:-22}"
+          [[ "$PORT" =~ ^[0-9]+$ ]]
+          SSH=(ssh -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=25 -i "$HOME/.ssh/deploy_key" -p "$PORT")
+          SCP=(scp -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -i "$HOME/.ssh/deploy_key" -P "$PORT")
+          remote="/root/trbhh-release-tools/$GITHUB_SHA"
+          incoming="$remote/activation-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" bash -s -- "$remote" "$incoming" <<'PREPARE'
+          set -euo pipefail
+          umask 077
+          base=/root/trbhh-release-tools
+          [[ ! -L "$base" && ! -L "$1" ]]
+          mkdir -p "$1"
+          [[ "$(realpath "$base")" == "$base" && "$(realpath "$1")" == "$1" ]]
+          mkdir "$2"
+          PREPARE
+          "${SCP[@]}" scripts/release/activate-categories.cjs "$RUNNER_TEMP/category-seeds.json" "$VPS_USER@$VPS_HOST:$incoming/"
+          script_hash=$(sha256sum scripts/release/activate-categories.cjs | cut -d' ' -f1)
+          payload_hash=$(sha256sum "$RUNNER_TEMP/category-seeds.json" | cut -d' ' -f1)
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" bash -s -- "$GITHUB_SHA" "$BACKUP_ID" "$incoming" "$script_hash" "$payload_hash" <<'ACTIVATE'
+          set -euo pipefail
+          umask 077
+          candidate=$1; backup_id=$2; incoming=$3; script_hash=$4; payload_hash=$5
+          backup="/root/trbhh-release-backups/audit-$backup_id"
+          [[ ! -L /root/trbhh && "$(realpath /root/trbhh)" == /root/trbhh ]]
+          [[ ! -L /root/trbhh-release-backups && ! -L "$backup" && "$(realpath "$backup")" == "$backup" ]]
+          for file in VERIFIED DEPLOYMENT_VERIFIED commit.txt container-before.json; do
+            [[ -f "$backup/$file" && ! -L "$backup/$file" ]]
+          done
+          baseline=$(cat "$backup/VERIFIED")
+          [[ "$baseline" =~ ^[0-9a-f]{40}$ && "$baseline" == "$(cat "$backup/commit.txt")" ]]
+          [[ "$(cat "$backup/DEPLOYMENT_VERIFIED")" == "$candidate" ]]
+          database=$(node - "$backup/container-before.json" <<'DATABASE'
+          try {
+            const fs=require('node:fs');
+            const [saved]=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+            const urls=saved.Config.Env.filter(v=>v.startsWith('DATABASE_URL='));
+            if(urls.length!==1)process.exit(1);
+            const url=new URL(urls[0].slice('DATABASE_URL='.length));
+            const name=decodeURIComponent(url.pathname.slice(1));
+            if(url.protocol!=='mysql:' || !/^[A-Za-z0-9_]{1,64}$/.test(name))process.exit(1);
+            process.stdout.write(name);
+          } catch {process.exit(1);}
+          DATABASE
+          )
+          [[ "$database" =~ ^[A-Za-z0-9_]{1,64}$ ]]
+          cd /root/trbhh
+          [[ "$(git rev-parse HEAD)" == "$candidate" ]]
+          printf '%s  %s\n' "$script_hash" "$incoming/activate-categories.cjs" "$payload_hash" "$incoming/category-seeds.json" | sha256sum --check --status
+          container=$(docker compose ps -q app)
+          [[ -n "$container" && "$(docker inspect -f '{{.State.Running}}' "$container")" == true ]]
+          # Bind proof to the same post-verified container and image, not only git HEAD.
+          [[ -f "$backup/container-after.json" && ! -L "$backup/container-after.json" ]]
+          node - "$backup/container-after.json" "$container" "$(docker inspect -f '{{.Image}}' "$container")" <<'CHECK'
+          try {
+            const fs=require('node:fs');
+            const [saved]=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+            if(saved.Id!==process.argv[3] || saved.Image!==process.argv[4])process.exit(1);
+          } catch {process.exit(1);}
+          CHECK
+          target=$(docker exec "$container" mktemp -d /tmp/trbhh-category-activation.XXXXXXXX)
+          [[ "$target" =~ ^/tmp/trbhh-category-activation\.[A-Za-z0-9]+$ ]]
+          trap 'docker exec "$container" rm -f "$target/category-seeds.json"; docker exec "$container" rmdir "$target"' EXIT
+          docker cp "$incoming/category-seeds.json" "$container:$target/category-seeds.json"
+          docker exec -u 0 "$container" chmod 644 "$target/category-seeds.json"
+          evidence="$backup/categories-$(basename "$incoming").json"
+          set -o noclobber
+          docker exec -i -w /app "$container" node - apply "$target/category-seeds.json" "$payload_hash" "$database" "$baseline" "$backup_id" verified < "$incoming/activate-categories.cjs" > "$evidence"
+          node - "$evidence" <<'RESULT'
+          try {
+            const result=JSON.parse(require('node:fs').readFileSync(process.argv[2],'utf8'));
+            if(result.protectedSettingsUnchanged!==true || JSON.stringify(result.settingWriteAllowlist)!=='["categories_v2_enabled"]')process.exit(1);
+          } catch {process.exit(1);}
+          RESULT
+          cat "$evidence"
+          ACTIVATE

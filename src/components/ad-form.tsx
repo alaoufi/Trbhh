@@ -14,6 +14,11 @@ import { ExpandableDetail } from '@/components/expandable-detail';
 import { formatPrice } from '@/lib/utils';
 import { parseMapsUrl } from '@/lib/maps';
 import { adPublishRejection, type AdPublishRejectionCode } from '@/lib/ad-publish-rejection';
+import { AdCategoryFields } from '@/components/ad-category-fields';
+import { AdCategorySummary } from '@/components/ad-category-summary';
+import { visibleCategoryValues } from '@/lib/ad-categories/validation';
+import type { CategoryFormConfig } from '@/lib/ad-categories/contracts';
+import type { CategoryValues } from '@/lib/ad-categories/validation';
 
 const MAX_VIDEO = 25 * 1024 * 1024; // 25MB
 
@@ -42,6 +47,7 @@ type Initial = Partial<{
   lat: string | null; lng: string | null;
   oldPrice: number; stockState: number;
   priceType: string | null; rentPeriod: string | null;
+  categoryValues: CategoryValues;
 }>;
 
 // مدد التأجير المتاحة عند اختيار «سعر تأجير»
@@ -63,9 +69,10 @@ function InfoItem({ icon: Icon, children }: { icon: React.ElementType; children:
 }
 
 export function AdForm({
-  action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, scheduleMaxDays = 30, allowOldPrice, allowStock, urgentOffer, featuredOffer, identity,
+  action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, scheduleMaxDays = 30, allowOldPrice, allowStock, urgentOffer, featuredOffer, identity, categoryConfig,
 }: {
   action: (fd: FormData) => void | Promise<void>;
+  categoryConfig?: CategoryFormConfig;
   countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string; dupId?: string;
   needPrice?: string; needBal?: string; dest?: string;
@@ -82,6 +89,16 @@ export function AdForm({
   const rejection = error ? adPublishRejection(error as AdPublishRejectionCode) : null;
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
   const isReq = adsType === 'request';
+  const [categoryId, setCategoryId] = useState(String(initial?.categoryId || ''));
+  const [subcategoryId, setSubcategoryId] = useState(String(initial?.subcategoryId || ''));
+  const [categoryValues, setCategoryValues] = useState<CategoryValues>(initial?.categoryValues || {});
+  const selectedSub = categoryConfig?.subcategories.find(s => String(s.id) === subcategoryId && String(s.categoryId) === categoryId);
+  const categoryOn = categoryConfig?.enabled === true;
+  const canPreserveCategory = !!initial?.id && !categoryConfig?.subcategories.some(s => s.id === initial.subcategoryId && s.categoryId === initial.categoryId && s.active && s.version > 0 && categoryConfig.categories.some(c => c.id === s.categoryId && c.active));
+  const [categoryMode, setCategoryMode] = useState(canPreserveCategory ? 'preserve' : 'select');
+  const preservingCategory = categoryOn && canPreserveCategory && categoryMode === 'preserve';
+  const priceEnabled = !categoryOn || (!preservingCategory && selectedSub?.priceEnabled === true);
+  const goodsEnabled = !categoryOn || (!preservingCategory && selectedSub?.goodsEnabled === true);
   // نوع السعر للمعروض: تأجير (سعر + مدة) / بيع (سعر) / على السوم (بلا سعر)
   const [priceMode, setPriceMode] = useState<'rent' | 'sale' | 'som'>(
     initial?.priceType === 'rent' || initial?.priceType === 'som' ? initial.priceType
@@ -173,6 +190,7 @@ export function AdForm({
       <SubmitOverlay label="جارٍ رفع الإعلان…" />
       {initial?.id && <input type="hidden" name="adId" value={initial.id} />}
       {dest && <input type="hidden" name="dest" value={dest} />}
+      {error === 'category' && categoryConfig && <p role="alert" className="rounded border border-red-300 p-3 text-sm text-red-700">{categoryConfig.labels.error}</p>}
 
       {error === 'missing' && (
         <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">
@@ -295,11 +313,28 @@ export function AdForm({
       </div>
 
       <Section icon={Tag} title={isReq ? 'بيانات الطلب' : 'بيانات العرض'}>
+        {categoryOn && <fieldset className="space-y-2 rounded-xl border border-primary/20 p-3">
+          <legend className="px-2 text-sm font-bold">{categoryConfig.labels.section}</legend>
+          {canPreserveCategory && <label className={lbl}>{categoryConfig.labels.preserveHint}<select name="category_mode" className={field} value={categoryMode} onChange={e=>{setCategoryMode(e.target.value);setCategoryId('');setSubcategoryId('');setCategoryValues({});}}>
+            <option value="preserve">{categoryConfig.labels.preserve}</option><option value="select">{categoryConfig.labels.reclassify}</option>
+          </select></label>}
+          {!preservingCategory && <><div className="grid gap-2 sm:grid-cols-2">
+            <label className={lbl}>{categoryConfig.labels.category}<select className={field} name="category_id" required value={categoryId} onChange={e=>{setCategoryId(e.target.value);setSubcategoryId('');setCategoryValues({});}}>
+              <option value="">{categoryConfig.labels.choose}</option>{categoryConfig.categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select></label>
+            <label className={lbl}>{categoryConfig.labels.subcategory}<select className={field} name="subcategory_id" required value={subcategoryId} onChange={e=>{setSubcategoryId(e.target.value);setCategoryValues({});}}>
+              <option value="">{categoryConfig.labels.choose}</option>{categoryConfig.subcategories.filter(s=>String(s.categoryId)===categoryId).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+            </select></label>
+          </div>
+          <input type="hidden" name="category_version" value={selectedSub?.version || ''}/>
+          {selectedSub && <AdCategoryFields fields={selectedSub.fields} values={categoryValues} onChange={setCategoryValues}/>}
+          </>}
+        </fieldset>}
         <div>
           <label className={lbl}>{isReq ? 'ماذا تطلب؟' : 'عنوان الإعلان'}</label>
           <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مثال: مطلوب سيارة للشراء' : 'مثال: سيارة للبيع'} />
         </div>
-        {isReq ? (
+        {priceEnabled && (isReq ? (
           <div>
             <label className={lbl}>الميزانية المتوقّعة</label>
             <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="اختياري — إن تركته فارغاً يظهر «مطلوب» فقط" />
@@ -345,14 +380,14 @@ export function AdForm({
               <p className="rounded-lg border-2 border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-800">🤝 على السوم: لا يظهر سعر على إعلانك — يتفاوض معك المهتمّون مباشرة.</p>
             )}
           </div>
-        )}
-        {allowOldPrice && !isReq && priceMode !== 'som' && (
+        ))}
+        {goodsEnabled && priceEnabled && allowOldPrice && !isReq && priceMode !== 'som' && (
           <div>
             <label className={lbl}>السعر قبل الخصم <span className="font-normal text-muted-foreground">(اختياري — لعروض اليوم)</span></label>
             <input name="old_price" type="number" min="0" step="any" defaultValue={initial?.oldPrice || ''} className={field} placeholder="إن كان أعلى من السعر يظهر الخصم ويدخل إعلانك «عروض اليوم»" />
           </div>
         )}
-        {allowStock && !isReq && (
+        {goodsEnabled && allowStock && !isReq && (
           <div>
             <label className={lbl}>حالة التوفر</label>
             <select name="stock_state" defaultValue={String(initial?.stockState ?? 0)} className={field}>
@@ -368,7 +403,7 @@ export function AdForm({
         </div>
       </Section>
 
-      <Section icon={Tag} title="تفاصيل إضافية">
+      {!categoryOn && <Section icon={Tag} title="تفاصيل إضافية">
         <AdExtraFields
           hideNegotiable={priceMode === 'som'}
           initial={{
@@ -379,7 +414,7 @@ export function AdForm({
             quantity: 1,
           }}
         />
-      </Section>
+      </Section>}
 
       <Section icon={MapPin} title="المكان">
         {/* هل تحديد المكان مطلوب؟ اختيار «غير مطلوب» يطوي الخيارات فلا تزحم النموذج */}
@@ -588,7 +623,7 @@ export function AdForm({
 
               <div className="card-3d rounded-2xl p-4">
                 {preview.urgent && <span className="mb-2 inline-block animate-pulse rounded-full bg-red-600 px-3 py-1 text-xs font-extrabold text-white shadow">🔥 عاجل</span>}
-                <div className="mb-3 flex flex-wrap items-baseline gap-2">
+                {priceEnabled && <div className="mb-3 flex flex-wrap items-baseline gap-2">
                   {(preview.price > 0 || isReq) && <span className="text-2xl font-bold text-primary">{preview.price > 0 ? formatPrice(preview.price) : 'مطلوب'}</span>}
                   {preview.price > 0 && priceMode === 'rent' && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">🔑 تأجير {(formRef.current?.querySelector('[name="rentPeriod"]') as HTMLSelectElement | null)?.value || 'شهري'}</span>}
                   {preview.price > 0 && priceMode === 'sale' && <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800">💰 بيع</span>}
@@ -598,8 +633,9 @@ export function AdForm({
                       <span className="rounded bg-rose-600 px-2 py-0.5 text-xs font-extrabold text-white">خصم {Math.round((1 - preview.price / preview.oldPrice) * 100)}٪</span>
                     </>
                   )}
-                </div>
+                </div>}
                 <ExpandableDetail text={preview.detail || ''} />
+                {categoryOn && selectedSub && <AdCategorySummary fields={visibleCategoryValues(selectedSub.fields,categoryValues)}/>}
               </div>
             </div>
 

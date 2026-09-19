@@ -10,7 +10,7 @@ vi.mock('@/lib/redis', () => ({ cached: vi.fn(), cacheDel: vi.fn(), cacheDelPatt
 vi.mock('@/lib/censor', () => ({ loadBanned: vi.fn(), censorSync: (value: string) => value }));
 vi.mock('@/lib/profiles', () => ({ getProfileDisplay: vi.fn() }));
 vi.mock('@/lib/seed-areas', () => ({ ensureSaudiAreas: vi.fn() }));
-vi.mock('@/lib/settings', () => ({ getPlatformAdLifecycleConfig: vi.fn(), getStoreSubPricing: vi.fn() }));
+vi.mock('@/lib/settings', () => ({ getSetting: async () => '0', getPlatformAdLifecycleConfig: vi.fn(), getStoreSubPricing: vi.fn() }));
 vi.mock('@/lib/platform-ad-visibility', () => ({ currentPlatformAdPublicWhere: async () => ({ status: 1, state: 'active', AND: [{ store_only: 0 }] }), platformDealAdPublicWhere: vi.fn() }));
 vi.mock('@/lib/ad-reviews', () => ({ getAdRatingsBrief: async () => new Map() }));
 vi.mock('@/lib/packages', () => ({

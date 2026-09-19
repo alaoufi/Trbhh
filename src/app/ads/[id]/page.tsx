@@ -25,6 +25,7 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 import { getAdAddons } from '@/lib/ad-addons';
 import { AdAddonsBox } from '@/components/ad-addons-box';
 import { ExpandableDetail } from '@/components/expandable-detail';
+import { AdCategorySummary } from '@/components/ad-category-summary';
 import { TrackedContact } from '@/components/ad-contact-track';
 import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
@@ -241,7 +242,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     image: ad.images,
     url: `https://${SITE.domain}/ads/${ad.id}`,
     ...(ad.createdAt ? { datePosted: ad.createdAt } : {}),
-    ...(ad.price > 0
+    ...(ad.priceEnabled && ad.price > 0
       ? { offers: { '@type': 'Offer', price: ad.price, priceCurrency: 'SAR', availability: 'https://schema.org/InStock', url: `https://${SITE.domain}/ads/${ad.id}` } }
       : {}),
   };
@@ -574,19 +575,21 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         {ad.urgentUntil && new Date(ad.urgentUntil) > new Date() && (
           <span className="mb-2 inline-block animate-pulse rounded-full bg-red-600 px-3 py-1 text-xs font-extrabold text-white shadow">🔥 عاجل</span>
         )}
-        <div className="mb-3 flex flex-wrap items-baseline gap-2">
+        {ad.priceEnabled && <div className="mb-3 flex flex-wrap items-baseline gap-2">
           <span className="text-2xl font-bold text-primary">{adPriceLabel(ad)}</span>
           {/* نوع السعر: تأجير بمدته أو بيع */}
           {ad.price > 0 && ad.priceType === 'rent' && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">🔑 تأجير {ad.rentPeriod || ''}</span>}
           {ad.price > 0 && ad.priceType === 'sale' && <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800">💰 بيع</span>}
           {/* عروض اليوم: السعر قبل الخصم مشطوب + نسبة الخصم */}
-          {ad.oldPrice > ad.price && ad.price > 0 && (
+          {ad.goodsEnabled && ad.oldPrice > ad.price && ad.price > 0 && (
             <>
               <span className="text-sm text-muted-foreground line-through" dir="ltr">{formatPrice(ad.oldPrice)}</span>
               <span className="rounded bg-rose-600 px-2 py-0.5 text-xs font-extrabold text-white">خصم {Math.round((1 - ad.price / ad.oldPrice) * 100)}٪</span>
             </>
           )}
-        </div>
+        </div>}
+        {ad.subcategoryName && <p className="mb-2 text-sm font-bold text-primary">{ad.subcategoryName}</p>}
+        <AdCategorySummary fields={ad.categoryFields}/>
         <ExpandableDetail text={ad.detail || ""} />
       </div>
 
@@ -703,7 +706,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
               url: shareUrl,
               title: ad.title,
               desc: (ad.detail || '').replace(/\s+/g, ' ').trim().slice(0, 120),
-              price: ad.price > 0 ? formatPrice(ad.price) : (ad.adsType === 'request' ? 'مطلوب' : ''),
+              price: ad.priceEnabled ? (ad.price > 0 ? formatPrice(ad.price) : (ad.adsType === 'request' ? 'مطلوب' : '')) : '',
               city: ad.area ? `${ad.area} - ${ad.city}` : (ad.city || ''),
               image: ad.images?.[0],
             }}

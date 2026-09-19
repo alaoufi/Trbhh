@@ -55,7 +55,7 @@ if [[ "$phase" == after ]]; then
   exit 0
 fi
 
-[[ "$current_commit" == 1e0547073567700e6bb5fe8ac663a86770767ab6 ]] || { echo 'Production baseline changed; stop and review'; exit 1; }
+[[ "$current_commit" == ec75f2862079107c742d8b8d903c24c5da5748da ]] || { echo 'Production baseline changed; stop and review'; exit 1; }
 [[ ! -e "$backup" && ! -L "$backup" ]] || { echo 'Backup destination already exists; use a new run'; exit 1; }
 mkdir -m 700 "$backup"
 printf '%s\n' "$current_commit" > "$backup/commit.txt"

@@ -37,6 +37,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
     key: 'content', title: 'الإعلانات والمحتوى', icon: Megaphone, color: '#0ea5e9',
     items: [
       { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone, perm: 'ads' },
+      { href: '/admin/categories', label: 'الأقسام وحقولها', icon: Megaphone, perm: 'categories' },
       { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy, perm: 'duplicates' },
       { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles, perm: 'classified' },
       { href: '/admin/promos', label: 'الإعلانات الترويجية', icon: MonitorPlay, perm: 'promos', description: 'مراجعة ونشر الإعلانات المدفوعة', keywords: ['ترويج', 'إعلان مدفوع', 'بانر عضو'] },
@@ -46,6 +47,8 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
     key: 'stores', title: 'المتاجر', icon: Store, color: '#0d9488',
     items: [
       { href: '/admin/stores', label: 'إدارة المتاجر', icon: Store, perm: 'stores' },
+      { href: '/admin/commerce', label: 'السلع المعتمدة والطلبات', icon: Store, perm: 'commerce' },
+      { href: '/admin/suppliers', label: 'الموردون وربط السلع', icon: Store, perm: 'suppliers' },
     ],
   },
   {
@@ -65,6 +68,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
       { href: '/admin/revenue?tab=wallets', label: 'محافظ الأعضاء', icon: WalletCards, perm: 'users', description: 'البحث في محافظ الأعضاء وسجل تعاملاتهم', keywords: ['محفظة عضو', 'رصيد عضو', 'سجل مالي'] },
       { href: '/admin/revenue?tab=accounts', label: 'حسابات الشحن البنكية', icon: Landmark, perm: 'users', description: 'البنوك والآيبان التي يحوّل إليها الأعضاء', keywords: ['الحساب البنكي', 'آيبان', 'بيانات التحويل', 'بنك', 'حساب الشحن'] },
       { href: '/admin/topups', label: 'طلبات شحن الرصيد', icon: HandCoins, perm: 'users', description: 'طلبات الشحن البنكي وإيصالاتها', keywords: ['شحن', 'إيصال', 'تحويل بنكي'] },
+      { href: '/admin/commerce/accounts', label: 'إيصالات السلع واستحقاقات الموردين', icon: ScrollText, perm: 'commerce' },
       { href: '/admin/payments', label: 'وسائل الدفع الإلكتروني', icon: CreditCard, perm: 'users', description: 'إعداد بوابات الدفع', keywords: ['دفع', 'بطاقة', 'مدى', 'بوابة دفع'] },
       { href: '/admin/revenue?tab=pricing', label: 'التسعير والباقات', icon: Crown, perm: 'users', description: 'أسعار الخدمات والاشتراكات والباقات', keywords: ['سعر', 'باقة', 'رسوم خدمة'] },
       { href: '/admin/revenue?tab=campaigns', label: 'حملات ومكافآت الشحن', icon: HandCoins, perm: 'users', description: 'عروض زيادة الرصيد والحملات المجدولة', keywords: ['مكافأة', 'عرض شحن', 'حملة شحن'] },

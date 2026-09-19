@@ -13,7 +13,7 @@ function timeShort(iso: string | null) {
 
 /** نسبة الخصم عندما يحدد المعلن سعراً قبل الخصم أعلى من السعر الحالي (عروض اليوم). */
 function discountPct(ad: AdCardType): number {
-  if (!ad.oldPrice || ad.price <= 0 || ad.oldPrice <= ad.price) return 0;
+  if (ad.priceEnabled === false || !ad.oldPrice || ad.price <= 0 || ad.oldPrice <= ad.price) return 0;
   return Math.round((1 - ad.price / ad.oldPrice) * 100);
 }
 

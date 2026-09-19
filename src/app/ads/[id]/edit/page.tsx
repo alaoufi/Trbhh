@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth';
 import { getCountries, getCities, getAreas, getAdForEdit } from '@/lib/data';
 import { AdForm } from '@/components/ad-form';
+import { getCategoryFormConfig } from '@/lib/ad-categories/service';
 import { updateAdAction } from '../../actions';
 
 export const metadata = { title: 'تعديل الإعلان' };
@@ -24,6 +25,7 @@ export default async function EditAdPage({ params, searchParams }: { params: Pro
     <div className="space-y-4">
       <h1 className="text-xl font-bold">تعديل الإعلان</h1>
       <AdForm
+        categoryConfig={await getCategoryFormConfig()}
         allowOldPrice={dealsOn}
         allowStock={stockOn}
         action={updateAdAction}

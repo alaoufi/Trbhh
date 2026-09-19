@@ -6,6 +6,8 @@
  *
  * node database-proof.cjs dump                         > protected.sql
  * node database-proof.cjs snapshot                     > protected-before.json
+ * node database-proof.cjs snapshot-full                > private-full.json
+ * node database-proof.cjs verify-restore-full private-full.json restored-full.json
  * node database-proof.cjs summary protected-before.json
  * node database-proof.cjs verify protected-before.json protected-after.json
  * node database-proof.cjs verify-restore protected-before.json isolated-restore.json
@@ -25,6 +27,7 @@ const { spawn } = require('node:child_process');
 const { readFileSync } = require('node:fs');
 
 const FORMAT = 'trbhh-database-proof-v1';
+const FULL_FORMAT = 'trbhh-database-full-proof-v1';
 const PAGE_SIZE = 2000;
 const REQUIRED_TABLES = ['users', 'ads'];
 // Explicit columns make a new additive column compatible with an old manifest.
@@ -136,7 +139,7 @@ async function dump() {
   fail('Neither mysqldump nor mariadb-dump is installed.');
 }
 
-async function snapshot() {
+async function snapshot(full = false) {
   const conn = connection();
   // Loaded only in snapshot mode. Query logs stay off: Prisma errors can include
   // values or connection details, so the top-level handler is deliberately terse.
@@ -155,6 +158,34 @@ async function snapshot() {
       const byPk = new Map();
       for (const r of columns) { if (!byColumn.has(r.t)) byColumn.set(r.t, []); byColumn.get(r.t).push(r); }
       for (const r of primary) { if (!byPk.has(r.t)) byPk.set(r.t, []); byPk.get(r.t).push(r.c); }
+      if (full) {
+        assert(tableRows.every(row => String(row.engine).toLowerCase() === 'innodb'), 'Full snapshot requires transactional tables.');
+        const tables = Object.create(null);
+        for (const row of tableRows) {
+          const definitions = byColumn.get(row.name) || [];
+          const columns = definitions.map(column => column.c);
+          assert(columns.length > 0, 'Full snapshot requires column metadata.');
+          const table = quoteIdentifier(row.name);
+          const [countRow] = await tx.$queryRawUnsafe('SELECT COUNT(*) AS n FROM ' + table);
+          const count = safeCount(countRow.n);
+          // One SELECT per table: OFFSET/keyset scans cannot safely enumerate a
+          // table with no unique key. Preserve duplicates in a sorted multiset.
+          // HEX keeps binary bytes, decimal precision and sub-ms timestamps out
+          // of JS/Prisma's lossy number/Date conversions. NULL stays distinct.
+          // This deliberately materializes one table; resource exhaustion fails
+          // closed, never truncates evidence or substitutes count-only proof.
+          const selection = columns.map((column, i) => 'HEX(CAST(' + quoteIdentifier(column) + ' AS BINARY)) AS ' + quoteIdentifier('c' + i)).join(',');
+          const rows = await tx.$queryRawUnsafe('SELECT ' + selection + ' FROM ' + table);
+          assert(rows.length === count, 'Inconsistent full table snapshot.');
+          const rowHashes = rows.map(record => fingerprint(columns.map((_, i) => {
+            const value = record['c' + i];
+            assert(value === null || (typeof value === 'string' && /^(?:[0-9A-F]{2})*$/.test(value)), 'Invalid full column representation.');
+            return value;
+          }))).sort();
+          tables[row.name] = {count, engine:row.engine, columns, primaryKeyColumns:byPk.get(row.name) || [], schemaSha256:fingerprint(definitions), rowHashes};
+        }
+        return {format:FULL_FORMAT, tables};
+      }
       const notes = [];
       const tables = {};
       for (const row of tableRows) {
@@ -260,6 +291,40 @@ async function operationalControls(tx, names, byColumn) {
   return out;
 }
 
+function readFullManifest(file) {
+  let value;
+  try { value = JSON.parse(readFileSync(file, 'utf8')); } catch { fail('Cannot read a valid private full manifest.'); }
+  const object = item => item !== null && typeof item === 'object' && !Array.isArray(item);
+  const digest = item => typeof item === 'string' && /^[a-f0-9]{64}$/.test(item);
+  assert(object(value) && value.format === FULL_FORMAT && object(value.tables), 'Unsupported full database manifest.');
+  for (const name of REQUIRED_TABLES) assert(Object.hasOwn(value.tables, name), 'Full manifest is missing a required core table.');
+  for (const [name, table] of Object.entries(value.tables)) {
+    quoteIdentifier(name);
+    assert(object(table) && Number.isSafeInteger(table.count) && table.count >= 0, 'Invalid full table count.');
+    assert(typeof table.engine === 'string' && table.engine.length > 0 && digest(table.schemaSha256), 'Invalid full table metadata.');
+    for (const list of [table.columns, table.primaryKeyColumns]) {
+      assert(Array.isArray(list) && new Set(list).size === list.length, 'Invalid full column list.');
+      list.forEach(quoteIdentifier);
+    }
+    assert(table.columns.length > 0 && table.primaryKeyColumns.every(column => table.columns.includes(column)), 'Incomplete full column list.');
+    assert(Array.isArray(table.rowHashes) && table.rowHashes.length === table.count && table.rowHashes.every(digest), 'Incomplete full row proof.');
+    table.rowHashes.sort();
+  }
+  return value;
+}
+
+function verifyFullRestore(before, after) {
+  let missingTables = 0, addedTables = 0, changedTables = 0;
+  for (const [name, table] of Object.entries(before.tables)) {
+    if (!Object.hasOwn(after.tables, name)) { missingTables++; continue; }
+    const next = after.tables[name];
+    if (['count','engine','columns','primaryKeyColumns','schemaSha256','rowHashes'].some(key => JSON.stringify(table[key]) !== JSON.stringify(next[key]))) changedTables++;
+  }
+  for (const name of Object.keys(after.tables)) if (!Object.hasOwn(before.tables, name)) addedTables++;
+  // No table names, row values or fingerprints in public verification output.
+  return {ok:missingTables === 0 && addedTables === 0 && changedTables === 0, comparedTables:Object.keys(before.tables).length, missingTables, addedTables, changedTables};
+}
+
 function readManifest(file) {
   assert(file, 'A private manifest path is required.');
   let value;
@@ -356,6 +421,13 @@ async function main() {
   const [mode, first, second] = process.argv.slice(2);
   if (mode === 'dump') return dump();
   if (mode === 'snapshot') { process.stdout.write(JSON.stringify(await snapshot()) + '\n'); return; }
+  if (mode === 'snapshot-full') { process.stdout.write(JSON.stringify(await snapshot(true)) + '\n'); return; }
+  if (mode === 'verify-restore-full') {
+    const result = verifyFullRestore(readFullManifest(first), readFullManifest(second));
+    process.stdout.write(JSON.stringify(result) + '\n');
+    if (!result.ok) process.exitCode = 1;
+    return;
+  }
   if (mode === 'summary') { process.stdout.write(JSON.stringify(summary(readManifest(first)), null, 2) + '\n'); return; }
   if (mode === 'verify-schema') {
     const result = await verifySchema();
@@ -369,7 +441,7 @@ async function main() {
     if (!result.ok) process.exitCode = 1;
     return;
   }
-  fail('Usage: database-proof.cjs dump | snapshot | summary FILE | verify BEFORE AFTER | verify-restore BEFORE RESTORED | verify-schema');
+  fail('Usage: database-proof.cjs dump | snapshot | snapshot-full | summary FILE | verify BEFORE AFTER | verify-restore BEFORE RESTORED | verify-restore-full BEFORE RESTORED | verify-schema');
 }
 
 main().catch((error) => {

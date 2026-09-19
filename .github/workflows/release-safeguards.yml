@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   safeguard:
-    if: github.ref == 'refs/heads/codex/trbhh-audit-fixes-20260910' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb'
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/trbhh-audit-fixes-20260910' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb' || (github.ref == 'refs/heads/codex/trbhh-v2-preview' && github.event_name == 'workflow_dispatch' && inputs.phase == 'before'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -33,6 +33,7 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           umask 077
@@ -41,7 +42,8 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/release_key
           port=${VPS_PORT:-22}
-          ssh-keyscan -p "$port" "$VPS_HOST" > ~/.ssh/known_hosts
+          test -n "$VPS_KNOWN_HOSTS"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           ssh_args=(-i ~/.ssh/release_key -p "$port" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -o ServerAliveInterval=15)
           target="$VPS_USER@$VPS_HOST"
           remote_tools="/root/trbhh-release-tools/$GITHUB_SHA"

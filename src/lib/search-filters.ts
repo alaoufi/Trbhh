@@ -24,6 +24,7 @@ export function normalizeSearchParams(sp: Record<string, string | undefined>) {
   const range = normalizePriceRange(sp.minPrice, sp.maxPrice);
   return {
     q: sp.q?.trim().slice(0, 200) || undefined,
+    categoryId: positiveSearchId(sp.category),
     cityId: positiveSearchId(sp.city),
     areaId: positiveSearchId(sp.area),
     type: sp.type === 'offer' || sp.type === 'request' ? sp.type : undefined,

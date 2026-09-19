@@ -10,11 +10,13 @@ import {
   getTopRatedAds,
   getStats,
   getPersonalizedAds,
+  searchAds,
 } from '@/lib/data';
 import { PublicSearchForm } from '@/components/public-search-form';
 import { HomeCategoryNavigation } from '@/components/home-category-navigation';
 import { AdGrid } from '@/components/ad-card';
-import { mergeHomeAds } from '@/lib/home-feed';
+import { mergeHomeAds, selectedHomeCategory } from '@/lib/home-feed';
+import { getCategoryFormConfig } from '@/lib/ad-categories/service';
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
 import { getHomeStats, getHomeClassifiedText, getSettingBool, getSetting, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
@@ -52,13 +54,15 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
 
 export default async function HomePage({ searchParams }: { searchParams?: Promise<{ published?: string; category?: string | string[] }> }) {
   const sp = (await searchParams) || {};
+  const categoryConfig = await getCategoryFormConfig().catch(() => null);
+  const selectedCategory = selectedHomeCategory(categoryConfig, sp.category);
   // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
   const [featured, latest, mostViewed, topRated, stats, homeStats, clsText] = await Promise.all([
-    getFeaturedAds(8),
-    getHomeLatestAds(8),
-    getMostViewedAds(8),
-    getTopRatedAds(8),
+    selectedCategory ? Promise.resolve([]) : getFeaturedAds(8),
+    selectedCategory ? searchAds({ categoryId: selectedCategory.id, take: 24, skip: 0 }) : getHomeLatestAds(8),
+    selectedCategory ? Promise.resolve([]) : getMostViewedAds(8),
+    selectedCategory ? Promise.resolve([]) : getTopRatedAds(8),
     getStats(),
     getHomeStats().catch(() => new Set(['ads', 'users', 'views'])),
     getHomeClassifiedText().catch(() => ({ title: 'الإعلانات المبوّبة', sub: 'تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي' })),
@@ -75,8 +79,10 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   // أيضاً عبر معرّف زيارته الدائم (trbhh_vid)، لا الأعضاء فقط.
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
-  const personalizedAds = await getPersonalizedAds(viewerKey, session?.uid || 0, 8).catch(() => []);
-  const storeAds = await homeFeaturedAds().catch(() => []);
+  const personalizedAds = selectedCategory ? [] : await getPersonalizedAds(viewerKey, session?.uid || 0, 8).catch(() => []);
+  const storeAds = selectedCategory ? [] : await homeFeaturedAds().catch(() => []);
+  const feedAds = selectedCategory ? latest : mergeHomeAds(featured, latest, storeAds, mostViewed, topRated);
+  const feedSearchHref = selectedCategory ? `/search?category=${selectedCategory.id}` : '/search';
   const feedTexts = await getFeedBannerItems().catch(() => []);
   // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
   const homeActionsOn = await getSettingBool('home_actions_on', true).catch(() => true);
@@ -128,20 +134,21 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
               <Megaphone className="h-4 w-4" /> {discoveryAddLabel}
             </Link>
           </div>
-          <div className="p-4 sm:px-6"><PublicSearchForm regions={cities} areas={areas} priceOn={priceOn} placeholder={discoveryPlaceholder} compact /></div>
+          <div className="p-4 sm:px-6"><PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.id.toString() }} priceOn={priceOn} placeholder={discoveryPlaceholder} compact /></div>
         </section>
       )}
-      <HomeCategoryNavigation selectedCategory={sp.category} />
+      <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} />
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 
       <div>
         <div className="space-y-4">
-          <AdGrid ads={mergeHomeAds(featured, latest, storeAds, mostViewed, topRated)} />
+          <AdGrid ads={feedAds} />
+          {selectedCategory && !feedAds.length && <p className="text-sm text-muted-foreground">{categoryConfig?.labels.emptyText}</p>}
           <PromoSlot placement="feed" />
           {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
           {/* تُعرض أحدث دفعة بسرعة؛ البحث يبقى السجل الكامل دون تحميله مسبقاً في الرئيسية. */}
-          <Link href="/search" className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
+          <Link href={feedSearchHref} className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
             عرض جميع الإعلانات في البحث ←
           </Link>
         </div>
@@ -158,7 +165,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
 
       {/* 🎯 يهمّك الآن — تغذية مخصّصة بدلالة ما تصفّحه وبحث عنه فعلياً،
           تظهر أول محتوى في الصفحة لمن له تصفّح سابق. */}
-      {personalizedAds.length > 0 && (
+      {!selectedCategory && personalizedAds.length > 0 && (
         <CollapsibleSection title="🎯 يهمّك الآن" defaultOpen={false}>
           <AdGrid ads={personalizedAds} />
         </CollapsibleSection>

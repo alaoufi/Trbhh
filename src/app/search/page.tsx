@@ -41,11 +41,12 @@ export default async function SearchPage({
   const page = Math.min(positiveSearchId(sp.page) || 1, pages);
   const ads = await searchAds({ ...query, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE });
   const params = {
+    category: query.categoryId?.toString(),
     q: query.q, city: cityId?.toString(), area: areaId?.toString(), type: query.type,
     sort: query.sort, special: query.special ? '1' : undefined,
     minPrice: query.minPrice?.toString(), maxPrice: query.maxPrice?.toString(),
   };
-  const hasFilters = !!(query.q || cityId || query.type || query.special || query.minPrice !== undefined || query.maxPrice !== undefined);
+  const hasFilters = !!(query.categoryId || query.q || cityId || query.type || query.special || query.minPrice !== undefined || query.maxPrice !== undefined);
   return (
     <div className="space-y-4">
       <Breadcrumb items={[{ label: 'بحث متقدم' }]} />

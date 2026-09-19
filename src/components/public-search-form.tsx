@@ -32,6 +32,7 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
     </label>}
   </>;
   return <form action="/search" method="get" role="search" className="space-y-3">
+    {params.category && <input name="category" type="hidden" value={params.category} />}
     <div className="flex items-end gap-2">
       <label className="min-w-0 flex-1 space-y-1 text-xs font-semibold text-foreground">البحث في الإعلانات
         <SearchSuggestInput key={params.q || ''} name="q" defaultValue={params.q || ''} placeholder={placeholder} />

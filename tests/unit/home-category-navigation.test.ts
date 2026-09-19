@@ -27,11 +27,12 @@ describe('homepage category discovery', () => {
     expect(html).toContain('action="/"'); expect(html).toContain('method="get"');
     expect(state.search).not.toHaveBeenCalled();
   });
-  it('uses the existing category filter for the selected category and displays matching ads', async () => {
+  it('renders only controls, leaving selected-category results to the continuous feed', async () => {
     state.search.mockResolvedValue([{ id: 1, title: 'Fixture matching car' }]);
     const html = renderToStaticMarkup(await HomeCategoryNavigation({ selectedCategory: '12' }));
-    expect(state.search).toHaveBeenCalledWith({ categoryId: 12, take: 24, skip: 0 });
-    expect(html).toContain('Fixture matching car');
+    expect(state.search).not.toHaveBeenCalled();
+    expect(html).not.toContain('Fixture matching car');
+    expect(html).not.toContain('<h2');
     expect(html).toMatch(/<option[^>]*value="12"[^>]*selected/);
   });
   it.each(['13', '-1', '12 OR 1=1', '999', ['12', '13']].map(selectedCategory => ({ selectedCategory })))('ignores inactive/unknown/invalid selections: %j', async ({ selectedCategory }) => {
@@ -46,14 +47,14 @@ describe('homepage category discovery', () => {
   });
   it('shows an empty result for an active category with no matching ads', async () => {
     const html = renderToStaticMarkup(await HomeCategoryNavigation({ selectedCategory: '12' }));
-    expect(html).toContain('لا توجد إعلانات');
+    expect(html).not.toContain('لا توجد إعلانات');
   });
   it('reads all new UI copy from editable settings', async () => {
     state.config.mockResolvedValue({ ...config, labels: { ...CATEGORY_LABELS,
       browse: 'Custom browse', clear: 'Custom clear', resultsTitle: 'Custom {category} / {limit}', emptyText: 'Custom empty',
     } });
     const html = renderToStaticMarkup(await HomeCategoryNavigation({ selectedCategory: '12' }));
-    for (const value of ['Custom browse', 'Custom clear', 'Custom السيارات / 24', 'Custom empty']) expect(html).toContain(value);
+    for (const value of ['Custom browse', 'Custom clear']) expect(html).toContain(value);
     for (const key of ['browse', 'clear', 'resultsTitle', 'emptyText']) expect(CATEGORY_LABELS).toHaveProperty(key);
     expect(state.setting).not.toHaveBeenCalled();
   });
@@ -66,8 +67,8 @@ describe('homepage category discovery', () => {
     const selected = await HomeCategoryNavigation({ selectedCategory: '12' });
     const cleared = await HomeCategoryNavigation({});
     const invalid = await HomeCategoryNavigation({ selectedCategory: '999' });
-    expect(selected!.props.children[0].key).toBe('12');
-    expect(cleared!.props.children[0].key).toBe('');
-    expect(invalid!.props.children[0].key).toBe(cleared!.props.children[0].key);
+    expect(selected!.props.children.key).toBe('12');
+    expect(cleared!.props.children.key).toBe('');
+    expect(invalid!.props.children.key).toBe(cleared!.props.children.key);
   });
 });

@@ -251,16 +251,28 @@ export async function storeProductAdIds(storeId: number): Promise<number[]> {
 
 /** Replace the store's showcased products (only the owner's own ads qualify). */
 export async function setStoreProducts(userId: number, adIds: number[]) {
+  if (adIds.some((id) => Number.isInteger(id) && !Number.isSafeInteger(id))) {
+    throw new Error('معرّف منتج غير صالح. أعد تحميل الصفحة قبل حفظ الاختيار.');
+  }
   await ensure();
   const storeId = await getActiveStoreId(userId);
   if (!storeId) return;
   const uniq = [...new Set(adIds.filter((n) => Number.isInteger(n) && n > 0))].slice(0, 500);
-  const owned = uniq.length
-    ? await prisma.ads.findMany({ where: { user_id: BigInt(userId), id: { in: uniq.map((n) => BigInt(n)) } }, select: { id: true } }).catch(() => [])
-    : [];
-  const valid = owned.map((a) => toInt(a.id));
-  await prisma.store_products.deleteMany({ where: { store_id: storeId } }).catch(() => {});
-  if (valid.length) await prisma.store_products.createMany({ data: valid.map((ad_id) => ({ store_id: storeId, ad_id })), skipDuplicates: true }).catch(() => {});
+  await prisma.$transaction(async (tx) => {
+    // A locking read sees the current owner and serializes catalog replacement
+    // with ownership updates/deletion of this store until this transaction ends.
+    const stores = await tx.$queryRaw<{user_id:number}[]>`SELECT user_id FROM stores WHERE id = ${BigInt(storeId)} FOR UPDATE`;
+    if (stores.length !== 1 || stores[0].user_id !== userId) {
+      throw new Error('تغيّرت ملكية المتجر أو لم يعد متاحاً. أعد تحميل الصفحة.');
+    }
+    // A failed ownership lookup is not an intentional empty selection.
+    const owned = uniq.length
+      ? await tx.ads.findMany({ where: { user_id: BigInt(userId), id: { in: uniq.map((n) => BigInt(n)) } }, select: { id: true } })
+      : [];
+    const valid = owned.map((a) => toInt(a.id));
+    await tx.store_products.deleteMany({ where: { store_id: storeId } });
+    if (valid.length) await tx.store_products.createMany({ data: valid.map((ad_id) => ({ store_id: storeId, ad_id })), skipDuplicates: true });
+  });
 }
 
 /** هل هذا الإعلان معروضٌ كمنتج في أي متجر؟ (لعزل منتجات المتجر عن حجب البائع الشخصي). */

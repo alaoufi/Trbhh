@@ -13,9 +13,8 @@ import { getAd, recordView } from '@/lib/data';
 import { getStore } from '@/lib/stores';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
-import { getStoreMeta, storeProductAdIds, collaboratorAds, storeIdByHandle } from '@/lib/merchant';
-import { isStoreSubBlocked } from '@/lib/subscription';
-import { storeHiddenByOwnerBan } from '@/lib/moderation';
+import { getStoreMeta } from '@/lib/merchant';
+import { storeProductAccess } from '@/lib/store-product-access';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { waLink } from '@/lib/classified-theme';
 import { AdGallery } from '@/components/ad-gallery';
@@ -29,9 +28,11 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; adId: string }> }) {
   const { id, adId } = await params;
-  const sid = /^\d+$/.test(id) ? Number(id) : await storeIdByHandle(id);
-  const ad = await getAd(Number(adId));
-  if (!ad || !sid) return { title: 'إعلان' };
+  const access = await storeProductAccess(id, adId);
+  if (!access?.publicVisible) return { title: 'إعلان', robots: { index: false, follow: false } };
+  const sid = access.storeId;
+  const ad = await getAd(access.productId);
+  if (!ad) return { title: 'إعلان', robots: { index: false, follow: false } };
   const meta = await getStoreMeta(sid);
   const desc = (ad.detail || '').replace(/\s+/g, ' ').trim().slice(0, 160);
   const url = `https://${SITE.domain}/companies/${meta.handle || sid}/p/${ad.id}`;
@@ -59,30 +60,16 @@ function InfoItem({ icon: Icon, children, color }: { icon: React.ElementType; ch
  */
 export default async function StoreProductPage({ params }: { params: Promise<{ id: string; adId: string }> }) {
   const { id, adId } = await params;
-  const storeId = /^\d+$/.test(id) ? Number(id) : await storeIdByHandle(id);
-  if (!Number.isInteger(storeId) || storeId <= 0) notFound();
-
-  const [s, ad] = await Promise.all([getStore(storeId), getAd(Number(adId))]);
-  if (!s || !ad) notFound();
-
+  const access = await storeProductAccess(id, adId);
+  if (!access) notFound();
+  const { storeId } = access;
   const session = await getSession().catch(() => null);
-  const isOwner = !!session && s.userId === session.uid;
+  const isOwner = !!session && access.ownerId === session.uid;
   const admin = session ? await hasAnyAdmin(session.uid).catch(() => false) : false;
+  if (!access.publicVisible && !isOwner && !admin) notFound();
+  const [s, ad] = await Promise.all([getStore(storeId), getAd(access.productId)]);
+  if (!s || !ad) notFound();
   const meta = await getStoreMeta(storeId);
-
-  // بوابة الاعتماد/الاشتراك: نفس منطق واجهة المتجر
-  const subBlocked = await isStoreSubBlocked(storeId).catch(() => false);
-  if ((meta.status !== 1 || subBlocked) && !isOwner && !admin) notFound();
-  // صاحب المتجر محظور: يُخفى منتج المتجر عند الحظر الإداري/الجسيم فقط (درع المتجر يستثني الحظر الآلي غير الجسيم).
-  if ((await storeHiddenByOwnerBan(s.userId).catch(() => false)) && !isOwner && !admin) notFound();
-
-  // الإعلان يجب أن يكون ضمن منتجات هذا المتجر (أو ضمن إعلانات الشركاء المعروضة فيه)
-  const [productIds, partners] = await Promise.all([
-    storeProductAdIds(storeId),
-    collaboratorAds(storeId).catch(() => []),
-  ]);
-  const allowed = productIds.includes(ad.id) || partners.some((p) => p.id === ad.id);
-  if (!allowed) notFound();
 
   // تُحتسب مشاهدة الإعلان (لا تُحتسب مشاهدة المالك على إعلانه)
   const vid = (await cookies()).get('trbhh_vid')?.value;
@@ -129,7 +116,7 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
 
   return (
     <div className="min-h-screen bg-muted/20 pb-24">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml }} />
+      {access.publicVisible && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml }} />}
       {/* رأس المتجر — رجوع + هوية المتجر (لا هوية تربح) */}
       <div className="sticky top-0 z-30 border-b bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-3 py-2">

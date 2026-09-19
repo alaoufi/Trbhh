@@ -41,7 +41,8 @@ jobs:
           docker inspect -f 'running={{.State.Running}} paused={{.State.Paused}} image={{.Image}}' "$container"
           df -Pk /root | awk 'NR==2 {print "free_kb=" $4}'
           dir="/root/trbhh-release-backups/audit-$1"
-          for item in code.tar.gz image.tar.gz before.json full-before.json database.sql.gz storage.tar.gz legacy.tar.gz restored.json full-restored.json full-current.json VERIFIED WATCHDOG_FIRED; do
+          docker inspect -f 'reader_running={{.State.Running}}' "trbhh-backup-reader-$1" 2>/dev/null || true
+          for item in code.tar.gz image.tar.gz before.json full-before.json database.sql.gz storage.tar.gz legacy.tar.gz legacy-before.json legacy-current.json restored.json full-restored.json full-current.json VERIFIED WATCHDOG_FIRED; do
             if test -f "$dir/$item"; then printf '%s bytes=' "$item"; stat -c %s "$dir/$item"; fi
           done
           SH

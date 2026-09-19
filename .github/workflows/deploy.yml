@@ -27,6 +27,7 @@ jobs:
           VPS_PORT: ${{ secrets.VPS_PORT }}
           # المفتاح الخاص كنص خام متعدد الأسطر (يُلصق كما هو — بلا أي ترميز يعرّضه للتلف)
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
           set -e
           if [ -z "$VPS_SSH_KEY" ]; then
@@ -38,6 +39,8 @@ jobs:
             exit 1
           fi
           mkdir -p ~/.ssh
+          test -n "$VPS_KNOWN_HOSTS"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           # نزيل أحرف \r فقط (قد تتسرّب من لوحات مفاتيح الجوال) مع إبقاء الأسطر كما هي
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
@@ -52,7 +55,7 @@ jobs:
           # حتى ٥ مرات بتراجع تصاعدي بدل فشل النشر على أول انقطاع عابر.
           n=0
           until [ "$n" -ge 5 ]; do
-            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            if ssh -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts \
                  -o ConnectTimeout=25 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
                  -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" "$REMOTE_CMD"; then
               echo "✅ تم النشر."

@@ -23,7 +23,7 @@ try{
  await page.getByRole('button',{name:'إضافة الحقل',exact:true}).click();
  await page.getByRole('button',{name:'حفظ إعدادات الحقول',exact:true}).click();
  await page.goto(origin+'/ads/new/');
- await page.getByRole('button',{name:'عقارات',exact:true}).click();
+ await page.getByLabel('القسم الرئيسي').selectOption('عقارات');
  await page.getByLabel('التصنيف الفرعي').selectOption('أراضٍ');
  await page.getByRole('button',{name:'نشر تجريبي',exact:true}).click();
  await page.getByText('أكمل حقل خيارات الفحص.',{exact:true}).last().waitFor();

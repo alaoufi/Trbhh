@@ -8,14 +8,14 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 try {
   const page = await browser.newPage();
   await page.goto(url);
-  await page.getByRole('button', { name: 'عقارات', exact: true }).waitFor();
+  await page.getByLabel('القسم الرئيسي').waitFor();
   assert.equal(await page.locator('.ad-page-section').count(), 4, 'All four sections must appear on one page');
   assert.equal(await page.getByRole('button', { name: /^(التالي|السابق)$/ }).count(), 0);
   await page.getByRole('button', { name: 'نشر تجريبي', exact: true }).click();
   await page.locator('.ad-error-summary').waitFor();
   assert.equal(await page.locator('.ad-error-summary').evaluate(el => el === document.activeElement), true);
   assert.equal(await page.locator('.seller-complete').count(), 0);
-  await page.getByRole('button', {name:'عقارات',exact:true}).click();
+  await page.getByLabel('القسم الرئيسي').selectOption('عقارات');
   await page.getByLabel('التصنيف الفرعي').selectOption('أراضٍ');
   await page.locator('#detail-purpose').selectOption('للإيجار');
   await page.getByRole('button', {name:'نشر تجريبي',exact:true}).click();

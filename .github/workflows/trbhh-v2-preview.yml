@@ -2,6 +2,11 @@ name: TRBHH V2 preview
 on:
   workflow_dispatch:
     inputs:
+      inspect_live:
+        description: 'Read-only infrastructure inventory for isolated live preview'
+        required: true
+        default: false
+        type: boolean
       live_snapshot:
         description: 'Export public production ads read-only (no deploy or database writes)'
         required: true
@@ -13,6 +18,32 @@ on:
   pull_request:
     paths: ['preview-v2/**', '.github/workflows/trbhh-v2-preview.yml']
 jobs:
+  inspect-live:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/trbhh-v2-preview' && inputs.inspect_live
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect only runtime metadata
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/inspect-ssh"
+          key="$RUNNER_TEMP/inspect-ssh/key"
+          known="$RUNNER_TEMP/inspect-ssh/known"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$key"
+          port="${VPS_PORT:-22}"
+          ssh-keyscan -T 15 -p "$port" "$VPS_HOST" > "$known"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known" -o ConnectTimeout=20 -i "$key" -p "$port" "$VPS_USER@$VPS_HOST" 'bash -s' < scripts/preview/inspect-live-runtime.sh
   preview:
     runs-on: ubuntu-latest
     defaults:

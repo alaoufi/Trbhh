@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const browser = await chromium.launch({channel:'msedge',headless:true});
+try {
+ const page = await browser.newPage();
+ await page.goto('http://127.0.0.1:4187/ads/new/');
+ await page.getByLabel('القسم الرئيسي').selectOption('عقارات');
+ await page.getByLabel('التصنيف الفرعي').selectOption('أراضٍ');
+ const region=page.getByRole('combobox',{name:/^المنطقة/});
+ const city=page.getByRole('combobox',{name:/^المدينة/});
+ assert.equal(await region.count(),1,'Region dropdown must exist');
+ assert.equal(await city.isDisabled(),true);
+ await region.selectOption('الرياض');
+ await city.selectOption('الخرج');
+ assert.ok(!(await city.locator('option').allTextContents()).includes('جدة'));
+ await region.selectOption('مكة المكرمة');
+ assert.equal(await city.inputValue(),'');
+ await city.selectOption('جدة');
+ await page.getByLabel('عنوان الإعلان').fill('إعلان لاختبار المنطقة والمدينة');
+ await page.getByRole('button',{name:'حفظ المسودة',exact:true}).click();
+ await page.reload();
+ await region.waitFor();
+ assert.equal(await region.inputValue(),'مكة المكرمة');
+ assert.equal(await city.inputValue(),'جدة');
+ await page.setViewportSize({width:390,height:844});
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ console.log('PASS region-first, filtered cities, reset, draft reload and mobile');
+} finally {await browser.close();}

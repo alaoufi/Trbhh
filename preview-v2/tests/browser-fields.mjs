@@ -18,10 +18,10 @@ async function fresh() {
   await page.goto(`${origin}/ads/new/`);
   await page.evaluate(() => {localStorage.removeItem('trbhh-v2-ad-draft-v1');localStorage.removeItem('trbhh-v2-field-settings-v1');});
   await page.reload();
-  await page.getByRole('button',{name:'عقارات',exact:true}).waitFor();
+  await page.getByLabel('القسم الرئيسي').waitFor();
 }
 async function selectBranch(category, branch) {
-  await page.getByRole('button',{name:category,exact:true}).click();
+  await page.getByLabel('القسم الرئيسي').selectOption(category);
   await page.getByLabel('التصنيف الفرعي').selectOption(branch);
   await page.locator('.category-details').waitFor();
 }
@@ -65,7 +65,8 @@ try {
   await selectBranch('وظائف','دوام كامل');
   await page.getByLabel('عنوان الإعلان').fill('محاسب لشركة تجريبية في الرياض');
   await page.getByLabel('وصف الإعلان').fill('وظيفة محاسب لمراجعة الحسابات والتقارير المالية. هذا إعلان تجريبي لا يمثل وظيفة متاحة.');
-  await page.getByLabel('المدينة', {exact:false}).selectOption('الرياض');
+  await page.getByRole('combobox',{name:/^المنطقة/}).selectOption('الرياض');
+  await page.getByRole('combobox',{name:/^المدينة/}).selectOption('الرياض');
   await page.locator('#detail-jobTitle').fill('محاسب مالي');
   await page.locator('#detail-workMode').selectOption('حضوري');
   await page.locator('#detail-qualification').selectOption('بكالوريوس');

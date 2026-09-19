@@ -7,6 +7,8 @@ phase=${1:?before or after}
 backup_id=${2:?numeric backup run id}
 candidate=${3:?candidate commit}
 reuse_media_id=${4:-}
+release_profile=${5:-standard}
+[[ "$release_profile" == standard || "$release_profile" == salla ]] || exit 1
 [[ "$phase" == before || "$phase" == after ]] || exit 1
 [[ "$backup_id" =~ ^[0-9]+$ && "$candidate" =~ ^[0-9a-f]{40}$ ]] || exit 1
 if [[ -n "$reuse_media_id" ]]; then
@@ -41,13 +43,20 @@ if [[ "$phase" == after ]]; then
   [[ ! -L "$runtime_manifest" && -f "$backup/runtime-twa-manifest.json" ]] || exit 1
   cp "$backup/runtime-twa-manifest.json" "$runtime_manifest"
   cmp --silent "$runtime_manifest" "$backup/runtime-twa-manifest.json"
-  cmp --silent .env "$backup/environment.env"
-  cmp --silent docker-compose.yml "$backup/docker-compose.yml"
+  if [[ "$release_profile" == salla ]]; then
+    [[ "$(cat "$backup/commit.txt")" == eda1e8cb400a90418b57ad5d0b5f97bc3e8fee96 && "$(cat "$backup/candidate.txt")" == "$candidate" ]] || exit 1
+    node "$tools_dir/salla-environment.cjs" verify "$backup/environment.env" .env "$backup/docker-compose.yml" docker-compose.yml
+    git show "$candidate:docker-compose.yml" | cmp --silent docker-compose.yml -
+    docker compose exec -T app node < "$tools_dir/supplier-schema-proof.cjs"
+  else
+    cmp --silent .env "$backup/environment.env"
+    cmp --silent docker-compose.yml "$backup/docker-compose.yml"
+  fi
   docker compose exec -T app node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/after.json"
   node "$tools_dir/database-proof.cjs" verify "$backup/before.json" "$backup/after.json"
   docker compose exec -T app node - verify-schema < "$tools_dir/database-proof.cjs"
   docker inspect "$container" > "$backup/container-after.json"
-  node "$tools_dir/verify-runtime.cjs" "$backup/container-before.json" "$backup/container-after.json"
+  node "$tools_dir/verify-runtime.cjs" "$backup/container-before.json" "$backup/container-after.json" "$release_profile"
   for media in storage legacy; do
     [[ -f "$backup/$media.path" ]] || continue
     media_path=$(cat "$backup/$media.path")
@@ -59,7 +68,11 @@ if [[ "$phase" == after ]]; then
   exit 0
 fi
 
-[[ "$current_commit" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || { echo 'Production baseline changed; stop and review'; exit 1; }
+if [[ "$release_profile" == salla ]]; then
+  [[ "$current_commit" == eda1e8cb400a90418b57ad5d0b5f97bc3e8fee96 && -z "$reuse_media_id" ]] || { echo 'Salla requires exact home baseline and fresh full backup'; exit 1; }
+else
+  [[ "$current_commit" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || { echo 'Production baseline changed; stop and review'; exit 1; }
+fi
 [[ ! -e "$backup" && ! -L "$backup" ]] || { echo 'Backup destination already exists; use a new run'; exit 1; }
 mkdir -m 700 "$backup"
 printf '%s\n' "$current_commit" > "$backup/commit.txt"

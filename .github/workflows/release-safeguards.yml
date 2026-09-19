@@ -7,7 +7,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [before, after]
+        options: [before, after, salla_prepare, salla_activate, salla_rollback]
         default: before
         required: true
       backup_id:
@@ -22,6 +22,14 @@ concurrency:
   group: vps-deploy
   cancel-in-progress: false
 jobs:
+  salla:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/salla-release-20260920' && startsWith(inputs.phase, 'salla_')
+    uses: ./.github/workflows/salla-release-prepare.yml
+    with:
+      phase: ${{ inputs.phase }}
+      backup_id: ${{ inputs.backup_id }}
+      confirmation: PREPARE_SALLA_WITH_MAINTENANCE_BACKUP
+    secrets: inherit
   safeguard:
     if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/trbhh-audit-fixes-20260910' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb' || (github.ref == 'refs/heads/codex/trbhh-v2-preview' && github.event_name == 'workflow_dispatch' && inputs.phase == 'before') || (github.ref == 'refs/heads/codex/commerce-approved-goods-20260919' && inputs.phase == 'before') || (github.ref == 'refs/heads/codex/home-feed-release-20260919' && inputs.phase == 'before'))
     runs-on: ubuntu-latest

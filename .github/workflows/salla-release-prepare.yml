@@ -1,0 +1,113 @@
+name: Reviewed Salla release operations
+on:
+  workflow_call:
+    inputs:
+      confirmation:
+        type: string
+        required: true
+      phase:
+        type: string
+        required: true
+      backup_id:
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  quality:
+    if: github.ref == 'refs/heads/codex/salla-release-20260920' && inputs.confirmation == 'PREPARE_SALLA_WITH_MAINTENANCE_BACKUP'
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: fixture_ci_root
+          MYSQL_ROOT_HOST: '%'
+          MYSQL_DATABASE: ci
+        ports: ['33309:3306']
+        options: --health-cmd="mysqladmin ping -h127.0.0.1 -pfixture_ci_root" --health-interval=10s --health-timeout=5s --health-retries=12
+    env:
+      DATABASE_URL: mysql://root:fixture_ci_root@127.0.0.1:33309/ci
+      AUTH_SECRET: synthetic_release_ci_secret_0123456789abcdef
+      REDIS_URL: ''
+      NEXT_TELEMETRY_DISABLED: '1'
+      SUPPLIER_ALLOW_LIVE_ORDERS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Executable release EXIT and cancellation race gates
+        run: pnpm exec vitest run tests/unit/salla-coordination.test.ts
+      - run: pnpm prisma db push --skip-generate
+      - run: pnpm typecheck && pnpm lint && pnpm test && pnpm build
+      - name: Isolated supplier and commerce transactions
+        env:
+          SUPPLIER_DB_TESTS: '1'
+          SUPPLIER_TEST_DATABASE_URL: mysql://root:fixture_ci_root@127.0.0.1:33309/trbhh_supplier_test
+          COMMERCE_DB_TESTS: '1'
+          COMMERCE_TEST_DATABASE_URL: mysql://root:fixture_ci_root@127.0.0.1:33309/trbhh_commerce_test
+        run: |
+          pnpm exec vitest run --config vitest.suppliers.config.ts
+          pnpm exec vitest run --config vitest.commerce.config.ts
+      - run: node scripts/release/build-supplier-schema-proof.cjs > supplier-schema-proof.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: supplier-schema-proof
+          path: supplier-schema-proof.cjs
+  prepare:
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: salla-release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: supplier-schema-proof
+      - name: Execute explicitly selected reviewed release phase
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          SALLA_CLIENT_ID: ${{ secrets.SALLA_CLIENT_ID }}
+          SALLA_CLIENT_SECRET: ${{ secrets.SALLA_CLIENT_SECRET }}
+          SALLA_WEBHOOK_SECRET: ${{ secrets.SALLA_WEBHOOK_SECRET }}
+          PHASE: ${{ inputs.phase || 'salla_prepare' }}
+          BACKUP_ID: ${{ inputs.backup_id }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ && "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
+          test -n "$VPS_HOST"; test -n "$VPS_USER"; test -n "$VPS_SSH_KEY"; test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/release_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          port=${VPS_PORT:-22}
+          args=(-i ~/.ssh/release_key -p "$port" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -o ServerAliveInterval=15)
+          target="$VPS_USER@$VPS_HOST"
+          tools="/root/trbhh-release-tools/$GITHUB_SHA"
+          backup="/root/trbhh-release-backups/audit-$GITHUB_RUN_ID"
+          ssh "${args[@]}" "$target" "set -eu; test ! -L /root/trbhh-release-tools; mkdir -p '$tools'; test ! -L '$tools'; chmod 700 /root/trbhh-release-tools '$tools'"
+          scp -i ~/.ssh/release_key -P "$port" -o StrictHostKeyChecking=yes scripts/release/{safeguards.sh,database-proof.cjs,verify-runtime.cjs,media-proof.cjs,salla-environment.cjs,salla-rollback.sh,salla-activate.sh,salla-cutover.sh,salla-coordination.sh} supplier-schema-proof.cjs "$target:$tools/"
+          if [[ "$PHASE" == salla_activate || "$PHASE" == salla_rollback ]]; then
+            [[ "$BACKUP_ID" =~ ^[0-9]+$ ]]
+            if [[ "$PHASE" == salla_activate ]]; then script=salla-activate.sh; else script=salla-rollback.sh; fi
+            ssh "${args[@]}" "$target" "bash '$tools/$script' '$BACKUP_ID' '$GITHUB_SHA'"
+            exit 0
+          fi
+          [[ "$PHASE" == salla_prepare ]]
+          test -n "$SALLA_CLIENT_ID"; test -n "$SALLA_CLIENT_SECRET"; test -n "$SALLA_WEBHOOK_SECRET"
+          ssh "${args[@]}" "$target" "bash '$tools/safeguards.sh' before '$GITHUB_RUN_ID' '$GITHUB_SHA' '' salla"
+          # JSON travels over encrypted stdin, never arguments, output, artifacts or logs.
+          node -e 'const keys=["SALLA_CLIENT_ID","SALLA_CLIENT_SECRET","SALLA_WEBHOOK_SECRET"];process.stdout.write(JSON.stringify(Object.fromEntries(keys.map(k=>[k,process.env[k]]))));' | ssh "${args[@]}" "$target" "set -eu; test \"\$(cat '$backup/VERIFIED')\" = eda1e8cb400a90418b57ad5d0b5f97bc3e8fee96; test \"\$(git -C /root/trbhh rev-parse HEAD)\" = eda1e8cb400a90418b57ad5d0b5f97bc3e8fee96; cmp --silent /root/trbhh/.env '$backup/environment.env'; node '$tools/salla-environment.cjs' prepare '$backup/environment.env' '$backup/salla-staged.env'"
+          echo 'Backup and private environment staged. No activation performed. Main review required.'

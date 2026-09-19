@@ -67,7 +67,7 @@ describe('production backup gates', () => {
     ['workflow_dispatch', 'claude/hostinger-vps-project-amw8vb', 'after', true],
     ['workflow_dispatch', 'codex/trbhh-v2-preview', 'after', false],
   ])('gates dispatch %s / %s / %s', (event, branch, phase, allowed) => {
-    const condition = workflow.match(/^    if: (.+)$/m)?.[1];
+    const condition = workflow.split('  safeguard:')[1].match(/^    if: (.+)$/m)?.[1];
     expect(condition).toBeDefined();
     expect(runInNewContext(condition!, {
       github: { event_name: event, ref: `refs/heads/${branch}` }, inputs: { phase },

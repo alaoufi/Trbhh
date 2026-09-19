@@ -45,6 +45,8 @@ function diagnoseEnvironment(before,input){
    containsNonAscii:present&&/[^\x00-\x7f]/.test(value),
    containsQuotes:present&&/["']/.test(value),
    containsDollar:present&&value.includes('$'),
+   looksMaskedPlaceholder:present&&/^[•●*\s]+$/.test(value),
+   hasAssignmentPrefix:present&&/^\s*(SALLA_CLIENT_ID|SALLA_CLIENT_SECRET|SALLA_WEBHOOK_SECRET)\s*=/.test(value),
    trimmedAllowed:present&&/^[A-Za-z0-9._~:/+=-]+$/.test(value.trim()),
    wrappedSingleOrDoubleQuote:present&&value.length>=2&&((value.startsWith('"')&&value.endsWith('"'))||(value.startsWith("'")&&value.endsWith("'")))};
   result.secrets[key]=flags;

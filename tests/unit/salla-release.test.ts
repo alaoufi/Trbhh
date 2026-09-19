@@ -39,6 +39,8 @@ describe('Salla release environment preparation',()=>{
    ['عربي',{containsNonAscii:true,trimmedAllowed:false}],
    ['ascii$secret',{containsDollar:true,trimmedAllowed:false}],
    ['ascii-id',{charactersValid:true,trimmedAllowed:true,leadingTrailingWhitespace:false}],
+   ['••●*** ',{looksMaskedPlaceholder:true,hasAssignmentPrefix:false}],
+   [' SALLA_CLIENT_SECRET=ascii',{looksMaskedPlaceholder:false,hasAssignmentPrefix:true}],
   ] as const;
   for(const [value,expected] of cases){
    const input={SALLA_CLIENT_ID:value,SALLA_CLIENT_SECRET:value,SALLA_WEBHOOK_SECRET:value};

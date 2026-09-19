@@ -15,7 +15,7 @@ describe('production backup gates', () => {
     expect(workflow).toContain("github.ref == 'refs/heads/codex/trbhh-v2-preview' && github.event_name == 'workflow_dispatch' && inputs.phase == 'before'");
   });
   it('pins the freshly verified live revision and retains restore proof', () => {
-    expect(script).toContain('"$current_commit" == ec75f2862079107c742d8b8d903c24c5da5748da');
+    expect(script).toContain('"$current_commit" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06');
     expect(script).toContain('verify-restore "$backup/before.json" "$backup/restored.json"');
     expect(script).toContain('--event-scheduler=OFF');
   });
@@ -78,6 +78,7 @@ describe('production backup gates', () => {
     expect(script).toContain('docker unpause "$container"');
     expect(script).toContain('trap resume_production EXIT');
     expect(script.indexOf('docker image save')).toBeLessThan(script.indexOf('docker pause "$container"'));
+    expect(script.indexOf('tar -czf - -C "$media_path"')).toBeLessThan(script.indexOf('docker pause "$container"'));
     expect(script).toContain('verify-restore-full "$backup/full-before.json" "$backup/full-restored.json"');
     expect(script).toContain('verify-restore-full "$backup/full-before.json" "$backup/full-current.json"');
     expect(script).toContain('--volumes-from "$container:ro"');

@@ -59,7 +59,7 @@ if [[ "$phase" == after ]]; then
   exit 0
 fi
 
-[[ "$current_commit" == ec75f2862079107c742d8b8d903c24c5da5748da ]] || { echo 'Production baseline changed; stop and review'; exit 1; }
+[[ "$current_commit" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || { echo 'Production baseline changed; stop and review'; exit 1; }
 [[ ! -e "$backup" && ! -L "$backup" ]] || { echo 'Backup destination already exists; use a new run'; exit 1; }
 mkdir -m 700 "$backup"
 printf '%s\n' "$current_commit" > "$backup/commit.txt"
@@ -121,6 +121,21 @@ if [[ -n "$reuse_media_id" ]]; then
     node "$tools_dir/media-proof.cjs" snapshot "$backup/$label-extracted" > "$backup/$label-before.json"
   done
   printf '%s\n' "$reuse_media_id" > "$backup/REUSED_MEDIA_SOURCE"
+else
+  # Compress media while the app is live; exact bidirectional verification under
+  # the guarded pause below rejects any concurrent upload/change before release.
+  for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
+    IFS=: read -r label env_name fallback <<< "$spec"
+    media_path=$(docker exec "$reader" node -e 'process.stdout.write(process.env[process.argv[1]]||process.argv[2]||"")' "$env_name" "$fallback")
+    [[ -n "$media_path" ]] || continue
+    [[ "$media_path" == /app/storage || "$media_path" == /app/legacy ]] || exit 1
+    printf '%s\n' "$media_path" > "$backup/$label.path"
+    docker exec -u 0 "$reader" tar -czf - -C "$media_path" . > "$backup/$label.tar.gz"
+    gzip -t "$backup/$label.tar.gz"
+    mkdir -m 700 "$backup/$label-extracted"
+    tar -xzf "$backup/$label.tar.gz" -C "$backup/$label-extracted" --no-same-owner
+    node "$tools_dir/media-proof.cjs" snapshot "$backup/$label-extracted" > "$backup/$label-before.json"
+  done
 fi
 # Independent time-bound resume survives SSH disconnects or a killed shell.
 systemd-run --unit="$watchdog" --on-active=15m /bin/sh -c 'touch "$1"; exec /usr/bin/docker unpause "$2"' sh "$backup/WATCHDOG_FIRED" "$container" >/dev/null
@@ -141,16 +156,7 @@ for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
   media_path=$(docker exec "$reader" node -e 'process.stdout.write(process.env[process.argv[1]]||process.argv[2]||"")' "$env_name" "$fallback")
   [[ -n "$media_path" ]] || continue
   [[ "$media_path" == /app/storage || "$media_path" == /app/legacy ]] || { echo 'Unexpected media path; review before backup'; exit 1; }
-  if [[ -z "$reuse_media_id" ]]; then
-    printf '%s\n' "$media_path" > "$backup/$label.path"
-    docker exec -u 0 "$reader" tar -czf - -C "$media_path" . > "$backup/$label.tar.gz"
-    gzip -t "$backup/$label.tar.gz"
-    mkdir -m 700 "$backup/$label-extracted"
-    tar -xzf "$backup/$label.tar.gz" -C "$backup/$label-extracted" --no-same-owner
-    node "$tools_dir/media-proof.cjs" snapshot "$backup/$label-extracted" > "$backup/$label-before.json"
-  else
-    [[ -f "$backup/$label-before.json" && "$(cat "$backup/$label.path")" == "$media_path" ]] || exit 1
-  fi
+  [[ -f "$backup/$label-before.json" && "$(cat "$backup/$label.path")" == "$media_path" ]] || exit 1
   docker exec -i -u 0 "$reader" node - snapshot "$media_path" < "$tools_dir/media-proof.cjs" > "$backup/$label-current.json"
   node "$tools_dir/media-proof.cjs" verify "$backup/$label-before.json" "$backup/$label-current.json"
   # Reverse verification rejects added live files as well as missing/changed ones.

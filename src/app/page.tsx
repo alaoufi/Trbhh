@@ -14,10 +14,10 @@ import {
 import { PublicSearchForm } from '@/components/public-search-form';
 import { HomeCategoryNavigation } from '@/components/home-category-navigation';
 import { AdGrid } from '@/components/ad-card';
-import { Section } from '@/components/section';
+import { mergeHomeAds } from '@/lib/home-feed';
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
-import { getHomeStats, getHomeClassifiedText, getHomeHeadings, getSettingBool, getSetting, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
+import { getHomeStats, getHomeClassifiedText, getSettingBool, getSetting, getWelcomePopupSeconds, SETTING_WELCOME_GUEST_TEXT, DEFAULT_WELCOME_GUEST_TEXT } from '@/lib/settings';
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
@@ -63,7 +63,6 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     getHomeStats().catch(() => new Set(['ads', 'users', 'views'])),
     getHomeClassifiedText().catch(() => ({ title: 'الإعلانات المبوّبة', sub: 'تصفّح البطاقات أو صمّم إعلانك بالمصمم الذكي' })),
   ]);
-  const H = await getHomeHeadings().catch(() => ({ stores: 'متاجر تربح', products: 'منتجات المتاجر', featured: 'إعلانات مميّزة', latest: 'أحدث الإعلانات', mostViewed: 'الأكثر مشاهدة' }));
   const statCards: { key: string; icon: React.ElementType; value: number; label: string; href?: string }[] = [
     { key: 'ads', icon: Megaphone, value: stats.ads, label: 'إعلان نشط', href: '/search' },
     { key: 'users', icon: Users, value: stats.users, label: 'عضو مسجّل' },
@@ -136,15 +135,9 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 
-      {featured.length > 0 && (
-        <Section title={H.featured} href="/search?special=1">
-          <AdGrid ads={featured} />
-        </Section>
-      )}
-
-      <Section title={H.latest} href="/search">
+      <div>
         <div className="space-y-4">
-          <AdGrid ads={latest} />
+          <AdGrid ads={mergeHomeAds(featured, latest, storeAds, mostViewed, topRated)} />
           <PromoSlot placement="feed" />
           {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
           {/* تُعرض أحدث دفعة بسرعة؛ البحث يبقى السجل الكامل دون تحميله مسبقاً في الرئيسية. */}
@@ -152,7 +145,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
             عرض جميع الإعلانات في البحث ←
           </Link>
         </div>
-      </Section>
+      </div>
 
       {/* سجّل واحصل على رصيد ترحيبي — للزوار فقط وقابل للإغلاق */}
       {!session && welcomeCredit > 0 && <WelcomeBanner amount={welcomeCredit} />}
@@ -227,32 +220,14 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
 
       {/* إعلان المتاجر — يظهر تلقائياً لكل متجر معتمد (بطاقة المتجر) */}
       {storeCards.length > 0 && (
-        <Section title={H.stores} href="/companies">
+        <div>
           {/* شبكة مضغوطة بارتفاع قليل — عمودان على الجوال وحتى أربعة على الشاشات الكبيرة */}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {storeCards.map((c) => <StoreMiniCard key={c.id} s={c} href={`/companies/${c.id}`} compact />)}
           </div>
-        </Section>
+        </div>
       )}
 
-      {/* منتجات المتاجر — تظهر فقط للمتاجر التي اعتمدت الإدارة عرض منتجاتها */}
-      {storeAds.length > 0 && (
-        <Section title={H.products} href="/companies">
-          <AdGrid ads={storeAds} />
-        </Section>
-      )}
-
-      {mostViewed.length > 0 && (
-        <Section title={H.mostViewed}>
-          <AdGrid ads={mostViewed} />
-        </Section>
-      )}
-
-      {topRated.length > 0 && (
-        <Section title="⭐ الأعلى تقييماً" href="/search">
-          <AdGrid ads={topRated} />
-        </Section>
-      )}
 
     </div>
   );

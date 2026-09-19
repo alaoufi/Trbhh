@@ -6,8 +6,12 @@ umask 077
 phase=${1:?before or after}
 backup_id=${2:?numeric backup run id}
 candidate=${3:?candidate commit}
+reuse_media_id=${4:-}
 [[ "$phase" == before || "$phase" == after ]] || exit 1
 [[ "$backup_id" =~ ^[0-9]+$ && "$candidate" =~ ^[0-9a-f]{40}$ ]] || exit 1
+if [[ -n "$reuse_media_id" ]]; then
+  [[ "$phase" == before && "$reuse_media_id" =~ ^[0-9]+$ && "$reuse_media_id" != "$backup_id" ]] || exit 1
+fi
 prod=/root/trbhh
 base=/root/trbhh-release-backups
 backup="$base/audit-$backup_id"
@@ -93,6 +97,31 @@ docker run -d --name "$reader" --label "trbhh.backup-reader=$backup_id" --networ
   --add-host host.docker.internal:host-gateway --env-file "$backup/reader.env" \
   --volumes-from "$container:ro" --entrypoint sleep "$current_image" infinity >/dev/null
 docker exec "$reader" sh -c 'command -v mysqldump || command -v mariadb-dump' >/dev/null
+# Prepare reused media before the guarded pause. The source need not be VERIFIED:
+# only its archives are reused, never its database, manifests or success markers.
+if [[ -n "$reuse_media_id" ]]; then
+  reuse_source="$base/audit-$reuse_media_id"
+  [[ -d "$reuse_source" && ! -L "$reuse_source" && "$(realpath "$reuse_source")" == "$reuse_source" ]] || exit 1
+  [[ -f "$reuse_source/commit.txt" && ! -L "$reuse_source/commit.txt" ]] || exit 1
+  [[ "$(cat "$reuse_source/commit.txt")" == "$current_commit" ]] || { echo 'Media source baseline mismatch'; exit 1; }
+  for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
+    IFS=: read -r label env_name fallback <<< "$spec"
+    media_path=$(docker exec "$reader" node -e 'process.stdout.write(process.env[process.argv[1]]||process.argv[2]||"")' "$env_name" "$fallback")
+    [[ -n "$media_path" ]] || continue
+    [[ "$media_path" == /app/storage || "$media_path" == /app/legacy ]] || exit 1
+    [[ -f "$reuse_source/$label.path" && ! -L "$reuse_source/$label.path" && -f "$reuse_source/$label.tar.gz" && ! -L "$reuse_source/$label.tar.gz" ]] || exit 1
+    [[ "$(cat "$reuse_source/$label.path")" == "$media_path" ]] || { echo 'Media source path mismatch'; exit 1; }
+    printf '%s\n' "$media_path" > "$backup/$label.path"
+    # A separate copy/reflink prevents later writes to the source changing this run.
+    cp --reflink=auto -- "$reuse_source/$label.tar.gz" "$backup/$label.tar.gz"
+    gzip -t "$backup/$label.tar.gz" 2> "$backup/$label-archive-validation.log"
+    mkdir -m 700 "$backup/$label-extracted"
+    [[ ! -L "$backup" && "$(realpath "$backup")" == "$backup" && ! -L "$backup/$label-extracted" && "$(realpath "$backup/$label-extracted")" == "$backup/$label-extracted" ]] || exit 1
+    tar -xzf "$backup/$label.tar.gz" -C "$backup/$label-extracted" --no-same-owner --keep-old-files > "$backup/$label-extract.log" 2>&1
+    node "$tools_dir/media-proof.cjs" snapshot "$backup/$label-extracted" > "$backup/$label-before.json"
+  done
+  printf '%s\n' "$reuse_media_id" > "$backup/REUSED_MEDIA_SOURCE"
+fi
 # Independent time-bound resume survives SSH disconnects or a killed shell.
 systemd-run --unit="$watchdog" --on-active=15m /bin/sh -c 'touch "$1"; exec /usr/bin/docker unpause "$2"' sh "$backup/WATCHDOG_FIRED" "$container" >/dev/null
 paused=1
@@ -112,14 +141,20 @@ for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
   media_path=$(docker exec "$reader" node -e 'process.stdout.write(process.env[process.argv[1]]||process.argv[2]||"")' "$env_name" "$fallback")
   [[ -n "$media_path" ]] || continue
   [[ "$media_path" == /app/storage || "$media_path" == /app/legacy ]] || { echo 'Unexpected media path; review before backup'; exit 1; }
-  printf '%s\n' "$media_path" > "$backup/$label.path"
-  docker exec -u 0 "$reader" tar -czf - -C "$media_path" . > "$backup/$label.tar.gz"
-  gzip -t "$backup/$label.tar.gz"
-  mkdir -m 700 "$backup/$label-extracted"
-  tar -xzf "$backup/$label.tar.gz" -C "$backup/$label-extracted" --no-same-owner
-  node "$tools_dir/media-proof.cjs" snapshot "$backup/$label-extracted" > "$backup/$label-before.json"
+  if [[ -z "$reuse_media_id" ]]; then
+    printf '%s\n' "$media_path" > "$backup/$label.path"
+    docker exec -u 0 "$reader" tar -czf - -C "$media_path" . > "$backup/$label.tar.gz"
+    gzip -t "$backup/$label.tar.gz"
+    mkdir -m 700 "$backup/$label-extracted"
+    tar -xzf "$backup/$label.tar.gz" -C "$backup/$label-extracted" --no-same-owner
+    node "$tools_dir/media-proof.cjs" snapshot "$backup/$label-extracted" > "$backup/$label-before.json"
+  else
+    [[ -f "$backup/$label-before.json" && "$(cat "$backup/$label.path")" == "$media_path" ]] || exit 1
+  fi
   docker exec -i -u 0 "$reader" node - snapshot "$media_path" < "$tools_dir/media-proof.cjs" > "$backup/$label-current.json"
   node "$tools_dir/media-proof.cjs" verify "$backup/$label-before.json" "$backup/$label-current.json"
+  # Reverse verification rejects added live files as well as missing/changed ones.
+  node "$tools_dir/media-proof.cjs" verify "$backup/$label-current.json" "$backup/$label-before.json"
 done
 
 # Restore into a disposable database with no production network or exposed ports.

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
+import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
 describe('production backup gates', () => {
@@ -17,6 +18,46 @@ describe('production backup gates', () => {
     expect(script).toContain('"$current_commit" == ec75f2862079107c742d8b8d903c24c5da5748da');
     expect(script).toContain('verify-restore "$backup/before.json" "$backup/restored.json"');
     expect(script).toContain('--event-scheduler=OFF');
+  });
+  it('accepts media reuse only from a distinct numeric before-run source', () => {
+    expect(workflow).toContain('reuse_media_id:');
+    expect(workflow).toContain('REUSE_MEDIA_ID: ${{ inputs.reuse_media_id }}');
+    expect(script).toContain('reuse_media_id=${4:-}');
+    expect(script).toContain('"$phase" == before && "$reuse_media_id" =~ ^[0-9]+$ && "$reuse_media_id" != "$backup_id"');
+    expect(script).toContain('"$(realpath "$reuse_source")" == "$reuse_source"');
+    expect(script).toContain('"$(cat "$reuse_source/commit.txt")" == "$current_commit"');
+  });
+  it('validates copied media in the new directory before arming the pause guard', () => {
+    const preparation = script.indexOf('# Prepare reused media before the guarded pause.');
+    const guard = script.indexOf('systemd-run --unit="$watchdog"');
+    expect(preparation).toBeGreaterThan(0);
+    expect(preparation).toBeLessThan(guard);
+    const block = script.slice(preparation, guard);
+    expect(block).toContain('! -L "$reuse_source/$label.tar.gz"');
+    expect(block).toContain('! -L "$reuse_source/$label.path"');
+    expect(block).toContain('cp --reflink=auto -- "$reuse_source/$label.tar.gz" "$backup/$label.tar.gz"');
+    expect(block).toContain('gzip -t "$backup/$label.tar.gz"');
+    expect(block).toContain('snapshot "$backup/$label-extracted"');
+    expect(block).not.toContain('database.sql');
+  });
+  it('requires exact current media, fresh database proof, and the original watchdog', () => {
+    expect(script).toContain('verify "$backup/$label-current.json" "$backup/$label-before.json"');
+    expect(script).toContain('node - dump < "$tools_dir/database-proof.cjs" | gzip > "$backup/database.sql.gz"');
+    expect(script).toContain('--on-active=15m');
+    expect(script).toContain('verify-restore-full "$backup/full-before.json" "$backup/full-restored.json"');
+    expect(script).toContain('verify-restore-full "$backup/full-before.json" "$backup/full-current.json"');
+    expect(script).not.toContain('> "$reuse_source/VERIFIED"');
+  });
+  it('bidirectional media proof rejects additions and same-size content changes', () => {
+    const { verify } = createRequire(import.meta.url)('../../scripts/release/media-proof.cjs');
+    const file = { path: 'fixture', kind: 'file', bytes: 1, sha256: 'a'.repeat(64) };
+    const manifest = (entries: object[]) => ({ format: 'trbhh-media-proof-v1', capturedAt: '2026-09-19T00:00:00Z', entryCount: entries.length, entries });
+    const original = manifest([file]);
+    const added = manifest([file, { ...file, path: 'added' }]);
+    expect(verify(original, original).ok).toBe(true);
+    expect(verify(original, added).ok).toBe(true);
+    expect(verify(added, original).ok).toBe(false);
+    expect(verify(original, manifest([{ ...file, sha256: 'b'.repeat(64) }])).ok).toBe(false);
   });
   it.each([
     ['workflow_dispatch', 'codex/commerce-approved-goods-20260919', 'before', true],

@@ -23,11 +23,30 @@ describe('Salla release environment preparation',()=>{
   const {diagnoseEnvironment}=require('../../scripts/release/salla-environment.cjs');
   expect(typeof diagnoseEnvironment).toBe('function');
   const result=diagnoseEnvironment('SUPPLIER_TOKEN_ENCRYPTION_KEY=\nSUPPLIER_RECONCILE_SECRET=bad-private-key\n', {SALLA_CLIENT_ID:'id',SALLA_CLIENT_SECRET:'private$secret',SALLA_WEBHOOK_SECRET:'safe'});
-  expect(result.secrets.SALLA_CLIENT_SECRET).toEqual({present:true,sizeValid:true,charactersValid:false});
+  expect(result.secrets.SALLA_CLIENT_SECRET).toMatchObject({present:true,sizeValid:true,charactersValid:false,containsDollar:true,trimmedAllowed:false});
   expect(result.persistent.SUPPLIER_TOKEN_ENCRYPTION_KEY).toEqual({present:true,blank:true,formatValid:false});
   expect(result.codes).toEqual(['invalid_secret','invalid_persistent_key']);
   expect(JSON.stringify(result)).not.toMatch(/private\$secret|bad-private-key/);
   expect(diagnoseEnvironment('SALLA_CLIENT_ID=x\nSALLA_CLIENT_ID=y\n',{}).codes).toContain('duplicate_key');
+ });
+ it('classifies copy artifacts and unsupported characters without returning or changing credentials',()=>{
+  const {diagnoseEnvironment}=require('../../scripts/release/salla-environment.cjs');
+  const cases=[
+   [' ascii\r\n',{leadingTrailingWhitespace:true,containsCRLF:true,containsOtherControl:false,containsNonAscii:false,containsQuotes:false,containsDollar:false,trimmedAllowed:true,wrappedSingleOrDoubleQuote:false}],
+   ['"ascii"',{containsQuotes:true,wrappedSingleOrDoubleQuote:true,trimmedAllowed:false}],
+   ["'ascii'",{containsQuotes:true,wrappedSingleOrDoubleQuote:true}],
+   ['a\u0000b\tc',{containsOtherControl:true,containsCRLF:false}],
+   ['عربي',{containsNonAscii:true,trimmedAllowed:false}],
+   ['ascii$secret',{containsDollar:true,trimmedAllowed:false}],
+   ['ascii-id',{charactersValid:true,trimmedAllowed:true,leadingTrailingWhitespace:false}],
+  ] as const;
+  for(const [value,expected] of cases){
+   const input={SALLA_CLIENT_ID:value,SALLA_CLIENT_SECRET:value,SALLA_WEBHOOK_SECRET:value};
+   const result=diagnoseEnvironment('',input);
+   expect(result.secrets.SALLA_CLIENT_ID).toMatchObject(expected);
+   expect(input.SALLA_CLIENT_ID).toBe(value);
+   expect(Object.values(result.secrets.SALLA_CLIENT_ID).every(flag=>typeof flag==='boolean')).toBe(true);
+  }
  });
  it('preserves every unrelated setting and existing persistent keys',()=>{
   const {prepareEnvironment,verifyEnvironment}=require('../../scripts/release/salla-environment.cjs');

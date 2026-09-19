@@ -38,9 +38,17 @@ function diagnoseEnvironment(before,input){
  try{parsed=parse(before);}catch(error){result.codes.push(['duplicate_key','unsupported_assignment'].includes(error.message)?error.message:'parse_failed');}
  for(const key of keys.slice(0,3)){
   const value=input?.[key];const present=typeof value==='string'&&value.length>0;
-  const flags={present,sizeValid:present&&value.length<=4096,charactersValid:present&&/^[A-Za-z0-9._~:/+=-]+$/.test(value)};
+  const flags={present,sizeValid:present&&value.length<=4096,charactersValid:present&&/^[A-Za-z0-9._~:/+=-]+$/.test(value),
+   leadingTrailingWhitespace:present&&value.trim()!==value,
+   containsCRLF:present&&/[\r\n]/.test(value),
+   containsOtherControl:present&&/[\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(value),
+   containsNonAscii:present&&/[^\x00-\x7f]/.test(value),
+   containsQuotes:present&&/["']/.test(value),
+   containsDollar:present&&value.includes('$'),
+   trimmedAllowed:present&&/^[A-Za-z0-9._~:/+=-]+$/.test(value.trim()),
+   wrappedSingleOrDoubleQuote:present&&value.length>=2&&((value.startsWith('"')&&value.endsWith('"'))||(value.startsWith("'")&&value.endsWith("'")))};
   result.secrets[key]=flags;
-  if(!Object.values(flags).every(Boolean)&&!result.codes.includes('invalid_secret'))result.codes.push('invalid_secret');
+  if(!(flags.present&&flags.sizeValid&&flags.charactersValid)&&!result.codes.includes('invalid_secret'))result.codes.push('invalid_secret');
  }
  if(parsed)for(const key of keys.slice(3,5)){
   const present=parsed.values.has(key),value=parsed.values.get(key);

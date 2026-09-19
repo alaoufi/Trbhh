@@ -10,7 +10,12 @@ import {
   getTopRatedAds,
   getStats,
   getPersonalizedAds,
+  countSearchAds,
+  searchAds,
 } from '@/lib/data';
+import { AdminPager } from '@/components/admin-pager';
+import { normalizeSearchParams, positiveSearchId, singleSearchParams, type SearchQueryInput } from '@/lib/search-filters';
+import { normalizeSandboxCategory, sandboxCatalogOptions } from '@/lib/sandbox-catalog';
 import { PublicSearchForm } from '@/components/public-search-form';
 import { AdGrid } from '@/components/ad-card';
 import { Section } from '@/components/section';
@@ -50,13 +55,14 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
   );
 }
 
-export default async function HomePage({ searchParams }: { searchParams?: Promise<{ published?: string }> }) {
-  const sp = (await searchParams) || {};
+export default async function HomePage({ searchParams }: { searchParams?: Promise<SearchQueryInput> }) {
+  const sp = singleSearchParams((await searchParams) || {});
+  const sandbox = isPreviewSandbox();
   // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
-  const [featured, latest, mostViewed, topRated, stats, homeStats, clsText] = await Promise.all([
+  const [featured, recent, mostViewed, topRated, stats, homeStats, clsText] = await Promise.all([
     getFeaturedAds(8),
-    getHomeLatestAds(8),
+    sandbox ? Promise.resolve([]) : getHomeLatestAds(8),
     getMostViewedAds(8),
     getTopRatedAds(8),
     getStats(),
@@ -108,6 +114,24 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     getCities(), getAreas(),
   ]);
 
+  const sq: Partial<ReturnType<typeof normalizeSearchParams>> = sandbox
+    ? normalizeSearchParams(priceOn ? sp : {...sp, minPrice:undefined, maxPrice:undefined}) : {};
+  const cityId = cities.some(item => item.countryId === 1 && item.id === sq.cityId) ? sq.cityId : undefined;
+  const areaId = cityId && areas.some(item => item.cityId === cityId && item.id === sq.areaId) ? sq.areaId : undefined;
+  const classification = sandbox ? normalizeSandboxCategory(sp) : {};
+  const query = {...sq, cityId, areaId, ...classification};
+  const params = {
+    ...classification, q:query.q, city:cityId?.toString(), area:areaId?.toString(), type:query.type,
+    sort:query.sort, special:query.special ? '1' : undefined,
+    minPrice:query.minPrice?.toString(), maxPrice:query.maxPrice?.toString(),
+  };
+  const total = sandbox ? await countSearchAds(query) : 0;
+  const pages = Math.max(1, Math.ceil(total / 24));
+  const page = Math.min(positiveSearchId(sp.page) || 1, pages);
+  const latest = sandbox ? await searchAds({...query, take:24, skip:(page - 1) * 24}) : recent;
+  const browseParams = new URLSearchParams(Object.entries(params).filter((entry): entry is [string,string] => entry[1] !== undefined));
+  const browseSearchHref = sandbox ? `/search?${browseParams}` : '/search';
+
   return (
     <div className="space-y-4">
       {/* ✅ تأكيد نشر الإعلان — يظهر بعد النشر الناجح والتحويل للرئيسية */}
@@ -118,7 +142,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
         </div>
       )}
 
-      {discoveryOn && (
+      {(discoveryOn || sandbox) && (
         <section aria-labelledby="discovery-title" className="home-discovery overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-sm">
           <div className="home-discovery-heading flex flex-wrap items-center justify-between gap-3 bg-[#16294a] px-4 py-4 text-white sm:px-6">
             <div className="min-w-0 flex-1">
@@ -129,7 +153,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
               <Megaphone className="h-4 w-4" /> {discoveryAddLabel}
             </Link>
           </div>
-          <div className="p-4 sm:px-6"><PublicSearchForm regions={cities} areas={areas} priceOn={priceOn} placeholder={discoveryPlaceholder} compact /></div>
+          <div className="p-4 sm:px-6"><PublicSearchForm key={sandbox ? JSON.stringify(params) : 'home'} regions={cities} areas={areas} priceOn={priceOn} placeholder={discoveryPlaceholder} compact params={sandbox ? params : undefined} categories={sandbox ? sandboxCatalogOptions : undefined} action={sandbox ? '/' : '/search'} /></div>
         </section>
       )}
       {/* Paid banner — top of home */}
@@ -141,13 +165,15 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
         </Section>
       )}
 
-      <Section title={H.latest} href="/search">
-        <div className="space-y-4">
-          <AdGrid ads={latest} />
+      <Section title={sandbox ? 'جميع الإعلانات العامة' : H.latest} href={browseSearchHref}>
+        <div className="space-y-4" data-testid={sandbox ? 'sandbox-public-feed' : undefined} data-total={sandbox ? total : undefined}>
+          {sandbox && <><p className="text-sm text-muted-foreground">النتائج: {total}</p><p className="text-xs text-muted-foreground">الإعلانات القديمة ذات التصنيف غير المطابق تظهر ضمن أخرى / أخرى؛ إعادة تصنيفها مؤجلة. إعلانات حساب الاختبار الشخصية لا تدخل هذه القائمة.</p></>}
+          {sandbox && latest.length === 0 ? <div className="rounded-xl border border-dashed p-8 text-center"><p className="font-semibold">لا توجد إعلانات تطابق بحثك.</p><Link href="/" className="mt-3 inline-block text-sm text-primary underline">امسح الفلاتر لتصفح جميع الإعلانات</Link></div> : <AdGrid ads={latest} />}
+          {sandbox && <AdminPager basePath="/" page={page} pages={pages} total={total} params={params} />}
           <PromoSlot placement="feed" />
           {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
           {/* تُعرض أحدث دفعة بسرعة؛ البحث يبقى السجل الكامل دون تحميله مسبقاً في الرئيسية. */}
-          <Link href="/search" className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
+          <Link href={browseSearchHref} className="card-3d block rounded-xl p-3 text-center text-sm font-bold text-primary hover:bg-secondary/40">
             عرض جميع الإعلانات في البحث ←
           </Link>
         </div>

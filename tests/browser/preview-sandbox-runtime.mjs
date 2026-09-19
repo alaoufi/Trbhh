@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import {verifySandboxBrowse} from './sandbox-browse-checks.mjs';
 const require = createRequire(import.meta.url);
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const base = process.env.PREVIEW_TEST_BASE || 'http://127.0.0.1:4192';
@@ -27,7 +28,7 @@ async function login(context,user='preview') {
   await page.locator('input[name="identifier"]').fill(user);
   await page.locator('input[name="password"]').fill(password);
   await page.getByRole('button',{name:'دخول',exact:true}).click();
-  await page.waitForURL('**/ads/new');
+  await page.waitForURL(url=>url.pathname==='/ads/new');
   try { await page.getByLabel('القسم الرئيسي').waitFor(); }
   catch(error) { console.error('Sandbox page state:',(await page.locator('body').innerText()).slice(-1200)); console.error('Cookie names:',(await context.cookies()).map(cookie=>cookie.name)); throw error; }
   return page;
@@ -38,6 +39,7 @@ try {
   for (const path of ['/admin','/api/pay/callback/test','/wallet','/register']) assert.equal((await guest.request.get(base+path)).status(),404,path);
   assert.equal((await guest.request.post(base+'/ads/new')).status(),405);
   const home=await guest.newPage();
+  await verifySandboxBrowse(home,base);
   await home.goto(base);
   assert.equal(await home.locator('html').getAttribute('data-design'),null);
   assert.match(await home.locator('body').innerText(),/بيئة اختبار مستقلة/);

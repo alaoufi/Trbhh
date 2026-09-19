@@ -1,4 +1,10 @@
 /** URL values are untrusted: reject malformed IDs and prices before querying. */
+export type SearchQueryInput = Record<string, string | string[] | undefined>;
+/** Repeated parameters are ambiguous: do not join them or choose a value. */
+export function singleSearchParams(input: SearchQueryInput): Record<string, string | undefined> {
+  return Object.fromEntries(Object.entries(input).filter((entry): entry is [string,string] => typeof entry[1] === 'string'));
+}
+
 export function positiveSearchId(value: string | undefined): number | undefined {
   if (!value || !/^\d+$/.test(value)) return undefined;
   const id = Number(value);

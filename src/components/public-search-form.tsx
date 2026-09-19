@@ -1,13 +1,15 @@
 import { SearchAreaPicker } from '@/components/search-area-picker';
 import { SearchSuggestInput } from '@/components/search-suggest';
 import { Search } from 'lucide-react';
+import { PublicCategoryPicker, type PublicCategoryOption } from './public-category-picker';
 
 type Region = { id: number; name: string; countryId?: number };
 type Area = { id: number; name: string; cityId: number };
 
-export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, placeholder = 'ماذا تبحث عنه؟', compact = false }: {
+export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, placeholder = 'ماذا تبحث عنه؟', compact = false, categories, action = '/search' }: {
   regions: Region[]; areas: Area[]; params?: Record<string, string | undefined>;
   priceOn?: boolean; placeholder?: string; compact?: boolean;
+  categories?: PublicCategoryOption[]; action?: string;
 }) {
   const field = 'h-11 min-w-0 w-full rounded-lg border bg-background px-3 text-sm text-foreground';
   const filters = <>
@@ -31,7 +33,7 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
       </select>
     </label>}
   </>;
-  return <form action="/search" method="get" role="search" className="space-y-3">
+  return <form action={action} method="get" role="search" className="space-y-3">
     <div className="flex items-end gap-2">
       <label className="min-w-0 flex-1 space-y-1 text-xs font-semibold text-foreground">البحث في الإعلانات
         <SearchSuggestInput key={params.q || ''} name="q" defaultValue={params.q || ''} placeholder={placeholder} />
@@ -39,6 +41,10 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
       <button type="submit" className="flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground hover:opacity-90"><Search className="h-4 w-4" /> بحث</button>
     </div>
     {params.special === '1' && <input name="special" type="hidden" value="1" />}
+    {compact && params.sort && <input name="sort" type="hidden" value={params.sort} />}
+    {categories && <div className="grid grid-cols-2 items-end gap-3">
+      <PublicCategoryPicker key={`${params.category || ''}/${params.subcategory || ''}`} categories={categories} category={params.category} subcategory={params.subcategory} className={field} />
+    </div>}
     {compact ? <details className="rounded-lg border bg-background px-3 py-2 text-foreground">
       <summary className="cursor-pointer text-sm font-semibold">المنطقة والمدينة · نوع الإعلان{priceOn ? ' · السعر' : ''}</summary>
       <div className="mt-3 grid grid-cols-2 items-end gap-3 sm:grid-cols-3">{filters}</div>

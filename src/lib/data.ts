@@ -15,6 +15,16 @@ import { publicStoreWhere } from './store-subscription-access';
 import { equivalentAreaIds, normalizePriceRange } from './search-filters';
 import { compactAdTitle } from './ad-presentation';
 import { searchCardVisibility } from './search-card-visibility';
+import { isPreviewSandbox } from './preview-sandbox';
+import { createSandboxCatalog, type SandboxCategory } from './sandbox-catalog';
+
+const getSandboxCatalog = cache(async () => {
+  const [categories, subcategories] = await Promise.all([
+    prisma.categories.findMany({select:{id:true,name:true}}),
+    prisma.sub_categories.findMany({select:{id:true,category_id:true,name:true}}),
+  ]);
+  return createSandboxCatalog(categories, subcategories);
+});
 
 export type AdCard = {
   id: number;
@@ -113,6 +123,7 @@ type AdRow = {
   user_id: bigint;
   city_id: bigint;
   category_id: bigint;
+  subcategory_id?: number | null;
   created_at: Date | null;
   bumped_at?: Date | null;
   urgent_until?: Date | null;
@@ -121,6 +132,7 @@ type AdRow = {
 };
 
 async function toCards(rows: AdRow[]): Promise<AdCard[]> {
+  const sandboxCatalog = isPreviewSandbox() ? await getSandboxCatalog() : null;
   const ids = rows.map((r) => r.id);
   const { getAdRatingsBrief } = await import('./ad-reviews');
   const [images, views, cities, cats, sellers, adMeta, ratings, areas] = await Promise.all([
@@ -152,6 +164,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
     })
     .map((r) => {
       const s = sellers.get(toInt(r.user_id));
+      const classification = sandboxCatalog?.display(r.category_id, r.subcategory_id);
       return {
         id: toInt(r.id),
         title: compactAdTitle(censorSync(r.title)),
@@ -161,7 +174,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         adsType: r.adsType,
         image: images.get(toInt(r.id)) ?? PLACEHOLDER,
         cityName: areaNames.get(r.area_id || 0) || cities.get(toInt(r.city_id)) || null,
-        categoryName: cats.get(toInt(r.category_id)) ?? null,
+        categoryName: classification ? `${classification.category} / ${classification.subcategory}` : cats.get(toInt(r.category_id)) ?? null,
         // الوقت الظاهر على البطاقة = آخر نشاط (التحديث ⬆ إن كان أحدث من النشر) ليطابق الترتيب
         createdAt: (r.bumped_at && r.created_at && r.bumped_at > r.created_at ? r.bumped_at : r.created_at)?.toISOString() ?? null,
         special: r.adsSpecial === 'checked',
@@ -192,6 +205,7 @@ const adSelect = {
   user_id: true,
   city_id: true,
   category_id: true,
+  subcategory_id: true,
   created_at: true,
   bumped_at: true,
   urgent_until: true,
@@ -486,7 +500,7 @@ export async function getAdsByCategory(categoryId: number, take = 24, skip = 0) 
   });
 }
 
-type SearchParamsT = {
+type SearchParamsT = SandboxCategory & {
   q?: string;
   categoryId?: number;
   countryId?: number;
@@ -522,9 +536,15 @@ const getSearchAreaIds = cache(async (areaId: number, cityId: number) => {
   return equivalentAreaIds(areas.map((area) => ({ id: toInt(area.id), name: area.name, cityId: area.city_id })), areaId, cityId);
 });
 
-async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special, minPrice, maxPrice }: SearchParamsT) {
+async function buildSearchWhere({ q, categoryId, category, subcategory, countryId, cityId, areaId, type, special, minPrice, maxPrice }: SearchParamsT) {
   const range = normalizePriceRange(minPrice, maxPrice);
   const visibility = await activeAdWhere();
+  // Imported rows can retain active status while paused or scheduled for later.
+  // Keep this extra eligibility gate sandbox-only; do not impose a recency cutoff.
+  const sandboxEligibility = isPreviewSandbox()
+    ? [{paused_by_owner:0, OR:[{publish_at:null}, {publish_at:{lte:new Date()}}]}]
+    : [];
+  const catalogWhere = isPreviewSandbox() && category ? [(await getSandboxCatalog()).where({category, subcategory})] : [];
   // بحث ذكي: تُقسَّم العبارة كلمات، وكل كلمة تُطابق العنوان أو التفاصيل بأي ترتيب،
   // مع توحيد أشكال الألف (أ إ آ ← ا) والتاء المربوطة (ة/ه) والياء (ى/ي)
   const norm = (w: string) => w.replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه');
@@ -536,7 +556,7 @@ async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type
   });
   return {
     ...visibility,
-    AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textClauses],
+    AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textClauses, ...catalogWhere, ...sandboxEligibility],
     ...(categoryId ? { category_id: BigInt(categoryId) } : {}),
     ...(countryId ? { country_id: countryId } : {}),
     ...(cityId ? { city_id: BigInt(cityId) } : {}),

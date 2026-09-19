@@ -51,7 +51,7 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
       <h2 className="font-bold">الموردون وقت إنشاء الطلب — بيانات داخلية</h2>
       <p className="text-xs">هذه تكاليف التوريد المحفوظة وليست إثباتًا لسداد المورد. الاستحقاق المحاسبي لا يُسجل قبل تأكيد البنك.</p>
       {suppliers.length===0 ? <p className="text-sm">لا توجد بنود مسندة لمورد؛ مخزون داخلي أو غير مسند.</p> : <div className="overflow-x-auto"><table className="w-full text-right text-sm">
-        <thead><tr><th>السلعة</th><th>المورد</th><th>رمز المورد</th><th>الكمية</th><th>تكلفة الوحدة</th><th>إجمالي التكلفة</th></tr></thead>
+        <thead><tr><th>السلعة</th><th>المورد</th><th>رمز المورد</th><th>الكمية</th><th>متوسط تكلفة الوحدة (مقرب للأعلى)</th><th>إجمالي التكلفة الدقيق</th></tr></thead>
         <tbody>{suppliers.map(s=><tr key={s.product_id.toString()} className="border-t"><td>{s.product_id.toString()}</td><td><Link className="text-primary underline" href={`/admin/commerce/accounts?supplier=${s.supplier_id}`}>{s.supplier_name} #{s.supplier_id.toString()}</Link></td><td>{s.supplier_sku}</td><td>{s.quantity}</td><td>{formatSar(s.unit_cost_minor)} ر.س</td><td>{formatSar(s.total_cost_minor)} ر.س</td></tr>)}</tbody>
       </table></div>}
     </section>

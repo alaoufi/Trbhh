@@ -7,10 +7,21 @@ import bcrypt from 'bcryptjs';
 import type { PrismaClient } from '@prisma/client';
 
 const BASELINE = '27b804d13ba884fb7cd3704356eb38c5faa29ab4';
-const DATABASE = 'trbhh_upgrade_test';
+const DATABASE = process.env.UPGRADE_SALLA_FIXTURE==='1' ? 'trbhh_upgrade_salla_test' : 'trbhh_upgrade_test';
 // Explicit release allowlist, checked against commerce/schema.ts, ad-categories/schema.ts
 // and Prisma. Do not derive this from the observed database: extra/missing columns must fail.
 const ADDITIVE_TABLE_COLUMNS: Record<string, string[]> = {
+  supplier_integration_profiles: ['supplier_id','provider','oauth_generation','maintenance','sync_enabled','auto_orders_enabled','mode','last_sync_at','last_error'],
+  supplier_connections: ['id','supplier_id','provider','external_store_id','status','encrypted_tokens','expires_at','refresh_claim','refresh_claimed_at','sync_claim','sync_claimed_at','version','created_at','updated_at'],
+  supplier_oauth_states: ['state_hash','browser_hash','oauth_generation','admin_id','supplier_id','expires_at','consumed_at'],
+  supplier_products: ['id','connection_id','supplier_id','external_id','sku','name','description','images','variants','options','categories','brand','public_price_minor','currency','quantity','available','source_updated_at','last_sync_at','sync_error','active','visible','featured','unit_cost_minor','selling_price_minor','pricing_policy','discount_minor','discount_bps','minimum_price_minor','minimum_margin_minor','commerce_product_id','revision'],
+  supplier_price_history: ['id','supplier_product_id','actor_id','kind','old_public_minor','new_public_minor','old_cost_minor','new_cost_minor','old_selling_minor','new_selling_minor','created_at'],
+  supplier_price_tiers: ['id','supplier_product_id','min_quantity','unit_cost_minor','active','created_at'],
+  supplier_stock_reservations: ['submission_key','id','supplier_product_id','kind','quantity','remaining_quantity','held_quantity','unit_cost_minor','active','priority','created_at'],
+  supplier_reservation_allocations: ['id','reservation_id','order_id','commerce_product_id','quantity','status'],
+  supplier_orders: ['id','order_id','connection_id','supplier_id','external_order_id','idempotency_key','status','selling_minor','payable_minor','profit_minor','shipping_minor','currency','payment_status','request_snapshot','claim_token','attempts','last_error','created_at','updated_at'],
+  supplier_shipments: ['id','supplier_order_id','external_id','carrier','tracking_number','status','fulfillment_status','source_updated_at','created_at','updated_at'],
+  supplier_webhook_events: ['id','connection_id','event_key','event_type','resource_id','payload','status','attempts','next_attempt_at','claim_token','claimed_at','last_error','created_at','processed_at'],
   ad_category_definitions: ['subcategory_id', 'version', 'kind', 'price_enabled', 'goods_enabled', 'fields_json'],
   ad_category_values: ['ad_id', 'subcategory_id', 'definition_version', 'values_json'],
   ad_category_audit: ['id', 'actor_id', 'action', 'payload', 'created_at'],

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { getCommerceGateway } from '@/lib/commerce/runtime';
 import { formatSar } from '@/lib/commerce/money';
+import { memberOrderTracking } from '@/lib/suppliers/tracking';
 import { payCommerceOrder, cancelCommerceOrder, checkCommercePayment } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,18 @@ export default async function MemberOrder({ params, searchParams }: {
     getCommerceConfig(), getCommerceGateway(),
   ]);
   const attempt = attempts[0];
+  const tracking = config.enabled && order.status === 'paid'
+    ? await memberOrderTracking(prisma, order.id, BigInt(session.uid)) : [];
+  let trackingLabels: string[] = [];
+  if (tracking.length) {
+    const { getSetting } = await import('@/lib/settings');
+    trackingLabels = await Promise.all([
+      getSetting('supplier_tracking_title', 'تتبع الشحن'),
+      getSetting('supplier_tracking_carrier_label', 'شركة الشحن'),
+      getSetting('supplier_tracking_number_label', 'رقم التتبع'),
+      getSetting('supplier_tracking_status_label', 'حالة الشحن'),
+    ]);
+  }
   const canPay = order.status === 'awaiting_payment' && (!attempt || attempt.status === 'pending')
     && config.enabled && config.paymentsEnabled && gateway?.ready;
   const query = await searchParams;
@@ -40,6 +53,16 @@ export default async function MemberOrder({ params, searchParams }: {
     <ul className="space-y-2">{items.map((item, index) => <li key={index} className="flex justify-between border-b pb-2 text-sm"><span>{item.title} × {item.quantity}</span><span>{formatSar(item.total_minor)} ر.س</span></li>)}</ul>
     <p className="text-sm">التوصيل: {formatSar(order.shipping_fee_minor)} ر.س</p>
     <p className="text-lg font-bold">الإجمالي النهائي: {formatSar(order.total_minor)} ر.س</p>
+    {tracking.length > 0 && <section aria-labelledby="shipment-tracking-title" className="space-y-3 border-t pt-4">
+      <h2 id="shipment-tracking-title" className="font-bold">{trackingLabels[0]}</h2>
+      <ul className="space-y-3">{tracking.map(shipment => <li key={shipment.id} className="rounded-lg border p-3 text-sm">
+        <dl className="space-y-1">
+          {shipment.carrier && <div><dt className="inline font-semibold">{trackingLabels[1]}: </dt><dd className="inline">{shipment.carrier}</dd></div>}
+          {shipment.trackingNumber && <div><dt className="inline font-semibold">{trackingLabels[2]}: </dt><dd className="inline break-all" dir="ltr">{shipment.trackingNumber}</dd></div>}
+          <div><dt className="inline font-semibold">{trackingLabels[3]}: </dt><dd className="inline">{shipment.status || shipment.fulfillmentStatus}</dd></div>
+        </dl>
+      </li>)}</ul>
+    </section>}
     {canPay && <form action={payCommerceOrder} className="space-y-2">
       <input type="hidden" name="orderId" value={id} />
       <label className="block text-sm"><input type="checkbox" name="confirm" value="1" required /> أوافق على دفع إجمالي هذا الطلب.</label>

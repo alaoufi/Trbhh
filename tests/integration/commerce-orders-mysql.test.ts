@@ -2,6 +2,7 @@ import {afterAll, beforeAll, beforeEach, describe, expect, it, vi} from 'vitest'
 import {PrismaClient} from '@prisma/client';
 import {execFileSync} from 'node:child_process';
 import {COMMERCE_DDL, assertCommerceSchemaReady} from '@/lib/commerce/schema';
+import {SUPPLIER_DDL} from '@/lib/suppliers/schema';
 import {createOrder, claimPaymentAttempt, recordPaymentReference, markPaymentUncertain, settleVerifiedPayment, cancelUnstartedOrder} from '@/lib/commerce/orders';
 import {dispatchPaidNotification} from '@/lib/commerce/notifications';
 import {commerceConfigFromRows} from '@/lib/commerce/config';
@@ -51,6 +52,7 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
     // Never overwrite/reuse an existing database. Cleanup only after this succeeds.
     await admin.$executeRawUnsafe('CREATE DATABASE trbhh_commerce_test');created=true;
     for(const ddl of COMMERCE_DDL) await client.$executeRawUnsafe(ddl);
+    for(const ddl of SUPPLIER_DDL) await client.$executeRawUnsafe(ddl);
     await assertCommerceSchemaReady(client);
   });
   afterAll(async()=>{

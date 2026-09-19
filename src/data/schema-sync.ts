@@ -1,3 +1,4 @@
+import { isPreviewReadOnly } from '@/lib/preview-mode';
 import 'server-only';
 import { prisma } from '@/lib/prisma';
 
@@ -947,6 +948,7 @@ async function backfillLegacyReceiptHashes(): Promise<void> {
 
 /** Idempotent schema sync — shared promise so concurrent callers run it once. */
 export function ensureSchema(): Promise<void> {
+  if (isPreviewReadOnly()) return Promise.resolve();
   if (!syncPromise) {
     syncPromise = run().catch((e) => {
       syncPromise = null; // allow retry on a later call

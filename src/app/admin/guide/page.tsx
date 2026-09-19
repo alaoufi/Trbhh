@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { requireAnyAdmin } from '@/lib/roles';
 import { GuideView, type GuideSection } from '@/components/guide-view';
+import { previewGuideSection } from '@/components/preview-guide-section';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'دليل الإدارة' };
@@ -303,7 +304,7 @@ export default async function AdminGuidePage() {
       headerIcon={BookOpen}
       title="دليل الإدارة"
       subtitle="خاص بفريق الإدارة فقط: كل قسم بهدفه وخطواته وطريق الوصول إليه — بلغة بسيطة لغير المختص."
-      sections={SECTIONS}
+      sections={[previewGuideSection, ...SECTIONS]}
     />
   );
 }

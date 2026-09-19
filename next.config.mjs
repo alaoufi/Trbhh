@@ -48,6 +48,13 @@ const nextConfig = {
   },
   output: 'standalone',
   reactStrictMode: true,
+  turbopack: {
+    // Shared local-preview source belongs to a nested package. Pin its runtime
+    // dependencies to this app, including when both packages are installed.
+    resolveAlias: Object.fromEntries(['react', 'react-dom', 'next', 'lucide-react'].map(name => [
+      name, `./node_modules/${name}`,
+    ])),
+  },
   poweredByHeader: false,
   // keep sharp external so the standalone output traces its native binaries
   serverExternalPackages: ['sharp'],

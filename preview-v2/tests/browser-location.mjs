@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const url = process.env.PREVIEW_URL || 'http://127.0.0.1:4187/ads/new/';
+assert.match(url, /^http:\/\/(127\.0\.0\.1|localhost):\d+\/ads\/new\/$/);
 const browser = await chromium.launch({channel:'msedge',headless:true});
 try {
  const page = await browser.newPage();
- await page.goto('http://127.0.0.1:4187/ads/new/');
+ await page.goto(url);
  await page.getByLabel('القسم الرئيسي').selectOption('عقارات');
  await page.getByLabel('التصنيف الفرعي').selectOption('أراضٍ');
  const region=page.getByRole('combobox',{name:/^المنطقة/});

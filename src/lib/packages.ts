@@ -1,3 +1,4 @@
+import { isPreviewReadOnly } from '@/lib/preview-mode';
 import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
@@ -65,6 +66,7 @@ function toPackage(r: Row): Package {
 
 let ensured = false;
 async function ensure() {
+  if (isPreviewReadOnly()) return;
   if (ensured) return;
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS packages (
@@ -248,6 +250,7 @@ export async function buyMemberPackage(userId: number, packageId: number): Promi
 
 /** Un-feature ads whose spotlight period elapsed. Call before reading featured ads. */
 export async function sweepExpiredFeatured() {
+  if (isPreviewReadOnly()) return;
   await ensure();
   const expired = await prisma.$queryRawUnsafe<{ ad_id: bigint }[]>(
     `SELECT ad_id FROM featured_ads WHERE until <= NOW()`,

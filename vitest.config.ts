@@ -11,7 +11,14 @@ if (authDbTests) {
 }
 export default defineConfig({
   resolve: {
+    dedupe: ['react', 'react-dom'],
     alias: {
+      // Shared preview components must use the root renderer, even when both
+      // applications have separate node_modules installations locally.
+      'react': path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      'next': path.resolve(__dirname, 'node_modules/next'),
+      'lucide-react': path.resolve(__dirname, 'node_modules/lucide-react'),
       // Next's poison-pill packages must be neutralized under plain Node.
       'server-only': path.resolve(__dirname, 'tests/stubs/empty.ts'),
       'client-only': path.resolve(__dirname, 'tests/stubs/empty.ts'),

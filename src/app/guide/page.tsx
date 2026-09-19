@@ -3,6 +3,7 @@ import {
   Flag, ShieldCheck, Crown, MonitorPlay, BarChart3, ShieldAlert, Rocket, Wallet, UserPen, Users,
 } from 'lucide-react';
 import { GuideView, type GuideSection } from '@/components/guide-view';
+import { previewGuideSection } from '@/components/preview-guide-section';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'دليل المستخدم' };
@@ -250,7 +251,7 @@ export default async function GuidePage() {
       title="دليل المستخدم"
       subtitle="للزوّار والأعضاء فقط: كل ما تحتاجه لتنشر وتبيع وتتواصل — بالهدف والخطوات."
       fromColor="#3287da" toColor="#1b4f8a"
-      sections={SECTIONS}
+      sections={process.env.PREVIEW_READ_ONLY === 'true' ? [previewGuideSection, ...SECTIONS] : SECTIONS}
     >
       {/* بدء سريع */}
       <section className="card-3d overflow-hidden rounded-2xl">

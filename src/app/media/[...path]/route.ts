@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { fetchPreviewMedia } from '@/lib/preview-media';
 import { createReadStream } from 'node:fs';
 import { open, readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
@@ -116,6 +117,7 @@ async function serveConvertedHeic(abs: string, ext: string, cacheControl: string
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: parts } = await params;
+  if (process.env.PREVIEW_READ_ONLY === 'true') return fetchPreviewMedia(parts, req.method);
   const rel = parts.join('/');
   const ext = rel.split('.').pop()?.toLowerCase() || '';
   const contentType = TYPES[ext] || 'application/octet-stream';

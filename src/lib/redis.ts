@@ -1,3 +1,4 @@
+import { isPreviewReadOnly } from '@/lib/preview-mode';
 import Redis from 'ioredis';
 
 const globalForRedis = globalThis as unknown as { redis?: Redis | null };
@@ -9,6 +10,7 @@ const globalForRedis = globalThis as unknown as { redis?: Redis | null };
  *   (which would take down the whole Node process)
  */
 function createRedis(): Redis | null {
+  if (isPreviewReadOnly()) return null;
   const url = process.env.REDIS_URL;
   if (!url) return null;
   const client = new Redis(url, {
@@ -25,7 +27,7 @@ function createRedis(): Redis | null {
   return client;
 }
 
-export const redis: Redis | null = globalForRedis.redis ?? createRedis();
+export const redis: Redis | null = isPreviewReadOnly() ? null : globalForRedis.redis ?? createRedis();
 
 if (process.env.NODE_ENV !== 'production') globalForRedis.redis = redis;
 

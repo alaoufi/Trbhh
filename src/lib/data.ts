@@ -1,3 +1,4 @@
+import { isPreviewReadOnly } from '@/lib/preview-mode';
 import 'server-only';
 import { cache } from 'react';
 import { prisma } from './prisma';
@@ -231,6 +232,7 @@ let lastLifetimeSweep = 0;
  *  في الإعدادات تُؤرشف (تختفي عن العامة، تبقى لصاحبها الذي يعيدها للظهور برسوم).
  *  0 = معطّل. لا تحذف شيئاً — أرشفة فقط. مُخنَّقة مرة/ساعة لكل حاوية. */
 export async function sweepOldAdsToArchive() {
+  if (isPreviewReadOnly()) return;
   const now = Date.now();
   if (now - lastLifetimeSweep < 3600_000) return;
   lastLifetimeSweep = now;
@@ -254,6 +256,7 @@ export async function sweepOldAdsToArchive() {
 /** Remove the «مميّز» badge from ads whose paid featuring period ended (expires_at = featured-until).
  *  The ad stays published — only the featuring lapses. Cheap, throttled. */
 export async function sweepExpiredPaidAds() {
+  if (isPreviewReadOnly()) return;
   const now = Date.now();
   if (now - lastExpirySweep < 600_000) return; // at most once/10 min per container
   lastExpirySweep = now;
@@ -263,6 +266,7 @@ export async function sweepExpiredPaidAds() {
   }).catch(() => {});
 }
 export async function sweepExpiredArchived() {
+  if (isPreviewReadOnly()) return;
   const now = Date.now();
   if (now - lastArchiveSweep < 3600_000) return; // at most once/hour
   lastArchiveSweep = now;
@@ -738,6 +742,7 @@ export async function getAdForEdit(id: number, userId: number) {
 
 /** Record a unique view (deduped per viewer key). Safe to call on every render. */
 export async function recordView(adId: number, viewerKey: string) {
+  if (isPreviewReadOnly()) return;
   try {
     const existing = await prisma.ads_views.findFirst({ where: { ads_id: BigInt(adId), user_id: viewerKey } });
     if (!existing) {
@@ -899,6 +904,7 @@ export const getAd = cache(getAdImpl);
 /* ناشر الجدولة الكسول: يرقّي الإعلانات المجدولة التي حان موعدها — يعمل مع التصفح بخنق ٦٠ث. */
 let schedLastRun = 0;
 export async function promoteScheduledAds(): Promise<void> {
+  if (isPreviewReadOnly()) return;
   const now = Date.now();
   if (now - schedLastRun < 60_000) return;
   schedLastRun = now;

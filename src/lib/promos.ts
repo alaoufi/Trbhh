@@ -1,3 +1,4 @@
+import { isPreviewReadOnly } from '@/lib/preview-mode';
 import 'server-only';
 import { prisma } from './prisma';
 import { mediaUrl } from './media';
@@ -9,6 +10,7 @@ export type { Promo, PromoPackage, PromoPlacement };
 
 let ensured = false;
 async function ensure() {
+  if (isPreviewReadOnly()) return;
   if (ensured) return;
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS promo_packages (
@@ -110,6 +112,7 @@ function toPromo(r: Row): Promo {
 
 /** Mark active promos whose period elapsed as expired. */
 async function sweepExpired() {
+  if (isPreviewReadOnly()) return;
   await prisma.$executeRawUnsafe(`UPDATE promo_ads SET status='expired' WHERE status='active' AND ends_at IS NOT NULL AND ends_at <= NOW()`).catch(() => {});
 }
 
@@ -188,6 +191,7 @@ export async function deletePromo(id: number) {
   await prisma.$executeRawUnsafe(`DELETE FROM promo_ads WHERE id=?`, id);
 }
 export async function recordPromoClick(id: number) {
+  if (isPreviewReadOnly()) return;
   await ensure();
   await prisma.$executeRawUnsafe(`UPDATE promo_ads SET clicks = clicks + 1 WHERE id = ?`, id).catch(() => {});
 }

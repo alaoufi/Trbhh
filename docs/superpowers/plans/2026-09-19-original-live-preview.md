@@ -10,15 +10,15 @@
 
 ## 1. Verify infrastructure before provisioning
 
-- [ ] Run `scripts/preview/inspect-live-runtime.sh` through the existing preview workflow with `inspect_live=true`. Output only revision, service health, database endpoint/schema, privilege capability booleans and available resources. Never print secrets or rows.
-- [ ] Verify the deployed revision matches the source baseline; preserve local dropdown and location changes.
+- [x] Run `scripts/preview/inspect-live-runtime.sh` through the existing preview workflow with `inspect_live=true`. Output only revision, service health, database endpoint/schema, privilege capability booleans and available resources. Never print secrets or rows.
+- [x] Verify the deployed revision matches the source baseline; preserve local dropdown and location changes.
 - [ ] Confirm availability of a privileged provisioning channel for a separate SELECT-only principal. If unavailable, report this exact access blocker; never run with writable production credentials.
 
 ## 2. Enforce runtime isolation
 
-- [ ] Unit tests first for a pure preview route policy: public GET/HEAD allowed; POST/PUT/PATCH/DELETE, auth, admin, wallet, scheduled tasks and internal APIs denied, including encoded paths.
-- [ ] Add an explicit environment-only preview mode. Default off; production behavior unchanged. Skip schema synchronization and scheduled/lifecycle writes. Force guest sessions, no production Redis, no outbound messaging or payment calls.
-- [ ] Test startup against a disposable SELECT-only MySQL principal; attempt a transactionally safe denied UPDATE with an impossible predicate and confirm rejection before connecting production.
+- [x] Unit tests first for a pure preview route policy: public GET/HEAD allowed; POST/PUT/PATCH/DELETE, auth, admin, wallet, scheduled tasks and internal APIs denied, including encoded paths.
+- [x] Add an explicit environment-only preview mode. Default off; production behavior unchanged. Skip schema synchronization and scheduled/lifecycle writes. Force guest sessions, no production Redis, no outbound messaging or payment calls.
+- [x] Test startup against a disposable SELECT-only MySQL principal; attempt a transactionally safe denied UPDATE with an impossible predicate and confirm rejection before connecting production.
 - [ ] Independently review every public rendering path and grant assertion. Do not deploy while any write path, private route, shared secret or cache remains reachable.
 
 ## 3. Preserve original presentation and experimental form
@@ -37,3 +37,5 @@
 - [ ] Deliver the actual verified preview URL. Keep the existing static Site unchanged until the replacement is verified; never describe its snapshot as a live connection.
 
 Approved by user: original design default, live public reads, experimental additions/edits isolated. Infrastructure provisioning is limited to this separate preview; no production UI/data/payment activation.
+
+Provisioning blocked by verified missing administrative database channel (run 35431110401). Application account lacks CREATE USER/GRANT OPTION; host socket/defaults access is unavailable; bundled Docker database is a different server. User input requested to open the correct database management panel or have the hosting administrator create the restricted principal. No production credentials reused, no production writes, no replacement deployment performed.

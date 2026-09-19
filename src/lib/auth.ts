@@ -1,3 +1,4 @@
+import { isPreviewReadOnly } from '@/lib/preview-mode';
 import 'server-only';
 import { cache } from 'react';
 import { cookies } from 'next/headers';
@@ -75,6 +76,7 @@ export async function createSession(payload: SessionPayload): Promise<void> {
 }
 
 async function getSessionImpl(): Promise<SessionPayload | null> {
+  if (isPreviewReadOnly()) return null;
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   assertSecureSecret();

@@ -1,3 +1,4 @@
+import { isPreviewReadOnly } from '@/lib/preview-mode';
 import 'server-only';
 import { prisma } from './prisma';
 
@@ -26,6 +27,7 @@ export const REGION_ORDER: string[] = Object.keys(SAUDI_AREAS);
 let seeded = false;
 /** Idempotently ensure every listed city exists under its region (Saudi = country_id 1). */
 export async function ensureSaudiAreas() {
+  if (isPreviewReadOnly()) return;
   if (seeded) return;
   try {
     const regions = await prisma.cities.findMany({ where: { country_id: 1 }, select: { id: true, name: true } });

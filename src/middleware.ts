@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { redirectLegacyApex, requestHostname } from '@/lib/public-origin';
 import { SITE } from '@/lib/constants';
+import { isPreviewReadOnly, previewRequestAllowed } from '@/lib/preview-mode';
 
 // subdomains that are the platform itself, never a store handle
 const RESERVED_SUB = new Set(['www', 'api', 'm', 'admin', 'mail', 'ftp', 'cdn', 'static', 'assets', 'app', 'apps', 'store', 'stores', 'trbhh', 'ns1', 'ns2', 'blog', 'help', 'support', 'dev', 'test', 'staging']);
@@ -19,6 +20,26 @@ function storeSubdomain(hostname: string): string {
 const SUB_ALLOWED = /^\/(companies\/|store-login|store-forgot|login|logout|forgot|media\/|api\/|p\/|_next|play\/|guide\/how)/;
 
 export function middleware(req: NextRequest) {
+  if (isPreviewReadOnly()) {
+    // Do not apply production/store redirects or issue a visitor cookie.
+    const target = req.nextUrl.pathname + req.nextUrl.search;
+    if (!previewRequestAllowed(req.method, target) || req.headers.has('next-action')) {
+      return new NextResponse('Preview: read-only public routes only', {
+        status: req.method === 'GET' || req.method === 'HEAD' ? 404 : 405,
+        headers: { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' },
+      });
+    }
+    const headers = new Headers(req.headers);
+    headers.set('x-pathname', target);
+    const response = NextResponse.next({ request: { headers } });
+    response.headers.set('Cache-Control', 'private, no-store');
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+    return response;
+  }
+  // Preserve the former matcher's bypass behavior when preview is disabled.
+  if (/^\/(?:_next\/static|_next\/image|media|favicon.ico|manifest.webmanifest|sw.js|icon|apple-icon|placeholder)/.test(req.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
   const hostname = requestHostname(
     req.headers.get('x-forwarded-host'),
     req.headers.get('host'),
@@ -77,5 +98,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|media|favicon.ico|manifest.webmanifest|sw.js|icon|apple-icon|placeholder).*)'],
+  matcher: ['/:path*'],
 };

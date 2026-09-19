@@ -1,3 +1,4 @@
+import { isPreviewReadOnly } from '@/lib/preview-mode';
 import 'server-only';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
@@ -67,6 +68,7 @@ async function visibilityWhere(): Promise<Prisma.classified_adsWhereInput> {
 /** ناشر الجدولة الكسول للمبوّبة: يرقّي المبوّبات المجدولة التي حان موعدها (خنق ٦٠ث). */
 let classifiedSchedLastRun = 0;
 export async function promoteScheduledClassifieds(): Promise<void> {
+  if (isPreviewReadOnly()) return;
   const now = Date.now();
   if (now - classifiedSchedLastRun < 60_000) return;
   classifiedSchedLastRun = now;
@@ -215,6 +217,7 @@ export async function countClassifieds(): Promise<number> {
 
 /** Count a unique view for a classified ad (deduped per viewer). */
 export async function recordClassifiedView(id: number, viewer: string) {
+  if (isPreviewReadOnly()) return;
   await ensureClassifiedTable();
   try {
     await prisma.$executeRawUnsafe(`INSERT INTO classified_views (ad_id, viewer) VALUES (?, ?)`, id, viewer);
@@ -226,6 +229,7 @@ export async function recordClassifiedView(id: number, viewer: string) {
 
 /** Count a click-through on a classified ad's link. */
 export async function recordClassifiedClick(id: number) {
+  if (isPreviewReadOnly()) return;
   await ensureClassifiedTable();
   await prisma.$executeRawUnsafe(`UPDATE classified_ads SET clicks = clicks + 1 WHERE id = ?`, id).catch(() => {});
 }

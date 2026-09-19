@@ -49,9 +49,11 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [{ url: '/icon-512.png?v=3', width: 512, height: 512, alt: SITE.name }],
     },
     twitter: { card: 'summary', title: shareTitle, description: shareDesc, images: ['/icon-512.png?v=3'] },
-    robots: { index: true, follow: true },
-    manifest: '/manifest.webmanifest',
-    appleWebApp: { capable: true, statusBarStyle: 'default', title: SITE.name },
+    robots: { index: process.env.PREVIEW_READ_ONLY !== 'true', follow: process.env.PREVIEW_READ_ONLY !== 'true' },
+    ...(process.env.PREVIEW_READ_ONLY === 'true' ? {} : {
+      manifest: '/manifest.webmanifest',
+      appleWebApp: { capable: true, statusBarStyle: 'default' as const, title: SITE.name },
+    }),
     icons: { icon: '/icon-192.png?v=3', apple: '/apple-icon.png?v=3' },
   };
 }
@@ -72,6 +74,7 @@ export async function generateViewport(): Promise<Viewport> {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const preview = process.env.PREVIEW_READ_ONLY === 'true';
   const session = await getSession();
   // اقرأ الكوكيز مرة واحدة، وشغّل الاستعلامات المستقلّة بالتوازي بدل التسلسل
   // (كانت ~٦ جولات متتابعة تُضاف لكل صفحة في الموقع لأنه التخطيط الجذري).
@@ -86,7 +89,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   ]);
   // شاشة المبوّبات الافتتاحية تُحجب كلياً عن أعضاء الإدارة (لا تعيقهم عن عملهم)
   let splashAds: Awaited<ReturnType<typeof getSplashClassifieds>> = [];
-  if (!isAdminUser) {
+  if (!preview && !isAdminUser) {
     try {
       splashAds = await getSplashClassifieds(12);
     } catch {
@@ -134,7 +137,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         {/* بيكسلات التتبع الإعلاني (Meta/Google Ads/TikTok/Snapchat) — لا تعمل
             إطلاقاً إلا بعد ضبط معرّفاتها الحقيقية في متغيرات البيئة على الخادم. */}
-        <AdPixels />
+        {!preview && <AdPixels />}
+        {preview && <aside className="border-b bg-amber-50 p-2 text-center text-sm text-slate-900">معاينة مستقلة — عرض البيانات العامة الحية فقط. إضافة الإعلانات وتعديلها محفوظان في هذا المتصفح ولا يغيّران الموقع الأصلي.</aside>}
         {/* Storefront (/companies/[id]) = fully independent site: ChromeGate hides
             the shared header/menu/footer, even across client-side navigation. */}
         <SiteDesignProvider config={designConfig} selected={design}>
@@ -152,21 +156,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         />
         {/* التقاط حدث التثبيت مبكراً (قد يُطلق قبل تحميل React) وحفظه على window */}
-        <script
+        {!preview && <script
           dangerouslySetInnerHTML={{
             __html: "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__bipEvent=e;try{window.dispatchEvent(new Event('bipready'))}catch(_){}});window.addEventListener('appinstalled',function(){window.__bipEvent=null;});",
           }}
-        />
-        <GeoPrompt />
-        <ForceUpdateGate />
-        <InstallPrompt />
-        <PwaRegister />
+        />}
+        {!preview && <><GeoPrompt /><ForceUpdateGate /><InstallPrompt /><PwaRegister /></>}
         {/* ختم التوثيق «متجر موثّق» (المركز السعودي للأعمال) — شارة عائمة تُثبَّت أسفل يسار
             الصفحة. نسخة واحدة على مستوى الموقع، والسكربت الرسمي يُحمَّل async بعد رسم الصفحة
             ليجد العنصر (المُصيَّر من الخادم) ويرسم الشارة — مطابقةً لكود التضمين الرسمي. */}
 
-        <Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="afterInteractive" />
-        <SealReposition />
+        {!preview && <><Script src="https://eauthenticate.saudibusiness.gov.sa/EAuthSealApi/seal.js" strategy="afterInteractive" /><SealReposition /></>}
       </body>
     </html>
   );

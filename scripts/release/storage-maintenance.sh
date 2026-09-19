@@ -1,7 +1,96 @@
 #!/usr/bin/env bash
 set -euo pipefail
 mode=${1:-audit}
-[[ "$mode" == audit ]] || { echo 'Cleanup is not configured until inventory is reviewed'; exit 1; }
+[[ "$mode" == audit || "$mode" == cleanup ]] || exit 1
+if [[ "$mode" == cleanup ]]; then
+  # Fixed inventory reviewed on 2026-09-19; never auto-select delete targets.
+  base=/root/trbhh-release-backups
+  keep=/root/trbhh-release-backups/audit-35459832130
+  legacy_base=/root/trbhh/backups
+  for parent in "$base" "$keep" "$legacy_base"; do
+    [[ -d "$parent" && ! -L "$parent" && "$(realpath "$parent")" == "$parent" ]] || exit 1
+  done
+  [[ -f "$keep/VERIFIED" && ! -L "$keep/VERIFIED" && ! -e "$keep/WATCHDOG_FIRED" ]] || exit 1
+  [[ "$(cat "$keep/VERIFIED")" == ec75f2862079107c742d8b8d903c24c5da5748da ]] || exit 1
+  [[ "$(cat "$keep/DEPLOYMENT_VERIFIED")" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || exit 1
+  [[ -f "$keep/SHA256SUMS" && ! -L "$keep/SHA256SUMS" ]] || exit 1
+  # Five self-contained archives; retained media must not depend on older dirs.
+  expected=$(printf '%s\n' code.tar.gz database.sql.gz image.tar.gz legacy.tar.gz storage.tar.gz | sort)
+  actual=$(awk '{print $2}' "$keep/SHA256SUMS" | sort)
+  [[ "$actual" == "$expected" ]] || exit 1
+  for name in code.tar.gz database.sql.gz image.tar.gz legacy.tar.gz storage.tar.gz; do
+    [[ -f "$keep/$name" && ! -L "$keep/$name" && -s "$keep/$name" ]] || exit 1
+  done
+  printf 'VERIFY_RETAINED_BACKUP %s\n' "$keep"
+  (cd "$keep" && sha256sum --strict --check SHA256SUMS)
+  gzip -t "$keep/code.tar.gz" "$keep/database.sql.gz" "$keep/image.tar.gz" "$keep/legacy.tar.gz" "$keep/storage.tar.gz"
+  [[ -f "$keep/full-restored.json" && -s "$keep/full-restored.json" ]] || exit 1
+  if docker ps --format '{{.Names}}' | grep -Eq '^trbhh-(backup-reader|restore)-'; then
+    echo 'An active backup/restore helper exists; refusing cleanup'; exit 1
+  fi
+  if pgrep -f '[s]afeguards.sh|[f]ull-backup.sh' >/dev/null; then
+    echo 'A backup process is still active; refusing cleanup'; exit 1
+  fi
+  targets=(
+    /root/trbhh-release-backups/audit-34534817972
+    /root/trbhh-release-backups/audit-35452145683
+    /root/trbhh-release-backups/audit-35453078005
+    /root/trbhh-release-backups/audit-35458433720
+    /root/trbhh-release-backups/audit-35464508812
+    /root/trbhh/backups/تربح-20260826-2015.zip
+    /root/trbhh/backups/تربح-20260826-2023.zip
+    /root/trbhh/backups/تربح-20260826-2131.zip
+    /root/trbhh/backups/تربح-20260827-0743.zip
+    /root/trbhh/backups/تربح-20260830-0300.zip
+    /root/trbhh/backups/تربح-20260831-0633.zip
+    /root/trbhh/backups/تربح-20260906-0300.zip
+    /root/trbhh/backups/تربح-20260913-0300.zip
+  )
+  # Validate every exact target and all mounts before the first deletion.
+  mounts=$(findmnt -rn -o TARGET)
+  containers=$(docker ps -aq)
+  docker_mounts=''
+  if [[ -n "$containers" ]]; then
+    docker_mounts=$(docker inspect --format '{{range .Mounts}}{{println .Source}}{{end}}' $containers)
+  fi
+  for target in "${targets[@]}"; do
+    [[ "$target" != "$keep" && ! -L "$target" ]] || exit 1
+    [[ -e "$target" ]] || continue
+    [[ "$(realpath "$target")" == "$target" ]] || exit 1
+    parent=$(dirname "$target")
+    [[ "$parent" == "$base" || "$parent" == "$legacy_base" ]] || exit 1
+    while IFS= read -r mount; do
+      [[ -z "$mount" ]] && continue
+      [[ "$mount" != "$target" && "$mount" != "$target/"* ]] || { echo 'Backup target is mounted; refusing cleanup'; exit 1; }
+    done <<< "$mounts"
+    while IFS= read -r mount; do
+      [[ -z "$mount" ]] && continue
+      mount=$(realpath "$mount")
+      [[ "$mount" != / && "$mount" != "$target" && "$mount" != "$target/"* && "$target" != "$mount/"* ]] || { echo 'Backup target overlaps Docker data; refusing cleanup'; exit 1; }
+    done <<< "$docker_mounts"
+  done
+  cd /root/trbhh
+  app=$(docker compose ps -q app)
+  test -n "$app"
+  test "$(docker inspect -f '{{.State.Running}} {{.State.Paused}}' "$app")" = 'true false'
+  before_free=$(df -Pk / | awk 'NR==2 {print $4}')
+  for target in "${targets[@]}"; do
+    [[ -e "$target" ]] || continue
+    printf 'REMOVING_BACKUP %s\n' "$target"
+    if [[ -d "$target" ]]; then rm -rf --one-file-system -- "$target"; else rm -f -- "$target"; fi
+    [[ ! -e "$target" ]] || exit 1
+  done
+  test -s "$keep/VERIFIED"
+  test -s "$keep/database.sql.gz"
+  test -s "$keep/legacy.tar.gz"
+  test "$(docker inspect -f '{{.State.Running}} {{.State.Paused}}' "$app")" = 'true false'
+  after_free=$(df -Pk / | awk 'NR==2 {print $4}')
+  printf 'FREED_KB=%s\nRETAINED_BACKUP=%s\n' "$((after_free-before_free))" "$keep"
+  df -Pk /
+  du -sk "$base"
+  docker inspect -f 'running={{.State.Running}} paused={{.State.Paused}}' "$app"
+  exit 0
+fi
 printf 'DISK\n'
 df -Pk /
 printf 'ROOT_USAGE_KB\n'

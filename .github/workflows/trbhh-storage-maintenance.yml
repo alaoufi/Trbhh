@@ -1,8 +1,5 @@
 name: Trbhh backup storage maintenance
 on:
-  push:
-    branches: [codex/home-feed-release-20260919]
-    paths: ['.github/workflows/trbhh-storage-maintenance.yml', 'scripts/release/storage-maintenance.sh']
   workflow_dispatch:
     inputs:
       mode:

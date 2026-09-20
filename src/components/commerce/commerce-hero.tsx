@@ -62,18 +62,26 @@ export function CommerceHero({ slides, intervalMs = 5000 }: { slides: HeroSlide[
       }}
     >
       <Link href={s.href} aria-label={s.title} className="block">
-        <div className="relative aspect-[16/9] w-full sm:aspect-[21/8]">
+        <div className="relative aspect-[16/10] w-full sm:aspect-[21/8]">
           {s.image
             ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={s.image} alt={s.title} loading="lazy" decoding="async" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover opacity-70" />
+              <img src={s.image} alt={s.title} loading="lazy" decoding="async" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover" />
             )
             : <div className="absolute inset-0 bg-gradient-to-l from-[#0f1d38] via-[#16294a] to-[#233a63]" />}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/90 via-[#0b162e]/40 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 p-5 sm:p-8">
-            <h2 className="max-w-xl text-xl font-extrabold drop-shadow sm:text-3xl">{s.title}</h2>
-            {s.subtitle && <p className="mt-1 max-w-lg text-sm text-white/85 sm:text-base">{s.subtitle}</p>}
-            <span className="mt-3 inline-block rounded-xl bg-gradient-to-l from-[#ff7418] to-[#f0b429] px-5 py-2 text-sm font-extrabold text-[#16294a] shadow">{s.cta || 'تسوّق الآن'}</span>
+          {/* توهّج ذهبي زخرفي */}
+          <span aria-hidden="true" className="pointer-events-none absolute -left-16 -top-20 h-64 w-64 rounded-full bg-[#f0b429]/20 blur-3xl" />
+          {/* تعتيم اتجاهي: أغمق على يمين النص (RTL) وأسفله لإبقاء الصورة ظاهرة */}
+          <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/95 via-[#0b162e]/55 to-[#0b162e]/10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/80 via-transparent to-transparent" />
+          <div className="absolute inset-y-0 right-0 flex max-w-xl flex-col justify-center p-6 sm:p-10">
+            <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-[#f0b429] px-3 py-1 text-[12px] font-extrabold text-[#16294a] shadow">★ عرض مميّز</span>
+            <h2 className="text-2xl font-extrabold leading-tight drop-shadow-lg sm:text-4xl">{s.title}</h2>
+            {s.subtitle && <p className="mt-2 max-w-lg text-sm font-semibold text-white/85 sm:text-lg">{s.subtitle}</p>}
+            <span className="mt-5 inline-flex w-fit items-center gap-2 rounded-xl bg-gradient-to-l from-[#ff7418] to-[#f0b429] px-6 py-3 text-base font-extrabold text-[#16294a] shadow-lg transition group-hover:brightness-105">
+              {s.cta || 'تسوّق الآن'}
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+            </span>
           </div>
         </div>
       </Link>

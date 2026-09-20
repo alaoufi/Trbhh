@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { getCommerceGateway } from '@/lib/commerce/runtime';
-import { CommerceHome, type CommerceHomeSection } from '@/components/commerce/commerce-home';
+import { CommerceHome, type CommerceHomeSection, type CommerceBanner } from '@/components/commerce/commerce-home';
 import { firstImageUrl, type CommerceCardItem } from '@/components/commerce/catalog';
 import type { HeroSlide } from '@/components/commerce/commerce-hero';
 
@@ -21,6 +21,11 @@ export default async function ApprovedShop() {
   ]);
   const canCheckout = config.paymentsEnabled && gateway?.ready && config.shippingFeeMinor !== null && !!config.text.shippingTerms;
 
+  const shortInfo = (d: string | null): string | null => {
+    const t = (d ?? '').replace(/\s+/g, ' ').trim();
+    return t ? (t.length > 60 ? `${t.slice(0, 57)}…` : t) : null;
+  };
+
   const toCard = (p: Row): CommerceCardItem => ({
     id: p.id.toString(),
     title: p.title,
@@ -28,6 +33,7 @@ export default async function ApprovedShop() {
     stock: p.stock_available,
     image: firstImageUrl(p.images),
     featured: (p.featured ?? 0) > 0,
+    info: shortInfo(p.description),
     href: `/shop/${p.id}`,
     buyable: canCheckout,
     buyLabel: config.text.buy,
@@ -38,24 +44,33 @@ export default async function ApprovedShop() {
   const rest = cards.filter((c) => !c.featured);
 
   const hero: HeroSlide[] = featured.slice(0, 5).map((c) => ({
-    id: c.id, title: c.title, image: c.image, href: c.href, cta: config.text.buy,
+    id: c.id, title: c.title, subtitle: c.info ?? undefined, image: c.image, href: c.href, cta: config.text.buy,
   }));
 
-  const sections: CommerceHomeSection[] = [
-    { id: 'featured', title: 'منتجات مميّزة', kind: 'products', items: featured },
-    { id: 'all', title: 'كل المنتجات', kind: 'products', items: rest.length ? rest : cards },
+  // تنويع التخطيط: المميّزة كـSpotlight (بطاقة كبيرة + صغيرة)، والبقية شبكة متكيّفة.
+  const allProducts = rest.length ? rest : cards;
+  const allSections: CommerceHomeSection[] = [
+    { id: 'featured', title: 'منتجات مميّزة', kind: 'products', items: featured, display: 'spotlight', accent: 'gold', subtitle: 'اختيار تربح' },
+    { id: 'all', title: 'كل المنتجات', kind: 'products', items: allProducts, display: 'grid', accent: 'navy', subtitle: `${allProducts.length} منتج` },
+  ];
+  const sections = allSections.filter((s) => s.items.length > 0);
+
+  // بانرات ترويجية حقيقية تُدرَج بين الصفوف (نصوصها من الإعداد، لا نصّ ثابت في الكود).
+  const banners: CommerceBanner[] = [
+    { title: config.text.title, subtitle: config.text.description, cta: config.text.buy, tone: 'gold' },
+    { title: 'منتجات موثوقة من موردين معتمدين', subtitle: 'التوريد والدفع يُداران خلف الكواليس بأمان.', tone: 'navy' },
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-extrabold text-[#16294a]">{config.text.title}</h1>
-        <p className="text-sm text-muted-foreground">{config.text.description}</p>
+        <h1 className="text-2xl font-extrabold text-[#16294a] sm:text-3xl">{config.text.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{config.text.description}</p>
       </div>
       {!canCheckout && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">{config.text.unavailable}</p>}
       {cards.length === 0
         ? <p className="rounded-xl border border-[#16294a]/15 bg-[#16294a]/5 p-6 text-center text-sm font-bold text-[#16294a]/70">لا توجد منتجات معتمدة للعرض حالياً.</p>
-        : <CommerceHome hero={hero} sections={sections} options={{ adEvery: 2 }} />}
+        : <CommerceHome hero={hero} sections={sections} options={{ adEvery: 1 }} banners={banners} />}
     </div>
   );
 }

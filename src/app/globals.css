@@ -517,3 +517,17 @@ button:active { }
   bottom: auto;
   z-index: 20;
 }
+
+/* ===== ثيم الكتالوج التجاري (سلة المعتمد): كحلي داكن + ذهبي/برتقالي =====
+   نطاق معزول (.commerce-scope) لا يغيّر ثيم الموقع العام — المكوّنات تستخدم
+   ألوان العلامة صراحةً، وهذه القواعد تضبط النصّ الافتراضي والتحديد والحركة. */
+.commerce-scope {
+  --navy: #16294a;
+  --gold: #f0b429;
+  --orange: #ff7418;
+  color: var(--navy);
+}
+.commerce-scope ::selection { background: var(--gold); color: var(--navy); }
+@media (prefers-reduced-motion: reduce) {
+  .commerce-scope * { animation: none !important; transition: none !important; }
+}

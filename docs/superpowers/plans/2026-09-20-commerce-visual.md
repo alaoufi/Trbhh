@@ -39,3 +39,13 @@
 
 ## Rollback and risks
 Disable the new presentation feature to restore legacy home; revert candidate code without dropping additive tables. Production deployment requires its own backup and approval. Principal risks: accidental member checkout, stale supplier pricing, source import races, injected media/links, analytics inflation, broad catalog queries and preview accidentally pointing to production. Test these boundaries explicitly.
+
+## التقدّم — الطبقة البصرية (2026-09-20)
+منجز في هذه الدفعة (بلا مساس بـOAuth/Callback/Webhook، وبلا دمج/نشر، وliveOrders=false):
+- [x] محرّك تخطيط ديناميكي نقيّ `src/lib/commerce/home-layout.ts`: إخفاء الأقسام الفارغة (٠) كليّاً، وتخطيط تلقائي حسب العدد (١ مميّز / ٢/٣/٤ / ٦ / ٧+ مقصوص بحدّ ٢٠)، وفواصل وخانات إعلان ديناميكية. اختبارات `tests/unit/home-layout.test.ts` تغطّي ٠/١/٢/٣/٤/٦/٢٠ والإسقاط والقصّ والإعلانات (١٤ اختباراً).
+- [x] ثيم كحلي/ذهبي معزول `.commerce-scope` + كتالوج بصري `src/components/commerce/catalog.tsx` (بطاقات، صور كسولة بأبعاد ثابتة وبديل، سعر بالهللة→ر.س، شارات مميّز/نفاد، نصّ صِرف بلا HTML خام).
+- [x] Hero متحرّك `src/components/commerce/commerce-hero.tsx`: تشغيل تلقائي + سحب + إيقاف عند المرور/التركيز/إخفاء التبويب + احترام prefers-reduced-motion + صور كسولة.
+- [x] تركيب رئيسية ديناميكي `src/components/commerce/commerce-home.tsx`، ورُبط بـ`/shop` مع الحفاظ الكامل على منطق backend (getCommerceConfig / assertCommerceSchemaReady / نفس الاستعلام المعتمد / بوّابة الدفع / canCheckout). الكتالوج محكوم ببوّابة `config.enabled` الإدارية.
+- [x] لقطات كمبيوتر/جوال ببيانات تجريبية معلّمة بوضوح: `docs/screenshots/commerce/commerce-desktop.png` و`commerce-mobile.png` (المصدر `commerce-preview.html`).
+
+حدود لم تُنفَّذ (خارج الطبقة البصرية): جداول الأقسام/الحملات في القاعدة، ترتيب بإشارات حقيقية، تتبّع أحداث المشاهدة/النقر، ومعاينة تكامل MySQL حيّة (اللقطات من معاينة معزولة بلا قاعدة). البناء ✓ · lint ✓ (٠ أخطاء) · الاختبارات ٨٩٣ ناجحة/٨ متجاوزة.

@@ -10,11 +10,19 @@ import {syncConnection} from '@/lib/suppliers/sync';
 const product:SupplierProduct={externalId:'3',sku:'s',name:'Name',description:'plain',images:[],variants:[],options:[],categories:[],brand:'',publicPriceMinor:5000,currency:'SAR',quantity:20,available:true,sourceUpdatedAt:null};
 function fixture(existing=false){
   const writes:{sql:string;values:unknown[]}[]=[];
+  const queries:string[]=[];
+  const startedAt=new Date('2026-09-20T10:00:00.000Z');
+  const candidates:{id:bigint;external_id:string;commerce_product_id:bigint|null;last_sync_at:Date|null;supplier_id:bigint}[]=[];
   const gate={supplier_id:2n,provider:'salla',status:'connected',active:1,maintenance:0,sync_enabled:1,sync_claim:null as string|null};
   const row={id:4n,supplier_id:2n,commerce_product_id:existing?9n:null,public_price_minor:4500,unit_cost_minor:4000,selling_price_minor:4700,source_updated_at:null as Date|null};
   const tx={$queryRaw:vi.fn(async(strings:TemplateStringsArray,...values:unknown[])=>{
-    const sql=strings.join('?');
+    const sql=strings.join('?');queries.push(sql);
+    if(sql.includes('AS started_at'))return [{started_at:startedAt}];
     if(sql.includes('supplier_connections'))return [gate];
+    if(sql.includes('FROM supplier_products')&&sql.includes('last_sync_at')){
+      if(sql.includes('FOR UPDATE'))return candidates.filter(row=>row.id===values[0]);
+      return candidates;
+    }
     if(sql.includes('FROM supplier_products'))return existing?[row]:[];
     if(sql.includes('FROM commerce_products'))return [{id:9n,stock_available:10,stock_reserved:3}];
     if(sql.includes('SUM('))return [{quantity:12n}];
@@ -26,7 +34,7 @@ function fixture(existing=false){
     return 1;
   })};
   const db={$transaction:vi.fn(async(fn:(tx:unknown)=>unknown)=>fn(tx)),$queryRaw:tx.$queryRaw} as unknown as CommerceDb;
-  return {db,tx,writes,gate,row};
+  return {db,tx,writes,gate,row,queries,startedAt,candidates};
 }
 beforeEach(()=>vi.clearAllMocks());
 describe('supplier source-only persistence',()=>{
@@ -111,5 +119,80 @@ describe('bounded sync claims',()=>{
     vi.mocked(adapterForConnection).mockResolvedValue({getProducts} as unknown as Awaited<ReturnType<typeof adapterForConnection>>);
     await expect(syncConnection(f.db,1n,config)).rejects.toThrow('supplier_sync_page_limit');
     expect(getProducts).toHaveBeenCalledTimes(100);
+  });
+});
+
+describe('complete catalog removal reconciliation',()=>{
+  const config={} as SupplierConfig;
+  function setup(){
+    const f=fixture();
+    f.candidates.push({id:7n,external_id:'missing',commerce_product_id:9n,last_sync_at:new Date(f.startedAt.getTime()-1),supplier_id:2n});
+    return f;
+  }
+  function pages(getProducts:ReturnType<typeof vi.fn>){
+    vi.mocked(adapterForConnection).mockResolvedValue({getProducts} as unknown as Awaited<ReturnType<typeof adapterForConnection>>);
+  }
+  it('marks missing products unavailable only after the final page; preserves overrides and history',async()=>{
+    const f=setup();
+    pages(vi.fn().mockResolvedValueOnce({products:[product],nextCursor:'2'}).mockImplementationOnce(async()=>{
+      expect(f.writes.some(w=>w.sql.includes('source_removed'))).toBe(false);
+      return {products:[],nextCursor:null};
+    }));
+    await syncConnection(f.db,1n,config);
+    const removed=f.writes.find(w=>w.sql.includes('source_removed'))!;
+    expect(removed).toBeDefined();
+    expect(removed.sql).toContain('available=0');
+    expect(removed.sql).not.toMatch(/active=|visible=|featured=|unit_cost_minor=|selling_price_minor=|DELETE/);
+    expect(f.writes.some(w=>w.sql.includes('UPDATE commerce_products SET stock_available=0'))).toBe(true);
+    expect(f.writes.filter(w=>w.sql.includes('supplier_price_history'))).toHaveLength(1); // imported source only
+    const commerceLock=f.queries.findIndex(q=>q.includes('FROM commerce_products')&&q.includes('FOR UPDATE'));
+    const productLock=f.queries.findIndex(q=>q.includes('last_sync_at')&&q.includes('FOR UPDATE'));
+    expect(commerceLock).toBeLessThan(productLock);
+  });
+  it('retains seen IDs even when an older source timestamp made their upsert a no-op',async()=>{
+    const f=fixture(true);f.row.source_updated_at=new Date('2026-09-20T11:00:00Z');
+    f.candidates.push({id:4n,external_id:product.externalId,commerce_product_id:9n,last_sync_at:null,supplier_id:2n});
+    pages(vi.fn().mockResolvedValue({products:[{...product,sourceUpdatedAt:'2026-09-19T00:00:00Z'}],nextCursor:null}));
+    await syncConnection(f.db,1n,config);
+    expect(f.writes.some(w=>w.sql.includes('source_removed'))).toBe(false);
+  });
+  it.each([0,1])('protects webhook updates at or after run start (+%s ms), rechecking under lock',async offset=>{
+    const f=setup();
+    const query=f.tx.$queryRaw.getMockImplementation()!;
+    f.tx.$queryRaw.mockImplementation(async(strings,...values)=>{
+      if(strings.join('?').includes('FROM commerce_products'))f.candidates[0].last_sync_at=new Date(f.startedAt.getTime()+offset);
+      return query(strings,...values);
+    });
+    pages(vi.fn().mockResolvedValue({products:[],nextCursor:null}));
+    await syncConnection(f.db,1n,config);
+    expect(f.writes.some(w=>w.sql.includes('source_removed')||w.sql.includes('UPDATE commerce_products'))).toBe(false);
+  });
+  it('handles a successful empty catalog and an unmapped never-synced product',async()=>{
+    const f=setup();f.candidates[0].commerce_product_id=null;f.candidates[0].last_sync_at=null;
+    pages(vi.fn().mockResolvedValue({products:[],nextCursor:null}));
+    expect(await syncConnection(f.db,1n,config)).toEqual({imported:0});
+    expect(f.writes.some(w=>w.sql.includes('source_removed'))).toBe(true);
+    expect(f.writes.some(w=>w.sql.includes('UPDATE commerce_products'))).toBe(false);
+  });
+  it.each(['failure','repeat','limit','lost'] as const)('does not remove anything after %s',async mode=>{
+    const f=setup();let page=0;
+    pages(vi.fn(async()=>{
+      page++;
+      if(mode==='failure'&&page===2)throw new Error('provider down');
+      if(mode==='lost'){f.gate.sync_claim='new-owner';return {products:[],nextCursor:null};}
+      return {products:[],nextCursor:mode==='limit'?String(page+1):'2'};
+    }));
+    await expect(syncConnection(f.db,1n,config)).rejects.toThrow('supplier_sync_');
+    expect(f.writes.some(w=>w.sql.includes('source_removed')||w.sql.includes('UPDATE commerce_products'))).toBe(false);
+  });
+  it('aborts if the commerce mapping changes while acquiring locks',async()=>{
+    const f=setup();const query=f.tx.$queryRaw.getMockImplementation()!;
+    f.tx.$queryRaw.mockImplementation(async(strings,...values)=>{
+      if(strings.join('?').includes('FROM commerce_products'))f.candidates[0]={...f.candidates[0],commerce_product_id:10n};
+      return query(strings,...values);
+    });
+    pages(vi.fn().mockResolvedValue({products:[],nextCursor:null}));
+    await expect(syncConnection(f.db,1n,config)).rejects.toThrow('supplier_sync_failed');
+    expect(f.writes.some(w=>w.sql.includes('source_removed'))).toBe(false);
   });
 });

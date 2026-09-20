@@ -1,0 +1,13 @@
+import {describe,it,expect} from 'vitest';
+import {Workbook} from 'exceljs';
+import {parseOnboardingWorkbook,validateOnboarding,normalizeStoreUrl,mergeOnboarding} from '@/lib/suppliers/onboarding-input';
+const valid={establishment_name:'مؤسسة التجربة',store_name:'متجر التجربة',store_url:'https://salla.sa/trbhh-test/',registration_number:'١٠١٠١٢٣٤٥٦',contact_name:'المفوض',phone:'0501234567',email:'test@example.com'};
+describe('supplier onboarding',()=>{
+ it('normalizes Arabic identifiers and canonical store URL',()=>{const r=validateOnboarding(valid);expect(r.errors).toEqual([]);expect(r.values.registration_number).toBe('1010123456');expect(r.values.store_url).toBe('https://salla.sa/trbhh-test');});
+ it('rejects missing required data, credentials and invalid URLs',()=>{expect(validateOnboarding({}).errors.length).toBeGreaterThan(0);expect(()=>normalizeStoreUrl('https://salla.sa.evil.test/store')).toThrow();expect(()=>normalizeStoreUrl('https://u:p@salla.sa/store')).toThrow();expect(validateOnboarding({...valid,client_secret:'secret'}).errors.length).toBeGreaterThan(0);});
+ it('blank preserves values; optional explicit none clears',()=>{expect(mergeOnboarding({notes:'old',brand:'x'},{notes:''})).toEqual({notes:'old',brand:'x'});expect(mergeOnboarding({notes:'old'},{notes:null})).toEqual({notes:null});});
+ it('validates email, tax, dates, Saudi IBAN and agreements',()=>{for(const patch of [{email:'bad'},{iban:'SA123'},{tax_number:'123'},{registration_expiry:'2026-02-31'},{stock_actual:'maybe'}])expect(validateOnboarding({...valid,...patch}).errors.length).toBeGreaterThan(0);});
+ it('reads vertical template with all string digits intact',async()=>{const w=new Workbook(),s=w.addWorksheet('المتجر');s.addRows([['الحقل','القيمة'],['اسم المنشأة',valid.establishment_name],['اسم المتجر',valid.store_name],['رابط متجر سلة',valid.store_url],['السجل التجاري',valid.registration_number],['اسم صاحب المتجر أو المفوض',valid.contact_name],['الجوال',valid.phone],['البريد',valid.email]]);const r=await parseOnboardingWorkbook(Buffer.from(await w.xlsx.writeBuffer()),'store.xlsx');expect(r.errors).toEqual([]);expect(r.values.phone).toBe('+966501234567');});
+ it('rejects formulas rather than using cached values',async()=>{const w=new Workbook(),s=w.addWorksheet('المتجر');s.addRows([['اسم المتجر',{formula:'1+1',result:2}]]);await expect(parseOnboardingWorkbook(Buffer.from(await w.xlsx.writeBuffer()),'store.xlsx')).rejects.toThrow('onboarding_formula');});
+ it('rejects unsupported and oversized files before parsing',async()=>{await expect(parseOnboardingWorkbook(Buffer.alloc(3*1024*1024),'store.xlsx')).rejects.toThrow();await expect(parseOnboardingWorkbook(Buffer.from('text'),'store.xls')).rejects.toThrow();});
+});

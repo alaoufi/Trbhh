@@ -258,6 +258,7 @@ model ad_category_audit {
 // Approved goods only. Independent from member ads, wallet top-ups and supplier payouts.
 // MySQL binary identifier collations and readiness indexes are enforced by commerce/schema.ts.
 model commerce_suppliers {
+  onboarding supplier_onboarding?
   supplier_integration_profiles supplier_integration_profiles? @relation("supplier_profile_supplier_fk")
   supplier_connections supplier_connections[] @relation("supplier_connection_supplier_fk")
   supplier_oauth_states supplier_oauth_states[] @relation("supplier_oauth_supplier_fk")
@@ -280,6 +281,24 @@ model commerce_suppliers {
   api_credential_ref String @default("") @db.VarChar(128)
   active Int @default(0) @db.TinyInt
   api_enabled Int @default(0) @db.TinyInt
+  created_at DateTime @default(now()) @db.DateTime(3)
+  updated_at DateTime @default(now()) @db.DateTime(3)
+}
+
+model supplier_onboarding {
+  supplier_id BigInt @id @db.UnsignedBigInt
+  supplier commerce_suppliers @relation(fields: [supplier_id], references: [id], onDelete: Restrict, map: "supplier_onboarding_supplier_fk")
+  registration_number String @unique(map: "supplier_onboarding_registration") @db.VarChar(10)
+  store_url String @unique(map: "supplier_onboarding_store") @db.VarChar(300)
+  encrypted_details String @db.MediumText
+  revision Int @default(1)
+  checked_connection_version Int?
+  checked_at DateTime? @db.DateTime(3)
+  check_status String @default("pending") @db.VarChar(24)
+  check_code String @default("") @db.VarChar(80)
+  check_sample_count Int @default(0)
+  check_claim String? @db.VarChar(36)
+  check_claimed_at DateTime? @db.DateTime(3)
   created_at DateTime @default(now()) @db.DateTime(3)
   updated_at DateTime @default(now()) @db.DateTime(3)
 }

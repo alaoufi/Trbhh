@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { COMMERCE_DDL } from '@/lib/commerce/schema';
 import { CATEGORY_DDL } from '@/lib/ad-categories/schema';
 import { SUPPLIER_DDL } from '@/lib/suppliers/schema';
+import { ONBOARDING_DDL } from '@/lib/suppliers/onboarding-schema';
 
 /**
  * Single source of truth for every column/table the app self-provisions on the
@@ -25,6 +26,7 @@ const STATEMENTS: string[] = [
   ...COMMERCE_DDL,
   ...CATEGORY_DDL,
   ...SUPPLIER_DDL,
+  ...ONBOARDING_DDL,
   `ALTER TABLE users ADD COLUMN auth_session_version VARCHAR(64) NOT NULL DEFAULT '0'`,
   /* Authentication: encrypted confirmed TOTP credentials and durable attempt limits. */
   `CREATE TABLE IF NOT EXISTS auth_mfa (

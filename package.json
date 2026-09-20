@@ -25,6 +25,7 @@
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "exceljs": "4.4.0",
     "heic-convert": "2.1.0",
     "ioredis": "^5.4.2",
     "jose": "^5.9.6",

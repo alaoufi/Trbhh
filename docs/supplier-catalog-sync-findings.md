@@ -1,0 +1,9 @@
+# Salla catalog sync findings — 2026-09-20
+
+- Full-sync absence reconciliation runs only after the provider returns the final page. Provider errors, repeated pagination and the 100-page ceiling never enter reconciliation.
+- Every successfully processed external ID is remembered, including stale source records whose upsert intentionally does nothing. An unseen source row is eligible only when its `last_sync_at` is null or strictly before the database-recorded run start; that check is repeated under its row lock to protect newer webhook updates.
+- Completion locks all mapped commerce products in ID order, then source products, then the connection claim. A changed mapping or lost claim aborts completion. Removal updates and the success marker/claim release share one transaction, so completion failure rolls them back together.
+- Missing products receive `available=0`, `quantity=0`, `sync_error='source_removed'` and a revision increment. Mapped commerce stock is capped to zero. No deletion, history rewrite, pricing change, or change to active/visible/featured overrides occurs. Existing webhook deletion behavior remains unchanged (`source_missing`).
+- Existing uniqueness on `(connection_id, external_id)` remains authoritative. Salla's mapper requires a valid `p.id`; SKU fallback is inapplicable to this provider and was not introduced. Multiple IDs may legitimately share a SKU.
+- Existing synchronization updates source/public price, but preserves negotiated cost and approved selling price. `calculatePricing` currently runs on explicit administrative application; automatic policy recalculation during sync is still outstanding and intentionally excluded from this change.
+- Tests use mocked database/provider boundaries only. No external network, real database, commit or push was used. MySQL transaction rollback and concurrent execution still require integration verification; unit coverage checks the guarded paths and lock ordering.

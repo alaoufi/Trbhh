@@ -25,24 +25,24 @@ export type CommerceBanner = {
   tone?: 'gold' | 'orange' | 'navy';
 };
 
-const BANNER_TONE: Record<NonNullable<CommerceBanner['tone']>, string> = {
-  gold: 'from-[#16294a] via-[#233a63] to-[#3a2f12]',
-  orange: 'from-[#7a2a06] via-[#16294a] to-[#233a63]',
-  navy: 'from-[#0f1d38] via-[#16294a] to-[#233a63]',
+// بانرات فاتحة (تقليل اللون الغامق): خلفية كريمية/فاتحة، نصّ كحلي، لمسة ذهبية.
+const BANNER_TONE: Record<NonNullable<CommerceBanner['tone']>, { bg: string; ring: string; glow: string; tag: string }> = {
+  gold: { bg: 'from-[#fff8ea] to-[#fbe6bd]', ring: 'ring-[#f0b429]/40', glow: 'bg-[#f0b429]/30', tag: 'bg-[#16294a] text-[#f0b429]' },
+  orange: { bg: 'from-[#fff2e6] to-[#ffdcc0]', ring: 'ring-[#ff7418]/30', glow: 'bg-[#ff7418]/25', tag: 'bg-[#ff7418] text-white' },
+  navy: { bg: 'from-[#eef3fb] to-[#d8e4f6]', ring: 'ring-[#16294a]/15', glow: 'bg-[#233a63]/20', tag: 'bg-[#16294a] text-white' },
 };
 
 function PromoBanner({ banner }: { banner: CommerceBanner }) {
   const tone = BANNER_TONE[banner.tone ?? 'gold'];
   const body = (
-    <div className={`relative overflow-hidden rounded-3xl bg-gradient-to-l ${tone} p-6 text-white shadow-lg ring-1 ring-black/10 sm:p-8`}>
-      {/* توهّج ذهبي زخرفي */}
-      <span aria-hidden="true" className="pointer-events-none absolute -left-10 -top-16 h-48 w-48 rounded-full bg-[#f0b429]/25 blur-3xl" />
-      <span aria-hidden="true" className="pointer-events-none absolute -bottom-16 left-24 h-40 w-40 rounded-full bg-[#ff7418]/20 blur-3xl" />
+    <div className={`relative overflow-hidden rounded-3xl bg-gradient-to-l ${tone.bg} p-6 text-[#16294a] shadow-md ring-1 ${tone.ring} sm:p-8`}>
+      {/* توهّج زخرفي فاتح */}
+      <span aria-hidden="true" className={`pointer-events-none absolute -left-10 -top-16 h-48 w-48 rounded-full ${tone.glow} blur-3xl`} />
       <div className="relative flex flex-wrap items-center justify-between gap-4">
         <div className="max-w-lg">
-          <div className="mb-1.5 inline-block rounded-full bg-[#f0b429] px-3 py-0.5 text-[11px] font-extrabold text-[#16294a]">عرض</div>
+          <div className={`mb-1.5 inline-block rounded-full px-3 py-0.5 text-[11px] font-extrabold ${tone.tag}`}>عرض</div>
           <h3 className="text-xl font-extrabold leading-snug sm:text-2xl">{banner.title}</h3>
-          {banner.subtitle && <p className="mt-1 text-sm font-semibold text-white/80">{banner.subtitle}</p>}
+          {banner.subtitle && <p className="mt-1 text-sm font-semibold text-[#16294a]/65">{banner.subtitle}</p>}
         </div>
         {banner.cta && (
           <span className="inline-flex items-center rounded-xl bg-gradient-to-l from-[#ff7418] to-[#f0b429] px-6 py-3 text-sm font-extrabold text-[#16294a] shadow-md">
@@ -52,7 +52,7 @@ function PromoBanner({ banner }: { banner: CommerceBanner }) {
       </div>
     </div>
   );
-  return banner.href ? <Link href={banner.href} className="block transition hover:brightness-[1.03]">{body}</Link> : body;
+  return banner.href ? <Link href={banner.href} className="block transition hover:brightness-[1.02]">{body}</Link> : body;
 }
 
 /** فاصل ذهبي رفيع بين الأقسام. */

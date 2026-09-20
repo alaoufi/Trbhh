@@ -71,9 +71,9 @@ export function CommerceHero({ slides, intervalMs = 5000 }: { slides: HeroSlide[
             : <div className="absolute inset-0 bg-gradient-to-l from-[#0f1d38] via-[#16294a] to-[#233a63]" />}
           {/* توهّج ذهبي زخرفي */}
           <span aria-hidden="true" className="pointer-events-none absolute -left-16 -top-20 h-64 w-64 rounded-full bg-[#f0b429]/20 blur-3xl" />
-          {/* تعتيم اتجاهي: أغمق على يمين النص (RTL) وأسفله لإبقاء الصورة ظاهرة */}
-          <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/95 via-[#0b162e]/55 to-[#0b162e]/10" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/80 via-transparent to-transparent" />
+          {/* تعتيم اتجاهي خفيف: أغمق قليلاً على يمين النص (RTL) لإبقاء الصورة ظاهرة وأفتح */}
+          <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/85 via-[#0b162e]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/55 via-transparent to-transparent" />
           <div className="absolute inset-y-0 right-0 flex max-w-xl flex-col justify-center p-6 sm:p-10">
             <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-[#f0b429] px-3 py-1 text-[12px] font-extrabold text-[#16294a] shadow">★ عرض مميّز</span>
             <h2 className="text-2xl font-extrabold leading-tight drop-shadow-lg sm:text-4xl">{s.title}</h2>

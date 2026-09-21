@@ -220,6 +220,9 @@ else
   [[ "$current_commit" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || { echo 'Production baseline changed; stop and review'; exit 1; }
 fi
 if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact || "$release_profile" == catalog_management ]]; then
+  # Build cache is disposable and is never used for rollback. Keep tagged images,
+  # volumes, verified backups and all application data untouched.
+  if [[ "$release_profile" == catalog_management ]]; then docker builder prune --force --filter 'until=168h' >/dev/null; fi
   # Measure while the app is live, before creating this backup or its archives.
   # A failed capacity gate creates no partial image/media backup and never pauses.
   capacity=$(docker exec -i -u 0 "$container" node - measure < "$tools_dir/backup-capacity-proof.cjs")

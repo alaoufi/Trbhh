@@ -32,4 +32,8 @@ describe('supplier catalog management production release',()=>{
   expect(script).toContain('catalog-management-media-reference.cjs\" verify');
   expect(runtime).toContain("'catalog_management'");
  });
+ it('may clear only stale builder cache before capacity measurement',()=>{
+  expect(script).toContain("docker builder prune --force --filter 'until=168h'");
+  expect(script).not.toMatch(/catalog_management[^\n]*docker (?:image|volume|system) prune/);
+ });
 });

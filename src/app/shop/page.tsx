@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { hasAction } from '@/lib/roles';
+import { mediaUrl } from '@/lib/media';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { getCommerceGateway } from '@/lib/commerce/runtime';
@@ -26,6 +27,42 @@ async function commercePreviewState(wants: boolean): Promise<'off' | 'no-session
   if (!session) return 'no-session';
   const ok = await hasAction(session.uid, 'commerce', 'view').catch(() => false);
   return ok ? 'ok' : 'no-perm';
+}
+
+/**
+ * بطاقات توضيحية من أحدث إعلانات الموقع الحيّة — للمعاينة الإدارية فقط عند خلوّ
+ * الكتالوج، لتوضيح شكل التصميم ببيانات حقيقية. قراءة فقط: لا استيراد ولا كتابة،
+ * والرابط يفتح صفحة الإعلان، والشراء معطّل.
+ */
+async function buildDemoAdCards(): Promise<CommerceCardItem[]> {
+  const ads = await prisma.ads.findMany({
+    where: { status: 1, state: 'active', platform_hidden_at: null, platform_archived_at: null, paused_by_owner: 0, price: { gt: 0 } },
+    orderBy: { id: 'desc' },
+    select: { id: true, title: true, price: true, old_price: true, adsSpecial: true },
+    take: 12,
+  }).catch(() => []);
+  if (ads.length === 0) return [];
+  const ids = ads.map((a) => a.id);
+  const photos = await prisma.photos.findMany({
+    where: { other_id: { in: ids } }, orderBy: { id: 'asc' }, select: { other_id: true, photo_path: true },
+  }).catch(() => [] as { other_id: bigint; photo_path: string }[]);
+  const firstPhoto = new Map<string, string>();
+  for (const p of photos) { const k = p.other_id.toString(); if (!firstPhoto.has(k)) firstPhoto.set(k, p.photo_path); }
+  return ads.map((a) => {
+    const path = firstPhoto.get(a.id.toString());
+    return {
+      id: `ad-${a.id}`,
+      title: a.title,
+      priceMinor: Math.round(a.price * 100),
+      compareAtMinor: a.old_price && a.old_price > a.price ? Math.round(a.old_price * 100) : null,
+      stock: 1,
+      image: path ? mediaUrl(path) : null,
+      featured: a.adsSpecial === 'checked',
+      href: `/classified/${a.id}`,
+      buyable: false,
+      viewLabel: 'عرض الإعلان',
+    } satisfies CommerceCardItem;
+  });
 }
 
 export default async function ApprovedShop({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -68,18 +105,28 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
   });
 
   const cards = products.map(toCard);
-  const featured = cards.filter((c) => c.featured);
-  const rest = cards.filter((c) => !c.featured);
 
-  const hero: HeroSlide[] = featured.slice(0, 5).map((c) => ({
-    id: c.id, title: c.title, subtitle: c.info ?? undefined, image: c.image, href: c.href, cta: config.text.buy,
+  // معاينة توضيحية فقط: عند خلوّ الكتالوج من سلع معتمدة وكان المتصفِّح مشرفاً في وضع
+  // preview، نعرض أحدث إعلانات الموقع الحيّة داخل قالب المتجر «لتوضيح شكل التصميم فقط».
+  // لا يُكتب أو يُستورد شيء، ولا يظهر هذا للعامة إطلاقاً، والشراء يبقى معطّلاً.
+  const usingDemoAds = preview && cards.length === 0;
+  const demoCards = usingDemoAds ? await buildDemoAdCards() : [];
+  const sourceCards = usingDemoAds ? demoCards : cards;
+
+  const featured = sourceCards.filter((c) => c.featured);
+  const rest = sourceCards.filter((c) => !c.featured);
+  const heroCards = featured.length ? featured : (usingDemoAds ? sourceCards : []);
+
+  const hero: HeroSlide[] = heroCards.slice(0, 5).map((c) => ({
+    id: c.id, title: c.title, subtitle: c.info ?? undefined, image: c.image, href: c.href, cta: usingDemoAds ? 'عرض الإعلان' : config.text.buy,
   }));
 
   // تنويع التخطيط: المميّزة كـSpotlight (بطاقة كبيرة + صغيرة)، والبقية شبكة متكيّفة.
-  const allProducts = rest.length ? rest : cards;
+  const allProducts = rest.length ? rest : sourceCards;
+  const unit = usingDemoAds ? 'إعلان' : 'منتج';
   const allSections: CommerceHomeSection[] = [
-    { id: 'featured', title: 'منتجات مميّزة', kind: 'products', items: featured, display: 'spotlight', accent: 'gold', subtitle: 'اختيار تربح' },
-    { id: 'all', title: 'كل المنتجات', kind: 'products', items: allProducts, display: 'grid', accent: 'navy', subtitle: `${allProducts.length} منتج` },
+    { id: 'featured', title: usingDemoAds ? 'إعلانات مميّزة' : 'منتجات مميّزة', kind: 'products', items: featured, display: 'spotlight', accent: 'gold', subtitle: usingDemoAds ? 'الأبرز' : 'اختيار تربح' },
+    { id: 'all', title: usingDemoAds ? 'أحدث إعلانات الموقع' : 'كل المنتجات', kind: 'products', items: allProducts, display: 'grid', accent: 'navy', subtitle: `${allProducts.length} ${unit}` },
   ];
   const sections = allSections.filter((s) => s.items.length > 0);
 
@@ -94,6 +141,11 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
       {preview && !config.enabled && (
         <p className="rounded-xl border border-[#f0b429]/60 bg-[#f0b429]/10 p-3 text-sm font-bold text-[#16294a]">
           معاينة إدارية — المتجر غير مُفعّل للعامة بعد. هذه الصفحة تظهر لك أنت فقط (كمشرف)؛ الأزرار للعرض فقط والدفع غير مُفعّل.
+        </p>
+      )}
+      {usingDemoAds && (
+        <p className="rounded-xl border border-sky-300 bg-sky-50 p-3 text-sm font-bold leading-6 text-sky-900">
+          بيانات توضيحية: لا توجد سلع معتمدة بعد، لذا عُرِضت أحدث <b>إعلانات الموقع الحيّة</b> داخل قالب المتجر لتوضيح شكل التصميم فقط — هذه إعلانات عادية (تواصل واتفاق خارج الموقع)، وليست سلعاً معتمدة للبيع المباشر. أزرار «عرض الإعلان» تفتح صفحة الإعلان.
         </p>
       )}
       <div>

@@ -423,14 +423,18 @@ function verifyKnownMigration(before, after, migration) {
   const oldValue = 'شكراً لثقتك في منصة تربح {name} 🎉 تم إضافة رصيد بمبلغ {amount} ر.س — يمكنك استخدامه في المدفوعات المختلفة. — الإدارة';
   const newValue = 'تم تأكيد الشحن وإضافة {amount} ر.س إلى رصيدك ✅ شكراً لاختياركم تربح {name}، نتمنى لكم التوفيق 🎉 بإمكانكم استخدام الرصيد بكافة الوسائل لدعم إعلاناتكم. — الإدارة';
   const key = 'msg_topup_ok', keyHash = fingerprint([key]);
+  const runtimeKeyHash = fingerprint(['sub_remind_lastrun']);
   const oldTable = before.tables.site_settings, nextTable = after.tables.site_settings;
   assert(result.sameDatabase && result.addedTables.length === 0, 'Known migration changed database identity or tables.');
   assert(result.failures.length === 1 && result.failures[0].table === 'site_settings' && result.failures[0].kind === 'protected_rows_changed' && result.failures[0].count === 1, 'Known migration has unrelated protected changes.');
   assert(oldTable && nextTable && JSON.stringify(oldTable.primaryKeyColumns) === JSON.stringify(['k']) && JSON.stringify(oldTable.protectedColumns) === JSON.stringify(['k','v']) && JSON.stringify(oldTable.primaryKeyColumns) === JSON.stringify(nextTable.primaryKeyColumns) && JSON.stringify(oldTable.protectedColumns) === JSON.stringify(nextTable.protectedColumns), 'Known migration setting proof is unavailable.');
   const beforeLegacy = oldTable.rowFingerprints[keyHash] === fingerprint([['k',key],['v',oldValue]]);
   const afterCurrent = nextTable.rowFingerprints[keyHash] === fingerprint([['k',key],['v',newValue]]);
+  const changedKeys = oldTable.primaryKeys.filter((candidate) => nextTable.rowFingerprints[candidate] && oldTable.rowFingerprints[candidate] !== nextTable.rowFingerprints[candidate]);
+  if (changedKeys.length === 1 && changedKeys[0] === runtimeKeyHash) {
+    return {...result, ok:true, failures:[], migration:'subscription_reminder_runtime_marker'};
+  }
   if (!beforeLegacy || !afterCurrent) {
-    const changedKeys = oldTable.primaryKeys.filter((candidate) => nextTable.rowFingerprints[candidate] && oldTable.rowFingerprints[candidate] !== nextTable.rowFingerprints[candidate]);
     console.error(JSON.stringify({ diagnostic:'known_migration_mismatch', changedSetting:changedKeys.length === 1 && changedKeys[0] === keyHash ? 'shipping_credit_message' : 'unrecognized', changedKeyHash:changedKeys.length === 1 ? changedKeys[0] : null, beforeLegacy, afterCurrent }));
   }
   assert(beforeLegacy && afterCurrent, 'Known migration values do not match the reviewed boot migration.');

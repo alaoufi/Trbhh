@@ -85,8 +85,11 @@ function Rating({ value, count }: { value?: number | null; count?: number | null
   );
 }
 
-/** السعر بالريال + سعر مشطوب اختياري (إن كان الأصل أعلى). */
+/** السعر بالريال + سعر مشطوب اختياري (إن كان الأصل أعلى). بلا سعر → «السعر عند التواصل». */
 function Price({ item, big = false }: { item: CommerceCardItem; big?: boolean }) {
+  if (item.priceMinor <= 0) {
+    return <span className={`font-extrabold text-[#16294a] ${big ? 'text-lg sm:text-xl' : 'text-sm'}`}>السعر عند التواصل</span>;
+  }
   const hasCompare = typeof item.compareAtMinor === 'number' && item.compareAtMinor > item.priceMinor;
   return (
     <div className="flex flex-col leading-none">

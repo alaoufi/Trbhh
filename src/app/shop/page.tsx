@@ -35,8 +35,10 @@ async function commercePreviewState(wants: boolean): Promise<'off' | 'no-session
  * والرابط يفتح صفحة الإعلان، والشراء معطّل.
  */
 async function buildDemoAdCards(): Promise<CommerceCardItem[]> {
+  // نفس فلتر «الإعلان الظاهر» المستخدم في الموقع (sitemap): منشور، فعّال، وغير
+  // مقصورٍ على المتجر (أو ضمن مهلة تربح). بلا شرط سعر — كثير من الإعلانات بلا سعر.
   const ads = await prisma.ads.findMany({
-    where: { status: 1, state: 'active', platform_hidden_at: null, platform_archived_at: null, paused_by_owner: 0, price: { gt: 0 } },
+    where: { status: 1, state: 'active', OR: [{ store_only: 0 }, { trbhh_until: { gt: new Date() } }] },
     orderBy: { id: 'desc' },
     select: { id: true, title: true, price: true, old_price: true, adsSpecial: true },
     take: 12,

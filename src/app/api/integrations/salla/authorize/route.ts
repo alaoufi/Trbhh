@@ -12,9 +12,11 @@ const csrfCookie = 'salla_merchant_start';
 const callbackPath = '/api/integrations/salla/callback';
 const headers = {
   'Cache-Control': 'no-store',
-  'Referrer-Policy': 'no-referrer',
+  // Strip invitation path/query while retaining Origin on the same-origin form POST.
+  'Referrer-Policy': 'strict-origin',
   'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://accounts.salla.sa; frame-ancestors 'none'; base-uri 'none'",
   'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
 };
 const escape = (value: string) => value.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]!));
 const failure = () => new NextResponse('رابط التفويض غير صالح أو انتهت صلاحيته. تواصل مع إدارة تربح للحصول على رابط جديد.', {status: 400, headers});
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
     const invitation = request.nextUrl.searchParams.get('invite') || '';
     const payload = parseMerchantInvitation(invitation, config);
     const csrf = randomBytes(32).toString('hex');
-    const response = new NextResponse(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تفويض متجر سلة — تربح</title><style>body{font-family:system-ui;margin:0;background:#faf9f6;color:#16294a}main{max-width:480px;margin:10vh auto;padding:28px}h1{font-size:25px}p{line-height:1.9}button{width:100%;border:0;border-radius:12px;background:#16294a;color:white;padding:16px;font:inherit;cursor:pointer}small{display:block;margin-top:20px;line-height:1.8}</style><main><h1>ربط ${escape(payload.expectedName)} بتربح</h1><p>انتقل إلى سلة ووافق من حساب صاحب المتجر لإتاحة قراءة بيانات المتجر ومنتجاته.</p><form method="post" action="/api/integrations/salla/authorize"><input type="hidden" name="invite" value="${escape(invitation)}"><input type="hidden" name="csrf" value="${csrf}"><button type="submit">متابعة التفويض في سلة</button></form><small>لا يُفعّل هذا الإجراء الشراء أو الدفع، ولا ينشر المنتجات للعامة.</small></main></html>`, {headers: {...headers, 'Content-Type':'text/html; charset=utf-8'}});
+    const response = new NextResponse(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="referrer" content="strict-origin"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تفويض متجر سلة — تربح</title><style>body{font-family:system-ui;margin:0;background:#faf9f6;color:#16294a}main{max-width:480px;margin:10vh auto;padding:28px}h1{font-size:25px}p{line-height:1.9}button{width:100%;border:0;border-radius:12px;background:#16294a;color:white;padding:16px;font:inherit;cursor:pointer}small{display:block;margin-top:20px;line-height:1.8}</style><main><h1>ربط ${escape(payload.expectedName)} بتربح</h1><p>انتقل إلى سلة ووافق من حساب صاحب المتجر لإتاحة قراءة بيانات المتجر ومنتجاته.</p><form method="post" action="/api/integrations/salla/authorize"><input type="hidden" name="invite" value="${escape(invitation)}"><input type="hidden" name="csrf" value="${csrf}"><button type="submit">متابعة التفويض في سلة</button></form><small>لا يُفعّل هذا الإجراء الشراء أو الدفع، ولا ينشر المنتجات للعامة.</small></main></html>`, {headers: {...headers, 'Content-Type':'text/html; charset=utf-8'}});
     response.cookies.set(csrfCookie, csrf, {httpOnly:true, secure:config.origin.startsWith('https:'), sameSite:'strict', path:'/api/integrations/salla/authorize', maxAge:600});
     return response;
   } catch { return failure(); }
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
     response.cookies.set(csrfCookie,'',{httpOnly:true,secure:config.origin.startsWith('https:'),sameSite:'strict',path:'/api/integrations/salla/authorize',maxAge:0});
     response.headers.set('Cache-Control','no-store');
-    response.headers.set('Referrer-Policy','no-referrer');
+    response.headers.set('Referrer-Policy','strict-origin');
     return response;
   } catch { return failure(); }
 }

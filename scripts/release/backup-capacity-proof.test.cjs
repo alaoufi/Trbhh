@@ -42,6 +42,16 @@ test('rejects missing metrics, unsafe counts and empty database/image before est
   assert.throws(()=>checkCapacity({...sample,tableCount:'0'},String(GiB),'10',space('1'),space('1')),/backup_capacity_invalid/);
   assert.throws(()=>checkCapacity(sample,'0','10',space('1'),space('1')),/backup_capacity_invalid/);
 });
+
+test('verified-parent capacity removes only duplicated media allocation, keeping image/DB/build and reserves',()=>{
+  const fresh=checkCapacity(sample,String(GiB),'1024',space('1'),space('1')).filesystems[0];
+  const reused=checkCapacity(sample,String(GiB),'1024',space('1'),space('1'),'verified-parent').filesystems[0];
+  assert.equal(BigInt(fresh.plannedBytes)-BigInt(reused.plannedBytes),2n*BigInt(sample.mediaBytes)+4096n*BigInt(sample.mediaEntries));
+  assert.equal(BigInt(fresh.requiredInodes)-BigInt(reused.requiredInodes),BigInt(sample.mediaEntries));
+  assert(BigInt(reused.reserveBytes)>=5n*GiB);
+  assert(BigInt(reused.reserveBytes)*4n>=BigInt(reused.plannedBytes));
+  assert.throws(()=>checkCapacity(sample,String(GiB),'1024',space('1'),space('1'),'skip'),/backup_capacity_invalid/);
+});
 test('media metadata walk counts symlinks without following them',()=>{
   const observed=[];
   const fake={lstatSync:entry=>{observed.push(entry);const base=path.basename(entry);return {size:base==='photo'?12n:5n,isDirectory:()=>base==='media',isFile:()=>base==='photo',isSymbolicLink:()=>base==='link'};},readdirSync:()=>['photo','link']};

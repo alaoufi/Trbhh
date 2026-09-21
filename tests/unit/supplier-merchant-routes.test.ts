@@ -29,7 +29,7 @@ describe('merchant invitation HTTP boundary',()=>{
   const response=await landing(new NextRequest(origin+'/api/integrations/salla/authorize?invite=signed'));
   expect(response.status).toBe(200);const html=await response.text();expect(html).toContain('&lt;script&gt;');expect(html).not.toContain('<script>');
   expect(response.headers.get('set-cookie')).toContain('HttpOnly');expect(response.headers.get('set-cookie')).toContain('SameSite=strict');
-  expect(response.headers.get('referrer-policy')).toBe('no-referrer');expect(response.headers.get('cache-control')).toBe('no-store');expect(state.start).not.toHaveBeenCalled();
+  expect(response.headers.get('referrer-policy')).toBe('strict-origin');expect(response.headers.get('cache-control')).toBe('no-store');expect(state.start).not.toHaveBeenCalled();
  });
  it('rejects expired links without exposing their error or signing material',async()=>{
   state.parse.mockImplementation(()=>{throw Error('private-signing-key');});const response=await landing(new NextRequest(origin+'/api/integrations/salla/authorize?invite=bad'));
@@ -46,6 +46,7 @@ describe('merchant invitation HTTP boundary',()=>{
  it('uses the same fixed callback with HttpOnly browser-bound owner context',async()=>{
   const response=await start(formRequest('/api/integrations/salla/authorize',`invite=signed&csrf=${csrf}`));expect(response.status).toBe(303);
   expect(response.headers.get('location')).toBe('https://accounts.salla.sa/oauth2/auth?state=verified');
+  expect(response.headers.get('referrer-policy')).toBe('strict-origin');
   const cookies=response.headers.get('set-cookie')||'';expect(cookies).toContain('salla_merchant_context=');expect(cookies).toContain('Path=/api/integrations/salla/callback');expect(cookies).toContain('HttpOnly');expect(cookies).toContain('Secure');
   expect(state.start).toHaveBeenCalledWith({},'signed',expect.objectContaining({origin}));
  });

@@ -43,17 +43,21 @@ function filesystemSpace(directory,filesystem=fs){
   const stat=filesystem.statSync(directory,{bigint:true}),space=filesystem.statfsSync(directory,{bigint:true});
   return {device:String(integer(stat.dev)),totalBytes:String(integer(space.blocks)*integer(space.bsize)),availableBytes:String(integer(space.bavail)*integer(space.bsize)),availableInodes:String(integer(space.ffree))};
 }
-function checkCapacity(measurement,imageValue,codeValue,backupSpace,dockerSpace){
+function checkCapacity(measurement,imageValue,codeValue,backupSpace,dockerSpace,mediaMode='fresh'){
   if(measurement?.format!=='trbhh-backup-capacity-v1')throw Error('backup_capacity_invalid');
+  if(!['fresh','verified-parent'].includes(mediaMode))throw Error('backup_capacity_invalid');
   const image=integer(imageValue),code=integer(codeValue),media=integer(measurement.mediaBytes),entries=integer(measurement.mediaEntries),tables=integer(measurement.tableCount);
   if(image===0n||code===0n||tables<2n)throw Error('backup_capacity_invalid');
   const database=maximum(integer(measurement.databaseBytes),64n*MiB);
   // Account for tar headers/padding for tiny files, compressed archives even if
   // effectively incompressible, extracted copies, SQL escaping, restore indexes,
   // and the new app image/build layers. Shared layers only reduce actual use.
-  const backupBytes=image*2n+code*2n+media*2n+entries*4096n+database*3n+512n*MiB;
+  // A verified immutable parent supplies media in-place: only small manifests
+  // are copied (covered by the fixed buffer), never archives/extracted files.
+  const freshMedia=mediaMode==='fresh';
+  const backupBytes=image*2n+code*2n+(freshMedia?media*2n+entries*4096n:0n)+database*3n+512n*MiB;
   const dockerBytes=image*3n+database*3n+GiB;
-  const backupInodes=entries+1000n,dockerInodes=tables*20n+100000n;
+  const backupInodes=(freshMedia?entries:0n)+1000n,dockerInodes=tables*20n+100000n;
   const shared=String(backupSpace.device)===String(dockerSpace.device);
   const requested=[{label:shared?'backup_and_docker':'backup',space:backupSpace,bytes:shared?backupBytes+dockerBytes:backupBytes,inodes:shared?backupInodes+dockerInodes:backupInodes}];
   if(!shared)requested.push({label:'docker',space:dockerSpace,bytes:dockerBytes,inodes:dockerInodes});
@@ -76,8 +80,8 @@ async function main(){
     if(mode==='measure'&&args.length===0){
       db=new (require('@prisma/client').PrismaClient)({log:[]});
       process.stdout.write(JSON.stringify(await measure(db))+'\n');
-    }else if(mode==='check'&&args.length===5){
-      const result=checkCapacity(JSON.parse(args[0]),args[1],args[2],filesystemSpace(args[3]),filesystemSpace(args[4]));
+    }else if(mode==='check'&&(args.length===5||args.length===6)){
+      const result=checkCapacity(JSON.parse(args[0]),args[1],args[2],filesystemSpace(args[3]),filesystemSpace(args[4]),args[5]);
       process.stdout.write(JSON.stringify(result)+'\n');
       if(!result.ok){process.stderr.write('Backup capacity insufficient; no archive was created and the app was not paused.\n');process.exitCode=1;}
     }else throw Error('backup_capacity_arguments');

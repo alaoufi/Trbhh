@@ -48,10 +48,12 @@ test('merchant OAuth runtime profile requires exact Salla key preservation and d
     const before={Config:{Env:['DATABASE_URL=private-db','AUTH_SECRET=private-auth','STORAGE_DIR=/app/storage','LEGACY_LOCAL_DIR=/app/legacy','SALLA_CLIENT_ID=private-client','SALLA_CLIENT_SECRET=private-secret','SALLA_WEBHOOK_SECRET=private-webhook','SUPPLIER_TOKEN_ENCRYPTION_KEY=private-key','SUPPLIER_RECONCILE_SECRET=private-reconcile','SUPPLIER_PUBLIC_ORIGIN=https://trbhh.sa','SUPPLIER_ALLOW_LIVE_ORDERS=false']},Mounts:[]};
     const beforePath=path.join(directory,'before.json'),afterPath=path.join(directory,'after.json');
     writeFileSync(beforePath,JSON.stringify([before]));
-    const run=container=>{writeFileSync(afterPath,JSON.stringify([container]));return spawnSync(process.execPath,[path.join(__dirname,'verify-runtime.cjs'),beforePath,afterPath,'merchant_oauth'],{encoding:'utf8'});};
-    assert.equal(run(before).status,0);
-    for(const edit of [line=>line.replace('SALLA_CLIENT_SECRET=private-secret','SALLA_CLIENT_SECRET=secret-changed'),line=>line.replace('SUPPLIER_ALLOW_LIVE_ORDERS=false','SUPPLIER_ALLOW_LIVE_ORDERS=true')]){
-      const result=run({...before,Config:{Env:before.Config.Env.map(edit)}});assert.equal(result.status,1);assert.doesNotMatch(result.stdout+result.stderr,/private-secret|secret-changed/);
+    for(const profile of ['merchant_oauth','merchant_headers']){
+      const run=container=>{writeFileSync(afterPath,JSON.stringify([container]));return spawnSync(process.execPath,[path.join(__dirname,'verify-runtime.cjs'),beforePath,afterPath,profile],{encoding:'utf8'});};
+      assert.equal(run(before).status,0);
+      for(const edit of [line=>line.replace('SALLA_CLIENT_SECRET=private-secret','SALLA_CLIENT_SECRET=secret-changed'),line=>line.replace('SUPPLIER_ALLOW_LIVE_ORDERS=false','SUPPLIER_ALLOW_LIVE_ORDERS=true')]){
+        const result=run({...before,Config:{Env:before.Config.Env.map(edit)}});assert.equal(result.status,1);assert.doesNotMatch(result.stdout+result.stderr,/private-secret|secret-changed/);
+      }
     }
   }finally{rmSync(directory,{recursive:true,force:true});}
 });

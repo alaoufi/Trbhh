@@ -41,7 +41,7 @@ jobs:
           PHASE: ${{ inputs.phase || 'before' }}
           BACKUP_ID: ${{ inputs.backup_id || github.run_id }}
           REUSE_MEDIA_ID: ${{ inputs.reuse_media_id }}
-          RELEASE_PROFILE: ${{ github.ref == 'refs/heads/codex/salla-owner-release-20260921' && 'merchant_oauth' || 'standard' }}
+          RELEASE_PROFILE: ${{ github.ref == 'refs/heads/codex/salla-owner-release-20260921' && inputs.reuse_media_id == '35603864905' && 'merchant_headers' || github.ref == 'refs/heads/codex/salla-owner-release-20260921' && 'merchant_oauth' || 'standard' }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
@@ -53,7 +53,11 @@ jobs:
           [[ "$BACKUP_ID" =~ ^[0-9]+$ ]]
           [[ "$PHASE" == before || "$PHASE" == after ]]
           if [[ -n "$REUSE_MEDIA_ID" ]]; then
-            [[ "$PHASE" == before && "$REUSE_MEDIA_ID" =~ ^[0-9]+$ && "$REUSE_MEDIA_ID" != "$BACKUP_ID" ]]
+            if [[ "$RELEASE_PROFILE" == merchant_headers ]]; then
+              [[ "$REUSE_MEDIA_ID" == 35603864905 && "$REUSE_MEDIA_ID" != "$BACKUP_ID" ]]
+            else
+              [[ "$PHASE" == before && "$REUSE_MEDIA_ID" =~ ^[0-9]+$ && "$REUSE_MEDIA_ID" != "$BACKUP_ID" ]]
+            fi
           fi
           mkdir -p ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/release_key
@@ -64,5 +68,5 @@ jobs:
           target="$VPS_USER@$VPS_HOST"
           remote_tools="/root/trbhh-release-tools/$GITHUB_SHA"
           ssh "${ssh_args[@]}" "$target" "set -eu; test ! -L /root/trbhh-release-tools; mkdir -p '$remote_tools'; chmod 700 /root/trbhh-release-tools '$remote_tools'"
-          scp -i ~/.ssh/release_key -P "$port" -o StrictHostKeyChecking=yes scripts/release/{safeguards.sh,database-proof.cjs,verify-runtime.cjs,media-proof.cjs,supplier-preservation-proof.cjs,backup-capacity-proof.cjs} "$target:$remote_tools/"
+          scp -i ~/.ssh/release_key -P "$port" -o StrictHostKeyChecking=yes scripts/release/{safeguards.sh,database-proof.cjs,verify-runtime.cjs,media-proof.cjs,supplier-preservation-proof.cjs,backup-capacity-proof.cjs,merchant-media-reference.cjs} "$target:$remote_tools/"
           ssh "${ssh_args[@]}" "$target" "bash '$remote_tools/safeguards.sh' '$PHASE' '$BACKUP_ID' '$GITHUB_SHA' '$REUSE_MEDIA_ID' '$RELEASE_PROFILE'"

@@ -126,7 +126,9 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
   // وللسلع المعتمدة: مميّزة (Spotlight) + الباقي (شبكة).
   const allProducts = rest.length ? rest : sourceCards;
   // فصل بصري بين «متجر تربح» (شراء مباشر) و«إعلانات تربح» (تواصل خارجي).
-  const demoSection: CommerceHomeSection = { id: 'ads', title: 'أحدث إعلانات تربح', kind: 'products', items: sourceCards, display: 'grid', accent: 'orange', subtitle: `${sourceCards.length} إعلان · للتواصل والاتفاق خارج الموقع` };
+  // ملاحظة: عبارة «الاتفاق خارج الموقع» تُعرض فقط داخل تفاصيل الإعلان (بلون مميّز)،
+  // لا هنا — تفادياً لالتباسها بسلع الموردين في نفس الصفحة.
+  const demoSection: CommerceHomeSection = { id: 'ads', title: 'أحدث إعلانات تربح', kind: 'products', items: sourceCards, display: 'grid', accent: 'orange', subtitle: `${sourceCards.length} إعلان` };
   const realSections: CommerceHomeSection[] = [
     { id: 'featured', title: 'متجر تربح — عروض مميّزة', kind: 'products', items: featured, display: 'spotlight', accent: 'orange', subtitle: 'شراء مباشر' },
     { id: 'all', title: 'متجر تربح — كل المنتجات', kind: 'products', items: allProducts, display: 'grid', accent: 'navy', subtitle: `${allProducts.length} منتج` },
@@ -142,7 +144,7 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
   // في وضع المعاينة (إعلانات أعضاء غير معتمدة) لا يصحّ ادّعاء «المعتمدة» في العنوان/البانر.
   const pageTitle = usingDemoAds ? 'إعلانات تربح' : config.text.title;
   const pageDesc = usingDemoAds
-    ? 'إعلانات الأعضاء للتواصل والاتفاق مباشرةً خارج الموقع — ليست سلعاً معتمدة للبيع المباشر.'
+    ? 'أحدث إعلانات الأعضاء المنشورة على تربح.'
     : config.text.description;
 
   // بانرات سفلية (فاتح + كحلي) بدعوة إجراء — نصوصها من الإعداد قدر الإمكان.

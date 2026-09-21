@@ -595,8 +595,18 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       </div>
 
       {/* إخلاء المسؤولية: يظهر فقط في تفاصيل إعلان عضو غير معتمد (ليس متجراً ولا بائعاً
-          موثّقاً ولا سلعة تربح/مورّد)، لتنبيه الطرفين أن المنصّة تعرض وتربط فقط. */}
-      {!inStore && !ad.storeOnly && !ad.seller?.trusted && <DisclaimerBar variant="full" />}
+          موثّقاً ولا سلعة تربح/مورّد)، لتنبيه الطرفين أن المنصّة تعرض وتربط فقط.
+          عبارة «الاتفاق خارج الموقع» بلونٍ برتقالي مميّز ملفت — وحصراً هنا لئلا تلتبس
+          بسلع الموردين في الصفحات الأخرى. */}
+      {!inStore && !ad.storeOnly && !ad.seller?.trusted && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-center gap-2 rounded-xl border-2 border-[#ff6a1a]/45 bg-[#ff6a1a]/10 px-3 py-2.5 text-center text-sm font-extrabold text-[#c2410c]">
+            <ShieldAlert className="h-5 w-5 shrink-0" />
+            الاتفاق والدفع يتمّان خارج الموقع — تأكّد بنفسك من سلامة الاتفاق
+          </div>
+          <DisclaimerBar variant="full" />
+        </div>
+      )}
 
       {/* الموقع على الخريطة — يظهر عند تحديد المعلن لموقع الإعلان */}
       {adLoc && (

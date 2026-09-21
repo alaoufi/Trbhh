@@ -3,7 +3,7 @@ import {revalidatePath} from 'next/cache';
 import {prisma} from '@/lib/prisma';
 import {requireAction,hasAction} from '@/lib/roles';
 import {MAX_ONBOARDING_BYTES,parseOnboardingWorkbook,validateOnboarding} from '@/lib/suppliers/onboarding-input';
-import {inspectOnboarding,issuePreviewToken,verifyPreviewToken,onboardingFileHash,saveOnboarding,safeOnboardingFilename} from '@/lib/suppliers/onboarding-store';
+import {inspectOnboarding,issuePreviewToken,verifyPreviewToken,onboardingAuditNote,onboardingFileHash,saveOnboarding,safeOnboardingFilename} from '@/lib/suppliers/onboarding-store';
 import {testSupplierReadiness} from '@/lib/suppliers/readiness';
 import {supplierConfig} from '@/lib/suppliers/config';
 import {issueMerchantInvitation} from '@/lib/suppliers/merchant-oauth';
@@ -17,7 +17,7 @@ export async function previewOnboarding(_previous:OnboardingUiState,form:FormDat
  const admin=await requireAction('suppliers','view');
  if(!await hasAction(admin.uid,'suppliers','add')&&!await hasAction(admin.uid,'suppliers','edit'))return failure(Error('onboarding_forbidden'));
  try{const {file,bytes,parsed}=await readFile(form);if(parsed.errors.length)return {errors:parsed.errors,warnings:parsed.warnings,report:toUiReport(parsed.report)};const state=await inspectOnboarding(prisma,parsed.values,secret());const complete=validateOnboarding(state.merged,{allowMissingRequired:state.existing&&state.connected?['email']:[]});if(complete.errors.length)return {errors:complete.errors,warnings:[...parsed.warnings,...state.warnings],report:toUiReport({...parsed.report,needsReview:complete.errors})};
-  await prisma.admin_log.create({data:{admin_id:BigInt(admin.uid),action:'معاينة ملف متجر سلة',target:state.existing?String(state.existing.id):'',note:JSON.stringify({filename:safeOnboardingFilename(file.name),operation:state.existing?'update':'create',fields:state.changedKeys})}});
+  await prisma.admin_log.create({data:{admin_id:BigInt(admin.uid),action:'معاينة ملف متجر سلة',target:state.existing?String(state.existing.id):'',note:onboardingAuditNote(file.name,'preview',state.changedKeys.length)}});
   return {errors:[],warnings:[...parsed.warnings,...state.warnings],report:toUiReport(parsed.report),preview:{token:issuePreviewToken(state.fingerprint,BigInt(admin.uid),onboardingFileHash(bytes),secret()),filename:safeOnboardingFilename(file.name),storeName:complete.values.store_name!,registrationNumber:complete.values.registration_number!,supplierId:state.existing?String(state.existing.id):null,connected:state.connected,changes:state.changes}};
  }catch(e){return failure(e);}
 }

@@ -65,6 +65,7 @@ export function verifyPreviewToken(token:string,adminId:bigint,fileHash:string,s
 }
 export const onboardingFileHash=(bytes:Buffer)=>createHash('sha256').update(bytes).digest('hex');
 export function safeOnboardingFilename(name:string){return name.split(/[\\/]/).pop()!.replace(/[^\p{L}\p{N}_. -]/gu,'_').slice(0,120);}
+export function onboardingAuditNote(filename:string,operation:'create'|'update'|'preview',changedCount:number){return JSON.stringify({operation,filename:safeOnboardingFilename(filename).slice(0,80),changedCount});}
 export async function saveOnboarding(db:CommerceDb,input:{values:OnboardingValues;fingerprint:string;filename:string;adminId:bigint;secret:string;canCreate:boolean;canEdit:boolean}){
  const validated=validateOnboarding(input.values,{preserveMissingRequired:true});if(validated.errors.length)throw Error('onboarding_validation');
  return db.$transaction(async tx=>{
@@ -87,7 +88,7 @@ export async function saveOnboarding(db:CommerceDb,input:{values:OnboardingValue
   await tx.$executeRaw`INSERT INTO supplier_integration_profiles(supplier_id,provider,maintenance,sync_enabled,auto_orders_enabled,mode) VALUES(${id},'salla',0,0,0,'development') ON DUPLICATE KEY UPDATE supplier_id=supplier_id`;
   const sealed=encryptDetails(v,id,input.secret);
   await tx.$executeRaw`INSERT INTO supplier_onboarding(supplier_id,registration_number,store_url,encrypted_details) VALUES(${id},${v.registration_number!},${v.store_url!},${sealed}) ON DUPLICATE KEY UPDATE encrypted_details=VALUES(encrypted_details),store_url=VALUES(store_url),revision=revision+1,updated_at=CURRENT_TIMESTAMP(3)`;
-  await tx.admin_log.create({data:{admin_id:input.adminId,action:'رفع ملف متجر سلة',target:String(id),note:JSON.stringify({operation:state.existing?'update':'create',filename:safeOnboardingFilename(input.filename),changed:state.changedKeys})}});
+  await tx.admin_log.create({data:{admin_id:input.adminId,action:'رفع ملف متجر سلة',target:String(id),note:onboardingAuditNote(input.filename,state.existing?'update':'create',state.changedKeys.length)}});
   return {supplierId:String(id),storeName:v.store_name!,connected:state.connected,status:'pending' as const};
  },{isolationLevel:'ReadCommitted',timeout:15000});
 }

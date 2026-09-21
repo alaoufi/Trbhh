@@ -1,5 +1,5 @@
 import {describe,it,expect,vi} from 'vitest';
-import {encryptDetails,decryptDetails,issuePreviewToken,verifyPreviewToken,inspectOnboarding,saveOnboarding} from '@/lib/suppliers/onboarding-store';
+import {encryptDetails,decryptDetails,issuePreviewToken,verifyPreviewToken,inspectOnboarding,onboardingAuditNote,saveOnboarding} from '@/lib/suppliers/onboarding-store';
 import type {OnboardingValues} from '@/lib/suppliers/onboarding-fields';
 import type {CommerceDb} from '@/lib/commerce/types';
 const secret='ab'.repeat(32),values={establishment_name:'شركة',store_name:'متجر',registration_number:'1010123456',store_url:'https://salla.sa/trbhh-test',contact_name:'مفوض',phone:'+966501234567',email:'test@example.com'};
@@ -24,6 +24,7 @@ function fixture(existing=false,email='test@example.com'){
  return {db,writes,audits,setRows:(v:typeof rows)=>{rows=v;},setLegacyNameRows:(v:typeof rows)=>{legacyNameRows=v;},setOnboarding:(v:unknown[])=>{onboarding=v;},setEmail:(v:unknown[])=>{emailOwners=v;},setConnections:(v:unknown[])=>{connections=v;}};
 }
 describe('registration import integrity',()=>{
+ it('keeps audit notes compact even when many workbook fields change',()=>{const note=onboardingAuditNote('نموذج_ربط_متجر_شعبيات.xlsx','update',39);expect(note.length).toBeLessThan(191);expect(JSON.parse(note)).toMatchObject({operation:'update',changedCount:39});});
  it('encrypts additional personal/bank details bound to supplier',()=>{const encrypted=encryptDetails({iban:'private'},1n,secret);expect(encrypted).not.toContain('private');expect(decryptDetails(encrypted,1n,secret)).toEqual({iban:'private'});expect(()=>decryptDetails(encrypted,2n,secret)).toThrow();});
  it('binds preview to file, admin, expiry and tamper protection',()=>{const t=issuePreviewToken('fp',1n,'file',secret,0);expect(verifyPreviewToken(t,1n,'file',secret,10)).toBe('fp');expect(()=>verifyPreviewToken(t,2n,'file',secret,10)).toThrow();expect(()=>verifyPreviewToken(t,1n,'other',secret,10)).toThrow();expect(()=>verifyPreviewToken(t,1n,'file',secret,99999999)).toThrow();expect(()=>verifyPreviewToken(t+'x',1n,'file',secret,10)).toThrow();});
  it('creates one supplier using existing profiles with sync and autoorders disabled',async()=>{const f=fixture(),p=await inspectOnboarding(f.db,values,secret);const r=await saveOnboarding(f.db,{values,fingerprint:p.fingerprint,filename:'store.xlsx',adminId:3n,secret,canCreate:true,canEdit:false});expect(r.supplierId).toBe('1');expect(f.writes.filter(w=>w.sql.includes('INSERT INTO commerce_suppliers'))).toHaveLength(1);expect(f.writes.some(w=>w.sql.includes("'salla',0,0,0,'development'"))).toBe(true);expect(JSON.stringify(f.audits,(_,v)=>typeof v==='bigint'?String(v):v)).not.toContain(values.email);});

@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { hasAction } from '@/lib/roles';
-import { mediaUrl } from '@/lib/media';
+import { PLACEHOLDER } from '@/lib/media';
+import { primaryImages } from '@/lib/account';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { getCommerceGateway } from '@/lib/commerce/runtime';
@@ -44,27 +45,27 @@ async function buildDemoAdCards(): Promise<CommerceCardItem[]> {
     take: 12,
   }).catch(() => []);
   if (ads.length === 0) return [];
-  const ids = ads.map((a) => a.id);
-  const photos = await prisma.photos.findMany({
-    where: { other_id: { in: ids } }, orderBy: { id: 'asc' }, select: { other_id: true, photo_path: true },
-  }).catch(() => [] as { other_id: bigint; photo_path: string }[]);
-  const firstPhoto = new Map<string, string>();
-  for (const p of photos) { const k = p.other_id.toString(); if (!firstPhoto.has(k)) firstPhoto.set(k, p.photo_path); }
-  return ads.map((a) => {
-    const path = firstPhoto.get(a.id.toString());
+  // ترجمة الصور بشكل صحيح: photos.photo_path = معرّف رفع → uploads.file_name → /media
+  // (نفس دالة الموقع primaryImages، لا يصحّ استخدام photo_path كمسارٍ مباشر).
+  const imgMap = await primaryImages(ads.map((a) => a.id)).catch(() => new Map<number, string>());
+  const cards: CommerceCardItem[] = ads.map((a) => {
+    const url = imgMap.get(Number(a.id));
     return {
       id: `ad-${a.id}`,
       title: a.title,
       priceMinor: Math.round(a.price * 100),
       compareAtMinor: a.old_price && a.old_price > a.price ? Math.round(a.old_price * 100) : null,
       stock: 1,
-      image: path ? mediaUrl(path) : null,
+      image: url && url !== PLACEHOLDER ? url : null,
       featured: a.adsSpecial === 'checked',
       href: `/classified/${a.id}`,
       buyable: false,
       viewLabel: 'عرض الإعلان',
     } satisfies CommerceCardItem;
   });
+  // لإظهار تخطيط Spotlight (بطاقة كبيرة + صغيرة) كما في التصميم المرجعي عند غياب المميّز.
+  if (!cards.some((c) => c.featured)) cards.slice(0, 3).forEach((c) => { c.featured = true; });
+  return cards;
 }
 
 export default async function ApprovedShop({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {

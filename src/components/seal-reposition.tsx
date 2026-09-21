@@ -28,13 +28,13 @@ export function SealReposition() {
       seal.style.setProperty('right', 'auto', 'important');
       seal.style.setProperty('z-index', '20', 'important');
       const height = seal.getBoundingClientRect().height;
-      // على الجوال: ارفع الختم فوق شريط التنقّل السفلي حتى لا يغطّيه
-      // (ارتفاع الشريط + safe-area + هامش ≈ ٨٤px).
+      // على الجوال: ثبّت الختم فوق شريط التنقّل السفلي (bottom) فلا يغطّيه مهما كان
+      // ارتفاعه — أعلى من الشريط + safe-area بهامش مريح.
       if (window.innerWidth < 768) {
-        const navClear = 84;
-        const maxTop = window.innerHeight - navClear - height;
-        const top = Math.max(64, Math.min(rect.top + 8, maxTop));
-        seal.style.setProperty('top', `${top}px`, 'important');
+        seal.style.setProperty('top', 'auto', 'important');
+        seal.style.setProperty('bottom', 'calc(88px + env(safe-area-inset-bottom, 0px))', 'important');
+        seal.style.setProperty('left', '12px', 'important');
+        seal.style.setProperty('right', 'auto', 'important');
       }
       if (height > 64 && height < 160) slot.style.minHeight = `${height + 16}px`;
     };

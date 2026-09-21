@@ -139,17 +139,23 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
     ? ['سيارات', 'عقارات', 'أجهزة وجوّالات', 'أثاث ومنزل', 'معدّات', 'خدمات', 'مواشي', 'أخرى'].map((name) => ({ name, href: `/search?q=${encodeURIComponent(name)}` }))
     : [];
 
+  // في وضع المعاينة (إعلانات أعضاء غير معتمدة) لا يصحّ ادّعاء «المعتمدة» في العنوان/البانر.
+  const pageTitle = usingDemoAds ? 'إعلانات تربح' : config.text.title;
+  const pageDesc = usingDemoAds
+    ? 'إعلانات الأعضاء للتواصل والاتفاق مباشرةً خارج الموقع — ليست سلعاً معتمدة للبيع المباشر.'
+    : config.text.description;
+
   // بانرات سفلية (فاتح + كحلي) بدعوة إجراء — نصوصها من الإعداد قدر الإمكان.
   const banners: CommerceBanner[] = [
-    { title: config.text.title, subtitle: config.text.description, cta: config.text.buy, tone: 'light' },
+    { title: pageTitle, subtitle: pageDesc, cta: usingDemoAds ? 'تصفّح الإعلانات' : config.text.buy, href: usingDemoAds ? '/search' : undefined, tone: 'light' },
     { title: 'معدّات وخدمات متنوّعة', subtitle: 'تصفّح أحدث ما نُشر على تربح في كل المناطق.', cta: 'تصفّح الآن', href: '/search', tone: 'navy' },
   ];
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-extrabold text-[#16294a] sm:text-3xl">{config.text.title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{config.text.description}</p>
+        <h1 className="text-2xl font-extrabold text-[#16294a] sm:text-3xl">{pageTitle}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{pageDesc}</p>
       </div>
       {!canCheckout && !usingDemoAds && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">{config.text.unavailable}</p>}
       {sourceCards.length === 0

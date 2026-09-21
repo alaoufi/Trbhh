@@ -7,6 +7,21 @@ const {integer,mediaSize,measure,checkCapacity}=require('./backup-capacity-proof
 const GiB=1024n*1024n*1024n;
 const sample={format:'trbhh-backup-capacity-v1',databaseBytes:String(GiB),tableCount:'172',mediaBytes:String(2n*GiB),mediaEntries:'1000'};
 const space=device=>({device,totalBytes:String(200n*GiB),availableBytes:String(100n*GiB),availableInodes:'1000000'});
+
+test('retains OS floor and workload contingency independent of historical disk size',()=>{
+  for(const image of [GiB,10n*GiB]){
+    const a=checkCapacity(sample,String(image),'1024',space('1'),space('1')).filesystems[0];
+    const larger={...space('1'),totalBytes:String(1000n*GiB)};
+    const b=checkCapacity(sample,String(image),'1024',larger,larger).filesystems[0];
+    assert.equal(a.requiredBytes,b.requiredBytes);
+    assert(BigInt(a.reserveBytes)>=5n*GiB);
+    assert(BigInt(a.reserveBytes)*4n>=BigInt(a.plannedBytes));
+    const exact={...space('1'),availableBytes:a.requiredBytes};
+    assert.equal(checkCapacity(sample,String(image),'1024',exact,exact).ok,true);
+    const below={...exact,availableBytes:String(BigInt(a.requiredBytes)-1n)};
+    assert.equal(checkCapacity(sample,String(image),'1024',below,below).ok,false);
+  }
+});
 test('checks shared filesystems against combined allocations, not each budget independently',()=>{
   const separate=checkCapacity(sample,String(GiB),'1024',space('1'),space('2'));
   const combined=checkCapacity(sample,String(GiB),'1024',space('1'),space('1'));

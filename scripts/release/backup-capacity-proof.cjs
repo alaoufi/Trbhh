@@ -59,9 +59,13 @@ function checkCapacity(measurement,imageValue,codeValue,backupSpace,dockerSpace)
   if(!shared)requested.push({label:'docker',space:dockerSpace,bytes:dockerBytes,inodes:dockerInodes});
   const filesystems=requested.map(({label,space,bytes,inodes})=>{
     const availableBytes=integer(space.availableBytes),availableInodes=integer(space.availableInodes);
-    const reserveBytes=maximum(5n*GiB,integer(space.totalBytes)/10n),reserveInodes=50000n;
+    // Reserve follows this operation's already conservative peak allocation,
+    // not historical filesystem capacity. Retain both a 5 GiB OS floor and 25%
+    // workload contingency, in addition to all archive/restore/build multipliers.
+    if(integer(space.totalBytes)<availableBytes)throw Error('backup_capacity_invalid');
+    const reserveBytes=maximum(5n*GiB,(bytes+3n)/4n),reserveInodes=50000n;
     const requiredBytes=bytes+reserveBytes,requiredInodes=inodes+reserveInodes;
-    return {label,availableBytes:String(availableBytes),requiredBytes:String(requiredBytes),reserveBytes:String(reserveBytes),availableInodes:String(availableInodes),requiredInodes:String(requiredInodes),ok:availableBytes>=requiredBytes&&availableInodes>=requiredInodes};
+    return {label,availableBytes:String(availableBytes),plannedBytes:String(bytes),requiredBytes:String(requiredBytes),reserveBytes:String(reserveBytes),availableInodes:String(availableInodes),requiredInodes:String(requiredInodes),ok:availableBytes>=requiredBytes&&availableInodes>=requiredInodes};
   });
   return {format:'trbhh-backup-capacity-check-v1',ok:filesystems.every(space=>space.ok),sharedFilesystem:shared,filesystems};
 }

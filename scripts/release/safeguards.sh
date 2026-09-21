@@ -130,7 +130,11 @@ if [[ "$phase" == after ]]; then
     node "$tools_dir/supplier-preservation-proof.cjs" verify "$backup/supplier-before.json" "$backup/supplier-after.json"
   fi
   docker compose exec -T app node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/after.json"
-  node "$tools_dir/database-proof.cjs" verify "$backup/before.json" "$backup/after.json"
+  if [[ "$release_profile" == onboarding_link ]]; then
+    node "$tools_dir/database-proof.cjs" verify-known-migration "$backup/before.json" "$backup/after.json" msg_topup_ok_v1
+  else
+    node "$tools_dir/database-proof.cjs" verify "$backup/before.json" "$backup/after.json"
+  fi
   docker compose exec -T app node - verify-schema < "$tools_dir/database-proof.cjs"
   docker inspect "$container" > "$backup/container-after.json"
   node "$tools_dir/verify-runtime.cjs" "$backup/container-before.json" "$backup/container-after.json" "$release_profile"

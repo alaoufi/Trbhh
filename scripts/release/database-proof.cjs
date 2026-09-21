@@ -417,8 +417,22 @@ function verify(before, after, isolatedRestore = false) {
   return { ok: failures.length === 0, isolatedRestore, sameDatabase: before.databaseIdentitySha256 === after.databaseIdentitySha256, comparedTables: Object.keys(before.tables).length, addedTables, changes, failures, afterAuthSchema: after.authSchema, afterControls: after.controls };
 }
 
+function verifyKnownMigration(before, after, migration) {
+  assert(migration === 'msg_topup_ok_v1', 'Unsupported known migration.');
+  const result = verify(before, after, false);
+  const oldValue = 'شكراً لثقتك في منصة تربح {name} 🎉 تم إضافة رصيد بمبلغ {amount} ر.س — يمكنك استخدامه في المدفوعات المختلفة. — الإدارة';
+  const newValue = 'تم تأكيد الشحن وإضافة {amount} ر.س إلى رصيدك ✅ شكراً لاختياركم تربح {name}، نتمنى لكم التوفيق 🎉 بإمكانكم استخدام الرصيد بكافة الوسائل لدعم إعلاناتكم. — الإدارة';
+  const key = 'msg_topup_ok', keyHash = fingerprint([key]);
+  const oldTable = before.tables.site_settings, nextTable = after.tables.site_settings;
+  assert(result.sameDatabase && result.addedTables.length === 0, 'Known migration changed database identity or tables.');
+  assert(result.failures.length === 1 && result.failures[0].table === 'site_settings' && result.failures[0].kind === 'protected_rows_changed' && result.failures[0].count === 1, 'Known migration has unrelated protected changes.');
+  assert(oldTable && nextTable && JSON.stringify(oldTable.primaryKeyColumns) === JSON.stringify(['k']) && JSON.stringify(oldTable.protectedColumns) === JSON.stringify(['k','v']) && JSON.stringify(oldTable.primaryKeyColumns) === JSON.stringify(nextTable.primaryKeyColumns) && JSON.stringify(oldTable.protectedColumns) === JSON.stringify(nextTable.protectedColumns), 'Known migration setting proof is unavailable.');
+  assert(oldTable.rowFingerprints[keyHash] === fingerprint([['k',key],['v',oldValue]]) && nextTable.rowFingerprints[keyHash] === fingerprint([['k',key],['v',newValue]]), 'Known migration values do not match the reviewed boot migration.');
+  return {...result, ok:true, failures:[], migration:'shipping_credit_message_v1'};
+}
+
 async function main() {
-  const [mode, first, second] = process.argv.slice(2);
+  const [mode, first, second, third] = process.argv.slice(2);
   if (mode === 'dump') return dump();
   if (mode === 'snapshot') { process.stdout.write(JSON.stringify(await snapshot()) + '\n'); return; }
   if (mode === 'snapshot-full') { process.stdout.write(JSON.stringify(await snapshot(true)) + '\n'); return; }
@@ -441,7 +455,13 @@ async function main() {
     if (!result.ok) process.exitCode = 1;
     return;
   }
-  fail('Usage: database-proof.cjs dump | snapshot | snapshot-full | summary FILE | verify BEFORE AFTER | verify-restore BEFORE RESTORED | verify-restore-full BEFORE RESTORED | verify-schema');
+  if (mode === 'verify-known-migration') {
+    const result = verifyKnownMigration(readManifest(first), readManifest(second), third);
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    if (!result.ok) process.exitCode = 1;
+    return;
+  }
+  fail('Usage: database-proof.cjs dump | snapshot | snapshot-full | summary FILE | verify BEFORE AFTER | verify-known-migration BEFORE AFTER NAME | verify-restore BEFORE RESTORED | verify-restore-full BEFORE RESTORED | verify-schema');
 }
 
 main().catch((error) => {

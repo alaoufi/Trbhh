@@ -99,7 +99,7 @@ export function CommerceHero({ slides, intervalMs = 5000, label = 'عروض مم
           {/* تعتيم كافٍ لإبقاء العنوان مقروءاً فوق أي صورة إعلان مزدحمة:
               طبقة أساس + تدرّج اتجاهي أغمق على يمين النص (RTL) + تدرّج سفلي. */}
           <div className="absolute inset-0 bg-[#0b162e]/45" />
-          <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/92 via-[#0b162e]/55 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/90 via-[#0b162e]/55 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/70 via-transparent to-transparent" />
           <div className="relative flex w-full max-w-xl flex-col justify-center p-6 sm:p-10">
             {eyebrow && <span className="mb-3 inline-flex w-fit max-w-full items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[12px] font-extrabold text-white ring-1 ring-white/25 backdrop-blur">

@@ -21,6 +21,7 @@ import HomePage from '@/app/page';
 import {AdGrid} from '@/components/ad-card';
 import {PublicSearchForm} from '@/components/public-search-form';
 import {CommerceHero} from '@/components/commerce/commerce-hero';
+import {NationalDayBanner,NationalDayHeroFrame} from '@/components/national-day-banner';
 function elements(value:unknown):ReactElement<Record<string,unknown>>[]{
  if(Array.isArray(value))return value.flatMap(elements);
  if(!isValidElement<Record<string,unknown>>(value))return [];
@@ -72,4 +73,33 @@ it('renders the approved presentation at the public root while retaining the sam
   expect(hero?.props.slides).toEqual(expect.arrayContaining([expect.objectContaining({title:'بيع. اشترِ. وتربح.',href:'/search'})]));
   expect(tree.find(e=>e.type===AdGrid)?.props).toMatchObject({appearance:'marketplace',ads:[{id:2},{id:3},{id:30}]});
  } finally {flag.mockRestore();}
+});
+it.each([
+ ['2026-09-20T20:59:59.999Z',false],
+ ['2026-09-20T21:00:00.000Z',true],
+ ['2026-09-24T21:00:00.000Z',false],
+])('applies and expires the public-home seasonal treatment without replacing the feed at %s',async(timestamp,active)=>{
+ const clock=vi.spyOn(Date,'now').mockReturnValue(Date.parse(timestamp));
+ const settings=await import('@/lib/settings');
+ const flag=vi.spyOn(settings,'getSettingBool').mockImplementation(async key=>key==='home_discovery_on');
+ try {
+  const tree=elements(await HomePage({searchParams:Promise.resolve({})}));
+  expect(tree[0].props['data-home-campaign']).toBe(active?'saudi-national-day-2026':undefined);
+  expect(tree.some(e=>e.type===NationalDayBanner)).toBe(active);
+  expect(tree.find(e=>e.type===NationalDayHeroFrame)?.props.active).toBe(active);
+  expect(tree.find(e=>e.type===AdGrid)?.props.ads).toEqual([{id:2},{id:3},{id:30}]);
+  expect(tree.find(e=>e.type===CommerceHero)?.props.slides).toEqual(expect.arrayContaining([expect.objectContaining({title:'بيع. اشترِ. وتربح.',href:'/search'})]));
+ } finally {flag.mockRestore();clock.mockRestore();}
+});
+it('keeps category results and their browse target during the seasonal treatment',async()=>{
+ const clock=vi.spyOn(Date,'now').mockReturnValue(Date.parse('2026-09-23T12:00:00+03:00'));
+ const settings=await import('@/lib/settings');
+ const flag=vi.spyOn(settings,'getSettingBool').mockImplementation(async key=>key==='home_discovery_on');
+ try {
+  const tree=elements(await HomePage({searchParams:Promise.resolve({category:'90'})}));
+  expect(tree.some(e=>e.type===NationalDayBanner)).toBe(true);
+  expect(tree.find(e=>e.type===AdGrid)?.props.ads).toEqual([{id:90},{id:89}]);
+  expect(tree.find(e=>e.type===CommerceHero)?.props.slides).toEqual(expect.arrayContaining([expect.objectContaining({href:'/search?category=90'})]));
+  expect(state.search).toHaveBeenCalledWith({categoryId:90,take:24,skip:0});
+ } finally {flag.mockRestore();clock.mockRestore();}
 });

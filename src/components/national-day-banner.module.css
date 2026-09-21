@@ -1,0 +1,18 @@
+.hero {
+  border-radius: 1.5rem;
+  box-shadow: 0 0 0 2px #006c35;
+}
+
+/* Only the public-home wrapper uses these accents. The brand, slides and links remain. */
+.hero :global(section[aria-roledescription='carousel']) {
+  background-color: #004c25;
+}
+
+.hero :global(button:not([aria-current])) {
+  outline-offset: 3px;
+  border: 1px solid rgb(255 255 255 / 25%);
+}
+
+.hero :global(button[aria-current='true']) > span {
+  background-color: #f0b429;
+}

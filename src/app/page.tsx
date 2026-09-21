@@ -35,6 +35,8 @@ import { PlatformRatingWidget } from '@/components/platform-rating-widget';
 import { getPlatformRating, getMyPlatformReview } from '@/lib/platform-rating';
 import { CommerceHero } from '@/components/commerce/commerce-hero';
 import { publicHomeHero } from '@/lib/public-home';
+import { isNationalDayCampaignActive } from '@/lib/national-day';
+import { NationalDayBanner, NationalDayHeroFrame } from '@/components/national-day-banner';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +58,7 @@ function Stat({ icon: Icon, value, label, href }: { icon: React.ElementType; val
 
 export default async function HomePage({ searchParams }: { searchParams?: Promise<{ published?: string; category?: string | string[] }> }) {
   const sp = (await searchParams) || {};
+  const nationalDayActive = isNationalDayCampaignActive();
   const categoryConfig = await getCategoryFormConfig().catch(() => null);
   const selectedCategory = selectedHomeCategory(categoryConfig, sp.category);
   // ناشر الجدولة الكسول — يرقّي الإعلانات المجدولة التي حان وقتها (خنق ٦٠ث)
@@ -116,7 +119,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   ]);
 
   return (
-    <div className="commerce-scope public-marketplace-home space-y-7 sm:space-y-10" data-home-version="marketplace-v2">
+    <div className="commerce-scope public-marketplace-home space-y-7 sm:space-y-10" data-home-version="marketplace-v2" data-home-campaign={nationalDayActive ? 'saudi-national-day-2026' : undefined}>
       {/* ✅ تأكيد نشر الإعلان — يظهر بعد النشر الناجح والتحويل للرئيسية */}
       {sp.published && (
         <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-center text-sm font-extrabold text-emerald-800 shadow-sm">
@@ -125,9 +128,13 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
         </div>
       )}
 
+      {nationalDayActive && <NationalDayBanner />}
+
       {discoveryOn && (
         <section className="space-y-4" aria-label="اكتشف سوق تربح">
-          <CommerceHero headingLevel={1} label="اكتشف تربح" slides={publicHomeHero(feedAds, discoveryTitle === 'تربح — إعلانات ومتاجر قريبة منك' ? 'بيع. اشترِ. وتربح.' : discoveryTitle, discoverySubtitle === 'ابحث عن عرضك القادم أو أضف إعلانك وتواصل مباشرة مع المعلن.' ? 'اعرض اللي عندك، واكتشف اللي تحتاجه، وتواصل مباشرة.' : discoverySubtitle, feedSearchHref)} />
+          <NationalDayHeroFrame active={nationalDayActive}>
+            <CommerceHero headingLevel={1} label="اكتشف تربح" slides={publicHomeHero(feedAds, discoveryTitle === 'تربح — إعلانات ومتاجر قريبة منك' ? 'بيع. اشترِ. وتربح.' : discoveryTitle, discoverySubtitle === 'ابحث عن عرضك القادم أو أضف إعلانك وتواصل مباشرة مع المعلن.' ? 'اعرض اللي عندك، واكتشف اللي تحتاجه، وتواصل مباشرة.' : discoverySubtitle, feedSearchHref)} />
+          </NationalDayHeroFrame>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-extrabold text-[#16294a]">وش تبحث عنه اليوم؟</h2>

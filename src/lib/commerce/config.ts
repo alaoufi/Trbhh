@@ -3,12 +3,17 @@ import { parseSar } from './money';
 export const COMMERCE_DEFAULTS = {
   commerce_enabled: '0',
   commerce_payments_enabled: '0',
+  // مفتاح مركزي للشراء (افتراضي معطّل). عندما يكون '0' يُمنع أي شراء حقيقي
+  // (إنشاء طلب/بدء دفع) من الخادم مهما كانت بقية الإعدادات — العرض والاستيراد
+  // والمزامنة والاختبارات الداخلية تبقى متاحة. يفعّله المشرف يدوياً فقط.
+  commerce_purchasing_enabled: '0',
   commerce_notifications_enabled: '0',
   commerce_admin_phone: '',
   commerce_title: 'سلع تربح المعتمدة',
   commerce_description: 'شراء مباشر من تربح. الإعلانات الأخرى للتواصل والاتفاق خارج الموقع.',
   commerce_buy_label: 'متابعة الطلب',
   commerce_unavailable_text: 'الشراء المباشر غير متاح حاليًا.',
+  commerce_purchasing_disabled_text: 'الشراء غير متاح حاليًا، المتجر في مرحلة التجهيز.',
   commerce_shipping_terms: '',
   commerce_shipping_fee_sar: '',
   commerce_checkout_error_text: 'تعذر إنشاء الطلب. تحقق من البيانات والكمية المتاحة، ثم أعد المحاولة. لم يبدأ الدفع.',
@@ -40,12 +45,14 @@ export function commerceConfigFromRows(rows: SettingRow[]) {
   return {
     enabled: get('commerce_enabled') === '1',
     paymentsEnabled: get('commerce_payments_enabled') === '1',
+    purchasingEnabled: get('commerce_purchasing_enabled') === '1',
     notificationsEnabled: get('commerce_notifications_enabled') === '1',
     adminPhone: saudiCommercePhone(get('commerce_admin_phone')),
     shippingFeeMinor,
     text: {
       title: get('commerce_title'), description: get('commerce_description'),
       buy: get('commerce_buy_label'), unavailable: get('commerce_unavailable_text'),
+      purchasingDisabled: get('commerce_purchasing_disabled_text'),
       shippingTerms: get('commerce_shipping_terms'), pending: get('commerce_payment_pending_text'),
       confirmed: get('commerce_payment_confirmed_text'), paidMessage: get('commerce_paid_message'),
       paymentActionRequired: get('commerce_payment_action_required_text'),

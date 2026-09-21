@@ -155,6 +155,10 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-5">
+      {/* رسالة تعطيل الشراء — تظهر فقط عند محاولة شراء (?error=purchasing)، لا على الموقع كله. */}
+      {sp?.error === 'purchasing' && (
+        <p className="rounded-xl border-2 border-[#ff6a1a]/45 bg-[#ff6a1a]/10 p-3 text-center text-sm font-extrabold text-[#c2410c]">{config.text.purchasingDisabled}</p>
+      )}
       <div>
         <h1 className="text-2xl font-extrabold text-[#16294a] sm:text-3xl">{pageTitle}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{pageDesc}</p>

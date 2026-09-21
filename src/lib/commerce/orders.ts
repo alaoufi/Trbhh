@@ -76,6 +76,9 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
   const items=normalizeOrderRequest(input.items), shipping=shippingSnapshot(input.shipping);
   const shippingFeeMinor=checkedMoney(policy.shippingFeeMinor);
   const fingerprint=requestFingerprint(items,shipping);
+  // دفاع في العمق: مفتاح الشراء المركزي fail-closed حتى لو تجاوز المُتصِل حارس الحدود.
+  const [pflag]=await db.$queryRaw<{v:string|null}[]>`SELECT v FROM site_settings WHERE k='commerce_purchasing_enabled' LIMIT 1`;
+  if((pflag?.v??'0')!=='1') throw new Error('purchasing_disabled');
   await assertCommerceSchemaReady(db);
   return db.$transaction(async tx=>{
     // Unique member/request key serializes concurrent replays. Building rows

@@ -21,7 +21,7 @@ import { prisma } from '@/lib/prisma';
 
 function config() {
   return commerceConfigFromRows([
-    { k: 'commerce_enabled', v: '1' }, { k: 'commerce_payments_enabled', v: '1' },
+    { k: 'commerce_enabled', v: '1' }, { k: 'commerce_payments_enabled', v: '1' }, { k: 'commerce_purchasing_enabled', v: '1' },
     { k: 'commerce_shipping_fee_sar', v: '15' }, { k: 'commerce_shipping_terms', v: 'Fixture shipping terms' },
     { k: 'commerce_checkout_error_text', v: 'Fixture invalid checkout' },
     { k: 'commerce_location_error_text', v: 'Fixture invalid Saudi location' },

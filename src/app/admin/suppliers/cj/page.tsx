@@ -1,0 +1,118 @@
+import Link from 'next/link';
+import { requireAction } from '@/lib/roles';
+import { cjConfig } from '@/lib/cj/config';
+import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
+import { getCommerceConfig } from '@/lib/commerce/settings';
+import { countCjProducts } from '@/lib/cj/mapping';
+import { testConnection, listProducts, getInventoryByPid, getWarehouses, calculateFreightToKSA } from '@/lib/cj/client';
+import { saveCjMargin } from './actions';
+
+export const dynamic = 'force-dynamic';
+export const metadata = { title: 'تكامل CJ — وضع الاختبار' };
+
+const input = 'min-h-9 rounded-lg border border-primary/25 bg-white px-2 py-1 text-sm';
+const btn = 'rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white';
+const card = 'card-3d rounded-xl p-4 space-y-2';
+
+function Result({ r }: { r: { ok: true; data: unknown } | { ok: false; error: string; status?: number } }) {
+  if (!r.ok) return <p className="rounded-lg bg-red-50 p-2 text-sm font-bold text-red-700">تعذّر: {r.error}{r.status ? ` (HTTP ${r.status})` : ''}</p>;
+  return <pre className="max-h-80 overflow-auto rounded-lg bg-[#0f1d38] p-3 text-xs leading-5 text-[#e5ebf6]" dir="ltr">{JSON.stringify(r.data, null, 2)}</pre>;
+}
+
+export default async function CjTestPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await requireAction('suppliers', 'view');
+  const sp = await searchParams;
+  const cfg = cjConfig();
+  const [commerce, marginBps, mapped] = await Promise.all([
+    getCommerceConfig().catch(() => null),
+    defaultMarginBps(),
+    countCjProducts(),
+  ]);
+  const liveAllowed = process.env.SUPPLIER_ALLOW_LIVE_ORDERS === 'true';
+  const run = typeof sp.run === 'string' ? sp.run : '';
+  const pid = typeof sp.pid === 'string' ? sp.pid : '';
+  const vid = typeof sp.vid === 'string' ? sp.vid : '';
+  const qty = typeof sp.qty === 'string' && /^\d{1,3}$/.test(sp.qty) ? Number(sp.qty) : 1;
+
+  // اختبارات قراءة فقط — تُنفَّذ فقط عند طلبها صراحةً، ولا تُنشئ أي طلب/شراء.
+  type AnyResult = { ok: true; data: unknown } | { ok: false; error: string; status?: number };
+  let result: AnyResult | null = null;
+  if (cfg.configured) {
+    if (run === 'connection') result = await testConnection();
+    else if (run === 'products') result = await listProducts(1, 20);
+    else if (run === 'inventory' && pid) result = await getInventoryByPid(pid);
+    else if (run === 'warehouses' && pid) result = await getWarehouses(pid);
+    else if (run === 'freight' && vid) result = await calculateFreightToKSA([{ vid, quantity: qty }]);
+  }
+
+  const sample = computePrice(2000, 1500, 0, marginBps); // مثال: تكلفة ٢٠ + شحن ١٥ ر.س
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-xl font-extrabold text-primary">تكامل CJdropshipping — وضع الاختبار</h1>
+
+      <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
+        هذه الصفحة لاختبار الاتصال والقراءة فقط (منتجات/مخزون/مستودعات/شحن). <b>لا يُنشأ أي طلب شراء حقيقي</b> —
+        الشراء مقفل بمفتاحين: «تفعيل الشراء» و<code>SUPPLIER_ALLOW_LIVE_ORDERS</code>.
+      </p>
+
+      {/* الحالة */}
+      <div className={card}>
+        <h2 className="font-bold">الحالة</h2>
+        <ul className="grid gap-1 text-sm sm:grid-cols-2">
+          <li>إعداد CJ: {cfg.configured ? <b className="text-emerald-700">جاهز</b> : <b className="text-red-700">ناقص (اضبط متغيّرات البيئة)</b>}</li>
+          <li>البريد: <span dir="ltr">{cfg.email || '—'}</span></li>
+          <li>مفتاح API: {cfg.apiKey ? '••••••' : '—'}</li>
+          <li>مفتاح التشفير: {/^[a-fA-F0-9]{64}$/.test(cfg.encryptionKey) ? 'صحيح' : 'ناقص/غير صالح'}</li>
+          <li>تفعيل الشراء (مركزي): {commerce?.purchasingEnabled ? <b className="text-red-700">مفعّل</b> : <b className="text-emerald-700">معطّل ✓</b>}</li>
+          <li>SUPPLIER_ALLOW_LIVE_ORDERS: {liveAllowed ? <b className="text-red-700">true</b> : <b className="text-emerald-700">false ✓</b>}</li>
+          <li>منتجات CJ المربوطة: {mapped}</li>
+          <li>الهامش الافتراضي: {(marginBps / 100).toFixed(2)}٪</li>
+        </ul>
+      </div>
+
+      {/* الهامش */}
+      <div className={card}>
+        <h2 className="font-bold">الهامش الافتراضي (قابل للتعديل)</h2>
+        {sp.saved === 'margin' && <p className="text-sm text-emerald-700">تم الحفظ.</p>}
+        {sp.error === 'margin' && <p className="text-sm text-red-700">قيمة غير صالحة (0–1000٪).</p>}
+        <form action={saveCjMargin} className="flex flex-wrap items-center gap-2">
+          <label className="text-sm">النسبة٪<input className={`${input} ms-2 w-24`} name="marginPercent" inputMode="decimal" defaultValue={(marginBps / 100).toString()} /></label>
+          <button className={btn}>حفظ الهامش</button>
+        </form>
+        <p className="text-xs text-muted-foreground">مثال حساب: تكلفة ٢٠ + شحن ١٥ ر.س بهامش {(marginBps / 100).toFixed(0)}٪ → ربح {(sample.profitMinor / 100).toFixed(2)} · بيع {(sample.salePriceMinor / 100).toFixed(2)} ر.س. (السعر غير مثبّت في الكود.)</p>
+      </div>
+
+      {/* اختبارات القراءة */}
+      <div className={card}>
+        <h2 className="font-bold">اختبارات القراءة (بلا شراء)</h2>
+        {!cfg.configured && <p className="text-sm text-red-700">اضبط متغيّرات CJ في البيئة أولاً لتشغيل الاختبارات.</p>}
+        <div className="flex flex-wrap gap-2">
+          <Link href="/admin/suppliers/cj?run=connection" className={btn}>اختبار الاتصال</Link>
+          <Link href="/admin/suppliers/cj?run=products" className={btn}>عيّنة منتجات (٢٠)</Link>
+        </div>
+        <form method="get" className="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="run" value="inventory" />
+          <label className="text-sm">pid (منتج)<input className={`${input} ms-2`} name="pid" defaultValue={pid} placeholder="CJ product id" /></label>
+          <button className={btn}>المخزون + المستودعات</button>
+        </form>
+        <form method="get" className="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="run" value="freight" />
+          <label className="text-sm">vid (متغيّر)<input className={`${input} ms-2`} name="vid" defaultValue={vid} placeholder="CJ variant id" /></label>
+          <label className="text-sm">الكمية<input className={`${input} ms-2 w-20`} name="qty" type="number" min={1} max={999} defaultValue={qty} /></label>
+          <button className={btn}>احتساب الشحن إلى السعودية</button>
+        </form>
+
+        {run && cfg.configured && (
+          <div className="pt-2">
+            <div className="mb-1 text-sm font-bold">نتيجة: {run}</div>
+            {result ? <Result r={result} /> : <p className="text-sm text-muted-foreground">أدخل المعرّف المطلوب ثم شغّل الاختبار.</p>}
+            {run === 'warehouses' && pid && result === null && <p className="text-sm text-muted-foreground">استخدم زر «المخزون + المستودعات» مع pid.</p>}
+          </div>
+        )}
+      </div>
+
+      <nav className="text-sm text-primary underline"><Link href="/admin/suppliers">العودة للموردين</Link></nav>
+    </div>
+  );
+}

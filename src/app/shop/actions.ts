@@ -13,6 +13,9 @@ export async function createCommerceOrder(_previous: { error: string } | null, f
   const session = await requireUser();
   const config = await getCommerceConfig();
   const gateway = await getCommerceGateway();
+  // مفتاح الشراء المركزي (fail-closed): يُمنع إنشاء أي طلب حقيقي إذا كان الشراء معطّلاً،
+  // مهما كانت بقية الإعدادات. الرسالة تظهر فقط عند محاولة الشراء (?error=purchasing).
+  if (!config.purchasingEnabled) redirect('/shop?error=purchasing');
   if (!config.enabled || !config.paymentsEnabled || !gateway?.ready || config.shippingFeeMinor === null || !config.text.shippingTerms.trim()) redirect('/shop?error=unavailable');
   if (!(await takeSecurityAttempt(`commerce-order:${session.uid}`, 6))) return { error: config.text.rateLimit };
   const product = String(form.get('productId') || '');

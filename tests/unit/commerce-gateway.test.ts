@@ -5,7 +5,8 @@ import type { CommerceDb, PaymentAttempt } from '@/lib/commerce/types';
 const persistence = vi.hoisted(() => ({ claimPaymentAttempt: vi.fn(), recordPaymentReference: vi.fn(), markPaymentUncertain: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/lib/commerce/orders', () => persistence);
 const attempt = { id: 2n, orderId: 1n, provider: 'fixture', reference: null, merchantOrderId: 'commerce:1', amountMinor: 1025, currency: 'SAR', status: 'creating', redirectUrl: null } as PaymentAttempt;
-const db = {} as CommerceDb;
+// db.$queryRaw is used only by the central purchasing-enabled guard; default enabled.
+const db = { $queryRaw: vi.fn().mockResolvedValue([{ v: '1' }]) } as unknown as CommerceDb;
 const makeGateway = (): CommerceGateway => ({ id: 'fixture', ready: true, create: vi.fn().mockResolvedValue({ reference: 'r1', redirectUrl: 'https://bank.example/pay?r=r1' }), verify: vi.fn(), isSafeRedirect: url => url.startsWith('https://bank.example/') });
 describe('commerce gateway orchestration never blindly repeats creation', () => {
   it('calls external create once only when durable claim is won', async () => {
@@ -42,6 +43,14 @@ describe('commerce gateway orchestration never blindly repeats creation', () => 
     persistence.claimPaymentAttempt.mockClear();
     const gateway = makeGateway(); gateway.ready = false;
     expect((await initiateCommercePayment(db, { memberId: 7n, orderId: 1n }, gateway)).status).toBe('unavailable');
+    expect(persistence.claimPaymentAttempt).not.toHaveBeenCalled();
+    expect(gateway.create).not.toHaveBeenCalled();
+  });
+  it('fails closed when the central purchasing switch is off, before any claim', async () => {
+    persistence.claimPaymentAttempt.mockClear();
+    const offDb = { $queryRaw: vi.fn().mockResolvedValue([{ v: '0' }]) } as unknown as CommerceDb;
+    const gateway = makeGateway();
+    expect((await initiateCommercePayment(offDb, { memberId: 7n, orderId: 1n }, gateway)).status).toBe('unavailable');
     expect(persistence.claimPaymentAttempt).not.toHaveBeenCalled();
     expect(gateway.create).not.toHaveBeenCalled();
   });

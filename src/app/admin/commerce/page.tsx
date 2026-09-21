@@ -16,6 +16,8 @@ type Order = { id: bigint; member_id: bigint; total_minor: number; status: strin
 type Notice = { id: bigint; order_id: bigint; channel: string; status: string };
 const labels: Record<string, string> = {
   commerce_enabled: 'عرض كتالوج السلع المعتمدة', commerce_payments_enabled: 'تفعيل الدفع المباشر بعد اجتياز اختبارات البنك',
+  commerce_purchasing_enabled: 'تفعيل الشراء (المفتاح المركزي — يبقى معطّلاً حتى اكتمال التجهيز والاختبار)',
+  commerce_purchasing_disabled_text: 'نص تعطيل الشراء (يظهر عند محاولة الشراء فقط)',
   commerce_notifications_enabled: 'إرسال تنبيهات الطلب عبر القنوات المتاحة', commerce_admin_phone: 'جوال مسؤول تربح',
   commerce_title: 'عنوان الكتالوج', commerce_description: 'وصف الكتالوج', commerce_buy_label: 'نص متابعة الطلب',
   commerce_unavailable_text: 'نص عدم الإتاحة', commerce_shipping_terms: 'شروط التوصيل', commerce_shipping_fee_sar: 'رسوم التوصيل بالريال — حدد 0.00 إذا كان مجانيًا',
@@ -60,7 +62,7 @@ export default async function CommerceAdminPage({ searchParams }: { searchParams
     {sp.saved && <p className="text-emerald-700">تم الحفظ.</p>}
     {sp.error && <p role="alert" className="text-red-700">لم يتم الحفظ. تحقق من الحقول وجاهزية البوابة.</p>}
     {sp.delivery && <p role="status">نتيجة الإرسال: {String(sp.delivery)}. لا تؤثر على حالة الدفع.</p>}
-    <nav className="flex flex-wrap gap-4 text-primary underline"><Link href="/shop">معاينة كتالوج السلع المعتمدة</Link><Link href="/admin/suppliers">الموردون وربط السلع</Link><Link href="/admin/commerce/accounts">الإيصالات والاستحقاقات</Link></nav>
+    <nav className="flex flex-wrap gap-4 text-primary underline"><Link href="/shop">معاينة كتالوج السلع المعتمدة</Link><Link href="/admin/suppliers">الموردون وربط السلع</Link><Link href="/admin/suppliers/cj">تكامل CJ (اختبار)</Link><Link href="/admin/commerce/accounts">الإيصالات والاستحقاقات</Link></nav>
     <details className="card-3d rounded-xl p-4"><summary className="cursor-pointer font-bold">الإعدادات والنصوص</summary>
       <form action={saveCommerceSettings} className="mt-3 grid gap-3 sm:grid-cols-2">
         {Object.entries(COMMERCE_DEFAULTS).map(([key, fallback]) => {

@@ -21,7 +21,7 @@ export async function saveCommerceSettings(form: FormData) {
   const phone = String(form.get('commerce_admin_phone') || '').trim();
   if (phone && !saudiCommercePhone(phone)) redirect('/admin/commerce?error=phone');
   const values = Object.entries(COMMERCE_DEFAULTS).map(([k, fallback]) => {
-    const flag = ['commerce_enabled', 'commerce_payments_enabled', 'commerce_notifications_enabled'].includes(k);
+    const flag = ['commerce_enabled', 'commerce_payments_enabled', 'commerce_purchasing_enabled', 'commerce_notifications_enabled'].includes(k);
     const v = flag ? (form.get(k) === '1' ? '1' : '0') : String(form.get(k) ?? fallback).trim();
     if (v.length > 1600) throw new Error('setting_too_long');
     return { k, v };

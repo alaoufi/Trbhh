@@ -23,6 +23,8 @@ export async function payCommerceOrder(form: FormData) {
   const id = orderId(form);
   const config = await getCommerceConfig();
   const gateway = await getCommerceGateway();
+  // مفتاح الشراء المركزي (fail-closed): يُمنع بدء أي دفع حقيقي إذا كان الشراء معطّلاً.
+  if (!config.purchasingEnabled) redirect(`/account/orders/${id}?error=purchasing`);
   if (!config.enabled || !config.paymentsEnabled || !gateway?.ready || form.get('confirm') !== '1') redirect(`/account/orders/${id}?error=unavailable`);
   const result = await initiateCommercePayment(prisma, { memberId: BigInt(session.uid), orderId: id }, gateway);
   if (result.status === 'redirect') redirect(result.url);

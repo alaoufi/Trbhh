@@ -2202,3 +2202,43 @@ model auth_security_limits {
   expires_at DateTime @db.DateTime(0)
   @@index([expires_at])
 }
+
+// ==== CJdropshipping integration (foundation) — kept in lockstep with src/lib/cj/schema.ts ====
+model cj_auth {
+  id                 Int       @id @default(1) @db.UnsignedTinyInt
+  sealed_tokens      String?   @db.Text
+  access_expires_at  DateTime? @db.DateTime(3)
+  refresh_expires_at DateTime? @db.DateTime(3)
+  updated_at         DateTime  @default(now()) @updatedAt @db.Timestamp(3)
+}
+
+model cj_products {
+  id                  BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  cj_product_id       String    @db.VarChar(64)
+  cj_variant_id       String    @default("") @db.VarChar(64)
+  cj_sku              String    @default("") @db.VarChar(191)
+  name                String    @default("") @db.VarChar(400)
+  image               String    @default("") @db.VarChar(1024)
+  supplier_cost_minor Int       @default(0)
+  shipping_cost_minor Int       @default(0)
+  other_costs_minor   Int       @default(0)
+  profit_minor        Int       @default(0)
+  sale_price_minor    Int       @default(0)
+  margin_bps          Int       @default(3000)
+  currency            String    @default("SAR") @db.VarChar(3)
+  commerce_product_id BigInt?   @db.UnsignedBigInt
+  trbhh_variant_id    String    @default("") @db.VarChar(64)
+  last_sync_at        DateTime? @db.DateTime(3)
+  created_at          DateTime  @default(now()) @db.Timestamp(3)
+  updated_at          DateTime  @default(now()) @updatedAt @db.Timestamp(3)
+
+  @@unique([cj_product_id, cj_variant_id], map: "cj_product_variant")
+  @@index([commerce_product_id], map: "cj_products_commerce")
+}
+
+model cj_webhook_events {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  event_key   String   @unique(map: "cj_webhook_event_key") @db.VarChar(191)
+  type        String   @default("") @db.VarChar(64)
+  received_at DateTime @default(now()) @db.Timestamp(3)
+}

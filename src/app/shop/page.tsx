@@ -58,7 +58,7 @@ async function buildDemoAdCards(): Promise<CommerceCardItem[]> {
       stock: 1,
       image: url && url !== PLACEHOLDER ? url : null,
       featured: a.adsSpecial === 'checked',
-      href: `/classified/${a.id}`,
+      href: `/ads/${a.id}`,
       buyable: false,
       viewLabel: 'عرض الإعلان',
     } satisfies CommerceCardItem;
@@ -141,16 +141,6 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-5">
-      {preview && !config.enabled && (
-        <p className="rounded-xl border border-[#f0b429]/60 bg-[#f0b429]/10 p-3 text-sm font-bold text-[#16294a]">
-          معاينة إدارية — المتجر غير مُفعّل للعامة بعد. هذه الصفحة تظهر لك أنت فقط (كمشرف)؛ الأزرار للعرض فقط والدفع غير مُفعّل.
-        </p>
-      )}
-      {usingDemoAds && (
-        <p className="rounded-xl border border-sky-300 bg-sky-50 p-3 text-sm font-bold leading-6 text-sky-900">
-          بيانات توضيحية: لا توجد سلع معتمدة بعد، لذا عُرِضت أحدث <b>إعلانات الموقع الحيّة</b> داخل قالب المتجر لتوضيح شكل التصميم فقط — هذه إعلانات عادية (تواصل واتفاق خارج الموقع)، وليست سلعاً معتمدة للبيع المباشر. أزرار «عرض الإعلان» تفتح صفحة الإعلان.
-        </p>
-      )}
       <div>
         <h1 className="text-2xl font-extrabold text-[#16294a] sm:text-3xl">{config.text.title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{config.text.description}</p>

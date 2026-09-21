@@ -21,7 +21,7 @@ export function ChromeGate({ header, footer, children }: { header: React.ReactNo
   return (
     <>
       {header}
-      <main className="container min-h-[60vh] pb-24 pt-3 md:pb-8">{children}</main>
+      <main className="container min-h-[60vh] pb-8 pt-3 md:pb-8">{children}</main>
       {footer}
     </>
   );

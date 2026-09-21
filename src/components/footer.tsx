@@ -5,10 +5,10 @@ import { DisclaimerBar } from '@/components/disclaimer';
 
 export function Footer() {
   return (
-    <footer className="mt-12 border-t border-black/20 bg-[#16294a] text-white">
-      <div className="container py-10 pb-24 md:pb-10">
-        <DisclaimerBar variant="full" className="mb-8" />
-        <div className="grid gap-8 md:grid-cols-3">
+    <footer className="mt-6 border-t border-black/20 bg-[#16294a] text-white md:mt-12">
+      <div className="container pt-7 pb-24 md:py-10 md:pb-10">
+        <DisclaimerBar variant="full" className="mb-6 md:mb-8" />
+        <div className="grid gap-6 md:grid-cols-3 md:gap-8">
           <div>
             <div className="mb-3 flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#f0b429] font-bold text-[#16294a]">ت</span>
@@ -36,7 +36,7 @@ export function Footer() {
             </a>
           </div>
         </div>
-        <div className="mt-8 border-t border-white/15 pt-6 text-center text-xs text-white/60">
+        <div className="mt-6 border-t border-white/15 pt-5 text-center text-xs text-white/60 md:mt-8 md:pt-6">
           جميع الحقوق محفوظة لمنصة {SITE.name} © 2015
         </div>
       </div>

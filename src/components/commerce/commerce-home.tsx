@@ -152,7 +152,7 @@ export function CommerceHome({
   const subtitleOf = new Map(sections.map((s) => [s.id, s.subtitle]));
 
   return (
-    <div className="commerce-scope space-y-7">
+    <div className="commerce-scope space-y-6 sm:space-y-8">
       {hero.length > 0 && <CommerceHero slides={hero} />}
       <TrustBar items={trust} />
       <CommerceCategories items={categories} />

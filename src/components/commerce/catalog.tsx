@@ -99,13 +99,13 @@ function FullCta({ item }: { item: CommerceCardItem }) {
   const out = item.stock <= 0;
   if (item.buyable && !out) {
     return (
-      <Link href={item.href} className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#f2610f] active:scale-[0.99]">
+      <Link href={item.href} className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-[13px] font-extrabold text-white shadow-sm transition hover:bg-[#f2610f] active:scale-[0.99] sm:py-2.5 sm:text-sm">
         <CartIcon className="h-4 w-4" />{item.buyLabel || 'أضف إلى السلة'}
       </Link>
     );
   }
   return (
-    <Link href={item.href} className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#16294a] px-4 py-2.5 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#0f1d38] active:scale-[0.99]">
+    <Link href={item.href} className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#16294a] px-4 py-2 text-[13px] font-extrabold text-white shadow-sm transition hover:bg-[#0f1d38] active:scale-[0.99] sm:py-2.5 sm:text-sm">
       {item.viewLabel || 'عرض التفاصيل'}
     </Link>
   );
@@ -148,10 +148,10 @@ export function CommerceCard({ item, feature = false }: { item: CommerceCardItem
         <MediaFill url={item.image} title={item.title} />
         <Badges item={item} />
       </Link>
-      <div className="flex flex-1 flex-col gap-2.5 p-4 text-center">
-        <Link href={item.href} className="line-clamp-2 min-h-[2.6em] text-sm font-extrabold leading-snug text-[#16294a] hover:text-[#0f1d38]">{item.title}</Link>
+      <div className="flex flex-1 flex-col gap-2 p-3 text-center sm:gap-2.5 sm:p-4">
+        <Link href={item.href} className="line-clamp-2 min-h-[2.6em] text-[13px] font-extrabold leading-snug text-[#16294a] hover:text-[#0f1d38] sm:text-sm">{item.title}</Link>
         {item.info && <p className="line-clamp-1 text-xs font-semibold text-[#16294a]/50">{item.info}</p>}
-        <div className="mt-0.5"><PriceBlock item={item} /></div>
+        <div className="mt-0.5 min-h-[1.6em]"><PriceBlock item={item} /></div>
         <FullCta item={item} />
       </div>
     </article>
@@ -165,7 +165,7 @@ export function CommerceGrid({ items, layout }: { items: CommerceCardItem[]; lay
     return <div className="grid grid-cols-1">{items.slice(0, 1).map((it) => <CommerceCard key={it.id} item={it} feature />)}</div>;
   }
   return (
-    <div className={`${homeGridClass(layout)} gap-4`}>
+    <div className={`${homeGridClass(layout)} gap-3 sm:gap-4`}>
       {items.map((it) => <CommerceCard key={it.id} item={it} />)}
     </div>
   );

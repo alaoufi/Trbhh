@@ -40,12 +40,15 @@ jobs:
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/integration-readiness.cjs
   owner-invite:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/salla-owner-release-20260921' && inputs.owner_invite == true
+    if: github.event_name == 'workflow_dispatch' && inputs.owner_invite == true && (github.ref == 'refs/heads/codex/salla-owner-release-20260921' || (github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.backup_id == '35629850346'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
       group: vps-deploy
       cancel-in-progress: false
+    env:
+      PRODUCTION_SHA: ${{ github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && '9a64552faca2b99e63a0e915ea73fd0989336b86' || github.sha }}
+      INVITATION_PROFILE: ${{ github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && 'national_day' || 'merchant_oauth' }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -55,6 +58,11 @@ jobs:
           cache: pnpm
       - name: Build the reviewed invitation operation
         run: |
+          set -euo pipefail
+          if [[ "$INVITATION_PROFILE" == national_day ]]; then
+            git fetch --no-tags --depth=1 origin "$PRODUCTION_SHA"
+            git diff --exit-code "$PRODUCTION_SHA" HEAD -- scripts/release/build-salla-owner-invite.cjs scripts/release/salla-owner-invite.ts src/lib/suppliers/merchant-oauth.ts src/lib/suppliers/config.ts src/lib/suppliers/crypto.ts src/lib/suppliers/http.ts src/lib/commerce/config.ts src/lib/commerce/money.ts
+          fi
           pnpm install --frozen-lockfile
           node scripts/release/build-salla-owner-invite.cjs --output "$RUNNER_TEMP/salla-owner-invite.cjs"
         env:
@@ -73,6 +81,7 @@ jobs:
           umask 077
           [[ "$BACKUP_ID" =~ ^[0-9]+$ ]]
           [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$PRODUCTION_SHA" =~ ^[a-f0-9]{40}$ ]]
           [[ "$REPORT_PUBLIC_KEY_B64" =~ ^[A-Za-z0-9+/=]+$ ]]
           test ${#REPORT_PUBLIC_KEY_B64} -lt 12000
           mkdir -p ~/.ssh
@@ -80,9 +89,9 @@ jobs:
           test -n "$VPS_KNOWN_HOSTS"
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           { printf "process.env.SALLA_AUDIT_REPORT_PUBLIC_KEY_B64='%s';\n" "$REPORT_PUBLIC_KEY_B64"; cat "$RUNNER_TEMP/salla-owner-invite.cjs"; } > "$RUNNER_TEMP/issue.cjs"
-          remote_tools="/root/trbhh-release-tools/$GITHUB_SHA"
+          remote_tools="/root/trbhh-release-tools/$PRODUCTION_SHA"
           ssh_args=(-i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25)
           target="$VPS_USER@$VPS_HOST"
           ssh "${ssh_args[@]}" "$target" "test -d '$remote_tools'; test ! -L '$remote_tools'"
           scp -i ~/.ssh/key -P "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes scripts/release/issue-owner-invite.sh "$target:$remote_tools/"
-          ssh "${ssh_args[@]}" "$target" "bash '$remote_tools/issue-owner-invite.sh' '$GITHUB_SHA' '$BACKUP_ID'" < "$RUNNER_TEMP/issue.cjs"
+          ssh "${ssh_args[@]}" "$target" "bash '$remote_tools/issue-owner-invite.sh' '$PRODUCTION_SHA' '$BACKUP_ID' '$INVITATION_PROFILE'" < "$RUNNER_TEMP/issue.cjs"

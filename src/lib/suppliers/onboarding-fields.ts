@@ -10,7 +10,14 @@ export const ONBOARDING_FIELDS = [
  ['account_holder','اسم صاحب الحساب',false],['authorized_name','اسم المفوض بالموافقة',false],['agreements','الإقرارات والموافقات',false],['submitted_date','تاريخ تعبئة النموذج',false],['notes','الملاحظات',false],
 ] as const;
 export type OnboardingValues=Record<string,string|null>;
-export type OnboardingValidation={values:OnboardingValues;errors:string[];warnings:string[]};
+export type OnboardingReportItem={field:string;label:string;note:string};
+export type OnboardingReport={
+  imported:string[]; // مفاتيح الحقول المقبولة كما هي
+  corrected:OnboardingReportItem[]; // صُحّحت تلقائياً
+  skipped:OnboardingReportItem[]; // حقول اختيارية تُجوّزت (فارغة/غير صالحة)
+  needsReview:string[]; // نواقص أساسية تمنع الحفظ
+};
+export type OnboardingValidation={values:OnboardingValues;errors:string[];warnings:string[];report:OnboardingReport};
 export const ONBOARDING_LABELS:Record<string,string>=Object.fromEntries(ONBOARDING_FIELDS.map(([k,label])=>[k,label]));
 export function maskedOnboardingValue(key:string,value:string|null|undefined):string {
  if(!value)return '—';

@@ -1,6 +1,6 @@
 import 'server-only';
 import {Workbook,type CellValue} from 'exceljs';
-import {ONBOARDING_FIELDS,type OnboardingValues,type OnboardingValidation} from './onboarding-fields';
+import {ONBOARDING_FIELDS,type OnboardingValues,type OnboardingValidation,type OnboardingReport} from './onboarding-fields';
 export const MAX_ONBOARDING_BYTES=2*1024*1024;
 const digits=(s:string)=>s.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776));
 const label=(s:string)=>s.normalize('NFKC').trim().replace(/[أإآ]/g,'ا').replace(/[\u064b-\u065fـ]/g,'').replace(/[\s:：*]+/g,' ').trim().toLowerCase();
@@ -16,34 +16,86 @@ export function normalizeStoreUrl(raw:string):string {
  return `https://${host}`;
 }
 function validIban(value:string) {if(!/^SA\d{22}$/.test(value))return false;const n=value.slice(4)+'2810'+value.slice(2,4);let r=0;for(const c of n)r=(r*10+Number(c))%97;return r===1;}
+const isRealDate=(iso:string)=>Number.isFinite(Date.parse(iso))&&new Date(iso).toISOString().slice(0,10)===iso;
+function coerceDate(v:string):string|null {
+ const s=digits(v).trim().replace(/\s+/g,'');
+ if(/^\d{4}-\d{2}-\d{2}$/.test(s))return isRealDate(s)?s:null;
+ let m=s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/); // dd/mm/yyyy
+ if(m){const iso=`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;return isRealDate(iso)?iso:null;}
+ m=s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/); // yyyy/mm/dd
+ if(m){const iso=`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;return isRealDate(iso)?iso:null;}
+ return null;
+}
+function coercePhone(v:string):string|null {
+ let s=digits(v).replace(/[\s\-()]/g,'');
+ if(s.startsWith('00966'))s='+966'+s.slice(5);
+ if(/^9665\d{8}$/.test(s))s='+'+s;
+ if(/^0?5\d{8}$/.test(s))s='+966'+s.replace(/^0/,'');
+ return /^\+9665\d{8}$/.test(s)?s:null;
+}
+/** يطبّع/يتحقّق قيمة حقل. ok=false ⇒ لا يمكن قبولها (غير صالحة). */
+function coerceField(key:string,value:string):{ok:true;value:string}|{ok:false} {
+ if(['registration_number','tax_number','identity_number','iban'].includes(key))value=digits(value).replace(/[\s-]/g,'');
+ if(key==='registration_number')return /^\d{10}$/.test(value)?{ok:true,value}:{ok:false};
+ if(key==='identity_number')return /^[12]\d{9}$/.test(value)?{ok:true,value}:{ok:false};
+ if(key==='tax_number')return /^3\d{13}3$/.test(value)?{ok:true,value}:{ok:false};
+ if(key==='phone'){const p=coercePhone(value);return p?{ok:true,value:p}:{ok:false};}
+ if(key==='email'){const e=value.trim().toLowerCase();return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)?{ok:true,value:e}:{ok:false};}
+ if(key==='iban'){const i=value.toUpperCase();return validIban(i)?{ok:true,value:i}:{ok:false};}
+ if(key==='store_url'){try{return {ok:true,value:normalizeStoreUrl(value)};}catch{return {ok:false};}}
+ if(['registration_expiry','submitted_date'].includes(key)){const d=coerceDate(value);return d?{ok:true,value:d}:{ok:false};}
+ if(['stock_actual','stock_updated'].includes(key)){const low=digits(value).trim().toLowerCase();if(['نعم','yes','true','1','y'].includes(low))return {ok:true,value:'نعم'};if(['لا','no','false','0','n'].includes(low))return {ok:true,value:'لا'};return {ok:false};}
+ return {ok:true,value};
+}
+const clip=(s:string)=>s.length>60?s.slice(0,57)+'…':s;
+
+/**
+ * تحقّق متسامح: يقبل أكبر قدر من البيانات. الحقول الاختيارية الفارغة تُحفظ null بلا
+ * خطأ، والقيم القابلة للتصحيح (جوال/تاريخ/بريد/IBAN…) تُصحَّح تلقائياً، والاختيارية
+ * غير القابلة للتصحيح تُتجاوز مع ملاحظة (بلا رفض)، ولا يُرفض الصف إلا إذا نقص حقلٌ
+ * أساسيّ فعلاً أو تعذّر تصحيح حقلٍ أساسيّ. يعيد تقريراً بأربع فئات.
+ */
 export function validateOnboarding(raw:Record<string,unknown>):OnboardingValidation {
- const errors:string[]=[],warnings:string[]=[],values:OnboardingValues={};
+ const values:OnboardingValues={};
+ const report:OnboardingReport={imported:[],corrected:[],skipped:[],needsReview:[]};
  const known=new Set(ONBOARDING_FIELDS.map(([k])=>String(k)));
- for(const key of Object.keys(raw))if(!known.has(key))errors.push(secretLabel.test(key)?'الملف يحتوي حقل بيانات دخول غير مسموح.':'يوجد حقل غير معروف؛ استخدم النموذج المعتمد.');
- for(const [key,name,required] of ONBOARDING_FIELDS){
-  const input=raw[key];if(input===undefined||input==='') {if(required)errors.push(`${name}: مطلوب.`);continue;}
-  if(input===null){if(required)errors.push(`${name}: لا يمكن مسحه.`);else values[key]=null;continue;}
-  if(typeof input!=='string'){errors.push(`${name}: يجب أن يكون نصًا.`);continue;}
-  let value=input.trim();if(!value){if(required)errors.push(`${name}: مطلوب.`);continue;}
-  if(value==='لا يوجد'){if(required)errors.push(`${name}: مطلوب.`);else values[key]=null;continue;}
-  const max=key==='store_url'?300:key==='email'?254:key==='address'?500:['notes','returns_policy','damage_policy','settlement_terms','agreements'].includes(key)?2000:200;
-  if(value.length>max||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)){errors.push(`${name}: قيمة طويلة أو غير صالحة.`);continue;}
-  try {
-   if(['registration_number','tax_number','identity_number','phone','iban'].includes(key))value=digits(value).replace(/[\s-]/g,'');
-   if(key==='registration_number'&&!/^\d{10}$/.test(value))throw Error();
-   if(key==='identity_number'&&!/^[12]\d{9}$/.test(value))throw Error();
-   if(key==='tax_number'&&!/^3\d{13}3$/.test(value))throw Error();
-   if(key==='phone'){if(/^05\d{8}$/.test(value))value='+966'+value.slice(1);if(/^9665\d{8}$/.test(value))value='+'+value;if(!/^\+9665\d{8}$/.test(value))throw Error();}
-   if(key==='email'){value=value.toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))throw Error();}
-   if(key==='iban'){value=value.toUpperCase();if(!validIban(value))throw Error();}
-   if(key==='store_url')value=normalizeStoreUrl(value);
-   if(['registration_expiry','submitted_date'].includes(key)){value=digits(value);if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||!Number.isFinite(Date.parse(value))||new Date(value).toISOString().slice(0,10)!==value)throw Error();}
-   if(['stock_actual','stock_updated'].includes(key)){if(!['نعم','لا','true','false','1','0'].includes(value))throw Error();value=['نعم','true','1'].includes(value)?'نعم':'لا';}
-   values[key]=value;
-  }catch{errors.push(`${name}: صيغة غير صالحة${['registration_expiry','submitted_date'].includes(key)?'؛ استخدم YYYY-MM-DD':''}.`);}
+ for(const key of Object.keys(raw)){
+  if(known.has(key))continue;
+  if(secretLabel.test(key))report.needsReview.push('الملف يحتوي حقل بيانات دخول غير مسموح.');
+  else report.skipped.push({field:key,label:key,note:'حقل غير معروف — تم تجاوزه.'});
  }
+ for(const [key,name,required] of ONBOARDING_FIELDS){
+  const input=raw[key];
+  const rawStr=input===null||input===undefined?'':typeof input==='string'?input:String(input);
+  const value=rawStr.trim();
+  // فارغ → للمطلوب: نقص أساسي؛ للاختياري الفارغ: يُترك دون قيمة (يُحفظ الأصل عند
+  // التحديث، ويُخزَّن فارغاً للمورد الجديد). «لا يوجد» = مسح صريح للاختياري.
+  if(value===''||value==='لا يوجد'){
+   if(required)report.needsReview.push(`${name}: مطلوب.`);
+   else if(value==='لا يوجد')values[key]=null;
+   continue;
+  }
+  const max=key==='store_url'?300:key==='email'?254:key==='address'?500:['notes','returns_policy','damage_policy','settlement_terms','agreements'].includes(key)?2000:200;
+  if(value.length>max||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)){
+   if(required)report.needsReview.push(`${name}: قيمة طويلة أو غير صالحة.`);
+   else report.skipped.push({field:key,label:name,note:`قيمة طويلة/غير صالحة — تم تجاوزها (حفظ القيمة السابقة). الأصل: ${clip(value)}`});
+   continue; // اختياري: يُتجاوز دون قيمة للحفاظ على البيانات السابقة
+  }
+  const res=coerceField(key,value);
+  if(res.ok){
+   values[key]=res.value;
+   if(res.value!==value)report.corrected.push({field:key,label:name,note:`تم تصحيحه تلقائياً: «${clip(value)}» ← «${clip(res.value)}»`});
+   else report.imported.push(key);
+  } else if(required){
+   report.needsReview.push(`${name}: صيغة غير صالحة${['registration_expiry','submitted_date'].includes(key)?'؛ استخدم YYYY-MM-DD':''}.`);
+  } else {
+   // اختياري غير قابل للتصحيح: يُتجاوز دون قيمة (يُحفظ الأصل، ولا يُستبدل ببيانات غير صالحة)
+   report.skipped.push({field:key,label:name,note:`صيغة غير صالحة — تم تجاوزها (حفظ القيمة السابقة). الأصل: ${clip(value)}`});
+  }
+ }
+ const warnings:string[]=[];
  if(values.stock_actual==='لا'||values.stock_updated==='لا')warnings.push('المورد لم يؤكد جاهزية المخزون؛ راجع ذلك قبل اعتماد أي منتج.');
- return {values,errors:[...new Set(errors)],warnings};
+ return {values,errors:[...new Set(report.needsReview)],warnings,report};
 }
 export function mergeOnboarding(old:OnboardingValues,incoming:OnboardingValues):OnboardingValues {
  return {...old,...Object.fromEntries(Object.entries(incoming).filter(([,v])=>v!==''))};

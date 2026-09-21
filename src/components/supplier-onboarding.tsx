@@ -4,9 +4,16 @@ import Link from 'next/link';
 import { useCallback, useEffect, useId, useRef, useState, useTransition } from 'react';
 import { ONBOARDING_LABELS, maskedOnboardingValue } from '@/lib/suppliers/onboarding-fields';
 
+export type OnboardingImportReport = {
+  imported: number;
+  corrected: { label: string; note: string }[];
+  skipped: { label: string; note: string }[];
+  needsReview: string[];
+};
 export type OnboardingUiState = {
   errors: string[];
   warnings: string[];
+  report?: OnboardingImportReport;
   preview?: {
     token: string;
     filename: string;
@@ -103,6 +110,19 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
           {pending && <p role="status" className="rounded-xl bg-blue-50 p-4 text-sm text-blue-900">{operation === 'readiness' ? 'جارٍ فحص الاتصال وقراءة عينة المنتجات…' : operation === 'save' ? 'جارٍ حفظ بيانات المورد…' : 'جارٍ قراءة الملف والتحقق من البيانات…'}</p>}
           {state.errors.length > 0 && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900"><p className="font-bold">تعذّر إكمال الخطوة</p><ul className="mt-2 list-inside list-disc space-y-1">{state.errors.map((error, i) => <li key={i}>{error}</li>)}</ul></div>}
           {state.warnings.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><p className="font-bold">ملاحظات تحتاج مراجعتك</p><ul className="mt-2 list-inside list-disc space-y-1">{state.warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul></div>}
+          {state.report && (state.report.imported > 0 || state.report.corrected.length > 0 || state.report.skipped.length > 0 || state.report.needsReview.length > 0) && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
+              <p className="font-bold">تقرير الاستيراد</p>
+              <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+                <li>✅ مقبولة كما هي: <b>{state.report.imported}</b></li>
+                <li>🛠️ صُحّحت تلقائياً: <b>{state.report.corrected.length}</b></li>
+                <li>⏭️ تُجوّزت (اختيارية): <b>{state.report.skipped.length}</b></li>
+                <li>⚠️ تحتاج مراجعة: <b>{state.report.needsReview.length}</b></li>
+              </ul>
+              {state.report.corrected.length > 0 && <details className="mt-2"><summary className="cursor-pointer font-semibold text-emerald-800">التفاصيل: صُحّحت تلقائياً</summary><ul className="mt-1 list-inside list-disc space-y-0.5 text-slate-600">{state.report.corrected.map((c, i) => <li key={i}><b>{c.label}</b> — {c.note}</li>)}</ul></details>}
+              {state.report.skipped.length > 0 && <details className="mt-2"><summary className="cursor-pointer font-semibold text-slate-700">التفاصيل: تُجوّزت</summary><ul className="mt-1 list-inside list-disc space-y-0.5 text-slate-600">{state.report.skipped.map((s, i) => <li key={i}><b>{s.label}</b> — {s.note}</li>)}</ul></details>}
+            </div>
+          )}
         </div>
 
         {!saved && <form onSubmit={event => {

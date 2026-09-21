@@ -71,7 +71,7 @@ const clip=(s:string)=>s.length>60?s.slice(0,57)+'…':s;
  * غير القابلة للتصحيح تُتجاوز مع ملاحظة (بلا رفض)، ولا يُرفض الصف إلا إذا نقص حقلٌ
  * أساسيّ فعلاً أو تعذّر تصحيح حقلٍ أساسيّ. يعيد تقريراً بأربع فئات.
  */
-export function validateOnboarding(raw:Record<string,unknown>,options:{preserveMissingRequired?:boolean}={}):OnboardingValidation {
+export function validateOnboarding(raw:Record<string,unknown>,options:{preserveMissingRequired?:boolean;allowMissingRequired?:readonly string[]}={}):OnboardingValidation {
  const values:OnboardingValues={};
  const report:OnboardingReport={imported:[],corrected:[],skipped:[],needsReview:[]};
  const known=new Set(ONBOARDING_FIELDS.map(([k])=>String(k)));
@@ -87,8 +87,8 @@ export function validateOnboarding(raw:Record<string,unknown>,options:{preserveM
   // فارغ → للمطلوب: نقص أساسي؛ للاختياري الفارغ: يُترك دون قيمة (يُحفظ الأصل عند
   // التحديث، ويُخزَّن فارغاً للمورد الجديد). «لا يوجد» = مسح صريح للاختياري.
   if(value===''||value==='لا يوجد'){
-   if(required&&!options.preserveMissingRequired)report.needsReview.push(`${name}: مطلوب.`);
-   else if(required&&['registration_number','store_url'].includes(key))report.needsReview.push(`${name}: مطلوب.`);
+   if(required&&['registration_number','store_url'].includes(key))report.needsReview.push(`${name}: مطلوب.`);
+   else if(required&&!options.preserveMissingRequired&&!options.allowMissingRequired?.includes(key))report.needsReview.push(`${name}: مطلوب.`);
    else if(value==='لا يوجد')values[key]=null;
    continue;
   }

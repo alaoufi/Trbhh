@@ -35,7 +35,7 @@ export async function inspectOnboarding(db:Reader,values:OnboardingValues,secret
  // Legacy API URL is only a conflict hint, never an OAuth endpoint or source of credentials.
  const urlOwners=await db.$queryRaw<{id:bigint}[]>`SELECT id FROM commerce_suppliers WHERE LOWER(TRIM(TRAILING '/' FROM api_base_url))=${storeUrl} LIMIT 3`;
  if(urlOwners.some(o=>o.id!==existing?.id))throw Error('onboarding_url_conflict');
- const emailOwners=await db.$queryRaw<{id:bigint}[]>`SELECT id FROM commerce_suppliers WHERE LOWER(email)=${values.email||''} AND id<>${existing?.id??0n} LIMIT 1`;
+ const emailOwners=values.email?await db.$queryRaw<{id:bigint}[]>`SELECT id FROM commerce_suppliers WHERE LOWER(email)=${values.email} AND id<>${existing?.id??0n} LIMIT 1`:[];
  const warnings=emailOwners.length?['البريد مستخدم لمورد بسجل تجاري مختلف؛ لن يتم دمج الموردين.']:[];
  const connections=existing?await db.$queryRaw<Connection[]>`SELECT id,external_store_id,status,version FROM supplier_connections WHERE supplier_id=${existing.id} AND provider='salla' ORDER BY id DESC LIMIT 20`:[];
  const old:OnboardingValues=identity?decryptDetails(identity.encrypted_details,identity.supplier_id,secret):{};
@@ -62,7 +62,7 @@ export async function saveOnboarding(db:CommerceDb,input:{values:OnboardingValue
   await tx.$executeRaw`INSERT IGNORE INTO site_settings(k,v) VALUES('supplier_onboarding_mutex','1')`;
   await tx.$queryRaw`SELECT k FROM site_settings WHERE k='supplier_onboarding_mutex' FOR UPDATE`;
   const state=await inspectOnboarding(tx,validated.values,input.secret);
-  const complete=validateOnboarding(state.merged);if(complete.errors.length)throw Error('onboarding_validation');
+  const complete=validateOnboarding(state.merged,{allowMissingRequired:state.existing&&state.connected?['email']:[]});if(complete.errors.length)throw Error('onboarding_validation');
   if(state.fingerprint!==input.fingerprint)throw Error('onboarding_preview_stale');
   if(state.existing?!input.canEdit:!input.canCreate)throw Error('onboarding_forbidden');
   const v=complete.values;let id=state.existing?.id;

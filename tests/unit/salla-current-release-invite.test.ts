@@ -54,7 +54,8 @@ describe('current verified release owner invitation',()=>{
   });
   it('allows issuance only with exact markers and unchanged running container',()=>{
     const ok=guard();expect(ok.status,ok.stderr).toBe(0);expect(ok.stdout).toBe('ISSUED');
-    for(const change of [{CANDIDATE:'b'.repeat(40)},{BACKUP_ID:'1'},{PROFILE:'unknown'},{LIVE_HEAD:'b'.repeat(40)},{LIVE_CONTAINER:'replacement'},{LIVE_STATE:'false false'},{LIVE_STATE:'true true'},{LIVE_IMAGE:'sha256:'+'b'.repeat(64)}]){
+    const changes: Record<string,string>[] = [{CANDIDATE:'b'.repeat(40)},{BACKUP_ID:'1'},{PROFILE:'unknown'},{LIVE_HEAD:'b'.repeat(40)},{LIVE_CONTAINER:'replacement'},{LIVE_STATE:'false false'},{LIVE_STATE:'true true'},{LIVE_IMAGE:'sha256:'+'b'.repeat(64)}];
+    for(const change of changes){
       const denied=guard(change);expect(denied.status).not.toBe(0);expect(denied.stdout).not.toContain('ISSUED');
     }
     for(const marker of ['VERIFIED','commit.txt','candidate.txt','DEPLOYMENT_VERIFIED']){

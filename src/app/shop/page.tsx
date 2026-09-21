@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma';
+import { getSession } from '@/lib/auth';
+import { hasAction } from '@/lib/roles';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { getCommerceGateway } from '@/lib/commerce/runtime';
@@ -11,9 +13,18 @@ export const dynamic = 'force-dynamic';
 // نفس منطق backend المعتمد (الإعداد/المخطط/الاستعلام/بوّابة الدفع) لم يتغيّر — التغيير في العرض فقط.
 type Row = { id: bigint; title: string; price_minor: number; stock_available: number; images: unknown; description: string | null; featured: number | null };
 
-export default async function ApprovedShop() {
-  const config = await getCommerceConfig();
-  if (!config.enabled) return <div className="card-3d rounded-xl p-6">{config.text.unavailable}</div>;
+/** معاينة إدارية فقط: هل المتصفِّح مشرفٌ له صلاحية عرض التجارة؟ (فحص منطقي لا يوقف الزائر). */
+async function isCommercePreviewer(): Promise<boolean> {
+  const session = await getSession();
+  if (!session) return false;
+  return hasAction(session.uid, 'commerce', 'view').catch(() => false);
+}
+
+export default async function ApprovedShop({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const [config, sp] = await Promise.all([getCommerceConfig(), searchParams]);
+  // وضع المعاينة: المشرف يرى الكتالوج الحيّ عبر ?preview=1 حتى لو كان المتجر مغلقاً للعامة.
+  const preview = sp?.preview === '1' && (await isCommercePreviewer());
+  if (!config.enabled && !preview) return <div className="card-3d rounded-xl p-6">{config.text.unavailable}</div>;
   await assertCommerceSchemaReady(prisma);
   const [products, gateway] = await Promise.all([
     prisma.$queryRaw<Row[]>`SELECT cp.id,cp.title,cp.price_minor,cp.stock_available,sp.images,sp.description,sp.featured FROM commerce_products cp LEFT JOIN supplier_products sp ON sp.commerce_product_id=cp.id LEFT JOIN supplier_connections sc ON sc.id=sp.connection_id LEFT JOIN supplier_integration_profiles sip ON sip.supplier_id=sp.supplier_id LEFT JOIN commerce_suppliers s ON s.id=sp.supplier_id WHERE cp.approved=1 AND cp.visible=1 AND cp.enabled=1 AND cp.currency='SAR' AND (sp.id IS NULL OR (sp.active=1 AND sp.visible=1 AND s.active=1 AND sip.maintenance=0 AND sc.status='connected')) ORDER BY COALESCE(sp.featured,0) DESC,cp.id DESC LIMIT 100`,
@@ -63,6 +74,11 @@ export default async function ApprovedShop() {
 
   return (
     <div className="space-y-5">
+      {preview && !config.enabled && (
+        <p className="rounded-xl border border-[#f0b429]/60 bg-[#f0b429]/10 p-3 text-sm font-bold text-[#16294a]">
+          معاينة إدارية — المتجر غير مُفعّل للعامة بعد. هذه الصفحة تظهر لك أنت فقط (كمشرف)؛ الأزرار للعرض فقط والدفع غير مُفعّل.
+        </p>
+      )}
       <div>
         <h1 className="text-2xl font-extrabold text-[#16294a] sm:text-3xl">{config.text.title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{config.text.description}</p>

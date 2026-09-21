@@ -8,10 +8,12 @@ backup_id=${2:?numeric backup run id}
 candidate=${3:?candidate commit}
 reuse_media_id=${4:-}
 release_profile=${5:-standard}
-[[ "$release_profile" == standard || "$release_profile" == salla || "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin ]] || exit 1
+[[ "$release_profile" == standard || "$release_profile" == salla || "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation ]] || exit 1
 [[ "$phase" == before || "$phase" == after ]] || exit 1
 [[ "$backup_id" =~ ^[0-9]+$ && "$candidate" =~ ^[0-9a-f]{40}$ ]] || exit 1
-if [[ "$release_profile" == supplier_admin ]]; then
+if [[ "$release_profile" == banner_separation ]]; then
+  [[ "$reuse_media_id" == 35640414518 && "$reuse_media_id" != "$backup_id" ]] || { echo 'Banner separation release requires its exact verified media chain'; exit 1; }
+elif [[ "$release_profile" == supplier_admin ]]; then
   [[ "$reuse_media_id" == 35637559322 && "$reuse_media_id" != "$backup_id" ]] || { echo 'Supplier administration release requires its exact verified media chain'; exit 1; }
 elif [[ "$release_profile" == national_day_loyalty ]]; then
   [[ "$reuse_media_id" == 35634930527 && "$reuse_media_id" != "$backup_id" ]] || { echo 'National Day loyalty release requires its exact verified media chain'; exit 1; }
@@ -25,7 +27,9 @@ elif [[ "$release_profile" == national_day ]]; then
   [[ "$reuse_media_id" == 35626587686 && "$reuse_media_id" != "$backup_id" ]] || { echo 'National day requires its exact reviewed media chain'; exit 1; }
 fi
 if [[ -n "$reuse_media_id" ]]; then
-  if [[ "$release_profile" == supplier_admin ]]; then
+  if [[ "$release_profile" == banner_separation ]]; then
+    [[ "$reuse_media_id" == 35640414518 && "$reuse_media_id" != "$backup_id" ]] || exit 1
+  elif [[ "$release_profile" == supplier_admin ]]; then
     [[ "$reuse_media_id" == 35637559322 && "$reuse_media_id" != "$backup_id" ]] || exit 1
   elif [[ "$release_profile" == national_day_loyalty ]]; then
     [[ "$reuse_media_id" == 35634930527 && "$reuse_media_id" != "$backup_id" ]] || exit 1
@@ -85,9 +89,12 @@ if [[ "$phase" == after ]]; then
     cmp --silent .env "$backup/environment.env"
     cmp --silent docker-compose.yml "$backup/docker-compose.yml"
   fi
-  if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin ]]; then
+  if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation ]]; then
     if [[ "$release_profile" == merchant_oauth ]]; then
       [[ "$(cat "$backup/VERIFIED")" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 && "$(cat "$backup/commit.txt")" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 && "$(cat "$backup/candidate.txt")" == "$candidate" ]] || exit 1
+    elif [[ "$release_profile" == banner_separation ]]; then
+      [[ "$(cat "$backup/VERIFIED")" == 7def385fc2a161f829486544815b6f3a58e327e7 && "$(cat "$backup/commit.txt")" == 7def385fc2a161f829486544815b6f3a58e327e7 && "$(cat "$backup/candidate.txt")" == "$candidate" ]] || exit 1
+      node "$tools_dir/banner-separation-media-reference.cjs" verify "$backup"
     elif [[ "$release_profile" == supplier_admin ]]; then
       [[ "$(cat "$backup/VERIFIED")" == b5bf261a7a03cf28cbdca8387363616e0386b9e8 && "$(cat "$backup/commit.txt")" == b5bf261a7a03cf28cbdca8387363616e0386b9e8 && "$(cat "$backup/candidate.txt")" == "$candidate" ]] || exit 1
       node "$tools_dir/supplier-admin-media-reference.cjs" verify "$backup"
@@ -141,6 +148,8 @@ elif [[ "$release_profile" == supplier_selection ]]; then
   [[ "$current_commit" == 415a8fe593522859f4cf85c2fa10e47a7d40109b && "$reuse_media_id" == 35607654850 ]] || { echo 'Supplier selection requires its exact reviewed baseline and backup chain'; exit 1; }
 elif [[ "$release_profile" == public_home ]]; then
   [[ "$current_commit" == 1a2111ccd9a17c151a2f47cf793f3bddf4d0451f && "$reuse_media_id" == 35619790007 ]] || { echo 'Public home requires its exact reviewed baseline and backup chain'; exit 1; }
+elif [[ "$release_profile" == banner_separation ]]; then
+  [[ "$current_commit" == 7def385fc2a161f829486544815b6f3a58e327e7 && "$reuse_media_id" == 35640414518 ]] || { echo 'Banner separation release requires its exact reviewed production baseline and backup chain'; exit 1; }
 elif [[ "$release_profile" == supplier_admin ]]; then
   [[ "$current_commit" == b5bf261a7a03cf28cbdca8387363616e0386b9e8 && "$reuse_media_id" == 35637559322 ]] || { echo 'Supplier administration release requires its exact reviewed production baseline and backup chain'; exit 1; }
 elif [[ "$release_profile" == national_day_loyalty ]]; then
@@ -152,7 +161,7 @@ elif [[ "$release_profile" == national_day ]]; then
 else
   [[ "$current_commit" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || { echo 'Production baseline changed; stop and review'; exit 1; }
 fi
-if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin ]]; then
+if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation ]]; then
   # Measure while the app is live, before creating this backup or its archives.
   # A failed capacity gate creates no partial image/media backup and never pauses.
   capacity=$(docker exec -i -u 0 "$container" node - measure < "$tools_dir/backup-capacity-proof.cjs")
@@ -167,6 +176,7 @@ if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_hea
   if [[ "$release_profile" == national_day_immersive ]]; then media_capacity=verified-parent; fi
   if [[ "$release_profile" == national_day_loyalty ]]; then media_capacity=verified-parent; fi
   if [[ "$release_profile" == supplier_admin ]]; then media_capacity=verified-parent; fi
+  if [[ "$release_profile" == banner_separation ]]; then media_capacity=verified-parent; fi
   node "$tools_dir/backup-capacity-proof.cjs" check "$capacity" "$image_bytes" "$code_bytes" "$base" "$docker_root" "$media_capacity"
 fi
 [[ ! -e "$backup" && ! -L "$backup" ]] || { echo 'Backup destination already exists; use a new run'; exit 1; }
@@ -175,10 +185,12 @@ printf '%s\n' "$current_commit" > "$backup/commit.txt"
 printf '%s\n' "$current_image" > "$backup/image-id.txt"
 printf '%s\n' "$candidate" > "$backup/candidate.txt"
 docker inspect "$container" > "$backup/container-before.json"
-if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin ]]; then
+if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation ]]; then
   node "$tools_dir/verify-runtime.cjs" "$backup/container-before.json" "$backup/container-before.json" "$release_profile"
 fi
-if [[ "$release_profile" == supplier_admin ]]; then
+if [[ "$release_profile" == banner_separation ]]; then
+  node "$tools_dir/banner-separation-media-reference.cjs" prepare "$base/audit-$reuse_media_id" "$backup"
+elif [[ "$release_profile" == supplier_admin ]]; then
   node "$tools_dir/supplier-admin-media-reference.cjs" prepare "$base/audit-$reuse_media_id" "$backup"
 elif [[ "$release_profile" == national_day_loyalty ]]; then
   node "$tools_dir/loyalty-media-reference.cjs" prepare "$base/audit-$reuse_media_id" "$backup"
@@ -234,7 +246,7 @@ docker exec "$reader" sh -c 'command -v mysqldump || command -v mariadb-dump' >/
 # Prepare reused media before the guarded pause. Merchant headers use only the
 # pinned verified parent above; the older generic reuse path copies/extracts
 # archives and does not reuse that source's manifests or success markers.
-if [[ "$release_profile" == merchant_headers || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || ( "$release_profile" == supplier_selection && -n "$reuse_media_id" ) ]]; then
+if [[ "$release_profile" == merchant_headers || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || ( "$release_profile" == supplier_selection && -n "$reuse_media_id" ) ]]; then
   for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
     IFS=: read -r label env_name fallback <<< "$spec"
     media_path=$(docker exec "$reader" node -e 'process.stdout.write(process.env[process.argv[1]]||process.argv[2]||"")' "$env_name" "$fallback")
@@ -290,7 +302,7 @@ echo 'Maintenance backup started; automatic resume guard armed.'
 echo 'Taking a private snapshot from the live app database connection.'
 docker exec -i "$reader" node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/before.json"
 docker exec -i "$reader" node - snapshot-full < "$tools_dir/database-proof.cjs" > "$backup/full-before.json"
-if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin ]]; then
+if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation ]]; then
   docker exec -i "$reader" node - snapshot < "$tools_dir/supplier-preservation-proof.cjs" > "$backup/supplier-before.json"
 fi
 node "$tools_dir/database-proof.cjs" summary "$backup/before.json"
@@ -359,7 +371,9 @@ systemctl stop "$watchdog.timer"
 systemctl stop "$watchdog.service" >/dev/null 2>&1 || true
 [[ ! -e "$backup/WATCHDOG_FIRED" ]] || exit 1
 (cd "$backup" && sha256sum database.sql.gz *.tar.gz > SHA256SUMS)
-if [[ "$release_profile" == supplier_admin ]]; then
+if [[ "$release_profile" == banner_separation ]]; then
+  (cd "$backup" && sha256sum BANNER_SEPARATION_MEDIA_REFERENCE.json REUSED_MEDIA_SOURCE *-before.json *.path >> SHA256SUMS)
+elif [[ "$release_profile" == supplier_admin ]]; then
   (cd "$backup" && sha256sum SUPPLIER_ADMIN_MEDIA_REFERENCE.json REUSED_MEDIA_SOURCE *-before.json *.path >> SHA256SUMS)
 elif [[ "$release_profile" == national_day_loyalty ]]; then
   (cd "$backup" && sha256sum LOYALTY_MEDIA_REFERENCE.json REUSED_MEDIA_SOURCE *-before.json *.path >> SHA256SUMS)

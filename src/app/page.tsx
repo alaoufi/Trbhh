@@ -35,7 +35,7 @@ import { PlatformRatingWidget } from '@/components/platform-rating-widget';
 import { getPlatformRating, getMyPlatformReview } from '@/lib/platform-rating';
 import { CommerceHero } from '@/components/commerce/commerce-hero';
 import { publicHomeHero } from '@/lib/public-home';
-import { isNationalDayCampaignActive, nationalDayHeroSlides } from '@/lib/national-day';
+import { isNationalDayCampaignActive, NATIONAL_DAY_HERO_INTERVAL_MS, nationalDayHeroSlides } from '@/lib/national-day';
 import { NationalDayBanner, NationalDayEntry, NationalDayHeroFrame } from '@/components/national-day-banner';
 
 export const dynamic = 'force-dynamic';
@@ -143,6 +143,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
           <NationalDayHeroFrame active={nationalDayActive}>
             <CommerceHero
               compact
+              intervalMs={nationalDayActive ? NATIONAL_DAY_HERO_INTERVAL_MS : undefined}
               headingLevel={1}
               label={nationalDayActive ? 'احتفال تربح باليوم الوطني' : 'اكتشف تربح'}
               slides={heroSlides}

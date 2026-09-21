@@ -72,9 +72,10 @@ it('renders the approved presentation at the public root while retaining the sam
   const hero=tree.find(e=>e.type===CommerceHero);
   expect(hero?.props.headingLevel).toBe(1);
   expect(hero?.props.slides).toEqual([
-   expect.objectContaining({id:'national-leadership',href:null,cta:''}),
-   expect.objectContaining({id:'national-flag',href:null,cta:''}),
+   expect.objectContaining({id:'national-leadership',href:null,cta:'',presentation:'separated'}),
+   expect.objectContaining({id:'national-flag',href:null,cta:'',presentation:'separated'}),
   ]);
+  expect(hero?.props.intervalMs).toBe(10000);
   expect(tree.find(e=>e.type===AdGrid)?.props).toMatchObject({appearance:'marketplace',ads:[{id:2},{id:3},{id:30}]});
  } finally {flag.mockRestore();clock.mockRestore();}
 });

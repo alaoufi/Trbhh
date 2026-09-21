@@ -64,4 +64,15 @@ describe('CommerceHero public homepage contract', () => {
     expect(regular).toContain('data-hero-size="regular"');
     expect(regular).toContain('min-h-[340px]');
   });
+
+  it('keeps a separated banner image outside its readable caption', () => {
+    const html = renderToStaticMarkup(createElement(CommerceHero, {
+      slides: [{ ...brand, presentation: 'separated', image: '/national-day/leadership.webp', href: null, cta: '' }],
+    }));
+    expect(html).toContain('data-slide-presentation="separated"');
+    expect(html).toContain('data-banner-image="true"');
+    expect(html).toContain('<figcaption');
+    expect(html.indexOf('data-banner-image="true"')).toBeLessThan(html.indexOf('<figcaption'));
+    expect(html).not.toContain('absolute inset-0 bg-[#0b162e]/45');
+  });
 });

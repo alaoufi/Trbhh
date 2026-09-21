@@ -5,7 +5,7 @@ vi.mock('@/lib/roles', () => ({ requireAction: state.gate }));
 vi.mock('@/lib/prisma', () => ({ prisma: { $transaction: state.transaction } }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('next/navigation', () => ({ redirect: (url: string) => { throw new Error(`redirect:${url}`); } }));
-import { deleteSupplier, deleteSupplierProducts, saveSupplier, saveSupplierProduct } from '@/app/admin/suppliers/actions';
+import { deleteSupplier, deleteSupplierProducts, saveStoreCoordinator, saveSupplier, saveSupplierProduct } from '@/app/admin/suppliers/actions';
 
 const form = (values: Record<string, string>) => {
   const data = new FormData();
@@ -74,6 +74,15 @@ describe('supplier administration boundaries', () => {
     state.schema.mockRejectedValueOnce(new Error('private DB details'));
     await expect(saveSupplier(form({ name: 'Fixture' }))).rejects.toThrow('redirect:/admin/suppliers?error=save');
     expect(state.transaction).not.toHaveBeenCalled();
+  });
+  it('saves or clears the optional coordinator without changing supplier or OAuth contact data', async()=>{
+    state.query.mockResolvedValueOnce([{id:2n}]);
+    await expect(saveStoreCoordinator(form({coordinatorSupplierId:'2',storeCoordinatorPhone:'0500000000'}))).rejects.toThrow('coordinator=1');
+    expect(state.gate).toHaveBeenCalledWith('suppliers','edit');
+    expect(state.execute.mock.calls[0][0].join('?')).toMatch(/^UPDATE commerce_suppliers SET store_coordinator_phone=/);
+    expect(state.execute.mock.calls[0].slice(1)).toContain('+966500000000');
+    expect(state.execute.mock.calls[0][0].join('?')).not.toMatch(/supplier_connections|oauth|\bphone=/);
+    expect(JSON.stringify(state.audit.mock.calls,(_,v)=>typeof v==='bigint'?v.toString():v)).not.toContain('+966500000000');
   });
   it('requires the supplier delete permission and exact two-step confirmations', async () => {
     await expect(deleteSupplierProducts(form({supplierId:'2',supplierName:'Fixture',confirmName:'Fixture',confirmPhrase:'حذف منتجات المورد',acknowledge:'1'}))).rejects.toThrow('redirect:');

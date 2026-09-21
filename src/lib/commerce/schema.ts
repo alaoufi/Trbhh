@@ -95,6 +95,7 @@ id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
 name VARCHAR(200) NOT NULL,
 contact_name VARCHAR(200) NOT NULL DEFAULT '',
 phone VARCHAR(40) NOT NULL DEFAULT '',
+store_coordinator_phone VARCHAR(20) NOT NULL DEFAULT '',
 email VARCHAR(254) NOT NULL DEFAULT '',
 address VARCHAR(500) NOT NULL DEFAULT '',
 registration_number VARCHAR(100) NOT NULL DEFAULT '',
@@ -153,7 +154,7 @@ const requiredIndexes: Record<string, Record<string, string[]>> = {
   commerce_audit_events:{PRIMARY:['id'],commerce_audit_event:['order_id','event']},
 };
 const requiredColumns: Record<string,string[]> = {
-  commerce_suppliers:['id','name','contact_name','phone','email','address','registration_number','tax_number','settlement_terms','notes','api_base_url','api_credential_ref','active','api_enabled','created_at','updated_at'],
+  commerce_suppliers:['id','name','contact_name','phone','store_coordinator_phone','email','address','registration_number','tax_number','settlement_terms','notes','api_base_url','api_credential_ref','active','api_enabled','created_at','updated_at'],
   commerce_product_suppliers:['product_id','supplier_id','supplier_sku','unit_cost_minor','currency'],
   commerce_order_suppliers:['order_id','product_id','supplier_id','supplier_name','supplier_sku','quantity','unit_cost_minor','total_cost_minor'],
   commerce_receipts:['id','order_id','provider','provider_ref','amount_minor','currency','recorded_at'],

@@ -4,11 +4,11 @@ import { hasAction, requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { formatSar } from '@/lib/commerce/money';
-import { deleteSupplier, deleteSupplierProducts, saveSupplier, saveSupplierProduct } from './actions';
+import { deleteSupplier, deleteSupplierProducts, saveStoreCoordinator, saveSupplier, saveSupplierProduct } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الموردون وربط السلع', robots: { index: false, follow: false } };
-type Supplier = { id: bigint; name: string; contact_name: string; phone: string; email: string; address: string; registration_number: string; tax_number: string; settlement_terms: string; notes: string; active: number; api_base_url: string; api_credential_ref: string; product_count: bigint; history_count: bigint };
+type Supplier = { id: bigint; name: string; contact_name: string; phone: string; store_coordinator_phone:string; email: string; address: string; registration_number: string; tax_number: string; settlement_terms: string; notes: string; active: number; api_base_url: string; api_credential_ref: string; product_count: bigint; history_count: bigint };
 type Mapping = { product_id: bigint; supplier_id: bigint; supplier_sku: string; unit_cost_minor: number; title: string; supplier_name: string; supplier_active: number };
 const input = 'mt-1 min-h-10 w-full rounded-lg border border-primary/25 bg-white px-3 text-sm';
 const button = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
@@ -32,6 +32,18 @@ function SupplierForm({ supplier }: { supplier?: Supplier }) {
     <p className="text-xs text-muted-foreground sm:col-span-2">تنشيط الملف يسمح بربط السلع فقط. حفظ عنوان API ومرجع TRBHH_SUPPLIER_* لا يتصل بالمورد. أدخل اسم المتغير البيئي فقط، ولا تدخل مفتاحًا سريًا أو كلمة مرور.</p>
     <button className={button}>حفظ المورد</button>
   </form>;
+}
+function StoreCoordinatorForm({supplier}:{supplier:Supplier}){
+  return <section className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4">
+    <h3 className="font-bold">منسق المتجر</h3>
+    <p className="mt-1 text-xs leading-6">رقم اختياري لإشعار التجهيز بعد تأكيد الدفع وإنشاء طلب سلة. مستقل عن رقم حساب المورد وتفويض سلة وواجهات API.</p>
+    <form action={saveStoreCoordinator} className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+      <input type="hidden" name="coordinatorSupplierId" value={supplier.id.toString()}/>
+      <label className="text-sm">رقم جوال المنسق<input className={input} name="storeCoordinatorPhone" inputMode="tel" autoComplete="tel" placeholder="05xxxxxxxx" defaultValue={supplier.store_coordinator_phone}/></label>
+      <button className={button}>حفظ المنسق</button>
+    </form>
+    {supplier.store_coordinator_phone&&<form action={saveStoreCoordinator} className="mt-2"><input type="hidden" name="coordinatorSupplierId" value={supplier.id.toString()}/><input type="hidden" name="storeCoordinatorPhone" value=""/><button className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-bold text-red-700">حذف رقم المنسق</button></form>}
+  </section>;
 }
 function MappingForm({ mapping, suppliers }: { mapping: Mapping; suppliers: Supplier[] }) {
   return <form action={saveSupplierProduct} aria-label={`تعديل ربط ${mapping.title}`} className="grid gap-3 sm:grid-cols-2">
@@ -78,7 +90,7 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
   const offset = (page - 1) * 100;
   try { await assertCommerceSchemaReady(prisma); } catch { return <p role="alert" className="card-3d rounded-xl p-5">مخطط الموردين غير جاهز؛ يلزم استكمال الجداول والفهارس قبل الإدارة.</p>; }
   const [suppliers, mappings] = await Promise.all([
-    prisma.$queryRaw<Supplier[]>`SELECT s.id,s.name,s.contact_name,s.phone,s.email,s.address,s.registration_number,s.tax_number,s.settlement_terms,s.notes,s.active,s.api_base_url,s.api_credential_ref,
+    prisma.$queryRaw<Supplier[]>`SELECT s.id,s.name,s.contact_name,s.phone,s.store_coordinator_phone,s.email,s.address,s.registration_number,s.tax_number,s.settlement_terms,s.notes,s.active,s.api_base_url,s.api_credential_ref,
       ((SELECT COUNT(*) FROM supplier_products p WHERE p.supplier_id=s.id)+(SELECT COUNT(*) FROM commerce_product_suppliers m WHERE m.supplier_id=s.id)) AS product_count,
       ((SELECT COUNT(*) FROM supplier_orders o WHERE o.supplier_id=s.id)+(SELECT COUNT(*) FROM commerce_order_suppliers os WHERE os.supplier_id=s.id)+(SELECT COUNT(*) FROM commerce_supplier_accruals a WHERE a.supplier_id=s.id)) AS history_count
       FROM commerce_suppliers s ORDER BY s.id DESC LIMIT 100 OFFSET ${offset}`,
@@ -92,6 +104,7 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
     <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">الموردون جهات داخلية لتربح. التنفيذ والتسوية خارج الموقع. لا تحويل أموال ولا اتصال API من هذه الصفحة.</p>
     <nav className="flex flex-wrap gap-4 text-primary underline"><Link href="/admin/commerce">السلع والطلبات</Link><Link href="/admin/commerce/accounts">الإيصالات والاستحقاقات</Link></nav>
     {query.saved === '1' && <p role="status" className="text-emerald-700">تم الحفظ.</p>}
+    {query.coordinator === '1' && <p role="status" className="text-emerald-700">تم تحديث منسق المتجر.</p>}
     {query.deleted==='products'&&<p role="status" className="text-emerald-700">تم حذف منتجات المورد. راجع المورد ثم نفّذ خطوة حذف ملفه إذا رغبت.</p>}
     {query.deleted==='supplier'&&<p role="status" className="text-emerald-700">تم حذف المورد بعد التأكد من خلوه من المنتجات وسجل الطلبات.</p>}
     {typeof query.error === 'string' && <p role="alert" className="text-red-700">{query.error==='delete_products_first'?'احذف منتجات المورد أولًا ثم أعد محاولة حذف المورد.':query.error==='delete_history'?'لا يمكن الحذف لأن للمورد سجل طلبات أو استحقاقات يجب حفظه.':query.error==='delete_confirmation'?'لم تتطابق بيانات التأكيد. اكتب اسم المورد والعبارة المطلوبة حرفيًا.':'تعذر إكمال العملية. راجع الحقول وجاهزية الجداول.'}</p>}
@@ -103,7 +116,7 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
     </nav>
     <section className="space-y-3"><h2 className="font-bold">الموردون — الصفحة {page}</h2>
       {!suppliers.length && <p className="text-sm">لا يوجد موردون في هذه الصفحة.</p>}
-      {suppliers.map(s => <details key={s.id.toString()} className="card-3d rounded-xl p-4"><summary className="mb-3 cursor-pointer">#{s.id.toString()} {s.name} — {s.active === 1 ? 'نشط' : 'غير نشط'}</summary><SupplierForm supplier={s} />{canDelete&&<SupplierDeletion supplier={s}/>}</details>)}
+      {suppliers.map(s => <details key={s.id.toString()} className="card-3d rounded-xl p-4"><summary className="mb-3 cursor-pointer">#{s.id.toString()} {s.name} — {s.active === 1 ? 'نشط' : 'غير نشط'}</summary><SupplierForm supplier={s} /><StoreCoordinatorForm supplier={s}/>{canDelete&&<SupplierDeletion supplier={s}/>}</details>)}
     </section>
     <section className="card-3d space-y-3 rounded-xl p-4"><h2 className="font-bold">اختيار منتجات المورد</h2><p className="text-sm">ابحث بالاسم أو SKU، عاين الصور والتفاصيل، ثم راجع المنتجات المحددة قبل إضافتها إلى تربح. المنتجات تبقى مخفية بعد الإضافة.</p><Link href="/admin/suppliers/catalog" className={`${button} inline-flex min-h-11 items-center`}>عرض المنتجات واختيارها</Link></section>
     <section className="space-y-3"><h2 className="font-bold">روابط السلع — الصفحة {page}</h2>

@@ -29,6 +29,9 @@ const STATEMENTS: string[] = [
   ...SUPPLIER_DDL,
   ...ONBOARDING_DDL,
   ...CJ_DDL,
+  `ALTER TABLE commerce_suppliers ADD COLUMN store_coordinator_phone VARCHAR(20) NOT NULL DEFAULT ''`,
+  `ALTER TABLE supplier_orders ADD COLUMN external_order_url VARCHAR(2048) NOT NULL DEFAULT ''`,
+  `ALTER TABLE supplier_orders ADD COLUMN external_customer_id VARCHAR(191) NULL`,
   `ALTER TABLE users ADD COLUMN auth_session_version VARCHAR(64) NOT NULL DEFAULT '0'`,
   /* Authentication: encrypted confirmed TOTP credentials and durable attempt limits. */
   `CREATE TABLE IF NOT EXISTS auth_mfa (

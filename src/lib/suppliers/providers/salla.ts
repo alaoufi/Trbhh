@@ -1,6 +1,7 @@
 import 'server-only';
 import {parseSar} from '@/lib/commerce/money';
-import type {SupplierAdapter,SupplierProduct,SupplierOrder,SupplierShipment,SupplierCreateOrderResult} from '../types';
+import {saudiCommercePhone} from '@/lib/commerce/config';
+import type {SupplierAdapter,SupplierProduct,SupplierOrder,SupplierShipment,SupplierCreateOrderResult,SupplierOrderRequest} from '../types';
 
 const BASE='https://api.salla.dev/admin/v2';
 type Obj=Record<string,unknown>;
@@ -99,10 +100,12 @@ function pagination(body:Obj,page:number):string|null {
 export class SallaAdapter implements SupplierAdapter {
   readonly provider='salla' as const;
   constructor(private readonly token:()=>Promise<string>,private readonly fetcher:typeof fetch=fetch){}
-  private async get(path:string):Promise<Obj|null>{
+  private async request(method:'GET'|'POST',path:string,payload?:Obj):Promise<Obj|null>{
     const token=await this.token();
     let response:Response;
-    try{response=await this.fetcher(BASE+path,{method:'GET',headers:{Authorization:`Bearer ${token}`,Accept:'application/json'},credentials:'omit',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(15000)});}catch{throw new Error('salla_request_failed');}
+    const headers:Record<string,string>={Authorization:`Bearer ${token}`,Accept:'application/json'};
+    if(payload)headers['Content-Type']='application/json';
+    try{response=await this.fetcher(BASE+path,{method,headers,body:payload?JSON.stringify(payload):undefined,credentials:'omit',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(15000)});}catch{throw new Error('salla_request_failed');}
     if(response.status===404)return null;
     if(!response.ok)throw new Error(`salla_http_${response.status}`);
     const reader=response.body?.getReader();if(!reader)throw new Error('salla_invalid_response');
@@ -114,6 +117,8 @@ export class SallaAdapter implements SupplierAdapter {
     if(body.success!==true)throw new Error('salla_response_failed');
     return body;
   }
+  private get(path:string){return this.request('GET',path);}
+  private post(path:string,payload:Obj){return this.request('POST',path,payload);}
   async getProducts(input:{cursor?:string|null;limit?:number;updatedSince?:string|null}={}){
     if(input.updatedSince)throw new Error('salla_updated_since_unsupported');
     const cursor=input.cursor??'1',limit=input.limit??50;
@@ -144,5 +149,57 @@ export class SallaAdapter implements SupplierAdapter {
     }
     throw new Error('salla_shipments_page_limit');
   }
-  async createOrder():Promise<SupplierCreateOrderResult>{throw new Error('unsupported_live_order_contract');}
+  async createOrder(request:SupplierOrderRequest):Promise<SupplierCreateOrderResult>{
+    if(request.currency!=='SAR'||!request.items.length||request.items.length>100)throw new Error('salla_order_contract');
+    // A product variant cannot safely be represented by product id alone. Keep
+    // this closed until immutable Salla option/value ids are captured in the snapshot.
+    if(request.items.some(item=>item.variantId||item.hasVariants))throw new Error('salla_variant_order_contract_required');
+    const normalized=saudiCommercePhone(request.shipping.phone);
+    if(!normalized)throw new Error('salla_customer_phone');
+    const local=normalized.slice(3),keyword=encodeURIComponent(local);
+    const customers=await this.get(`/customers?keyword=${keyword}&page=1&per_page=30`);
+    if(!customers||!Array.isArray(customers.data)||customers.data.length>30)throw new Error('salla_customers_unavailable');
+    let customerId:string|undefined;
+    for(const value of customers.data){
+      const customer=object(value),mobile=String(customer.mobile??'').replace(/\D/g,''),code=String(customer.mobile_code??'').replace(/\D/g,'');
+      const candidate=mobile.startsWith('966')?mobile:code==='966'?`966${mobile.replace(/^0/,'')}`:mobile.startsWith('05')?`966${mobile.slice(1)}`:mobile.length===9?`966${mobile}`:'';
+      if(candidate===normalized){customerId=id(customer.id);break;}
+    }
+    if(!customerId){
+      const names=request.shipping.name.trim().split(/\s+/).filter(Boolean),first=names.shift()||'عميل',last=names.join(' ')||first;
+      const created=await this.post('/customers',{first_name:first.slice(0,100),last_name:last.slice(0,100),mobile:Number(local),mobile_code_country:'+966'});
+      if(!created)throw new Error('salla_customer_create_failed');
+      customerId=id(object(created.data).id);
+    }
+    let cityId:string|undefined,countryId:string|undefined;
+    for(let page=1;page<=100&&!cityId;page++){
+      const cities=await this.get(`/countries/SA/cities?page=${page}&per_page=100`);
+      if(!cities||!Array.isArray(cities.data)||cities.data.length>100)throw new Error('salla_cities_unavailable');
+      const country=object(cities.country);if(text(country.code,2)!=='SA')throw new Error('salla_country_mismatch');
+      countryId=id(country.id);
+      for(const value of cities.data){const city=object(value);if(text(city.name,120).trim()===request.shipping.city.trim()){cityId=id(city.id);if(id(city.country_id)!==countryId)throw new Error('salla_country_mismatch');break;}}
+      if(cityId)break;
+      if(!pagination(cities,page))break;
+    }
+    if(!cityId||!countryId)throw new Error('salla_city_not_found');
+    const products=request.items.map(item=>{
+      const identifier=Number(id(item.externalId));if(!Number.isSafeInteger(identifier))throw new Error('salla_invalid_id');
+      if(!Number.isSafeInteger(item.quantity)||item.quantity<1||item.quantity>100000)throw new Error('salla_order_contract');
+      return {identifier_type:'id',identifier,quantity:item.quantity};
+    });
+    const body=await this.post('/orders',{
+      customer:{id:Number(customerId)},
+      receiver:{name:request.shipping.name.trim().slice(0,191),phone:normalized,country_code:'SA',notify:false},
+      delivery_method:'shipping',
+      ship_to:{country:Number(countryId),city:Number(cityId),address:request.shipping.addressLine.trim().slice(0,500),postal_code:request.shipping.postalCode.trim().slice(0,20)},
+      payment:{status:'paid'},products,
+    });
+    if(!body)throw new Error('salla_order_create_failed');
+    const order=object(body.data),externalOrderId=id(order.id),returnedCustomer=id(object(order.customer).id);
+    if(returnedCustomer!==customerId)throw new Error('salla_resource_mismatch');
+    const externalOrderUrl=text(object(order.urls).admin,2048);
+    let url:URL;try{url=new URL(externalOrderUrl);}catch{throw new Error('salla_invalid_response');}
+    if(url.protocol!=='https:'||url.hostname!=='s.salla.sa'||!url.pathname.startsWith('/orders/order/')||url.username||url.password||url.port)throw new Error('salla_invalid_response');
+    return {status:'submitted',externalOrderId,externalOrderUrl:url.href,externalCustomerId:customerId};
+  }
 }

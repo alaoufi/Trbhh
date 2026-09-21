@@ -32,11 +32,12 @@ export type SupplierOrder = {
 };
 export type SupplierOrderRequest = {
   idempotencyKey:string;merchantOrderId:string;currency:'SAR';shippingMinor:number;
-  items:readonly {externalId:string;variantId?:string;quantity:number;unitCostMinor:number}[];
+  items:readonly {externalId:string;variantId?:string;hasVariants?:boolean;name?:string;sku?:string;variantName?:string;quantity:number;unitCostMinor:number}[];
   shipping:{name:string;phone:string;addressLine:string;city:string;postalCode:string;country:'SA'};
+  shippingNotes?:string;
 };
 export type SupplierCreateOrderResult =
-  | {status:'submitted';externalOrderId:string}
+  | {status:'submitted';externalOrderId:string;externalOrderUrl:string;externalCustomerId:string}
   | {status:'simulated';externalOrderId:null}
   | {status:'unknown';externalOrderId:null;errorCode:string};
 /** Implementations own private credentials. Callers enforce durable claims, RBAC,

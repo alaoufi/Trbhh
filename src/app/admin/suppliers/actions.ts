@@ -5,6 +5,7 @@ import { requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { parseSupplier, parseSupplierProduct } from '@/lib/commerce/supplier-input';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
+import { normalizeStoreCoordinatorPhone } from '@/lib/suppliers/coordinator';
 
 export async function saveSupplier(form: FormData) {
   const rawId = String(form.get('id') || '');
@@ -53,6 +54,29 @@ export async function saveSupplierProduct(form: FormData) {
   } catch { redirect('/admin/suppliers?error=mapping'); }
   revalidatePath('/admin/suppliers');
   redirect('/admin/suppliers?saved=1');
+}
+
+/** Separate from the supplier/account phone and every Salla credential. An
+ * empty value explicitly removes the operational coordinator. */
+export async function saveStoreCoordinator(form:FormData){
+  const session=await requireAction('suppliers','edit');
+  const rawId=String(form.get('coordinatorSupplierId')||'');
+  if(!/^[1-9]\d{0,14}$/.test(rawId))redirect('/admin/suppliers?error=coordinator');
+  let phone:string;
+  try{phone=normalizeStoreCoordinatorPhone(String(form.get('storeCoordinatorPhone')||''));}
+  catch{redirect('/admin/suppliers?error=coordinator');}
+  try{
+    await assertCommerceSchemaReady(prisma);
+    await prisma.$transaction(async tx=>{
+      const id=BigInt(rawId);
+      const [supplier]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM commerce_suppliers WHERE id=${id} FOR UPDATE`;
+      if(!supplier)throw new Error('supplier_not_found');
+      await tx.$executeRaw`UPDATE commerce_suppliers SET store_coordinator_phone=${phone},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${id}`;
+      await tx.admin_log.create({data:{admin_id:BigInt(session.uid),action:phone?'تحديث منسق متجر':'حذف منسق متجر',target:rawId,note:phone?'تم حفظ رقم منسق تشغيلي منفصل':'تم حذف رقم المنسق التشغيلي'}});
+    });
+  }catch{redirect('/admin/suppliers?error=coordinator');}
+  revalidatePath('/admin/suppliers');
+  redirect('/admin/suppliers?coordinator=1');
 }
 
 const supplierId = (form: FormData) => {

@@ -4,6 +4,15 @@ on:
     branches: [codex/home-feed-release-20260919]
     paths: ['.github/workflows/integration-readiness.yml', 'scripts/release/integration-readiness.cjs']
   workflow_dispatch:
+    inputs:
+      salla_check:
+        description: Inspect the current Salla connection without writes or orders
+        type: boolean
+        default: false
+      report_public_key_b64:
+        description: Base64 PEM public key for the encrypted Salla report
+        type: string
+        required: false
 permissions:
   contents: read
 jobs:
@@ -13,6 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Read counts, category definitions and secret presence only
+        if: ${{ inputs.salla_check != true }}
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -27,3 +37,26 @@ jobs:
           test -n "$VPS_KNOWN_HOSTS"
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/integration-readiness.cjs
+      - name: Inspect Salla connection and encrypt the result
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.salla_check == true }}
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          REPORT_PUBLIC_KEY_B64: ${{ inputs.report_public_key_b64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$REPORT_PUBLIC_KEY_B64" =~ ^[A-Za-z0-9+/=]+$ ]]
+          test "${#REPORT_PUBLIC_KEY_B64}" -ge 400
+          test "${#REPORT_PUBLIC_KEY_B64}" -le 8192
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/key
+          test -n "$VPS_KNOWN_HOSTS"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          {
+            printf "process.env.SALLA_AUDIT_REPORT_PUBLIC_KEY_B64='%s';\n" "$REPORT_PUBLIC_KEY_B64"
+            cat scripts/release/salla-connection-inspect.cjs
+          } | ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose exec -T app node -'

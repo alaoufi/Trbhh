@@ -137,7 +137,7 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
           invoke(previewAction, form, 'preview', emptyState);
         }} className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div><h2 className="text-lg font-bold">بيانات المتجر</h2><p className="mt-1 text-sm leading-6 text-slate-500">نزّل النموذج المعتمد واملأ بيانات متجر واحد.</p></div>
+            <div><h2 className="text-lg font-bold">بيانات المورد والمتجر</h2><p className="mt-1 text-sm leading-6 text-slate-500">نزّل نموذج تربح المعتمد واملأ بيانات متجر واحد.</p></div>
             <a href="/admin/suppliers/onboarding/template" download className={secondary}>تنزيل نموذج Excel</a>
           </div>
           <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-5 sm:p-8">
@@ -153,6 +153,7 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
             {file && <p className="mt-3 break-all text-xs text-slate-600">{file.name} · {(file.size / 1024).toFixed(0)} كيلوبايت</p>}
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-4"><p className="max-w-xl text-xs leading-6 text-slate-500">لا تُدخل كلمة مرور سلة أو رموز التحقق أو مفاتيح الربط في الملف. يتم تفويض الاتصال عبر صفحة التكاملات.</p><button disabled={!file || pending} className={primary}>معاينة البيانات</button></div>
+          <aside className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-7 text-blue-950"><b>هل الملف تصدير منتجات من سلة؟</b> لا ترفعه هنا. احفظ بيانات المورد أولًا، ثم افتح <Link href={integrationsHref} className="font-bold underline">تكامل الموردين</Link> وأنشئ رابط التفويض لصاحب المتجر؛ بعد الموافقة تُجلب المنتجات من Salla API دون نشرها تلقائيًا.</aside>
         </form>}
 
         {preview && !saved && <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white" aria-label="معاينة بيانات المتجر">

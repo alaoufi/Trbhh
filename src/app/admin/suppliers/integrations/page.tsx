@@ -5,6 +5,7 @@ import {prisma} from '@/lib/prisma';
 import {getSetting} from '@/lib/settings';
 import {assertSupplierSchemaReady} from '@/lib/suppliers/schema';
 import {formatSar} from '@/lib/commerce/money';
+import {SupplierOwnerInviteButton} from '@/components/supplier-owner-invite-button';
 import {saveProfile,saveProduct,connectSalla,disconnectSalla,synchronize,saveTier,disableProduct,saveTrackingLabels} from './actions';
 export const dynamic='force-dynamic';
 export const metadata={title:'تكامل الموردين',robots:{index:false,follow:false}};
@@ -40,7 +41,8 @@ export default async function Integrations({searchParams}:{searchParams:Promise<
  {[['active','المورد نشط',s.active],['maintenance','وضع الصيانة',s.maintenance],['syncEnabled','مزامنة المنتجات',s.sync_enabled],['autoOrdersEnabled','إنشاء الطلبات التلقائي',s.auto_orders_enabled]].map(([name,label,value])=><label key={String(name)} className="flex items-center gap-2"><input name={String(name)} type="checkbox" value="1" defaultChecked={value===1}/>{label}</label>)}
  <button className={button}>حفظ إعدادات المورد</button></form>
  <p className="text-xs">آخر مزامنة: {s.last_sync_at?.toISOString()||'لم تتم'} · حالة الخطأ: {s.last_error||'لا يوجد'}</p>
- {s.provider==='salla'&&<form action={connectSalla}><input type="hidden" name="supplierId" value={String(s.id)}/><button className={button}>ربط متجر Salla / إعادة الربط</button></form>}
+ {s.provider==='salla'&&!connections.some(c=>c.supplier_id===s.id)&&<SupplierOwnerInviteButton supplierId={String(s.id)} supplierName={s.name}/>}
+ {s.provider==='salla'&&<details><summary className="cursor-pointer text-sm underline">ربط مباشر من جلسة المشرف</summary><form action={connectSalla} className="mt-2"><input type="hidden" name="supplierId" value={String(s.id)}/><button className={button}>متابعة الربط في Salla</button></form></details>}
  {connections.filter(c=>c.supplier_id===s.id).map(c=><div key={String(c.id)} className="flex flex-wrap items-center gap-2 rounded border p-2"><span>المتجر {c.external_store_id} · {c.status}</span><form action={synchronize}><input type="hidden" name="id" value={String(c.id)}/><button className={button}>مزامنة الآن</button></form><form action={disconnectSalla}><input type="hidden" name="id" value={String(c.id)}/><button className="rounded border px-3 py-2">فصل الاتصال</button></form></div>)}
  </article>)}</section>
  <nav className="flex flex-wrap gap-4 text-sm" aria-label="صفحات الموردين والاتصالات">{supplierPage>1&&<Link href={`?suppliers=${supplierPage-1}&page=${page}`}>الموردون السابقون</Link>}{profiles.length===25&&<Link href={`?suppliers=${supplierPage+1}&page=${page}`}>الموردون التاليون</Link>}{connectionPage>1&&<Link href={`?suppliers=${supplierPage}&connections=${connectionPage-1}&page=${page}`}>الاتصالات السابقة</Link>}{connections.length===50&&<Link href={`?suppliers=${supplierPage}&connections=${connectionPage+1}&page=${page}`}>الاتصالات التالية</Link>}</nav>

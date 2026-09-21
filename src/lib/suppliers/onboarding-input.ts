@@ -7,6 +7,7 @@ const digits=(s:string)=>s.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).r
 const label=(s:string)=>s.normalize('NFKC').trim().replace(/[أإآ]/g,'ا').replace(/[\u064b-\u065fـ]/g,'').replace(/[\s:：*]+/g,' ').trim().toLowerCase();
 const aliases=new Map<string,string>(ONBOARDING_FIELDS.flatMap(([key,name])=>[[label(key),key],[label(name),key]]));
 for(const [name,key] of [['رقم السجل التجاري','registration_number'],['البريد الإلكتروني','email'],['رقم الجوال','phone'],['رابط المتجر','store_url']])aliases.set(label(name),key);
+const productColumns=new Set(['اسم المنتج','اسم السلعة','product name','product','sku','رمز المنتج','السعر','price','الكمية','quantity','المخزون','stock','الصورة','image'].map(label));
 const secretLabel=/(password|secret|token|otp|كلمة.*مرور|رمز.*تحقق|بيانات.*دخول)/i;
 export function normalizeStoreUrl(raw:string):string {
  const u=new URL(raw.trim());
@@ -137,18 +138,19 @@ export async function parseOnboardingWorkbook(bytes:Buffer,_filename:string):Pro
  const archive=validateZip(bytes);
  const workbook=new Workbook();try {await workbook.xlsx.load(bytes as unknown as Parameters<typeof workbook.xlsx.load>[0]);}catch{throw Error('onboarding_not_excel');}
  const sheets=workbook.worksheets.filter(s=>s.actualRowCount>0);if(!sheets.length)throw Error('onboarding_sheet');
- const candidates:{raw:Record<string,unknown>;score:number}[]=[];
+ const candidates:{raw:Record<string,unknown>;score:number}[]=[];let productExport=false;
  for(const sheet of sheets){
   if(sheet.rowCount>5000||sheet.columnCount>200)continue;
   const rows:string[][]=[];sheet.eachRow(row=>{const values:string[]=[];row.eachCell({includeEmpty:true},(c,n)=>{values[n-1]=cell(c.value);});rows.push(values);});
   const raw:Record<string,unknown>={};let score=0,hasSecret=false;
+  if(rows.some(row=>row.filter(value=>productColumns.has(label(value||''))).length>=3))productExport=true;
   const put=(name:string,value:string)=>{if(secretLabel.test(name)){hasSecret=true;return;}const key=aliases.get(label(name));if(!key)return;if(Object.hasOwn(raw,key))throw Error('onboarding_duplicate_field');raw[key]=value??'';score++;};
   const header=rows.findIndex(r=>r.filter(v=>aliases.has(label(v||''))).length>=3);
   if(header>=0){const records=rows.slice(header+1).filter(r=>r.some(v=>v?.trim()));if(records.length>1)throw Error('onboarding_single_store');if(records[0])rows[header].forEach((name,i)=>put(name,records[0][i]||''));}
-  else for(const row of rows)put(row[0]||'',row[1]||'');
+  else for(const row of rows)for(let i=0;i<row.length-1;i++)if(aliases.has(label(row[i]||'')))put(row[i]||'',row[i+1]||'');
   if(score>=3){if(hasSecret)throw Error('onboarding_secret');candidates.push({raw,score});}
  }
- if(!candidates.length)throw Error('onboarding_sheet');
+ if(!candidates.length)throw Error(productExport?'onboarding_product_export':'onboarding_sheet');
  candidates.sort((a,b)=>b.score-a.score);if(candidates.length>1&&candidates[0].score===candidates[1].score)throw Error('onboarding_sheet');
  const result=validateOnboarding(candidates[0].raw);
  if(sheets.length>1)result.warnings.push('تم اعتماد ورقة بيانات المتجر وتجاوز الأوراق الإضافية مثل التعليمات.');

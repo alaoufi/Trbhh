@@ -58,33 +58,21 @@ function TrustBar({ items = DEFAULT_TRUST }: { items?: TrustItem[] }) {
 
 export type CommerceCategory = { name: string; href: string; image?: string | null };
 
-function CatIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-8 w-8 text-[#16294a]/45" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 9l9-5 9 5-9 5z" /><path d="M3 9v6l9 5 9-5V9" /><path d="M12 14v6" />
-    </svg>
-  );
-}
-
-function CatMedia({ image, name }: { image?: string | null; name: string }) {
-  if (!image) return <CatIcon />;
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={image} alt={name} loading="lazy" decoding="async" className="h-full w-full object-cover" />;
-}
-
-/** «تصفّح حسب الفئة» — بطاقات موحّدة: صف أفقي قابل للسحب على الجوال، شبكة على الحاسوب. */
+/** «تصفّح حسب الفئة» — شرائح بأسماء الفئات فقط (بلا أيقونات): صفّ قابل للسحب على
+ *  الجوال، وتوزيع منسدل على الحاسوب. */
 function CommerceCategories({ items }: { items: CommerceCategory[] }) {
   if (!items || items.length === 0) return null;
   return (
-    <section className="space-y-4">
+    <section className="space-y-3">
       <SectionHeader title="تصفّح حسب الفئة" accent="navy" />
-      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-4 sm:overflow-visible md:grid-cols-6 lg:grid-cols-7">
+      <div className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
         {items.map((c) => (
-          <Link key={c.name} href={c.href} className="group flex w-20 shrink-0 flex-col items-center gap-2 sm:w-auto">
-            <span className="grid aspect-square w-full max-w-[84px] place-items-center overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm transition group-hover:shadow-md">
-              <CatMedia image={c.image} name={c.name} />
-            </span>
-            <span className="line-clamp-1 w-full text-center text-xs font-bold text-[#16294a]">{c.name}</span>
+          <Link
+            key={c.name}
+            href={c.href}
+            className="shrink-0 whitespace-nowrap rounded-full border border-[#16294a]/15 bg-white px-4 py-2 text-sm font-bold text-[#16294a] shadow-sm transition hover:border-[#ff6a1a]/60 hover:bg-[#ff6a1a]/5 hover:text-[#ff6a1a]"
+          >
+            {c.name}
           </Link>
         ))}
       </div>

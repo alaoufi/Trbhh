@@ -3,16 +3,18 @@ set -euo pipefail
 mode=${1:-audit}
 [[ "$mode" == audit || "$mode" == cleanup ]] || exit 1
 if [[ "$mode" == cleanup ]]; then
-  # Fixed inventory reviewed on 2026-09-19; never auto-select delete targets.
+  # Fixed inventory reviewed on 2026-09-22; never auto-select delete targets.
   base=/root/trbhh-release-backups
-  keep=/root/trbhh-release-backups/audit-35465592273
+  # This is the self-contained full backup at the root of the active Salla and
+  # supplier-release chain. All newer compact checkpoints ultimately bind to it.
+  keep=/root/trbhh-release-backups/audit-35603864905
   legacy_base=/root/trbhh/backups
   for parent in "$base" "$keep" "$legacy_base"; do
     [[ -d "$parent" && ! -L "$parent" && "$(realpath "$parent")" == "$parent" ]] || exit 1
   done
   [[ -f "$keep/VERIFIED" && ! -L "$keep/VERIFIED" && ! -e "$keep/WATCHDOG_FIRED" ]] || exit 1
-  [[ "$(cat "$keep/VERIFIED")" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || exit 1
-  [[ "$(cat "$keep/DEPLOYMENT_VERIFIED")" == ab5a641580e00678f66b071a576676ea7adfb191 ]] || exit 1
+  [[ "$(cat "$keep/VERIFIED")" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 ]] || exit 1
+  [[ "$(cat "$keep/DEPLOYMENT_VERIFIED")" == 5f8dbc01c38bf431a9ae099a581b80536097b346 ]] || exit 1
   [[ -f "$keep/SHA256SUMS" && ! -L "$keep/SHA256SUMS" ]] || exit 1
   # Five self-contained archives; retained media must not depend on older dirs.
   expected=$(printf '%s\n' code.tar.gz database.sql.gz image.tar.gz legacy.tar.gz storage.tar.gz | sort)
@@ -32,7 +34,7 @@ if [[ "$mode" == cleanup ]]; then
     echo 'A backup process is still active; refusing cleanup'; exit 1
   fi
   targets=(
-    /root/trbhh-release-backups/audit-35459832130
+    /root/trbhh-release-backups/audit-35465592273
   )
   # Validate every exact target and all mounts before the first deletion.
   mounts=$(findmnt -rn -o TARGET)

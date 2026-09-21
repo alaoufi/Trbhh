@@ -12,9 +12,10 @@ describe('one-off backup cleanup safety', () => {
   });
   it('keeps the newly verified release backup and deletes only its predecessor', () => {
     const targets = script.match(/targets=\(([\s\S]*?)\n  \)/)![1].trim().split(/\s+/);
-    expect(targets).toEqual(['/root/trbhh-release-backups/audit-35459832130']);
-    expect(script).toContain('keep=/root/trbhh-release-backups/audit-35465592273');
-    expect(script).toContain('[[ "$(cat "$keep/DEPLOYMENT_VERIFIED")" == ab5a641580e00678f66b071a576676ea7adfb191 ]]');
+    expect(targets).toEqual(['/root/trbhh-release-backups/audit-35465592273']);
+    expect(script).toContain('keep=/root/trbhh-release-backups/audit-35603864905');
+    expect(script).toContain('[[ "$(cat "$keep/VERIFIED")" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 ]]');
+    expect(script).toContain('[[ "$(cat "$keep/DEPLOYMENT_VERIFIED")" == 5f8dbc01c38bf431a9ae099a581b80536097b346 ]]');
     expect(targets.every(p => /^\/root\/trbhh-release-backups\/audit-\d+$/.test(p) || /^\/root\/trbhh\/backups\/تربح-\d{8}-\d{4}\.zip$/.test(p))).toBe(true);
   });
   it('validates retained archives and resolves paths and mounts before deletion', () => {

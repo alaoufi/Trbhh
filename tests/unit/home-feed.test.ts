@@ -18,7 +18,7 @@ describe('continuous home feed', () => {
   it('wires a bounded selected-only grid and suppresses unrelated recommendations', () => {
     const page=readFileSync('src/app/page.tsx','utf8');
     expect(page).toContain('searchAds({ categoryId: selectedCategory.id, take: 24, skip: 0 })');
-    expect(page).toContain('<AdGrid ads={feedAds} />');
+    expect(page).toMatch(/<AdGrid\s+ads=\{feedAds\}(?:\s+appearance="marketplace")?\s*\/>/);
     expect(page).toContain('!selectedCategory && personalizedAds.length');
     expect(page).toContain('category=${selectedCategory.id}');
   });

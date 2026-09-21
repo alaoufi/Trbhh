@@ -88,4 +88,4 @@ if(require.main===module){
     const result=mode==='prepare'&&first&&second?prepare(first,second):mode==='verify'&&first&&!second?verify(first):null;check(result);process.stdout.write(JSON.stringify(result)+'\n');
   }catch{process.stderr.write('Verified supplier-selection media chain failed; retain full parent and both checkpoints. Private values withheld.\n');process.exitCode=1;}
 }
-module.exports={prepare,verify,inspectCheckpoint,CHECKPOINT_ID,CHECKPOINT_BASELINE,CURRENT_COMMIT};
+module.exports={prepare,verify,inspectCheckpoint,CHECKPOINT_ID,CHECKPOINT_BASELINE,CURRENT_COMMIT,container,sameRuntime};

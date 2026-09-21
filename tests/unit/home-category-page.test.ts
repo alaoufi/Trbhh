@@ -20,6 +20,7 @@ vi.mock('@/components/platform-rating-widget',()=>({PlatformRatingWidget:()=>nul
 import HomePage from '@/app/page';
 import {AdGrid} from '@/components/ad-card';
 import {PublicSearchForm} from '@/components/public-search-form';
+import {CommerceHero} from '@/components/commerce/commerce-hero';
 function elements(value:unknown):ReactElement<Record<string,unknown>>[]{
  if(Array.isArray(value))return value.flatMap(elements);
  if(!isValidElement<Record<string,unknown>>(value))return [];
@@ -58,5 +59,17 @@ it('retains only the validated category in the homepage search form',async()=>{
   expect(selected.find(e=>e.type===PublicSearchForm)?.props.params).toEqual({category:'90'});
   const invalid=elements(await HomePage({searchParams:Promise.resolve({category:'91'})}));
   expect(invalid.find(e=>e.type===PublicSearchForm)?.props.params).toEqual({category:undefined});
+ } finally {flag.mockRestore();}
+});
+it('renders the approved presentation at the public root while retaining the same feed',async()=>{
+ const settings=await import('@/lib/settings');
+ const flag=vi.spyOn(settings,'getSettingBool').mockImplementation(async key=>key==='home_discovery_on');
+ try {
+  const tree=elements(await HomePage({searchParams:Promise.resolve({})}));
+  expect(tree.some(e=>e.props['data-home-version']==='marketplace-v2')).toBe(true);
+  const hero=tree.find(e=>e.type===CommerceHero);
+  expect(hero?.props.headingLevel).toBe(1);
+  expect(hero?.props.slides).toEqual(expect.arrayContaining([expect.objectContaining({title:'بيع. اشترِ. وتربح.',href:'/search'})]));
+  expect(tree.find(e=>e.type===AdGrid)?.props).toMatchObject({appearance:'marketplace',ads:[{id:2},{id:3},{id:30}]});
  } finally {flag.mockRestore();}
 });

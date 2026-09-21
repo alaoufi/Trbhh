@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createElement } from 'react';
+import { createElement, Children, isValidElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CATEGORY_LABELS } from '@/lib/ad-categories/contracts';
 const state = vi.hoisted(() => ({ config: vi.fn(), search: vi.fn(), setting: vi.fn() }));
@@ -67,8 +67,17 @@ describe('homepage category discovery', () => {
     const selected = await HomeCategoryNavigation({ selectedCategory: '12' });
     const cleared = await HomeCategoryNavigation({});
     const invalid = await HomeCategoryNavigation({ selectedCategory: '999' });
-    expect(selected!.props.children.key).toBe('12');
-    expect(cleared!.props.children.key).toBe('');
-    expect(invalid!.props.children.key).toBe(cleared!.props.children.key);
+    const formKey = (value: typeof selected) => Children.toArray(value!.props.children).find(child => isValidElement(child) && child.type === 'form');
+    const selectedForm = formKey(selected), clearedForm = formKey(cleared), invalidForm = formKey(invalid);
+    expect(isValidElement(selectedForm) && selectedForm.key).toContain('12');
+    expect(isValidElement(clearedForm) && clearedForm.key).not.toContain('12');
+    expect(isValidElement(invalidForm) && invalidForm.key).toBe(isValidElement(clearedForm) && clearedForm.key);
+  });
+  it('keeps visual category links on the public home and excludes inactive categories', async () => {
+    const html = renderToStaticMarkup(await HomeCategoryNavigation({ selectedCategory: '12', visual: true }));
+    expect(html).toContain('href="/?category=12"');
+    expect(html).toContain('aria-current="page"');
+    expect(html).not.toContain('قسم مخفي');
+    expect(html).not.toContain('/shop');
   });
 });

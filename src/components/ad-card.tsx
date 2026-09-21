@@ -5,6 +5,7 @@ import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown, Store } from 'lucide
 import type { AdCard as AdCardType } from '@/lib/data';
 import { adPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
 import { timeAgo, cn } from '@/lib/utils';
+import { homeGridClass, pickHomeLayout } from '@/lib/commerce/home-layout';
 
 function timeShort(iso: string | null) {
   const s = timeAgo(iso); // e.g. "قبل 3 يوم"
@@ -243,7 +244,35 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
   );
 }
 
-export async function AdGrid({ ads, className }: { ads: AdCardType[]; className?: string }) {
+/** Existing marketplace semantics with the approved public-home visual treatment. */
+export function AdCardMarketplace({ ad }: { ad: AdCardType }) {
+  return <Link href={`/ads/${ad.id}`} className="marketplace-card group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+    <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+      <Image src={ad.image} alt={compactAdTitle(ad.title)} fill sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className="object-cover transition duration-300 group-hover:scale-105" />
+      <div className="absolute inset-x-2 top-2 flex flex-wrap gap-1">
+        <span className="rounded-full bg-[#16294a]/95 px-2.5 py-1 text-[10px] font-bold text-white">{ad.adsType === 'request' ? 'مطلوب' : 'معروض'}</span>
+        {(ad.special || ad.tier) && <span className="rounded-full bg-[#f0b429] px-2.5 py-1 text-[10px] font-extrabold text-[#16294a]">{ad.tier === 'gold' ? 'إعلان ذهبي مميز' : ad.tier === 'silver' ? 'إعلان فضي مميز' : 'إعلان مميز'}</span>}
+        {ad.urgent && <span className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-bold text-white">عاجل</span>}
+      </div>
+    </div>
+    <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
+      <div className="flex flex-wrap items-baseline gap-1.5"><strong className="text-base font-extrabold text-[#16294a] sm:text-xl">{adPriceLabel(ad)}</strong><OldPrice ad={ad} /><DiscountChip ad={ad} /></div>
+      <h3 className="line-clamp-2 min-h-10 break-words text-sm font-bold leading-5 text-slate-800">{compactAdTitle(ad.title)}</h3>
+      {ad.storeName && <StoreTag name={ad.storeName} />}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+        {ad.cityName && <span className="inline-flex min-w-0 items-center gap-1"><MapPin className="h-3 w-3 shrink-0" />{ad.cityName}</span>}
+        <span>{timeShort(ad.createdAt)}</span>
+      </div>
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[10px] text-slate-500">
+        <span className="inline-flex min-w-0 items-center gap-1">{ad.sellerTrusted && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-label="بائع موثق" />}<span className="truncate">{ad.sellerName || 'المعلن'}</span></span>
+        {(ad.ratingCount ?? 0) > 0 && <span className="inline-flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400 text-amber-500" />{ad.ratingAvg} ({ad.ratingCount})</span>}
+        <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" />{ad.views}</span>
+      </div>
+    </div>
+  </Link>;
+}
+
+export async function AdGrid({ ads, className, appearance }: { ads: AdCardType[]; className?: string; appearance?: 'marketplace' }) {
   if (!ads.length) {
     const { getEmptyText } = await import('@/lib/settings');
     const msg = await getEmptyText('ads').catch(() => 'لا توجد إعلانات لعرضها حالياً.');
@@ -263,6 +292,9 @@ export async function AdGrid({ ads, className }: { ads: AdCardType[]; className?
         {ads.map((ad) => <AdCardList key={ad.id} ad={ad} />)}
       </div>
     );
+  }
+  if (appearance === 'marketplace') {
+    return <div className={cn(homeGridClass(pickHomeLayout(ads.length)), 'gap-3 sm:gap-5', className)}>{ads.map(ad => <AdCardMarketplace key={ad.id} ad={ad} />)}</div>;
   }
   return (
     <div className={cn('grid gap-3 lg:grid-cols-2', className)}>

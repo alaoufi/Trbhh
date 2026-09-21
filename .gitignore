@@ -44,3 +44,7 @@ next-env.d.ts
 !/storage/uploads/.gitkeep
 scratchpad/
 .worktrees/
+
+# Generated local component preview (rebuilt by tests/visual/public-home-preview.cjs)
+/docs/screenshots/public-home/fixture*
+/docs/screenshots/public-home/index.html

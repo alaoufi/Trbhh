@@ -33,6 +33,8 @@ import { FeedTextBanner } from '@/components/feed-text-banner';
 import { getFeedBannerItems } from '@/lib/settings';
 import { PlatformRatingWidget } from '@/components/platform-rating-widget';
 import { getPlatformRating, getMyPlatformReview } from '@/lib/platform-rating';
+import { CommerceHero } from '@/components/commerce/commerce-hero';
+import { publicHomeHero } from '@/lib/public-home';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,7 +116,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   ]);
 
   return (
-    <div className="space-y-4">
+    <div className="commerce-scope public-marketplace-home space-y-7 sm:space-y-10" data-home-version="marketplace-v2">
       {/* ✅ تأكيد نشر الإعلان — يظهر بعد النشر الناجح والتحويل للرئيسية */}
       {sp.published && (
         <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-center text-sm font-extrabold text-emerald-800 shadow-sm">
@@ -124,28 +126,27 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
       )}
 
       {discoveryOn && (
-        <section aria-labelledby="discovery-title" className="overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-[#16294a] px-4 py-4 text-white sm:px-6">
-            <div className="min-w-0 flex-1">
-              <h1 id="discovery-title" className="text-xl font-extrabold leading-relaxed sm:text-2xl">{discoveryTitle}</h1>
-              <p className="mt-1 text-sm leading-6 text-slate-100">{discoverySubtitle}</p>
+        <section className="space-y-4" aria-label="اكتشف سوق تربح">
+          <CommerceHero headingLevel={1} label="اكتشف تربح" slides={publicHomeHero(feedAds, discoveryTitle === 'تربح — إعلانات ومتاجر قريبة منك' ? 'بيع. اشترِ. وتربح.' : discoveryTitle, discoverySubtitle === 'ابحث عن عرضك القادم أو أضف إعلانك وتواصل مباشرة مع المعلن.' ? 'اعرض اللي عندك، واكتشف اللي تحتاجه، وتواصل مباشرة.' : discoverySubtitle, feedSearchHref)} />
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-extrabold text-[#16294a]">وش تبحث عنه اليوم؟</h2>
+              <Link href="/ads/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>
             </div>
-            <Link href="/ads/new" className="flex h-11 shrink-0 items-center gap-2 rounded-xl bg-[#f0b429] px-4 text-sm font-extrabold text-[#16294a] hover:bg-[#f8c955]">
-              <Megaphone className="h-4 w-4" /> {discoveryAddLabel}
-            </Link>
+            <PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.id.toString() }} priceOn={priceOn} placeholder={discoveryPlaceholder} compact />
           </div>
-          <div className="p-4 sm:px-6"><PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.id.toString() }} priceOn={priceOn} placeholder={discoveryPlaceholder} compact /></div>
         </section>
       )}
-      <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} />
+      <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} visual />
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 
-      <div>
+      <section aria-label={selectedCategory?.name || 'السوق'} className="space-y-4">
+        {feedAds.length > 0 && <div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-xl font-extrabold text-[#16294a]"><span className="h-6 w-1.5 rounded-full bg-[#ff6a1a]" />{selectedCategory?.name || 'اكتشف السوق'}</h2><Link href={feedSearchHref} className="py-2 text-sm font-bold text-[#16294a]">عرض الكل ←</Link></div>}
         <div className="space-y-4">
           {selectedCategory && !feedAds.length
             ? <p className="text-sm text-muted-foreground">{categoryConfig?.labels.emptyText}</p>
-            : <AdGrid ads={feedAds} />}
+            : <AdGrid ads={feedAds} appearance="marketplace" />}
           <PromoSlot placement="feed" />
           {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
           {/* تُعرض أحدث دفعة بسرعة؛ البحث يبقى السجل الكامل دون تحميله مسبقاً في الرئيسية. */}
@@ -153,7 +154,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
             عرض جميع الإعلانات في البحث ←
           </Link>
         </div>
-      </div>
+      </section>
 
       {/* سجّل واحصل على رصيد ترحيبي — للزوار فقط وقابل للإغلاق */}
       {!session && welcomeCredit > 0 && <WelcomeBanner amount={welcomeCredit} />}
@@ -168,7 +169,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
           تظهر أول محتوى في الصفحة لمن له تصفّح سابق. */}
       {!selectedCategory && personalizedAds.length > 0 && (
         <CollapsibleSection title="🎯 يهمّك الآن" defaultOpen={false}>
-          <AdGrid ads={personalizedAds} />
+          <AdGrid ads={personalizedAds} appearance="marketplace" />
         </CollapsibleSection>
       )}
 
@@ -228,15 +229,19 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
 
       {/* إعلان المتاجر — يظهر تلقائياً لكل متجر معتمد (بطاقة المتجر) */}
       {storeCards.length > 0 && (
-        <div>
+        <section aria-label="متاجر تربح" className="space-y-4">
+          <div className="flex items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-xl font-extrabold text-[#16294a]"><span className="h-6 w-1.5 rounded-full bg-[#ff6a1a]" />متاجر تربح</h2><Link href="/companies" className="py-2 text-sm font-bold text-[#16294a]">كل المتاجر ←</Link></div>
           {/* شبكة مضغوطة بارتفاع قليل — عمودان على الجوال وحتى أربعة على الشاشات الكبيرة */}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {storeCards.map((c) => <StoreMiniCard key={c.id} s={c} href={`/companies/${c.id}`} compact />)}
           </div>
-        </div>
+        </section>
       )}
-
-
+      <section aria-label="تواصل بثقة" className="grid gap-4 rounded-3xl bg-[#16294a] p-6 text-white sm:grid-cols-3 sm:p-8">
+        <div><h2 className="font-extrabold text-[#f0b429]">بين البائع والمشتري مباشرة</h2><p className="mt-2 text-sm leading-6 text-white/80">تواصل مع المعلن واتفق معه على تفاصيل السلعة.</p></div>
+        <div><h3 className="font-extrabold text-[#f0b429]">بدون عمولة على البيع</h3><p className="mt-2 text-sm leading-6 text-white/80">تربح يتيح لك عرض إعلانك والوصول إلى المهتمين.</p></div>
+        <div><h3 className="font-extrabold text-[#f0b429]">تحقق قبل الدفع</h3><p className="mt-2 text-sm leading-6 text-white/80">افحص السلعة، وتأكد من الطرف الآخر، ولا تشارك رمز التحقق.</p></div>
+      </section>
     </div>
   );
 }

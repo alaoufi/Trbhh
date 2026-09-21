@@ -5,7 +5,7 @@ const before = JSON.parse(fs.readFileSync(beforePath, 'utf8'))[0];
 const after = JSON.parse(fs.readFileSync(afterPath, 'utf8'))[0];
 const env = (c) => Object.fromEntries(c.Config.Env.map((v) => { const at = v.indexOf('='); return [v.slice(0, at), v.slice(at + 1)]; }));
 const first = env(before); const last = env(after);
-if(['merchant_oauth','merchant_headers','supplier_selection'].includes(process.argv[4])){
+if(['merchant_oauth','merchant_headers','supplier_selection','public_home'].includes(process.argv[4])){
   const keys=['SALLA_CLIENT_ID','SALLA_CLIENT_SECRET','SALLA_WEBHOOK_SECRET','SUPPLIER_TOKEN_ENCRYPTION_KEY','SUPPLIER_RECONCILE_SECRET','SUPPLIER_PUBLIC_ORIGIN','SUPPLIER_ALLOW_LIVE_ORDERS'];
   if(keys.some(key=>!first[key]||first[key]!==last[key])||first.SUPPLIER_PUBLIC_ORIGIN!=='https://trbhh.sa'||first.SUPPLIER_ALLOW_LIVE_ORDERS!=='false'){
     console.error('Merchant OAuth runtime preservation or disabled-order gate failed; values withheld.');process.exit(1);

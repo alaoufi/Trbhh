@@ -18,8 +18,10 @@ export function SealReposition() {
     // كل عناصر الختم المحتملة أينما حقنها المزوّد (بالفئة/المعرّف أو نطاق المزوّد).
     const sealEls = (): HTMLElement[] => {
       const set = new Set<HTMLElement>();
+      // العنصر الفعلي الذي يحقنه المزوّد ويجعله fixed هو iframe.sbc-seal-frame
+      // (z-index هائل)، لذا نستهدفه صراحةً أينما كان في المستند.
       document.querySelectorAll<HTMLElement>(
-        '[data-verify-seal-slot] .sbc-verify-seal, [data-verify-seal-slot] .sbc-verify-seal *, [class*="sbc-verify"], [id*="sbc"], iframe[src*="saudibusiness"], iframe[src*="eauthenticate"], a[href*="saudibusiness"], img[src*="saudibusiness"]',
+        '.sbc-seal-frame, .sbc-verify-seal .sbc-seal-frame, [class*="sbc-seal"], [class*="sbc-verify"], iframe[src*="saudibusiness"], iframe[src*="eauthenticate"]',
       ).forEach((el) => set.add(el));
       return [...set];
     };

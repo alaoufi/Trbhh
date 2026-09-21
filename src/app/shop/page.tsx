@@ -13,18 +13,35 @@ export const dynamic = 'force-dynamic';
 // نفس منطق backend المعتمد (الإعداد/المخطط/الاستعلام/بوّابة الدفع) لم يتغيّر — التغيير في العرض فقط.
 type Row = { id: bigint; title: string; price_minor: number; stock_available: number; images: unknown; description: string | null; featured: number | null };
 
-/** معاينة إدارية فقط: هل المتصفِّح مشرفٌ له صلاحية عرض التجارة؟ (فحص منطقي لا يوقف الزائر). */
-async function isCommercePreviewer(): Promise<boolean> {
-  const session = await getSession();
-  if (!session) return false;
-  return hasAction(session.uid, 'commerce', 'view').catch(() => false);
+/**
+ * حالة المعاينة الإدارية عند طلب ?preview=1 (فحص منطقي لا يوقف الزائر):
+ *   off        — لم يُطلب preview.
+ *   no-session — طُلب preview لكن لا توجد جلسة دخول.
+ *   no-perm    — مسجّل دخول لكن بلا صلاحية commerce:view.
+ *   ok         — مشرف مخوّل → تُعرض المعاينة.
+ */
+async function commercePreviewState(wants: boolean): Promise<'off' | 'no-session' | 'no-perm' | 'ok'> {
+  if (!wants) return 'off';
+  const session = await getSession().catch(() => null);
+  if (!session) return 'no-session';
+  const ok = await hasAction(session.uid, 'commerce', 'view').catch(() => false);
+  return ok ? 'ok' : 'no-perm';
 }
 
 export default async function ApprovedShop({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [config, sp] = await Promise.all([getCommerceConfig(), searchParams]);
   // وضع المعاينة: المشرف يرى الكتالوج الحيّ عبر ?preview=1 حتى لو كان المتجر مغلقاً للعامة.
-  const preview = sp?.preview === '1' && (await isCommercePreviewer());
-  if (!config.enabled && !preview) return <div className="card-3d rounded-xl p-6">{config.text.unavailable}</div>;
+  const previewState = await commercePreviewState(sp?.preview === '1');
+  const preview = previewState === 'ok';
+  if (!config.enabled && !preview) {
+    // رسالة تشخيصية واضحة بدل شاشة «غير متاح» العامة عند محاولة معاينة إدارية.
+    const msg = previewState === 'no-session'
+      ? 'معاينة إدارية: لم يتم التعرّف على جلسة دخول. سجّل الدخول بحسابك الإداري على trbhh.sa (في نفس المتصفّح)، ثم أعد فتح /shop?preview=1 من هذا الجهاز.'
+      : previewState === 'no-perm'
+        ? 'معاينة إدارية: حسابك مسجّل الدخول لكنه لا يملك صلاحية «عرض التجارة» (commerce:view). ادخل بحساب المدير العام، أو امنح حسابك هذه الصلاحية من لوحة الإدارة، ثم أعد المحاولة.'
+        : config.text.unavailable;
+    return <div className="card-3d rounded-xl p-6 text-sm font-bold leading-7 text-[#16294a]">{msg}</div>;
+  }
   await assertCommerceSchemaReady(prisma);
   const [products, gateway] = await Promise.all([
     prisma.$queryRaw<Row[]>`SELECT cp.id,cp.title,cp.price_minor,cp.stock_available,sp.images,sp.description,sp.featured FROM commerce_products cp LEFT JOIN supplier_products sp ON sp.commerce_product_id=cp.id LEFT JOIN supplier_connections sc ON sc.id=sp.connection_id LEFT JOIN supplier_integration_profiles sip ON sip.supplier_id=sp.supplier_id LEFT JOIN commerce_suppliers s ON s.id=sp.supplier_id WHERE cp.approved=1 AND cp.visible=1 AND cp.enabled=1 AND cp.currency='SAR' AND (sp.id IS NULL OR (sp.active=1 AND sp.visible=1 AND s.active=1 AND sip.maintenance=0 AND sc.status='connected')) ORDER BY COALESCE(sp.featured,0) DESC,cp.id DESC LIMIT 100`,

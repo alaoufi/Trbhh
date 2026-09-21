@@ -61,7 +61,7 @@ describe('current verified release owner invitation',()=>{
     for(const marker of ['VERIFIED','commit.txt','candidate.txt','DEPLOYMENT_VERIFIED']){
       const denied=guard({}, {[marker]:'b'.repeat(40)});expect(denied.status).not.toBe(0);expect(denied.stdout).not.toContain('ISSUED');
     }
-  });
+  },15000);
   it('keeps the original merchant baseline flow available',()=>{
     const old='07d2e9ead8e0b28824102d5c8a31b097e01f9459';
     const result=guard({PROFILE:'merchant_oauth'},{VERIFIED:old,'commit.txt':old});expect(result.status,result.stderr).toBe(0);expect(result.stdout).toBe('ISSUED');

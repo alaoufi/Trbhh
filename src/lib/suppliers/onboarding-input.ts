@@ -1,4 +1,5 @@
 import 'server-only';
+import {isIP} from 'node:net';
 import {Workbook,type CellValue} from 'exceljs';
 import {ONBOARDING_FIELDS,type OnboardingValues,type OnboardingValidation,type OnboardingReport} from './onboarding-fields';
 import {MAX_ONBOARDING_BYTES} from './onboarding-limits';
@@ -6,7 +7,18 @@ export {MAX_ONBOARDING_BYTES} from './onboarding-limits';
 const digits=(s:string)=>s.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776));
 const label=(s:string)=>s.normalize('NFKC').trim().replace(/[أإآ]/g,'ا').replace(/[\u064b-\u065fـ]/g,'').replace(/[\s:：*]+/g,' ').trim().toLowerCase();
 const aliases=new Map<string,string>(ONBOARDING_FIELDS.flatMap(([key,name])=>[[label(key),key],[label(name),key]]));
-for(const [name,key] of [['رقم السجل التجاري','registration_number'],['البريد الإلكتروني','email'],['رقم الجوال','phone'],['رابط المتجر','store_url']])aliases.set(label(name),key);
+for(const [name,key] of [
+ ['رقم السجل التجاري','registration_number'],['البريد الإلكتروني','email'],['رقم الجوال','phone'],['رابط المتجر','store_url'],
+ ['اسم المنشأة حسب السجل التجاري','establishment_name'],['اسم متجر سلة الرسمي','store_name'],['تاريخ انتهاء السجل التجاري','registration_expiry'],
+ ['العنوان الوطني / عنوان المنشأة','address'],['اسم صاحب المتجر أو المفوض بالكامل','contact_name'],['صفته','contact_role'],
+ ['رقم الهوية أو الإقامة للمفوض','identity_number'],['البريد الإلكتروني الرسمي','email'],['مدة تجهيز الطلب قبل الشحن','preparation_time'],
+ ['متوسط مدة التوصيل داخل السعودية','delivery_time'],['شركات الشحن المستخدمة','shipping_companies'],['هل يتم الشحن لجميع مناطق السعودية؟','coverage'],
+ ['المناطق غير المشمولة بالشحن','excluded_regions'],['هل مخزون سلة هو المخزون الفعلي المتاح للبيع؟','stock_actual'],
+ ['هل يتم تحديث المخزون في سلة بشكل منتظم؟','stock_updated'],['مدة السماح بالاسترجاع','returns_period'],
+ ['معالجة المنتج التالف أو غير المطابق','damage_policy'],['من يتحمل شحن المرتجع عند وجود عيب؟','return_shipping'],
+ ['دورية التسوية المالية','settlement_terms'],['رقم الآيبان IBAN','iban'],['اسم صاحب الحساب البنكي','account_holder'],
+ ['اسم المفوض بالموافقة على الربط','authorized_name'],['هل تقر بصحة جميع البيانات؟','agreements'],
+])aliases.set(label(name),key);
 const productColumns=new Set(['اسم المنتج','اسم السلعة','product name','product','sku','رمز المنتج','السعر','price','الكمية','quantity','المخزون','stock','الصورة','image'].map(label));
 const secretLabel=/(password|secret|token|otp|كلمة.*مرور|رمز.*تحقق|بيانات.*دخول)/i;
 export function normalizeStoreUrl(raw:string):string {
@@ -14,7 +26,9 @@ export function normalizeStoreUrl(raw:string):string {
  if(u.protocol!=='https:'||u.username||u.password||u.port||u.search||u.hash)throw Error('onboarding_store_url');
  const host=u.hostname.toLowerCase(),path=u.pathname.replace(/\/+$/,'');
  if(host==='salla.sa') {if(!/^\/[a-zA-Z0-9_-]{2,100}$/.test(path))throw Error('onboarding_store_url');return `https://${host}${path.toLowerCase()}`;}
- if(!/^[a-z0-9][a-z0-9-]{0,62}\.salla\.sa$/.test(host)||path)throw Error('onboarding_store_url');
+ if(path)throw Error('onboarding_store_url');
+ const parts=host.split('.');
+ if(host.length>253||isIP(host)!==0||parts.length<2||parts.some(part=>!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(part))||!/(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})$/.test(parts.at(-1)!))throw Error('onboarding_store_url');
  return `https://${host}`;
 }
 function validIban(value:string) {if(!/^SA\d{22}$/.test(value))return false;const n=value.slice(4)+'2810'+value.slice(2,4);let r=0;for(const c of n)r=(r*10+Number(c))%97;return r===1;}
@@ -57,7 +71,7 @@ const clip=(s:string)=>s.length>60?s.slice(0,57)+'…':s;
  * غير القابلة للتصحيح تُتجاوز مع ملاحظة (بلا رفض)، ولا يُرفض الصف إلا إذا نقص حقلٌ
  * أساسيّ فعلاً أو تعذّر تصحيح حقلٍ أساسيّ. يعيد تقريراً بأربع فئات.
  */
-export function validateOnboarding(raw:Record<string,unknown>):OnboardingValidation {
+export function validateOnboarding(raw:Record<string,unknown>,options:{preserveMissingRequired?:boolean}={}):OnboardingValidation {
  const values:OnboardingValues={};
  const report:OnboardingReport={imported:[],corrected:[],skipped:[],needsReview:[]};
  const known=new Set(ONBOARDING_FIELDS.map(([k])=>String(k)));
@@ -73,7 +87,8 @@ export function validateOnboarding(raw:Record<string,unknown>):OnboardingValidat
   // فارغ → للمطلوب: نقص أساسي؛ للاختياري الفارغ: يُترك دون قيمة (يُحفظ الأصل عند
   // التحديث، ويُخزَّن فارغاً للمورد الجديد). «لا يوجد» = مسح صريح للاختياري.
   if(value===''||value==='لا يوجد'){
-   if(required)report.needsReview.push(`${name}: مطلوب.`);
+   if(required&&!options.preserveMissingRequired)report.needsReview.push(`${name}: مطلوب.`);
+   else if(required&&['registration_number','store_url'].includes(key))report.needsReview.push(`${name}: مطلوب.`);
    else if(value==='لا يوجد')values[key]=null;
    continue;
   }
@@ -100,7 +115,7 @@ export function validateOnboarding(raw:Record<string,unknown>):OnboardingValidat
  return {values,errors:[...new Set(report.needsReview)],warnings,report};
 }
 export function mergeOnboarding(old:OnboardingValues,incoming:OnboardingValues):OnboardingValues {
- return {...old,...Object.fromEntries(Object.entries(incoming).filter(([,v])=>v!==''))};
+ return {...old,...Object.fromEntries(Object.entries(incoming).filter(([,v])=>v!==''&&v!==undefined))};
 }
 /** Bound ZIP expansion before ExcelJS decompresses. Active content is detected but never executed. */
 function validateZip(buffer:Buffer):{macros:boolean;externalLinks:boolean}{
@@ -152,7 +167,7 @@ export async function parseOnboardingWorkbook(bytes:Buffer,_filename:string):Pro
  }
  if(!candidates.length)throw Error(productExport?'onboarding_product_export':'onboarding_sheet');
  candidates.sort((a,b)=>b.score-a.score);if(candidates.length>1&&candidates[0].score===candidates[1].score)throw Error('onboarding_sheet');
- const result=validateOnboarding(candidates[0].raw);
+ const result=validateOnboarding(candidates[0].raw,{preserveMissingRequired:true});
  if(sheets.length>1)result.warnings.push('تم اعتماد ورقة بيانات المتجر وتجاوز الأوراق الإضافية مثل التعليمات.');
  if(archive.macros)result.warnings.push('تمت قراءة قيم الخلايا فقط وتجاهل وحدات الماكرو دون تشغيلها أو حفظها.');
  if(archive.externalLinks)result.warnings.push('تم تجاهل الروابط الخارجية في ملف Excel وقراءة القيم المحلية فقط.');

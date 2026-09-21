@@ -43,7 +43,7 @@ export async function inspectOnboarding(db:Reader,values:OnboardingValues,secret
  const merged=mergeOnboarding(old,values);
  const changes=ONBOARDING_FIELDS.map(([field,label])=>({key:field,label,before:maskedOnboardingValue(field,old[field]),after:maskedOnboardingValue(field,merged[field]),kind:merged[field]===old[field]||(!merged[field]&&!old[field])?'unchanged' as const:old[field]?'changed' as const:'new' as const}));
  const changedKeys=changes.filter(c=>c.kind!=='unchanged').map(c=>c.key);
- const ordered=(value:OnboardingValues)=>Object.entries(value).filter(([,v])=>v!=='').sort(([a],[b])=>a.localeCompare(b));
+ const ordered=(value:OnboardingValues)=>Object.entries(value).filter(([,v])=>v!==''&&v!==undefined).sort(([a],[b])=>a.localeCompare(b));
  const fingerprint=createHash('sha256').update(JSON.stringify({id:existing?.id.toString()??null,revision:identity?.revision??0,old:ordered(old),values:ordered(values),connections:connections.map(c=>[c.id.toString(),c.status,c.version])})).digest('hex');
  return {existing,identity,connections,old,merged,changes,changedKeys,warnings,fingerprint,connected:connections.some(c=>c.status==='connected')};
 }
@@ -56,15 +56,16 @@ export function verifyPreviewToken(token:string,adminId:bigint,fileHash:string,s
 export const onboardingFileHash=(bytes:Buffer)=>createHash('sha256').update(bytes).digest('hex');
 export function safeOnboardingFilename(name:string){return name.split(/[\\/]/).pop()!.replace(/[^\p{L}\p{N}_. -]/gu,'_').slice(0,120);}
 export async function saveOnboarding(db:CommerceDb,input:{values:OnboardingValues;fingerprint:string;filename:string;adminId:bigint;secret:string;canCreate:boolean;canEdit:boolean}){
- const validated=validateOnboarding(input.values);if(validated.errors.length)throw Error('onboarding_validation');
+ const validated=validateOnboarding(input.values,{preserveMissingRequired:true});if(validated.errors.length)throw Error('onboarding_validation');
  return db.$transaction(async tx=>{
   // Serialize registration imports, including previously unknown registration numbers.
   await tx.$executeRaw`INSERT IGNORE INTO site_settings(k,v) VALUES('supplier_onboarding_mutex','1')`;
   await tx.$queryRaw`SELECT k FROM site_settings WHERE k='supplier_onboarding_mutex' FOR UPDATE`;
   const state=await inspectOnboarding(tx,validated.values,input.secret);
+  const complete=validateOnboarding(state.merged);if(complete.errors.length)throw Error('onboarding_validation');
   if(state.fingerprint!==input.fingerprint)throw Error('onboarding_preview_stale');
   if(state.existing?!input.canEdit:!input.canCreate)throw Error('onboarding_forbidden');
-  const v=state.merged;let id=state.existing?.id;
+  const v=complete.values;let id=state.existing?.id;
   if(id){
    // Do not change active state, API controls or connection state from a spreadsheet.
    await tx.$executeRaw`UPDATE commerce_suppliers SET name=${v.store_name||''},contact_name=${v.contact_name||''},phone=${v.phone||''},email=${v.email||''},address=${v.address||''},registration_number=${v.registration_number||''},tax_number=${v.tax_number||''},settlement_terms=${v.settlement_terms||''},notes=${v.notes||''},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${id}`;

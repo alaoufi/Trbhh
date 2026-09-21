@@ -11,4 +11,5 @@ describe('supplier onboarding authorization handoff',()=>{
   expect(html).toContain('invite=signed-token');
   expect(html).toContain('نسخ الرابط');
  });
+ it('explains that an already connected store does not need another authorization link',()=>{const noop=async()=>({errors:[],warnings:[]});const html=renderToStaticMarkup(createElement(SupplierOnboarding,{previewAction:noop,saveAction:noop,initialState:{errors:[],warnings:[],saved:{supplierId:'1',storeName:'شعبيات الأولين',connected:true,status:'ready'}}}));expect(html).toContain('متصل بالفعل');expect(html).toContain('لا يحتاج رابط تفويض جديد');});
 });

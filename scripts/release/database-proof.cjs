@@ -426,6 +426,7 @@ function verifyKnownMigration(before, after, migration) {
   const runtimeKeyHash = fingerprint(['sub_remind_lastrun']);
   const oldTable = before.tables.site_settings, nextTable = after.tables.site_settings;
   assert(result.sameDatabase && result.addedTables.length === 0, 'Known migration changed database identity or tables.');
+  if (result.ok) return {...result, migration:'none'};
   assert(result.failures.length === 1 && result.failures[0].table === 'site_settings' && result.failures[0].kind === 'protected_rows_changed' && result.failures[0].count === 1, 'Known migration has unrelated protected changes.');
   assert(oldTable && nextTable && JSON.stringify(oldTable.primaryKeyColumns) === JSON.stringify(['k']) && JSON.stringify(oldTable.protectedColumns) === JSON.stringify(['k','v']) && JSON.stringify(oldTable.primaryKeyColumns) === JSON.stringify(nextTable.primaryKeyColumns) && JSON.stringify(oldTable.protectedColumns) === JSON.stringify(nextTable.protectedColumns), 'Known migration setting proof is unavailable.');
   const beforeLegacy = oldTable.rowFingerprints[keyHash] === fingerprint([['k',key],['v',oldValue]]);

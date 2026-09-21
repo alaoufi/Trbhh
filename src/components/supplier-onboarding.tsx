@@ -180,6 +180,7 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
             <p className="mt-2 text-sm leading-7">{ready ? 'يمكنك متابعة المنتجات من صفحة التكاملات والكتالوج.' : !saved.connected ? 'أكمل تفويض الاتصال بمتجر سلة، ثم تحقق من الجاهزية.' : 'حالة الاتصال وحدها لا تعني الجاهزية؛ يلزم نجاح الفحص الفعلي.'}</p>
             {saved.sampleCount !== undefined && <p className="mt-2 text-sm">عدد المنتجات في عينة الفحص: {saved.sampleCount}</p>}
           </div>
+          {saved.connected && <p className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-7 text-blue-950"><b>المتجر متصل بالفعل.</b> لا يحتاج رابط تفويض جديد. روابط التفويض القديمة تنتهي أو تُلغى بعد إتمام الربط أو إنشاء رابط أحدث؛ استخدم فحص الجاهزية والمزامنة الحالية.</p>}
           {!saved.connected && saved.authorizationUrl && <section className="mt-5 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-5 text-emerald-950" aria-label="رابط تفويض متجر سلة">
             <h3 className="font-bold">رابط تفويض متجر سلة جاهز</h3>
             <p className="mt-2 text-sm leading-7">أرسل هذا الرابط لصاحب المتجر. يفتح الرابط ويوافق على الربط فقط، دون أي إعدادات تقنية.</p>

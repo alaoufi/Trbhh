@@ -1,0 +1,31 @@
+name: Verify Salla coordinator on isolated MySQL
+on:
+  push:
+    branches: [codex/salla-store-coordinator-20260922]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: fixture_ci_root
+          MYSQL_ROOT_HOST: '%'
+          MYSQL_DATABASE: ci
+        ports: ['33309:3306']
+        options: --health-cmd="mysqladmin ping -h127.0.0.1 -pfixture_ci_root" --health-interval=10s --health-timeout=5s --health-retries=12
+    env:
+      DATABASE_URL: mysql://root:fixture_ci_root@127.0.0.1:33309/ci
+      SUPPLIER_DB_TESTS: '1'
+      SUPPLIER_TEST_DATABASE_URL: mysql://root:fixture_ci_root@127.0.0.1:33309/trbhh_supplier_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run tests/integration/suppliers-mysql.test.ts --maxWorkers=1

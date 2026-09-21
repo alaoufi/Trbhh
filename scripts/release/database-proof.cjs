@@ -431,7 +431,7 @@ function verifyKnownMigration(before, after, migration) {
   const afterCurrent = nextTable.rowFingerprints[keyHash] === fingerprint([['k',key],['v',newValue]]);
   if (!beforeLegacy || !afterCurrent) {
     const changedKeys = oldTable.primaryKeys.filter((candidate) => nextTable.rowFingerprints[candidate] && oldTable.rowFingerprints[candidate] !== nextTable.rowFingerprints[candidate]);
-    console.error(JSON.stringify({ diagnostic:'known_migration_mismatch', changedSetting:changedKeys.length === 1 && changedKeys[0] === keyHash ? 'shipping_credit_message' : 'unrecognized', beforeLegacy, afterCurrent }));
+    console.error(JSON.stringify({ diagnostic:'known_migration_mismatch', changedSetting:changedKeys.length === 1 && changedKeys[0] === keyHash ? 'shipping_credit_message' : 'unrecognized', changedKeyHash:changedKeys.length === 1 ? changedKeys[0] : null, beforeLegacy, afterCurrent }));
   }
   assert(beforeLegacy && afterCurrent, 'Known migration values do not match the reviewed boot migration.');
   return {...result, ok:true, failures:[], migration:'shipping_credit_message_v1'};

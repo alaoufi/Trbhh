@@ -152,9 +152,9 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
         <h1 className="text-2xl font-extrabold text-[#16294a] sm:text-3xl">{config.text.title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{config.text.description}</p>
       </div>
-      {!canCheckout && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">{config.text.unavailable}</p>}
-      {cards.length === 0
-        ? <p className="rounded-xl border border-[#16294a]/15 bg-[#16294a]/5 p-6 text-center text-sm font-bold text-[#16294a]/70">لا توجد منتجات معتمدة للعرض حالياً.</p>
+      {!canCheckout && !usingDemoAds && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">{config.text.unavailable}</p>}
+      {sourceCards.length === 0
+        ? <p className="rounded-xl border border-[#16294a]/15 bg-[#16294a]/5 p-6 text-center text-sm font-bold text-[#16294a]/70">{preview ? 'لا توجد إعلانات حيّة مطابقة لعرضها كبيانات توضيحية.' : 'لا توجد منتجات معتمدة للعرض حالياً.'}</p>
         : <CommerceHome hero={hero} sections={sections} options={{ adEvery: 1 }} banners={banners} />}
     </div>
   );

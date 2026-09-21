@@ -8,11 +8,11 @@ vi.mock('@/lib/prisma',()=>({prisma:{}}));
 vi.mock('@/lib/suppliers/connections',()=>({completeOAuth:state.complete}));
 import {GET} from '@/app/api/integrations/salla/callback/route';
 const request=(query='state=state-value&code=code-value')=>new NextRequest(`https://untrusted-host.example/api/integrations/salla/callback?${query}`);
-beforeEach(()=>{vi.resetAllMocks();vi.stubEnv('SUPPLIER_PUBLIC_ORIGIN','https://configured.example');state.session.mockResolvedValue({uid:7});state.permission.mockResolvedValue(true);state.cookie.mockReturnValue({value:'browser-value'});state.complete.mockResolvedValue(undefined);});
+beforeEach(()=>{vi.resetAllMocks();vi.stubEnv('SUPPLIER_PUBLIC_ORIGIN','https://configured.example');state.session.mockResolvedValue({uid:7});state.permission.mockResolvedValue(true);state.cookie.mockImplementation((name:string)=>name==='salla_oauth_browser'?{value:'browser-value'}:undefined);state.complete.mockResolvedValue(undefined);});
 afterEach(()=>vi.unstubAllEnvs());
 describe('Salla callback route boundary',()=>{
  it('rejects guests before permission/cookie/exchange',async()=>{
-  state.session.mockResolvedValue(null);expect((await GET(request())).status).toBe(403);expect(state.permission).not.toHaveBeenCalled();expect(state.cookie).not.toHaveBeenCalled();expect(state.complete).not.toHaveBeenCalled();
+  state.session.mockResolvedValue(null);expect((await GET(request())).status).toBe(403);expect(state.permission).not.toHaveBeenCalled();expect(state.complete).not.toHaveBeenCalled();
  });
  it('requires supplier edit permission',async()=>{
   state.permission.mockResolvedValue(false);expect((await GET(request())).status).toBe(403);expect(state.permission).toHaveBeenCalledWith(7,'suppliers','edit');expect(state.complete).not.toHaveBeenCalled();

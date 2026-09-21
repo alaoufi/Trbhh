@@ -36,7 +36,7 @@ export async function saveProduct(form:FormData) {
 }
 export async function connectSalla(form:FormData) {
  const admin=await requireAction('suppliers','edit');let url:string;
- try {await assertSupplierSchemaReady(prisma);const config=supplierConfig();const result=await beginOAuth(prisma,formId(form,'supplierId'),BigInt(admin.uid),config);url=result.url;(await cookies()).set('salla_oauth_browser',result.browser,{httpOnly:true,secure:config.origin.startsWith('https:'),sameSite:'lax',path:'/api/integrations/salla/callback',maxAge:600});} catch {redirect(`${path}?result=connection_failed`);}
+ try {await assertSupplierSchemaReady(prisma);const config=supplierConfig();const result=await beginOAuth(prisma,formId(form,'supplierId'),BigInt(admin.uid),config);url=result.url;const jar=await cookies();jar.set('salla_merchant_context','',{httpOnly:true,secure:config.origin.startsWith('https:'),sameSite:'lax',path:'/api/integrations/salla/callback',maxAge:0});jar.set('salla_oauth_browser',result.browser,{httpOnly:true,secure:config.origin.startsWith('https:'),sameSite:'lax',path:'/api/integrations/salla/callback',maxAge:600});} catch {redirect(`${path}?result=connection_failed`);}
  redirect(url);
 }
 export async function disconnectSalla(form:FormData) {

@@ -63,8 +63,6 @@ async function buildDemoAdCards(): Promise<CommerceCardItem[]> {
       viewLabel: 'عرض الإعلان',
     } satisfies CommerceCardItem;
   });
-  // لإظهار تخطيط Spotlight (بطاقة كبيرة + صغيرة) كما في التصميم المرجعي عند غياب المميّز.
-  if (!cards.some((c) => c.featured)) cards.slice(0, 3).forEach((c) => { c.featured = true; });
   return cards;
 }
 
@@ -118,25 +116,26 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
 
   const featured = sourceCards.filter((c) => c.featured);
   const rest = sourceCards.filter((c) => !c.featured);
-  const heroCards = featured.length ? featured : (usingDemoAds ? sourceCards : []);
+  const heroCards = featured.length ? featured : sourceCards;
 
   const hero: HeroSlide[] = heroCards.slice(0, 5).map((c) => ({
     id: c.id, title: c.title, subtitle: c.info ?? undefined, image: c.image, href: c.href, cta: usingDemoAds ? 'عرض الإعلان' : config.text.buy,
   }));
 
-  // تنويع التخطيط: المميّزة كـSpotlight (بطاقة كبيرة + صغيرة)، والبقية شبكة متكيّفة.
+  // شبكة نظيفة كما في التصميم المرجعي: قسم واحد «عروض مميّزة» في المعاينة التوضيحية،
+  // وللسلع المعتمدة: مميّزة (Spotlight) + الباقي (شبكة).
   const allProducts = rest.length ? rest : sourceCards;
-  const unit = usingDemoAds ? 'إعلان' : 'منتج';
-  const allSections: CommerceHomeSection[] = [
-    { id: 'featured', title: usingDemoAds ? 'إعلانات مميّزة' : 'منتجات مميّزة', kind: 'products', items: featured, display: 'spotlight', accent: 'gold', subtitle: usingDemoAds ? 'الأبرز' : 'اختيار تربح' },
-    { id: 'all', title: usingDemoAds ? 'أحدث إعلانات الموقع' : 'كل المنتجات', kind: 'products', items: allProducts, display: 'grid', accent: 'navy', subtitle: `${allProducts.length} ${unit}` },
+  const demoSection: CommerceHomeSection = { id: 'ads', title: 'عروض مميّزة', kind: 'products', items: sourceCards, display: 'grid', accent: 'orange', subtitle: `${sourceCards.length} عرض` };
+  const realSections: CommerceHomeSection[] = [
+    { id: 'featured', title: 'منتجات مميّزة', kind: 'products', items: featured, display: 'spotlight', accent: 'orange', subtitle: 'اختيار تربح' },
+    { id: 'all', title: 'كل المنتجات', kind: 'products', items: allProducts, display: 'grid', accent: 'navy', subtitle: `${allProducts.length} منتج` },
   ];
-  const sections = allSections.filter((s) => s.items.length > 0);
+  const sections = usingDemoAds ? [demoSection] : realSections.filter((s) => s.items.length > 0);
 
-  // بانرات ترويجية حقيقية تُدرَج بين الصفوف (نصوصها من الإعداد، لا نصّ ثابت في الكود).
+  // بانرات سفلية (فاتح + كحلي) بدعوة إجراء — نصوصها من الإعداد قدر الإمكان.
   const banners: CommerceBanner[] = [
-    { title: config.text.title, subtitle: config.text.description, cta: config.text.buy, tone: 'gold' },
-    { title: 'منتجات موثوقة من موردين معتمدين', subtitle: 'التوريد والدفع يُداران خلف الكواليس بأمان.', tone: 'navy' },
+    { title: config.text.title, subtitle: config.text.description, cta: config.text.buy, tone: 'light' },
+    { title: 'معدّات وخدمات متنوّعة', subtitle: 'تصفّح أحدث ما نُشر على تربح في كل المناطق.', cta: 'تصفّح الآن', tone: 'navy' },
   ];
 
   return (
@@ -148,7 +147,7 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
       {!canCheckout && !usingDemoAds && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">{config.text.unavailable}</p>}
       {sourceCards.length === 0
         ? <p className="rounded-xl border border-[#16294a]/15 bg-[#16294a]/5 p-6 text-center text-sm font-bold text-[#16294a]/70">{preview ? 'لا توجد إعلانات حيّة مطابقة لعرضها كبيانات توضيحية.' : 'لا توجد منتجات معتمدة للعرض حالياً.'}</p>
-        : <CommerceHome hero={hero} sections={sections} options={{ adEvery: 1 }} banners={banners} />}
+        : <CommerceHome hero={hero} sections={sections} banners={banners} />}
     </div>
   );
 }

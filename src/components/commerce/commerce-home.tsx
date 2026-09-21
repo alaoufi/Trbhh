@@ -4,72 +4,62 @@ import { CommerceGrid, CommerceSpotlight, CommerceCarousel, type CommerceCardIte
 import { composeHome, type HomeSectionInput, type ComposeHomeOptions, type HomeSectionAccent } from '@/lib/commerce/home-layout';
 
 /**
- * تركيب الصفحة الرئيسية التجارية الديناميكي (كحلي/ذهبي، RTL) — بمستوى متجر حقيقي:
- *   • Hero متحرّك غنيّ بالصور أعلى الصفحة (يُخفى إن لا شرائح)،
- *   • أقسام مدفوعة بالبيانات بأشكال متنوّعة (شبكة/Spotlight/صفّ أفقي)،
- *   • عنوان كل قسم بطابع لوني مميّز (ذهبي/كحلي/برتقالي) ليتمايز الموردون عن
- *     البائعين الموثوقين عن عروض الأعضاء،
- *   • بانر إعلاني حقيقي (تدرّج + دعوة إجراء) بين الصفوف — لا مساحات فارغة،
- *   • القسم الفارغ لا يُصيَّر إطلاقاً (لا عنوان معلّق).
+ * تركيب الصفحة الرئيسية لمتجر تربح بأسلوب متجر معدّات احترافي (كحلي/برتقالي، RTL):
+ *   • Hero متحرّك غنيّ بالصورة أعلى الصفحة،
+ *   • شريط ثقة (معدّات موثوقة/توصيل/دعم/دفع آمن)،
+ *   • صفوف منتجات بعناوين واضحة وتخطيط متكيّف،
+ *   • بانرات ترويجية سفلية (فاتح + كحلي) بدعوة إجراء.
+ * القسم الفارغ لا يُصيَّر إطلاقاً.
  */
 
 export type CommerceHomeSection = HomeSectionInput<CommerceCardItem> & { subtitle?: string };
 
-/** بانر ترويجي حقيقي (موسمي/عرض محدود/مورّد) — تدرّج كحلي↔ذهبي + دعوة إجراء. */
 export type CommerceBanner = {
   title: string;
   subtitle?: string;
   cta?: string;
   href?: string;
-  /** طابع: gold (موسمي) · orange (عرض محدود) · navy (مورّد/فئة). */
-  tone?: 'gold' | 'orange' | 'navy';
+  tone?: 'light' | 'navy';
 };
 
-// بانرات فاتحة (تقليل اللون الغامق): خلفية كريمية/فاتحة، نصّ كحلي، لمسة ذهبية.
-const BANNER_TONE: Record<NonNullable<CommerceBanner['tone']>, { bg: string; ring: string; glow: string; tag: string }> = {
-  gold: { bg: 'from-[#fff8ea] to-[#fbe6bd]', ring: 'ring-[#f0b429]/40', glow: 'bg-[#f0b429]/30', tag: 'bg-[#16294a] text-[#f0b429]' },
-  orange: { bg: 'from-[#fff2e6] to-[#ffdcc0]', ring: 'ring-[#ff7418]/30', glow: 'bg-[#ff7418]/25', tag: 'bg-[#ff7418] text-white' },
-  navy: { bg: 'from-[#eef3fb] to-[#d8e4f6]', ring: 'ring-[#16294a]/15', glow: 'bg-[#233a63]/20', tag: 'bg-[#16294a] text-white' },
-};
+export type TrustItem = { title: string; subtitle: string; icon: 'shield' | 'truck' | 'support' | 'pay' };
 
-function PromoBanner({ banner }: { banner: CommerceBanner }) {
-  const tone = BANNER_TONE[banner.tone ?? 'gold'];
-  const body = (
-    <div className={`relative overflow-hidden rounded-3xl bg-gradient-to-l ${tone.bg} p-6 text-[#16294a] shadow-md ring-1 ${tone.ring} sm:p-8`}>
-      {/* توهّج زخرفي فاتح */}
-      <span aria-hidden="true" className={`pointer-events-none absolute -left-10 -top-16 h-48 w-48 rounded-full ${tone.glow} blur-3xl`} />
-      <div className="relative flex flex-wrap items-center justify-between gap-4">
-        <div className="max-w-lg">
-          <div className={`mb-1.5 inline-block rounded-full px-3 py-0.5 text-[11px] font-extrabold ${tone.tag}`}>عرض</div>
-          <h3 className="text-xl font-extrabold leading-snug sm:text-2xl">{banner.title}</h3>
-          {banner.subtitle && <p className="mt-1 text-sm font-semibold text-[#16294a]/65">{banner.subtitle}</p>}
-        </div>
-        {banner.cta && (
-          <span className="inline-flex items-center rounded-xl bg-gradient-to-l from-[#ff7418] to-[#f0b429] px-6 py-3 text-sm font-extrabold text-[#16294a] shadow-md">
-            {banner.cta}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-  return banner.href ? <Link href={banner.href} className="block transition hover:brightness-[1.02]">{body}</Link> : body;
+const DEFAULT_TRUST: TrustItem[] = [
+  { title: 'عروض موثوقة', subtitle: 'إعلانات محقّقة على المنصّة', icon: 'shield' },
+  { title: 'تواصل مباشر', subtitle: 'اتفق مع المُعلن مباشرةً', icon: 'support' },
+  { title: 'تغطية واسعة', subtitle: 'في جميع مناطق المملكة', icon: 'truck' },
+  { title: 'دفع خارج المنصّة', subtitle: 'المنصّة تعرض وتربط فقط', icon: 'pay' },
+];
+
+function TrustIcon({ name }: { name: TrustItem['icon'] }) {
+  const p = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  const cls = 'h-7 w-7 text-[#ff6a1a]';
+  if (name === 'shield') return <svg viewBox="0 0 24 24" className={cls} {...p} aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z" /><path d="m9 12 2 2 4-4" /></svg>;
+  if (name === 'truck') return <svg viewBox="0 0 24 24" className={cls} {...p} aria-hidden="true"><path d="M3 6h11v9H3zM14 9h4l3 3v3h-7z" /><circle cx="7.5" cy="18" r="1.6" /><circle cx="17.5" cy="18" r="1.6" /></svg>;
+  if (name === 'support') return <svg viewBox="0 0 24 24" className={cls} {...p} aria-hidden="true"><path d="M4 13v-1a8 8 0 0 1 16 0v1" /><rect x="3" y="13" width="4" height="6" rx="1.5" /><rect x="17" y="13" width="4" height="6" rx="1.5" /><path d="M20 19a4 4 0 0 1-4 3h-2" /></svg>;
+  return <svg viewBox="0 0 24 24" className={cls} {...p} aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M3 10h18" /><path d="M7 15h4" /></svg>;
 }
 
-/** فاصل ذهبي رفيع بين الأقسام. */
-function Divider() {
+function TrustBar({ items = DEFAULT_TRUST }: { items?: TrustItem[] }) {
   return (
-    <div className="flex items-center gap-3 py-1" aria-hidden="true">
-      <span className="h-px flex-1 bg-gradient-to-l from-transparent via-[#f0b429]/60 to-transparent" />
-      <span className="h-1.5 w-1.5 rotate-45 bg-[#f0b429]" />
-      <span className="h-px flex-1 bg-gradient-to-l from-transparent via-[#f0b429]/60 to-transparent" />
+    <div className="grid grid-cols-2 gap-3 rounded-2xl border border-black/5 bg-white p-4 shadow-sm sm:grid-cols-4 sm:divide-x sm:divide-x-reverse sm:divide-black/5">
+      {items.map((it) => (
+        <div key={it.title} className="flex items-center gap-3 sm:justify-center sm:px-2">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#ff6a1a]/10"><TrustIcon name={it.icon} /></span>
+          <div className="min-w-0">
+            <div className="text-sm font-extrabold text-[#16294a]">{it.title}</div>
+            <div className="truncate text-[11px] font-semibold text-[#16294a]/55">{it.subtitle}</div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
 const ACCENT_BAR: Record<HomeSectionAccent, string> = {
-  gold: 'from-[#ff7418] to-[#f0b429]',
+  gold: 'from-[#ff8a3d] to-[#ff6a1a]',
   navy: 'from-[#233a63] to-[#16294a]',
-  orange: 'from-[#ff7418] to-[#ff9a4d]',
+  orange: 'from-[#ff8a3d] to-[#ff6a1a]',
 };
 
 function SectionHeader({ title, subtitle, accent }: { title: string; subtitle?: string; accent: HomeSectionAccent }) {
@@ -84,42 +74,59 @@ function SectionHeader({ title, subtitle, accent }: { title: string; subtitle?: 
   );
 }
 
+function BottomBanners({ banners }: { banners: CommerceBanner[] }) {
+  if (banners.length === 0) return null;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {banners.slice(0, 2).map((b, i) => {
+        const navy = b.tone === 'navy';
+        const body = (
+          <div className={`relative flex h-full flex-col justify-center overflow-hidden rounded-2xl p-6 shadow-sm ring-1 sm:p-7 ${navy ? 'bg-gradient-to-l from-[#0f1d38] to-[#233a63] text-white ring-black/10' : 'bg-gradient-to-l from-[#fff5ea] to-[#ffe6cc] text-[#16294a] ring-[#ff6a1a]/25'}`}>
+            <span aria-hidden="true" className={`pointer-events-none absolute -left-8 -top-10 h-36 w-36 rounded-full blur-3xl ${navy ? 'bg-[#ff6a1a]/25' : 'bg-[#ff6a1a]/20'}`} />
+            <h3 className="relative text-lg font-extrabold sm:text-xl">{b.title}</h3>
+            {b.subtitle && <p className={`relative mt-1 text-sm font-semibold ${navy ? 'text-white/80' : 'text-[#16294a]/65'}`}>{b.subtitle}</p>}
+            {b.cta && <span className="relative mt-4 inline-flex w-fit items-center rounded-xl bg-[#ff6a1a] px-6 py-2.5 text-sm font-extrabold text-white shadow-sm">{b.cta}</span>}
+          </div>
+        );
+        return b.href ? <Link key={i} href={b.href} className="block transition hover:brightness-[1.02]">{body}</Link> : <div key={i}>{body}</div>;
+      })}
+    </div>
+  );
+}
+
 export function CommerceHome({
   hero = [],
   sections,
   options,
-  banners,
+  banners = [],
+  trust,
 }: {
   hero?: HeroSlide[];
   sections: CommerceHomeSection[];
   options?: ComposeHomeOptions;
-  /** بانرات ترويجية حقيقية تُدرَج في خانات الإعلان بالترتيب (تدوير عند النفاد). */
+  /** بانرات سفلية (فاتح/كحلي) بدعوة إجراء. */
   banners?: CommerceBanner[];
+  /** عناصر شريط الثقة (اختياري) — الافتراضي أربعة عناصر. */
+  trust?: TrustItem[];
 }) {
   const composed = composeHome(sections, options);
   const subtitleOf = new Map(sections.map((s) => [s.id, s.subtitle]));
-  const promos = banners && banners.length > 0 ? banners : null;
-  let adIdx = 0;
 
   return (
-    // نطاق الثيم التجاري (كحلي/ذهبي) — معزول عن ثيم الموقع العام
     <div className="commerce-scope space-y-7">
       {hero.length > 0 && <CommerceHero slides={hero} />}
+      <TrustBar items={trust} />
 
-      {composed.map((sec) => {
-        const showAd = sec.adSlotAfter && promos;
-        const banner = showAd ? promos[adIdx++ % promos.length] : null;
-        return (
-          <section key={sec.id} className="space-y-4">
-            {sec.dividerBefore && <Divider />}
-            <SectionHeader title={sec.title} subtitle={subtitleOf.get(sec.id)} accent={sec.accent} />
-            {sec.display === 'spotlight' && <CommerceSpotlight items={sec.items} />}
-            {sec.display === 'carousel' && <CommerceCarousel items={sec.items} />}
-            {sec.display === 'grid' && <CommerceGrid items={sec.items} layout={sec.layout} />}
-            {banner && <PromoBanner banner={banner} />}
-          </section>
-        );
-      })}
+      {composed.map((sec) => (
+        <section key={sec.id} className="space-y-4">
+          <SectionHeader title={sec.title} subtitle={subtitleOf.get(sec.id)} accent={sec.accent} />
+          {sec.display === 'spotlight' && <CommerceSpotlight items={sec.items} />}
+          {sec.display === 'carousel' && <CommerceCarousel items={sec.items} />}
+          {sec.display === 'grid' && <CommerceGrid items={sec.items} layout={sec.layout} />}
+        </section>
+      ))}
+
+      <BottomBanners banners={banners} />
     </div>
   );
 }

@@ -75,12 +75,16 @@ export function CommerceHero({ slides, intervalMs = 5000 }: { slides: HeroSlide[
           <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/85 via-[#0b162e]/40 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/55 via-transparent to-transparent" />
           <div className="absolute inset-y-0 right-0 flex max-w-xl flex-col justify-center p-6 sm:p-10">
-            <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-[#f0b429] px-3 py-1 text-[12px] font-extrabold text-[#16294a] shadow">★ عرض مميّز</span>
-            <h2 className="text-2xl font-extrabold leading-tight drop-shadow-lg sm:text-4xl">{s.title}</h2>
+            <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[12px] font-extrabold text-white ring-1 ring-white/25 backdrop-blur">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#ff6a1a]" /> متوفّر في جميع مناطق المملكة
+            </span>
+            <h2 className="text-2xl font-extrabold leading-tight drop-shadow-lg sm:text-4xl">
+              {s.title}
+            </h2>
             {s.subtitle && <p className="mt-2 max-w-lg text-sm font-semibold text-white/85 sm:text-lg">{s.subtitle}</p>}
-            <span className="mt-5 inline-flex w-fit items-center gap-2 rounded-xl bg-gradient-to-l from-[#ff7418] to-[#f0b429] px-6 py-3 text-base font-extrabold text-[#16294a] shadow-lg transition group-hover:brightness-105">
-              {s.cta || 'تسوّق الآن'}
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+            <span className="mt-5 inline-flex w-fit items-center gap-2 rounded-xl bg-[#ff6a1a] px-6 py-3 text-base font-extrabold text-white shadow-lg transition group-hover:bg-[#f2610f]">
+              {s.cta || 'تصفّح الآن'}
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
             </span>
           </div>
         </div>
@@ -93,7 +97,7 @@ export function CommerceHero({ slides, intervalMs = 5000 }: { slides: HeroSlide[
           <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
             {slides.map((sl, k) => (
               <button key={sl.id} type="button" onClick={() => go(k)} aria-label={`الشريحة ${k + 1}`} aria-current={k === i}
-                className={`h-1.5 rounded-full transition-all ${k === i ? 'w-6 bg-[#f0b429]' : 'w-1.5 bg-white/50 hover:bg-white/80'}`} />
+                className={`h-1.5 rounded-full transition-all ${k === i ? 'w-6 bg-[#ff6a1a]' : 'w-1.5 bg-white/50 hover:bg-white/80'}`} />
             ))}
           </div>
         </>

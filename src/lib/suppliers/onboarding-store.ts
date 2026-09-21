@@ -27,6 +27,16 @@ export async function inspectOnboarding(db:Reader,values:OnboardingValues,secret
  if(identities.some(o=>o.store_url===storeUrl&&o.registration_number!==registration))throw Error('onboarding_url_conflict');
  const identity=identities.find(o=>o.registration_number===registration);
  if(identity&&(!existing||identity.supplier_id!==existing.id))throw Error('onboarding_identity_conflict');
+ // Legacy suppliers may have been connected to Salla before registration/onboarding
+ // details existed. Adopt only one active, exact-name, blank-registration candidate
+ // that already owns a connected Salla store; ambiguous names remain unmatched.
+ if(!existing&&!identity&&values.store_name){
+  const legacy=await db.$queryRaw<SupplierRow[]>(Prisma.sql`SELECT id,name,contact_name,phone,email,address,registration_number,tax_number,settlement_terms,notes,active,updated_at FROM commerce_suppliers WHERE active=1 AND TRIM(COALESCE(registration_number,''))='' AND LOWER(TRIM(name))=LOWER(TRIM(${values.store_name})) LIMIT 3`);
+  if(legacy.length===1){
+   const linked=await db.$queryRaw<{id:bigint}[]>`SELECT id FROM supplier_connections WHERE supplier_id=${legacy[0].id} AND provider='salla' AND status='connected' LIMIT 2`;
+   if(linked.length===1)existing=legacy[0];
+  }
+ }
  if(explicitSupplierId&&existing?.id!==explicitSupplierId)throw Error('onboarding_identity_conflict');
  if(existing){
   const profiles=await db.$queryRaw<{provider:string}[]>`SELECT provider FROM supplier_integration_profiles WHERE supplier_id=${existing.id}`;

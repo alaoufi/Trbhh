@@ -3,8 +3,8 @@ import {revalidatePath} from 'next/cache';
 import {prisma} from '@/lib/prisma';
 import {requireAction} from '@/lib/roles';
 import {assertSupplierSchemaReady} from '@/lib/suppliers/schema';
-import {loadCatalog,loadCatalogDetail,reviewCatalogSelection,approveCatalogSelection} from '@/lib/suppliers/catalog-admin';
-import type {CatalogActions,CatalogSearch,CatalogSelection,CatalogApproval} from '@/lib/suppliers/catalog-selection';
+import {loadCatalog,loadCatalogDetail,reviewCatalogSelection,approveCatalogSelection,updateCatalogProductSale,hideCatalogProduct,removeCatalogProduct} from '@/lib/suppliers/catalog-admin';
+import type {CatalogActions,CatalogSearch,CatalogSelection,CatalogApproval,CatalogSaleUpdate,CatalogRemoval} from '@/lib/suppliers/catalog-selection';
 
 const messages:Record<string,string>={
  catalog_invalid:'تحقق من البحث أو اختيار المورد ثم أعد المحاولة.',
@@ -18,6 +18,9 @@ const messages:Record<string,string>={
  invalid_money:'تحقق من مبالغ التكلفة وسعر البيع.',
  supplier_product_conflict:'تغيرت بيانات المنتج. أعد تحميل القائمة ومعاينة الاختيار.',
  catalog_config:'المعاينة غير متاحة حاليًا. راجع إعداد الخادم.',
+ catalog_cost_missing:'أضف تكلفة التوريد أولًا قبل تعديل سعر البيع.',
+ catalog_remove_confirmation:'أكد حذف المنتج من تربح أولًا.',
+ catalog_remove_history:'لا يمكن حذف المنتج لأن له سجل طلبات أو حجوزات. استخدم «إخفاء من تربح» بدلًا من الحذف.',
 };
 function failure(error:unknown):{error:string}{return {error:messages[error instanceof Error?error.message:'']||'تعذر إكمال العملية. لم تُعتمد إضافة جزئية؛ أعد المحاولة.'};}
 const secret=()=>process.env.SUPPLIER_TOKEN_ENCRYPTION_KEY||'';
@@ -40,4 +43,16 @@ export async function approveProducts(input:CatalogApproval):ReturnType<CatalogA
   revalidatePath('/admin/suppliers/catalog');revalidatePath('/admin/suppliers/integrations');
   return result;
  }catch(error){return failure(error);}
+}
+export async function updateProductSale(input:CatalogSaleUpdate):ReturnType<CatalogActions['updateSale']>{
+ await requireAction('suppliers','view');const admin=await requireAction('suppliers','edit');
+ try{await assertSupplierSchemaReady(prisma);const result=await updateCatalogProductSale(prisma,input,BigInt(admin.uid));revalidatePath('/admin/suppliers/catalog');revalidatePath('/admin/suppliers/integrations');return result;}catch(error){return failure(error);}
+}
+export async function hideProduct(input:CatalogSelection):ReturnType<CatalogActions['hide']>{
+ await requireAction('suppliers','view');const admin=await requireAction('suppliers','edit');
+ try{await assertSupplierSchemaReady(prisma);const result=await hideCatalogProduct(prisma,input,BigInt(admin.uid));revalidatePath('/admin/suppliers/catalog');revalidatePath('/admin/suppliers/integrations');revalidatePath('/shop');return result;}catch(error){return failure(error);}
+}
+export async function removeProduct(input:CatalogRemoval):ReturnType<CatalogActions['remove']>{
+ await requireAction('suppliers','view');const admin=await requireAction('suppliers','edit');
+ try{await assertSupplierSchemaReady(prisma);const result=await removeCatalogProduct(prisma,input,BigInt(admin.uid));revalidatePath('/admin/suppliers/catalog');revalidatePath('/admin/suppliers/integrations');revalidatePath('/shop');return result;}catch(error){return failure(error);}
 }

@@ -4,8 +4,8 @@ import {CATALOG_SELECTION_LIMIT, type CatalogProduct} from '@/lib/suppliers/cata
 
 const product = (key: string, overrides: Partial<CatalogProduct> = {}): CatalogProduct => ({
   key, revision: 3, name: `منتج ${key}`, sku: '', supplierKey: 's_1', supplierName: 'مورد سلة', image: null,
-  priceMinor: 12500, costMinor: null, sellingMinor: null, minimumPriceMinor: 0, minimumMarginMinor: 0,
-  quantity: 10, available: true, hasOptions: false, status: 'imported', statusLabel: 'مستورد', canSelect: true, lastSyncAt: null, ...overrides,
+  priceMinor: 12500, costMinor: null, sellingMinor: null, pricingPolicy: 'source', minimumPriceMinor: 0, minimumMarginMinor: 0,
+  quantity: 10, available: true, hasOptions: false, status: 'imported', statusLabel: 'مستورد', canSelect: true, canManage: false, active: false, visible: false, lastSyncAt: null, ...overrides,
 });
 
 describe('catalog selection across searches and pages', () => {

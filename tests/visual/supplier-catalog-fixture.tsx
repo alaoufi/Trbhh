@@ -8,10 +8,10 @@ const products: CatalogProduct[] = names.map((name, index) => ({
   key: `p_${9000001 + index}`, revision: 1, name, sku: `HERITAGE-${index + 1}`,
   supplierKey: 's_700001', supplierName: 'متجر تراثي — بيانات تجريبية', image: `https://catalog-fixture.test/product-${index}.svg`,
   priceMinor: [24500, 8900, 17500, 7500, 12000, 6800][index],
-  costMinor: index === 0 ? null : [0, 5500, 10000, 5000, 8000, 3000][index], sellingMinor: null,
+  costMinor: index === 0 ? null : [0, 5500, 10000, 5000, 8000, 3000][index], sellingMinor: null, pricingPolicy: 'source',
   minimumPriceMinor: 0, minimumMarginMinor: 0, quantity: index === 3 ? 0 : 12 + index,
   available: index !== 3, hasOptions: index === 2,
-  status: index === 3 ? 'unavailable' : 'imported', statusLabel: index === 3 ? 'نفد المخزون' : 'مستورد — لم يُضف بعد', canSelect: true,
+  status: index === 3 ? 'unavailable' : 'imported', statusLabel: index === 3 ? 'نفد المخزون' : 'مستورد — لم يُضف بعد', canSelect: true, canManage: false, active: false, visible: false,
   lastSyncAt: '2026-09-21T12:00:00.000Z',
 }));
 let approvals = 0;
@@ -40,6 +40,9 @@ const actions: CatalogActions = {
     for (const row of input.products) { const product = products.find(item => item.key === row.key)!; product.status = 'added_hidden'; product.statusLabel = 'مضاف إلى تربح — مخفي'; product.canSelect = false; product.revision++; }
     approvals++; return { added: input.products.length };
   },
+  async updateSale() {return {updated: true};},
+  async hide() {return {hidden: true};},
+  async remove() {return {removed: true};},
 };
 Object.assign(window, { catalogFixture: { approvals: () => approvals, added: () => products.filter(product => product.status === 'added_hidden').length } });
 createRoot(document.getElementById('root')!).render(<SupplierCatalog initialData={page({ query: '', supplierKey: '', page: 1 })} actions={actions} exampleState />);

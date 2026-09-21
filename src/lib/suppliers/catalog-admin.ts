@@ -5,11 +5,11 @@ import type {CommerceDb} from '@/lib/commerce/types';
 import {checkedMoney,parseSar} from '@/lib/commerce/money';
 import {saveProductControlsInTransaction} from './admin';
 import {calculatePricing} from './pricing';
-import {CATALOG_PAGE_SIZE,CATALOG_SELECTION_LIMIT,type CatalogSearch,type CatalogPage,type CatalogProduct,type CatalogDetail,type CatalogSelection,type CatalogReview,type CatalogApproval} from './catalog-selection';
+import {CATALOG_PAGE_SIZE,CATALOG_SELECTION_LIMIT,type CatalogSearch,type CatalogPage,type CatalogProduct,type CatalogDetail,type CatalogSelection,type CatalogReview,type CatalogApproval,type CatalogSaleUpdate,type CatalogRemoval} from './catalog-selection';
 
 type Reader=Pick<CommerceDb,'$queryRaw'>;
-type Row={id:bigint;revision:number;supplier_id:bigint;connection_id:bigint;commerce_product_id:bigint|null;name:string;sku:string;supplier_name:string;images:unknown;public_price_minor:number;unit_cost_minor:number|null;selling_price_minor:number|null;minimum_price_minor:number;minimum_margin_minor:number;quantity:number|null;available:number;active:number;visible:number;featured:number;last_sync_at:Date|null;source_updated_at:Date|null;supplier_active:number;maintenance:number;connection_status:string;connection_provider:string;profile_provider:string;currency:string;description?:string;brand?:string;categories?:unknown;options?:unknown;variants?:unknown;has_options?:number;commerce_visible:number|null;commerce_enabled:number|null;commerce_approved:number|null};
-const fields=Prisma.sql`p.id,p.revision,p.supplier_id,p.connection_id,p.commerce_product_id,p.name,p.sku,s.name AS supplier_name,p.public_price_minor,p.unit_cost_minor,p.selling_price_minor,p.minimum_price_minor,p.minimum_margin_minor,p.quantity,p.available,p.active,p.visible,p.featured,p.last_sync_at,p.source_updated_at,p.currency,s.active AS supplier_active,ip.maintenance,c.status AS connection_status,c.provider AS connection_provider,ip.provider AS profile_provider,cp.visible AS commerce_visible,cp.enabled AS commerce_enabled,cp.approved AS commerce_approved`;
+type Row={id:bigint;revision:number;supplier_id:bigint;connection_id:bigint;commerce_product_id:bigint|null;name:string;sku:string;supplier_name:string;images:unknown;public_price_minor:number;unit_cost_minor:number|null;selling_price_minor:number|null;pricing_policy:string;discount_minor:number;discount_bps:number;minimum_price_minor:number;minimum_margin_minor:number;quantity:number|null;available:number;active:number;visible:number;featured:number;last_sync_at:Date|null;source_updated_at:Date|null;supplier_active:number;maintenance:number;connection_status:string;connection_provider:string;profile_provider:string;currency:string;description?:string;brand?:string;categories?:unknown;options?:unknown;variants?:unknown;has_options?:number;commerce_visible:number|null;commerce_enabled:number|null;commerce_approved:number|null};
+const fields=Prisma.sql`p.id,p.revision,p.supplier_id,p.connection_id,p.commerce_product_id,p.name,p.sku,s.name AS supplier_name,p.public_price_minor,p.unit_cost_minor,p.selling_price_minor,p.pricing_policy,p.discount_minor,p.discount_bps,p.minimum_price_minor,p.minimum_margin_minor,p.quantity,p.available,p.active,p.visible,p.featured,p.last_sync_at,p.source_updated_at,p.currency,s.active AS supplier_active,ip.maintenance,c.status AS connection_status,c.provider AS connection_provider,ip.provider AS profile_provider,cp.visible AS commerce_visible,cp.enabled AS commerce_enabled,cp.approved AS commerce_approved`;
 const cardFields=Prisma.sql`${fields},JSON_ARRAY(JSON_UNQUOTE(JSON_EXTRACT(p.images,'$[0]'))) AS images,(JSON_LENGTH(p.options)>0 OR JSON_LENGTH(p.variants)>0) AS has_options`;
 const joins=Prisma.sql`FROM supplier_products p JOIN commerce_suppliers s ON s.id=p.supplier_id JOIN supplier_connections c ON c.id=p.connection_id AND c.supplier_id=p.supplier_id JOIN supplier_integration_profiles ip ON ip.supplier_id=p.supplier_id LEFT JOIN commerce_products cp ON cp.id=p.commerce_product_id`;
 const TTL=10*60*1000;
@@ -47,7 +47,8 @@ function product(row:Row):CatalogProduct{
  if(linked&&row.visible===1&&row.active===1&&row.commerce_visible===1&&row.commerce_enabled===1&&row.commerce_approved===1){status='published';statusLabel='منشور';}
  else if(!eligible(row)){status='disconnected';statusLabel=row.connection_status!=='connected'?'الاتصال غير متاح':'المورد غير متاح';}
  else if(!linked&&(row.available!==1||row.quantity===0)){status='unavailable';statusLabel='غير متوفر حاليًا · يمكن إضافته مخفيًا';}
- return {key:'p_'+row.id,revision:row.revision,name:plain(row.name,255),sku:plain(row.sku,191),supplierKey:'s_'+row.supplier_id,supplierName:plain(row.supplier_name,255),image:images(row.images)[0]||null,priceMinor:checkedMoney(row.public_price_minor),costMinor:row.unit_cost_minor===null?null:checkedMoney(row.unit_cost_minor),sellingMinor:row.selling_price_minor===null?null:checkedMoney(row.selling_price_minor),minimumPriceMinor:checkedMoney(row.minimum_price_minor),minimumMarginMinor:checkedMoney(row.minimum_margin_minor),quantity:row.quantity,available:row.available===1,status,statusLabel,canSelect:!linked&&eligible(row),hasOptions:row.has_options!==undefined?Number(row.has_options)!==0:list(row.options??[]).length>0||list(row.variants??[]).length>0,lastSyncAt:date(row.last_sync_at)};
+ const pricingPolicy=['manual','source','fixed_discount','percent_discount'].includes(row.pricing_policy)?row.pricing_policy as CatalogProduct['pricingPolicy']:'source';
+ return {key:'p_'+row.id,revision:row.revision,name:plain(row.name,255),sku:plain(row.sku,191),supplierKey:'s_'+row.supplier_id,supplierName:plain(row.supplier_name,255),image:images(row.images)[0]||null,priceMinor:checkedMoney(row.public_price_minor),costMinor:row.unit_cost_minor===null?null:checkedMoney(row.unit_cost_minor),sellingMinor:row.selling_price_minor===null?null:checkedMoney(row.selling_price_minor),pricingPolicy,minimumPriceMinor:checkedMoney(row.minimum_price_minor),minimumMarginMinor:checkedMoney(row.minimum_margin_minor),quantity:row.quantity,available:row.available===1,status,statusLabel,canSelect:!linked&&eligible(row),canManage:linked,active:row.active===1,visible:row.visible===1,hasOptions:row.has_options!==undefined?Number(row.has_options)!==0:list(row.options??[]).length>0||list(row.variants??[]).length>0,lastSyncAt:date(row.last_sync_at)};
 }
 function searchInput(input:CatalogSearch):CatalogSearch{
  if(!input||typeof input.query!=='string'||input.query.length>120||/[\u0000-\u001f\u007f]/.test(input.query)||typeof input.supplierKey!=='string'||!Number.isInteger(input.page)||input.page<1||input.page>10000)throw Error('catalog_invalid');
@@ -114,8 +115,69 @@ export async function approveCatalogSelection(db:CommerceDb,input:CatalogApprova
   // Lock and validate the complete batch before any mappings are written.
   // Competing approvals serialize; replay fails after revision/mapping changes.
   const rows=await selectedRows(tx,selected,true);
-  const controls=rows.map(row=>{const amounts=prices.get('p_'+row.id)!;calculatePricing({publicMinor:row.public_price_minor,...amounts,policy:'manual',minimumPriceMinor:row.minimum_price_minor,minimumMarginMinor:row.minimum_margin_minor});return {id:row.id,revision:row.revision,policy:'manual' as const,...amounts,discountMinor:0,discountBps:0,minimumPriceMinor:row.minimum_price_minor,minimumMarginMinor:row.minimum_margin_minor,active:false,visible:false,featured:false};});
+  const controls=rows.map(row=>{const amounts=prices.get('p_'+row.id)!,policy=amounts.sellingMinor===row.public_price_minor?'source' as const:'manual' as const;calculatePricing({publicMinor:row.public_price_minor,...amounts,policy,minimumPriceMinor:row.minimum_price_minor,minimumMarginMinor:row.minimum_margin_minor});return {id:row.id,revision:row.revision,policy,...amounts,discountMinor:0,discountBps:0,minimumPriceMinor:row.minimum_price_minor,minimumMarginMinor:row.minimum_margin_minor,active:false,visible:false,featured:false};});
   for(const control of controls)await saveProductControlsInTransaction(tx,control,adminId);
   return {added:controls.length};
+ },{isolationLevel:'ReadCommitted',timeout:30000});
+}
+
+type ManagedRow={id:bigint;revision:number;commerce_product_id:bigint|null;public_price_minor:number;unit_cost_minor:number|null;selling_price_minor:number|null;pricing_policy:string;discount_minor:number;discount_bps:number;minimum_price_minor:number;minimum_margin_minor:number;active:number;visible:number;featured:number};
+function managedSelection(input:CatalogSelection):{id:bigint;revision:number}{
+ if(!input||typeof input!=='object'||!Number.isSafeInteger(input.revision)||input.revision<0)throw Error('catalog_invalid');
+ return {id:keyId(input.key),revision:input.revision};
+}
+async function managedRow(tx:Prisma.TransactionClient,input:CatalogSelection):Promise<ManagedRow>{
+ const parsed=managedSelection(input);
+ const [row]=await tx.$queryRaw<ManagedRow[]>`SELECT id,revision,commerce_product_id,public_price_minor,unit_cost_minor,selling_price_minor,pricing_policy,discount_minor,discount_bps,minimum_price_minor,minimum_margin_minor,active,visible,featured FROM supplier_products WHERE id=${parsed.id}`;
+ if(!row||row.revision!==parsed.revision||row.commerce_product_id===null)throw Error('catalog_stale');
+ return row;
+}
+
+/** Edit only the selling rule from the visual catalog; all other controls are preserved. */
+export async function updateCatalogProductSale(db:CommerceDb,input:CatalogSaleUpdate,adminId:bigint):Promise<{updated:true}>{
+ if(!input||!['source','manual'].includes(input.mode)||typeof input.selling!=='string')throw Error('catalog_price');
+ return db.$transaction(async tx=>{
+  const row=await managedRow(tx,input);
+  if(row.unit_cost_minor===null)throw Error('catalog_cost_missing');
+  let sellingMinor:number;
+  try{sellingMinor=input.mode==='source'?row.public_price_minor:parseSar(input.selling);}catch{throw Error('catalog_price');}
+  await saveProductControlsInTransaction(tx,{id:row.id,revision:row.revision,policy:input.mode,costMinor:row.unit_cost_minor,sellingMinor,discountMinor:0,discountBps:0,minimumPriceMinor:row.minimum_price_minor,minimumMarginMinor:row.minimum_margin_minor,active:row.active===1,visible:row.visible===1,featured:row.featured===1},adminId);
+  return {updated:true as const};
+ },{isolationLevel:'ReadCommitted',timeout:30000});
+}
+
+async function lockManagedRow(tx:Prisma.TransactionClient,input:CatalogSelection):Promise<ManagedRow>{
+ const parsed=managedSelection(input);
+ const [lookup]=await tx.$queryRaw<{commerce_product_id:bigint|null}[]>`SELECT commerce_product_id FROM supplier_products WHERE id=${parsed.id}`;
+ if(!lookup?.commerce_product_id)throw Error('catalog_stale');
+ await tx.$queryRaw`SELECT id FROM commerce_products WHERE id=${lookup.commerce_product_id} FOR UPDATE`;
+ const [row]=await tx.$queryRaw<ManagedRow[]>`SELECT id,revision,commerce_product_id,public_price_minor,unit_cost_minor,selling_price_minor,pricing_policy,discount_minor,discount_bps,minimum_price_minor,minimum_margin_minor,active,visible,featured FROM supplier_products WHERE id=${parsed.id} FOR UPDATE`;
+ if(!row||row.revision!==parsed.revision||row.commerce_product_id!==lookup.commerce_product_id)throw Error('catalog_stale');
+ return row;
+}
+
+/** Reversible emergency action available next to every mapped catalog product. */
+export async function hideCatalogProduct(db:CommerceDb,input:CatalogSelection,adminId:bigint):Promise<{hidden:true}>{
+ return db.$transaction(async tx=>{
+  const row=await lockManagedRow(tx,input);
+  await tx.$executeRaw`UPDATE commerce_products SET enabled=0,visible=0,updated_at=CURRENT_TIMESTAMP(3) WHERE id=${row.commerce_product_id}`;
+  await tx.$executeRaw`UPDATE supplier_products SET active=0,visible=0,revision=revision+1 WHERE id=${row.id}`;
+  await tx.admin_log.create({data:{admin_id:adminId,action:'إخفاء منتج مورد',target:String(row.id),note:'visible=0;active=0;source_catalog_preserved=1'}});
+  return {hidden:true as const};
+ },{isolationLevel:'ReadCommitted',timeout:30000});
+}
+
+/** Remove only the Trbhh mapping. Source data remains available for a later manual re-add. */
+export async function removeCatalogProduct(db:CommerceDb,input:CatalogRemoval,adminId:bigint):Promise<{removed:true}>{
+ if(input?.confirmed!==true)throw Error('catalog_remove_confirmation');
+ return db.$transaction(async tx=>{
+  const row=await lockManagedRow(tx,input),commerceId=row.commerce_product_id!;
+  const [history]=await tx.$queryRaw<{orders:bigint;allocations:bigint}[]>`SELECT (SELECT COUNT(*) FROM commerce_order_items WHERE product_id=${commerceId}) AS orders,(SELECT COUNT(*) FROM supplier_reservation_allocations WHERE commerce_product_id=${commerceId}) AS allocations`;
+  if(!history||history.orders>0n||history.allocations>0n)throw Error('catalog_remove_history');
+  await tx.$executeRaw`DELETE FROM commerce_product_suppliers WHERE product_id=${commerceId}`;
+  await tx.$executeRaw`UPDATE supplier_products SET commerce_product_id=NULL,selling_price_minor=NULL,pricing_policy='source',discount_minor=0,discount_bps=0,active=0,visible=0,featured=0,revision=revision+1 WHERE id=${row.id}`;
+  await tx.$executeRaw`DELETE FROM commerce_products WHERE id=${commerceId}`;
+  await tx.admin_log.create({data:{admin_id:adminId,action:'حذف منتج مورد من تربح',target:String(row.id),note:`commerce_product=${commerceId};source_catalog_preserved=1;history=0`}});
+  return {removed:true as const};
  },{isolationLevel:'ReadCommitted',timeout:30000});
 }

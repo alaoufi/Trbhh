@@ -8,10 +8,12 @@ backup_id=${2:?numeric backup run id}
 candidate=${3:?candidate commit}
 reuse_media_id=${4:-}
 release_profile=${5:-standard}
-[[ "$release_profile" == standard || "$release_profile" == salla || "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact ]] || exit 1
+[[ "$release_profile" == standard || "$release_profile" == salla || "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact || "$release_profile" == catalog_management ]] || exit 1
 [[ "$phase" == before || "$phase" == after ]] || exit 1
 [[ "$backup_id" =~ ^[0-9]+$ && "$candidate" =~ ^[0-9a-f]{40}$ ]] || exit 1
-if [[ "$release_profile" == onboarding_audit_compact ]]; then
+if [[ "$release_profile" == catalog_management ]]; then
+  [[ "$reuse_media_id" == 35656382084 && "$reuse_media_id" != "$backup_id" ]] || { echo 'Catalog management release requires its exact verified media chain'; exit 1; }
+elif [[ "$release_profile" == onboarding_audit_compact ]]; then
   [[ "$reuse_media_id" == 35653890678 && "$reuse_media_id" != "$backup_id" ]] || { echo 'Onboarding audit compact release requires its exact verified media chain'; exit 1; }
 elif [[ "$release_profile" == onboarding_legacy_identity ]]; then
   [[ "$reuse_media_id" == 35651818861 && "$reuse_media_id" != "$backup_id" ]] || { echo 'Onboarding legacy identity release requires its exact verified media chain'; exit 1; }
@@ -37,7 +39,9 @@ elif [[ "$release_profile" == national_day ]]; then
   [[ "$reuse_media_id" == 35626587686 && "$reuse_media_id" != "$backup_id" ]] || { echo 'National day requires its exact reviewed media chain'; exit 1; }
 fi
 if [[ -n "$reuse_media_id" ]]; then
-  if [[ "$release_profile" == onboarding_audit_compact ]]; then
+  if [[ "$release_profile" == catalog_management ]]; then
+    [[ "$reuse_media_id" == 35656382084 && "$reuse_media_id" != "$backup_id" ]] || exit 1
+  elif [[ "$release_profile" == onboarding_audit_compact ]]; then
     [[ "$reuse_media_id" == 35653890678 && "$reuse_media_id" != "$backup_id" ]] || exit 1
   elif [[ "$release_profile" == onboarding_legacy_identity ]]; then
     [[ "$reuse_media_id" == 35651818861 && "$reuse_media_id" != "$backup_id" ]] || exit 1
@@ -109,8 +113,11 @@ if [[ "$phase" == after ]]; then
     cmp --silent .env "$backup/environment.env"
     cmp --silent docker-compose.yml "$backup/docker-compose.yml"
   fi
-  if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact ]]; then
-    if [[ "$release_profile" == merchant_oauth ]]; then
+  if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact || "$release_profile" == catalog_management ]]; then
+    if [[ "$release_profile" == catalog_management ]]; then
+      [[ "$(cat "$backup/VERIFIED")" == 6dc58319b9d570c32f4c983491e8950689292b31 && "$(cat "$backup/commit.txt")" == 6dc58319b9d570c32f4c983491e8950689292b31 && "$(cat "$backup/candidate.txt")" == "$candidate" ]] || exit 1
+      node "$tools_dir/catalog-management-media-reference.cjs" verify "$backup"
+    elif [[ "$release_profile" == merchant_oauth ]]; then
       [[ "$(cat "$backup/VERIFIED")" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 && "$(cat "$backup/commit.txt")" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 && "$(cat "$backup/candidate.txt")" == "$candidate" ]] || exit 1
     elif [[ "$release_profile" == onboarding_audit_compact ]]; then
       [[ "$(cat "$backup/VERIFIED")" == 1b700dbdcb7d6a2c6fba8ea2cc03cb50aeb20b7d && "$(cat "$backup/commit.txt")" == 1b700dbdcb7d6a2c6fba8ea2cc03cb50aeb20b7d && "$(cat "$backup/candidate.txt")" == "$candidate" ]] || exit 1
@@ -158,7 +165,7 @@ if [[ "$phase" == after ]]; then
     node "$tools_dir/supplier-preservation-proof.cjs" verify "$backup/supplier-before.json" "$backup/supplier-after.json"
   fi
   docker compose exec -T app node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/after.json"
-  if [[ "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact ]]; then
+  if [[ "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact || "$release_profile" == catalog_management ]]; then
     node "$tools_dir/database-proof.cjs" verify-known-migration "$backup/before.json" "$backup/after.json" msg_topup_ok_v1
   else
     node "$tools_dir/database-proof.cjs" verify "$backup/before.json" "$backup/after.json"
@@ -179,6 +186,8 @@ fi
 
 if [[ "$release_profile" == salla ]]; then
   [[ "$current_commit" == eda1e8cb400a90418b57ad5d0b5f97bc3e8fee96 && -z "$reuse_media_id" ]] || { echo 'Salla requires exact home baseline and fresh full backup'; exit 1; }
+elif [[ "$release_profile" == catalog_management ]]; then
+  [[ "$current_commit" == 6dc58319b9d570c32f4c983491e8950689292b31 && "$reuse_media_id" == 35656382084 ]] || { echo 'Catalog management release requires its exact reviewed production baseline and backup chain'; exit 1; }
 elif [[ "$release_profile" == merchant_oauth ]]; then
   [[ "$current_commit" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 && -z "$reuse_media_id" ]] || { echo 'Merchant OAuth requires its exact reviewed baseline and fresh full backup'; exit 1; }
 elif [[ "$release_profile" == merchant_headers ]]; then
@@ -210,7 +219,7 @@ elif [[ "$release_profile" == national_day ]]; then
 else
   [[ "$current_commit" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || { echo 'Production baseline changed; stop and review'; exit 1; }
 fi
-if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact ]]; then
+if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact || "$release_profile" == catalog_management ]]; then
   # Measure while the app is live, before creating this backup or its archives.
   # A failed capacity gate creates no partial image/media backup and never pauses.
   capacity=$(docker exec -i -u 0 "$container" node - measure < "$tools_dir/backup-capacity-proof.cjs")
@@ -230,6 +239,7 @@ if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_hea
   if [[ "$release_profile" == onboarding_template ]]; then media_capacity=verified-parent; fi
   if [[ "$release_profile" == onboarding_legacy_email ]]; then media_capacity=verified-parent; fi
   if [[ "$release_profile" == onboarding_legacy_identity ]]; then media_capacity=verified-parent; fi
+  if [[ "$release_profile" == catalog_management ]]; then media_capacity=verified-parent; fi
   if [[ "$release_profile" == onboarding_audit_compact ]]; then media_capacity=verified-parent; fi
   node "$tools_dir/backup-capacity-proof.cjs" check "$capacity" "$image_bytes" "$code_bytes" "$base" "$docker_root" "$media_capacity"
 fi
@@ -239,10 +249,12 @@ printf '%s\n' "$current_commit" > "$backup/commit.txt"
 printf '%s\n' "$current_image" > "$backup/image-id.txt"
 printf '%s\n' "$candidate" > "$backup/candidate.txt"
 docker inspect "$container" > "$backup/container-before.json"
-if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact ]]; then
+if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact || "$release_profile" == catalog_management ]]; then
   node "$tools_dir/verify-runtime.cjs" "$backup/container-before.json" "$backup/container-before.json" "$release_profile"
 fi
-if [[ "$release_profile" == onboarding_audit_compact ]]; then
+if [[ "$release_profile" == catalog_management ]]; then
+  node "$tools_dir/catalog-management-media-reference.cjs" prepare "$base/audit-$reuse_media_id" "$backup"
+elif [[ "$release_profile" == onboarding_audit_compact ]]; then
   node "$tools_dir/onboarding-audit-compact-media-reference.cjs" prepare "$base/audit-$reuse_media_id" "$backup"
 elif [[ "$release_profile" == onboarding_legacy_identity ]]; then
   node "$tools_dir/onboarding-legacy-identity-media-reference.cjs" prepare "$base/audit-$reuse_media_id" "$backup"
@@ -310,7 +322,7 @@ docker exec "$reader" sh -c 'command -v mysqldump || command -v mariadb-dump' >/
 # Prepare reused media before the guarded pause. Merchant headers use only the
 # pinned verified parent above; the older generic reuse path copies/extracts
 # archives and does not reuse that source's manifests or success markers.
-if [[ "$release_profile" == merchant_headers || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact || ( "$release_profile" == supplier_selection && -n "$reuse_media_id" ) ]]; then
+if [[ "$release_profile" == merchant_headers || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact || "$release_profile" == catalog_management || ( "$release_profile" == supplier_selection && -n "$reuse_media_id" ) ]]; then
   for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
     IFS=: read -r label env_name fallback <<< "$spec"
     media_path=$(docker exec "$reader" node -e 'process.stdout.write(process.env[process.argv[1]]||process.argv[2]||"")' "$env_name" "$fallback")
@@ -366,7 +378,7 @@ echo 'Maintenance backup started; automatic resume guard armed.'
 echo 'Taking a private snapshot from the live app database connection.'
 docker exec -i "$reader" node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/before.json"
 docker exec -i "$reader" node - snapshot-full < "$tools_dir/database-proof.cjs" > "$backup/full-before.json"
-if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact ]]; then
+if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || "$release_profile" == national_day_loyalty || "$release_profile" == supplier_admin || "$release_profile" == banner_separation || "$release_profile" == onboarding_link || "$release_profile" == onboarding_template || "$release_profile" == onboarding_legacy_email || "$release_profile" == onboarding_legacy_identity || "$release_profile" == onboarding_audit_compact || "$release_profile" == catalog_management ]]; then
   docker exec -i "$reader" node - snapshot < "$tools_dir/supplier-preservation-proof.cjs" > "$backup/supplier-before.json"
 fi
 node "$tools_dir/database-proof.cjs" summary "$backup/before.json"
@@ -435,7 +447,9 @@ systemctl stop "$watchdog.timer"
 systemctl stop "$watchdog.service" >/dev/null 2>&1 || true
 [[ ! -e "$backup/WATCHDOG_FIRED" ]] || exit 1
 (cd "$backup" && sha256sum database.sql.gz *.tar.gz > SHA256SUMS)
-if [[ "$release_profile" == onboarding_audit_compact ]]; then
+if [[ "$release_profile" == catalog_management ]]; then
+  (cd "$backup" && sha256sum CATALOG_MANAGEMENT_MEDIA_REFERENCE.json REUSED_MEDIA_SOURCE *-before.json *.path >> SHA256SUMS)
+elif [[ "$release_profile" == onboarding_audit_compact ]]; then
   (cd "$backup" && sha256sum ONBOARDING_AUDIT_COMPACT_MEDIA_REFERENCE.json REUSED_MEDIA_SOURCE *-before.json *.path >> SHA256SUMS)
 elif [[ "$release_profile" == onboarding_legacy_identity ]]; then
   (cd "$backup" && sha256sum ONBOARDING_LEGACY_IDENTITY_MEDIA_REFERENCE.json REUSED_MEDIA_SOURCE *-before.json *.path >> SHA256SUMS)

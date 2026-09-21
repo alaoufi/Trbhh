@@ -12,6 +12,7 @@ export type CatalogProduct = CatalogSelection & {
   priceMinor: number;
   costMinor: number | null;
   sellingMinor: number | null;
+  pricingPolicy: 'manual' | 'source' | 'fixed_discount' | 'percent_discount';
   minimumPriceMinor: number;
   minimumMarginMinor: number;
   quantity: number | null;
@@ -20,6 +21,9 @@ export type CatalogProduct = CatalogSelection & {
   status: 'imported' | 'added_hidden' | 'published' | 'unavailable' | 'disconnected';
   statusLabel: string;
   canSelect: boolean;
+  canManage: boolean;
+  active: boolean;
+  visible: boolean;
   lastSyncAt: string | null;
 };
 export type CatalogDetail = CatalogProduct & {
@@ -53,9 +57,14 @@ export type CatalogApproval = {
   confirmed: boolean;
   products: (CatalogSelection & { cost: string; selling: string })[];
 };
+export type CatalogSaleUpdate = CatalogSelection & { mode: 'source' | 'manual'; selling: string };
+export type CatalogRemoval = CatalogSelection & { confirmed: boolean };
 export type CatalogActions = {
   search: (input: CatalogSearch) => Promise<{ data?: CatalogPage; error?: string }>;
   details: (key: string) => Promise<{ product?: CatalogDetail; error?: string }>;
   review: (selection: CatalogSelection[]) => Promise<{ review?: CatalogReview; error?: string }>;
   approve: (input: CatalogApproval) => Promise<{ added?: number; error?: string }>;
+  updateSale: (input: CatalogSaleUpdate) => Promise<{ updated?: boolean; error?: string }>;
+  hide: (input: CatalogSelection) => Promise<{ hidden?: boolean; error?: string }>;
+  remove: (input: CatalogRemoval) => Promise<{ removed?: boolean; error?: string }>;
 };

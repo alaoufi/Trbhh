@@ -6,7 +6,8 @@ import {SupplierOwnerInviteButton} from '@/components/supplier-owner-invite-butt
 describe('supplier owner authorization control',()=>{
  it('explains that the generated link is for the store owner and is temporary',()=>{
   const html=renderToStaticMarkup(createElement(SupplierOwnerInviteButton,{supplierId:'7',supplierName:'شعبيات الأولين'}));
-  expect(html).toContain('إنشاء رابط تفويض لصاحب المتجر');
+  expect(html).toContain('إنشاء رابط متابعة التفويض');
+  expect(html).toContain('متابعة التفويض في سلة');
   expect(html).toContain('24 ساعة');
   expect(html).toContain('شعبيات الأولين');
  });

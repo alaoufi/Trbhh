@@ -8,7 +8,15 @@ vi.mock('@/lib/prisma', () => ({ prisma: {} }));
 vi.mock('@/lib/suppliers/schema', () => ({ assertSupplierSchemaReady: state.schema }));
 vi.mock('@/lib/suppliers/catalog-admin', () => ({ loadCatalog: state.catalog }));
 vi.mock('@/components/supplier-catalog', () => ({ SupplierCatalog: () => createElement('div', null, 'الكتالوج المصور') }));
-vi.mock('@/app/admin/suppliers/catalog/actions', () => ({ searchProducts: vi.fn(), productDetails: vi.fn(), reviewProducts: vi.fn(), approveProducts: vi.fn() }));
+vi.mock('@/app/admin/suppliers/catalog/actions', () => ({
+  searchProducts: vi.fn(),
+  productDetails: vi.fn(),
+  reviewProducts: vi.fn(),
+  approveProducts: vi.fn(),
+  updateProductSale: vi.fn(),
+  hideProduct: vi.fn(),
+  removeProduct: vi.fn(),
+}));
 import Page from '@/app/admin/suppliers/catalog/page';
 
 describe('visual supplier catalog page', () => {

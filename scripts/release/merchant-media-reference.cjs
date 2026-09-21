@@ -101,4 +101,4 @@ if(require.main===module){
     process.stdout.write(JSON.stringify(result)+'\n');
   }catch{process.stderr.write('Verified parent media reference failed; preserve both backups and stop. Private details withheld.\n');process.exitCode=1;}
 }
-module.exports={parseSums,inspectParent,prepare,verify,PARENT_ID,PARENT_COMMIT,DEPLOYED_COMMIT};
+module.exports={parseSums,inspectParent,prepare,verify,PARENT_ID,PARENT_COMMIT,DEPLOYED_COMMIT,canonicalDirectory,hashFile,readSmall};

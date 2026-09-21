@@ -57,7 +57,7 @@ function searchInput(input:CatalogSearch):CatalogSearch{
 export async function loadCatalog(db:Reader,input:CatalogSearch):Promise<CatalogPage>{
  const query=searchInput(input),filter=query.supplierKey?Prisma.sql`AND p.supplier_id=${keyId(query.supplierKey,'s_')}`:Prisma.empty;
  const [rows,suppliers]=await Promise.all([
-  db.$queryRaw<Row[]>(Prisma.sql`SELECT ${cardFields} ${joins} WHERE c.provider='salla' AND ip.provider='salla' ${filter} AND (${query.query}='' OR LOCATE(${query.query},p.name)>0 OR LOCATE(${query.query},p.sku)>0) ORDER BY p.id DESC LIMIT ${CATALOG_PAGE_SIZE+1} OFFSET ${(query.page-1)*CATALOG_PAGE_SIZE}`),
+  db.$queryRaw<Row[]>(Prisma.sql`SELECT ${cardFields} ${joins} WHERE c.provider='salla' AND ip.provider='salla' ${filter} AND (${query.query}='' OR LOCATE(LOWER(${query.query}),LOWER(p.name))>0 OR LOCATE(LOWER(${query.query}),LOWER(p.sku))>0) ORDER BY p.id DESC LIMIT ${CATALOG_PAGE_SIZE+1} OFFSET ${(query.page-1)*CATALOG_PAGE_SIZE}`),
   db.$queryRaw<{id:bigint;name:string}[]>`SELECT s.id,s.name FROM commerce_suppliers s JOIN supplier_integration_profiles ip ON ip.supplier_id=s.id WHERE ip.provider='salla' ORDER BY s.name,s.id LIMIT 200`,
  ]);
  return {...query,products:rows.slice(0,CATALOG_PAGE_SIZE).map(product),suppliers:suppliers.map(row=>({key:'s_'+row.id,name:plain(row.name,255)})),hasNext:rows.length>CATALOG_PAGE_SIZE};

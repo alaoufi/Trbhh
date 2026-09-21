@@ -33,6 +33,7 @@ describe('supplier visual catalog backend',()=>{
   const calls=d.query.mock.calls.map(([sql])=>sql as {sql:string;values:unknown[]});
   const search=calls.find(call=>call.sql?.includes('LOCATE'))!;
   expect(search.sql).not.toContain('%_? قهوة');expect(search.values).toContain('%_? قهوة');expect(search.values).toContain(21);expect(search.values).toContain(20);
+  expect(search.sql).toContain('LOCATE(LOWER(?),LOWER(p.name))');expect(search.sql).toContain('LOCATE(LOWER(?),LOWER(p.sku))');expect(search.sql).not.toMatch(/\bLIKE\b/i);
   expect(d.execute).not.toHaveBeenCalled();
  });
  it('strips external IDs and unsafe image URLs while returning readable detail',async()=>{

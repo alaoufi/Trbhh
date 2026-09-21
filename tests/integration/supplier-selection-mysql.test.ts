@@ -1,10 +1,10 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import type { CommerceDb } from '@/lib/commerce/types';
 import type { CatalogApproval, CatalogSelection } from '@/lib/suppliers/catalog-selection';
-import { approveCatalogSelection, reviewCatalogSelection } from '@/lib/suppliers/catalog-admin';
-import { assertSupplierSchemaReady } from '@/lib/suppliers/schema';
+import { approveCatalogSelection, loadCatalog, reviewCatalogSelection } from '@/lib/suppliers/catalog-admin';
+import { assertSupplierSchemaReady, SUPPLIER_DDL } from '@/lib/suppliers/schema';
 
 type TransactionOptions = { maxWait?: number; timeout?: number; isolationLevel?: Prisma.TransactionIsolationLevel };
 
@@ -14,6 +14,33 @@ function decorateTransaction(db: PrismaClient, decorate: (tx: Prisma.Transaction
   const transaction = <T>(run: (tx: Prisma.TransactionClient) => Promise<T>, options?: TransactionOptions) =>
     db.$transaction(async tx => run(await decorate(tx)), options);
   return { $queryRaw: db.$queryRaw.bind(db), $transaction: transaction as CommerceDb['$transaction'] };
+}
+
+async function prepareEmptySupplierFixtureSchema(db: PrismaClient) {
+  // Prisma db push cannot represent the runtime's binary text collations. Align
+  // only the canonical supplier tables in the guarded, empty test database.
+  // Production readiness remains unchanged and runs against the real result.
+  const tables = SUPPLIER_DDL.map(ddl => {
+    const table = ddl.match(/^CREATE TABLE IF NOT EXISTS (supplier_[a-z_]+) /)?.[1];
+    if (!table) throw new Error('Unexpected canonical supplier table identifier');
+    return table;
+  });
+  const metadata = await db.$queryRaw<{ name: string; collation: string }[]>(Prisma.sql`
+    SELECT TABLE_NAME AS name,TABLE_COLLATION AS collation FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN (${Prisma.join(tables)})`);
+  if (metadata.length !== tables.length || metadata.some(row => !['utf8mb4_bin', 'utf8mb4_unicode_ci'].includes(row.collation))) {
+    throw new Error('Supplier test schema differs from the expected Prisma/canonical collations');
+  }
+  // Finish every emptiness check before the first ALTER; never repair populated tables.
+  for (const table of tables) {
+    const [row] = await db.$queryRaw<{ count: bigint }[]>(Prisma.sql`SELECT COUNT(*) AS count FROM ${Prisma.raw('`' + table + '`')}`);
+    if (Number(row?.count) !== 0) throw new Error('Supplier fixture collation setup requires empty canonical tables');
+  }
+  for (const table of tables) {
+    if (metadata.find(row => row.name === table)?.collation === 'utf8mb4_bin') continue;
+    // Identifier comes only from source-owned SUPPLIER_DDL, never environment or data.
+    await db.$executeRawUnsafe('ALTER TABLE `' + table + '` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_bin');
+  }
 }
 
 describe.skipIf(process.env.AUTH_DB_TESTS !== '1')('isolated MySQL visual supplier selection', () => {
@@ -41,6 +68,7 @@ describe.skipIf(process.env.AUTH_DB_TESTS !== '1')('isolated MySQL visual suppli
     const [actual] = await db.$queryRaw<{ name: string }[]>`SELECT DATABASE() AS name`;
     if ('/' + actual?.name !== url.pathname) throw new Error('Connected database does not match the explicit test database');
     if (await db.users.count() !== 0) throw new Error('Supplier selection suite requires an empty disposable user table');
+    await prepareEmptySupplierFixtureSchema(db);
     await assertSupplierSchemaReady(db);
     permitted = true;
     const admin = await db.users.create({ data: { userName: `selection-admin-${suffix}`, name: 'Synthetic selection administrator', type: 'user', is_admin: 1 } });
@@ -112,6 +140,19 @@ describe.skipIf(process.env.AUTH_DB_TESTS !== '1')('isolated MySQL visual suppli
     expect(await db.supplier_price_history.count({ where: { supplier_product_id: { in: sourceIds } } })).toBe(0);
     expect(await db.admin_log.count({ where: { admin_id: adminId } })).toBe(0);
   }
+
+  it('searches SKU and name without case sensitivity while treating percent and underscore literally', async () => {
+    const filter = { supplierKey: `s_${supplierId}`, page: 1 };
+    const bySku = await loadCatalog(db, { ...filter, query: 'synthetic-0' });
+    expect(bySku.products.map(product => product.key)).toEqual([selected[0].key]);
+    expect(bySku.products[0]).toMatchObject({ name: `${titlePrefix}0`, sku: 'SYNTHETIC-0', priceMinor: 3000, quantity: 5, hasOptions: true });
+    const byName = await loadCatalog(db, { ...filter, query: `${titlePrefix}0`.toUpperCase() });
+    expect(byName.products.map(product => product.key)).toEqual([selected[0].key]);
+    for (const query of ['%', '_']) {
+      expect((await loadCatalog(db, { ...filter, query })).products).toEqual([]);
+    }
+    await assertNoAddition();
+  });
 
   it('atomically adds complex and sold-out products with every publish/enable flag off', async () => {
     const input = await approval();

@@ -1,0 +1,33 @@
+{
+  "verifiedAt": "2026-09-21T14:15:34.111Z",
+  "fixtureOnly": true,
+  "checks": [
+    {
+      "width": 1440,
+      "preview": true,
+      "focusTrap": true,
+      "singleAddRequiresReview": true,
+      "crossPageSelection": true,
+      "nameSearch": true,
+      "skuSearch": true,
+      "searchFailurePreservesSelection": true,
+      "explicitReview": true,
+      "hiddenAddition": true,
+      "internalKeysHidden": true
+    },
+    {
+      "width": 390,
+      "preview": true,
+      "focusTrap": true,
+      "singleAddRequiresReview": true,
+      "crossPageSelection": true,
+      "nameSearch": true,
+      "skuSearch": true,
+      "searchFailurePreservesSelection": true,
+      "explicitReview": true,
+      "hiddenAddition": true,
+      "internalKeysHidden": true
+    }
+  ],
+  "errors": []
+}

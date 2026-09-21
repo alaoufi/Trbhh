@@ -33,9 +33,10 @@ function SupplierForm({ supplier }: { supplier?: Supplier }) {
     <button className={button}>حفظ المورد</button>
   </form>;
 }
-function MappingForm({ mapping, suppliers }: { mapping?: Mapping; suppliers: Supplier[] }) {
-  return <form action={saveSupplierProduct} aria-label={mapping ? `ربط السلعة ${mapping.product_id}` : 'ربط سلعة بمورد'} className="grid gap-3 sm:grid-cols-2">
-    <label>رقم السلعة المعتمدة<input className={input} name="productId" inputMode="numeric" pattern="[1-9][0-9]{0,14}" required readOnly={!!mapping} defaultValue={mapping?.product_id.toString()} /></label>
+function MappingForm({ mapping, suppliers }: { mapping: Mapping; suppliers: Supplier[] }) {
+  return <form action={saveSupplierProduct} aria-label={`تعديل ربط ${mapping.title}`} className="grid gap-3 sm:grid-cols-2">
+    <input type="hidden" name="productId" value={mapping.product_id.toString()} />
+    <p className="font-bold sm:col-span-2">{mapping.title}</p>
     <label>المورد<select className={input} name="supplierId" required defaultValue={mapping?.supplier_id.toString() || ''}>
       <option value="">اختر المورد النشط</option>
       {mapping && !suppliers.some(s => s.id === mapping.supplier_id) && <option value={mapping.supplier_id.toString()} disabled={mapping.supplier_active !== 1}>{mapping.supplier_name} (#{mapping.supplier_id.toString()}) — خارج هذه الصفحة{mapping.supplier_active === 1 ? '' : ' — غير نشط'}</option>}
@@ -61,6 +62,7 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
   return <div className="space-y-4">
     <h1 className="text-xl font-bold text-primary">الموردون وربط السلع</h1>
     <Link href="/admin/suppliers/onboarding" className="inline-block rounded-lg bg-amber-400 px-4 py-2 font-bold text-slate-900">رفع ملف متجر سلة</Link>
+    <Link href="/admin/suppliers/catalog" className="inline-block rounded-lg bg-primary px-4 py-2 font-bold text-white">اختيار منتجات سلة</Link>
     <Link href="/admin/suppliers/integrations" className="inline-block rounded-lg bg-primary px-4 py-2 text-white">تكامل Salla وكتالوج الموردين</Link>
     <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">الموردون جهات داخلية لتربح. التنفيذ والتسوية خارج الموقع. لا تحويل أموال ولا اتصال API من هذه الصفحة.</p>
     <nav className="flex flex-wrap gap-4 text-primary underline"><Link href="/admin/commerce">السلع والطلبات</Link><Link href="/admin/commerce/accounts">الإيصالات والاستحقاقات</Link></nav>
@@ -76,10 +78,10 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
       {!suppliers.length && <p className="text-sm">لا يوجد موردون في هذه الصفحة.</p>}
       {suppliers.map(s => <details key={s.id.toString()} className="card-3d rounded-xl p-4"><summary className="mb-3 cursor-pointer">#{s.id.toString()} {s.name} — {s.active === 1 ? 'نشط' : 'غير نشط'}</summary><SupplierForm supplier={s} /></details>)}
     </section>
-    <section className="card-3d space-y-3 rounded-xl p-4"><h2 className="font-bold">ربط سلعة بمورد</h2><p className="text-sm">التكلفة داخلية؛ لا تغيّر سعر البيع للعميل. التعديلات تخص الطلبات الجديدة ولا تغيّر لقطات الطلبات السابقة. قائمة الاختيار تعرض موردي الصفحة الحالية والمورد المرتبط بالسلعة.</p><MappingForm suppliers={suppliers} /></section>
+    <section className="card-3d space-y-3 rounded-xl p-4"><h2 className="font-bold">اختيار منتجات المورد</h2><p className="text-sm">ابحث بالاسم أو SKU، عاين الصور والتفاصيل، ثم راجع المنتجات المحددة قبل إضافتها إلى تربح. المنتجات تبقى مخفية بعد الإضافة.</p><Link href="/admin/suppliers/catalog" className={`${button} inline-flex min-h-11 items-center`}>عرض المنتجات واختيارها</Link></section>
     <section className="space-y-3"><h2 className="font-bold">روابط السلع — الصفحة {page}</h2>
       {!mappings.length && <p className="text-sm">لا توجد روابط سلع في هذه الصفحة.</p>}
-      {mappings.map(m => <details key={m.product_id.toString()} className="card-3d rounded-xl p-4"><summary className="mb-3 cursor-pointer">#{m.product_id.toString()} {m.title} · {m.supplier_name} · {formatSar(m.unit_cost_minor)} ر.س</summary><MappingForm mapping={m} suppliers={suppliers} /></details>)}
+      {mappings.map(m => <details key={m.product_id.toString()} className="card-3d rounded-xl p-4"><summary className="mb-3 cursor-pointer">{m.title} · {m.supplier_name} · {formatSar(m.unit_cost_minor)} ر.س</summary><MappingForm mapping={m} suppliers={suppliers} /></details>)}
     </section>
   </div>;
 }

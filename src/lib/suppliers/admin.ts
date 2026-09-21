@@ -1,4 +1,5 @@
 import 'server-only';
+import type {Prisma} from '@prisma/client';
 import type {CommerceDb} from '@/lib/commerce/types';
 import {parseSar} from '@/lib/commerce/money';
 import {calculatePricing} from './pricing';
@@ -31,7 +32,10 @@ export async function saveIntegration(db:CommerceDb,input:ReturnType<typeof pars
 type Product={id:bigint;connection_id:bigint;supplier_id:bigint;commerce_product_id:bigint|null;revision:number;name:string;sku:string;public_price_minor:number;unit_cost_minor:number|null;selling_price_minor:number|null;quantity:number|null;available:number;variants:unknown;options:unknown};
 const hasVariants=(v:unknown)=>{try {return Array.isArray(typeof v==='string'?JSON.parse(v):v)&&(typeof v==='string'?JSON.parse(v):v).length>0;}catch{return true;}};
 export async function saveProductControls(db:CommerceDb,input:ReturnType<typeof parseProductControls>,adminId:bigint) {
-  await db.$transaction(async tx=>{
+  await db.$transaction(tx=>saveProductControlsInTransaction(tx,input,adminId));
+}
+/** Reuse the existing pricing/mapping operation inside an all-or-nothing review. */
+export async function saveProductControlsInTransaction(tx:Prisma.TransactionClient,input:ReturnType<typeof parseProductControls>,adminId:bigint) {
     // Lock commerce product before imported row, matching checkout/sync lock order.
     const [lookup]=await tx.$queryRaw<{commerce_product_id:bigint|null}[]>`SELECT commerce_product_id FROM supplier_products WHERE id=${input.id}`;
     if(lookup?.commerce_product_id)await tx.$queryRaw`SELECT id FROM commerce_products WHERE id=${lookup.commerce_product_id} FOR UPDATE`;
@@ -54,7 +58,6 @@ export async function saveProductControls(db:CommerceDb,input:ReturnType<typeof 
     await tx.$executeRaw`INSERT INTO supplier_price_history(supplier_product_id,actor_id,kind,old_public_minor,new_public_minor,old_cost_minor,new_cost_minor,old_selling_minor,new_selling_minor) VALUES(${product.id},${adminId},'admin',${product.public_price_minor},${product.public_price_minor},${product.unit_cost_minor},${price.costMinor},${product.selling_price_minor},${price.sellingMinor})`;
     await tx.$executeRaw`UPDATE supplier_products SET commerce_product_id=${commerceId},unit_cost_minor=${price.costMinor},selling_price_minor=${price.sellingMinor},pricing_policy=${input.policy},discount_minor=${input.discountMinor},discount_bps=${input.discountBps},minimum_price_minor=${input.minimumPriceMinor},minimum_margin_minor=${input.minimumMarginMinor},active=${Number(input.active)},visible=${Number(input.visible)},featured=${Number(input.featured)},revision=revision+1 WHERE id=${product.id}`;
     await tx.admin_log.create({data:{admin_id:adminId,action:'ضبط منتج مورد',target:product.id.toString(),note:`visible=${Number(input.visible)};active=${Number(input.active)};selling=${price.sellingMinor};cost=${price.costMinor}`}});
-  });
 }
 export async function addPriceTier(db:CommerceDb,form:FormData,adminId:bigint) {
   const productId=formId(form,'productId'),quantity=Number(form.get('quantity')),cost=parseSar(String(form.get('cost')||'')),kind=String(form.get('kind'));

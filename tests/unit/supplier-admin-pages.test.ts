@@ -29,13 +29,24 @@ describe('supplier and operational accounting pages', () => {
     expect(html).toMatch(/<textarea[^>]*name="settlementTerms"/);
     expect(html.match(/<input[^>]*name="phone"[^>]*>/)?.[0]).toContain('maxLength="40"');
   });
-  it('offers active suppliers by name and keeps inactive ones unavailable for new mappings', async () => {
-    state.query.mockResolvedValueOnce([{ id: 7n, name: 'Active fixture', active: 1 }, { id: 8n, name: 'Inactive fixture', active: 0 }]).mockResolvedValueOnce([]);
+  it('edits existing mappings by product name and keeps inactive supplier choices unavailable', async () => {
+    state.query.mockResolvedValueOnce([{ id: 7n, name: 'Active fixture', active: 1 }, { id: 8n, name: 'Inactive fixture', active: 0 }]).mockResolvedValueOnce([{ product_id: 987654321n, supplier_id: 7n, supplier_sku: 'SKU', unit_cost_minor: 1000, title: 'Fixture product', supplier_name: 'Active fixture', supplier_active: 1 }]);
     const html = renderToStaticMarkup(await Suppliers({ searchParams: Promise.resolve({}) }));
     expect(html).toMatch(/<select[^>]*name="supplierId"/);
     expect(html).toContain('Active fixture');
     expect(html).toMatch(/<option[^>]*value="8"[^>]*disabled=""|<option[^>]*disabled=""[^>]*value="8"/);
     expect(html).not.toMatch(/<input[^>]*name="supplierId"/);
+    expect(html).toMatch(/<input type="hidden" name="productId" value="987654321"/);
+    expect(html).not.toContain('رقم السلعة المعتمدة');
+    expect(html).not.toContain('#987654321');
+    expect(html).toContain('تعديل ربط Fixture product');
+    expect(html).toContain('/admin/suppliers/catalog');
+  });
+  it('replaces manual product-number creation with the visual catalog', async () => {
+    const html = renderToStaticMarkup(await Suppliers({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain('عرض المنتجات واختيارها');
+    expect(html).toContain('المنتجات تبقى مخفية');
+    expect(html).not.toContain('name="productId"');
   });
   it.each(['', '0', '-1', '01', '1.5', '1e2', '100001', '1 OR 1=1', ['2', '3']].map(page => ({ page })))('rejects invalid supplier pages before schema or data queries: %j', async ({ page }) => {
     await expect(Suppliers({ searchParams: Promise.resolve({ page }) })).rejects.toThrow('not_found');

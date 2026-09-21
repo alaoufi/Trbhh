@@ -427,7 +427,13 @@ function verifyKnownMigration(before, after, migration) {
   assert(result.sameDatabase && result.addedTables.length === 0, 'Known migration changed database identity or tables.');
   assert(result.failures.length === 1 && result.failures[0].table === 'site_settings' && result.failures[0].kind === 'protected_rows_changed' && result.failures[0].count === 1, 'Known migration has unrelated protected changes.');
   assert(oldTable && nextTable && JSON.stringify(oldTable.primaryKeyColumns) === JSON.stringify(['k']) && JSON.stringify(oldTable.protectedColumns) === JSON.stringify(['k','v']) && JSON.stringify(oldTable.primaryKeyColumns) === JSON.stringify(nextTable.primaryKeyColumns) && JSON.stringify(oldTable.protectedColumns) === JSON.stringify(nextTable.protectedColumns), 'Known migration setting proof is unavailable.');
-  assert(oldTable.rowFingerprints[keyHash] === fingerprint([['k',key],['v',oldValue]]) && nextTable.rowFingerprints[keyHash] === fingerprint([['k',key],['v',newValue]]), 'Known migration values do not match the reviewed boot migration.');
+  const beforeLegacy = oldTable.rowFingerprints[keyHash] === fingerprint([['k',key],['v',oldValue]]);
+  const afterCurrent = nextTable.rowFingerprints[keyHash] === fingerprint([['k',key],['v',newValue]]);
+  if (!beforeLegacy || !afterCurrent) {
+    const changedKeys = oldTable.primaryKeys.filter((candidate) => nextTable.rowFingerprints[candidate] && oldTable.rowFingerprints[candidate] !== nextTable.rowFingerprints[candidate]);
+    console.error(JSON.stringify({ diagnostic:'known_migration_mismatch', changedSetting:changedKeys.length === 1 && changedKeys[0] === keyHash ? 'shipping_credit_message' : 'unrecognized', beforeLegacy, afterCurrent }));
+  }
+  assert(beforeLegacy && afterCurrent, 'Known migration values do not match the reviewed boot migration.');
   return {...result, ok:true, failures:[], migration:'shipping_credit_message_v1'};
 }
 

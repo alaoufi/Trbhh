@@ -7,7 +7,8 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect runtime and pilot tables without modifying data
+      - uses: actions/checkout@v4
+      - name: Trace stored Salla products against their immutable source IDs
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -18,8 +19,5 @@ jobs:
           mkdir -p ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/deploy_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" '
-            set -e
-            cd /root/trbhh
-            docker compose exec -T app sh -lc "test -r /app/database/2026-08-17-dynamic-ads.sql && echo SQL_FILE=present || (echo SQL_FILE=missing; exit 1)"
-          '
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/deploy_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" \
+            'cd /root/trbhh && docker compose exec -T app node -' < scripts/diagnostics/salla-image-forensics.cjs

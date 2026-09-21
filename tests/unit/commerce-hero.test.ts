@@ -32,6 +32,16 @@ describe('CommerceHero public homepage contract', () => {
     expect(html).not.toContain('سوق سعودي');
   });
 
+  it('renders an informational slide without a link or marketplace call to action', () => {
+    const html = renderToStaticMarkup(createElement(CommerceHero, {
+      slides: [{ ...brand, href: null, cta: '', title: 'دام عزك يا وطن' }],
+    }));
+    expect(html).toContain('دام عزك يا وطن');
+    expect(html).not.toContain('<a');
+    expect(html).not.toContain('تصفّح الآن');
+    expect(html).not.toContain('تصفح السوق');
+  });
+
   it('provides an explicit pause control only for a moving carousel', () => {
     const html = renderToStaticMarkup(createElement(CommerceHero, { slides: [brand, { ...brand, id: 'another' }] }));
     expect(html).toContain('aria-label="إيقاف الحركة"');

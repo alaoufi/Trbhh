@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { isNationalDayCampaignActive } from '@/lib/national-day';
+import { isNationalDayCampaignActive, nationalDayHeroSlides } from '@/lib/national-day';
 import * as NationalDayComponents from '@/components/national-day-banner';
 const { NationalDayBanner, NationalDayHeroFrame } = NationalDayComponents;
 
@@ -25,12 +25,16 @@ describe('2026 National Day campaign window in Riyadh', () => {
 });
 
 describe('inline public-home campaign presentation', () => {
-  it('shows the reused greeting with working marketplace links and no blocking overlay', () => {
+  it('shows a patriotic loyalty message without commercial calls to action', () => {
     const html = renderToStaticMarkup(createElement(NationalDayBanner));
     expect(html).toContain('دام عزك يا وطن');
     expect(html).toContain('اليوم الوطني السعودي');
-    expect(html).toContain('href="/search"');
-    expect(html).toContain('href="/ads/new"');
+    expect(html).toContain('ولاء');
+    expect(html).toContain('انتماء');
+    expect(html).not.toContain('href="/search"');
+    expect(html).not.toContain('href="/ads/new"');
+    expect(html).not.toContain('تصفح السوق');
+    expect(html).not.toContain('أضف إعلانك');
     expect(html).not.toContain('/shop');
     expect(html).not.toContain('role="dialog"');
     expect(html).not.toContain('aria-modal');
@@ -57,7 +61,21 @@ describe('inline public-home campaign presentation', () => {
     expect(html).toContain('data-national-day-entry="true"');
     expect(html).toContain('/national-day/saudi-flag.svg');
     expect(html).toContain('/national-day/leadership.webp');
+    expect(html).toContain('ولاء');
+    expect(html).toContain('انتماء');
     expect(html).toContain('تخطي');
     expect(html).toContain('data-phase="idle"');
+  });
+
+  it('provides informational patriotic slides without marketplace links or buttons', () => {
+    const slides = nationalDayHeroSlides();
+    expect(slides).toHaveLength(2);
+    expect(slides).toEqual(expect.arrayContaining([
+      expect.objectContaining({ href: null, cta: '' }),
+    ]));
+    const copy = slides.map(slide => `${slide.title} ${slide.subtitle} ${slide.eyebrow} ${slide.cta}`).join(' ');
+    expect(copy).toMatch(/ولاء|ولاؤنا/);
+    expect(copy).toContain('انتماء');
+    expect(copy).not.toMatch(/تصفح السوق|اكتشف السوق|أضف إعلانك/);
   });
 });

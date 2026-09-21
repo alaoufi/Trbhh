@@ -22,7 +22,7 @@ function Fixture() {
   const [single, setSingle] = useState(false);
   const nationalDay = isNationalDayCampaignActive();
   const marketplaceHero = publicHomeHero(fixtureAds, 'بيع. اشترِ. وتربح.', 'اعرض اللي عندك، واكتشف اللي تحتاجه، وتواصل مباشرة.');
-  const hero = nationalDay ? nationalDayHeroSlides('/search') : marketplaceHero;
+  const hero = nationalDay ? nationalDayHeroSlides() : marketplaceHero;
   return <>
     <aside className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900" aria-label="حدود المعاينة">
       معاينة محلية للمكونات فقط — البيانات والصور تجريبية، وليست الموقع الحي أو صفحة الرئيسية كاملة.

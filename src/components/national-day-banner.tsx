@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 import styles from './national-day-banner.module.css';
 export { NationalDayEntry } from './national-day-entry';
@@ -7,15 +6,12 @@ export { NationalDayEntry } from './national-day-entry';
 export function NationalDayBanner() {
   return <section aria-labelledby="national-day-title" className="relative overflow-hidden rounded-2xl border border-[#006c35]/20 bg-[#006c35] p-3 text-white shadow-sm sm:p-4">
     <span aria-hidden="true" className="pointer-events-none absolute -left-12 -top-20 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-    <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="relative">
       <div className="min-w-0">
         <p className="text-xs font-bold text-white/90">اليوم الوطني السعودي</p>
         <h2 id="national-day-title" className="mt-0.5 text-xl font-extrabold leading-relaxed sm:text-2xl">دام عزك يا وطن</h2>
-        <p className="text-sm leading-6 text-white/90">نحتفل معكم بسوق يقرّب البائع والمشتري.</p>
-      </div>
-      <div className="flex shrink-0 flex-wrap gap-2">
-        <Link href="/search" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#f0b429] px-4 py-2 text-sm font-extrabold text-[#16294a] transition hover:bg-[#f8c955] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">تصفح السوق ←</Link>
-        <Link href="/ads/new" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/60 bg-[#004c25] px-4 py-2 text-sm font-extrabold text-white transition hover:bg-[#003b1d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">أضف إعلانك</Link>
+        <p className="text-sm leading-6 text-white/90">وطنٌ نعتز به، وقيادةٌ نخلص لها، وولاءٌ وانتماءٌ يتجددان في كل عام.</p>
+        <p className="mt-1 text-xs font-bold leading-5 text-[#f0b429]">اللهم احفظ المملكة وأدم عليها عزها وأمنها وازدهارها.</p>
       </div>
     </div>
   </section>;

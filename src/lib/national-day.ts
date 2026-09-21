@@ -8,25 +8,25 @@ export function isNationalDayCampaignActive(now = Date.now()): boolean {
   return Number.isFinite(now) && now >= START && now < END;
 }
 
-export function nationalDayHeroSlides(href: string): HeroSlide[] {
+export function nationalDayHeroSlides(): HeroSlide[] {
   return [
     {
       id: 'national-leadership',
-      title: 'قيادة وطن.. وطموح شعب',
-      subtitle: 'خادم الحرمين الشريفين الملك سلمان وسمو ولي العهد الأمير محمد بن سلمان.',
+      title: 'وطنٌ نعتز به.. وقيادةٌ نخلص لها',
+      subtitle: 'نجدد الولاء والانتماء لوطننا وقيادتنا، ونسأل الله أن يديم على المملكة عزها وأمنها وازدهارها.',
       image: '/national-day/leadership.webp',
-      href,
-      cta: 'اكتشف السوق',
-      eyebrow: 'اليوم الوطني السعودي',
+      href: null,
+      cta: '',
+      eyebrow: 'ولاءٌ راسخ · وانتماءٌ لا يتغير',
       contentAlign: 'center',
     },
     {
       id: 'national-flag',
-      title: 'دام عزك يا وطن',
-      subtitle: 'رايتنا خضراء.. وعزّنا يمتد من جيل إلى جيل.',
+      title: 'رايتنا شامخة.. وولاؤنا راسخ',
+      subtitle: 'نفخر بتاريخنا، ونعتز بحاضرنا، ونبني مستقبلنا تحت راية التوحيد.',
       image: '/national-day/saudi-flag.svg',
-      href,
-      cta: 'تصفح السوق',
+      href: null,
+      cta: '',
       eyebrow: 'المملكة العربية السعودية',
       contentAlign: 'center',
       imageFit: 'contain',

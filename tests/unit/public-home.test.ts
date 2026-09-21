@@ -12,7 +12,7 @@ describe('public marketplace hero', () => {
     const slides = publicHomeHero([ad], 'تربح', 'سوقك', '/search?category=90');
     expect(slides[0].href).toBe('/search?category=90');
     expect(slides[1]).toMatchObject({ href: '/ads/12', subtitle: adPriceLabel(ad), eyebrow: 'من إعلانات السوق · الرياض' });
-    expect(slides.every(slide => !slide.href.startsWith('/shop'))).toBe(true);
+    expect(slides.every(slide => slide.href === null || !slide.href.startsWith('/shop'))).toBe(true);
   });
   it('does not leak disabled prices or mislabel requests or paid promotion', () => {
     const request = { ...ad, adsType: 'request', priceEnabled: false };

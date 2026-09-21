@@ -123,7 +123,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     discoverySubtitle === 'ابحث عن عرضك القادم أو أضف إعلانك وتواصل مباشرة مع المعلن.' ? 'اعرض اللي عندك، واكتشف اللي تحتاجه، وتواصل مباشرة.' : discoverySubtitle,
     feedSearchHref,
   );
-  const heroSlides = nationalDayActive ? nationalDayHeroSlides(feedSearchHref) : marketplaceHeroSlides;
+  const heroSlides = nationalDayActive ? nationalDayHeroSlides() : marketplaceHeroSlides;
 
   return (
     <div className="commerce-scope public-marketplace-home space-y-7 sm:space-y-10" data-home-version="marketplace-v2" data-home-campaign={nationalDayActive ? 'saudi-national-day-2026' : undefined}>

@@ -7,7 +7,8 @@ export type HeroSlide = {
   title: string;
   subtitle?: string;
   image: string | null;
-  href: string;
+  /** رابط الشريحة؛ القيمة null تجعلها رسالة بصرية غير تجارية. */
+  href: string | null;
   cta?: string;
   /** وصف محلي للإعلان أو المنصة؛ النص الفارغ يخفي الشارة. */
   eyebrow?: string;
@@ -70,6 +71,31 @@ export function CommerceHero({ slides, intervalMs = 5000, label = 'عروض مم
   const s = slides[active];
   const eyebrow = s.eyebrow ?? 'متوفّر في جميع مناطق المملكة';
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
+  const slideVisual = <div className={`relative flex w-full items-center ${compact ? 'min-h-[230px] sm:min-h-[320px]' : 'min-h-[340px] sm:min-h-[360px]'}`}>
+    {s.image
+      ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={s.image} alt={s.title} loading={active === 0 ? 'eager' : 'lazy'} decoding="async" referrerPolicy="no-referrer" className={`absolute inset-0 h-full w-full ${s.imageFit === 'contain' ? 'bg-[#006c35] object-contain' : 'object-cover'}`} />
+      )
+      : <div className="absolute inset-0 bg-gradient-to-l from-[#0f1d38] via-[#16294a] to-[#233a63]" />}
+    <span aria-hidden="true" className="pointer-events-none absolute -left-16 -top-20 h-64 w-64 rounded-full bg-[#ff6a1a]/15 blur-3xl" />
+    <div className="absolute inset-0 bg-[#0b162e]/45" />
+    <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/90 via-[#0b162e]/55 to-transparent" />
+    <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/70 via-transparent to-transparent" />
+    <div className={`relative flex w-full max-w-xl flex-col justify-center ${compact ? 'p-4 sm:p-8' : 'p-6 sm:p-10'} ${s.contentAlign === 'center' ? 'mx-auto items-center text-center' : ''}`}>
+      {eyebrow && <span className="mb-3 inline-flex w-fit max-w-full items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[12px] font-extrabold text-white ring-1 ring-white/25 backdrop-blur">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff6a1a]" /> {eyebrow}
+      </span>}
+      <Heading className={`break-words font-extrabold leading-snug drop-shadow-lg ${compact ? 'line-clamp-2 text-xl sm:text-4xl' : 'line-clamp-3 text-2xl sm:text-4xl'}`}>
+        {s.title}
+      </Heading>
+      {s.subtitle && <p className="mt-2 line-clamp-3 max-w-lg break-words text-sm font-semibold leading-6 text-white/85 sm:text-lg">{s.subtitle}</p>}
+      {s.cta !== '' && <span className={`inline-flex w-fit items-center gap-2 rounded-xl bg-[#ff6a1a] font-extrabold text-[#16294a] shadow-lg transition group-hover:bg-[#ff8a3d] ${compact ? 'mt-3 px-4 py-2.5 text-sm sm:mt-5 sm:px-6 sm:py-3 sm:text-base' : 'mt-5 px-6 py-3 text-base'}`}>
+        {s.cta || 'تصفّح الآن'}
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+      </span>}
+    </div>
+  </div>;
 
   return (
     <section
@@ -90,36 +116,9 @@ export function CommerceHero({ slides, intervalMs = 5000, label = 'عروض مم
         touchX.current = null;
       }}
     >
-      <Link href={s.href} aria-label={s.title} className="group block">
-        <div className={`relative flex w-full items-center ${compact ? 'min-h-[230px] sm:min-h-[320px]' : 'min-h-[340px] sm:min-h-[360px]'}`}>
-          {s.image
-            ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={s.image} alt={s.title} loading={active === 0 ? 'eager' : 'lazy'} decoding="async" referrerPolicy="no-referrer" className={`absolute inset-0 h-full w-full ${s.imageFit === 'contain' ? 'bg-[#006c35] object-contain' : 'object-cover'}`} />
-            )
-            : <div className="absolute inset-0 bg-gradient-to-l from-[#0f1d38] via-[#16294a] to-[#233a63]" />}
-          {/* توهّج برتقالي زخرفي */}
-          <span aria-hidden="true" className="pointer-events-none absolute -left-16 -top-20 h-64 w-64 rounded-full bg-[#ff6a1a]/15 blur-3xl" />
-          {/* تعتيم كافٍ لإبقاء العنوان مقروءاً فوق أي صورة إعلان مزدحمة:
-              طبقة أساس + تدرّج اتجاهي أغمق على يمين النص (RTL) + تدرّج سفلي. */}
-          <div className="absolute inset-0 bg-[#0b162e]/45" />
-          <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/90 via-[#0b162e]/55 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/70 via-transparent to-transparent" />
-          <div className={`relative flex w-full max-w-xl flex-col justify-center ${compact ? 'p-4 sm:p-8' : 'p-6 sm:p-10'} ${s.contentAlign === 'center' ? 'mx-auto items-center text-center' : ''}`}>
-            {eyebrow && <span className="mb-3 inline-flex w-fit max-w-full items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[12px] font-extrabold text-white ring-1 ring-white/25 backdrop-blur">
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff6a1a]" /> {eyebrow}
-            </span>}
-            <Heading className={`break-words font-extrabold leading-snug drop-shadow-lg ${compact ? 'line-clamp-2 text-xl sm:text-4xl' : 'line-clamp-3 text-2xl sm:text-4xl'}`}>
-              {s.title}
-            </Heading>
-            {s.subtitle && <p className="mt-2 line-clamp-3 max-w-lg break-words text-sm font-semibold leading-6 text-white/85 sm:text-lg">{s.subtitle}</p>}
-            <span className={`inline-flex w-fit items-center gap-2 rounded-xl bg-[#ff6a1a] font-extrabold text-[#16294a] shadow-lg transition group-hover:bg-[#ff8a3d] ${compact ? 'mt-3 px-4 py-2.5 text-sm sm:mt-5 sm:px-6 sm:py-3 sm:text-base' : 'mt-5 px-6 py-3 text-base'}`}>
-              {s.cta || 'تصفّح الآن'}
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-            </span>
-          </div>
-        </div>
-      </Link>
+      {s.href
+        ? <Link href={s.href} aria-label={s.title} className="group block">{slideVisual}</Link>
+        : <div className="group block">{slideVisual}</div>}
 
       {n > 1 && (
         <div className="relative flex flex-wrap items-center justify-between gap-2 px-4 pb-3">

@@ -41,7 +41,7 @@ jobs:
           PHASE: ${{ inputs.phase || 'before' }}
           BACKUP_ID: ${{ inputs.backup_id || github.run_id }}
           REUSE_MEDIA_ID: ${{ inputs.reuse_media_id }}
-          RELEASE_PROFILE: ${{ github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35629850346' && 'national_day_immersive' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35626587686' && 'national_day' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35619790007' && 'public_home' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && 'supplier_selection' || github.ref == 'refs/heads/codex/salla-owner-release-20260921' && inputs.reuse_media_id == '35603864905' && 'merchant_headers' || github.ref == 'refs/heads/codex/salla-owner-release-20260921' && 'merchant_oauth' || 'standard' }}
+          RELEASE_PROFILE: ${{ github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35634930527' && 'national_day_loyalty' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35629850346' && 'national_day_immersive' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35626587686' && 'national_day' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.reuse_media_id == '35619790007' && 'public_home' || github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && 'supplier_selection' || github.ref == 'refs/heads/codex/salla-owner-release-20260921' && inputs.reuse_media_id == '35603864905' && 'merchant_headers' || github.ref == 'refs/heads/codex/salla-owner-release-20260921' && 'merchant_oauth' || 'standard' }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
@@ -52,7 +52,9 @@ jobs:
           umask 077
           [[ "$BACKUP_ID" =~ ^[0-9]+$ ]]
           [[ "$PHASE" == before || "$PHASE" == after ]]
-          if [[ "$RELEASE_PROFILE" == supplier_selection ]]; then
+          if [[ "$RELEASE_PROFILE" == national_day_loyalty ]]; then
+            [[ "$REUSE_MEDIA_ID" == 35634930527 && "$REUSE_MEDIA_ID" != "$BACKUP_ID" ]]
+          elif [[ "$RELEASE_PROFILE" == supplier_selection ]]; then
             [[ "$REUSE_MEDIA_ID" == 35607654850 && "$REUSE_MEDIA_ID" != "$BACKUP_ID" ]]
           elif [[ "$RELEASE_PROFILE" == public_home ]]; then
             [[ "$REUSE_MEDIA_ID" == 35619790007 && "$REUSE_MEDIA_ID" != "$BACKUP_ID" ]]
@@ -62,7 +64,9 @@ jobs:
             [[ "$REUSE_MEDIA_ID" == 35626587686 && "$REUSE_MEDIA_ID" != "$BACKUP_ID" ]]
           fi
           if [[ -n "$REUSE_MEDIA_ID" ]]; then
-            if [[ "$RELEASE_PROFILE" == supplier_selection ]]; then
+            if [[ "$RELEASE_PROFILE" == national_day_loyalty ]]; then
+              [[ "$REUSE_MEDIA_ID" == 35634930527 && "$REUSE_MEDIA_ID" != "$BACKUP_ID" ]]
+            elif [[ "$RELEASE_PROFILE" == supplier_selection ]]; then
               [[ "$REUSE_MEDIA_ID" == 35607654850 && "$REUSE_MEDIA_ID" != "$BACKUP_ID" ]]
             elif [[ "$RELEASE_PROFILE" == public_home ]]; then
               [[ "$REUSE_MEDIA_ID" == 35619790007 && "$REUSE_MEDIA_ID" != "$BACKUP_ID" ]]
@@ -85,5 +89,5 @@ jobs:
           target="$VPS_USER@$VPS_HOST"
           remote_tools="/root/trbhh-release-tools/$GITHUB_SHA"
           ssh "${ssh_args[@]}" "$target" "set -eu; test ! -L /root/trbhh-release-tools; mkdir -p '$remote_tools'; chmod 700 /root/trbhh-release-tools '$remote_tools'"
-          scp -i ~/.ssh/release_key -P "$port" -o StrictHostKeyChecking=yes scripts/release/{safeguards.sh,database-proof.cjs,verify-runtime.cjs,media-proof.cjs,supplier-preservation-proof.cjs,backup-capacity-proof.cjs,merchant-media-reference.cjs,selection-media-reference.cjs,home-media-reference.cjs,selection-operational-attestation.cjs,national-media-reference.cjs,immersive-media-reference.cjs,public-home-supplier-forensics.cjs} "$target:$remote_tools/"
+          scp -i ~/.ssh/release_key -P "$port" -o StrictHostKeyChecking=yes scripts/release/{safeguards.sh,database-proof.cjs,verify-runtime.cjs,media-proof.cjs,supplier-preservation-proof.cjs,backup-capacity-proof.cjs,merchant-media-reference.cjs,selection-media-reference.cjs,home-media-reference.cjs,selection-operational-attestation.cjs,national-media-reference.cjs,immersive-media-reference.cjs,loyalty-media-reference.cjs,public-home-supplier-forensics.cjs} "$target:$remote_tools/"
           ssh "${ssh_args[@]}" "$target" "bash '$remote_tools/safeguards.sh' '$PHASE' '$BACKUP_ID' '$GITHUB_SHA' '$REUSE_MEDIA_ID' '$RELEASE_PROFILE'"

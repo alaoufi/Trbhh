@@ -44,14 +44,14 @@ export function NationalDayEntry({ active }: { active: boolean }) {
     <div className={styles.flagStage} aria-hidden={phase !== 'flag'}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/national-day/saudi-flag.svg" alt="علم المملكة العربية السعودية" className={styles.flag} />
-      <p>راية التوحيد.. شامخة دائمًا</p>
+      <p>راية التوحيد.. شامخةٌ بعز الوطن</p>
     </div>
     <div className={styles.leadersStage} aria-hidden={phase !== 'leaders'}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/national-day/leadership.webp" alt="خادم الحرمين الشريفين الملك سلمان وسمو ولي العهد الأمير محمد بن سلمان" />
       <div className={styles.leadersCopy}>
         <strong>دام عزك يا وطن</strong>
-        <span>قيادة طموحة.. وشعب يصنع المستقبل</span>
+        <span>ولاءٌ لقيادتنا، وانتماءٌ لوطننا، وفخرٌ بمسيرة المملكة</span>
       </div>
     </div>
     <button type="button" onClick={dismiss} className={styles.skip}>تخطي</button>

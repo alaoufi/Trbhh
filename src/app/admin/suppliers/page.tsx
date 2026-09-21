@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { requireAction } from '@/lib/roles';
+import { hasAction, requireAction } from '@/lib/roles';
 import { prisma } from '@/lib/prisma';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { formatSar } from '@/lib/commerce/money';
-import { saveSupplier, saveSupplierProduct } from './actions';
+import { deleteSupplier, deleteSupplierProducts, saveSupplier, saveSupplierProduct } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الموردون وربط السلع', robots: { index: false, follow: false } };
-type Supplier = { id: bigint; name: string; contact_name: string; phone: string; email: string; address: string; registration_number: string; tax_number: string; settlement_terms: string; notes: string; active: number; api_base_url: string; api_credential_ref: string };
+type Supplier = { id: bigint; name: string; contact_name: string; phone: string; email: string; address: string; registration_number: string; tax_number: string; settlement_terms: string; notes: string; active: number; api_base_url: string; api_credential_ref: string; product_count: bigint; history_count: bigint };
 type Mapping = { product_id: bigint; supplier_id: bigint; supplier_sku: string; unit_cost_minor: number; title: string; supplier_name: string; supplier_active: number };
 const input = 'mt-1 min-h-10 w-full rounded-lg border border-primary/25 bg-white px-3 text-sm';
 const button = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
@@ -47,8 +47,30 @@ function MappingForm({ mapping, suppliers }: { mapping: Mapping; suppliers: Supp
     <button className={button}>حفظ ربط السلعة</button>
   </form>;
 }
+function SupplierDeletion({supplier}:{supplier:Supplier}) {
+  const products=Number(supplier.product_count),history=Number(supplier.history_count);
+  return <details className="mt-5 rounded-xl border-2 border-red-200 bg-red-50 p-4 text-red-950"><summary className="cursor-pointer font-bold">حذف المورد والمنتجات</summary>
+    <p className="mt-3 text-sm leading-7">هذه عملية نهائية من خطوتين. المنتجات المرتبطة: <b>{products}</b>، سجلات الطلبات المحمية: <b>{history}</b>.</p>
+    {history>0&&<p role="alert" className="mt-3 rounded-lg bg-white p-3 text-sm font-bold">لا يمكن حذف هذا المورد لأن لديه سجل طلبات أو استحقاقات يجب حفظه.</p>}
+    {products>0&&history===0&&<form action={deleteSupplierProducts} className="mt-4 grid gap-3 rounded-xl border border-red-200 bg-white p-4">
+      <input type="hidden" name="supplierId" value={supplier.id.toString()}/><input type="hidden" name="supplierName" value={supplier.name}/><p className="text-sm font-bold">الخطوة 1: حذف كل منتجات المورد من كتالوج تربح أولًا.</p>
+      <label className="text-sm">اكتب اسم المورد للتأكيد<input className={input} name="confirmName" autoComplete="off" required /></label>
+      <label className="text-sm">اكتب العبارة: <b>حذف منتجات المورد</b><input className={input} name="confirmPhrase" autoComplete="off" required /></label>
+      <label className="text-sm"><input type="checkbox" name="acknowledge" value="1" required/> أفهم أن المنتجات المحذوفة لا يمكن استعادتها من هذه الشاشة.</label>
+      <button className="w-fit rounded-lg bg-red-700 px-4 py-2 font-bold text-white">حذف منتجات المورد</button>
+    </form>}
+    {products===0&&history===0&&<form action={deleteSupplier} className="mt-4 grid gap-3 rounded-xl border border-red-300 bg-white p-4">
+      <input type="hidden" name="supplierId" value={supplier.id.toString()}/><input type="hidden" name="supplierName" value={supplier.name}/><p className="text-sm font-bold">الخطوة 2: لا توجد منتجات أو طلبات. يمكنك حذف ملف المورد نهائيًا.</p>
+      <label className="text-sm">اكتب اسم المورد كما يظهر: <b>{supplier.name}</b><input className={input} name="confirmName" autoComplete="off" required /></label>
+      <label className="text-sm">اكتب العبارة: <b>حذف المورد نهائياً</b><input className={input} name="confirmPhrase" autoComplete="off" required /></label>
+      <label className="text-sm"><input type="checkbox" name="acknowledge" value="1" required/> أفهم أن ملف المورد وربطه بسلة سيحذفان نهائيًا.</label>
+      <button className="w-fit rounded-lg bg-red-800 px-4 py-2 font-bold text-white">حذف المورد نهائيًا</button>
+    </form>}
+  </details>;
+}
 export default async function Suppliers({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAction('suppliers', 'view');
+  const admin=await requireAction('suppliers', 'view');
+  const canDelete=await hasAction(admin.uid,'suppliers','delete');
   const query = await searchParams;
   const rawPage = query.page;
   if (rawPage !== undefined && (typeof rawPage !== 'string' || !/^[1-9]\d{0,5}$/.test(rawPage) || Number(rawPage) > 100000)) notFound();
@@ -56,7 +78,10 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
   const offset = (page - 1) * 100;
   try { await assertCommerceSchemaReady(prisma); } catch { return <p role="alert" className="card-3d rounded-xl p-5">مخطط الموردين غير جاهز؛ يلزم استكمال الجداول والفهارس قبل الإدارة.</p>; }
   const [suppliers, mappings] = await Promise.all([
-    prisma.$queryRaw<Supplier[]>`SELECT id,name,contact_name,phone,email,address,registration_number,tax_number,settlement_terms,notes,active,api_base_url,api_credential_ref FROM commerce_suppliers ORDER BY id DESC LIMIT 100 OFFSET ${offset}`,
+    prisma.$queryRaw<Supplier[]>`SELECT s.id,s.name,s.contact_name,s.phone,s.email,s.address,s.registration_number,s.tax_number,s.settlement_terms,s.notes,s.active,s.api_base_url,s.api_credential_ref,
+      ((SELECT COUNT(*) FROM supplier_products p WHERE p.supplier_id=s.id)+(SELECT COUNT(*) FROM commerce_product_suppliers m WHERE m.supplier_id=s.id)) AS product_count,
+      ((SELECT COUNT(*) FROM supplier_orders o WHERE o.supplier_id=s.id)+(SELECT COUNT(*) FROM commerce_order_suppliers os WHERE os.supplier_id=s.id)+(SELECT COUNT(*) FROM commerce_supplier_accruals a WHERE a.supplier_id=s.id)) AS history_count
+      FROM commerce_suppliers s ORDER BY s.id DESC LIMIT 100 OFFSET ${offset}`,
     prisma.$queryRaw<Mapping[]>`SELECT m.product_id,m.supplier_id,m.supplier_sku,m.unit_cost_minor,p.title,s.name AS supplier_name,s.active AS supplier_active FROM commerce_product_suppliers m JOIN commerce_products p ON p.id=m.product_id JOIN commerce_suppliers s ON s.id=m.supplier_id ORDER BY m.product_id DESC LIMIT 100 OFFSET ${offset}`,
   ]);
   return <div className="space-y-4">
@@ -67,7 +92,9 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
     <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">الموردون جهات داخلية لتربح. التنفيذ والتسوية خارج الموقع. لا تحويل أموال ولا اتصال API من هذه الصفحة.</p>
     <nav className="flex flex-wrap gap-4 text-primary underline"><Link href="/admin/commerce">السلع والطلبات</Link><Link href="/admin/commerce/accounts">الإيصالات والاستحقاقات</Link></nav>
     {query.saved === '1' && <p role="status" className="text-emerald-700">تم الحفظ.</p>}
-    {typeof query.error === 'string' && <p role="alert" className="text-red-700">تعذر الحفظ. راجع الحقول وجاهزية الجداول. ربط السلعة يتطلب سلعة معتمدة وموردًا نشطًا، والربط البرمجي غير متاح بعد.</p>}
+    {query.deleted==='products'&&<p role="status" className="text-emerald-700">تم حذف منتجات المورد. راجع المورد ثم نفّذ خطوة حذف ملفه إذا رغبت.</p>}
+    {query.deleted==='supplier'&&<p role="status" className="text-emerald-700">تم حذف المورد بعد التأكد من خلوه من المنتجات وسجل الطلبات.</p>}
+    {typeof query.error === 'string' && <p role="alert" className="text-red-700">{query.error==='delete_products_first'?'احذف منتجات المورد أولًا ثم أعد محاولة حذف المورد.':query.error==='delete_history'?'لا يمكن الحذف لأن للمورد سجل طلبات أو استحقاقات يجب حفظه.':query.error==='delete_confirmation'?'لم تتطابق بيانات التأكيد. اكتب اسم المورد والعبارة المطلوبة حرفيًا.':'تعذر إكمال العملية. راجع الحقول وجاهزية الجداول.'}</p>}
     <details className="card-3d rounded-xl p-4"><summary className="mb-3 cursor-pointer font-bold">إضافة مورد</summary><SupplierForm /></details>
     <nav aria-label="صفحات الموردين وروابط السلع" className="flex flex-wrap items-center gap-4 text-primary">
       {page > 1 && <Link className="underline" href={`/admin/suppliers?page=${page - 1}`}>الصفحة السابقة</Link>}
@@ -76,7 +103,7 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
     </nav>
     <section className="space-y-3"><h2 className="font-bold">الموردون — الصفحة {page}</h2>
       {!suppliers.length && <p className="text-sm">لا يوجد موردون في هذه الصفحة.</p>}
-      {suppliers.map(s => <details key={s.id.toString()} className="card-3d rounded-xl p-4"><summary className="mb-3 cursor-pointer">#{s.id.toString()} {s.name} — {s.active === 1 ? 'نشط' : 'غير نشط'}</summary><SupplierForm supplier={s} /></details>)}
+      {suppliers.map(s => <details key={s.id.toString()} className="card-3d rounded-xl p-4"><summary className="mb-3 cursor-pointer">#{s.id.toString()} {s.name} — {s.active === 1 ? 'نشط' : 'غير نشط'}</summary><SupplierForm supplier={s} />{canDelete&&<SupplierDeletion supplier={s}/>}</details>)}
     </section>
     <section className="card-3d space-y-3 rounded-xl p-4"><h2 className="font-bold">اختيار منتجات المورد</h2><p className="text-sm">ابحث بالاسم أو SKU، عاين الصور والتفاصيل، ثم راجع المنتجات المحددة قبل إضافتها إلى تربح. المنتجات تبقى مخفية بعد الإضافة.</p><Link href="/admin/suppliers/catalog" className={`${button} inline-flex min-h-11 items-center`}>عرض المنتجات واختيارها</Link></section>
     <section className="space-y-3"><h2 className="font-bold">روابط السلع — الصفحة {page}</h2>

@@ -1,7 +1,8 @@
 import 'server-only';
 import {Workbook,type CellValue} from 'exceljs';
 import {ONBOARDING_FIELDS,type OnboardingValues,type OnboardingValidation,type OnboardingReport} from './onboarding-fields';
-export const MAX_ONBOARDING_BYTES=2*1024*1024;
+import {MAX_ONBOARDING_BYTES} from './onboarding-limits';
+export {MAX_ONBOARDING_BYTES} from './onboarding-limits';
 const digits=(s:string)=>s.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-1632)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-1776));
 const label=(s:string)=>s.normalize('NFKC').trim().replace(/[أإآ]/g,'ا').replace(/[\u064b-\u065fـ]/g,'').replace(/[\s:：*]+/g,' ').trim().toLowerCase();
 const aliases=new Map<string,string>(ONBOARDING_FIELDS.flatMap(([key,name])=>[[label(key),key],[label(name),key]]));
@@ -100,21 +101,26 @@ export function validateOnboarding(raw:Record<string,unknown>):OnboardingValidat
 export function mergeOnboarding(old:OnboardingValues,incoming:OnboardingValues):OnboardingValues {
  return {...old,...Object.fromEntries(Object.entries(incoming).filter(([,v])=>v!==''))};
 }
-/** Bound ZIP expansion before ExcelJS decompresses. Reject ZIP64, encryption and macros. */
-function validateZip(buffer:Buffer){
- if(buffer.length>MAX_ONBOARDING_BYTES||buffer.length<22||buffer.readUInt32LE(0)!==0x04034b50)throw Error('onboarding_file');
+/** Bound ZIP expansion before ExcelJS decompresses. Active content is detected but never executed. */
+function validateZip(buffer:Buffer):{macros:boolean;externalLinks:boolean}{
+ if(buffer.length>MAX_ONBOARDING_BYTES)throw Error('onboarding_size');
+ if(buffer.length<22||buffer.readUInt32LE(0)!==0x04034b50)throw Error('onboarding_not_excel');
  let end=-1;for(let i=buffer.length-22;i>=Math.max(0,buffer.length-65557);i--)if(buffer.readUInt32LE(i)===0x06054b50){end=i;break;}
- if(end<0)throw Error('onboarding_file');
- const count=buffer.readUInt16LE(end+10);let pos=buffer.readUInt32LE(end+16),size=0;
- if(count>128||count===0||pos>=end)throw Error('onboarding_file');
+ if(end<0)throw Error('onboarding_not_excel');
+ const count=buffer.readUInt16LE(end+10);let pos=buffer.readUInt32LE(end+16),size=0,macros=false,externalLinks=false;
+ if(count>512||count===0||count===0xffff||pos===0xffffffff||pos>=end)throw Error('onboarding_archive');
  for(let i=0;i<count;i++){
-  if(pos+46>end||buffer.readUInt32LE(pos)!==0x02014b50)throw Error('onboarding_file');
+  if(pos+46>end||buffer.readUInt32LE(pos)!==0x02014b50)throw Error('onboarding_archive');
   const expanded=buffer.readUInt32LE(pos+24),nameSize=buffer.readUInt16LE(pos+28),extra=buffer.readUInt16LE(pos+30),comment=buffer.readUInt16LE(pos+32);
-  if(pos+46+nameSize+extra+comment>end||buffer.readUInt16LE(pos+8)&1)throw Error('onboarding_file');
+  if(pos+46+nameSize+extra+comment>end)throw Error('onboarding_archive');
+  if(buffer.readUInt16LE(pos+8)&1)throw Error('onboarding_encrypted');
   const name=buffer.subarray(pos+46,pos+46+nameSize).toString('utf8');size+=expanded;
-  if(size>8*1024*1024||/vbaProject|externalLinks|\.bin$/i.test(name))throw Error('onboarding_file');
+  if(expanded>24*1024*1024||size>64*1024*1024||name.includes('../')||name.startsWith('/'))throw Error('onboarding_archive');
+  if(/vbaProject|macrosheets|\.bin$/i.test(name))macros=true;
+  if(/externalLinks/i.test(name))externalLinks=true;
   pos+=46+nameSize+extra+comment;
  }
+ return {macros,externalLinks};
 }
 function cell(value:CellValue):string {
  if(value===null||value===undefined)return '';
@@ -127,16 +133,26 @@ function cell(value:CellValue):string {
  if('hyperlink' in value)return value.hyperlink;
  throw Error('onboarding_cell');
 }
-export async function parseOnboardingWorkbook(bytes:Buffer,filename:string):Promise<OnboardingValidation>{
- if(!/\.xlsx$/i.test(filename))throw Error('onboarding_file');validateZip(bytes);
- const workbook=new Workbook();try {await workbook.xlsx.load(bytes as unknown as Parameters<typeof workbook.xlsx.load>[0]);}catch{throw Error('onboarding_file');}
- const sheets=workbook.worksheets.filter(s=>s.actualRowCount>0);if(sheets.length!==1)throw Error('onboarding_sheet');
- const sheet=sheets[0];if(sheet.rowCount>100||sheet.columnCount>40)throw Error('onboarding_sheet');
- const rows:string[][]=[];sheet.eachRow(row=>{const values:string[]=[];row.eachCell({includeEmpty:true},(c,n)=>{values[n-1]=cell(c.value);});rows.push(values);});
- const raw:Record<string,unknown>={};
- const put=(name:string,value:string)=>{if(secretLabel.test(name))throw Error('onboarding_secret');const key=aliases.get(label(name));if(!key){if(name&&value&& !['الحقل','القيمة'].includes(name))throw Error('onboarding_header');return;}if(Object.hasOwn(raw,key))throw Error('onboarding_duplicate_field');raw[key]=value??'';};
- const header=rows.findIndex(r=>r.filter(v=>aliases.has(label(v||''))).length>=3);
- if(header>=0){const records=rows.slice(header+1).filter(r=>r.some(v=>v?.trim()));if(records.length!==1)throw Error('onboarding_single_store');rows[header].forEach((name,i)=>put(name,records[0][i]||''));}
- else for(const row of rows)put(row[0]||'',row[1]||'');
- return validateOnboarding(raw);
+export async function parseOnboardingWorkbook(bytes:Buffer,_filename:string):Promise<OnboardingValidation>{
+ const archive=validateZip(bytes);
+ const workbook=new Workbook();try {await workbook.xlsx.load(bytes as unknown as Parameters<typeof workbook.xlsx.load>[0]);}catch{throw Error('onboarding_not_excel');}
+ const sheets=workbook.worksheets.filter(s=>s.actualRowCount>0);if(!sheets.length)throw Error('onboarding_sheet');
+ const candidates:{raw:Record<string,unknown>;score:number}[]=[];
+ for(const sheet of sheets){
+  if(sheet.rowCount>5000||sheet.columnCount>200)continue;
+  const rows:string[][]=[];sheet.eachRow(row=>{const values:string[]=[];row.eachCell({includeEmpty:true},(c,n)=>{values[n-1]=cell(c.value);});rows.push(values);});
+  const raw:Record<string,unknown>={};let score=0,hasSecret=false;
+  const put=(name:string,value:string)=>{if(secretLabel.test(name)){hasSecret=true;return;}const key=aliases.get(label(name));if(!key)return;if(Object.hasOwn(raw,key))throw Error('onboarding_duplicate_field');raw[key]=value??'';score++;};
+  const header=rows.findIndex(r=>r.filter(v=>aliases.has(label(v||''))).length>=3);
+  if(header>=0){const records=rows.slice(header+1).filter(r=>r.some(v=>v?.trim()));if(records.length>1)throw Error('onboarding_single_store');if(records[0])rows[header].forEach((name,i)=>put(name,records[0][i]||''));}
+  else for(const row of rows)put(row[0]||'',row[1]||'');
+  if(score>=3){if(hasSecret)throw Error('onboarding_secret');candidates.push({raw,score});}
+ }
+ if(!candidates.length)throw Error('onboarding_sheet');
+ candidates.sort((a,b)=>b.score-a.score);if(candidates.length>1&&candidates[0].score===candidates[1].score)throw Error('onboarding_sheet');
+ const result=validateOnboarding(candidates[0].raw);
+ if(sheets.length>1)result.warnings.push('تم اعتماد ورقة بيانات المتجر وتجاوز الأوراق الإضافية مثل التعليمات.');
+ if(archive.macros)result.warnings.push('تمت قراءة قيم الخلايا فقط وتجاهل وحدات الماكرو دون تشغيلها أو حفظها.');
+ if(archive.externalLinks)result.warnings.push('تم تجاهل الروابط الخارجية في ملف Excel وقراءة القيم المحلية فقط.');
+ return result;
 }

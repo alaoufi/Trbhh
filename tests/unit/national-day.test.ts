@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { isNationalDayCampaignActive, nationalDayHeroSlides } from '@/lib/national-day';
 import * as NationalDayComponents from '@/components/national-day-banner';
+import {NATIONAL_DAY_ENTRY_TIMING} from '@/components/national-day-entry';
 const { NationalDayBanner, NationalDayHeroFrame } = NationalDayComponents;
 
 describe('2026 National Day campaign window in Riyadh', () => {
@@ -65,6 +66,11 @@ describe('inline public-home campaign presentation', () => {
     expect(html).toContain('انتماء');
     expect(html).toContain('تخطي');
     expect(html).toContain('data-phase="idle"');
+  });
+
+  it('keeps the flag and leadership portrait visible long enough to be read', () => {
+    expect(NATIONAL_DAY_ENTRY_TIMING.flagMs).toBeGreaterThanOrEqual(3000);
+    expect(NATIONAL_DAY_ENTRY_TIMING.leadersMs).toBeGreaterThanOrEqual(6000);
   });
 
   it('provides informational patriotic slides without marketplace links or buttons', () => {

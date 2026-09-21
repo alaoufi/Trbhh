@@ -34,7 +34,7 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
   { key: 'backup',        label: 'النسخ الاحتياطي',      actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'stores',        label: 'المتاجر',            actions: ['view', 'edit', 'suspend', 'delete'] },
   { key: 'commerce',      label: 'السلع والطلبات',      actions: ['view', 'add', 'edit', 'suspend'] },
-  { key: 'suppliers',     label: 'الموردون وربط السلع', actions: ['view', 'add', 'edit'] },
+  { key: 'suppliers',     label: 'الموردون وربط السلع', actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'categories',    label: 'الأقسام وحقولها',      actions: ['view', 'add', 'edit', 'delete', 'suspend'] },
 ];
 

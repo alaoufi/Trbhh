@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-const state = vi.hoisted(() => ({ gate: vi.fn(), schema: vi.fn(), query: vi.fn() }));
+const state = vi.hoisted(() => ({ gate: vi.fn(), hasAction: vi.fn(), schema: vi.fn(), query: vi.fn() }));
 vi.mock('@/lib/commerce/schema', () => ({ assertCommerceSchemaReady: state.schema }));
-vi.mock('@/lib/roles', () => ({ requireAction: state.gate }));
+vi.mock('@/lib/roles', () => ({ requireAction: state.gate, hasAction: state.hasAction }));
 vi.mock('@/lib/prisma', () => ({ prisma: { $queryRaw: state.query } }));
-vi.mock('@/app/admin/suppliers/actions', () => ({ saveSupplier: vi.fn(), saveSupplierProduct: vi.fn() }));
+vi.mock('@/app/admin/suppliers/actions', () => ({ saveSupplier: vi.fn(), saveSupplierProduct: vi.fn(), deleteSupplier:vi.fn(), deleteSupplierProducts:vi.fn() }));
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('not_found'); } }));
 import Suppliers from '@/app/admin/suppliers/page';
 import Accounts from '@/app/admin/commerce/accounts/page';
 describe('supplier and operational accounting pages', () => {
-  beforeEach(() => { vi.resetAllMocks(); state.gate.mockResolvedValue({ uid: 9 }); state.query.mockResolvedValue([]); });
+  beforeEach(() => { vi.resetAllMocks(); state.gate.mockResolvedValue({ uid: 9 }); state.hasAction.mockResolvedValue(false); state.query.mockResolvedValue([]); });
   it.each([[Suppliers, 'suppliers'], [Accounts, 'commerce']] as const)('gates page access before any reads', async (page, service) => {
     state.gate.mockRejectedValueOnce(new Error('forbidden'));
     await expect(page({ searchParams: Promise.resolve({}) })).rejects.toThrow('forbidden');

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useId, useRef, useState, useTransition } from 'react';
 import { ONBOARDING_LABELS, maskedOnboardingValue } from '@/lib/suppliers/onboarding-fields';
+import { MAX_ONBOARDING_BYTES, MAX_ONBOARDING_MEGABYTES } from '@/lib/suppliers/onboarding-limits';
 
 export type OnboardingImportReport = {
   imported: number;
@@ -30,6 +31,8 @@ export type OnboardingUiState = {
     status: 'pending' | 'ready' | 'failed';
     code?: string;
     sampleCount?: number;
+    authorizationUrl?: string;
+    authorizationExpiresAt?: string;
   };
 };
 
@@ -54,6 +57,7 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
   const [file, setFile] = useState<File | null>(null);
   const [pending, startTransition] = useTransition();
   const [operation, setOperation] = useState<'preview' | 'save' | 'readiness' | null>(null);
+  const [copied, setCopied] = useState(false);
   const busy = useRef(false);
   const checked = useRef(new Set<string>());
   const fileId = useId();
@@ -138,10 +142,10 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
           </div>
           <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-5 sm:p-8">
             <label htmlFor={fileId} className="block font-bold">اختر ملف بيانات المتجر</label>
-            <p id={`${fileId}-help`} className="mt-2 text-sm text-slate-500">ملف ‎.xlsx فقط، بحجم لا يتجاوز 2 ميجابايت.</p>
-            <input id={fileId} name="file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={pending} aria-describedby={`${fileId}-help`} className="mt-4 block w-full min-w-0 text-sm file:me-3 file:rounded-lg file:border-0 file:bg-slate-200 file:px-4 file:py-3 file:font-semibold file:text-slate-800" onChange={event => {
+            <p id={`${fileId}-help`} className="mt-2 text-sm text-slate-500">ملف Excel حديث ‎.xlsx أو ‎.xlsm حتى {MAX_ONBOARDING_MEGABYTES} ميجابايت. نقرأ قيم الخلايا فقط ولا نشغّل وحدات الماكرو.</p>
+            <input id={fileId} name="file" type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12" disabled={pending} aria-describedby={`${fileId}-help`} className="mt-4 block w-full min-w-0 text-sm file:me-3 file:rounded-lg file:border-0 file:bg-slate-200 file:px-4 file:py-3 file:font-semibold file:text-slate-800" onChange={event => {
               const selected = event.target.files?.[0] ?? null;
-              const errors = selected && (!/\.xlsx$/i.test(selected.name) || selected.size > 2 * 1024 * 1024 || selected.size === 0) ? ['اختر ملف Excel صالحًا بصيغة .xlsx وبحجم لا يتجاوز 2 ميجابايت.'] : [];
+              const errors = selected && (selected.size > MAX_ONBOARDING_BYTES || selected.size === 0) ? [`اختر ملف Excel غير فارغ بحجم لا يتجاوز ${MAX_ONBOARDING_MEGABYTES} ميجابايت.`] : [];
               setFile(errors.length ? null : selected);
               setState({ errors, warnings: [] });
               if (errors.length) event.target.value = '';
@@ -175,6 +179,16 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
             <p className="mt-2 text-sm leading-7">{ready ? 'يمكنك متابعة المنتجات من صفحة التكاملات والكتالوج.' : !saved.connected ? 'أكمل تفويض الاتصال بمتجر سلة، ثم تحقق من الجاهزية.' : 'حالة الاتصال وحدها لا تعني الجاهزية؛ يلزم نجاح الفحص الفعلي.'}</p>
             {saved.sampleCount !== undefined && <p className="mt-2 text-sm">عدد المنتجات في عينة الفحص: {saved.sampleCount}</p>}
           </div>
+          {!saved.connected && saved.authorizationUrl && <section className="mt-5 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-5 text-emerald-950" aria-label="رابط تفويض متجر سلة">
+            <h3 className="font-bold">رابط تفويض متجر سلة جاهز</h3>
+            <p className="mt-2 text-sm leading-7">أرسل هذا الرابط لصاحب المتجر. يفتح الرابط ويوافق على الربط فقط، دون أي إعدادات تقنية.</p>
+            <label className="mt-3 block text-xs font-semibold">رابط التفويض<input readOnly dir="ltr" value={saved.authorizationUrl} className="mt-2 min-h-11 w-full rounded-lg border border-emerald-300 bg-white px-3 text-left text-xs" /></label>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <button type="button" className={primary} onClick={async()=>{try{await navigator.clipboard.writeText(saved.authorizationUrl!);setCopied(true);}catch{setCopied(false);}}}>{copied?'تم نسخ الرابط':'نسخ الرابط'}</button>
+              <a className={secondary} href={saved.authorizationUrl} target="_blank" rel="noreferrer">فتح رابط التفويض</a>
+            </div>
+            {saved.authorizationExpiresAt && <p className="mt-3 text-xs">الرابط مؤقت وصالح لمدة 24 ساعة من وقت إنشائه.</p>}
+          </section>}
           <div className="mt-6 flex flex-wrap gap-3">
             {!saved.connected && (connectAction ? <form action={connectAction}><input type="hidden" name="supplierId" value={saved.supplierId} /><button disabled={pending} className={primary}>ربط متجر سلة</button></form> : <Link className={primary} href={integrationsHref}>ربط متجر سلة عبر التكاملات</Link>)}
             {saved.connected && readinessAction && <button className={primary} disabled={pending} onClick={() => { const form = new FormData(); form.set('supplierId', saved.supplierId); invoke(readinessAction, form, 'readiness', state); }}>{ready ? 'إعادة فحص الجاهزية' : 'فحص الجاهزية مجددًا'}</button>}

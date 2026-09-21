@@ -54,3 +54,81 @@ export async function saveSupplierProduct(form: FormData) {
   revalidatePath('/admin/suppliers');
   redirect('/admin/suppliers?saved=1');
 }
+
+const supplierId = (form: FormData) => {
+  const raw = String(form.get('supplierId') || '');
+  if (!/^[1-9]\d{0,14}$/.test(raw)) throw new Error('delete_confirmation');
+  return BigInt(raw);
+};
+function confirmed(form: FormData, phrase: string) {
+  const name = String(form.get('confirmName') || '').normalize('NFKC').trim();
+  const expected = String(form.get('supplierName') || '').normalize('NFKC').trim();
+  const typed = String(form.get('confirmPhrase') || '').normalize('NFKC').trim();
+  if (!name || !expected || name !== expected || typed !== phrase || form.get('acknowledge') !== '1') throw new Error('delete_confirmation');
+  return name;
+}
+function deleteRedirect(error: unknown): never {
+  const code = error instanceof Error && ['delete_confirmation','delete_products_first','delete_history','delete_not_found'].includes(error.message) ? error.message : 'delete_failed';
+  redirect(`/admin/suppliers?error=${code}`);
+}
+
+/** Destructive step one: remove source/catalog products only when no order history exists. */
+export async function deleteSupplierProducts(form: FormData) {
+  const session = await requireAction('suppliers', 'delete');
+  let id: bigint, confirmName: string;
+  try { id = supplierId(form); confirmName = confirmed(form, 'حذف منتجات المورد'); } catch (error) { deleteRedirect(error); }
+  try {
+    await assertCommerceSchemaReady(prisma);
+    await prisma.$transaction(async tx => {
+      const [supplier] = await tx.$queryRaw<{id: bigint; name: string}[]>`SELECT id,name FROM commerce_suppliers WHERE id=${id} FOR UPDATE`;
+      if (!supplier) throw new Error('delete_not_found');
+      if (supplier.name.normalize('NFKC').trim() !== confirmName) throw new Error('delete_confirmation');
+      const [counts] = await tx.$queryRaw<{history_count: bigint}[]>`SELECT
+        ((SELECT COUNT(*) FROM supplier_orders WHERE supplier_id=${id})+
+         (SELECT COUNT(*) FROM commerce_order_suppliers WHERE supplier_id=${id})+
+         (SELECT COUNT(*) FROM commerce_supplier_accruals WHERE supplier_id=${id})+
+         (SELECT COUNT(*) FROM supplier_reservation_allocations a JOIN supplier_stock_reservations r ON r.id=a.reservation_id JOIN supplier_products p ON p.id=r.supplier_product_id WHERE p.supplier_id=${id})) AS history_count`;
+      if (Number(counts?.history_count || 0) > 0) throw new Error('delete_history');
+      const products = await tx.$queryRaw<{commerce_product_id: bigint | null}[]>`SELECT commerce_product_id FROM supplier_products WHERE supplier_id=${id} FOR UPDATE`;
+      await tx.$executeRaw`DELETE h FROM supplier_price_history h JOIN supplier_products p ON p.id=h.supplier_product_id WHERE p.supplier_id=${id}`;
+      await tx.$executeRaw`DELETE t FROM supplier_price_tiers t JOIN supplier_products p ON p.id=t.supplier_product_id WHERE p.supplier_id=${id}`;
+      await tx.$executeRaw`DELETE r FROM supplier_stock_reservations r JOIN supplier_products p ON p.id=r.supplier_product_id WHERE p.supplier_id=${id}`;
+      await tx.$executeRaw`DELETE FROM commerce_product_suppliers WHERE supplier_id=${id}`;
+      await tx.$executeRaw`UPDATE supplier_products SET commerce_product_id=NULL WHERE supplier_id=${id}`;
+      await tx.$executeRaw`DELETE FROM supplier_products WHERE supplier_id=${id}`;
+      for (const product of products) if (product.commerce_product_id) await tx.$executeRaw`DELETE p FROM commerce_products p LEFT JOIN commerce_order_items i ON i.product_id=p.id LEFT JOIN supplier_reservation_allocations a ON a.commerce_product_id=p.id LEFT JOIN commerce_product_suppliers m ON m.product_id=p.id WHERE p.id=${product.commerce_product_id} AND i.id IS NULL AND a.id IS NULL AND m.product_id IS NULL`;
+      await tx.admin_log.create({data:{admin_id:BigInt(session.uid),action:'حذف منتجات مورد',target:id.toString(),note:`المورد=${supplier.name}; تم حذف منتجات الكتالوج قبل ملف المورد`}});
+    });
+  } catch (error) { deleteRedirect(error); }
+  revalidatePath('/admin/suppliers');revalidatePath('/admin/suppliers/catalog');revalidatePath('/admin/suppliers/integrations');revalidatePath('/shop');
+  redirect('/admin/suppliers?deleted=products');
+}
+
+/** Destructive step two: delete the supplier only after its products and history are both empty. */
+export async function deleteSupplier(form: FormData) {
+  const session = await requireAction('suppliers', 'delete');
+  let id: bigint, confirmName: string;
+  try { id = supplierId(form); confirmName = confirmed(form, 'حذف المورد نهائياً'); } catch (error) { deleteRedirect(error); }
+  try {
+    await assertCommerceSchemaReady(prisma);
+    await prisma.$transaction(async tx => {
+      const [supplier] = await tx.$queryRaw<{id: bigint; name: string}[]>`SELECT id,name FROM commerce_suppliers WHERE id=${id} FOR UPDATE`;
+      if (!supplier) throw new Error('delete_not_found');
+      if (supplier.name.normalize('NFKC').trim() !== confirmName) throw new Error('delete_confirmation');
+      const [counts] = await tx.$queryRaw<{product_count: bigint; history_count: bigint}[]>`SELECT
+        ((SELECT COUNT(*) FROM supplier_products WHERE supplier_id=${id})+(SELECT COUNT(*) FROM commerce_product_suppliers WHERE supplier_id=${id})) AS product_count,
+        ((SELECT COUNT(*) FROM supplier_orders WHERE supplier_id=${id})+(SELECT COUNT(*) FROM commerce_order_suppliers WHERE supplier_id=${id})+(SELECT COUNT(*) FROM commerce_supplier_accruals WHERE supplier_id=${id})) AS history_count`;
+      if (Number(counts?.product_count || 0) > 0) throw new Error('delete_products_first');
+      if (Number(counts?.history_count || 0) > 0) throw new Error('delete_history');
+      await tx.$executeRaw`DELETE FROM supplier_oauth_states WHERE supplier_id=${id}`;
+      await tx.$executeRaw`DELETE e FROM supplier_webhook_events e JOIN supplier_connections c ON c.id=e.connection_id WHERE c.supplier_id=${id}`;
+      await tx.$executeRaw`DELETE FROM supplier_connections WHERE supplier_id=${id}`;
+      await tx.$executeRaw`DELETE FROM supplier_onboarding WHERE supplier_id=${id}`;
+      await tx.$executeRaw`DELETE FROM supplier_integration_profiles WHERE supplier_id=${id}`;
+      await tx.$executeRaw`DELETE FROM commerce_suppliers WHERE id=${id}`;
+      await tx.admin_log.create({data:{admin_id:BigInt(session.uid),action:'حذف مورد نهائياً',target:id.toString(),note:`المورد=${supplier.name}; تأكيد مزدوج؛ بلا منتجات أو سجل طلبات`}});
+    });
+  } catch (error) { deleteRedirect(error); }
+  revalidatePath('/admin/suppliers');revalidatePath('/admin/suppliers/catalog');revalidatePath('/admin/suppliers/integrations');
+  redirect('/admin/suppliers?deleted=supplier');
+}

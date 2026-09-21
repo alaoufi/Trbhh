@@ -26,12 +26,16 @@
 .entry[data-phase='flag'] .flagStage,
 .entry[data-phase='leaders'] .leadersStage { opacity: 1; }
 
+.flagMast { position: relative; width: min(78vw, 720px); padding-inline-start: .7rem; perspective: 1100px; }
+.flagPole { position: absolute; z-index: 2; inset-block: -5% -12%; inset-inline-start: 0; width: .55rem; border-radius: 999px; background: linear-gradient(90deg, #8a6724, #ffe3a0 45%, #8a6724); box-shadow: 0 10px 28px rgb(0 0 0 / 35%); }
 .flag {
-  width: min(78vw, 720px);
+  display: block;
+  width: 100%;
   border-radius: .4rem;
   box-shadow: 0 28px 65px rgb(0 0 0 / 35%);
   transform-origin: 0 50%;
-  animation: wave 900ms ease-in-out infinite alternate;
+  will-change: transform, filter;
+  animation: wave 1400ms cubic-bezier(.45,.05,.55,.95) infinite;
 }
 
 .flagStage p { font-size: clamp(1.2rem, 4vw, 2rem); font-weight: 900; text-shadow: 0 3px 16px rgb(0 0 0 / 45%); }
@@ -61,8 +65,8 @@
 .skip:focus-visible { outline: 3px solid #f0b429; outline-offset: 3px; }
 
 @keyframes wave {
-  0% { transform: rotateY(-7deg) skewY(-1deg) scaleX(.98); filter: brightness(.93); }
-  100% { transform: rotateY(7deg) skewY(1deg) scaleX(1.02); filter: brightness(1.08); }
+  0%, 100% { transform: rotateY(-13deg) skewY(-1.8deg) translateX(-1.5%); filter: brightness(.9) drop-shadow(18px 18px 16px rgb(0 0 0 / 25%)); }
+  50% { transform: rotateY(13deg) skewY(1.8deg) translateX(1.5%); filter: brightness(1.12) drop-shadow(-12px 18px 18px rgb(0 0 0 / 30%)); }
 }
 
 @media (max-width: 640px) {

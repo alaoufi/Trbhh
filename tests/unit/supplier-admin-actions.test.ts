@@ -5,7 +5,7 @@ vi.mock('@/lib/roles', () => ({ requireAction: state.gate }));
 vi.mock('@/lib/prisma', () => ({ prisma: { $transaction: state.transaction } }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('next/navigation', () => ({ redirect: (url: string) => { throw new Error(`redirect:${url}`); } }));
-import { saveSupplier, saveSupplierProduct } from '@/app/admin/suppliers/actions';
+import { deleteSupplier, deleteSupplierProducts, saveSupplier, saveSupplierProduct } from '@/app/admin/suppliers/actions';
 
 const form = (values: Record<string, string>) => {
   const data = new FormData();
@@ -74,5 +74,18 @@ describe('supplier administration boundaries', () => {
     state.schema.mockRejectedValueOnce(new Error('private DB details'));
     await expect(saveSupplier(form({ name: 'Fixture' }))).rejects.toThrow('redirect:/admin/suppliers?error=save');
     expect(state.transaction).not.toHaveBeenCalled();
+  });
+  it('requires the supplier delete permission and exact two-step confirmations', async () => {
+    await expect(deleteSupplierProducts(form({supplierId:'2',supplierName:'Fixture',confirmName:'Fixture',confirmPhrase:'حذف منتجات المورد',acknowledge:'1'}))).rejects.toThrow('redirect:');
+    expect(state.gate).toHaveBeenLastCalledWith('suppliers','delete');
+    expect(state.transaction).toHaveBeenCalledOnce();
+    vi.clearAllMocks();state.gate.mockResolvedValue({uid:9});state.query.mockResolvedValue([{id:2n,name:'Fixture'}]);
+    await expect(deleteSupplier(form({supplierId:'2',supplierName:'Fixture',confirmName:'Wrong',confirmPhrase:'حذف المورد نهائياً',acknowledge:'1'}))).rejects.toThrow('error=delete_confirmation');
+    expect(state.transaction).not.toHaveBeenCalled();
+  });
+  it('blocks supplier deletion until imported products are removed', async () => {
+    state.query.mockResolvedValueOnce([{id:2n,name:'Fixture'}]).mockResolvedValueOnce([{product_count:1n,history_count:0n}]);
+    await expect(deleteSupplier(form({supplierId:'2',supplierName:'Fixture',confirmName:'Fixture',confirmPhrase:'حذف المورد نهائياً',acknowledge:'1'}))).rejects.toThrow('error=delete_products_first');
+    expect(state.execute).not.toHaveBeenCalled();
   });
 });

@@ -137,8 +137,8 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
           invoke(previewAction, form, 'preview', emptyState);
         }} className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div><h2 className="text-lg font-bold">بيانات المورد والمتجر</h2><p className="mt-1 text-sm leading-6 text-slate-500">نزّل نموذج تربح المعتمد واملأ بيانات متجر واحد.</p></div>
-            <a href="/admin/suppliers/onboarding/template" download className={secondary}>تنزيل نموذج Excel</a>
+            <div><h2 className="text-lg font-bold">Excel — خيار احتياطي</h2><p className="mt-1 text-sm leading-6 text-slate-500">المسار الأساسي هو إنشاء رابط بيانات المورد من بطاقة المورد. استخدم الملف فقط عند الحاجة للاستيراد الإداري.</p></div>
+            <a href="/admin/suppliers/onboarding/template" download className={secondary}>تنزيل نموذج Excel الاحتياطي</a>
           </div>
           <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-5 sm:p-8">
             <label htmlFor={fileId} className="block font-bold">اختر ملف بيانات المتجر</label>

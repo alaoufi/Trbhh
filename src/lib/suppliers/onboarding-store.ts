@@ -24,6 +24,11 @@ export async function inspectOnboarding(db:Reader,values:OnboardingValues,secret
  if(suppliers.length>1)throw Error('onboarding_duplicate_registration');
  const identities=await db.$queryRaw<OnboardRow[]>`SELECT * FROM supplier_onboarding WHERE registration_number=${registration} OR store_url=${storeUrl}`;
  let existing=suppliers[0];
+ if(explicitSupplierId){
+  const [target]=await db.$queryRaw<SupplierRow[]>`SELECT id,name,contact_name,phone,email,address,registration_number,tax_number,settlement_terms,notes,active,updated_at FROM commerce_suppliers WHERE id=${explicitSupplierId} LIMIT 1`;
+  if(!target||existing&&existing.id!==target.id)throw Error('onboarding_identity_conflict');
+  existing=target;
+ }
  if(identities.some(o=>o.store_url===storeUrl&&o.registration_number!==registration))throw Error('onboarding_url_conflict');
  const identity=identities.find(o=>o.registration_number===registration);
  if(identity&&(!existing||identity.supplier_id!==existing.id))throw Error('onboarding_identity_conflict');
@@ -66,20 +71,21 @@ export function verifyPreviewToken(token:string,adminId:bigint,fileHash:string,s
 export const onboardingFileHash=(bytes:Buffer)=>createHash('sha256').update(bytes).digest('hex');
 export function safeOnboardingFilename(name:string){return name.split(/[\\/]/).pop()!.replace(/[^\p{L}\p{N}_. -]/gu,'_').slice(0,120);}
 export function onboardingAuditNote(filename:string,operation:'create'|'update'|'preview',changedCount:number){return JSON.stringify({operation,filename:safeOnboardingFilename(filename).slice(0,80),changedCount});}
-export async function saveOnboarding(db:CommerceDb,input:{values:OnboardingValues;fingerprint:string;filename:string;adminId:bigint;secret:string;canCreate:boolean;canEdit:boolean}){
+export async function saveOnboarding(db:CommerceDb,input:{values:OnboardingValues;fingerprint:string;filename:string;auditAction?:string;explicitSupplierId?:bigint;activateSupplier?:boolean;adminId:bigint;secret:string;canCreate:boolean;canEdit:boolean}){
  const validated=validateOnboarding(input.values,{preserveMissingRequired:true});if(validated.errors.length)throw Error('onboarding_validation');
  return db.$transaction(async tx=>{
   // Serialize registration imports, including previously unknown registration numbers.
   await tx.$executeRaw`INSERT IGNORE INTO site_settings(k,v) VALUES('supplier_onboarding_mutex','1')`;
   await tx.$queryRaw`SELECT k FROM site_settings WHERE k='supplier_onboarding_mutex' FOR UPDATE`;
-  const state=await inspectOnboarding(tx,validated.values,input.secret);
+  const state=await inspectOnboarding(tx,validated.values,input.secret,input.explicitSupplierId??null);
   const complete=validateOnboarding(state.merged,{allowMissingRequired:state.existing&&state.connected?['email']:[]});if(complete.errors.length)throw Error('onboarding_validation');
   if(state.fingerprint!==input.fingerprint)throw Error('onboarding_preview_stale');
   if(state.existing?!input.canEdit:!input.canCreate)throw Error('onboarding_forbidden');
   const v=complete.values;let id=state.existing?.id;
   if(id){
    // Do not change active state, API controls or connection state from a spreadsheet.
-   await tx.$executeRaw`UPDATE commerce_suppliers SET name=${v.store_name||''},contact_name=${v.contact_name||''},phone=${v.phone||''},email=${v.email||''},address=${v.address||''},registration_number=${v.registration_number||''},tax_number=${v.tax_number||''},settlement_terms=${v.settlement_terms||''},notes=${v.notes||''},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${id}`;
+   if(input.activateSupplier)await tx.$executeRaw`UPDATE commerce_suppliers SET name=${v.store_name||''},contact_name=${v.contact_name||''},phone=${v.phone||''},email=${v.email||''},address=${v.address||''},registration_number=${v.registration_number||''},tax_number=${v.tax_number||''},settlement_terms=${v.settlement_terms||''},notes=${v.notes||''},active=1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=${id}`;
+   else await tx.$executeRaw`UPDATE commerce_suppliers SET name=${v.store_name||''},contact_name=${v.contact_name||''},phone=${v.phone||''},email=${v.email||''},address=${v.address||''},registration_number=${v.registration_number||''},tax_number=${v.tax_number||''},settlement_terms=${v.settlement_terms||''},notes=${v.notes||''},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${id}`;
   }else{
    // Active profile permits OAuth; products/sync/automatic ordering remain disabled.
    await tx.$executeRaw`INSERT INTO commerce_suppliers(name,contact_name,phone,email,address,registration_number,tax_number,settlement_terms,notes,active,api_enabled) VALUES(${v.store_name||''},${v.contact_name||''},${v.phone||''},${v.email||''},${v.address||''},${v.registration_number||''},${v.tax_number||''},${v.settlement_terms||''},${v.notes||''},1,0)`;
@@ -88,7 +94,7 @@ export async function saveOnboarding(db:CommerceDb,input:{values:OnboardingValue
   await tx.$executeRaw`INSERT INTO supplier_integration_profiles(supplier_id,provider,maintenance,sync_enabled,auto_orders_enabled,mode) VALUES(${id},'salla',0,0,0,'development') ON DUPLICATE KEY UPDATE supplier_id=supplier_id`;
   const sealed=encryptDetails(v,id,input.secret);
   await tx.$executeRaw`INSERT INTO supplier_onboarding(supplier_id,registration_number,store_url,encrypted_details) VALUES(${id},${v.registration_number!},${v.store_url!},${sealed}) ON DUPLICATE KEY UPDATE encrypted_details=VALUES(encrypted_details),store_url=VALUES(store_url),revision=revision+1,updated_at=CURRENT_TIMESTAMP(3)`;
-  await tx.admin_log.create({data:{admin_id:input.adminId,action:'رفع ملف متجر سلة',target:String(id),note:onboardingAuditNote(input.filename,state.existing?'update':'create',state.changedKeys.length)}});
+  await tx.admin_log.create({data:{admin_id:input.adminId,action:input.auditAction||'رفع ملف متجر سلة',target:String(id),note:onboardingAuditNote(input.filename,state.existing?'update':'create',state.changedKeys.length)}});
   return {supplierId:String(id),storeName:v.store_name!,connected:state.connected,status:'pending' as const};
  },{isolationLevel:'ReadCommitted',timeout:15000});
 }

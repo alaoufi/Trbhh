@@ -5,10 +5,14 @@ import { prisma } from '@/lib/prisma';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { formatSar } from '@/lib/commerce/money';
 import { deleteSupplier, deleteSupplierProducts, saveSupplier, saveSupplierProduct } from './actions';
+import {approveSupplierData,reopenSupplierData} from './data-actions';
+import {SupplierDataInvitePanel} from '@/components/supplier-data-invite-panel';
+import {decryptInvitationDraft} from '@/lib/suppliers/data-invitations';
+import type {OnboardingValues} from '@/lib/suppliers/onboarding-fields';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الموردون وربط السلع', robots: { index: false, follow: false } };
-type Supplier = { id: bigint; name: string; contact_name: string; phone: string; email: string; address: string; registration_number: string; tax_number: string; settlement_terms: string; notes: string; active: number; api_base_url: string; api_credential_ref: string; product_count: bigint; history_count: bigint };
+type Supplier = { id: bigint; name: string; contact_name: string; phone: string; email: string; address: string; registration_number: string; tax_number: string; settlement_terms: string; notes: string; active: number; api_base_url: string; api_credential_ref: string; product_count: bigint; history_count: bigint; store_url:string|null;invite_status:string|null;invite_generation:number|null;invite_draft:string|null;invite_expires:Date|null;connection_count:bigint };
 type Mapping = { product_id: bigint; supplier_id: bigint; supplier_sku: string; unit_cost_minor: number; title: string; supplier_name: string; supplier_active: number };
 const input = 'mt-1 min-h-10 w-full rounded-lg border border-primary/25 bg-white px-3 text-sm';
 const button = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
@@ -78,20 +82,24 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
   const offset = (page - 1) * 100;
   try { await assertCommerceSchemaReady(prisma); } catch { return <p role="alert" className="card-3d rounded-xl p-5">مخطط الموردين غير جاهز؛ يلزم استكمال الجداول والفهارس قبل الإدارة.</p>; }
   const [suppliers, mappings] = await Promise.all([
-    prisma.$queryRaw<Supplier[]>`SELECT s.id,s.name,s.contact_name,s.phone,s.email,s.address,s.registration_number,s.tax_number,s.settlement_terms,s.notes,s.active,s.api_base_url,s.api_credential_ref,
+    prisma.$queryRaw<Supplier[]>`SELECT s.id,s.name,s.contact_name,s.phone,s.email,s.address,s.registration_number,s.tax_number,s.settlement_terms,s.notes,s.active,s.api_base_url,s.api_credential_ref,o.store_url,i.status AS invite_status,i.generation AS invite_generation,i.encrypted_draft AS invite_draft,i.expires_at AS invite_expires,
       ((SELECT COUNT(*) FROM supplier_products p WHERE p.supplier_id=s.id)+(SELECT COUNT(*) FROM commerce_product_suppliers m WHERE m.supplier_id=s.id)) AS product_count,
-      ((SELECT COUNT(*) FROM supplier_orders o WHERE o.supplier_id=s.id)+(SELECT COUNT(*) FROM commerce_order_suppliers os WHERE os.supplier_id=s.id)+(SELECT COUNT(*) FROM commerce_supplier_accruals a WHERE a.supplier_id=s.id)) AS history_count
-      FROM commerce_suppliers s ORDER BY s.id DESC LIMIT 100 OFFSET ${offset}`,
+      ((SELECT COUNT(*) FROM supplier_orders so WHERE so.supplier_id=s.id)+(SELECT COUNT(*) FROM commerce_order_suppliers os WHERE os.supplier_id=s.id)+(SELECT COUNT(*) FROM commerce_supplier_accruals a WHERE a.supplier_id=s.id)) AS history_count,
+      (SELECT COUNT(*) FROM supplier_connections c WHERE c.supplier_id=s.id) AS connection_count
+      FROM commerce_suppliers s LEFT JOIN supplier_onboarding o ON o.supplier_id=s.id LEFT JOIN supplier_data_invitations i ON i.supplier_id=s.id ORDER BY s.id DESC LIMIT 100 OFFSET ${offset}`,
     prisma.$queryRaw<Mapping[]>`SELECT m.product_id,m.supplier_id,m.supplier_sku,m.unit_cost_minor,p.title,s.name AS supplier_name,s.active AS supplier_active FROM commerce_product_suppliers m JOIN commerce_products p ON p.id=m.product_id JOIN commerce_suppliers s ON s.id=m.supplier_id ORDER BY m.product_id DESC LIMIT 100 OFFSET ${offset}`,
   ]);
   return <div className="space-y-4">
     <h1 className="text-xl font-bold text-primary">الموردون وربط السلع</h1>
-    <Link href="/admin/suppliers/onboarding" className="inline-block rounded-lg bg-amber-400 px-4 py-2 font-bold text-slate-900">رفع ملف متجر سلة</Link>
+    <p className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-950">افتح بطاقة المورد ثم أنشئ «رابط بيانات المورد» وأرسله لصاحب المتجر. سيظهر طلبه هنا للمراجعة والاعتماد.</p>
+    <Link href="/admin/suppliers/onboarding" className="inline-block rounded-lg bg-amber-100 px-4 py-2 font-bold text-slate-900">Excel — خيار احتياطي</Link>
     <Link href="/admin/suppliers/catalog" className="inline-block rounded-lg bg-primary px-4 py-2 font-bold text-white">اختيار منتجات سلة</Link>
     <Link href="/admin/suppliers/integrations" className="inline-block rounded-lg bg-primary px-4 py-2 text-white">تكامل Salla وكتالوج الموردين</Link>
     <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">الموردون جهات داخلية لتربح. التنفيذ والتسوية خارج الموقع. لا تحويل أموال ولا اتصال API من هذه الصفحة.</p>
     <nav className="flex flex-wrap gap-4 text-primary underline"><Link href="/admin/commerce">السلع والطلبات</Link><Link href="/admin/commerce/accounts">الإيصالات والاستحقاقات</Link></nav>
     {query.saved === '1' && <p role="status" className="text-emerald-700">تم الحفظ.</p>}
+    {query.data==='approved'&&<p role="status" className="text-emerald-700">تم اعتماد بيانات المورد وأصبحت روابط المتجر والتفويض متاحة.</p>}
+    {query.data==='reopened'&&<p role="status" className="text-emerald-700">أعيد النموذج للمورد للتصحيح.</p>}
     {query.deleted==='products'&&<p role="status" className="text-emerald-700">تم حذف منتجات المورد. راجع المورد ثم نفّذ خطوة حذف ملفه إذا رغبت.</p>}
     {query.deleted==='supplier'&&<p role="status" className="text-emerald-700">تم حذف المورد بعد التأكد من خلوه من المنتجات وسجل الطلبات.</p>}
     {typeof query.error === 'string' && <p role="alert" className="text-red-700">{query.error==='delete_products_first'?'احذف منتجات المورد أولًا ثم أعد محاولة حذف المورد.':query.error==='delete_history'?'لا يمكن الحذف لأن للمورد سجل طلبات أو استحقاقات يجب حفظه.':query.error==='delete_confirmation'?'لم تتطابق بيانات التأكيد. اكتب اسم المورد والعبارة المطلوبة حرفيًا.':'تعذر إكمال العملية. راجع الحقول وجاهزية الجداول.'}</p>}
@@ -103,7 +111,7 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
     </nav>
     <section className="space-y-3"><h2 className="font-bold">الموردون — الصفحة {page}</h2>
       {!suppliers.length && <p className="text-sm">لا يوجد موردون في هذه الصفحة.</p>}
-      {suppliers.map(s => <details key={s.id.toString()} className="card-3d rounded-xl p-4"><summary className="mb-3 cursor-pointer">#{s.id.toString()} {s.name} — {s.active === 1 ? 'نشط' : 'غير نشط'}</summary><SupplierForm supplier={s} />{canDelete&&<SupplierDeletion supplier={s}/>}</details>)}
+      {suppliers.map(s => {let inviteValues:OnboardingValues={};if(s.invite_draft&&s.invite_generation)try{inviteValues=decryptInvitationDraft(s.invite_draft,s.id,s.invite_generation,process.env.SUPPLIER_TOKEN_ENCRYPTION_KEY||'');}catch{}const invitation=s.invite_status&&s.invite_generation&&s.invite_expires?{status:s.invite_status,generation:s.invite_generation,expiresAt:s.invite_expires.toISOString(),values:inviteValues}:null;return <details key={s.id.toString()} className="card-3d rounded-xl p-4"><summary className="mb-3 cursor-pointer">#{s.id.toString()} {s.name} — {s.active === 1 ? 'نشط' : 'غير نشط'}{s.invite_status==='submitted'?' — بيانات بانتظار المراجعة':''}</summary><SupplierForm supplier={s}/><SupplierDataInvitePanel supplierId={s.id.toString()} supplierName={s.name} invitation={invitation} approvedStoreUrl={s.store_url} connected={Number(s.connection_count)>0} approveAction={approveSupplierData} reopenAction={reopenSupplierData}/>{canDelete&&<SupplierDeletion supplier={s}/>}</details>;})}
     </section>
     <section className="card-3d space-y-3 rounded-xl p-4"><h2 className="font-bold">اختيار منتجات المورد</h2><p className="text-sm">ابحث بالاسم أو SKU، عاين الصور والتفاصيل، ثم راجع المنتجات المحددة قبل إضافتها إلى تربح. المنتجات تبقى مخفية بعد الإضافة.</p><Link href="/admin/suppliers/catalog" className={`${button} inline-flex min-h-11 items-center`}>عرض المنتجات واختيارها</Link></section>
     <section className="space-y-3"><h2 className="font-bold">روابط السلع — الصفحة {page}</h2>

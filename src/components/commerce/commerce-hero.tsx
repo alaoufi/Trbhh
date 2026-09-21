@@ -69,11 +69,13 @@ export function CommerceHero({ slides, intervalMs = 5000 }: { slides: HeroSlide[
               <img src={s.image} alt={s.title} loading="lazy" decoding="async" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover" />
             )
             : <div className="absolute inset-0 bg-gradient-to-l from-[#0f1d38] via-[#16294a] to-[#233a63]" />}
-          {/* توهّج ذهبي زخرفي */}
-          <span aria-hidden="true" className="pointer-events-none absolute -left-16 -top-20 h-64 w-64 rounded-full bg-[#f0b429]/20 blur-3xl" />
-          {/* تعتيم اتجاهي خفيف: أغمق قليلاً على يمين النص (RTL) لإبقاء الصورة ظاهرة وأفتح */}
-          <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/85 via-[#0b162e]/40 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/55 via-transparent to-transparent" />
+          {/* توهّج برتقالي زخرفي */}
+          <span aria-hidden="true" className="pointer-events-none absolute -left-16 -top-20 h-64 w-64 rounded-full bg-[#ff6a1a]/15 blur-3xl" />
+          {/* تعتيم كافٍ لإبقاء العنوان مقروءاً فوق أي صورة إعلان مزدحمة:
+              طبقة أساس + تدرّج اتجاهي أغمق على يمين النص (RTL) + تدرّج سفلي. */}
+          <div className="absolute inset-0 bg-[#0b162e]/45" />
+          <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/92 via-[#0b162e]/55 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/70 via-transparent to-transparent" />
           <div className="absolute inset-y-0 right-0 flex max-w-xl flex-col justify-center p-6 sm:p-10">
             <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[12px] font-extrabold text-white ring-1 ring-white/25 backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-[#ff6a1a]" /> متوفّر في جميع مناطق المملكة

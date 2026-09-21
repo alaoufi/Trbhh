@@ -31,6 +31,17 @@ img.media,svg.media{position:absolute;inset:0;width:100%;height:100%;object-fit:
 .trust .ic svg{width:26px;height:26px}
 .trust b{font-size:14px;font-weight:800;display:block}
 .trust span{font-size:11px;color:rgba(22,41,74,.55);font-weight:700}
+/* Categories */
+.cats{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.cats::-webkit-scrollbar{display:none}
+@media(min-width:640px){.cats{display:grid;grid-template-columns:repeat(4,1fr);overflow:visible}}
+@media(min-width:768px){.cats{grid-template-columns:repeat(6,1fr)}}
+@media(min-width:1024px){.cats{grid-template-columns:repeat(8,1fr)}}
+.cat{flex:0 0 auto;width:80px;display:flex;flex-direction:column;align-items:center;gap:8px}
+@media(min-width:640px){.cat{width:auto}}
+.cat .ic{aspect-ratio:1;width:100%;max-width:84px;background:#fff;border:1px solid rgba(0,0,0,.05);border-radius:16px;display:grid;place-items:center;box-shadow:0 4px 12px -8px rgba(16,41,74,.3);color:rgba(22,41,74,.45)}
+.cat .ic svg{width:32px;height:32px}
+.cat b{font-size:12px;font-weight:800;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 /* Section head */
 .shead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
 .shead h2{font-size:20px;font-weight:800;display:flex;align-items:center;gap:10px}
@@ -106,9 +117,24 @@ img.media,svg.media{position:absolute;inset:0;width:100%;height:100%;object-fit:
     <div class="it"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18"/><path d="M7 15h4"/></svg></span><div><b>خارج المنصّة</b><span>نعرض ونربط فقط</span></div></div>
   </div>
 
-  <!-- عروض مميزة -->
+  <!-- تصفّح حسب الفئة -->
   <div>
-    <div class="shead"><h2><i></i>عروض مميّزة</h2><span class="cnt">٤ عروض</span></div>
+    <div class="shead"><h2><i></i>تصفّح حسب الفئة</h2></div>
+    <div class="cats">
+      <span class="cat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5z"/><path d="M3 9v6l9 5 9-5V9"/></svg></span><b>سيارات</b></span>
+      <span class="cat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5z"/><path d="M3 9v6l9 5 9-5V9"/></svg></span><b>عقارات</b></span>
+      <span class="cat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5z"/><path d="M3 9v6l9 5 9-5V9"/></svg></span><b>أجهزة</b></span>
+      <span class="cat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5z"/><path d="M3 9v6l9 5 9-5V9"/></svg></span><b>أثاث ومنزل</b></span>
+      <span class="cat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5z"/><path d="M3 9v6l9 5 9-5V9"/></svg></span><b>معدّات</b></span>
+      <span class="cat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5z"/><path d="M3 9v6l9 5 9-5V9"/></svg></span><b>خدمات</b></span>
+      <span class="cat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5z"/><path d="M3 9v6l9 5 9-5V9"/></svg></span><b>مواشي</b></span>
+      <span class="cat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5z"/><path d="M3 9v6l9 5 9-5V9"/></svg></span><b>أخرى</b></span>
+    </div>
+  </div>
+
+  <!-- أحدث إعلانات تربح -->
+  <div>
+    <div class="shead"><h2><i></i>أحدث إعلانات تربح</h2><span class="cnt">للتواصل والاتفاق خارج الموقع</span></div>
     <div class="grid">
       <!-- scissor lift -->
       <div class="card"><div class="pic"><span class="badge">خصم 105</span>

@@ -56,6 +56,42 @@ function TrustBar({ items = DEFAULT_TRUST }: { items?: TrustItem[] }) {
   );
 }
 
+export type CommerceCategory = { name: string; href: string; image?: string | null };
+
+function CatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-8 w-8 text-[#16294a]/45" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 9l9-5 9 5-9 5z" /><path d="M3 9v6l9 5 9-5V9" /><path d="M12 14v6" />
+    </svg>
+  );
+}
+
+function CatMedia({ image, name }: { image?: string | null; name: string }) {
+  if (!image) return <CatIcon />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={image} alt={name} loading="lazy" decoding="async" className="h-full w-full object-cover" />;
+}
+
+/** «تصفّح حسب الفئة» — بطاقات موحّدة: صف أفقي قابل للسحب على الجوال، شبكة على الحاسوب. */
+function CommerceCategories({ items }: { items: CommerceCategory[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <section className="space-y-4">
+      <SectionHeader title="تصفّح حسب الفئة" accent="navy" />
+      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-4 sm:overflow-visible md:grid-cols-6 lg:grid-cols-7">
+        {items.map((c) => (
+          <Link key={c.name} href={c.href} className="group flex w-20 shrink-0 flex-col items-center gap-2 sm:w-auto">
+            <span className="grid aspect-square w-full max-w-[84px] place-items-center overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm transition group-hover:shadow-md">
+              <CatMedia image={c.image} name={c.name} />
+            </span>
+            <span className="line-clamp-1 w-full text-center text-xs font-bold text-[#16294a]">{c.name}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 const ACCENT_BAR: Record<HomeSectionAccent, string> = {
   gold: 'from-[#ff8a3d] to-[#ff6a1a]',
   navy: 'from-[#233a63] to-[#16294a]',
@@ -100,6 +136,7 @@ export function CommerceHome({
   options,
   banners = [],
   trust,
+  categories = [],
 }: {
   hero?: HeroSlide[];
   sections: CommerceHomeSection[];
@@ -108,6 +145,8 @@ export function CommerceHome({
   banners?: CommerceBanner[];
   /** عناصر شريط الثقة (اختياري) — الافتراضي أربعة عناصر. */
   trust?: TrustItem[];
+  /** فئات «تصفّح حسب الفئة» (اختياري) — لا تُصيَّر إن كانت فارغة. */
+  categories?: CommerceCategory[];
 }) {
   const composed = composeHome(sections, options);
   const subtitleOf = new Map(sections.map((s) => [s.id, s.subtitle]));
@@ -116,6 +155,7 @@ export function CommerceHome({
     <div className="commerce-scope space-y-7">
       {hero.length > 0 && <CommerceHero slides={hero} />}
       <TrustBar items={trust} />
+      <CommerceCategories items={categories} />
 
       {composed.map((sec) => (
         <section key={sec.id} className="space-y-4">

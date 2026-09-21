@@ -6,7 +6,7 @@ import { primaryImages } from '@/lib/account';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { getCommerceGateway } from '@/lib/commerce/runtime';
-import { CommerceHome, type CommerceHomeSection, type CommerceBanner } from '@/components/commerce/commerce-home';
+import { CommerceHome, type CommerceHomeSection, type CommerceBanner, type CommerceCategory } from '@/components/commerce/commerce-home';
 import { firstImageUrl, type CommerceCardItem } from '@/components/commerce/catalog';
 import type { HeroSlide } from '@/components/commerce/commerce-hero';
 
@@ -125,17 +125,24 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
   // شبكة نظيفة كما في التصميم المرجعي: قسم واحد «عروض مميّزة» في المعاينة التوضيحية،
   // وللسلع المعتمدة: مميّزة (Spotlight) + الباقي (شبكة).
   const allProducts = rest.length ? rest : sourceCards;
-  const demoSection: CommerceHomeSection = { id: 'ads', title: 'عروض مميّزة', kind: 'products', items: sourceCards, display: 'grid', accent: 'orange', subtitle: `${sourceCards.length} عرض` };
+  // فصل بصري بين «متجر تربح» (شراء مباشر) و«إعلانات تربح» (تواصل خارجي).
+  const demoSection: CommerceHomeSection = { id: 'ads', title: 'أحدث إعلانات تربح', kind: 'products', items: sourceCards, display: 'grid', accent: 'orange', subtitle: `${sourceCards.length} إعلان · للتواصل والاتفاق خارج الموقع` };
   const realSections: CommerceHomeSection[] = [
-    { id: 'featured', title: 'منتجات مميّزة', kind: 'products', items: featured, display: 'spotlight', accent: 'orange', subtitle: 'اختيار تربح' },
-    { id: 'all', title: 'كل المنتجات', kind: 'products', items: allProducts, display: 'grid', accent: 'navy', subtitle: `${allProducts.length} منتج` },
+    { id: 'featured', title: 'متجر تربح — عروض مميّزة', kind: 'products', items: featured, display: 'spotlight', accent: 'orange', subtitle: 'شراء مباشر' },
+    { id: 'all', title: 'متجر تربح — كل المنتجات', kind: 'products', items: allProducts, display: 'grid', accent: 'navy', subtitle: `${allProducts.length} منتج` },
   ];
   const sections = usingDemoAds ? [demoSection] : realSections.filter((s) => s.items.length > 0);
+
+  // «تصفّح حسب الفئة»: فئات تربط بالبحث الحالي (لا نظام أقسام — الأقسام مُزالة من المشروع).
+  // نصوص مبدئية للعرض؛ تنتظر تعريف الفئات الحقيقية من الإدارة.
+  const categories: CommerceCategory[] = usingDemoAds
+    ? ['سيارات', 'عقارات', 'أجهزة وجوّالات', 'أثاث ومنزل', 'معدّات', 'خدمات', 'مواشي', 'أخرى'].map((name) => ({ name, href: `/search?q=${encodeURIComponent(name)}` }))
+    : [];
 
   // بانرات سفلية (فاتح + كحلي) بدعوة إجراء — نصوصها من الإعداد قدر الإمكان.
   const banners: CommerceBanner[] = [
     { title: config.text.title, subtitle: config.text.description, cta: config.text.buy, tone: 'light' },
-    { title: 'معدّات وخدمات متنوّعة', subtitle: 'تصفّح أحدث ما نُشر على تربح في كل المناطق.', cta: 'تصفّح الآن', tone: 'navy' },
+    { title: 'معدّات وخدمات متنوّعة', subtitle: 'تصفّح أحدث ما نُشر على تربح في كل المناطق.', cta: 'تصفّح الآن', href: '/search', tone: 'navy' },
   ];
 
   return (
@@ -147,7 +154,7 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
       {!canCheckout && !usingDemoAds && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">{config.text.unavailable}</p>}
       {sourceCards.length === 0
         ? <p className="rounded-xl border border-[#16294a]/15 bg-[#16294a]/5 p-6 text-center text-sm font-bold text-[#16294a]/70">{preview ? 'لا توجد إعلانات حيّة مطابقة لعرضها كبيانات توضيحية.' : 'لا توجد منتجات معتمدة للعرض حالياً.'}</p>
-        : <CommerceHome hero={hero} sections={sections} banners={banners} />}
+        : <CommerceHome hero={hero} sections={sections} banners={banners} categories={categories} />}
     </div>
   );
 }

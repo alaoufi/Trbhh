@@ -8,13 +8,15 @@ backup_id=${2:?numeric backup run id}
 candidate=${3:?candidate commit}
 reuse_media_id=${4:-}
 release_profile=${5:-standard}
-[[ "$release_profile" == standard || "$release_profile" == salla || "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day ]] || exit 1
+[[ "$release_profile" == standard || "$release_profile" == salla || "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive ]] || exit 1
 [[ "$phase" == before || "$phase" == after ]] || exit 1
 [[ "$backup_id" =~ ^[0-9]+$ && "$candidate" =~ ^[0-9a-f]{40}$ ]] || exit 1
 if [[ "$release_profile" == supplier_selection ]]; then
   [[ "$reuse_media_id" == 35607654850 && "$reuse_media_id" != "$backup_id" ]] || { echo 'Supplier selection requires its exact verified media chain'; exit 1; }
 elif [[ "$release_profile" == public_home ]]; then
   [[ "$reuse_media_id" == 35619790007 && "$reuse_media_id" != "$backup_id" ]] || { echo 'Public home requires its exact reviewed media chain'; exit 1; }
+elif [[ "$release_profile" == national_day_immersive ]]; then
+  [[ "$reuse_media_id" == 35629850346 && "$reuse_media_id" != "$backup_id" ]] || { echo 'Immersive National Day requires its exact reviewed media chain'; exit 1; }
 elif [[ "$release_profile" == national_day ]]; then
   [[ "$reuse_media_id" == 35626587686 && "$reuse_media_id" != "$backup_id" ]] || { echo 'National day requires its exact reviewed media chain'; exit 1; }
 fi
@@ -23,6 +25,8 @@ if [[ -n "$reuse_media_id" ]]; then
     [[ "$reuse_media_id" == 35607654850 && "$reuse_media_id" != "$backup_id" ]] || exit 1
   elif [[ "$release_profile" == public_home ]]; then
     [[ "$reuse_media_id" == 35619790007 && "$reuse_media_id" != "$backup_id" ]] || exit 1
+  elif [[ "$release_profile" == national_day_immersive ]]; then
+    [[ "$reuse_media_id" == 35629850346 && "$reuse_media_id" != "$backup_id" ]] || exit 1
   elif [[ "$release_profile" == national_day ]]; then
     [[ "$reuse_media_id" == 35626587686 && "$reuse_media_id" != "$backup_id" ]] || exit 1
   elif [[ "$release_profile" == merchant_headers ]]; then
@@ -73,9 +77,12 @@ if [[ "$phase" == after ]]; then
     cmp --silent .env "$backup/environment.env"
     cmp --silent docker-compose.yml "$backup/docker-compose.yml"
   fi
-  if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day ]]; then
+  if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive ]]; then
     if [[ "$release_profile" == merchant_oauth ]]; then
       [[ "$(cat "$backup/VERIFIED")" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 && "$(cat "$backup/commit.txt")" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 && "$(cat "$backup/candidate.txt")" == "$candidate" ]] || exit 1
+    elif [[ "$release_profile" == national_day_immersive ]]; then
+      [[ "$(cat "$backup/VERIFIED")" == 9a64552faca2b99e63a0e915ea73fd0989336b86 && "$(cat "$backup/commit.txt")" == 9a64552faca2b99e63a0e915ea73fd0989336b86 && "$(cat "$backup/candidate.txt")" == "$candidate" ]] || exit 1
+      node "$tools_dir/immersive-media-reference.cjs" verify "$backup"
     elif [[ "$release_profile" == national_day ]]; then
       [[ "$(cat "$backup/VERIFIED")" == 6b9ad47c6ace6cc7a7c25fc0d04947a5eaece2fb && "$(cat "$backup/commit.txt")" == 6b9ad47c6ace6cc7a7c25fc0d04947a5eaece2fb && "$(cat "$backup/candidate.txt")" == "$candidate" ]] || exit 1
       node "$tools_dir/national-media-reference.cjs" verify "$backup"
@@ -120,12 +127,14 @@ elif [[ "$release_profile" == supplier_selection ]]; then
   [[ "$current_commit" == 415a8fe593522859f4cf85c2fa10e47a7d40109b && "$reuse_media_id" == 35607654850 ]] || { echo 'Supplier selection requires its exact reviewed baseline and backup chain'; exit 1; }
 elif [[ "$release_profile" == public_home ]]; then
   [[ "$current_commit" == 1a2111ccd9a17c151a2f47cf793f3bddf4d0451f && "$reuse_media_id" == 35619790007 ]] || { echo 'Public home requires its exact reviewed baseline and backup chain'; exit 1; }
+elif [[ "$release_profile" == national_day_immersive ]]; then
+  [[ "$current_commit" == 9a64552faca2b99e63a0e915ea73fd0989336b86 && "$reuse_media_id" == 35629850346 ]] || { echo 'Immersive National Day requires its exact reviewed production baseline and backup chain'; exit 1; }
 elif [[ "$release_profile" == national_day ]]; then
   [[ "$current_commit" == 6b9ad47c6ace6cc7a7c25fc0d04947a5eaece2fb && "$reuse_media_id" == 35626587686 ]] || { echo 'National day requires its exact reviewed baseline and backup chain'; exit 1; }
 else
   [[ "$current_commit" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || { echo 'Production baseline changed; stop and review'; exit 1; }
 fi
-if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day ]]; then
+if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive ]]; then
   # Measure while the app is live, before creating this backup or its archives.
   # A failed capacity gate creates no partial image/media backup and never pauses.
   capacity=$(docker exec -i -u 0 "$container" node - measure < "$tools_dir/backup-capacity-proof.cjs")
@@ -137,6 +146,7 @@ if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_hea
   if [[ "$release_profile" == supplier_selection && -n "$reuse_media_id" ]]; then media_capacity=verified-parent; fi
   if [[ "$release_profile" == public_home ]]; then media_capacity=verified-parent; fi
   if [[ "$release_profile" == national_day ]]; then media_capacity=verified-parent; fi
+  if [[ "$release_profile" == national_day_immersive ]]; then media_capacity=verified-parent; fi
   node "$tools_dir/backup-capacity-proof.cjs" check "$capacity" "$image_bytes" "$code_bytes" "$base" "$docker_root" "$media_capacity"
 fi
 [[ ! -e "$backup" && ! -L "$backup" ]] || { echo 'Backup destination already exists; use a new run'; exit 1; }
@@ -145,7 +155,7 @@ printf '%s\n' "$current_commit" > "$backup/commit.txt"
 printf '%s\n' "$current_image" > "$backup/image-id.txt"
 printf '%s\n' "$candidate" > "$backup/candidate.txt"
 docker inspect "$container" > "$backup/container-before.json"
-if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day ]]; then
+if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive ]]; then
   node "$tools_dir/verify-runtime.cjs" "$backup/container-before.json" "$backup/container-before.json" "$release_profile"
 fi
 if [[ "$release_profile" == merchant_headers ]]; then
@@ -153,6 +163,8 @@ if [[ "$release_profile" == merchant_headers ]]; then
   # extraction. Both checkpoint directories must remain retained for rollback.
   node "$tools_dir/merchant-media-reference.cjs" prepare "$base/audit-$reuse_media_id" "$backup"
   node "$tools_dir/verify-runtime.cjs" "$base/audit-$reuse_media_id/container-after.json" "$backup/container-before.json" merchant_headers
+elif [[ "$release_profile" == national_day_immersive ]]; then
+  node "$tools_dir/immersive-media-reference.cjs" prepare "$base/audit-$reuse_media_id" "$backup"
 elif [[ "$release_profile" == national_day ]]; then
   node "$tools_dir/national-media-reference.cjs" prepare "$base/audit-$reuse_media_id" "$backup"
 elif [[ "$release_profile" == public_home ]]; then
@@ -198,7 +210,7 @@ docker exec "$reader" sh -c 'command -v mysqldump || command -v mariadb-dump' >/
 # Prepare reused media before the guarded pause. Merchant headers use only the
 # pinned verified parent above; the older generic reuse path copies/extracts
 # archives and does not reuse that source's manifests or success markers.
-if [[ "$release_profile" == merchant_headers || "$release_profile" == public_home || "$release_profile" == national_day || ( "$release_profile" == supplier_selection && -n "$reuse_media_id" ) ]]; then
+if [[ "$release_profile" == merchant_headers || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive || ( "$release_profile" == supplier_selection && -n "$reuse_media_id" ) ]]; then
   for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
     IFS=: read -r label env_name fallback <<< "$spec"
     media_path=$(docker exec "$reader" node -e 'process.stdout.write(process.env[process.argv[1]]||process.argv[2]||"")' "$env_name" "$fallback")
@@ -254,7 +266,7 @@ echo 'Maintenance backup started; automatic resume guard armed.'
 echo 'Taking a private snapshot from the live app database connection.'
 docker exec -i "$reader" node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/before.json"
 docker exec -i "$reader" node - snapshot-full < "$tools_dir/database-proof.cjs" > "$backup/full-before.json"
-if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day ]]; then
+if [[ "$release_profile" == merchant_oauth || "$release_profile" == merchant_headers || "$release_profile" == supplier_selection || "$release_profile" == public_home || "$release_profile" == national_day || "$release_profile" == national_day_immersive ]]; then
   docker exec -i "$reader" node - snapshot < "$tools_dir/supplier-preservation-proof.cjs" > "$backup/supplier-before.json"
 fi
 node "$tools_dir/database-proof.cjs" summary "$backup/before.json"
@@ -327,6 +339,8 @@ if [[ "$release_profile" == merchant_headers ]]; then
   # Child DB/code/image are independent; media restore reads parent archives
   # named and pinned by this private reference. Never remove its parent backup.
   (cd "$backup" && sha256sum PARENT_MEDIA_REFERENCE.json REUSED_MEDIA_SOURCE *-before.json *.path >> SHA256SUMS)
+elif [[ "$release_profile" == national_day_immersive ]]; then
+  (cd "$backup" && sha256sum IMMERSIVE_MEDIA_REFERENCE.json REUSED_MEDIA_SOURCE *-before.json *.path >> SHA256SUMS)
 elif [[ "$release_profile" == national_day ]]; then
   (cd "$backup" && sha256sum NATIONAL_MEDIA_REFERENCE.json REUSED_MEDIA_SOURCE *-before.json *.path >> SHA256SUMS)
 elif [[ "$release_profile" == public_home ]]; then

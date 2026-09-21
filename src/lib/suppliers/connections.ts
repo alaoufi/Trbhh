@@ -3,7 +3,7 @@ import {randomBytes,randomUUID} from 'node:crypto';
 import type {CommerceDb} from '@/lib/commerce/types';
 import {digest,openTokens,sealTokens} from './crypto';
 import {assertOAuthConfig,type SupplierConfig} from './config';
-import {authorizationUrl,exchangeCode,merchantIdentity,refreshGrant} from './salla-oauth';
+import {authorizationUrl,exchangeCode,merchantStoreIdentity,assertMerchantStoreMatches,refreshGrant} from './salla-oauth';
 import {parseMerchantContext,verifyInvitedMerchant,type MerchantContext} from './merchant-oauth';
 
 export async function beginOAuth(db:CommerceDb,supplierId:bigint,adminId:bigint,config:SupplierConfig,constraints?:{expectedGeneration:number;requireUnconnected:true}) {
@@ -39,7 +39,10 @@ export async function completeOAuth(db:CommerceDb,input:{state:string;browser:st
   if(!input.code||input.code.length>8192)throw new Error('supplier_oauth_code');
   const merchant=input.merchantContext===undefined?undefined:parseMerchantContext(input.merchantContext,input.state,config);
   const supplierId=await consumeOAuthState(db,input.state,input.browser,input.adminId,merchant);
-  const grant=await exchangeCode(config,input.code,fetcher),storeId=await merchantIdentity(grant.accessToken,fetcher);
+  const onboarding=await db.$transaction(async tx=>{const [row]=await tx.$queryRaw<{store_url:string}[]>`SELECT store_url FROM supplier_onboarding WHERE supplier_id=${supplierId}`;return row;});
+  if(!onboarding)throw new Error('supplier_merchant_identity_mismatch');
+  const grant=await exchangeCode(config,input.code,fetcher),identity=await merchantStoreIdentity(grant.accessToken,fetcher),storeId=identity.id;
+  assertMerchantStoreMatches(identity,storeId,onboarding.store_url);
   if(merchant)await verifyInvitedMerchant(grant.accessToken,storeId,merchant.expectedName,fetcher);
   const encrypted=sealTokens(grant,`salla:${supplierId}:${storeId}`,config.encryptionKey);
   await db.$transaction(async tx=>{

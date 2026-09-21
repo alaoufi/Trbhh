@@ -39,7 +39,7 @@ export async function syncConnection(db:CommerceDb,connectionId:bigint,config:Su
   await assertSupplierSchemaReady(db);
   const claim=randomUUID();
   const startedAt=await db.$transaction(async tx=>{
-    const [gate]=await tx.$queryRaw<(SyncGate&{sync_claimed_at:Date|null})[]>`SELECT c.supplier_id,c.provider,c.status,c.sync_claim,c.sync_claimed_at,s.active,p.maintenance,p.sync_enabled FROM supplier_connections c JOIN commerce_suppliers s ON s.id=c.supplier_id JOIN supplier_integration_profiles p ON p.supplier_id=c.supplier_id AND p.provider=c.provider WHERE c.id=${connectionId} FOR UPDATE`;
+    const [gate]=await tx.$queryRaw<(SyncGate&{sync_claimed_at:Date|null})[]>`SELECT c.supplier_id,c.provider,c.status,c.sync_claim,c.sync_claimed_at,s.active,p.maintenance,p.sync_enabled,p.mode FROM supplier_connections c JOIN commerce_suppliers s ON s.id=c.supplier_id JOIN supplier_integration_profiles p ON p.supplier_id=c.supplier_id AND p.provider=c.provider WHERE c.id=${connectionId} FOR UPDATE`;
     assertSyncGate(gate,gate?.sync_claim??null);
     if(gate.sync_claim&&(!gate.sync_claimed_at||gate.sync_claimed_at.getTime()>Date.now()-LEASE_MS))throw new Error('supplier_sync_busy');
     await tx.$executeRaw`UPDATE supplier_connections SET sync_claim=${claim},sync_claimed_at=UTC_TIMESTAMP(3) WHERE id=${connectionId}`;
@@ -64,7 +64,7 @@ export async function syncConnection(db:CommerceDb,connectionId:bigint,config:Su
       if(result.nextCursor===null){
         await db.$transaction(async tx=>{
           const missing=await lockMissingProducts(tx,connectionId,seen,startedAt);
-          const [gate]=await tx.$queryRaw<SyncGate[]>`SELECT c.supplier_id,c.provider,c.status,c.sync_claim,s.active,p.maintenance,p.sync_enabled FROM supplier_connections c JOIN commerce_suppliers s ON s.id=c.supplier_id JOIN supplier_integration_profiles p ON p.supplier_id=c.supplier_id AND p.provider=c.provider WHERE c.id=${connectionId} FOR UPDATE`;
+          const [gate]=await tx.$queryRaw<SyncGate[]>`SELECT c.supplier_id,c.provider,c.status,c.sync_claim,s.active,p.maintenance,p.sync_enabled,p.mode FROM supplier_connections c JOIN commerce_suppliers s ON s.id=c.supplier_id JOIN supplier_integration_profiles p ON p.supplier_id=c.supplier_id AND p.provider=c.provider WHERE c.id=${connectionId} FOR UPDATE`;
           assertSyncGate(gate,claim);
           for(const row of missing){
             if(row.supplier_id!==gate.supplier_id)throw new Error('supplier_mapping_invalid');

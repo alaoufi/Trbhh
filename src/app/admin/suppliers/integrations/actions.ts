@@ -9,6 +9,7 @@ import {beginOAuth,disconnectConnection} from '@/lib/suppliers/connections';
 import {formId,parseIntegrationControls,parseProductControls,saveIntegration,saveProductControls,addPriceTier,stopProduct} from '@/lib/suppliers/admin';
 import {assertSupplierSchemaReady} from '@/lib/suppliers/schema';
 import {syncConnection} from '@/lib/suppliers/sync';
+import {verifySupplierStoreIdentity} from '@/lib/suppliers/registry';
 import {setSetting} from '@/lib/settings';
 const path='/admin/suppliers/integrations';
 export async function saveTrackingLabels(form:FormData) {
@@ -26,7 +27,7 @@ export async function disableProduct(form:FormData) {
 }
 export async function saveProfile(form:FormData) {
  const admin=await requireAction('suppliers','edit');
- try {await assertSupplierSchemaReady(prisma);await saveIntegration(prisma,parseIntegrationControls(form),BigInt(admin.uid));} catch {redirect(`${path}?result=save_failed`);}
+ try {await assertSupplierSchemaReady(prisma);const input=parseIntegrationControls(form);if(input.provider==='salla'&&input.mode==='live')await verifySupplierStoreIdentity(prisma,input.supplierId,supplierConfig());await saveIntegration(prisma,input,BigInt(admin.uid));} catch {redirect(`${path}?result=save_failed`);}
  revalidatePath(path);redirect(`${path}?result=saved`);
 }
 export async function saveProduct(form:FormData) {

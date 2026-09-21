@@ -21,6 +21,26 @@ async function tokenGrant(config:SupplierConfig,fields:Record<string,string>,fet
 }
 export const exchangeCode=(config:SupplierConfig,code:string,fetcher:typeof fetch=fetch)=>tokenGrant(config,{grant_type:'authorization_code',code,redirect_uri:callbackUrl(config)},fetcher);
 export const refreshGrant=(config:SupplierConfig,refreshToken:string,fetcher:typeof fetch=fetch)=>tokenGrant(config,{grant_type:'refresh_token',refresh_token:refreshToken},fetcher);
+export type SallaMerchantStoreIdentity={id:string;name:string;domain:string};
+function canonicalStoreUrl(value:unknown):string {
+  if(typeof value!=='string'||value.length>300)throw new Error('supplier_merchant_identity_mismatch');
+  try{
+    const url=new URL(value.trim()),host=url.hostname.toLowerCase();
+    if(url.protocol!=='https:'||url.username||url.password||url.port||url.search||url.hash||!host||host==='demostore.salla.sa'||host.endsWith('.demostore.salla.sa')||/^\/dev-[a-z0-9_-]+(?:\/|$)/i.test(url.pathname))throw new Error();
+    const path=url.pathname.replace(/\/+$/,'');return `${url.protocol}//${host}${path}`;
+  }catch{throw new Error('supplier_merchant_identity_mismatch');}
+}
+export function assertMerchantStoreMatches(identity:SallaMerchantStoreIdentity,expectedId:string,expectedStoreUrl:string):void {
+  if(!/^\d{1,30}$/.test(identity.id)||identity.id!==expectedId||canonicalStoreUrl(identity.domain)!==canonicalStoreUrl(expectedStoreUrl))throw new Error('supplier_merchant_identity_mismatch');
+}
+export async function merchantStoreIdentity(accessToken:string,fetcher:typeof fetch=fetch):Promise<SallaMerchantStoreIdentity> {
+  try {
+    const response=await fetcher('https://accounts.salla.sa/oauth2/user/info',{headers:{Authorization:`Bearer ${accessToken}`,Accept:'application/json'},cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});
+    const value=await boundedJson(response) as {success?:boolean;data?:{merchant?:{id?:unknown;name?:unknown;domain?:unknown}}},merchant=value?.data?.merchant,id=merchant?.id;
+    if(value.success!==true||!merchant||!(typeof id==='string'||Number.isSafeInteger(id))||!/^\d{1,30}$/.test(String(id))||typeof merchant.name!=='string'||!merchant.name.trim()||merchant.name.length>255)throw new Error();
+    return {id:String(id),name:merchant.name.trim(),domain:canonicalStoreUrl(merchant.domain)};
+  } catch {throw new Error('salla_merchant_request_failed');}
+}
 export async function merchantIdentity(accessToken:string,fetcher:typeof fetch=fetch):Promise<string> {
   try {
     const response=await fetcher('https://accounts.salla.sa/oauth2/user/info',{headers:{Authorization:`Bearer ${accessToken}`,Accept:'application/json'},cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});

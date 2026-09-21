@@ -13,7 +13,7 @@ function fixture(existing=false){
   const queries:string[]=[];
   const startedAt=new Date('2026-09-20T10:00:00.000Z');
   const candidates:{id:bigint;external_id:string;commerce_product_id:bigint|null;last_sync_at:Date|null;supplier_id:bigint}[]=[];
-  const gate={supplier_id:2n,provider:'salla',status:'connected',active:1,maintenance:0,sync_enabled:1,sync_claim:null as string|null};
+  const gate={supplier_id:2n,provider:'salla',status:'connected',active:1,maintenance:0,sync_enabled:1,mode:'live',sync_claim:null as string|null};
   const row={id:4n,supplier_id:2n,commerce_product_id:existing?9n:null,public_price_minor:4500,unit_cost_minor:4000,selling_price_minor:4700,source_updated_at:null as Date|null};
   const tx={$queryRaw:vi.fn(async(strings:TemplateStringsArray,...values:unknown[])=>{
     const sql=strings.join('?');queries.push(sql);
@@ -148,6 +148,9 @@ describe('complete catalog removal reconciliation',()=>{
     const commerceLock=f.queries.findIndex(q=>q.includes('FROM commerce_products')&&q.includes('FOR UPDATE'));
     const productLock=f.queries.findIndex(q=>q.includes('last_sync_at')&&q.includes('FOR UPDATE'));
     expect(commerceLock).toBeLessThan(productLock);
+  });
+  it('blocks development/demo profiles before any imported row can be changed',async()=>{
+    const f=fixture();f.gate.mode='development';await expect(upsertSourceProduct(f.db,1n,product)).rejects.toThrow('supplier_sync_unavailable');expect(f.writes).toHaveLength(0);
   });
   it('retains seen IDs even when an older source timestamp made their upsert a no-op',async()=>{
     const f=fixture(true);f.row.source_updated_at=new Date('2026-09-20T11:00:00Z');

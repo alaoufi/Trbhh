@@ -5,9 +5,9 @@ import type {SupplierProduct} from './types';
 import {assertSupplierSchemaReady} from './schema';
 
 type Existing={id:bigint;supplier_id:bigint;commerce_product_id:bigint|null;public_price_minor:number;unit_cost_minor:number|null;selling_price_minor:number|null;source_updated_at:Date|null};
-export type SyncGate={supplier_id:bigint;provider:string;status:string;active:number;maintenance:number;sync_enabled:number;sync_claim:string|null};
+export type SyncGate={supplier_id:bigint;provider:string;status:string;active:number;maintenance:number;sync_enabled:number;mode:string;sync_claim:string|null};
 export function assertSyncGate(gate:SyncGate|undefined,claim:string|null):asserts gate is SyncGate {
-  if(!gate||gate.provider!=='salla'||gate.status!=='connected'||gate.active!==1||gate.maintenance!==0||gate.sync_enabled!==1)throw new Error('supplier_sync_unavailable');
+  if(!gate||gate.provider!=='salla'||gate.status!=='connected'||gate.active!==1||gate.maintenance!==0||gate.sync_enabled!==1||gate.mode!=='live')throw new Error('supplier_sync_unavailable');
   if(gate.sync_claim!==claim)throw new Error('supplier_sync_claim_lost');
 }
 function validate(product:SupplierProduct){
@@ -36,7 +36,7 @@ export async function upsertClaimedSourceProduct(db:CommerceDb,connectionId:bigi
     }
     const [existing]=await tx.$queryRaw<Existing[]>`SELECT id,supplier_id,commerce_product_id,public_price_minor,unit_cost_minor,selling_price_minor,source_updated_at FROM supplier_products WHERE connection_id=${connectionId} AND external_id=${product.externalId} FOR UPDATE`;
     if(existing?.commerce_product_id!==(lookup?.commerce_product_id??null)&&existing?.commerce_product_id!=null)throw new Error('supplier_mapping_changed');
-    const [gate]=await tx.$queryRaw<SyncGate[]>`SELECT c.supplier_id,c.provider,c.status,c.sync_claim,s.active,p.maintenance,p.sync_enabled FROM supplier_connections c JOIN commerce_suppliers s ON s.id=c.supplier_id JOIN supplier_integration_profiles p ON p.supplier_id=c.supplier_id AND p.provider=c.provider WHERE c.id=${connectionId} FOR SHARE`;
+    const [gate]=await tx.$queryRaw<SyncGate[]>`SELECT c.supplier_id,c.provider,c.status,c.sync_claim,s.active,p.maintenance,p.sync_enabled,p.mode FROM supplier_connections c JOIN commerce_suppliers s ON s.id=c.supplier_id JOIN supplier_integration_profiles p ON p.supplier_id=c.supplier_id AND p.provider=c.provider WHERE c.id=${connectionId} FOR SHARE`;
     assertSyncGate(gate,claim);
     if(existing&&existing.supplier_id!==gate.supplier_id)throw new Error('supplier_mapping_invalid');
     const sourceDate=product.sourceUpdatedAt===null?null:new Date(product.sourceUpdatedAt);

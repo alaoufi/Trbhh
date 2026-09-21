@@ -28,4 +28,10 @@ describe('supplier catalog product management controls', () => {
     const html = renderToStaticMarkup(createElement(SupplierCatalog, {initialData: page(product('imported')), actions}));
     expect(html).toContain('سعر البيع الافتراضي هو سعر المورد');
   });
+
+  it('renders an explicit missing-image placeholder and never borrows another product image', () => {
+    const html = renderToStaticMarkup(createElement(SupplierCatalog, {initialData: page(product('imported')), actions}));
+    expect(html).toContain('لا توجد صورة متاحة');
+    expect(html).not.toMatch(/<img\b/);
+  });
 });

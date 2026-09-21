@@ -130,10 +130,10 @@ describe('merchant identity before connection persistence', () => {
 
   it('consumes a valid state but never stores a wrong-store grant or changes existing demo credentials', async () => {
     const attempt = await ownerAttempt();
-    const tx = {$queryRaw: vi.fn().mockResolvedValue([{supplier_id: 2n}]), $executeRaw: vi.fn().mockResolvedValue(1)};
+    const tx = {$queryRaw: vi.fn().mockResolvedValueOnce([{supplier_id: 2n}]).mockResolvedValueOnce([{store_url:'https://salla.sa/alawaleen'}]), $executeRaw: vi.fn().mockResolvedValue(1)};
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600})))
-      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44}}})))
+      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44,name:storeName,domain:'https://salla.sa/alawaleen'}}})))
       .mockResolvedValueOnce(storeResponse({name: 'متجر تجريبي', domain: 'https://demostore.salla.sa/test'}));
     await expect(completeOAuth(transactionDb(tx), {state: attempt.state, browser: attempt.browser, adminId: 1n, code: 'code', merchantContext: attempt.context}, config, fetcher)).rejects.toThrow('supplier_merchant_identity_mismatch');
     expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
@@ -145,12 +145,13 @@ describe('merchant identity before connection persistence', () => {
     const attempt = await ownerAttempt();
     const tx = {$queryRaw: vi.fn()
       .mockResolvedValueOnce([{supplier_id: 2n}])
+      .mockResolvedValueOnce([{store_url:'https://salla.sa/alawaleen'}])
       .mockResolvedValueOnce([{provider: 'salla', active: 1, maintenance: 0}])
       .mockResolvedValueOnce([{state_hash: digest(attempt.state)}])
       .mockResolvedValueOnce([{id: 99n}]), $executeRaw: vi.fn().mockResolvedValue(1)};
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600})))
-      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44}}})))
+      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44,name:storeName,domain:'https://salla.sa/alawaleen'}}})))
       .mockResolvedValueOnce(storeResponse());
     await expect(completeOAuth(transactionDb(tx), {state: attempt.state, browser: attempt.browser, adminId: 1n, code: 'code', merchantContext: attempt.context}, config, fetcher)).rejects.toThrow('supplier_merchant_already_connected');
     expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
@@ -160,13 +161,14 @@ describe('merchant identity before connection persistence', () => {
     const attempt = await ownerAttempt();
     const tx = {$queryRaw: vi.fn()
       .mockResolvedValueOnce([{supplier_id: 2n}])
+      .mockResolvedValueOnce([{store_url:'https://salla.sa/alawaleen'}])
       .mockResolvedValueOnce([{provider: 'salla', active: 1, maintenance: 0}])
       .mockResolvedValueOnce([{state_hash: digest(attempt.state)}])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]), $executeRaw: vi.fn().mockResolvedValue(1)};
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600})))
-      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44}}})))
+      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44,name:storeName,domain:'https://salla.sa/alawaleen'}}})))
       .mockResolvedValueOnce(storeResponse());
     await expect(completeOAuth(transactionDb(tx), {state: attempt.state, browser: attempt.browser, adminId: 1n, code: 'code', merchantContext: attempt.context}, config, fetcher)).resolves.toBe(2n);
     expect(tx.$executeRaw).toHaveBeenCalledTimes(2);

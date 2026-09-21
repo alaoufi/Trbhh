@@ -18,7 +18,6 @@ import { getStoreMeta, followersCount, getStoreRating, getStoreReviews, isFollow
 import { fillTemplate } from '@/lib/settings';
 import { WelcomePopup } from '@/components/welcome-popup';
 import { Button } from '@/components/ui/button';
-import { DisclaimerBar } from '@/components/disclaimer';
 import { StoreBottomNav } from '@/components/store-bottomnav';
 import { StoreContactLink } from '@/components/store-contact-link';
 import { StoreCatalog } from '@/components/store-catalog';
@@ -581,8 +580,6 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           ))}
         </div>
         )}
-
-        <DisclaimerBar />
       </div>
 
       <StoreBottomNav brand={brand} wa={wa} isOwner={isOwner} storeId={storeId} canAdd={!!meta.allowAds} home={`/companies/${meta.handle || storeId}`} />

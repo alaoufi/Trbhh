@@ -27,6 +27,7 @@ import { AdAddonsBox } from '@/components/ad-addons-box';
 import { ExpandableDetail } from '@/components/expandable-detail';
 import { AdCategorySummary } from '@/components/ad-category-summary';
 import { TrackedContact } from '@/components/ad-contact-track';
+import { DisclaimerBar } from '@/components/disclaimer';
 import { AdGrid } from '@/components/ad-card';
 import { getSellerRating } from '@/lib/reviews';
 import { getAdRating, getAdReviews, canReviewAd, myAdReview, adReviewsEnabled, getSellerCredibility } from '@/lib/ad-reviews';
@@ -592,6 +593,10 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <AdCategorySummary fields={ad.categoryFields}/>
         <ExpandableDetail text={ad.detail || ""} />
       </div>
+
+      {/* إخلاء المسؤولية: يظهر فقط في تفاصيل إعلان عضو غير معتمد (ليس متجراً ولا بائعاً
+          موثّقاً ولا سلعة تربح/مورّد)، لتنبيه الطرفين أن المنصّة تعرض وتربط فقط. */}
+      {!inStore && !ad.storeOnly && !ad.seller?.trusted && <DisclaimerBar variant="full" />}
 
       {/* الموقع على الخريطة — يظهر عند تحديد المعلن لموقع الإعلان */}
       {adLoc && (

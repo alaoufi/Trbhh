@@ -1,13 +1,11 @@
 import Link from 'next/link';
 import { Phone } from 'lucide-react';
 import { SITE } from '@/lib/constants';
-import { DisclaimerBar } from '@/components/disclaimer';
 
 export function Footer() {
   return (
     <footer className="mt-6 border-t border-black/20 bg-[#16294a] text-white md:mt-12">
       <div className="container pt-7 pb-24 md:py-10 md:pb-10">
-        <DisclaimerBar variant="full" className="mb-6 md:mb-8" />
         <div className="grid gap-6 md:grid-cols-3 md:gap-8">
           <div>
             <div className="mb-3 flex items-center gap-2">

@@ -11,6 +11,8 @@ export type HeroSlide = {
   cta?: string;
   /** وصف محلي للإعلان أو المنصة؛ النص الفارغ يخفي الشارة. */
   eyebrow?: string;
+  contentAlign?: 'start' | 'center';
+  imageFit?: 'cover' | 'contain';
 };
 
 /**
@@ -21,11 +23,12 @@ export type HeroSlide = {
  *   • صور كسولة بأبعاد ثابتة وبديل عند غيابها (لا قفز تخطيط).
  * شريحة واحدة = بلا أزرار/نقاط/تشغيل. صفر شرائح = لا يُصيَّر شيء.
  */
-export function CommerceHero({ slides, intervalMs = 5000, label = 'عروض مميّزة', headingLevel = 2 }: {
+export function CommerceHero({ slides, intervalMs = 5000, label = 'عروض مميّزة', headingLevel = 2, compact = false }: {
   slides: HeroSlide[];
   intervalMs?: number;
   label?: string;
   headingLevel?: 1 | 2;
+  compact?: boolean;
 }) {
   const [i, setI] = useState(0);
   const [manualPaused, setManualPaused] = useState(false);
@@ -72,6 +75,7 @@ export function CommerceHero({ slides, intervalMs = 5000, label = 'عروض مم
     <section
       aria-roledescription="carousel"
       aria-label={label}
+      data-hero-size={compact ? 'compact' : 'regular'}
       className="relative overflow-hidden rounded-3xl bg-[#16294a] text-white shadow-lg"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -87,11 +91,11 @@ export function CommerceHero({ slides, intervalMs = 5000, label = 'عروض مم
       }}
     >
       <Link href={s.href} aria-label={s.title} className="group block">
-        <div className="relative flex min-h-[340px] w-full items-center sm:min-h-[360px]">
+        <div className={`relative flex w-full items-center ${compact ? 'min-h-[230px] sm:min-h-[320px]' : 'min-h-[340px] sm:min-h-[360px]'}`}>
           {s.image
             ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={s.image} alt={s.title} loading={active === 0 ? 'eager' : 'lazy'} decoding="async" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover" />
+              <img src={s.image} alt={s.title} loading={active === 0 ? 'eager' : 'lazy'} decoding="async" referrerPolicy="no-referrer" className={`absolute inset-0 h-full w-full ${s.imageFit === 'contain' ? 'bg-[#006c35] object-contain' : 'object-cover'}`} />
             )
             : <div className="absolute inset-0 bg-gradient-to-l from-[#0f1d38] via-[#16294a] to-[#233a63]" />}
           {/* توهّج برتقالي زخرفي */}
@@ -101,15 +105,15 @@ export function CommerceHero({ slides, intervalMs = 5000, label = 'عروض مم
           <div className="absolute inset-0 bg-[#0b162e]/45" />
           <div className="absolute inset-0 bg-gradient-to-l from-[#0b162e]/90 via-[#0b162e]/55 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0b162e]/70 via-transparent to-transparent" />
-          <div className="relative flex w-full max-w-xl flex-col justify-center p-6 sm:p-10">
+          <div className={`relative flex w-full max-w-xl flex-col justify-center ${compact ? 'p-4 sm:p-8' : 'p-6 sm:p-10'} ${s.contentAlign === 'center' ? 'mx-auto items-center text-center' : ''}`}>
             {eyebrow && <span className="mb-3 inline-flex w-fit max-w-full items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[12px] font-extrabold text-white ring-1 ring-white/25 backdrop-blur">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#ff6a1a]" /> {eyebrow}
             </span>}
-            <Heading className="line-clamp-3 break-words text-2xl font-extrabold leading-snug drop-shadow-lg sm:text-4xl">
+            <Heading className={`break-words font-extrabold leading-snug drop-shadow-lg ${compact ? 'line-clamp-2 text-xl sm:text-4xl' : 'line-clamp-3 text-2xl sm:text-4xl'}`}>
               {s.title}
             </Heading>
             {s.subtitle && <p className="mt-2 line-clamp-3 max-w-lg break-words text-sm font-semibold leading-6 text-white/85 sm:text-lg">{s.subtitle}</p>}
-            <span className="mt-5 inline-flex w-fit items-center gap-2 rounded-xl bg-[#ff6a1a] px-6 py-3 text-base font-extrabold text-[#16294a] shadow-lg transition group-hover:bg-[#ff8a3d]">
+            <span className={`inline-flex w-fit items-center gap-2 rounded-xl bg-[#ff6a1a] font-extrabold text-[#16294a] shadow-lg transition group-hover:bg-[#ff8a3d] ${compact ? 'mt-3 px-4 py-2.5 text-sm sm:mt-5 sm:px-6 sm:py-3 sm:text-base' : 'mt-5 px-6 py-3 text-base'}`}>
               {s.cta || 'تصفّح الآن'}
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
             </span>

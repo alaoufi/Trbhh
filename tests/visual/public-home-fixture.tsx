@@ -2,10 +2,10 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { CommerceHero } from '@/components/commerce/commerce-hero';
-import { NationalDayBanner, NationalDayHeroFrame } from '@/components/national-day-banner';
+import { NationalDayBanner, NationalDayEntry, NationalDayHeroFrame } from '@/components/national-day-banner';
 import { AdCardMarketplace } from '@/components/ad-card';
 import { publicHomeHero } from '@/lib/public-home';
-import { isNationalDayCampaignActive } from '@/lib/national-day';
+import { isNationalDayCampaignActive, nationalDayHeroSlides } from '@/lib/national-day';
 import { homeGridClass, pickHomeLayout } from '@/lib/commerce/home-layout';
 import type { AdCard } from '@/lib/data';
 
@@ -21,7 +21,8 @@ const fixtureAds: AdCard[] = [
 function Fixture() {
   const [single, setSingle] = useState(false);
   const nationalDay = isNationalDayCampaignActive();
-  const hero = publicHomeHero(fixtureAds, 'بيع. اشترِ. وتربح.', 'اعرض اللي عندك، واكتشف اللي تحتاجه، وتواصل مباشرة.');
+  const marketplaceHero = publicHomeHero(fixtureAds, 'بيع. اشترِ. وتربح.', 'اعرض اللي عندك، واكتشف اللي تحتاجه، وتواصل مباشرة.');
+  const hero = nationalDay ? nationalDayHeroSlides('/search') : marketplaceHero;
   return <>
     <aside className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900" aria-label="حدود المعاينة">
       معاينة محلية للمكونات فقط — البيانات والصور تجريبية، وليست الموقع الحي أو صفحة الرئيسية كاملة.
@@ -31,9 +32,10 @@ function Fixture() {
       </div></details>
     </aside>
     <div className="commerce-scope public-marketplace-home space-y-7 sm:space-y-10" data-fixture="public-home-components">
+      {nationalDay && <NationalDayEntry active />}
       {nationalDay && <NationalDayBanner />}
       <section className="space-y-4" aria-label="اكتشف سوق تربح">
-        <NationalDayHeroFrame active={nationalDay}><CommerceHero headingLevel={1} label="اكتشف تربح" slides={single ? hero.slice(0, 1) : hero} /></NationalDayHeroFrame>
+        <NationalDayHeroFrame active={nationalDay}><CommerceHero compact headingLevel={1} label={nationalDay ? 'احتفال تربح باليوم الوطني' : 'اكتشف تربح'} slides={single ? hero.slice(0, 1) : hero} /></NationalDayHeroFrame>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-extrabold text-[#16294a]">وش تبحث عنه اليوم؟</h2><span className="inline-flex min-h-11 items-center rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-white">أضف إعلانك</span></div>
           <form onSubmit={event => event.preventDefault()} role="search" aria-label="نموذج تجريبي للبحث" className="space-y-3">

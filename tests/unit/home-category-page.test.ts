@@ -63,6 +63,7 @@ it('retains only the validated category in the homepage search form',async()=>{
  } finally {flag.mockRestore();}
 });
 it('renders the approved presentation at the public root while retaining the same feed',async()=>{
+ const clock=vi.spyOn(Date,'now').mockReturnValue(Date.parse('2026-09-23T12:00:00+03:00'));
  const settings=await import('@/lib/settings');
  const flag=vi.spyOn(settings,'getSettingBool').mockImplementation(async key=>key==='home_discovery_on');
  try {
@@ -70,9 +71,12 @@ it('renders the approved presentation at the public root while retaining the sam
   expect(tree.some(e=>e.props['data-home-version']==='marketplace-v2')).toBe(true);
   const hero=tree.find(e=>e.type===CommerceHero);
   expect(hero?.props.headingLevel).toBe(1);
-  expect(hero?.props.slides).toEqual(expect.arrayContaining([expect.objectContaining({title:'بيع. اشترِ. وتربح.',href:'/search'})]));
+  expect(hero?.props.slides).toEqual([
+   expect.objectContaining({id:'national-leadership',href:'/search'}),
+   expect.objectContaining({id:'national-flag',href:'/search'}),
+  ]);
   expect(tree.find(e=>e.type===AdGrid)?.props).toMatchObject({appearance:'marketplace',ads:[{id:2},{id:3},{id:30}]});
- } finally {flag.mockRestore();}
+ } finally {flag.mockRestore();clock.mockRestore();}
 });
 it.each([
  ['2026-09-20T20:59:59.999Z',false],
@@ -87,8 +91,15 @@ it.each([
   expect(tree[0].props['data-home-campaign']).toBe(active?'saudi-national-day-2026':undefined);
   expect(tree.some(e=>e.type===NationalDayBanner)).toBe(active);
   expect(tree.find(e=>e.type===NationalDayHeroFrame)?.props.active).toBe(active);
+  expect(tree.some(e=>typeof e.type==='function'&&e.type.name==='NationalDayEntry')).toBe(active);
   expect(tree.find(e=>e.type===AdGrid)?.props.ads).toEqual([{id:2},{id:3},{id:30}]);
-  expect(tree.find(e=>e.type===CommerceHero)?.props.slides).toEqual(expect.arrayContaining([expect.objectContaining({title:'بيع. اشترِ. وتربح.',href:'/search'})]));
+  const hero=tree.find(e=>e.type===CommerceHero);
+  expect(hero?.props.compact).toBe(true);
+  if(active) expect(hero?.props.slides).toEqual([
+   expect.objectContaining({id:'national-leadership',image:'/national-day/leadership.webp',href:'/search'}),
+   expect.objectContaining({id:'national-flag',image:'/national-day/saudi-flag.svg',href:'/search'}),
+  ]);
+  else expect(hero?.props.slides).toEqual(expect.arrayContaining([expect.objectContaining({title:'بيع. اشترِ. وتربح.',href:'/search'})]));
  } finally {flag.mockRestore();clock.mockRestore();}
 });
 it('keeps category results and their browse target during the seasonal treatment',async()=>{
@@ -99,7 +110,10 @@ it('keeps category results and their browse target during the seasonal treatment
   const tree=elements(await HomePage({searchParams:Promise.resolve({category:'90'})}));
   expect(tree.some(e=>e.type===NationalDayBanner)).toBe(true);
   expect(tree.find(e=>e.type===AdGrid)?.props.ads).toEqual([{id:90},{id:89}]);
-  expect(tree.find(e=>e.type===CommerceHero)?.props.slides).toEqual(expect.arrayContaining([expect.objectContaining({href:'/search?category=90'})]));
+  expect(tree.find(e=>e.type===CommerceHero)?.props.slides).toEqual([
+   expect.objectContaining({id:'national-leadership',href:'/search?category=90'}),
+   expect.objectContaining({id:'national-flag',href:'/search?category=90'}),
+  ]);
   expect(state.search).toHaveBeenCalledWith({categoryId:90,take:24,skip:0});
  } finally {flag.mockRestore();clock.mockRestore();}
 });

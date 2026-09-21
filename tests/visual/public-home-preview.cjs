@@ -37,10 +37,12 @@ async function main() {
     const tint = ['#e2e8f0', '#fff1dc', '#e8edf3', '#e9f2ee', '#efeaf5', '#e7f0e1'][index - 1];
     fs.writeFileSync(path.join(output, `fixture-${index}.svg`), `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><rect width="800" height="600" fill="${tint}"/><rect x="180" y="140" width="440" height="280" rx="28" fill="none" stroke="#16294a" stroke-width="6"/><path d="m200 395 140-140 95 95 85-75 80 100" fill="none" stroke="#16294a" stroke-width="6"/><circle cx="520" cy="220" r="35" fill="#f0b429"/><text x="400" y="510" text-anchor="middle" font-family="Arial" font-size="28" fill="#16294a">FIXTURE ${index}</text></svg>`);
   }
+  fs.copyFileSync(path.join(root, 'public/national-day/leadership.webp'), path.join(output, 'leadership.webp'));
+  fs.copyFileSync(path.join(root, 'public/national-day/saudi-flag.svg'), path.join(output, 'saudi-flag.svg'));
   fs.writeFileSync(path.join(output, 'fixture-manifest.json'), JSON.stringify({ builtAt: new Date().toISOString(), fixtureOnly: true, productionRoute: false, components: ['CommerceHero', 'AdCardMarketplace', 'NationalDayBanner', 'NationalDayHeroFrame'], cssModuleAssets: emitted.filter(file => file.type === 'asset' && file.fileName.endsWith('.css')).map(file => file.fileName), sampleAds: 6, databaseAccess: false, browserVerified: false }, null, 2));
   if (!process.argv.includes('--serve')) { console.log(JSON.stringify({ fixtureOnly: true, directory: output })); return; }
   const port = Number(process.env.PUBLIC_HOME_FIXTURE_PORT || 4319);
-  const known = new Map([['/', ['index.html', 'text/html; charset=utf-8']], ['/fixture.css', ['fixture.css', 'text/css']], ['/fixture.js', ['fixture.js', 'application/javascript']], ...Array.from({ length: 6 }, (_, index) => [`/fixture-${index + 1}.svg`, [`fixture-${index + 1}.svg`, 'image/svg+xml']])]);
+  const known = new Map([['/', ['index.html', 'text/html; charset=utf-8']], ['/fixture.css', ['fixture.css', 'text/css']], ['/fixture.js', ['fixture.js', 'application/javascript']], ['/national-day/leadership.webp', ['leadership.webp', 'image/webp']], ['/national-day/saudi-flag.svg', ['saudi-flag.svg', 'image/svg+xml']], ...Array.from({ length: 6 }, (_, index) => [`/fixture-${index + 1}.svg`, [`fixture-${index + 1}.svg`, 'image/svg+xml']])]);
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://127.0.0.1:${port}`);
     const target = known.get(url.pathname === '/_next/image' ? url.searchParams.get('url') : url.pathname);

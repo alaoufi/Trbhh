@@ -14,15 +14,13 @@
 
 **Files:**
 - Create: `public/national-day/saudi-flag.svg`
-- Create: `public/national-day/king-salman.webp`
-- Create: `public/national-day/crown-prince.webp`
 - Create: `public/national-day/leadership.webp`
 - Create: `public/national-day/SOURCES.md`
 
-- [ ] Render the official Vision 2030 report portrait page at high resolution and crop each portrait.
-- [ ] Generate 1600x900 WebP canvases with safe mobile focal positions.
-- [ ] Save the Saudi flag SVG locally and document both sources.
-- [ ] Verify every image with `sharp().metadata()` and keep each raster asset below 350KB.
+- [x] Render the official Vision 2030 report portrait page at high resolution and create a respectful leadership composite that preserves the official portraits.
+- [x] Generate 1600x900 WebP canvases with safe mobile focal positions.
+- [x] Save the Saudi flag SVG locally and document both sources.
+- [x] Verify every image with `sharp().metadata()` and keep each raster asset below 350KB.
 
 ### Task 2: Specify the campaign data and compact hero contract with failing tests
 
@@ -31,10 +29,10 @@
 - Modify: `tests/unit/commerce-hero.test.ts`
 - Modify: `tests/unit/home-category-page.test.ts`
 
-- [ ] Add tests expecting `nationalDayHeroSlides('/search')` to return exactly three local-image slides in the order king, crown prince, flag.
-- [ ] Add a static-render test expecting `CommerceHero` with `compact` to include `data-hero-size="compact"` and compact height classes.
-- [ ] Update page composition tests to expect national slides inside the window and the existing marketplace slides outside it.
-- [ ] Run the focused tests and confirm they fail because the APIs do not exist yet.
+- [x] Add tests expecting `nationalDayHeroSlides('/search')` to return exactly two local-image slides in the order leadership, flag.
+- [x] Add a static-render test expecting `CommerceHero` with `compact` to include `data-hero-size="compact"` and compact height classes.
+- [x] Update page composition tests to expect national slides inside the window and the existing marketplace slides outside it.
+- [x] Run the focused tests and confirm they fail because the APIs do not exist yet.
 
 ### Task 3: Implement campaign data and compact hero
 
@@ -43,10 +41,10 @@
 - Modify: `src/components/commerce/commerce-hero.tsx`
 - Modify: `src/app/page.tsx`
 
-- [ ] Export `nationalDayHeroSlides(href)` with the three local assets, Arabic titles, labels, and marketplace link.
-- [ ] Add `compact?: boolean` to `CommerceHero`; render 230/320px heights and smaller mobile typography only when true.
-- [ ] Select national slides during the campaign and pass `compact` on the public homepage.
-- [ ] Run the focused tests and confirm they pass.
+- [x] Export `nationalDayHeroSlides(href)` with the two local assets, Arabic titles, labels, and marketplace link.
+- [x] Add `compact?: boolean` to `CommerceHero`; render 230/320px heights and smaller mobile typography only when true.
+- [x] Select national slides during the campaign and pass `compact` on the public homepage.
+- [x] Run the focused tests and confirm they pass.
 
 ### Task 4: Build the first-entry sequence test-first
 
@@ -56,10 +54,10 @@
 - Modify: `src/app/page.tsx`
 - Modify: `tests/unit/national-day.test.ts`
 
-- [ ] Add a test expecting the active entry shell to contain the flag, leadership image, «تخطي», session-only marker, and reduced-motion semantics; verify it fails.
-- [ ] Implement the client component with `sessionStorage`, flag and leaders timers, cleanup, skip control, and `matchMedia` support.
-- [ ] Mount it only while the campaign is active and make the inline banner compact.
-- [ ] Run the focused tests and confirm they pass.
+- [x] Add a test expecting the active entry shell to contain the flag, leadership image, «تخطي», session-only marker, and reduced-motion semantics; verify it fails.
+- [x] Implement the client component with `sessionStorage`, flag and leaders timers, cleanup, skip control, and `matchMedia` support.
+- [x] Mount it only while the campaign is active and make the inline banner compact.
+- [x] Run the focused tests and confirm they pass.
 
 ### Task 5: Visual and regression verification
 
@@ -67,10 +65,10 @@
 - Modify: `tests/visual/public-home-fixture.tsx`
 - Modify: `tests/visual/public-home-preview.cjs`
 
-- [ ] Add the national slides and entry component to the fixture.
-- [ ] Run `pnpm typecheck`, `pnpm lint`, focused tests, then the complete unit suite.
-- [ ] Inspect at 390x844 and desktop widths, confirm no horizontal overflow and that the search begins near the first mobile viewport.
-- [ ] Commit and push the feature branch only after all checks pass.
+- [x] Add the national slides and entry component to the fixture.
+- [x] Run `pnpm typecheck`, `pnpm lint`, focused tests, then the complete unit suite.
+- [x] Inspect at 390x844 and desktop widths, confirm no horizontal overflow and that the search begins near the first mobile viewport.
+- [x] Commit and push the feature branch only after all checks pass.
 
 ### Task 6: Safe production release
 
@@ -83,4 +81,3 @@
 - [ ] Wait for the correct Hostinger container to rebuild and restart.
 - [ ] Run after-release database, runtime, and media comparisons.
 - [ ] Verify the public homepage externally and in a 390px mobile browser before reporting completion.
-

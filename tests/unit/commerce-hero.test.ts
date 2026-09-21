@@ -44,4 +44,14 @@ describe('CommerceHero public homepage contract', () => {
   it('does not render an empty carousel', () => {
     expect(renderToStaticMarkup(createElement(CommerceHero, { slides: [] }))).toBe('');
   });
+
+  it('offers a compact public-home layout without changing the default hero', () => {
+    const compact = renderToStaticMarkup(createElement(CommerceHero, { slides: [brand], compact: true }));
+    expect(compact).toContain('data-hero-size="compact"');
+    expect(compact).toContain('min-h-[230px]');
+    expect(compact).toContain('sm:min-h-[320px]');
+    const regular = renderToStaticMarkup(createElement(CommerceHero, { slides: [brand] }));
+    expect(regular).toContain('data-hero-size="regular"');
+    expect(regular).toContain('min-h-[340px]');
+  });
 });

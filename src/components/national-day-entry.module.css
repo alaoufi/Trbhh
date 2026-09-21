@@ -1,0 +1,84 @@
+.entry {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  background: #004c25;
+  color: white;
+  transition: opacity 320ms ease;
+}
+
+.entry[data-phase='idle'] { display: none; }
+
+.flagStage,
+.leadersStage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1rem;
+  opacity: 0;
+  transition: opacity 360ms ease;
+}
+
+.flagStage { perspective: 1000px; background: radial-gradient(circle at 50% 45%, #0b8b4b, #004c25 68%); }
+.entry[data-phase='flag'] .flagStage,
+.entry[data-phase='leaders'] .leadersStage { opacity: 1; }
+
+.flag {
+  width: min(78vw, 720px);
+  border-radius: .4rem;
+  box-shadow: 0 28px 65px rgb(0 0 0 / 35%);
+  transform-origin: 0 50%;
+  animation: wave 900ms ease-in-out infinite alternate;
+}
+
+.flagStage p { font-size: clamp(1.2rem, 4vw, 2rem); font-weight: 900; text-shadow: 0 3px 16px rgb(0 0 0 / 45%); }
+
+.leadersStage { background: #071a22; }
+.leadersStage::before { content: ''; position: absolute; inset: -2rem; background: url('/national-day/leadership.webp') center / cover; filter: blur(18px) brightness(.45); transform: scale(1.08); }
+.leadersStage > img { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.leadersStage::after { content: ''; position: absolute; z-index: 2; inset: 0; background: linear-gradient(to top, rgb(3 20 22 / 92%), transparent 55%); }
+.leadersCopy { position: absolute; z-index: 3; bottom: clamp(4rem, 9vh, 7rem); display: grid; gap: .35rem; padding: 0 1rem; text-align: center; text-shadow: 0 3px 18px rgb(0 0 0 / 65%); }
+.leadersCopy strong { font-size: clamp(2rem, 7vw, 4.5rem); }
+.leadersCopy span { font-size: clamp(.95rem, 3vw, 1.5rem); font-weight: 800; }
+
+.skip {
+  position: absolute;
+  z-index: 4;
+  inset-block-start: max(1rem, env(safe-area-inset-top));
+  inset-inline-end: 1rem;
+  min-width: 4.5rem;
+  min-height: 2.75rem;
+  border: 1px solid rgb(255 255 255 / 60%);
+  border-radius: 999px;
+  background: rgb(0 0 0 / 34%);
+  color: white;
+  font-weight: 800;
+  backdrop-filter: blur(8px);
+}
+.skip:focus-visible { outline: 3px solid #f0b429; outline-offset: 3px; }
+
+@keyframes wave {
+  0% { transform: rotateY(-7deg) skewY(-1deg) scaleX(.98); filter: brightness(.93); }
+  100% { transform: rotateY(7deg) skewY(1deg) scaleX(1.02); filter: brightness(1.08); }
+}
+
+@media (max-width: 640px) {
+  .leadersStage > img {
+    object-fit: contain;
+    object-position: center 38%;
+  }
+
+  .leadersStage::after {
+    background: linear-gradient(to top, rgb(3 20 22 / 98%) 8%, rgb(3 20 22 / 66%) 32%, transparent 62%);
+  }
+
+  .leadersCopy { bottom: max(4.5rem, 10vh); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry, .flagStage, .leadersStage { transition: none; }
+  .flag { animation: none; }
+}

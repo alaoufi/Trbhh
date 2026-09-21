@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { isNationalDayCampaignActive } from '@/lib/national-day';
-import { NationalDayBanner, NationalDayHeroFrame } from '@/components/national-day-banner';
+import * as NationalDayComponents from '@/components/national-day-banner';
+const { NationalDayBanner, NationalDayHeroFrame } = NationalDayComponents;
 
 describe('2026 National Day campaign window in Riyadh', () => {
   it.each([
@@ -47,5 +48,16 @@ describe('inline public-home campaign presentation', () => {
     const html = renderToStaticMarkup(createElement(NationalDayHeroFrame, { active: true }, createElement('section', {}, 'Existing hero')));
     expect(html).toContain('data-national-day-hero="true"');
     expect(html).toContain('<section>Existing hero</section>');
+  });
+
+  it('provides a session-only entry with a flag, leadership image and skip control', () => {
+    expect('NationalDayEntry' in NationalDayComponents).toBe(true);
+    const Entry = (NationalDayComponents as typeof NationalDayComponents & {NationalDayEntry: (props:{active:boolean})=>ReturnType<typeof createElement>}).NationalDayEntry;
+    const html = renderToStaticMarkup(createElement(Entry, {active:true}));
+    expect(html).toContain('data-national-day-entry="true"');
+    expect(html).toContain('/national-day/saudi-flag.svg');
+    expect(html).toContain('/national-day/leadership.webp');
+    expect(html).toContain('تخطي');
+    expect(html).toContain('data-phase="idle"');
   });
 });

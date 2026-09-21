@@ -28,4 +28,4 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec vitest run tests/integration/suppliers-mysql.test.ts --maxWorkers=1
+      - run: pnpm exec vitest run --config vitest.suppliers.config.ts --maxWorkers=1

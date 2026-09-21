@@ -4,10 +4,22 @@ on:
     branches: [codex/home-feed-release-20260919]
     paths: ['.github/workflows/integration-readiness.yml', 'scripts/release/integration-readiness.cjs']
   workflow_dispatch:
+    inputs:
+      owner_invite:
+        description: Issue the approved Salla owner invitation after verified deployment
+        type: boolean
+        default: false
+      backup_id:
+        description: Verified merchant OAuth release backup ID
+        type: string
+      report_public_key_b64:
+        description: RSA public key for encrypted owner invitation output
+        type: string
 permissions:
   contents: read
 jobs:
   inspect:
+    if: inputs.owner_invite != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -27,3 +39,50 @@ jobs:
           test -n "$VPS_KNOWN_HOSTS"
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/integration-readiness.cjs
+  owner-invite:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/salla-owner-release-20260921' && inputs.owner_invite == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: vps-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Build the reviewed invitation operation
+        run: |
+          pnpm install --frozen-lockfile
+          node scripts/release/build-salla-owner-invite.cjs --output "$RUNNER_TEMP/salla-owner-invite.cjs"
+        env:
+          DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ci
+      - name: Issue invitation only after exact release and backup verification
+        env:
+          BACKUP_ID: ${{ inputs.backup_id }}
+          REPORT_PUBLIC_KEY_B64: ${{ inputs.report_public_key_b64 }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$BACKUP_ID" =~ ^[0-9]+$ ]]
+          [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$REPORT_PUBLIC_KEY_B64" =~ ^[A-Za-z0-9+/=]+$ ]]
+          test ${#REPORT_PUBLIC_KEY_B64} -lt 12000
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/key
+          test -n "$VPS_KNOWN_HOSTS"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          { printf "process.env.SALLA_AUDIT_REPORT_PUBLIC_KEY_B64='%s';\n" "$REPORT_PUBLIC_KEY_B64"; cat "$RUNNER_TEMP/salla-owner-invite.cjs"; } > "$RUNNER_TEMP/issue.cjs"
+          remote_tools="/root/trbhh-release-tools/$GITHUB_SHA"
+          ssh_args=(-i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25)
+          target="$VPS_USER@$VPS_HOST"
+          ssh "${ssh_args[@]}" "$target" "test -d '$remote_tools'; test ! -L '$remote_tools'"
+          scp -i ~/.ssh/key -P "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes scripts/release/issue-owner-invite.sh "$target:$remote_tools/"
+          ssh "${ssh_args[@]}" "$target" "bash '$remote_tools/issue-owner-invite.sh' '$GITHUB_SHA' '$BACKUP_ID'" < "$RUNNER_TEMP/issue.cjs"

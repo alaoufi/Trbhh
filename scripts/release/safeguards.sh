@@ -8,7 +8,7 @@ backup_id=${2:?numeric backup run id}
 candidate=${3:?candidate commit}
 reuse_media_id=${4:-}
 release_profile=${5:-standard}
-[[ "$release_profile" == standard || "$release_profile" == salla ]] || exit 1
+[[ "$release_profile" == standard || "$release_profile" == salla || "$release_profile" == merchant_oauth ]] || exit 1
 [[ "$phase" == before || "$phase" == after ]] || exit 1
 [[ "$backup_id" =~ ^[0-9]+$ && "$candidate" =~ ^[0-9a-f]{40}$ ]] || exit 1
 if [[ -n "$reuse_media_id" ]]; then
@@ -52,6 +52,12 @@ if [[ "$phase" == after ]]; then
     cmp --silent .env "$backup/environment.env"
     cmp --silent docker-compose.yml "$backup/docker-compose.yml"
   fi
+  if [[ "$release_profile" == merchant_oauth ]]; then
+    [[ "$(cat "$backup/VERIFIED")" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 && "$(cat "$backup/commit.txt")" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 && "$(cat "$backup/candidate.txt")" == "$candidate" ]] || exit 1
+    # Finish preservation proof before issuing OAuth invitations or running sync.
+    docker compose exec -T app node - snapshot < "$tools_dir/supplier-preservation-proof.cjs" > "$backup/supplier-after.json"
+    node "$tools_dir/supplier-preservation-proof.cjs" verify "$backup/supplier-before.json" "$backup/supplier-after.json"
+  fi
   docker compose exec -T app node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/after.json"
   node "$tools_dir/database-proof.cjs" verify "$backup/before.json" "$backup/after.json"
   docker compose exec -T app node - verify-schema < "$tools_dir/database-proof.cjs"
@@ -70,6 +76,15 @@ fi
 
 if [[ "$release_profile" == salla ]]; then
   [[ "$current_commit" == eda1e8cb400a90418b57ad5d0b5f97bc3e8fee96 && -z "$reuse_media_id" ]] || { echo 'Salla requires exact home baseline and fresh full backup'; exit 1; }
+elif [[ "$release_profile" == merchant_oauth ]]; then
+  [[ "$current_commit" == 07d2e9ead8e0b28824102d5c8a31b097e01f9459 && -z "$reuse_media_id" ]] || { echo 'Merchant OAuth requires its exact reviewed baseline and fresh full backup'; exit 1; }
+  # Measure while the app is live, before creating this backup or its archives.
+  # A failed capacity gate creates no partial image/media backup and never pauses.
+  capacity=$(docker exec -i -u 0 "$container" node - measure < "$tools_dir/backup-capacity-proof.cjs")
+  image_bytes=$(docker image inspect -f '{{.Size}}' "$current_image")
+  code_bytes=$(git archive --format=tar "$current_commit" | wc -c)
+  docker_root=$(docker info --format '{{.DockerRootDir}}')
+  node "$tools_dir/backup-capacity-proof.cjs" check "$capacity" "$image_bytes" "$code_bytes" "$base" "$docker_root"
 else
   [[ "$current_commit" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06 ]] || { echo 'Production baseline changed; stop and review'; exit 1; }
 fi
@@ -79,6 +94,9 @@ printf '%s\n' "$current_commit" > "$backup/commit.txt"
 printf '%s\n' "$current_image" > "$backup/image-id.txt"
 printf '%s\n' "$candidate" > "$backup/candidate.txt"
 docker inspect "$container" > "$backup/container-before.json"
+if [[ "$release_profile" == merchant_oauth ]]; then
+  node "$tools_dir/verify-runtime.cjs" "$backup/container-before.json" "$backup/container-before.json" merchant_oauth
+fi
 cp .env "$backup/environment.env"
 cp docker-compose.yml "$backup/docker-compose.yml"
 [[ -f "$runtime_manifest" && ! -L "$runtime_manifest" ]] || exit 1
@@ -158,6 +176,9 @@ echo 'Maintenance backup started; automatic resume guard armed.'
 echo 'Taking a private snapshot from the live app database connection.'
 docker exec -i "$reader" node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/before.json"
 docker exec -i "$reader" node - snapshot-full < "$tools_dir/database-proof.cjs" > "$backup/full-before.json"
+if [[ "$release_profile" == merchant_oauth ]]; then
+  docker exec -i "$reader" node - snapshot < "$tools_dir/supplier-preservation-proof.cjs" > "$backup/supplier-before.json"
+fi
 node "$tools_dir/database-proof.cjs" summary "$backup/before.json"
 node -e 'const p=JSON.parse(require("fs").readFileSync(process.argv[1])); if(p.nonTransactionalTables.length) {console.error("Non-transactional tables require a different consistent backup method"); process.exit(1)}; if(p.controls.archiveAutoDeleteEnabled && p.controls.expiredArchivedCandidates > 0) {console.error("Pending automatic deletion requires review before release"); process.exit(1)}' "$backup/before.json"
 docker exec -i "$reader" node - dump < "$tools_dir/database-proof.cjs" | gzip > "$backup/database.sql.gz"

@@ -58,6 +58,14 @@ describe('current real-store owner invitation', () => {
     await expect(issueCurrentOwnerInvitation(database(), {...env, SUPPLIER_ALLOW_LIVE_ORDERS: 'true'}, new Date())).rejects.toThrow('owner_invitation_unsafe_environment');
   });
 
+  it('reports a safe stage code instead of raw database diagnostics', async () => {
+    const db = {$transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
+      $queryRaw: vi.fn().mockRejectedValue(new Error('private database detail')),
+      $executeRaw: vi.fn(),
+    }))};
+    await expect(issueCurrentOwnerInvitation(db, env, new Date())).rejects.toThrow('owner_invitation_schema_flags');
+  });
+
   it('creates a 24-hour signed token and encrypts the only report containing it', () => {
     const invitation = buildInvitation({supplierId: '1', adminId: '7', expectedName: 'شعبيات الأولين', generation: 5}, env, new Date('2026-09-22T13:00:00.000Z'));
     expect(invitation.expiresAt).toBe('2026-09-23T13:00:00.000Z');

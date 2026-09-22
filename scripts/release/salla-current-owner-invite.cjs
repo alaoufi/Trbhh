@@ -77,34 +77,43 @@ function encryptOwnerReport(report, key) {
   }
 }
 
+async function stage(code, operation) {
+  try {
+    return await operation();
+  } catch (failure) {
+    if (failure instanceof Error && /^owner_invitation_[a-z_]+$/.test(failure.message)) throw failure;
+    throw new Error(code);
+  }
+}
+
 async function issueCurrentOwnerInvitation(db, env = process.env, now = new Date()) {
   assertEnvironment(env);
   return db.$transaction(async tx => {
-    const flags = await tx.$queryRaw`SELECT k,v FROM site_settings WHERE k IN ('commerce_enabled','commerce_purchasing_enabled','commerce_payments_enabled')`;
+    const flags = await stage('owner_invitation_schema_flags', () => tx.$queryRaw`SELECT k,v FROM site_settings WHERE k IN ('commerce_enabled','commerce_purchasing_enabled','commerce_payments_enabled')`);
     if (flags.some(row => enabled(row.v))) throw new Error('owner_invitation_purchase_gate');
-    const [automatic] = await tx.$queryRaw`SELECT supplier_id AS id FROM supplier_integration_profiles WHERE auto_orders_enabled<>0 LIMIT 1`;
+    const [automatic] = await stage('owner_invitation_schema_automatic', () => tx.$queryRaw`SELECT supplier_id AS id FROM supplier_integration_profiles WHERE auto_orders_enabled<>0 LIMIT 1`);
     if (automatic) throw new Error('owner_invitation_automatic_orders');
-    const [supplier] = await tx.$queryRaw`SELECT s.id,s.name,s.active,o.store_url FROM commerce_suppliers s JOIN supplier_onboarding o ON o.supplier_id=s.id WHERE s.id=${TARGET_SUPPLIER_ID} FOR UPDATE`;
+    const [supplier] = await stage('owner_invitation_schema_supplier', () => tx.$queryRaw`SELECT s.id,s.name,s.active,o.store_url FROM commerce_suppliers s JOIN supplier_onboarding o ON o.supplier_id=s.id WHERE s.id=${TARGET_SUPPLIER_ID} FOR UPDATE`);
     if (!supplier || supplier.id !== TARGET_SUPPLIER_ID || supplier.name !== TARGET_NAME || supplier.active !== 1 || supplier.store_url !== TARGET_STORE_URL) {
       throw new Error('owner_invitation_target_mismatch');
     }
-    const [profile] = await tx.$queryRaw`SELECT provider,mode,maintenance,sync_enabled,auto_orders_enabled,oauth_generation FROM supplier_integration_profiles WHERE supplier_id=${TARGET_SUPPLIER_ID} FOR UPDATE`;
+    const [profile] = await stage('owner_invitation_schema_profile', () => tx.$queryRaw`SELECT provider,mode,maintenance,sync_enabled,auto_orders_enabled,oauth_generation FROM supplier_integration_profiles WHERE supplier_id=${TARGET_SUPPLIER_ID} FOR UPDATE`);
     if (!profile || profile.provider !== 'salla' || profile.mode !== 'development' || profile.maintenance !== 0
       || profile.sync_enabled !== 0 || profile.auto_orders_enabled !== 0
       || !Number.isSafeInteger(profile.oauth_generation) || profile.oauth_generation < 0 || profile.oauth_generation >= 2147483645) {
       throw new Error('owner_invitation_target_profile');
     }
-    const [connections] = await tx.$queryRaw`SELECT COUNT(*) AS count FROM supplier_connections WHERE supplier_id=${TARGET_SUPPLIER_ID}`;
+    const [connections] = await stage('owner_invitation_schema_connections', () => tx.$queryRaw`SELECT COUNT(*) AS count FROM supplier_connections WHERE supplier_id=${TARGET_SUPPLIER_ID}`);
     if (!connections || BigInt(connections.count) !== 0n) throw new Error('owner_invitation_target_connected');
-    const [products] = await tx.$queryRaw`SELECT COUNT(*) AS count FROM supplier_products WHERE supplier_id=${TARGET_SUPPLIER_ID}`;
-    const [catalog] = await tx.$queryRaw`SELECT COUNT(*) AS count FROM commerce_product_suppliers WHERE supplier_id=${TARGET_SUPPLIER_ID}`;
+    const [products] = await stage('owner_invitation_schema_products', () => tx.$queryRaw`SELECT COUNT(*) AS count FROM supplier_products WHERE supplier_id=${TARGET_SUPPLIER_ID}`);
+    const [catalog] = await stage('owner_invitation_schema_catalog', () => tx.$queryRaw`SELECT COUNT(*) AS count FROM commerce_product_suppliers WHERE supplier_id=${TARGET_SUPPLIER_ID}`);
     if (!products || !catalog || BigInt(products.count) !== 0n || BigInt(catalog.count) !== 0n) throw new Error('owner_invitation_target_catalog');
-    const issuers = await tx.$queryRaw`SELECT DISTINCT admin_id FROM supplier_oauth_states WHERE consumed_at IS NOT NULL LIMIT 2`;
+    const issuers = await stage('owner_invitation_schema_issuers', () => tx.$queryRaw`SELECT DISTINCT admin_id FROM supplier_oauth_states WHERE consumed_at IS NOT NULL LIMIT 2`);
     if (issuers.length !== 1 || !/^[1-9]\d{0,14}$/.test(String(issuers[0].admin_id))) throw new Error('owner_invitation_issuer_ambiguous');
     const adminId = issuers[0].admin_id;
-    const [admin] = await tx.$queryRaw`SELECT id,is_admin FROM users WHERE id=${adminId}`;
+    const [admin] = await stage('owner_invitation_schema_admin', () => tx.$queryRaw`SELECT id,is_admin FROM users WHERE id=${adminId}`);
     if (!admin || admin.id !== adminId || admin.is_admin !== 1) throw new Error('owner_invitation_issuer_unauthorized');
-    const changed = await tx.$executeRaw`UPDATE supplier_integration_profiles SET oauth_generation=oauth_generation+1 WHERE supplier_id=${TARGET_SUPPLIER_ID} AND oauth_generation=${profile.oauth_generation}`;
+    const changed = await stage('owner_invitation_schema_update', () => tx.$executeRaw`UPDATE supplier_integration_profiles SET oauth_generation=oauth_generation+1 WHERE supplier_id=${TARGET_SUPPLIER_ID} AND oauth_generation=${profile.oauth_generation}`);
     if (changed !== 1) throw new Error('owner_invitation_generation_conflict');
     const invitation = buildInvitation({
       supplierId: String(TARGET_SUPPLIER_ID), adminId: String(adminId), expectedName: TARGET_NAME,

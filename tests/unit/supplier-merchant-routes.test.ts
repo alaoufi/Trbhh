@@ -1,12 +1,13 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {NextRequest} from 'next/server';
-const state=vi.hoisted(()=>({session:vi.fn(),permission:vi.fn(),parse:vi.fn(),context:vi.fn(),start:vi.fn(),issue:vi.fn(),complete:vi.fn(),cookie:vi.fn()}));
+const state=vi.hoisted(()=>({session:vi.fn(),permission:vi.fn(),parse:vi.fn(),context:vi.fn(),start:vi.fn(),issue:vi.fn(),complete:vi.fn(),sync:vi.fn(),failure:vi.fn(),cookie:vi.fn()}));
 vi.mock('@/lib/auth',()=>({getSession:state.session}));
 vi.mock('@/lib/roles',()=>({hasAction:state.permission}));
 vi.mock('@/lib/prisma',()=>({prisma:{}}));
 vi.mock('next/headers',()=>({cookies:async()=>({get:state.cookie})}));
 vi.mock('@/lib/suppliers/merchant-oauth',()=>({parseMerchantInvitation:state.parse,parseMerchantContext:state.context,startMerchantOAuth:state.start,issueMerchantInvitation:state.issue}));
-vi.mock('@/lib/suppliers/connections',()=>({completeOAuth:state.complete}));
+vi.mock('@/lib/suppliers/connections',()=>({completeOAuth:state.complete,recordOAuthFailure:state.failure}));
+vi.mock('@/lib/suppliers/sync',()=>({syncAuthorizedSupplier:state.sync}));
 import {GET as landing,POST as start} from '@/app/api/integrations/salla/authorize/route';
 import {POST as issue} from '@/app/api/integrations/salla/invite/route';
 import {GET as callback} from '@/app/api/integrations/salla/callback/route';
@@ -20,7 +21,7 @@ beforeEach(()=>{
  state.permission.mockResolvedValue(true);state.session.mockResolvedValue(null);
  state.start.mockResolvedValue({url:'https://accounts.salla.sa/oauth2/auth?state=verified',browser:'b'.repeat(64),context:'signed-owner-context'});
  state.issue.mockResolvedValue({url:origin+'/api/integrations/salla/authorize?invite=signed',expiresAt:new Date('2026-09-22T12:00:00Z')});
- state.complete.mockResolvedValue(2n);
+ state.complete.mockResolvedValue(2n);state.sync.mockResolvedValue({imported:1});state.failure.mockResolvedValue(undefined);
 });
 afterEach(()=>vi.unstubAllEnvs());
 describe('merchant invitation HTTP boundary',()=>{
@@ -65,8 +66,9 @@ describe('owner callback independent of admin login',()=>{
  const request=()=>new NextRequest(origin+'/api/integrations/salla/callback?state=verified&code=provider-code');
  beforeEach(()=>state.cookie.mockImplementation((name:string)=>name==='salla_merchant_context'?{value:'signed-context'}:name==='salla_oauth_browser'?{value:'b'.repeat(64)}:undefined));
  it('completes from a guest browser only with signed context and active issuer permission',async()=>{
-  const response=await callback(request());expect(response.status).toBe(200);expect(await response.text()).toContain('تم ربط متجرك');expect(response.headers.get('location')).toBeNull();
+  const response=await callback(request());expect(response.status).toBe(200);const body=await response.text();expect(body).toContain('تم ربط متجرك');expect(body).toContain('<!doctype html>');expect(response.headers.get('location')).toBeNull();
   expect(state.permission).toHaveBeenCalledWith(7,'suppliers','edit');expect(state.complete).toHaveBeenCalledWith({},expect.objectContaining({adminId:7n,merchantContext:'signed-context',state:'verified'}),expect.anything());
+  expect(state.sync).toHaveBeenCalledWith({},2n,expect.anything());
   expect(response.headers.get('set-cookie')).toContain('salla_merchant_context=;');expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
  });
  it('forged or expired context never exchanges a code',async()=>{
@@ -77,5 +79,9 @@ describe('owner callback independent of admin login',()=>{
  });
  it('wrong merchant errors are sanitized and do not report Connected',async()=>{
   state.complete.mockRejectedValue(Error('provider-access-token-secret'));const response=await callback(request());expect(response.status).toBe(400);const body=await response.text();expect(body).toContain('لم يكتمل');expect(body).not.toContain('provider-access-token-secret');
+  expect(state.failure).toHaveBeenCalledWith({},expect.objectContaining({supplierId:2n,adminId:7n,error:expect.any(Error)}));
+ });
+ it('keeps authorization successful when initial catalog sync is queued for retry',async()=>{
+  state.sync.mockRejectedValue(Error('provider-private-payload'));const response=await callback(request());expect(response.status).toBe(200);const body=await response.text();expect(body).toContain('تم ربط متجرك');expect(body).toContain('المزامنة');expect(body).not.toContain('provider-private-payload');
  });
 });

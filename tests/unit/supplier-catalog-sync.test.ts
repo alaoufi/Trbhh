@@ -149,8 +149,8 @@ describe('complete catalog removal reconciliation',()=>{
     const productLock=f.queries.findIndex(q=>q.includes('last_sync_at')&&q.includes('FOR UPDATE'));
     expect(commerceLock).toBeLessThan(productLock);
   });
-  it('blocks development/demo profiles before any imported row can be changed',async()=>{
-    const f=fixture();f.gate.mode='development';await expect(upsertSourceProduct(f.db,1n,product)).rejects.toThrow('supplier_sync_unavailable');expect(f.writes).toHaveLength(0);
+  it('allows read-only catalog persistence in development mode',async()=>{
+    const f=fixture();f.gate.mode='development';await expect(upsertSourceProduct(f.db,1n,product)).resolves.toBeUndefined();expect(f.writes.some(w=>w.sql.includes('supplier_products'))).toBe(true);
   });
   it('retains seen IDs even when an older source timestamp made their upsert a no-op',async()=>{
     const f=fixture(true);f.row.source_updated_at=new Date('2026-09-20T11:00:00Z');

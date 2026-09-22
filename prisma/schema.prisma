@@ -5,6 +5,9 @@ generator client {
 
 model supplier_integration_profiles {
   oauth_generation Int @default(0)
+  oauth_invite_expires_at DateTime? @db.DateTime(3)
+  oauth_last_attempt_at DateTime? @db.DateTime(3)
+  oauth_last_error String @default("") @db.VarChar(80)
   supplier_id BigInt @id  @db.UnsignedBigInt
   provider String  @db.VarChar(16)
   maintenance Int @default(0) @db.TinyInt

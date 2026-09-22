@@ -11,7 +11,7 @@ const DATABASE = process.env.UPGRADE_SALLA_FIXTURE==='1' ? 'trbhh_upgrade_salla_
 // Explicit release allowlist, checked against commerce/schema.ts, ad-categories/schema.ts
 // and Prisma. Do not derive this from the observed database: extra/missing columns must fail.
 const ADDITIVE_TABLE_COLUMNS: Record<string, string[]> = {
-  supplier_integration_profiles: ['supplier_id','provider','oauth_generation','maintenance','sync_enabled','auto_orders_enabled','mode','last_sync_at','last_error'],
+  supplier_integration_profiles: ['supplier_id','provider','oauth_generation','oauth_invite_expires_at','oauth_last_attempt_at','oauth_last_error','maintenance','sync_enabled','auto_orders_enabled','mode','last_sync_at','last_error'],
   supplier_connections: ['id','supplier_id','provider','external_store_id','status','oauth_scope_version','encrypted_tokens','expires_at','refresh_claim','refresh_claimed_at','sync_claim','sync_claimed_at','version','created_at','updated_at'],
   supplier_oauth_states: ['state_hash','browser_hash','oauth_generation','admin_id','supplier_id','expires_at','consumed_at'],
   supplier_products: ['id','connection_id','supplier_id','external_id','sku','name','description','images','variants','options','categories','brand','public_price_minor','currency','quantity','available','source_updated_at','last_sync_at','sync_error','active','visible','featured','unit_cost_minor','selling_price_minor','pricing_policy','discount_minor','discount_bps','minimum_price_minor','minimum_margin_minor','commerce_product_id','revision'],

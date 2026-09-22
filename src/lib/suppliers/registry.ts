@@ -22,7 +22,7 @@ export async function adapterForConnection(db:CommerceDb,id:bigint,config:Suppli
   if(id<=0n)throw new Error('supplier_connection_unavailable');
   const [row]=await db.$queryRaw<SallaConnection[]>`SELECT c.id,c.provider,c.status,c.external_store_id,s.active,p.maintenance,p.mode,o.store_url FROM supplier_connections c JOIN commerce_suppliers s ON s.id=c.supplier_id JOIN supplier_integration_profiles p ON p.supplier_id=c.supplier_id AND p.provider=c.provider JOIN supplier_onboarding o ON o.supplier_id=c.supplier_id WHERE c.id=${id}`;
   if(row&&row.provider!=='salla')throw new Error('supplier_provider_unsupported');
-  if(!row||row.status!=='connected'||row.active!==1||row.maintenance!==0||row.mode!=='live')throw new Error('supplier_connection_unavailable');
+  if(!row||row.status!=='connected'||row.active!==1||row.maintenance!==0)throw new Error('supplier_connection_unavailable');
   const token=await verifiedToken(db,row,config,fetcher);
   return new SallaAdapter(async()=>token,fetcher);
 }

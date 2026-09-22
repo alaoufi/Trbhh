@@ -67,13 +67,13 @@ describe('current verified release owner invitation',()=>{
     const result=guard({PROFILE:'merchant_oauth'},{VERIFIED:old,'commit.txt':old});expect(result.status,result.stderr).toBe(0);expect(result.stdout).toBe('ISSUED');
   });
   it('requires identical bundled OAuth sources before building a newer ops revision',()=>{
-    const block=job.split('      - name: Build the reviewed invitation operation')[1].split('          pnpm install')[0];
+    const block=job.split('      - name: Build the reviewed invitation operation')[1].split('        env:')[0];
     expect(block).toContain('git fetch --no-tags --depth=1 origin "$PRODUCTION_SHA"');
     expect(block).toContain('git diff --exit-code "$PRODUCTION_SHA" HEAD --');
     for(const file of ['scripts/release/build-salla-owner-invite.cjs','scripts/release/salla-owner-invite.ts','src/lib/suppliers/merchant-oauth.ts','src/lib/suppliers/config.ts','src/lib/suppliers/crypto.ts','src/lib/suppliers/http.ts','src/lib/commerce/config.ts','src/lib/commerce/money.ts'])expect(block).toContain(file);
     const shellBlock=block.split('        run: |')[1].split('\n').map(line=>line.replace(/^          /,'')).join('\n');
     for(const changed of ['0','1']){
-      const result=spawnSync(bash,['-c','git(){ if [[ "$1" == diff ]]; then return "$SOURCE_CHANGED"; fi; }\n'+shellBlock+'\necho BUILD_ALLOWED'],{encoding:'utf8',timeout:10000,env:{...process.env,INVITATION_PROFILE:'national_day',PRODUCTION_SHA:LIVE,SOURCE_CHANGED:changed}});
+      const result=spawnSync(bash,['-c','git(){ if [[ "$1" == diff ]]; then return "$SOURCE_CHANGED"; fi; }\npnpm(){ :; }\nnode(){ :; }\n'+shellBlock+'\necho BUILD_ALLOWED'],{encoding:'utf8',timeout:10000,env:{...process.env,INVITATION_PROFILE:'national_day',PRODUCTION_SHA:LIVE,SOURCE_CHANGED:changed,RUNNER_TEMP:'/tmp'}});
       expect(result.status===0).toBe(changed==='0');expect(result.stdout.includes('BUILD_ALLOWED')).toBe(changed==='0');
     }
   });

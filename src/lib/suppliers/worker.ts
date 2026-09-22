@@ -9,6 +9,7 @@ import {upsertSourceProduct} from './catalog';
 import {syncConnection} from './sync';
 import {dispatchSupplierOrder} from './orders';
 import {recordSupplierTracking,deliverSupplierNotices} from './tracking';
+import {SALLA_OAUTH_SCOPE_VERSION} from './salla-scope-contract';
 
 const MAX_ATTEMPTS=8;
 type Inbox={id:bigint;connection_id:bigint;resource_id:string;event_type:string;payload:unknown;attempts:number};
@@ -82,7 +83,7 @@ export async function reconcileSuppliers(db:CommerceDb,config:SupplierConfig,fet
  for(const row of tracking){if(Date.now()>=deadline)break;try{const observedAt=new Date().toISOString(),adapter=await adapterForConnection(db,row.connection_id,config,boundedFetch),order=await adapter.getOrder(row.external_order_id);if(order){await recordSupplierTracking(db,row.connection_id,order,observedAt);counts.tracked++;}}catch{counts.failed++;}}
  if(Date.now()+10000>=deadline)return finish();
  // At most one full catalog per request. Shared fetch deadline also bounds its 100-page cap.
- const connections=await db.$queryRaw<{id:bigint}[]>`SELECT c.id FROM supplier_connections c JOIN supplier_integration_profiles p ON p.supplier_id=c.supplier_id JOIN commerce_suppliers s ON s.id=c.supplier_id WHERE c.provider='salla' AND c.status='connected' AND s.active=1 AND p.maintenance=0 AND p.sync_enabled=1 AND p.mode='live' AND (c.sync_claim IS NULL OR c.sync_claimed_at<DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 5 MINUTE)) AND (p.last_sync_at IS NULL OR p.last_sync_at<DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL 30 MINUTE)) AND c.updated_at<DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL 5 MINUTE) ORDER BY c.updated_at,c.id LIMIT 1`;
+ const connections=await db.$queryRaw<{id:bigint}[]>`SELECT c.id FROM supplier_connections c JOIN supplier_integration_profiles p ON p.supplier_id=c.supplier_id JOIN commerce_suppliers s ON s.id=c.supplier_id WHERE c.provider='salla' AND c.status='connected' AND c.oauth_scope_version=${SALLA_OAUTH_SCOPE_VERSION} AND c.encrypted_tokens IS NOT NULL AND s.active=1 AND p.maintenance=0 AND p.sync_enabled=1 AND (c.sync_claim IS NULL OR c.sync_claimed_at<DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 5 MINUTE)) AND (p.last_sync_at IS NULL OR p.last_sync_at<DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL 30 MINUTE)) AND c.updated_at<DATE_SUB(CURRENT_TIMESTAMP(3),INTERVAL 5 MINUTE) ORDER BY c.updated_at,c.id LIMIT 1`;
  for(const row of connections){
   try{
    await db.$transaction(async tx=>{await tx.$executeRaw`UPDATE supplier_connections SET updated_at=CURRENT_TIMESTAMP(3) WHERE id=${row.id}`;});

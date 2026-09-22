@@ -8,6 +8,9 @@ const TABLES:TableSpec[] = [
     name: "supplier_integration_profiles",
     columns: {
       oauth_generation: "INT NOT NULL DEFAULT 0",
+      oauth_invite_expires_at: "DATETIME(3) NULL",
+      oauth_last_attempt_at: "DATETIME(3) NULL",
+      oauth_last_error: "VARCHAR(80) NOT NULL DEFAULT ''",
       supplier_id: "BIGINT UNSIGNED NOT NULL",
       provider: "VARCHAR(16) NOT NULL",
       maintenance: "TINYINT NOT NULL DEFAULT 0",

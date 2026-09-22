@@ -10,7 +10,7 @@ export function parseIntegrationControls(form:FormData) {
   const provider=String(form.get('provider')),mode=String(form.get('mode'));
   if(!['salla','cj','other'].includes(provider)||!['development','live'].includes(mode))throw new Error('supplier_invalid_fields');
   const syncEnabled=flag(form,'syncEnabled'),autoOrdersEnabled=flag(form,'autoOrdersEnabled');
-  if(mode!=='live'&&(syncEnabled||autoOrdersEnabled))throw new Error('supplier_invalid_fields');
+  if(mode!=='live'&&autoOrdersEnabled)throw new Error('supplier_invalid_fields');
   return {supplierId:formId(form,'supplierId'),provider:provider as SupplierProvider,mode:mode as SupplierMode,active:flag(form,'active'),maintenance:flag(form,'maintenance'),syncEnabled,autoOrdersEnabled};
 }
 export function parseProductControls(form:FormData) {

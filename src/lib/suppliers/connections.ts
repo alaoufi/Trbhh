@@ -17,7 +17,11 @@ export async function beginOAuth(db:CommerceDb,supplierId:bigint,adminId:bigint,
       const [existing]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM supplier_connections WHERE supplier_id=${supplierId} LIMIT 1 FOR UPDATE`;
       if(existing)throw new Error('supplier_merchant_already_connected');
     }
-    await tx.$executeRaw`UPDATE supplier_integration_profiles SET oauth_generation=oauth_generation+1 WHERE supplier_id=${supplierId}`;
+    // A forwarded owner invitation may safely start more than one browser attempt.
+    // Its generation is advanced when the invitation is issued (or explicitly
+    // revoked), so consuming it here would make a failed redirect impossible to
+    // retry. Direct admin starts retain the previous single-current-attempt rule.
+    if(!constraints)await tx.$executeRaw`UPDATE supplier_integration_profiles SET oauth_generation=oauth_generation+1 WHERE supplier_id=${supplierId}`;
     await tx.$executeRaw`INSERT INTO supplier_oauth_states(state_hash,browser_hash,admin_id,supplier_id,oauth_generation,expires_at) SELECT ${digest(state)},${digest(browser)},${adminId},supplier_id,oauth_generation,${new Date(Date.now()+600000)} FROM supplier_integration_profiles WHERE supplier_id=${supplierId}`;
   });
   return {url:authorizationUrl(config,state),browser};

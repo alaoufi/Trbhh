@@ -60,7 +60,7 @@ describe('owner-forwardable Salla invitations', () => {
     expect(demo.tx.$executeRaw).not.toHaveBeenCalled();
   });
 
-  it('consumes invitation generation once and rejects replay without creating another OAuth state', async () => {
+  it('allows the same unexpired invitation to restart OAuth until the store is connected', async () => {
     const issued = await invitation();
     let generation = 1;
     const tx = {
@@ -68,12 +68,15 @@ describe('owner-forwardable Salla invitations', () => {
       $executeRaw: vi.fn(async (sql: TemplateStringsArray) => {if (sql.join('').includes('oauth_generation=oauth_generation+1')) generation++; return 1;}),
     };
     const db = transactionDb(tx);
-    const attempt = await startMerchantOAuth(db, issued.invitation, config);
-    const state = new URL(attempt.url).searchParams.get('state')!;
-    expect(parseMerchantContext(attempt.context, state, config).generation).toBe(2);
-    const writes = tx.$executeRaw.mock.calls.length;
-    await expect(startMerchantOAuth(db, issued.invitation, config)).rejects.toThrow('supplier_oauth_superseded');
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(writes);
+    const first = await startMerchantOAuth(db, issued.invitation, config);
+    const second = await startMerchantOAuth(db, issued.invitation, config);
+    const firstState = new URL(first.url).searchParams.get('state')!;
+    const secondState = new URL(second.url).searchParams.get('state')!;
+    expect(firstState).not.toBe(secondState);
+    expect(parseMerchantContext(first.context, firstState, config).generation).toBe(1);
+    expect(parseMerchantContext(second.context, secondState, config).generation).toBe(1);
+    expect(generation).toBe(1);
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
   });
 
   it('rejects a connection added after invitation issuance without changing it', async () => {
@@ -102,7 +105,7 @@ describe('owner-forwardable Salla invitations', () => {
     await expect(consumeOAuthState(db, attempt.state, attempt.browser, 2n, context)).rejects.toThrow('supplier_merchant_context_invalid');
     expect(tx.$queryRaw).not.toHaveBeenCalled();
     await expect(consumeOAuthState(db, attempt.state, attempt.browser, 1n, context)).rejects.toThrow('supplier_oauth_state');
-    expect(tx.$queryRaw.mock.calls[0].slice(1)).toEqual([digest(attempt.state), digest(attempt.browser), 1n, 2n, 2]);
+    expect(tx.$queryRaw.mock.calls[0].slice(1)).toEqual([digest(attempt.state), digest(attempt.browser), 1n, 2n, 1]);
     expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 });

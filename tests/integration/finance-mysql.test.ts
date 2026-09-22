@@ -97,9 +97,12 @@ async function draft(key='fixture-settlement-01',ids=[1n]) {
 async function release(id=1n) {await releaseAccrual(db,actor,id,'2026-08-15','Synthetic due-date approval',at);}
 async function failAudit(run:()=>Promise<unknown>) {
   // A real storage failure, after preceding writes in the same transaction.
-  await db.$executeRawUnsafe("CREATE TRIGGER finance_fixture_reject_audit BEFORE INSERT ON finance_audit FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='fixture_audit_unavailable'");
-  try {await expect(run()).rejects.toThrow('fixture_audit_unavailable');}
-  finally {await db.$executeRawUnsafe('DROP TRIGGER finance_fixture_reject_audit');}
+  // ALTER works through MySQL's prepared protocol; CREATE TRIGGER does not.
+  // Existing audit rows survive the additive column and its later removal.
+  await db.$executeRawUnsafe('ALTER TABLE finance_audit ADD COLUMN fixture_required INT NOT NULL');
+  try {
+    await expect(run()).rejects.toMatchObject({code:'P2010',meta:{code:'1364',message:expect.stringContaining('fixture_required')}});
+  } finally {await db.$executeRawUnsafe('ALTER TABLE finance_audit DROP COLUMN fixture_required');}
 }
 
 describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
@@ -112,6 +115,10 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     await admin.$executeRawUnsafe('CREATE DATABASE trbhh_finance_test');
     created=true;
     expect((await db.$queryRaw<{name:string}[]>`SELECT DATABASE() AS name`)[0].name).toBe('trbhh_finance_test');
+    const [modes]=await db.$queryRaw<{globalMode:string;sessionMode:string}[]>`SELECT @@GLOBAL.sql_mode AS globalMode,@@SESSION.sql_mode AS sessionMode`;
+    // Pool connections inherit the global mode; a permissive server must not silently
+    // turn our storage-failure injection into an implicit default value.
+    for(const mode of [modes.globalMode,modes.sessionMode])expect(mode).toMatch(/\bSTRICT_(?:TRANS|ALL)_TABLES\b/);
     for(const ddl of [...COMMERCE_DDL,...FINANCE_DDL])await db.$executeRawUnsafe(ddl);
     await assertFinanceSchemaReady(db);
   });

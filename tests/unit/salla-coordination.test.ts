@@ -2,7 +2,7 @@ import {spawnSync} from 'node:child_process';
 import {describe, expect, it} from 'vitest';
 
 describe('executable Salla release coordination', () => {
-  for (const scenario of ['explicit-exit', 'command-failure', 'success', 'cancel-delayed-worker', 'duplicate-rollback', 'stop-failure']) {
+  for (const scenario of ['explicit-exit', 'command-failure', 'success', 'child-exit-cleanup', 'cancel-delayed-worker', 'duplicate-rollback', 'stop-failure']) {
     it(scenario, () => {
       const bash = process.platform === 'win32' ? 'C:/Program Files/Git/bin/bash.exe' : 'bash';
       const result = spawnSync(bash, ['tests/fixtures/salla-coordination.sh', scenario], {encoding: 'utf8', timeout: 15000});

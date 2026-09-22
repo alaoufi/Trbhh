@@ -2,8 +2,21 @@
 # Real shell exits/process cancellation; systemctl and Docker are mocked, never contacted.
 set -euo pipefail
 scenario=${1:?scenario}
-fixture=$(mktemp -d)
-trap 'rm -rf -- "$fixture"' EXIT
+fixture_root=$(cd "${TMPDIR:-/tmp}" && pwd -P)
+fixture=$(mktemp -d "$fixture_root/trbhh-salla-fixture.XXXXXXXX")
+fixture_owner=$BASHPID
+cleanup_fixture() {
+  local result=$? child
+  # Background Bash contexts can inherit EXIT. Only the creating shell owns this directory.
+  [[ "$BASHPID" == "$fixture_owner" ]] || return "$result"
+  trap - EXIT
+  for child in $(jobs -pr); do kill "$child" 2>/dev/null || true; done
+  wait 2>/dev/null || true
+  [[ "$fixture" == "$fixture_root"/trbhh-salla-fixture.* ]] || return 1
+  rm -rf -- "$fixture"
+  return "$result"
+}
+trap cleanup_fixture EXIT
 backup=$fixture
 tools=$fixture
 id=1
@@ -32,6 +45,11 @@ docker() {
 }
 salla_restore() { echo restore >> "$fixture/events"; }
 case "$scenario" in
+  child-exit-cleanup)
+    # Force the inherited EXIT-handler path independently of OS signal timing.
+    (trap cleanup_fixture EXIT; exit 0)
+    [[ -d "$fixture" ]]
+    ;;
   explicit-exit|command-failure|success)
     # Exercise the production EXIT handler in a separate shell context.
     salla_request_rollback() { echo rollback >> "$fixture/events"; }
@@ -49,7 +67,7 @@ case "$scenario" in
     else [[ "$result" != 0 && "$(cat "$fixture/events")" == rollback ]]; fi
     ;;
   cancel-delayed-worker|duplicate-rollback)
-    (sleep 1; echo candidate-reapplied >> "$fixture/events") & worker=$!
+    (trap - EXIT; sleep 1; echo candidate-reapplied >> "$fixture/events") & worker=$!
     salla_cancel_and_restore
     if [[ "$scenario" == duplicate-rollback ]]; then salla_cancel_and_restore; fi
     sleep 1.2

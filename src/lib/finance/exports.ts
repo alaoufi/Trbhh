@@ -1,23 +1,23 @@
 import type { FinanceInvoice, FinanceReport } from './types';
-import { monthOfDate, formatFinanceMoney } from './reports';
+import { formatFinanceMoney } from './reports';
+import { financeExportScope, financeInvoiceMatches, financeMovementMatches, financeSupplierMatches } from './filters';
 export type FinanceSheet={name:string;headers:string[];rows:(string|number|null)[][]};
 const money=(value:number|null)=>value===null?null:value/100;
 export function financeExportSheets(report:FinanceReport):FinanceSheet[]{
   const {query,data}=report;
-  const selectedInvoice=(v:FinanceInvoice)=>monthOfDate(v.at)===query.month&&(!query.supplierId||v.source.suppliers.some(s=>s.supplierId===query.supplierId))&&(!query.status||v.status===query.status)&&(!query.q||[v.id,v.orderId,v.number||'',v.source.customerName].some(x=>x.includes(query.q!)));
   return [
     {name:'ملخص',headers:['البند','المبلغ بالريال','التوضيح','المصدر'],rows:report.metrics.map(x=>[x.label,money(x.valueMinor),x.explanation,x.href])},
-    {name:'الموردون',headers:['المورد','الرصيد الافتتاحي','المستحقات','المسدد','المتبقي','المعلق','المتأخر'],rows:report.suppliers.map(x=>[x.name,money(x.openingMinor),money(x.accruedMinor),money(x.paidMinor),money(x.remainingMinor),money(x.pendingMinor),money(x.overdueMinor)])},
-    {name:'الحركات',headers:['التاريخ','الحركة','له','عليه','الرصيد','المرجع','المصدر'],rows:report.movements.map(x=>[x.at,x.label,money(x.creditMinor),money(x.debitMinor),money(x.balanceMinor),x.reference,x.href])},
+    {name:'الموردون',headers:['المورد','الرصيد الافتتاحي','المستحقات','المسدد','المتبقي','المعلق','المتأخر'],rows:report.suppliers.filter(x=>financeSupplierMatches(x,query)).map(x=>[x.name,money(x.openingMinor),money(x.accruedMinor),money(x.paidMinor),money(x.remainingMinor),money(x.pendingMinor),money(x.overdueMinor)])},
+    {name:'الحركات',headers:['التاريخ','الحركة','له','عليه','الرصيد','المرجع','المصدر'],rows:report.movements.filter(x=>financeMovementMatches(x,query)).map(x=>[x.at,x.label,money(x.creditMinor),money(x.debitMinor),money(x.balanceMinor),x.reference,x.href])},
     {name:'الميزانية',headers:['البند','المخطط','الفعلي','الفرق','نسبة الصرف'],rows:report.budget.map(x=>[x.label,money(x.plannedMinor),money(x.actualMinor),money(x.differenceMinor),x.usagePercent])},
     {name:'المطابقة',headers:['الحالة','التوضيح','الفرق بالريال','المصدر'],rows:report.issues.map(x=>[x.severity==='error'?'يمنع الإقفال':'مراجعة',x.message,money(x.differenceMinor??null),x.href])},
-    {name:'الفواتير',headers:['الرقم','الطلب','التاريخ','النوع','الحالة','قبل الضريبة','الضريبة','الإجمالي'],rows:data.invoices.filter(selectedInvoice).map(x=>[x.number||x.id,x.orderId,x.at,x.kind,x.status,money(x.netMinor),money(x.vatMinor),money(x.totalMinor)])},
+    {name:'الفواتير',headers:['الرقم','الطلب','التاريخ','النوع','الحالة','قبل الضريبة','الضريبة','الإجمالي'],rows:data.invoices.filter(x=>financeInvoiceMatches(x,query)).map(x=>[x.number||x.id,x.orderId,x.at,x.kind,x.status,money(x.netMinor),money(x.vatMinor),money(x.totalMinor)])},
   ];
 }
 export function escapeFinanceHtml(value:unknown):string{return String(value??'غير مكتمل').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));}
 export function printableFinanceReport(report:FinanceReport):string{
   const sheets=financeExportSheets(report);
-  return printShell('تقرير تربح المالي — '+report.query.month,sheets.map(sheet=>'<h2>'+escapeFinanceHtml(sheet.name)+'</h2><table><thead><tr>'+sheet.headers.map(h=>'<th>'+escapeFinanceHtml(h)+'</th>').join('')+'</tr></thead><tbody>'+sheet.rows.map(row=>'<tr>'+row.map(x=>'<td>'+escapeFinanceHtml(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table>').join(''));
+  return printShell('تقرير تربح المالي — '+report.query.month,'<p>'+escapeFinanceHtml(financeExportScope)+'</p>'+sheets.map(sheet=>'<h2>'+escapeFinanceHtml(sheet.name)+'</h2><table><thead><tr>'+sheet.headers.map(h=>'<th>'+escapeFinanceHtml(h)+'</th>').join('')+'</tr></thead><tbody>'+sheet.rows.map(row=>'<tr>'+row.map(x=>'<td>'+escapeFinanceHtml(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table>').join(''));
 }
 export function printableFinanceInvoice(invoice:FinanceInvoice,internal:boolean):string{
   const s=invoice.snapshot;

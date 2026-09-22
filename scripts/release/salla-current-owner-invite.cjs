@@ -88,33 +88,46 @@ async function stage(code, operation) {
 
 async function issueCurrentOwnerInvitation(db, env = process.env, now = new Date()) {
   assertEnvironment(env);
-  return db.$transaction(async tx => {
+  let checkpoint = 'transaction';
+  try {
+    return await db.$transaction(async tx => {
+    checkpoint = 'flags';
     const flags = await stage('owner_invitation_schema_flags', () => tx.$queryRaw`SELECT k,v FROM site_settings WHERE k IN ('commerce_enabled','commerce_purchasing_enabled','commerce_payments_enabled')`);
     if (flags.some(row => enabled(row.v))) throw new Error('owner_invitation_purchase_gate');
+    checkpoint = 'automatic';
     const [automatic] = await stage('owner_invitation_schema_automatic', () => tx.$queryRaw`SELECT supplier_id AS id FROM supplier_integration_profiles WHERE auto_orders_enabled<>0 LIMIT 1`);
     if (automatic) throw new Error('owner_invitation_automatic_orders');
+    checkpoint = 'supplier';
     const [supplier] = await stage('owner_invitation_schema_supplier', () => tx.$queryRaw`SELECT s.id,s.name,s.active,o.store_url FROM commerce_suppliers s JOIN supplier_onboarding o ON o.supplier_id=s.id WHERE s.id=${TARGET_SUPPLIER_ID} FOR UPDATE`);
     if (!supplier || supplier.id !== TARGET_SUPPLIER_ID || supplier.name !== TARGET_NAME || supplier.active !== 1 || supplier.store_url !== TARGET_STORE_URL) {
       throw new Error('owner_invitation_target_mismatch');
     }
+    checkpoint = 'profile';
     const [profile] = await stage('owner_invitation_schema_profile', () => tx.$queryRaw`SELECT provider,mode,maintenance,sync_enabled,auto_orders_enabled,oauth_generation FROM supplier_integration_profiles WHERE supplier_id=${TARGET_SUPPLIER_ID} FOR UPDATE`);
     if (!profile || profile.provider !== 'salla' || profile.mode !== 'development' || profile.maintenance !== 0
       || profile.sync_enabled !== 0 || profile.auto_orders_enabled !== 0
       || !Number.isSafeInteger(profile.oauth_generation) || profile.oauth_generation < 0 || profile.oauth_generation >= 2147483645) {
       throw new Error('owner_invitation_target_profile');
     }
+    checkpoint = 'connections';
     const [connections] = await stage('owner_invitation_schema_connections', () => tx.$queryRaw`SELECT COUNT(*) AS count FROM supplier_connections WHERE supplier_id=${TARGET_SUPPLIER_ID}`);
     if (!connections || BigInt(connections.count) !== 0n) throw new Error('owner_invitation_target_connected');
+    checkpoint = 'products';
     const [products] = await stage('owner_invitation_schema_products', () => tx.$queryRaw`SELECT COUNT(*) AS count FROM supplier_products WHERE supplier_id=${TARGET_SUPPLIER_ID}`);
+    checkpoint = 'catalog';
     const [catalog] = await stage('owner_invitation_schema_catalog', () => tx.$queryRaw`SELECT COUNT(*) AS count FROM commerce_product_suppliers WHERE supplier_id=${TARGET_SUPPLIER_ID}`);
     if (!products || !catalog || BigInt(products.count) !== 0n || BigInt(catalog.count) !== 0n) throw new Error('owner_invitation_target_catalog');
+    checkpoint = 'issuers';
     const issuers = await stage('owner_invitation_schema_issuers', () => tx.$queryRaw`SELECT DISTINCT admin_id FROM supplier_oauth_states WHERE consumed_at IS NOT NULL LIMIT 2`);
     if (issuers.length !== 1 || !/^[1-9]\d{0,14}$/.test(String(issuers[0].admin_id))) throw new Error('owner_invitation_issuer_ambiguous');
+    checkpoint = 'admin';
     const adminId = issuers[0].admin_id;
     const [admin] = await stage('owner_invitation_schema_admin', () => tx.$queryRaw`SELECT id,is_admin FROM users WHERE id=${adminId}`);
     if (!admin || admin.id !== adminId || admin.is_admin !== 1) throw new Error('owner_invitation_issuer_unauthorized');
+    checkpoint = 'update';
     const changed = await stage('owner_invitation_schema_update', () => tx.$executeRaw`UPDATE supplier_integration_profiles SET oauth_generation=oauth_generation+1 WHERE supplier_id=${TARGET_SUPPLIER_ID} AND oauth_generation=${profile.oauth_generation}`);
     if (changed !== 1) throw new Error('owner_invitation_generation_conflict');
+    checkpoint = 'invitation';
     const invitation = buildInvitation({
       supplierId: String(TARGET_SUPPLIER_ID), adminId: String(adminId), expectedName: TARGET_NAME,
       generation: profile.oauth_generation + 1,
@@ -124,7 +137,11 @@ async function issueCurrentOwnerInvitation(db, env = process.env, now = new Date
       targetStore: TARGET_NAME, storeUrl: TARGET_STORE_URL,
       purchasingEnabled: false, paymentsEnabled: false, liveOrdersEnabled: false, productsPublished: false,
     };
-  });
+    });
+  } catch (failure) {
+    if (failure instanceof Error && /^owner_invitation_[a-z_]+$/.test(failure.message)) throw failure;
+    throw new Error(`owner_invitation_checkpoint_${checkpoint}`);
+  }
 }
 
 async function main(env = process.env, dependencies = {}) {

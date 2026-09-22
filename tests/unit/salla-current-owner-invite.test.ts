@@ -66,6 +66,11 @@ describe('current real-store owner invitation', () => {
     await expect(issueCurrentOwnerInvitation(db, env, new Date())).rejects.toThrow('owner_invitation_schema_flags');
   });
 
+  it('reports a safe transaction checkpoint when Prisma rejects outside a query', async () => {
+    const db = {$transaction: vi.fn().mockRejectedValue(new Error('private transaction detail'))};
+    await expect(issueCurrentOwnerInvitation(db, env, new Date())).rejects.toThrow('owner_invitation_checkpoint_transaction');
+  });
+
   it('creates a 24-hour signed token and encrypts the only report containing it', () => {
     const invitation = buildInvitation({supplierId: '1', adminId: '7', expectedName: 'شعبيات الأولين', generation: 5}, env, new Date('2026-09-22T13:00:00.000Z'));
     expect(invitation.expiresAt).toBe('2026-09-23T13:00:00.000Z');

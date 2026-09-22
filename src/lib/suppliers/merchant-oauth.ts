@@ -88,7 +88,7 @@ export async function startMerchantOAuth(db: CommerceDb, token: string, config: 
   const result = await beginOAuth(db, BigInt(invitation.supplierId), BigInt(invitation.adminId), config, {expectedGeneration: invitation.generation, requiredScopeVersion:SALLA_OAUTH_SCOPE_VERSION});
   const state = new URL(result.url).searchParams.get('state') || '';
   if (!/^[a-f0-9]{64}$/.test(state)) throw new Error('supplier_oauth_state');
-  const context: MerchantContext = {...invitation, generation: invitation.generation + 1, expiresAt: Date.now() + CONTEXT_LIFETIME_MS, stateHash: digest(state)};
+  const context: MerchantContext = {...invitation, expiresAt: Date.now() + CONTEXT_LIFETIME_MS, stateHash: digest(state)};
   return {...result, context: sign(context, 'context', config)};
 }
 

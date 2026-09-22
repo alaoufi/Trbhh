@@ -1,4 +1,4 @@
-name: Diagnose Dynamic Ads Lab (read-only)
+name: Diagnose Salla Catalog Association (read-only)
 
 on:
   workflow_dispatch:
@@ -7,19 +7,21 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect runtime and pilot tables without modifying data
+      - uses: actions/checkout@v4
+      - name: Trace stored products to the connected Salla merchant without modifying data
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
           set -e
           mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=25 -i ~/.ssh/deploy_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" '
-            set -e
-            cd /root/trbhh
-            docker compose exec -T app sh -lc "test -r /app/database/2026-08-17-dynamic-ads.sql && echo SQL_FILE=present || (echo SQL_FILE=missing; exit 1)"
-          '
+          ssh -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=25 \
+            -i ~/.ssh/deploy_key -p "${VPS_PORT:-22}" "$VPS_USER@$VPS_HOST" \
+            'set -e; cd /root/trbhh; docker compose exec -T app node -' \
+            < scripts/diagnostics/salla-image-forensics.cjs

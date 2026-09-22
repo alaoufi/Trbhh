@@ -47,14 +47,26 @@ async function main(){
     const identity=await fetch('https://accounts.salla.sa/oauth2/user/info',{headers:{Authorization:`Bearer ${token}`,Accept:'application/json'},redirect:'error',cache:'no-store',signal:AbortSignal.timeout(15000)});
     check(identity.ok,`identity_${identity.status}`);const identityBody=await identity.json(),merchant=object(identityBody?.data?.merchant),identityId=string(merchant.id);
     const count=await db.$queryRawUnsafe('SELECT COUNT(*) AS n FROM supplier_products WHERE connection_id=?',supplier.connection_id);
-    const rows=await db.$queryRawUnsafe('SELECT id,external_id,sku,name,public_price_minor,quantity,images,last_sync_at,source_updated_at FROM supplier_products WHERE connection_id=? ORDER BY id DESC LIMIT 20',supplier.connection_id);
+    const footprint=await db.$queryRawUnsafe(`SELECT
+      COUNT(*) AS total,
+      COALESCE(SUM(active=1),0) AS active,
+      COALESCE(SUM(visible=1),0) AS visible,
+      COALESCE(SUM(featured=1),0) AS featured,
+      COALESCE(SUM(commerce_product_id IS NOT NULL),0) AS commerceLinked,
+      (SELECT COUNT(*) FROM supplier_price_history h JOIN supplier_products p2 ON p2.id=h.supplier_product_id WHERE p2.connection_id=?) AS priceHistory,
+      (SELECT COUNT(*) FROM supplier_price_tiers t JOIN supplier_products p2 ON p2.id=t.supplier_product_id WHERE p2.connection_id=?) AS priceTiers,
+      (SELECT COUNT(*) FROM supplier_stock_reservations r JOIN supplier_products p2 ON p2.id=r.supplier_product_id WHERE p2.connection_id=?) AS reservations,
+      (SELECT COUNT(*) FROM supplier_orders so WHERE so.connection_id=?) AS supplierOrders,
+      (SELECT COUNT(*) FROM supplier_webhook_events we WHERE we.connection_id=?) AS webhookEvents
+      FROM supplier_products p WHERE p.connection_id=?`,supplier.connection_id,supplier.connection_id,supplier.connection_id,supplier.connection_id,supplier.connection_id,supplier.connection_id);
+    const rows=await db.$queryRawUnsafe('SELECT id,external_id,sku,name,public_price_minor,quantity,images,last_sync_at,source_updated_at,active,visible,featured,commerce_product_id FROM supplier_products WHERE connection_id=? ORDER BY id DESC LIMIT 100',supplier.connection_id);
     const pageBody=await get('/products?page=1&per_page=60',token),page=list(pageBody.data).map(sourceProduct),pageById=new Map(page.map(item=>[item.externalId,item]));
     const samples=[];
     for(const row of rows.slice(0,8)){
       const detailBody=await get(`/products/${encodeURIComponent(row.external_id)}`,token),detail=sourceProduct(detailBody.data),listed=pageById.get(string(row.external_id))||null,images=storedImages(row.images);
       samples.push({db:{rowId:string(row.id),externalId:string(row.external_id),sku:string(row.sku),name:string(row.name),priceMinor:Number(row.public_price_minor),quantity:row.quantity,imageUrls:images,lastSyncAt:row.last_sync_at,sourceUpdatedAt:row.source_updated_at},detail,listed,proof:{identityMatchesConnection:identityId===string(supplier.external_store_id),externalIdMatches:detail.externalId===string(row.external_id),skuMatches:detail.sku===string(row.sku),nameMatches:detail.name===string(row.name),priceMatches:Number(detail.price)*100===Number(row.public_price_minor),quantityMatches:detail.quantity===row.quantity,imagesMatch:exact(detail.imageUrls,images),listAndDetailImagesMatch:listed?exact(listed.imageUrls,detail.imageUrls):null,listAndDetailRecordMatch:listed?listed.externalId===detail.externalId&&listed.sku===detail.sku&&listed.name===detail.name:null}});
     }
-    report.push({supplier:{id:string(supplier.id),name:supplier.name,connectionId:string(supplier.connection_id),externalStoreId:string(supplier.external_store_id),identityId,identityName:string(merchant.name),identityDomain:string(merchant.domain),status:supplier.status,mode:supplier.mode,storeUrl:supplier.store_url,syncEnabled:Boolean(supplier.sync_enabled),lastSyncAt:supplier.last_sync_at,lastError:supplier.last_error,storedProductCount:Number(count[0].n),sourceFirstPageCount:page.length},samples});
+    report.push({supplier:{id:string(supplier.id),name:supplier.name,connectionId:string(supplier.connection_id),externalStoreId:string(supplier.external_store_id),identityId,identityName:string(merchant.name),identityDomain:string(merchant.domain),status:supplier.status,mode:supplier.mode,storeUrl:supplier.store_url,syncEnabled:Boolean(supplier.sync_enabled),lastSyncAt:supplier.last_sync_at,lastError:supplier.last_error,storedProductCount:Number(count[0].n),sourceFirstPageCount:page.length},footprint:footprint[0],storedProducts:rows.map(row=>({rowId:string(row.id),externalId:string(row.external_id),sku:string(row.sku),name:string(row.name),active:Boolean(row.active),visible:Boolean(row.visible),featured:Boolean(row.featured),commerceProductId:row.commerce_product_id===null?null:string(row.commerce_product_id),source:'salla-merchant:'+identityId})),samples});
   }
   process.stdout.write(JSON.stringify({ok:true,readOnly:true,liveOrdersDisabled:true,report},(_,value)=>typeof value==='bigint'?String(value):value,2)+'\n');
 }

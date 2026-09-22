@@ -41,14 +41,14 @@ jobs:
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 "$VPS_USER@$VPS_HOST" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/integration-readiness.cjs
   owner-invite:
-    if: github.event_name == 'workflow_dispatch' && inputs.owner_invite == true && (github.ref == 'refs/heads/codex/salla-owner-release-20260921' || (github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.backup_id == '35629850346') || (github.ref == 'refs/heads/codex/salla-customer-scope-sandbox-order-20260922' && inputs.backup_id == '35718106015'))
+    if: github.event_name == 'workflow_dispatch' && inputs.owner_invite == true && (github.ref == 'refs/heads/codex/salla-owner-release-20260921' || (github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && inputs.backup_id == '35629850346') || (github.ref == 'refs/heads/codex/salla-customer-scope-sandbox-order-20260922' && inputs.backup_id == '35720454989'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
       group: vps-deploy
       cancel-in-progress: false
     env:
-      PRODUCTION_SHA: ${{ github.ref == 'refs/heads/codex/salla-customer-scope-sandbox-order-20260922' && '354d226ccf5bc80b92c67a227c2263ada1cdfa86' || (github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && '9a64552faca2b99e63a0e915ea73fd0989336b86' || github.sha) }}
+      PRODUCTION_SHA: ${{ github.ref == 'refs/heads/codex/salla-customer-scope-sandbox-order-20260922' && '5dad593a7580de4fe0ec8d275283a33c321b36db' || (github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && '9a64552faca2b99e63a0e915ea73fd0989336b86' || github.sha) }}
       INVITATION_PROFILE: ${{ github.ref == 'refs/heads/codex/salla-customer-scope-sandbox-order-20260922' && 'customer_scope' || (github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && 'national_day' || 'merchant_oauth') }}
     steps:
       - uses: actions/checkout@v4
@@ -116,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          [[ "$BACKUP_RUN_ID" == '35718106015' ]]
+          [[ "$BACKUP_RUN_ID" == '35720454989' ]]
           [[ "$REPORT_PUBLIC_KEY_B64" =~ ^[A-Za-z0-9+/=]+$ ]]
           test ${#REPORT_PUBLIC_KEY_B64} -lt 12000
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BACKUP_RUN_ID" |

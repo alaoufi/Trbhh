@@ -6,7 +6,7 @@ type Input={inviteExpiresAt:Date|null;connection:{status:string;scopeVersion:num
 
 const STATUS:Record<SupplierOAuthStatusKey,SupplierOAuthStatus>={
  unauthorized:{key:'unauthorized',label:'غير مفوض',tone:'slate'},
- pending:{key:'pending',label:'بانتظار التفويض',tone:'amber'},
+ pending:{key:'pending',label:'بانتظار تفويض صاحب المتجر',tone:'amber'},
  authorized:{key:'authorized',label:'مفوض',tone:'emerald'},
  expired:{key:'expired',label:'انتهت الصلاحية',tone:'red'},
  reauthorization_required:{key:'reauthorization_required',label:'يحتاج إعادة تفويض',tone:'red'},

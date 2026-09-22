@@ -1,6 +1,6 @@
 import { ScrollText, User } from 'lucide-react';
 import Link from 'next/link';
-import { requireAction } from '@/lib/roles';
+import { requireAction, hasAction } from '@/lib/roles';
 import { listAdminLog, countAdminLog } from '@/lib/audit';
 import { AdminPager } from '@/components/admin-pager';
 
@@ -16,10 +16,13 @@ function fmt(iso: string | null) {
 const PAGE_SIZE = 30;
 
 export default async function AdminAuditPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  await requireAction('users', 'view');
+  const session = await requireAction('users', 'view');
+  // التفاصيل المالية (المبالغ) تظهر فقط لمن يملك صلاحية مالية (users:edit — نفس صلاحية
+  // تأكيد الشحن والمدفوعات)؛ يُحجب المبلغ عن المراقب الذي يملك العرض فقط.
+  const canSeeFinancial = await hasAction(session.uid, 'users', 'edit');
   const { page: pageRaw } = await searchParams;
   const page = Math.max(1, parseInt(pageRaw || '1') || 1);
-  const [rows, total] = await Promise.all([listAdminLog(PAGE_SIZE, (page - 1) * PAGE_SIZE), countAdminLog()]);
+  const [rows, total] = await Promise.all([listAdminLog(PAGE_SIZE, (page - 1) * PAGE_SIZE, { redactFinancial: !canSeeFinancial }), countAdminLog()]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   return (
     <div className="space-y-4">

@@ -6,7 +6,8 @@ import { readFinanceData } from '@/lib/finance/read-model';
 import { readFinanceInvoice, customerInvoice } from '@/lib/finance/documents';
 import { financeSectionExportSheets, printableFinanceInvoice, printableFinanceReport } from '@/lib/finance/exports';
 import { recordFinanceExport } from '@/lib/finance/service';
-import { accessActor } from '@/lib/access-control/guards';
+import { accessActor, readActorAccess } from '@/lib/access-control/guards';
+import { redactFinanceAudit } from '@/lib/finance/audit-visibility';
 import { withFinanceAuditContext } from '@/lib/finance/audit-context';
 export const dynamic='force-dynamic';
 export async function GET(request:Request){
@@ -26,7 +27,8 @@ export async function GET(request:Request){
     const internal=url.searchParams.get('view')!=='customer';
     return new Response(printableFinanceInvoice(internal?invoice:customerInvoice(invoice),internal),{headers:{...headers,'Content-Type':'text/html; charset=utf-8'}});
   }
-  const report=buildFinanceReport(await readFinanceData(prisma),query,new Date());
+  const [access,data]=await Promise.all([readActorAccess(session.uid),readFinanceData(prisma)]);
+  const report=buildFinanceReport(redactFinanceAudit(data,access.keys),query,new Date());
   await auditExport(query.month,query.section);
   if(format==='print')return new Response(printableFinanceReport(report),{headers:{...headers,'Content-Type':'text/html; charset=utf-8'}});
   const workbook=new ExcelJS.Workbook();workbook.creator='TRBHH';

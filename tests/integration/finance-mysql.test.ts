@@ -652,6 +652,10 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     await expect(recordFinanceReconciliation(db,actor,input,at)).rejects.toThrow('finance_reconciliation_unresolved');
     expect(await count('finance_reconciliations')).toBe(0);
     const invoice=await capturedId();await issueInvoice(db,actor,invoice,fiscal(),gate,at);
+    expect((await report('2026-08',at)).issues.filter(issue=>issue.severity==='error').map(issue=>issue.key)).toEqual(['eligibility:1']);
+    await expect(recordFinanceReconciliation(db,actor,input,at)).rejects.toThrow('finance_reconciliation_unresolved');
+    await release();
+    expect((await report('2026-08',at)).issues.filter(issue=>issue.severity==='error')).toEqual([]);
     await failAudit(()=>recordFinanceReconciliation(db,actor,input,at));expect(await count('finance_reconciliations')).toBe(0);
     const id=await recordFinanceReconciliation(db,actor,input,at);
     const before=await db.$queryRaw`SELECT * FROM finance_reconciliations WHERE id=${id}`;

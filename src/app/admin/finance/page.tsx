@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
-import { getFinancePermissions, requireFinance } from '@/lib/finance/permissions';
+import { financePermissionsFromKeys, requireFinance } from '@/lib/finance/permissions';
+import { readActorAccess } from '@/lib/access-control/guards';
+import { redactFinanceAudit } from '@/lib/finance/audit-visibility';
 import { readFinanceData } from '@/lib/finance/read-model';
 import { buildFinanceReport, parseFinanceQuery } from '@/lib/finance/reports';
 import { FinanceWorkspace } from '@/components/finance/finance-workspace';
@@ -47,8 +49,9 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   const params = await searchParams;
   const query = parseFinanceQuery(Object.fromEntries(Object.entries(params).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])));
   const session = await requireFinance(query.section);
-  const [permissions, data] = await Promise.all([getFinancePermissions(session.uid,query.section), readFinanceData(prisma)]);
-  const report = buildFinanceReport(data, query, new Date());
+  const [access, data] = await Promise.all([readActorAccess(session.uid), readFinanceData(prisma)]);
+  const permissions = financePermissionsFromKeys(access.keys, query.section);
+  const report = buildFinanceReport(redactFinanceAudit(data, access.keys), query, new Date());
   const error = typeof params.error === 'string' ? params.error : null;
   return <div className="space-y-3">
     {params.saved && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">تم حفظ الإجراء. عُرض التقرير من السجلات المحدثة.</p>}

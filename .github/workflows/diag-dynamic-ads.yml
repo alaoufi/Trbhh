@@ -1,4 +1,4 @@
-name: Diagnose Salla Catalog Association (read-only)
+name: Quarantine Proven Salla Demo Catalog
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect fail-closed quarantine plan without modifying data
+      - name: Quarantine the fingerprinted demo catalog in one transaction
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -28,4 +28,4 @@ jobs:
           ssh "${ssh_args[@]}" "$target" "set -eu; test ! -L /root/trbhh-release-tools; mkdir -m 700 -p '$remote_tools'; test ! -L '$remote_tools'"
           scp -i ~/.ssh/deploy_key -P "$port" -o StrictHostKeyChecking=yes \
             scripts/release/salla-catalog-quarantine{,-plan}.cjs "$target:$remote_tools/"
-          ssh "${ssh_args[@]}" "$target" "set -eu; cd /root/trbhh; container=\$(docker compose ps -q app); test -n \"\$container\"; docker cp '$remote_tools/salla-catalog-quarantine.cjs' \"\$container:/tmp/salla-catalog-quarantine.cjs\"; docker cp '$remote_tools/salla-catalog-quarantine-plan.cjs' \"\$container:/tmp/salla-catalog-quarantine-plan.cjs\"; docker compose exec -T -e NODE_PATH=/app/node_modules app node /tmp/salla-catalog-quarantine.cjs inspect"
+          ssh "${ssh_args[@]}" "$target" "set -eu; cd /root/trbhh; container=\$(docker compose ps -q app); test -n \"\$container\"; docker cp '$remote_tools/salla-catalog-quarantine.cjs' \"\$container:/tmp/salla-catalog-quarantine.cjs\"; docker cp '$remote_tools/salla-catalog-quarantine-plan.cjs' \"\$container:/tmp/salla-catalog-quarantine-plan.cjs\"; docker compose exec -T -e NODE_PATH=/app/node_modules app node /tmp/salla-catalog-quarantine.cjs apply 79241bf63f377661c5e4f4913373c2903433bc0df027925955c8301cb3b7d825 QUARANTINE_DEMO_MERCHANT_1921390206"

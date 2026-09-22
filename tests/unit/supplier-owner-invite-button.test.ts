@@ -1,6 +1,7 @@
 import {describe,expect,it} from 'vitest';
 import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
+import {readFileSync} from 'node:fs';
 import {SupplierOwnerInviteButton} from '@/components/supplier-owner-invite-button';
 
 describe('supplier owner authorization control',()=>{
@@ -10,6 +11,12 @@ describe('supplier owner authorization control',()=>{
   expect(html).toContain('متابعة التفويض في سلة');
   expect(html).toContain('24 ساعة');
   expect(html).toContain('أكثر من مرة');
-  expect(html).toContain('شعبيات الأولين');
+ expect(html).toContain('شعبيات الأولين');
+ });
+ it('submits the URL-encoded body required by the hardened OAuth form reader',()=>{
+  const source=readFileSync('src/components/supplier-owner-invite-button.tsx','utf8');
+  expect(source).toContain("new URLSearchParams({supplierId})");
+  expect(source).toContain("'Content-Type':'application/x-www-form-urlencoded'");
+  expect(source).not.toContain('new FormData()');
  });
 });

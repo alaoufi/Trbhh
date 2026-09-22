@@ -11,8 +11,8 @@ export function SupplierOwnerInviteButton({supplierId,supplierName}:{supplierId:
  const issue=async()=>{
   if(pending)return;setPending(true);setError('');setCopied(false);
   try{
-   const body=new FormData();body.set('supplierId',supplierId);
-   const response=await fetch('/api/integrations/salla/invite',{method:'POST',body,credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
+   const body=new URLSearchParams({supplierId});
+   const response=await fetch('/api/integrations/salla/invite',{method:'POST',body,credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded'}});
    const result=await response.json() as InviteResult;
    if(!response.ok||typeof result.url!=='string'||typeof result.expiresAt!=='string')throw Error();
    const parsed=new URL(result.url);if(parsed.origin!==window.location.origin||parsed.pathname!=='/api/integrations/salla/authorize'||!parsed.searchParams.get('invite'))throw Error();

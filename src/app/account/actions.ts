@@ -441,13 +441,10 @@ export async function switchAccountAction(formData: FormData) {
   const u = await prisma.users.findUnique({ where: { id: BigInt(target) }, select: { id: true, name: true, userName: true, ban: true, auth_session_version: true } }).catch(() => null);
   if (!u) redirect('/account');
   if (u.ban === 'checked') redirect('/account?error=switchbanned');
-  // أمان: يُمنع تصعيد الصلاحية — لا تبديل بلا كلمة مرور من حساب عادي إلى حساب إدارة.
-  // أمّا التبديل بين حسابين إداريين (كلاهما يملك صلاحية أصلاً) فمسموح — لا تصعيد فيه.
-  const { hasAnyAdmin } = await import('@/lib/roles');
-  if (await hasAnyAdmin(target).catch(() => false)) {
-    const meAdmin = await hasAnyAdmin(session.uid).catch(() => false);
-    if (!meAdmin) redirect('/account?error=switchadmin');
-  }
+  // A linked account proves association, not permission to impersonate staff.
+  // Even another staff member must authenticate as the target independently.
+  const { isPrivilegedAccount } = await import('@/lib/auth-security');
+  if (await isPrivilegedAccount(target)) redirect('/login?next=/admin');
   // «ذكّرني قبل أي إجراء»: يمرّ بصفحة تأكيد قبل التبديل ما لم يكن مباشراً أو مؤكّداً
   if (!confirmed) {
     const mode = await getLinkMode(target).catch(() => 'confirm' as const);

@@ -1,22 +1,17 @@
 import 'server-only';
-import { redirect } from 'next/navigation';
 import { prisma } from './prisma';
-import { getSession } from './auth';
 import { findDuplicateAds } from './duplicates';
 import { countClassifieds } from './classified';
 
-/** Gate: require an admin (users.is_admin = 1). Redirects otherwise. */
+/** Legacy facade; all authority is an explicit registered permission. */
 export async function requireAdmin() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  const user = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { is_admin: true } });
-  if (!user || user.is_admin !== 1) redirect('/');
-  return session;
+  const {requireAccess}=await import('./access-control/guards');
+  return requireAccess('dashboard','view');
 }
 
 export async function isAdmin(userId: number) {
-  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { is_admin: true } });
-  return u?.is_admin === 1;
+  const {hasAccess}=await import('./access-control/guards');
+  return hasAccess(userId,'dashboard','view');
 }
 
 export async function adminStats() {

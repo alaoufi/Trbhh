@@ -42,7 +42,8 @@ export async function findMergeableAccount(identifier: string, selfUid: number):
   if (!u) return { ok: false, error: 'notfound' };
   if (u.id === selfUid) return { ok: false, error: 'self' };
   if (u.merged) return { ok: false, error: 'alreadymerged' };
-  if (u.is_admin === 1) return { ok: false, error: 'admin' };
+  const {isPrivilegedAccount}=await import('./auth-security');
+  if (await isPrivilegedAccount(u.id)) return { ok: false, error: 'admin' };
   return { ok: true, uid: u.id, phone: u.phone, name: u.name || u.userName || 'حساب' };
 }
 

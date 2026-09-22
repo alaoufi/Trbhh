@@ -1,5 +1,6 @@
+import { requireAdminPage } from '@/lib/access-control/guards';
 import { Star, MapPin, User } from 'lucide-react';
-import { requireAnyAdmin } from '@/lib/roles';
+
 import { getPlatformRating, getPlatformReviews } from '@/lib/platform-rating';
 import { timeAgo } from '@/lib/utils';
 
@@ -7,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'تقييمات المنصة' };
 
 export default async function AdminRatingsPage() {
-  await requireAnyAdmin();
+  await requireAdminPage('/admin/ratings');
   const [rating, reviews] = await Promise.all([getPlatformRating(), getPlatformReviews(300)]);
   const low = reviews.filter((r) => r.star < 3);
 

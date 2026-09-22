@@ -1,6 +1,7 @@
 import {describe,it,expect,vi,beforeEach} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {commerceConfigFromRows} from '@/lib/commerce/config';
+vi.mock('@/lib/finance/schema',()=>({financeSchemaAvailable:async()=>false}));
 const state=vi.hoisted(()=>({query:vi.fn(),tracking:vi.fn()}));
 vi.mock('@/lib/auth',()=>({requireUser:async()=>({uid:7})}));
 vi.mock('@/lib/prisma',()=>({prisma:{$queryRaw:state.query}}));

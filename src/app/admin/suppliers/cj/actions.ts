@@ -1,13 +1,13 @@
 'use server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { requireAction } from '@/lib/roles';
+import { requireAccess } from '@/lib/access-control/guards';
 import { setDefaultMarginBps } from '@/lib/cj/pricing';
 import { saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync';
 
 /** حفظ الهامش الافتراضي (٪) — للمشرف فقط. لا شراء ولا اتصال بمورّد هنا. */
 export async function saveCjMargin(form: FormData) {
-  await requireAction('suppliers', 'edit');
+  await requireAccess('pricing', 'manage_settings');
   const pct = Number(String(form.get('marginPercent') || '').trim());
   if (!Number.isFinite(pct) || pct < 0 || pct > 1000) redirect('/admin/suppliers/cj?error=margin');
   await setDefaultMarginBps(Math.round(pct * 100));
@@ -24,7 +24,7 @@ const numField = (form: FormData, name: string): number | undefined => {
 
 /** حفظ إعدادات مزامنة الكتالوج (تفعيل/حجم صفحة/عدد صفحات/صرف/شحن). */
 export async function saveCjSync(form: FormData) {
-  await requireAction('suppliers', 'edit');
+  await requireAccess('integrations', 'manage_settings');
   const rate = numField(form, 'usdToSar'); // يُدخَل بالريال (٣٫٧٥) ويُخزَّن ×١٠٠
   await saveCjSyncSettings({
     enabled: String(form.get('enabled') || '') === '1',
@@ -39,7 +39,7 @@ export async function saveCjSync(form: FormData) {
 
 /** مزامنة الآن (يدوية) — تتجاوز مفتاح الجدولة. قراءة فقط، لا شراء. */
 export async function runCjSync() {
-  await requireAction('suppliers', 'edit');
+  await requireAccess('integrations', 'sync');
   const r = await syncCjCatalog({ force: true });
   if (r.ok) redirect(`/admin/suppliers/cj?synced=1&imported=${r.imported}&pages=${r.pages}&skipped=${r.skipped}`);
   redirect(`/admin/suppliers/cj?syncerr=${encodeURIComponent(r.error)}`);

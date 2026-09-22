@@ -9,10 +9,10 @@ import { Search, X, SlidersHorizontal } from 'lucide-react';
  * opens a full-width search field overlaid on the header row, freeing the
  * header space for the "open your store" call-to-action.
  */
-export function HeaderSearch() {
+export function HeaderSearch({canAdminSearch=false}:{canAdminSearch?:boolean}) {
   const [open, setOpen] = useState(false);
   // داخل لوحة الإدارة يبحث في بيانات الإدارة فقط، وفي الموقع يبحث في الموقع فقط
-  const inAdmin = /^\/admin(\/|$)/.test(usePathname() || '');
+  const inAdmin = /^\/admin(\/|$)/.test(usePathname() || '') && canAdminSearch;
   const target = inAdmin ? '/admin/search' : '/search';
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {

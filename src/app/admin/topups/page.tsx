@@ -1,6 +1,9 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { HandCoins, Receipt, Clock, CheckCircle2, XCircle, User, ShieldAlert, Undo2 } from 'lucide-react';
-import { requireAction } from '@/lib/roles';
+
 import { listTopupsAdmin, findReceiptMatches } from '@/lib/wallet';
 import { mediaUrl } from '@/lib/media';
 import { approveTopupAction, rejectTopupAction, cancelTopupAction } from '../actions';
@@ -29,7 +32,7 @@ function fmt(iso: string | null) {
 const PAGE_SIZE = 20;
 
 export default async function AdminTopups({ searchParams }: { searchParams: Promise<{ tab?: string; source?: string; page?: string; check?: string; id?: string; batch?: string; a?: string; r?: string; p?: string; u?: string; tests?: string; count?: string }> }) {
-  await requireAction('users', 'edit');
+  await requireAdminPage('/admin/topups');
   const { tab: tabRaw, source: sourceRaw, page: pageRaw, check, id: checkedId } = await searchParams;
   const tab: Tab = (TABS.some((t) => t.key === tabRaw) ? tabRaw : 'pending') as Tab;
   const source = sourceRaw === 'online' ? 'online' : 'transfer';
@@ -55,21 +58,21 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
       {(check === 'unresolved' || check === 'unavailable' || check === 'invalid') && <div className="rounded-xl border-2 border-slate-300 bg-slate-50 p-3 text-sm font-bold text-slate-800">تعذر تنفيذ التحقق لهذه العملية. لم يتغير الرصيد ولم يتم اعتماد الطلب يدوياً.</div>}
 
       <div className="grid gap-2 sm:grid-cols-2">
-        <Link href="/admin/topups?source=transfer&tab=approved" className={`rounded-xl border-2 p-3 text-sm font-extrabold ${source === 'transfer' ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-card text-primary hover:bg-primary/5'}`}>
+        <AccessPage href="/admin/topups?source=transfer&tab=approved"><Link href="/admin/topups?source=transfer&tab=approved" className={`rounded-xl border-2 p-3 text-sm font-extrabold ${source === 'transfer' ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-card text-primary hover:bg-primary/5'}`}>
           <span className="block">الحوالات المؤكدة</span><span className="mt-1 block text-xs font-medium opacity-80">مراجعة التحويلات البنكية والإيصالات فقط</span>
-        </Link>
-        <Link href="/admin/topups?source=online&tab=all" className={`rounded-xl border-2 p-3 text-sm font-extrabold ${source === 'online' ? 'border-sky-600 bg-sky-600 text-white' : 'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100'}`}>
+        </Link></AccessPage>
+        <AccessPage href="/admin/topups?source=online&tab=all"><Link href="/admin/topups?source=online&tab=all" className={`rounded-xl border-2 p-3 text-sm font-extrabold ${source === 'online' ? 'border-sky-600 bg-sky-600 text-white' : 'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100'}`}>
           <span className="block">عمليات الشحن الإلكتروني</span><span className="mt-1 block text-xs font-medium opacity-80">نتائج البنك النهائية — بلا تدخل يدوي</span>
-        </Link>
+        </Link></AccessPage>
       </div>
 
       {/* تبويبات بحسب الحالة مع عدّاداتها */}
       <div className="flex flex-wrap gap-1.5 rounded-xl bg-secondary/40 p-1.5">
         {TABS.map((t) => (
-          <Link key={t.key} href={`/admin/topups?source=${source}&tab=${t.key}`} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold ${tab === t.key ? 'bg-primary text-white shadow' : 'text-muted-foreground hover:bg-white/60'}`}>
+          <AccessPage href={`/admin/topups?source=${source}&tab=${t.key}`} key={t.key}><Link key={t.key} href={`/admin/topups?source=${source}&tab=${t.key}`} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold ${tab === t.key ? 'bg-primary text-white shadow' : 'text-muted-foreground hover:bg-white/60'}`}>
             {t.label}
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold text-white ${t.cls}`}>{countOf[t.key]}</span>
-          </Link>
+          </Link></AccessPage>
         ))}
       </div>
 
@@ -156,27 +159,27 @@ export default async function AdminTopups({ searchParams }: { searchParams: Prom
             {r.status === 1 && r.source !== 'online' && (
               <details className="rounded-lg border border-slate-300">
                 <summary className="cursor-pointer list-none px-3 py-2 text-sm font-bold text-slate-700">↩ إلغاء التأكيد (سند مكرر/خطأ) — مع سبب…</summary>
-                <form action={cancelTopupAction} className="space-y-2 p-3">
+                <AccessBoundary module={'topups'} action={'refund'}><form action={cancelTopupAction} className="space-y-2 p-3">
                   <input type="hidden" name="id" value={r.id} />
                   <textarea name="reason" rows={2} required placeholder="سبب الإلغاء (إلزامي) — يُحفظ ويُرسل للعضو، مثال: إيصال مكرر سبق اعتماده في طلب #…" className="w-full rounded-lg border border-slate-300 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-slate-400" />
                   <ConfirmSubmit msg={`تأكيد إلغاء هذا الشحن؟ سيُخصم ${r.amount} ر.س من رصيد العضو فوراً (قد يصبح رصيده سالباً) ويصله سبب الإلغاء.`} className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">إلغاء التأكيد وخصم المبلغ</ConfirmSubmit>
-                </form>
+                </form></AccessBoundary>
               </details>
             )}
 
             {r.status === 0 && r.source !== 'online' && (
               <div className="space-y-2 border-t border-primary/10 pt-2">
-                <form action={approveTopupAction}>
+                <AccessBoundary module={'topups'} action={'approve'}><form action={approveTopupAction}>
                   <input type="hidden" name="id" value={r.id} />
                   <ConfirmSubmit msg="تأكيد وصول المبلغ وإضافته لرصيد العضو فوراً؟" className="btn-3d w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white sm:w-auto">✓ تأكيد وصول المبلغ وإضافته للرصيد</ConfirmSubmit>
-                </form>
+                </form></AccessBoundary>
                 <details className="rounded-lg border border-red-200">
                   <summary className="cursor-pointer list-none px-3 py-2 text-sm font-bold text-red-600">رفض الطلب (مع سبب)…</summary>
-                  <form action={rejectTopupAction} className="space-y-2 p-3">
+                  <AccessBoundary module={'topups'} action={'edit'}><form action={rejectTopupAction} className="space-y-2 p-3">
                     <input type="hidden" name="id" value={r.id} />
                     <textarea name="reason" rows={2} required defaultValue={dupMatches.has(r.id) ? 'رفض لتكرار رفع السند' : undefined} placeholder="سبب الرفض — يُحفظ ويُرسل للعضو" className="w-full rounded-lg border border-red-300 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-red-300" />
                     <ConfirmSubmit msg="تأكيد رفض طلب الشحن؟ سيصل العضو رسالة بالسبب المكتوب." className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white">رفض وإرسال السبب للعضو</ConfirmSubmit>
-                  </form>
+                  </form></AccessBoundary>
                 </details>
               </div>
             )}

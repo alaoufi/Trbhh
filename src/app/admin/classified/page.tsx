@@ -1,10 +1,13 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import { Sparkles, Trash2, ExternalLink, Play, Pause, Timer, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { getAllClassifieds, type AdminClassified } from '@/lib/classified';
 import { CLASSIFIED_THEMES } from '@/lib/classified-theme';
 import { getClassifiedLifetimeDays } from '@/lib/settings';
 import { timeAgo } from '@/lib/utils';
-import { requirePerm } from '@/lib/roles';
+
 import { adminDeleteClassifiedAction, toggleClassifiedAction, classifiedLifetimeAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
@@ -29,7 +32,7 @@ function StateChip({ c, globalDays }: { c: AdminClassified; globalDays: number }
 }
 
 export default async function AdminClassified() {
-  await requirePerm('classified');
+  await requireAdminPage('/admin/classified');
   const [items, globalDays] = await Promise.all([getAllClassifieds(120), getClassifiedLifetimeDays().catch(() => 0)]);
   // 💳 هل المبوّب مدفوع وكم؟ نطابق خصومات «إعلان مبوّب» لصاحبه: بالرقم في الملاحظة
   // (إعادة التفعيل) أو بتقارب وقت الخصم مع وقت إنشاء المبوّب (النشر الأول)
@@ -58,7 +61,7 @@ export default async function AdminClassified() {
       <div className="card-3d flex flex-wrap items-center gap-2 rounded-xl p-3 text-sm">
         <Timer className="h-4 w-4 shrink-0 text-primary" />
         <span>مدة البقاء الافتراضية: <b className="text-primary">{globalDays > 0 ? `${en(globalDays)} يوم` : 'بلا حد'}</b></span>
-        <Link href="/admin/settings" className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"><Settings className="h-3.5 w-3.5" /> تغييرها</Link>
+        <AccessPage href="/admin/settings"><Link href="/admin/settings" className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"><Settings className="h-3.5 w-3.5" /> تغييرها</Link></AccessPage>
         <span className="text-xs text-muted-foreground">— وتحديد مدة لإعلان بعينه أدناه يتغلّب على الافتراضية.</span>
       </div>
 
@@ -94,24 +97,24 @@ export default async function AdminClassified() {
 
               {/* تنشيط/تعطيل · مدة البقاء · حذف */}
               <div className="flex flex-wrap items-center gap-1.5">
-                <form action={toggleClassifiedAction}>
+                <AccessBoundary module={'classified'} action={'suspend'}><form action={toggleClassifiedAction}>
                   <input type="hidden" name="id" value={c.id} />
                   <input type="hidden" name="action" value={enabled ? 'disable' : 'enable'} />
                   {enabled
                     ? <ConfirmSubmit msg="تعطيل هذا المبوّب؟ يختفي من الموقع حتى تنشيطه." className="flex items-center gap-1 rounded-md border border-amber-400 px-2.5 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-50"><Pause className="h-3.5 w-3.5" /> تعطيل</ConfirmSubmit>
                     : <ConfirmSubmit msg="تنشيط هذا المبوّب؟ يعود للظهور فوراً." className="flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white"><Play className="h-3.5 w-3.5" /> تنشيط</ConfirmSubmit>}
-                </form>
+                </form></AccessBoundary>
 
-                <form action={classifiedLifetimeAction} className="flex items-center gap-1 rounded-md border border-primary/30 p-0.5">
+                <AccessBoundary module={'classified'} action={'edit'}><form action={classifiedLifetimeAction} className="flex items-center gap-1 rounded-md border border-primary/30 p-0.5">
                   <input type="hidden" name="id" value={c.id} />
                   <input name="days" type="number" min={0} max={3650} placeholder="أيام" title="مدة البقاء بالأيام من الآن (0 = حسب الافتراضية)" className="w-16 rounded bg-background px-1.5 py-1 text-xs" />
                   <button className="flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-xs font-bold text-primary"><Timer className="h-3.5 w-3.5" /> مدة</button>
-                </form>
+                </form></AccessBoundary>
 
-                <form action={adminDeleteClassifiedAction}>
+                <AccessBoundary module={'classified'} action={'delete'}><form action={adminDeleteClassifiedAction}>
                   <input type="hidden" name="id" value={c.id} />
                   <ConfirmSubmit msg="حذف هذا الإعلان المبوّب نهائياً؟ لا يمكن التراجع." className="flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف</ConfirmSubmit>
-                </form>
+                </form></AccessBoundary>
               </div>
             </div>
           );

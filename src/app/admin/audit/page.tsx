@@ -1,6 +1,7 @@
+import { AccessPage } from '@/components/access-boundary';
+import { requireAdminPage, hasAccess } from '@/lib/access-control/guards';
 import { ScrollText, User } from 'lucide-react';
 import Link from 'next/link';
-import { requireAction, hasAction } from '@/lib/roles';
 import { listAdminLog, countAdminLog } from '@/lib/audit';
 import { AdminPager } from '@/components/admin-pager';
 
@@ -16,10 +17,12 @@ function fmt(iso: string | null) {
 const PAGE_SIZE = 30;
 
 export default async function AdminAuditPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  const session = await requireAction('users', 'view');
-  // التفاصيل المالية (المبالغ) تظهر فقط لمن يملك صلاحية مالية (users:edit — نفس صلاحية
-  // تأكيد الشحن والمدفوعات)؛ يُحجب المبلغ عن المراقب الذي يملك العرض فقط.
-  const canSeeFinancial = await hasAction(session.uid, 'users', 'edit');
+  // الوصول للسجل يتطلب صلاحية «التدقيق» (audit:view) على مستوى الخادم.
+  const session = await requireAdminPage('/admin/audit');
+  // أما تفاصيل المبالغ في الأحداث المالية (رصيد/شحن/تسوية/استرداد/مدفوعات) فتظهر فقط
+  // لمن يملك صلاحية مالية أو صلاحية تدقيق مالي مناسبة (finance:view أو reconciliation:view)؛
+  // وتُحجب عن بقية المدقّقين — حماية على الخادم لا مجرد إخفاء في الواجهة.
+  const canSeeFinancial = (await hasAccess(session.uid, 'finance', 'view')) || (await hasAccess(session.uid, 'reconciliation', 'view'));
   const { page: pageRaw } = await searchParams;
   const page = Math.max(1, parseInt(pageRaw || '1') || 1);
   const [rows, total] = await Promise.all([listAdminLog(PAGE_SIZE, (page - 1) * PAGE_SIZE, { redactFinancial: !canSeeFinancial }), countAdminLog()]);
@@ -36,7 +39,7 @@ export default async function AdminAuditPage({ searchParams }: { searchParams: P
       <div className="space-y-2">
         {rows.map((r) => (
           <div key={r.id} className="card-3d flex flex-wrap items-center gap-2 rounded-xl p-3 text-sm">
-            <Link href={`/admin/users/${r.adminId}`} className="flex items-center gap-1 font-bold text-primary hover:underline"><User className="h-4 w-4" /> {r.adminName}</Link>
+            <AccessPage href={`/admin/users/${r.adminId}`}><Link href={`/admin/users/${r.adminId}`} className="flex items-center gap-1 font-bold text-primary hover:underline"><User className="h-4 w-4" /> {r.adminName}</Link></AccessPage>
             <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">{r.action}</span>
             {r.target && <span className="text-xs font-bold text-foreground/80">{r.target}</span>}
             {r.note && <span className="text-xs text-muted-foreground">— {r.note}</span>}

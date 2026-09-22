@@ -1,6 +1,6 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {getSession} from '@/lib/auth';
-import {hasAction} from '@/lib/roles';
+import {hasAccess} from '@/lib/access-control/guards';
 import {prisma} from '@/lib/prisma';
 import {supplierConfig} from '@/lib/suppliers/config';
 import {issueMerchantInvitation} from '@/lib/suppliers/merchant-oauth';
@@ -12,7 +12,7 @@ const headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer'};
 /** Administrative issuing endpoint. Never accepts caller-supplied admin identity. */
 export async function POST(request:NextRequest) {
   const session=await getSession();
-  if(!session||!await hasAction(session.uid,'suppliers','edit'))return NextResponse.json({error:'unauthorized'},{status:403,headers});
+  if(!session||!await hasAccess(session.uid,'integrations', 'authorize'))return NextResponse.json({error:'unauthorized'},{status:403,headers});
   try{
     const config=supplierConfig();
     if(request.headers.get('origin')!==config.origin)return NextResponse.json({error:'invalid_origin'},{status:403,headers});

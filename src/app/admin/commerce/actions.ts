@@ -2,7 +2,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { requireAction } from '@/lib/roles';
+import { requireAccess } from '@/lib/access-control/guards';
 import { COMMERCE_DEFAULTS, saudiCommercePhone } from '@/lib/commerce/config';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
@@ -13,7 +13,7 @@ import { dispatchPaidNotification } from '@/lib/commerce/notifications';
 import { getMessagingConfig, sendSms, sendWhatsApp } from '@/lib/sms';
 
 export async function saveCommerceSettings(form: FormData) {
-  const session = await requireAction('commerce', 'edit');
+  const session = await requireAccess('products', 'manage_settings');
   await assertCommerceSchemaReady(prisma);
   if (form.get('commerce_payments_enabled') === '1' && !(await getCommerceGateway())?.ready) {
     redirect('/admin/commerce?error=gateway_unverified');
@@ -36,7 +36,7 @@ export async function saveCommerceSettings(form: FormData) {
 
 export async function saveCommerceProduct(form: FormData) {
   const idRaw = String(form.get('id') || '');
-  const session = await requireAction('commerce', idRaw ? 'edit' : 'add');
+  const session = await requireAccess('products', idRaw ? 'edit' : 'create');
   if (idRaw && !/^[1-9]\d{0,14}$/.test(idRaw)) redirect('/admin/commerce?error=product');
   let data: ReturnType<typeof parseCommerceProduct>;
   let stockDelta: number;
@@ -64,7 +64,7 @@ export async function saveCommerceProduct(form: FormData) {
 }
 
 export async function deliverCommerceNotification(form: FormData) {
-  await requireAction('commerce', 'edit');
+  await requireAccess('notifications', 'create');
   if (form.get('confirm') !== '1') redirect('/admin/commerce?error=confirm');
   const id = String(form.get('id') || '');
   if (!/^[1-9]\d{0,14}$/.test(id)) redirect('/admin/commerce?error=notification');

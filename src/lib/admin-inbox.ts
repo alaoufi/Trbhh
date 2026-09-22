@@ -4,6 +4,11 @@ import { toInt } from './utils';
 
 /** The primary administration account that receives "message the admin" chats. */
 let cachedAdminId: number | null = null;
+/** Authorization callers must not turn an unavailable identity lookup into a public inbox. */
+export async function getPrimaryAdminIdStrict():Promise<number>{
+  const admin=await prisma.users.findFirst({where:{is_admin:1},orderBy:{id:'asc'},select:{id:true}});
+  return admin?toInt(admin.id):0;
+}
 export async function getPrimaryAdminId(): Promise<number> {
   if (cachedAdminId) return cachedAdminId;
   const admin = await prisma.users.findFirst({ where: { is_admin: 1 }, orderBy: { id: 'asc' }, select: { id: true } }).catch(() => null);

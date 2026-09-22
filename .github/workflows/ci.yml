@@ -58,22 +58,70 @@ jobs:
         run: pnpm test
 
       - name: Authentication transactions on isolated MySQL
+        if: ${{ !cancelled() }}
         run: pnpm exec vitest run tests/integration/auth-mysql.test.ts --maxWorkers=1
         env:
           AUTH_DB_TESTS: '1'
           AUTH_TEST_DATABASE_URL: mysql://ci:ci@127.0.0.1:33309/ci
 
       - name: Supplier selection transactions on isolated MySQL
+        if: ${{ !cancelled() }}
         run: pnpm exec vitest run tests/integration/supplier-selection-mysql.test.ts --maxWorkers=1
         env:
           AUTH_DB_TESTS: '1'
           AUTH_TEST_DATABASE_URL: mysql://ci:ci@127.0.0.1:33309/ci
 
       - name: Supplier order and coordinator transactions on isolated MySQL
+        if: ${{ !cancelled() }}
         run: pnpm exec vitest run --config vitest.suppliers.config.ts
         env:
           SUPPLIER_DB_TESTS: '1'
           SUPPLIER_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_supplier_test
 
+      - name: RBAC transactions on isolated MySQL
+        if: ${{ !cancelled() }}
+        run: pnpm exec vitest run --config vitest.access-control.config.ts
+        env:
+          RBAC_DB_TESTS: '1'
+          RBAC_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_rbac_test
+
+      - name: Finance transactions on isolated MySQL
+        if: ${{ !cancelled() }}
+        run: pnpm exec vitest run --config vitest.finance.config.ts
+        env:
+          FINANCE_DB_TESTS: '1'
+          FINANCE_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_finance_test
+
+      - name: Commerce transactions on isolated MySQL
+        if: ${{ !cancelled() }}
+        run: pnpm exec vitest run --config vitest.commerce.config.ts
+        env:
+          COMMERCE_DB_TESTS: '1'
+          COMMERCE_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_commerce_test
+
+      - name: Store catalog transactions on isolated MySQL
+        if: ${{ !cancelled() }}
+        run: pnpm exec vitest run tests/integration/store-products-mysql.test.ts --maxWorkers=1
+        env:
+          AUTH_DB_TESTS: '1'
+          AUTH_TEST_DATABASE_URL: mysql://ci:ci@127.0.0.1:33309/ci
+          STORE_DB_TESTS: '1'
+          STORE_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_store_test
+
+      - name: Category transactions on isolated MySQL
+        if: ${{ !cancelled() }}
+        run: pnpm exec vitest run --config vitest.categories.config.ts
+        env:
+          CATEGORIES_DB_TESTS: '1'
+          CATEGORIES_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_categories_test
+
+      - name: Search visibility on isolated MySQL
+        if: ${{ !cancelled() }}
+        run: pnpm exec vitest run --config vitest.search.config.ts
+        env:
+          SEARCH_VISIBILITY_MYSQL: '1'
+          SEARCH_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_search_visibility_test
+
       - name: Production build
+        if: ${{ !cancelled() }}
         run: pnpm build

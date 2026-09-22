@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ROLE_PRESET, ALL_KEYS, ALL_MATRIX_KEYS, MATRIX_LOCKED, SERVICES, MATRIX_ROLES } from '@/lib/roles';
+import {legacyPermission,SENSITIVE_KEYS} from '@/lib/access-control/catalog';
 
 // قاعدة العمل ٩: «مراقب متاجر تربّح» معزول تماماً في إدارة المتاجر.
 describe('عزل دور مراقب المتاجر', () => {
@@ -35,8 +36,9 @@ describe('قفل تعديل الإعلانات (خصوصية)', () => {
 });
 
 describe('سلامة تعريف الأدوار', () => {
-  it('المدير العام يملك كل المفاتيح', () => {
-    expect(ROLE_PRESET.manager).toEqual(ALL_KEYS);
+  it('القالب القديم لا يمنح الإجراءات الحساسة افتراضيًا', () => {
+    expect(ROLE_PRESET.manager.length).toBeGreaterThan(0);
+    for(const key of ROLE_PRESET.manager)expect(SENSITIVE_KEYS.has(legacyPermission(key)!)).toBe(false);
   });
   it('خدمة المتاجر موجودة ضمن الخدمات', () => {
     expect(SERVICES.some((s) => s.key === 'stores')).toBe(true);

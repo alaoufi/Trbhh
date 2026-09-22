@@ -11,7 +11,7 @@ type Item = { n: number; label: string; href: string; oldest: Date | null };
  * لكل بند، والمتأخر أكثر من ٢٤ ساعة يتلوّن أحمر داكناً. يستمر بالظهور حتى
  * تُعالَج كل البنود فيختفي تلقائياً.
  */
-export async function AdminAlertsBanner() {
+export async function AdminAlertsBanner({keys}: {keys: ReadonlySet<string>}) {
   const notArchived = { OR: [{ data_archive: null }, { data_archive: '' }] };
 
   // عدّاد + أقدم طلب لكل بند (لحساب وقت التأخير)
@@ -28,45 +28,45 @@ export async function AdminAlertsBanner() {
     pendingPromos,
     verifyOrders,
   ] = await Promise.all([
-    prisma.ads.count({ where: { status: 0, publish_at: null, paused_by_owner: 0, ...notArchived } }).catch(() => 0),
-    prisma.ads.findFirst({ where: { status: 0, publish_at: null, paused_by_owner: 0, ...notArchived }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
+    keys.has('ads:view') ? prisma.ads.count({ where: { status: 0, publish_at: null, paused_by_owner: 0, ...notArchived } }).catch(() => 0) : 0,
+    keys.has('ads:view') ? prisma.ads.findFirst({ where: { status: 0, publish_at: null, paused_by_owner: 0, ...notArchived }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
     // Electronic payments settle from the bank only; they are never an admin task.
-    prisma.wallet_topups.count({ where: { status: 0, NOT: { source: 'online' } } }).catch(() => 0),
-    prisma.wallet_topups.findFirst({ where: { status: 0, NOT: { source: 'online' } }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
+    keys.has('topups:view') ? prisma.wallet_topups.count({ where: { status: 0, NOT: { source: 'online' } } }).catch(() => 0) : 0,
+    keys.has('topups:view') ? prisma.wallet_topups.findFirst({ where: { status: 0, NOT: { source: 'online' } }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
     // نفس تعريف تبويب «بانتظار الموافقة» في صفحة التوثيق — المرفوض (step=2) ليس طلباً معلقاً
-    prisma.users.count({ where: { trusted: { not: 1 }, step: { not: 2 }, OR: [{ step: 1 }, { national_identity: { gt: 0 } }, { commercial_register: { gt: 0 } }, { work_permit: { gt: 0 } }] } }).catch(() => 0),
-    prisma.name_requests.count({ where: { status: 0, kind: 'user' } }).catch(() => 0),
-    prisma.name_requests.findFirst({ where: { status: 0, kind: 'user' }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
-    prisma.name_requests.count({ where: { status: 0, kind: 'store' } }).catch(() => 0),
-    prisma.name_requests.findFirst({ where: { status: 0, kind: 'store' }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
+    keys.has('verifications:view') ? prisma.users.count({ where: { trusted: { not: 1 }, step: { not: 2 }, OR: [{ step: 1 }, { national_identity: { gt: 0 } }, { commercial_register: { gt: 0 } }, { work_permit: { gt: 0 } }] } }).catch(() => 0) : 0,
+    keys.has('users:view') ? prisma.name_requests.count({ where: { status: 0, kind: 'user' } }).catch(() => 0) : 0,
+    keys.has('users:view') ? prisma.name_requests.findFirst({ where: { status: 0, kind: 'user' }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
+    keys.has('users:view') ? prisma.name_requests.count({ where: { status: 0, kind: 'store' } }).catch(() => 0) : 0,
+    keys.has('users:view') ? prisma.name_requests.findFirst({ where: { status: 0, kind: 'store' }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
     // البلاغات بانتظار إجراء (لم تُغلق بعد بحظر/حذف/تجاهل) — تُعالَج من صفحة البلاغات
-    prisma.repord_ads.count({ where: { status: 0 } }).catch(() => 0),
-    prisma.repord_ads.findFirst({ where: { status: 0 }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
-    prisma.stores.count({ where: { status: 0 } }).catch(() => 0),
-    prisma.stores.findFirst({ where: { status: 0 }, orderBy: { id: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
-    prisma.store_transfers.count({ where: { status: 1 } }).catch(() => 0),
-    prisma.store_transfers.findFirst({ where: { status: 1 }, orderBy: { id: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
-    import('@/lib/admin-inbox').then((m) => m.countAdminUnread()).catch(() => 0),
-    import('@/lib/admin-inbox').then(async (m) => {
+    keys.has('reports:view') ? prisma.repord_ads.count({ where: { status: 0 } }).catch(() => 0) : 0,
+    keys.has('reports:view') ? prisma.repord_ads.findFirst({ where: { status: 0 }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
+    keys.has('stores:view') ? prisma.stores.count({ where: { status: 0 } }).catch(() => 0) : 0,
+    keys.has('stores:view') ? prisma.stores.findFirst({ where: { status: 0 }, orderBy: { id: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
+    keys.has('stores:view') ? prisma.store_transfers.count({ where: { status: 1 } }).catch(() => 0) : 0,
+    keys.has('stores:view') ? prisma.store_transfers.findFirst({ where: { status: 1 }, orderBy: { id: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
+    keys.has('messages:view') ? import('@/lib/admin-inbox').then((m) => m.countAdminUnread()).catch(() => 0) : 0,
+    keys.has('messages:view') ? import('@/lib/admin-inbox').then(async (m) => {
       const adminId = await m.getPrimaryAdminId().catch(() => 0);
       if (!adminId) return null;
       const r = await prisma.chats.findFirst({ where: { reciver_id: adminId, is_read: 0 }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).catch(() => null);
       return r?.created_at ?? null;
-    }).catch(() => null),
-    import('@/lib/promos').then((m) => m.countPendingPromos()).catch(() => 0),
-    import('@/lib/verify-paid').then((m) => m.countPendingVerifyOrders()).catch(() => ({ n: 0, oldest: null })),
+    }).catch(() => null) : null,
+    keys.has('promos:view') ? import('@/lib/promos').then((m) => m.countPendingPromos()).catch(() => 0) : 0,
+    keys.has('stores:view') ? import('@/lib/verify-paid').then((m) => m.countPendingVerifyOrders()).catch(() => ({ n: 0, oldest: null })) : {n:0,oldest:null},
   ]);
 
   // سندات شحن مكرَّرة (تطابق سند سابق) بانتظار المراجعة — مقارنة البصمات مكلفة
   // نسبياً فتُخزَّن مؤقتاً لدقيقة واحدة بدل إعادة حسابها في كل تحميل صفحة إدارية
-  const dupTopups = await cached('admin:dup-topups-count', 60, () =>
+  const dupTopups = keys.has('topups:view') ? await cached('admin:dup-topups-count', 60, () =>
     import('@/lib/wallet').then((m) => m.countPendingDupTopups()).catch(() => 0),
-  );
+  ) : 0;
 
   // حظر آلي بانتظار مراجعتكم (فكّ الحظر أو الإبقاء عليه) — يبقى ظاهراً حتى تُبتّ فيه، لا يزول بمرور الوقت
   const [newBans, oldestNewBan] = await Promise.all([
-    prisma.mod_log.count({ where: { action: 'banned', reviewed_at: null } }).catch(() => 0),
-    prisma.mod_log.findFirst({ where: { action: 'banned', reviewed_at: null }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null),
+    keys.has('reports:view') ? prisma.mod_log.count({ where: { action: 'banned', reviewed_at: null } }).catch(() => 0) : 0,
+    keys.has('reports:view') ? prisma.mod_log.findFirst({ where: { action: 'banned', reviewed_at: null }, orderBy: { created_at: 'asc' }, select: { created_at: true } }).then((r) => r?.created_at ?? null).catch(() => null) : null,
   ]);
 
   const items: Item[] = [

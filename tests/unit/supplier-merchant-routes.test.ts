@@ -2,7 +2,7 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {NextRequest} from 'next/server';
 const state=vi.hoisted(()=>({session:vi.fn(),permission:vi.fn(),parse:vi.fn(),context:vi.fn(),start:vi.fn(),issue:vi.fn(),complete:vi.fn(),sync:vi.fn(),failure:vi.fn(),cookie:vi.fn()}));
 vi.mock('@/lib/auth',()=>({getSession:state.session}));
-vi.mock('@/lib/roles',()=>({hasAction:state.permission}));
+vi.mock('@/lib/access-control/guards',()=>({hasAccess:state.permission}));
 vi.mock('@/lib/prisma',()=>({prisma:{}}));
 vi.mock('next/headers',()=>({cookies:async()=>({get:state.cookie})}));
 vi.mock('@/lib/suppliers/merchant-oauth',()=>({parseMerchantInvitation:state.parse,parseMerchantContext:state.context,startMerchantOAuth:state.start,issueMerchantInvitation:state.issue}));
@@ -86,7 +86,7 @@ describe('owner callback independent of admin login',()=>{
  beforeEach(()=>state.cookie.mockImplementation((name:string)=>name==='salla_merchant_context'?{value:'signed-context'}:name==='salla_oauth_browser'?{value:'b'.repeat(64)}:undefined));
  it('completes from a guest browser only with signed context and active issuer permission',async()=>{
   const response=await callback(request());expect(response.status).toBe(200);const body=await response.text();expect(body).toContain('تم ربط متجرك');expect(body).toContain('<!doctype html>');expect(response.headers.get('location')).toBeNull();
-  expect(state.permission).toHaveBeenCalledWith(7,'suppliers','edit');expect(state.complete).toHaveBeenCalledWith({},expect.objectContaining({adminId:7n,merchantContext:'signed-context',state:'verified'}),expect.anything());
+  expect(state.permission).toHaveBeenCalledWith(7,'integrations','authorize');expect(state.complete).toHaveBeenCalledWith({},expect.objectContaining({adminId:7n,merchantContext:'signed-context',state:'verified'}),expect.anything());
   expect(state.sync).toHaveBeenCalledWith({},2n,expect.anything());
   expect(response.headers.get('set-cookie')).toContain('salla_merchant_context=;');expect(response.headers.get('set-cookie')).toContain('Max-Age=0');
  });

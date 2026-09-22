@@ -1,7 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { requireAction } from '@/lib/roles';
+import { requireAccess } from '@/lib/access-control/guards';
 import { prisma } from '@/lib/prisma';
 import { parseSupplier, parseSupplierProduct } from '@/lib/commerce/supplier-input';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
@@ -9,7 +9,7 @@ import { normalizeStoreCoordinatorPhone } from '@/lib/suppliers/coordinator';
 
 export async function saveSupplier(form: FormData) {
   const rawId = String(form.get('id') || '');
-  const session = await requireAction('suppliers', rawId ? 'edit' : 'add');
+  const session = await requireAccess('suppliers', rawId ? 'edit' : 'create');
   if (rawId && !/^[1-9]\d{0,14}$/.test(rawId)) redirect('/admin/suppliers?error=fields');
   let data: ReturnType<typeof parseSupplier>;
   try { data = parseSupplier(form); } catch { redirect('/admin/suppliers?error=fields'); }
@@ -37,7 +37,7 @@ export async function saveSupplier(form: FormData) {
 }
 
 export async function saveSupplierProduct(form: FormData) {
-  const session = await requireAction('suppliers', 'edit');
+  const session = await requireAccess('products', 'edit');
   let data: ReturnType<typeof parseSupplierProduct>;
   try { data = parseSupplierProduct(form); } catch { redirect('/admin/suppliers?error=mapping'); }
   try {
@@ -59,7 +59,7 @@ export async function saveSupplierProduct(form: FormData) {
 /** Separate from the supplier/account phone and every Salla credential. An
  * empty value explicitly removes the operational coordinator. */
 export async function saveStoreCoordinator(form:FormData){
-  const session=await requireAction('suppliers','edit');
+  const session=await requireAccess('suppliers', 'edit');
   const rawId=String(form.get('coordinatorSupplierId')||'');
   if(!/^[1-9]\d{0,14}$/.test(rawId))redirect('/admin/suppliers?error=coordinator');
   let phone:string;
@@ -98,7 +98,7 @@ function deleteRedirect(error: unknown): never {
 
 /** Destructive step one: remove source/catalog products only when no order history exists. */
 export async function deleteSupplierProducts(form: FormData) {
-  const session = await requireAction('suppliers', 'delete');
+  const session = await requireAccess('products', 'delete');
   let id: bigint, confirmName: string;
   try { id = supplierId(form); confirmName = confirmed(form, 'حذف منتجات المورد'); } catch (error) { deleteRedirect(error); }
   try {
@@ -130,7 +130,7 @@ export async function deleteSupplierProducts(form: FormData) {
 
 /** Destructive step two: delete the supplier only after its products and history are both empty. */
 export async function deleteSupplier(form: FormData) {
-  const session = await requireAction('suppliers', 'delete');
+  const session = await requireAccess('suppliers', 'delete');
   let id: bigint, confirmName: string;
   try { id = supplierId(form); confirmName = confirmed(form, 'حذف المورد نهائياً'); } catch (error) { deleteRedirect(error); }
   try {

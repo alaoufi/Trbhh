@@ -2,7 +2,7 @@ import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest';
 import {NextRequest} from 'next/server';
 const state=vi.hoisted(()=>({session:vi.fn(),permission:vi.fn(),cookie:vi.fn(),complete:vi.fn(),sync:vi.fn(),failure:vi.fn()}));
 vi.mock('@/lib/auth',()=>({getSession:state.session}));
-vi.mock('@/lib/roles',()=>({hasAction:state.permission}));
+vi.mock('@/lib/access-control/guards',()=>({hasAccess:state.permission}));
 vi.mock('next/headers',()=>({cookies:async()=>({get:state.cookie})}));
 vi.mock('@/lib/prisma',()=>({prisma:{}}));
 vi.mock('@/lib/suppliers/connections',()=>({completeOAuth:state.complete,recordOAuthFailure:state.failure}));
@@ -16,7 +16,7 @@ describe('Salla callback route boundary',()=>{
   state.session.mockResolvedValue(null);expect((await GET(request())).status).toBe(403);expect(state.permission).not.toHaveBeenCalled();expect(state.complete).not.toHaveBeenCalled();
  });
  it('requires supplier edit permission',async()=>{
-  state.permission.mockResolvedValue(false);expect((await GET(request())).status).toBe(403);expect(state.permission).toHaveBeenCalledWith(7,'suppliers','edit');expect(state.complete).not.toHaveBeenCalled();
+  state.permission.mockResolvedValue(false);expect((await GET(request())).status).toBe(403);expect(state.permission).toHaveBeenCalledWith(7,'integrations','authorize');expect(state.complete).not.toHaveBeenCalled();
  });
  it('passes server admin/browser identity and redirects only to configured origin',async()=>{
   const response=await GET(request());expect(response.status).toBe(303);expect(response.headers.get('location')).toBe('https://configured.example/admin/suppliers/integrations?result=connected');

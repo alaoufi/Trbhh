@@ -10,7 +10,8 @@ describe('private live Al Rajhi top-up', () => {
     expect(existsSync(file)).toBe(true);
     const source = readFileSync(file, 'utf8');
     const formSource = readFileSync(resolve(root, 'src/app/admin/payments/private-topup/private-topup-form.tsx'), 'utf8');
-    expect(source).toContain("requireAction('users', 'edit')");
+    expect(source).toContain("requireAdminPage('/admin/payments/private-topup')");
+    expect(source).toContain("module={'payments'} action={'manage_settings'}");
     expect(source).toContain('index: false');
     expect(source).toContain('startAlrajhiPrivateTopupAction');
     expect(formSource).toContain('dir="ltr"');

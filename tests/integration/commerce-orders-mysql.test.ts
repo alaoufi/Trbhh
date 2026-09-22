@@ -46,11 +46,13 @@ async function prepared(key='fixture-request-0001') {
 describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
   beforeAll(async()=>{
     const url=new URL(raw||'');
-    if(url.protocol!=='mysql:'||url.hostname!=='127.0.0.1'||url.port!=='33309'||url.pathname!=='/trbhh_commerce_test'||url.search||url.hash) throw new Error('Refusing non-isolated commerce DB');
+    if(url.protocol!=='mysql:'||url.hostname!=='127.0.0.1'||url.port!=='33309'||url.pathname!=='/trbhh_commerce_test'||url.search||url.hash||url.username!=='root'||!url.password) throw new Error('Refusing non-isolated commerce DB');
     client=new PrismaClient({datasourceUrl:url.href,log:[]});
     url.pathname='/mysql';admin=new PrismaClient({datasourceUrl:url.href,log:[]});
     // Never overwrite/reuse an existing database. Cleanup only after this succeeds.
     await admin.$executeRawUnsafe('CREATE DATABASE trbhh_commerce_test');created=true;
+    expect((await client.$queryRaw<{name:string}[]>`SELECT DATABASE() AS name`)[0].name).toBe('trbhh_commerce_test');
+    await client.$executeRawUnsafe('CREATE TABLE site_settings (k VARCHAR(60) NOT NULL PRIMARY KEY,v TEXT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin');
     for(const ddl of COMMERCE_DDL) await client.$executeRawUnsafe(ddl);
     for(const ddl of SUPPLIER_DDL) await client.$executeRawUnsafe(ddl);
     await assertCommerceSchemaReady(client);
@@ -63,6 +65,17 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
   beforeEach(async()=>{
     for(const table of ['commerce_supplier_accruals','commerce_receipts','commerce_order_suppliers','commerce_product_suppliers','commerce_suppliers','commerce_notifications','commerce_audit_events','commerce_payment_attempts','commerce_order_items','commerce_orders','commerce_products']) await client.$executeRawUnsafe(`DELETE FROM ${table}`);
     await client.$executeRaw`INSERT INTO commerce_products (id,title,price_minor,stock_available,stock_reserved,approved,visible,enabled) VALUES (1,'Fixture product',1025,10,0,1,1,1),(2,'Second product',200,0,0,1,1,1)`;
+    // The service's purchasing gate is exercised against this newly-created
+    // disposable loopback database, never bypassed or changed in production.
+    await client.$executeRaw`DELETE FROM site_settings`;
+    await client.$executeRaw`INSERT INTO site_settings(k,v) VALUES('commerce_purchasing_enabled','1')`;
+  });
+  it.each(['missing','0','false','true'])('fails closed for purchasing gate %s before writing or reserving stock',async flag=>{
+    await client.$executeRaw`DELETE FROM site_settings WHERE k='commerce_purchasing_enabled'`;
+    if(flag!=='missing')await client.$executeRaw`INSERT INTO site_settings(k,v) VALUES('commerce_purchasing_enabled',${flag})`;
+    await expect(createOrder(client,input(),policy)).rejects.toThrow('purchasing_disabled');
+    expect(await count('commerce_orders')).toBe(0);
+    expect((await client.$queryRaw<{stock_available:number;stock_reserved:number}[]>`SELECT stock_available,stock_reserved FROM commerce_products WHERE id=1`)[0]).toEqual({stock_available:10,stock_reserved:0});
   });
   it('atomically reserves once for concurrent identical request keys and snapshots server totals',async()=>{
     const orders=await Promise.all([createOrder(client,input(),policy),createOrder(client,input(),policy)]);

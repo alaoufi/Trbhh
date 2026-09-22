@@ -10,7 +10,7 @@ import { getSession } from '@/lib/auth';
 import { ProfileSwitcher } from '@/components/profile-switcher';
 import { getUserProfiles, getActiveProfile } from '@/lib/profiles';
 import { linkedAccounts } from '@/lib/account-links';
-import { hasAnyAdmin } from '@/lib/roles';
+import { hasAccess } from '@/lib/access-control/guards';
 import { recordStoreVisit, classifySource, getStoreViews } from '@/lib/store-analytics';
 import { getBalance } from '@/lib/wallet';
 import { storeHiddenByOwnerBan } from '@/lib/moderation';
@@ -79,7 +79,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
 
   const session = await getSession().catch(() => null);
   const isOwner = !!session && s.userId === session.uid;
-  const admin = session ? await hasAnyAdmin(session.uid).catch(() => false) : false;
+  const admin = session ? await hasAccess(session.uid, 'stores', 'view').catch(() => false) : false;
   const meta = await getStoreMeta(storeId);
   // approval gate: pending/suspended stores aren't public. Instead of a bare 404,
   // show a friendly status page (e.g. when a merchant previews a store still under review).

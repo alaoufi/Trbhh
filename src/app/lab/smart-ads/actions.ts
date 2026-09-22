@@ -7,7 +7,7 @@ import { confirmDynamicDraftEntity } from '@/lib/dynamic-ads/repository';
 import { validateDynamicValues } from '@/lib/dynamic-ads/schema';
 
 export async function analyseSmartAdAction(formData: FormData) {
-  const session = await requireSmartAdsLab();
+  const session = await requireSmartAdsLab('create');
   const title = String(formData.get('title') || '').trim();
   const description = String(formData.get('description') || '').trim();
   if (!title) redirect('/lab/smart-ads?error=title');
@@ -29,7 +29,7 @@ export async function analyseSmartAdAction(formData: FormData) {
 }
 
 export async function confirmSmartAdEntityAction(formData: FormData) {
-  const session = await requireSmartAdsLab();
+  const session = await requireSmartAdsLab('edit');
   const draftId = Number(formData.get('draft_id'));
   const entityId = Number(formData.get('entity_id'));
   if (!Number.isSafeInteger(draftId) || !Number.isSafeInteger(entityId)) redirect('/lab/smart-ads');

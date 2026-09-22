@@ -4,7 +4,7 @@ import { open, readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { statLocal, statInDir } from '@/lib/storage';
 import { isHeicBytes, heicBytesToJpeg } from '@/lib/upload-normalize';
-import { isPotentiallyProtectedUploadPath, isProtectedUploadType } from '@/lib/media-access';
+import { isCanonicalMediaPath, isPotentiallyProtectedUploadPath, isProtectedUploadType } from '@/lib/media-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -80,8 +80,8 @@ async function protectedMediaCacheControl(rel: string): Promise<string | null> {
   if (!session) return null;
   if (upload.user_id === session.uid) return 'private, no-store';
 
-  const { hasAction } = await import('@/lib/roles');
-  return (await hasAction(session.uid, 'verifications', 'view').catch(() => false)) ? 'private, no-store' : null;
+  const { hasAccess } = await import('@/lib/access-control/guards');
+  return (await hasAccess(session.uid, 'verifications', 'view').catch(() => false)) ? 'private, no-store' : null;
 }
 
 const IMG_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp', 'tif', 'tiff']);
@@ -117,6 +117,7 @@ async function serveConvertedHeic(abs: string, ext: string, cacheControl: string
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const { path: parts } = await params;
   const rel = parts.join('/');
+  if (!isCanonicalMediaPath(rel)) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
   const ext = rel.split('.').pop()?.toLowerCase() || '';
   const contentType = TYPES[ext] || 'application/octet-stream';
   const cacheControl = await protectedMediaCacheControl(rel);

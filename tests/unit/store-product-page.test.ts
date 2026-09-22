@@ -9,7 +9,7 @@ vi.mock('@/lib/data', () => ({ getAd: m.ad, recordView: async () => {} }));
 vi.mock('@/lib/stores', () => ({ getStore: m.store }));
 vi.mock('@/lib/merchant', () => ({ getStoreMeta: m.meta, storeProductAdIds: m.products, collaboratorAds: m.partners, storeIdByHandle: async () => 1 }));
 vi.mock('@/lib/auth', () => ({ getSession: m.session }));
-vi.mock('@/lib/roles', () => ({ hasAnyAdmin: m.admin }));
+vi.mock('@/lib/access-control/guards', () => ({ hasAccess: m.admin }));
 vi.mock('@/lib/subscription', () => ({ isStoreSubBlocked: m.sub }));
 vi.mock('@/lib/moderation', async (original) => ({ ...await original<object>(), storeHiddenByOwnerBan: m.ban }));
 vi.mock('@/lib/prisma', () => ({ prisma: { stores: { findUnique: m.storeRow }, ads: { findUnique: m.adRow }, users: { findUnique: m.ownerRow }, site_settings: { findMany: m.settings }, store_products: { findFirst: m.membership } } }));

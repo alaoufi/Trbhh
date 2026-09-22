@@ -1,8 +1,11 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import { getAuditUxSettings } from '@/lib/settings';
 import { AUDIT_UX_FLAGS, AUDIT_UX_TEXTS } from '@/lib/ux-settings';
 import Link from 'next/link';
 import { Settings, Check, BarChart3, Eye, ChevronDown } from 'lucide-react';
-import { requireAction } from '@/lib/roles';
+
 import { getMemberWindows, getMsgDeleteMinutes, getSettingBool, getSettingNum, getClassifiedStatsAudience, getClassifiedLifetimeDays, getClassifiedSplashSeconds, getAppConfig, getHomeStats, HOME_STAT_KEYS, HOME_STAT_LABELS, SETTING_ADS_APPROVAL, getDupThresholds, getClassifiedDupConfig, getAdLifetimeDays, getStrikeBanDays, getStoreShield } from '@/lib/settings';
 import { getIdentityPlans, getExemptDays } from '@/lib/identity-plans';
 import { Button } from '@/components/ui/button';
@@ -26,7 +29,7 @@ function Group({ title, children, open = false }: { title: React.ReactNode; chil
 }
 
 export default async function AdminSettings({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
-  await requireAction('users', 'edit');
+  await requireAdminPage('/admin/settings');
   const auditUx = await getAuditUxSettings();
   const [{ saved, error: saveError }, w, msgDeleteMin, homeStats, statsAudience, classifiedDays, splashSeconds, adsApproval, appCfg, dupThresholds, cdup, pushOn, suggestOn, savedSearchOn, matchNotifyOn, storeReportOn, scheduleOn, bumpOn, adContactStatsOn, couponsOn, stockOn, hoursOn, dealsOn, autoRenewOn, auctionOn, staffOn, nameLockOn, homeActionsOn, archiveAutodeleteOn, platformRatingOn, adLifetimeDays, strikeBanDays, maxProfiles, identityPlans, identityExemptDays, maxStores, scheduleMaxDays, storeShieldOn, adReviewsOn, requestsMarketOn] = await Promise.all([searchParams, getMemberWindows(), getMsgDeleteMinutes(), getHomeStats(), getClassifiedStatsAudience(), getClassifiedLifetimeDays(), getClassifiedSplashSeconds(), getSettingBool(SETTING_ADS_APPROVAL, false), getAppConfig(), getDupThresholds(), getClassifiedDupConfig(), getSettingBool('push_on', false), getSettingBool('search_suggest_on', true), getSettingBool('saved_search_on', true), getSettingBool('match_notify_on', false), getSettingBool('store_report_on', false), getSettingBool('schedule_on', false), getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('coupons_on', false), getSettingBool('stock_on', false), getSettingBool('hours_on', false), getSettingBool('deals_on', false), getSettingBool('autorenew_on', false), getSettingBool('auction_on', false), getSettingBool('staff_on', false), getSettingBool('namelock_on', true), getSettingBool('home_actions_on', true), getSettingBool('archive_autodelete_on', false), getSettingBool('platform_rating_on', true), getAdLifetimeDays(), getStrikeBanDays(), getSettingNum('max_profiles', 5), getIdentityPlans(), getExemptDays(), getSettingNum('max_stores', 3), getSettingNum('schedule_max_days', 30), getStoreShield(), getSettingBool('ad_reviews_on', true), getSettingBool('requests_market_on', true)]);
   return (
@@ -39,7 +42,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
       {saved === '1' && <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800"><Check className="h-4 w-4" /> تم الحفظ.</div>}
       {saveError === 'save' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر حفظ الإعدادات — سُجِّل الخطأ في «سجل الأخطاء». حاول مجدداً.</div>}
 
-      <form action={saveSettingsAction} className="space-y-2 rounded-xl border border-primary/20 bg-card p-4">
+      <AccessBoundary module={'settings'} action={'manage_settings'}><form action={saveSettingsAction} className="space-y-2 rounded-xl border border-primary/20 bg-card p-4">
         <Group title="البحث وتجربة الزائر وإعداد المتجر">
           {AUDIT_UX_FLAGS.map(([key, label]) => <label key={key} className="flex items-center gap-2 text-sm"><input type="checkbox" name={key} defaultChecked={auditUx.flags[key]} className="h-4 w-4 accent-primary" />{label}</label>)}
           {AUDIT_UX_TEXTS.map(([key, label]) => <label key={key} className="block space-y-1 text-sm"><span>{label}</span><textarea name={key} defaultValue={auditUx.texts[key]} rows={key === 'store_landing_features' ? 4 : 2} maxLength={1000} className="w-full rounded-lg border bg-background p-2" /></label>)}
@@ -70,7 +73,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
           <input name="maxStores" type="number" min={0} defaultValue={maxStores} className="h-11 w-full rounded-lg border border-primary/30 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
           <span className="block text-xs text-muted-foreground">كم متجراً يستطيع العضو فتحه تحت حسابه الموحّد (تعدّد المتاجر). 0 = بلا حد. لكل متجر اشتراكه الشهري المستقل.</span>
         </label>
-        <div className="rounded-lg border border-amber-300 bg-amber-50/40 p-3">
+        <AccessBoundary module="pricing" action="manage_settings"><div className="rounded-lg border border-amber-300 bg-amber-50/40 p-3">
           <div className="mb-1 text-sm font-bold text-amber-800">باقات الهويات الإضافية (الحساب الرئيسي مجاني)</div>
           <p className="mb-2 text-xs text-muted-foreground">على الحسابات الشخصية فقط — المتاجر مستثناة (لها اشتراكها الشهري المستقل). ٣ باقات، كل باقة عدد حسابات + أسعار المدد. سعر 0 لأي مدة = تلك المدة غير معروضة. الميزة مجانية بالكامل ما لم تضع عدد حسابات وسعراً.</p>
           {identityPlans.map((pl) => (
@@ -95,7 +98,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
             <input name="identityExemptDays" type="number" min={0} defaultValue={identityExemptDays} className="h-9 w-full rounded border border-primary/30 px-2 text-sm" />
             <span className="block text-[11px] text-muted-foreground">مدة إعفاء الهويات الموجودة من الاشتراك (١٨٠ = ٦ أشهر). تُوضَّح للعضو أثناء الربط.</span>
           </label>
-        </div>
+        </div></AccessBoundary>
         </Group>
 
         <Group title={<><BarChart3 className="h-4 w-4" /> إحصائيات الصفحة الرئيسية</>}>
@@ -251,7 +254,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
           </label>
           <p className="mt-2 text-xs text-muted-foreground">
             رسوم إعادة إظهار الإعلان المؤرشف — ضمن كل التسعير الآن في{' '}
-            <Link href="/admin/revenue?tab=pricing#restore-fee" className="font-bold text-primary underline">الإيرادات ← كل التسعير</Link>.
+            <AccessPage href="/admin/revenue?tab=pricing#restore-fee"><Link href="/admin/revenue?tab=pricing#restore-fee" className="font-bold text-primary underline">الإيرادات ← كل التسعير</Link></AccessPage>.
           </p>
         </Group>
 
@@ -287,10 +290,10 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
 
         {/* كل تسعير في تربح — باقات، اشتراكات، عاجل وتمييز، استعادة المؤرشف… — تبويب واحد */}
         <div className="border-t border-primary/15 pt-3">
-          <Link href="/admin/revenue?tab=pricing" className="flex items-center justify-between gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
+          <AccessPage href="/admin/revenue?tab=pricing"><Link href="/admin/revenue?tab=pricing" className="flex items-center justify-between gap-2 rounded-xl border-2 border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
             <span>💳 كل التسعير — الباقات والاشتراكات وأرصدة الأعضاء</span>
             <span className="text-xs text-muted-foreground">إدارة الإيرادات ←</span>
-          </Link>
+          </Link></AccessPage>
         </div>
 
         {/* التطبيقات (أندرويد/آيفون): المتاجر والتحديث الإجباري */}
@@ -335,7 +338,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
         </Group>
 
         <Button>حفظ</Button>
-      </form>
+      </form></AccessBoundary>
     </div>
   );
 }

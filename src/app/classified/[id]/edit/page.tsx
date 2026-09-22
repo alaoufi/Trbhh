@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
-import { hasAnyAdmin } from '@/lib/roles';
+import { hasAccess } from '@/lib/access-control/guards';
 import { getClassifiedById } from '@/lib/classified';
 import { ClassifiedForm } from '@/components/classified-form';
 import { updateClassifiedAction } from '../../actions';
@@ -16,7 +16,7 @@ export default async function EditClassifiedPage({
   const [{ id }, { error, price, bal, left }] = await Promise.all([params, searchParams]);
   const c = await getClassifiedById(Number(id));
   if (!c) notFound();
-  const admin = await hasAnyAdmin(session.uid).catch(() => false);
+  const admin = await hasAccess(session.uid, 'classified', 'edit').catch(() => false);
   if (c.userId !== session.uid && !admin) redirect('/account/classified');
   return (
     <div className="space-y-4">

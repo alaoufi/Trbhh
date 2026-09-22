@@ -13,7 +13,7 @@ import { SITE } from '@/lib/constants';
 import { getAd, recordView } from '@/lib/data';
 import { getStore } from '@/lib/stores';
 import { getSession } from '@/lib/auth';
-import { hasAnyAdmin } from '@/lib/roles';
+import { hasAccess } from '@/lib/access-control/guards';
 import { getStoreMeta } from '@/lib/merchant';
 import { storeProductAccess } from '@/lib/store-product-access';
 import { formatPrice, timeAgo } from '@/lib/utils';
@@ -66,7 +66,7 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
   const { storeId } = access;
   const session = await getSession().catch(() => null);
   const isOwner = !!session && access.ownerId === session.uid;
-  const admin = session ? await hasAnyAdmin(session.uid).catch(() => false) : false;
+  const admin = session ? await hasAccess(session.uid, 'stores', 'view').catch(() => false) : false;
   if (!access.publicVisible && !isOwner && !admin) notFound();
   const [s, ad] = await Promise.all([getStore(storeId), getAd(access.productId)]);
   if (!s || !ad) notFound();

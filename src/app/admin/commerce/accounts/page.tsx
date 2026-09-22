@@ -1,6 +1,8 @@
+import { AccessPage } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { requireAction } from '@/lib/roles';
+
 import { prisma } from '@/lib/prisma';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { formatSar } from '@/lib/commerce/money';
@@ -12,7 +14,7 @@ type Accrual = { id: bigint; order_id: bigint; product_id: bigint; supplier_id: 
 const date = (value: Date) => value.toLocaleString('ar-SA', { timeZone: 'Asia/Riyadh', dateStyle: 'short', timeStyle: 'short' });
 
 export default async function Accounts({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAction('commerce', 'view');
+  await requireAdminPage('/admin/commerce/accounts');
   const query = await searchParams;
   const raw = query.supplier;
   if (raw !== undefined && raw !== '' && (typeof raw !== 'string' || !/^[1-9]\d{0,14}$/.test(raw))) notFound();
@@ -30,10 +32,10 @@ export default async function Accounts({ searchParams }: { searchParams: Promise
   return <div className="space-y-4">
     <h1 className="text-xl font-bold text-primary">إيصالات السلع واستحقاقات الموردين</h1>
     <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">سجل تشغيلي داخلي للقراءة فقط، وليس نظام محاسبة نظاميًا متكاملًا. الإيصال يسجل دفعة العميل المتحقق منها بنكيًا؛ استحقاق المورد ينتظر التسوية خارج الموقع ولا يثبت تحويل مستحقاته.</p>
-    <nav className="flex gap-4 text-primary underline"><Link href="/admin/commerce">السلع والطلبات</Link><Link href="/admin/suppliers">الموردون</Link></nav>
+    <nav className="flex gap-4 text-primary underline"><AccessPage href="/admin/commerce"><Link href="/admin/commerce">السلع والطلبات</Link></AccessPage><AccessPage href="/admin/suppliers"><Link href="/admin/suppliers">الموردون</Link></AccessPage></nav>
     <form method="get" action="/admin/commerce/accounts" className="card-3d flex flex-wrap items-end gap-3 rounded-xl p-4">
       <label className="text-sm">تصفية برقم المورد<input name="supplier" inputMode="numeric" pattern="[1-9][0-9]{0,14}" defaultValue={supplierId?.toString() || ''} className="mt-1 block min-h-10 rounded-lg border border-primary/25 px-3" /></label>
-      <button className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">تصفية</button><Link href="/admin/commerce/accounts" className="text-primary underline">عرض الكل</Link>
+      <button className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">تصفية</button><AccessPage href="/admin/commerce/accounts"><Link href="/admin/commerce/accounts" className="text-primary underline">عرض الكل</Link></AccessPage>
     </form>
     <nav aria-label="صفحات الإيصالات والاستحقاقات" className="flex flex-wrap items-center gap-4 text-primary">
       {page > 1 && <Link className="underline" href={pageHref(page - 1)}>الصفحة السابقة</Link>}
@@ -43,12 +45,12 @@ export default async function Accounts({ searchParams }: { searchParams: Promise
     <section className="card-3d overflow-x-auto rounded-xl p-4"><h2 className="font-bold">إيصالات دفعات العملاء — الصفحة {page}</h2>
       <p className="my-2 text-xs">عند اختيار مورد، يظهر إجمالي إيصال الطلب الذي يتضمن سلعه؛ هذا الإجمالي ليس نصيب المورد وقد يشمل سلعًا أخرى ورسوم توصيل.</p>
       <table className="w-full text-right text-sm"><thead><tr><th>الإيصال</th><th>الطلب</th><th>المزود والمرجع</th><th>دفعة العميل</th><th>وقت التسجيل</th></tr></thead>
-        <tbody>{receipts.map(r => <tr key={r.id.toString()} className="border-t"><td className="py-2">{r.id.toString()}</td><td><Link className="text-primary underline" href={`/admin/commerce/orders/${r.order_id}`}>#{r.order_id.toString()}</Link></td><td><bdi>{r.provider} · {r.provider_ref}</bdi></td><td>{formatSar(r.amount_minor)} {r.currency}</td><td>{date(r.recorded_at)}</td></tr>)}</tbody>
+        <tbody>{receipts.map(r => <tr key={r.id.toString()} className="border-t"><td className="py-2">{r.id.toString()}</td><td><AccessPage href={`/admin/commerce/orders/${r.order_id}`}><Link className="text-primary underline" href={`/admin/commerce/orders/${r.order_id}`}>#{r.order_id.toString()}</Link></AccessPage></td><td><bdi>{r.provider} · {r.provider_ref}</bdi></td><td>{formatSar(r.amount_minor)} {r.currency}</td><td>{date(r.recorded_at)}</td></tr>)}</tbody>
       </table>{!receipts.length && <p className="py-3 text-sm">لا توجد إيصالات مطابقة.</p>}
     </section>
     <section className="card-3d overflow-x-auto rounded-xl p-4"><h2 className="font-bold">استحقاقات الموردين — الصفحة {page}</h2>
       <table className="mt-3 w-full text-right text-sm"><thead><tr><th>القيد</th><th>الطلب / السلعة</th><th>المورد وقت الطلب</th><th>الاستحقاق</th><th>التسوية الخارجية</th><th>وقت التسجيل</th></tr></thead>
-        <tbody>{accruals.map(a => <tr key={a.id.toString()} className="border-t"><td className="py-2">{a.id.toString()}</td><td><Link className="text-primary underline" href={`/admin/commerce/orders/${a.order_id}`}>#{a.order_id.toString()}</Link> / {a.product_id.toString()}</td><td>#{a.supplier_id.toString()} {a.supplier_name}</td><td>{formatSar(a.amount_minor)} {a.currency}</td><td>{a.status === 'offline_pending' ? 'بانتظار التسوية خارج الموقع' : 'حالة تحتاج مراجعة داخلية'}</td><td>{date(a.created_at)}</td></tr>)}</tbody>
+        <tbody>{accruals.map(a => <tr key={a.id.toString()} className="border-t"><td className="py-2">{a.id.toString()}</td><td><AccessPage href={`/admin/commerce/orders/${a.order_id}`}><Link className="text-primary underline" href={`/admin/commerce/orders/${a.order_id}`}>#{a.order_id.toString()}</Link></AccessPage> / {a.product_id.toString()}</td><td>#{a.supplier_id.toString()} {a.supplier_name}</td><td>{formatSar(a.amount_minor)} {a.currency}</td><td>{a.status === 'offline_pending' ? 'بانتظار التسوية خارج الموقع' : 'حالة تحتاج مراجعة داخلية'}</td><td>{date(a.created_at)}</td></tr>)}</tbody>
       </table>{!accruals.length && <p className="py-3 text-sm">لا توجد استحقاقات مطابقة.</p>}
     </section>
   </div>;

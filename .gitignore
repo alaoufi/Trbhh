@@ -48,3 +48,7 @@ scratchpad/
 # Generated local component preview (rebuilt by tests/visual/public-home-preview.cjs)
 /docs/screenshots/public-home/fixture*
 /docs/screenshots/public-home/index.html
+
+# Reproducible local finance fixture output; retain reviewed screenshots only.
+/docs/screenshots/finance/fixture*
+/docs/screenshots/finance/*.html

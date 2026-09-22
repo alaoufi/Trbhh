@@ -1,10 +1,13 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import Image from 'next/image';
 import { UserPen, Check, XCircle, FileText, ExternalLink } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { mediaUrl } from '@/lib/media';
-import { requirePerm } from '@/lib/roles';
+
 import { approveNameRequestAction, rejectNameRequestAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
@@ -20,7 +23,7 @@ type Tab = (typeof TABS)[number]['k'];
 const STATUS_OF: Record<Tab, number> = { pending: 0, approved: 1, rejected: 2 };
 
 export default async function AdminNameRequests({ searchParams }: { searchParams: Promise<{ view?: string; done?: string }> }) {
-  await requirePerm('users');
+  await requireAdminPage('/admin/name-requests');
   const { view, done } = await searchParams;
   const tab: Tab = (TABS.some((t) => t.k === view) ? view : 'pending') as Tab;
 
@@ -53,9 +56,9 @@ export default async function AdminNameRequests({ searchParams }: { searchParams
         <div className="flex items-center gap-2"><UserPen className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold text-primary">طلبات تغيير الاسم</h1></div>
         <div className="flex flex-wrap gap-2">
           {TABS.map((t) => (
-            <Link key={t.k} href={`/admin/name-requests${t.k === 'pending' ? '' : `?view=${t.k}`}`} className={tabCls(t.k)}>
+            <AccessPage href={`/admin/name-requests${t.k === 'pending' ? '' : `?view=${t.k}`}`} key={t.k}><Link key={t.k} href={`/admin/name-requests${t.k === 'pending' ? '' : `?view=${t.k}`}`} className={tabCls(t.k)}>
               {t.l} {counts[t.k] > 0 && <span className={`mr-1 rounded-full px-1.5 text-xs text-white ${badgeCls[t.k]}`}>{counts[t.k]}</span>}
-            </Link>
+            </Link></AccessPage>
           ))}
         </div>
       </div>
@@ -75,7 +78,7 @@ export default async function AdminNameRequests({ searchParams }: { searchParams
             <div key={toInt(r.id)} className="card-3d overflow-hidden rounded-2xl border-2 border-primary/25">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-primary/15 bg-primary/5 px-4 py-3">
                 <div>
-                  <Link href={`/admin/users/${toInt(r.user_id)}`} className="font-extrabold text-primary hover:underline">{u?.name || u?.userName || `عضو #${toInt(r.user_id)}`}</Link>
+                  <AccessPage href={`/admin/users/${toInt(r.user_id)}`}><Link href={`/admin/users/${toInt(r.user_id)}`} className="font-extrabold text-primary hover:underline">{u?.name || u?.userName || `عضو #${toInt(r.user_id)}`}</Link></AccessPage>
                   <div className="text-xs text-muted-foreground" dir="ltr">{u?.phoneNumber} · {timeAgo(r.created_at ? r.created_at.toISOString() : null)}</div>
                 </div>
                 <span className={`rounded-full px-3 py-1 text-xs font-bold ${r.kind === 'storeact' ? 'bg-amber-100 text-amber-800' : r.kind === 'store' ? 'bg-teal-100 text-teal-800' : 'bg-primary/10 text-primary'}`}>{r.kind === 'storeact' ? '🏷️ نشاط متجر' : r.kind === 'store' ? '🏪 اسم متجر' : '👤 اسم عضو'}</span>
@@ -124,20 +127,20 @@ export default async function AdminNameRequests({ searchParams }: { searchParams
                 {/* الإجراءات */}
                 {r.status === 0 && (
                   <div className="space-y-2 border-t border-primary/10 pt-3">
-                    <form action={approveNameRequestAction}>
+                    <AccessBoundary module={'users'} action={'edit'}><form action={approveNameRequestAction}>
                       <input type="hidden" name="id" value={toInt(r.id)} />
                       <ConfirmSubmit msg="تأكيد الموافقة على تغيير الاسم؟ يُطبَّق الاسم الجديد فوراً وتصل العضو رسالة." className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">
                         <Check className="h-4 w-4" /> الموافقة (يُطبَّق الاسم فوراً + رسالة للعضو)
                       </ConfirmSubmit>
-                    </form>
-                    <form action={rejectNameRequestAction} className="space-y-2 rounded-xl border-2 border-amber-300 bg-amber-50/60 p-3">
+                    </form></AccessBoundary>
+                    <AccessBoundary module={'users'} action={'edit'}><form action={rejectNameRequestAction} className="space-y-2 rounded-xl border-2 border-amber-300 bg-amber-50/60 p-3">
                       <input type="hidden" name="id" value={toInt(r.id)} />
                       <label className="block text-sm font-extrabold text-amber-800">سبب الرفض — يُحفظ ويصل العضو برسالة</label>
                       <textarea name="note" required rows={2} maxLength={250} placeholder="مثال: المستند لا يُظهر الاسم الجديد بوضوح — أرفق مستنداً أوضح…" className="w-full rounded-lg border-2 border-amber-300 bg-white p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-amber-400" />
                       <ConfirmSubmit msg="تأكيد رفض طلب تغيير الاسم؟ سيصل العضو السبب المكتوب." className="flex items-center gap-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700">
                         <XCircle className="h-4 w-4" /> رفض الطلب
                       </ConfirmSubmit>
-                    </form>
+                    </form></AccessBoundary>
                   </div>
                 )}
               </div>

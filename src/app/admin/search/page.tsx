@@ -1,6 +1,8 @@
+import { AccessPage } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { Search, Users, Megaphone, Store, Sparkles, PanelsTopLeft } from 'lucide-react';
-import { getUserPerms, requireAnyAdmin } from '@/lib/roles';
+import { readActorAccess } from '@/lib/access-control/guards';
 import { findAdminServices } from '@/lib/admin-service-search';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
@@ -27,37 +29,37 @@ function adTab(a: { status: number; paused_by_owner: number; adsSpecial: string;
 /** بحث الإدارة: يبحث في حقول الإدارة فقط، وكل نتيجة تعرض مكانها في الإدارة
  *  (الصفحة والتبويب) مع رابط الانتقال إليه، ومكان عرضها في صفحات الموقع. */
 export default async function AdminSearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const session = await requireAnyAdmin();
+  const session = await requireAdminPage('/admin/search');
   await ensureSchema();
   const { q: qRaw } = await searchParams;
   const q = (qRaw || '').trim();
   const TAKE = 10;
-  const permissions = await getUserPerms(session.uid);
+  const { keys: permissions } = await readActorAccess(session.uid);
   const services = q.length >= 2 ? findAdminServices(q, permissions) : [];
 
   type MemberRow = { id: bigint; name: string | null; userName: string | null; phoneNumber: string | null; ban: string | null };
   const memberWhere = memberSearchSql(q);
   const [users, ads, stores, classifieds] = q.length >= 2
     ? await Promise.all([
-        prisma.$queryRawUnsafe<MemberRow[]>(
+        permissions.has('users:view') ? prisma.$queryRawUnsafe<MemberRow[]>(
           `SELECT id, name, userName, phoneNumber, ban FROM users WHERE archived_at IS NULL AND (${memberWhere.sql}) ORDER BY id DESC LIMIT ${TAKE}`,
           ...memberWhere.args,
-        ).catch(() => [] as MemberRow[]),
-        prisma.ads.findMany({
+        ).catch(() => [] as MemberRow[]) : [],
+        permissions.has('ads:view') ? prisma.ads.findMany({
           where: { OR: [{ title: { contains: q } }, ...(/^\d+$/.test(q) ? [{ id: BigInt(q) }] : [])] },
           select: { id: true, title: true, status: true, paused_by_owner: true, adsSpecial: true, data_archive: true },
           orderBy: { id: 'desc' }, take: TAKE,
-        }).catch(() => []),
-        prisma.stores.findMany({
+        }).catch(() => []) : [],
+        permissions.has('stores:view') ? prisma.stores.findMany({
           where: { OR: [{ store_name: { contains: q } }, { store_username: { contains: q } }] },
           select: { id: true, store_name: true, status: true },
           orderBy: { id: 'desc' }, take: TAKE,
-        }).catch(() => []),
-        prisma.classified_ads.findMany({
+        }).catch(() => []) : [],
+        permissions.has('classified:view') ? prisma.classified_ads.findMany({
           where: { OR: [{ title: { contains: q } }, { body: { contains: q } }] },
           select: { id: true, title: true, body: true, status: true },
           orderBy: { id: 'desc' }, take: TAKE,
-        }).catch(() => []),
+        }).catch(() => []) : [],
       ])
     : [[], [], [], []];
   const linkedCounts = await linkedAccountCounts(users.map((u) => toInt(u.id)));
@@ -99,8 +101,8 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
                 </div>
                 <div className="text-[11px] text-muted-foreground">عضو #{toInt(u.id)} · الحسابات الموحدة: {linkedCounts.get(toInt(u.id)) ?? 1}</div>
                 <div className="flex flex-wrap gap-1.5">
-                  <Link href={`/admin/users/${toInt(u.id)}`} className={chipAdmin}>📌 فتح ملف العضو</Link>
-                  <Link href={`/admin/users/${toInt(u.id)}#wallet`} className={chipAdmin}>💳 فتح المحفظة</Link>
+                  <AccessPage href={`/admin/users/${toInt(u.id)}`}><Link href={`/admin/users/${toInt(u.id)}`} className={chipAdmin}>📌 فتح ملف العضو</Link></AccessPage>
+                  {permissions.has('wallets:view') && <AccessPage href={`/admin/revenue?tab=wallets&user=${toInt(u.id)}`}><Link href={`/admin/revenue?tab=wallets&user=${toInt(u.id)}`} className={chipAdmin}>💳 فتح المحفظة</Link></AccessPage>}
                   <Link href={`/users/${toInt(u.id)}`} className={chipSite}>🌐 في الموقع: صفحة العضو</Link>
                 </div>
               </div>
@@ -119,7 +121,7 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
                     <span className="shrink-0 text-xs text-muted-foreground">#{toInt(a.id)}</span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    <Link href={`/admin/ads?view=${t}&q=${toInt(a.id)}`} className={chipAdmin}>📌 في الإدارة: الإعلانات ← تبويب «{AD_TABS[t]}»</Link>
+                    <AccessPage href={`/admin/ads?view=${t}&q=${toInt(a.id)}`}><Link href={`/admin/ads?view=${t}&q=${toInt(a.id)}`} className={chipAdmin}>📌 في الإدارة: الإعلانات ← تبويب «{AD_TABS[t]}»</Link></AccessPage>
                     {published
                       ? <Link href={`/ads/${toInt(a.id)}`} className={chipSite}>🌐 في الموقع: صفحة الإعلان (القوائم والبحث)</Link>
                       : <Link href={`/ads/${toInt(a.id)}`} className={chipOff}>🚫 لا يظهر للزوار — عرض صفحته (إدارة)</Link>}
@@ -138,7 +140,7 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
                   <span className="text-xs text-muted-foreground">#{toInt(s.id)}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  <Link href="/admin/stores" className={chipAdmin}>📌 في الإدارة: إدارة المتاجر ← بطاقة المتجر</Link>
+                  <AccessPage href="/admin/stores"><Link href="/admin/stores" className={chipAdmin}>📌 في الإدارة: إدارة المتاجر ← بطاقة المتجر</Link></AccessPage>
                   {s.status === 1
                     ? <Link href={`/companies/${toInt(s.id)}`} className={chipSite}>🌐 في الموقع: صفحة المتجر ودليل المتاجر</Link>
                     : <span className={chipOff}>🚫 غير معتمد — لا يظهر في الموقع بعد</span>}
@@ -156,7 +158,7 @@ export default async function AdminSearchPage({ searchParams }: { searchParams: 
                   <span className="shrink-0 text-xs text-muted-foreground">#{toInt(c.id)}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  <Link href="/admin/classified" className={chipAdmin}>📌 في الإدارة: الإعلانات المبوّبة</Link>
+                  <AccessPage href="/admin/classified"><Link href="/admin/classified" className={chipAdmin}>📌 في الإدارة: الإعلانات المبوّبة</Link></AccessPage>
                   {c.status === 1
                     ? <Link href="/classified" className={chipSite}>🌐 في الموقع: صفحة المبوّبة وشاشة الافتتاح والرئيسية</Link>
                     : <span className={chipOff}>🚫 موقوف — لا يظهر في الموقع</span>}

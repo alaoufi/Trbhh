@@ -1,0 +1,47 @@
+name: Finance and RBAC release operations
+on:
+  workflow_call:
+    inputs:
+      phase:
+        type: string
+        default: inspect
+  workflow_dispatch:
+    inputs:
+      phase:
+        type: choice
+        options: [inspect]
+        default: inspect
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
+jobs:
+  operate:
+    if: github.ref == 'refs/heads/codex/finance-tax-audit-20260922' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read-only inspected production state
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$VPS_HOST"; test -n "$VPS_USER"; test -n "$VPS_SSH_KEY"; test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/finance_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          port=${VPS_PORT:-22}; [[ "$port" =~ ^[0-9]+$ ]]
+          SSH=(ssh -i ~/.ssh/finance_key -p "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=25 -o ServerAliveInterval=15)
+          target="$VPS_USER@$VPS_HOST"
+          "${SSH[@]}" "$target" 'set -eu; cd /root/trbhh; printf "CHECKOUT="; git rev-parse HEAD; git status --short; docker compose ps; id=$(docker compose ps -q app); docker inspect -f "IMAGE={{.Image}} RUNNING={{.State.Running}}" "$id"; docker exec "$id" cat /app/.next/BUILD_ID; df -h /root; find /root/trbhh-release-backups -maxdepth 2 -name VERIFIED -printf "%h\n" | sort | tail -8'
+          "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/finance-runtime-inspect.cjs

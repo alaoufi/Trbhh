@@ -1,6 +1,9 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { Store, Check, X, Home, ShieldAlert, Pause, Play, Users, Star, Megaphone, Phone, Mail, Link2, IdCard, CalendarDays, FileCheck2, AlertTriangle, UserCog } from 'lucide-react';
-import { requireAction, hasAction } from '@/lib/roles';
+import { hasAction } from '@/lib/roles';
 import { getPendingStores, adminStoreList, approvedTransfers, type AdminStore } from '@/lib/merchant';
 import { getStoresCommsLog, type StoreComm } from '@/lib/audit';
 import { timeAgo } from '@/lib/utils';
@@ -80,11 +83,11 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
           {s.ownerTrusted && (
             <details className="mt-1 rounded-lg border border-slate-300 bg-white">
               <summary className="cursor-pointer list-none px-2 py-1 text-[11px] font-bold text-slate-700">↩ إلغاء توثيق المتجر (علامة التوثيق فقط — بسبب)…</summary>
-              <form action={storeUntrustAction} className="flex items-center gap-1 border-t border-slate-200 p-1.5">
+              <AccessBoundary module={'stores'} action={'edit'}><form action={storeUntrustAction} className="flex items-center gap-1 border-t border-slate-200 p-1.5">
                 <input type="hidden" name="userId" value={s.userId} />
                 <input name="reason" required maxLength={300} placeholder="سبب الإلغاء (إلزامي — يصل صاحب المتجر)" className="h-8 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs outline-none" />
                 <ConfirmSubmit msg="تأكيد إلغاء توثيق المتجر؟ تُسحب علامة «موثّق» فقط — المتجر وإعلاناته لا تتأثر إطلاقاً، ويصل صاحبه السبب، والمدفوع يُسترد له غير المستخدم تلقائياً." className="shrink-0 rounded-lg bg-slate-700 px-2.5 py-1.5 text-[11px] font-bold text-white">إلغاء التوثيق</ConfirmSubmit>
-              </form>
+              </form></AccessBoundary>
             </details>
           )}
         </div>
@@ -102,7 +105,7 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
               ? <b className={new Date(s.showUntil) > new Date() ? 'text-emerald-700' : 'text-red-600'}>مدفوع حتى {fmtDate(s.showUntil)}{new Date(s.showUntil) > new Date() ? '' : ' (منتهٍ)'}</b>
               : <b className="text-muted-foreground">غير معروض</b>}
         </div>
-        <div className="sm:col-span-2 text-[11px] text-muted-foreground">من وافق ومتى؟ كل قرارات الاعتماد والتوثيق والمنح والعرض تُسجَّل باسم صاحب الصلاحية في <Link href="/admin/audit" className="font-bold text-primary underline">سجل النشاط</Link>.</div>
+        <div className="sm:col-span-2 text-[11px] text-muted-foreground">من وافق ومتى؟ كل قرارات الاعتماد والتوثيق والمنح والعرض تُسجَّل باسم صاحب الصلاحية في <AccessPage href="/admin/audit"><Link href="/admin/audit" className="font-bold text-primary underline">سجل النشاط</Link></AccessPage>.</div>
       </div>
 
       {/* المعلومات الكاملة */}
@@ -174,37 +177,37 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
       <div className="flex flex-wrap items-center gap-2">
         {s.status === 0 && (
           <>
-            <form action={approveStoreAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="approve" /><ConfirmSubmit msg="تأكيد اعتماد هذا المتجر؟ سيُفعَّل ويصل صاحبه إشعار." className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد</ConfirmSubmit></form>
-            <form action={approveStoreAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="reject" /><ConfirmSubmit msg="تأكيد رفض طلب هذا المتجر؟" className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit></form>
+            <AccessBoundary module={'stores'} action={'approve'}><form action={approveStoreAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="approve" /><ConfirmSubmit msg="تأكيد اعتماد هذا المتجر؟ سيُفعَّل ويصل صاحبه إشعار." className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> اعتماد</ConfirmSubmit></form></AccessBoundary>
+            <AccessBoundary module={'stores'} action={'approve'}><form action={approveStoreAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="reject" /><ConfirmSubmit msg="تأكيد رفض طلب هذا المتجر؟" className="flex items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit></form></AccessBoundary>
           </>
         )}
         {s.status === 1 && (
           <>
             {/* الإيقاف لا يُحفظ إلا بسبب مكتوب — يُعرض مع تاريخ ووقت الإيقاف. */}
-            <form action={toggleStoreStatusAction} className="flex items-center gap-1 rounded-lg border border-red-200 p-0.5"><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend" /><input name="reason" required maxLength={300} placeholder="سبب الإيقاف (إلزامي)" title="سبب الإيقاف — إلزامي، يُحفظ ويُعرض مع تاريخ ووقت الإيقاف" className="w-32 rounded bg-background px-1.5 py-1 text-xs" /><ConfirmSubmit msg="إيقاف مؤقت لهذا المتجر بالسبب المكتوب؟ يختفي متجره ومنتجاته ويُمنع النشر منه — من يفتحه يرى «المتجر غير نشط حالياً، أعد المحاولة لاحقاً» حتى إعادة التفعيل." className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف مؤقت</ConfirmSubmit></form>
-            <form action={toggleStoreStatusAction} className="flex items-center gap-1 rounded-lg border border-red-300 p-0.5"><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend_perm" /><input name="reason" required maxLength={300} placeholder="سبب الإيقاف (إلزامي)" title="سبب الإيقاف النهائي — إلزامي، يُحفظ ويُعرض مع تاريخ ووقت الإيقاف" className="w-32 rounded bg-background px-1.5 py-1 text-xs" /><ConfirmSubmit msg="إيقاف نهائي لهذا المتجر بالسبب المكتوب؟ يُمنع النشر والتصفّح — من يفتحه يرى «لا يوجد متجر نشط بهذا الاسم». يمكن إعادة تفعيله لاحقاً من هنا." className="flex items-center gap-1 rounded-lg bg-red-800 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف نهائي</ConfirmSubmit></form>
-            <form action={requestStoreHomeAction}><input type="hidden" name="storeId" value={s.id} /><button className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white"><Home className="h-3.5 w-3.5" /> اطلب للرئيسية</button></form>
+            <AccessBoundary module={'stores'} action={'suspend'}><form action={toggleStoreStatusAction} className="flex items-center gap-1 rounded-lg border border-red-200 p-0.5"><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend" /><input name="reason" required maxLength={300} placeholder="سبب الإيقاف (إلزامي)" title="سبب الإيقاف — إلزامي، يُحفظ ويُعرض مع تاريخ ووقت الإيقاف" className="w-32 rounded bg-background px-1.5 py-1 text-xs" /><ConfirmSubmit msg="إيقاف مؤقت لهذا المتجر بالسبب المكتوب؟ يختفي متجره ومنتجاته ويُمنع النشر منه — من يفتحه يرى «المتجر غير نشط حالياً، أعد المحاولة لاحقاً» حتى إعادة التفعيل." className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف مؤقت</ConfirmSubmit></form></AccessBoundary>
+            <AccessBoundary module={'stores'} action={'suspend'}><form action={toggleStoreStatusAction} className="flex items-center gap-1 rounded-lg border border-red-300 p-0.5"><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="suspend_perm" /><input name="reason" required maxLength={300} placeholder="سبب الإيقاف (إلزامي)" title="سبب الإيقاف النهائي — إلزامي، يُحفظ ويُعرض مع تاريخ ووقت الإيقاف" className="w-32 rounded bg-background px-1.5 py-1 text-xs" /><ConfirmSubmit msg="إيقاف نهائي لهذا المتجر بالسبب المكتوب؟ يُمنع النشر والتصفّح — من يفتحه يرى «لا يوجد متجر نشط بهذا الاسم». يمكن إعادة تفعيله لاحقاً من هنا." className="flex items-center gap-1 rounded-lg bg-red-800 px-3 py-1.5 text-xs font-bold text-white"><Pause className="h-3.5 w-3.5" /> إيقاف نهائي</ConfirmSubmit></form></AccessBoundary>
+            <AccessBoundary module={'stores'} action={'edit'}><form action={requestStoreHomeAction}><input type="hidden" name="storeId" value={s.id} /><button className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white"><Home className="h-3.5 w-3.5" /> اطلب للرئيسية</button></form></AccessBoundary>
           </>
         )}
         {(s.status === 2 || s.status === 3) && (
-          <form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="activate" /><ConfirmSubmit msg="تأكيد إعادة تفعيل هذا المتجر؟ يعود للظهور فوراً." className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Play className="h-3.5 w-3.5" /> إعادة تفعيل</ConfirmSubmit></form>
+          <AccessBoundary module={'stores'} action={'suspend'}><form action={toggleStoreStatusAction}><input type="hidden" name="storeId" value={s.id} /><input type="hidden" name="action" value="activate" /><ConfirmSubmit msg="تأكيد إعادة تفعيل هذا المتجر؟ يعود للظهور فوراً." className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Play className="h-3.5 w-3.5" /> إعادة تفعيل</ConfirmSubmit></form></AccessBoundary>
         )}
       </div>
 
       {/* منح أيام مجانية (تمديد التجربة أو تعويض) */}
-      <form action={grantStoreDaysAction} className="flex items-center gap-2 rounded-xl border-2 border-indigo-200 bg-indigo-50/40 p-2">
+      <AccessBoundary module={'stores'} action={'edit'}><form action={grantStoreDaysAction} className="flex items-center gap-2 rounded-xl border-2 border-indigo-200 bg-indigo-50/40 p-2">
         <input type="hidden" name="storeId" value={s.id} />
         <span className="shrink-0 text-xs font-bold text-indigo-700">🎁 منح أيام:</span>
         <input name="days" type="number" min={1} required placeholder="عدد الأيام" className="h-9 w-28 min-w-0 rounded-lg border bg-white px-2 text-xs outline-none" />
         <ConfirmSubmit msg="تأكيد منح الأيام المدخلة لهذا المتجر مجاناً؟" className="flex shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white">منح / تمديد التجربة</ConfirmSubmit>
-      </form>
+      </form></AccessBoundary>
 
       {/* إنذار مخالفة منتجات */}
-      <form action={warnStoreAction} className="flex items-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50/40 p-2">
+      <AccessBoundary module={'stores'} action={'suspend'}><form action={warnStoreAction} className="flex items-center gap-2 rounded-xl border-2 border-amber-200 bg-amber-50/40 p-2">
         <input type="hidden" name="storeId" value={s.id} />
         <input name="reason" required maxLength={300} placeholder="سبب الإنذار (منتج مخالف…)" className="h-9 min-w-0 flex-1 rounded-lg border bg-white px-2 text-xs outline-none" />
         <ConfirmSubmit msg="تأكيد تسجيل إنذار على هذا المتجر بالسبب المكتوب؟ يُحفظ في سجله ويصل صاحبه." className="flex shrink-0 items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white"><ShieldAlert className="h-3.5 w-3.5" /> إنذار</ConfirmSubmit>
-      </form>
+      </form></AccessBoundary>
 
       {/* ⚠ رسائل رسمية سابقة — ظاهرة هنا مباشرة (لا داخل السجل المطوي) حتى لا يكرّر مسؤول آخر نفس الرسالة */}
       {priorMsgs.length > 0 && (
@@ -221,18 +224,18 @@ function StoreCard({ s, comms = [] }: { s: AdminStore; comms?: StoreComm[] }) {
       )}
 
       {/* ✉️ رسالة رسمية من إدارة المتاجر لصاحب المتجر — تصله في «الرسائل» باسم الإدارة */}
-      <form action={adminMessageStoreOwnerAction} className="flex items-center gap-2 rounded-xl border-2 border-sky-200 bg-sky-50/40 p-2">
+      <AccessBoundary module={'stores'} action={'view'}><form action={adminMessageStoreOwnerAction} className="flex items-center gap-2 rounded-xl border-2 border-sky-200 bg-sky-50/40 p-2">
         <input type="hidden" name="storeId" value={s.id} />
         <input name="message" required maxLength={1000} placeholder="✉️ رسالة رسمية من إدارة المتاجر لصاحب المتجر…" className="h-9 min-w-0 flex-1 rounded-lg border bg-white px-2 text-xs outline-none" />
         <button className="flex shrink-0 items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white">إرسال رسمي</button>
-      </form>
+      </form></AccessBoundary>
 
     </div>
   );
 }
 
 export default async function AdminStores({ searchParams }: { searchParams: Promise<{ msg?: string; vbal?: string; q?: string; suspenderr?: string }> }) {
-  const session = await requireAction('stores', 'view');
+  const session = await requireAdminPage('/admin/stores');
   // صلاحية التعديل (الموافقة/الرفض/الإلغاء تتطلّب stores:edit) — نُخفي أزرار الإجراء
   // عمّن يملك العرض فقط بدل إظهار أزرار تُعيده صفحة «لا صلاحية» بصمت عند الضغط.
   const canEdit = await hasAction(session.uid, 'stores', 'edit').catch(() => false);
@@ -259,7 +262,7 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
             {verifyPkgs.length > 0
               ? verifyPkgs.map((pkg) => <span key={pkg.idx} className="rounded-full bg-white px-2 py-0.5 text-sky-800 shadow-sm">باقة {pkg.idx}: {en(pkg.fee)} ر.س / {en(pkg.days)} يوم</span>)
               : <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">⚠ الخدمة معطلة — كل الباقات برسوم 0</span>}
-            <Link href="/admin/revenue?tab=pricing" className="rounded-full border border-sky-400 bg-white px-2 py-0.5 text-sky-700 underline">تعديل الباقات ←</Link>
+            <AccessPage href="/admin/revenue?tab=pricing"><Link href="/admin/revenue?tab=pricing" className="rounded-full border border-sky-400 bg-white px-2 py-0.5 text-sky-700 underline">تعديل الباقات ←</Link></AccessPage>
           </span>
         </div>
         {verifyOrders.pending.length === 0 && verifyOrders.active.length === 0 && (
@@ -279,18 +282,18 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
                 {canEdit ? (
                   <div className="flex flex-wrap items-center gap-2">
                     {o.balance >= o.fee ? (
-                      <form action={approveVerifyOrderAction}>
+                      <AccessBoundary module={'stores'} action={'approve'}><form action={approveVerifyOrderAction}>
                         <input type="hidden" name="id" value={o.id} />
                         <ConfirmSubmit msg={`تأكيد الموافقة على توثيق «${o.storeName || o.userName}»؟ سيُخصم ${o.fee} ر.س من رصيده فوراً ويُفعَّل التوثيق ${o.days} يوماً.`} className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white"><Check className="h-3.5 w-3.5" /> موافقة وخصم وتفعيل</ConfirmSubmit>
-                      </form>
+                      </form></AccessBoundary>
                     ) : (
                       <span className="flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-500" title="رصيد العضو لا يغطي رسوم الباقة — اطلب منه شحن رصيده ثم وافق، أو ارفض الطلب">✗ يتعذّر الخصم — رصيد العضو لا يكفي</span>
                     )}
-                    <form action={rejectVerifyOrderAction} className="flex min-w-0 flex-1 items-center gap-1">
+                    <AccessBoundary module={'stores'} action={'approve'}><form action={rejectVerifyOrderAction} className="flex min-w-0 flex-1 items-center gap-1">
                       <input type="hidden" name="id" value={o.id} />
                       <input name="note" maxLength={300} placeholder="سبب الرفض (اختياري — يصل العضو)" className="h-8 min-w-0 flex-1 rounded-lg border border-destructive/30 bg-white px-2 text-xs outline-none" />
                       <ConfirmSubmit msg="تأكيد رفض طلب التوثيق؟ لا يُخصم شيء ويصل العضو السبب (إن كُتب)." className="flex shrink-0 items-center gap-1 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-bold text-destructive"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit>
-                    </form>
+                    </form></AccessBoundary>
                   </div>
                 ) : (
                   <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">عرض فقط — لا تملك صلاحية «تعديل المتاجر» للموافقة أو الرفض. اطلب من المدير منحك الصلاحية.</div>
@@ -306,11 +309,11 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
                 </div>
                 <details className="rounded-lg border border-slate-300">
                   <summary className="cursor-pointer list-none px-3 py-1.5 text-xs font-bold text-slate-700">↩ إلغاء التوثيق (بسبب) — يُعاد له {en(rf.refund)} ر.س قيمة الأيام غير المستخدمة…</summary>
-                  <form action={cancelVerifyOrderAction} className="flex items-center gap-1 border-t border-slate-200 p-2">
+                  <AccessBoundary module={'stores'} action={'edit'}><form action={cancelVerifyOrderAction} className="flex items-center gap-1 border-t border-slate-200 p-2">
                     <input type="hidden" name="id" value={o.id} />
                     <input name="reason" required maxLength={300} placeholder="سبب الإلغاء (إلزامي — يصل العضو)" className="h-8 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-xs outline-none" />
                     <ConfirmSubmit msg={`تأكيد إلغاء التوثيق؟ تُسحب الشارة فوراً ويُعاد لرصيد العضو ${rf.refund} ر.س (${rf.remainingDays} يوم غير مستخدم من ${o.days}).`} className="flex shrink-0 items-center gap-1 rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-bold text-white">إلغاء واسترداد</ConfirmSubmit>
-                  </form>
+                  </form></AccessBoundary>
                 </details>
               </div>
             ); })}
@@ -334,11 +337,11 @@ export default async function AdminStores({ searchParams }: { searchParams: Prom
                     من <b>{tr.fromName}</b> ← إلى <b>{tr.toName}</b>{tr.toPhone ? <> (<span dir="ltr">{tr.toPhone}</span>)</> : null} · وافق المالك {timeAgo(tr.at)}
                   </div>
                 </div>
-                <form action={completeStoreTransferAction} className="flex items-center gap-2">
+                <AccessBoundary module={'stores'} action={'edit'}><form action={completeStoreTransferAction} className="flex items-center gap-2">
                   <input type="hidden" name="storeId" value={tr.storeId} />
                   <label className="flex items-center gap-1 text-[11px] font-bold text-primary"><input type="checkbox" name="confirm" required className="h-3.5 w-3.5 accent-[hsl(var(--primary))]" /> أؤكّد</label>
                   <ConfirmSubmit msg="تأكيد تنفيذ نقل ملكية المتجر للعضو الجديد؟ لا يمكن التراجع." className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white"><UserCog className="h-3.5 w-3.5" /> تنفيذ النقل</ConfirmSubmit>
-                </form>
+                </form></AccessBoundary>
               </div>
             ))}
           </div>

@@ -6,7 +6,7 @@ import nextConfig from '../../next.config.mjs';
 
 const state = vi.hoisted(() => ({parse: vi.fn(), start: vi.fn(), permission: vi.fn()}));
 vi.mock('@/lib/prisma', () => ({prisma: {}}));
-vi.mock('@/lib/roles', () => ({hasAction: state.permission}));
+vi.mock('@/lib/access-control/guards', () => ({hasAccess: state.permission}));
 vi.mock('@/lib/suppliers/merchant-oauth', () => ({parseMerchantInvitation: state.parse, startMerchantOAuth: state.start}));
 import {GET, POST} from '@/app/api/integrations/salla/authorize/route';
 

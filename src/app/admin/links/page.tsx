@@ -1,6 +1,9 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { Link2, Users } from 'lucide-react';
-import { requireAction } from '@/lib/roles';
+
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { listLinkGroups } from '@/lib/account-links';
@@ -14,7 +17,7 @@ export const metadata = { title: 'ربط الأعضاء' };
 /** تبويب مستقل: ربط حسابات الشخص الواحد المنفصلة في مجموعة واحدة (نفس المالك).
  *  الإدارة تُنشئ الرابط فقط — لا دمج بيانات ولا تدخّل في نشاط الحسابات. */
 export default async function AdminLinksPage({ searchParams }: { searchParams: Promise<{ q?: string; picked?: string }> }) {
-  await requireAction('users', 'edit');
+  await requireAdminPage('/admin/links');
   const { q: qRaw, picked: pickedRaw } = await searchParams;
   const q = (qRaw || '').trim();
   const picked = (pickedRaw || '').split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isInteger(n) && n > 0).slice(0, 10);
@@ -103,10 +106,10 @@ export default async function AdminLinksPage({ searchParams }: { searchParams: P
               {pickedUsers.map((u) => <span key={toInt(u.id)} className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-primary shadow-sm">{u.name || u.userName}</span>)}
             </div>
             {picked.length >= 2 ? (
-              <form action={linkAccountsAction} className="mt-2">
+              <AccessBoundary module={'security'} action={'manage_settings'}><form action={linkAccountsAction} className="mt-2">
                 <input type="hidden" name="userIds" value={picked.join(',')} />
                 <ConfirmSubmit msg={`ربط هذه الحسابات (${picked.length}) في مجموعة «نفس المالك»؟`} className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">🔗 اربط الحسابات المختارة</ConfirmSubmit>
-              </form>
+              </form></AccessBoundary>
             ) : <p className="mt-2 text-[11px] text-muted-foreground">اختر حسابين على الأقل.</p>}
           </div>
         )}
@@ -122,17 +125,17 @@ export default async function AdminLinksPage({ searchParams }: { searchParams: P
             {g.members.map((m) => (
               <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-secondary/30 px-2.5 py-1.5 text-sm">
                 <span className="flex flex-wrap items-center gap-1.5">
-                  <Link href={`/admin/users?q=${encodeURIComponent(m.userName || m.name)}`} className="font-bold text-primary hover:underline">{m.name}</Link>
+                  <AccessPage href={`/admin/users?q=${encodeURIComponent(m.userName || m.name)}`}><Link href={`/admin/users?q=${encodeURIComponent(m.userName || m.name)}`} className="font-bold text-primary hover:underline">{m.name}</Link></AccessPage>
                   <span className="text-xs text-muted-foreground" dir="ltr">{m.phone}</span>
                   {kindBadge(m)}
                   {m.hasStore && <span className="text-[10px] text-muted-foreground">«{m.storeName}»</span>}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Link href={`/messages/${m.id}`} className="rounded-md border border-primary/30 px-2 py-1 text-[10px] font-bold text-primary hover:bg-accent">✉ مراسلة</Link>
-                  <form action={unlinkAccountAction}>
+                  <AccessBoundary module={'security'} action={'manage_settings'}><form action={unlinkAccountAction}>
                     <input type="hidden" name="userId" value={m.id} />
                     <ConfirmSubmit msg={`فك ربط «${m.name}» من هذه المجموعة؟`} className="rounded-md border border-red-300 px-2 py-1 text-[10px] font-bold text-red-600 hover:bg-red-50">فك</ConfirmSubmit>
-                  </form>
+                  </form></AccessBoundary>
                 </span>
               </div>
             ))}

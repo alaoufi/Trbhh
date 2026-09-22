@@ -303,6 +303,7 @@ model ad_category_audit {
 // Approved goods only. Independent from member ads, wallet top-ups and supplier payouts.
 // MySQL binary identifier collations and readiness indexes are enforced by commerce/schema.ts.
 model commerce_suppliers {
+  finance_settlements finance_settlements[]
   onboarding supplier_onboarding?
   supplier_integration_profiles supplier_integration_profiles? @relation("supplier_profile_supplier_fk")
   supplier_connections supplier_connections[] @relation("supplier_connection_supplier_fk")
@@ -373,6 +374,8 @@ model commerce_order_suppliers {
   @@id([order_id, product_id])
 }
 model commerce_receipts {
+  finance_refunds finance_refunds[]
+  finance_invoices finance_invoices[]
   order commerce_orders @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_receipt_order_fk")
   id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
   order_id BigInt @unique(map: "commerce_receipt_order") @db.UnsignedBigInt
@@ -384,6 +387,8 @@ model commerce_receipts {
   @@unique([provider, provider_ref], map: "commerce_receipt_reference")
 }
 model commerce_supplier_accruals {
+  finance_review finance_accrual_reviews?
+  finance_settlement_lines finance_settlement_lines[]
   snapshot commerce_order_suppliers @relation(fields: [order_id, product_id], references: [order_id, product_id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_accrual_snapshot_fk")
   supplier commerce_suppliers @relation(fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_accrual_supplier_fk")
   id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
@@ -419,6 +424,8 @@ model commerce_products {
 }
 
 model commerce_orders {
+  finance_refunds finance_refunds[]
+  finance_invoices finance_invoices[]
   supplier_reservation_allocations supplier_reservation_allocations[] @relation("supplier_allocation_order_fk")
   supplier_orders supplier_orders[] @relation("supplier_order_order_fk")
   receipt commerce_receipts?
@@ -1714,6 +1721,7 @@ model user_subscripes {
 }
 
 model users {
+  access_assignments access_user_roles[]
   id                        BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
   userName                  String?    @db.VarChar(255)
   password                  String?    @db.VarChar(255)
@@ -2288,4 +2296,232 @@ model cj_webhook_events {
   event_key   String   @unique(map: "cj_webhook_event_key") @db.VarChar(191)
   type        String   @default("") @db.VarChar(64)
   received_at DateTime @default(now()) @db.Timestamp(3)
+}
+
+// Financial follow-up is additive. CHECK constraints and binary collations are
+// maintained in src/lib/finance/schema.ts because Prisma cannot express them.
+model access_control_state {
+  id Int @id @db.UnsignedTinyInt
+  revision BigInt @default(0) @db.UnsignedBigInt
+  initialized_at DateTime? @db.DateTime(3)
+}
+model access_departments {
+  id String @id @db.VarChar(64)
+  name String @db.VarChar(120)
+  active Int @default(1) @db.TinyInt
+  roles access_roles[]
+}
+model access_roles {
+  id String @id @db.VarChar(64)
+  name String @db.VarChar(120)
+  department_id String @db.VarChar(64)
+  active Int @default(1) @db.TinyInt
+  system_role Int @default(0) @db.TinyInt
+  department access_departments @relation(fields:[department_id],references:[id],onDelete:Restrict,onUpdate:Restrict,map:"access_role_department_fk")
+  permissions access_role_permissions[]
+  assignments access_user_roles[]
+}
+model access_role_permissions {
+  role_id String @db.VarChar(64)
+  permission String @db.VarChar(120)
+  role access_roles @relation(fields:[role_id],references:[id],onDelete:Restrict,onUpdate:Restrict,map:"access_permission_role_fk")
+  @@id([role_id,permission])
+}
+model access_user_roles {
+  user_id BigInt @db.UnsignedBigInt
+  role_id String @db.VarChar(64)
+  user users @relation(fields:[user_id],references:[id],onDelete:Restrict,onUpdate:Restrict,map:"access_assignment_user_fk")
+  role access_roles @relation(fields:[role_id],references:[id],onDelete:Restrict,onUpdate:Restrict,map:"access_assignment_role_fk")
+  @@id([user_id,role_id])
+  @@index([role_id],map:"access_assignment_role")
+}
+model access_audit {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  created_at DateTime @default(now()) @db.DateTime(3)
+  actor_id BigInt? @db.UnsignedBigInt
+  action String @db.VarChar(40)
+  target String @db.VarChar(128)
+  reason String @db.VarChar(1000)
+  before_json Json
+  after_json Json
+  ip String? @db.VarChar(45)
+  session_fingerprint String? @db.Char(64)
+  @@index([created_at,id],map:"access_audit_created")
+  @@index([actor_id,id],map:"access_audit_actor")
+}
+
+model finance_periods {
+  month String @id @db.Char(7)
+  closed_at DateTime? @db.DateTime(3)
+  checks_json Json
+  reason String @default("") @db.VarChar(1000)
+  version Int @default(0)
+}
+
+model finance_budgets {
+  month String @db.Char(7)
+  category String @db.VarChar(32)
+  planned_minor BigInt
+  @@id([month, category])
+}
+
+model finance_expenses {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  request_key String @unique(map: "finance_expense_request") @db.VarChar(80)
+  fingerprint String @db.Char(64)
+  category String @db.VarChar(32)
+  description String @db.VarChar(500)
+  net_minor BigInt
+  vat_minor BigInt
+  total_minor BigInt
+  paid_minor BigInt
+  occurred_at DateTime @db.DateTime(3)
+  due_at DateTime @db.DateTime(3)
+  reference String @db.VarChar(160)
+  reversal_of BigInt? @unique(map: "finance_expense_reversal") @db.UnsignedBigInt
+  actor_id BigInt @db.UnsignedBigInt
+  original finance_expenses? @relation("finance_expense_reversal", fields: [reversal_of], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_expense_reversal_fk")
+  reversal finance_expenses? @relation("finance_expense_reversal")
+}
+
+model finance_accrual_reviews {
+  accrual_id BigInt @id @db.UnsignedBigInt
+  eligible_at DateTime? @db.DateTime(3)
+  due_at DateTime? @db.DateTime(3)
+  hold_reason String @default("") @db.VarChar(1000)
+  actor_id BigInt @db.UnsignedBigInt
+  accrual commerce_supplier_accruals @relation(fields: [accrual_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_review_accrual_fk")
+}
+
+model finance_settlements {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  request_key String @unique(map: "finance_settlement_request") @db.VarChar(80)
+  fingerprint String @db.Char(64)
+  supplier_id BigInt @db.UnsignedBigInt
+  amount_minor BigInt
+  created_at DateTime @db.DateTime(3)
+  approved_at DateTime? @db.DateTime(3)
+  status String @default("draft") @db.VarChar(16)
+  reference String @default("") @db.VarChar(160)
+  reason String @db.VarChar(1000)
+  reversal_of BigInt? @unique(map: "finance_settlement_reversal") @db.UnsignedBigInt
+  actor_id BigInt @db.UnsignedBigInt
+  supplier commerce_suppliers @relation(fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_settlement_supplier_fk")
+  original finance_settlements? @relation("finance_settlement_reversal", fields: [reversal_of], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_settlement_reversal_fk")
+  reversal finance_settlements? @relation("finance_settlement_reversal")
+  lines finance_settlement_lines[]
+  @@index([supplier_id], map: "finance_settlement_supplier_fk")
+}
+
+model finance_settlement_lines {
+  settlement_id BigInt @db.UnsignedBigInt
+  accrual_id BigInt @db.UnsignedBigInt
+  amount_minor BigInt
+  settlement finance_settlements @relation(fields: [settlement_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_line_settlement_fk")
+  accrual commerce_supplier_accruals @relation(fields: [accrual_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_line_accrual_fk")
+  @@id([settlement_id, accrual_id])
+  @@index([accrual_id], map: "finance_line_accrual_fk")
+}
+
+model finance_invoices {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id BigInt @db.UnsignedBigInt
+  receipt_id BigInt @db.UnsignedBigInt
+  kind String @default("invoice") @db.VarChar(16)
+  source_key String @unique(map: "finance_invoice_source") @db.VarChar(191)
+  number String? @unique(map: "finance_invoice_number") @db.VarChar(60)
+  parent_id BigInt? @db.UnsignedBigInt
+  status String @default("pending_policy") @db.VarChar(24)
+  created_at DateTime @db.DateTime(3)
+  issued_at DateTime? @db.DateTime(3)
+  net_minor BigInt?
+  vat_minor BigInt?
+  total_minor BigInt
+  snapshot Json?
+  source_snapshot Json
+  reason String @default("") @db.VarChar(1000)
+  order commerce_orders @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_invoice_order_fk")
+  receipt commerce_receipts @relation(fields: [receipt_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_invoice_receipt_fk")
+  parent finance_invoices? @relation("finance_invoice_parent", fields: [parent_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_invoice_parent_fk")
+  adjustments finance_invoices[] @relation("finance_invoice_parent")
+  @@index([order_id], map: "finance_invoice_order_fk")
+  @@index([receipt_id], map: "finance_invoice_receipt_fk")
+  @@index([parent_id], map: "finance_invoice_parent_fk")
+}
+
+model finance_sequences {
+  name String @id @db.VarChar(40)
+  next_value BigInt
+}
+
+model finance_audit {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  created_at DateTime @db.DateTime(3)
+  actor_id BigInt @db.UnsignedBigInt
+  action String @db.VarChar(60)
+  entity String @db.VarChar(40)
+  entity_id String @db.VarChar(80)
+  reason String @db.VarChar(1000)
+  payload Json
+  @@index([entity, entity_id], map: "finance_audit_entity")
+}
+
+model finance_refunds {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id BigInt @db.UnsignedBigInt
+  receipt_id BigInt @db.UnsignedBigInt
+  provider String @db.VarChar(40)
+  external_id String @db.VarChar(160)
+  amount_minor BigInt
+  currency String @default("SAR") @db.VarChar(3)
+  refunded_at DateTime @db.DateTime(3)
+  evidence_ref String @db.VarChar(500)
+  actor_id BigInt @db.UnsignedBigInt
+  order commerce_orders @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_refund_order_fk")
+  receipt commerce_receipts @relation(fields: [receipt_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_refund_receipt_fk")
+  @@unique([provider, external_id], map: "finance_refund_provider_reference")
+  @@index([order_id], map: "finance_refund_order_fk")
+  @@index([receipt_id], map: "finance_refund_receipt_fk")
+}
+
+model finance_reconciliations {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  request_key String @unique(map: "finance_reconciliation_request") @db.VarChar(80)
+  fingerprint String @db.Char(64)
+  month String @db.Char(7)
+  snapshot Json
+  reason String @db.VarChar(1000)
+  actor_id BigInt @db.UnsignedBigInt
+  created_at DateTime @db.DateTime(3)
+  @@index([month], map: "finance_reconciliation_month")
+}
+
+model finance_change_requests {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  request_key String @unique(map: "finance_change_request") @db.VarChar(80)
+  fingerprint String @db.Char(64)
+  kind String @db.VarChar(24)
+  target_id String @db.VarChar(80)
+  payload Json
+  status String @default("pending") @db.VarChar(16)
+  maker_id BigInt @db.UnsignedBigInt
+  checker_id BigInt? @db.UnsignedBigInt
+  reason String @db.VarChar(1000)
+  approval_reason String @default("") @db.VarChar(1000)
+  result Json?
+  created_at DateTime @db.DateTime(3)
+  decided_at DateTime? @db.DateTime(3)
+  tax_policy finance_tax_policies?
+  @@index([kind, target_id], map: "finance_change_target")
+}
+
+model finance_tax_policies {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  request_id BigInt @unique(map: "finance_tax_request") @db.UnsignedBigInt
+  effective_from DateTime @unique(map: "finance_tax_effective") @db.Date
+  issuer Json
+  vat_bps Int
+  policy_reference String @unique(map: "finance_tax_reference") @db.VarChar(160)
+  created_at DateTime @db.DateTime(3)
+  request finance_change_requests @relation(fields: [request_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_tax_request_fk")
 }

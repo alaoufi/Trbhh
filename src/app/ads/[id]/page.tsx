@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { SplashSuppress } from '@/components/splash-suppress';
 import { getAd, getSimilarAds, getSellerAds, recordView } from '@/lib/data';
-import { hasAction } from '@/lib/roles';
+import { hasAccess } from '@/lib/access-control/guards';
 import { adminArchiveAdAction, adminBanAdAction, adminBanSellerAction, adminDeleteAdRedirectAction, adminHideStoreAdAction, adminHideCommentAction, adminMessageAdOwnerAction } from '@/app/admin/actions';
 import { getComments } from '@/lib/comments';
 import { getSession } from '@/lib/auth';
@@ -104,20 +104,22 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   if (!ad) notFound();
 
   const session = await getSession();
-  const [canArchive, canDeleteAd, canBanSeller] = session
+  const [canArchive, canApproveAd, canDeleteAd, canBanSeller] = session
     ? await Promise.all([
-        hasAction(session.uid, 'ads', 'archive'),
-        hasAction(session.uid, 'ads', 'delete'),
-        hasAction(session.uid, 'users', 'edit'),
+        hasAccess(session.uid, 'ads', 'archive'),
+        hasAccess(session.uid, 'ads', 'approve'),
+        hasAccess(session.uid, 'ads', 'delete'),
+        hasAccess(session.uid, 'users', 'ban'),
       ])
-    : [false, false, false];
-  const admin = canArchive || canDeleteAd || canBanSeller;
+    : [false, false, false, false];
+  const canToggleAd = ad.status === 1 ? canArchive : canApproveAd;
+  const [admin,canReadMessages,canSendMessage,canReadWallets,canSuspendStore]=session?await Promise.all([hasAccess(session.uid,'ads','view'),hasAccess(session.uid,'messages','view'),hasAccess(session.uid,'messages','create'),hasAccess(session.uid,'wallets','view'),hasAccess(session.uid,'stores','suspend')]):[false,false,false,false,false];
   // إعلان غير نشط (بانتظار الموافقة/مؤرشف/موقوف): لا يراه إلا صاحبه أو الإدارة
   const ownerViewing = !!(session && ad.seller && session.uid === ad.seller.id);
   // إضافات الإعلان المدفوعة (تمييز/عاجل/عرض/تحديث) — تُعرض للإدارة ولصاحب الإعلان فقط
-  const addons = admin || ownerViewing ? await getAdAddons(ad.id).catch(() => null) : null;
+  const addons = (admin && canReadWallets) || ownerViewing ? await getAdAddons(ad.id).catch(() => null) : null;
   // رسائل سابقة من أي مشرف لصاحب الإعلان — تمنع تكرار نفس الرسالة من مسؤول آخر
-  const priorAdminMsgs = admin && !ownerViewing && ad.seller
+  const priorAdminMsgs = admin && canReadMessages && !ownerViewing && ad.seller
     ? await import('@/lib/chat').then((m) => m.listAdminMessagesTo(ad.seller!.id)).catch(() => [])
     : [];
   if ((ad.status !== 1 || ad.state !== 'active') && !ownerViewing && !admin) notFound();
@@ -835,7 +837,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           </div>
           {addons && <div className="mb-3"><AdAddonsBox info={addons} title="⭐ الإضافات المدفوعة لهذا الإعلان — الباقة وتاريخ الانتهاء" /></div>}
 
-          {ad.seller && !ownerViewing && (
+          {ad.seller && !ownerViewing && canSendMessage && (
             <div className="mb-3 rounded-lg bg-white/70 p-2.5">
               <div className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-amber-800"><Send className="h-3.5 w-3.5" /> راسل صاحب الإعلان</div>
               {spx.adminmsg === '1' && <p className="mb-2 rounded-md bg-emerald-50 px-2 py-1.5 text-xs font-bold text-emerald-700">✓ أُرسلت رسالتك — رابط الإعلان أُضيف تلقائياً في نهايتها.</p>}
@@ -870,7 +872,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                   🚫 مخفيّ حالياً عن النشر{ad.hiddenReason ? ` — السبب المُرسل للمتجر: «${ad.hiddenReason}»` : ''}
                 </div>
               )}
-              <form action={adminHideStoreAdAction} className="space-y-2">
+              {canToggleAd && (ad.status !== 1 || canSuspendStore) && <form action={adminHideStoreAdAction} className="space-y-2">
                 <input type="hidden" name="adId" value={ad.id} />
                 <input type="hidden" name="storeId" value={sellerStoreId} />
                 {ad.status === 1 ? (
@@ -885,7 +887,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                     <Check className="h-4 w-4" /> إعادة النشر
                   </ConfirmSubmit>
                 )}
-              </form>
+              </form>}
               <div className="flex items-center justify-between gap-2 text-xs font-bold text-amber-800">
                 <span>إنذارات متجر «{storeMeta?.storeName || `#${sellerStoreId}`}»: {storeWarnCount}/3</span>
                 <Link href={`/admin/stores?q=${encodeURIComponent(storeMeta?.storeName || '')}`} className="text-primary underline">إدارة المتجر ←</Link>
@@ -895,12 +897,12 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           <>
           <p className="mb-3 text-xs text-amber-800/80">لا يُسمح بتعديل محتوى إعلان العضو حفاظاً على خصوصيته. «الأرشفة» مؤقتة وقابلة للاستعادة (صاحبها يعيدها للظهور برسوم) — أما «حظر الإعلان» فحذف فوري نهائي لا رجعة فيه إطلاقاً، وللإعلانات المخالفة الواضحة فقط.</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {canArchive && (
+            {canToggleAd && (
               <form action={adminArchiveAdAction}>
                 <input type="hidden" name="adId" value={ad.id} />
-                {ad.archived ? (
-                  <ConfirmSubmit msg="تأكيد إظهار (استعادة) هذا الإعلان من الأرشيف؟ يعود ظاهراً للعامة في الموقع فوراً." className="flex w-full items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50">
-                    <Check className="h-4 w-4" /> إظهار (استعادة من الأرشيف)
+                {ad.status !== 1 ? (
+                  <ConfirmSubmit msg="تأكيد اعتماد ونشر هذا الإعلان؟ يعود ظاهراً للعامة في الموقع فوراً." className="flex w-full items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50">
+                    <Check className="h-4 w-4" /> اعتماد ونشر
                   </ConfirmSubmit>
                 ) : (
                   <ConfirmSubmit msg="تأكيد أرشفة هذا الإعلان؟ يختفي فوراً من الموقع وينتقل لتبويب «المؤرشفة» — يبقى محفوظاً ولا يُحذف تلقائياً." className="flex w-full items-center justify-center gap-1 rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
@@ -909,10 +911,10 @@ export default async function AdPage({ params, searchParams }: { params: Promise
                 )}
               </form>
             )}
-            {canArchive && (
+            {canToggleAd && (
               <div className="col-span-2 -mt-1 flex items-center gap-1.5 text-[11px] font-bold sm:col-span-3">
-                {ad.archived ? (
-                  <span className="flex items-center gap-1 text-amber-700"><Archive className="h-3 w-3" /> الحالة الآن: مؤرشف (مخفي عن الزوّار)</span>
+                {ad.status !== 1 ? (
+                  <span className="flex items-center gap-1 text-amber-700"><Archive className="h-3 w-3" /> الحالة الآن: مخفي عن الزوّار</span>
                 ) : (
                   <span className="flex items-center gap-1 text-emerald-700"><Check className="h-3 w-3" /> الحالة الآن: نشط (ظاهر للزوّار)</span>
                 )}

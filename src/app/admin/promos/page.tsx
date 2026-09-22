@@ -1,6 +1,9 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { Megaphone, Check, X, Trash2, Settings2, ExternalLink } from 'lucide-react';
-import { requirePerm } from '@/lib/roles';
+
 import { listPromos } from '@/lib/promos';
 import { PLACEMENT_LABEL, STATUS_LABEL } from '@/lib/promo-placements';
 import { ConfirmSubmit } from '@/components/confirm-submit';
@@ -15,7 +18,7 @@ const statusStyle: Record<string, string> = {
 };
 
 export default async function AdminPromos() {
-  await requirePerm('promos');
+  await requireAdminPage('/admin/promos');
   const items = await listPromos();
   const pending = items.filter((p) => p.status === 'pending');
   const others = items.filter((p) => p.status !== 'pending');
@@ -26,9 +29,9 @@ export default async function AdminPromos() {
           <Megaphone className="h-6 w-6 text-primary" />
           <h1 className="text-xl font-bold text-primary">الإعلانات الترويجية</h1>
         </div>
-        <Link href="/admin/revenue?tab=pricing#promo-packages" className="flex items-center gap-1 rounded-lg border border-primary/30 px-3 py-2 text-sm font-medium text-primary hover:bg-accent">
+        <AccessPage href="/admin/revenue?tab=pricing#promo-packages"><Link href="/admin/revenue?tab=pricing#promo-packages" className="flex items-center gap-1 rounded-lg border border-primary/30 px-3 py-2 text-sm font-medium text-primary hover:bg-accent">
           <Settings2 className="h-4 w-4" /> باقات المدد والأسعار
-        </Link>
+        </Link></AccessPage>
       </div>
 
       <Section title={`بانتظار الموافقة (${pending.length})`} items={pending} />
@@ -60,12 +63,12 @@ function Card({ p }: { p: import('@/lib/promos').Promo }) {
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {p.status !== 'active' && (
-            <form action={approvePromoAction}><input type="hidden" name="id" value={p.id} /><ConfirmSubmit msg="تأكيد الموافقة على هذا الإعلان الترويجي ونشره؟" className="flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white"><Check className="h-3.5 w-3.5" /> موافقة ونشر</ConfirmSubmit></form>
+            <AccessBoundary module={'promos'} action={'approve'}><form action={approvePromoAction}><input type="hidden" name="id" value={p.id} /><ConfirmSubmit msg="تأكيد الموافقة على هذا الإعلان الترويجي ونشره؟" className="flex items-center gap-1 rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white"><Check className="h-3.5 w-3.5" /> موافقة ونشر</ConfirmSubmit></form></AccessBoundary>
           )}
           {p.status === 'pending' && (
-            <form action={rejectPromoAction}><input type="hidden" name="id" value={p.id} /><ConfirmSubmit msg="تأكيد رفض هذا الإعلان الترويجي؟" className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit></form>
+            <AccessBoundary module={'promos'} action={'approve'}><form action={rejectPromoAction}><input type="hidden" name="id" value={p.id} /><ConfirmSubmit msg="تأكيد رفض هذا الإعلان الترويجي؟" className="flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs"><X className="h-3.5 w-3.5" /> رفض</ConfirmSubmit></form></AccessBoundary>
           )}
-          <form action={deletePromoAction}><input type="hidden" name="id" value={p.id} /><ConfirmSubmit msg="حذف هذا الإعلان الترويجي نهائياً؟ لا يمكن التراجع." className="flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1 text-xs text-destructive"><Trash2 className="h-3.5 w-3.5" /> حذف</ConfirmSubmit></form>
+          <AccessBoundary module={'promos'} action={'delete'}><form action={deletePromoAction}><input type="hidden" name="id" value={p.id} /><ConfirmSubmit msg="حذف هذا الإعلان الترويجي نهائياً؟ لا يمكن التراجع." className="flex items-center gap-1 rounded-md border border-destructive/30 px-2.5 py-1 text-xs text-destructive"><Trash2 className="h-3.5 w-3.5" /> حذف</ConfirmSubmit></form></AccessBoundary>
         </div>
       </div>
     </div>

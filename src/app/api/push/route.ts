@@ -23,7 +23,9 @@ export async function POST(req: NextRequest) {
   if (!(await pushEnabled())) return NextResponse.json({ ok: false }, { status: 403 });
   const body = await req.json().catch(() => null);
   if (!body?.endpoint) return NextResponse.json({ ok: false }, { status: 400 });
-  await savePushSub(session.uid, body);
+  try {
+    if(!await savePushSub(session.uid, body))return NextResponse.json({ok:false},{status:409});
+  }catch{return NextResponse.json({ok:false},{status:503});}
   return NextResponse.json({ ok: true });
 }
 
@@ -32,6 +34,6 @@ export async function DELETE(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ ok: false }, { status: 401 });
   const body = await req.json().catch(() => null);
-  if (body?.endpoint) await deletePushSub(String(body.endpoint));
+  if (body?.endpoint) await deletePushSub(session.uid,String(body.endpoint));
   return NextResponse.json({ ok: true });
 }

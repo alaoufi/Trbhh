@@ -1,7 +1,7 @@
 import {randomBytes, timingSafeEqual} from 'node:crypto';
 import {NextRequest, NextResponse} from 'next/server';
 import {prisma} from '@/lib/prisma';
-import {hasAction} from '@/lib/roles';
+import {hasAccess} from '@/lib/access-control/guards';
 import {supplierConfig} from '@/lib/suppliers/config';
 import {parseMerchantInvitation, startMerchantOAuth} from '@/lib/suppliers/merchant-oauth';
 import {readOAuthForm} from '@/lib/suppliers/oauth-form';
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     if (!/^[a-f0-9]{64}$/.test(csrf) || !/^[a-f0-9]{64}$/.test(expected) || !timingSafeEqual(Buffer.from(csrf), Buffer.from(expected))) return failure();
     const invitation = form.get('invite') || '';
     const payload = parseMerchantInvitation(invitation, config);
-    if (!await hasAction(Number(payload.adminId), 'suppliers', 'edit')) return failure();
+    if (!await hasAccess(Number(payload.adminId), 'integrations', 'authorize')) return failure();
     const result = await startMerchantOAuth(prisma, invitation, config);
     const response = NextResponse.redirect(result.url, 303);
     for (const [name,value] of [['salla_oauth_browser', result.browser], ['salla_merchant_context', result.context]]) {

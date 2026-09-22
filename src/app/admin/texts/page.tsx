@@ -1,6 +1,9 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { MessageSquare, Check, ShieldAlert, BellRing, Home, Megaphone, Sparkles, Inbox, Braces, ShieldCheck, HandCoins, Smile } from 'lucide-react';
-import { requireAction } from '@/lib/roles';
+
 import {
   getSetting, getHomeHeadings, getEmptyTexts, getWelcomePopupSeconds, getDisclaimer,
   SETTING_DISCLAIMER_SHORT, SETTING_DISCLAIMER_LONG,
@@ -55,7 +58,7 @@ const VARIABLES = [
 ];
 
 export default async function AdminTexts({ searchParams }: { searchParams: Promise<{ saved?: string; sec?: string }> }) {
-  await requireAction('users', 'edit');
+  await requireAdminPage('/admin/texts');
   const { saved, sec: secRaw } = await searchParams;
   const sec: Sec = (SECTIONS.some((s) => s.key === secRaw) ? secRaw : 'general') as Sec;
   const [tplAd, tplAdmin, tplSupport, adNotice, subMsg, showMsg, adshowMsg, ticker, clsTitle, clsSub, headings, empty, verifyOk, verifyReject, topupInfo, topupOk, topupReject, topupNameNote, topupCancel] = await Promise.all([
@@ -105,9 +108,9 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
       {/* تبويبات فرعية حسب مكان النص */}
       <div className="flex flex-wrap gap-1.5 rounded-xl bg-secondary/40 p-1.5">
         {SECTIONS.map((s) => (
-          <Link key={s.key} href={`/admin/texts?sec=${s.key}`} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold ${sec === s.key ? 'bg-primary text-white shadow' : 'text-muted-foreground hover:bg-white/60'}`}>
+          <AccessPage href={`/admin/texts?sec=${s.key}`} key={s.key}><Link key={s.key} href={`/admin/texts?sec=${s.key}`} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-bold ${sec === s.key ? 'bg-primary text-white shadow' : 'text-muted-foreground hover:bg-white/60'}`}>
             <s.icon className="h-4 w-4" /> {s.label}
-          </Link>
+          </Link></AccessPage>
         ))}
       </div>
 
@@ -133,7 +136,7 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
       )}
 
       {sec !== 'vars' && (
-      <form action={saveTextsAction} className="space-y-4 rounded-xl border border-primary/20 bg-card p-4">
+      <AccessBoundary module={'texts'} action={'edit'}><form action={saveTextsAction} className="space-y-4 rounded-xl border border-primary/20 bg-card p-4">
         <input type="hidden" name="sec" value={sec} />
 
         {sec === 'general' && (
@@ -324,7 +327,7 @@ export default async function AdminTexts({ searchParams }: { searchParams: Promi
         )}
 
         <Button>حفظ</Button>
-      </form>
+      </form></AccessBoundary>
       )}
     </div>
   );

@@ -1,10 +1,13 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import type { Prisma } from '@prisma/client';
 import { Star, Trash2, EyeOff, Check, Archive } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { requirePerm } from '@/lib/roles';
+
 import { adminDeleteAdAction, adminToggleSpecialAction, adminToggleAdStatusAction, deleteAllPendingAdsAction, deleteAllArchivedAdsAction, banUserAction } from '../actions';
 import { getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { sweepExpiredArchived } from '@/lib/data';
@@ -31,7 +34,7 @@ const TABS = [
 type Tab = typeof TABS[number]['k'];
 
 export default async function AdminAds({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; page?: string }> }) {
-  await requirePerm('ads');
+  await requireAdminPage('/admin/ads');
   const { view, q, page: pageRaw } = await searchParams;
   const tab: Tab = (TABS.some((t) => t.k === view) ? view : 'all') as Tab;
   const term = (q || '').trim();
@@ -124,18 +127,18 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
       <AdminSearch basePath={`/admin/ads${tab !== 'all' ? `?view=${tab}` : ''}`} defaultValue={q} placeholder="بحث بالعنوان أو التفاصيل أو رقم الإعلان…" />
 
       {tab === 'pending' && pendingCount > 0 && (
-        <form action={deleteAllPendingAdsAction} className="flex items-center justify-between gap-2 rounded-xl border-2 border-amber-300 bg-amber-50 p-3">
+        <AccessBoundary module={'ads'} action={'delete'}><form action={deleteAllPendingAdsAction} className="flex items-center justify-between gap-2 rounded-xl border-2 border-amber-300 bg-amber-50 p-3">
           <span className="text-sm font-bold text-amber-800">أرشفة كل الإعلانات المنتظِرة للموافقة ({pendingCount})؟ تنتقل للأرشيف ويمكن حذفها نهائياً من هناك.</span>
           <ConfirmSubmit msg={`تأكيد: أرشفة كل الإعلانات المنتظِرة للموافقة (${pendingCount} إعلان)؟ تنتقل لتبويب «المؤرشفة».`} className="flex items-center gap-1 rounded-md bg-amber-600 px-3 py-2 text-sm font-bold text-white hover:bg-amber-700"><Archive className="h-4 w-4" /> أرشفة الكل</ConfirmSubmit>
-        </form>
+        </form></AccessBoundary>
       )}
       {tab === 'archived' && (
         <>
           {archivedCount > 0 && (
-            <form action={deleteAllArchivedAdsAction} className="flex items-center justify-between gap-2 rounded-xl border-2 border-destructive/30 bg-destructive/5 p-3">
+            <AccessBoundary module={'ads'} action={'delete'}><form action={deleteAllArchivedAdsAction} className="flex items-center justify-between gap-2 rounded-xl border-2 border-destructive/30 bg-destructive/5 p-3">
               <span className="text-sm font-bold text-destructive">حذف كل الإعلانات المؤرشفة ({archivedCount}) نهائياً؟ لا يمكن التراجع.</span>
               <ConfirmSubmit msg={`تأكيد: حذف كل الإعلانات المؤرشفة (${archivedCount} إعلان) نهائياً من الأرشيف؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-md bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90"><Trash2 className="h-4 w-4" /> حذف الكل نهائياً</ConfirmSubmit>
-            </form>
+            </form></AccessBoundary>
           )}
           <p className="text-xs font-bold text-amber-700">الإعلانات المؤرشفة محفوظة ولا تُحذف تلقائياً — احذف منها يدوياً بتأكيد (فردياً أو «حذف الكل»).</p>
         </>
@@ -187,38 +190,38 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
                 <p className="whitespace-pre-line text-sm leading-6 text-foreground/90">{(a.detail || '').slice(0, 600) || '— لا توجد تفاصيل —'}{(a.detail || '').length > 600 ? '…' : ''}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Link href={`/ads/${toInt(a.id)}`} className="rounded-md border border-primary/30 px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary/5">فتح صفحة الإعلان كاملة (بالصور)</Link>
-                  <Link href={`/admin/users/${toInt(a.user_id)}`} className="rounded-md border px-2.5 py-1 text-xs font-bold text-muted-foreground hover:bg-secondary">ملف المعلن</Link>
+                  <AccessPage href={`/admin/users/${toInt(a.user_id)}`}><Link href={`/admin/users/${toInt(a.user_id)}`} className="rounded-md border px-2.5 py-1 text-xs font-bold text-muted-foreground hover:bg-secondary">ملف المعلن</Link></AccessPage>
                   {/* حظر المعلن — أيام محددة أو فارغ = دائم */}
-                  <form action={banUserAction} className="flex items-center gap-1">
+                  <AccessBoundary module={'users'} action={'ban'}><form action={banUserAction} className="flex items-center gap-1">
                     <input type="hidden" name="userId" value={toInt(a.user_id)} />
                     <input name="days" type="number" min={0} placeholder="أيام" className="h-7 w-16 rounded-md border border-destructive/30 px-2 text-xs" />
                     <ConfirmSubmit msg="تأكيد حظر هذا المعلن؟ ستختفي كل إعلاناته من الموقع طوال مدة الحظر." className="rounded-md bg-destructive px-2.5 py-1 text-xs font-bold text-white hover:bg-destructive/90">⛔ حظر المعلن (فارغ = دائم)</ConfirmSubmit>
-                  </form>
+                  </form></AccessBoundary>
                 </div>
               </div>
             </details>
 
             <div className="flex flex-wrap gap-1">
               {a.status === 0 && (
-                <form action={adminToggleAdStatusAction}>
+                <AccessBoundary module={'ads'} action={'approve'}><form action={adminToggleAdStatusAction}>
                   <input type="hidden" name="adId" value={toInt(a.id)} />
                   <ConfirmSubmit msg={a.data_archive ? 'تأكيد إعادة نشر هذا الإعلان من الأرشيف؟ سيظهر للزوار فوراً.' : 'تأكيد الموافقة على هذا الإعلان ونشره فوراً؟'} title={a.data_archive ? 'إعادة النشر من الأرشيف' : 'موافقة ونشر فوري'} className="flex items-center gap-1 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"><Check className="h-3.5 w-3.5" /> {a.data_archive ? 'إعادة نشر' : 'موافقة ونشر'}</ConfirmSubmit>
-                </form>
+                </form></AccessBoundary>
               )}
-              <form action={adminToggleSpecialAction}>
+              <AccessBoundary module={'promos'} action={'edit'}><form action={adminToggleSpecialAction}>
                 <input type="hidden" name="adId" value={toInt(a.id)} />
                 <ConfirmSubmit msg={a.adsSpecial === 'checked' ? 'إلغاء تمييز هذا الإعلان؟' : 'تمييز هذا الإعلان (يظهر بإطار ذهبي في مقدمة القوائم)؟'} title={a.adsSpecial === 'checked' ? 'إلغاء التمييز' : 'تمييز الإعلان'} className={`flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold ${a.adsSpecial === 'checked' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'text-muted-foreground hover:bg-secondary'}`}>
                   <Star className={`h-3.5 w-3.5 ${a.adsSpecial === 'checked' ? 'fill-amber-400 text-amber-500' : ''}`} /> {a.adsSpecial === 'checked' ? 'إلغاء التمييز' : 'تمييز'}
                 </ConfirmSubmit>
-              </form>
+              </form></AccessBoundary>
               {a.status === 1 && (
-                <form action={adminToggleAdStatusAction}><input type="hidden" name="adId" value={toInt(a.id)} /><ConfirmSubmit msg="تأكيد إيقاف هذا الإعلان وأرشفته؟ سيختفي من الموقع وينتقل لتبويب «المؤرشفة» — يبقى محفوظاً ولا يُحذف تلقائياً." title="إيقاف/أرشفة" className="flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold hover:bg-secondary"><EyeOff className="h-3.5 w-3.5" /> إيقاف</ConfirmSubmit></form>
+                <AccessBoundary module={'ads'} action={'archive'}><form action={adminToggleAdStatusAction}><input type="hidden" name="adId" value={toInt(a.id)} /><ConfirmSubmit msg="تأكيد إيقاف هذا الإعلان وأرشفته؟ سيختفي من الموقع وينتقل لتبويب «المؤرشفة» — يبقى محفوظاً ولا يُحذف تلقائياً." title="إيقاف/أرشفة" className="flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold hover:bg-secondary"><EyeOff className="h-3.5 w-3.5" /> إيقاف</ConfirmSubmit></form></AccessBoundary>
               )}
               {/* لا حذف مباشر: المؤرشف يُحذف نهائياً بتأكيد، وغير المؤرشف يُؤرشف أولاً */}
               {a.data_archive ? (
-                <form action={adminDeleteAdAction}><input type="hidden" name="adId" value={toInt(a.id)} /><ConfirmSubmit msg={`حذف الإعلان «${a.title?.trim() || `#${toInt(a.id)}`}» نهائياً من الأرشيف؟ لا يمكن التراجع.`} title="حذف نهائي من الأرشيف" className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف نهائي</ConfirmSubmit></form>
+                <AccessBoundary module={'ads'} action={'delete'}><form action={adminDeleteAdAction}><input type="hidden" name="adId" value={toInt(a.id)} /><ConfirmSubmit msg={`حذف الإعلان «${a.title?.trim() || `#${toInt(a.id)}`}» نهائياً من الأرشيف؟ لا يمكن التراجع.`} title="حذف نهائي من الأرشيف" className="flex items-center gap-1 rounded-md border border-destructive/30 px-2 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف نهائي</ConfirmSubmit></form></AccessBoundary>
               ) : a.status === 0 ? (
-                <form action={adminDeleteAdAction}><input type="hidden" name="adId" value={toInt(a.id)} /><ConfirmSubmit msg="أرشفة هذا الإعلان؟ سينتقل إلى تبويب «المؤرشفة»، ومنه يمكن حذفه نهائياً." title="أرشفة" className="flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-50"><Archive className="h-3.5 w-3.5" /> أرشفة</ConfirmSubmit></form>
+                <AccessBoundary module={'ads'} action={'delete'}><form action={adminDeleteAdAction}><input type="hidden" name="adId" value={toInt(a.id)} /><ConfirmSubmit msg="أرشفة هذا الإعلان؟ سينتقل إلى تبويب «المؤرشفة»، ومنه يمكن حذفه نهائياً." title="أرشفة" className="flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-50"><Archive className="h-3.5 w-3.5" /> أرشفة</ConfirmSubmit></form></AccessBoundary>
               ) : null}
             </div>
           </div>

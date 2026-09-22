@@ -58,3 +58,4 @@ describe('owned order payment feedback', () => {
     expect(state.query.mock.calls[0].slice(1)).toEqual([1n, 7n]);
   });
 });
+vi.mock('@/lib/finance/schema',()=>({financeSchemaAvailable:async()=>false}));

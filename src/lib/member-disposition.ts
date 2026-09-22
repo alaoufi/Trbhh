@@ -27,12 +27,15 @@ export async function inspectMemberDependencies(userId: number): Promise<MemberD
 }
 
 export async function archiveMemberAccount(userId: number, adminId: number, reason: string): Promise<void> {
-  await unlinkAccount(userId);
+  const {withUnassignedAccountChange}=await import('./access-control/store');
+  await withUnassignedAccountChange(prisma,userId,async tx=>{
   // Preserve each record, but remove it from all live visitor listings.
-  await prisma.ads.updateMany({ where: { user_id: BigInt(userId) }, data: { status: 0, data_archive: new Date().toISOString(), paused_by_owner: 0 } });
-  await prisma.stores.updateMany({ where: { user_id: userId }, data: { status: 0 } });
-  await prisma.users.update({
+  await tx.ads.updateMany({ where: { user_id: BigInt(userId) }, data: { status: 0, data_archive: new Date().toISOString(), paused_by_owner: 0 } });
+  await tx.stores.updateMany({ where: { user_id: userId }, data: { status: 0 } });
+  await tx.users.update({
     where: { id: BigInt(userId) },
     data: { archived_at: new Date(), archived_by: BigInt(adminId), archive_reason: reason.slice(0, 300) || 'أرشفة إدارية', token: null, remember_token: null },
   });
+  });
+  await unlinkAccount(userId);
 }

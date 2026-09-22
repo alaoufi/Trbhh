@@ -1,5 +1,5 @@
 import { ADMIN_NAV, type AdminNavItem } from '@/components/admin-nav-def';
-import type { Perm } from '@/lib/roles';
+import { canAccessPage } from '@/lib/access-control/catalog';
 
 function normalizeArabic(value: string): string {
   return value
@@ -13,12 +13,12 @@ function normalizeArabic(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
-export function findAdminServices(query: string, permissions: Set<Perm>): AdminNavItem[] {
+export function findAdminServices(query: string, permissions: ReadonlySet<string>): AdminNavItem[] {
   const terms = normalizeArabic(query).split(' ').filter(Boolean);
   if (!terms.length) return [];
 
   return ADMIN_NAV
-    .filter((item) => item.perm === null || permissions.has(item.perm))
+    .filter((item) => canAccessPage(permissions, item.href))
     .map((item) => {
       const haystack = normalizeArabic([item.label, item.description || '', ...(item.keywords || [])].join(' '));
       const matched = terms.filter((term) => haystack.includes(term)).length;

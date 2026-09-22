@@ -1,14 +1,48 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { PrismaClient, type Prisma } from '@prisma/client';
 import { searchCardVisibility } from '@/lib/search-card-visibility';
 import { platformAdPublicWhere } from '@/lib/platform-ad-visibility';
+import { isolatedSearchUrl, searchAdsDdl, SEARCH_FIXTURE_DATABASE } from '../helpers/search-visibility-fixture';
 
-// Explicit opt-in; never reads DATABASE_URL or dotenv. All fixture changes roll back.
+// Only the pure predicate is used: prevent a settings/ambient Prisma import.
+vi.mock('@/lib/settings', () => ({ getPlatformAdLifecycleConfig: () => { throw new Error('Settings access is outside the isolated search fixture'); } }));
+
+// Explicit opt-in; never uses DATABASE_URL or a previously created fixture.
 const enabled = process.env.SEARCH_VISIBILITY_MYSQL === '1';
-const db = enabled ? new PrismaClient({ datasourceUrl: 'mysql://root:local_disposable_root_only@127.0.0.1:33309/trbhh_commerce_preview_20260919' }) : undefined;
-afterAll(async () => { await db?.$disconnect(); });
+let db: PrismaClient | undefined, admin: PrismaClient | undefined, created = false;
+
 describe.skipIf(!enabled)('real MySQL search visibility', () => {
   const now = new Date('2026-09-19T12:00:00Z');
+  beforeAll(async () => {
+    const url = isolatedSearchUrl(process.env.SEARCH_TEST_DATABASE_URL);
+    const sql = execFileSync(process.execPath, ['node_modules/prisma/build/index.js', 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', 'prisma/schema.prisma', '--script'], {
+      encoding: 'utf8', timeout: 20000, env: { ...process.env, DATABASE_URL: url.href },
+    });
+    const ddl = searchAdsDdl(sql);
+    const adminUrl = new URL(url); adminUrl.pathname = '/mysql';
+    admin = new PrismaClient({ datasourceUrl: adminUrl.href, log: [] });
+    // Deliberately no IF NOT EXISTS or preemptive DROP. A prior DB is not ours.
+    await admin.$executeRawUnsafe('CREATE DATABASE trbhh_search_visibility_test');
+    created = true;
+    db = new PrismaClient({ datasourceUrl: url.href, log: [] });
+    const database = await db.$queryRawUnsafe<{ name: string }[]>('SELECT DATABASE() AS name');
+    expect(database[0].name).toBe(SEARCH_FIXTURE_DATABASE);
+    await db.$executeRawUnsafe(ddl);
+    await db.ads.create({ data: {
+      id: 1n, adsType: 'offer', user_id: 2n, city_id: 1n, category_id: 1n,
+      title: 'وظيفة محاسب — إعلان اختبار مستقل', detail: 'Synthetic isolated search visibility fixture', video_path: '',
+      state: 'active', status: 1, store_only: 0, adsSpecial: 'no', created_at: new Date('2026-09-01T12:00:00Z'),
+    } });
+  });
+  afterAll(async () => {
+    try {
+      await db?.$disconnect();
+    } finally {
+      try { if (created) await admin!.$executeRawUnsafe('DROP DATABASE trbhh_search_visibility_test'); }
+      finally { created = false; await admin?.$disconnect(); }
+    }
+  });
   async function query({ defaultDays = 0, bannedIds = [], plans = [], subscriptions = [], changes = {}, lifecycle = false }: {
     defaultDays?: number; bannedIds?: bigint[];
     plans?: { id: number; adDays: number }[];
@@ -20,9 +54,9 @@ describe.skipIf(!enabled)('real MySQL search visibility', () => {
     try {
       await db!.$transaction(async (tx) => {
         const database = await tx.$queryRaw<{ name: string }[]>`SELECT DATABASE() AS name`;
-        expect(database[0].name).toBe('trbhh_commerce_preview_20260919');
+        expect(database[0].name).toBe(SEARCH_FIXTURE_DATABASE);
         const fixture = await tx.ads.findUniqueOrThrow({ where: { id: 1n }, select: { title: true, user_id: true } });
-        expect(fixture).toEqual({ title: 'وظيفة محاسب — إعلان اختبار محلي', user_id: 2n });
+        expect(fixture).toEqual({ title: 'وظيفة محاسب — إعلان اختبار مستقل', user_id: 2n });
         await tx.ads.update({ where: { id: 1n }, data: {
           status: 1, state: 'active', store_only: 0, trbhh_until: null,
           created_at: new Date('2026-09-01T12:00:00Z'), adsSpecial: 'no', expires_at: null, urgent_until: null,

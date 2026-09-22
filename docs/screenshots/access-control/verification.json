@@ -1,0 +1,30 @@
+{
+  "verifiedDate": "2026-09-22",
+  "fixtureOnly": true,
+  "renderer": "real AccessControlWorkspace client component with real application Tailwind CSS",
+  "browser": "Edge via cua_repl only",
+  "sourceData": "synthetic",
+  "databaseAccess": false,
+  "externalRequestsAllowedByCsp": false,
+  "serverActions": "not imported; no-op client stubs; capture-phase submit prevention",
+  "checks": {
+    "tabNavigation": true,
+    "roleUnionInitial": { "selectedRoles": 4, "effectivePermissions": 5 },
+    "roleUnionAfterUncheck": { "selectedRoles": 3, "effectivePermissions": 3 },
+    "roleUnionRestored": { "selectedRoles": 4, "effectivePermissions": 5 },
+    "disabledRoleAndDepartmentExcluded": true,
+    "roleUnionCheckedOnMobile": true,
+    "readonlyFieldsetsDisabled": true,
+    "readonlySaveButtonDisabled": true,
+    "uninitializedDepartmentSaveButtonsDisabled": 3,
+    "submitPreventedNoticeObserved": true,
+    "mobileViewportWidth": 390,
+    "mobileDocumentScrollWidth": 385,
+    "mobileHorizontalOverflow": false,
+    "consoleErrorsObserved": []
+  },
+  "screenshots": ["roles-desktop.png", "assignment-desktop.png", "assignment-mobile.png"],
+  "screenshotScope": "viewport only; full-page capture repeatedly timed out in browser provider",
+  "browserCleanup": "temporary viewport reset; both created fixture tabs closed; pre-existing tabs untouched",
+  "limits": ["no live authorization/session test", "no MySQL transaction test", "no MFA test", "no persistence or real audit writes", "fixture GET search form is prevented like all other submits"]
+}

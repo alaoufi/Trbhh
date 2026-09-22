@@ -1,9 +1,12 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage, readActorAccess } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowRight, User, Phone, Mail, Save, KeyRound, ShieldCheck, Check, AlertTriangle, Megaphone, Calendar, Wallet, Plus, Minus, Ban, ShieldAlert, Bot, Trash2, Copy, Waves, Flag, ScrollText } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
-import { requireAction } from '@/lib/roles';
+
 import { getBalance, listTxns } from '@/lib/wallet';
 import { getModLog, DUP_LIMIT, CONTENT_STRIKE_LIMIT } from '@/lib/moderation';
 import { getUserAdminLog } from '@/lib/audit';
@@ -29,21 +32,22 @@ const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
 };
 
 export default async function AdminUserDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; sent?: string; error?: string; setpass?: string; bal?: string; linked?: string }> }) {
-  await requireAction('users', 'view');
+  const session = await requireAdminPage('/admin/users/[id]');
+  const {keys} = await readActorAccess(session.uid);
   const { id } = await params;
   const { saved, sent, error, setpass, bal, linked } = await searchParams;
   const uid = Number(id);
   const [u, adsCount, balance, txns, modLog, adminLog, strikes, dupRow, linkedMembers, dependencies] = await Promise.all([
     prisma.users.findUnique({ where: { id: BigInt(uid) } }).catch(() => null),
-    prisma.ads.count({ where: { user_id: BigInt(uid) } }).catch(() => 0),
-    getBalance(uid),
-    listTxns(uid, 15),
-    getModLog(200, uid).catch(() => []),
-    getUserAdminLog(uid, 200).catch(() => []),
-    prisma.user_strikes.findMany({ where: { user_id: BigInt(uid) } }).catch(() => []),
-    prisma.dup_attempts.findUnique({ where: { user_id: BigInt(uid) } }).catch(() => null),
+    keys.has('ads:view') ? prisma.ads.count({ where: { user_id: BigInt(uid) } }).catch(() => 0) : null,
+    keys.has('wallets:view') ? getBalance(uid) : null,
+    keys.has('wallets:view') ? listTxns(uid, 15) : [],
+    keys.has('reports:view') ? getModLog(200, uid).catch(() => []) : [],
+    keys.has('audit:view') ? getUserAdminLog(uid, 200).catch(() => []) : [],
+    keys.has('reports:view') ? prisma.user_strikes.findMany({ where: { user_id: BigInt(uid) } }).catch(() => []) : [],
+    keys.has('reports:view') ? prisma.dup_attempts.findUnique({ where: { user_id: BigInt(uid) } }).catch(() => null) : null,
     linkedAccounts(uid),
-    inspectMemberDependencies(uid),
+    keys.has('users:delete') ? inspectMemberDependencies(uid) : null,
   ]);
   if (!u) notFound();
   const field = 'h-10 w-full rounded-lg border bg-background px-3 text-sm';
@@ -104,7 +108,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
   return (
     <div className="max-w-lg space-y-4">
       <div className="flex items-center gap-2">
-        <Link href="/admin/users" className="rounded-lg p-2 hover:bg-secondary"><ArrowRight className="h-5 w-5" /></Link>
+        <AccessPage href="/admin/users"><Link href="/admin/users" className="rounded-lg p-2 hover:bg-secondary"><ArrowRight className="h-5 w-5" /></Link></AccessPage>
         <h1 className="flex items-center gap-2 text-xl font-extrabold text-primary"><User className="h-5 w-5" /> {u.name || u.userName || 'عضو'}</h1>
       </div>
 
@@ -122,7 +126,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
         <div className="col-span-2 flex items-center gap-2">
           {u.ban === 'checked' ? <Badge variant="muted">محظور{u.ban_until ? ` حتى ${fmtDate(u.ban_until.toISOString())}` : ' نهائياً'}</Badge> : <Badge variant="trusted">نشط</Badge>}
           {u.trusted === 1 && <Badge variant="trusted">موثّق</Badge>}
-          {u.is_admin === 1 && <Badge>مدير</Badge>}
+
         </div>
       </div>
 
@@ -132,22 +136,22 @@ export default async function AdminUserDetail({ params, searchParams }: { params
           <div className="space-y-2">
             {linkedMembers.map((member) => <div key={member.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-secondary/35 p-2 text-xs">
               <span><b>{member.name}</b> · #{member.id}{member.hasStore ? ` · متجر: ${member.storeName}` : ''}</span>
-              {member.id !== uid && <Link href={`/admin/users/${member.id}`} className="font-bold text-primary underline">فتح الملف</Link>}
+              {member.id !== uid && <AccessPage href={`/admin/users/${member.id}`}><Link href={`/admin/users/${member.id}`} className="font-bold text-primary underline">فتح الملف</Link></AccessPage>}
             </div>)}
-            <form action={unlinkMemberAccountAction}><input type="hidden" name="userId" value={uid} /><ConfirmSubmit msg="فكّ ارتباط هذا الحساب من الدخول الموحد فقط؟ لن تُحذف الإعلانات ولا الرصيد ولا الرسائل." className="rounded-lg border border-amber-400 px-3 py-2 text-xs font-bold text-amber-800">فك الارتباط فقط</ConfirmSubmit></form>
+            <AccessBoundary module={'security'} action={'manage_settings'}><form action={unlinkMemberAccountAction}><input type="hidden" name="userId" value={uid} /><ConfirmSubmit msg="فكّ ارتباط هذا الحساب من الدخول الموحد فقط؟ لن تُحذف الإعلانات ولا الرصيد ولا الرسائل." className="rounded-lg border border-amber-400 px-3 py-2 text-xs font-bold text-amber-800">فك الارتباط فقط</ConfirmSubmit></form></AccessBoundary>
           </div>
         )}
       </section>
 
-      <section className="space-y-3 rounded-2xl border-2 border-amber-300 bg-amber-50/50 p-4">
+      {(dependencies) && <section className="space-y-3 rounded-2xl border-2 border-amber-300 bg-amber-50/50 p-4">
         <div className="flex items-center gap-2 text-sm font-extrabold text-amber-900"><Trash2 className="h-4 w-4" /> فحص الأرشفة والحذف</div>
         <p className="text-xs font-bold text-amber-900">قبل أي إجراء يُعاد فحص الحقوق. الإعلانات، المتجر، الرصيد، عمليات الشحن أو الرسائل تمنع الحذف الدائم وتحفظ بالأرشفة.</p>
         <div className="grid grid-cols-2 gap-2 text-xs"><span>إعلانات: <b>{dependencies.advertisements}</b></span><span>متاجر: <b>{dependencies.stores}</b></span><span>رصيد محجوز/متاح: <b>{dependencies.balanceHalala / 100} ر.س</b></span><span>شحن/حركات: <b>{dependencies.topups + dependencies.walletTransactions}</b></span><span className="col-span-2">رسائل: <b>{dependencies.messages}</b></span></div>
-        {dispositionFor(dependencies) === 'archive' ? <form action={disposeMemberAccountAction} className="space-y-2"><input type="hidden" name="userId" value={uid} /><input type="hidden" name="decision" value="archive" /><input type="hidden" name="confirmation" value="ARCHIVE" /><input name="reason" maxLength={300} required placeholder="سبب الأرشفة (إلزامي)" className={field} /><ConfirmSubmit msg="تأكيد أرشفة الحساب؟ سيختفي من الموقع ومن البحث، وتبقى جميع الحقوق والسجلات محفوظة." className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">أرشفة آمنة وإخفاء الحساب</ConfirmSubmit></form> : <form action={disposeMemberAccountAction} className="space-y-2"><input type="hidden" name="userId" value={uid} /><input type="hidden" name="decision" value="delete" /><input type="hidden" name="confirmation" value="DELETE" /><ConfirmSubmit msg="التأكيد الثاني: الحساب فارغ فعلاً. حذف الهوية نهائياً بعد فك الارتباط؟ لا يمكن التراجع." className="rounded-lg bg-destructive px-3 py-2 text-xs font-bold text-white">حذف الحساب الفارغ نهائياً</ConfirmSubmit></form>}
-      </section>
+        {dispositionFor(dependencies) === 'archive' ? <AccessBoundary module={'users'} action={'delete'}><form action={disposeMemberAccountAction} className="space-y-2"><input type="hidden" name="userId" value={uid} /><input type="hidden" name="decision" value="archive" /><input type="hidden" name="confirmation" value="ARCHIVE" /><input name="reason" maxLength={300} required placeholder="سبب الأرشفة (إلزامي)" className={field} /><ConfirmSubmit msg="تأكيد أرشفة الحساب؟ سيختفي من الموقع ومن البحث، وتبقى جميع الحقوق والسجلات محفوظة." className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">أرشفة آمنة وإخفاء الحساب</ConfirmSubmit></form></AccessBoundary> : <AccessBoundary module={'users'} action={'delete'}><form action={disposeMemberAccountAction} className="space-y-2"><input type="hidden" name="userId" value={uid} /><input type="hidden" name="decision" value="delete" /><input type="hidden" name="confirmation" value="DELETE" /><ConfirmSubmit msg="التأكيد الثاني: الحساب فارغ فعلاً. حذف الهوية نهائياً بعد فك الارتباط؟ لا يمكن التراجع." className="rounded-lg bg-destructive px-3 py-2 text-xs font-bold text-white">حذف الحساب الفارغ نهائياً</ConfirmSubmit></form></AccessBoundary>}
+      </section>}
 
       {/* سجل المخالفات: عدد مرات الحظر + الإنذارات النشطة الآن — نظرة سريعة قبل السجل الكامل */}
-      <div className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
+      {(keys.has('reports:view') || keys.has('audit:view')) && <div className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
         <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><ScrollText className="h-4 w-4" /> سجل المخالفات</div>
         <div className="grid grid-cols-2 gap-2">
           <Fact icon={Ban} label="مرات الحظر (آلي + يدوي)" value={String(banCount)} />
@@ -170,37 +174,37 @@ export default async function AdminUserDetail({ params, searchParams }: { params
             <div className="mt-2 max-h-96 space-y-1.5 overflow-y-auto">{timeline.map((e) => e.node)}</div>
           </details>
         )}
-      </div>
+      </div>}
 
       {/* edit */}
-      <form action={updateUserAction} className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
+      <AccessBoundary module={'users'} action={'edit'}><form action={updateUserAction} className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
         <div className="text-sm font-extrabold text-primary">تعديل البيانات</div>
         <input type="hidden" name="userId" value={uid} />
         <label className="block space-y-1"><span className="flex items-center gap-1 text-sm font-bold"><User className="h-4 w-4" /> الاسم</span><input name="name" defaultValue={u.name || ''} className={field} /></label>
         <label className="block space-y-1"><span className="flex items-center gap-1 text-sm font-bold"><Phone className="h-4 w-4" /> الجوال</span><input name="phoneNumber" defaultValue={u.phoneNumber || ''} dir="ltr" className={field} /></label>
         <label className="block space-y-1"><span className="flex items-center gap-1 text-sm font-bold"><Mail className="h-4 w-4" /> البريد</span><input name="email" defaultValue={u.email || ''} dir="ltr" className={field} /></label>
         <ConfirmSubmit msg="حفظ تعديلات بيانات هذا العضو (الاسم/الجوال/البريد)؟" className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground hover:bg-primary/90"><Save className="h-4 w-4" /> حفظ التعديلات</ConfirmSubmit>
-      </form>
+      </form></AccessBoundary>
 
       {/* set password manually — works without SMS */}
-      <form action={setUserPasswordAction} className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
+      <AccessBoundary module={'security'} action={'manage_settings'}><form action={setUserPasswordAction} className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
         <input type="hidden" name="userId" value={uid} />
         <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><KeyRound className="h-4 w-4" /> تعيين كلمة مرور يدوياً</div>
         <p className="text-xs font-bold text-muted-foreground">اكتب كلمة مرور جديدة للعضو مباشرة (بلا رسالة)، ثم أبلغه بها. يحلّ أي مشكلة دخول فوراً.</p>
         <input name="password" type="text" minLength={12} required placeholder="كلمة المرور الجديدة (12 حرفاً فأكثر)" className={field} />
         <ConfirmSubmit msg="تعيين كلمة المرور المكتوبة لهذا العضو؟ تحلّ محل كلمته الحالية فوراً." className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground hover:bg-primary/90"><Save className="h-4 w-4" /> تعيين كلمة المرور</ConfirmSubmit>
-      </form>
+      </form></AccessBoundary>
 
       {/* send new password via SMS */}
-      <form action={sendUserPasswordAction} className="space-y-3 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+      <AccessBoundary module={'security'} action={'manage_settings'}><form action={sendUserPasswordAction} className="space-y-3 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
         <input type="hidden" name="userId" value={uid} />
         <div className="flex items-center gap-2 text-sm font-extrabold text-amber-800"><KeyRound className="h-4 w-4" /> إرسال كلمة مرور جديدة</div>
         <p className="text-xs font-bold text-amber-800">يُنشئ كلمة مرور جديدة للعضو ويرسلها إلى جواله عبر رسالة نصية (يتطلّب ضبط بوابة الرسائل).</p>
         <ConfirmSubmit msg="إنشاء كلمة مرور جديدة وإرسالها لجوال العضو؟ تحلّ محل كلمته الحالية." className="inline-flex h-10 items-center gap-2 rounded-lg bg-amber-600 px-4 text-sm font-extrabold text-white hover:bg-amber-700"><KeyRound className="h-4 w-4" /> إرسال كلمة المرور</ConfirmSubmit>
-      </form>
+      </form></AccessBoundary>
 
       {/* المحفظة / الرصيد */}
-      <div id="wallet" className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
+      {(keys.has('wallets:view')) && <div id="wallet" className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><Wallet className="h-4 w-4" /> رصيد العضو</div>
           <div className="text-lg font-extrabold text-primary">{balance} ر.س</div>
@@ -212,8 +216,8 @@ export default async function AdminUserDetail({ params, searchParams }: { params
             <input name="note" placeholder="ملاحظة (اختياري)" className={`${field} flex-1`} />
           </div>
           <div className="flex gap-2">
-            <ConfirmSubmit msg="تأكيد شحن المبلغ المدخل لرصيد هذا العضو؟" name="kind" value="credit" className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700"><Plus className="h-4 w-4" /> شحن رصيد</ConfirmSubmit>
-            <ConfirmSubmit msg="تأكيد خصم المبلغ المدخل من رصيد هذا العضو؟" name="kind" value="debit" className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-500 px-3 py-2 text-sm font-bold text-white hover:bg-red-600"><Minus className="h-4 w-4" /> خصم</ConfirmSubmit>
+            {(keys.has('wallets:edit')) && <ConfirmSubmit msg="تأكيد شحن المبلغ المدخل لرصيد هذا العضو؟" name="kind" value="credit" className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700"><Plus className="h-4 w-4" /> شحن رصيد</ConfirmSubmit>}
+            {(keys.has('wallets:refund')) && <ConfirmSubmit msg="تأكيد خصم المبلغ المدخل من رصيد هذا العضو؟" name="kind" value="debit" className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-red-500 px-3 py-2 text-sm font-bold text-white hover:bg-red-600"><Minus className="h-4 w-4" /> خصم</ConfirmSubmit>}
           </div>
         </form>
         {txns.length > 0 && (
@@ -230,11 +234,11 @@ export default async function AdminUserDetail({ params, searchParams }: { params
             </ul>
           </div>
         )}
-      </div>
+      </div>}
 
-      <Link href={`/admin/users/${uid}/permissions`} className="inline-flex items-center gap-1 rounded-lg border border-primary/30 px-3 py-2 text-sm font-bold text-primary hover:bg-accent">
+      <AccessPage href={`/admin/users/${uid}/permissions`}><Link href={`/admin/users/${uid}/permissions`} className="inline-flex items-center gap-1 rounded-lg border border-primary/30 px-3 py-2 text-sm font-bold text-primary hover:bg-accent">
         <ShieldCheck className="h-4 w-4" /> إدارة الصلاحيات
-      </Link>
+      </Link></AccessPage>
     </div>
   );
 }

@@ -75,6 +75,12 @@ jobs:
           SUPPLIER_DB_TESTS: '1'
           SUPPLIER_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_supplier_test
 
+      - name: RBAC transactions on isolated MySQL
+        run: pnpm exec vitest run --config vitest.access-control.config.ts
+        env:
+          RBAC_DB_TESTS: '1'
+          RBAC_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_rbac_test
+
       - name: Production build
         run: pnpm build
 

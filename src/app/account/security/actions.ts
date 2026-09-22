@@ -6,7 +6,7 @@ import { requireUser, verifyPassword, newPasswordError, hashPassword, createSess
 import { prisma } from '@/lib/prisma';
 import { consumeMfa, getMfaCredential, takeSecurityAttempt, clearSecurityAttempts, mfaReadiness, lockAuthPolicy } from '@/lib/auth-security';
 import { generateTotpSecret, encryptSecret, decryptSecret, generateRecoveryCodes, recoveryHash, matchFactor } from '@/lib/mfa-crypto';
-import { requireManager } from '@/lib/roles';
+import { requireAccess } from '@/lib/access-control/guards';
 import { AUTH_PASSWORD_MIN, AUTH_REQUIRE_ADMIN_MFA } from '@/lib/settings';
 
 const COOKIE = 'trbhh_mfa_enrollment';
@@ -79,7 +79,7 @@ export async function changeOwnPasswordAction(_previous: SecurityState, form: Fo
 }
 
 export async function saveAuthPolicyAction(_previous: SecurityState, form: FormData): Promise<SecurityState> {
-  const session = await requireManager();
+  const session = await requireAccess('security','manage_settings');
   if (!(await takeSecurityAttempt('auth-policy:' + session.uid))) return { error: 'محاولات كثيرة؛ انتظر عشر دقائق.' };
   const user = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { password: true } });
   if (!user?.password || !(await verifyPassword(value(form, 'currentPassword'), user.password))) return { error: 'كلمة المرور الحالية غير صحيحة.' };

@@ -28,20 +28,27 @@ export async function getPushPublicKey(): Promise<string> {
 }
 
 /** حفظ اشتراك جهاز (مرة لكل endpoint). */
-export async function savePushSub(userId: number, sub: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<void> {
+export async function savePushSub(userId: number, sub: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<boolean> {
   await ensure();
-  const endpoint = String(sub.endpoint || '').slice(0, 500);
-  if (!endpoint || !sub.keys?.p256dh || !sub.keys?.auth) return;
-  await prisma.push_subs.deleteMany({ where: { endpoint } }).catch(() => {});
-  await prisma.push_subs.create({
-    data: { user_id: BigInt(userId), endpoint, p256dh: String(sub.keys.p256dh).slice(0, 255), auth: String(sub.keys.auth).slice(0, 120) },
-  }).catch(() => {});
+  const endpoint = String(sub.endpoint || '');
+  if (!Number.isSafeInteger(userId)||userId<=0||!endpoint||endpoint.length>500||!sub.keys?.p256dh||!sub.keys?.auth) return false;
+  const p256dh=String(sub.keys.p256dh),auth=String(sub.keys.auth);
+  if(p256dh.length>255||auth.length>120)return false;
+  // The legacy endpoint index is not unique. Serializable + locking reads
+  // prevent concurrent first registrations from attaching one device to two users.
+  return prisma.$transaction(async tx=>{
+    const existing=await tx.$queryRaw<{id:bigint;user_id:bigint}[]>`SELECT id,user_id FROM push_subs WHERE BINARY endpoint=${endpoint} FOR UPDATE`;
+    if(existing.some(row=>row.user_id!==BigInt(userId)))return false;
+    if(existing.length)await tx.$executeRaw`UPDATE push_subs SET p256dh=${p256dh},auth=${auth} WHERE user_id=${userId} AND BINARY endpoint=${endpoint}`;
+    else await tx.push_subs.create({data:{user_id:BigInt(userId),endpoint,p256dh,auth}});
+    return true;
+  },{isolationLevel:'Serializable',maxWait:5000,timeout:10000});
 }
 
-export async function deletePushSub(endpoint: string): Promise<void> {
+export async function deletePushSub(userId:number,endpoint: string): Promise<void> {
   await ensure();
-  if (!endpoint) return;
-  await prisma.push_subs.deleteMany({ where: { endpoint: endpoint.slice(0, 500) } }).catch(() => {});
+  if (!Number.isSafeInteger(userId)||userId<=0||!endpoint||endpoint.length>500) return;
+  await prisma.$executeRaw`DELETE FROM push_subs WHERE user_id=${userId} AND BINARY endpoint=${endpoint}`;
 }
 
 export async function hasPushSub(userId: number): Promise<boolean> {

@@ -4,16 +4,16 @@ import { requireFinance } from '@/lib/finance/permissions';
 import { buildFinanceReport, parseFinanceQuery } from '@/lib/finance/reports';
 import { readFinanceData } from '@/lib/finance/read-model';
 import { readFinanceInvoice, customerInvoice } from '@/lib/finance/documents';
-import { financeExportSheets, printableFinanceInvoice, printableFinanceReport } from '@/lib/finance/exports';
+import { financeSectionExportSheets, printableFinanceInvoice, printableFinanceReport } from '@/lib/finance/exports';
 import { recordFinanceExport } from '@/lib/finance/service';
 export const dynamic='force-dynamic';
 export async function GET(request:Request){
-  const session=await requireFinance('export');
   const url=new URL(request.url),format=url.searchParams.get('format');
   if(format!=='xlsx'&&format!=='print')return new Response('صيغة غير مدعومة',{status:400});
   const query=parseFinanceQuery(Object.fromEntries(url.searchParams));
-  const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; base-uri 'none'"};
   const invoiceId=url.searchParams.get('invoiceId');
+  const session=await requireFinance(invoiceId?'invoices':query.section,'export');
+  const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; base-uri 'none'"};
   if(invoiceId){
     if(!/^[1-9]\d{0,14}$/.test(invoiceId)||format!=='print')return new Response('طلب غير صالح',{status:400});
     const invoice=await readFinanceInvoice(prisma,invoiceId);
@@ -26,7 +26,7 @@ export async function GET(request:Request){
   await recordFinanceExport(prisma,BigInt(session.uid),query.month,format,query.section);
   if(format==='print')return new Response(printableFinanceReport(report),{headers:{...headers,'Content-Type':'text/html; charset=utf-8'}});
   const workbook=new ExcelJS.Workbook();workbook.creator='TRBHH';
-  for(const sheet of financeExportSheets(report)){
+  for(const sheet of financeSectionExportSheets(report)){
     const page=workbook.addWorksheet(sheet.name,{views:[{rightToLeft:true}]});
     page.addRow(sheet.headers);
     for(const row of sheet.rows)page.addRow(row); // Plain strings, never Excel formula objects.

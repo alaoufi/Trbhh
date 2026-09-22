@@ -1,5 +1,7 @@
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import { ShieldAlert, Trash2, Plus } from 'lucide-react';
-import { requirePerm } from '@/lib/roles';
+
 import { getGuardWords, getAllowedPhrases, BUILTIN, CATEGORY_LABEL, GUARD_CATEGORIES, type GuardCategory } from '@/lib/content-guard';
 import { Button } from '@/components/ui/button';
 import { addGuardWordAction, deleteGuardWordAction, addAllowedPhraseAction, deleteAllowedPhraseAction } from '../actions';
@@ -17,7 +19,7 @@ const COLORS: Record<GuardCategory, string> = {
 };
 
 export default async function GuardWordsPage() {
-  await requirePerm('words');
+  await requireAdminPage('/admin/guard-words');
   const [custom, allowed] = await Promise.all([getGuardWords(), getAllowedPhrases()]);
   return (
     <div className="space-y-5">
@@ -42,19 +44,19 @@ export default async function GuardWordsPage() {
             أضف الجملة المسموحة كاملةً (مثل <b>وايت سكس</b>) فتُقبل كما هي، بينما تبقى الكلمة المفردة (مثل «سكس») مشفَّرة بنجمات.
             تُقبل الجملة بأقواس أو بدونها.
           </p>
-          <form action={addAllowedPhraseAction} className="flex gap-2">
+          <AccessBoundary module={'words'} action={'create'}><form action={addAllowedPhraseAction} className="flex gap-2">
             <input name="phrase" required maxLength={120} placeholder="أضف جملة مسموحة… مثل (وايت سكس)" className="h-10 flex-1 rounded-lg border-2 border-emerald-300 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-400" />
             <Button size="sm" className="gap-1"><Plus className="h-4 w-4" /> إضافة</Button>
-          </form>
+          </form></AccessBoundary>
           {allowed.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {allowed.map((p) => (
                 <span key={p.id} className="flex items-center gap-1.5 rounded-lg border-2 border-emerald-300 bg-emerald-50 px-2.5 py-1 text-sm font-bold text-emerald-800">
                   {p.phrase}
-                  <form action={deleteAllowedPhraseAction}>
+                  <AccessBoundary module={'words'} action={'delete'}><form action={deleteAllowedPhraseAction}>
                     <input type="hidden" name="id" value={p.id} />
                     <ConfirmSubmit msg={`حذف الجملة المسموحة «${p.phrase}»؟`} title="حذف" className="text-destructive hover:opacity-70"><Trash2 className="h-3.5 w-3.5" /></ConfirmSubmit>
-                  </form>
+                  </form></AccessBoundary>
                 </span>
               ))}
             </div>
@@ -70,11 +72,11 @@ export default async function GuardWordsPage() {
               <h2 className="font-extrabold drop-shadow">{CATEGORY_LABEL[cat]}</h2>
             </div>
             <div className="space-y-3 p-3">
-              <form action={addGuardWordAction} className="flex gap-2">
+              <AccessBoundary module={'words'} action={'create'}><form action={addGuardWordAction} className="flex gap-2">
                 <input type="hidden" name="category" value={cat} />
                 <input name="word" required maxLength={120} placeholder="أضف كلمة/عبارة للحظر…" className="h-10 flex-1 rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/40" />
                 <Button size="sm" className="gap-1"><Plus className="h-4 w-4" /> إضافة</Button>
-              </form>
+              </form></AccessBoundary>
 
               {words.length > 0 && (
                 <div>
@@ -83,10 +85,10 @@ export default async function GuardWordsPage() {
                     {words.map((w) => (
                       <span key={w.id} className="flex items-center gap-1.5 rounded-lg border-2 border-primary/20 bg-accent/30 px-2.5 py-1 text-sm font-bold">
                         {w.word}
-                        <form action={deleteGuardWordAction}>
+                        <AccessBoundary module={'words'} action={'delete'}><form action={deleteGuardWordAction}>
                           <input type="hidden" name="id" value={w.id} />
                           <ConfirmSubmit msg={`حذف كلمة «${w.word}» من كلمات الحماية؟`} title="حذف" className="text-destructive hover:opacity-70"><Trash2 className="h-3.5 w-3.5" /></ConfirmSubmit>
-                        </form>
+                        </form></AccessBoundary>
                       </span>
                     ))}
                   </div>

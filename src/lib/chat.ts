@@ -55,6 +55,10 @@ export async function sendChat(fromId: number, toId: number, message: string): P
   await prisma.chat_typing.deleteMany({ where: { user_id: fromId, peer_id: toId } }).catch(() => {});
   // تنبيه فوري للمستلم (إن فعّلته الإدارة واشترك جهازه) — لا يعطّل الإرسال بأي حال
   import('./push').then(async ({ sendPushToUser }) => {
+    // Staff inbox snippets carry the same permissions as the conversation.
+    // Keep the member's message, but do not deliver its body to revoked staff.
+    const {canUseMemberChat}=await import('./chat-access');
+    if(!await canUseMemberChat(toId,'view'))return;
     const sender = await prisma.users.findUnique({ where: { id: BigInt(fromId) }, select: { name: true, userName: true } }).catch(() => null);
     await sendPushToUser(toId, {
       title: `رسالة جديدة من ${sender?.name || sender?.userName || 'عضو'}`,

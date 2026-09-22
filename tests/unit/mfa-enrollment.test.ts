@@ -4,7 +4,7 @@ const m = vi.hoisted(() => ({ password: vi.fn(), policyError: vi.fn(), credentia
 vi.mock('next/headers', () => ({ cookies: async () => ({ set: m.set, get: m.get, delete: vi.fn() }) }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/auth', () => ({ requireUser: async () => ({ uid: 7, name: 'Tester', type: 'user' }), verifyPassword: m.password, newPasswordError: m.policyError, hashPassword: async () => 'newhash', createSession: m.session, shouldUseSecureCookies: () => true }));
-vi.mock('@/lib/roles', () => ({ requireManager: async () => ({ uid: 7 }) }));
+vi.mock('@/lib/access-control/guards', () => ({ requireAccess: async () => ({ uid: 7 }) }));
 vi.mock('@/lib/settings', () => ({ AUTH_PASSWORD_MIN: 'min', AUTH_REQUIRE_ADMIN_MFA: 'mfa', setSetting: m.setting }));
 vi.mock('@/lib/auth-security', () => ({ consumeMfa: m.consume, getMfaCredential: m.credential, takeSecurityAttempt: m.attempt, clearSecurityAttempts: async () => {}, mfaReadiness: m.ready, lockAuthPolicy: async () => false }));
 vi.mock('@/lib/prisma', () => ({ prisma: { users: { findUnique: m.user }, $transaction: async (fn: (tx: unknown) => unknown) => fn({ $queryRawUnsafe: m.rows, $executeRawUnsafe: m.execute, site_settings: { upsert: m.setting } }) } }));

@@ -6,6 +6,7 @@ import { getConversations } from '@/lib/messages';
 import { getEmptyText } from '@/lib/settings';
 import { timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { canUseMemberChat } from '@/lib/chat-access';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'مراسلات الإدارة' };
@@ -13,6 +14,7 @@ export const metadata = { title: 'مراسلات الإدارة' };
 export default async function MessagesPage() {
  const session = await getSession();
  if (!session) redirect('/login');
+ if (!await canUseMemberChat(session.uid,'view')) redirect('/account?access=denied');
  const convos = await getConversations(session.uid);
  const emptyMsg = await getEmptyText('chats').catch(() => 'لا توجد محادثات بعد.');
  return (

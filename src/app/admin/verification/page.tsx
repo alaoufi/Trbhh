@@ -1,5 +1,7 @@
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage, hasAccess } from '@/lib/access-control/guards';
 import { MessageSquare, Check, Smartphone, Send, Stethoscope } from 'lucide-react';
-import { requireAction } from '@/lib/roles';
+
 import { getMessagingConfig, smsDiagnose } from '@/lib/sms';
 import { Button } from '@/components/ui/button';
 import { saveVerificationAction } from '../actions';
@@ -8,7 +10,8 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'بوابات التحقق (SMS/واتساب)' };
 
 export default async function VerificationPage({ searchParams }: { searchParams: Promise<{ saved?: string; test?: string }> }) {
-  await requireAction('users', 'edit');
+  const session=await requireAdminPage('/admin/verification');
+  if(!await hasAccess(session.uid,'security','manage_settings'))return <section className="space-y-3 rounded-xl border p-5"><h1 className="text-xl font-bold">بوابات التحقق (SMS / واتساب)</h1><p>عرض فقط. إدارة إعدادات الربط وتشخيص الإرسال تتطلب صلاحية إدارة إعدادات الأمان.</p></section>;
   const [{ saved, test }, c] = await Promise.all([searchParams, getMessagingConfig()]);
   const field = 'h-10 w-full rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/40';
   const testPhone = (test || '').trim();
@@ -42,7 +45,7 @@ export default async function VerificationPage({ searchParams }: { searchParams:
         )}
       </form>
 
-      <form action={saveVerificationAction} className="space-y-4">
+      <AccessBoundary module={'security'} action={'manage_settings'}><form action={saveVerificationAction} className="space-y-4">
         {/* channel + enable */}
         <div className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
           <label className="flex items-center gap-2 text-sm font-bold">
@@ -97,7 +100,7 @@ export default async function VerificationPage({ searchParams }: { searchParams:
         </section>
 
         <Button className="w-full">حفظ الإعدادات</Button>
-      </form>
+      </form></AccessBoundary>
     </div>
   );
 }

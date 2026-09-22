@@ -22,6 +22,10 @@ import { scanContent } from './content-guard';
 export async function deleteAccountNow(userId: number): Promise<void> {
   await ensureSchema();
   const uid = BigInt(userId);
+  // Revoke role assignments through access control first. Freeze the account
+  // under the same lock as grants before any legacy cascading cleanup begins.
+  const {withUnassignedAccountChange}=await import('./access-control/store');
+  await withUnassignedAccountChange(prisma,userId,tx=>tx.users.update({where:{id:uid},data:{ban:'checked',ban_until:null,auth_session_version:randomBytes(24).toString('hex')}}));
 
   // 1) merchant store (store-scoped cascade already exists)
   const storeId = await storeIdOfUser(userId).catch(() => 0);

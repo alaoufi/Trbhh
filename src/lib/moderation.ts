@@ -72,7 +72,8 @@ export async function recordStrike(userId: number, kind: string): Promise<number
 
 /** Ban a user's account (permanent — used by auto-moderation). */
 export async function banUser(userId: number, reason?: string) {
-  await prisma.users.update({ where: { id: BigInt(userId) }, data: { ban: 'checked', ban_reason: reason?.slice(0, 300) ?? null, ban_at: new Date() } }).catch(() => {});
+  const {withUnassignedAccountChange}=await import('./access-control/store');
+  await withUnassignedAccountChange(prisma,userId,tx=>tx.users.update({ where: { id: BigInt(userId) }, data: { ban: 'checked', ban_reason: reason?.slice(0, 300) ?? null, ban_at: new Date() } }));
 }
 
 /* ---- ban duration (temporary N days / permanent) ---- */
@@ -103,7 +104,8 @@ export type BanSource = 'auto' | 'admin';
 export async function banUserFor(userId: number, days: number, source: BanSource = 'admin', reason?: string) {
   await ensureBanCol();
   const until = days > 0 ? new Date(Date.now() + Math.min(days, 3650) * 86_400_000) : null;
-  await prisma.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'checked', ban_until: until, ban_source: source, ban_reason: reason?.slice(0, 300) ?? null, ban_at: new Date() } }).catch(() => {});
+  const {withUnassignedAccountChange}=await import('./access-control/store');
+  await withUnassignedAccountChange(prisma,userId,tx=>tx.users.updateMany({ where: { id: BigInt(userId) }, data: { ban: 'checked', ban_until: until, ban_source: source, ban_reason: reason?.slice(0, 300) ?? null, ban_at: new Date() } }));
 }
 
 /** Lift a user's ban. يمسح السبب والتاريخ معاً. */

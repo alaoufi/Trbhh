@@ -4,7 +4,10 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requireAction, requireUserBan, requireManager, AdminMfaEnrollmentRequired, setUserPerms, applyRolePreset, ALL_KEYS, setRolePermKeys, MATRIX_ROLES, type Role } from '@/lib/roles';
+import { setRolePermKeys } from '@/lib/roles';
+import { requireAccess } from '@/lib/access-control/guards';
+import { isPrivilegedAccount } from '@/lib/auth-security';
+import { withUnassignedAccountChange } from '@/lib/access-control/store';
 import { findDuplicateAds, findCrossUserDuplicateAds } from '@/lib/duplicates';
 import { deleteClassified, setClassifiedStatus, setClassifiedLifetime } from '@/lib/classified';
 import { adminDeleteMessage, archiveAdminThread, restoreAdminThread, deleteArchivedAdminThread } from '@/lib/chat';
@@ -26,8 +29,14 @@ import { logAdmin } from '@/lib/audit';
 import { archiveMemberAccount, dispositionFor, inspectMemberDependencies } from '@/lib/member-disposition';
 import { unlinkAccount } from '@/lib/account-links';
 
+async function protectStaffTarget(userId: number) {
+  if (Number.isSafeInteger(userId) && userId > 0 && await isPrivilegedAccount(userId)) {
+    await requireAccess('access_control', 'manage_settings');
+  }
+}
+
 export async function reviewInternationalRegistrationAction(formData: FormData) {
-  const admin = await requireAction('users', 'edit');
+  const admin = await requireAccess('users', 'approve');
   const id = Number(formData.get('id') || 0);
   const decision = String(formData.get('decision') || '');
   const note = String(formData.get('note') || '').trim().slice(0, 300);
@@ -51,7 +60,7 @@ export async function reviewInternationalRegistrationAction(formData: FormData) 
 }
 
 export async function deleteInternationalRegistrationAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireAccess('users', 'delete');
   const id = Number(formData.get('id') || 0);
   if (Number.isSafeInteger(id) && id > 0) await prisma.$executeRawUnsafe('DELETE FROM international_registration_requests WHERE id=? AND status <> \'approved\'', id);
   revalidatePath('/admin/international-registrations');
@@ -59,7 +68,7 @@ export async function deleteInternationalRegistrationAction(formData: FormData) 
 }
 
 export async function createMemberServiceOrderAction(formData: FormData) {
-  const admin = await requireAction('users', 'edit');
+  const admin = await requireAccess('pricing', 'manage_settings');
   const userId = Number(formData.get('userId') || 0);
   const title = String(formData.get('title') || '').trim();
   const description = String(formData.get('description') || '').trim();
@@ -80,7 +89,7 @@ export async function createMemberServiceOrderAction(formData: FormData) {
 }
 
 export async function cancelPendingMemberServiceOrderAdminAction(formData: FormData) {
-  const admin = await requireAction('users', 'edit');
+  const admin = await requireAccess('pricing', 'manage_settings');
   const orderId = Number(formData.get('orderId') || 0);
   const userId = Number(formData.get('userId') || 0);
   const reason = String(formData.get('reason') || '').trim().slice(0, 300);
@@ -104,38 +113,38 @@ function readPromoPkgForm(formData: FormData) {
 }
 
 export async function approvePromoAction(formData: FormData) {
-  await requireAction('promos', 'edit');
+  await requireAccess('promos', 'approve');
   const id = Number(formData.get('id'));
   if (id) await approvePromo(id);
   revalidatePath('/admin/promos');
 }
 export async function rejectPromoAction(formData: FormData) {
-  await requireAction('promos', 'edit');
+  await requireAccess('promos', 'approve');
   const id = Number(formData.get('id'));
   if (id) await rejectPromo(id);
   revalidatePath('/admin/promos');
 }
 export async function deletePromoAction(formData: FormData) {
-  await requireAction('promos', 'delete');
+  await requireAccess('promos', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deletePromo(id);
   revalidatePath('/admin/promos');
 }
 export async function createPromoPackageAction(formData: FormData) {
-  await requireAction('promos', 'add');
+  await requireAccess('promos', 'create');
   await createPromoPackage(readPromoPkgForm(formData));
   revalidatePath('/admin/revenue');
   revalidatePath('/promote');
 }
 export async function updatePromoPackageAction(formData: FormData) {
-  await requireAction('promos', 'edit');
+  await requireAccess('promos', 'edit');
   const id = Number(formData.get('id'));
   if (id) await updatePromoPackage(id, readPromoPkgForm(formData));
   revalidatePath('/admin/revenue');
   revalidatePath('/promote');
 }
 export async function deletePromoPackageAction(formData: FormData) {
-  await requireAction('promos', 'delete');
+  await requireAccess('promos', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deletePromoPackage(id);
   revalidatePath('/admin/revenue');
@@ -161,14 +170,14 @@ function readPackageForm(formData: FormData) {
 }
 
 export async function createPackageAction(formData: FormData) {
-  await requireAction('packages', 'add');
+  await requireAccess('packages', 'create');
   await createPackage(readPackageForm(formData));
   revalidatePath('/admin/revenue');
   revalidatePath('/packages');
 }
 
 export async function updatePackageAction(formData: FormData) {
-  await requireAction('packages', 'edit');
+  await requireAccess('packages', 'edit');
   const id = Number(formData.get('id'));
   if (id) await updatePackage(id, readPackageForm(formData));
   revalidatePath('/admin/revenue');
@@ -176,7 +185,7 @@ export async function updatePackageAction(formData: FormData) {
 }
 
 export async function deletePackageAction(formData: FormData) {
-  await requireAction('packages', 'delete');
+  await requireAccess('packages', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deletePackage(id);
   revalidatePath('/admin/revenue');
@@ -184,7 +193,7 @@ export async function deletePackageAction(formData: FormData) {
 }
 
 export async function assignUserPackageAction(formData: FormData) {
-  await requireAction('packages', 'edit');
+  await requireAccess('packages', 'edit');
   const userId = Number(formData.get('userId'));
   const packageId = Number(formData.get('packageId')) || 0;
   const days = parseInt(String(formData.get('days') || '0')) || 0;
@@ -193,35 +202,35 @@ export async function assignUserPackageAction(formData: FormData) {
 }
 
 export async function addBannedWordAction(formData: FormData) {
-  await requireAction('words', 'add');
+  await requireAccess('words', 'create');
   const word = String(formData.get('word') || '').trim();
   if (word) await addBannedWord(word);
   revalidatePath('/admin/words');
 }
 
 export async function deleteBannedWordAction(formData: FormData) {
-  await requireAction('words', 'delete');
+  await requireAccess('words', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deleteBannedWord(id);
   revalidatePath('/admin/words');
 }
 
 export async function addNameWordAction(formData: FormData) {
-  await requireAction('words', 'add');
+  await requireAccess('words', 'create');
   const word = String(formData.get('word') || '').trim();
   if (word) await addNameWord(word);
   revalidatePath('/admin/words');
 }
 
 export async function deleteNameWordAction(formData: FormData) {
-  await requireAction('words', 'delete');
+  await requireAccess('words', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deleteNameWord(id);
   revalidatePath('/admin/words');
 }
 
 export async function addGuardWordAction(formData: FormData) {
-  await requireAction('words', 'add');
+  await requireAccess('words', 'create');
   const category = String(formData.get('category') || '') as GuardCategory;
   const word = String(formData.get('word') || '').trim();
   if (word && GUARD_CATEGORIES.includes(category)) await addGuardWord(category, word);
@@ -229,28 +238,28 @@ export async function addGuardWordAction(formData: FormData) {
 }
 
 export async function deleteGuardWordAction(formData: FormData) {
-  await requireAction('words', 'delete');
+  await requireAccess('words', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deleteGuardWord(id);
   revalidatePath('/admin/guard-words');
 }
 
 export async function saveGuardBlockCountAction(formData: FormData) {
-  await requireAction('words', 'edit');
+  await requireAccess('words', 'edit');
   const n = Math.max(0, Math.min(50, parseInt(String(formData.get('count') || '3')) || 0));
   await setSetting('guard_block_count', String(n));
   revalidatePath('/admin/guard-words');
 }
 
 export async function addAllowedPhraseAction(formData: FormData) {
-  await requireAction('words', 'add');
+  await requireAccess('words', 'create');
   const phrase = String(formData.get('phrase') || '').trim();
   if (phrase) { const { addAllowedPhrase } = await import('@/lib/content-guard'); await addAllowedPhrase(phrase); }
   revalidatePath('/admin/guard-words');
 }
 
 export async function deleteAllowedPhraseAction(formData: FormData) {
-  await requireAction('words', 'delete');
+  await requireAccess('words', 'delete');
   const id = Number(formData.get('id'));
   if (id) { const { deleteAllowedPhrase } = await import('@/lib/content-guard'); await deleteAllowedPhrase(id); }
   revalidatePath('/admin/guard-words');
@@ -258,7 +267,7 @@ export async function deleteAllowedPhraseAction(formData: FormData) {
 
 /** Enable/disable a classified ad (hidden from the site while disabled). */
 export async function toggleClassifiedAction(formData: FormData) {
-  await requireAction('classified', 'suspend');
+  await requireAccess('classified', 'suspend');
   const id = Number(formData.get('id'));
   const enable = String(formData.get('action')) === 'enable';
   if (id) await setClassifiedStatus(id, enable);
@@ -268,7 +277,7 @@ export async function toggleClassifiedAction(formData: FormData) {
 
 /** Set a classified ad's lifetime in days from now (0 = follow the global setting). */
 export async function classifiedLifetimeAction(formData: FormData) {
-  await requireAction('classified', 'edit');
+  await requireAccess('classified', 'edit');
   const id = Number(formData.get('id'));
   const days = Math.max(0, parseInt(String(formData.get('days') || '0')) || 0);
   if (id) await setClassifiedLifetime(id, days);
@@ -277,7 +286,7 @@ export async function classifiedLifetimeAction(formData: FormData) {
 }
 
 export async function adminDeleteClassifiedAction(formData: FormData) {
-  await requireAction('classified', 'delete');
+  await requireAccess('classified', 'delete');
   const id = Number(formData.get('id'));
   if (id) await deleteClassified(id);
   revalidatePath('/admin/classified');
@@ -286,7 +295,7 @@ export async function adminDeleteClassifiedAction(formData: FormData) {
 
 /** Approve or reject a merchant store. */
 export async function approveStoreAction(formData: FormData) {
-  const session = await requireAction('stores', 'edit');
+  const session = await requireAccess('stores', 'approve');
   const id = Number(formData.get('storeId'));
   const approve = String(formData.get('action')) === 'approve';
   if (id) {
@@ -298,7 +307,7 @@ export async function approveStoreAction(formData: FormData) {
 
 /** Admin asks an approved store to feature its products on the home page. */
 export async function requestStoreHomeAction(formData: FormData) {
-  const session = await requireAction('stores', 'edit');
+  const session = await requireAccess('stores', 'edit');
   const id = Number(formData.get('storeId'));
   if (id) {
     await adminRequestHome(id);
@@ -310,7 +319,7 @@ export async function requestStoreHomeAction(formData: FormData) {
 /** Suspend (stop) or reactivate a store.
  *  الإيقاف (مؤقت/نهائي) لا يُحفظ إلا بسبب مكتوب — يُعرض مع تاريخ ووقت الإيقاف. */
 export async function toggleStoreStatusAction(formData: FormData) {
-  const session = await requireAction('stores', 'suspend');
+  const session = await requireAccess('stores', 'suspend');
   const id = Number(formData.get('storeId'));
   const action = String(formData.get('action'));
   if (id) {
@@ -327,7 +336,7 @@ export async function toggleStoreStatusAction(formData: FormData) {
 
 /** Issue a violation warning against a store (3 warnings → auto-suspend). */
 export async function warnStoreAction(formData: FormData) {
-  const session = await requireAction('stores', 'edit');
+  const session = await requireAccess('stores', 'suspend');
   const id = Number(formData.get('storeId'));
   const reason = String(formData.get('reason') || '').trim();
   if (id && reason) {
@@ -340,7 +349,7 @@ export async function warnStoreAction(formData: FormData) {
 /** حذف نهائي حقيقي — فقط من الأرشيف (متجر موقوف نهائياً بالفعل، أي «حذفه» سابقاً
  *  من لوحة المتاجر عبر «إيقاف نهائي» = toggleStoreStatusAction)، ولا رجعة فيه. */
 export async function adminDeleteStoreForeverAction(formData: FormData) {
-  const session = await requireAction('stores', 'delete');
+  const session = await requireAccess('stores', 'delete');
   const id = Number(formData.get('storeId'));
   if (id && formData.get('confirm')) {
     const s = await prisma.stores.findUnique({ where: { id: BigInt(id) }, select: { status: true, store_name: true } }).catch(() => null);
@@ -354,7 +363,7 @@ export async function adminDeleteStoreForeverAction(formData: FormData) {
 
 /** أرشفة تعليق (إخفاء عن الجمهور دون حذفه) — يظهر في تبويب «التعليقات» بالأرشيف. */
 export async function adminHideCommentAction(formData: FormData) {
-  const session = await requireAction('comments', 'delete');
+  const session = await requireAccess('comments', 'delete');
   const id = Number(formData.get('commentId'));
   const adId = Number(formData.get('adId') || 0);
   if (id) {
@@ -367,7 +376,7 @@ export async function adminHideCommentAction(formData: FormData) {
 
 /** استعادة تعليق من الأرشيف. */
 export async function adminRestoreCommentAction(formData: FormData) {
-  const session = await requireAction('comments', 'delete');
+  const session = await requireAccess('comments', 'delete');
   const id = Number(formData.get('commentId'));
   if (id) {
     await prisma.comments.updateMany({ where: { id: BigInt(id) }, data: { hide: 'no' } });
@@ -378,7 +387,7 @@ export async function adminRestoreCommentAction(formData: FormData) {
 
 /** Admin approves/rejects a merchant's request to feature products on Trbhh. */
 export async function decidePlatformAction(formData: FormData) {
-  const session = await requireAction('stores', 'edit');
+  const session = await requireAccess('stores', 'edit');
   const id = Number(formData.get('storeId'));
   const approve = String(formData.get('action')) === 'approve';
   if (id) {
@@ -390,7 +399,7 @@ export async function decidePlatformAction(formData: FormData) {
 
 /** Admin executes a mutually-consented ownership transfer (step 3). */
 export async function completeStoreTransferAction(formData: FormData) {
-  const session = await requireAction('stores', 'edit');
+  const session = await requireAccess('stores', 'edit');
   const id = Number(formData.get('storeId'));
   if (id && formData.get('confirm')) {
     await completeStoreTransfer(id);
@@ -401,7 +410,7 @@ export async function completeStoreTransferAction(formData: FormData) {
 
 /** Admin removes a single (inappropriate) chat message from a monitored thread. */
 export async function adminDeleteMessageAction(formData: FormData) {
-  await requireAction('messages', 'delete');
+  await requireAccess('messages', 'delete');
   const id = Number(formData.get('messageId'));
   if (id) await adminDeleteMessage(id);
   revalidatePath('/admin/messages');
@@ -409,7 +418,7 @@ export async function adminDeleteMessageAction(formData: FormData) {
 
 /** Archive a resolved member-to-administration conversation without deleting it. */
 export async function archiveAdminMessageThreadAction(formData: FormData) {
-  const session = await requireAction('messages', 'edit');
+  const session = await requireAccess('messages', 'edit');
   const memberId = Number(formData.get('memberId') || 0);
   const adminId = await getPrimaryAdminId();
   if (Number.isSafeInteger(memberId) && memberId > 0 && adminId) {
@@ -422,7 +431,7 @@ export async function archiveAdminMessageThreadAction(formData: FormData) {
 
 /** Restore an archived support conversation to the actionable inbox. */
 export async function restoreAdminMessageThreadAction(formData: FormData) {
-  const session = await requireAction('messages', 'edit');
+  const session = await requireAccess('messages', 'edit');
   const memberId = Number(formData.get('memberId') || 0);
   const adminId = await getPrimaryAdminId();
   if (Number.isSafeInteger(memberId) && memberId > 0 && adminId && await restoreAdminThread(adminId, memberId)) {
@@ -434,7 +443,7 @@ export async function restoreAdminMessageThreadAction(formData: FormData) {
 
 /** Final deletion is intentionally limited to conversations already archived. */
 export async function deleteArchivedAdminMessageThreadAction(formData: FormData) {
-  const session = await requireAction('messages', 'delete');
+  const session = await requireAccess('messages', 'delete');
   const memberId = Number(formData.get('memberId') || 0);
   const adminId = await getPrimaryAdminId();
   if (Number.isSafeInteger(memberId) && memberId > 0 && adminId && await deleteArchivedAdminThread(adminId, memberId)) {
@@ -448,7 +457,7 @@ export async function deleteArchivedAdminMessageThreadAction(formData: FormData)
 /** لا حذف مباشر: إن لم يكن الإعلان مؤرشفاً يُؤرشف أولاً (ينتقل للأرشيف)،
  *  والحذف النهائي لا يتم إلا على إعلان مؤرشف. */
 export async function adminDeleteAdRedirectAction(formData: FormData) {
-  const session = await requireAction('ads', 'delete');
+  const session = await requireAccess('ads', 'delete');
   const id = BigInt(String(formData.get('adId')));
   const a = await prisma.ads.findUnique({ where: { id }, select: { data_archive: true } }).catch(() => null);
   const isArchived = !!(a?.data_archive && a.data_archive.trim() !== '');
@@ -468,24 +477,27 @@ export async function adminDeleteAdRedirectAction(formData: FormData) {
 
 /** Archive (hide) an ad from its detail page (admin). Auto-deleted after 30 days. */
 export async function adminArchiveAdAction(formData: FormData) {
-  await requireAction('ads', 'archive');
+  await requireAccess('ads', 'view');
   const id = BigInt(String(formData.get('adId')));
-  const a = await prisma.ads.findUnique({ where: { id } });
-  if (a) {
+  await prisma.$transaction(async (tx) => {
+    const [a] = await tx.$queryRawUnsafe<{ status: number | null }[]>('SELECT status FROM ads WHERE id = ? FOR UPDATE', id);
+    if (!a) return;
     const archiving = a.status === 1;
-    await prisma.ads.update({
+    await requireAccess('ads', archiving ? 'archive' : 'approve');
+    await tx.ads.update({
       where: { id },
       // النشر من الإدارة يمسح علامة «أوقفه صاحبه» أيضاً
       data: { status: archiving ? 0 : 1, data_archive: archiving ? new Date().toISOString() : null, ...(archiving ? {} : { paused_by_owner: 0 }) },
-    }).catch(() => {});
-  }
+    });
+  });
   revalidatePath(`/ads/${toInt(id)}`);
 }
 
 /** رسالة من الإدارة لصاحب الإعلان (من داخل صفحة الإعلان) — يُضاف رابط الإعلان تلقائياً
  *  آخر الرسالة، وتُرسَل من حساب المشرف الحالي فتصله ردوده في «الرسائل». */
 export async function adminMessageAdOwnerAction(formData: FormData) {
-  const session = await requireAction('ads', 'archive');
+  await requireAccess('ads', 'view');
+  const session = await requireAccess('messages', 'create');
   const adId = Number(formData.get('adId') || 0);
   const text = String(formData.get('message') || '').trim().slice(0, 1000);
   if (!adId || !text) redirect(`/ads/${adId}#admin-tools`);
@@ -503,7 +515,7 @@ export async function adminMessageAdOwnerAction(formData: FormData) {
 /** حظر إعلان مخالف نهائياً: حذف فوري ولا رجعة فيه — يختلف عن «الأرشفة» (مؤقتة وقابلة للاستعادة).
  *  يُستخدم للمحتوى المخالف الواضح؛ يُسجَّل في سجل التجاوزات وسجل نشاط الإدارة. */
 export async function adminBanAdAction(formData: FormData) {
-  const session = await requireAction('ads', 'delete');
+  const session = await requireAccess('ads', 'delete');
   const id = BigInt(String(formData.get('adId')));
   const reason = String(formData.get('reason') || '').trim().slice(0, 300);
   const ad = await prisma.ads.findUnique({ where: { id }, select: { title: true, user_id: true } }).catch(() => null);
@@ -524,20 +536,27 @@ export async function adminBanAdAction(formData: FormData) {
  *  المتجر مع سبب المخالفة) وإرسال إنذار مخالفة لصاحب المتجر (يحتسب ضمن ٣
  *  إنذارات)، أو إعادة نشره. لا أرشفة ولا حذف ولا حظر للمتجر. */
 export async function adminHideStoreAdAction(formData: FormData) {
-  const session = await requireAction('ads', 'archive');
+  const session = await requireAccess('ads', 'view');
   const id = BigInt(String(formData.get('adId')));
   const storeId = Number(formData.get('storeId') || 0);
   const reason = String(formData.get('reason') || '').trim();
-  const a = await prisma.ads.findUnique({ where: { id }, select: { status: true } }).catch(() => null);
-  if (!a) { revalidatePath(`/ads/${toInt(id)}`); return; }
-  if (a.status === 1) {
-    // إخفاء عن النشر + تسجيل السبب على الإعلان (يراه صاحب المتجر) + إنذار مخالفة
-    await prisma.ads.update({ where: { id }, data: { status: 0, arc_msg: (reason || 'مخفي من الإدارة لمخالفة').slice(0, 225) } }).catch(() => {});
+  const changed = await prisma.$transaction(async (tx) => {
+    const [a] = await tx.$queryRawUnsafe<{ status: number | null }[]>('SELECT status FROM ads WHERE id = ? FOR UPDATE', id);
+    if (!a) return null;
+    const hiding = a.status === 1;
+    await requireAccess('ads', hiding ? 'archive' : 'approve');
+    if (hiding) await requireAccess('stores', 'suspend');
+    const linked = await tx.store_products.findFirst({ where: { store_id: storeId, ad_id: Number(id) }, select: { store_id: true } });
+    if (!linked) redirect('/admin/stores?error=source');
+    await tx.ads.update({ where: { id }, data: { status: hiding ? 0 : 1, arc_msg: hiding ? (reason || 'مخفي من الإدارة لمخالفة').slice(0, 225) : null } });
+    return { hiding };
+  });
+  if (!changed) { revalidatePath(`/ads/${toInt(id)}`); return; }
+  if (changed.hiding) {
     if (storeId && reason) await addStoreWarning(storeId, reason).catch(() => {});
     await logAdmin(session.uid, 'إخفاء إعلان متجر عن النشر + إنذار مخالفة', `إعلان #${toInt(id)} · متجر #${storeId}`, reason);
   } else {
     // إعادة النشر — يمسح سبب الإخفاء (الإنذار السابق يبقى مسجّلاً على المتجر)
-    await prisma.ads.update({ where: { id }, data: { status: 1, arc_msg: null } }).catch(() => {});
     await logAdmin(session.uid, 'إعادة نشر إعلان متجر', `إعلان #${toInt(id)}`);
   }
   await bustAdCaches().catch(() => {});
@@ -549,8 +568,9 @@ export async function adminHideStoreAdAction(formData: FormData) {
  *  `permanent` flag → permanent, else `days` (temporary). If already banned → unban.
  *  الحظر لا يُحفظ إلا بسبب مكتوب ومدة محددة (أيام ≥ 1 أو دائم) — يُعرضان مع الحظر. */
 export async function adminBanSellerAction(formData: FormData) {
-  const session = await requireUserBan();
+  const session = await requireAccess('users', 'ban');
   const uid = Number(formData.get('userId'));
+  await protectStaffTarget(uid);
   const adId = String(formData.get('adId') || '');
   const back = adId ? `/ads/${adId}` : '/';
   const u = await prisma.users.findUnique({ where: { id: BigInt(uid) } });
@@ -573,7 +593,7 @@ export async function adminBanSellerAction(formData: FormData) {
 }
 
 export async function adminDeleteDuplicatesAction() {
-  await requireAction('duplicates', 'delete');
+  await requireAccess('duplicates', 'delete');
   const { groups } = await findDuplicateAds();
   const dupIds = groups.flatMap((g) => g.dups.map((d) => BigInt(d.id)));
   let deleted = 0;
@@ -589,7 +609,7 @@ export async function adminDeleteDuplicatesAction() {
 
 /** حذف الإعلانات المكررة عبر أعضاء مختلفين (شبكات سبام بأرقام/حسابات متعددة). */
 export async function adminDeleteCrossDuplicatesAction() {
-  await requireAction('duplicates', 'delete');
+  await requireAccess('duplicates', 'delete');
   const { groups } = await findCrossUserDuplicateAds();
   const dupIds = groups.flatMap((g) => g.dups.map((d) => BigInt(d.id)));
   let deleted = 0;
@@ -605,7 +625,7 @@ export async function adminDeleteCrossDuplicatesAction() {
 
 /** Execute a logged-out account-deletion request (Google Play requirement). */
 export async function executeDeletionRequestAction(formData: FormData) {
-  await requireAction('users', 'delete');
+  await requireAccess('users', 'delete');
   const id = Number(formData.get('id'));
   const phone = String(formData.get('phone') || '');
   const uid = await findUserByPhone(phone);
@@ -616,7 +636,7 @@ export async function executeDeletionRequestAction(formData: FormData) {
 
 /** Dismiss a deletion request without deleting (e.g. ownership not verified). */
 export async function dismissDeletionRequestAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireAccess('users', 'edit');
   const id = Number(formData.get('id'));
   if (id) await closeDeletionRequest(id);
   revalidatePath('/admin/users');
@@ -626,8 +646,9 @@ export async function dismissDeletionRequestAction(formData: FormData) {
  *  لا يُحفظ الحظر إلا بعد كتابة سبب الحظر وتحديد مدته (أيام ≥ 1 أو دائم) — يُعرضان
  *  لاحقاً مع الحظر (السبب + التاريخ والوقت). */
 export async function banUserAction(formData: FormData) {
-  const session = await requireUserBan();
+  const session = await requireAccess('users', 'ban');
   const id = Number(formData.get('userId'));
+  await protectStaffTarget(id);
   const permanent = !!formData.get('permanent');
   const days = Math.max(0, parseInt(String(formData.get('days') || '0')) || 0);
   const reason = String(formData.get('reason') || '').trim();
@@ -642,8 +663,9 @@ export async function banUserAction(formData: FormData) {
 
 /** Lift a member's ban. */
 export async function unbanUserAction(formData: FormData) {
-  const session = await requireUserBan();
+  const session = await requireAccess('users', 'ban');
   const id = Number(formData.get('userId'));
+  await protectStaffTarget(id);
   await unbanUser(id);
   await logAdmin(session.uid, 'رفع حظر', `العضو #${String(formData.get('userId') || '')}`);
   revalidatePath('/admin/users');
@@ -654,37 +676,20 @@ export async function unbanUserAction(formData: FormData) {
  *  has 'users:edit' (e.g. a limited profile-editing grant) — otherwise they could
  *  hand themselves (or anyone) every permission in the system. */
 export async function setUserPermsAction(formData: FormData) {
-  await requireManager();
-  const id = Number(formData.get('userId'));
-  if (!id) redirect('/admin/users');
-  const keys = formData.getAll('perm').map((v) => String(v)).filter((k) => ALL_KEYS.includes(k));
-  try { await setUserPerms(id, keys); } catch (error) {
-    if (error instanceof AdminMfaEnrollmentRequired) redirect(`/admin/users/${id}/permissions?mfa=required`);
-    throw error;
-  }
-  revalidatePath('/admin/users');
-  redirect(`/admin/users/${id}/permissions?saved=1`);
+  await requireAccess('access_control', 'manage_settings');
+  redirect('/admin/access-control');
 }
 
 /** Apply a quick role preset (manager/moderator/monitor/none) to a user. Manager-only — see setUserPermsAction. */
 export async function applyPresetAction(formData: FormData) {
-  await requireManager();
-  const id = Number(formData.get('userId'));
-  const role = String(formData.get('role') || 'none') as Role | 'none';
-  if (id) {
-    try { await applyRolePreset(id, role); } catch (error) {
-      if (error instanceof AdminMfaEnrollmentRequired) redirect(`/admin/users/${id}/permissions?mfa=required`);
-      throw error;
-    }
-  }
-  revalidatePath('/admin/users');
-  redirect(`/admin/users/${id}/permissions?saved=1`);
+  await requireAccess('access_control', 'manage_settings');
+  redirect('/admin/access-control');
 }
 
 /** Save the member self-service windows (edit/delete allowed period, hours). */
 /** النصوص الظاهرة للزائر (تبويب مقسّم لأقسام) — يُحفَظ قسم واحد فقط في كل مرة. */
 export async function saveTextsAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('texts', 'edit');
   const sec = String(formData.get('sec') || 'general');
   const put = async (key: string, name: string) => setSetting(key, String(formData.get(name) ?? '').trim());
   if (sec === 'general') {
@@ -744,7 +749,9 @@ export async function saveTextsAction(formData: FormData) {
 
 export async function saveSettingsAction(formData: FormData) {
  try {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('settings', 'manage_settings');
+  const pricingSubmitted = [...formData.keys()].some(key => /^idpkg[1-3]_(?:name|acc|m|h|y)$/.test(key) || key === 'identityExemptDays');
+  if (pricingSubmitted) await requireAccess('pricing', 'manage_settings');
   const editH = Math.max(0, parseInt(String(formData.get('editHours') || '0')) || 0);
   const delH = Math.max(0, parseInt(String(formData.get('deleteHours') || '0')) || 0);
   const msgDelMin = Math.max(0, parseInt(String(formData.get('msgDeleteMinutes') || '0')) || 0);
@@ -768,7 +775,8 @@ export async function saveSettingsAction(formData: FormData) {
   await setSetting(SETTING_MSG_DELETE_MINUTES, String(msgDelMin));
   await setSetting('max_profiles', String(Math.max(0, parseInt(String(formData.get('maxProfiles') || '0')) || 0)));
   await setSetting('max_stores', String(Math.max(0, parseInt(String(formData.get('maxStores') || '0')) || 0)));
-  // باقات الهويات: ٣ باقات × (اسم + عدد + شهري/نصف/سنوي) + إعفاء
+  // Plan fields are omitted by the UI when the actor cannot manage pricing.
+  if (pricingSubmitted) {
   for (let i = 1; i <= 3; i++) {
     await setSetting(`idpkg${i}_name`, String(formData.get(`idpkg${i}_name`) || '').trim().slice(0, 24));
     for (const k of ['acc', 'm', 'h', 'y']) {
@@ -776,6 +784,7 @@ export async function saveSettingsAction(formData: FormData) {
     }
   }
   await setSetting('identity_exempt_days', String(Math.max(0, parseInt(String(formData.get('identityExemptDays') || '0')) || 0)));
+  }
   await setSetting(SETTING_HOME_STATS, homeStats);
   await setSetting(SETTING_CLASSIFIED_STATS, classifiedStats);
   await setSetting(SETTING_CLASSIFIED_DAYS, String(classifiedDays));
@@ -843,7 +852,7 @@ export async function saveSettingsAction(formData: FormData) {
 
 /** Revenue hub: store-subscription plans + grace, and ad-service/duplicate pricing. */
 export async function saveRevenueAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('pricing', 'manage_settings');
   const nn = (k: string, d = 0) => String(Math.max(0, parseInt(String(formData.get(k) || d)) || d));
   await setSetting(SETTING_SUB_ENABLED, formData.get('subEnabled') !== null ? '1' : '0');
   await setSetting(SETTING_SUB_MONTHLY, nn('subMonthly'));
@@ -932,7 +941,7 @@ export async function saveRevenueAction(formData: FormData) {
 
 /** Admin grants/extends/clears a store's subscription (days from now; 0 = clear). */
 export async function adminSetStoreSubAction(formData: FormData) {
-  await requireAction('stores', 'edit');
+  await requireAccess('stores', 'edit');
   const storeId = toInt(BigInt(String(formData.get('storeId') || '0')));
   const days = parseInt(String(formData.get('days') || '0')) || 0;
   const { adminSetStoreSub } = await import('@/lib/subscription');
@@ -944,7 +953,7 @@ export async function adminSetStoreSubAction(formData: FormData) {
 
 /** Admin grants extra free days to a store (extend trial / comp time). */
 export async function grantStoreDaysAction(formData: FormData) {
-  const session = await requireAction('stores', 'edit');
+  const session = await requireAccess('stores', 'edit');
   const storeId = toInt(BigInt(String(formData.get('storeId') || '0')));
   const days = Math.max(1, parseInt(String(formData.get('days') || '0')) || 0);
   if (storeId && days) {
@@ -958,18 +967,17 @@ export async function grantStoreDaysAction(formData: FormData) {
 
 /** Save the permission matrix for one role (checkbox keys named "k"). Manager-only — see setUserPermsAction. */
 export async function saveRolePermsAction(formData: FormData) {
-  await requireManager();
-  const role = String(formData.get('role') || '') as Role;
-  if (!MATRIX_ROLES.includes(role)) return;
-  const keys = formData.getAll('k').map((v) => String(v));
-  await setRolePermKeys(role, keys);
+  await requireAccess('access_control', 'manage_settings');
+  const role = String(formData.get('role') || '');
+  if (role !== 'member' && role !== 'visitor') redirect('/admin/access-control');
+  await setRolePermKeys(role, formData.getAll('k').map(String));
   revalidatePath('/admin/roles');
-  redirect(`/admin/roles?saved=${role}`);
+  redirect('/admin/roles?saved=' + role);
 }
 
 /** Save messaging/verification gateway settings (SMS + WhatsApp). */
 export async function saveVerificationAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireAccess('security', 'manage_settings');
   const s = (k: string) => String(formData.get(k) || '').trim();
   const ch = s('channel');
   const channel = ch === 'whatsapp' || ch === 'both' ? ch : 'sms';
@@ -997,7 +1005,7 @@ export async function saveVerificationAction(formData: FormData) {
 const errUrl = (msg: string) => `/admin/backup?error=${encodeURIComponent(msg).slice(0, 200)}`;
 
 export async function createBackupAction() {
-  await requireAction('backup', 'add');
+  await requireAccess('backup', 'create');
   let dest = '/admin/backup?done=backup';
   try {
     const name = await createBackup();
@@ -1010,7 +1018,7 @@ export async function createBackupAction() {
 }
 
 export async function deleteBackupAction(formData: FormData) {
-  await requireAction('backup', 'delete');
+  await requireAccess('backup', 'delete');
   const name = String(formData.get('name') || '');
   let dest = '/admin/backup?done=deleted';
   try {
@@ -1023,7 +1031,7 @@ export async function deleteBackupAction(formData: FormData) {
 }
 
 export async function restoreBackupAction(formData: FormData) {
-  await requireAction('backup', 'edit');
+  await requireAccess('backup', 'edit');
   const name = String(formData.get('name') || '');
   const confirm = String(formData.get('confirm') || '').trim();
   const agree = formData.get('agree') !== null;
@@ -1043,7 +1051,7 @@ export async function restoreBackupAction(formData: FormData) {
 }
 
 export async function trustUserAction(formData: FormData) {
-  const session = await requireAction('verifications', 'edit');
+  const session = await requireAccess('verifications', 'approve');
   const id = BigInt(String(formData.get('userId')));
   const u = await prisma.users.findUnique({ where: { id } });
   if (u && u.trusted !== 1) {
@@ -1078,7 +1086,7 @@ async function untrustCore(adminId: number, id: number, reason: string) {
 }
 
 export async function untrustUserAction(formData: FormData) {
-  const session = await requireAction('verifications', 'edit');
+  const session = await requireAccess('verifications', 'approve');
   const id = Number(formData.get('userId') || 0);
   const reason = String(formData.get('reason') || '').trim().slice(0, 300);
   if (!id || !reason) return;
@@ -1088,7 +1096,7 @@ export async function untrustUserAction(formData: FormData) {
 /** إلغاء توثيق المتجر من صفحة إدارة المتاجر (بصلاحية المتاجر) — يسحب علامة التوثيق فقط،
  *  ولا يمس المتجر ولا إعلاناته؛ والمدفوع يُسترد له غير المستخدم تلقائياً. */
 export async function storeUntrustAction(formData: FormData) {
-  const session = await requireAction('stores', 'edit');
+  const session = await requireAccess('stores', 'edit');
   const id = Number(formData.get('userId') || 0);
   const reason = String(formData.get('reason') || '').trim().slice(0, 300);
   if (!id || !reason) return;
@@ -1097,7 +1105,7 @@ export async function storeUntrustAction(formData: FormData) {
 
 /** موافقة إدارة المتاجر على التوثيق المدفوع: خصم الرسوم أولاً — لا توثيق بلا رصيد كافٍ. */
 export async function approveVerifyOrderAction(formData: FormData) {
-  const session = await requireAction('stores', 'edit');
+  const session = await requireAccess('stores', 'approve');
   const id = Number(formData.get('id') || 0);
   if (!id) return;
   const { approvePaidVerification } = await import('@/lib/verify-paid');
@@ -1117,7 +1125,7 @@ export async function approveVerifyOrderAction(formData: FormData) {
 
 /** رفض طلب التوثيق المدفوع مع سبب يُحفظ ويصل العضو. */
 export async function rejectVerifyOrderAction(formData: FormData) {
-  const session = await requireAction('stores', 'edit');
+  const session = await requireAccess('stores', 'approve');
   const id = Number(formData.get('id') || 0);
   // السبب اختياري: لا نمنع الرفض إن تُرك فارغاً (كان الحقل الإلزامي يحجب الإرسال بصمت
   // بعد نافذة التأكيد فيبقى الطلب معلقاً دون أن يدري الإداري) — نستخدم سبباً افتراضياً.
@@ -1135,7 +1143,7 @@ export async function rejectVerifyOrderAction(formData: FormData) {
 
 /** إلغاء توثيق مدفوع نشط بسبب إلزامي + استرداد قيمة الأيام غير المستخدمة للرصيد. */
 export async function cancelVerifyOrderAction(formData: FormData) {
-  const session = await requireAction('stores', 'edit');
+  const session = await requireAccess('stores', 'edit');
   const id = Number(formData.get('id') || 0);
   const reason = String(formData.get('reason') || '').trim().slice(0, 300);
   if (!id || !reason) return;
@@ -1166,7 +1174,7 @@ async function sendVerifyMessage(userId: number, key: string, fallback: string, 
 
 /** حذف تنبيه عضو (اطّلاع الإدارة). */
 export async function adminDeleteNotifAction(formData: FormData) {
-  const session = await requireAction('messages', 'delete');
+  const session = await requireAccess('notifications', 'delete');
   const id = BigInt(String(formData.get('id') || '0'));
   await prisma.notfications.delete({ where: { id } }).catch(() => {});
   await logAdmin(session.uid, 'حذف تنبيه', `تنبيه #${toInt(id)}`);
@@ -1175,7 +1183,7 @@ export async function adminDeleteNotifAction(formData: FormData) {
 
 /** حذف كل التنبيهات المقروءة (تنظيف الأرشيف). */
 export async function adminClearReadNotifsAction() {
-  const session = await requireAction('messages', 'delete');
+  const session = await requireAccess('notifications', 'delete');
   const r = await prisma.notfications.deleteMany({ where: { NOT: { read_at: null } } }).catch(() => ({ count: 0 }));
   await logAdmin(session.uid, 'حذف التنبيهات المقروءة', `${r.count} تنبيه`);
   revalidatePath('/admin/notifs');
@@ -1183,7 +1191,7 @@ export async function adminClearReadNotifsAction() {
 
 /** مسح سجل الأخطاء التقنية بالكامل (بعد المراجعة/الإصلاح). */
 export async function clearErrorLogAction() {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('errors', 'delete');
   const { clearErrorLogs } = await import('@/lib/error-log');
   await clearErrorLogs();
   await logAdmin(session.uid, 'مسح سجل الأخطاء التقنية');
@@ -1192,7 +1200,7 @@ export async function clearErrorLogAction() {
 
 /** تأكيد وصول مبلغ طلب الشحن: إضافة المبلغ للرصيد + رسالة للعضو. */
 export async function approveTopupAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('topups', 'approve');
   const id = Number(formData.get('id') || 0);
   if (!id) return;
   const { approveTopup, sendTopupSuccessSms } = await import('@/lib/wallet');
@@ -1211,7 +1219,7 @@ export async function approveTopupAction(formData: FormData) {
  * ناجح ومطابقة المبلغ عبر المسار الذرّي نفسه المستخدم في Callback.
  */
 export async function verifyOnlineTopupAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('topups', 'approve');
   const id = Number(formData.get('id') || 0);
   if (!Number.isSafeInteger(id) || id <= 0) redirect('/admin/topups?tab=pending&check=invalid');
 
@@ -1232,7 +1240,7 @@ export async function verifyOnlineTopupAction(formData: FormData) {
 
 /** Check the online pending rows currently shown to the administrator (max 20). */
 export async function verifyVisibleOnlineTopupsAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('topups', 'approve');
   const ids = String(formData.get('ids') || '')
     .split(',').map((v) => Number(v)).filter((id) => Number.isSafeInteger(id) && id > 0).slice(0, 20);
   if (!ids.length) redirect('/admin/topups?tab=pending&batch=empty');
@@ -1257,7 +1265,7 @@ export async function verifyVisibleOnlineTopupsAction(formData: FormData) {
 
 /** Delete selected pending online rows that an administrator explicitly marks as tests. */
 export async function deleteOnlineTopupTestsAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('topups', 'delete');
   const ids = String(formData.get('ids') || '')
     .split(',').map((v) => Number(v)).filter((id) => Number.isSafeInteger(id) && id > 0).slice(0, 20);
   if (!ids.length) redirect('/admin/topups?tab=pending&tests=empty');
@@ -1272,7 +1280,7 @@ export async function deleteOnlineTopupTestsAction(formData: FormData) {
 
 /** إضافة حساب تحويل (بنك/رقم/اسم) يظهر للأعضاء في «محفظتي». */
 export async function addTopupAccountAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('payments', 'manage_settings');
   const bank = String(formData.get('bank') || '').trim().slice(0, 80);
   const number = String(formData.get('number') || '').trim().slice(0, 80);
   const iban = String(formData.get('iban') || '').trim().slice(0, 80);
@@ -1289,7 +1297,7 @@ export async function addTopupAccountAction(formData: FormData) {
 
 /** حذف حساب تحويل. */
 export async function deleteTopupAccountAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireAccess('payments', 'manage_settings');
   const idx = Number(formData.get('idx'));
   const accounts = await getTopupAccounts();
   if (Number.isInteger(idx) && idx >= 0 && idx < accounts.length) {
@@ -1303,7 +1311,7 @@ export async function deleteTopupAccountAction(formData: FormData) {
 
 /** إضافة مصروف للموقع (يظهر في الميزانية المفصلة). */
 export async function addSiteExpenseAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('expenses', 'create');
   const label = String(formData.get('label') || '').trim();
   const amount = Math.round(Number(formData.get('amount') || 0));
   const note = String(formData.get('note') || '').trim();
@@ -1317,7 +1325,7 @@ export async function addSiteExpenseAction(formData: FormData) {
 
 /** حذف مصروف. */
 export async function deleteSiteExpenseAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('expenses', 'delete');
   const id = Number(formData.get('id') || 0);
   if (!id) return;
   const { deleteSiteExpense } = await import('@/lib/wallet');
@@ -1328,7 +1336,7 @@ export async function deleteSiteExpenseAction(formData: FormData) {
 
 /** إلغاء تأكيد شحن سبق اعتماده (سند مكرر/خطأ): خصم المبلغ + سبب إلزامي + رسالة للعضو. */
 export async function cancelTopupAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('topups', 'refund');
   const id = Number(formData.get('id') || 0);
   const reason = String(formData.get('reason') || '').trim().slice(0, 300);
   if (!id || !reason) return;
@@ -1345,7 +1353,7 @@ export async function cancelTopupAction(formData: FormData) {
 
 /** رفض طلب الشحن مع سبب يبقى محفوظاً + رسالة للعضو بالسبب. */
 export async function rejectTopupAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('topups', 'edit');
   const id = Number(formData.get('id') || 0);
   const reason = String(formData.get('reason') || '').trim().slice(0, 300);
   if (!id || !reason) return;
@@ -1362,7 +1370,7 @@ export async function rejectTopupAction(formData: FormData) {
 
 /** الموافقة على التوثيق: تفعيل فوري + رسالة للعضو. */
 export async function approveVerificationAction(formData: FormData) {
-  const session = await requireAction('verifications', 'edit');
+  const session = await requireAccess('verifications', 'approve');
   const id = Number(formData.get('userId') || 0);
   if (!id) return;
   await prisma.users.update({ where: { id: BigInt(id) }, data: { trusted: 1, step: 0, verify_note: null, verified_at: new Date() } }).catch(() => {});
@@ -1385,7 +1393,7 @@ export async function approveVerificationAction(formData: FormData) {
 
 /** رفض التوثيق مع سبب يبقى محفوظاً + رسالة للعضو بالسبب. */
 export async function rejectVerificationAction(formData: FormData) {
-  const session = await requireAction('verifications', 'edit');
+  const session = await requireAccess('verifications', 'approve');
   const id = Number(formData.get('userId') || 0);
   const reason = String(formData.get('reason') || '').trim().slice(0, 300);
   if (!id || !reason) return;
@@ -1398,7 +1406,7 @@ export async function rejectVerificationAction(formData: FormData) {
 
 /** حذف وثائق التوثيق (بعد تأكيد): يمسح المرفوعات وأعمدة الوثائق ويعيد الحالة. */
 export async function deleteVerificationDocsAction(formData: FormData) {
-  await requireAction('verifications', 'edit');
+  await requireAccess('verifications', 'delete');
   const id = Number(formData.get('userId') || 0);
   if (!id) return;
   await prisma.uploads.deleteMany({ where: { user_id: id, type: { in: ['verify_nid', 'verify_cr', 'verify_wp'] } } }).catch(() => {});
@@ -1412,7 +1420,7 @@ export async function deleteVerificationDocsAction(formData: FormData) {
 /** لا حذف مباشر: إعلان غير مؤرشف يُؤرشف أولاً (ينتقل لتبويب «المؤرشفة»)،
  *  والحذف النهائي لا يتم إلا على إعلان مؤرشف (من الأرشيف، يدوياً بتأكيد). */
 export async function adminDeleteAdAction(formData: FormData) {
-  const session = await requireAction('ads', 'delete');
+  const session = await requireAccess('ads', 'delete');
   const id = BigInt(String(formData.get('adId')));
   const a = await prisma.ads.findUnique({ where: { id }, select: { data_archive: true } }).catch(() => null);
   if (!a) { revalidatePath('/admin/ads'); return; }
@@ -1437,7 +1445,7 @@ export async function adminDeleteAdAction(formData: FormData) {
  * دائماً، ويُسجَّل في سجل التجاوزات — لا يبقى بلاغ بلا قرار وبلا إشعار الطرفين.
  */
 export async function resolveReportAction(formData: FormData) {
-  const session = await requireAction('reports', 'delete');
+  const session = await requireAccess('reports', 'delete');
   const reportId = BigInt(String(formData.get('reportId') || '0'));
   const action = String(formData.get('action') || '');
   if (!reportId || !['ban', 'delete', 'dismiss'].includes(action)) { revalidatePath('/admin/reports'); return; }
@@ -1450,10 +1458,13 @@ export async function resolveReportAction(formData: FormData) {
   const ownerId = ad ? toInt(ad.user_id) : 0;
 
   if (action === 'ban' && ownerId) {
+    await requireAccess('users', 'ban');
+    await protectStaffTarget(ownerId);
     await banUserFor(ownerId, await getStrikeBanDays(), 'admin', `بلاغ على الإعلان «${adTitle}»`);
     await logMod(ownerId, { kind: 'report', category: null, term: null, snippet: `حظر بسبب بلاغ على «${adTitle}»`, action: 'banned', adId: ad ? toInt(ad.id) : null });
   }
   if (action === 'delete' && ad) {
+    await requireAccess('ads', 'delete');
     const isArchived = !!(ad.data_archive && ad.data_archive.trim() !== '');
     if (!isArchived) await prisma.ads.update({ where: { id: ad.id }, data: { status: 0, data_archive: new Date().toISOString() } }).catch(() => {});
     await logMod(ownerId || 0, { kind: 'report', category: null, term: null, snippet: `حذف الإعلان «${adTitle}» بسبب بلاغ`, action: 'blocked', adId: toInt(ad.id) });
@@ -1484,7 +1495,7 @@ export async function resolveReportAction(formData: FormData) {
  *  لا صلاحية البلاغات: القرار هنا يغيّر حالة حظر حساب فعلياً، فلا يجوز لدور بلا
  *  صلاحية حظر (مثل «مراقب») فكّ حظر عضو من هذا المسار الجانبي. */
 export async function reviewModLogAction(formData: FormData) {
-  const session = await requireUserBan();
+  const session = await requireAccess('users', 'ban');
   const modLogId = parseInt(String(formData.get('modLogId') || '0'), 10);
   const decision = String(formData.get('decision') || '');
   if (!modLogId || !['unban', 'keep'].includes(decision)) { revalidatePath('/admin/reports'); return; }
@@ -1503,7 +1514,7 @@ export async function reviewModLogAction(formData: FormData) {
 
 /** مسح نهائي لسجل بلاغ عضو مُعالَج بالفعل (من الأرشيف فقط) — سجل تاريخي بحت لا يمس الإعلان أو العضو. */
 export async function adminDeleteReportRecordAction(formData: FormData) {
-  const session = await requireAction('reports', 'delete');
+  const session = await requireAccess('reports', 'delete');
   const reportId = BigInt(String(formData.get('reportId') || '0'));
   if (reportId) {
     const r = await prisma.repord_ads.findUnique({ where: { id: reportId }, select: { status: true } }).catch(() => null);
@@ -1517,7 +1528,7 @@ export async function adminDeleteReportRecordAction(formData: FormData) {
 
 /** مسح نهائي لسطر في سجل الرصد الآلي (من الأرشيف فقط) — سجل تاريخي بحت. */
 export async function adminDeleteModLogAction(formData: FormData) {
-  const session = await requireAction('reports', 'delete');
+  const session = await requireAccess('reports', 'delete');
   const id = parseInt(String(formData.get('modLogId') || '0'), 10);
   if (id) {
     const r = await prisma.mod_log.findUnique({ where: { id }, select: { action: true, reviewed_at: true } }).catch(() => null);
@@ -1531,7 +1542,8 @@ export async function adminDeleteModLogAction(formData: FormData) {
 }
 
 export async function adminToggleSpecialAction(formData: FormData) {
-  await requireAction('ads', 'archive');
+  await requireAccess('ads', 'view');
+  await requireAccess('promos', 'edit');
   const id = BigInt(String(formData.get('adId')));
   const a = await prisma.ads.findUnique({ where: { id } });
   if (a) await prisma.ads.update({ where: { id }, data: { adsSpecial: a.adsSpecial === 'checked' ? 'no' : 'checked' } });
@@ -1539,17 +1551,19 @@ export async function adminToggleSpecialAction(formData: FormData) {
 }
 
 export async function adminToggleAdStatusAction(formData: FormData) {
-  await requireAction('ads', 'archive');
+  await requireAccess('ads', 'view');
   const id = BigInt(String(formData.get('adId')));
-  const a = await prisma.ads.findUnique({ where: { id } });
-  if (a) {
+  await prisma.$transaction(async (tx) => {
+    const [a] = await tx.$queryRawUnsafe<{ status: number | null }[]>('SELECT status FROM ads WHERE id = ? FOR UPDATE', id);
+    if (!a) return;
     const archiving = a.status === 1; // hiding => archive (stamp date); showing => clear
-    await prisma.ads.update({
+    await requireAccess('ads', archiving ? 'archive' : 'approve');
+    await tx.ads.update({
       where: { id },
       // النشر من الإدارة يمسح علامة «أوقفه صاحبه» أيضاً
       data: { status: archiving ? 0 : 1, data_archive: archiving ? new Date().toISOString() : null, ...(archiving ? {} : { paused_by_owner: 0 }) },
     });
-  }
+  });
   await bustAdCaches().catch(() => {}); // approved/hidden ad reflects immediately
   revalidatePath('/admin/ads');
   revalidatePath('/');
@@ -1558,7 +1572,7 @@ export async function adminToggleAdStatusAction(formData: FormData) {
 /** أرشفة كل الإعلانات المنتظِرة للموافقة (لا حذف مباشر) — تنتقل لتبويب
  *  «المؤرشفة» ومنه يمكن حذفها نهائياً بتأكيد. */
 export async function deleteAllPendingAdsAction() {
-  const session = await requireAction('ads', 'delete');
+  const session = await requireAccess('ads', 'delete');
   const r = await prisma.ads.updateMany({
     // لا يشمل الموقوفة من أصحابها — تلك ليست بانتظار موافقة
     where: { status: 0, paused_by_owner: 0, OR: [{ data_archive: null }, { data_archive: '' }] },
@@ -1571,7 +1585,7 @@ export async function deleteAllPendingAdsAction() {
 }
 
 export async function deleteAllArchivedAdsAction() {
-  await requireAction('ads', 'delete');
+  await requireAccess('ads', 'delete');
   const arch = await prisma.ads.findMany({
     where: { NOT: [{ data_archive: null }, { data_archive: '' }] },
     select: { id: true },
@@ -1590,11 +1604,11 @@ export async function deleteAllArchivedAdsAction() {
 /* ---- User view / edit / send-password ---- */
 /** Admin credits or debits a member's wallet (رصيد). action=credit|debit. */
 export async function adjustUserBalanceAction(formData: FormData) {
-  const admin = await requireAction('users', 'edit');
   const uid = toInt(BigInt(String(formData.get('userId'))));
   const amount = Math.abs(parseInt(String(formData.get('amount') || '0')) || 0);
   const note = String(formData.get('note') || '').trim() || undefined;
   const kind = String(formData.get('kind') || 'credit');
+  const admin = await requireAccess('wallets', kind === 'debit' ? 'refund' : 'edit');
   if (!uid || amount <= 0) redirect(`/admin/users/${uid}?error=${encodeURIComponent('أدخل مبلغاً صحيحاً')}`);
   const { creditUser, debitUser } = await import('@/lib/wallet');
   const r = kind === 'debit' ? await debitUser(uid, amount, admin.uid, note) : await creditUser(uid, amount, admin.uid, note);
@@ -1605,9 +1619,10 @@ export async function adjustUserBalanceAction(formData: FormData) {
 }
 
 export async function updateUserAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireAccess('users', 'edit');
   const id = BigInt(String(formData.get('userId')));
   const uid = toInt(id);
+  await protectStaffTarget(uid);
   const name = String(formData.get('name') || '').trim();
   const phoneRaw = String(formData.get('phoneNumber') || '').trim();
   const email = String(formData.get('email') || '').trim();
@@ -1615,22 +1630,28 @@ export async function updateUserAction(formData: FormData) {
   if (name) data.name = name;
   if (phoneRaw) data.phoneNumber = toLocalSaudi(phoneRaw);
   data.email = email || null;
-  await prisma.users.update({ where: { id }, data }).catch(() => {});
+  try { await withUnassignedAccountChange(prisma, uid, tx => tx.users.update({ where: { id }, data })); }
+  catch (error) {
+    if (error instanceof Error && error.message === 'rbac_remove_roles_first') redirect('/admin/users/' + uid + '?error=' + encodeURIComponent('يجب إزالة أدوار الإدارة أولاً من إدارة الصلاحيات قبل تغيير بيانات هذا الحساب.'));
+    throw error;
+  }
   revalidatePath(`/admin/users/${uid}`);
   revalidatePath('/admin/users');
   redirect(`/admin/users/${uid}?saved=1`);
 }
 
 export async function sendUserPasswordAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireAccess('security', 'manage_settings');
   const uid = Number(formData.get('userId'));
+  await protectStaffTarget(uid);
   const r = await sendNewPasswordToUser(uid);
   redirect(`/admin/users/${uid}?${r.ok ? 'sent=1' : 'error=' + encodeURIComponent(r.error || 'فشل الإرسال')}`);
 }
 
 /** رسالة رسمية من إدارة المتاجر لصاحب متجر — تصله في «الرسائل» باسم الإدارة مع تنبيه. */
 export async function adminMessageStoreOwnerAction(formData: FormData) {
-  const session = await requireAction('stores', 'edit');
+  await requireAccess('stores', 'view');
+  const session = await requireAccess('messages', 'create');
   const storeId = Number(formData.get('storeId') || 0);
   const text = String(formData.get('message') || '').trim().slice(0, 1000);
   if (!storeId || !text) redirect('/admin/stores');
@@ -1644,7 +1665,7 @@ export async function adminMessageStoreOwnerAction(formData: FormData) {
 
 /** موافقة الإدارة على طلب تغيير اسم العضو: يُطبَّق الاسم الجديد فوراً وتصل العضو رسالة. */
 export async function approveNameRequestAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('users', 'edit');
   const id = BigInt(String(formData.get('id') || '0'));
   const r = await prisma.name_requests.findUnique({ where: { id } }).catch(() => null);
   if (!r || r.status !== 0) redirect('/admin/name-requests');
@@ -1668,7 +1689,7 @@ export async function approveNameRequestAction(formData: FormData) {
 
 /** رفض طلب تغيير الاسم مع سبب يُحفظ ويصل العضو برسالة. */
 export async function rejectNameRequestAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('users', 'edit');
   const id = BigInt(String(formData.get('id') || '0'));
   const note = String(formData.get('note') || '').trim().slice(0, 250);
   const r = await prisma.name_requests.findUnique({ where: { id } }).catch(() => null);
@@ -1685,19 +1706,25 @@ export async function rejectNameRequestAction(formData: FormData) {
 }
 
 export async function setUserPasswordAction(formData: FormData) {
-  await requireAction('users', 'edit');
+  await requireAccess('security', 'manage_settings');
   const uid = Number(formData.get('userId'));
+  await protectStaffTarget(uid);
   const pass = String(formData.get('password') || '');
   const passwordError = await newPasswordError(pass);
   if (passwordError) redirect(`/admin/users/${uid}?error=${encodeURIComponent(passwordError)}`);
-  await prisma.users.update({ where: { id: BigInt(uid) }, data: { password: await hashPassword(pass), auth_session_version: crypto.randomUUID() } });
+  const password = await hashPassword(pass);
+  try { await withUnassignedAccountChange(prisma, uid, tx => tx.users.update({ where: { id: BigInt(uid) }, data: { password, auth_session_version: crypto.randomUUID() } })); }
+  catch (error) {
+    if (error instanceof Error && error.message === 'rbac_remove_roles_first') redirect('/admin/users/' + uid + '?error=' + encodeURIComponent('يجب إزالة أدوار الإدارة أولاً من إدارة الصلاحيات قبل إعادة تعيين كلمة المرور.'));
+    throw error;
+  }
   redirect(`/admin/users/${uid}?setpass=1`);
 }
 
 
 /** إضافة حملة شحن مجدولة: تبدأ من تاريخ محدد وتستمر لمدة أيام محددة (بتوقيت السعودية). */
 export async function addTopupCampaignAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('campaigns', 'create');
   const { getTopupCampaigns, setTopupCampaigns } = await import('@/lib/settings');
   const { normalizeTopupCampaignPresentation } = await import('@/lib/topup-campaign-presentation');
   const fromRaw = String(formData.get('from') || '').trim();
@@ -1747,7 +1774,7 @@ export async function addTopupCampaignAction(formData: FormData) {
 
 /** حذف حملة شحن مجدولة. */
 export async function deleteTopupCampaignAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('campaigns', 'delete');
   const { getTopupCampaigns, setTopupCampaigns } = await import('@/lib/settings');
   const id = Number(formData.get('id') || 0);
   const list = (await getTopupCampaigns()).filter((c) => c.id !== id);
@@ -1760,10 +1787,11 @@ export async function deleteTopupCampaignAction(formData: FormData) {
 
 /** ربط حسابات أعضاء معاً (نفس المالك) — تبويب «ربط الأعضاء». الإدارة تنشئ الرابط فقط. */
 export async function linkAccountsAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('security', 'manage_settings');
   const raw = String(formData.get('userIds') || '');
   const ids = raw.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isInteger(n) && n > 0);
   if (ids.length >= 2) {
+    for (const id of ids) await protectStaffTarget(id);
     const { linkAccounts } = await import('@/lib/account-links');
     const r = await linkAccounts(ids, session.uid);
     if (r.ok) await logAdmin(session.uid, 'ربط حسابات أعضاء', ids.map((i) => `#${i}`).join(' + '));
@@ -1773,8 +1801,9 @@ export async function linkAccountsAction(formData: FormData) {
 
 /** فك ربط حساب من مجموعته. */
 export async function unlinkAccountAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('security', 'manage_settings');
   const uid = Number(formData.get('userId') || 0);
+  await protectStaffTarget(uid);
   if (uid > 0) {
     const { unlinkAccount } = await import('@/lib/account-links');
     await unlinkAccount(uid);
@@ -1787,7 +1816,7 @@ export async function unlinkAccountAction(formData: FormData) {
 
 /** حفظ الإعدادات العامة للدفع: التفعيل، المزوّد الفعّال، الوضع (تجريبي/مباشر)، وحدّا المبلغ. */
 export async function savePaymentSettingsAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('payments', 'manage_settings');
   const { savePaymentSettings, CONTROLLABLE_METHODS } = await import('@/lib/payments');
   const methods = CONTROLLABLE_METHODS.filter((m) => formData.get(`method_${m}`) === 'on');
   await savePaymentSettings({
@@ -1805,7 +1834,7 @@ export async function savePaymentSettingsAction(formData: FormData) {
 
 /** Enable/disable member top-up methods without ever storing bank credentials in the database. */
 export async function saveTopupMethodSettingsAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('payments', 'manage_settings');
   const { saveTopupMethodSettings, getTopupMethodAvailability, alrajhiConfigReport } = await import('@/lib/payments');
   const report = alrajhiConfigReport();
   const electronicRequested = formData.get('electronicEnabled') === 'on';
@@ -1822,8 +1851,9 @@ export async function saveTopupMethodSettingsAction(formData: FormData) {
 
 /** Remove one account from unified login only; its advertisements, wallet and history stay untouched. */
 export async function unlinkMemberAccountAction(formData: FormData) {
-  const admin = await requireAction('users', 'edit');
+  const admin = await requireAccess('security', 'manage_settings');
   const uid = Number(formData.get('userId') || 0);
+  await protectStaffTarget(uid);
   if (!Number.isSafeInteger(uid) || uid <= 0) redirect('/admin/users');
   await unlinkAccount(uid);
   await logAdmin(admin.uid, 'فك ارتباط دخول موحّد', `العضو #${uid}`, 'لم تُنقل أو تُحذف أي بيانات');
@@ -1834,8 +1864,9 @@ export async function unlinkMemberAccountAction(formData: FormData) {
 
 /** Archive records safely; permanent deletion is intentionally possible only for an empty account and a second explicit confirmation. */
 export async function disposeMemberAccountAction(formData: FormData) {
-  const admin = await requireAction('users', 'delete');
+  const admin = await requireAccess('users', 'delete');
   const uid = Number(formData.get('userId') || 0);
+  await protectStaffTarget(uid);
   const decision = String(formData.get('decision') || '');
   const confirmation = String(formData.get('confirmation') || '');
   const reason = String(formData.get('reason') || '').trim().slice(0, 300);
@@ -1860,7 +1891,7 @@ export async function disposeMemberAccountAction(formData: FormData) {
 
 /** Saves the manual transfer switch without touching electronic-payment settings. */
 export async function saveBankTransferSettingAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('payments', 'manage_settings');
   const enabled = formData.get('transferEnabled') === 'on';
   const { saveBankTransferSetting } = await import('@/lib/payments');
   await saveBankTransferSetting(enabled);
@@ -1878,7 +1909,7 @@ function safeGatewayReason(value: string | undefined): string {
 }
 
 export async function startAlrajhiSandboxAction(formData: FormData) {
-  const admin = await requireAction('users', 'edit');
+  const admin = await requireAccess('payments', 'manage_settings');
   const amount = Math.max(1, Math.min(100, Math.round(Number(formData.get('amount') || 10))));
   const { alrajhiConfigReport, getProviderCreds } = await import('@/lib/payments');
   const report = alrajhiConfigReport();
@@ -1903,7 +1934,7 @@ export async function startAlrajhiSandboxAction(formData: FormData) {
  * server-to-server confirmation flow before any wallet credit is possible.
  */
 export async function startAlrajhiPrivateTopupAction(formData: FormData) {
-  const admin = await requireAction('users', 'edit');
+  const admin = await requireAccess('payments', 'manage_settings');
   const { alrajhiConfigReport, getProviderCreds, getPaymentConfig } = await import('@/lib/payments');
   const report = alrajhiConfigReport();
   if (!report.ready || report.environment !== 'production') redirect('/admin/payments/private-topup?state=notready');
@@ -1944,7 +1975,7 @@ export async function startAlrajhiPrivateTopupAction(formData: FormData) {
 }
 
 export async function saveProviderCredsAction(formData: FormData) {
-  const session = await requireAction('users', 'edit');
+  const session = await requireAccess('payments', 'manage_settings');
   const provider = String(formData.get('provider') || '');
   const { saveProviderCreds, providerMeta } = await import('@/lib/payments');
   const meta = providerMeta(provider);

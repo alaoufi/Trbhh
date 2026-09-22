@@ -1,5 +1,5 @@
 import { requireUser } from '@/lib/auth';
-import { isManager } from '@/lib/roles';
+import { hasAccess } from '@/lib/access-control/guards';
 import { getMfaCredential, mfaReadiness } from '@/lib/auth-security';
 import { getAuthSecuritySettings } from '@/lib/settings';
 import { SecurityForms } from './forms';
@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'أمان الحساب' };
 export default async function SecurityPage() {
   const session = await requireUser();
-  const [credential, manager, settings] = await Promise.all([getMfaCredential(session.uid), isManager(session.uid), getAuthSecuritySettings()]);
+  const [credential, manager, settings] = await Promise.all([getMfaCredential(session.uid), hasAccess(session.uid, 'security', 'manage_settings'), getAuthSecuritySettings()]);
   const readiness = manager ? await mfaReadiness() : [];
   return <main className="mx-auto max-w-2xl space-y-5 px-4 py-6">
     <h1 className="text-2xl font-bold">أمان الحساب</h1>

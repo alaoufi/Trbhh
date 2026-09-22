@@ -30,14 +30,15 @@ const errorMessages: Record<string, string> = {
 };
 
 export default async function FinancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const session = await requireFinance('view');
-  const [params, permissions, data] = await Promise.all([searchParams, getFinancePermissions(session.uid), readFinanceData(prisma)]);
+  const params = await searchParams;
   const query = parseFinanceQuery(Object.fromEntries(Object.entries(params).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])));
+  const session = await requireFinance(query.section);
+  const [permissions, data] = await Promise.all([getFinancePermissions(session.uid,query.section), readFinanceData(prisma)]);
   const report = buildFinanceReport(data, query, new Date());
   const error = typeof params.error === 'string' ? params.error : null;
   return <div className="space-y-3">
     {params.saved && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">تم حفظ الإجراء. عُرض التقرير من السجلات المحدثة.</p>}
     {error && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{errorMessages[error] || 'تعذر تنفيذ الإجراء. راجع الحقول المطلوبة والفترة وصلاحيتك وجاهزية المصادر، ثم أعد المحاولة.'}</p>}
-    <FinanceWorkspace report={report} canEdit={permissions.edit} canApprove={permissions.approve} canClose={permissions.close} canExport={permissions.export} actionKey={randomUUID()} />
+    <FinanceWorkspace report={report} canEdit={permissions.edit} canApprove={permissions.approve} canClose={permissions.close} canExport={permissions.export} canRefund={permissions.refund} visibleSections={permissions.visibleSections} viewFinance={permissions.viewFinance} viewSettlements={permissions.viewSettlements} viewReconciliation={permissions.viewReconciliation} actionKey={randomUUID()} />
   </div>;
 }

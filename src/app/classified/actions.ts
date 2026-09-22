@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { saveUpload } from '@/lib/storage';
 import { watermarkImage } from '@/lib/watermark';
 import { createClassified, getClassifiedById, updateClassified, deleteClassified, reactivateClassified, setClassifiedStatus, getClassifiedOwnerState } from '@/lib/classified';
-import { hasAnyAdmin } from '@/lib/roles';
+import { hasAccess } from '@/lib/access-control/guards';
 import { getMemberWindows, withinWindow, getClassifiedDupConfig, getServicePricing, serviceHasPrice, isDur, DUR_DAYS, getStrikeBanDays, getSettingBool } from '@/lib/settings';
 import { charge, consumeDupCredit, addDupCredit, adjustBalance } from '@/lib/wallet';
 import { censorGuard, summarizeHits } from '@/lib/content-guard';
@@ -292,7 +292,7 @@ export async function updateClassifiedAction(formData: FormData) {
   const id = Number(formData.get('id'));
   const existing = id ? await getClassifiedById(id) : null;
   if (!existing) redirect('/account/classified');
-  const isAdmin = await hasAnyAdmin(session.uid).catch(() => false);
+  const isAdmin = await hasAccess(session.uid, 'classified', 'edit').catch(() => false);
   const isOwner = existing!.userId === session.uid;
   if (!isOwner && !isAdmin) redirect('/account/classified');
   // المالك مقيّد بمهلة التعديل؛ الإدارة تعدّل بلا قيد
@@ -424,7 +424,7 @@ export async function toggleClassifiedStatusAction(formData: FormData) {
   const st = await getClassifiedOwnerState(id);
   if (!st) redirect('/classified');
   const isOwner = st.userId === session.uid;
-  const admin = await hasAnyAdmin(session.uid).catch(() => false);
+  const admin = await hasAccess(session.uid, 'classified', 'suspend').catch(() => false);
   if (!isOwner && !admin) redirect(`/classified/${id}`);
   await setClassifiedStatus(id, st.status !== 1); // عكس الحالة الحالية
   revalidatePath(`/classified/${id}`);
@@ -441,7 +441,7 @@ export async function deleteClassifiedFromDetailAction(formData: FormData) {
   const st = await getClassifiedOwnerState(id);
   if (!st) redirect('/classified');
   const isOwner = st.userId === session.uid;
-  const admin = await hasAnyAdmin(session.uid).catch(() => false);
+  const admin = await hasAccess(session.uid, 'classified', 'delete').catch(() => false);
   if (!isOwner && !admin) redirect(`/classified/${id}`);
   // المالك مقيّد بمهلة الحذف؛ الإدارة بلا قيد
   if (isOwner && !admin) {

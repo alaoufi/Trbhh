@@ -1,5 +1,8 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
-import { requireAction } from '@/lib/roles';
+
 import { cjConfig } from '@/lib/cj/config';
 import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
 import { getCommerceConfig } from '@/lib/commerce/settings';
@@ -20,7 +23,7 @@ function Result({ r }: { r: { ok: true; data: unknown } | { ok: false; error: st
 }
 
 export default async function CjTestPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAction('suppliers', 'view');
+  await requireAdminPage('/admin/suppliers/cj');
   const sp = await searchParams;
   const cfg = cjConfig();
   const [commerce, marginBps, mapped] = await Promise.all([
@@ -76,10 +79,10 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
         <h2 className="font-bold">الهامش الافتراضي (قابل للتعديل)</h2>
         {sp.saved === 'margin' && <p className="text-sm text-emerald-700">تم الحفظ.</p>}
         {sp.error === 'margin' && <p className="text-sm text-red-700">قيمة غير صالحة (0–1000٪).</p>}
-        <form action={saveCjMargin} className="flex flex-wrap items-center gap-2">
+        <AccessBoundary module={'pricing'} action={'manage_settings'}><form action={saveCjMargin} className="flex flex-wrap items-center gap-2">
           <label className="text-sm">النسبة٪<input className={`${input} ms-2 w-24`} name="marginPercent" inputMode="decimal" defaultValue={(marginBps / 100).toString()} /></label>
           <button className={btn}>حفظ الهامش</button>
-        </form>
+        </form></AccessBoundary>
         <p className="text-xs text-muted-foreground">مثال حساب: تكلفة ٢٠ + شحن ١٥ ر.س بهامش {(marginBps / 100).toFixed(0)}٪ → ربح {(sample.profitMinor / 100).toFixed(2)} · بيع {(sample.salePriceMinor / 100).toFixed(2)} ر.س. (السعر غير مثبّت في الكود.)</p>
       </div>
 
@@ -88,8 +91,8 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
         <h2 className="font-bold">اختبارات القراءة (بلا شراء)</h2>
         {!cfg.configured && <p className="text-sm text-red-700">اضبط متغيّرات CJ في البيئة أولاً لتشغيل الاختبارات.</p>}
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin/suppliers/cj?run=connection" className={btn}>اختبار الاتصال</Link>
-          <Link href="/admin/suppliers/cj?run=products" className={btn}>عيّنة منتجات (٢٠)</Link>
+          <AccessPage href="/admin/suppliers/cj?run=connection"><Link href="/admin/suppliers/cj?run=connection" className={btn}>اختبار الاتصال</Link></AccessPage>
+          <AccessPage href="/admin/suppliers/cj?run=products"><Link href="/admin/suppliers/cj?run=products" className={btn}>عيّنة منتجات (٢٠)</Link></AccessPage>
         </div>
         <form method="get" className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="run" value="inventory" />
@@ -112,7 +115,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
         )}
       </div>
 
-      <nav className="text-sm text-primary underline"><Link href="/admin/suppliers">العودة للموردين</Link></nav>
+      <nav className="text-sm text-primary underline"><AccessPage href="/admin/suppliers"><Link href="/admin/suppliers">العودة للموردين</Link></AccessPage></nav>
     </div>
   );
 }

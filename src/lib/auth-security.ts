@@ -2,7 +2,8 @@ import 'server-only';
 import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { ensureSchema } from '@/data/schema-sync';
-import { getAuthSecuritySettings, AUTH_REQUIRE_ADMIN_MFA } from './settings';
+import { getAuthSecuritySettings } from './settings';
+export { lockAuthPolicy } from './auth-policy-lock';
 import { decryptSecret, matchFactor } from './mfa-crypto';
 
 export type MfaCredential = { user_id: bigint; secret: string; recovery_hashes: string; last_step: bigint; version: string };
@@ -14,13 +15,14 @@ export async function getMfaCredential(uid: number): Promise<MfaCredential | nul
 /** Strict account-level classification also covers granular permissions and assigned roles. */
 export async function isPrivilegedAccount(uid: number): Promise<boolean> {
   const rows = await prisma.$queryRawUnsafe<{ id: bigint }[]>(
-    "SELECT u.id FROM users u WHERE u.id = ? AND (u.is_admin = 1 OR EXISTS (SELECT 1 FROM admin_perms p WHERE p.user_id = u.id) OR EXISTS (SELECT 1 FROM admin_roles r WHERE r.user_id = u.id)) LIMIT 1", uid);
+    "SELECT u.id FROM users u WHERE u.id = ? AND (u.is_admin = 1 OR EXISTS (SELECT 1 FROM admin_perms p WHERE p.user_id = u.id) OR EXISTS (SELECT 1 FROM admin_roles r WHERE r.user_id = u.id) OR EXISTS (SELECT 1 FROM access_user_roles ar WHERE ar.user_id=u.id)) LIMIT 1", uid);
   return rows.length > 0;
 }
 export async function getAuthSessionVersion(uid: number): Promise<string | null> {
   await ensureSchema();
-  const user = await prisma.users.findUnique({ where: { id: BigInt(uid) }, select: { auth_session_version: true, archived_at: true, merged_into: true } });
-  return !user || user.archived_at || user.merged_into ? null : user.auth_session_version;
+  const user = await prisma.users.findUnique({ where: { id: BigInt(uid) }, select: { auth_session_version: true, archived_at: true, merged_into: true, ban:true, ban_until:true } });
+  const banned=user?.ban==='checked'&&(!user.ban_until||user.ban_until.getTime()>Date.now());
+  return !user || user.archived_at || user.merged_into || banned ? null : user.auth_session_version;
 }
 export async function sessionMeetsAuthPolicy(session: { uid: number; mfaVersion?: string; authVersion?: string }): Promise<boolean> {
   const currentVersion = await getAuthSessionVersion(session.uid);
@@ -57,15 +59,9 @@ export async function consumeMfa(uid: number, code: string): Promise<string | nu
   if (version) await clearSecurityAttempts('mfa:' + uid);
   return version;
 }
-/** Serialize policy activation with every application-level admin privilege grant. */
-export async function lockAuthPolicy(tx: Prisma.TransactionClient): Promise<boolean> {
-  await tx.$executeRawUnsafe('INSERT IGNORE INTO site_settings (k,v) VALUES (?,?)', AUTH_REQUIRE_ADMIN_MFA, '0');
-  const rows = await tx.$queryRawUnsafe<{ v: string }[]>('SELECT v FROM site_settings WHERE k = ? FOR UPDATE', AUTH_REQUIRE_ADMIN_MFA);
-  return rows[0]?.v === '1';
-}
 export async function mfaReadiness(tx: Pick<Prisma.TransactionClient, '$queryRawUnsafe'> = prisma): Promise<{ id: number; name: string; enrolled: boolean }[]> {
   await ensureSchema();
   const rows = await tx.$queryRawUnsafe<{ id: bigint; name: string; version: string | null }[]>(
-    "SELECT DISTINCT u.id, COALESCE(u.name,u.userName,'عضو') AS name, m.version FROM users u LEFT JOIN auth_mfa m ON m.user_id=u.id WHERE u.archived_at IS NULL AND (u.merged_into IS NULL OR u.merged_into=0) AND (u.is_admin=1 OR EXISTS (SELECT 1 FROM admin_perms p WHERE p.user_id=u.id) OR EXISTS (SELECT 1 FROM admin_roles r WHERE r.user_id=u.id))");
+    "SELECT DISTINCT u.id, COALESCE(u.name,u.userName,'عضو') AS name, m.version FROM users u LEFT JOIN auth_mfa m ON m.user_id=u.id WHERE u.archived_at IS NULL AND (u.merged_into IS NULL OR u.merged_into=0) AND (u.is_admin=1 OR EXISTS (SELECT 1 FROM admin_perms p WHERE p.user_id=u.id) OR EXISTS (SELECT 1 FROM admin_roles r WHERE r.user_id=u.id) OR EXISTS (SELECT 1 FROM access_user_roles ar WHERE ar.user_id=u.id))");
   return rows.map((r) => ({ id: Number(r.id), name: r.name, enrolled: !!r.version }));
 }

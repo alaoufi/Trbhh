@@ -8,12 +8,15 @@ import { getMsgDeleteMinutes, getAdMsgTemplates, getAdminMsgTemplates, getSuppor
 import { getPrimaryAdminId } from '@/lib/admin-inbox';
 import { storeIdOfUser, getStoreMeta } from '@/lib/merchant';
 import { ChatRoom } from '@/components/chat-room';
+import { canUseMemberChat } from '@/lib/chat-access';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ThreadPage({ params }: { params: Promise<{ userId: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
+  if (!await canUseMemberChat(session.uid,'view')) redirect('/account?access=denied');
+  const [canSend,canDelete,canEdit]=await Promise.all([canUseMemberChat(session.uid,'create'),canUseMemberChat(session.uid,'delete'),canUseMemberChat(session.uid,'edit')]);
   const { userId } = await params;
   const otherId = Number(userId);
   if (otherId === session.uid) redirect('/messages');
@@ -49,7 +52,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
         <Link href="/messages" className="rounded-lg p-2 hover:bg-secondary"><ArrowRight className="h-5 w-5" /></Link>
         <Link href={`/users/${thread.other.id}`} className="flex-1 font-bold hover:text-primary">{thread.other.name}</Link>
         {/* حظر/رفع حظر — لا يُحظر حساب الإدارة */}
-        {otherId !== adminId && (
+        {otherId !== adminId && canEdit && (
           iBlocked ? (
             <form action={unblockUserAction}>
               <input type="hidden" name="userId" value={otherId} />
@@ -76,7 +79,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ userId:
           {iBlocked ? 'أنت حظرت هذا العضو — لا يمكنكما تبادل الرسائل. ارفع الحظر لاستئناف المراسلة.' : 'لا يمكن مراسلة هذا العضو حالياً.'}
         </div>
       ) : (
-        <ChatRoom peerId={otherId} initial={thread.messages} deleteWindowMin={delWindow} templates={templates} />
+        <ChatRoom peerId={otherId} initial={thread.messages} deleteWindowMin={delWindow} templates={templates} canSend={canSend} canDelete={canDelete} />
       )}
     </div>
   );

@@ -1,10 +1,11 @@
 import 'server-only';
-import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { prisma } from './prisma';
 import { getSession } from './auth';
 import { getSetting, setSetting } from './settings';
 import { ensureSchema } from '@/data/schema-sync';
+import { hasAccess, readActorAccess, requireAccess } from './access-control/guards';
+import { legacyPermission, SENSITIVE_KEYS } from './access-control/catalog';
 
 export type Service =
   | 'users' | 'ads' | 'duplicates' | 'classified'
@@ -45,7 +46,6 @@ export const ACTION_LABELS: Record<Action, string> = {
 };
 
 export const ALL_KEYS: string[] = SERVICES.flatMap((s) => s.actions.map((a) => `${s.key}:${a}`));
-const KEY_SET = new Set(ALL_KEYS);
 export const key = (s: Service, a: Action) => `${s}:${a}`;
 
 /* ---- role presets (quick-apply bundles of granular permissions) ---- */
@@ -56,7 +56,7 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 /** Admin-granular presets (applied to a single admin user's admin_perms). */
 export const ROLE_PRESET: Record<Role, string[]> = {
-  manager: ALL_KEYS,
+  manager: ALL_KEYS.filter(k=>{const mapped=legacyPermission(k);return mapped!==null&&!SENSITIVE_KEYS.has(mapped);}),
   moderator: [
     'ads:view', 'ads:archive', 'ads:delete',
     'classified:view', 'classified:delete',
@@ -99,7 +99,7 @@ const MATRIX_SET = new Set(ALL_MATRIX_KEYS);
 const toSuspend = (k: string) => k.replace(/:archive$/, ':suspend');
 
 export const DEFAULT_ROLE_PERMS: Record<Role, string[]> = {
-  manager: ALL_MATRIX_KEYS,
+  manager: [],
   moderator: ROLE_PRESET.moderator.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
   monitor: ROLE_PRESET.monitor.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
   store_monitor: ROLE_PRESET.store_monitor.map(toSuspend).filter((k) => MATRIX_SET.has(k)),
@@ -114,18 +114,9 @@ async function ensureRolePerms() {
   // seed sensible defaults exactly once (so clearing a role later isn't reseeded)
   const seeded = await getSetting('role_perms_seeded', '0').catch(() => '0');
   if (seeded !== '1') {
-    const seed = MATRIX_ROLES.flatMap((role) => DEFAULT_ROLE_PERMS[role].map((perm) => ({ role, perm })));
+    const seed = (['member','visitor'] as const).flatMap((role) => DEFAULT_ROLE_PERMS[role].map((perm) => ({ role, perm })));
     await prisma.role_perms.createMany({ data: seed, skipDuplicates: true }).catch(() => {});
     await setSetting('role_perms_seeded', '1').catch(() => {});
-  }
-  // targeted one-time seed for the store-monitor role (added after initial seeding)
-  const storesSeeded = await getSetting('role_perms_stores_seeded_v2', '0').catch(() => '0');
-  if (storesSeeded !== '1') {
-    await prisma.role_perms.createMany({
-      data: DEFAULT_ROLE_PERMS.store_monitor.map((perm) => ({ role: 'store_monitor', perm })),
-      skipDuplicates: true,
-    }).catch(() => {});
-    await setSetting('role_perms_stores_seeded_v2', '1').catch(() => {});
   }
   rolePermsEnsured = true;
 }
@@ -146,16 +137,14 @@ async function loadRolePerms(): Promise<Map<string, Set<string>>> {
 
 /** Enabled matrix keys for a role (e.g. "ads:add"). */
 export async function getRolePermKeys(role: Role): Promise<Set<string>> {
+  if(role!=='member'&&role!=='visitor')return new Set();
   return (await loadRolePerms()).get(role) ?? new Set<string>();
 }
 
 /** Replace a role's matrix permissions with the given key list. */
 export async function setRolePermKeys(role: Role, keys: string[]) {
-  await ensureRolePerms();
-  const valid = [...new Set(keys.filter((k) => MATRIX_SET.has(k)))];
-  await prisma.role_perms.deleteMany({ where: { role } });
-  if (valid.length) await prisma.role_perms.createMany({ data: valid.map((perm) => ({ role, perm })), skipDuplicates: true });
-  rolePermCache = null;
+  void role;void keys;
+  throw new Error('rbac_legacy_grants_disabled');
 }
 
 /** Can a role perform an action on a section (matrix-based). */
@@ -169,172 +158,56 @@ export async function viewerRole(): Promise<Role> {
   return session ? 'member' : 'visitor';
 }
 
-const ensureTables = ensureSchema;
-
-/** The full set of granular permission keys granted to a user. */
-async function getUserPermKeysImpl(userId: number): Promise<Set<string>> {
-  await ensureTables();
-  // is_admin = 1 is a full manager (back-compat)
-  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { is_admin: true } }).catch(() => null);
-  if (u?.is_admin === 1) return new Set(ALL_KEYS);
-
-  const out = new Set<string>();
-  const perms = await prisma.admin_perms.findMany({ where: { user_id: BigInt(userId) }, select: { perm: true } }).catch(() => []);
-  for (const p of perms) if (KEY_SET.has(p.perm)) out.add(p.perm);
-
-  // expand any role assignment into keys using the editable matrix
-  const roleRow = await prisma.admin_roles.findUnique({ where: { user_id: BigInt(userId) } }).catch(() => null);
-  const role = roleRow?.role as Role | undefined;
-  if (role) {
-    const rk = await getRolePermKeys(role).catch(() => new Set<string>());
-    for (const k of rk) {
-      if (KEY_SET.has(k)) out.add(k);
-      // 'suspend' in the matrix also satisfies the legacy 'archive' gate
-      if (k.endsWith(':suspend')) {
-        const arch = k.replace(/:suspend$/, ':archive');
-        if (KEY_SET.has(arch)) out.add(arch);
-      }
-    }
-    // safety net: if the matrix is somehow empty for a known admin role, use preset
-    if (rk.size === 0 && ROLE_PRESET[role]?.length) for (const k of ROLE_PRESET[role]) out.add(k);
-  }
-
-  return out;
+/** Compatibility facade: staff authorization is exclusively the new RBAC registry. */
+export async function getUserPermKeys(userId:number):Promise<Set<string>>{
+  const access=await readActorAccess(userId);
+  if(!access.ready)return new Set();
+  const keys=new Set(access.keys);
+  // Aliases are derived from explicit canonical grants, never from legacy rows.
+  for(const old of ALL_KEYS){const mapped=legacyPermission(old);if(mapped&&access.keys.has(mapped))keys.add(old);}
+  return keys;
 }
-
-export async function hasAction(userId: number, service: Service, action: Action): Promise<boolean> {
-  return (await getUserPermKeys(userId)).has(key(service, action));
+export async function hasAction(userId:number,service:Service,action:Action){
+  const mapped=legacyPermission(`${service}:${action}`);if(!mapped)return false;
+  const [module,verb]=mapped.split(':');return hasAccess(userId,module,verb);
 }
-
-/** Services the user can at least view (for nav/menu/dashboard). */
-export async function getUserPerms(userId: number): Promise<Set<Perm>> {
-  const keys = await getUserPermKeys(userId);
-  const set = new Set<Perm>();
-  for (const s of SERVICES) if (keys.has(key(s.key, 'view'))) set.add(s.key);
-  return set;
+export async function getUserPerms(userId:number):Promise<Set<Perm>>{
+  const keys=await getUserPermKeys(userId);
+  return new Set(SERVICES.filter(s=>keys.has(`${s.key}:view`)).map(s=>s.key));
 }
-
-/** Any action on a service → the service area is reachable. */
-export async function hasPerm(userId: number, service: Service): Promise<boolean> {
-  const keys = await getUserPermKeys(userId);
-  return SERVICES.find((s) => s.key === service)?.actions.some((a) => keys.has(key(service, a))) ?? false;
-}
-
-export async function hasAnyAdmin(userId: number): Promise<boolean> {
-  return (await getUserPermKeys(userId)).size > 0;
-}
-
-/** True only for full managers (all permissions / is_admin). */
-export async function isManager(userId: number): Promise<boolean> {
-  return (await getUserPermKeys(userId)).size >= ALL_KEYS.length;
-}
-
+export async function hasPerm(userId:number,service:Service){return hasAction(userId,service,'view');}
+export async function hasAnyAdmin(userId:number){const access=await readActorAccess(userId);return access.ready&&access.keys.size>0;}
+/** Legacy name retained for callers; it checks a permission, never a role label/count. */
+export async function isManager(userId:number){return hasAccess(userId,'access_control','manage_settings');}
 export class AdminMfaEnrollmentRequired extends Error {
-  constructor() { super('يجب أن يربط العضو تطبيق التحقق من أمان الحساب قبل منحه صلاحيات الإدارة.'); }
+  constructor(){super('يجب ربط تطبيق التحقق قبل منح صلاحيات الإدارة.');}
 }
-
-/** Replace a user's granular permissions with the given key list. */
-export async function setUserPerms(userId: number, keys: string[]) {
-  await ensureTables();
-  const valid = [...new Set(keys.filter((k) => KEY_SET.has(k)))];
-  const { lockAuthPolicy } = await import('./auth-security');
-  await prisma.$transaction(async (tx) => {
-    const enforced = await lockAuthPolicy(tx);
-    if (enforced && valid.length) {
-      const credential = await tx.auth_mfa.findUnique({ where: { user_id: BigInt(userId) }, select: { version: true } });
-      if (!credential) throw new AdminMfaEnrollmentRequired();
-    }
-    await tx.admin_perms.deleteMany({ where: { user_id: BigInt(userId) } });
-    await tx.admin_roles.deleteMany({ where: { user_id: BigInt(userId) } });
-    if (valid.length) await tx.admin_perms.createMany({ data: valid.map((perm) => ({ user_id: BigInt(userId), perm })), skipDuplicates: true });
-  });
+/** Old entrypoints cannot write unaudited grants or resurrect legacy permissions. */
+export async function setUserPerms(userId:number,keys:string[]){void userId;void keys;throw new Error('rbac_legacy_grants_disabled');}
+export async function applyRolePreset(userId:number,role:Role|'none'){void userId;void role;throw new Error('rbac_legacy_grants_disabled');}
+export async function getUserRole(userId:number):Promise<Role|null>{
+  const {roles}=await readActorAccess(userId);
+  return roles.some(r=>r.id==='system_access_admin')?'manager':null;
 }
-
-export async function applyRolePreset(userId: number, role: Role | 'none') {
-  if (role === 'none' || !ROLE_PRESET[role as Role]) {
-    await setUserPerms(userId, []);
-  } else {
-    await setUserPerms(userId, ROLE_PRESET[role as Role]);
-  }
-}
-
-/** Best-effort label for a user's current permission set (for display). */
-export async function getUserRole(userId: number): Promise<Role | null> {
-  const keys = await getUserPermKeys(userId);
-  if (!keys.size) return null;
-  if (keys.size >= ALL_KEYS.length) return 'manager';
-  const sameAs = (r: Role) => ROLE_PRESET[r].length === keys.size && ROLE_PRESET[r].every((k) => keys.has(k));
-  if (sameAs('moderator')) return 'moderator';
-  if (sameAs('monitor')) return 'monitor';
-  if (sameAs('store_monitor')) return 'store_monitor';
-  return null; // custom set
-}
-
-/**
- * Batched role labels for a page of users — TWO queries total instead of
- * 3-4 per user (the per-user loop was saturating the DB pool and hanging
- * the admin panel). is_admin=1 → manager; else the assigned role if any.
- */
-export async function getUserRolesMap(ids: number[]): Promise<Map<number, Role | null>> {
-  await ensureTables();
-  const map = new Map<number, Role | null>();
-  if (!ids.length) return map;
-  const big = ids.filter((n) => Number.isFinite(n) && n > 0).map((n) => BigInt(n));
-  const [admins, roleRows] = await Promise.all([
-    prisma.users.findMany({ where: { id: { in: big }, is_admin: 1 }, select: { id: true } }).catch(() => []),
-    prisma.admin_roles.findMany({ where: { user_id: { in: big } } }).catch(() => []),
-  ]);
-  for (const id of ids) map.set(id, null);
-  for (const r of roleRows) {
-    const role = r.role as Role;
-    if (role in ROLE_PRESET) map.set(Number(r.user_id), role);
-  }
-  for (const a of admins) map.set(Number(a.id), 'manager');
+export async function getUserRolesMap(ids:number[]):Promise<Map<number,Role|null>>{
+  const map=new Map<number,Role|null>(ids.map(id=>[id,null]));
+  if(!ids.length)return map;
+  try{
+    await ensureSchema();
+    const valid=ids.filter(id=>Number.isSafeInteger(id)&&id>0);if(!valid.length)return map;
+    const rows=await prisma.$queryRawUnsafe<{user_id:bigint}[]>(`SELECT ur.user_id FROM access_user_roles ur JOIN access_roles r ON r.id=ur.role_id JOIN access_departments d ON d.id=r.department_id JOIN access_control_state s ON s.id=1 WHERE s.initialized_at IS NOT NULL AND r.active=1 AND d.active=1 AND r.id='system_access_admin' AND ur.user_id IN (${valid.map(()=>'?').join(',')})`,...valid);
+    for(const r of rows)map.set(Number(r.user_id),'manager');
+  }catch{/* Labels reveal no permissions and grant nothing on read failure. */}
   return map;
 }
-
-/* ---- gates ---- */
-export async function requireAction(service: Service, action: Action) {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (!(await hasAction(session.uid, service, action))) redirect('/');
-  return session;
+export async function requireAction(service:Service,action:Action){
+  const mapped=legacyPermission(`${service}:${action}`);if(!mapped)redirect('/account?access=denied');
+  const [module,verb]=mapped.split(':');return requireAccess(module,verb);
 }
-
-/** Ban/unban a member. Requires the distinct «حظر» permission (users:ban);
- *  full users:edit also satisfies it (backward-compat with existing admins). */
-export async function requireUserBan() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  const keys = await getUserPermKeys(session.uid);
-  if (!keys.has('users:ban') && !keys.has('users:edit')) redirect('/');
-  return session;
+export async function requireUserBan(){return requireAccess('users','ban');}
+export async function requirePerm(service:Service){return requireAction(service,'view');}
+export async function requireManager(){return requireAccess('access_control','manage_settings');}
+export async function requireAnyAdmin(){
+  const session=await getSession();if(!session)redirect('/login');
+  if(!(await hasAnyAdmin(session.uid)))redirect('/account?access=denied');return session;
 }
-
-/** Page-level gate: requires the "view" action on a service. */
-export async function requirePerm(service: Service) {
-  return requireAction(service, 'view');
-}
-
-/** Full-manager-only gate — for actions that grant/edit OTHER admins' permissions
- *  or role matrices (setUserPermsAction/applyPresetAction/saveRolePermsAction).
- *  `users:edit` alone is NOT enough here: it would let a limited admin (e.g.
- *  granted only to edit member profiles) promote themselves or anyone else to
- *  full manager — a privilege-escalation hole. Only an existing full manager
- *  may change what any admin (including themselves) is allowed to do. */
-export async function requireManager() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (!(await isManager(session.uid))) redirect('/admin');
-  return session;
-}
-
-export async function requireAnyAdmin() {
-  const session = await getSession();
-  if (!session) redirect('/login');
-  if (!(await hasAnyAdmin(session.uid))) redirect('/');
-  return session;
-}
-
-/* memoized per-request (React cache): tames repeated hot reads within one navigation */
-export const getUserPermKeys = cache(getUserPermKeysImpl);

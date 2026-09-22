@@ -1,6 +1,8 @@
+import { AccessPage } from '@/components/access-boundary';
+import { requireAdminPage, readActorAccess } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { requireAction } from '@/lib/roles';
+
 import { prisma } from '@/lib/prisma';
 import { formatSar } from '@/lib/commerce/money';
 import type { ShippingSnapshot } from '@/lib/commerce/types';
@@ -21,18 +23,19 @@ const fulfillmentLabels: Record<string, string> = {
 };
 
 export default async function AdminOrderDetail({ params }: { params: Promise<{ id: string }> }) {
-  await requireAction('commerce', 'view');
+  const session=await requireAdminPage('/admin/commerce/orders/[id]');
+  const {keys}=await readActorAccess(session.uid);
   const { id } = await params;
   if (!/^[1-9]\d{0,14}$/.test(id)) notFound();
-  const [order] = await prisma.$queryRaw<Order[]>`SELECT id,member_id,status,fulfillment_status,subtotal_minor,shipping_fee_minor,total_minor,shipping FROM commerce_orders WHERE id=${BigInt(id)} LIMIT 1`;
+  const [order] = keys.has('shipping:view') ? await prisma.$queryRaw<Order[]>`SELECT id,member_id,status,fulfillment_status,subtotal_minor,shipping_fee_minor,total_minor,shipping FROM commerce_orders WHERE id=${BigInt(id)} LIMIT 1` : await prisma.$queryRaw<Order[]>`SELECT id,member_id,status,fulfillment_status,subtotal_minor,shipping_fee_minor,total_minor,'{}' AS shipping FROM commerce_orders WHERE id=${BigInt(id)} LIMIT 1`;
   if (!order) notFound();
   // Order creation permits at most 100 lines. Read the purchased snapshots,
   // never the mutable product catalog or the member's current profile.
   const items = await prisma.$queryRaw<Item[]>`SELECT id,title,quantity,unit_price_minor,total_minor FROM commerce_order_items WHERE order_id=${order.id} ORDER BY id LIMIT 100`;
-  const suppliers = await prisma.$queryRaw<SupplierSnapshot[]>`SELECT product_id,supplier_id,supplier_name,supplier_sku,quantity,unit_cost_minor,total_cost_minor FROM commerce_order_suppliers WHERE order_id=${order.id} ORDER BY product_id LIMIT 100`;
+  const suppliers = keys.has('settlements:view') ? await prisma.$queryRaw<SupplierSnapshot[]>`SELECT product_id,supplier_id,supplier_name,supplier_sku,quantity,unit_cost_minor,total_cost_minor FROM commerce_order_suppliers WHERE order_id=${order.id} ORDER BY product_id LIMIT 100` : [];
   const shipping: ShippingSnapshot = typeof order.shipping === 'string' ? JSON.parse(order.shipping) : order.shipping;
   return <section className="card-3d space-y-4 rounded-xl p-5">
-    <Link href="/admin/commerce" className="text-primary underline">العودة إلى السلع والطلبات</Link>
+    <AccessPage href="/admin/orders"><Link href="/admin/orders" className="text-primary underline">العودة إلى السلع والطلبات</Link></AccessPage>
     <h1 className="text-xl font-bold text-primary">تفاصيل الطلب #{order.id.toString()}</h1>
     <p className="text-sm">رقم العضو: {order.member_id.toString()}</p>
     <p>حالة دفع العميل: {paymentLabels[order.status] ?? 'حالة غير معروفة — راجع المسؤول'}</p>
@@ -47,15 +50,15 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
     </div>
     <p>قيمة السلع: {formatSar(order.subtotal_minor)} ر.س · التوصيل: {formatSar(order.shipping_fee_minor)} ر.س</p>
     <p className="font-bold">الإجمالي: {formatSar(order.total_minor)} ر.س</p>
-    <section className="space-y-2 rounded-lg border p-3">
+    {keys.has('settlements:view') && <section className="space-y-2 rounded-lg border p-3">
       <h2 className="font-bold">الموردون وقت إنشاء الطلب — بيانات داخلية</h2>
       <p className="text-xs">هذه تكاليف التوريد المحفوظة وليست إثباتًا لسداد المورد. الاستحقاق المحاسبي لا يُسجل قبل تأكيد البنك.</p>
       {suppliers.length===0 ? <p className="text-sm">لا توجد بنود مسندة لمورد؛ مخزون داخلي أو غير مسند.</p> : <div className="overflow-x-auto"><table className="w-full text-right text-sm">
         <thead><tr><th>السلعة</th><th>المورد</th><th>رمز المورد</th><th>الكمية</th><th>متوسط تكلفة الوحدة (مقرب للأعلى)</th><th>إجمالي التكلفة الدقيق</th></tr></thead>
-        <tbody>{suppliers.map(s=><tr key={s.product_id.toString()} className="border-t"><td>{s.product_id.toString()}</td><td><Link className="text-primary underline" href={`/admin/commerce/accounts?supplier=${s.supplier_id}`}>{s.supplier_name} #{s.supplier_id.toString()}</Link></td><td>{s.supplier_sku}</td><td>{s.quantity}</td><td>{formatSar(s.unit_cost_minor)} ر.س</td><td>{formatSar(s.total_cost_minor)} ر.س</td></tr>)}</tbody>
+        <tbody>{suppliers.map(s=><tr key={s.product_id.toString()} className="border-t"><td>{s.product_id.toString()}</td><td><AccessPage href={`/admin/commerce/accounts?supplier=${s.supplier_id}`}><Link className="text-primary underline" href={`/admin/commerce/accounts?supplier=${s.supplier_id}`}>{s.supplier_name} #{s.supplier_id.toString()}</Link></AccessPage></td><td>{s.supplier_sku}</td><td>{s.quantity}</td><td>{formatSar(s.unit_cost_minor)} ر.س</td><td>{formatSar(s.total_cost_minor)} ر.س</td></tr>)}</tbody>
       </table></div>}
-    </section>
-    <section className="space-y-2 rounded-lg border p-3">
+    </section>}
+    {keys.has('shipping:view') && <section className="space-y-2 rounded-lg border p-3">
       <h2 className="font-bold">بيانات المستلم والتوصيل المحفوظة للطلب</h2>
       <dl className="grid gap-2 sm:grid-cols-2">
         <div><dt>المستلم</dt><dd>{shipping.name}</dd></div>
@@ -65,6 +68,6 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
         <div><dt>الرمز البريدي</dt><dd>{shipping.postalCode}</dd></div>
         <div><dt>الدولة</dt><dd>{shipping.country}</dd></div>
       </dl>
-    </section>
+    </section>}
   </section>;
 }

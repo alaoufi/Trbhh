@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ gate: vi.fn(), schema: vi.fn(), transaction: vi.fn(), query: vi.fn(), execute: vi.fn(), audit: vi.fn() }));
 vi.mock('@/lib/commerce/schema', () => ({ assertCommerceSchemaReady: state.schema }));
-vi.mock('@/lib/roles', () => ({ requireAction: state.gate }));
+vi.mock('@/lib/access-control/guards', () => ({ requireAccess: state.gate }));
 vi.mock('@/lib/prisma', () => ({ prisma: { $transaction: state.transaction } }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('next/navigation', () => ({ redirect: (url: string) => { throw new Error(`redirect:${url}`); } }));
@@ -27,7 +27,7 @@ describe('supplier administration boundaries', () => {
   });
   it('uses suppliers add/edit independently of commerce permissions', async () => {
     await expect(saveSupplier(form({ name: 'Fixture' }))).rejects.toThrow('redirect:');
-    expect(state.gate).toHaveBeenLastCalledWith('suppliers', 'add');
+    expect(state.gate).toHaveBeenLastCalledWith('suppliers', 'create');
     state.query.mockResolvedValueOnce([{ id: 2n }]);
     await expect(saveSupplier(form({ id: '2', name: 'Fixture' }))).rejects.toThrow('redirect:');
     expect(state.gate).toHaveBeenLastCalledWith('suppliers', 'edit');
@@ -53,7 +53,7 @@ describe('supplier administration boundaries', () => {
   it('locks product before supplier, then maps and audits atomically', async () => {
     state.query.mockResolvedValueOnce([{ id: 12n, approved: 1 }]).mockResolvedValueOnce([{ id: 2n, active: 1 }]);
     await expect(saveSupplierProduct(form({ productId: '12', supplierId: '2', supplierSku: 'SKU1', unitCost: '10.25' }))).rejects.toThrow('saved=1');
-    expect(state.gate).toHaveBeenCalledWith('suppliers', 'edit');
+    expect(state.gate).toHaveBeenCalledWith('products', 'edit');
     expect(state.query.mock.calls[0][0].join('?')).toMatch(/commerce_products.*FOR UPDATE/);
     expect(state.query.mock.calls[1][0].join('?')).toMatch(/commerce_suppliers.*FOR UPDATE/);
     expect(state.transaction).toHaveBeenCalledOnce();
@@ -84,9 +84,9 @@ describe('supplier administration boundaries', () => {
     expect(state.execute.mock.calls[0][0].join('?')).not.toMatch(/supplier_connections|oauth|\bphone=/);
     expect(JSON.stringify(state.audit.mock.calls,(_,v)=>typeof v==='bigint'?v.toString():v)).not.toContain('+966500000000');
   });
-  it('requires the supplier delete permission and exact two-step confirmations', async () => {
+  it('requires product delete permission and exact two-step confirmations', async () => {
     await expect(deleteSupplierProducts(form({supplierId:'2',supplierName:'Fixture',confirmName:'Fixture',confirmPhrase:'حذف منتجات المورد',acknowledge:'1'}))).rejects.toThrow('redirect:');
-    expect(state.gate).toHaveBeenLastCalledWith('suppliers','delete');
+    expect(state.gate).toHaveBeenLastCalledWith('products','delete');
     expect(state.transaction).toHaveBeenCalledOnce();
     vi.clearAllMocks();state.gate.mockResolvedValue({uid:9});state.query.mockResolvedValue([{id:2n,name:'Fixture'}]);
     await expect(deleteSupplier(form({supplierId:'2',supplierName:'Fixture',confirmName:'Wrong',confirmPhrase:'حذف المورد نهائياً',acknowledge:'1'}))).rejects.toThrow('error=delete_confirmation');

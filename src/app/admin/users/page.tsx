@@ -1,9 +1,12 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage, readActorAccess } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { BadgeCheck, Ban, Check, ShieldCheck, UserPen } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { requirePerm, getUserRolesMap, ROLE_LABELS } from '@/lib/roles';
+
 import { getPackages, getUserPackageMap } from '@/lib/packages';
 import { liftExpiredBans, getBanMap } from '@/lib/moderation';
 import { AdminSearch } from '@/components/admin-search';
@@ -35,7 +38,8 @@ const IDLE_COND = `(ban IS NULL OR ban <> 'checked')
   AND NOT EXISTS (SELECT 1 FROM ads a WHERE a.user_id = users.id AND a.created_at > (NOW() - INTERVAL 1 YEAR))`;
 
 export default async function AdminUsers({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string; page?: string; banerr?: string }> }) {
-  await requirePerm('users');
+  const session=await requireAdminPage('/admin/users');
+  const {keys}=await readActorAccess(session.uid);
   await ensureSchema();
   const { q, filter: filterRaw, page: pageRaw, banerr } = await searchParams;
   const term = (q || '').trim();
@@ -73,14 +77,14 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
   const ids = users.map((u) => toInt(u.id));
   // صفات كل عضو للإدارة (مشاهدة فقط): هل يملك متجراً؟ — لعرض هوياته بلا تدخّل
   const storeByUser = new Map<number, { id: number; name: string; status: number }>();
-  if (ids.length) {
+  if (ids.length && keys.has('stores:view')) {
     const srows = await prisma.stores.findMany({ where: { user_id: { in: ids } }, select: { id: true, user_id: true, store_name: true, status: true } }).catch(() => []);
     for (const s of srows) storeByUser.set(s.user_id, { id: toInt(s.id), name: s.store_name || 'متجر', status: s.status });
   }
   const [packages, pkgMap, roleById, banMap, pendingVerify, pendingNames, linkedCounts] = await Promise.all([
     getPackages(),
     getUserPackageMap(ids),
-    getUserRolesMap(ids),
+    keys.has('access_control:view') ? Promise.all(ids.map(async id=>[id,(await readActorAccess(id)).roles.map(role=>role.name)] as const)).then(rows=>new Map(rows)) : new Map<number,string[]>(),
     getBanMap(ids),
     // نفس تعريف «بانتظار الموافقة» في صفحة التوثيق — المرفوض (step=2) لا يُعدّ معلقاً
     prisma.users.count({ where: { trusted: { not: 1 }, step: { not: 2 }, OR: [{ step: 1 }, { national_identity: { gt: 0 } }, { commercial_register: { gt: 0 } }, { work_permit: { gt: 0 } }] } }).catch(() => 0),
@@ -99,14 +103,14 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
         <h1 className="text-xl font-bold text-primary">الأعضاء</h1>
         {/* طلبات الأعضاء المعلّقة — وصول مباشر من نفس الصفحة */}
         <div className="flex flex-wrap gap-2">
-          <Link href="/admin/verifications" className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm font-bold ${pendingVerify > 0 ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-primary/25 text-primary hover:bg-secondary'}`}>
+          <AccessPage href="/admin/verifications"><Link href="/admin/verifications" className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm font-bold ${pendingVerify > 0 ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-primary/25 text-primary hover:bg-secondary'}`}>
             <ShieldCheck className="h-4 w-4" /> طلبات التوثيق
             {pendingVerify > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-xs text-white">{pendingVerify}</span>}
-          </Link>
-          <Link href="/admin/name-requests" className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm font-bold ${pendingNames > 0 ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-primary/25 text-primary hover:bg-secondary'}`}>
+          </Link></AccessPage>
+          <AccessPage href="/admin/name-requests"><Link href="/admin/name-requests" className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm font-bold ${pendingNames > 0 ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-primary/25 text-primary hover:bg-secondary'}`}>
             <UserPen className="h-4 w-4" /> طلبات تغيير الاسم
             {pendingNames > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-xs text-white">{pendingNames}</span>}
-          </Link>
+          </Link></AccessPage>
         </div>
       </div>
 
@@ -121,15 +125,15 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
               {r.note && <span className="text-xs text-muted-foreground">— {r.note}</span>}
               <span className="text-xs text-muted-foreground">{timeAgo(r.at)}</span>
               <span className="mr-auto flex gap-1">
-                <form action={executeDeletionRequestAction}>
+                <AccessBoundary module={'users'} action={'delete'}><form action={executeDeletionRequestAction}>
                   <input type="hidden" name="id" value={r.id} />
                   <input type="hidden" name="phone" value={r.phone} />
                   <ConfirmSubmit msg={`تأكيد: حذف حساب صاحب الرقم ${r.phone} وجميع بياناته نهائياً؟ لا يمكن التراجع.`} className="rounded-md bg-destructive px-3 py-1 text-xs font-bold text-white">تنفيذ الحذف</ConfirmSubmit>
-                </form>
-                <form action={dismissDeletionRequestAction}>
+                </form></AccessBoundary>
+                <AccessBoundary module={'users'} action={'edit'}><form action={dismissDeletionRequestAction}>
                   <input type="hidden" name="id" value={r.id} />
                   <ConfirmSubmit msg="تجاهل طلب حذف الحساب هذا؟ يُزال من القائمة دون حذف الحساب." className="rounded-md border px-3 py-1 text-xs font-bold text-muted-foreground hover:bg-secondary">تجاهل</ConfirmSubmit>
-                </form>
+                </form></AccessBoundary>
               </span>
             </div>
           ))}
@@ -146,10 +150,10 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
           const qs = params.toString();
           const on = filter === f.k;
           return (
-            <Link key={f.k} href={`/admin/users${qs ? `?${qs}` : ''}`}
+            <AccessPage href={`/admin/users${qs ? `?${qs}` : ''}`} key={f.k}><Link key={f.k} href={`/admin/users${qs ? `?${qs}` : ''}`}
               className={`rounded-full px-4 py-1.5 text-sm font-bold transition ${on ? 'bg-primary text-white shadow' : 'card-3d text-primary hover:border-primary/40'}`}>
               {f.l}
-            </Link>
+            </Link></AccessPage>
           );
         })}
       </div>
@@ -160,22 +164,22 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
             {users.map((u) => {
               const id = toInt(u.id);
               const role = roleById.get(id);
-              const label = role ? ROLE_LABELS[role] : (u.is_admin === 1 ? 'مدير' : null);
+              const label = role?.join('، ') || null;
               const banned = u.ban === 'checked';
               const banInfo = banMap.get(id) ?? null; // تفاصيل الحظر: المدة + السبب + تاريخ/وقت التنفيذ
               const until = banInfo?.until ?? null; // Date = temporary, null (while banned) = permanent
               return (
               <article key={id} className="card-3d space-y-3 rounded-2xl p-4">
                 <div>
-                  <Link href={`/admin/users/${id}`} className="flex items-center gap-1 font-medium text-primary hover:underline">{u.name || u.userName || '—'}{u.trusted === 1 && <BadgeCheck className="h-4 w-4 text-primary" />}</Link>
+                  <AccessPage href={`/admin/users/${id}`}><Link href={`/admin/users/${id}`} className="flex items-center gap-1 font-medium text-primary hover:underline">{u.name || u.userName || '—'}{u.trusted === 1 && <BadgeCheck className="h-4 w-4 text-primary" />}</Link></AccessPage>
                   <div className="text-xs text-muted-foreground">عضو #{id} · {timeAgo(u.created_at)}</div>
                   {/* 🎭 صفات العضو (مشاهدة فقط للإدارة — لا تدخّل): عضو دائماً، متجر إن ملك، إدارة إن كان مشرفاً + مراسلة */}
                   <div className="mt-1 flex flex-wrap items-center gap-1">
                     <span className="rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-700">عضو</span>
                     {storeByUser.get(id) && (
-                      <Link href={`/admin/stores?q=${encodeURIComponent(storeByUser.get(id)!.name)}`} className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200">🏬 متجر «{storeByUser.get(id)!.name}»{storeByUser.get(id)!.status !== 1 && ' (موقوف)'}</Link>
+                      <AccessPage href={`/admin/stores?q=${encodeURIComponent(storeByUser.get(id)!.name)}`}><Link href={`/admin/stores?q=${encodeURIComponent(storeByUser.get(id)!.name)}`} className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-200">🏬 متجر «{storeByUser.get(id)!.name}»{storeByUser.get(id)!.status !== 1 && ' (موقوف)'}</Link></AccessPage>
                     )}
-                    {(roleById.get(id) || u.is_admin === 1) && (
+                    {label && (
                       <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">إدارة</span>
                     )}
                     <Link href={`/messages/${id}`} className="rounded-full border border-primary/30 px-1.5 py-0.5 text-[10px] font-bold text-primary hover:bg-accent">✉ مراسلة</Link>
@@ -193,12 +197,12 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                     : <Badge variant="trusted">نشط</Badge>}
                 </div>
                 <div>
-                  <Link href={`/admin/users/${id}/permissions`} className="inline-flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1 text-xs text-primary hover:bg-accent">
+                  <AccessPage href={`/admin/users/${id}/permissions`}><Link href={`/admin/users/${id}/permissions`} className="inline-flex items-center gap-1 rounded-md border border-primary/30 px-2 py-1 text-xs text-primary hover:bg-accent">
                     <ShieldCheck className="h-3.5 w-3.5" /> {label || 'الصلاحيات'}
-                  </Link>
+                  </Link></AccessPage>
                 </div>
                 <div>
-                  <form action={assignUserPackageAction} className="flex items-center gap-1">
+                  <AccessBoundary module={'packages'} action={'edit'}><form action={assignUserPackageAction} className="flex items-center gap-1">
                     <input type="hidden" name="userId" value={id} />
                     <select name="packageId" defaultValue={pkgMap.get(id) ?? 0} className="rounded-md border bg-background px-1.5 py-1 text-xs">
                       <option value={0}>—</option>
@@ -206,34 +210,34 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
                     </select>
                     <input name="days" type="number" min={0} placeholder="أيام" title="مدة الاشتراك بالأيام (0 = دائم)" className="w-14 rounded-md border bg-background px-1.5 py-1 text-xs" />
                     <ConfirmSubmit msg="تأكيد تغيير باقة هذا العضو بالاختيار والمدة المحددين؟" className="rounded-md border px-2 py-1 text-xs hover:bg-secondary">حفظ</ConfirmSubmit>
-                  </form>
+                  </form></AccessBoundary>
                 </div>
                 <div className="flex flex-wrap gap-2 border-t pt-3">
-                  <Link href={`/admin/users/${id}`} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white">فتح ملف العضو</Link>
-                  <Link href={`/admin/users/${id}#wallet`} className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-bold text-primary">فتح المحفظة</Link>
+                  <AccessPage href={`/admin/users/${id}`}><Link href={`/admin/users/${id}`} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white">فتح ملف العضو</Link></AccessPage>
+                  <AccessPage href={`/admin/users/${id}#wallet`}><Link href={`/admin/users/${id}#wallet`} className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-bold text-primary">فتح المحفظة</Link></AccessPage>
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-1">
                     {u.trusted === 1 ? (
-                      <form action={untrustUserAction} className="flex items-center gap-1 rounded-md border border-slate-300 p-0.5">
+                      <AccessBoundary module={'verifications'} action={'approve'}><form action={untrustUserAction} className="flex items-center gap-1 rounded-md border border-slate-300 p-0.5">
                         <input type="hidden" name="userId" value={id} />
                         <input name="reason" required maxLength={300} placeholder="سبب الإلغاء" title="سبب إلغاء التوثيق — إلزامي، يُحفظ ويصل العضو" className="w-24 rounded bg-background px-1.5 py-1 text-xs" />
                         <ConfirmSubmit msg="تأكيد إلغاء التوثيق بالسبب المكتوب؟ تُسحب الشارة فوراً ويصل العضو السبب — والمدفوع يُسترد له غير المستخدم." className="flex items-center gap-1 rounded bg-slate-200 px-2 py-1 text-xs font-bold text-slate-700">إلغاء التوثيق</ConfirmSubmit>
-                      </form>
+                      </form></AccessBoundary>
                     ) : (
-                      <form action={trustUserAction}><input type="hidden" name="userId" value={id} /><ConfirmSubmit msg="توثيق هذا العضو؟ تظهر شارة موثّق فوراً." className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Check className="h-3 w-3" /> توثيق</ConfirmSubmit></form>
+                      <AccessBoundary module={'verifications'} action={'approve'}><form action={trustUserAction}><input type="hidden" name="userId" value={id} /><ConfirmSubmit msg="توثيق هذا العضو؟ تظهر شارة موثّق فوراً." className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-secondary"><Check className="h-3 w-3" /> توثيق</ConfirmSubmit></form></AccessBoundary>
                     )}
                     {banned ? (
-                      <form action={unbanUserAction}><input type="hidden" name="userId" value={id} /><ConfirmSubmit msg="رفع الحظر عن هذا العضو؟ تعود إعلاناته للظهور فوراً." className="flex items-center gap-1 rounded-md border border-emerald-400 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50"><Ban className="h-3 w-3" /> رفع الحظر</ConfirmSubmit></form>
+                      <AccessBoundary module={'users'} action={'ban'}><form action={unbanUserAction}><input type="hidden" name="userId" value={id} /><ConfirmSubmit msg="رفع الحظر عن هذا العضو؟ تعود إعلاناته للظهور فوراً." className="flex items-center gap-1 rounded-md border border-emerald-400 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50"><Ban className="h-3 w-3" /> رفع الحظر</ConfirmSubmit></form></AccessBoundary>
                     ) : (
                       // حظر يدوي: يلزم سبب مكتوب + مدة (أيام للمؤقت أو زر «دائم») — بلا سبب لا يُحفظ.
-                      <form action={banUserAction} className="flex flex-wrap items-center gap-1 rounded-md border border-destructive/30 p-1">
+                      <AccessBoundary module={'users'} action={'ban'}><form action={banUserAction} className="flex flex-wrap items-center gap-1 rounded-md border border-destructive/30 p-1">
                         <input type="hidden" name="userId" value={id} />
                         <input name="reason" required maxLength={300} placeholder="سبب الحظر (إلزامي)" title="سبب الحظر — إلزامي، يُحفظ ويُعرض مع تاريخ ووقت الحظر" className="w-32 rounded bg-background px-1.5 py-1 text-xs" />
                         <input name="days" type="number" min={1} placeholder="أيام" title="مدة الحظر بالأيام (للحظر المؤقت)" className="w-14 rounded bg-background px-1.5 py-1 text-xs" />
                         <ConfirmSubmit msg="تأكيد حظر هذا العضو للمدة المدخلة بالسبب المكتوب؟ ستختفي كل إعلاناته طوال الحظر." className="flex items-center gap-1 rounded bg-destructive/10 px-2 py-1 text-xs font-bold text-destructive"><Ban className="h-3 w-3" /> حظر مؤقت</ConfirmSubmit>
                         <ConfirmSubmit name="permanent" value="1" msg="تأكيد الحظر الدائم لهذا العضو بالسبب المكتوب؟ ستختفي كل إعلاناته حتى رفع الحظر." className="rounded-md border border-destructive/40 px-2 py-1 text-xs font-bold text-destructive hover:bg-destructive/10">دائم</ConfirmSubmit>
-                      </form>
+                      </form></AccessBoundary>
                     )}
                   </div>
                 </div>

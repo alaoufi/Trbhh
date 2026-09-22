@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import { pollThread, sendChat, setTyping, deleteChatMessage } from '@/lib/chat';
 import { getMsgDeleteMinutes } from '@/lib/settings';
 import { getPrimaryAdminId, smartAdminReply, shouldAutoReply } from '@/lib/admin-inbox';
+import { canUseMemberChat } from '@/lib/chat-access';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,6 +11,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest, ctx: { params: Promise<{ peerId: string }> }) {
   const session = await getSession();
   if (!session) return Response.json({ error: 'unauth' }, { status: 401 });
+  if (!await canUseMemberChat(session.uid,'view')) return Response.json({error:'forbidden'},{status:403});
   const { peerId } = await ctx.params;
   const other = Number(peerId);
   const after = Number(req.nextUrl.searchParams.get('after') || '0') || 0;
@@ -21,6 +23,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ peerId: str
 export async function POST(req: NextRequest, ctx: { params: Promise<{ peerId: string }> }) {
   const session = await getSession();
   if (!session) return Response.json({ error: 'unauth' }, { status: 401 });
+  if (!await canUseMemberChat(session.uid,'create')) return Response.json({error:'forbidden'},{status:403});
   const { peerId } = await ctx.params;
   const other = Number(peerId);
   if (!other || other === session.uid) return Response.json({ ok: false });
@@ -55,6 +58,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ peerId: st
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ peerId: string }> }) {
   const session = await getSession();
   if (!session) return Response.json({ error: 'unauth' }, { status: 401 });
+  if (!await canUseMemberChat(session.uid,'delete')) return Response.json({error:'forbidden'},{status:403});
   await ctx.params; // peer is implied by the message ownership check
   const body = await req.json().catch(() => ({} as { messageId?: number }));
   const messageId = Number(body.messageId || 0);

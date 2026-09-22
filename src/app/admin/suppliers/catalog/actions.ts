@@ -1,7 +1,7 @@
 'use server';
 import {revalidatePath} from 'next/cache';
 import {prisma} from '@/lib/prisma';
-import {requireAction} from '@/lib/roles';
+import {requireAccess} from '@/lib/access-control/guards';
 import {assertSupplierSchemaReady} from '@/lib/suppliers/schema';
 import {loadCatalog,loadCatalogDetail,reviewCatalogSelection,approveCatalogSelection,updateCatalogProductSale,hideCatalogProduct,removeCatalogProduct} from '@/lib/suppliers/catalog-admin';
 import type {CatalogActions,CatalogSearch,CatalogSelection,CatalogApproval,CatalogSaleUpdate,CatalogRemoval} from '@/lib/suppliers/catalog-selection';
@@ -25,19 +25,19 @@ const messages:Record<string,string>={
 function failure(error:unknown):{error:string}{return {error:messages[error instanceof Error?error.message:'']||'تعذر إكمال العملية. لم تُعتمد إضافة جزئية؛ أعد المحاولة.'};}
 const secret=()=>process.env.SUPPLIER_TOKEN_ENCRYPTION_KEY||'';
 export async function searchProducts(input:CatalogSearch):ReturnType<CatalogActions['search']>{
- await requireAction('suppliers','view');
+ await requireAccess('products', 'view');
  try{await assertSupplierSchemaReady(prisma);return {data:await loadCatalog(prisma,input)};}catch(error){return failure(error);}
 }
 export async function productDetails(key:string):ReturnType<CatalogActions['details']>{
- await requireAction('suppliers','view');
+ await requireAccess('products', 'view');
  try{await assertSupplierSchemaReady(prisma);return {product:await loadCatalogDetail(prisma,key)};}catch(error){return failure(error);}
 }
 export async function reviewProducts(input:CatalogSelection[]):ReturnType<CatalogActions['review']>{
- await requireAction('suppliers','view');const admin=await requireAction('suppliers','edit');
+ await requireAccess('products', 'view');const admin=await requireAccess('products', 'create');
  try{await assertSupplierSchemaReady(prisma);return {review:await reviewCatalogSelection(prisma,input,BigInt(admin.uid),secret())};}catch(error){return failure(error);}
 }
 export async function approveProducts(input:CatalogApproval):ReturnType<CatalogActions['approve']>{
- await requireAction('suppliers','view');const admin=await requireAction('suppliers','edit');
+ await requireAccess('products', 'view');const admin=await requireAccess('products', 'approve');
  try{
   await assertSupplierSchemaReady(prisma);const result=await approveCatalogSelection(prisma,input,BigInt(admin.uid),secret());
   revalidatePath('/admin/suppliers/catalog');revalidatePath('/admin/suppliers/integrations');
@@ -45,14 +45,14 @@ export async function approveProducts(input:CatalogApproval):ReturnType<CatalogA
  }catch(error){return failure(error);}
 }
 export async function updateProductSale(input:CatalogSaleUpdate):ReturnType<CatalogActions['updateSale']>{
- await requireAction('suppliers','view');const admin=await requireAction('suppliers','edit');
+ await requireAccess('products', 'view');const admin=await requireAccess('products', 'edit');
  try{await assertSupplierSchemaReady(prisma);const result=await updateCatalogProductSale(prisma,input,BigInt(admin.uid));revalidatePath('/admin/suppliers/catalog');revalidatePath('/admin/suppliers/integrations');return result;}catch(error){return failure(error);}
 }
 export async function hideProduct(input:CatalogSelection):ReturnType<CatalogActions['hide']>{
- await requireAction('suppliers','view');const admin=await requireAction('suppliers','edit');
+ await requireAccess('products', 'view');const admin=await requireAccess('products', 'suspend');
  try{await assertSupplierSchemaReady(prisma);const result=await hideCatalogProduct(prisma,input,BigInt(admin.uid));revalidatePath('/admin/suppliers/catalog');revalidatePath('/admin/suppliers/integrations');revalidatePath('/shop');return result;}catch(error){return failure(error);}
 }
 export async function removeProduct(input:CatalogRemoval):ReturnType<CatalogActions['remove']>{
- await requireAction('suppliers','view');const admin=await requireAction('suppliers','edit');
+ await requireAccess('products', 'view');const admin=await requireAccess('products', 'delete');
  try{await assertSupplierSchemaReady(prisma);const result=await removeCatalogProduct(prisma,input,BigInt(admin.uid));revalidatePath('/admin/suppliers/catalog');revalidatePath('/admin/suppliers/integrations');revalidatePath('/shop');return result;}catch(error){return failure(error);}
 }

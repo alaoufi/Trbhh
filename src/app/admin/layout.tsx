@@ -1,20 +1,20 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { Home, ChevronDown } from 'lucide-react';
-import { requireAnyAdmin, getUserPerms, getUserRole, ROLE_LABELS } from '@/lib/roles';
+import { requireAnyAdmin } from '@/lib/roles';
+import { readActorAccess } from '@/lib/access-control/guards';
+import { canAccessPage } from '@/lib/access-control/catalog';
 import { ScrollTop } from '@/components/scroll-top';
 import { ADMIN_GROUPS } from '@/components/admin-nav-def';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAnyAdmin();
-  // تذكيرات قرب انتهاء الاشتراك — تشغيل كسول (لا جدولة خلفية)؛ ذاتي الخنق كل ٣٠ دقيقة
-  import('@/lib/subscription').then((m) => { m.sendDueSubReminders().catch(() => {}); m.sendMonthlyStoreReports().catch(() => {}); }).catch(() => {});
-  const [perms, role] = await Promise.all([getUserPerms(session.uid), getUserRole(session.uid)]);
+  const access = await readActorAccess(session.uid);
   const pathname = ((await headers()).get('x-pathname') || '').split('?')[0];
 
   // المتشابهات في قوائم فرعية ملوّنة — تُفتح المجموعة التي تحوي الصفحة الحالية
   const groups = ADMIN_GROUPS
-    .map((g) => ({ ...g, items: g.items.filter((n) => n.perm === null || perms.has(n.perm)) }))
+    .map((g) => ({ ...g, items: g.items.filter((n) => canAccessPage(access.keys, n.href)) }))
     .filter((g) => g.items.length > 0);
 
   return (
@@ -22,7 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <aside id="admin-nav" className="h-fit card-3d rounded-xl p-3">
         <div className="mb-3 border-b pb-3">
           <div className="text-base font-extrabold text-primary">لوحة التحكم</div>
-          {role && <div className="mt-1 text-xs font-bold text-muted-foreground">صلاحيتك: <span className="font-extrabold text-primary">{ROLE_LABELS[role]}</span></div>}
+          <div className="mt-2 flex flex-wrap gap-1">{access.roles.map(role => <span key={role.id} className="rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">{role.name}</span>)}</div>
         </div>
         <nav className="space-y-1.5">
           {groups.map((g) =>

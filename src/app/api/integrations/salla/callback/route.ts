@@ -1,7 +1,7 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {cookies} from 'next/headers';
 import {getSession} from '@/lib/auth';
-import {hasAction} from '@/lib/roles';
+import {hasAccess} from '@/lib/access-control/guards';
 import {prisma} from '@/lib/prisma';
 import {supplierConfig} from '@/lib/suppliers/config';
 import {completeOAuth,recordOAuthFailure} from '@/lib/suppliers/connections';
@@ -23,11 +23,11 @@ export async function GET(request:NextRequest) {
   if(merchantContext){
     try{
       const context=parseMerchantContext(merchantContext,request.nextUrl.searchParams.get('state')||'',supplierConfig());
-      if(!await hasAction(Number(context.adminId),'suppliers','edit'))throw Error('permission_revoked');
+      if(!await hasAccess(Number(context.adminId),'integrations', 'authorize'))throw Error('permission_revoked');
       adminId=BigInt(context.adminId);merchantSupplierId=BigInt(context.supplierId);
     }catch{return NextResponse.json({error:'invalid_merchant_authorization'},{status:403,headers:{'Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});}
   }else{
-    if(!session||!await hasAction(session.uid,'suppliers','edit'))return NextResponse.json({error:'unauthorized'},{status:403,headers:{'Cache-Control':'no-store'}});
+    if(!session||!await hasAccess(session.uid,'integrations', 'authorize'))return NextResponse.json({error:'unauthorized'},{status:403,headers:{'Cache-Control':'no-store'}});
     adminId=BigInt(session.uid);
   }
   let origin:string;

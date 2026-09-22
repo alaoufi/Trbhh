@@ -1,6 +1,6 @@
 import type { FinanceInvoice, FinanceReport } from './types';
-import { formatFinanceMoney } from './reports';
-import { financeExportScope, financeInvoiceMatches, financeMovementMatches, financeSupplierMatches } from './filters';
+import { formatFinanceMoney, monthOfDate } from './reports';
+import { financeExportScope, financeMatchesText, financeInvoiceMatches, financeMovementMatches, financeSupplierMatches } from './filters';
 export type FinanceSheet={name:string;headers:string[];rows:(string|number|null)[][]};
 const money=(value:number|null)=>value===null?null:value/100;
 export function financeExportSheets(report:FinanceReport):FinanceSheet[]{
@@ -14,9 +14,26 @@ export function financeExportSheets(report:FinanceReport):FinanceSheet[]{
     {name:'الفواتير',headers:['الرقم','الطلب','التاريخ','النوع','الحالة','قبل الضريبة','الضريبة','الإجمالي'],rows:data.invoices.filter(x=>financeInvoiceMatches(x,query)).map(x=>[x.number||x.id,x.orderId,x.at,x.kind,x.status,money(x.netMinor),money(x.vatMinor),money(x.totalMinor)])},
   ];
 }
+/** HTTP exports are scoped to one authorized section; the internal bundle is never sent wholesale. */
+export function financeSectionExportSheets(report:FinanceReport):FinanceSheet[]{
+  const {query,data}=report;
+  const all=financeExportSheets(report);
+  const select=(...names:string[])=>all.filter(sheet=>names.includes(sheet.name));
+  switch(query.section){
+    case 'overview':case 'cashflow':case 'month-end':return select('ملخص');
+    case 'suppliers':case 'settlements':return select('الموردون','الحركات');
+    case 'budget':return select('الميزانية');
+    case 'invoices':return select('الفواتير');
+    case 'reconciliation':return select('المطابقة');
+    case 'tax':return [{name:'الضريبة',headers:['البند','المبلغ بالريال','المصدر'],rows:report.metrics.filter(row=>row.key==='vat').map(row=>[row.label,money(row.valueMinor),row.href])},...select('الفواتير')];
+    case 'expenses':return [{name:'المصروفات',headers:['التاريخ','المصروف','قبل الضريبة','الضريبة','الإجمالي','المدفوع','المرجع'],rows:data.expenses.filter(row=>monthOfDate(row.at)===query.month&&financeMatchesText(query,row.description,row.reference,row.id)).map(row=>{const sign=row.reversalOf?-1:1;return [row.at,row.description,money(sign*row.netMinor),money(sign*row.vatMinor),money(sign*row.totalMinor),money(sign*row.paidMinor),row.reference];})}];
+    case 'ledger':return [{name:'سجل التدقيق',headers:['التاريخ','المستخدم','الإجراء','النوع','المستند','السبب'],rows:data.audit.filter(row=>monthOfDate(row.at)===query.month&&financeMatchesText(query,row.id,row.actorId,row.action,row.entityId,row.reason)).map(row=>[row.at,row.actorId,row.action,row.entity,row.entityId,row.reason])}];
+    case 'close':return [];
+  }
+}
 export function escapeFinanceHtml(value:unknown):string{return String(value??'غير مكتمل').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));}
 export function printableFinanceReport(report:FinanceReport):string{
-  const sheets=financeExportSheets(report);
+  const sheets=financeSectionExportSheets(report);
   return printShell('تقرير تربح المالي — '+report.query.month,'<p>'+escapeFinanceHtml(financeExportScope)+'</p>'+sheets.map(sheet=>'<h2>'+escapeFinanceHtml(sheet.name)+'</h2><table><thead><tr>'+sheet.headers.map(h=>'<th>'+escapeFinanceHtml(h)+'</th>').join('')+'</tr></thead><tbody>'+sheet.rows.map(row=>'<tr>'+row.map(x=>'<td>'+escapeFinanceHtml(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table>').join(''));
 }
 export function printableFinanceInvoice(invoice:FinanceInvoice,internal:boolean):string{

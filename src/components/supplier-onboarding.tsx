@@ -38,6 +38,8 @@ export type OnboardingUiState = {
 
 export type OnboardingAction = (prev: OnboardingUiState, form: FormData) => Promise<OnboardingUiState>;
 export type SupplierOnboardingProps = {
+  canSave?:boolean;
+  canAuthorize?:boolean;
   previewAction: OnboardingAction;
   saveAction: OnboardingAction;
   readinessAction?: OnboardingAction;
@@ -52,7 +54,7 @@ const integrationsHref = '/admin/suppliers/integrations';
 const primary = 'inline-flex min-h-11 items-center justify-center rounded-xl bg-[#16294A] px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-500 disabled:cursor-not-allowed disabled:opacity-50';
 const secondary = 'inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-500';
 
-export function SupplierOnboarding({ previewAction, saveAction, readinessAction, connectAction, initialState, exampleState = false }: SupplierOnboardingProps) {
+export function SupplierOnboarding({ previewAction, saveAction, readinessAction, connectAction, initialState, exampleState = false, canSave=false, canAuthorize=false }: SupplierOnboardingProps) {
   const [state, setState] = useState<OnboardingUiState>(initialState ?? emptyState);
   const [file, setFile] = useState<File | null>(null);
   const [pending, startTransition] = useTransition();
@@ -152,7 +154,7 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
             }} />
             {file && <p className="mt-3 break-all text-xs text-slate-600">{file.name} · {(file.size / 1024).toFixed(0)} كيلوبايت</p>}
           </div>
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-4"><p className="max-w-xl text-xs leading-6 text-slate-500">لا تُدخل كلمة مرور سلة أو رموز التحقق أو مفاتيح الربط في الملف. يتم تفويض الاتصال عبر صفحة التكاملات.</p><button disabled={!file || pending} className={primary}>معاينة البيانات</button></div>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-4"><p className="max-w-xl text-xs leading-6 text-slate-500">لا تُدخل كلمة مرور سلة أو رموز التحقق أو مفاتيح الربط في الملف. يتم تفويض الاتصال عبر صفحة التكاملات.</p><button disabled={!canSave || !file || pending} className={primary}>معاينة البيانات</button></div>
           <aside className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-7 text-blue-950"><b>هل الملف تصدير منتجات من سلة؟</b> لا ترفعه هنا. احفظ بيانات المورد أولًا، ثم افتح <Link href={integrationsHref} className="font-bold underline">تكامل الموردين</Link> وأنشئ رابط التفويض لصاحب المتجر؛ بعد الموافقة تُجلب المنتجات من Salla API دون نشرها تلقائيًا.</aside>
         </form>}
 
@@ -170,7 +172,7 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
             const form = new FormData(event.currentTarget);
             form.set('file', file);
             invoke(saveAction, form, 'save', state);
-          }}><input type="hidden" name="token" value={preview.token} /><p className="text-xs leading-6 text-slate-500">{file ? 'راجع البيانات أعلاه قبل اعتماد الحفظ.' : 'اختر الملف الأصلي وأعد المعاينة للتمكن من الحفظ.'}</p><button className={primary} disabled={pending || !file || state.errors.length > 0}>حفظ بيانات المورد</button></form>
+          }}><input type="hidden" name="token" value={preview.token} /><p className="text-xs leading-6 text-slate-500">{file ? 'راجع البيانات أعلاه قبل اعتماد الحفظ.' : 'اختر الملف الأصلي وأعد المعاينة للتمكن من الحفظ.'}</p><button className={primary} disabled={!canSave || pending || !file || state.errors.length > 0}>حفظ بيانات المورد</button></form>
         </section>}
 
         {saved && <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7" aria-label="حالة المورد">
@@ -181,7 +183,7 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
             {saved.sampleCount !== undefined && <p className="mt-2 text-sm">عدد المنتجات في عينة الفحص: {saved.sampleCount}</p>}
           </div>
           {saved.connected && <p className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-7 text-blue-950"><b>المتجر متصل بالفعل.</b> لا يحتاج رابط تفويض جديد. روابط التفويض القديمة تنتهي أو تُلغى بعد إتمام الربط أو إنشاء رابط أحدث؛ استخدم فحص الجاهزية والمزامنة الحالية.</p>}
-          {!saved.connected && saved.authorizationUrl && <section className="mt-5 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-5 text-emerald-950" aria-label="رابط تفويض متجر سلة">
+          {canAuthorize && !saved.connected && saved.authorizationUrl && <section className="mt-5 rounded-xl border-2 border-emerald-300 bg-emerald-50 p-5 text-emerald-950" aria-label="رابط تفويض متجر سلة">
             <h3 className="font-bold">رابط تفويض متجر سلة جاهز</h3>
             <p className="mt-2 text-sm leading-7">أرسل هذا الرابط لصاحب المتجر. يفتح الرابط ويوافق على الربط فقط، دون أي إعدادات تقنية.</p>
             <label className="mt-3 block text-xs font-semibold">رابط التفويض<input readOnly dir="ltr" value={saved.authorizationUrl} className="mt-2 min-h-11 w-full rounded-lg border border-emerald-300 bg-white px-3 text-left text-xs" /></label>
@@ -192,7 +194,7 @@ export function SupplierOnboarding({ previewAction, saveAction, readinessAction,
             {saved.authorizationExpiresAt && <p className="mt-3 text-xs">الرابط مؤقت وصالح لمدة 24 ساعة من وقت إنشائه.</p>}
           </section>}
           <div className="mt-6 flex flex-wrap gap-3">
-            {!saved.connected && (connectAction ? <form action={connectAction}><input type="hidden" name="supplierId" value={saved.supplierId} /><button disabled={pending} className={primary}>ربط متجر سلة</button></form> : <Link className={primary} href={integrationsHref}>ربط متجر سلة عبر التكاملات</Link>)}
+            {canAuthorize && !saved.connected && (connectAction ? <form action={connectAction}><input type="hidden" name="supplierId" value={saved.supplierId} /><button disabled={pending} className={primary}>ربط متجر سلة</button></form> : <Link className={primary} href={integrationsHref}>ربط متجر سلة عبر التكاملات</Link>)}
             {saved.connected && readinessAction && <button className={primary} disabled={pending} onClick={() => { const form = new FormData(); form.set('supplierId', saved.supplierId); invoke(readinessAction, form, 'readiness', state); }}>{ready ? 'إعادة فحص الجاهزية' : 'فحص الجاهزية مجددًا'}</button>}
             <Link href={integrationsHref} className={secondary}>التكاملات وكتالوج المنتجات</Link>
           </div>

@@ -9,7 +9,7 @@ vi.mock('@/app/admin/finance/actions', () => ({
   reverseFinanceExpense: async () => {}, reverseFinanceSettlement: async () => {}, saveFinanceBudget: async () => {},
 }));
 import { FinanceWorkspace } from '@/components/finance/finance-workspace';
-import { financeExportSheets, printableFinanceReport } from '@/lib/finance/exports';
+import { financeExportSheets, financeSectionExportSheets, printableFinanceReport } from '@/lib/finance/exports';
 import { financeExportScope, formatFinanceRecordDate } from '@/lib/finance/filters';
 
 function invoice(id: string, at: string, customer: string, supplierId: string, supplierName: string, totalMinor: number): FinanceInvoice {
@@ -43,7 +43,7 @@ function report(query: Partial<FinanceQuery> = {}): FinanceReport {
   };
 }
 function render(source: FinanceReport): string {
-  return renderToStaticMarkup(createElement(FinanceWorkspace, { report: source, canEdit: false, canApprove: false, canClose: false, canExport: true, actionKey: 'd0fb8672-aa6b-41ee-8383-2526b28f6c80' }));
+  return renderToStaticMarkup(createElement(FinanceWorkspace, { report: source, canEdit: false, canApprove: false, canClose: false, canExport: true, viewFinance: true, viewSettlements: true, actionKey: 'd0fb8672-aa6b-41ee-8383-2526b28f6c80' }));
 }
 function sheetRows(source: FinanceReport, name: string) { return financeExportSheets(source).find(sheet => sheet.name === name)!.rows; }
 function displayedInvoiceIds(html: string): string[] {
@@ -51,6 +51,13 @@ function displayedInvoiceIds(html: string): string[] {
 }
 
 describe('finance exports match the visible source records', () => {
+  it.each([['budget', ['الميزانية']], ['invoices', ['الفواتير']], ['suppliers', ['الموردون','الحركات']], ['reconciliation', ['المطابقة']], ['overview', ['ملخص']], ['ledger', ['سجل التدقيق']]] as const)('exports only the authorized %s section', (section, names) => {
+    expect(financeSectionExportSheets(report({section})).map(sheet=>sheet.name)).toEqual(names);
+    if(section==='budget'||section==='ledger') {
+      expect(printableFinanceReport(report({section}))).not.toContain('INV-A');
+      expect(printableFinanceReport(report({section}))).not.toContain('BANK-ALPHA');
+    }
+  });
   it.each([
     ['supplier Arabic name', 'مدار', ['A']],
     ['supplier case-insensitive Latin name', 'alpha supply', ['A']],

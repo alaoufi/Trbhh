@@ -1,8 +1,11 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { readActorAccess, requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { Archive, Megaphone, Flag, Bot, Users, MessageSquare, Store, Trash2, RotateCcw, Ban, Copy, Waves, ShieldAlert } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
-import { requireAnyAdmin } from '@/lib/roles';
+
 import { getModLog } from '@/lib/moderation';
 import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { adminDeleteReportRecordAction, adminDeleteModLogAction, adminRestoreCommentAction, adminDeleteStoreForeverAction, toggleStoreStatusAction } from '../actions';
@@ -33,9 +36,12 @@ const TABS = [
 type TabKey = typeof TABS[number]['key'];
 
 export default async function AdminArchivePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  await requireAnyAdmin();
+  const session = await requireAdminPage('/admin/archive');
+  const { keys } = await readActorAccess(session.uid);
+  const domains: Record<TabKey,string> = {ads:'ads',reports:'reports',modlog:'reports',members:'users',comments:'comments',stores:'stores'};
+  const tabs = TABS.filter(item => keys.has(`${domains[item.key]}:view`));
   const { tab } = await searchParams;
-  const active: TabKey = (TABS.some((t) => t.key === tab) ? tab : 'ads') as TabKey;
+  const active = tabs.find(item => item.key === tab)?.key || tabs[0]?.key;
 
   return (
     <div className="space-y-4">
@@ -46,13 +52,14 @@ export default async function AdminArchivePage({ searchParams }: { searchParams:
       <p className="text-sm text-muted-foreground">كل شيء يُحذف أو يُغلق أو يُنهى بدل أن يختفي أو يتراكم بالعرض الحي — ينتقل هنا محفوظاً، ومن أراد المراجعة يعود إليه هنا فقط.</p>
 
       <div className="flex flex-wrap gap-1 overflow-x-auto rounded-xl bg-secondary/40 p-1">
-        {TABS.map((t) => (
-          <Link key={t.key} href={`/admin/archive?tab=${t.key}`} className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-bold ${active === t.key ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-white/60'}`}>
+        {tabs.map((t) => (
+          <AccessPage href={`/admin/archive?tab=${t.key}`} key={t.key}><Link key={t.key} href={`/admin/archive?tab=${t.key}`} className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-bold ${active === t.key ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-white/60'}`}>
             <t.icon className="h-4 w-4" /> {t.label}
-          </Link>
+          </Link></AccessPage>
         ))}
       </div>
 
+      {!active && <p className="rounded-xl border p-4">لا توجد أقسام أرشيف ضمن صلاحياتك الحالية.</p>}
       {active === 'ads' && <AdsArchiveTab />}
       {active === 'reports' && <ReportsArchiveTab />}
       {active === 'modlog' && <ModLogArchiveTab />}
@@ -70,7 +77,7 @@ async function AdsArchiveTab() {
     <div className="card-3d flex flex-col items-center gap-3 rounded-2xl p-8 text-center">
       <Megaphone className="h-8 w-8 text-amber-600" />
       <p className="text-sm text-muted-foreground">الإعلانات المؤرشفة ({count}) — إظهار/حذف نهائي فردي أو جماعي — من صفحة إدارة الإعلانات مباشرة.</p>
-      <Link href="/admin/ads?view=archived" className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90">فتح تبويب المؤرشفة ←</Link>
+      <AccessPage href="/admin/ads?view=archived"><Link href="/admin/ads?view=archived" className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary/90">فتح تبويب المؤرشفة ←</Link></AccessPage>
     </div>
   );
 }
@@ -104,10 +111,10 @@ async function ReportsArchiveTab() {
           <div className="mt-1 text-sm"><span className="rounded bg-secondary px-2 py-0.5 text-xs">{reasonById.get(r.reason_id) || 'بلاغ'}</span> {r.comment && <span className="text-muted-foreground">— {r.comment}</span>}</div>
           <div className="mt-1 flex items-center justify-between gap-2">
             <span className="text-xs font-bold text-emerald-700">✓ {ACTION_LABEL[r.action || ''] || 'عولج'}{r.handled_at ? ` — ${timeAgo(r.handled_at)}` : ''}</span>
-            <form action={adminDeleteReportRecordAction}>
+            <AccessBoundary module={'reports'} action={'delete'}><form action={adminDeleteReportRecordAction}>
               <input type="hidden" name="reportId" value={toInt(r.id)} />
               <ConfirmSubmit msg="مسح هذا السجل نهائياً من الأرشيف؟ لا يمس الإعلان أو العضو — سجل تاريخي فقط." className="flex items-center gap-1 text-xs font-bold text-destructive hover:underline"><Trash2 className="h-3.5 w-3.5" /> مسح نهائي</ConfirmSubmit>
-            </form>
+            </form></AccessBoundary>
           </div>
         </div>
       ))}
@@ -171,7 +178,7 @@ async function ModLogArchiveTab() {
               {banned && e.reviewedAt && (
                 <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">رُوجع — الحساب الآن: {isBannedNowById.get(e.userId) ? 'محظور' : 'غير محظور'}</span>
               )}
-              <Link href={`/admin/users/${e.userId}`} className="text-xs font-bold text-primary underline">{nameById.get(e.userId) || `عضو #${en(e.userId)}`}</Link>
+              <AccessPage href={`/admin/users/${e.userId}`}><Link href={`/admin/users/${e.userId}`} className="text-xs font-bold text-primary underline">{nameById.get(e.userId) || `عضو #${en(e.userId)}`}</Link></AccessPage>
               <span className="text-xs text-muted-foreground">{timeAgo(e.createdAt)}</span>
               <span className="mr-auto shrink-0 text-[11px] font-bold text-primary">عرض التفاصيل ▾</span>
             </summary>
@@ -181,10 +188,10 @@ async function ModLogArchiveTab() {
               {adBanned && <div className="text-xs text-muted-foreground">🗑 هذا الإعلان حُذف نهائياً عبر هذا الإجراء نفسه — لا صفحة له بعد الآن.</div>}
               {accountDeleted && <div className="text-xs text-muted-foreground">🗑️ حذف العضو حسابه بنفسه — الاسم والبيانات مموَّهة نهائياً.</div>}
               <AdEventLink e={e} />
-              <form action={adminDeleteModLogAction} className="pt-1">
+              <AccessBoundary module={'reports'} action={'delete'}><form action={adminDeleteModLogAction} className="pt-1">
                 <input type="hidden" name="modLogId" value={e.id} />
                 <ConfirmSubmit msg="مسح هذا السطر نهائياً من سجل الرصد الآلي؟ سجل تاريخي فقط — لا يغيّر حالة العضو أو الإعلان." className="flex items-center gap-1 text-xs font-bold text-destructive hover:underline"><Trash2 className="h-3.5 w-3.5" /> مسح نهائي</ConfirmSubmit>
-              </form>
+              </form></AccessBoundary>
             </div>
           </details>
         );
@@ -240,10 +247,10 @@ async function CommentsArchiveTab() {
               ) : (
                 <span className="text-xs text-muted-foreground">🗑 الإعلان محذوف نهائياً</span>
               )}
-              <form action={adminRestoreCommentAction}>
+              <AccessBoundary module={'comments'} action={'delete'}><form action={adminRestoreCommentAction}>
                 <input type="hidden" name="commentId" value={toInt(c.id)} />
                 <ConfirmSubmit msg="استعادة هذا التعليق؟ يعود ظاهراً للجمهور فوراً." className="flex items-center gap-1 text-xs font-bold text-emerald-700 hover:underline"><RotateCcw className="h-3.5 w-3.5" /> استعادة</ConfirmSubmit>
-              </form>
+              </form></AccessBoundary>
             </div>
           </div>
         );
@@ -262,16 +269,16 @@ async function StoresArchiveTab() {
         <div key={toInt(s.id)} className="card-3d flex flex-wrap items-center justify-between gap-2 rounded-xl p-3 text-sm">
           <Link href={`/companies/${toInt(s.id)}`} className="font-bold text-primary hover:underline">{s.store_name || `متجر #${toInt(s.id)}`}</Link>
           <div className="flex items-center gap-2">
-            <form action={toggleStoreStatusAction}>
+            <AccessBoundary module={'stores'} action={'suspend'}><form action={toggleStoreStatusAction}>
               <input type="hidden" name="storeId" value={toInt(s.id)} />
               <input type="hidden" name="action" value="activate" />
               <ConfirmSubmit msg="استعادة هذا المتجر من الأرشيف؟ يعود للظهور فوراً." className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"><RotateCcw className="h-3.5 w-3.5" /> استعادة</ConfirmSubmit>
-            </form>
-            <form action={adminDeleteStoreForeverAction} className="flex items-center gap-2">
+            </form></AccessBoundary>
+            <AccessBoundary module={'stores'} action={'delete'}><form action={adminDeleteStoreForeverAction} className="flex items-center gap-2">
               <input type="hidden" name="storeId" value={toInt(s.id)} />
               <label className="flex items-center gap-1 text-[11px] font-bold text-destructive"><input type="checkbox" name="confirm" required className="h-3.5 w-3.5 accent-red-600" /> تأكيد</label>
               <ConfirmSubmit msg={`حذف متجر «${s.store_name || `#${toInt(s.id)}`}» نهائياً بكل بياناته (متابعون/تقييمات/فروع)؟ لا يمكن التراجع.`} className="flex items-center gap-1 rounded-lg bg-destructive px-3 py-1.5 text-xs font-bold text-white hover:bg-destructive/90"><Trash2 className="h-3.5 w-3.5" /> حذف نهائي</ConfirmSubmit>
-            </form>
+            </form></AccessBoundary>
           </div>
         </div>
       ))}

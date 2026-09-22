@@ -178,7 +178,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
               </Link>
             )}
             {isAdmin && (
-              <Link href="/admin" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-amber-500/15 px-3 py-3 text-[15px] font-extrabold text-amber-700 hover:bg-amber-500/25">
+              <Link href={adminHrefs.includes('/admin')?'/admin':adminHrefs[0]||'/account'} onClick={close} className="mb-1 flex items-center gap-3 rounded-lg bg-amber-500/15 px-3 py-3 text-[15px] font-extrabold text-amber-700 hover:bg-amber-500/25">
                 <Shield className="h-5 w-5 shrink-0" /> <span>لوحة الإدارة</span>
               </Link>
             )}

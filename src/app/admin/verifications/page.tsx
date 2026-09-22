@@ -1,3 +1,6 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ShieldCheck, Check, FileText, ExternalLink, XCircle, Trash2, BadgeCheck } from 'lucide-react';
@@ -5,7 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
 import { mediaUrl } from '@/lib/media';
 import { approveVerificationAction, rejectVerificationAction, deleteVerificationDocsAction, untrustUserAction } from '../actions';
-import { requirePerm } from '@/lib/roles';
+
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +23,7 @@ const TABS = [
 type Tab = typeof TABS[number]['k'];
 
 export default async function AdminVerifications({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
-  await requirePerm('verifications');
+  await requireAdminPage('/admin/verifications');
   const { view } = await searchParams;
   const tab: Tab = (TABS.some((t) => t.k === view) ? view : 'pending') as Tab;
 
@@ -88,9 +91,9 @@ export default async function AdminVerifications({ searchParams }: { searchParam
         <div className="flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-primary" /><h1 className="text-xl font-bold text-primary">طلبات التوثيق</h1></div>
         <div className="flex flex-wrap gap-2">
           {TABS.map((t) => (
-            <Link key={t.k} href={`/admin/verifications${t.k === 'pending' ? '' : `?view=${t.k}`}`} className={tabCls(t.k)}>
+            <AccessPage href={`/admin/verifications${t.k === 'pending' ? '' : `?view=${t.k}`}`} key={t.k}><Link key={t.k} href={`/admin/verifications${t.k === 'pending' ? '' : `?view=${t.k}`}`} className={tabCls(t.k)}>
               {t.l} {counts[t.k] > 0 && <span className={`mr-1 rounded-full px-1.5 text-xs text-white ${badgeCls[t.k]}`}>{counts[t.k]}</span>}
-            </Link>
+            </Link></AccessPage>
           ))}
         </div>
       </div>
@@ -144,25 +147,25 @@ export default async function AdminVerifications({ searchParams }: { searchParam
                 {/* الإجراءات حسب الحالة */}
                 <div className="space-y-2 border-t border-primary/10 pt-3">
                   {st.key !== 'approved' ? (
-                    <form action={approveVerificationAction}>
+                    <AccessBoundary module={'verifications'} action={'approve'}><form action={approveVerificationAction}>
                       <input type="hidden" name="userId" value={id} />
                       <ConfirmSubmit msg="تأكيد الموافقة على التوثيق؟ يُفعَّل فوراً وتصل العضو رسالة." className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">
                         <Check className="h-4 w-4" /> {st.key === 'rejected' ? 'الموافقة رغم الرفض (تفعيل فوري + رسالة)' : 'الموافقة على التوثيق (يُفعَّل فوراً + رسالة للعضو)'}
                       </ConfirmSubmit>
-                    </form>
+                    </form></AccessBoundary>
                   ) : (
-                    <form action={untrustUserAction} className="space-y-2 rounded-xl border-2 border-slate-300 bg-slate-50 p-3">
+                    <AccessBoundary module={'verifications'} action={'approve'}><form action={untrustUserAction} className="space-y-2 rounded-xl border-2 border-slate-300 bg-slate-50 p-3">
                       <label className="block text-sm font-extrabold text-slate-700">إلغاء التوثيق — سبب الإلغاء إلزامي (يُحفظ ويصل العضو، وإن كان توثيقاً مدفوعاً يُعاد له قيمة الأيام غير المستخدمة)</label>
                       <input type="hidden" name="userId" value={id} />
                       <textarea name="reason" required rows={2} maxLength={300} placeholder="اكتب سبب إلغاء التوثيق بوضوح…" className="w-full rounded-lg border-2 border-slate-300 bg-white p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-slate-400" />
                       <ConfirmSubmit msg="تأكيد إلغاء التوثيق؟ تُسحب الشارة فوراً ويصل العضو السبب — والمدفوع يُسترد له غير المستخدم تلقائياً." className="flex items-center gap-1.5 rounded-lg bg-slate-700 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">
                         <XCircle className="h-4 w-4" /> إلغاء التوثيق
                       </ConfirmSubmit>
-                    </form>
+                    </form></AccessBoundary>
                   )}
 
                   {st.key === 'pending' && (
-                    <form action={rejectVerificationAction} className="space-y-2 rounded-xl border-2 border-amber-300 bg-amber-50/60 p-3">
+                    <AccessBoundary module={'verifications'} action={'approve'}><form action={rejectVerificationAction} className="space-y-2 rounded-xl border-2 border-amber-300 bg-amber-50/60 p-3">
                       <input type="hidden" name="userId" value={id} />
                       <label className="block text-sm font-extrabold text-amber-800">سبب الرفض — يُحفظ في السجل ويصل العضو برسالة</label>
                       <textarea
@@ -176,19 +179,19 @@ export default async function AdminVerifications({ searchParams }: { searchParam
                       <ConfirmSubmit msg="تأكيد رفض التوثيق؟ يُحفظ السبب ويصل العضو برسالة." className="flex items-center gap-1 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700">
                         <XCircle className="h-4 w-4" /> رفض التوثيق
                       </ConfirmSubmit>
-                    </form>
+                    </form></AccessBoundary>
                   )}
 
                   {docs.length > 0 && (
                     <details className="rounded-xl border border-destructive/30">
                       <summary className="cursor-pointer list-none px-3 py-2 text-sm font-bold text-destructive">حذف الوثائق…</summary>
-                      <form action={deleteVerificationDocsAction} className="flex flex-wrap items-center justify-between gap-2 border-t border-destructive/20 p-3">
+                      <AccessBoundary module={'verifications'} action={'delete'}><form action={deleteVerificationDocsAction} className="flex flex-wrap items-center justify-between gap-2 border-t border-destructive/20 p-3">
                         <input type="hidden" name="userId" value={id} />
                         <span className="text-xs font-bold text-destructive">تأكيد: ستُحذف كل وثائق هذا الطلب نهائياً ولا يمكن التراجع. هل أنت متأكد؟</span>
                         <button className="flex shrink-0 items-center gap-1 rounded-lg bg-destructive px-3 py-2 text-sm font-bold text-white hover:bg-destructive/90">
                           <Trash2 className="h-4 w-4" /> نعم، احذف الوثائق
                         </button>
-                      </form>
+                      </form></AccessBoundary>
                     </details>
                   )}
                 </div>

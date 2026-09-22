@@ -5,6 +5,7 @@ import {
    Archive, AlertTriangle, CreditCard, WalletCards, Landmark,
 } from 'lucide-react';
 import type { Perm } from '@/lib/roles';
+import { DEPARTMENTS, MODULES, pagePermission } from '@/lib/access-control/catalog';
 
 export type AdminNavItem = { href: string; label: string; icon: React.ElementType; perm: Perm | null; description?: string; keywords?: string[] };
 export type AdminNavGroup = { key: string; title: string; icon: React.ElementType; color: string; items: AdminNavItem[] };
@@ -13,7 +14,7 @@ export type AdminNavGroup = { key: string; title: string; icon: React.ElementTyp
  * قائمة لوحة الإدارة مجمّعة: المتشابهات في قائمة فرعية، ولكل تصنيف لون مميّز.
  * مشتركة بين تخطيط الإدارة وقائمة الهيدر (الثلاث شرطات).
  */
-export const ADMIN_GROUPS: AdminNavGroup[] = [
+const LEGACY_GROUPS: AdminNavGroup[] = [
   {
     key: 'top', title: '', icon: LayoutDashboard, color: '#3287da',
     items: [
@@ -90,5 +91,23 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
   },
 ];
 
-/** القائمة المسطّحة (للتوافق: فلترة الصلاحيات وغيرها). */
-export const ADMIN_NAV: AdminNavItem[] = ADMIN_GROUPS.flatMap((g) => g.items);
+const items = LEGACY_GROUPS.flatMap(group => group.items).map(item => item.href === '/admin/roles' ? { ...item, href: '/admin/access-control', label: 'الأقسام والأدوار والصلاحيات' } : item);
+items.push(
+ {href:'/admin/revenue?tab=packages',label:'باقات عدد الإعلانات',icon:Crown,perm:'packages'},
+ {href:'/admin/revenue?tab=promo-packages',label:'باقات الترويج',icon:MonitorPlay,perm:'promos'},
+ {href:'/admin/orders',label:'الطلبات والمبيعات',icon:Store,perm:'commerce'},
+ { href: '/admin/finance?section=tax', label: 'الضرائب', icon: Landmark, perm: 'finance' },
+ { href: '/admin/finance?section=reconciliation', label: 'المطابقة المالية', icon: ScrollText, perm: 'finance' },
+ { href: '/admin/finance?section=close', label: 'إقفال الفترات', icon: Archive, perm: 'finance' },
+ { href: '/admin/suppliers/catalog', label: 'كتالوج الموردين', icon: Store, perm: 'suppliers' },
+ { href: '/admin/suppliers/integrations', label: 'ربط المتاجر والمزامنة', icon: LinkIcon, perm: 'suppliers' },
+ { href: '/admin/shipping', label: 'الشحن والتتبع', icon: Store, perm: 'commerce' },
+ { href: '/admin/ratings', label: 'تقييمات المنصة', icon: MessagesSquare, perm: null },
+);
+const colors = ['#16294A','#166534','#92700D','#0F766E','#0369A1','#4338CA','#7E22CE','#BE185D','#9A3412','#475569'];
+export const ADMIN_GROUPS: AdminNavGroup[] = DEPARTMENTS.map((department,index)=>({
+ key:department.id,title:department.name,icon:department.id==='technical'?Settings:department.id==='finance'?Coins:department.id==='audit'?Shield:Store,color:colors[index],
+ items:items.filter(item=>MODULES.find(module=>module.key===pagePermission(item.href)?.split(':')[0])?.departmentId===department.id),
+}));
+/** Registered navigation; legacy perm metadata never authorizes access. */
+export const ADMIN_NAV: AdminNavItem[] = ADMIN_GROUPS.flatMap(group => group.items);

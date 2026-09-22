@@ -5,12 +5,13 @@ const context = vi.hoisted(() => ({ uid: 0 }));
 // Only the HTTP request boundary is mocked; all database operations and crypto below are real.
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('@/lib/roles', async (load) => ({ ...await load<typeof import('@/lib/roles')>(), requireManager: async () => ({ uid: context.uid }) }));
+vi.mock('@/lib/access-control/guards',()=>({requireAccess:async()=>({uid:context.uid})}));
 import { prisma } from '@/lib/prisma';
 import { ensureSchema } from '@/data/schema-sync';
 import { consumeMfa, takeSecurityAttempt, mfaReadiness } from '@/lib/auth-security';
 import { encryptSecret, generateTotpSecret, generateRecoveryCodes, recoveryHash, totpCode } from '@/lib/mfa-crypto';
 import { AUTH_REQUIRE_ADMIN_MFA, AUTH_PASSWORD_MIN } from '@/lib/settings';
-import { setUserPerms, AdminMfaEnrollmentRequired } from '@/lib/roles';
+import { setUserPerms } from '@/lib/roles';
 import { saveAuthPolicyAction } from '@/app/account/security/actions';
 
 const enabled = process.env.AUTH_DB_TESTS === '1';
@@ -81,8 +82,9 @@ suite('isolated MySQL authentication transactions', () => {
     expect(await takeSecurityAttempt(key)).toBe(true);
     expect((await prisma.auth_security_limits.findUniqueOrThrow({ where: { k: key } })).hits).toBe(1);
   });
-  it('checks real readiness before activation and blocks unenrolled grants afterward', async () => {
-    await setUserPerms(Number(ids[1]), ['users:view']);
+  it('checks real legacy staff readiness before activation and refuses the retired grant path', async () => {
+    // Pre-migration fixture; multi-role MFA grants have their own isolated suite.
+    await prisma.admin_perms.create({data:{user_id:ids[1],perm:'users:view'}});
     expect((await mfaReadiness()).find((r) => r.id === Number(ids[1]))?.enrolled).toBe(false);
     const form = (factor: string) => { const f = new FormData(); f.set('currentPassword', password); f.set('factorCode', factor); f.set('requireAdminMfa', 'on'); f.set('passwordMinimum', '12'); return f; };
     expect(await saveAuthPolicyAction(null, form(codes[0]))).toHaveProperty('error');
@@ -90,9 +92,10 @@ suite('isolated MySQL authentication transactions', () => {
     await enroll(ids[1]);
     expect(await saveAuthPolicyAction(null, form(codes[1]))).toHaveProperty('notice');
     expect((await prisma.site_settings.findUnique({ where: { k: AUTH_REQUIRE_ADMIN_MFA } }))?.v).toBe('1');
-    await expect(setUserPerms(Number(ids[2]), ['users:view'])).rejects.toBeInstanceOf(AdminMfaEnrollmentRequired);
+    await expect(setUserPerms(Number(ids[2]), ['users:view'])).rejects.toThrow('rbac_legacy_grants_disabled');
     expect(await prisma.admin_perms.count({ where: { user_id: ids[2] } })).toBe(0);
-    await enroll(ids[2]); await setUserPerms(Number(ids[2]), ['users:view']);
-    expect(await prisma.admin_perms.count({ where: { user_id: ids[2] } })).toBe(1);
+    await enroll(ids[2]);
+    await expect(setUserPerms(Number(ids[2]), ['users:view'])).rejects.toThrow('rbac_legacy_grants_disabled');
+    expect(await prisma.admin_perms.count({ where: { user_id: ids[2] } })).toBe(0);
   }, 20_000);
 });

@@ -1,9 +1,12 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import { canUseMemberChat } from '@/lib/chat-access';
 
 export async function sendMessageAction(formData: FormData) {
   const session = await requireUser();
+  if (!await canUseMemberChat(session.uid,'create')) redirect('/account?access=denied');
   const reciverId = Number(formData.get('reciverId'));
   const rawMessage = String(formData.get('message') || '').trim();
   if (!reciverId || !rawMessage || reciverId === session.uid) return;
@@ -25,6 +28,7 @@ export async function sendMessageAction(formData: FormData) {
 /** حظر عضو — يمنع المراسلة بين الطرفين. */
 export async function blockUserAction(formData: FormData) {
   const session = await requireUser();
+  if (!await canUseMemberChat(session.uid,'edit')) redirect('/account?access=denied');
   const target = Number(formData.get('userId') || 0);
   if (target && target !== session.uid) {
     const { blockUser } = await import('@/lib/blocks');
@@ -37,6 +41,7 @@ export async function blockUserAction(formData: FormData) {
 /** رفع الحظر عن عضو. */
 export async function unblockUserAction(formData: FormData) {
   const session = await requireUser();
+  if (!await canUseMemberChat(session.uid,'edit')) redirect('/account?access=denied');
   const target = Number(formData.get('userId') || 0);
   if (target) {
     const { unblockUser } = await import('@/lib/blocks');

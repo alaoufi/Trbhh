@@ -258,11 +258,23 @@ export async function createAndSendOtp(phone: string): Promise<{ ok: boolean; de
 
 /** Admin action: set a fresh random password for a member and SMS it to them. */
 export async function sendNewPasswordToUser(userId: number): Promise<{ ok: boolean; error?: string }> {
-  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { phoneNumber: true } }).catch(() => null);
-  if (!u?.phoneNumber) return { ok: false, error: 'لا يوجد رقم جوال لهذا العضو' };
+  const { withUnassignedAccountChange } = await import('@/lib/access-control/store');
   const pass = 'A-' + randomBytes(31).toString('hex');
-  await prisma.users.update({ where: { id: BigInt(userId) }, data: { password: await hashPassword(pass), auth_session_version: randomUUID() } });
-  const sent = await sendVerification(u.phoneNumber, `كلمة مرورك الجديدة في تربح: ${pass}`);
+  const password = await hashPassword(pass);
+  let phone: string;
+  try {
+    phone = await withUnassignedAccountChange(prisma, userId, async tx => {
+      const user = await tx.users.findUnique({ where: { id: BigInt(userId) }, select: { phoneNumber: true } });
+      if (!user?.phoneNumber) throw new Error('account_phone_missing');
+      await tx.users.update({ where: { id: BigInt(userId) }, data: { password, auth_session_version: randomUUID() } });
+      return user.phoneNumber;
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'rbac_remove_roles_first') return { ok: false, error: 'يجب إزالة أدوار الإدارة أولاً من إدارة الصلاحيات قبل إعادة تعيين كلمة المرور.' };
+    if (error instanceof Error && error.message === 'account_phone_missing') return { ok: false, error: 'لا يوجد رقم جوال لهذا العضو' };
+    throw error;
+  }
+  const sent = await sendVerification(phone, `كلمة مرورك الجديدة في تربح: ${pass}`);
   if (!sent) return { ok: false, error: 'حُدّثت كلمة المرور لكن تعذّر إرسال الرسالة (تحقّق من إعداد البوابة)' };
   return { ok: true };
 }

@@ -1,6 +1,8 @@
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import { AlertTriangle, User, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { requireAction } from '@/lib/roles';
+
 import { listErrorLogs } from '@/lib/error-log';
 import { clearErrorLogAction } from '../actions';
 import { AdminPager } from '@/components/admin-pager';
@@ -18,7 +20,7 @@ function fmt(iso: string | null) {
 const PAGE_SIZE = 30;
 
 export default async function AdminErrorsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  await requireAction('users', 'edit');
+  await requireAdminPage('/admin/errors');
   const { page: pageRaw } = await searchParams;
   const page = Math.max(1, parseInt(pageRaw || '1') || 1);
   const { rows, total } = await listErrorLogs(PAGE_SIZE, (page - 1) * PAGE_SIZE);
@@ -32,11 +34,11 @@ export default async function AdminErrorsPage({ searchParams }: { searchParams: 
           <h1 className="text-xl font-bold text-primary">سجل الأخطاء التقنية</h1>
         </div>
         {rows.length > 0 && (
-          <form action={clearErrorLogAction}>
+          <AccessBoundary module={'errors'} action={'delete'}><form action={clearErrorLogAction}>
             <ConfirmSubmit msg="مسح كل سجل الأخطاء نهائياً؟" className="flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10">
               <Trash2 className="h-3.5 w-3.5" /> مسح السجل
             </ConfirmSubmit>
-          </form>
+          </form></AccessBoundary>
         )}
       </div>
       <p className="text-sm text-muted-foreground">كل خطأ يعترض عضواً (شاشة «حدث خطأ غير متوقع») يُسجَّل هنا تلقائياً — رسالته ورابط الصفحة والعضو (إن كان مسجّلاً) — لاكتشاف الأعطال المتكررة قبل أن يبلّغ عنها أحد.</p>

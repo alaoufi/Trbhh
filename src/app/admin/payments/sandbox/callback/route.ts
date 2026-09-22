@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAction } from '@/lib/roles';
+import { requireAccess } from '@/lib/access-control/guards';
 import { decodeArbCallback } from '@/lib/payments/providers/alrajhi-arb';
 import { readSandboxTicket } from '@/lib/payments/alrajhi-sandbox';
 import { readAlrajhiCallbackBody } from '@/lib/payments/alrajhi-callback';
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  await requireAction('users', 'edit');
+  await requireAccess('payments', 'manage_settings');
   const url = new URL(req.url); const data = ticket(url);
   const body = Object.fromEntries(url.searchParams.entries());
   const result = resultOf(body, data) || 'unverified';

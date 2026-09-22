@@ -1,8 +1,9 @@
+vi.mock('@/components/access-boundary',()=>({AccessPage:({children}:{children:React.ReactNode})=>children}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 const state = vi.hoisted(() => ({ gate: vi.fn(), query: vi.fn() }));
-vi.mock('@/lib/roles', () => ({ requireAction: state.gate }));
+vi.mock('@/lib/access-control/guards', () => ({ requireAdminPage: state.gate, readActorAccess: async () => ({keys:new Set(['products:view','products:create','products:approve','products:edit','products:suspend','products:delete','shipping:view','settlements:view'])}) }));
 vi.mock('@/lib/prisma', () => ({ prisma: { $queryRaw: state.query } }));
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('not_found'); } }));
 import Detail from '@/app/admin/commerce/orders/[id]/page';
@@ -14,12 +15,12 @@ describe('private read-only admin order detail', () => {
   it('requires independent commerce view permission before querying', async () => {
     state.gate.mockRejectedValue(new Error('forbidden'));
     await expect(Detail({ params: Promise.resolve({ id: '12' }) })).rejects.toThrow('forbidden');
-    expect(state.gate).toHaveBeenCalledWith('commerce', 'view');
+    expect(state.gate).toHaveBeenCalledWith('/admin/commerce/orders/[id]');
     expect(state.query).not.toHaveBeenCalled();
   });
   it.each(['0', '-1', '01', '1.5', '1e2', '12 OR 1=1', ' 12', '1000000000000000'])('rejects invalid ID %s before querying', async id => {
     await expect(Detail({ params: Promise.resolve({ id }) })).rejects.toThrow('not_found');
-    expect(state.gate).toHaveBeenCalledWith('commerce', 'view');
+    expect(state.gate).toHaveBeenCalledWith('/admin/commerce/orders/[id]');
     expect(state.query).not.toHaveBeenCalled();
   });
   it('returns not found without fetching items for a missing order', async () => {

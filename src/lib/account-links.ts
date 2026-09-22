@@ -99,7 +99,8 @@ export async function linkVerifiedAccount(ownerId: number, targetUid: number): P
   if (!targetUid || targetUid === ownerId) return { ok: false, error: 'self' };
   const u = await prisma.users.findUnique({ where: { id: BigInt(targetUid) }, select: { name: true, userName: true, is_admin: true } }).catch(() => null);
   if (!u) return { ok: false, error: 'notfound' };
-  if (u.is_admin === 1) return { ok: false, error: 'admin' };
+  const {isPrivilegedAccount}=await import('./auth-security');
+  if (await isPrivilegedAccount(targetUid)) return { ok: false, error: 'admin' };
   const targetGroup = await prisma.account_links.findUnique({ where: { user_id: BigInt(targetUid) }, select: { group_id: true } }).catch(() => null);
   if (targetGroup) {
     const myGroup = await prisma.account_links.findUnique({ where: { user_id: BigInt(ownerId) }, select: { group_id: true } }).catch(() => null);

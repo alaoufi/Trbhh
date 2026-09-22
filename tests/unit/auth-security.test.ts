@@ -23,6 +23,14 @@ describe('session enforcement for every login and account-switch path', () => {
     expect(await sessionMeetsAuthPolicy({ uid: 7 })).toBe(false);
     expect(await sessionMeetsAuthPolicy({ uid: 7, authVersion: 'rotated' })).toBe(true);
   });
+  it('revokes an already authenticated banned or archived staff session',async()=>{
+    db.user.mockResolvedValue({auth_session_version:'0',archived_at:null,ban:'checked',ban_until:null});
+    expect(await sessionMeetsAuthPolicy({uid:7})).toBe(false);
+    db.user.mockResolvedValue({auth_session_version:'0',archived_at:new Date(),ban:'no'});
+    expect(await sessionMeetsAuthPolicy({uid:7})).toBe(false);
+    db.user.mockResolvedValue({auth_session_version:'0',archived_at:null,ban:'checked',ban_until:new Date(0)});
+    expect(await sessionMeetsAuthPolicy({uid:7})).toBe(true);
+  });
   it('keeps a legacy unenrolled session until explicit activation', async () => {
     expect(await sessionMeetsAuthPolicy({ uid: 7 })).toBe(true);
     db.settings.mockResolvedValue({ requireAdminMfa: true });

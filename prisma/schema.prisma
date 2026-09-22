@@ -1721,6 +1721,7 @@ model user_subscripes {
 }
 
 model users {
+  access_assignments access_user_roles[]
   id                        BigInt     @id @default(autoincrement()) @db.UnsignedBigInt
   userName                  String?    @db.VarChar(255)
   password                  String?    @db.VarChar(255)
@@ -2299,6 +2300,56 @@ model cj_webhook_events {
 
 // Financial follow-up is additive. CHECK constraints and binary collations are
 // maintained in src/lib/finance/schema.ts because Prisma cannot express them.
+model access_control_state {
+  id Int @id @db.UnsignedTinyInt
+  revision BigInt @default(0) @db.UnsignedBigInt
+  initialized_at DateTime? @db.DateTime(3)
+}
+model access_departments {
+  id String @id @db.VarChar(64)
+  name String @db.VarChar(120)
+  active Int @default(1) @db.TinyInt
+  roles access_roles[]
+}
+model access_roles {
+  id String @id @db.VarChar(64)
+  name String @db.VarChar(120)
+  department_id String @db.VarChar(64)
+  active Int @default(1) @db.TinyInt
+  system_role Int @default(0) @db.TinyInt
+  department access_departments @relation(fields:[department_id],references:[id],onDelete:Restrict,onUpdate:Restrict,map:"access_role_department_fk")
+  permissions access_role_permissions[]
+  assignments access_user_roles[]
+}
+model access_role_permissions {
+  role_id String @db.VarChar(64)
+  permission String @db.VarChar(120)
+  role access_roles @relation(fields:[role_id],references:[id],onDelete:Restrict,onUpdate:Restrict,map:"access_permission_role_fk")
+  @@id([role_id,permission])
+}
+model access_user_roles {
+  user_id BigInt @db.UnsignedBigInt
+  role_id String @db.VarChar(64)
+  user users @relation(fields:[user_id],references:[id],onDelete:Restrict,onUpdate:Restrict,map:"access_assignment_user_fk")
+  role access_roles @relation(fields:[role_id],references:[id],onDelete:Restrict,onUpdate:Restrict,map:"access_assignment_role_fk")
+  @@id([user_id,role_id])
+  @@index([role_id],map:"access_assignment_role")
+}
+model access_audit {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  created_at DateTime @default(now()) @db.DateTime(3)
+  actor_id BigInt? @db.UnsignedBigInt
+  action String @db.VarChar(40)
+  target String @db.VarChar(128)
+  reason String @db.VarChar(1000)
+  before_json Json
+  after_json Json
+  ip String? @db.VarChar(45)
+  session_fingerprint String? @db.Char(64)
+  @@index([created_at,id],map:"access_audit_created")
+  @@index([actor_id,id],map:"access_audit_actor")
+}
+
 model finance_periods {
   month String @id @db.Char(7)
   closed_at DateTime? @db.DateTime(3)

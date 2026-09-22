@@ -1,7 +1,7 @@
 'use server';
 import {revalidatePath} from 'next/cache';
 import {prisma} from '@/lib/prisma';
-import {requireAction,hasAction} from '@/lib/roles';
+import {requireAccess,hasAccess} from '@/lib/access-control/guards';
 import {MAX_ONBOARDING_BYTES,parseOnboardingWorkbook,validateOnboarding} from '@/lib/suppliers/onboarding-input';
 import {inspectOnboarding,issuePreviewToken,verifyPreviewToken,onboardingAuditNote,onboardingFileHash,saveOnboarding,safeOnboardingFilename} from '@/lib/suppliers/onboarding-store';
 import {testSupplierReadiness} from '@/lib/suppliers/readiness';
@@ -14,24 +14,24 @@ function toUiReport(r:{imported:string[];corrected:{label:string;note:string}[];
 async function readFile(form:FormData){const file=form.get('file');if(!(file instanceof File)||!file.size)throw Error('onboarding_file');if(file.size>MAX_ONBOARDING_BYTES)throw Error('onboarding_size');const bytes=Buffer.from(await file.arrayBuffer());return {file,bytes,parsed:await parseOnboardingWorkbook(bytes,file.name)};}
 const secret=()=>process.env.SUPPLIER_TOKEN_ENCRYPTION_KEY||'';
 export async function previewOnboarding(_previous:OnboardingUiState,form:FormData):Promise<OnboardingUiState>{
- const admin=await requireAction('suppliers','view');
- if(!await hasAction(admin.uid,'suppliers','add')&&!await hasAction(admin.uid,'suppliers','edit'))return failure(Error('onboarding_forbidden'));
+ const admin=await requireAccess('suppliers','view');
+ if(!await hasAccess(admin.uid,'suppliers','create')&&!await hasAccess(admin.uid,'suppliers','edit'))return failure(Error('onboarding_forbidden'));
  try{const {file,bytes,parsed}=await readFile(form);if(parsed.errors.length)return {errors:parsed.errors,warnings:parsed.warnings,report:toUiReport(parsed.report)};const state=await inspectOnboarding(prisma,parsed.values,secret());const complete=validateOnboarding(state.merged,{allowMissingRequired:state.existing&&state.connected?['email']:[]});if(complete.errors.length)return {errors:complete.errors,warnings:[...parsed.warnings,...state.warnings],report:toUiReport({...parsed.report,needsReview:complete.errors})};
   await prisma.admin_log.create({data:{admin_id:BigInt(admin.uid),action:'معاينة ملف متجر سلة',target:state.existing?String(state.existing.id):'',note:onboardingAuditNote(file.name,'preview',state.changedKeys.length)}});
   return {errors:[],warnings:[...parsed.warnings,...state.warnings],report:toUiReport(parsed.report),preview:{token:issuePreviewToken(state.fingerprint,BigInt(admin.uid),onboardingFileHash(bytes),secret()),filename:safeOnboardingFilename(file.name),storeName:complete.values.store_name!,registrationNumber:complete.values.registration_number!,supplierId:state.existing?String(state.existing.id):null,connected:state.connected,changes:state.changes}};
  }catch(e){return failure(e);}
 }
 export async function confirmOnboarding(_previous:OnboardingUiState,form:FormData):Promise<OnboardingUiState>{
- const admin=await requireAction('suppliers','view');
+ const admin=await requireAccess('suppliers','view');
  try{const {file,bytes,parsed}=await readFile(form);if(parsed.errors.length)return {errors:parsed.errors,warnings:parsed.warnings,report:toUiReport(parsed.report)};const fingerprint=verifyPreviewToken(String(form.get('token')||''),BigInt(admin.uid),onboardingFileHash(bytes),secret());
-  const saved=await saveOnboarding(prisma,{values:parsed.values,fingerprint,filename:file.name,adminId:BigInt(admin.uid),secret:secret(),canCreate:await hasAction(admin.uid,'suppliers','add'),canEdit:await hasAction(admin.uid,'suppliers','edit')});
+  const saved=await saveOnboarding(prisma,{values:parsed.values,fingerprint,filename:file.name,adminId:BigInt(admin.uid),secret:secret(),canCreate:await hasAccess(admin.uid,'suppliers','create'),canEdit:await hasAccess(admin.uid,'suppliers','edit')});
   const warnings=[...parsed.warnings];let authorizationUrl:string|undefined,authorizationExpiresAt:string|undefined;
-  if(!saved.connected){try{const invitation=await issueMerchantInvitation(prisma,BigInt(saved.supplierId),BigInt(admin.uid),supplierConfig());authorizationUrl=invitation.url;authorizationExpiresAt=invitation.expiresAt.toISOString();}catch{warnings.push('تم حفظ المورد، لكن تعذر إنشاء رابط التفويض الآن. أنشئه من صفحة التكاملات.');}}
+  if(!saved.connected&&await hasAccess(admin.uid,'integrations','authorize')){try{const invitation=await issueMerchantInvitation(prisma,BigInt(saved.supplierId),BigInt(admin.uid),supplierConfig());authorizationUrl=invitation.url;authorizationExpiresAt=invitation.expiresAt.toISOString();}catch{warnings.push('تم حفظ المورد، لكن تعذر إنشاء رابط التفويض الآن. أنشئه من صفحة التكاملات.');}}
   revalidatePath('/admin/suppliers');revalidatePath('/admin/suppliers/integrations');return {errors:[],warnings,report:toUiReport(parsed.report),saved:{...saved,authorizationUrl,authorizationExpiresAt}};
  }catch(e){return failure(e);}
 }
 export async function checkOnboarding(_previous:OnboardingUiState,form:FormData):Promise<OnboardingUiState>{
- const admin=await requireAction('suppliers','edit');
+ const admin=await requireAccess('integrations','sync');
  try{const raw=String(form.get('supplierId')||'');if(!/^[1-9]\d{0,14}$/.test(raw))throw Error();const id=BigInt(raw);
   const [supplier]=await prisma.$queryRaw<{name:string}[]>`SELECT s.name FROM commerce_suppliers s JOIN supplier_onboarding o ON o.supplier_id=s.id WHERE s.id=${id}`;if(!supplier)throw Error();
   const result=await testSupplierReadiness(prisma,id,BigInt(admin.uid),supplierConfig());

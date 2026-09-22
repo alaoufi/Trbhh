@@ -1,8 +1,11 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { Ban, Trash2, XCircle, Flag, ShieldAlert, AlertTriangle, Copy, Waves, Bot, Check, Megaphone } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { toInt, timeAgo } from '@/lib/utils';
-import { requirePerm } from '@/lib/roles';
+
 import { getModLog } from '@/lib/moderation';
 import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { resolveReportAction, reviewModLogAction } from '../actions';
@@ -28,7 +31,7 @@ const TABS = [
 type TabKey = typeof TABS[number]['key'];
 
 export default async function AdminReportsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  await requirePerm('reports');
+  await requireAdminPage('/admin/reports');
   const { tab } = await searchParams;
   const active: TabKey = tab === 'auto' ? 'auto' : 'members';
   const pendingCount = await prisma.repord_ads.count({ where: { status: 0 } }).catch(() => 0);
@@ -43,12 +46,12 @@ export default async function AdminReportsPage({ searchParams }: { searchParams:
       {/* التبويبان: بلاغات يرفعها الأعضاء يدوياً، مقابل مخالفات يرصدها النظام آلياً */}
       <div className="flex gap-1 overflow-x-auto rounded-xl bg-secondary/40 p-1">
         {TABS.map((t) => (
-          <Link key={t.key} href={`/admin/reports?tab=${t.key}`} className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-bold ${active === t.key ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-white/60'}`}>
+          <AccessPage href={`/admin/reports?tab=${t.key}`} key={t.key}><Link key={t.key} href={`/admin/reports?tab=${t.key}`} className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-bold ${active === t.key ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-white/60'}`}>
             <t.icon className="h-4 w-4" /> {t.label}
             {t.key === 'members' && pendingCount > 0 && (
               <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${active === t.key ? 'bg-white/25 text-white' : 'bg-amber-500 text-white'}`}>{pendingCount}</span>
             )}
-          </Link>
+          </Link></AccessPage>
         ))}
       </div>
 
@@ -94,25 +97,25 @@ async function MemberReportsTab() {
               <span className="text-xs text-muted-foreground">{timeAgo(r.created_at)}</span>
             </div>
             <div className="mt-1 text-sm"><span className="rounded bg-destructive/10 px-2 py-0.5 text-xs text-destructive">{reasonById.get(r.reason_id) || 'بلاغ'}</span> {r.comment && <span className="text-muted-foreground">— {r.comment}</span>}</div>
-            <div className="mt-1 text-xs text-muted-foreground">المُبلِّغ: <Link href={`/admin/users/${r.user_id}`} className="text-primary hover:underline">عضو #{r.user_id}</Link></div>
+            <div className="mt-1 text-xs text-muted-foreground">المُبلِّغ: <AccessPage href={`/admin/users/${r.user_id}`}><Link href={`/admin/users/${r.user_id}`} className="text-primary hover:underline">عضو #{r.user_id}</Link></AccessPage></div>
             {respById.get(toInt(r.id)) && (
               <div className="mt-2 rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-sm text-emerald-900"><b>ردّ صاحب الإعلان:</b> {respById.get(toInt(r.id))}</div>
             )}
-            <form action={resolveReportAction} className="mt-3 flex flex-wrap gap-2">
+            <AccessBoundary module={'reports'} action={'delete'}><form action={resolveReportAction} className="mt-3 flex flex-wrap gap-2">
               <input type="hidden" name="reportId" value={toInt(r.id)} />
-              <ConfirmSubmit name="action" value="ban" msg="حظر صاحب هذا الإعلان؟ سيصله إشعار بالحظر، ويصل المُبلِّغ إشعار تأكيد." className="flex items-center gap-1 rounded-lg bg-destructive px-3 py-1.5 text-xs font-bold text-white hover:bg-destructive/90"><Ban className="h-3.5 w-3.5" /> حظر الناشر</ConfirmSubmit>
-              <ConfirmSubmit name="action" value="delete" msg="حذف (أرشفة) هذا الإعلان؟ سيصل صاحبه إشعار بالإزالة، ويصل المُبلِّغ إشعار تأكيد." className="flex items-center gap-1 rounded-lg border-2 border-destructive px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف الإعلان</ConfirmSubmit>
+              <AccessBoundary module="users" action="ban"><ConfirmSubmit name="action" value="ban" msg="حظر صاحب هذا الإعلان؟ سيصله إشعار بالحظر، ويصل المُبلِّغ إشعار تأكيد." className="flex items-center gap-1 rounded-lg bg-destructive px-3 py-1.5 text-xs font-bold text-white hover:bg-destructive/90"><Ban className="h-3.5 w-3.5" /> حظر الناشر</ConfirmSubmit></AccessBoundary>
+              <AccessBoundary module="ads" action="delete"><ConfirmSubmit name="action" value="delete" msg="حذف (أرشفة) هذا الإعلان؟ سيصل صاحبه إشعار بالإزالة، ويصل المُبلِّغ إشعار تأكيد." className="flex items-center gap-1 rounded-lg border-2 border-destructive px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف الإعلان</ConfirmSubmit></AccessBoundary>
               <ConfirmSubmit name="action" value="dismiss" msg="تجاهل هذا البلاغ (لا مخالفة)؟ يصل المُبلِّغ إشعار بأنه رُوجع." className="flex items-center gap-1 rounded-lg border-2 border-primary/25 px-3 py-1.5 text-xs font-bold text-muted-foreground hover:bg-secondary"><XCircle className="h-3.5 w-3.5" /> تجاهل</ConfirmSubmit>
-            </form>
+            </form></AccessBoundary>
           </div>
         ))}
       </div>
 
       {resolvedCount > 0 && (
-        <Link href="/admin/archive?tab=reports" className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
+        <AccessPage href="/admin/archive?tab=reports"><Link href="/admin/archive?tab=reports" className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
           <span>📁 البلاغات المُعالَجة ({resolvedCount}) انتقلت للأرشيف</span>
           <span>فتح الأرشيف ←</span>
-        </Link>
+        </Link></AccessPage>
       )}
     </div>
   );
@@ -198,7 +201,7 @@ async function AutoReportsTab() {
             <div key={e.id} className="card-3d space-y-2 rounded-xl border-2 border-red-400 bg-red-50 p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Ban className="h-4 w-4 shrink-0 text-red-600" />
-                <Link href={`/admin/users/${e.userId}`} className="text-sm font-bold text-primary underline">{nameById.get(e.userId) || `عضو #${en(e.userId)}`}</Link>
+                <AccessPage href={`/admin/users/${e.userId}`}><Link href={`/admin/users/${e.userId}`} className="text-sm font-bold text-primary underline">{nameById.get(e.userId) || `عضو #${en(e.userId)}`}</Link></AccessPage>
                 <span className="rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white">حُظر الحساب</span>
                 <span className="mr-auto text-xs text-muted-foreground">{timeAgo(e.createdAt)}</span>
               </div>
@@ -210,11 +213,11 @@ async function AutoReportsTab() {
               )}
               <AdEventLink e={e} danger />
               <div className="text-xs font-bold text-amber-800">الإجراء المطلوب: افتحوا الإعلان (وإن كان تكراراً قارنوه بالأصلي)، ثم فكّوا الحظر إن كان غير مستحق، أو أبقوه إن كانت المخالفة واضحة.</div>
-              <form action={reviewModLogAction} className="flex flex-wrap gap-2 pt-1">
+              <AccessBoundary module={'users'} action={'ban'}><form action={reviewModLogAction} className="flex flex-wrap gap-2 pt-1">
                 <input type="hidden" name="modLogId" value={e.id} />
                 <ConfirmSubmit name="decision" value="unban" msg="فكّ الحظر عن هذا العضو؟ يصله إشعار بذلك وتعود إعلاناته للظهور فوراً." className="flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"><Check className="h-3.5 w-3.5" /> فكّ الحظر</ConfirmSubmit>
                 <ConfirmSubmit name="decision" value="keep" msg="الإبقاء على الحظر بعد المراجعة؟ يصل العضو إشعار بذلك." className="flex items-center gap-1 rounded-lg border-2 border-red-400 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100"><Ban className="h-3.5 w-3.5" /> استمرار الحظر</ConfirmSubmit>
-              </form>
+              </form></AccessBoundary>
             </div>
           ))}
         </div>
@@ -222,10 +225,10 @@ async function AutoReportsTab() {
 
       {/* بقية السجل: مخالفات لم تصل لحدّ الحظر، وحالات حظر رُوجعت بالفعل — انتقلت للأرشيف لإبقاء هذا العرض حياً بالمعلّق فقط */}
       {rest.length > 0 && (
-        <Link href="/admin/archive?tab=modlog" className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
+        <AccessPage href="/admin/archive?tab=modlog"><Link href="/admin/archive?tab=modlog" className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm font-bold text-primary hover:bg-primary/10">
           <span>📁 بقية السجل ({rest.length}) — مخالفات مُغلقة وحالات رُوجعت، بالأرشيف</span>
           <span>فتح الأرشيف ←</span>
-        </Link>
+        </Link></AccessPage>
       )}
     </div>
   );

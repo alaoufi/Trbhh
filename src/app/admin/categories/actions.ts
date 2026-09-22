@@ -2,7 +2,7 @@
 import {redirect} from 'next/navigation';
 import {revalidatePath} from 'next/cache';
 import {prisma} from '@/lib/prisma';
-import {requireAction} from '@/lib/roles';
+import {requireAccess} from '@/lib/access-control/guards';
 import {setSetting} from '@/lib/settings';
 import {bustAdCaches} from '@/lib/data';
 import {categoryId,CATEGORY_LABELS} from '@/lib/ad-categories/contracts';
@@ -12,14 +12,14 @@ import {CategoryValidationError} from '@/lib/ad-categories/validation';
 async function refresh(){await bustAdCaches();revalidatePath('/admin/categories');revalidatePath('/ads/new');revalidatePath('/ads/[id]','page');revalidatePath('/companies/[id]/p/[adId]','page');}
 function nameAndOrder(fd:FormData){const name=String(fd.get('name')||'').trim(),order=Number(fd.get('order')||0);if(!name||name.length>200||!Number.isSafeInteger(order)||order<0||order>10000)throw new CategoryValidationError('','الاسم أو الترتيب غير صالح');return {name,order};}
 export async function saveCategorySettings(fd:FormData){
-  await requireAction('categories','edit');
+  await requireAccess('categories', 'manage_settings');
   await setSetting('categories_v2_enabled',fd.get('enabled')==='1'?'1':'0');
   for(const [k,fallback] of Object.entries(CATEGORY_LABELS)) await setSetting(`categories_v2_label_${k}`,String(fd.get(`label_${k}`)||fallback).trim().slice(0,500));
   await refresh();redirect('/admin/categories?saved=1');
 }
 export async function saveCategory(fd:FormData){
   const id=fd.get('id')?categoryId(fd.get('id')):null;
-  const actor=await requireAction('categories',id?'edit':'add');
+  const actor=await requireAccess('categories',id?'edit':'create');
   try{
     const {name,order}=nameAndOrder(fd);
     await prisma.$transaction(async tx=>{
@@ -30,7 +30,7 @@ export async function saveCategory(fd:FormData){
   await refresh();redirect('/admin/categories?saved=1');
 }
 export async function toggleCategory(fd:FormData){
-  const actor=await requireAction('categories','suspend');const id=categoryId(fd.get('id'));const sub=fd.get('sub')==='1';const active=fd.get('active')==='1';
+  const actor=await requireAccess('categories','suspend');const id=categoryId(fd.get('id'));const sub=fd.get('sub')==='1';const active=fd.get('active')==='1';
   await prisma.$transaction(async tx=>{
     if(sub)await tx.sub_categories.update({where:{id:BigInt(id)},data:{active:active?1:0}});
     else await tx.categories.update({where:{id:BigInt(id)},data:{is_active:active?'yes':'no'}});
@@ -39,7 +39,7 @@ export async function toggleCategory(fd:FormData){
 }
 export async function saveSubcategory(fd:FormData){
   const id=fd.get('id')?categoryId(fd.get('id')):null;
-  const actor=await requireAction('categories',id?'edit':'add');
+  const actor=await requireAccess('categories',id?'edit':'create');
   try{
     const {name,order}=nameAndOrder(fd),cid=categoryId(fd.get('category_id')),def=parseSubcategoryDefinition(fd);
     await prisma.$transaction(async tx=>{

@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { Sparkles, ExternalLink, Eye, MousePointerClick, ArrowRight, Pencil, Trash2, Pause, Play } from 'lucide-react';
 import { getSession } from '@/lib/auth';
-import { hasAnyAdmin } from '@/lib/roles';
+import { hasAccess } from '@/lib/access-control/guards';
 import { getClassifiedById, recordClassifiedView, getClassifiedOwnerState, classifiedPublicVisible } from '@/lib/classified';
 import { getClassifiedStatsAudience } from '@/lib/settings';
 import { ClassifiedVisual, ClassifiedContact } from '@/components/classified-card';
@@ -39,8 +39,9 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
   if (!c) notFound();
 
   const session = await getSession().catch(() => null);
-  const admin = session ? await hasAnyAdmin(session.uid).catch(() => false) : false;
+  const admin = session ? await hasAccess(session.uid, 'classified', 'view').catch(() => false) : false;
   const isOwner = !!session && c.userId === session.uid;
+  const [canEdit,canSuspend,canDelete]=session?await Promise.all(['edit','suspend','delete'].map(action=>hasAccess(session.uid,'classified',action))):[false,false,false];
   // حالة الإعلان (ظاهر/موقوف) — تلزم لأزرار الإجراءات (المالك/الإدارة فقط)
   const ownerState = (isOwner || admin) ? await getClassifiedOwnerState(numId).catch(() => null) : null;
   const isPaused = ownerState ? ownerState.status !== 1 : false;
@@ -101,12 +102,12 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
           card={{ url: shareUrl, title: shareText, image: c.image ?? undefined, desc: c.text ?? undefined, contain: true }}
           compact
         />
-        {(isOwner || admin) && (
+        {(isOwner || canEdit || canSuspend || canDelete) && (
           <>
-            <Link href={`/classified/${c.id}/edit`} className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-primary">
+            {(isOwner || canEdit) && <Link href={`/classified/${c.id}/edit`} className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-primary">
               <Pencil className="h-3.5 w-3.5" /> تعديل
-            </Link>
-            <form action={toggleClassifiedStatusAction}>
+            </Link>}
+            {(isOwner || canSuspend) && <form action={toggleClassifiedStatusAction}>
               <input type="hidden" name="id" value={c.id} />
               <ConfirmSubmit
                 msg={isPaused ? 'استئناف عرض هذا الإعلان للزوّار؟' : 'إيقاف هذا الإعلان؟ يختفي عن الزوّار ويعود متى استأنفته.'}
@@ -114,8 +115,8 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
               >
                 {isPaused ? <><Play className="h-3.5 w-3.5" /> استئناف</> : <><Pause className="h-3.5 w-3.5" /> إيقاف</>}
               </ConfirmSubmit>
-            </form>
-            <form action={deleteClassifiedFromDetailAction}>
+            </form>}
+            {(isOwner || canDelete) && <form action={deleteClassifiedFromDetailAction}>
               <input type="hidden" name="id" value={c.id} />
               <ConfirmSubmit
                 msg="حذف هذا الإعلان المبوّب نهائياً؟ لا يمكن التراجع."
@@ -123,7 +124,7 @@ export default async function ClassifiedDetailPage({ params, searchParams }: { p
               >
                 <Trash2 className="h-3.5 w-3.5" /> حذف
               </ConfirmSubmit>
-            </form>
+            </form>}
           </>
         )}
       </div>

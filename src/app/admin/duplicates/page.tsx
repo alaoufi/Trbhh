@@ -1,7 +1,10 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import Link from 'next/link';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { Copy, Trash2, Check, Users } from 'lucide-react';
-import { requirePerm } from '@/lib/roles';
+
 import { findDuplicateAds, findCrossUserDuplicateAds, findCrossUserImages } from '@/lib/duplicates';
 import { mediaUrl } from '@/lib/media';
 import { timeAgo } from '@/lib/utils';
@@ -11,7 +14,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'الإعلانات المكررة' };
 
 export default async function AdminDuplicates({ searchParams }: { searchParams: Promise<{ deleted?: string; crossdeleted?: string }> }) {
-  await requirePerm('duplicates');
+  await requireAdminPage('/admin/duplicates');
   const sp = await searchParams;
   const [{ groups, dupCount }, { groups: crossGroups, dupCount: crossDupCount }, stolen] = await Promise.all([
     findDuplicateAds(), findCrossUserDuplicateAds(), findCrossUserImages(20),
@@ -41,11 +44,11 @@ export default async function AdminDuplicates({ searchParams }: { searchParams: 
       </div>
 
       {dupCount > 0 && (
-        <form action={adminDeleteDuplicatesAction}>
+        <AccessBoundary module={'duplicates'} action={'delete'}><form action={adminDeleteDuplicatesAction}>
           <ConfirmSubmit msg={`تأكيد: حذف كل النسخ المكررة (${dupCount} إعلان) نهائياً؟ يُحتفظ بأقدم إعلان في كل مجموعة ولا يمكن التراجع.`} className="flex items-center gap-2 rounded-lg bg-destructive px-4 py-2.5 text-sm font-bold text-white">
             <Trash2 className="h-4 w-4" /> حذف كل المكرر ({dupCount})
           </ConfirmSubmit>
-        </form>
+        </form></AccessBoundary>
       )}
 
       {groups.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد إعلانات مكررة. 🎉</p>}
@@ -79,11 +82,11 @@ export default async function AdminDuplicates({ searchParams }: { searchParams: 
         </div>
         <p className="text-sm text-muted-foreground">نفس نص الإعلان (العنوان والتفاصيل) منشور من أكثر من حساب — مؤشر شبكة سبام تنشر بأرقام/حسابات متعددة.</p>
         {crossDupCount > 0 && (
-          <form action={adminDeleteCrossDuplicatesAction}>
+          <AccessBoundary module={'duplicates'} action={'delete'}><form action={adminDeleteCrossDuplicatesAction}>
             <ConfirmSubmit msg={`تأكيد: حذف كل النسخ المكررة بين أعضاء مختلفين (${crossDupCount} إعلان) نهائياً؟ يُحتفظ بأقدم إعلان في كل مجموعة ولا يمكن التراجع.`} className="flex items-center gap-2 rounded-lg bg-destructive px-4 py-2.5 text-sm font-bold text-white">
               <Trash2 className="h-4 w-4" /> حذف كل المكرر بين الأعضاء ({crossDupCount})
             </ConfirmSubmit>
-          </form>
+          </form></AccessBoundary>
         )}
         {crossGroups.length === 0 && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ لا يوجد تكرار بين أعضاء مختلفين.</p>}
         <div className="space-y-3">
@@ -93,14 +96,14 @@ export default async function AdminDuplicates({ searchParams }: { searchParams: 
                 <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">يُبقى</span>
                 <Link href={`/ads/${g.keepId}`} className="truncate font-medium hover:text-primary">{g.keepTitle}</Link>
                 <span className="text-xs text-muted-foreground">#{g.keepId}</span>
-                <Link href={`/admin/users/${g.keepUserId}`} className="text-xs text-primary hover:underline">عضو #{g.keepUserId}</Link>
+                <AccessPage href={`/admin/users/${g.keepUserId}`}><Link href={`/admin/users/${g.keepUserId}`} className="text-xs text-primary hover:underline">عضو #{g.keepUserId}</Link></AccessPage>
               </div>
               <ul className="mt-2 space-y-1 border-t pt-2">
                 {g.dups.map((d) => (
                   <li key={d.id} className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="rounded bg-red-100 px-2 py-0.5 font-medium text-red-700">مكرر</span>
                     <Link href={`/ads/${d.id}`} className="truncate hover:text-primary">#{d.id}</Link>
-                    <Link href={`/admin/users/${d.userId}`} className="text-primary hover:underline">عضو #{d.userId}</Link>
+                    <AccessPage href={`/admin/users/${d.userId}`}><Link href={`/admin/users/${d.userId}`} className="text-primary hover:underline">عضو #{d.userId}</Link></AccessPage>
                     <span>{timeAgo(d.createdAt)}</span>
                   </li>
                 ))}
@@ -123,7 +126,7 @@ export default async function AdminDuplicates({ searchParams }: { searchParams: 
               <div className="font-bold text-red-600">نفس الصورة لدى {g.files.length} أعضاء:</div>
               <div className="flex flex-wrap gap-1.5">
                 {g.files.map((f) => (
-                  <Link key={f.userId} href={`/admin/users/${f.userId}`} className="rounded-full border border-primary/25 bg-primary/5 px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary/10">{f.userName}</Link>
+                  <AccessPage href={`/admin/users/${f.userId}`} key={f.userId}><Link key={f.userId} href={`/admin/users/${f.userId}`} className="rounded-full border border-primary/25 bg-primary/5 px-2.5 py-1 text-xs font-bold text-primary hover:bg-primary/10">{f.userName}</Link></AccessPage>
                 ))}
               </div>
             </div>

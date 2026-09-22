@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { Bell } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import { hasAnyAdmin, getUserPerms } from '@/lib/roles';
+import { readActorAccess } from '@/lib/access-control/guards';
+import { canAccessPage } from '@/lib/access-control/catalog';
 import { storeIdOfUser } from '@/lib/merchant';
 import { SiteMenu } from '@/components/site-menu';
 import { ADMIN_NAV } from '@/components/admin-nav-def';
@@ -14,7 +15,8 @@ import { ProfileSwitcher } from '@/components/profile-switcher';
 
 export async function Header() {
   const session = await getSession();
-  const admin = session ? await hasAnyAdmin(session.uid) : false;
+  const access = session ? await readActorAccess(session.uid) : null;
+  const admin = !!access?.ready && !!access.keys.size;
   const myStoreId = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // اسم المتجر لمبدّل الهوية (اختياري: يظهر فقط لأصحاب المتاجر)
   const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
@@ -23,9 +25,7 @@ export async function Header() {
   // الحسابات المرتبطة بنفس المالك (للتبديل من مبدّل الهوية) — فارغة إن لا ربط
   const linkedAccts = session ? await import('@/lib/account-links').then((m) => m.linkedAccounts(session.uid)).catch(() => []) : [];
   // روابط الإدارة المصرّح بها — تُعرض في قائمة الهيدر داخل لوحة الإدارة
-  const adminHrefs = admin
-    ? await getUserPerms(session!.uid).then((perms) => ADMIN_NAV.filter((n) => n.perm === null || perms.has(n.perm)).map((n) => n.href)).catch(() => [] as string[])
-    : [];
+  const adminHrefs = access ? ADMIN_NAV.filter(item => canAccessPage(access.keys, item.href)).map(item => item.href) : [];
   // جرس الهيدر: مجموع الرسائل غير المقروءة + التنبيهات الجديدة
   // الجرس = رسائل غير مقروءة + تنبيهات (عدا نوع message لئلا تُعدّ الرسالة مرتين)
   const [unreadMsgs, newNotifs] = session
@@ -49,7 +49,7 @@ export async function Header() {
         <HeaderCta isAuthed={!!session} myStoreId={myStoreId} />
 
         {/* بحث مصغّر: عدسة تفتح حقل البحث */}
-        <HeaderSearch />
+        <HeaderSearch canAdminSearch={access?.keys.has('search:view') ?? false} />
 
         {/* جرس الرسائل والتنبيهات + ساعة حية بتوقيت الرياض تحته */}
         <div className="flex shrink-0 flex-col items-center gap-0.5">
@@ -83,7 +83,7 @@ export async function Header() {
         (يضعه SealReposition) — يظهر للعضو والزائر، ونافذته تفتح وتُغلق طبيعياً. */}
     {session && <ProfileBar uid={session.uid} />}
     {/* 🔔 تنبيه إداري عالمي: يظهر لأي إداري في كل صفحة حتى تُعالَج الطلبات المعلقة */}
-    {admin && <AdminAlertsBanner />}
+    {admin && <AdminAlertsBanner keys={access!.keys} />}
     </>
   );
 }

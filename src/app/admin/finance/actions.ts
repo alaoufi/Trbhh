@@ -2,13 +2,15 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
-import { requireFinance, type FinanceAction } from '@/lib/finance/permissions';
+import { requireAccess } from '@/lib/access-control/guards';
+import type { AccessModule, AccessAction } from '@/lib/access-control/catalog';
 import { financeSections } from '@/lib/finance/reports';
 import { financeField as field, parseFinanceSar, publicFinanceError } from '@/lib/finance/input';
 import { approveSettlement, captureInvoices, closeMonth, financeMonth, parseFinanceId, parseFinanceMonth, prepareSettlement, recordExpense, releaseAccrual, reverseExpense, reverseSettlement, saveBudget } from '@/lib/finance/service';
 
-async function run(form:FormData,permission:FinanceAction,work:(actor:bigint)=>Promise<unknown>):Promise<never> {
-  const session=await requireFinance(permission);
+async function run(form:FormData,module:AccessModule,permission:AccessAction,work:(actor:bigint)=>Promise<unknown>):Promise<never> {
+  await requireAccess(module,'view');
+  const session=await requireAccess(module,permission);
   const section=form.get('returnTo');
   const params=new URLSearchParams({section:typeof section==='string'&&financeSections.some(s=>s.key===section)?section:'overview'});
   let error:string|null=null;
@@ -21,10 +23,10 @@ async function run(form:FormData,permission:FinanceAction,work:(actor:bigint)=>P
   redirect('/admin/finance?'+params.toString());
 }
 export async function saveFinanceBudget(form:FormData) {
-  return run(form,'edit',actor=>saveBudget(prisma,actor,{month:field(form,'month'),category:field(form,'category'),plannedMinor:parseFinanceSar(field(form,'planned'))}));
+  return run(form,'budget','edit',actor=>saveBudget(prisma,actor,{month:field(form,'month'),category:field(form,'category'),plannedMinor:parseFinanceSar(field(form,'planned'))}));
 }
 export async function recordFinanceExpense(form:FormData) {
-  return run(form,'edit',actor=>{
+  return run(form,'expenses','create',actor=>{
     const occurredAt=field(form,'occurredAt');
     if(occurredAt.slice(0,7)!==field(form,'month')||occurredAt>new Date(Date.now()+3*3600000).toISOString().slice(0,10))throw new Error('finance_date_invalid');
     return recordExpense(prisma,actor,{category:field(form,'category'),description:field(form,'description'),netMinor:parseFinanceSar(field(form,'net')),vatMinor:parseFinanceSar(field(form,'vat')),paidMinor:parseFinanceSar(field(form,'paid')),occurredAt,dueAt:field(form,'dueAt'),reference:field(form,'reference'),requestKey:field(form,'requestKey')});
@@ -32,13 +34,13 @@ export async function recordFinanceExpense(form:FormData) {
 }
 function currentMonthOnly(form:FormData){if(field(form,'month')!==financeMonth())throw new Error('finance_current_period_required');}
 export async function reverseFinanceExpense(form:FormData) {
-  return run(form,'approve',actor=>{currentMonthOnly(form);return reverseExpense(prisma,actor,parseFinanceId(field(form,'expenseId')),field(form,'reason'));});
+  return run(form,'expenses','refund',actor=>{currentMonthOnly(form);return reverseExpense(prisma,actor,parseFinanceId(field(form,'expenseId')),field(form,'reason'));});
 }
 export async function releaseFinanceAccrual(form:FormData) {
-  return run(form,'approve',actor=>{currentMonthOnly(form);return releaseAccrual(prisma,actor,parseFinanceId(field(form,'accrualId')),field(form,'dueAt'),field(form,'reason'));});
+  return run(form,'settlements','approve',actor=>{currentMonthOnly(form);return releaseAccrual(prisma,actor,parseFinanceId(field(form,'accrualId')),field(form,'dueAt'),field(form,'reason'));});
 }
 export async function prepareFinanceSettlement(form:FormData) {
-  return run(form,'edit',actor=>{
+  return run(form,'settlements','create',actor=>{
     currentMonthOnly(form);
     const ids=form.getAll('accrualIds');
     if(ids.some(id=>typeof id!=='string'))throw new Error('finance_selection_invalid');
@@ -46,18 +48,18 @@ export async function prepareFinanceSettlement(form:FormData) {
   });
 }
 export async function approveFinanceSettlement(form:FormData) {
-  return run(form,'approve',actor=>{
+  return run(form,'settlements','approve',actor=>{
     currentMonthOnly(form);
     if(field(form,'confirm')!=='1')throw new Error('finance_confirmation_required');
     return approveSettlement(prisma,actor,parseFinanceId(field(form,'settlementId')),field(form,'reference'));
   });
 }
 export async function reverseFinanceSettlement(form:FormData) {
-  return run(form,'approve',actor=>{currentMonthOnly(form);return reverseSettlement(prisma,actor,parseFinanceId(field(form,'settlementId')),field(form,'reason'));});
+  return run(form,'settlements','refund',actor=>{currentMonthOnly(form);return reverseSettlement(prisma,actor,parseFinanceId(field(form,'settlementId')),field(form,'reason'));});
 }
 export async function closeFinanceMonth(form:FormData) {
-  return run(form,'close',actor=>closeMonth(prisma,actor,field(form,'month'),form.getAll('checks').map(String),field(form,'reason')));
+  return run(form,'periods','close_period',actor=>closeMonth(prisma,actor,field(form,'month'),form.getAll('checks').map(String),field(form,'reason')));
 }
 export async function captureFinanceInvoices(form:FormData) {
-  return run(form,'edit',actor=>captureInvoices(prisma,actor));
+  return run(form,'invoices','create',actor=>captureInvoices(prisma,actor));
 }

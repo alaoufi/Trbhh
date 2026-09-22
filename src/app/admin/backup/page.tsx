@@ -1,5 +1,8 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import { DatabaseBackup, Download, Trash2, AlertTriangle, ShieldAlert, Check, HardDriveDownload, RotateCcw } from 'lucide-react';
-import { requireAction, hasAction } from '@/lib/roles';
+import { hasAction } from '@/lib/roles';
 import { listBackups } from '@/lib/backup';
 import { Button } from '@/components/ui/button';
 import { ConfirmSubmit } from '@/components/confirm-submit';
@@ -17,7 +20,7 @@ function fmtDate(ms: number): string {
 }
 
 export default async function BackupPage({ searchParams }: { searchParams: Promise<{ done?: string; error?: string; name?: string; safety?: string }> }) {
-  const session = await requireAction('backup', 'view');
+  const session = await requireAdminPage('/admin/backup');
   const [{ done, error, name, safety }, backups, canAdd, canRestore, canDelete] = await Promise.all([
     searchParams,
     listBackups(),
@@ -54,9 +57,9 @@ export default async function BackupPage({ searchParams }: { searchParams: Promi
             هذه العملية <b className="text-emerald-700">آمنة تماماً</b> ولا تؤثّر على الموقع.
           </p>
           {canAdd ? (
-            <form action={createBackupAction}>
+            <AccessBoundary module={'backup'} action={'create'}><form action={createBackupAction}>
               <Button className="gap-2"><HardDriveDownload className="h-4 w-4" /> إنشاء نسخة احتياطية الآن</Button>
-            </form>
+            </form></AccessBoundary>
           ) : (
             <p className="text-xs font-bold text-muted-foreground">لا تملك صلاحية إنشاء نسخة.</p>
           )}
@@ -77,19 +80,19 @@ export default async function BackupPage({ searchParams }: { searchParams: Promi
                 <div className="text-xs font-bold text-muted-foreground">{fmtDate(b.mtime)} · {b.sizeMB} ميغابايت</div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <a
+                <AccessBoundary module="backup" action="export"><a
                   href={`/admin/backup/download?name=${encodeURIComponent(b.name)}`}
                   className="inline-flex h-9 items-center gap-1 rounded-lg border-2 border-primary/25 bg-white px-3 text-sm font-bold text-primary hover:bg-secondary"
                 >
                   <Download className="h-4 w-4" /> تنزيل
-                </a>
+                </a></AccessBoundary>
                 {canDelete && (
-                  <form action={deleteBackupAction}>
+                  <AccessBoundary module={'backup'} action={'delete'}><form action={deleteBackupAction}>
                     <input type="hidden" name="name" value={b.name} />
                     <ConfirmSubmit msg={`حذف النسخة الاحتياطية «${b.name}» نهائياً؟ لا يمكن التراجع.`} title="حذف" className="inline-flex h-9 items-center gap-1 rounded-lg border-2 border-destructive/30 px-3 text-sm font-bold text-destructive hover:bg-destructive/5">
                       <Trash2 className="h-4 w-4" /> حذف
                     </ConfirmSubmit>
-                  </form>
+                  </form></AccessBoundary>
                 )}
               </div>
             </div>
@@ -114,7 +117,7 @@ export default async function BackupPage({ searchParams }: { searchParams: Promi
             </div>
 
             {backups.map((b) => (
-              <form key={b.name} action={restoreBackupAction} className="rounded-xl border-2 border-red-200 p-3">
+              <AccessBoundary module={'backup'} action={'edit'} key={b.name}><form key={b.name} action={restoreBackupAction} className="rounded-xl border-2 border-red-200 p-3">
                 <input type="hidden" name="name" value={b.name} />
                 <div className="mb-2 text-sm font-extrabold text-primary">{b.name} <span className="font-bold text-muted-foreground">· {fmtDate(b.mtime)}</span></div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -132,7 +135,7 @@ export default async function BackupPage({ searchParams }: { searchParams: Promi
                     <RotateCcw className="h-4 w-4" /> استعادة هذه النسخة
                   </button>
                 </div>
-              </form>
+              </form></AccessBoundary>
             ))}
           </div>
         </section>

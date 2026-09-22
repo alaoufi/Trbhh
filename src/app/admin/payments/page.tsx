@@ -1,5 +1,7 @@
+import { AccessBoundary } from '@/components/access-boundary';
+import { requireAdminPage } from '@/lib/access-control/guards';
 import { CreditCard, CheckCircle2, Circle, ExternalLink, KeyRound, ShieldCheck, Clock } from 'lucide-react';
-import { requireAction } from '@/lib/roles';
+
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { saveBankTransferSettingAction, savePaymentSettingsAction, saveProviderCredsAction, saveTopupMethodSettingsAction } from '../actions';
 import { PROVIDER_META, providerMeta, getPaymentConfig, getProviderCreds, isProviderConfigured, getEnabledMethods, getTopupMethodAvailability, alrajhiConfigReport, CONTROLLABLE_METHODS, METHOD_LABEL_AR } from '@/lib/payments';
@@ -10,7 +12,7 @@ export const metadata = { title: 'وسائل الدفع الإلكتروني' };
 const METHOD_LABEL = METHOD_LABEL_AR;
 
 export default async function AdminPayments({ searchParams }: { searchParams: Promise<{ saved?: string; alrajhi?: string }> }) {
-  await requireAction('users', 'edit');
+  await requireAdminPage('/admin/payments');
   const { saved, alrajhi } = await searchParams;
   const cfg = await getPaymentConfig();
   const enabledMethods = await getEnabledMethods();
@@ -44,22 +46,22 @@ export default async function AdminPayments({ searchParams }: { searchParams: Pr
       {saved && <div className="rounded-lg border-2 border-emerald-400 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-800">✅ حُفظت الإعدادات.</div>}
       {alrajhi === 'missing' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-900">لا يمكن تفعيل الدفع الإلكتروني قبل اكتمال إعدادات الراجحي واختبار Sandbox.</div>}
 
-      <form action={saveBankTransferSettingAction} className="space-y-3 rounded-2xl border-2 border-sky-300 bg-sky-50/60 p-4">
+      <AccessBoundary module={'payments'} action={'manage_settings'}><form action={saveBankTransferSettingAction} className="space-y-3 rounded-2xl border-2 border-sky-300 bg-sky-50/60 p-4">
         <h2 className="flex items-center gap-2 font-bold text-primary"><ShieldCheck className="h-5 w-5" /> تفعيل الحوالات البنكية</h2>
         <p className="text-sm text-muted-foreground">تحكّم مستقل: عند الإيقاف يختفي خيار التحويل وإرفاق الإيصال من محفظة العضو، ولا يتأثر الدفع الإلكتروني.</p>
         <label className="flex items-start gap-2 rounded-xl border border-sky-200 bg-white p-3 text-sm font-bold"><input type="checkbox" name="transferEnabled" defaultChecked={topupMethods.transfer} className="mt-0.5 h-5 w-5 accent-primary" /><span>إتاحة التحويل البنكي وإرفاق الإيصال للأعضاء <small className="mt-1 block font-medium text-muted-foreground">الحالة الآن: {topupMethods.transfer ? 'مفعّل' : 'موقوف'}.</small></span></label>
         <ConfirmSubmit msg="حفظ حالة الحوالات البنكية؟" className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">حفظ إعداد الحوالات البنكية</ConfirmSubmit>
-      </form>
+      </form></AccessBoundary>
 
-      <form action={saveTopupMethodSettingsAction} className="space-y-3 rounded-2xl border-2 border-primary/25 bg-card p-4">
+      <AccessBoundary module={'payments'} action={'manage_settings'}><form action={saveTopupMethodSettingsAction} className="space-y-3 rounded-2xl border-2 border-primary/25 bg-card p-4">
         <h2 className="flex items-center gap-2 font-bold text-primary"><ShieldCheck className="h-5 w-5" /> تفعيل الدفع الإلكتروني</h2>
         <label className="flex items-start gap-2 text-sm font-bold"><input type="checkbox" name="electronicEnabled" defaultChecked={topupMethods.electronic} disabled={!alrajhiReport.ready} className="mt-0.5 h-4 w-4 accent-primary disabled:opacity-50" /><span>الدفع الإلكتروني عبر مصرف الراجحي {!alrajhiReport.ready && <small className="block font-medium text-amber-700">موقوف حتى تكتمل حقول البيئة ويُنفذ اختبار المصرف.</small>}</span></label>
         <div className="rounded-xl bg-primary/5 p-3 text-xs"><b className="text-primary">حالة حقول الراجحي ({alrajhiReport.environment}):</b><div className="mt-2 flex flex-wrap gap-1.5">{alrajhiReport.fields.map((field) => <span key={field.key} className={`rounded-full px-2 py-1 font-bold ${field.present ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>{field.present ? '✓' : '!' } {field.key}</span>)}</div><p className="mt-2 text-muted-foreground">القيم لا تظهر هنا ولا تُحفظ في قاعدة البيانات. اختبار الاتصال الحقيقي يُتاح بعد استلام عقد API الرسمي من المصرف.</p></div>
         <ConfirmSubmit msg="حفظ تفعيل الدفع الإلكتروني؟" className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">حفظ إعداد الدفع الإلكتروني</ConfirmSubmit>
-      </form>
+      </form></AccessBoundary>
 
       {/* الإعدادات العامة */}
-      <form action={savePaymentSettingsAction} className="space-y-3 rounded-2xl border border-primary/20 bg-card p-4">
+      <AccessBoundary module={'payments'} action={'manage_settings'}><form action={savePaymentSettingsAction} className="space-y-3 rounded-2xl border border-primary/20 bg-card p-4">
         <h2 className="flex items-center gap-2 font-bold text-primary"><ShieldCheck className="h-5 w-5" /> الإعداد العام</h2>
         <label className="flex items-start gap-2 text-sm font-medium">
           <input type="checkbox" name="enabled" defaultChecked={cfg.enabled} className="mt-0.5 h-4 w-4 accent-primary" />
@@ -112,7 +114,7 @@ export default async function AdminPayments({ searchParams }: { searchParams: Pr
         </div>
 
         <ConfirmSubmit msg="حفظ إعدادات الدفع العامة؟" className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">حفظ الإعداد العام</ConfirmSubmit>
-      </form>
+      </form></AccessBoundary>
 
       {/* مفاتيح المزوّدين الجاهزين */}
       <div className="space-y-3">
@@ -121,7 +123,7 @@ export default async function AdminPayments({ searchParams }: { searchParams: Pr
           const st = stateOf(m.id);
           const active = cfg.provider === m.id;
           return (
-            <form key={m.id} action={saveProviderCredsAction} className={`space-y-3 rounded-2xl border p-4 ${active ? 'border-emerald-400 bg-emerald-50/40' : 'border-primary/15 bg-card'}`}>
+            <AccessBoundary module={'payments'} action={'manage_settings'} key={m.id}><form key={m.id} action={saveProviderCredsAction} className={`space-y-3 rounded-2xl border p-4 ${active ? 'border-emerald-400 bg-emerald-50/40' : 'border-primary/15 bg-card'}`}>
               <input type="hidden" name="provider" value={m.id} />
               <div className="flex flex-wrap items-center gap-2">
                 <KeyRound className="h-5 w-5 text-primary" />
@@ -154,7 +156,7 @@ export default async function AdminPayments({ searchParams }: { searchParams: Pr
                 ))}
               </div>
               <ConfirmSubmit msg={`حفظ مفاتيح ${m.name}؟`} className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">حفظ مفاتيح {m.name}</ConfirmSubmit>
-            </form>
+            </form></AccessBoundary>
           );
         })}
       </div>

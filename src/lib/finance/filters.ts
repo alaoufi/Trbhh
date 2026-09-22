@@ -22,4 +22,4 @@ export function financeMovementMatches(movement: StatementMovement, query: Finan
   return (!query.status || movement.status === query.status) && financeMatchesText(query, movement.id, movement.label, movement.orderId, movement.reference);
 }
 
-export const financeExportScope = 'يشمل التصدير جميع أوراق التقرير. تُصفّى صفوف الفواتير والموردين والحركات مثل الشاشة؛ تبقى إجماليات الشهر والمورد والميزانية والمطابقة كاملة.';
+export const financeExportScope = 'يشمل التصدير القسم المعروض والمصرّح به فقط. تُصفّى صفوف التفاصيل مثل الشاشة؛ وتبقى إجماليات القسم محسوبة على مصادر الفترة.';

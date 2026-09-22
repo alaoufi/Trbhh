@@ -3,7 +3,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { getSession } from '@/lib/auth';
-import { hasAction } from '@/lib/roles';
+import { hasAccess } from '@/lib/access-control/guards';
 import { backupFilePath, isValidBackupName } from '@/lib/backup';
 
 export const runtime = 'nodejs';
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
-  if (!session || !(await hasAction(session.uid, 'backup', 'view'))) {
+  if (!session || !(await hasAccess(session.uid, 'backup', 'export'))) {
     return new Response('غير مصرّح', { status: 403 });
   }
   const name = req.nextUrl.searchParams.get('name') || '';

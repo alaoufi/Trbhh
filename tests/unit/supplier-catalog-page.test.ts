@@ -1,9 +1,10 @@
+vi.mock('@/components/access-boundary',()=>({AccessPage:({children}:{children:React.ReactNode})=>children}));
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 
 const state = vi.hoisted(() => ({ gate: vi.fn(), schema: vi.fn(), catalog: vi.fn() }));
-vi.mock('@/lib/roles', () => ({ requireAction: state.gate }));
+vi.mock('@/lib/access-control/guards', () => ({ requireAdminPage: state.gate, readActorAccess: async () => ({keys:new Set(['products:view','products:create','products:approve','products:edit','products:suspend','products:delete','shipping:view','settlements:view'])}) }));
 vi.mock('@/lib/prisma', () => ({ prisma: {} }));
 vi.mock('@/lib/suppliers/schema', () => ({ assertSupplierSchemaReady: state.schema }));
 vi.mock('@/lib/suppliers/catalog-admin', () => ({ loadCatalog: state.catalog }));
@@ -20,7 +21,7 @@ vi.mock('@/app/admin/suppliers/catalog/actions', () => ({
 import Page from '@/app/admin/suppliers/catalog/page';
 
 describe('visual supplier catalog page', () => {
-  beforeEach(() => { vi.resetAllMocks(); state.catalog.mockResolvedValue({ products: [], suppliers: [], page: 1, hasNext: false, query: '', supplierKey: '' }); });
+  beforeEach(() => { vi.resetAllMocks(); state.gate.mockResolvedValue({uid:9}); state.catalog.mockResolvedValue({ products: [], suppliers: [], page: 1, hasNext: false, query: '', supplierKey: '' }); });
   it('denies page access before reading source products', async () => {
     state.gate.mockRejectedValueOnce(new Error('forbidden'));
     await expect(Page()).rejects.toThrow('forbidden');

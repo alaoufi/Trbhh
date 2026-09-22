@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ gate: vi.fn(), schema: vi.fn(), transaction: vi.fn(), gateway: vi.fn(), dispatch: vi.fn() }));
-vi.mock('@/lib/roles', () => ({ requireAction: state.gate }));
+vi.mock('@/lib/access-control/guards', () => ({ requireAccess: state.gate }));
 vi.mock('@/lib/prisma', () => ({ prisma: { $transaction: state.transaction } }));
 vi.mock('@/lib/commerce/schema', () => ({ assertCommerceSchemaReady: state.schema }));
 vi.mock('@/lib/commerce/runtime', () => ({ getCommerceGateway: state.gateway }));
@@ -21,10 +21,10 @@ describe('commerce admin request authorization', () => {
   it('requires independent add versus edit privileges, not ads:edit', async () => {
     state.gate.mockRejectedValueOnce(new Error('forbidden'));
     await expect(saveCommerceProduct(new FormData())).rejects.toThrow();
-    expect(state.gate).toHaveBeenLastCalledWith('commerce', 'add');
+    expect(state.gate).toHaveBeenLastCalledWith('products', 'create');
     const edit = new FormData(); edit.set('id', '1'); state.gate.mockRejectedValueOnce(new Error('forbidden'));
     await expect(saveCommerceProduct(edit)).rejects.toThrow();
-    expect(state.gate).toHaveBeenLastCalledWith('commerce', 'edit');
+    expect(state.gate).toHaveBeenLastCalledWith('products', 'edit');
   });
   it('cannot enable payment just by toggling a setting without a verified adapter', async () => {
     state.gate.mockResolvedValueOnce({ uid: 1 }); state.schema.mockResolvedValueOnce(undefined); state.gateway.mockResolvedValueOnce(null);

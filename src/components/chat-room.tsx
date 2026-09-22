@@ -13,9 +13,9 @@ function fmtTime(at: string | null): string {
   }
 }
 
-export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] }: { peerId: number; initial: Msg[]; deleteWindowMin?: number; templates?: string[] }) {
-  const canDelete = (m: Msg) => {
-    if (!m.fromMe) return false;
+export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [], canSend = true, canDelete = true }: { peerId: number; initial: Msg[]; deleteWindowMin?: number; templates?: string[]; canSend?: boolean; canDelete?: boolean }) {
+  const canDeleteMessage = (m: Msg) => {
+    if (!canDelete || !m.fromMe) return false;
     if (!deleteWindowMin) return true; // unlimited
     if (!m.at) return true;
     return (Date.now() - new Date(m.at).getTime()) / 60000 <= deleteWindowMin;
@@ -31,6 +31,7 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
 
   // نص جاهز → يملأ مربّع الكتابة ليعدّله المُرسِل قبل الإرسال
   const applyTemplate = (t: string) => {
+    if (!canSend) return;
     setText(t);
     inputRef.current?.focus();
   };
@@ -75,6 +76,7 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
   }, [poll]);
 
   const onType = (v: string) => {
+    if (!canSend) return;
     setText(v);
     const now = Date.now();
     if (now - typingSentRef.current > 2000) {
@@ -88,6 +90,8 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
   };
 
   const removeMsg = async (id: number) => {
+    const message = messages.find(item => item.id === id);
+    if (!message || !canDeleteMessage(message)) return;
     if (!confirm('حذف هذه الرسالة؟')) return;
     setMessages((prev) => prev.filter((m) => m.id !== id)); // optimistic
     if (id < 0) return; // never persisted (temp bubble)
@@ -104,6 +108,7 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canSend) return;
     const msg = text.trim();
     if (!msg) return;
     setText('');
@@ -139,7 +144,7 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
         className="flex min-h-[45vh] max-h-[62vh] flex-col gap-1.5 overflow-y-auto rounded-xl p-3"
         style={{ background: '#e5ddd5' }}
       >
-        {messages.length === 0 && !typing && <p className="m-auto text-sm text-gray-600">ابدأ المحادثة الآن</p>}
+        {messages.length === 0 && !typing && <p className="m-auto text-sm text-gray-600">{canSend ? 'ابدأ المحادثة الآن' : 'لا توجد رسائل في المحادثة.'}</p>}
         {messages.map((m) => (
           <div
             key={m.id}
@@ -150,7 +155,7 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
             <p className="whitespace-pre-wrap break-words leading-relaxed">{m.message}</p>
             <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-gray-500">
               {/* حذف الرسالة (لرسائلي فقط) — يحذف الرسالة وحدها لا المحادثة */}
-              {canDelete(m) && (
+              {canDeleteMessage(m) && (
                 <button
                   type="button"
                   onClick={() => removeMsg(m.id)}
@@ -178,7 +183,7 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
       </div>
 
       {/* نصوص جاهزة إضافية — الضغط يستبدل نص مربّع الكتابة ليعدّله ويرسله */}
-      {templates.length > 1 && (
+      {canSend && templates.length > 1 && (
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
           {templates.map((t, i) => (
             <button
@@ -193,7 +198,7 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
         </div>
       )}
 
-      <form onSubmit={send} className="mt-3 flex gap-2">
+      {canSend ? <form onSubmit={send} className="mt-3 flex gap-2">
         <input
           ref={inputRef}
           value={text}
@@ -205,7 +210,7 @@ export function ChatRoom({ peerId, initial, deleteWindowMin = 0, templates = [] 
         <button type="submit" aria-label="إرسال" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
           <Send className="h-4 w-4" />
         </button>
-      </form>
+      </form> : <p className="mt-3 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">عرض المحادثة فقط — الإرسال غير متاح ضمن صلاحياتك.</p>}
     </>
   );
 }

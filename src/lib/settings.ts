@@ -848,7 +848,8 @@ export async function getAppConfig(): Promise<AppConfig> {
 
 /* Authentication policy: read directly, never use the best-effort presentation cache.
    A database error must not silently disable an enforced security policy. */
-export const AUTH_REQUIRE_ADMIN_MFA = 'auth_require_admin_mfa';
+import { AUTH_REQUIRE_ADMIN_MFA } from './auth-policy-lock';
+export { AUTH_REQUIRE_ADMIN_MFA } from './auth-policy-lock';
 export const AUTH_PASSWORD_MIN = 'auth_password_min';
 export async function getAuthSecuritySettings(): Promise<{ requireAdminMfa: boolean; passwordMinimum: number }> {
   await ensure();

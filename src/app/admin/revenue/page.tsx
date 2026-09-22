@@ -1,6 +1,9 @@
+import { AccessPage } from '@/components/access-boundary';
+import { AccessBoundary } from '@/components/access-boundary';
 import Link from 'next/link';
 import { Wallet, TrendingUp, TrendingDown, Coins, Crown, Megaphone, Save, Check, Users, ListChecks, ReceiptText, Trash2, ArrowRight, Scale, Landmark, HandCoins, Star, Settings2, WalletCards } from 'lucide-react';
-import { requireAction, getUserPerms } from '@/lib/roles';
+import { requireAdminPage, readActorAccess } from '@/lib/access-control/guards';
+import { canAccessPage } from '@/lib/access-control/catalog';
 import { prisma } from '@/lib/prisma';
 import { toInt } from '@/lib/utils';
 import { getRevenueSummary, getMemberLedger, listSiteExpenses, listTxns, getBalance, getMonthlyBudget } from '@/lib/wallet';
@@ -39,6 +42,8 @@ function Tile({ icon: Icon, value, label, tone }: { icon: React.ElementType; val
 
 const num = 'h-10 w-full rounded-lg border border-primary/30 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-primary/40';
 const TABS = [
+  { key: 'packages', label: 'باقات الإعلانات', icon: Crown },
+  { key: 'promo-packages', label: 'باقات الترويج', icon: Megaphone },
   { key: 'overview', label: 'الميزانية', icon: Coins },
   { key: 'balances', label: 'أرصدة الأعضاء', icon: Users },
   { key: 'wallets', label: 'محافظ الأعضاء', icon: WalletCards },
@@ -51,11 +56,11 @@ const TABS = [
 type TabKey = typeof TABS[number]['key'];
 
 export default async function AdminRevenuePage({ searchParams }: { searchParams: Promise<{ saved?: string; tab?: string; user?: string; camp?: string; cat?: string; ppage?: string; q?: string; wallet?: string }> }) {
-  const session = await requireAction('users', 'view');
   const { saved, tab, user, camp, cat, ppage, q, wallet } = await searchParams;
-  const active: TabKey = tab === 'balances' || tab === 'wallets' || tab === 'pricing' || tab === 'expenses' || tab === 'accounts' || tab === 'campaigns' || tab === 'payments' ? tab : 'overview';
+  const active: TabKey = tab === 'packages' || tab === 'promo-packages' || tab === 'balances' || tab === 'wallets' || tab === 'pricing' || tab === 'expenses' || tab === 'accounts' || tab === 'campaigns' || tab === 'payments' ? tab : 'overview';
+  const session = await requireAdminPage('/admin/revenue', { tab: active });
   const userId = Number(user || 0) || 0;
-  const perms = await getUserPerms(session.uid);
+  const {keys: perms} = await readActorAccess(session.uid);
 
   return (
     <div className="max-w-3xl space-y-4">
@@ -64,13 +69,15 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
 
       {/* التبويبات */}
       <div className="flex gap-1 overflow-x-auto rounded-xl bg-secondary/40 p-1">
-        {TABS.map((t) => (
-          <Link key={t.key} href={`/admin/revenue?tab=${t.key}`} className={`flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-bold ${active === t.key ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-white/60'}`}>
+        {TABS.filter(t => canAccessPage(perms, `/admin/revenue?tab=${t.key}`)).map((t) => (
+          <AccessPage href={`/admin/revenue?tab=${t.key}`} key={t.key}><Link key={t.key} href={`/admin/revenue?tab=${t.key}`} className={`flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-bold ${active === t.key ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-white/60'}`}>
             <t.icon className="h-4 w-4" /> {t.label}
-          </Link>
+          </Link></AccessPage>
         ))}
       </div>
 
+      {active === 'packages' && <PackagesSection />}
+      {active === 'promo-packages' && <PromoPackagesSection />}
       {active === 'overview' && <OverviewTab />}
       {active === 'balances' && (userId ? <MemberDetailTab userId={userId} /> : <BalancesTab />)}
       {active === 'wallets' && <MemberWalletsTab userId={userId} query={q || ''} notice={wallet || ''} />}
@@ -78,7 +85,7 @@ export default async function AdminRevenuePage({ searchParams }: { searchParams:
       {active === 'accounts' && <AccountsTab />}
       {active === 'campaigns' && <CampaignsTab camp={camp} />}
       {active === 'payments' && <PaymentsTab cat={cat} page={Math.max(1, parseInt(ppage || '1') || 1)} />}
-      {active === 'pricing' && <PricingTab canPackages={perms.has('packages')} canPromos={perms.has('promos')} />}
+      {active === 'pricing' && <PricingTab canPackages={perms.has('packages:view')} canPromos={perms.has('promos:view')} />}
     </div>
   );
 }
@@ -108,13 +115,13 @@ async function MemberWalletsTab({ userId, query, notice }: { userId: number; que
       <p className="text-xs text-muted-foreground">تظهر الأعضاء ذوو تعامل مالي فقط. البحث يشمل الاسم والجوال والبريد ورقم العضو ومرجع الدفع الإلكتروني.</p>
       <div className="divide-y rounded-xl border border-primary/15">
         {visibleUsers.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">لا توجد محافظ مطابقة.</p>}
-        {visibleUsers.map((row) => { const id = toInt(row.id); const charged = txns.filter((txn) => toInt(txn.user_id) === id && txn.amount < 0).reduce((sum, txn) => sum + Math.abs(txn.amount), 0); const activeCount = orders.filter((order) => toInt(order.user_id) === id && ['pending_acceptance', 'awaiting_execution', 'active'].includes(order.status)).length; return <Link key={id} href={`/admin/revenue?tab=wallets&user=${id}`} className="flex items-center justify-between gap-3 p-3 hover:bg-primary/5"><span><b className="block">{nameOf(id)}</b><small className="text-muted-foreground">#{id} · خصم {charged} ر.س · خدمات قائمة {activeCount}</small></span><b className="text-emerald-700">{row.balance} ر.س</b></Link>; })}
+        {visibleUsers.map((row) => { const id = toInt(row.id); const charged = txns.filter((txn) => toInt(txn.user_id) === id && txn.amount < 0).reduce((sum, txn) => sum + Math.abs(txn.amount), 0); const activeCount = orders.filter((order) => toInt(order.user_id) === id && ['pending_acceptance', 'awaiting_execution', 'active'].includes(order.status)).length; return <AccessPage href={`/admin/revenue?tab=wallets&user=${id}`} key={id}><Link key={id} href={`/admin/revenue?tab=wallets&user=${id}`} className="flex items-center justify-between gap-3 p-3 hover:bg-primary/5"><span><b className="block">{nameOf(id)}</b><small className="text-muted-foreground">#{id} · خصم {charged} ر.س · خدمات قائمة {activeCount}</small></span><b className="text-emerald-700">{row.balance} ر.س</b></Link></AccessPage>; })}
       </div>
     </section>
     {member && <section className="space-y-3">
       <div className="card-3d rounded-2xl p-4"><h2 className="font-extrabold text-primary">محفظة {nameOf(userId)} <span className="text-sm text-muted-foreground">#{userId}</span></h2><p className="mt-2 text-2xl font-extrabold text-emerald-700">الرصيد المتاح: {member.balance} ر.س</p></div>
-      <section className="card-3d rounded-2xl p-4"><h3 className="mb-3 font-extrabold">إنشاء خدمة خاصة</h3><form action={createMemberServiceOrderAction} className="grid gap-2 sm:grid-cols-2"><input type="hidden" name="userId" value={userId} /><input name="title" required maxLength={160} placeholder="اسم الخدمة" className={num} /><input name="amount" type="number" min={1} step={1} required placeholder="المبلغ (ر.س)" className={num} /><textarea name="description" maxLength={500} placeholder="وصف الخدمة" className="min-h-20 rounded-lg border border-primary/30 p-2 text-sm sm:col-span-2" /><label className="text-xs font-bold">البداية<input name="startsAt" type="datetime-local" required className={num} /></label><label className="text-xs font-bold">النهاية<input name="endsAt" type="datetime-local" required className={num} /></label><label className="text-xs font-bold sm:col-span-2">مهلة موافقة العضو<input name="acceptUntil" type="datetime-local" required className={num} /></label><button className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white sm:col-span-2">إنشاء مذكرة الخدمة دون خصم</button></form></section>
-      <section className="card-3d rounded-2xl p-4"><h3 className="mb-2 font-extrabold">أوامر الخدمات</h3>{memberOrders.map((order) => <div key={toInt(order.id)} className="mb-2 rounded-lg border border-primary/15 p-3 text-sm"><b>{order.title} — {order.amount} ر.س</b><div className="text-xs text-muted-foreground">{order.status} · {fmt(order.starts_at?.toISOString() || null)} إلى {fmt(order.ends_at?.toISOString() || null)}</div>{order.status === 'pending_acceptance' && <form action={cancelPendingMemberServiceOrderAdminAction} className="mt-2 flex gap-2"><input type="hidden" name="orderId" value={toInt(order.id)} /><input type="hidden" name="userId" value={userId} /><input name="reason" placeholder="سبب الإلغاء" className="rounded border px-2 py-1 text-xs" /><button className="text-xs font-bold text-red-700">إلغاء قبل القبول</button></form>}</div>)}</section>
+      <section className="card-3d rounded-2xl p-4"><h3 className="mb-3 font-extrabold">إنشاء خدمة خاصة</h3><AccessBoundary module={'pricing'} action={'manage_settings'}><form action={createMemberServiceOrderAction} className="grid gap-2 sm:grid-cols-2"><input type="hidden" name="userId" value={userId} /><input name="title" required maxLength={160} placeholder="اسم الخدمة" className={num} /><input name="amount" type="number" min={1} step={1} required placeholder="المبلغ (ر.س)" className={num} /><textarea name="description" maxLength={500} placeholder="وصف الخدمة" className="min-h-20 rounded-lg border border-primary/30 p-2 text-sm sm:col-span-2" /><label className="text-xs font-bold">البداية<input name="startsAt" type="datetime-local" required className={num} /></label><label className="text-xs font-bold">النهاية<input name="endsAt" type="datetime-local" required className={num} /></label><label className="text-xs font-bold sm:col-span-2">مهلة موافقة العضو<input name="acceptUntil" type="datetime-local" required className={num} /></label><button className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white sm:col-span-2">إنشاء مذكرة الخدمة دون خصم</button></form></AccessBoundary></section>
+      <section className="card-3d rounded-2xl p-4"><h3 className="mb-2 font-extrabold">أوامر الخدمات</h3>{memberOrders.map((order) => <div key={toInt(order.id)} className="mb-2 rounded-lg border border-primary/15 p-3 text-sm"><b>{order.title} — {order.amount} ر.س</b><div className="text-xs text-muted-foreground">{order.status} · {fmt(order.starts_at?.toISOString() || null)} إلى {fmt(order.ends_at?.toISOString() || null)}</div>{order.status === 'pending_acceptance' && <AccessBoundary module={'pricing'} action={'manage_settings'}><form action={cancelPendingMemberServiceOrderAdminAction} className="mt-2 flex gap-2"><input type="hidden" name="orderId" value={toInt(order.id)} /><input type="hidden" name="userId" value={userId} /><input name="reason" placeholder="سبب الإلغاء" className="rounded border px-2 py-1 text-xs" /><button className="text-xs font-bold text-red-700">إلغاء قبل القبول</button></form></AccessBoundary>}</div>)}</section>
       <section className="card-3d rounded-2xl p-4"><h3 className="mb-2 font-extrabold">السجل المالي</h3>{memberTxns.map((txn) => <div key={toInt(txn.id)} className="flex justify-between border-b border-primary/10 py-2 text-sm"><span>{txn.note || txn.reason} <small className="block text-muted-foreground">#{toInt(txn.id)} · {fmt(txn.created_at?.toISOString() || null)}</small></span><b className={txn.amount >= 0 ? 'text-emerald-700' : 'text-red-600'}>{txn.amount >= 0 ? '+' : ''}{txn.amount} ر.س</b></div>)}{memberTopups.map((topup) => <div key={`topup-${toInt(topup.id)}`} className="border-b border-primary/10 py-2 text-xs">شحن #{toInt(topup.id)}: {topup.amount} ر.س — {topup.source === 'online' ? `بطاقة/بوابة ${topup.method || ''}` : 'تحويل بنكي'} {topup.provider_ref ? `· ${topup.provider_ref}` : ''}</div>)}</section>
     </section>}
   </div>;
@@ -192,7 +199,7 @@ async function OverviewTab() {
           <ul className="space-y-1">
             {rev.recent.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-2 border-b border-border/40 py-1.5 text-xs last:border-0">
-                <Link href={`/admin/users/${t.userId}`} className="min-w-0 flex-1 truncate font-bold text-primary hover:underline">{t.userName}</Link>
+                <AccessPage href={`/admin/users/${t.userId}`}><Link href={`/admin/users/${t.userId}`} className="min-w-0 flex-1 truncate font-bold text-primary hover:underline">{t.userName}</Link></AccessPage>
                 <span className="min-w-0 flex-1 truncate text-muted-foreground">{t.label}</span>
                 <span className={`shrink-0 font-bold ${t.amount > 0 ? 'text-sky-600' : 'text-emerald-600'}`}>{t.amount > 0 ? '+' : ''}{en(t.amount)}</span>
                 <span className="shrink-0 text-muted-foreground">{fmt(t.at)}</span>
@@ -230,7 +237,7 @@ async function BalancesTab() {
             {rows.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">لا توجد حركات مالية بعد.</td></tr>}
             {rows.map((r) => (
               <tr key={r.userId} className="border-b border-border/40 text-center last:border-0">
-                <td className="p-2 text-right"><Link href={`/admin/revenue?tab=balances&user=${r.userId}`} className="font-bold text-primary hover:underline">{r.name}</Link></td>
+                <td className="p-2 text-right"><AccessPage href={`/admin/revenue?tab=balances&user=${r.userId}`}><Link href={`/admin/revenue?tab=balances&user=${r.userId}`} className="font-bold text-primary hover:underline">{r.name}</Link></AccessPage></td>
                 <td className="p-2 text-sky-600">{en(r.credited)}</td>
                 <td className="p-2 text-emerald-600">{en(r.consumed)}</td>
                 <td className="p-2 font-bold">{en(r.balance)}</td>
@@ -240,7 +247,7 @@ async function BalancesTab() {
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-muted-foreground">اضغط اسم العضو لكشف حساب مفصّل (من أول شحن حتى آخر حركة). شحن/خصم رصيد أي عضو من صفحته في <Link href="/admin/users" className="font-bold text-primary underline">الأعضاء</Link>.</p>
+      <p className="text-[11px] text-muted-foreground">اضغط اسم العضو لكشف حساب مفصّل (من أول شحن حتى آخر حركة). شحن/خصم رصيد أي عضو من صفحته في <AccessPage href="/admin/users"><Link href="/admin/users" className="font-bold text-primary underline">الأعضاء</Link></AccessPage>.</p>
     </div>
   );
 }
@@ -259,9 +266,9 @@ async function MemberDetailTab({ userId }: { userId: number }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <Link href="/admin/revenue?tab=balances" className="flex items-center gap-1 rounded-full border-2 border-primary/25 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5"><ArrowRight className="h-3.5 w-3.5" /> كل الأرصدة</Link>
-        <h2 className="text-lg font-extrabold text-primary">كشف حساب: <Link href={`/admin/users/${userId}`} className="underline">{name}</Link></h2>
-        <Link href={`/admin/users/${userId}`} className="btn-3d rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">＋ إضافة / خصم رصيد</Link>
+        <AccessPage href="/admin/revenue?tab=balances"><Link href="/admin/revenue?tab=balances" className="flex items-center gap-1 rounded-full border-2 border-primary/25 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/5"><ArrowRight className="h-3.5 w-3.5" /> كل الأرصدة</Link></AccessPage>
+        <h2 className="text-lg font-extrabold text-primary">كشف حساب: <AccessPage href={`/admin/users/${userId}`}><Link href={`/admin/users/${userId}`} className="underline">{name}</Link></AccessPage></h2>
+        <AccessPage href={`/admin/users/${userId}`}><Link href={`/admin/users/${userId}`} className="btn-3d rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">＋ إضافة / خصم رصيد</Link></AccessPage>
       </div>
       <div className="grid grid-cols-3 gap-2">
         <Tile icon={TrendingUp} value={`${en(credited)}`} label="إجمالي المشحون" tone="text-sky-600" />
@@ -312,7 +319,7 @@ async function ExpensesTab() {
       <div className="grid grid-cols-1 gap-2">
         <Tile icon={ReceiptText} value={`${en(total)}`} label="إجمالي مصروفات الموقع (ر.س)" tone="text-red-500" />
       </div>
-      <form action={addSiteExpenseAction} className="card-3d space-y-2 rounded-2xl p-4">
+      <AccessBoundary module={'expenses'} action={'create'}><form action={addSiteExpenseAction} className="card-3d space-y-2 rounded-2xl p-4">
         <div className="text-sm font-bold text-primary">إضافة مصروف</div>
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">البند</span><input name="label" required placeholder="مثال: استضافة، رسائل SMS، تسويق…" className={num} /></label>
@@ -321,7 +328,7 @@ async function ExpensesTab() {
           <label className="space-y-1"><span className="text-xs font-bold">ملاحظة (اختياري)</span><input name="note" className={num} /></label>
         </div>
         <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة المصروف</button>
-      </form>
+      </form></AccessBoundary>
       <div className="card-3d overflow-x-auto rounded-2xl p-2">
         <table className="w-full min-w-[520px] text-sm">
           <thead>
@@ -342,10 +349,10 @@ async function ExpensesTab() {
                 <td className="p-2 text-xs text-muted-foreground">{day(r.spentAt)}</td>
                 <td className="p-2 text-right text-xs text-muted-foreground">{r.note || '—'}</td>
                 <td className="p-2">
-                  <form action={deleteSiteExpenseAction}>
+                  <AccessBoundary module={'expenses'} action={'delete'}><form action={deleteSiteExpenseAction}>
                     <input type="hidden" name="id" value={r.id} />
                     <ConfirmSubmit msg={`حذف مصروف «${r.label}» نهائياً؟`} title="حذف" className="text-red-500 hover:text-red-700"><Trash2 className="h-4 w-4" /></ConfirmSubmit>
-                  </form>
+                  </form></AccessBoundary>
                 </td>
               </tr>
             ))}
@@ -363,7 +370,7 @@ async function AccountsTab() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">هذه الحسابات تظهر للأعضاء في «محفظتي» ضمن «شحن رصيدك» — كل حقل بزر نسخ، وتحت الاسم عبارة تنبيه (تُعدَّل من «النصوص» ← المحفظة). يمكنك إضافة أكثر من حساب.</p>
-      <form action={addTopupAccountAction} className="card-3d space-y-2 rounded-2xl p-4">
+      <AccessBoundary module={'payments'} action={'manage_settings'}><form action={addTopupAccountAction} className="card-3d space-y-2 rounded-2xl p-4">
         <div className="flex items-center gap-2 text-sm font-bold text-primary"><Landmark className="h-4 w-4" /> إضافة حساب</div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label className="space-y-1"><span className="text-xs font-bold">البنك</span><input name="bank" placeholder="مثال: الراجحي" className={num} /></label>
@@ -372,7 +379,7 @@ async function AccountsTab() {
           <label className="space-y-1"><span className="text-xs font-bold">اسم صاحب الحساب</span><input name="name" className={num} /></label>
         </div>
         <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة الحساب</button>
-      </form>
+      </form></AccessBoundary>
       <div className="space-y-2">
         {accounts.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">لا توجد حسابات بعد — أضف حساباً ليظهر للأعضاء في «محفظتي».</p>}
         {accounts.map((a, i) => (
@@ -383,10 +390,10 @@ async function AccountsTab() {
               {a.iban && <div><span className="text-xs font-bold text-muted-foreground">الآيبان: </span><b dir="ltr" className="break-all text-primary">{a.iban}</b></div>}
               {a.name && <div><span className="text-xs font-bold text-muted-foreground">الاسم: </span><b>{a.name}</b></div>}
             </div>
-            <form action={deleteTopupAccountAction}>
+            <AccessBoundary module={'payments'} action={'manage_settings'}><form action={deleteTopupAccountAction}>
               <input type="hidden" name="idx" value={i} />
               <ConfirmSubmit msg="حذف حساب الشحن هذا؟ لن يظهر للأعضاء في صفحة شحن الرصيد." title="حذف الحساب" className="flex items-center gap-1 rounded-lg border border-red-300 px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4" /> حذف</ConfirmSubmit>
-            </form>
+            </form></AccessBoundary>
           </div>
         ))}
       </div>
@@ -444,10 +451,10 @@ async function CampaignsTab({ camp }: { camp?: string }) {
               <div className="flex flex-wrap items-center gap-2 text-sm font-bold">
                 {stateChip(campaignState(c))}
                 <span>{c.to ? <>من {fmtCamp(c.from)} لمدة {Math.max(1, Math.round((new Date(c.to).getTime() - new Date(c.from).getTime()) / 86400000))} يوم (حتى {fmtCamp(c.to)})</> : <>من {fmtCamp(c.from)} — <b className="text-emerald-700">مفتوحة (تستمر حتى تحذفها)</b></>}</span>
-                <form action={deleteTopupCampaignAction} className="mr-auto">
+                <AccessBoundary module={'campaigns'} action={'delete'}><form action={deleteTopupCampaignAction} className="mr-auto">
                   <input type="hidden" name="id" value={c.id} />
                   <ConfirmSubmit msg="حذف هذه الحملة نهائياً؟ سيتوقف عرضها وسجلها من التقارير." className="rounded-lg border border-destructive/40 px-2 py-1 text-[11px] font-bold text-destructive">حذف</ConfirmSubmit>
-                </form>
+                </form></AccessBoundary>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {c.tiers.map((t, i) => <span key={`${t.amount}-${i}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">اشحن {t.amount} تحصل على {t.bonus} ريال</span>)}
@@ -469,7 +476,7 @@ async function CampaignsTab({ camp }: { camp?: string }) {
                         <ul className="space-y-1">
                           {r.members.map((m) => (
                             <li key={m.userId} className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1 text-xs shadow-sm ring-1 ring-black/5">
-                              <Link href={`/admin/users/${m.userId}`} className="min-w-0 flex-1 truncate font-bold text-primary hover:underline">{m.name}</Link>
+                              <AccessPage href={`/admin/users/${m.userId}`}><Link href={`/admin/users/${m.userId}`} className="min-w-0 flex-1 truncate font-bold text-primary hover:underline">{m.name}</Link></AccessPage>
                               <b className="shrink-0 text-sky-700">{en(m.amount)} ر.س</b>
                             </li>
                           ))}
@@ -486,7 +493,7 @@ async function CampaignsTab({ camp }: { camp?: string }) {
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-[11px] font-extrabold text-amber-800">⚠ لا توجد حملات — البانر مخفي حتى تضيف حملة يشمل تاريخُها اليوم.</div>
       )}
       <Collapse summary={<span className="text-emerald-800">➕ إضافة حملة جديدة</span>} className="border-emerald-200 bg-emerald-50/40">
-        <form action={addTopupCampaignAction} className="space-y-2">
+        <AccessBoundary module={'campaigns'} action={'create'}><form action={addTopupCampaignAction} className="space-y-2">
         <div className="grid grid-cols-3 gap-2">
           <label className="space-y-1"><span className="text-xs font-bold">تبدأ من تاريخ</span><input name="from" type="date" required className={num} /></label>
           <label className="space-y-1"><span className="text-xs font-bold">وقت البداية (اختياري)</span><input name="fromTime" type="time" defaultValue="00:00" className={num} /></label>
@@ -508,7 +515,7 @@ async function CampaignsTab({ camp }: { camp?: string }) {
           <p className="text-[10px] text-muted-foreground">كل سطر شريحة مستقلة (الأسطر الفارغة تُتجاهل) — تُعرض في البانر بنفس هذا الترتيب، وتُطبَّق أعلى شريحة يبلغها مبلغ الشحن.</p>
         </div>
         <button className="btn-3d rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white">💾 إضافة الحملة</button>
-        </form>
+        </form></AccessBoundary>
       </Collapse>
     </div>
     </>
@@ -538,10 +545,10 @@ async function PaymentsTab({ cat, page }: { cat?: string; page: number }) {
   const nameById = new Map(users.map((u) => [toInt(u.id), u.name || u.userName || `#${toInt(u.id)}`]));
   const fmtAt = (d: Date | null) => (d ? new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d) : '');
   const chip = (key: string, label: string, totalV: number, n: number) => (
-    <Link key={key || 'all'} href={`/admin/revenue?tab=payments${key ? `&cat=${key}` : ''}`} className={`flex flex-col items-center rounded-xl border-2 px-3 py-1.5 text-center ${catKey === key ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-card text-primary hover:bg-primary/5'}`}>
+    <AccessPage href={`/admin/revenue?tab=payments${key ? `&cat=${key}` : ''}`} key={key || 'all'}><Link key={key || 'all'} href={`/admin/revenue?tab=payments${key ? `&cat=${key}` : ''}`} className={`flex flex-col items-center rounded-xl border-2 px-3 py-1.5 text-center ${catKey === key ? 'border-primary bg-primary text-white' : 'border-primary/20 bg-card text-primary hover:bg-primary/5'}`}>
       <span className="text-xs font-extrabold">{label}</span>
       <span className={`text-[11px] font-bold ${catKey === key ? 'text-white/90' : 'text-muted-foreground'}`}>{en(totalV)} ر.س · {en(n)}</span>
-    </Link>
+    </Link></AccessPage>
   );
   return (
     <div className="space-y-4">
@@ -561,7 +568,7 @@ async function PaymentsTab({ cat, page }: { cat?: string; page: number }) {
               <tbody>
                 {rows.map((r) => (
                   <tr key={String(r.id)} className="border-b border-border/40 text-center last:border-0">
-                    <td className="p-2 text-right"><Link href={`/admin/revenue?tab=balances&user=${toInt(r.user_id)}`} className="font-bold text-primary hover:underline">{nameById.get(toInt(r.user_id)) || `#${toInt(r.user_id)}`}</Link></td>
+                    <td className="p-2 text-right"><AccessPage href={`/admin/revenue?tab=balances&user=${toInt(r.user_id)}`}><Link href={`/admin/revenue?tab=balances&user=${toInt(r.user_id)}`} className="font-bold text-primary hover:underline">{nameById.get(toInt(r.user_id)) || `#${toInt(r.user_id)}`}</Link></AccessPage></td>
                     <td className="p-2"><span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">{REASON_LABELS[r.reason as keyof typeof REASON_LABELS] ?? r.reason}</span></td>
                     <td className="p-2 font-extrabold text-emerald-700">{en(Math.abs(r.amount))} ر.س</td>
                     <td className="p-2 text-xs text-muted-foreground">{fmtAt(r.created_at)}</td>
@@ -575,7 +582,7 @@ async function PaymentsTab({ cat, page }: { cat?: string; page: number }) {
         {pages > 1 && (
           <div className="flex flex-wrap items-center justify-center gap-1 pt-1 text-sm">
             {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
-              <Link key={n} href={`/admin/revenue?tab=payments${catKey ? `&cat=${catKey}` : ''}&ppage=${n}`} className={`rounded-lg px-2.5 py-1 font-bold ${n === cur ? 'bg-primary text-white' : 'text-primary hover:bg-primary/5'}`}>{en(n)}</Link>
+              <AccessPage href={`/admin/revenue?tab=payments${catKey ? `&cat=${catKey}` : ''}&ppage=${n}`} key={n}><Link key={n} href={`/admin/revenue?tab=payments${catKey ? `&cat=${catKey}` : ''}&ppage=${n}`} className={`rounded-lg px-2.5 py-1 font-bold ${n === cur ? 'bg-primary text-white' : 'text-primary hover:bg-primary/5'}`}>{en(n)}</Link></AccessPage>
             ))}
             <span className="mr-2 text-xs text-muted-foreground">الإجمالي: {en(total)} عملية</span>
           </div>
@@ -625,7 +632,7 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
 
     {canPackages && <PackagesSection />}
 
-    <form action={saveRevenueAction} className="card-3d space-y-4 rounded-2xl p-4">
+    <AccessBoundary module={'pricing'} action={'manage_settings'}><form action={saveRevenueAction} className="card-3d space-y-4 rounded-2xl p-4">
       <div id="store-sub" className="flex items-center gap-2 font-bold text-primary scroll-mt-20"><Crown className="h-5 w-5" /> اشتراك المتاجر</div>
       <label className="flex items-center gap-2 text-sm font-bold">
         <input type="checkbox" name="subEnabled" defaultChecked={sub.enabled} className="h-4 w-4 accent-[hsl(var(--primary))]" />
@@ -822,7 +829,7 @@ async function PricingTab({ canPackages, canPromos }: { canPackages: boolean; ca
         </table>
       </div>
       <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"><Save className="h-4 w-4" /> حفظ التسعيرات</button>
-    </form>
+    </form></AccessBoundary>
 
     {canPromos && <PromoPackagesSection />}
     </>
@@ -886,10 +893,10 @@ async function PackagesSection() {
       <p className="text-[11px] text-muted-foreground">لكل باقة: السعر (0 = مجانية)، عدد الإعلانات المسموح بها يومياً، الفارق الزمني بالساعات بين إعلان وآخر، وباقات التميز (كم إعلاناً يُثبّت بالأعلى وكم يوماً يبقى، ذهبي أو فضي).</p>
 
       <Collapse summary={<span className="text-primary">➕ إضافة باقة جديدة</span>} className="bg-primary/5">
-        <form action={createPackageAction} className="space-y-2">
+        <AccessBoundary module={'packages'} action={'create'}><form action={createPackageAction} className="space-y-2">
           <PackageFields />
           <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة الباقة</button>
-        </form>
+        </form></AccessBoundary>
       </Collapse>
 
       <div className="space-y-2">
@@ -906,16 +913,16 @@ async function PackagesSection() {
               {p.isDefault && <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">افتراضية</span>}
             </>}
           >
-            <form action={updatePackageAction} className="space-y-2">
+            <AccessBoundary module={'packages'} action={'edit'}><form action={updatePackageAction} className="space-y-2">
               <input type="hidden" name="id" value={p.id} />
               <PackageFields p={p} />
               <div className="flex items-center gap-2">
                 <button className="btn-3d rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-white">حفظ</button>
-                <button formAction={deletePackageAction} className="flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10">
-                  <Trash2 className="h-3.5 w-3.5" /> حذف
-                </button>
+
               </div>
-            </form>
+            </form></AccessBoundary><AccessBoundary module="packages" action="delete"><form action={deletePackageAction} className="mt-2"><input type="hidden" name="id" value={p.id}/><button className="flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-3.5 w-3.5" /> حذف
+                </button></form></AccessBoundary>
           </Collapse>
         ))}
         {packages.length === 0 && <p className="py-6 text-center text-muted-foreground">لا توجد باقات بعد — أضِف أول باقة بالأعلى.</p>}
@@ -944,11 +951,11 @@ async function PromoPackagesSection() {
       <p className="text-[11px] text-muted-foreground">حدّد المدد وأسعارها (مثال: أسبوعان = 14 يوم، شهر = 30، ستة أشهر = 180، سنة = 365). تظهر للمعلن عند تصميم إعلانه الترويجي، وتبدأ من تاريخ الموافقة — مراجعة الطلبات نفسها من «الإعلانات الترويجية».</p>
 
       <Collapse summary={<span className="text-primary">➕ إضافة باقة مدة جديدة</span>} className="bg-primary/5">
-        <form action={createPromoPackageAction} className="space-y-2">
+        <AccessBoundary module={'promos'} action={'create'}><form action={createPromoPackageAction} className="space-y-2">
           <PromoFields />
           <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name="active" defaultChecked /> مُفعّلة</label>
           <button className="btn-3d rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">إضافة</button>
-        </form>
+        </form></AccessBoundary>
       </Collapse>
 
       <div className="space-y-2">
@@ -961,15 +968,15 @@ async function PromoPackagesSection() {
               {!p.active && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">موقوفة</span>}
             </>}
           >
-            <form action={updatePromoPackageAction} className="space-y-2">
+            <AccessBoundary module={'promos'} action={'edit'}><form action={updatePromoPackageAction} className="space-y-2">
               <input type="hidden" name="id" value={p.id} />
               <PromoFields p={p} />
               <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" name="active" defaultChecked={p.active} /> مُفعّلة</label>
               <div className="flex gap-2">
                 <button className="btn-3d rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-white">حفظ</button>
-                <button formAction={deletePromoPackageAction} className="flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف</button>
+
               </div>
-            </form>
+            </form></AccessBoundary><AccessBoundary module="promos" action="delete"><form action={deletePromoPackageAction} className="mt-2"><input type="hidden" name="id" value={p.id}/><button className="flex items-center gap-1 rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف</button></form></AccessBoundary>
           </Collapse>
         ))}
         {packages.length === 0 && <p className="py-6 text-center text-muted-foreground">لا توجد باقات — أضِف أول باقة بالأعلى.</p>}

@@ -1,5 +1,6 @@
+import { requireAdminPage } from '@/lib/access-control/guards';
 import { ShieldCheck, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { requireAction } from '@/lib/roles';
+
 import { getIntegrityReport, type IntegrityFinding } from '@/lib/integrity';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,7 @@ const SEV: Record<IntegrityFinding['severity'], { ring: string; chip: string; la
 };
 
 export default async function IntegrityPage() {
-  await requireAction('users', 'view');
+  await requireAdminPage('/admin/integrity');
   const report = await getIntegrityReport();
   const issues = report.filter((f) => f.count > 0);
   const clean = report.filter((f) => f.count === 0);

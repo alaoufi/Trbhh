@@ -1,11 +1,13 @@
 import 'server-only';
 import {assertOAuthConfig,callbackUrl,type SupplierConfig} from './config';
 import {boundedJson} from './http';
+import {SALLA_REQUIRED_SCOPES} from './salla-scope-contract';
+export {assertRequiredScopes,SALLA_OAUTH_SCOPE_VERSION,SALLA_REQUIRED_SCOPES} from './salla-scope-contract';
 export type OAuthGrant={accessToken:string;refreshToken:string;expiresIn:number};
 export function authorizationUrl(config:SupplierConfig,state:string):string {
   assertOAuthConfig(config);
   const url=new URL('https://accounts.salla.sa/oauth2/auth');
-  url.search=new URLSearchParams({client_id:config.clientId,response_type:'code',redirect_uri:callbackUrl(config),scope:'offline_access',state}).toString();
+  url.search=new URLSearchParams({client_id:config.clientId,response_type:'code',redirect_uri:callbackUrl(config),scope:SALLA_REQUIRED_SCOPES.join(' '),state}).toString();
   return url.href;
 }
 /** Fixed provider hosts only. No redirect, error body, credentials or token logging. */

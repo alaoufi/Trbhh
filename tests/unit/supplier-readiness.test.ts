@@ -9,7 +9,7 @@ import {sealTokens} from '@/lib/suppliers/crypto';
 const config:SupplierConfig={origin:'https://trbhh.com',clientId:'client',clientSecret:'client-secret',encryptionKey:Buffer.alloc(32,7).toString('hex'),webhookSecret:'',cronSecret:'',liveOrders:false};
 const product={id:3,name:'Sample',price:{amount:'12.50',currency:'SAR'},quantity:4,status:'sale',is_available:true};
 function fixture(){
-  const connection={id:1n,supplier_id:2n,provider:'salla',external_store_id:'123',status:'connected',active:1,maintenance:0,version:7,
+  const connection={id:1n,supplier_id:2n,provider:'salla',external_store_id:'123',status:'connected',active:1,maintenance:0,version:7,oauth_scope_version:1,
     encrypted_tokens:sealTokens({accessToken:'private-access-token',refreshToken:'private-refresh-token'},'salla:2:123',config.encryptionKey),expires_at:new Date(Date.now()+3600000),refresh_claim:null as string|null,refresh_claimed_at:null as Date|null};
   const row={checked_connection_version:null as number|null,checked_at:null as Date|null,check_status:'pending',check_code:'',check_sample_count:0,check_claim:null as string|null,check_claimed_at:null as Date|null};
   const writes:{sql:string;values:unknown[]}[]=[];

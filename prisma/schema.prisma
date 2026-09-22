@@ -24,6 +24,7 @@ model supplier_connections {
   provider String  @db.VarChar(16)
   external_store_id String  @db.VarChar(191)
   status String @default("disconnected") @db.VarChar(24)
+  oauth_scope_version Int @default(0)
   encrypted_tokens String?  @db.Text
   expires_at DateTime?  @db.DateTime(3)
   refresh_claim String?  @db.Char(36)
@@ -224,6 +225,7 @@ model supplier_coordinator_notifications {
   claim_token String? @db.Char(36)
   claimed_at DateTime? @db.DateTime(3)
   last_error String @default("") @db.VarChar(80)
+  provider_message_id String @default("") @db.VarChar(191)
   created_at DateTime @default(now()) @db.DateTime(3)
   sent_at DateTime? @db.DateTime(3)
   relation_supplier_order_id supplier_orders @relation("supplier_coordinator_notification_order_fk", fields: [supplier_order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_coordinator_notification_order_fk")

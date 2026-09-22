@@ -7,7 +7,7 @@ vi.mock('next/headers',()=>({cookies:async()=>({get:state.cookie})}));
 vi.mock('@/lib/prisma',()=>({prisma:{}}));
 vi.mock('@/lib/suppliers/connections',()=>({completeOAuth:state.complete}));
 import {GET} from '@/app/api/integrations/salla/callback/route';
-const request=(query='state=state-value&code=code-value')=>new NextRequest(`https://untrusted-host.example/api/integrations/salla/callback?${query}`);
+const request=(query='state=state-value&code=code-value&scope=offline_access%20customers.read_write')=>new NextRequest(`https://untrusted-host.example/api/integrations/salla/callback?${query}`);
 beforeEach(()=>{vi.resetAllMocks();vi.stubEnv('SUPPLIER_PUBLIC_ORIGIN','https://configured.example');state.session.mockResolvedValue({uid:7});state.permission.mockResolvedValue(true);state.cookie.mockImplementation((name:string)=>name==='salla_oauth_browser'?{value:'browser-value'}:undefined);state.complete.mockResolvedValue(undefined);});
 afterEach(()=>vi.unstubAllEnvs());
 describe('Salla callback route boundary',()=>{
@@ -19,7 +19,7 @@ describe('Salla callback route boundary',()=>{
  });
  it('passes server admin/browser identity and redirects only to configured origin',async()=>{
   const response=await GET(request());expect(response.status).toBe(303);expect(response.headers.get('location')).toBe('https://configured.example/admin/suppliers/integrations?result=connected');
-  expect(state.complete).toHaveBeenCalledWith(expect.anything(),{state:'state-value',code:'code-value',browser:'browser-value',adminId:7n},expect.objectContaining({origin:'https://configured.example'}));
+  expect(state.complete).toHaveBeenCalledWith(expect.anything(),{state:'state-value',code:'code-value',scope:'offline_access customers.read_write',browser:'browser-value',adminId:7n},expect.objectContaining({origin:'https://configured.example'}));
   expect(response.headers.get('cache-control')).toBe('no-store');expect(response.headers.get('referrer-policy')).toBe('no-referrer');
   const cookie=response.headers.get('set-cookie')||'';expect(cookie).toContain('Max-Age=0');expect(cookie).toContain('HttpOnly');expect(cookie).toContain('Secure');expect(cookie).toContain('Path=/api/integrations/salla/callback');
  });
@@ -37,4 +37,9 @@ describe('Salla callback route boundary',()=>{
  it('fails closed on invalid configured origin',async()=>{
   vi.stubEnv('SUPPLIER_PUBLIC_ORIGIN','https://user:pass@example.com');expect((await GET(request())).status).toBe(503);expect(state.complete).not.toHaveBeenCalled();
  });
+});
+it('passes the provider-returned scopes into the durable OAuth completion check',async()=>{
+ const {GET}=await import('@/app/api/integrations/salla/callback/route');
+ await GET(new NextRequest('https://configured.example/api/integrations/salla/callback?state='+`${'a'.repeat(64)}&code=ok&scope=offline_access%20customers.read_write`));
+ expect(state.complete).toHaveBeenCalledWith(expect.anything(),expect.objectContaining({scope:'offline_access customers.read_write'}),expect.anything());
 });

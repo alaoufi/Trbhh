@@ -3,10 +3,10 @@ import {randomBytes,randomUUID} from 'node:crypto';
 import type {CommerceDb} from '@/lib/commerce/types';
 import {digest,openTokens,sealTokens} from './crypto';
 import {assertOAuthConfig,type SupplierConfig} from './config';
-import {authorizationUrl,exchangeCode,merchantStoreIdentity,assertMerchantStoreMatches,refreshGrant} from './salla-oauth';
+import {authorizationUrl,exchangeCode,merchantStoreIdentity,assertMerchantStoreMatches,refreshGrant,assertRequiredScopes,SALLA_OAUTH_SCOPE_VERSION} from './salla-oauth';
 import {parseMerchantContext,verifyInvitedMerchant,type MerchantContext} from './merchant-oauth';
 
-export async function beginOAuth(db:CommerceDb,supplierId:bigint,adminId:bigint,config:SupplierConfig,constraints?:{expectedGeneration:number;requireUnconnected:true}) {
+export async function beginOAuth(db:CommerceDb,supplierId:bigint,adminId:bigint,config:SupplierConfig,constraints?:{expectedGeneration:number;requiredScopeVersion:number}) {
   assertOAuthConfig(config);
   const state=randomBytes(32).toString('hex'),browser=randomBytes(32).toString('hex');
   await db.$transaction(async tx=>{
@@ -14,8 +14,8 @@ export async function beginOAuth(db:CommerceDb,supplierId:bigint,adminId:bigint,
     if(!profile||profile.provider!=='salla'||profile.active!==1||profile.maintenance!==0)throw new Error('supplier_connection_unavailable');
     if(constraints){
       if(profile.oauth_generation!==constraints.expectedGeneration)throw new Error('supplier_oauth_superseded');
-      const [existing]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM supplier_connections WHERE supplier_id=${supplierId} LIMIT 1 FOR UPDATE`;
-      if(existing)throw new Error('supplier_merchant_already_connected');
+      const connections=await tx.$queryRaw<{id:bigint;oauth_scope_version:number}[]>`SELECT id,oauth_scope_version FROM supplier_connections WHERE supplier_id=${supplierId} ORDER BY id LIMIT 2 FOR UPDATE`;
+      if(connections.length>1||connections[0]?.oauth_scope_version===constraints.requiredScopeVersion)throw new Error('supplier_merchant_already_connected');
     }
     await tx.$executeRaw`UPDATE supplier_integration_profiles SET oauth_generation=oauth_generation+1 WHERE supplier_id=${supplierId}`;
     await tx.$executeRaw`INSERT INTO supplier_oauth_states(state_hash,browser_hash,admin_id,supplier_id,oauth_generation,expires_at) SELECT ${digest(state)},${digest(browser)},${adminId},supplier_id,oauth_generation,${new Date(Date.now()+600000)} FROM supplier_integration_profiles WHERE supplier_id=${supplierId}`;
@@ -34,9 +34,10 @@ export async function consumeOAuthState(db:CommerceDb,state:string,browser:strin
     return row.supplier_id;
   });
 }
-export async function completeOAuth(db:CommerceDb,input:{state:string;browser:string;adminId:bigint;code:string;merchantContext?:string},config:SupplierConfig,fetcher:typeof fetch=fetch) {
+export async function completeOAuth(db:CommerceDb,input:{state:string;browser:string;adminId:bigint;code:string;scope:string;merchantContext?:string},config:SupplierConfig,fetcher:typeof fetch=fetch) {
   assertOAuthConfig(config);
   if(!input.code||input.code.length>8192)throw new Error('supplier_oauth_code');
+  assertRequiredScopes(input.scope);
   const merchant=input.merchantContext===undefined?undefined:parseMerchantContext(input.merchantContext,input.state,config);
   const supplierId=await consumeOAuthState(db,input.state,input.browser,input.adminId,merchant);
   const onboarding=await db.$transaction(async tx=>{const [row]=await tx.$queryRaw<{store_url:string}[]>`SELECT store_url FROM supplier_onboarding WHERE supplier_id=${supplierId}`;return row;});
@@ -51,24 +52,26 @@ export async function completeOAuth(db:CommerceDb,input:{state:string;browser:st
     const [attempt]=await tx.$queryRaw<{state_hash:string}[]>`SELECT o.state_hash FROM supplier_oauth_states o JOIN supplier_integration_profiles p ON p.supplier_id=o.supplier_id AND p.oauth_generation=o.oauth_generation WHERE o.state_hash=${digest(input.state)} AND o.consumed_at IS NOT NULL AND o.supplier_id=${supplierId} FOR UPDATE`;
     if(!attempt)throw new Error('supplier_oauth_superseded');
     if(merchant){
-      const [targetConnection]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM supplier_connections WHERE supplier_id=${supplierId} LIMIT 1 FOR UPDATE`;
-      if(targetConnection)throw new Error('supplier_merchant_already_connected');
+      const targetConnections=await tx.$queryRaw<{id:bigint;external_store_id:string;oauth_scope_version:number}[]>`SELECT id,external_store_id,oauth_scope_version FROM supplier_connections WHERE supplier_id=${supplierId} ORDER BY id LIMIT 2 FOR UPDATE`;
+      const targetConnection=targetConnections[0];
+      if(targetConnections.length>1||targetConnection&&(targetConnection.external_store_id!==storeId||targetConnection.oauth_scope_version===SALLA_OAUTH_SCOPE_VERSION))throw new Error('supplier_merchant_already_connected');
     }
     const [existing]=await tx.$queryRaw<{id:bigint;supplier_id:bigint}[]>`SELECT id,supplier_id FROM supplier_connections WHERE provider='salla' AND external_store_id=${storeId} FOR UPDATE`;
     if(existing && existing.supplier_id!==supplierId)throw new Error('supplier_store_already_owned');
     const expires=new Date(Date.now()+grant.expiresIn*1000);
-    if(existing)await tx.$executeRaw`UPDATE supplier_connections SET encrypted_tokens=${encrypted},expires_at=${expires},status='connected',refresh_claim=NULL,refresh_claimed_at=NULL,version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=${existing.id}`;
-    else await tx.$executeRaw`INSERT INTO supplier_connections(supplier_id,provider,external_store_id,status,encrypted_tokens,expires_at) VALUES(${supplierId},'salla',${storeId},'connected',${encrypted},${expires})`;
+    if(existing)await tx.$executeRaw`UPDATE supplier_connections SET encrypted_tokens=${encrypted},expires_at=${expires},status='connected',oauth_scope_version=${SALLA_OAUTH_SCOPE_VERSION},refresh_claim=NULL,refresh_claimed_at=NULL,version=version+1,updated_at=CURRENT_TIMESTAMP(3) WHERE id=${existing.id}`;
+    else await tx.$executeRaw`INSERT INTO supplier_connections(supplier_id,provider,external_store_id,status,encrypted_tokens,expires_at,oauth_scope_version) VALUES(${supplierId},'salla',${storeId},'connected',${encrypted},${expires},${SALLA_OAUTH_SCOPE_VERSION})`;
   });
   return supplierId;
 }
-type Connection={id:bigint;supplier_id:bigint;external_store_id:string;status:string;active:number;maintenance:number;encrypted_tokens:string|null;expires_at:Date|null;refresh_claim:string|null;refresh_claimed_at:Date|null;version:number};
+type Connection={id:bigint;supplier_id:bigint;external_store_id:string;status:string;active:number;maintenance:number;oauth_scope_version:number;encrypted_tokens:string|null;expires_at:Date|null;refresh_claim:string|null;refresh_claimed_at:Date|null;version:number};
 /** A refresh token is single-use. Durable claim precedes network; ambiguous outcomes require reconnect. */
 export async function accessTokenForConnection(db:CommerceDb,id:bigint,config:SupplierConfig,fetcher:typeof fetch=fetch):Promise<string> {
   const claim=randomUUID();
   const result=await db.$transaction(async tx=>{
     const [row]=await tx.$queryRaw<Connection[]>`SELECT c.*,s.active,p.maintenance FROM supplier_connections c JOIN commerce_suppliers s ON s.id=c.supplier_id JOIN supplier_integration_profiles p ON p.supplier_id=c.supplier_id WHERE c.id=${id} AND c.provider='salla' FOR UPDATE`;
     if(!row||row.status!=='connected'||row.active!==1||row.maintenance!==0||!row.encrypted_tokens)throw new Error('supplier_connection_unavailable');
+    if(row.oauth_scope_version!==SALLA_OAUTH_SCOPE_VERSION)throw new Error('supplier_reauthorization_required');
     if(row.refresh_claim) {
       if(row.refresh_claimed_at && row.refresh_claimed_at.getTime()<Date.now()-120000) {
         await tx.$executeRaw`UPDATE supplier_connections SET status='reconnect_required',encrypted_tokens=NULL,version=version+1 WHERE id=${id}`;

@@ -28,7 +28,7 @@ export async function GET(request:NextRequest) {
   let outcome='connection_failed';
   try {
     if(request.nextUrl.searchParams.has('error'))throw new Error('denied');
-    await completeOAuth(prisma,{state:request.nextUrl.searchParams.get('state')||'',code:request.nextUrl.searchParams.get('code')||'',browser,adminId,...(merchantContext?{merchantContext}:{})},supplierConfig());
+    await completeOAuth(prisma,{state:request.nextUrl.searchParams.get('state')||'',code:request.nextUrl.searchParams.get('code')||'',scope:request.nextUrl.searchParams.get('scope')||'',browser,adminId,...(merchantContext?{merchantContext}:{})},supplierConfig());
     outcome='connected';
   } catch { /* OAuth responses can contain secrets; never log or reflect them. */ }
   const response=merchantContext

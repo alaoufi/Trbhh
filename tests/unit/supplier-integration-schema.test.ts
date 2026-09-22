@@ -42,7 +42,7 @@ it('supports generic providers and additive restrictive binary tables',()=>{
     expect(ddl).not.toMatch(/CASCADE|DROP TABLE/);
   }
   const sql=SUPPLIER_DDL.join('\n');
-  for(const field of ['sync_claim','sync_claimed_at','held_quantity','refresh_claim','encrypted_tokens','commerce_product_id','minimum_margin_minor','external_order_url','external_customer_id','supplier_order_sync_attempts','supplier_coordinator_notifications'])expect(sql).toContain(field);
+  for(const field of ['sync_claim','sync_claimed_at','held_quantity','refresh_claim','encrypted_tokens','oauth_scope_version','commerce_product_id','minimum_margin_minor','external_order_url','external_customer_id','supplier_order_sync_attempts','supplier_coordinator_notifications','provider_message_id'])expect(sql).toContain(field);
 });
 it('fails closed against missing tables without mutating schema',async()=>{
   await expect(assertSupplierSchemaReady({$queryRaw:async()=>[]} as never)).rejects.toThrow('supplier_schema_not_ready');

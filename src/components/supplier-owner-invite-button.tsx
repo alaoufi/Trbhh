@@ -17,12 +17,12 @@ export function SupplierOwnerInviteButton({supplierId,supplierName}:{supplierId:
    if(!response.ok||typeof result.url!=='string'||typeof result.expiresAt!=='string')throw Error();
    const parsed=new URL(result.url);if(parsed.origin!==window.location.origin||parsed.pathname!=='/api/integrations/salla/authorize'||!parsed.searchParams.get('invite'))throw Error();
    setUrl(result.url);setExpiresAt(result.expiresAt);
-  }catch{setError('تعذّر إنشاء الرابط الآن. تأكد أن المورد نشط وغير مرتبط ثم أعد المحاولة.');}
+  }catch{setError('تعذّر إنشاء الرابط الآن. تأكد أن المورد نشط أو أن اتصاله يحتاج إعادة تفويض ثم أعد المحاولة.');}
   finally{setPending(false);}
  };
  return <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4" aria-label={`تفويض متجر ${supplierName}`}>
   <h3 className="font-bold text-emerald-950">متابعة تفويض متجر سلة — {supplierName}</h3>
-  <p className="mt-1 text-sm leading-6 text-emerald-900">أنشئ رابطًا مؤقتًا صالحًا 24 ساعة وأرسله لصاحب المتجر. بعد الإنشاء يظهر زر «متابعة التفويض في سلة» لفتحه مباشرة، دون طلب أي إعدادات تقنية من صاحب المتجر.</p>
+  <p className="mt-1 text-sm leading-6 text-emerald-900">أنشئ رابطًا مؤقتًا صالحًا 24 ساعة وأرسله لصاحب المتجر، ثم يختار «متابعة التفويض في سلة». التفويض الجديد مطلوب للسماح بحفظ العميل وإنشاء طلبه في سلة، دون طلب أي إعدادات تقنية من صاحب المتجر.</p>
   {!url&&<button type="button" className={`${primary} mt-3`} disabled={pending} onClick={issue}>{pending?'جارٍ إنشاء الرابط…':'إنشاء رابط متابعة التفويض'}</button>}
   {error&&<p role="alert" className="mt-3 text-sm font-semibold text-red-700">{error}</p>}
   {url&&<div className="mt-3 space-y-3">

@@ -26,7 +26,9 @@ describe('owner OAuth header precedence', () => {
   it('uses Next routing to override global form-action only for the exact authorization page', async () => {
     const response = await configResponse(authorize + '?invite=invalid');
     const policy = response.headers.get('content-security-policy')!;
-    expect(directive(policy, 'form-action')).toBe("form-action 'self' https://accounts.salla.sa");
+    // A logged-out merchant is redirected from accounts.salla.sa/login to
+    // s.salla.sa/auth. Chromium checks the whole form redirect chain.
+    expect(directive(policy, 'form-action')).toBe("form-action 'self' https://accounts.salla.sa https://s.salla.sa");
     expect(directive(policy, 'default-src')).toBe("default-src 'none'");
     expect(directive(policy, 'frame-ancestors')).toBe("frame-ancestors 'none'");
     expect(directive(policy, 'base-uri')).toBe("base-uri 'none'");

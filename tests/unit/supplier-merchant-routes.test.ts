@@ -44,6 +44,25 @@ describe('merchant invitation HTTP boundary',()=>{
  it('a revoked issuing admin cannot start an owner authorization',async()=>{
   state.permission.mockResolvedValue(false);expect((await start(formRequest('/api/integrations/salla/authorize',`invite=signed&csrf=${csrf}`))).status).toBe(400);expect(state.start).not.toHaveBeenCalled();
  });
+ it('keeps the browser CSRF proof usable when the merchant returns and retries the same form',async()=>{
+  const request=()=>formRequest('/api/integrations/salla/authorize',`invite=signed&csrf=${csrf}`);
+  const first=await start(request());
+  const cookie=first.cookies.get('salla_merchant_start');
+  expect(cookie?.maxAge).not.toBe(0);
+  expect(cookie?.value??csrf).toBe(csrf);
+  const second=await start(request());
+  expect(second.status).toBe(303);
+  expect(state.start).toHaveBeenCalledTimes(2);
+ });
+ it('does not invalidate an already open form when its invitation is opened in another tab',async()=>{
+  const response=await landing(new NextRequest(origin+'/api/integrations/salla/authorize?invite=signed',{headers:{cookie:`salla_merchant_start=${csrf}`}}));
+  expect(response.cookies.get('salla_merchant_start')?.value).toBe(csrf);
+  expect(await response.text()).toContain(`name="csrf" value="${csrf}"`);
+ });
+ it('replaces malformed browser CSRF cookies with a fresh unpredictable proof',async()=>{
+  const response=await landing(new NextRequest(origin+'/api/integrations/salla/authorize?invite=signed',{headers:{cookie:'salla_merchant_start=malformed'}}));
+  expect(response.cookies.get('salla_merchant_start')?.value).toMatch(/^[a-f0-9]{64}$/);
+ });
  it('uses the same fixed callback with HttpOnly browser-bound owner context',async()=>{
   const response=await start(formRequest('/api/integrations/salla/authorize',`invite=signed&csrf=${csrf}`));expect(response.status).toBe(303);
   expect(response.headers.get('location')).toBe('https://accounts.salla.sa/oauth2/auth?state=verified');

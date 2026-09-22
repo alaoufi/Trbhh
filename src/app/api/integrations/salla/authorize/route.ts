@@ -14,7 +14,9 @@ const headers = {
   'Cache-Control': 'no-store',
   // Strip invitation path/query while retaining Origin on the same-origin form POST.
   'Referrer-Policy': 'strict-origin',
-  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://accounts.salla.sa; frame-ancestors 'none'; base-uri 'none'",
+  // Salla's logged-out flow continues from accounts.salla.sa to s.salla.sa/auth.
+  // Chromium applies form-action to every redirect in the submitted navigation.
+  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://accounts.salla.sa https://s.salla.sa; frame-ancestors 'none'; base-uri 'none'",
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
 };
@@ -27,7 +29,9 @@ export async function GET(request: NextRequest) {
     const config = supplierConfig();
     const invitation = request.nextUrl.searchParams.get('invite') || '';
     const payload = parseMerchantInvitation(invitation, config);
-    const csrf = randomBytes(32).toString('hex');
+    // Reopening the invitation must not invalidate another tab's pending form.
+    const existing = request.cookies.get(csrfCookie)?.value || '';
+    const csrf = /^[a-f0-9]{64}$/.test(existing) ? existing : randomBytes(32).toString('hex');
     const response = new NextResponse(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="referrer" content="strict-origin"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تفويض متجر سلة — تربح</title><style>body{font-family:system-ui;margin:0;background:#faf9f6;color:#16294a}main{max-width:480px;margin:10vh auto;padding:28px}h1{font-size:25px}p{line-height:1.9}button{width:100%;border:0;border-radius:12px;background:#16294a;color:white;padding:16px;font:inherit;cursor:pointer}small{display:block;margin-top:20px;line-height:1.8}</style><main><h1>ربط ${escape(payload.expectedName)} بتربح</h1><p>انتقل إلى سلة ووافق من حساب صاحب المتجر لإتاحة قراءة بيانات المتجر ومنتجاته.</p><form method="post" action="/api/integrations/salla/authorize"><input type="hidden" name="invite" value="${escape(invitation)}"><input type="hidden" name="csrf" value="${csrf}"><button type="submit">متابعة التفويض في سلة</button></form><small>لا يُفعّل هذا الإجراء الشراء أو الدفع، ولا ينشر المنتجات للعامة.</small></main></html>`, {headers: {...headers, 'Content-Type':'text/html; charset=utf-8'}});
     response.cookies.set(csrfCookie, csrf, {httpOnly:true, secure:config.origin.startsWith('https:'), sameSite:'strict', path:'/api/integrations/salla/authorize', maxAge:600});
     return response;
@@ -49,7 +53,8 @@ export async function POST(request: NextRequest) {
     for (const [name,value] of [['salla_oauth_browser', result.browser], ['salla_merchant_context', result.context]]) {
       response.cookies.set(name,value,{httpOnly:true,secure:config.origin.startsWith('https:'),sameSite:'lax',path:callbackPath,maxAge:600});
     }
-    response.cookies.set(csrfCookie,'',{httpOnly:true,secure:config.origin.startsWith('https:'),sameSite:'strict',path:'/api/integrations/salla/authorize',maxAge:0});
+    // Keep the short-lived CSRF proof for Back/retry. The invitation generation,
+    // Origin check and one-use OAuth state still protect every separate attempt.
     response.headers.set('Cache-Control','no-store');
     response.headers.set('Referrer-Policy','strict-origin');
     return response;

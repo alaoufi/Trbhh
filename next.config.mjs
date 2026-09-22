@@ -24,11 +24,11 @@ const nextConfig = {
         ],
       },
       // Exact OAuth pages override the global policy after it has matched.
-      // The owner's confirmation POST redirects only to Salla's fixed host.
+      // The owner's confirmation POST follows Salla's authorization + login hosts.
       {
         source: '/api/integrations/salla/authorize',
         headers: [
-          { key: 'Content-Security-Policy', value: "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://accounts.salla.sa; frame-ancestors 'none'; base-uri 'none'" },
+          { key: 'Content-Security-Policy', value: "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://accounts.salla.sa https://s.salla.sa; frame-ancestors 'none'; base-uri 'none'" },
           { key: 'Referrer-Policy', value: 'strict-origin' },
           { key: 'X-Frame-Options', value: 'DENY' },
         ],

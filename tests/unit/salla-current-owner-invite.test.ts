@@ -95,6 +95,7 @@ describe('current owner invitation workflow gate', () => {
     expect(workflow).toContain('actions/runs/$BACKUP_RUN_ID');
     expect(workflow).toContain('salla-current-owner-invite.cjs');
     expect(workflow).toContain('NODE_PATH=/app/node_modules');
+    expect(workflow).toContain('docker exec -u 0');
     expect(workflow).not.toMatch(/docker compose up|git reset|git checkout/);
   });
 });

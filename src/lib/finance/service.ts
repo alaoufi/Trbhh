@@ -2,6 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import type { CommerceDb } from '@/lib/commerce/types';
+import {constantSecret} from '@/lib/suppliers/crypto';
 import {requireFinancePermission,enforceFinanceChecker} from '@/lib/access-control/financial-authorization';
 import { assertFinanceSchemaReady } from './schema';
 import { financeJson, financeNumber, readFinanceData } from './read-model';
@@ -166,13 +167,25 @@ export async function reverseSettlement(db:CommerceDb,actor:bigint,settlementId:
 
 /** Receipts themselves are the durable pending work queue: missed workers can replay them. */
 export async function captureInvoices(db:CommerceDb,actor:bigint) {
-  await assertFinanceSchemaReady(db);await db.$transaction(tx=>requireFinancePermission(tx,actor,'invoices:create'),options);const data=await readFinanceData(db);let created=0;
+  if(typeof actor!=='bigint'||actor<=0n||actor>BigInt(Number.MAX_SAFE_INTEGER))throw new Error('access_forbidden');
+  return capturePendingInvoices(db,actor,tx=>requireFinancePermission(tx,actor,'invoices:create'));
+}
+/** Narrow service credential: only capture pending receipt snapshots, never issue fiscal documents. */
+export async function captureInvoicesForWorker(db:CommerceDb,authorization:string) {
+  const secret=process.env.FINANCE_CAPTURE_SECRET||'';
+  if(secret.length<32)throw new Error('finance_capture_not_configured');
+  if(typeof authorization!=='string'||authorization.length>1024||!authorization.startsWith('Bearer ')||!constantSecret(authorization.slice(7),secret))throw new Error('finance_capture_unauthorized');
+  return capturePendingInvoices(db,0n,async()=>{});
+}
+/** Private primitive: the caller supplies an already verified, narrowly scoped authority. */
+async function capturePendingInvoices(db:CommerceDb,actor:bigint,authorize:(tx:Tx)=>Promise<void>) {
+  await assertFinanceSchemaReady(db);await db.$transaction(authorize,options);const data=await readFinanceData(db);let created=0;
   for(const receipt of data.receipts){
     const source=data.orders.find(order=>order.id===receipt.orderId);
     if(!source||source.status!=='paid'||source.totalMinor!==receipt.amountMinor||receipt.currency!=='SAR'||source.currency!=='SAR')continue;
     if(data.invoices.some(invoice=>invoice.kind==='invoice'&&invoice.receiptId===receipt.id))continue;
     created+=await db.$transaction(async tx=>{
-      await requireFinancePermission(tx,actor,'invoices:create');
+      await authorize(tx);
       await requireOpenPeriod(tx,financeMonth(new Date(receipt.at)));
       const key=`receipt:${receipt.id}`;
       const [prior]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_invoices WHERE source_key=${key} FOR UPDATE`;if(prior)return 0;

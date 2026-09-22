@@ -47,6 +47,11 @@ export async function issueAdjustment(db:CommerceDb,actor:bigint,input:{original
       return existing.number;
     }
     validateAdjustment(input.kind,financeJson<FiscalSnapshot>(original.snapshot),notes.map(x=>({kind:x.kind,snapshot:financeJson<FiscalSnapshot>(x.snapshot)})),input.snapshot);
+    if(input.kind==='debit_note'){
+      const refunds=await tx.$queryRaw<{amount_minor:bigint}[]>`SELECT amount_minor FROM finance_refunds WHERE receipt_id=${original.receipt_id} FOR UPDATE`;
+      const netCredit=sumFinanceMoney(notes.map(note=>(note.kind==='credit_note'?1:-1)*financeJson<FiscalSnapshot>(note.snapshot).totalMinor))-input.snapshot.totalMinor;
+      if(netCredit<sumFinanceMoney(refunds.map(refund=>financeNumber(refund.amount_minor))))throw new Error('finance_note_refund_already_paid');
+    }
     if(input.kind==='credit_note'){
       for(const line of [...input.snapshot.lines].sort((a,b)=>(a.supplierId||'').localeCompare(b.supplierId||''))){
         if(!line.supplierId||!line.supplierMinor)continue;

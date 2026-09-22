@@ -177,10 +177,11 @@ export async function issueInvoice(db:CommerceDb,actor:bigint,invoiceId:bigint,s
     const [row]=await tx.$queryRaw<{id:bigint;order_id:bigint;receipt_id:bigint;total_minor:bigint;status:string;number:string|null;snapshot:unknown;source_snapshot:unknown}[]>`SELECT * FROM finance_invoices WHERE id=${invoiceId} FOR UPDATE`;
     if(!row||snapshot.sourceOrderId!==String(row.order_id)||snapshot.sourceReceiptId!==String(row.receipt_id)||snapshot.totalMinor!==financeNumber(row.total_minor))throw new Error('finance_invoice_difference');
     if(row.status==='issued'){if(fingerprint(financeJson(row.snapshot))!==fingerprint(snapshot))throw new Error('finance_invoice_immutable');return row.number;}
-    const source=financeJson<{items:{productId:string;quantity:number;totalMinor:number}[];shippingMinor:number;suppliers:{productId:string;supplierId:string;amountMinor:number}[]}>(row.source_snapshot);
+    const source=financeJson<{customerName:string;items:{productId:string;title:string;quantity:number;totalMinor:number}[];shippingMinor:number;suppliers:{productId:string;supplierId:string;amountMinor:number}[]}>(row.source_snapshot);
+    if(snapshot.customer.name!==source.customerName)throw new Error('finance_invoice_identity_difference');
     if(new Set(snapshot.lines.map(line=>line.key)).size!==snapshot.lines.length)throw new Error('finance_invoice_difference');
     const productLines=snapshot.lines.filter(line=>line.key!=='shipping');
-    if(source.items.length!==productLines.length||source.items.some(item=>!productLines.some(line=>line.key===item.productId&&line.quantity===item.quantity&&line.grossMinor===item.totalMinor)))throw new Error('finance_invoice_difference');
+    if(source.items.length!==productLines.length||source.items.some(item=>!productLines.some(line=>line.key===item.productId&&line.title===item.title&&line.quantity===item.quantity&&line.grossMinor===item.totalMinor)))throw new Error('finance_invoice_difference');
     if(snapshot.lines.filter(line=>line.key==='shipping').reduce((sum,l)=>sum+l.grossMinor,0)!==source.shippingMinor)throw new Error('finance_invoice_difference');
     for(const line of snapshot.lines){
       const allocation=source.suppliers.find(supplier=>supplier.productId===line.key);

@@ -196,6 +196,17 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     }
     expect(await count('finance_audit')).toBe(1);
   });
+  it('rejects changed customer and product names before first issuance without altering the captured source',async()=>{
+    await seedOrder();const id=await capturedId();const before=await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${id}`;
+    const customerChanged=fiscal();customerChanged.customer.name='Different customer';
+    const productChanged=fiscal();productChanged.lines[0].title='Different product';
+    for(const snapshot of [customerChanged,productChanged]){
+      await expect(issueInvoice(db,actor,id,snapshot,gate,at)).rejects.toThrow(/finance_/);
+      expect(await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${id}`).toEqual(before);
+      expect(await count('finance_sequences')).toBe(0);
+    }
+    expect(await count('finance_audit')).toBe(1);
+  });
   it('issues a prior-month receipt only while both periods are open and retains its accounting date',async()=>{
     await seedOrder();const id=await capturedId();
     expect(await issueInvoice(db,actor,id,fiscal(),gate,later)).toBe('INV-2026-00000001');
@@ -256,6 +267,16 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     expect(await count('finance_invoices')).toBe(1);
     expect(await db.$queryRaw`SELECT name FROM finance_sequences WHERE name='CRN-2026'`).toEqual([]);
     expect((await readFinanceData(db)).settlements[0].status).toBe('approved');
+  });
+  it('does not restore credit through a debit note after the corresponding money was refunded',async()=>{
+    await seedOrder();const id=await capturedId();await issueInvoice(db,actor,id,fiscal(),gate,at);
+    const input={originalId:id,kind:'credit_note' as const,requestKey:'fixture-credit-before-refund',reason:'Approved return',snapshot:fiscal()};
+    await issueAdjustment(db,actor,input,gate,at);
+    await recordVerifiedFinanceRefund(db,actor,refund('fixture-confirmed-full-refund',11500),gate,at);
+    const before=await readFinanceData(db);
+    await expect(issueAdjustment(db,actor,{...input,kind:'debit_note',requestKey:'fixture-debit-after-refund',reason:'Cannot restore paid refund'},gate,at)).rejects.toThrow('finance_note_refund_already_paid');
+    expect(await readFinanceData(db)).toEqual(before);
+    expect(await db.$queryRaw`SELECT name FROM finance_sequences WHERE name='DBN-2026'`).toEqual([]);
   });
   it('rolls back refund and credit-note storage if their audit record fails',async()=>{
     await seedOrder();await failAudit(()=>recordVerifiedFinanceRefund(db,actor,refund(),gate,at));

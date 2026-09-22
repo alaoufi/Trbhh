@@ -24,10 +24,14 @@ const FINANCIAL_AUDIT_RE = /(ر\.?\s?س|ريال|\bSAR\b|IBAN|آيبان|رصي�
 export function isFinancialAudit(action: string, note?: string | null, target?: string | null): boolean {
   return FINANCIAL_AUDIT_RE.test(`${action || ''} ${note || ''} ${target || ''}`);
 }
-const REDACTED_FINANCIAL_NOTE = '🔒 تفاصيل مالية محجوبة (تتطلب صلاحية مالية)';
+export const REDACTED_FINANCIAL_NOTE = '🔒 تفاصيل مالية محجوبة (تتطلب صلاحية مالية)';
 /** يحجب الملاحظة المالية (حيث المبالغ) للسطور المالية، مع إبقاء الفعل والهدف للمساءلة. */
 function redactFinancialRow(r: AdminLogRow): AdminLogRow {
   return isFinancialAudit(r.action, r.note, r.target) ? { ...r, note: REDACTED_FINANCIAL_NOTE } : r;
+}
+/** يطبّق حجب الملاحظات المالية على مجموعة سطور — نقيّ وقابل للاختبار بلا قاعدة بيانات. */
+export function redactAdminLogRows(rows: AdminLogRow[], redact: boolean): AdminLogRow[] {
+  return redact ? rows.map(redactFinancialRow) : rows;
 }
 
 /** سجل ما أرسلته الإدارة للمتاجر (إنذارات ورسائل رسمية وإخفاء إعلانات) مع اسم المُرسِل.
@@ -95,7 +99,7 @@ export async function getUserAdminLog(userId: number, limit = 200, opts: { redac
     id: toInt(r.id), adminId: toInt(r.admin_id), adminName: nameById.get(toInt(r.admin_id)) || `#${toInt(r.admin_id)}`,
     action: r.action, target: r.target, note: r.note, at: r.created_at ? r.created_at.toISOString() : null,
   }));
-  return opts.redactFinancial ? mapped.map(redactFinancialRow) : mapped;
+  return redactAdminLogRows(mapped, !!opts.redactFinancial);
 }
 
 /** قراءة سجل النشاط (الأحدث أولاً) مع أسماء المشرفين. */
@@ -109,5 +113,5 @@ export async function listAdminLog(limit = 200, offset = 0, opts: { redactFinanc
     id: toInt(r.id), adminId: toInt(r.admin_id), adminName: nameById.get(toInt(r.admin_id)) || `#${toInt(r.admin_id)}`,
     action: r.action, target: r.target, note: r.note, at: r.created_at ? r.created_at.toISOString() : null,
   }));
-  return opts.redactFinancial ? mapped.map(redactFinancialRow) : mapped;
+  return redactAdminLogRows(mapped, !!opts.redactFinancial);
 }

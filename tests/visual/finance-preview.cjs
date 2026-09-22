@@ -9,7 +9,7 @@ const tailwind = require('tailwindcss');
 const loadConfig = require('tailwindcss/loadConfig');
 const root = path.resolve(__dirname, '../..');
 const output = path.join(root, 'docs/screenshots/finance');
-const sections = ['overview', 'suppliers', 'settlements', 'budget', 'month-end', 'cashflow', 'close', 'invoices', 'reconciliation', 'tax', 'ledger', 'expenses'];
+const sections = ['overview', 'suppliers', 'settlements', 'budget', 'month-end', 'cashflow', 'close', 'invoices', 'reconciliation', 'tax', 'ledger', 'expenses', 'returns'];
 
 async function main() {
   fs.mkdirSync(output, { recursive: true });
@@ -30,6 +30,7 @@ async function main() {
   fs.writeFileSync(path.join(output, 'fixture.css'), `${css}\n${moduleCss}`);
   const page = (pathname, entries) => `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تربح — معاينة المالية ببيانات اختبار</title><link rel="stylesheet" href="/fixture.css"><style>body{margin:0;background:#eeede8;font-family:Tahoma,Arial,sans-serif}#fixture-notice{background:#f0b429;color:#16294a;text-align:center;font:700 12px/1.8 Tahoma;padding:8px 12px}#fixture-root{max-width:1420px;margin:0 auto;padding:24px} @media(max-width:600px){#fixture-root{padding:10px}} @media print{#fixture-notice{display:block}}</style></head><body><div id="fixture-notice" role="status">معاينة محلية · جميع الأسماء والمبالغ بيانات اختبار · لا اتصال بقاعدة البيانات أو البنك · الحفظ والتحويل معطّلان</div><main id="fixture-root">${renderFinanceFixture(pathname, entries)}</main><script>document.addEventListener('submit',function(event){event.preventDefault();event.stopImmediatePropagation();document.getElementById('fixture-notice').textContent='هذه معاينة محلية ببيانات اختبار؛ لا يتم حفظ أي إجراء أو تنفيذ تحويل.';window.scrollTo({top:0,behavior:'smooth'});},true);</script></body></html>`;
   for (const section of sections) fs.writeFileSync(path.join(output, `${section}.html`), page('/admin/finance', { section, month: '2026-09', mode: 'accountant' }));
+  fs.writeFileSync(path.join(output, 'reopen-period.html'), page('/admin/finance', { section: 'close', month: '2026-08', mode: 'accountant' }));
   fs.writeFileSync(path.join(output, 'supplier-statement.html'), page('/admin/finance', { section: 'suppliers', month: '2026-09', mode: 'accountant', supplierId: '102' }));
   fs.writeFileSync(path.join(output, 'invoice-internal.html'), page('/admin/finance/invoices/invoice-1', {}));
   fs.writeFileSync(path.join(output, 'invoice-customer.html'), page('/admin/finance/invoices/invoice-1', { view: 'customer' }));

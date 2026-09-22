@@ -96,6 +96,7 @@
 .details { border:1px solid #e3e6e8; border-radius:11px; padding:13px 15px; background:#fafbf9; }
 .details summary { cursor:pointer; font-weight:700; font-size:12px; }
 .details[open] summary { margin-bottom:15px; }
+.auditJson { max-width:600px; max-height:280px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; direction:ltr; text-align:left; border:1px solid #e3e6e8; border-radius:8px; padding:10px; background:white; font-size:11px; font-weight:400; }
 .progress { height:6px; background:#edf0f0; border-radius:9px; overflow:hidden; margin:8px 0 4px; }
 .progress span { display:block; height:100%; background:#cba440; border-radius:9px; }
 .progressOver span { background:#b26043; }

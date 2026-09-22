@@ -2,27 +2,28 @@
 export const DEPARTMENTS = [
   {id:'executive',name:'الإدارة العليا'}, {id:'finance',name:'المحاسبة والمالية'},
   {id:'tax',name:'الضرائب'}, {id:'supply',name:'الموردون والمنتجات'},
-  {id:'sales',name:'الطلبات والمبيعات'}, {id:'shipping',name:'الشحن'},
+  {id:'sales',name:'الطلبات والمبيعات'}, {id:'shipping',name:'الشحن واللوجستيات'},
   {id:'integrations',name:'المتاجر والتكاملات'}, {id:'support',name:'خدمة العملاء'},
   {id:'audit',name:'التدقيق والمراجعة'}, {id:'technical',name:'إدارة النظام التقنية'},
 ] as const;
 export const ACTION_LABELS: Record<string,string> = {
   view:'عرض', create:'إنشاء', edit:'تعديل', delete:'حذف', approve:'اعتماد', export:'تصدير',
-  refund:'مرتجع مالي', reconcile:'مطابقة', close_period:'إقفال الفترة', manage_settings:'إدارة الإعدادات',
+  refund:'مرتجع مالي', reconcile:'مطابقة', close_period:'إقفال الفترة', reopen_period:'إعادة فتح فترة مقفلة', manage_settings:'إدارة الإعدادات',
   archive:'أرشفة', suspend:'تعطيل', ban:'حظر', authorize:'تفويض الربط', sync:'مزامنة',
 };
 export const MODULES = [
   {key:'dashboard',label:'اللوحة التنفيذية',departmentId:'executive',actions:['view']},
   {key:'search',label:'بحث الإدارة',departmentId:'executive',actions:['view']},
   {key:'finance',label:'التقارير والتدفق النقدي',departmentId:'finance',actions:['view','export']},
-  {key:'settlements',label:'مستحقات وتسويات الموردين',departmentId:'finance',actions:['view','create','edit','approve','refund','export']},
+  {key:'settlements',label:'مستحقات وتسويات الموردين',departmentId:'finance',actions:['view','create','edit','approve','refund','export','delete']},
   {key:'budget',label:'الميزانية',departmentId:'finance',actions:['view','edit','export']},
   {key:'expenses',label:'المصروفات',departmentId:'finance',actions:['view','create','delete','approve','refund','export']},
-  {key:'invoices',label:'الفواتير والمستندات',departmentId:'finance',actions:['view','create','export','refund']},
+  {key:'invoices',label:'الفواتير والمستندات',departmentId:'finance',actions:['view','create','export','refund','delete']},
   {key:'wallets',label:'أرصدة الأعضاء والخدمات',departmentId:'finance',actions:['view','create','edit','refund','export']},
   {key:'topups',label:'طلبات شحن الرصيد',departmentId:'finance',actions:['view','edit','approve','refund','delete']},
   {key:'payments',label:'بوابات وحسابات الدفع',departmentId:'finance',actions:['view','manage_settings']},
-  {key:'tax',label:'الضريبة',departmentId:'tax',actions:['view','manage_settings','export']},
+  {key:'returns',label:'المرتجعات المالية',departmentId:'finance',actions:['view','create','approve','refund','export','delete']},
+  {key:'tax',label:'الضريبة',departmentId:'tax',actions:['view','manage_settings','approve','export']},
   {key:'suppliers',label:'بيانات الموردين',departmentId:'supply',actions:['view','create','edit','delete']},
   {key:'products',label:'الكتالوج والمنتجات',departmentId:'supply',actions:['view','create','edit','delete','approve','suspend','export','manage_settings']},
   {key:'categories',label:'تصنيفات السوق وحقولها',departmentId:'supply',actions:['view','create','edit','delete','suspend','manage_settings']},
@@ -47,7 +48,7 @@ export const MODULES = [
   {key:'words',label:'حارس المحتوى والكلمات',departmentId:'support',actions:['view','create','edit','delete']},
   {key:'audit',label:'سجل التدقيق',departmentId:'audit',actions:['view','export']},
   {key:'reconciliation',label:'المطابقة المالية',departmentId:'audit',actions:['view','reconcile','export']},
-  {key:'periods',label:'إقفال الشهر',departmentId:'audit',actions:['view','close_period']},
+  {key:'periods',label:'إقفال الشهر',departmentId:'audit',actions:['view','close_period','reopen_period','approve']},
   {key:'archive',label:'الأرشيف',departmentId:'audit',actions:['view']},
   {key:'access_control',label:'الأقسام والأدوار والصلاحيات',departmentId:'technical',actions:['view','manage_settings']},
   {key:'security',label:'أمان الحسابات والمصادقة',departmentId:'technical',actions:['view','manage_settings']},
@@ -58,11 +59,11 @@ export const MODULES = [
 ] as const;
 export type AccessModule = typeof MODULES[number]['key'];
 export type AccessAction = typeof MODULES[number]['actions'][number];
-const financialModules = new Set(['finance','settlements','budget','expenses','invoices','wallets','topups','payments','tax','orders','reconciliation','audit']);
-const sensitive = (module:string,action:string) => action==='refund' || action==='close_period'
-  || (action==='approve' && ['settlements','expenses','topups'].includes(module))
-  || (['tax','payments','products','security'].includes(module) && action==='manage_settings')
-  || (module==='expenses' && action==='delete')
+const financialModules = new Set(['finance','settlements','budget','expenses','invoices','wallets','topups','payments','tax','orders','reconciliation','audit','returns']);
+const sensitive = (module:string,action:string) => action==='refund' || ['close_period','reopen_period'].includes(action)
+  || (action==='approve' && ['settlements','expenses','topups','returns','tax','periods'].includes(module))
+  || (['tax','payments','products','security','access_control'].includes(module) && action==='manage_settings')
+  || (['expenses','invoices','settlements','returns','topups'].includes(module) && action==='delete')
   || (module==='backup' && ['export','edit'].includes(action))
   || (action==='export' && financialModules.has(module));
 export const PERMISSIONS = MODULES.flatMap(m=>m.actions.map(action=>({
@@ -85,13 +86,13 @@ export function legacyPermission(key:string):string|null {
 
 /** Templates are empty of exceptional financial powers; assignments are explicit. */
 export const DEFAULT_ROLES: {id:string;name:string;departmentId:string;permissions:string[]}[] = [
-  {id:'system_access_admin',name:'مسؤول إدارة الصلاحيات',departmentId:'technical',permissions:PERMISSIONS.filter(p=>!p.sensitive).map(p=>p.key)},
+  {id:'system_access_admin',name:'إدارة النظام — صلاحيات غير حساسة',departmentId:'technical',permissions:PERMISSIONS.filter(p=>!p.sensitive).map(p=>p.key)},
   ...DEPARTMENTS.map(d=>({id:`department_${d.id}`,name:d.name,departmentId:d.id,permissions:PERMISSIONS.filter(p=>p.departmentId===d.id && !p.sensitive && p.action==='view').map(p=>p.key)})),
 ];
 
 export const FINANCE_SECTION_MODULE:Record<string,AccessModule> = {
   overview:'finance','cashflow':'finance','month-end':'finance',suppliers:'settlements',settlements:'settlements',
-  budget:'budget',expenses:'expenses',invoices:'invoices',tax:'tax',reconciliation:'reconciliation',close:'periods',ledger:'audit',
+  budget:'budget',expenses:'expenses',invoices:'invoices',tax:'tax',reconciliation:'reconciliation',close:'periods',ledger:'audit',returns:'returns',
 };
 const exactPages:Record<string,AccessModule> = {
   '/admin':'dashboard','/admin/search':'search','/admin/guide':'dashboard','/admin/archive':'archive',

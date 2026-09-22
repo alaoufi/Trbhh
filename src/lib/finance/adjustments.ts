@@ -1,10 +1,12 @@
 import 'server-only';
+import type {Prisma} from '@prisma/client';
 import type {CommerceDb} from '@/lib/commerce/types';
+import {requireFinancePermission} from '@/lib/access-control/financial-authorization';
 import type {FiscalSnapshot} from './types';
 import {calculateFiscalLines,checkedFinanceInteger,sumFinanceMoney} from './calculations';
 import {assertFinanceSchemaReady} from './schema';
 import {financeJson,financeNumber} from './read-model';
-import {accrualRemaining,auditFinance,financeMonth,fingerprint,parseFinanceId,requireOpenPeriod} from './service';
+import {auditFinance,financeMonth,fingerprint,parseFinanceId,requireOpenPeriod} from './service';
 type NoteKind='credit_note'|'debit_note';
 type PriorNote={kind:NoteKind;snapshot:FiscalSnapshot};
 const options={maxWait:10000,timeout:30000};
@@ -36,6 +38,14 @@ export async function issueAdjustment(db:CommerceDb,actor:bigint,input:{original
   if(!/^[\w.:-]{8,80}$/.test(input.requestKey)||!input.reason.trim()||input.reason.length>1000)throw new Error('finance_note_invalid');
   await assertFinanceSchemaReady(db);
   return db.$transaction(async tx=>{
+    await requireFinancePermission(tx,actor,'invoices:refund');
+    return issueAdjustmentInTransaction(tx,actor,input,gate,now);
+  },options);
+}
+/** Internal trusted workflow primitive; caller must hold its fresh authorization and checker locks. */
+export async function issueAdjustmentInTransaction(tx:Prisma.TransactionClient,actor:bigint,input:{originalId:bigint;kind:NoteKind;requestKey:string;reason:string;snapshot:FiscalSnapshot},gate:{enabled:boolean;approvedPolicyReference:string},now=new Date()){
+    if(!gate.enabled||!gate.approvedPolicyReference||input.snapshot.policyReference!==gate.approvedPolicyReference)throw new Error('finance_issuance_not_approved');
+    if(!/^[\w.:-]{8,80}$/.test(input.requestKey)||!input.reason.trim()||input.reason.length>1000)throw new Error('finance_note_invalid');
     await requireOpenPeriod(tx,financeMonth(now));
     const [original]=await tx.$queryRaw<{id:bigint;order_id:bigint;receipt_id:bigint;kind:string;status:string;snapshot:unknown;source_snapshot:unknown}[]>`SELECT * FROM finance_invoices WHERE id=${input.originalId} FOR UPDATE`;
     if(!original||original.kind!=='invoice'||original.status!=='issued'||!original.snapshot)throw new Error('finance_note_original_missing');
@@ -58,7 +68,9 @@ export async function issueAdjustment(db:CommerceDb,actor:bigint,input:{original
         const supplierId=parseFinanceId(line.supplierId);
         await tx.$queryRaw`SELECT id FROM commerce_suppliers WHERE id=${supplierId} FOR UPDATE`;
         const [accrual]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM commerce_supplier_accruals WHERE order_id=${original.order_id} AND product_id=${parseFinanceId(line.key)} AND supplier_id=${supplierId} FOR UPDATE`;
-        if(!accrual||await accrualRemaining(tx,accrual.id,supplierId,now,false)<line.supplierMinor)throw new Error('finance_note_supplier_already_paid');
+        // A legitimate return after payout creates a supplier recovery balance.
+        // The past settlement remains immutable; it is not silently reversed.
+        if(!accrual)throw new Error('finance_note_supplier_missing');
       }
     }
     const series=(input.kind==='credit_note'?'CRN-':'DBN-')+financeMonth(now).slice(0,4);
@@ -67,9 +79,8 @@ export async function issueAdjustment(db:CommerceDb,actor:bigint,input:{original
     const number=series+'-'+String(seq.next_value).padStart(8,'0');
     await tx.$executeRaw`UPDATE finance_sequences SET next_value=next_value+1 WHERE name=${series}`;
     await tx.$executeRaw`INSERT INTO finance_invoices(order_id,receipt_id,kind,source_key,number,parent_id,status,created_at,issued_at,net_minor,vat_minor,total_minor,snapshot,source_snapshot,reason) VALUES(${original.order_id},${original.receipt_id},${input.kind},${key},${number},${original.id},'issued',${now},${now},${input.snapshot.netMinor},${input.snapshot.vatMinor},${input.snapshot.totalMinor},${JSON.stringify(input.snapshot)},${JSON.stringify(financeJson(original.source_snapshot))},${input.reason.trim()})`;
-    await auditFinance(tx,actor,'note_issued','invoice',String(original.id),input.reason.trim(),{number,kind:input.kind,sourceKey:key},now);
+    await auditFinance(tx,actor,'note_issued','invoice',String(original.id),input.reason.trim(),{before:null,after:{number,kind:input.kind,sourceKey:key,snapshot:input.snapshot},sourceInvoiceId:String(original.id)},now);
     return number;
-  },options);
 }
 export type VerifiedFinanceRefund={verified:boolean;status:string;provider:string;externalId:string;receiptId:string;orderId:string;amountMinor:number;currency:string;refundedAt:string;evidenceRef:string};
 export function validateVerifiedRefund(input:VerifiedFinanceRefund,enabled:boolean){
@@ -84,6 +95,7 @@ export async function recordVerifiedFinanceRefund(db:CommerceDb,actor:bigint,inp
   if(at>now)throw new Error('finance_refund_date_invalid');
   await assertFinanceSchemaReady(db);
   return db.$transaction(async tx=>{
+    await requireFinancePermission(tx,actor,'returns:refund');
     await requireOpenPeriod(tx,financeMonth(at));
     const [receipt]=await tx.$queryRaw<{id:bigint;order_id:bigint;amount_minor:bigint;provider:string;currency:string;recorded_at:Date}[]>`SELECT * FROM commerce_receipts WHERE id=${parseFinanceId(input.receiptId)} FOR UPDATE`;
     if(!receipt||String(receipt.order_id)!==input.orderId||receipt.provider!==input.provider||receipt.currency!==input.currency||at<receipt.recorded_at)throw new Error('finance_refund_receipt_invalid');

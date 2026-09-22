@@ -1,5 +1,5 @@
 import { monthOfDate } from './reports';
-import type { FinanceInvoice, FinanceQuery, StatementMovement, SupplierBalance } from './types';
+import type { FinanceChangeRequest, FinanceData, FinanceInvoice, FinanceQuery, StatementMovement, SupplierBalance } from './types';
 
 const dateFormatter = new Intl.DateTimeFormat('ar-SA', { day: 'numeric', month: 'short', year: 'numeric', calendar: 'gregory', timeZone: 'Asia/Riyadh' });
 export function formatFinanceRecordDate(value: string | null): string {
@@ -23,3 +23,14 @@ export function financeMovementMatches(movement: StatementMovement, query: Finan
 }
 
 export const financeExportScope = 'يشمل التصدير القسم المعروض والمصرّح به فقط. تُصفّى صفوف التفاصيل مثل الشاشة؛ وتبقى إجماليات القسم محسوبة على مصادر الفترة.';
+
+/** Request lists and exports share the same source and period filters. */
+export function financeChangeMatches(request:FinanceChangeRequest,query:FinanceQuery,data:FinanceData):boolean {
+  const kind=query.section==='returns'?'return':query.section==='tax'?'tax_settings':query.section==='close'?'reopen_period':null;
+  const invoice=data.invoices.find(row=>row.id===request.targetId);
+  return (!kind||request.kind===kind)
+    && (request.kind==='reopen_period'?request.targetId===query.month:monthOfDate(request.at)===query.month)
+    && (!query.status||request.status===query.status)
+    && (!query.supplierId||Boolean(invoice?.source.suppliers.some(row=>row.supplierId===query.supplierId)))
+    && financeMatchesText(query,request.id,request.targetId,request.reason,request.approvalReason,request.makerId,request.checkerId,request.at,formatFinanceRecordDate(request.at),request.result?.number??null,invoice?.number??null,invoice?.source.customerName??null,invoice?.source.suppliers.map(row=>row.supplierName).join(' ')??null);
+}

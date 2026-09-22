@@ -22,7 +22,7 @@ let db:PrismaClient,peer:PrismaClient,admin:PrismaClient,created=false;
 const actor:AccessActor={userId:1,ip:'127.0.0.1',sessionFingerprint:'a'.repeat(64)};
 const actor2:AccessActor={userId:2,ip:'::1',sessionFingerprint:'b'.repeat(64)};
 const why='Synthetic authorization reviewed';
-const manager='system_access_admin';
+const manager='bootstrap_access_manager';
 const tables=['access_audit','access_user_roles','access_role_permissions','access_roles','access_departments','access_control_state','auth_mfa','site_settings','admin_perms','admin_roles','role_perms','users'];
 const fixtureDdl=[
   "CREATE TABLE users(id BIGINT UNSIGNED PRIMARY KEY,name VARCHAR(255) NULL,userName VARCHAR(255) NULL,phoneNumber VARCHAR(255) NULL,is_admin TINYINT NOT NULL DEFAULT 0,ban ENUM('checked','no') NULL DEFAULT 'no',ban_until DATETIME NULL,archived_at DATETIME NULL,merged_into BIGINT NULL,auth_session_version VARCHAR(64) NOT NULL DEFAULT '0') ENGINE=InnoDB",
@@ -33,7 +33,7 @@ const fixtureDdl=[
   'CREATE TABLE auth_mfa(user_id BIGINT UNSIGNED PRIMARY KEY,version VARCHAR(64) NOT NULL) ENGINE=InnoDB',
 ];
 async function total(table:string){if(!tables.includes(table))throw new Error('Unknown fixture table');return Number((await db.$queryRawUnsafe<{n:bigint}[]>('SELECT COUNT(*) AS n FROM '+table))[0].n);}
-async function setup(){await initializeAccessControl(db,actor);}
+async function setup(){await initializeAccessControl(db,actor,[1,2]);}
 async function role(keys=['ads:view'],departmentId='support',active=true){return saveRole(db,actor,{name:'Synthetic role',departmentId,active,permissions:keys,reason:why});}
 async function assign(userId:number,roleIds:string[],by=actor){await assignUserRoles(db,by,{userId,roleIds,reason:why});}
 async function enroll(ids=[1,2]){for(const id of ids)await db.$executeRaw`INSERT INTO auth_mfa(user_id,version) VALUES(${id},'fixture-mfa-v1') ON DUPLICATE KEY UPDATE version=VALUES(version)`;}
@@ -74,7 +74,7 @@ describe.runIf(enabled)('RBAC real isolated MySQL transactions',()=>{
     await setup();
     expect((await readAccess(db,3)).keys).toEqual(new Set(['classified:edit','ads:view','users:create']));
     expect((await readAccess(db,4)).keys.size).toBe(0);
-    for(const key of (await readAccess(db,1)).keys)expect(SENSITIVE_KEYS.has(key)).toBe(false);
+    for(const key of (await readAccess(db,1)).keys)if(key!=='access_control:manage_settings')expect(SENSITIVE_KEYS.has(key)).toBe(false);
     expect((await readAccess(db,1)).keys.has('access_control:manage_settings')).toBe(true);
     expect(await db.$queryRaw`SELECT * FROM admin_perms ORDER BY user_id,perm`).toEqual(old);
     const before=await db.$queryRaw`SELECT * FROM access_audit`;
@@ -82,16 +82,24 @@ describe.runIf(enabled)('RBAC real isolated MySQL transactions',()=>{
     await assign(3,[]);await db.$executeRaw`INSERT INTO admin_perms(user_id,perm) VALUES(3,'users:edit')`;
     await setup();expect((await readAccess(db,3)).keys.size).toBe(0);
   });
+  it('requires explicit access-management nomination and never grants it to other existing admins',async()=>{
+    await expect(initializeAccessControl(db,actor)).rejects.toThrow('access_bootstrap_manager_required');
+    expect(await total('access_roles')).toBe(0);
+    await initializeAccessControl(db,actor,[1]);
+    expect((await readAccess(db,1)).keys.has('access_control:manage_settings')).toBe(true);
+    expect((await readAccess(db,2)).keys.has('access_control:manage_settings')).toBe(false);
+    expect((await readAccess(db,2)).keys.has('access_control:view')).toBe(true);
+  });
   it('legacy null ban and merged_into zero remain enabled',async()=>{
     await db.$executeRaw`UPDATE users SET ban=NULL,merged_into=0 WHERE id=1`;await setup();
     expect((await readAccess(db,1)).keys.has('access_control:manage_settings')).toBe(true);
   });
   it('rejects a nonadministrator migration operator before importing anything',async()=>{
-    await expect(initializeAccessControl(db,{...actor,userId:5})).rejects.toThrow('access_forbidden');expect(await total('access_roles')).toBe(0);expect(await total('access_audit')).toBe(0);
+    await expect(initializeAccessControl(db,{...actor,userId:5},[5])).rejects.toThrow('access_forbidden');expect(await total('access_roles')).toBe(0);expect(await total('access_audit')).toBe(0);
   });
   it('migration without an enabled access manager rolls back every grant',async()=>{
     await db.$executeRaw`UPDATE users SET ban='checked' WHERE is_admin=1`;
-    await expect(initializeAccessControl(db)).rejects.toThrow('access_last_manager');expect(await total('access_roles')).toBe(0);expect(await total('access_control_state')).toBe(0);
+    await expect(initializeAccessControl(db,actor,[1])).rejects.toThrow('access_forbidden');expect(await total('access_roles')).toBe(0);expect(await total('access_control_state')).toBe(0);
   });
   it('unions multiple roles and fresh reads immediately reflect role and department disable',async()=>{
     await setup();const first=await role(['ads:view']),second=await role(['users:view'],'sales');await assign(5,[first,second]);

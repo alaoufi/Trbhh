@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { FinanceWorkspace } from '@/components/finance/finance-workspace';
 import { FinanceInvoiceView } from '@/components/finance/finance-invoice-view';
 import { buildFinanceReport, parseFinanceQuery } from '@/lib/finance/reports';
+import { calculateFiscalLines } from '@/lib/finance/calculations';
 import type { FinanceData, FinanceOrder } from '@/lib/finance/types';
 
 /** All identities, amounts and references below are synthetic and clearly labeled in the preview. */
@@ -32,13 +33,24 @@ export function financeFixtureData(): FinanceData {
       { id: 'settlement-2', supplierId: '102', amountMinor: 110000, at: '2026-09-21T12:00:00+03:00', status: 'draft', reference: '', reason: 'مسودة اختبار تنتظر مراجعة التحويل الخارجي', lines: [{ accrualId: 'accrual-2', amountMinor: 110000 }], reversalOf: null },
     ],
     budgets: [{ month: '2026-09', category: 'sales', plannedMinor: 1800000 }, { month: '2026-09', category: 'supplier_cost', plannedMinor: 1100000 }, { month: '2026-09', category: 'marketing', plannedMinor: 100000 }, { month: '2026-09', category: 'hosting', plannedMinor: 15000 }, { month: '2026-09', category: 'shipping', plannedMinor: 15000 }, { month: '2026-09', category: 'payment_fees', plannedMinor: 20000 }],
-    periods: [],
+    periods: [{month:'2026-08',closedAt:'2026-09-02T12:00:00+03:00',checks:['payment','refunds','suppliers','invoices','expenses','differences','review'],reason:'إقفال تجريبي للمراجعة البصرية',version:2}],
+    requests: [
+      {id:'request-1',kind:'return',targetId:'invoice-1',payload:{lines:[{key:'301',quantity:1}]},status:'pending',makerId:'999',checkerId:null,reason:'طلب مرتجع تجريبي موثق من الفاتورة الأصلية',approvalReason:'',at:'2026-09-22T10:00:00+03:00',decidedAt:null,result:{totalMinor:285000,vatMinor:37174,supplierMinor:180000}},
+      {id:'request-2',kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:'2026-10-01',issuer:{name:'جهة إصدار تجريبية',taxNumber:'300000000000003',address:'عنوان اختبار فقط'},vatBps:1500,policyReference:'TEST-POLICY-1'},status:'pending',makerId:'998',checkerId:null,reason:'اختبار مراجعة إعدادات الضريبة المستقبلية',approvalReason:'',at:'2026-09-22T10:00:00+03:00',decidedAt:null,result:null},
+      {id:'request-3',kind:'reopen_period',targetId:'2026-08',payload:{expectedVersion:2},status:'pending',makerId:'998',checkerId:null,reason:'تصحيح مصدر تجريبي بعد مراجعة المستندات',approvalReason:'',at:'2026-09-22T10:00:00+03:00',decidedAt:null,result:null},
+    ],
+    taxPolicies: [],
     audit: [{ id: 'audit-1', at: '2026-09-21T12:00:00+03:00', actorId: '999', action: 'تجهيز تسوية تجريبية', entity: 'تسوية', entityId: 'settlement-2', reason: 'المعاينة المحلية فقط' }, { id: 'audit-2', at: '2026-09-18T12:00:00+03:00', actorId: '999', action: 'تسجيل مصروف تجريبي', entity: 'مصروف', entityId: 'expense-4', reason: 'المعاينة المحلية فقط' }],
   };
 }
 
 export function renderFinanceFixture(pathname: string, entries: Record<string, string>): string {
   const data = financeFixtureData();
+  // Explicitly synthetic issued example, preserving original source order totals.
+  const original=data.invoices[0];
+  const net=Math.round(original.source.items[0].totalMinor/1.15), shippingNet=Math.round(original.source.shippingMinor/1.15);
+  const totals=calculateFiscalLines([{key:'301',title:original.source.items[0].title,quantity:1,unitNetMinor:net,discountMinor:0,vatBps:1500,supplierId:'101',supplierMinor:180000},{key:'shipping',title:'الشحن التجريبي',quantity:1,unitNetMinor:shippingNet,discountMinor:0,vatBps:1500}]);
+  data.invoices[0]={...original,number:'TEST-INV-001',status:'issued',netMinor:totals.netMinor,vatMinor:totals.vatMinor,totalMinor:totals.totalMinor,snapshot:{version:1,issuer:{name:'جهة إصدار اختبارية',taxNumber:'300000000000003',address:'عنوان اختبار فقط'},customer:{name:original.source.customerName,address:'عنوان عميل تجريبي'},currency:'SAR',lines:totals.lines,netMinor:totals.netMinor,vatMinor:totals.vatMinor,totalMinor:totals.totalMinor,paidMinor:totals.totalMinor,sourceOrderId:original.orderId,sourceReceiptId:original.receiptId,policyReference:'TEST-POLICY-0'},reason:'مستند اختبار؛ ليس فاتورة حقيقية'};
   const invoiceId = entries.invoiceId || (pathname.startsWith('/admin/finance/invoices/') ? decodeURIComponent(pathname.split('/').pop() || '') : undefined);
   if (invoiceId) {
     const invoice = data.invoices.find(item => item.id === invoiceId);
@@ -46,5 +58,5 @@ export function renderFinanceFixture(pathname: string, entries: Record<string, s
   }
   const query = parseFinanceQuery({ month: '2026-09', ...entries }, new Date('2026-09-22T12:00:00+03:00'));
   const report = buildFinanceReport(data, query, new Date('2026-09-22T12:00:00+03:00'));
-  return renderToStaticMarkup(createElement(FinanceWorkspace, { report, canEdit: true, canApprove: true, canClose: true, canExport: true, actionKey: '4ae04525-d45c-4d94-b880-116cf6d014c1' }));
+  return renderToStaticMarkup(createElement(FinanceWorkspace, { report, canEdit: true, canApprove: true, canClose: true, canExport: true, canRefund:true, canCancel:true, canManageTax:true, canReopen:true, canReconcile:true, currentUserId:'999', visibleSections:['overview','suppliers','settlements','budget','month-end','cashflow','close','invoices','reconciliation','tax','ledger','expenses','returns'], viewFinance:true, viewSettlements:true, viewReconciliation:true, actionKey: '4ae04525-d45c-4d94-b880-116cf6d014c1' }));
 }

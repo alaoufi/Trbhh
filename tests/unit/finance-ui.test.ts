@@ -4,13 +4,16 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FinanceData, FinanceInvoice, FinanceSection } from '@/lib/finance/types';
 
 vi.mock('@/app/admin/finance/actions', () => ({
+  restoreFinanceDraftInvoice: async () => {},
+  approveFinanceRequest: async () => {}, cancelFinanceRequest: async () => {}, requestFinanceReturn: async () => {}, requestFinanceTaxSettings: async () => {}, requestFinancePeriodReopen: async () => {}, cancelFinanceSettlement: async () => {}, cancelFinanceDraftInvoice: async () => {}, reviewFinanceReconciliation: async () => {},
   approveFinanceSettlement: async () => {}, captureFinanceInvoices: async () => {}, closeFinanceMonth: async () => {},
   prepareFinanceSettlement: async () => {}, recordFinanceExpense: async () => {}, releaseFinanceAccrual: async () => {},
   reverseFinanceExpense: async () => {}, reverseFinanceSettlement: async () => {}, saveFinanceBudget: async () => {},
 }));
 import { FinanceInvoiceView } from '@/components/finance/finance-invoice-view';
+import { FinanceWorkflowPanel } from '@/components/finance/finance-workflows';
 import { FinanceWorkspace } from '@/components/finance/finance-workspace';
-import { buildFinanceReport } from '@/lib/finance/reports';
+import { buildFinanceReport, monthOfDate } from '@/lib/finance/reports';
 
 const invoice: FinanceInvoice = {
   id: 'inv-1', orderId: 'order-1', receiptId: 'receipt-1', number: null, kind: 'invoice', parentId: null,
@@ -122,4 +125,59 @@ describe('finance workspace review flows', () => {
     const editor = renderSection('settlements', source, { canEdit: true, canApprove: false, canClose: false, canExport: false });
     expect(editor).not.toContain('name="confirm"');
   });
+});
+
+describe('finance request controls and preserved records',()=>{
+ function workflow(section:FinanceSection,extra:Record<string,unknown>={},source=data()) {
+  return renderToStaticMarkup(createElement(FinanceWorkflowPanel,{report:buildFinanceReport(source,{month:'2026-09',section,mode:'accountant'}),actionKey:'preview-actions',...extra}));
+ }
+ function requestData():FinanceData {
+  return {...data(),requests:[{id:'31',kind:'return',targetId:invoice.id,payload:{lines:[{key:'product-1',quantity:1}]},status:'pending',makerId:'9',checkerId:null,reason:'return evidence',approvalReason:'',at:invoice.at,decidedAt:null,result:{totalMinor:11500,vatMinor:1500}}]};
+ }
+ it('a reviewer sees creator and server-derived amounts but no unauthorized mutation forms',()=>{
+  const html=workflow('returns',{},requestData());
+  expect(html).toContain('المنشئ #9');expect(html).toContain('115.00');expect(html).toContain('15.00');
+  expect(html).not.toContain('<form');expect(html).not.toContain('حفظ طلب المرتجع');expect(html).not.toContain('اعتماد الطلب بعد المراجعة');
+ });
+ it('creation does not imply checker or cancellation controls',()=>{
+  const html=workflow('returns',{canCreate:true},requestData());
+  expect(html).toContain('إنشاء طلب مرتجع');expect(html).not.toContain('اعتماد الطلب بعد المراجعة');expect(html).not.toContain('إلغاء الطلب مع الاحتفاظ');
+ });
+ it('a maker approval requires clear independent-checker warning and confirmation',()=>{
+  const html=workflow('returns',{canApprove:true,currentUserId:'9'},requestData());
+  expect(html).toContain('إذا وجد معتمد آخر سيُرفض الاعتماد الذاتي');expect(html).toContain('أقر بأن اعتماد طلبي');expect(html).toContain('type="checkbox" required=""');expect(html).toContain('name="kind" value="return"');
+ });
+ it('a completed request shows decision identity and cannot be approved or cancelled again',()=>{
+  const source=requestData();source.requests![0]={...source.requests![0],status:'approved',checkerId:'10',approvalReason:'checked source',decidedAt:invoice.at,result:{number:'CN-0001',mode:'independent_checker'}};
+  const html=workflow('returns',{canApprove:true,canCancel:true},source);
+  expect(html).toContain('CN-0001');expect(html).toContain('#10');expect(html).toContain('checked source');expect(html).not.toContain('<form');
+ });
+ it('tax settings are not assumed and cannot be changed with approve-only permission',()=>{
+  const reader=workflow('tax',{canApprove:true});expect(reader).not.toContain('name="vatPercent"');
+  const manager=workflow('tax',{canManageTax:true});expect(manager).toContain('name="vatPercent"');expect(manager).not.toMatch(/name="vatPercent"[^>]*value="/);expect(manager).toContain('ليس إثباتًا للامتثال الضريبي');
+ });
+ it('reopening a closed period is available with reopen permission independently of close',()=>{
+  const source={...data(),periods:[{month:'2026-09',closedAt:invoice.at,checks:[],reason:'period closed',version:4}]};
+  const html=workflow('close',{canReopen:true},source);expect(html).toContain('إرسال طلب إعادة فتح');expect(html).toContain('name="expectedVersion" value="4"');expect(html).not.toContain('disabled=""');
+  expect(workflow('close',{},source)).not.toContain('إرسال طلب إعادة فتح');
+ });
+ it('cancelled draft invoice stays visible without claiming it is issued or pending policy',()=>{
+  const html=renderToStaticMarkup(createElement(FinanceInvoiceView,{invoice:{...invoice,status:'cancelled'},internal:false}));
+  expect(html).toContain('مسودة ملغاة');expect(html).toContain('ليست فاتورة صادرة');expect(html).not.toContain('>مُصدر<');expect(html).not.toContain('سجل مالي بانتظار اعتماد');
+ });
+ it('audit JSON is rendered as escaped text with actor connection metadata',()=>{
+  const source={...data(),audit:[{id:'1',at:invoice.at,actorId:'9',action:'budget_saved',entity:'budget',entityId:'1',reason:'review',before:{text:'<script>alert(1)</script>'},after:{plannedMinor:100},ip:'127.0.0.1',sessionFingerprint:'hash-only',payload:{mode:'sole_approver',makerId:'9',checkerId:'9'}}]};
+  const html=renderSection('ledger',source);expect(html).toContain('&lt;script&gt;');expect(html).not.toContain('<script>alert');expect(html).toContain('hash-only');expect(html).toContain('127.0.0.1');expect(html).toContain('sole_approver');
+ });
+});
+
+it('restoring a cancelled draft requires both creation and cancellation controls',()=>{
+ const source={...data(),invoices:[{...invoice,status:'cancelled' as const}]};
+ const report=buildFinanceReport(source,{month:'2026-09',section:'invoices',mode:'accountant'});
+ const render=(canEdit:boolean,canCancel:boolean)=>renderToStaticMarkup(createElement(FinanceWorkspace,{report,canEdit,canCancel,canApprove:false,canClose:false,canExport:false,actionKey:'restore-fixture'}));
+ expect(render(true,false)).not.toContain('استعادة المسودة للمراجعة');expect(render(false,true)).not.toContain('استعادة المسودة للمراجعة');
+ expect(render(true,true)).toContain('استعادة المسودة للمراجعة');
+ const closedSource={...source,periods:[{month:monthOfDate(new Date()),closedAt:invoice.at,checks:[],reason:'closed'}]};
+ const closed=renderToStaticMarkup(createElement(FinanceWorkspace,{report:buildFinanceReport(closedSource,{month:'2026-09',section:'invoices',mode:'accountant'}),canEdit:true,canCancel:true,canApprove:false,canClose:false,canExport:false,actionKey:'restore-fixture'}));
+ expect(closed).toMatch(new RegExp('<button[^>]*disabled=""[^>]*>استعادة المسودة</button>'));
 });

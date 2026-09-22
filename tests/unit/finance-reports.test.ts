@@ -231,10 +231,20 @@ describe('finance reports from immutable recorded sources',()=>{
     const report=buildFinanceReport(data,query,now);
     expect(report.suppliers[0]).toMatchObject({openingMinor:7000,accruedMinor:-700,remainingMinor:6300});
   });
-  it('blocks a supplier credit which overreduces the unpaid source allocation',()=>{
-    const data=fixture();addPartialCredit(data);data.settlements=[settlement({amountMinor:7000,lines:[{accrualId:'a1',amountMinor:7000}]})];data.refunds=[refund()];
+  it('preserves a settled supplier return as a recovery receivable without inventing available cash',()=>{
+    const data=fixture();data.accruals[0].dueAt='2026-09-11T00:00:00Z';addPartialCredit(data);data.settlements=[settlement({amountMinor:7000,lines:[{accrualId:'a1',amountMinor:7000}]})];data.refunds=[refund()];
     const report=buildFinanceReport(data,query,now);
-    expect(report.issues.some(i=>i.key.includes('overpayment'))).toBe(true);expect(report.canClose).toBe(false);
+    expect(report.suppliers[0].remainingMinor).toBe(-700);
+    expect(report.issues.some(i=>i.key.includes('supplier_recovery')&&i.severity==='warning')).toBe(true);expect(report.canClose).toBe(true);
+    expect(report.availableMinor).toBe(3350);
+    expect(settlementCandidates(data,'s1',new Date('2026-09-26T12:00:00Z'))).toEqual([]);
+  });
+  it('cancelled settlements never count as payments and cancelled invoice drafts need corrective review',()=>{
+    const data=fixture();data.settlements=[settlement({status:'cancelled'})];
+    expect(metric(buildFinanceReport(data,query,now),'supplier_paid')).toBe(0);
+    data.invoices[0].status='cancelled';data.invoices[0].snapshot=null;
+    const report=buildFinanceReport(data,query,now);expect(report.canClose).toBe(false);
+    expect(report.issues.some(i=>i.key==='invoice_cancelled:i1')).toBe(true);
   });
   it('detects a note supplier allocation that does not belong to its original order item',()=>{
     const data=fixture();const credit=addPartialCredit(data);credit.snapshot!.lines[0].supplierId='s2';

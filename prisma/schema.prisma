@@ -2483,3 +2483,45 @@ model finance_refunds {
   @@index([order_id], map: "finance_refund_order_fk")
   @@index([receipt_id], map: "finance_refund_receipt_fk")
 }
+
+model finance_reconciliations {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  request_key String @unique(map: "finance_reconciliation_request") @db.VarChar(80)
+  fingerprint String @db.Char(64)
+  month String @db.Char(7)
+  snapshot Json
+  reason String @db.VarChar(1000)
+  actor_id BigInt @db.UnsignedBigInt
+  created_at DateTime @db.DateTime(3)
+  @@index([month], map: "finance_reconciliation_month")
+}
+
+model finance_change_requests {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  request_key String @unique(map: "finance_change_request") @db.VarChar(80)
+  fingerprint String @db.Char(64)
+  kind String @db.VarChar(24)
+  target_id String @db.VarChar(80)
+  payload Json
+  status String @default("pending") @db.VarChar(16)
+  maker_id BigInt @db.UnsignedBigInt
+  checker_id BigInt? @db.UnsignedBigInt
+  reason String @db.VarChar(1000)
+  approval_reason String @default("") @db.VarChar(1000)
+  result Json?
+  created_at DateTime @db.DateTime(3)
+  decided_at DateTime? @db.DateTime(3)
+  tax_policy finance_tax_policies?
+  @@index([kind, target_id], map: "finance_change_target")
+}
+
+model finance_tax_policies {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  request_id BigInt @unique(map: "finance_tax_request") @db.UnsignedBigInt
+  effective_from DateTime @unique(map: "finance_tax_effective") @db.Date
+  issuer Json
+  vat_bps Int
+  policy_reference String @unique(map: "finance_tax_reference") @db.VarChar(160)
+  created_at DateTime @db.DateTime(3)
+  request finance_change_requests @relation(fields: [request_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_tax_request_fk")
+}

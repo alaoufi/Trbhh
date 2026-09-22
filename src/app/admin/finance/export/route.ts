@@ -6,6 +6,8 @@ import { readFinanceData } from '@/lib/finance/read-model';
 import { readFinanceInvoice, customerInvoice } from '@/lib/finance/documents';
 import { financeSectionExportSheets, printableFinanceInvoice, printableFinanceReport } from '@/lib/finance/exports';
 import { recordFinanceExport } from '@/lib/finance/service';
+import { accessActor } from '@/lib/access-control/guards';
+import { withFinanceAuditContext } from '@/lib/finance/audit-context';
 export const dynamic='force-dynamic';
 export async function GET(request:Request){
   const url=new URL(request.url),format=url.searchParams.get('format');
@@ -13,17 +15,19 @@ export async function GET(request:Request){
   const query=parseFinanceQuery(Object.fromEntries(url.searchParams));
   const invoiceId=url.searchParams.get('invoiceId');
   const session=await requireFinance(invoiceId?'invoices':query.section,'export');
+  const actor=await accessActor(session);
+  const auditExport=(month:string,target:string)=>withFinanceAuditContext({ip:actor.ip,sessionFingerprint:actor.sessionFingerprint},()=>recordFinanceExport(prisma,BigInt(session.uid),month,format,target));
   const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; base-uri 'none'"};
   if(invoiceId){
     if(!/^[1-9]\d{0,14}$/.test(invoiceId)||format!=='print')return new Response('طلب غير صالح',{status:400});
     const invoice=await readFinanceInvoice(prisma,invoiceId);
     if(!invoice)return new Response('غير موجود',{status:404});
-    await recordFinanceExport(prisma,BigInt(session.uid),invoice.at.slice(0,7),format,'invoice:'+invoiceId);
+    await auditExport(invoice.at.slice(0,7),'invoice:'+invoiceId);
     const internal=url.searchParams.get('view')!=='customer';
     return new Response(printableFinanceInvoice(internal?invoice:customerInvoice(invoice),internal),{headers:{...headers,'Content-Type':'text/html; charset=utf-8'}});
   }
   const report=buildFinanceReport(await readFinanceData(prisma),query,new Date());
-  await recordFinanceExport(prisma,BigInt(session.uid),query.month,format,query.section);
+  await auditExport(query.month,query.section);
   if(format==='print')return new Response(printableFinanceReport(report),{headers:{...headers,'Content-Type':'text/html; charset=utf-8'}});
   const workbook=new ExcelJS.Workbook();workbook.creator='TRBHH';
   for(const sheet of financeSectionExportSheets(report)){

@@ -11,7 +11,7 @@ describe('access control registry and defaults',()=>{
     expect(legacyPermission('ads:edit')).toBeNull();
   });
   it('never seeds sensitive financial actions in any role, including the access administrator',()=>{
-    for(const key of ['settlements:approve','periods:close_period','orders:refund','tax:manage_settings','finance:export','backup:export','backup:edit'])expect(SENSITIVE_KEYS.has(key)).toBe(true);
+    for(const key of ['settlements:approve','settlements:delete','invoices:delete','topups:delete','returns:approve','returns:refund','returns:delete','periods:close_period','periods:reopen_period','periods:approve','orders:refund','tax:manage_settings','tax:approve','access_control:manage_settings','finance:export','backup:export','backup:edit'])expect(SENSITIVE_KEYS.has(key)).toBe(true);
     for(const role of DEFAULT_ROLES)for(const key of role.permissions){expect(permissionKeySet.has(key)).toBe(true);expect(SENSITIVE_KEYS.has(key)).toBe(false);}
   });
   it('uses explicit module/action grants instead of role labels or a wildcard',()=>{

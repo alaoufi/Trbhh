@@ -81,7 +81,7 @@ async function mutate<T>(db:PrismaClient,actor:AccessActor,action:string,target:
   },{isolationLevel:'ReadCommitted',maxWait:10000,timeout:30000});
 }
 /** Explicit operator migration. Only the first successful transaction imports legacy grants. */
-export async function initializeAccessControl(db:PrismaClient,actor?:AccessActor):Promise<void>{
+export async function initializeAccessControl(db:PrismaClient,actor?:AccessActor,bootstrapManagerIds:readonly number[]=[]):Promise<void>{
   if(actor)validActor(actor);
   for(const ddl of ACCESS_CONTROL_DDL)await db.$executeRawUnsafe(ddl);
   await assertAccessControlSchema(db);
@@ -89,6 +89,10 @@ export async function initializeAccessControl(db:PrismaClient,actor?:AccessActor
     await tx.$executeRaw`INSERT IGNORE INTO access_control_state(id) VALUES(1)`;
     const [state]=await tx.$queryRaw<{initialized_at:Date|null}[]>`SELECT initialized_at FROM access_control_state WHERE id=1 FOR UPDATE`;
     if(state.initialized_at)return;
+    // Access management is sensitive too. No preset or legacy administrator
+    // automatically receives it; the operator must name initial custodians.
+    if(!actor||!bootstrapManagerIds.length||bootstrapManagerIds.length>20)throw new Error('access_bootstrap_manager_required');
+    const managers=[...new Set(bootstrapManagerIds.map(validUser))];
     if(actor){const allowed=await tx.$queryRawUnsafe<{id:bigint}[]>(`SELECT u.id FROM users u WHERE u.id=? AND u.is_admin=1 AND ${enabledSql} FOR UPDATE`,actor.userId);if(!allowed.length)throw new Error('access_forbidden');}
     const before=await graph(tx);
     // Partial/pre-existing assignments need explicit investigation, never an overwrite.
@@ -101,6 +105,14 @@ export async function initializeAccessControl(db:PrismaClient,actor?:AccessActor
     }
     const roots=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM users WHERE is_admin=1 ORDER BY id`;
     for(const root of roots)await tx.$executeRaw`INSERT INTO access_user_roles(user_id,role_id) VALUES(${root.id},'system_access_admin')`;
+    const custodian='bootstrap_access_manager';
+    await tx.$executeRaw`INSERT INTO access_roles(id,name,department_id,active,system_role) VALUES(${custodian},'مسؤول صلاحيات معتمد صراحة','technical',1,1)`;
+    for(const key of [...DEFAULT_ROLES[0].permissions,MANAGE])await tx.$executeRaw`INSERT INTO access_role_permissions(role_id,permission) VALUES(${custodian},${key})`;
+    for(const id of managers){
+      const users=await tx.$queryRawUnsafe<{id:bigint}[]>(`SELECT u.id FROM users u WHERE u.id=? AND u.is_admin=1 AND ${enabledSql} FOR UPDATE`,id);
+      if(!users.length)throw new Error('access_forbidden');
+      await tx.$executeRaw`INSERT INTO access_user_roles(user_id,role_id) VALUES(${id},${custodian})`;
+    }
     const legacy=await tx.$queryRaw<{user_id:bigint;perm:string}[]>`SELECT p.user_id,p.perm FROM admin_perms p JOIN users u ON u.id=p.user_id WHERE u.is_admin<>1 UNION SELECT a.user_id,p.perm FROM admin_roles a JOIN role_perms p ON p.role=a.role JOIN users u ON u.id=a.user_id WHERE u.is_admin<>1`;
     const grants=new Map<string,Set<string>>();
     for(const row of legacy){const key=legacyPermission(row.perm);if(!key||SENSITIVE_KEYS.has(key))continue;const id=String(row.user_id);if(!grants.has(id))grants.set(id,new Set());grants.get(id)!.add(key);}
@@ -112,7 +124,7 @@ export async function initializeAccessControl(db:PrismaClient,actor?:AccessActor
     }
     await managersRemain(tx);await requireMfa(tx,mfa);
     await tx.$executeRaw`UPDATE access_control_state SET initialized_at=UTC_TIMESTAMP(3) WHERE id=1`;
-    await audit(tx,actor??null,'initialize','access-control','Explicit migration of existing non-sensitive grants',before,await graph(tx));
+    await audit(tx,actor,'initialize','access-control','Explicit migration; access-management custodians explicitly nominated: '+managers.join(','),before,await graph(tx));
   },{isolationLevel:'ReadCommitted',maxWait:10000,timeout:60000});
 }
 export async function saveDepartment(db:PrismaClient,actor:AccessActor,input:DepartmentInput):Promise<string>{

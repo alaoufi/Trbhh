@@ -1,10 +1,7 @@
 name: Verify baseline database upgrade preserves data
 on:
   push:
-    branches: [codex/trbhh-audit-fixes-20260910]
-    paths:
-      - tests/integration/auth-upgrade.test.ts
-      - .github/workflows/release-upgrade-check.yml
+    branches: [codex/trbhh-audit-fixes-20260910, codex/finance-tax-audit-20260922]
 permissions:
   contents: read
 jobs:

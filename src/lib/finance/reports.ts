@@ -7,6 +7,7 @@ export const financeSections:{key:FinanceSection;label:string}[] = [
   {key:'budget',label:'ميزانية الشهر'},{key:'month-end',label:'ملخص الشهر'},{key:'cashflow',label:'التدفق النقدي'},
   {key:'close',label:'إقفال الشهر'},{key:'invoices',label:'أرشيف الفواتير'},{key:'reconciliation',label:'المطابقة'},
   {key:'tax',label:'مراجعة الضريبة'},{key:'ledger',label:'سجل الحركات'},{key:'expenses',label:'المصروفات'},
+  {key:'returns',label:'المرتجعات المالية'},
 ];
 export const budgetLabels:Record<BudgetCategory,string> = {
   sales:'المبيعات',trbhh_income:'دخل تربح',supplier_cost:'قيمة الموردين',shipping:'الشحن',payment_fees:'رسوم الدفع',
@@ -91,7 +92,7 @@ function periodProjection(data:FinanceData,query:FinanceQuery,now:Date) {
   const refunds=data.refunds.filter(r=>orderMatches(r.orderId)&&known(r.at));
   const accruals=data.accruals.filter(a=>(!supplier||a.supplierId===supplier)&&known(a.at));
   const settlements=data.settlements.filter(s=>(!supplier||s.supplierId===supplier)&&known(s.at));
-  const posted=settlements.filter(s=>s.status!=='draft');
+  const posted=settlements.filter(s=>s.status==='approved'||s.status==='reversed');
   const expenses=supplier?[]:data.expenses.filter(e=>known(e.at));
   const invoices=data.invoices.filter(i=>orderMatches(i.orderId)&&known(i.at));
   const supplierAdjustments=invoices.filter(i=>i.status==='issued'&&i.kind!=='invoice').flatMap(invoice=>(invoice.snapshot?.lines??[]).flatMap((line,index)=>line.supplierId&&line.supplierMinor!==undefined&&(!supplier||line.supplierId===supplier)?[{id:`${invoice.id}:${index}`,invoiceId:invoice.id,at:invoice.at,orderId:invoice.orderId,productId:line.key,supplierId:line.supplierId,amountMinor:fiscalSign(invoice)*line.supplierMinor}]:[]));
@@ -131,7 +132,8 @@ function periodProjection(data:FinanceData,query:FinanceQuery,now:Date) {
   const cash=sum([...recordedReceipts.filter(r=>within(r.at)).map(r=>r.amountMinor),...recordedRefunds.filter(r=>within(r.at)).map(r=>-r.amountMinor),...posted.filter(s=>within(s.at)).map(s=>-sign(s)*s.amountMinor),...monthlyExpenses.map(e=>-sign(e)*e.paidMinor)]);
   const cumulativeCash=sum([...recordedReceipts.map(r=>r.amountMinor),...recordedRefunds.map(r=>-r.amountMinor),...posted.map(s=>-sign(s)*s.amountMinor),...expenses.map(e=>-sign(e)*e.paidMinor)]);
   const remainingExpenses=sum(expenses.map(e=>sign(e)*sum([e.totalMinor,-e.paidMinor])));
-  const available=sum([cumulativeCash,-sum(suppliers.map(s=>s.remainingMinor)),-remainingExpenses]);
+  // A recovery receivable is not collected cash. Keep gross unpaid obligations reserved.
+  const available=sum([cumulativeCash,-sum(accruals.map(a=>Math.max(0,remaining(a)))),-remainingExpenses]);
   const anchor=query.month===monthOfDate(now)?timestamp(now):bounds.end.getTime()-1;
   // Reversal timestamps establish when a liability was cancelled; they must not
   // move that liability into a different due window or create negative payables.
@@ -187,6 +189,7 @@ export function settlementCandidates(data:FinanceData,supplierId:string,now=new 
   if(!data.ready)return [];
   validateMoney(data);
   const projection=periodProjection(data,{month:monthOfDate(now),section:'settlements',mode:'simple',supplierId},now);
+  if(projection.accruals.some(a=>projection.remaining(a)<0))return [];
   const reserved=new Set(projection.settlements.filter(s=>s.status==='draft').flatMap(s=>s.lines.map(l=>l.accrualId)));
   return projection.accruals.filter(a=>projection.eligible(a)&&timestamp(a.dueAt!)<=timestamp(now)&&!reserved.has(a.id)).map(accrual=>({accrual,remainingMinor:projection.remaining(accrual)})).filter(c=>c.remainingMinor>0);
 }
@@ -249,11 +252,15 @@ export function buildFinanceReport(data:FinanceData,query:FinanceQuery,now=new D
     const order=data.orders.find(o=>o.id===accrual.orderId);
     if(!order?.paidAt||!projection.known(order.paidAt)||!order.suppliers.some(s=>s.supplierId===accrual.supplierId&&s.productId===accrual.productId))issue(`accrual_orphan:${accrual.id}`,'استحقاق مورد بلا دفع موثق وبند مطابق في لقطة الطلب.','suppliers',accrual.orderId);
     if(!projection.eligible(accrual)&&projection.remaining(accrual)>0)issue(`eligibility:${accrual.id}`,'استحقاق معلق: لم تعتمد الأهلية وموعد التسوية أو لم يحل تاريخ الأهلية.','suppliers',accrual.id);
-    if(projection.remaining(accrual)<0)issue(`overpayment:${accrual.id}`,'التسويات تتجاوز الاستحقاق المحفوظ.','settlements',accrual.id,projection.remaining(accrual));
+    if(projection.remaining(accrual)<0){
+      const legitimateRecovery=projection.adjustment(accrual)<0&&(projection.allocations.get(accrual.id)??0)<=accrual.amountMinor;
+      issue(`${legitimateRecovery?'supplier_recovery':'overpayment'}:${accrual.id}`,legitimateRecovery?'رصيد مستحق على المورد بعد مرتجع موثق؛ التسويات السابقة محفوظة، ويلزم إثبات استرداده قبل تسوية جديدة.':'التسويات تتجاوز الاستحقاق المحفوظ.','settlements',accrual.id,projection.remaining(accrual),legitimateRecovery?'warning':'error');
+    }
     if(projection.adjustment(accrual)>0||sum([accrual.amountMinor,projection.adjustment(accrual)])<0)issue(`note_supplier_limit:${accrual.id}`,'صافي تعديل المورد يتجاوز حصته الأصلية أو يعيد أكثر من التخفيض السابق.','invoices',accrual.orderId);
     if((projection.allocations.get(accrual.id)??0)<0)issue(`settlement_negative:${accrual.id}`,'الحركات العكسية تتجاوز المدفوع على هذا الاستحقاق.','settlements',accrual.id);
   }
   for(const settlement of projection.settlements){
+    if(settlement.status==='cancelled')continue;
     if(settlement.status==='draft'){issue(`settlement_draft:${settlement.id}`,'تسوية بانتظار الاعتماد؛ لم تدخل في المدفوع.','settlements',settlement.id,undefined,'warning');continue;}
     difference(`settlement_total:${settlement.id}`,sum(settlement.lines.map(l=>l.amountMinor)),settlement.amountMinor,'توزيع التسوية لا يطابق إجماليها.','settlements',settlement.id);
     if(!settlement.reference)issue(`settlement_reference:${settlement.id}`,'تسوية معتمدة بلا مرجع تحويل.','settlements',settlement.id);
@@ -267,7 +274,7 @@ export function buildFinanceReport(data:FinanceData,query:FinanceQuery,now=new D
       const original=data.settlements.find(s=>s.id===settlement.reversalOf);
       const reversalLines=[...settlement.lines].sort((a,b)=>a.accrualId.localeCompare(b.accrualId));
       const originalLines=original?[...original.lines].sort((a,b)=>a.accrualId.localeCompare(b.accrualId)):[];
-      if(!original||original.reversalOf||original.status==='draft'||original.supplierId!==settlement.supplierId||timestamp(original.at)>timestamp(settlement.at)||original.amountMinor!==settlement.amountMinor||JSON.stringify(reversalLines)!==JSON.stringify(originalLines))issue(`settlement_reversal:${settlement.id}`,'الحركة العكسية لا تطابق التسوية الأصلية.','settlements',settlement.id);
+      if(!original||original.reversalOf||!['approved','reversed'].includes(original.status)||original.supplierId!==settlement.supplierId||timestamp(original.at)>timestamp(settlement.at)||original.amountMinor!==settlement.amountMinor||JSON.stringify(reversalLines)!==JSON.stringify(originalLines))issue(`settlement_reversal:${settlement.id}`,'الحركة العكسية لا تطابق التسوية الأصلية.','settlements',settlement.id);
     } else if(settlement.status==='reversed'&&!data.settlements.some(s=>s.reversalOf===settlement.id&&s.status!=='draft'))issue(`settlement_reversal_missing:${settlement.id}`,'التسوية معلّمة كمعكوسة لكن حركتها العكسية مفقودة.','settlements',settlement.id);
   }
   duplicates(projection.posted.filter(s=>s.reversalOf).map(s=>s.reversalOf!),'settlement_reversal_duplicate','تم عكس التسوية أكثر من مرة.','settlements');
@@ -282,6 +289,7 @@ export function buildFinanceReport(data:FinanceData,query:FinanceQuery,now=new D
   }
   duplicates(projection.expenses.filter(e=>e.reversalOf).map(e=>e.reversalOf!),'expense_reversal_duplicate','تم عكس المصروف أكثر من مرة.','expenses');
   for(const invoice of projection.invoices){
+    if(invoice.status==='cancelled'){issue(`invoice_cancelled:${invoice.id}`,'ألغيت مسودة الفاتورة؛ المقبوض محفوظ ويتطلب مراجعة تصحيحية، ولا يجوز إصدار المسودة الملغاة.','invoices',invoice.orderId);continue;}
     if(invoice.status==='pending_policy'){issue(`pending_policy:${invoice.id}`,'الفاتورة قيد تجهيز السياسة: لا يمكن حسم الضريبة أو الدخل ولا إقفال الشهر.','invoices',invoice.orderId);continue;}
     const snapshot=invoice.snapshot;
     if(!snapshot||invoice.netMinor===null||invoice.vatMinor===null||!invoice.number||!snapshot.policyReference){issue(`invoice_snapshot_missing:${invoice.id}`,'الفاتورة الصادرة تفتقد لقطة مالية أو رقمًا أو سياسة إصدار محفوظة.','invoices',invoice.orderId);continue;}

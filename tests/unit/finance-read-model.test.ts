@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {financeNumber,readFinanceData} from '@/lib/finance/read-model';
+import {financeNumber,readFinanceData,readEffectiveFinanceTaxPolicy} from '@/lib/finance/read-model';
 import {FINANCE_TABLES} from '@/lib/finance/schema';
 
 describe('financial source projection consistency',()=>{
@@ -38,5 +38,20 @@ describe('financial source projection consistency',()=>{
   });
   it('reads exact native bigint, numeric and decimal integer strings',()=>{
     expect(financeNumber(0)).toBe(0);expect(financeNumber(123n)).toBe(123);expect(financeNumber('-123')).toBe(-123);expect(financeNumber('9007199254740991')).toBe(Number.MAX_SAFE_INTEGER);
+  });
+  it('effective policy lookup uses the Riyadh date and does not assume a policy exists',async()=>{
+    const observed:unknown[][]=[];
+    const db={$queryRaw:async(sql:TemplateStringsArray,...values:unknown[])=>{observed.push(values);expect(sql.join('?')).toContain('effective_from<=');return [];}};
+    expect(await readEffectiveFinanceTaxPolicy(db as never,new Date('2026-09-30T20:59:59Z'))).toBeNull();
+    expect(await readEffectiveFinanceTaxPolicy(db as never,new Date('2026-09-30T21:00:00Z'))).toBeNull();
+    expect(observed).toEqual([['2026-09-30'],['2026-10-01']]);
+  });
+  it('preserves audit before/after and request metadata in the read projection',async()=>{
+    const payload={before:{status:'draft'},after:{status:'approved'},ip:'127.0.0.1',sessionFingerprint:'a'.repeat(64)};
+    const db={$queryRaw:async(sql:TemplateStringsArray)=>{
+      const query=sql.join('?');if(query.includes('information_schema.TABLES'))return FINANCE_TABLES.map(name=>({name,engine:'InnoDB'}));
+      if(query.includes('reason,payload FROM finance_audit'))return [{id:1n,created_at:new Date('2026-09-22T12:00:00Z'),actor_id:72n,action:'settlement_approved',entity:'settlement',entity_id:'9',reason:'proof checked',payload:JSON.stringify(payload)}];return [];
+    }};
+    expect((await readFinanceData(db as never)).audit[0]).toMatchObject({...payload,actorId:'72',entityId:'9'});
   });
 });

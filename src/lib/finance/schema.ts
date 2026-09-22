@@ -4,6 +4,13 @@ import type { CommerceDb } from '@/lib/commerce/types';
 const engine = ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin';
 /** Additive only; importing a reader never performs DDL. */
 export const FINANCE_DDL = [
+  `CREATE TABLE IF NOT EXISTS finance_reconciliations (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    request_key VARCHAR(80) NOT NULL, fingerprint CHAR(64) NOT NULL,
+    month CHAR(7) NOT NULL, snapshot JSON NOT NULL, reason VARCHAR(1000) NOT NULL,
+    actor_id BIGINT UNSIGNED NOT NULL, created_at DATETIME(3) NOT NULL,
+    UNIQUE KEY finance_reconciliation_request(request_key), KEY finance_reconciliation_month(month)
+  )${engine}`,
   `CREATE TABLE IF NOT EXISTS finance_periods (
     month CHAR(7) NOT NULL PRIMARY KEY, closed_at DATETIME(3) NULL,
     checks_json JSON NOT NULL, reason VARCHAR(1000) NOT NULL DEFAULT '', version INT NOT NULL DEFAULT 0
@@ -79,6 +86,21 @@ export const FINANCE_DDL = [
     entity_id VARCHAR(80) NOT NULL, reason VARCHAR(1000) NOT NULL, payload JSON NOT NULL,
     KEY finance_audit_entity(entity,entity_id)
   )${engine}`,
+  `CREATE TABLE IF NOT EXISTS finance_change_requests (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, request_key VARCHAR(80) NOT NULL, fingerprint CHAR(64) NOT NULL,
+    kind VARCHAR(24) NOT NULL, target_id VARCHAR(80) NOT NULL, payload JSON NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    maker_id BIGINT UNSIGNED NOT NULL, checker_id BIGINT UNSIGNED NULL, reason VARCHAR(1000) NOT NULL, approval_reason VARCHAR(1000) NOT NULL DEFAULT '',
+    result JSON NULL, created_at DATETIME(3) NOT NULL, decided_at DATETIME(3) NULL,
+    UNIQUE KEY finance_change_request(request_key), KEY finance_change_target(kind,target_id),
+    CHECK(kind IN ('return','tax_settings','reopen_period')), CHECK(status IN ('pending','approved','cancelled'))
+  )${engine}`,
+  `CREATE TABLE IF NOT EXISTS finance_tax_policies (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, request_id BIGINT UNSIGNED NOT NULL,
+    effective_from DATE NOT NULL, issuer JSON NOT NULL, vat_bps INT NOT NULL, policy_reference VARCHAR(160) NOT NULL, created_at DATETIME(3) NOT NULL,
+    UNIQUE KEY finance_tax_request(request_id), UNIQUE KEY finance_tax_effective(effective_from), UNIQUE KEY finance_tax_reference(policy_reference),
+    CONSTRAINT finance_tax_request_fk FOREIGN KEY(request_id) REFERENCES finance_change_requests(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CHECK(vat_bps>=0 AND vat_bps<=10000)
+  )${engine}`,
 ] as const;
 
 export const FINANCE_TABLES = FINANCE_DDL.map(sql => sql.match(/^CREATE TABLE IF NOT EXISTS (\w+)/)![1]);
@@ -89,7 +111,7 @@ export async function financeSchemaAvailable(db: Pick<CommerceDb, '$queryRaw'>):
 export async function assertFinanceSchemaReady(db: Pick<CommerceDb, '$queryRaw'>) {
   if (!(await financeSchemaAvailable(db))) throw new Error('finance_schema_not_ready');
   const keys = await db.$queryRaw<{ name: string; non_unique: bigint | number }[]>`SELECT DISTINCT INDEX_NAME AS name,NON_UNIQUE AS non_unique FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME LIKE 'finance\\_%'`;
-  for (const name of ['finance_expense_request','finance_expense_reversal','finance_settlement_request','finance_settlement_reversal','finance_invoice_source','finance_invoice_number','finance_refund_provider_reference']) {
+  for (const name of ['finance_expense_request','finance_expense_reversal','finance_settlement_request','finance_settlement_reversal','finance_invoice_source','finance_invoice_number','finance_refund_provider_reference','finance_reconciliation_request','finance_change_request','finance_tax_request','finance_tax_effective','finance_tax_reference']) {
     if (!keys.some(row => row.name === name && Number(row.non_unique) === 0)) throw new Error('finance_schema_not_ready');
   }
 }

@@ -1,6 +1,6 @@
 import type { FinanceInvoice, FinanceReport } from './types';
 import { formatFinanceMoney, monthOfDate } from './reports';
-import { financeExportScope, financeMatchesText, financeInvoiceMatches, financeMovementMatches, financeSupplierMatches } from './filters';
+import { financeExportScope, financeMatchesText, financeInvoiceMatches, financeMovementMatches, financeSupplierMatches,financeChangeMatches } from './filters';
 export type FinanceSheet={name:string;headers:string[];rows:(string|number|null)[][]};
 const money=(value:number|null)=>value===null?null:value/100;
 export function financeExportSheets(report:FinanceReport):FinanceSheet[]{
@@ -25,6 +25,7 @@ export function financeSectionExportSheets(report:FinanceReport):FinanceSheet[]{
     case 'budget':return select('الميزانية');
     case 'invoices':return select('الفواتير');
     case 'reconciliation':return select('المطابقة');
+    case 'returns':return [{name:'طلبات المرتجعات',headers:['الطلب المالي','الفاتورة الأصلية','التاريخ','الحالة','المنشئ','المراجع','السبب','إجمالي المرتجع','الضريبة','حصة المورد','الإشعار'],rows:(data.requests??[]).filter(row=>financeChangeMatches(row,query,data)).map(row=>[row.id,row.targetId,row.at,row.status,row.makerId,row.checkerId,row.reason,money(row.result?.totalMinor??null),money(row.result?.vatMinor??null),money(row.result?.supplierMinor??null),row.result?.number??null])}];
     case 'tax':return [{name:'الضريبة',headers:['البند','المبلغ بالريال','المصدر'],rows:report.metrics.filter(row=>row.key==='vat').map(row=>[row.label,money(row.valueMinor),row.href])},...select('الفواتير')];
     case 'expenses':return [{name:'المصروفات',headers:['التاريخ','المصروف','قبل الضريبة','الضريبة','الإجمالي','المدفوع','المرجع'],rows:data.expenses.filter(row=>monthOfDate(row.at)===query.month&&financeMatchesText(query,row.description,row.reference,row.id)).map(row=>{const sign=row.reversalOf?-1:1;return [row.at,row.description,money(sign*row.netMinor),money(sign*row.vatMinor),money(sign*row.totalMinor),money(sign*row.paidMinor),row.reference];})}];
     case 'ledger':return [{name:'سجل التدقيق',headers:['التاريخ','المستخدم','الإجراء','النوع','المستند','السبب'],rows:data.audit.filter(row=>monthOfDate(row.at)===query.month&&financeMatchesText(query,row.id,row.actorId,row.action,row.entityId,row.reason)).map(row=>[row.at,row.actorId,row.action,row.entity,row.entityId,row.reason])}];
@@ -39,7 +40,7 @@ export function printableFinanceReport(report:FinanceReport):string{
 export function printableFinanceInvoice(invoice:FinanceInvoice,internal:boolean):string{
   const s=invoice.snapshot;
   const rows=s?s.lines.map(x=>[x.title,x.quantity,formatFinanceMoney(x.netMinor),formatFinanceMoney(x.vatMinor),formatFinanceMoney(x.grossMinor)]):invoice.source.items.map(x=>[x.title,x.quantity,'غير مكتمل','غير مكتمل',formatFinanceMoney(x.totalMinor)]);
-  const parties=s?'<p>'+escapeFinanceHtml(s.issuer.name)+' — '+escapeFinanceHtml(s.issuer.address)+' — الرقم الضريبي: '+escapeFinanceHtml(s.issuer.taxNumber)+'</p>':'<p>بانتظار بيانات جهة الإصدار والسياسة الضريبية — ليس فاتورة ضريبية مُصدرة.</p>';
+  const parties=invoice.status==='cancelled'?'<p>مسودة ملغاة محفوظة للمراجعة — ليست فاتورة ضريبية مُصدرة، ولا يمكن اعتمادها.</p>':s?'<p>'+escapeFinanceHtml(s.issuer.name)+' — '+escapeFinanceHtml(s.issuer.address)+' — الرقم الضريبي: '+escapeFinanceHtml(s.issuer.taxNumber)+'</p>':'<p>بانتظار بيانات جهة الإصدار والسياسة الضريبية — ليس فاتورة ضريبية مُصدرة.</p>';
   const extra=internal?'<h2>مراجع داخلية</h2><p>مرجع المقبوض: '+escapeFinanceHtml(invoice.receiptId)+'</p><ul>'+invoice.source.suppliers.map(x=>'<li>'+escapeFinanceHtml(x.supplierName)+': '+escapeFinanceHtml(formatFinanceMoney(x.amountMinor))+'</li>').join('')+'</ul>':'';
   return printShell('تربح — '+(invoice.number||'سجل #'+invoice.id),parties+'<p>العميل: '+escapeFinanceHtml(s?.customer.name||invoice.source.customerName)+' — '+escapeFinanceHtml(s?.customer.address||'')+'</p><p>الطلب: '+escapeFinanceHtml(invoice.orderId)+' — التاريخ: '+escapeFinanceHtml(invoice.issuedAt || invoice.at)+'</p><table><thead><tr><th>المنتج</th><th>الكمية</th><th>قبل الضريبة</th><th>الضريبة</th><th>الإجمالي</th></tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(x=>'<td>'+escapeFinanceHtml(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table><p>إجمالي المستند: '+formatFinanceMoney(invoice.totalMinor)+' ريال سعودي</p><p>'+escapeFinanceHtml(invoice.reason)+'</p>'+extra);
 }

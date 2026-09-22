@@ -104,15 +104,16 @@ describe.skipIf(process.env.SUPPLIER_DB_TESTS!=='1')('isolated supplier MySQL pr
   expect(await deliverSupplierNotices(db)).toBe(1);expect(await deliverSupplierNotices(db)).toBe(0);
   expect((await db.$queryRaw<{title:string}[]>`SELECT title FROM notfications`)[0].title).toBe('يوجد تحديث على شحن طلبك. راجع تفاصيل الطلب.');
  });
- const enqueue=(key:string,event='product.updated',resourceId='10',kind:'product'|'order'='product')=>receiveSallaEvent(db,{key,event,merchant:'999',resourceId,occurredAt:new Date().toISOString(),kind});
- const sourceResponse=()=>new Response(JSON.stringify({success:true,data:{id:10,name:'Fresh fixture',sku:'fixture',price:{amount:50,currency:'SAR'},quantity:20,status:'sale',is_available:true,images:[]}}));
+  const enqueue=(key:string,event='product.updated',resourceId='10',kind:'product'|'order'='product')=>receiveSallaEvent(db,{key,event,merchant:'999',resourceId,occurredAt:new Date().toISOString(),kind});
+  const identityResponse=()=>new Response(JSON.stringify({success:true,data:{merchant:{id:999,name:'Fixture supplier',domain:'https://fixture.salla.sa'}}}));
+  const sourceResponse=()=>new Response(JSON.stringify({success:true,data:{id:10,name:'Fresh fixture',sku:'fixture',price:{amount:50,currency:'SAR'},quantity:20,status:'sale',is_available:true,images:[]}}));
  it('worker claims once concurrently and imports the authoritative product',async()=>{
   await enqueue('worker-concurrent');let signal!:()=>void,release!:()=>void;
   const started=new Promise<void>(r=>{signal=r;}),wait=new Promise<void>(r=>{release=r;});
-  const fetcher=vi.fn(async()=>{signal();await wait;return sourceResponse();});
+   const fetcher=vi.fn(async(input:RequestInfo|URL)=>{if(String(input).includes('/oauth2/user/info'))return identityResponse();signal();await wait;return sourceResponse();});
   const first=processNextSupplierEvent(db,config,fetcher);await started;
   try{expect(await processNextSupplierEvent(db,config,fetcher)).toBe('empty');}finally{release();}
-  expect(await first).toBe('done');expect(fetcher).toHaveBeenCalledTimes(1);
+   expect(await first).toBe('done');expect(fetcher).toHaveBeenCalledTimes(2);
   expect((await db.$queryRaw<{status:string;attempts:number}[]>`SELECT status,attempts FROM supplier_webhook_events`)[0]).toEqual({status:'done',attempts:1});
   expect((await db.$queryRaw<{name:string;active:number;visible:number}[]>`SELECT name,active,visible FROM supplier_products`)[0]).toEqual({name:'Fresh fixture',active:0,visible:0});
  });
@@ -122,12 +123,12 @@ describe.skipIf(process.env.SUPPLIER_DB_TESTS!=='1')('isolated supplier MySQL pr
   expect(await processNextSupplierEvent(db,config,bad)).toBe('empty');expect(bad).toHaveBeenCalledTimes(1);
   expect((await db.$queryRaw<{last_error:string;future:bigint}[]>`SELECT last_error,next_attempt_at>UTC_TIMESTAMP(3) AS future FROM supplier_webhook_events`)[0]).toEqual({last_error:'supplier_event_retry',future:1n});
   await db.$executeRaw`UPDATE supplier_webhook_events SET status='processing',claim_token='00000000-0000-4000-8000-000000000099',claimed_at=DATE_SUB(UTC_TIMESTAMP(3),INTERVAL 6 MINUTE)`;
-  expect(await processNextSupplierEvent(db,config,vi.fn(async()=>sourceResponse()))).toBe('done');
+   expect(await processNextSupplierEvent(db,config,vi.fn(async(input:RequestInfo|URL)=>String(input).includes('/oauth2/user/info')?identityResponse():sourceResponse()))).toBe('done');
   expect((await db.$queryRaw<{attempts:number;claim_token:string|null}[]>`SELECT attempts,claim_token FROM supplier_webhook_events`)[0]).toEqual({attempts:2,claim_token:null});
  });
  it('worker missing product closes stock but preserves administrator publication flags',async()=>{
   await mapped();await enqueue('worker-deletion','product.deleted');
-  expect(await processNextSupplierEvent(db,config,vi.fn(async()=>new Response('',{status:404})))).toBe('done');
+   expect(await processNextSupplierEvent(db,config,vi.fn(async(input:RequestInfo|URL)=>String(input).includes('/oauth2/user/info')?identityResponse():new Response('',{status:404})))).toBe('done');
   expect((await db.$queryRaw<{available:number;active:number;visible:number}[]>`SELECT available,active,visible FROM supplier_products`)[0]).toEqual({available:0,active:1,visible:1});
   expect((await db.$queryRaw<{stock_available:number;enabled:number}[]>`SELECT stock_available,enabled FROM commerce_products`)[0]).toEqual({stock_available:0,enabled:1});
  });
@@ -179,7 +180,7 @@ describe.skipIf(process.env.SUPPLIER_DB_TESTS!=='1')('isolated supplier MySQL pr
   const source={externalId:'88',status:'in_progress',paymentStatus:'paid',currency:'SAR' as const,payableMinor:9400,sourceUpdatedAt:null,shipments:[{externalId:'90',carrier:'DHL',trackingNumber:'FIXTURE-TRACK',status:'in_transit',fulfillmentStatus:'shipped',sourceUpdatedAt:'2026-09-19T10:00:00Z'}]};
   await Promise.all([recordSupplierTracking(db,1n,source),recordSupplierTracking(db,1n,source)]);
   await recordSupplierTracking(db,1n,{...source,shipments:[{...source.shipments[0],status:'creating',sourceUpdatedAt:'2026-09-18T10:00:00Z'}]});
-  const fetcher=vi.fn(async(input:RequestInfo|URL)=>new Response(JSON.stringify(String(input).includes('/shipments?')?{success:true,data:[{id:90,order_id:88,courier_name:'DHL',tracking_number:'FIXTURE-TRACK',status:'in_transit',updated_at:'2026-09-19T10:00:00Z'}],pagination:{currentPage:1,totalPages:1}}:{success:true,data:{id:88,status:{slug:'in_progress'},currency:'SAR',amounts:{total:{amount:94,currency:'SAR'}},shipping_status:'shipped'}})));
+   const fetcher=vi.fn(async(input:RequestInfo|URL)=>String(input).includes('/oauth2/user/info')?identityResponse():new Response(JSON.stringify(String(input).includes('/shipments?')?{success:true,data:[{id:90,order_id:88,courier_name:'DHL',tracking_number:'FIXTURE-TRACK',status:'in_transit',updated_at:'2026-09-19T10:00:00Z'}],pagination:{currentPage:1,totalPages:1}}:{success:true,data:{id:88,status:{slug:'in_progress'},currency:'SAR',amounts:{total:{amount:94,currency:'SAR'}},shipping_status:'shipped'}})));
   await enqueue('tracking-worker','order.updated','88','order');expect(await processNextSupplierEvent(db,config,fetcher)).toBe('done');
   const owned=await memberOrderTracking(db,local.id,5n);expect(owned).toHaveLength(1);expect(owned[0]).toMatchObject({trackingNumber:'FIXTURE-TRACK',status:'in_transit'});expect(await memberOrderTracking(db,local.id,6n)).toEqual([]);expect(JSON.stringify(owned)).not.toMatch(/supplier|cost|payable/);
   expect((await db.$queryRaw<{n:bigint}[]>`SELECT COUNT(*) AS n FROM supplier_shipments`)[0].n).toBe(1n);

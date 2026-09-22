@@ -17,18 +17,18 @@ export function SupplierOwnerInviteButton({supplierId,supplierName}:{supplierId:
    if(!response.ok||typeof result.url!=='string'||typeof result.expiresAt!=='string')throw Error();
    const parsed=new URL(result.url);if(parsed.origin!==window.location.origin||parsed.pathname!=='/api/integrations/salla/authorize'||!parsed.searchParams.get('invite'))throw Error();
    setUrl(result.url);setExpiresAt(result.expiresAt);
-  }catch{setError('تعذّر إنشاء الرابط الآن. تأكد أن المورد نشط وغير مرتبط ثم أعد المحاولة.');}
+  }catch{setError('تعذّر إنشاء الرابط الآن. تأكد أن المورد نشط أو أن اتصاله يحتاج إعادة تفويض ثم أعد المحاولة.');}
   finally{setPending(false);}
  };
  return <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4" aria-label={`تفويض متجر ${supplierName}`}>
   <h3 className="font-bold text-emerald-950">متابعة تفويض متجر سلة — {supplierName}</h3>
-  <p className="mt-1 text-sm leading-6 text-emerald-900">أنشئ رابطًا مؤقتًا صالحًا 24 ساعة وأرسله لصاحب المتجر. بعد الإنشاء يظهر زر «متابعة التفويض في سلة» لفتحه مباشرة، دون طلب أي إعدادات تقنية من صاحب المتجر.</p>
-  {!url&&<button type="button" className={`${primary} mt-3`} disabled={pending} onClick={issue}>{pending?'جارٍ إنشاء الرابط…':'إنشاء رابط متابعة التفويض'}</button>}
+  <p className="mt-1 text-sm leading-6 text-emerald-900">أنشئ رابطًا مؤقتًا صالحًا 24 ساعة وأرسله لصاحب المتجر ليختار «متابعة التفويض في سلة». يمكن فتح الرابط والمحاولة أكثر من مرة خلال صلاحيته، ويمكنك إنشاء رابط جديد فور انتهاء السابق. التفويض الجديد مطلوب للسماح بحفظ العميل وإنشاء طلبه في سلة.</p>
+  <button type="button" className={`${primary} mt-3`} disabled={pending} onClick={issue}>{pending?'جارٍ إنشاء الرابط…':'إنشاء/تجديد رابط تفويض سلة'}</button>
   {error&&<p role="alert" className="mt-3 text-sm font-semibold text-red-700">{error}</p>}
   {url&&<div className="mt-3 space-y-3">
    <label className="block text-xs font-semibold text-emerald-950">رابط التفويض<input readOnly dir="ltr" value={url} className="mt-2 min-h-11 w-full rounded-lg border border-emerald-300 bg-white px-3 text-left text-xs"/></label>
    <div className="flex flex-wrap gap-2"><button type="button" className={primary} onClick={async()=>{try{await navigator.clipboard.writeText(url);setCopied(true);}catch{setCopied(false);}}}>{copied?'تم نسخ الرابط':'نسخ الرابط'}</button><a href={url} target="_blank" rel="noreferrer" className={secondary}>متابعة التفويض في سلة</a></div>
-   <p className="text-xs text-emerald-900">صالح لمدة 24 ساعة من إنشائه{expiresAt?`، وينتهي ${new Date(expiresAt).toLocaleString('ar-SA')}`:''}. إنشاء رابط جديد يلغي الرابط السابق.</p>
+   <p className="text-xs text-emerald-900">صالح لمدة 24 ساعة من إنشائه{expiresAt?`، وينتهي ${new Date(expiresAt).toLocaleString('ar-SA')}`:''}. يمكنك فتحه أكثر من مرة، وإنشاء رابط جديد يلغي الرابط السابق فقط.</p>
   </div>}
  </section>;
 }

@@ -4,7 +4,7 @@ const state = vi.hoisted(() => ({ gate: vi.fn(), hasAction: vi.fn(), schema: vi.
 vi.mock('@/lib/commerce/schema', () => ({ assertCommerceSchemaReady: state.schema }));
 vi.mock('@/lib/roles', () => ({ requireAction: state.gate, hasAction: state.hasAction }));
 vi.mock('@/lib/prisma', () => ({ prisma: { $queryRaw: state.query } }));
-vi.mock('@/app/admin/suppliers/actions', () => ({ saveSupplier: vi.fn(), saveSupplierProduct: vi.fn(), deleteSupplier:vi.fn(), deleteSupplierProducts:vi.fn() }));
+vi.mock('@/app/admin/suppliers/actions', () => ({ saveSupplier: vi.fn(), saveStoreCoordinator:vi.fn(), saveSupplierProduct: vi.fn(), deleteSupplier:vi.fn(), deleteSupplierProducts:vi.fn() }));
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('not_found'); } }));
 import Suppliers from '@/app/admin/suppliers/page';
 import Accounts from '@/app/admin/commerce/accounts/page';

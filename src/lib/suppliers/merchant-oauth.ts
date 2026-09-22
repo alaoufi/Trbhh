@@ -63,18 +63,19 @@ export function parseMerchantContext(token: string, state: string, config: Suppl
 export async function issueMerchantInvitation(db: CommerceDb, supplierId: bigint, adminId: bigint, config: SupplierConfig) {
   assertOAuthConfig(config);
   if (!/^[1-9]\d{0,14}$/.test(String(supplierId)) || !/^[1-9]\d{0,14}$/.test(String(adminId))) throw new Error('supplier_merchant_invitation_invalid');
+  const expiresAt = new Date(Date.now() + INVITATION_LIFETIME_MS);
   const invitation = await db.$transaction(async tx => {
     const [supplier] = await tx.$queryRaw<{name: string; active: number}[]>`SELECT name,active FROM commerce_suppliers WHERE id=${supplierId} FOR UPDATE`;
     if (!supplier || supplier.active !== 1 || !supplier.name.trim() || supplier.name.length > 255 || /[\u0000-\u001f]/.test(supplier.name)) throw new Error('supplier_connection_unavailable');
     const [storedProfile] = await tx.$queryRaw<{provider: string; maintenance: number; oauth_generation: number}[]>`SELECT provider,maintenance,oauth_generation FROM supplier_integration_profiles WHERE supplier_id=${supplierId} FOR UPDATE`;
     if (storedProfile && (storedProfile.provider !== 'salla' || storedProfile.maintenance !== 0)) throw new Error('supplier_connection_unavailable');
-    const [existing] = await tx.$queryRaw<{id: bigint}[]>`SELECT id FROM supplier_connections WHERE supplier_id=${supplierId} LIMIT 1 FOR UPDATE`;
-    if (existing) throw new Error('supplier_merchant_already_connected');
+    const connections = await tx.$queryRaw<{id: bigint; oauth_scope_version:number}[]>`SELECT id,oauth_scope_version FROM supplier_connections WHERE supplier_id=${supplierId} ORDER BY id LIMIT 2 FOR UPDATE`;
+    if (connections.length > 1) throw new Error('supplier_merchant_already_connected');
     if (!storedProfile) await tx.$executeRaw`INSERT INTO supplier_integration_profiles(supplier_id,provider,maintenance,sync_enabled,auto_orders_enabled,mode,oauth_generation) VALUES(${supplierId},'salla',0,0,0,'development',0)`;
     const profile = storedProfile || {provider: 'salla', maintenance: 0, oauth_generation: 0};
     if (!Number.isSafeInteger(profile.oauth_generation) || profile.oauth_generation < 0 || profile.oauth_generation >= 2147483645) throw new Error('supplier_oauth_generation');
-    await tx.$executeRaw`UPDATE supplier_integration_profiles SET oauth_generation=oauth_generation+1 WHERE supplier_id=${supplierId}`;
-    return {supplierId: String(supplierId), adminId: String(adminId), expectedName: supplier.name, generation: profile.oauth_generation + 1, expiresAt: Date.now() + INVITATION_LIFETIME_MS};
+    await tx.$executeRaw`UPDATE supplier_integration_profiles SET oauth_generation=oauth_generation+1,oauth_invite_expires_at=${expiresAt},oauth_last_error='' WHERE supplier_id=${supplierId}`;
+    return {supplierId: String(supplierId), adminId: String(adminId), expectedName: supplier.name, generation: profile.oauth_generation + 1, expiresAt: expiresAt.getTime()};
   });
   const token = sign(invitation, 'invitation', config);
   return {invitation: token, url: `${config.origin}/api/integrations/salla/authorize?invite=${encodeURIComponent(token)}`, expiresAt: new Date(invitation.expiresAt)};
@@ -84,7 +85,7 @@ export async function issueMerchantInvitation(db: CommerceDb, supplierId: bigint
 export async function startMerchantOAuth(db: CommerceDb, token: string, config: SupplierConfig) {
   const invitation = parseMerchantInvitation(token, config);
   const {beginOAuth} = await import('./connections');
-  const result = await beginOAuth(db, BigInt(invitation.supplierId), BigInt(invitation.adminId), config, {expectedGeneration: invitation.generation, requireUnconnected: true});
+  const result = await beginOAuth(db, BigInt(invitation.supplierId), BigInt(invitation.adminId), config, {expectedGeneration: invitation.generation});
   const state = new URL(result.url).searchParams.get('state') || '';
   if (!/^[a-f0-9]{64}$/.test(state)) throw new Error('supplier_oauth_state');
   const context: MerchantContext = {...invitation, expiresAt: Date.now() + CONTEXT_LIFETIME_MS, stateHash: digest(state)};

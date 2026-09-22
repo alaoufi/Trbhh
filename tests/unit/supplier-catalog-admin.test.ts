@@ -4,7 +4,7 @@ import type {CatalogApproval} from '@/lib/suppliers/catalog-selection';
 import {loadCatalog,loadCatalogDetail,reviewCatalogSelection,approveCatalogSelection} from '@/lib/suppliers/catalog-admin';
 
 const secret='ab'.repeat(32),admin=7n,now=Date.parse('2026-09-21T12:00:00Z');
-function row(id=1n){return {id,revision:3,supplier_id:2n,connection_id:4n,commerce_product_id:null,name:'قهوة عربية',sku:'COFFEE-1',supplier_name:'متجر المورد',images:['https://cdn.salla.sa/test.jpg'],public_price_minor:2500,unit_cost_minor:null,selling_price_minor:null,minimum_price_minor:2000,minimum_margin_minor:100,quantity:0,available:0,active:0,visible:0,featured:0,last_sync_at:new Date(now),source_updated_at:new Date(now),supplier_active:1,maintenance:0,connection_status:'connected',connection_provider:'salla',profile_provider:'salla',currency:'SAR',description:'<p>قهوة &amp; هيل</p><script>secret()</script>',brand:'محلي',categories:[{externalId:'private-category',name:'قهوة'}],options:[{externalId:'private-option',name:'الحجم',values:['كبير']}],variants:[{externalId:'private-variant',name:'كبير',sku:'COFFEE-L',publicPriceMinor:3000,quantity:2,available:true,options:{الحجم:'كبير'}}],commerce_visible:null,commerce_enabled:null,commerce_approved:null};}
+function row(id=1n){return {id,revision:3,supplier_id:2n,connection_id:4n,commerce_product_id:null,name:'قهوة عربية',sku:'COFFEE-1',supplier_name:'متجر المورد',images:['https://cdn.salla.sa/test.jpg'],public_price_minor:2500,unit_cost_minor:null,selling_price_minor:null,minimum_price_minor:2000,minimum_margin_minor:100,quantity:0,available:0,active:0,visible:0,featured:0,last_sync_at:new Date(now),source_updated_at:new Date(now),supplier_active:1,maintenance:0,profile_mode:'live',connection_status:'connected',connection_provider:'salla',connection_scope_version:1,connection_has_tokens:1,profile_provider:'salla',currency:'SAR',description:'<p>قهوة &amp; هيل</p><script>secret()</script>',brand:'محلي',categories:[{externalId:'private-category',name:'قهوة'}],options:[{externalId:'private-option',name:'الحجم',values:['كبير']}],variants:[{externalId:'private-variant',name:'كبير',sku:'COFFEE-L',publicPriceMinor:3000,quantity:2,available:true,options:{الحجم:'كبير'}}],commerce_visible:null,commerce_enabled:null,commerce_approved:null};}
 type Row=ReturnType<typeof row>;
 const text=(sql:unknown)=>Array.isArray(sql)?sql.join('?'):(sql as {sql?:string})?.sql||'';
 function database(initial:Row[]){
@@ -35,6 +35,11 @@ describe('supplier visual catalog backend',()=>{
   expect(search.sql).not.toContain('%_? قهوة');expect(search.values).toContain('%_? قهوة');expect(search.values).toContain(21);expect(search.values).toContain(20);
   expect(search.sql).toContain('LOCATE(LOWER(?),LOWER(p.name))');expect(search.sql).toContain('LOCATE(LOWER(?),LOWER(p.sku))');expect(search.sql).not.toMatch(/\bLIKE\b/i);
   expect(d.execute).not.toHaveBeenCalled();
+ });
+ it('allows a verified connected development profile in the selectable catalog query',async()=>{
+  const d=database([]);await loadCatalog(d.db,{query:'',supplierKey:'',page:1});
+  const catalogSql=d.query.mock.calls.map(([sql])=>text(sql)).find(sql=>sql.includes('LOCATE'))!;
+  expect(catalogSql).not.toContain("ip.mode='live'");
  });
  it('strips external IDs and unsafe image URLs while returning readable detail',async()=>{
   const product=row();product.images.push('http://127.0.0.1/internal');

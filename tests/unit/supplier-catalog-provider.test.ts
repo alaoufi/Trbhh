@@ -2,7 +2,7 @@ import {describe,it,expect,vi} from 'vitest';
 import {SallaAdapter,mapSallaProduct} from '@/lib/suppliers/providers/salla';
 
 const raw=()=>({id:123,name:'Product',sku:'sku',description:'<p>Hello</p><script>secret()</script>',price:{amount:50,currency:'SAR'},quantity:10,status:'sale',is_available:true,images:[{url:'https://cdn.salla.sa/item.jpg'},{url:'http://localhost/x'}],categories:[{id:3,name:'Category'}],brand:{name:'Brand'},options:[{id:4,name:'Size',values:[{id:5,name:'Large'}]}],skus:[{id:6,sku:'large',price:{amount:47,currency:'SAR'},stock_quantity:2,related_options:[4],related_option_values:[5]}]});
-describe('Salla read-only adapter',()=>{
+describe('Salla adapter',()=>{
   it('maps exact SAR, variants/options and plain allowlisted data',()=>{
     const p=mapSallaProduct({...raw(),cost_price:1,access_token:'secret'});
     expect(p).toMatchObject({externalId:'123',publicPriceMinor:5000,description:'Hello',brand:'Brand',images:['https://cdn.salla.sa/item.jpg']});
@@ -26,12 +26,42 @@ describe('Salla read-only adapter',()=>{
     expect(fetcher.mock.calls[0][0]).toBe('https://api.salla.dev/admin/v2/products?page=1&per_page=50');
     expect(fetcher.mock.calls[0][1]).toMatchObject({method:'GET',credentials:'omit',redirect:'error',cache:'no-store'});
   });
-  it('never leaks upstream error bodies and never posts orders',async()=>{
+  it('never leaks upstream error bodies',async()=>{
     const fetcher=vi.fn().mockResolvedValue(new Response('private-token customer',{status:401}));
     const adapter=new SallaAdapter(async()=>'token',fetcher);
     await expect(adapter.getProduct('123')).rejects.toThrow('salla_http_401');
-    await expect(adapter.createOrder()).rejects.toThrow('unsupported_live_order_contract');
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('creates an official paid Salla order for an existing exact-phone customer',async()=>{
+    const fetcher=vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({success:true,data:[{id:77,full_name:'محمد',mobile:500000000,mobile_code:'+966'}],pagination:{currentPage:1,totalPages:1}})))
+      .mockResolvedValueOnce(new Response(JSON.stringify({success:true,data:[{id:100,name:'الرياض',name_en:'Riyadh',country_id:200}],country:{id:200,code:'SA'},pagination:{currentPage:1,totalPages:1}})))
+      .mockResolvedValueOnce(new Response(JSON.stringify({success:true,data:{id:9001,customer:{id:77},urls:{admin:'https://s.salla.sa/orders/order/safe'}}}),{status:201}));
+    const result=await new SallaAdapter(async()=>'token',fetcher).createOrder({
+      idempotencyKey:'supplier:41:1',merchantOrderId:'41',currency:'SAR',shippingMinor:0,
+      shipping:{name:'محمد',phone:'+966500000000',addressLine:'حي النرجس',city:'الرياض',postalCode:'12345',country:'SA'},
+      items:[{externalId:'123',sku:'SKU-1',name:'منتج تجريبي',quantity:2,unitCostMinor:100}],
+    });
+    expect(result).toEqual({status:'submitted',externalOrderId:'9001',externalOrderUrl:'https://s.salla.sa/orders/order/safe',externalCustomerId:'77'});
+    const [url,init]=fetcher.mock.calls[2];expect(url).toBe('https://api.salla.dev/admin/v2/orders');
+    const body=JSON.parse(init.body);
+    expect(body).toMatchObject({customer:{id:77},receiver:{name:'محمد',phone:'966500000000',country_code:'SA',notify:false},delivery_method:'shipping',ship_to:{country:200,city:100,address:'حي النرجس',postal_code:'12345'},payment:{status:'paid'},products:[{identifier_type:'id',identifier:123,quantity:2}]});
+    expect(JSON.stringify(body)).not.toContain('unitCostMinor');
+  });
+  it('creates a missing customer before the order and rejects variants without stable option IDs',async()=>{
+    const responses=[
+      {success:true,data:[],pagination:{currentPage:1,totalPages:1}},
+      {success:true,data:{id:78,first_name:'محمد',last_name:'العوفي',mobile:500000000,mobile_code:'966'}},
+      {success:true,data:[{id:100,name:'الرياض',country_id:200}],country:{id:200,code:'SA'},pagination:{currentPage:1,totalPages:1}},
+      {success:true,data:{id:9002,customer:{id:78},urls:{admin:'https://s.salla.sa/orders/order/safe2'}}},
+    ];
+    const fetcher=vi.fn().mockImplementation(()=>Promise.resolve(new Response(JSON.stringify(responses.shift()),{status:responses.length===0?201:200})));
+    const adapter=new SallaAdapter(async()=>'token',fetcher),base={idempotencyKey:'supplier:42:1',merchantOrderId:'42',currency:'SAR' as const,shippingMinor:0,shipping:{name:'محمد العوفي',phone:'+966500000000',addressLine:'العنوان',city:'الرياض',postalCode:'',country:'SA' as const}};
+    await expect(adapter.createOrder({...base,items:[{externalId:'123',variantId:'456',name:'منتج',sku:'SKU',quantity:1,unitCostMinor:1}]})).rejects.toThrow('salla_variant_order_contract_required');
+    await expect(adapter.createOrder({...base,items:[{externalId:'123',hasVariants:true,name:'منتج',sku:'SKU',quantity:1,unitCostMinor:1}]})).rejects.toThrow('salla_variant_order_contract_required');
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(await adapter.createOrder({...base,items:[{externalId:'123',name:'منتج',sku:'SKU',quantity:1,unitCostMinor:1}]})).toMatchObject({status:'submitted',externalOrderId:'9002',externalCustomerId:'78'});
+    expect(fetcher.mock.calls[1][0]).toBe('https://api.salla.dev/admin/v2/customers');
   });
   it('rejects path injection before requesting',async()=>{
     const fetcher=vi.fn();const adapter=new SallaAdapter(async()=>'token',fetcher);

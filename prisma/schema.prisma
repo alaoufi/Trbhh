@@ -5,6 +5,9 @@ generator client {
 
 model supplier_integration_profiles {
   oauth_generation Int @default(0)
+  oauth_invite_expires_at DateTime? @db.DateTime(3)
+  oauth_last_attempt_at DateTime? @db.DateTime(3)
+  oauth_last_error String @default("") @db.VarChar(80)
   supplier_id BigInt @id  @db.UnsignedBigInt
   provider String  @db.VarChar(16)
   maintenance Int @default(0) @db.TinyInt
@@ -24,6 +27,7 @@ model supplier_connections {
   provider String  @db.VarChar(16)
   external_store_id String  @db.VarChar(191)
   status String @default("disconnected") @db.VarChar(24)
+  oauth_scope_version Int @default(0)
   encrypted_tokens String?  @db.Text
   expires_at DateTime?  @db.DateTime(3)
   refresh_claim String?  @db.Char(36)
@@ -185,11 +189,52 @@ model supplier_orders {
   relation_connection_id supplier_connections @relation("supplier_order_connection_fk", fields: [connection_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_order_connection_fk")
   relation_supplier_id commerce_suppliers @relation("supplier_order_supplier_fk", fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_order_supplier_fk")
   supplier_shipments supplier_shipments[] @relation("supplier_shipment_order_fk")
+  sync_attempts supplier_order_sync_attempts[] @relation("supplier_order_sync_attempt_fk")
+  coordinator_notifications supplier_coordinator_notifications[] @relation("supplier_coordinator_notification_order_fk")
+  external_order_url String @default("") @db.VarChar(2048)
+  external_customer_id String? @db.VarChar(191)
   @@unique([idempotency_key], map: "supplier_order_idempotency")
   @@unique([order_id, connection_id], map: "supplier_order_connection")
   @@unique([connection_id, external_order_id], map: "supplier_order_external")
   @@index([status, updated_at, id], map: "supplier_order_jobs")
   @@index([supplier_id, id], map: "supplier_order_supplier")
+}
+
+model supplier_order_sync_attempts {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  supplier_order_id BigInt @db.UnsignedBigInt
+  attempt_no Int
+  operation String @default("create_order") @db.VarChar(32)
+  status String @default("started") @db.VarChar(24)
+  request_fingerprint String @db.Char(64)
+  external_order_id String? @db.VarChar(191)
+  error_code String @default("") @db.VarChar(80)
+  started_at DateTime @default(now()) @db.DateTime(3)
+  finished_at DateTime? @db.DateTime(3)
+  relation_supplier_order_id supplier_orders @relation("supplier_order_sync_attempt_fk", fields: [supplier_order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_order_sync_attempt_fk")
+  @@unique([supplier_order_id, attempt_no], map: "supplier_order_sync_attempt_once")
+  @@index([status, started_at, id], map: "supplier_order_sync_jobs")
+}
+
+model supplier_coordinator_notifications {
+  id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  supplier_order_id BigInt @db.UnsignedBigInt
+  supplier_id BigInt @db.UnsignedBigInt
+  event String @default("order_submitted") @db.VarChar(40)
+  channel String @default("sms") @db.VarChar(16)
+  recipient String @db.VarChar(20)
+  status String @default("pending") @db.VarChar(24)
+  attempts Int @default(0)
+  claim_token String? @db.Char(36)
+  claimed_at DateTime? @db.DateTime(3)
+  last_error String @default("") @db.VarChar(80)
+  provider_message_id String @default("") @db.VarChar(191)
+  created_at DateTime @default(now()) @db.DateTime(3)
+  sent_at DateTime? @db.DateTime(3)
+  relation_supplier_order_id supplier_orders @relation("supplier_coordinator_notification_order_fk", fields: [supplier_order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_coordinator_notification_order_fk")
+  relation_supplier_id commerce_suppliers @relation("supplier_coordinator_notification_supplier_fk", fields: [supplier_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "supplier_coordinator_notification_supplier_fk")
+  @@unique([supplier_order_id, event], map: "supplier_coordinator_notification_once")
+  @@index([status, created_at, id], map: "supplier_coordinator_notification_jobs")
 }
 
 model supplier_shipments {
@@ -264,6 +309,7 @@ model commerce_suppliers {
   supplier_oauth_states supplier_oauth_states[] @relation("supplier_oauth_supplier_fk")
   supplier_products supplier_products[] @relation("supplier_product_supplier_fk")
   supplier_orders supplier_orders[] @relation("supplier_order_supplier_fk")
+  coordinator_notifications supplier_coordinator_notifications[] @relation("supplier_coordinator_notification_supplier_fk")
   product_mappings commerce_product_suppliers[]
   order_snapshots commerce_order_suppliers[]
   accruals commerce_supplier_accruals[]
@@ -271,6 +317,7 @@ model commerce_suppliers {
   name String @db.VarChar(200)
   contact_name String @default("") @db.VarChar(200)
   phone String @default("") @db.VarChar(40)
+  store_coordinator_phone String @default("") @db.VarChar(20)
   email String @default("") @db.VarChar(254)
   address String @default("") @db.VarChar(500)
   registration_number String @default("") @db.VarChar(100)

@@ -1,8 +1,9 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import type {CommerceDb} from '@/lib/commerce/types';
 import {supplierConfig} from '@/lib/suppliers/config';
-import {completeOAuth, consumeOAuthState} from '@/lib/suppliers/connections';
+import {completeOAuth, consumeOAuthState,recordOAuthFailure,supplierOAuthFailureCode} from '@/lib/suppliers/connections';
 import {digest, openTokens} from '@/lib/suppliers/crypto';
+import {SALLA_REQUIRED_SCOPES} from '@/lib/suppliers/salla-oauth';
 import {issueMerchantInvitation, parseMerchantContext, parseMerchantInvitation, startMerchantOAuth, verifyInvitedMerchant} from '@/lib/suppliers/merchant-oauth';
 
 const config = supplierConfig({SUPPLIER_PUBLIC_ORIGIN: 'https://trbhh.sa', SALLA_CLIENT_ID: 'test-client', SALLA_CLIENT_SECRET: 'test-secret', SUPPLIER_TOKEN_ENCRYPTION_KEY: 'ab'.repeat(32)});
@@ -47,7 +48,7 @@ describe('owner-forwardable Salla invitations', () => {
     expect(() => parseMerchantInvitation(issued.invitation, config)).toThrow();
   });
 
-  it('creates only an inert missing profile and refuses a target already holding a connection', async () => {
+  it('creates only an inert missing profile and can renew a link for an already connected target', async () => {
     const missing = issuer(undefined);
     // Explicitly represent a missing profile; the helper default represents an existing one.
     missing.tx.$queryRaw.mockReset().mockResolvedValueOnce([{name: storeName, active: 1}]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
@@ -55,9 +56,11 @@ describe('owner-forwardable Salla invitations', () => {
     const statements = missing.tx.$executeRaw.mock.calls.map(([sql]) => sql.join('')).join('\n');
     expect(statements).toContain("'salla',0,0,0,'development',0");
     expect(statements).not.toContain('supplier_connections');
-    const demo = issuer({provider: 'salla', maintenance: 0, oauth_generation: 3}, {id: 1n});
-    await expect(issueMerchantInvitation(demo.db, 1n, 1n, config)).rejects.toThrow('supplier_merchant_already_connected');
-    expect(demo.tx.$executeRaw).not.toHaveBeenCalled();
+    const stale = issuer({provider: 'salla', maintenance: 0, oauth_generation: 3}, {id: 1n,oauth_scope_version:0});
+    await expect(issueMerchantInvitation(stale.db, 1n, 1n, config)).resolves.toMatchObject({url:expect.stringContaining('/api/integrations/salla/authorize')});
+    const connected = issuer({provider: 'salla', maintenance: 0, oauth_generation: 3}, {id: 1n,oauth_scope_version:1});
+    await expect(issueMerchantInvitation(connected.db, 1n, 1n, config)).resolves.toMatchObject({url:expect.stringContaining('/api/integrations/salla/authorize')});
+    expect(connected.tx.$executeRaw.mock.calls.map(([sql])=>sql.join('')).join('\n')).toContain('oauth_invite_expires_at');
   });
 
   it('allows the same unexpired invitation to restart OAuth until the store is connected', async () => {
@@ -76,14 +79,14 @@ describe('owner-forwardable Salla invitations', () => {
     expect(parseMerchantContext(first.context, firstState, config).generation).toBe(1);
     expect(parseMerchantContext(second.context, secondState, config).generation).toBe(1);
     expect(generation).toBe(1);
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(4);
   });
 
-  it('rejects a connection added after invitation issuance without changing it', async () => {
+  it('can restart authorization against the existing single connection without changing it', async () => {
     const issued = await invitation();
-    const tx = {$queryRaw: vi.fn().mockResolvedValueOnce([{provider: 'salla', active: 1, maintenance: 0, oauth_generation: 1}]).mockResolvedValueOnce([{id: 99n}]), $executeRaw: vi.fn()};
-    await expect(startMerchantOAuth(transactionDb(tx), issued.invitation, config)).rejects.toThrow('supplier_merchant_already_connected');
-    expect(tx.$executeRaw).not.toHaveBeenCalled();
+    const tx = {$queryRaw: vi.fn().mockResolvedValueOnce([{provider: 'salla', active: 1, maintenance: 0, oauth_generation: 1}]).mockResolvedValueOnce([{id: 99n,oauth_scope_version:1}]), $executeRaw: vi.fn()};
+    await expect(startMerchantOAuth(transactionDb(tx), issued.invitation, config)).resolves.toMatchObject({url:expect.stringContaining('accounts.salla.sa')});
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
   });
 
   it('separates invitation and context signatures, expires callback context and binds its state', async () => {
@@ -133,50 +136,69 @@ describe('merchant identity before connection persistence', () => {
 
   it('consumes a valid state but never stores a wrong-store grant or changes existing demo credentials', async () => {
     const attempt = await ownerAttempt();
-    const tx = {$queryRaw: vi.fn().mockResolvedValue([{supplier_id: 2n}]), $executeRaw: vi.fn().mockResolvedValue(1)};
+    const tx = {$queryRaw: vi.fn().mockResolvedValueOnce([{supplier_id: 2n}]).mockResolvedValueOnce([{store_url:'https://salla.sa/alawaleen'}]), $executeRaw: vi.fn().mockResolvedValue(1)};
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600})))
-      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44}}})))
+      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44,name:storeName,domain:'https://salla.sa/alawaleen'}}})))
       .mockResolvedValueOnce(storeResponse({name: 'متجر تجريبي', domain: 'https://demostore.salla.sa/test'}));
-    await expect(completeOAuth(transactionDb(tx), {state: attempt.state, browser: attempt.browser, adminId: 1n, code: 'code', merchantContext: attempt.context}, config, fetcher)).rejects.toThrow('supplier_merchant_identity_mismatch');
+    await expect(completeOAuth(transactionDb(tx), {state: attempt.state, browser: attempt.browser, adminId: 1n, code: 'code', scope:SALLA_REQUIRED_SCOPES.join(' '), merchantContext: attempt.context}, config, fetcher)).rejects.toThrow('supplier_merchant_identity_mismatch');
     expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
     expect(tx.$executeRaw.mock.calls[0][0].join('')).toContain('UPDATE supplier_oauth_states SET consumed_at');
     expect(tx.$executeRaw.mock.calls.flat().join('')).not.toContain('new-access');
   });
 
-  it('refuses a newly connected target in the final transaction after successful provider verification', async () => {
+  it('reauthorizes the same verified store by updating its single connection', async () => {
     const attempt = await ownerAttempt();
     const tx = {$queryRaw: vi.fn()
       .mockResolvedValueOnce([{supplier_id: 2n}])
+      .mockResolvedValueOnce([{store_url:'https://salla.sa/alawaleen'}])
       .mockResolvedValueOnce([{provider: 'salla', active: 1, maintenance: 0}])
       .mockResolvedValueOnce([{state_hash: digest(attempt.state)}])
-      .mockResolvedValueOnce([{id: 99n}]), $executeRaw: vi.fn().mockResolvedValue(1)};
+      .mockResolvedValueOnce([{id: 99n,external_store_id:'44',oauth_scope_version:1}])
+      .mockResolvedValueOnce([{id:99n,supplier_id:2n}]), $executeRaw: vi.fn().mockResolvedValue(1)};
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600})))
-      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44}}})))
+      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44,name:storeName,domain:'https://salla.sa/alawaleen'}}})))
       .mockResolvedValueOnce(storeResponse());
-    await expect(completeOAuth(transactionDb(tx), {state: attempt.state, browser: attempt.browser, adminId: 1n, code: 'code', merchantContext: attempt.context}, config, fetcher)).rejects.toThrow('supplier_merchant_already_connected');
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+    await expect(completeOAuth(transactionDb(tx), {state: attempt.state, browser: attempt.browser, adminId: 1n, code: 'code', scope:SALLA_REQUIRED_SCOPES.join(' '), merchantContext: attempt.context}, config, fetcher)).resolves.toBe(2n);
+    const sql=tx.$executeRaw.mock.calls.map(([query])=>query.join('')).join('\n');
+    expect(sql).toContain('UPDATE supplier_connections SET encrypted_tokens');
+    expect(sql).toContain('sync_enabled=1');
+    expect(sql).not.toContain('INSERT INTO supplier_connections');
   });
 
   it('persists only the verified merchant connection with connection-bound encrypted tokens', async () => {
     const attempt = await ownerAttempt();
     const tx = {$queryRaw: vi.fn()
       .mockResolvedValueOnce([{supplier_id: 2n}])
+      .mockResolvedValueOnce([{store_url:'https://salla.sa/alawaleen'}])
       .mockResolvedValueOnce([{provider: 'salla', active: 1, maintenance: 0}])
       .mockResolvedValueOnce([{state_hash: digest(attempt.state)}])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]), $executeRaw: vi.fn().mockResolvedValue(1)};
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600})))
-      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44}}})))
+      .mockResolvedValueOnce(new Response(JSON.stringify({success: true, data: {merchant: {id: 44,name:storeName,domain:'https://salla.sa/alawaleen'}}})))
       .mockResolvedValueOnce(storeResponse());
-    await expect(completeOAuth(transactionDb(tx), {state: attempt.state, browser: attempt.browser, adminId: 1n, code: 'code', merchantContext: attempt.context}, config, fetcher)).resolves.toBe(2n);
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(2);
+    await expect(completeOAuth(transactionDb(tx), {state: attempt.state, browser: attempt.browser, adminId: 1n, code: 'code', scope:SALLA_REQUIRED_SCOPES.join(' '), merchantContext: attempt.context}, config, fetcher)).resolves.toBe(2n);
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(3);
     const [sql, supplierId, merchantId, encrypted] = tx.$executeRaw.mock.calls[1];
     expect(sql.join('')).toContain('INSERT INTO supplier_connections');
     expect([supplierId, merchantId]).toEqual([2n, '44']);
     expect(openTokens(encrypted, 'salla:2:44', config.encryptionKey)).toEqual({accessToken: 'new-access', refreshToken: 'new-refresh'});
     expect(tx.$executeRaw.mock.calls.map(([query]) => query.join('')).join('\n')).not.toMatch(/supplier_products|commerce_products|commerce_purchasing_enabled/);
   });
+});
+
+describe('sanitized OAuth operational log',()=>{
+ it('stores only an allowlisted technical code and never the provider secret',async()=>{
+  const writes:{sql:string;values:unknown[]}[]=[];
+  const tx={$queryRaw:vi.fn(),$executeRaw:vi.fn(async(sql:TemplateStringsArray,...values:unknown[])=>{writes.push({sql:sql.join('?'),values});return 1;})};
+  await recordOAuthFailure(transactionDb(tx),{state:'a'.repeat(64),adminId:1n,supplierId:2n,error:new Error('access_token=secret')});
+  expect(supplierOAuthFailureCode(new Error('access_token=secret'))).toBe('supplier_oauth_failed');
+  expect(supplierOAuthFailureCode(new Error('supplier_merchant_identity_mismatch'))).toBe('supplier_merchant_identity_mismatch');
+  expect(JSON.stringify(writes,(_,value)=>typeof value==='bigint'?String(value):value)).not.toContain('access_token=secret');
+  expect(writes.map(write=>write.sql).join('\n')).toContain('INSERT INTO admin_log');
+  expect(writes.flatMap(write=>write.values)).toContain('supplier_oauth_failed');
+ });
 });

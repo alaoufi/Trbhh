@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, '../..');
 const sources = [
   'scripts/release/salla-owner-invite.ts',
   'src/lib/suppliers/merchant-oauth.ts',
+  'src/lib/suppliers/salla-scope-contract.ts',
   'src/lib/suppliers/config.ts',
   'src/lib/suppliers/crypto.ts',
   'src/lib/suppliers/http.ts',

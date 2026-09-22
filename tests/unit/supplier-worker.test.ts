@@ -62,4 +62,11 @@ describe('durable supplier GET inbox',()=>{
   expect(result.failed).toBe(5);expect(adapterForConnection).toHaveBeenCalledTimes(5);
   expect(Object.values(result).every(n=>typeof n==='number')).toBe(true);
  });
+ it('retries catalog sync after OAuth in development mode but only for a current token-bearing connection',async()=>{
+  const f=fixture();await reconcileSuppliers(f.db,config);
+  const sql=vi.mocked(f.db.$queryRaw).mock.calls.map(call=>(call[0] as unknown as TemplateStringsArray).join('?')).find(text=>text.includes('p.sync_enabled=1'))||'';
+  expect(sql).not.toContain("p.mode='live'");
+  expect(sql).toContain('c.oauth_scope_version=');
+  expect(sql).toContain('c.encrypted_tokens IS NOT NULL');
+ });
 });

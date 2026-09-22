@@ -4,10 +4,11 @@ import {Prisma} from '@prisma/client';
 import type {CommerceDb} from '@/lib/commerce/types';
 import {mergeOnboarding,validateOnboarding} from './onboarding-input';
 import {ONBOARDING_FIELDS,maskedOnboardingValue,type OnboardingValues} from './onboarding-fields';
+import {SALLA_OAUTH_SCOPE_VERSION} from './salla-scope-contract';
 type Reader=Pick<Prisma.TransactionClient,'$queryRaw'>;
 type SupplierRow={id:bigint;name:string;contact_name:string;phone:string;email:string;address:string;registration_number:string;tax_number:string;settlement_terms:string;notes:string;active:number;updated_at:Date};
 type OnboardRow={supplier_id:bigint;registration_number:string;store_url:string;encrypted_details:string;revision:number;check_status:string;checked_connection_version:number|null;checked_at:Date|null;check_code:string;check_sample_count:number};
-type Connection={id:bigint;external_store_id:string;status:string;version:number};
+type Connection={id:bigint;external_store_id:string;status:string;version:number;oauth_scope_version:number};
 const baseMap={store_name:'name',contact_name:'contact_name',phone:'phone',email:'email',address:'address',registration_number:'registration_number',tax_number:'tax_number',settlement_terms:'settlement_terms',notes:'notes'} as const;
 function key(value:string){if(!/^[a-f0-9]{64}$/i.test(value))throw Error('onboarding_encryption');return Buffer.from(value,'hex');}
 export function encryptDetails(values:OnboardingValues,supplierId:bigint,secret:string):string {
@@ -47,15 +48,15 @@ export async function inspectOnboarding(db:Reader,values:OnboardingValues,secret
  if(urlOwners.some(o=>o.id!==existing?.id))throw Error('onboarding_url_conflict');
  const emailOwners=values.email?await db.$queryRaw<{id:bigint}[]>`SELECT id FROM commerce_suppliers WHERE LOWER(email)=${values.email} AND id<>${existing?.id??0n} LIMIT 1`:[];
  const warnings=emailOwners.length?['البريد مستخدم لمورد بسجل تجاري مختلف؛ لن يتم دمج الموردين.']:[];
- const connections=existing?await db.$queryRaw<Connection[]>`SELECT id,external_store_id,status,version FROM supplier_connections WHERE supplier_id=${existing.id} AND provider='salla' ORDER BY id DESC LIMIT 20`:[];
+ const connections=existing?await db.$queryRaw<Connection[]>`SELECT id,external_store_id,status,version,oauth_scope_version FROM supplier_connections WHERE supplier_id=${existing.id} AND provider='salla' ORDER BY id DESC LIMIT 20`:[];
  const old:OnboardingValues=identity?decryptDetails(identity.encrypted_details,identity.supplier_id,secret):{};
  if(existing)for(const [field,column]of Object.entries(baseMap))old[field]=String(existing[column as keyof SupplierRow]??'')||null;
  const merged=mergeOnboarding(old,values);
  const changes=ONBOARDING_FIELDS.map(([field,label])=>({key:field,label,before:maskedOnboardingValue(field,old[field]),after:maskedOnboardingValue(field,merged[field]),kind:merged[field]===old[field]||(!merged[field]&&!old[field])?'unchanged' as const:old[field]?'changed' as const:'new' as const}));
  const changedKeys=changes.filter(c=>c.kind!=='unchanged').map(c=>c.key);
  const ordered=(value:OnboardingValues)=>Object.entries(value).filter(([,v])=>v!==''&&v!==undefined).sort(([a],[b])=>a.localeCompare(b));
- const fingerprint=createHash('sha256').update(JSON.stringify({id:existing?.id.toString()??null,revision:identity?.revision??0,old:ordered(old),values:ordered(values),connections:connections.map(c=>[c.id.toString(),c.status,c.version])})).digest('hex');
- return {existing,identity,connections,old,merged,changes,changedKeys,warnings,fingerprint,connected:connections.some(c=>c.status==='connected')};
+ const fingerprint=createHash('sha256').update(JSON.stringify({id:existing?.id.toString()??null,revision:identity?.revision??0,old:ordered(old),values:ordered(values),connections:connections.map(c=>[c.id.toString(),c.status,c.version,c.oauth_scope_version])})).digest('hex');
+ return {existing,identity,connections,old,merged,changes,changedKeys,warnings,fingerprint,connected:connections.some(c=>c.status==='connected'&&c.oauth_scope_version===SALLA_OAUTH_SCOPE_VERSION)};
 }
 export function issuePreviewToken(fingerprint:string,adminId:bigint,fileHash:string,secret:string,now=Date.now()){
  const body=Buffer.from(JSON.stringify({fingerprint,adminId:String(adminId),fileHash,expires:now+15*60000})).toString('base64url');return body+'.'+createHmac('sha256',key(secret)).update(body).digest('hex');

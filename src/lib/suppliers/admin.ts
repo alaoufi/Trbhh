@@ -9,7 +9,9 @@ const flag=(form:FormData,key:string)=>form.get(key)==='1';
 export function parseIntegrationControls(form:FormData) {
   const provider=String(form.get('provider')),mode=String(form.get('mode'));
   if(!['salla','cj','other'].includes(provider)||!['development','live'].includes(mode))throw new Error('supplier_invalid_fields');
-  return {supplierId:formId(form,'supplierId'),provider:provider as SupplierProvider,mode:mode as SupplierMode,active:flag(form,'active'),maintenance:flag(form,'maintenance'),syncEnabled:flag(form,'syncEnabled'),autoOrdersEnabled:flag(form,'autoOrdersEnabled')};
+  const syncEnabled=flag(form,'syncEnabled'),autoOrdersEnabled=flag(form,'autoOrdersEnabled');
+  if(mode!=='live'&&autoOrdersEnabled)throw new Error('supplier_invalid_fields');
+  return {supplierId:formId(form,'supplierId'),provider:provider as SupplierProvider,mode:mode as SupplierMode,active:flag(form,'active'),maintenance:flag(form,'maintenance'),syncEnabled,autoOrdersEnabled};
 }
 export function parseProductControls(form:FormData) {
   const policy=String(form.get('policy')),revision=Number(form.get('revision'));

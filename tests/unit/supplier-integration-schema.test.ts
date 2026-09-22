@@ -33,16 +33,16 @@ function metadata(){
   }};
   return {tables,columns,indexes,foreign,db};
 }
-it('supports generic providers and eleven additive restrictive binary tables',()=>{
+it('supports generic providers and additive restrictive binary tables',()=>{
   expect(SUPPLIER_PROVIDERS).toEqual(['salla','cj','other']);
-  expect(SUPPLIER_DDL).toHaveLength(11);
+  expect(SUPPLIER_DDL).toHaveLength(13);
   for(const ddl of SUPPLIER_DDL){
     expect(ddl).toMatch(/^CREATE TABLE IF NOT EXISTS supplier_/);
     expect(ddl).toContain('ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin');
     expect(ddl).not.toMatch(/CASCADE|DROP TABLE/);
   }
   const sql=SUPPLIER_DDL.join('\n');
-  for(const field of ['sync_claim','sync_claimed_at','held_quantity','refresh_claim','encrypted_tokens','commerce_product_id','minimum_margin_minor'])expect(sql).toContain(field);
+  for(const field of ['sync_claim','sync_claimed_at','held_quantity','refresh_claim','encrypted_tokens','oauth_scope_version','commerce_product_id','minimum_margin_minor','external_order_url','external_customer_id','supplier_order_sync_attempts','supplier_coordinator_notifications','provider_message_id'])expect(sql).toContain(field);
 });
 it('fails closed against missing tables without mutating schema',async()=>{
   await expect(assertSupplierSchemaReady({$queryRaw:async()=>[]} as never)).rejects.toThrow('supplier_schema_not_ready');
@@ -50,7 +50,7 @@ it('fails closed against missing tables without mutating schema',async()=>{
 it('Prisma generated SQL mirrors all restrictive supplier relations and unique keys',()=>{
   const sql=execFileSync(process.execPath,['node_modules/prisma/build/index.js','migrate','diff','--from-empty','--to-schema-datamodel','prisma/schema.prisma','--script'],{encoding:'utf8',timeout:20000,env:{...process.env,DATABASE_URL:'mysql://fixture:fixture@127.0.0.1:33309/trbhh_commerce_test'}});
   const m=metadata();
-  expect(m.foreign).toHaveLength(17);
+  expect(m.foreign).toHaveLength(20);
   for(const fk of m.foreign){
     const expected='ALTER TABLE `'+fk.t+'` ADD CONSTRAINT `'+fk.n+'` FOREIGN KEY (`'+fk.c+'`) REFERENCES `'+fk.parent+'`(`'+fk.ref+'`) ON DELETE RESTRICT ON UPDATE RESTRICT;';
     expect(sql.split('\n').filter(l=>l.startsWith('ALTER TABLE'))).toContain(expected);

@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import { financeSchemaAvailable } from '@/lib/finance/schema';
 import { requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCommerceConfig } from '@/lib/commerce/settings';
@@ -23,6 +25,9 @@ export default async function MemberOrder({ params, searchParams }: {
     getCommerceConfig(), getCommerceGateway(),
   ]);
   const attempt = attempts[0];
+  const documents = await financeSchemaAvailable(prisma)
+    ? await prisma.$queryRaw<{id:bigint;number:string|null;status:string}[]>`SELECT i.id,i.number,i.status FROM finance_invoices i INNER JOIN commerce_orders o ON o.id=i.order_id WHERE o.id=${order.id} AND o.member_id=${BigInt(session.uid)} ORDER BY i.id`
+    : [];
   const tracking = config.enabled && order.status === 'paid'
     ? await memberOrderTracking(prisma, order.id, BigInt(session.uid)) : [];
   let trackingLabels: string[] = [];
@@ -46,6 +51,7 @@ export default async function MemberOrder({ params, searchParams }: {
         : query.payment === 'action_required' ? config.text.paymentActionRequired : null;
   return <section className="card-3d space-y-4 rounded-xl p-5">
     <h1 className="text-xl font-bold text-primary">طلب #{id}</h1>
+    {documents.length>0&&<section className="space-y-2" aria-label="مستندات الطلب">{documents.map(document=><Link key={String(document.id)} href={`/account/invoices/${document.id}`} className="block rounded-lg border p-3 text-sm">عرض {document.number||'سجل العملية — بيانات الإصدار قيد المراجعة'}</Link>)}</section>}
     {order.status === 'paid' ? <p className="rounded-lg bg-emerald-50 p-3 text-emerald-800">{config.text.confirmed}</p>
       : order.status === 'cancelled' ? <p>تم إلغاء الطلب قبل بدء الدفع.</p>
         : <p className="rounded-lg bg-amber-50 p-3">{attempt ? config.text.pending : config.text.unavailable}</p>}

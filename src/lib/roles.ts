@@ -8,8 +8,8 @@ import { ensureSchema } from '@/data/schema-sync';
 
 export type Service =
   | 'users' | 'ads' | 'duplicates' | 'classified'
-  | 'words' | 'reports' | 'verifications' | 'comments' | 'packages' | 'promos' | 'backup' | 'messages' | 'stores' | 'commerce' | 'categories' | 'suppliers';
-export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive' | 'suspend' | 'ban';
+  | 'words' | 'reports' | 'verifications' | 'comments' | 'packages' | 'promos' | 'backup' | 'messages' | 'stores' | 'commerce' | 'categories' | 'suppliers' | 'finance';
+export type Action = 'view' | 'add' | 'edit' | 'delete' | 'archive' | 'suspend' | 'ban' | 'approve' | 'close' | 'export';
 
 /** Backward-compat alias: a "Perm" is a service (page-level access). */
 export type Perm = Service;
@@ -34,12 +34,14 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
   { key: 'backup',        label: 'النسخ الاحتياطي',      actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'stores',        label: 'المتاجر',            actions: ['view', 'edit', 'suspend', 'delete'] },
   { key: 'commerce',      label: 'السلع والطلبات',      actions: ['view', 'add', 'edit', 'suspend'] },
+  { key: 'finance',       label: 'المتابعة المالية والفواتير', actions: ['view', 'edit', 'approve', 'close', 'export'] },
   { key: 'suppliers',     label: 'الموردون وربط السلع', actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'categories',    label: 'الأقسام وحقولها',      actions: ['view', 'add', 'edit', 'delete', 'suspend'] },
 ];
 
 export const ACTION_LABELS: Record<Action, string> = {
   view: 'عرض', add: 'إضافة', edit: 'تعديل', delete: 'حذف', archive: 'أرشفة', suspend: 'تعطيل', ban: 'حظر',
+  approve: 'اعتماد مالي', close: 'إقفال الشهر', export: 'تصدير',
 };
 
 export const ALL_KEYS: string[] = SERVICES.flatMap((s) => s.actions.map((a) => `${s.key}:${a}`));
@@ -91,7 +93,7 @@ export const MATRIX_ROLES: Role[] = ['manager', 'moderator', 'monitor', 'store_m
 // staff may NEVER be granted the ability to edit a member's ad content (privacy)
 export const MATRIX_LOCKED = new Set<string>(['ads:edit']);
 export const ALL_MATRIX_KEYS: string[] = SERVICES
-  .flatMap((s) => MATRIX_ACTIONS.map((a) => `${s.key}:${a}`))
+  .flatMap((s) => (s.key === 'finance' ? s.actions : MATRIX_ACTIONS).map((a) => `${s.key}:${a}`))
   .filter((k) => !MATRIX_LOCKED.has(k));
 const MATRIX_SET = new Set(ALL_MATRIX_KEYS);
 const toSuspend = (k: string) => k.replace(/:archive$/, ':suspend');

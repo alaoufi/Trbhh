@@ -1,0 +1,31 @@
+import type { FinanceInvoice, FinanceReport } from './types';
+import { monthOfDate, formatFinanceMoney } from './reports';
+export type FinanceSheet={name:string;headers:string[];rows:(string|number|null)[][]};
+const money=(value:number|null)=>value===null?null:value/100;
+export function financeExportSheets(report:FinanceReport):FinanceSheet[]{
+  const {query,data}=report;
+  const selectedInvoice=(v:FinanceInvoice)=>monthOfDate(v.at)===query.month&&(!query.supplierId||v.source.suppliers.some(s=>s.supplierId===query.supplierId))&&(!query.status||v.status===query.status)&&(!query.q||[v.id,v.orderId,v.number||'',v.source.customerName].some(x=>x.includes(query.q!)));
+  return [
+    {name:'ملخص',headers:['البند','المبلغ بالريال','التوضيح','المصدر'],rows:report.metrics.map(x=>[x.label,money(x.valueMinor),x.explanation,x.href])},
+    {name:'الموردون',headers:['المورد','الرصيد الافتتاحي','المستحقات','المسدد','المتبقي','المعلق','المتأخر'],rows:report.suppliers.map(x=>[x.name,money(x.openingMinor),money(x.accruedMinor),money(x.paidMinor),money(x.remainingMinor),money(x.pendingMinor),money(x.overdueMinor)])},
+    {name:'الحركات',headers:['التاريخ','الحركة','له','عليه','الرصيد','المرجع','المصدر'],rows:report.movements.map(x=>[x.at,x.label,money(x.creditMinor),money(x.debitMinor),money(x.balanceMinor),x.reference,x.href])},
+    {name:'الميزانية',headers:['البند','المخطط','الفعلي','الفرق','نسبة الصرف'],rows:report.budget.map(x=>[x.label,money(x.plannedMinor),money(x.actualMinor),money(x.differenceMinor),x.usagePercent])},
+    {name:'المطابقة',headers:['الحالة','التوضيح','الفرق بالريال','المصدر'],rows:report.issues.map(x=>[x.severity==='error'?'يمنع الإقفال':'مراجعة',x.message,money(x.differenceMinor??null),x.href])},
+    {name:'الفواتير',headers:['الرقم','الطلب','التاريخ','النوع','الحالة','قبل الضريبة','الضريبة','الإجمالي'],rows:data.invoices.filter(selectedInvoice).map(x=>[x.number||x.id,x.orderId,x.at,x.kind,x.status,money(x.netMinor),money(x.vatMinor),money(x.totalMinor)])},
+  ];
+}
+export function escapeFinanceHtml(value:unknown):string{return String(value??'غير مكتمل').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));}
+export function printableFinanceReport(report:FinanceReport):string{
+  const sheets=financeExportSheets(report);
+  return printShell('تقرير تربح المالي — '+report.query.month,sheets.map(sheet=>'<h2>'+escapeFinanceHtml(sheet.name)+'</h2><table><thead><tr>'+sheet.headers.map(h=>'<th>'+escapeFinanceHtml(h)+'</th>').join('')+'</tr></thead><tbody>'+sheet.rows.map(row=>'<tr>'+row.map(x=>'<td>'+escapeFinanceHtml(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table>').join(''));
+}
+export function printableFinanceInvoice(invoice:FinanceInvoice,internal:boolean):string{
+  const s=invoice.snapshot;
+  const rows=s?s.lines.map(x=>[x.title,x.quantity,formatFinanceMoney(x.netMinor),formatFinanceMoney(x.vatMinor),formatFinanceMoney(x.grossMinor)]):invoice.source.items.map(x=>[x.title,x.quantity,'غير مكتمل','غير مكتمل',formatFinanceMoney(x.totalMinor)]);
+  const parties=s?'<p>'+escapeFinanceHtml(s.issuer.name)+' — '+escapeFinanceHtml(s.issuer.address)+' — الرقم الضريبي: '+escapeFinanceHtml(s.issuer.taxNumber)+'</p>':'<p>بانتظار بيانات جهة الإصدار والسياسة الضريبية — ليس فاتورة ضريبية مُصدرة.</p>';
+  const extra=internal?'<h2>مراجع داخلية</h2><p>مرجع المقبوض: '+escapeFinanceHtml(invoice.receiptId)+'</p><ul>'+invoice.source.suppliers.map(x=>'<li>'+escapeFinanceHtml(x.supplierName)+': '+escapeFinanceHtml(formatFinanceMoney(x.amountMinor))+'</li>').join('')+'</ul>':'';
+  return printShell('تربح — '+(invoice.number||'سجل #'+invoice.id),parties+'<p>العميل: '+escapeFinanceHtml(s?.customer.name||invoice.source.customerName)+' — '+escapeFinanceHtml(s?.customer.address||'')+'</p><p>الطلب: '+escapeFinanceHtml(invoice.orderId)+' — التاريخ: '+escapeFinanceHtml(invoice.issuedAt || invoice.at)+'</p><table><thead><tr><th>المنتج</th><th>الكمية</th><th>قبل الضريبة</th><th>الضريبة</th><th>الإجمالي</th></tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(x=>'<td>'+escapeFinanceHtml(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table><p>إجمالي المستند: '+formatFinanceMoney(invoice.totalMinor)+' ريال سعودي</p><p>'+escapeFinanceHtml(invoice.reason)+'</p>'+extra);
+}
+function printShell(title:string,content:string):string{
+  return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+escapeFinanceHtml(title)+'</title><style>body{font:15px Tahoma,Arial;max-width:1120px;margin:32px auto;padding:24px;color:#16294a}h1{border-bottom:4px solid #f0b429;padding-bottom:16px}h2{margin-top:32px}table{border-collapse:collapse;width:100%;margin:16px 0}th,td{border:1px solid #ddd;text-align:right;padding:10px;overflow-wrap:anywhere}th{background:#f6f3eb}p{line-height:1.9}.notice{background:#fff7df;padding:14px}@media print{body{margin:0;padding:0;font-size:10pt}.print-help{display:none}thead{display:table-header-group}tr{break-inside:avoid}h2{break-after:avoid}table{font-size:9pt}}</style></head><body><p class="print-help">للحفظ بصيغة PDF استخدم طباعة المتصفح ثم «حفظ كـ PDF».</p><h1>'+escapeFinanceHtml(title)+'</h1><p class="notice">الأرقام من السجلات المتاحة. «غير مكتمل» لا تعني صفرًا. الطباعة ليست اعتمادًا للفوترة الإلكترونية.</p>'+content+'</body></html>';
+}

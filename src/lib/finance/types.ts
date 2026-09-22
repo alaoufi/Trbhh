@@ -1,0 +1,25 @@
+/** Finance projections use integer halalas and immutable transaction sources. */
+export type FinanceSection = 'overview' | 'suppliers' | 'settlements' | 'budget' | 'month-end' | 'cashflow' | 'close' | 'invoices' | 'reconciliation' | 'tax' | 'ledger' | 'expenses';
+export type BudgetCategory = 'sales' | 'trbhh_income' | 'supplier_cost' | 'shipping' | 'payment_fees' | 'marketing' | 'hosting' | 'administration' | 'tax' | 'refunds' | 'other';
+export type FinanceOrder = { id: string; memberId: string; customerName: string; status: string; createdAt: string; paidAt: string | null; subtotalMinor: number; shippingMinor: number; totalMinor: number; currency: string; items: { productId: string; title: string; quantity: number; unitMinor: number; totalMinor: number }[]; suppliers: { supplierId: string; supplierName: string; productId: string; amountMinor: number }[] };
+export type FinanceReceipt = { id: string; orderId: string; provider: string; amountMinor: number; currency: string; reference: string; at: string };
+export type FinanceRefund = { id: string; orderId: string; receiptId: string; provider: string; externalId: string; amountMinor: number; currency: string; at: string; evidenceRef: string; actorId: string };
+export type FinanceAccrual = { id: string; orderId: string; productId: string; supplierId: string; amountMinor: number; at: string; eligibleAt: string | null; dueAt: string | null; holdReason: string };
+export type FinanceSupplier = { id: string; name: string };
+export type FinanceExpense = { id: string; category: BudgetCategory; description: string; netMinor: number; vatMinor: number; totalMinor: number; paidMinor: number; at: string; dueAt: string; reference: string; reversalOf: string | null };
+export type FinanceSettlement = { id: string; supplierId: string; amountMinor: number; at: string; status: 'draft' | 'approved' | 'reversed'; reference: string; reason: string; lines: { accrualId: string; amountMinor: number }[]; reversalOf: string | null };
+export type FiscalLine = { key: string; title: string; quantity: number; unitNetMinor: number; discountMinor: number; vatBps: number; supplierId?: string; supplierMinor?: number };
+export type CalculatedFiscalLine = FiscalLine & { netMinor: number; vatMinor: number; grossMinor: number };
+export type FiscalSnapshot = { version: 1; issuer: { name: string; taxNumber: string; address: string }; customer: { name: string; address: string }; currency: 'SAR'; lines: CalculatedFiscalLine[]; netMinor: number; vatMinor: number; totalMinor: number; paidMinor: number; sourceOrderId: string; sourceReceiptId: string; policyReference: string };
+export type FinanceInvoice = { id: string; orderId: string; receiptId: string; number: string | null; kind: 'invoice' | 'credit_note' | 'debit_note'; parentId: string | null; status: 'pending_policy' | 'issued'; at: string; issuedAt?: string | null; totalMinor: number; netMinor: number | null; vatMinor: number | null; snapshot: FiscalSnapshot | null; source: FinanceOrder; reason: string };
+export type FinanceBudget = { month: string; category: BudgetCategory; plannedMinor: number };
+export type FinancePeriod = { month: string; closedAt: string | null; checks: string[]; reason: string };
+export type FinanceAudit = { id: string; at: string; actorId: string; action: string; entity: string; entityId: string; reason: string };
+export type FinanceData = { ready: boolean; orders: FinanceOrder[]; receipts: FinanceReceipt[]; refunds: FinanceRefund[]; suppliers: FinanceSupplier[]; accruals: FinanceAccrual[]; expenses: FinanceExpense[]; settlements: FinanceSettlement[]; invoices: FinanceInvoice[]; budgets: FinanceBudget[]; periods: FinancePeriod[]; audit: FinanceAudit[] };
+export type FinanceQuery = { month: string; section: FinanceSection; mode: 'simple' | 'accountant'; supplierId?: string; q?: string; status?: string };
+export type FinanceMetric = { key: string; label: string; valueMinor: number | null; explanation: string; href: string };
+export type FinanceIssue = { key: string; severity: 'error' | 'warning'; message: string; href: string; differenceMinor?: number };
+export type SupplierBalance = { id: string; name: string; openingMinor: number; accruedMinor: number; paidMinor: number; pendingMinor: number; remainingMinor: number; dueMinor: number; overdueMinor: number; nextDueAt: string | null; lastSettlementAt: string | null };
+export type StatementMovement = { id: string; at: string; label: string; creditMinor: number; debitMinor: number; balanceMinor: number; orderId: string | null; reference: string; href: string; status: string };
+export type BudgetComparison = { category: BudgetCategory; label: string; plannedMinor: number; actualMinor: number | null; differenceMinor: number | null; usagePercent: number | null };
+export type FinanceReport = { query: FinanceQuery; metrics: FinanceMetric[]; previousMetrics: FinanceMetric[]; suppliers: SupplierBalance[]; movements: StatementMovement[]; budget: BudgetComparison[]; issues: FinanceIssue[]; due7Minor: number; due30Minor: number; availableMinor: number; canClose: boolean; data: FinanceData };

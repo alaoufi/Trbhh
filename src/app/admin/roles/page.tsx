@@ -1,7 +1,7 @@
 import { KeyRound, Check, Lock } from 'lucide-react';
 import {
   requireAction, SERVICES, MATRIX_ACTIONS, MATRIX_ROLES, MATRIX_LOCKED,
-  ACTION_LABELS, ROLE_LABELS, getRolePermKeys, type Role,
+  ACTION_LABELS, ROLE_LABELS, getRolePermKeys, type Role, type Action,
 } from '@/lib/roles';
 import { Button } from '@/components/ui/button';
 import { saveRolePermsAction } from '../actions';
@@ -18,6 +18,7 @@ const ROLE_COLORS: Record<Role, string> = {
   member: 'from-sky-600 to-sky-800',
   visitor: 'from-slate-500 to-slate-700',
 };
+const columns:Action[]=[...MATRIX_ACTIONS,'approve','close','export'];
 
 export default async function RolesPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   await requireAction('users', 'edit');
@@ -56,7 +57,7 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
                 <thead>
                   <tr className="bg-secondary/60 text-primary">
                     <th className="p-2 text-right font-extrabold">القسم</th>
-                    {MATRIX_ACTIONS.map((a) => (
+                    {columns.map((a) => (
                       <th key={a} className="p-2 font-extrabold">{ACTION_LABELS[a]}</th>
                     ))}
                   </tr>
@@ -65,9 +66,9 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
                   {SERVICES.map((s) => (
                     <tr key={s.key} className="border-t">
                       <td className="p-2 text-right font-bold">{s.label}</td>
-                      {MATRIX_ACTIONS.map((a) => {
+                      {columns.map((a) => {
                         const k = `${s.key}:${a}`;
-                        const locked = MATRIX_LOCKED.has(k);
+                        const locked = MATRIX_LOCKED.has(k) || (s.key==='finance' ? !s.actions.includes(a) : !MATRIX_ACTIONS.includes(a));
                         return (
                           <td key={a} className="p-2">
                             {locked ? (

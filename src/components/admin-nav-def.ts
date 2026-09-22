@@ -64,6 +64,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
   {
     key: 'money', title: 'المال والاشتراكات', icon: Coins, color: '#16a34a',
     items: [
+      { href: '/admin/finance', label: 'المتابعة المالية والفواتير', icon: Landmark, perm: 'finance', description: 'دخل وخرج ومستحقات الموردين والفواتير والميزانية والمطابقة', keywords: ['مالية','فاتورة','ضريبة','تسوية','إقفال'] },
       { href: '/admin/revenue', label: 'الميزانية والتقارير المالية', icon: Coins, perm: 'users', description: 'ملخص الدخل والمصروف والميزانية', keywords: ['إيرادات', 'تقرير مالي', 'ميزانية'] },
       { href: '/admin/revenue?tab=wallets', label: 'محافظ الأعضاء', icon: WalletCards, perm: 'users', description: 'البحث في محافظ الأعضاء وسجل تعاملاتهم', keywords: ['محفظة عضو', 'رصيد عضو', 'سجل مالي'] },
       { href: '/admin/revenue?tab=accounts', label: 'حسابات الشحن البنكية', icon: Landmark, perm: 'users', description: 'البنوك والآيبان التي يحوّل إليها الأعضاء', keywords: ['الحساب البنكي', 'آيبان', 'بيانات التحويل', 'بنك', 'حساب الشحن'] },

@@ -6,6 +6,7 @@
 | --- | --- |
 | اللوحة اليومية | [عرض](overview-desktop.png) |
 | حسابات الموردين | [عرض](suppliers-desktop.png) |
+| كشف حساب مورد وحركاته | [عرض](supplier-statement-desktop.png) |
 | التسويات | [عرض](settlements-desktop.png) |
 | الميزانية | [عرض](budget-desktop.png) |
 | ملخص الشهر | [عرض](month-end-desktop.png) |

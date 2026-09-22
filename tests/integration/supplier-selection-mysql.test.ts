@@ -80,11 +80,11 @@ describe.skipIf(process.env.AUTH_DB_TESTS !== '1')('isolated MySQL visual suppli
     sourceIds = [];
     const supplier = await db.commerce_suppliers.create({ data: { name: `Selection fixture ${suffix}`, active: 1 } });
     supplierId = supplier.id;
-    // The visual catalog intentionally excludes development/demo Salla stores.
-    // This fixture exercises the selectable production catalog path without
-    // enabling synchronization or automatic ordering.
-    await db.supplier_integration_profiles.create({ data: { supplier_id: supplierId, provider: 'salla', sync_enabled: 0, auto_orders_enabled: 0, mode: 'live' } });
-    const connection = await db.supplier_connections.create({ data: { supplier_id: supplierId, provider: 'salla', external_store_id: `selection-${suffix}`, status: 'connected' } });
+    // OAuth enables read-only catalog sync in development while automatic
+    // ordering remains disabled. A current token-bearing connection is the
+    // authorization fence for selecting imported products.
+    await db.supplier_integration_profiles.create({ data: { supplier_id: supplierId, provider: 'salla', sync_enabled: 1, auto_orders_enabled: 0, mode: 'development' } });
+    const connection = await db.supplier_connections.create({ data: { supplier_id: supplierId, provider: 'salla', external_store_id: `selection-${suffix}`, status: 'connected', oauth_scope_version: 1, encrypted_tokens: 'synthetic-test-envelope' } });
     connectionId = connection.id;
     for (let index = 0; index < 2; index++) {
       const source = await db.supplier_products.create({ data: {
@@ -171,8 +171,8 @@ describe.skipIf(process.env.AUTH_DB_TESTS !== '1')('isolated MySQL visual suppli
     expect(await db.commerce_product_suppliers.count({ where: { supplier_id: supplierId } })).toBe(2);
     expect(await db.supplier_price_history.count({ where: { supplier_product_id: { in: sourceIds }, kind: 'admin' } })).toBe(2);
     expect(await db.admin_log.count({ where: { admin_id: adminId } })).toBe(2);
-    expect(await db.supplier_integration_profiles.findUnique({ where: { supplier_id: supplierId! } })).toMatchObject({ sync_enabled: 0, auto_orders_enabled: 0, mode: 'live' });
-    expect(await db.supplier_connections.findUnique({ where: { id: connectionId! } })).toMatchObject({ status: 'connected', version: 0, encrypted_tokens: null });
+    expect(await db.supplier_integration_profiles.findUnique({ where: { supplier_id: supplierId! } })).toMatchObject({ sync_enabled: 1, auto_orders_enabled: 0, mode: 'development' });
+    expect(await db.supplier_connections.findUnique({ where: { id: connectionId! } })).toMatchObject({ status: 'connected', oauth_scope_version: 1, version: 0, encrypted_tokens: 'synthetic-test-envelope' });
   });
 
   it('rejects a stale second product without adding the earlier product', async () => {

@@ -19,8 +19,14 @@ permissions:
   contents: read
   actions: read
 jobs:
+  finance-release:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/finance-tax-audit-20260922' && inputs.owner_invite != true
+    uses: ./.github/workflows/finance-release.yml
+    with:
+      phase: inspect
+    secrets: inherit
   inspect:
-    if: inputs.owner_invite != true
+    if: inputs.owner_invite != true && github.ref != 'refs/heads/codex/finance-tax-audit-20260922'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

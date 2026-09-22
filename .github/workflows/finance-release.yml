@@ -1,5 +1,10 @@
 name: Finance and RBAC release operations
 on:
+  workflow_call:
+    inputs:
+      phase:
+        type: string
+        default: inspect
   workflow_dispatch:
     inputs:
       phase:

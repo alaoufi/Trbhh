@@ -91,7 +91,10 @@ describe('current owner invitation workflow gate', () => {
     const workflow = readFileSync('.github/workflows/integration-readiness.yml', 'utf8');
     expect(workflow).toContain("github.ref == 'refs/heads/codex/salla-customer-scope-sandbox-order-20260922'");
     expect(workflow).toContain("5dad593a7580de4fe0ec8d275283a33c321b36db");
+    expect(workflow).toContain("354d226ccf5bc80b92c67a227c2263ada1cdfa86");
     expect(workflow).toContain("35720454989");
+    expect(workflow).toContain("35720519825");
+    expect(workflow).toContain('actions/runs/$PRODUCTION_DEPLOY_RUN_ID/attempts/2');
     expect(workflow).toContain('SALLA_AUDIT_REPORT_PUBLIC_KEY_B64');
     expect(workflow).toContain('actions/runs/$BACKUP_RUN_ID');
     expect(workflow).toContain('salla-current-owner-invite.cjs');

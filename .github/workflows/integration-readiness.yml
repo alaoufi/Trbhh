@@ -49,6 +49,8 @@ jobs:
       cancel-in-progress: false
     env:
       PRODUCTION_SHA: ${{ github.ref == 'refs/heads/codex/salla-customer-scope-sandbox-order-20260922' && '5dad593a7580de4fe0ec8d275283a33c321b36db' || (github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && '9a64552faca2b99e63a0e915ea73fd0989336b86' || github.sha) }}
+      PRODUCTION_BASELINE_SHA: ${{ github.ref == 'refs/heads/codex/salla-customer-scope-sandbox-order-20260922' && '354d226ccf5bc80b92c67a227c2263ada1cdfa86' || '' }}
+      PRODUCTION_DEPLOY_RUN_ID: ${{ github.ref == 'refs/heads/codex/salla-customer-scope-sandbox-order-20260922' && '35720519825' || '' }}
       INVITATION_PROFILE: ${{ github.ref == 'refs/heads/codex/salla-customer-scope-sandbox-order-20260922' && 'customer_scope' || (github.ref == 'refs/heads/codex/supplier-visual-selection-20260921' && 'national_day' || 'merchant_oauth') }}
     steps:
       - uses: actions/checkout@v4
@@ -120,7 +122,9 @@ jobs:
           [[ "$REPORT_PUBLIC_KEY_B64" =~ ^[A-Za-z0-9+/=]+$ ]]
           test ${#REPORT_PUBLIC_KEY_B64} -lt 12000
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BACKUP_RUN_ID" |
-            jq -e --arg sha "$PRODUCTION_SHA" '.status == "completed" and .conclusion == "success" and .head_sha == $sha and .event == "workflow_dispatch" and .path == ".github/workflows/fetch-full-backup.yml"' >/dev/null
+            jq -e --arg sha "$PRODUCTION_BASELINE_SHA" '.status == "completed" and .conclusion == "success" and .head_sha == $sha and .event == "workflow_dispatch" and .path == ".github/workflows/fetch-full-backup.yml"' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PRODUCTION_DEPLOY_RUN_ID/attempts/2" |
+            jq -e --arg sha "$PRODUCTION_SHA" '.status == "completed" and .conclusion == "success" and .head_sha == $sha and .event == "push" and .path == ".github/workflows/deploy.yml"' >/dev/null
           mkdir -p ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/key
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts

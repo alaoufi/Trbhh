@@ -88,6 +88,7 @@ services:
       SALLA_WEBHOOK_SECRET: ${SALLA_WEBHOOK_SECRET:-}
       SUPPLIER_RECONCILE_SECRET: ${SUPPLIER_RECONCILE_SECRET:-}
       SUPPLIER_ALLOW_LIVE_ORDERS: ${SUPPLIER_ALLOW_LIVE_ORDERS:-false}
+      FINANCE_CAPTURE_SECRET: ${FINANCE_CAPTURE_SECRET:-}
       NODE_ENV: production
       # كل الأوقات والتواريخ بتوقيت الرياض (+3)
       TZ: Asia/Riyadh

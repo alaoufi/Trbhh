@@ -244,13 +244,23 @@ export async function createCjOrder(input: unknown): Promise<CjResult<{ orderId:
 
 function str(v: unknown): string | null { return typeof v === 'string' && v.trim() ? v : null; }
 function num(v: unknown): number | null { const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN; return Number.isFinite(n) ? n : null; }
+/** سعر CJ قد يأتي رقماً أو نصاً أو نطاقاً «a--b» / «a-b» — نأخذ أدنى قيمة صالحة. */
+function parsePrice(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (!s) return null;
+  const first = s.split(/--|~|,|\s|to/i)[0].split('-')[0].trim();
+  const n = Number(first.replace(/[^0-9.]/g, ''));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 function mapSummary(p: Record<string, unknown>): CjProductSummary {
   return {
     pid: String(p.pid ?? p.productId ?? ''),
     productName: String(p.productNameEn ?? p.productName ?? ''),
     productSku: String(p.productSku ?? p.sku ?? ''),
-    sellPrice: num(p.sellPrice),
+    sellPrice: parsePrice(p.sellPrice ?? p.productPrice ?? p.price),
     productImage: str(p.productImage) || str(p.bigImage),
     categoryName: str(p.categoryName),
   };
@@ -260,7 +270,7 @@ function mapVariant(v: Record<string, unknown>): CjVariant {
     vid: String(v.vid ?? v.variantId ?? ''),
     variantSku: String(v.variantSku ?? v.sku ?? ''),
     variantName: str(v.variantNameEn ?? v.variantName),
-    variantSellPrice: num(v.variantSellPrice ?? v.sellPrice),
+    variantSellPrice: parsePrice(v.variantSellPrice ?? v.sellPrice),
     variantImage: str(v.variantImage),
     variantWeight: num(v.variantWeight),
   };

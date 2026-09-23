@@ -57,12 +57,29 @@ test('media metadata walk counts symlinks without following them',()=>{
   const fake={lstatSync:entry=>{observed.push(entry);const base=path.basename(entry);return {size:base==='photo'?12n:5n,isDirectory:()=>base==='media',isFile:()=>base==='photo',isSymbolicLink:()=>base==='link'};},readdirSync:()=>['photo','link']};
   assert.deepEqual(mediaSize('/media',fake),{bytes:'17',entries:'3'});assert.equal(observed.length,3);
 });
+
+test('mixed capacity budgets fresh storage only from independently measured roots and retains reserves',()=>{
+  const roots=[{label:'storage',bytes:'835478783',entries:'2073'},{label:'legacy',bytes:'11642840587',entries:'12826'}];
+  const measured={...sample,mediaBytes:'12478319370',mediaEntries:'14899',mediaRoots:roots};
+  const fresh=checkCapacity(measured,String(GiB),'1024',space('1'),space('1')).filesystems[0];
+  const parent=checkCapacity(measured,String(GiB),'1024',space('1'),space('1'),'verified-parent').filesystems[0];
+  const mixed=checkCapacity(measured,String(GiB),'1024',space('1'),space('1'),'fresh-storage-retained-legacy').filesystems[0];
+  assert.equal(BigInt(mixed.plannedBytes)-BigInt(parent.plannedBytes),2n*835478783n+2073n*4096n);
+  assert.equal(BigInt(fresh.plannedBytes)-BigInt(mixed.plannedBytes),2n*11642840587n+12826n*4096n);
+  assert.equal(BigInt(mixed.requiredInodes)-BigInt(parent.requiredInodes),2073n);
+  assert(BigInt(mixed.reserveBytes)>=5n*GiB);assert(BigInt(mixed.reserveBytes)*4n>=BigInt(mixed.plannedBytes));
+  const below={...space('1'),availableBytes:String(BigInt(mixed.requiredBytes)-1n)};
+  assert.equal(checkCapacity(measured,String(GiB),'1024',below,below,'fresh-storage-retained-legacy').ok,false);
+  for(const mediaRoots of [undefined,[],[roots[0]],[roots[0],roots[0]],[{...roots[0],bytes:'1'},roots[1]],[roots[0],{...roots[1],entries:'0'}]])assert.throws(()=>checkCapacity({...measured,mediaRoots},String(GiB),'1024',space('1'),space('1'),'fresh-storage-retained-legacy'),/backup_capacity_invalid/);
+});
 test('live measurement uses database metadata SELECT and allowed media paths only',async()=>{
   const db={$queryRawUnsafe:async sql=>{assert.match(sql,/^SELECT /);assert.match(sql,/information_schema.TABLES/);return [{bytes:{toString:()=> '12345'},tables_count:172n}];}};
   const fs={lstatSync:()=>({size:0n,isDirectory:()=>true,isFile:()=>false,isSymbolicLink:()=>false}),readdirSync:()=>[]};
   const result=await measure(db,{STORAGE_DIR:'/app/storage',LEGACY_LOCAL_DIR:'/app/legacy'},fs);
   assert.equal(result.tableCount,'172');assert.equal(result.mediaEntries,'2');
+  assert.deepEqual(result.mediaRoots,[{label:'storage',bytes:'0',entries:'1'},{label:'legacy',bytes:'0',entries:'1'}]);
   await assert.rejects(()=>measure(db,{STORAGE_DIR:'/unexpected'},fs),/backup_capacity_unsupported_media/);
+  await assert.rejects(()=>measure(db,{STORAGE_DIR:'/app/legacy'},fs),/backup_capacity_unsupported_media/);
 });
 test('capacity preflight belongs only to merchant baseline and precedes audit directory and pause',()=>{
   const source=readFileSync(path.join(__dirname,'safeguards.sh'),'utf8');

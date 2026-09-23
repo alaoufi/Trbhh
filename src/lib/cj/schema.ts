@@ -60,6 +60,60 @@ export const CJ_DDL: string[] = [
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  // طلبات CJ داخل تربح (بنية دورة الطلب — لا شراء حقيقي حتى التفعيل اليدوي).
+  // internal_ref مفتاح تفرّد داخلي يمنع تكرار الطلب (idempotency).
+  `CREATE TABLE IF NOT EXISTS cj_orders (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    internal_ref VARCHAR(64) NOT NULL,
+    user_id BIGINT UNSIGNED NULL,
+    cj_product_id VARCHAR(64) NOT NULL DEFAULT '',
+    product_name VARCHAR(400) NOT NULL DEFAULT '',
+    cj_order_id VARCHAR(64) NOT NULL DEFAULT '',
+    status VARCHAR(32) NOT NULL DEFAULT 'awaiting_payment',
+    status_reason VARCHAR(300) NOT NULL DEFAULT '',
+    items_total_minor INT NOT NULL DEFAULT 0,
+    shipping_total_minor INT NOT NULL DEFAULT 0,
+    tax_total_minor INT NOT NULL DEFAULT 0,
+    grand_total_minor INT NOT NULL DEFAULT 0,
+    currency VARCHAR(3) NOT NULL DEFAULT 'SAR',
+    carrier VARCHAR(120) NOT NULL DEFAULT '',
+    tracking_number VARCHAR(160) NOT NULL DEFAULT '',
+    tracking_url VARCHAR(1024) NOT NULL DEFAULT '',
+    tracking_status VARCHAR(64) NOT NULL DEFAULT '',
+    ship_name VARCHAR(160) NOT NULL DEFAULT '',
+    ship_phone VARCHAR(40) NOT NULL DEFAULT '',
+    ship_country VARCHAR(4) NOT NULL DEFAULT 'SA',
+    ship_region VARCHAR(120) NOT NULL DEFAULT '',
+    ship_city VARCHAR(120) NOT NULL DEFAULT '',
+    ship_address1 VARCHAR(400) NOT NULL DEFAULT '',
+    ship_address2 VARCHAR(400) NOT NULL DEFAULT '',
+    ship_zip VARCHAR(20) NOT NULL DEFAULT '',
+    placed_at DATETIME(3) NULL,
+    delivered_at DATETIME(3) NULL,
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY cj_orders_ref (internal_ref),
+    KEY cj_orders_status (status),
+    KEY cj_orders_user (user_id),
+    KEY cj_orders_cjid (cj_order_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // سجل أحداث/خط زمني للطلب — event_key فريد يجعل استقبال الأحداث/الـwebhooks idempotent.
+  `CREATE TABLE IF NOT EXISTS cj_order_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    order_id BIGINT UNSIGNED NOT NULL,
+    event_key VARCHAR(191) NOT NULL,
+    type VARCHAR(48) NOT NULL DEFAULT 'note',
+    source VARCHAR(24) NOT NULL DEFAULT 'internal',
+    from_status VARCHAR(32) NOT NULL DEFAULT '',
+    to_status VARCHAR(32) NOT NULL DEFAULT '',
+    note VARCHAR(1000) NOT NULL DEFAULT '',
+    actor_id BIGINT UNSIGNED NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY cj_order_event_key (event_key),
+    KEY cj_order_events_order (order_id, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   // مخزن أحداث webhooks من CJ (idempotent عبر مفتاح الحدث).
   `CREATE TABLE IF NOT EXISTS cj_webhook_events (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,

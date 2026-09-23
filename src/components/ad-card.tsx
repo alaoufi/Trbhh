@@ -93,7 +93,7 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
           )}
         </div>
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-white">
-          <Image src={ad.image} alt={compactAdTitle(ad.title)} fill sizes="96px" className="object-cover" />
+          <Image src={ad.image} unoptimized={/^https?:\/\//.test(ad.image)} alt={compactAdTitle(ad.title)} fill sizes="96px" className="object-cover" />
           {ad.special && (
             <span className="absolute right-1 top-1 rounded bg-[hsl(var(--new))] px-1.5 py-0.5 text-[10px] font-bold text-white">
               مميّز
@@ -170,7 +170,7 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
   return (
     <Link href={ad.href ?? `/ads/${ad.id}`} className="card-3d group flex flex-col overflow-hidden rounded-2xl">
       <div className="relative aspect-square w-full overflow-hidden bg-white">
-        <Image src={ad.image} alt={compactAdTitle(ad.title)} fill sizes="(max-width:640px) 50vw, 33vw" className="object-cover transition group-hover:scale-105" />
+        <Image src={ad.image} unoptimized={/^https?:\/\//.test(ad.image)} alt={compactAdTitle(ad.title)} fill sizes="(max-width:640px) 50vw, 33vw" className="object-cover transition group-hover:scale-105" />
         {/* شارات فوق الصورة */}
         <span className={cn('absolute right-0 top-2 rounded-l-full px-2 py-0.5 text-[10px] font-extrabold text-white shadow', isReq ? 'bg-amber-500' : 'bg-primary')}>
           {isReq ? 'طلب' : 'عرض'}
@@ -232,7 +232,7 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
       {/* برواز على الصورة — إطار أبيض بحدّ ملوّن وظلّ (يسار RTL) */}
       <div className="shrink-0 self-center rounded-2xl border-2 border-primary/30 bg-white p-1 shadow-md">
         <div className="relative aspect-square w-24 overflow-hidden rounded-xl sm:w-32">
-          <Image src={ad.image} alt={compactAdTitle(ad.title)} fill sizes="(max-width:640px) 96px, 128px" className="object-cover" />
+          <Image src={ad.image} unoptimized={/^https?:\/\//.test(ad.image)} alt={compactAdTitle(ad.title)} fill sizes="(max-width:640px) 96px, 128px" className="object-cover" />
           {tier && (
             <span className={cn('absolute left-1 top-1 grid h-6 w-6 place-items-center rounded-full shadow', tier === 'gold' ? 'bg-amber-400' : 'bg-slate-300')}>
               <Star className={cn('h-3.5 w-3.5', tier === 'gold' ? 'fill-amber-700 text-amber-700' : 'fill-slate-600 text-slate-600')} />
@@ -248,7 +248,7 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
 export function AdCardMarketplace({ ad }: { ad: AdCardType }) {
   return <Link href={ad.href ?? `/ads/${ad.id}`} className="marketplace-card group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
     <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
-      <Image src={ad.image} alt={compactAdTitle(ad.title)} fill sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className="object-cover transition duration-300 group-hover:scale-105" />
+      <Image src={ad.image} unoptimized={/^https?:\/\//.test(ad.image)} alt={compactAdTitle(ad.title)} fill sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 25vw" className="object-cover transition duration-300 group-hover:scale-105" />
       <div className="absolute inset-x-2 top-2 flex flex-wrap gap-1">
         <span className="rounded-full bg-[#16294a]/95 px-2.5 py-1 text-[10px] font-bold text-white">{ad.adsType === 'request' ? 'مطلوب' : 'معروض'}</span>
         {(ad.special || ad.tier) && <span className="rounded-full bg-[#f0b429] px-2.5 py-1 text-[10px] font-extrabold text-[#16294a]">{ad.tier === 'gold' ? 'إعلان ذهبي مميز' : ad.tier === 'silver' ? 'إعلان فضي مميز' : 'إعلان مميز'}</span>}

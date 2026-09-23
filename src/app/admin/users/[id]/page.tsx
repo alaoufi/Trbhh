@@ -10,6 +10,7 @@ import { toInt, timeAgo } from '@/lib/utils';
 import { getBalance, listTxns } from '@/lib/wallet';
 import { getModLog, DUP_LIMIT, CONTENT_STRIKE_LIMIT } from '@/lib/moderation';
 import { getUserAdminLog } from '@/lib/audit';
+import { redactAdminLog } from '@/lib/admin-audit-visibility';
 import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +38,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
   const { id } = await params;
   const { saved, sent, error, setpass, bal, linked } = await searchParams;
   const uid = Number(id);
-  const [u, adsCount, balance, txns, modLog, adminLog, strikes, dupRow, linkedMembers, dependencies] = await Promise.all([
+  const [u, adsCount, balance, txns, modLog, rawAdminLog, strikes, dupRow, linkedMembers, dependencies] = await Promise.all([
     prisma.users.findUnique({ where: { id: BigInt(uid) } }).catch(() => null),
     keys.has('ads:view') ? prisma.ads.count({ where: { user_id: BigInt(uid) } }).catch(() => 0) : null,
     keys.has('wallets:view') ? getBalance(uid) : null,
@@ -49,6 +50,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
     linkedAccounts(uid),
     keys.has('users:delete') ? inspectMemberDependencies(uid) : null,
   ]);
+  const adminLog = redactAdminLog(rawAdminLog, keys);
   if (!u) notFound();
   const field = 'h-10 w-full rounded-lg border bg-background px-3 text-sm';
   const fmtDate = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'short', timeStyle: 'short' }).format(d); };
@@ -146,7 +148,14 @@ export default async function AdminUserDetail({ params, searchParams }: { params
       {(dependencies) && <section className="space-y-3 rounded-2xl border-2 border-amber-300 bg-amber-50/50 p-4">
         <div className="flex items-center gap-2 text-sm font-extrabold text-amber-900"><Trash2 className="h-4 w-4" /> فحص الأرشفة والحذف</div>
         <p className="text-xs font-bold text-amber-900">قبل أي إجراء يُعاد فحص الحقوق. الإعلانات، المتجر، الرصيد، عمليات الشحن أو الرسائل تمنع الحذف الدائم وتحفظ بالأرشفة.</p>
-        <div className="grid grid-cols-2 gap-2 text-xs"><span>إعلانات: <b>{dependencies.advertisements}</b></span><span>متاجر: <b>{dependencies.stores}</b></span><span>رصيد محجوز/متاح: <b>{dependencies.balanceHalala / 100} ر.س</b></span><span>شحن/حركات: <b>{dependencies.topups + dependencies.walletTransactions}</b></span><span className="col-span-2">رسائل: <b>{dependencies.messages}</b></span></div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          {keys.has('ads:view') && <span>إعلانات: <b>{dependencies.advertisements}</b></span>}
+          {keys.has('stores:view') && <span>متاجر: <b>{dependencies.stores}</b></span>}
+          {keys.has('wallets:view') && <><span>رصيد محجوز/متاح: <b>{dependencies.balanceHalala / 100} ر.س</b></span><span>حركات المحفظة: <b>{dependencies.walletTransactions}</b></span></>}
+          {keys.has('topups:view') && <span>طلبات الشحن: <b>{dependencies.topups}</b></span>}
+          {keys.has('messages:view') && <span className="col-span-2">رسائل: <b>{dependencies.messages}</b></span>}
+        </div>
+        <p className="text-xs text-muted-foreground">تظهر تفاصيل المتعلقات بحسب صلاحيات عرض مصادرها. يظل فحص الحقوق كاملًا قبل الحذف أو الأرشفة.</p>
         {dispositionFor(dependencies) === 'archive' ? <AccessBoundary module={'users'} action={'delete'}><form action={disposeMemberAccountAction} className="space-y-2"><input type="hidden" name="userId" value={uid} /><input type="hidden" name="decision" value="archive" /><input type="hidden" name="confirmation" value="ARCHIVE" /><input name="reason" maxLength={300} required placeholder="سبب الأرشفة (إلزامي)" className={field} /><ConfirmSubmit msg="تأكيد أرشفة الحساب؟ سيختفي من الموقع ومن البحث، وتبقى جميع الحقوق والسجلات محفوظة." className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">أرشفة آمنة وإخفاء الحساب</ConfirmSubmit></form></AccessBoundary> : <AccessBoundary module={'users'} action={'delete'}><form action={disposeMemberAccountAction} className="space-y-2"><input type="hidden" name="userId" value={uid} /><input type="hidden" name="decision" value="delete" /><input type="hidden" name="confirmation" value="DELETE" /><ConfirmSubmit msg="التأكيد الثاني: الحساب فارغ فعلاً. حذف الهوية نهائياً بعد فك الارتباط؟ لا يمكن التراجع." className="rounded-lg bg-destructive px-3 py-2 text-xs font-bold text-white">حذف الحساب الفارغ نهائياً</ConfirmSubmit></form></AccessBoundary>}
       </section>}
 

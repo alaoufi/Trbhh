@@ -1,9 +1,10 @@
 import { AccessPage } from '@/components/access-boundary';
-import { requireAdminPage } from '@/lib/access-control/guards';
+import { requireAdminPage, readActorAccess } from '@/lib/access-control/guards';
 import { ScrollText, User } from 'lucide-react';
 import Link from 'next/link';
 
 import { listAdminLog, countAdminLog } from '@/lib/audit';
+import { redactAdminLog } from '@/lib/admin-audit-visibility';
 import { AdminPager } from '@/components/admin-pager';
 
 export const dynamic = 'force-dynamic';
@@ -18,10 +19,11 @@ function fmt(iso: string | null) {
 const PAGE_SIZE = 30;
 
 export default async function AdminAuditPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  await requireAdminPage('/admin/audit');
+  const session = await requireAdminPage('/admin/audit');
   const { page: pageRaw } = await searchParams;
   const page = Math.max(1, parseInt(pageRaw || '1') || 1);
-  const [rows, total] = await Promise.all([listAdminLog(PAGE_SIZE, (page - 1) * PAGE_SIZE), countAdminLog()]);
+  const [rawRows, total, access] = await Promise.all([listAdminLog(PAGE_SIZE, (page - 1) * PAGE_SIZE), countAdminLog(), readActorAccess(session.uid)]);
+  const rows = redactAdminLog(rawRows, access.keys);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   return (
     <div className="space-y-4">

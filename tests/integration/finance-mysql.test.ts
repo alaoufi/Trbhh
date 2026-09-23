@@ -218,6 +218,20 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
   });
   it('rejects direct financial service writes by support and read-only auditor without any financial mutation',async()=>{
     await seedOrder();
+    // Compare complete stored rows, including the approved policy fixture and
+    // source receipt/accrual amounts; counts alone would miss unauthorized edits.
+    const snapshot=async()=>{
+      const tables:Record<string,string[]>={};
+      for(const table of cleanupTables){
+        const rows=await db.$queryRawUnsafe<Record<string,unknown>[]>(`SELECT * FROM ${table}`);
+        tables[table]=rows.map(row=>JSON.stringify(row,(_key,value)=>typeof value==='bigint'?{bigint:value.toString()}:value)).sort();
+      }
+      return tables;
+    };
+    const before=await snapshot();
+    expect(before.finance_tax_policies).toHaveLength(1);
+    expect(before.finance_change_requests).toHaveLength(1);
+    expect(before.commerce_receipts).toHaveLength(1);
     for(const uid of [73n,75n]){
       await expect(recordExpense(db,uid,expense)).rejects.toThrow('access_forbidden');
       await expect(saveBudget(db,uid,{month:'2026-08',category:'hosting',plannedMinor:100,reason:'Synthetic denied budget'})).rejects.toThrow('access_forbidden');
@@ -225,9 +239,8 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
       await expect(releaseAccrual(db,uid,1n,'2026-08-15','No grant',at)).rejects.toThrow('access_forbidden');
       await expect(recordVerifiedFinanceRefund(db,uid,refund(),gate,at)).rejects.toThrow('access_forbidden');
       await expect(closeMonth(db,uid,'2026-08',[...CLOSE_CHECKS],'No grant',later)).rejects.toThrow('access_forbidden');
+      expect(await snapshot()).toEqual(before);
     }
-    for(const table of FINANCE_TABLES)expect(await count(table)).toBe(0);
-    expect(await count('commerce_receipts')).toBe(1);
   });
   it('rechecks permissions after a prior successful read and after department revocation',async()=>{
     expect((await readAccess(db,Number(actor))).keys.has('expenses:create')).toBe(true);

@@ -4,6 +4,7 @@ import { readCjAuth, writeCjAuth } from './store';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import type {
   CjResult, CjProductSummary, CjProductDetail, CjVariant, CjInventory, CjWarehouse, CjFreightOption, CjTrack,
+  CjCategory, CjProductPage,
 } from './types';
 
 /**
@@ -118,10 +119,47 @@ export async function testConnection(): Promise<CjResult<{ email: string }>> {
 }
 
 export async function listProducts(pageNum = 1, pageSize = 20, filters: { productName?: string; categoryId?: string } = {}): Promise<CjResult<CjProductSummary[]>> {
-  const r = await call<{ list?: unknown[] }>('/product/list', { query: { pageNum, pageSize, productName: filters.productName, categoryId: filters.categoryId } });
+  const r = await listProductsPage(pageNum, pageSize, filters);
+  if (!r.ok) return r;
+  return { ok: true, data: r.data.items };
+}
+
+/** صفحة منتجات مع الإجمالي (لتصفّح الآلاف: صفحات + قفز). */
+export async function listProductsPage(pageNum = 1, pageSize = 20, filters: { productName?: string; categoryId?: string } = {}): Promise<CjResult<CjProductPage>> {
+  const r = await call<{ list?: unknown[]; total?: unknown }>('/product/list', { query: { pageNum, pageSize, productName: filters.productName, categoryId: filters.categoryId } });
   if (!r.ok) return r;
   const list = Array.isArray(r.data?.list) ? r.data!.list! : [];
-  return { ok: true, data: list.map((p) => mapSummary(p as Record<string, unknown>)) };
+  const total = num(r.data?.total) ?? list.length;
+  return { ok: true, data: { items: list.map((p) => mapSummary(p as Record<string, unknown>)), total, pageNum, pageSize } };
+}
+
+// شجرة التصنيفات نادرة التغيّر — نخزّنها في الذاكرة لتفادي حدّ المعدّل عند كل تحميل.
+let categoryCache: { at: number; data: CjCategory[] } | null = null;
+const CATEGORY_TTL_MS = 6 * 60 * 60 * 1000;
+
+/** تصنيفات CJ مسطَّحة (المستوى الثالث مع المسار الكامل) — للفلترة. مخزّنة ٦ ساعات. */
+export async function getCategories(): Promise<CjResult<CjCategory[]>> {
+  if (categoryCache && Date.now() - categoryCache.at < CATEGORY_TTL_MS) return { ok: true, data: categoryCache.data };
+  const r = await call<unknown>('/product/getCategory', {});
+  if (!r.ok) return r;
+  const out: CjCategory[] = [];
+  const firsts = Array.isArray(r.data) ? r.data : [];
+  for (const f of firsts as Record<string, unknown>[]) {
+    const fName = String(f.categoryFirstName ?? '');
+    const seconds = Array.isArray(f.categoryFirstList) ? (f.categoryFirstList as Record<string, unknown>[]) : [];
+    for (const s of seconds) {
+      const sName = String(s.categorySecondName ?? '');
+      const thirds = Array.isArray(s.categorySecondList) ? (s.categorySecondList as Record<string, unknown>[]) : [];
+      for (const t of thirds) {
+        const id = String(t.categoryId ?? '');
+        const name = String(t.categoryName ?? '');
+        if (id && name) out.push({ id, name, path: [fName, sName, name].filter(Boolean).join(' › ') });
+      }
+    }
+  }
+  out.sort((a, b) => a.path.localeCompare(b.path));
+  categoryCache = { at: Date.now(), data: out };
+  return { ok: true, data: out };
 }
 
 export async function getProduct(pid: string): Promise<CjResult<CjProductDetail>> {

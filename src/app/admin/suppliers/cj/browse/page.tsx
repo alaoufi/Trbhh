@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireAccess } from '@/lib/access-control/guards';
 import { cjConfig } from '@/lib/cj/config';
-import { listProducts } from '@/lib/cj/client';
+import { listProductsPage, getCategories } from '@/lib/cj/client';
 import { sampleOneCjProduct } from '@/lib/cj/sample';
 import { importedCjPids, listCjProducts } from '@/lib/cj/mapping';
 import { cjSyncSettings } from '@/lib/cj/sync';
@@ -11,7 +11,7 @@ import { importCjProduct, removeCjProduct } from '../actions';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'تصفّح منتجات CJ واستيرادها' };
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 24;
 const card = 'card-3d rounded-xl p-3 space-y-2';
 const btn = 'rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white disabled:opacity-40';
 const ghost = 'rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary';
@@ -23,6 +23,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   await requireAccess('integrations', 'view');
   const sp = await searchParams;
   const q = typeof sp.q === 'string' ? sp.q.slice(0, 100) : '';
+  const cat = typeof sp.cat === 'string' && /^[0-9A-Za-z_-]{1,64}$/.test(sp.cat) ? sp.cat : '';
   const page = Math.max(1, parseInt(typeof sp.page === 'string' ? sp.page : '1') || 1);
   const detailPid = typeof sp.detail === 'string' && /^[0-9A-Za-z_-]{1,64}$/.test(sp.detail) ? sp.detail : '';
   const cfg = cjConfig();
@@ -31,14 +32,20 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     return <div className="space-y-3"><h1 className="text-xl font-extrabold text-primary">تصفّح منتجات CJ</h1><p className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm">اضبط متغيّرات CJ (البريد والمفتاح) في بيئة الخادم أولاً.</p></div>;
   }
 
-  const [settings, marginBps] = await Promise.all([cjSyncSettings(), defaultMarginBps()]);
-  const listing = await listProducts(page, PAGE_SIZE, { productName: q || undefined });
-  const items = listing.ok ? listing.data : [];
+  const [settings, marginBps, catsRes] = await Promise.all([cjSyncSettings(), defaultMarginBps(), getCategories()]);
+  const categories = catsRes.ok ? catsRes.data : [];
+  const listing = await listProductsPage(page, PAGE_SIZE, { productName: q || undefined, categoryId: cat || undefined });
+  const items = listing.ok ? listing.data.items : [];
+  const total = listing.ok ? listing.data.total : 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const imported = items.length ? await importedCjPids(items.map((p) => p.pid)) : new Set<string>();
   const detail = detailPid ? await sampleOneCjProduct(detailPid) : null;
   const importedList = await listCjProducts(60);
   const salePreview = (u: number | null) => (u != null && u > 0 ? computePrice(Math.round(u * settings.usdToSarX100), settings.shippingMinor, 0, marginBps).salePriceMinor : null);
-  const backHref = `/admin/suppliers/cj/browse?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}`;
+  const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`;
+  const pageHref = (n: number) => `/admin/suppliers/cj/browse?page=${Math.min(Math.max(1, n), totalPages)}${keep}`;
+  const backHref = `/admin/suppliers/cj/browse?page=${page}${keep}`;
+  const activeCat = categories.find((c) => c.id === cat);
 
   return (
     <div className="space-y-4">
@@ -57,12 +64,26 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       {sp.removed === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حذف المنتج من التخزين الوسيط.</p>}
       {!listing.ok && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر جلب المنتجات من CJ: {listing.error}{listing.status ? ` (HTTP ${listing.status})` : ''}</p>}
 
-      {/* بحث */}
+      {/* بحث + فلترة بالتصنيف */}
       <form method="get" className="flex flex-wrap items-end gap-2">
-        <label className="text-sm">بحث بالاسم<input className={`${input} ms-2 w-64`} name="q" defaultValue={q} placeholder="مثال: jacket, shorts…" /></label>
-        <button className={btn}>بحث</button>
-        {q && <Link href="/admin/suppliers/cj/browse" className={ghost}>مسح</Link>}
+        <label className="text-sm">بحث بالاسم<input className={`${input} ms-2 w-56`} name="q" defaultValue={q} placeholder="مثال: jacket, shorts…" /></label>
+        <label className="text-sm">التصنيف
+          <select name="cat" defaultValue={cat} className={`${input} ms-2 w-64`}>
+            <option value="">كل التصنيفات{total ? ` (${total.toLocaleString('en')})` : ''}</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.path}</option>)}
+          </select>
+        </label>
+        <button className={btn}>عرض</button>
+        {(q || cat) && <Link href="/admin/suppliers/cj/browse" className={ghost}>مسح الفلاتر</Link>}
       </form>
+      {!categories.length && <p className="text-xs text-amber-700">تعذّر جلب شجرة التصنيفات من CJ الآن — البحث بالاسم يعمل، وأعد المحاولة لاحقاً.</p>}
+
+      {/* ملخّص النتائج */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span className="text-muted-foreground">
+          {listing.ok ? <>إجمالي المنتجات{activeCat ? ` في «${activeCat.name}»` : ''}{q ? ` للبحث «${q}»` : ''}: <b className="text-primary">{total.toLocaleString('en')}</b> · صفحة {page.toLocaleString('en')} من {totalPages.toLocaleString('en')}</> : '—'}
+        </span>
+      </div>
 
       {/* شبكة المنتجات */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -89,11 +110,19 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
         {listing.ok && !items.length && <p className="col-span-full rounded-lg bg-white p-6 text-center text-sm text-muted-foreground">لا نتائج{q ? ` للبحث «${q}»` : ''}.</p>}
       </div>
 
-      {/* صفحات */}
-      <div className="flex items-center justify-between">
-        <Link href={`/admin/suppliers/cj/browse?page=${Math.max(1, page - 1)}${q ? `&q=${encodeURIComponent(q)}` : ''}`} aria-disabled={page <= 1} className={`${ghost} ${page <= 1 ? 'pointer-events-none opacity-40' : ''}`}>الصفحة السابقة</Link>
-        <span className="text-sm text-muted-foreground">صفحة {page}</span>
-        <Link href={`/admin/suppliers/cj/browse?page=${page + 1}${q ? `&q=${encodeURIComponent(q)}` : ''}`} aria-disabled={items.length < PAGE_SIZE} className={`${ghost} ${items.length < PAGE_SIZE ? 'pointer-events-none opacity-40' : ''}`}>الصفحة التالية</Link>
+      {/* صفحات — تنقّل كامل + قفز لصفحة */}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Link href={pageHref(1)} aria-disabled={page <= 1} className={`${ghost} ${page <= 1 ? 'pointer-events-none opacity-40' : ''}`}>« الأولى</Link>
+        <Link href={pageHref(page - 1)} aria-disabled={page <= 1} className={`${ghost} ${page <= 1 ? 'pointer-events-none opacity-40' : ''}`}>السابقة</Link>
+        <form method="get" className="flex items-center gap-1">
+          {q && <input type="hidden" name="q" value={q} />}
+          {cat && <input type="hidden" name="cat" value={cat} />}
+          <input className={`${input} w-16 text-center`} name="page" type="number" min={1} max={totalPages} defaultValue={page} aria-label="رقم الصفحة" />
+          <span className="text-sm text-muted-foreground">/ {totalPages.toLocaleString('en')}</span>
+          <button className={btn}>اذهب</button>
+        </form>
+        <Link href={pageHref(page + 1)} aria-disabled={page >= totalPages} className={`${ghost} ${page >= totalPages ? 'pointer-events-none opacity-40' : ''}`}>التالية</Link>
+        <Link href={pageHref(totalPages)} aria-disabled={page >= totalPages} className={`${ghost} ${page >= totalPages ? 'pointer-events-none opacity-40' : ''}`}>الأخيرة »</Link>
       </div>
 
       {/* تفاصيل منتج مختار */}

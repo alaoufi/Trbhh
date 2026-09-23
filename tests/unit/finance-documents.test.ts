@@ -2,6 +2,7 @@ import {describe,it,expect,vi} from 'vitest';
 import {customerInvoice,readFinanceInvoice} from '@/lib/finance/documents';
 import {printableFinanceInvoice,escapeFinanceHtml} from '@/lib/finance/exports';
 import {FINANCE_TABLES} from '@/lib/finance/schema';
+import {financeSchemaColumns} from '../fixtures/finance-schema-columns';
 import type {FinanceInvoice} from '@/lib/finance/types';
 const invoice:FinanceInvoice={id:'1',orderId:'2',receiptId:'private-receipt',number:'INV-2026-1',kind:'invoice',parentId:null,status:'issued',at:'2026-09-22T12:00:00.000Z',totalMinor:11500,netMinor:10000,vatMinor:1500,reason:'',
  source:{id:'2',memberId:'44',customerName:'<script>alert(1)</script>',status:'paid',createdAt:'2026-09-22T12:00:00Z',paidAt:'2026-09-22T12:00:00Z',subtotalMinor:11500,shippingMinor:0,totalMinor:11500,currency:'SAR',items:[],suppliers:[{supplierId:'8',supplierName:'PRIVATE_SUPPLIER',productId:'9',amountMinor:6000}]},
@@ -21,7 +22,8 @@ describe('customer finance documents',()=>{
    const queries:{sql:string;values:unknown[]}[]=[];
    const db={$queryRaw:vi.fn(async(sql:TemplateStringsArray,...values:unknown[])=>{
      const q=sql.join('?');queries.push({sql:q,values});
-     if(q.includes('information_schema'))return FINANCE_TABLES.map(name=>({name,engine:'InnoDB'}));
+     if(q.includes('information_schema.TABLES'))return FINANCE_TABLES.map(name=>({name,engine:'InnoDB'}));
+     if(q.includes('information_schema.COLUMNS'))return financeSchemaColumns();
      return [];
    })};
    expect(await readFinanceInvoice(db as never,'1',44)).toBeNull();

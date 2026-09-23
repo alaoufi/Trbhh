@@ -1,6 +1,6 @@
 import 'server-only';
 import type { CommerceDb } from '@/lib/commerce/types';
-import type { FinanceInvoice, FinanceOrder, FiscalSnapshot } from './types';
+import type { FinanceInvoice, FinanceOrder, ArchivedFiscalSnapshot as FiscalSnapshot } from './types';
 import { financeJson, financeNumber } from './read-model';
 import { financeSchemaAvailable } from './schema';
 import { parseFinanceId } from './service';
@@ -19,7 +19,12 @@ export async function readFinanceInvoice(db:Pick<CommerceDb,'$queryRaw'>,id:stri
 }
 /** Strip internal allocation data before crossing any member rendering boundary. */
 export function customerInvoice(invoice:FinanceInvoice):FinanceInvoice{
+  const snapshot=invoice.snapshot;
+  const stripSupplier=<T extends {supplierId?:string;supplierMinor?:number}>({supplierId:_supplierId,supplierMinor:_supplierMinor,...line}:T)=>line;
+  const publicSnapshot:FinanceInvoice['snapshot']=!snapshot?null:snapshot.version===1
+    ?{...snapshot,sourceReceiptId:'',policyReference:'',lines:snapshot.lines.map(stripSupplier)}
+    :{...snapshot,sourceReceiptId:'',policyReference:'',policyId:'',policyRequestId:'',orderSnapshotFingerprint:'',lines:snapshot.lines.map(stripSupplier)};
   return {...invoice,receiptId:'',reason:invoice.status==='pending_policy'?'بانتظار اعتماد بيانات الإصدار.':invoice.kind==='invoice'?'':invoice.reason,
     source:{...invoice.source,memberId:'',suppliers:[]},
-    snapshot:invoice.snapshot?{...invoice.snapshot,sourceReceiptId:'',policyReference:'',lines:invoice.snapshot.lines.map(({supplierId:_supplierId,supplierMinor:_supplierMinor,...line})=>line)}:null};
+    snapshot:publicSnapshot};
 }

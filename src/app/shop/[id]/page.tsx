@@ -8,13 +8,14 @@ import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { formatSar } from '@/lib/commerce/money';
 import { getCities, getAreas, getCountries } from '@/lib/data';
 import { CommerceCheckoutForm } from '@/components/commerce-checkout-form';
+import {readApprovedFiscalPolicy} from '@/lib/finance/fiscal-policy';
 
 export const dynamic = 'force-dynamic';
 export default async function ProductCheckout({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireUser();
   const config = await getCommerceConfig();
   const gateway = await getCommerceGateway();
-  if (!config.enabled || !config.paymentsEnabled || !gateway?.ready || config.shippingFeeMinor === null || !config.text.shippingTerms.trim()) {
+  if (!config.purchasingEnabled || !config.enabled || !config.paymentsEnabled || !gateway?.ready || config.shippingFeeMinor === null || !config.text.shippingTerms.trim()) {
     return <div className="card-3d rounded-xl p-5">{config.text.unavailable}</div>;
   }
   const { id } = await params;
@@ -22,13 +23,16 @@ export default async function ProductCheckout({ params }: { params: Promise<{ id
   await assertCommerceSchemaReady(prisma);
   const [product] = await prisma.$queryRaw<{ id: bigint; title: string; price_minor: number; stock_available: number }[]>`SELECT id,title,price_minor,stock_available FROM commerce_products WHERE id=${BigInt(id)} AND approved=1 AND enabled=1 AND visible=1 AND currency='SAR'`;
   if (!product || product.stock_available <= 0) notFound();
+  const policy=await readApprovedFiscalPolicy(prisma,new Date()).catch(()=>null);
+  if(!policy)return <div className="card-3d rounded-xl p-5">{config.text.unavailable}</div>;
   const [countries, cities, areas] = await Promise.all([getCountries(), getCities(), getAreas()]);
   const saudi = countries.find(c => /سعود/.test(c.name));
   return <section className="card-3d mx-auto max-w-2xl space-y-3 rounded-xl p-5">
     <h1 className="text-xl font-bold text-primary">{product.title}</h1>
-    <p>{formatSar(product.price_minor)} ر.س للقطعة · رسوم التوصيل: {formatSar(config.shippingFeeMinor)} ر.س للطلب</p>
+    <p>{formatSar(product.price_minor)} ر.س للقطعة ({policy.calculationPolicy.priceBasis==='inclusive'?'شامل الضريبة':'قبل الضريبة'}) · رسوم التوصيل: {formatSar(config.shippingFeeMinor)} ر.س للطلب ({policy.calculationPolicy.shippingPriceBasis==='inclusive'?'شاملة الضريبة':'قبل الضريبة'})</p>
     <p className="text-sm">{config.text.shippingTerms}</p>
     <CommerceCheckoutForm id={id} requestKey={randomUUID()} memberName={session.name} maximum={Math.min(9999, product.stock_available)}
-      regions={cities.filter(c => c.countryId === saudi?.id)} areas={areas} submitLabel={config.text.buy} />
+      regions={cities.filter(c => c.countryId === saudi?.id)} areas={areas} submitLabel={config.text.buy}
+      fiscalQuote={{unitPriceMinor:product.price_minor,priceBasis:policy.calculationPolicy.priceBasis,vatBps:policy.vatBps,shippingFeeMinor:config.shippingFeeMinor,shippingPriceBasis:policy.calculationPolicy.shippingPriceBasis,shippingVatBps:policy.calculationPolicy.shippingVatBps}} />
   </section>;
 }

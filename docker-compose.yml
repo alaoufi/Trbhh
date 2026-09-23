@@ -93,6 +93,7 @@ services:
       SUPPLIER_RECONCILE_SECRET: ${SUPPLIER_RECONCILE_SECRET:-}
       SUPPLIER_ALLOW_LIVE_ORDERS: ${SUPPLIER_ALLOW_LIVE_ORDERS:-false}
       FINANCE_CAPTURE_SECRET: ${FINANCE_CAPTURE_SECRET:-}
+      FINANCE_ISSUANCE_SECRET: ${FINANCE_ISSUANCE_SECRET:-}
       # CJdropshipping — قراءة فقط في هذه المرحلة (لا شراء/دفع). تُقرأ من .env على الخادم.
       # الختم يستخدم SUPPLIER_TOKEN_ENCRYPTION_KEY أعلاه.
       CJ_API_BASE: ${CJ_API_BASE:-}

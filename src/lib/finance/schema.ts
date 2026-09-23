@@ -97,21 +97,45 @@ export const FINANCE_DDL = [
   `CREATE TABLE IF NOT EXISTS finance_tax_policies (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, request_id BIGINT UNSIGNED NOT NULL,
     effective_from DATE NOT NULL, issuer JSON NOT NULL, vat_bps INT NOT NULL, policy_reference VARCHAR(160) NOT NULL, created_at DATETIME(3) NOT NULL,
+    calculation_policy JSON NULL,
     UNIQUE KEY finance_tax_request(request_id), UNIQUE KEY finance_tax_effective(effective_from), UNIQUE KEY finance_tax_reference(policy_reference),
     CONSTRAINT finance_tax_request_fk FOREIGN KEY(request_id) REFERENCES finance_change_requests(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CHECK(vat_bps>=0 AND vat_bps<=10000)
   )${engine}`,
+  `CREATE TABLE IF NOT EXISTS finance_order_fiscal_snapshots (
+    order_id BIGINT UNSIGNED NOT NULL PRIMARY KEY, policy_id BIGINT UNSIGNED NOT NULL, request_id BIGINT UNSIGNED NOT NULL,
+    captured_at DATETIME(3) NOT NULL, fingerprint CHAR(64) NOT NULL, snapshot JSON NOT NULL,
+    CONSTRAINT finance_order_fiscal_order_fk FOREIGN KEY(order_id) REFERENCES commerce_orders(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT finance_order_fiscal_policy_fk FOREIGN KEY(policy_id) REFERENCES finance_tax_policies(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT finance_order_fiscal_request_fk FOREIGN KEY(request_id) REFERENCES finance_change_requests(id) ON DELETE RESTRICT ON UPDATE RESTRICT
+  )${engine}`,
 ] as const;
 
+export const FINANCE_UPGRADE_DDL = ['ALTER TABLE finance_tax_policies ADD COLUMN calculation_policy JSON NULL'] as const;
+
 export const FINANCE_TABLES = FINANCE_DDL.map(sql => sql.match(/^CREATE TABLE IF NOT EXISTS (\w+)/)![1]);
+const fiscalSnapshotColumns:Record<string,string>={order_id:'bigint unsigned',policy_id:'bigint unsigned',request_id:'bigint unsigned',captured_at:'datetime(3)',fingerprint:'char(64)',snapshot:'json'};
 export async function financeSchemaAvailable(db: Pick<CommerceDb, '$queryRaw'>): Promise<boolean> {
+ try {
   const rows = await db.$queryRaw<{ name: string; engine: string }[]>`SELECT TABLE_NAME AS name,ENGINE AS engine FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME LIKE 'finance\\_%'`;
-  return FINANCE_TABLES.every(name => rows.some(row => row.name === name && row.engine === 'InnoDB'));
+  if(!FINANCE_TABLES.every(name => rows.some(row => row.name === name && row.engine === 'InnoDB')))return false;
+  // An existing table does not prove its additive upgrade completed. Read views
+  // also use this gate before selecting the new policy column.
+  const columns=await db.$queryRaw<{t:string;c:string;type:string;nullable:string;def:string|null;extra:string}[]>`SELECT TABLE_NAME AS t,COLUMN_NAME AS c,COLUMN_TYPE AS type,IS_NULLABLE AS nullable,COLUMN_DEFAULT AS def,EXTRA AS extra FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('finance_tax_policies','finance_order_fiscal_snapshots')`;
+  if(!columns.some(row=>row.t==='finance_tax_policies'&&row.c==='calculation_policy'&&row.type==='json'&&row.nullable==='YES'&&row.def===null&&row.extra===''))return false;
+  return Object.entries(fiscalSnapshotColumns).every(([name,type])=>columns.some(row=>row.t==='finance_order_fiscal_snapshots'&&row.c===name&&row.type===type&&row.nullable==='NO'&&row.def===null&&row.extra===''));
+ }catch{return false;}
 }
 export async function assertFinanceSchemaReady(db: Pick<CommerceDb, '$queryRaw'>) {
+ try {
   if (!(await financeSchemaAvailable(db))) throw new Error('finance_schema_not_ready');
-  const keys = await db.$queryRaw<{ name: string; non_unique: bigint | number }[]>`SELECT DISTINCT INDEX_NAME AS name,NON_UNIQUE AS non_unique FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME LIKE 'finance\\_%'`;
+  const keys = await db.$queryRaw<{ t:string;name: string;c:string;seq:number;non_unique: bigint | number;prefix:number|null }[]>`SELECT TABLE_NAME AS t,INDEX_NAME AS name,COLUMN_NAME AS c,SEQ_IN_INDEX AS seq,NON_UNIQUE AS non_unique,SUB_PART AS prefix FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME LIKE 'finance\\_%'`;
   for (const name of ['finance_expense_request','finance_expense_reversal','finance_settlement_request','finance_settlement_reversal','finance_invoice_source','finance_invoice_number','finance_refund_provider_reference','finance_reconciliation_request','finance_change_request','finance_tax_request','finance_tax_effective','finance_tax_reference']) {
     if (!keys.some(row => row.name === name && Number(row.non_unique) === 0)) throw new Error('finance_schema_not_ready');
   }
+  const primary=keys.filter(row=>row.t==='finance_order_fiscal_snapshots'&&row.name==='PRIMARY');
+  if(primary.length!==1||primary[0].c!=='order_id'||Number(primary[0].seq)!==1||Number(primary[0].non_unique)!==0||primary[0].prefix!==null)throw new Error('finance_schema_not_ready');
+  const relations=await db.$queryRaw<{c:string;p:string;r:string;local_parent:number;deletion:string;updates:string}[]>`SELECT k.COLUMN_NAME AS c,k.REFERENCED_TABLE_NAME AS p,k.REFERENCED_COLUMN_NAME AS r,(k.REFERENCED_TABLE_SCHEMA=DATABASE()) AS local_parent,f.DELETE_RULE AS deletion,f.UPDATE_RULE AS updates FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.REFERENTIAL_CONSTRAINTS f ON f.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND f.TABLE_NAME=k.TABLE_NAME AND f.CONSTRAINT_NAME=k.CONSTRAINT_NAME WHERE k.TABLE_SCHEMA=DATABASE() AND k.TABLE_NAME='finance_order_fiscal_snapshots'`;
+  for(const [column,parent] of [['order_id','commerce_orders'],['policy_id','finance_tax_policies'],['request_id','finance_change_requests']])if(!relations.some(row=>row.c===column&&row.p===parent&&row.r==='id'&&Number(row.local_parent)===1&&['RESTRICT','NO ACTION'].includes(row.deletion)&&['RESTRICT','NO ACTION'].includes(row.updates)))throw new Error('finance_schema_not_ready');
+ }catch{throw new Error('finance_schema_not_ready');}
 }

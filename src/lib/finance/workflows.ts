@@ -2,14 +2,16 @@ import 'server-only';
 import type {Prisma} from '@prisma/client';
 import type {CommerceDb} from '@/lib/commerce/types';
 import {requireFinancePermission,enforceFinanceChecker} from '@/lib/access-control/financial-authorization';
-import type {FinanceChangeKind,FinanceChangeRequest,FinanceReturnPayload,FinanceTaxPayload,FinanceReopenPayload,FiscalSnapshot} from './types';
+import type {FinanceChangeKind,FinanceChangeRequest,FinanceReturnPayload,FinanceTaxPayload,FinanceReopenPayload,ArchivedFiscalSnapshot as FiscalSnapshot} from './types';
+import {validateCalculationPolicy} from './fiscal-v2';
+import {buildReturnSnapshotV2,type PriorV2} from './adjustments-v2';
 import {calculateFiscalLines,checkedFinanceBigInt,checkedFinanceInteger,sumFinanceMoney} from './calculations';
 import {assertFinanceSchemaReady} from './schema';
 import {financeJson,financeNumber} from './read-model';
 import {auditFinance,financeMonth,fingerprint,parseFinanceId,parseFinanceMonth,requireOpenPeriod} from './service';
 import {issueAdjustmentInTransaction,validateAdjustment} from './adjustments';
 type Tx=Prisma.TransactionClient;
-type Prior={kind:'credit_note'|'debit_note';snapshot:FiscalSnapshot};
+type Prior={id?:string;kind:'credit_note'|'debit_note';snapshot:FiscalSnapshot};
 export type FinanceChangeInput={kind:FinanceChangeKind;targetId:string;payload:unknown;reason:string;requestKey:string};
 const options={maxWait:10000,timeout:30000,isolationLevel:'ReadCommitted' as const};
 const grants={return:{request:'returns:create',approve:'returns:approve',cancel:'returns:delete'},tax_settings:{request:'tax:manage_settings',approve:'tax:approve',cancel:'tax:manage_settings'},reopen_period:{request:'periods:reopen_period',approve:'periods:approve',cancel:'periods:reopen_period'}} as const;
@@ -21,6 +23,10 @@ export function validateFinanceChange(input:FinanceChangeInput,now=new Date()){
  const reason=reasonText(input.reason),payload=object(input.payload);
  if(input.kind==='return'){
   parseFinanceId(input.targetId);
+  if(payload.reversalOf!==undefined){
+   if(typeof payload.reversalOf!=='string'||!Array.isArray(payload.lines)||payload.lines.length)throw new Error('finance_credit_reversal_invalid');
+   parseFinanceId(payload.reversalOf);return {...input,reason,payload:{lines:[],reversalOf:payload.reversalOf} as FinanceReturnPayload};
+  }
   if(!Array.isArray(payload.lines)||!payload.lines.length||payload.lines.length>200)throw new Error('finance_return_invalid');
   const lines=payload.lines.map(value=>{const line=object(value);if(typeof line.key!=='string'||!line.key||line.key.length>80||typeof line.quantity!=='number'||!Number.isSafeInteger(line.quantity)||line.quantity<1)throw new Error('finance_return_invalid');return {key:line.key,quantity:line.quantity};});
   if(new Set(lines.map(x=>x.key)).size!==lines.length)throw new Error('finance_return_invalid');
@@ -34,12 +40,22 @@ export function validateFinanceChange(input:FinanceChangeInput,now=new Date()){
  const issuer=object(payload.issuer),effectiveFrom=String(payload.effectiveFrom||''),rate=payload.vatBps,policy=String(payload.policyReference||'').trim();
  const date=new Date(`${effectiveFrom}T00:00:00+03:00`);
  if(input.targetId!=='tax'||!/^20\d{2}-\d{2}-\d{2}$/.test(effectiveFrom)||!Number.isFinite(date.getTime())||new Date(date.getTime()+10800000).toISOString().slice(0,10)!==effectiveFrom||date<=now||!Number.isSafeInteger(rate)||Number(rate)<0||Number(rate)>10000||!policy||policy.length>160||typeof issuer.name!=='string'||!issuer.name.trim()||issuer.name.length>200||typeof issuer.address!=='string'||!issuer.address.trim()||issuer.address.length>500||typeof issuer.taxNumber!=='string'||!/^3\d{13}3$/.test(issuer.taxNumber))throw new Error('finance_tax_policy_invalid');
- return {...input,reason,payload:{effectiveFrom,issuer:{name:issuer.name.trim(),address:issuer.address.trim(),taxNumber:issuer.taxNumber},vatBps:Number(rate),policyReference:policy} as FinanceTaxPayload};
+ return {...input,reason,payload:{effectiveFrom,issuer:{name:issuer.name.trim(),address:issuer.address.trim(),taxNumber:issuer.taxNumber},vatBps:Number(rate),policyReference:policy,...(payload.calculationPolicy==null?{}:{calculationPolicy:validateCalculationPolicy(payload.calculationPolicy)})} as FinanceTaxPayload};
 }
 
 /** Derive a note exclusively from immutable issued lines. Rounding that cannot reconcile requires review. */
 export function buildReturnSnapshot(original:FiscalSnapshot,prior:Prior[],payload:FinanceReturnPayload):FiscalSnapshot {
+ if(payload.reversalOf){
+  const credit=prior.find(x=>x.id===payload.reversalOf&&x.kind==='credit_note');
+  if(!credit)throw new Error('finance_credit_reversal_invalid');
+  const snapshot=credit.snapshot.version===2?{...credit.snapshot,reversalOf:payload.reversalOf,derivation:'source_allocation' as const}:credit.snapshot;
+  validateAdjustment('debit_note',original,prior,snapshot);return snapshot;
+ }
  const clean=validateFinanceChange({kind:'return',targetId:original.sourceOrderId,payload,reason:'return snapshot',requestKey:'return-preview'}).payload as FinanceReturnPayload;
+ if(original.version===2){
+  if(prior.some(x=>x.snapshot.version!==2))throw new Error('finance_note_identity_invalid');
+  const snapshot=buildReturnSnapshotV2(original,prior as PriorV2[],clean);validateAdjustment('credit_note',original,prior,snapshot);return snapshot;
+ }
  const lines=clean.lines.map(selection=>{
   const source=original.lines.find(line=>line.key===selection.key);if(!source)throw new Error('finance_return_line_missing');
   const priorValue=(field:'quantity'|'netMinor'|'supplierMinor')=>sumFinanceMoney(prior.flatMap(note=>note.snapshot.lines.filter(line=>line.key===selection.key).map(line=>(note.kind==='credit_note'?1:-1)*(line[field]??0))));
@@ -74,8 +90,14 @@ export async function readFinanceChangeKind(db:Pick<CommerceDb,'$queryRaw'>,id:b
 async function returnSource(tx:Tx,id:string){
  const [invoice]=await tx.$queryRaw<{id:bigint;kind:string;status:string;snapshot:unknown}[]>`SELECT id,kind,status,snapshot FROM finance_invoices WHERE id=${parseFinanceId(id)} FOR UPDATE`;
  if(!invoice||invoice.kind!=='invoice'||invoice.status!=='issued'||!invoice.snapshot)throw new Error('finance_note_original_missing');
- const notes=await tx.$queryRaw<{kind:Prior['kind'];snapshot:unknown}[]>`SELECT kind,snapshot FROM finance_invoices WHERE parent_id=${invoice.id} AND status='issued'`;
- return {original:financeJson<FiscalSnapshot>(invoice.snapshot),prior:notes.map(note=>({kind:note.kind,snapshot:financeJson<FiscalSnapshot>(note.snapshot)}))};
+ const notes=await tx.$queryRaw<{id:bigint;kind:Prior['kind'];snapshot:unknown}[]>`SELECT id,kind,snapshot FROM finance_invoices WHERE parent_id=${invoice.id} AND status='issued'`;
+ return {original:financeJson<FiscalSnapshot>(invoice.snapshot),prior:notes.map(note=>({id:String(note.id),kind:note.kind,snapshot:financeJson<FiscalSnapshot>(note.snapshot)}))};
+}
+async function requireUnreversedCredit(tx:Tx,payload:FinanceReturnPayload){
+ if(!payload.reversalOf)return;
+ const key=`note:credit-reversal:${payload.reversalOf}`;
+ const rows=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_invoices WHERE source_key=${key}`;
+ if(rows.length)throw new Error('finance_credit_already_reversed');
 }
 const returnResult=(snapshot:FiscalSnapshot)=>({totalMinor:snapshot.totalMinor,vatMinor:snapshot.vatMinor,supplierMinor:sumFinanceMoney(snapshot.lines.map(line=>line.supplierMinor??0))});
 export async function requestFinanceChange(db:CommerceDb,actor:bigint,input:FinanceChangeInput,now=new Date()):Promise<bigint>{
@@ -85,7 +107,7 @@ export async function requestFinanceChange(db:CommerceDb,actor:bigint,input:Fina
   const [existing]=await tx.$queryRaw<{id:bigint;fingerprint:string}[]>`SELECT id,fingerprint FROM finance_change_requests WHERE request_key=${value.requestKey} FOR UPDATE`;
   if(existing){if(existing.fingerprint!==hash)throw new Error('finance_idempotency_conflict');return existing.id;}
   let result:FinanceChangeRequest['result']=null;
-  if(value.kind==='return'){const source=await returnSource(tx,value.targetId);result=returnResult(buildReturnSnapshot(source.original,source.prior,value.payload as FinanceReturnPayload));}
+  if(value.kind==='return'){const source=await returnSource(tx,value.targetId);await requireUnreversedCredit(tx,value.payload as FinanceReturnPayload);result=returnResult(buildReturnSnapshot(source.original,source.prior,value.payload as FinanceReturnPayload));}
   if(value.kind==='reopen_period'){
    const [period]=await tx.$queryRaw<{closed_at:Date|null;version:number}[]>`SELECT closed_at,version FROM finance_periods WHERE month=${value.targetId} FOR UPDATE`;
    if(!period?.closed_at||financeNumber(period.version)!==(value.payload as FinanceReopenPayload).expectedVersion)throw new Error('finance_period_version_conflict');
@@ -108,13 +130,15 @@ export async function approveFinanceChange(db:CommerceDb,actor:bigint,id:bigint,
   const payload=financeJson<FinanceChangeRequest['payload']>(row.payload);let result:NonNullable<FinanceChangeRequest['result']>={mode:checker.mode};
   if(kind==='return'){
    await requireOpenPeriod(tx,financeMonth(now));
+   const returnPayload=payload as FinanceReturnPayload;await requireUnreversedCredit(tx,returnPayload);
    const source=await returnSource(tx,row.target_id),snapshot=buildReturnSnapshot(source.original,source.prior,payload as FinanceReturnPayload),preview=returnResult(snapshot);
    if(fingerprint(preview)!==fingerprint(financeJson(row.result)))throw new Error('finance_return_changed');
-   const number=await issueAdjustmentInTransaction(tx,actor,{originalId:parseFinanceId(row.target_id),kind:'credit_note',requestKey:`return-request:${id}`,reason:(row.reason+' / '+reason).slice(0,1000),snapshot},{enabled:true,approvedPolicyReference:source.original.policyReference},now);
+   const number=await issueAdjustmentInTransaction(tx,actor,{originalId:parseFinanceId(row.target_id),kind:returnPayload.reversalOf?'debit_note':'credit_note',requestKey:returnPayload.reversalOf?`credit-reversal:${returnPayload.reversalOf}`:`return-request:${id}`,reason:(row.reason+' / '+reason).slice(0,1000),snapshot},{enabled:true,approvedPolicyReference:source.original.policyReference},now);
    result={...result,...preview,number};
   }else if(kind==='tax_settings'){
    const validated=validateFinanceChange({kind,targetId:row.target_id,payload,reason:row.reason,requestKey:`tax-approval:${id}`},now).payload as FinanceTaxPayload;
-   await tx.$executeRaw`INSERT INTO finance_tax_policies(request_id,effective_from,issuer,vat_bps,policy_reference,created_at) VALUES(${id},${validated.effectiveFrom},${JSON.stringify(validated.issuer)},${validated.vatBps},${validated.policyReference},${now})`;
+   if(validated.calculationPolicy)await requireFinancePermission(tx,BigInt(validated.calculationPolicy.automationDelegateId),'invoices:create');
+   await tx.$executeRaw`INSERT INTO finance_tax_policies(request_id,effective_from,issuer,vat_bps,policy_reference,created_at,calculation_policy) VALUES(${id},${validated.effectiveFrom},${JSON.stringify(validated.issuer)},${validated.vatBps},${validated.policyReference},${now},${validated.calculationPolicy?JSON.stringify(validated.calculationPolicy):null})`;
    const [policy]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_tax_policies WHERE request_id=${id}`;result.policyId=String(policy.id);
   }else{
    const expected=(payload as FinanceReopenPayload).expectedVersion;

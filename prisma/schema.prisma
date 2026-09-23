@@ -424,6 +424,7 @@ model commerce_products {
 }
 
 model commerce_orders {
+  fiscal_snapshot finance_order_fiscal_snapshots?
   finance_refunds finance_refunds[]
   finance_invoices finance_invoices[]
   supplier_reservation_allocations supplier_reservation_allocations[] @relation("supplier_allocation_order_fk")
@@ -2579,6 +2580,7 @@ model finance_reconciliations {
 }
 
 model finance_change_requests {
+  order_fiscal_snapshots finance_order_fiscal_snapshots[]
   id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
   request_key String @unique(map: "finance_change_request") @db.VarChar(80)
   fingerprint String @db.Char(64)
@@ -2598,12 +2600,28 @@ model finance_change_requests {
 }
 
 model finance_tax_policies {
+  order_fiscal_snapshots finance_order_fiscal_snapshots[]
   id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
   request_id BigInt @unique(map: "finance_tax_request") @db.UnsignedBigInt
   effective_from DateTime @unique(map: "finance_tax_effective") @db.Date
   issuer Json
+  calculation_policy Json?
   vat_bps Int
   policy_reference String @unique(map: "finance_tax_reference") @db.VarChar(160)
   created_at DateTime @db.DateTime(3)
   request finance_change_requests @relation(fields: [request_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_tax_request_fk")
+}
+
+model finance_order_fiscal_snapshots {
+  order_id BigInt @id @db.UnsignedBigInt
+  policy_id BigInt @db.UnsignedBigInt
+  request_id BigInt @db.UnsignedBigInt
+  captured_at DateTime @db.DateTime(3)
+  fingerprint String @db.Char(64)
+  snapshot Json
+  order commerce_orders @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_order_fiscal_order_fk")
+  policy finance_tax_policies @relation(fields: [policy_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_order_fiscal_policy_fk")
+  request finance_change_requests @relation(fields: [request_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_order_fiscal_request_fk")
+  @@index([policy_id], map: "finance_order_fiscal_policy_fk")
+  @@index([request_id], map: "finance_order_fiscal_request_fk")
 }

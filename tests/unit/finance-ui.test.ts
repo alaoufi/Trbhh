@@ -5,7 +5,7 @@ import type { FinanceData, FinanceInvoice, FinanceSection } from '@/lib/finance/
 
 vi.mock('@/app/admin/finance/actions', () => ({
   restoreFinanceDraftInvoice: async () => {},
-  approveFinanceRequest: async () => {}, cancelFinanceRequest: async () => {}, requestFinanceReturn: async () => {}, requestFinanceTaxSettings: async () => {}, requestFinancePeriodReopen: async () => {}, cancelFinanceSettlement: async () => {}, cancelFinanceDraftInvoice: async () => {}, reviewFinanceReconciliation: async () => {},
+  approveFinanceRequest: async () => {}, cancelFinanceRequest: async () => {}, requestFinanceReturn: async () => {}, requestFinanceReturnReversal: async () => {}, requestFinanceTaxSettings: async () => {}, requestFinancePeriodReopen: async () => {}, cancelFinanceSettlement: async () => {}, cancelFinanceDraftInvoice: async () => {}, reviewFinanceReconciliation: async () => {},
   approveFinanceSettlement: async () => {}, captureFinanceInvoices: async () => {}, closeFinanceMonth: async () => {},
   prepareFinanceSettlement: async () => {}, recordFinanceExpense: async () => {}, releaseFinanceAccrual: async () => {},
   reverseFinanceExpense: async () => {}, reverseFinanceSettlement: async () => {}, saveFinanceBudget: async () => {},
@@ -155,6 +155,36 @@ describe('finance request controls and preserved records',()=>{
  it('tax settings are not assumed and cannot be changed with approve-only permission',()=>{
   const reader=workflow('tax',{canApprove:true});expect(reader).not.toContain('name="vatPercent"');
   const manager=workflow('tax',{canManageTax:true});expect(manager).toContain('name="vatPercent"');expect(manager).not.toMatch(/name="vatPercent"[^>]*value="/);expect(manager).toContain('ليس إثباتًا للامتثال الضريبي');
+ });
+ it('requires explicit policy selections with no defaults, including when an earlier policy exists',()=>{
+  const source=data();source.taxPolicies=[{id:'1',requestId:'2',at:invoice.at,effectiveFrom:'2026-09-01',issuer:{name:'Previous issuer',taxNumber:'300000000000003',address:'Previous address'},vatBps:1500,policyReference:'previous-policy'}];
+  const html=workflow('tax',{canManageTax:true},source),formHtml=html.slice(html.indexOf('<form'));
+  for(const field of ['priceBasis','itemScope','shippingPriceBasis','discountTreatment','rounding','policyRollover']){
+   const select=formHtml.match(new RegExp(`<select(?=[^>]*name="${field}")[^>]*>[\\s\\S]*?</select>`))?.[0];expect(select).toContain('required=""');
+   expect(select).toMatch(/<option(?=[^>]*value="")(?=[^>]*selected="")[^>]*>/);expect(select?.match(/selected=""/g)).toHaveLength(1);
+  }
+  for(const field of ['issuerName','issuerTaxNumber','issuerAddress','vatPercent','shippingVatPercent','automationDelegateId']){expect(formHtml).toContain(`name="${field}"`);expect(formHtml).not.toMatch(new RegExp(`<input(?=[^>]*name="${field}")(?=[^>]*value="[^"]+")[^>]*>`));}
+  expect(html).toContain('بيانات حساب موظف موجود');expect(html).toContain('لم تُحدد سياسة حساب للإصدار المستقبلي');
+  const reader=workflow('tax',{canApprove:true},source);expect(reader).not.toContain('name="automationDelegateId"');
+ });
+ it('shows the full proposed calculation and automation policy for independent review',()=>{
+  const source=data();source.requests=[{id:'32',kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:'2026-10-01',issuer:{name:'Issuer',taxNumber:'300000000000003',address:'Address'},vatBps:1500,policyReference:'future-policy',calculationPolicy:{version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatBps:525,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42'}},status:'pending',makerId:'9',checkerId:null,reason:'policy evidence',approvalReason:'',at:invoice.at,decidedAt:null,result:null}];
+  const html=workflow('tax',{canApprove:true},source);
+  for(const text of ['شامل الضريبة','غير شامل الضريبة','نسبة موحدة على جميع منتجات الكتالوج','5.25%','قبل احتساب الضريبة','تقريب كل بند إلى أقرب هللة؛ النصف للأعلى','إيقاف الإصدار للمراجعة عند تغير السياسة','الموظف المفوض #42'])expect(html).toContain(text);
+  expect(html).toContain('اعتماد الطلب بعد المراجعة');
+ });
+ it('offers a source-only full reversal for issued credit notes, independently of approval controls',()=>{
+  const source=data();source.invoices.push({...invoice,id:'credit-1',kind:'credit_note',parentId:'inv-1',status:'issued',number:'CN-001',snapshot:{version:1,issuer:{name:'Issuer',taxNumber:'300000000000003',address:'Address'},customer:{name:'Customer',address:'Address'},currency:'SAR',lines:[],netMinor:10000,vatMinor:1500,totalMinor:11500,paidMinor:11500,sourceOrderId:'order-1',sourceReceiptId:'receipt-1',policyReference:'fixture'}});
+  source.invoices.push({...source.invoices[1],id:'credit-draft',status:'pending_policy',number:null});
+  const html=workflow('returns',{canCreate:true},source);
+  expect(html).toContain('طلب عكس الإشعار الدائن بالكامل');expect(html).toContain('name="creditNoteId" value="credit-1"');expect(html).toContain('name="invoiceId" value="inv-1"');expect(html).not.toContain('value="credit-draft"');
+  expect(html).not.toContain('name="totalMinor"');expect(html).not.toContain('name="snapshot"');expect(html).not.toContain('اعتماد الطلب بعد المراجعة');
+  expect(workflow('returns',{canApprove:true},source)).not.toContain('name="creditNoteId"');
+ });
+ it('identifies credit reversal requests for the checker rather than labelling them as a new credit',()=>{
+  const source=requestData();source.requests![0]={...source.requests![0],payload:{lines:[],reversalOf:'credit-1'},result:{number:'DN-0001',totalMinor:11500,vatMinor:1500}};
+  const html=workflow('returns',{canApprove:true},source);
+  expect(html).toContain('عكس الإشعار الدائن بالكامل');expect(html).toContain('/admin/finance/invoices/credit-1');expect(html).toContain('الإشعار المدين: DN-0001');expect(html).not.toContain('الإشعار الدائن: DN-0001');
  });
  it('reopening a closed period is available with reopen permission independently of close',()=>{
   const source={...data(),periods:[{month:'2026-09',closedAt:invoice.at,checks:[],reason:'period closed',version:4}]};

@@ -5,10 +5,13 @@ import {checkedMoney, lineTotal, sumMoney, MAX_MONEY_MINOR} from './money';
 import {assertCommerceSchemaReady} from './schema';
 import {reserveSupplierCost,finishSupplierReservations,capReleasedSupplierStock,type CostLine} from '@/lib/suppliers/reservations';
 import {snapshotSupplierOrders} from '@/lib/suppliers/orders';
+import {readApprovedFiscalPolicy} from '@/lib/finance/fiscal-policy';
+import {buildOrderFiscalSnapshot,quoteFiscalProduct,quoteFiscalShipping,saveOrderFiscalSnapshot,requireOrderFiscalPolicyAtPayment} from '@/lib/finance/order-fiscal-snapshot';
+import type {CalculatedFiscalLineV2} from '@/lib/finance/types';
 import type {AttemptStatus, CommerceDb, CreateOrderInput, ExpectedPayment, NotificationChannel, NotificationTarget, OrderLineInput, OrderPolicy, OrderSnapshot, OrderStatus, PaymentAttempt, PaymentClaim, ShippingSnapshot, VerifiedPayment} from './types';
 
 type Tx = Prisma.TransactionClient;
-type OrderRow = {id:bigint;member_id:bigint;request_fingerprint:string;status:OrderStatus;currency:'SAR';subtotal_minor:number;shipping_fee_minor:number;total_minor:number;shipping:ShippingSnapshot|string};
+type OrderRow = {id:bigint;member_id:bigint;created_at:Date;request_fingerprint:string;status:OrderStatus;currency:'SAR';subtotal_minor:number;shipping_fee_minor:number;total_minor:number;shipping:ShippingSnapshot|string};
 type AttemptRow = {id:bigint;order_id:bigint;provider:string;provider_ref:string|null;redirect_url:string|null;merchant_order_id:string;claim_token:string;amount_minor:number;currency:'SAR';status:AttemptStatus};
 const transactionOptions={maxWait:10000,timeout:20000};
 function id(value:bigint):void {
@@ -87,13 +90,16 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
     const [row]=await tx.$queryRaw<OrderRow[]>`SELECT * FROM commerce_orders WHERE member_id=${input.memberId} AND request_key=${input.requestKey} FOR UPDATE`;
     if(!row||row.request_fingerprint!==fingerprint) throw new Error('request_conflict');
     if(row.status!=='building') return readOrder(tx,row);
+    const fiscalPolicy=await readApprovedFiscalPolicy(tx,row.created_at);
+    const fiscalLines:CalculatedFiscalLineV2[]=[];
     const totals:number[]=[];
     const supplierCostLines=new Map<string,CostLine[]>();
     for(const item of items) {
       const [product]=await tx.$queryRaw<{id:bigint;title:string;price_minor:number;currency:string;stock_available:number;stock_reserved:number;approved:number;visible:number;enabled:number}[]>`SELECT id,title,price_minor,currency,stock_available,stock_reserved,approved,visible,enabled FROM commerce_products WHERE id=${item.productId} FOR UPDATE`;
       if(!product||product.approved!==1||product.visible!==1||product.enabled!==1||product.currency!=='SAR'||product.price_minor<=0||product.stock_available<item.quantity) throw new Error('product_unavailable');
       checkedMoney(product.stock_available);checkedMoney(product.stock_reserved+item.quantity);
-      const total=lineTotal(product.price_minor,item.quantity);totals.push(total);
+      const fiscalLine=quoteFiscalProduct(fiscalPolicy,{key:String(item.productId),title:product.title,quantity:item.quantity,unitPriceMinor:product.price_minor});
+      const total=checkedMoney(fiscalLine.grossMinor);totals.push(total);
       await tx.$executeRaw`UPDATE commerce_products SET stock_available=stock_available-${item.quantity},stock_reserved=stock_reserved+${item.quantity},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${item.productId}`;
       await tx.$executeRaw`INSERT INTO commerce_order_items (order_id,product_id,title,quantity,unit_price_minor,total_minor) VALUES (${row.id},${item.productId},${product.title},${item.quantity},${product.price_minor},${total})`;
       // Lock mapping (including its absent-key gap) and profile while snapshotting.
@@ -106,13 +112,20 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
         const cost=await reserveSupplierCost(tx,row.id,item.productId,mapping.supplier_id,item.quantity,mapping.unit_cost_minor,product.price_minor);
         supplierCostLines.set(String(item.productId),cost.lines);
         await tx.$executeRaw`INSERT INTO commerce_order_suppliers (order_id,product_id,supplier_id,supplier_name,supplier_sku,quantity,unit_cost_minor,total_cost_minor) VALUES (${row.id},${item.productId},${mapping.supplier_id},${supplier.name},${mapping.supplier_sku},${item.quantity},${cost.unitCostMinor},${cost.totalCostMinor})`;
+        fiscalLine.supplierId=String(mapping.supplier_id);fiscalLine.supplierMinor=cost.totalCostMinor;
       }
+      fiscalLines.push(fiscalLine);
     }
-    const subtotal=sumMoney(totals), total=sumMoney([subtotal,shippingFeeMinor]);
-    await tx.$executeRaw`UPDATE commerce_orders SET status='awaiting_payment',subtotal_minor=${subtotal},shipping_fee_minor=${shippingFeeMinor},total_minor=${total} WHERE id=${row.id}`;
+    const shippingLine=quoteFiscalShipping(fiscalPolicy,shippingFeeMinor),payableShipping=checkedMoney(shippingLine.grossMinor);
+    fiscalLines.push(shippingLine);
+    const fiscalSnapshot=buildOrderFiscalSnapshot(row.id,row.created_at,fiscalPolicy,shipping,fiscalLines);
+    const subtotal=sumMoney(totals), total=sumMoney([subtotal,payableShipping]);
+    if(total!==fiscalSnapshot.totalMinor)throw new Error('finance_invoice_difference');
+    await saveOrderFiscalSnapshot(tx,fiscalSnapshot);
+    await tx.$executeRaw`UPDATE commerce_orders SET status='awaiting_payment',subtotal_minor=${subtotal},shipping_fee_minor=${payableShipping},total_minor=${total} WHERE id=${row.id}`;
     await snapshotSupplierOrders(tx,row.id,shipping,supplierCostLines);
     await tx.$executeRaw`INSERT INTO commerce_audit_events (order_id,event,payload) VALUES (${row.id},'order_created',${JSON.stringify({memberId:input.memberId.toString(),totalMinor:total,currency:'SAR'})})`;
-    return readOrder(tx,{...row,status:'awaiting_payment',subtotal_minor:subtotal,shipping_fee_minor:shippingFeeMinor,total_minor:total});
+    return readOrder(tx,{...row,status:'awaiting_payment',subtotal_minor:subtotal,shipping_fee_minor:payableShipping,total_minor:total});
   },transactionOptions);
 }
 
@@ -157,6 +170,8 @@ export async function claimPaymentAttempt(db:CommerceDb,input:{memberId:bigint;o
     const [existing]=await tx.$queryRaw<AttemptRow[]>`SELECT * FROM commerce_payment_attempts WHERE order_id=${order.id} FOR UPDATE`;
     if(existing) return {claimed:false,attempt:attemptView(existing)};
     if(order.status!=='awaiting_payment') throw new Error('order_not_payable');
+    const [clock]=await tx.$queryRaw<{now:Date}[]>`SELECT UTC_TIMESTAMP(3) AS now`;
+    await requireOrderFiscalPolicyAtPayment(tx,order.id,clock.now);
     checkedMoney(order.total_minor);if(order.total_minor<=0||order.currency!=='SAR') throw new Error('order_not_payable');
     const token=randomUUID(),merchantOrderId=`commerce:${order.id}:${randomUUID()}`;
     await tx.$executeRaw`INSERT INTO commerce_payment_attempts (order_id,provider,merchant_order_id,claim_token,amount_minor,currency) VALUES (${order.id},${input.provider},${merchantOrderId},${token},${order.total_minor},'SAR')`;

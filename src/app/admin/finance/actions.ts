@@ -86,8 +86,29 @@ export async function requestFinanceReturn(form:FormData) {
     return requestFinanceChange(prisma,actor,{kind:'return',targetId:String(parseFinanceId(field(form,'invoiceId'))),payload:{lines},reason:field(form,'reason'),requestKey:field(form,'requestKey')});
   });
 }
+export async function requestFinanceReturnReversal(form:FormData) {
+  return run(form,'returns','create',actor=>requestFinanceChange(prisma,actor,{kind:'return',targetId:String(parseFinanceId(field(form,'invoiceId'))),payload:{lines:[],reversalOf:String(parseFinanceId(field(form,'creditNoteId')))},reason:field(form,'reason'),requestKey:field(form,'requestKey')}));
+}
+function policySelection<T extends string>(form:FormData,name:string,choices:readonly T[]):T {
+  const value=field(form,name);
+  if(!choices.includes(value as T))throw new Error('finance_calculation_policy_invalid');
+  return value as T;
+}
 export async function requestFinanceTaxSettings(form:FormData) {
-  return run(form,'tax','manage_settings',actor=>requestFinanceChange(prisma,actor,{kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:field(form,'effectiveFrom'),issuer:{name:field(form,'issuerName'),taxNumber:field(form,'issuerTaxNumber'),address:field(form,'issuerAddress')},vatBps:parseFinanceSar(field(form,'vatPercent')),policyReference:field(form,'policyReference')},reason:field(form,'reason'),requestKey:field(form,'requestKey')}));
+  return run(form,'tax','manage_settings',actor=>{
+    const shippingVatBps=parseFinanceSar(field(form,'shippingVatPercent'));
+    if(shippingVatBps>10000)throw new Error('finance_calculation_policy_invalid');
+    const calculationPolicy={version:2 as const,
+      priceBasis:policySelection(form,'priceBasis',['inclusive','exclusive'] as const),
+      itemScope:policySelection(form,'itemScope',['uniform_catalog'] as const),
+      shippingPriceBasis:policySelection(form,'shippingPriceBasis',['inclusive','exclusive'] as const),shippingVatBps,
+      discountTreatment:policySelection(form,'discountTreatment',['none','before_tax'] as const),
+      rounding:policySelection(form,'rounding',['line_half_up'] as const),
+      policyRollover:policySelection(form,'policyRollover',['hold_for_review'] as const),
+      automationDelegateId:String(parseFinanceId(field(form,'automationDelegateId'))),
+    };
+    return requestFinanceChange(prisma,actor,{kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:field(form,'effectiveFrom'),issuer:{name:field(form,'issuerName'),taxNumber:field(form,'issuerTaxNumber'),address:field(form,'issuerAddress')},vatBps:parseFinanceSar(field(form,'vatPercent')),policyReference:field(form,'policyReference'),calculationPolicy},reason:field(form,'reason'),requestKey:field(form,'requestKey')});
+  });
 }
 export async function requestFinancePeriodReopen(form:FormData) {
   return run(form,'periods','reopen_period',actor=>{

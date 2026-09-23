@@ -3,6 +3,8 @@ import {PrismaClient} from '@prisma/client';
 import {execFileSync} from 'node:child_process';
 import {COMMERCE_DDL, assertCommerceSchemaReady} from '@/lib/commerce/schema';
 import {SUPPLIER_DDL} from '@/lib/suppliers/schema';
+import {FINANCE_DDL} from '@/lib/finance/schema';
+import type {FiscalCalculationPolicy,OrderFiscalSnapshot} from '@/lib/finance/types';
 import {createOrder, claimPaymentAttempt, recordPaymentReference, markPaymentUncertain, settleVerifiedPayment, cancelUnstartedOrder} from '@/lib/commerce/orders';
 import {dispatchPaidNotification} from '@/lib/commerce/notifications';
 import {commerceConfigFromRows} from '@/lib/commerce/config';
@@ -36,6 +38,23 @@ const input=(requestKey='fixture-request-0001',quantity=2,memberId=1n)=>({member
 const policy={shippingFeeMinor:125};
 const targets=[{recipient:'member:1',channel:'in_app' as const},{recipient:'+966500000000',channel:'sms' as const},{recipient:'+966500000000',channel:'whatsapp' as const}];
 const count=async(table:string)=>Number((await client.$queryRawUnsafe<{n:bigint}[]>(`SELECT COUNT(*) AS n FROM ${table}`))[0].n);
+const syntheticCalculation:FiscalCalculationPolicy={version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'inclusive',shippingVatBps:0,discountTreatment:'none',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42'};
+/** Disposable, explicitly approved zero-rate fixture; never a production policy/default. */
+async function approvedFiscalPolicy(options:{reference?:string;effectiveFrom?:string;vatBps?:number;calculationPolicy?:FiscalCalculationPolicy|null}={}) {
+  const reference=options.reference??'synthetic-commerce-zero-rate',effectiveFrom=options.effectiveFrom??'2020-01-01';
+  const calculationPolicy=options.calculationPolicy===undefined?syntheticCalculation:options.calculationPolicy;
+  const payload={effectiveFrom,issuer:{name:'Synthetic commerce issuer',taxNumber:'300000000000003',address:'Synthetic issuer address'},vatBps:options.vatBps??0,policyReference:reference,calculationPolicy};
+  const approvedAt=new Date('2019-12-01T00:00:00Z');
+  await client.$executeRaw`INSERT INTO finance_change_requests(request_key,fingerprint,kind,target_id,payload,status,maker_id,checker_id,reason,approval_reason,created_at,decided_at) VALUES(${reference},${'a'.repeat(64)},'tax_settings','tax',${JSON.stringify(payload)},'approved',41,42,'Synthetic policy fixture','Synthetic independent approval',${approvedAt},${approvedAt})`;
+  const [request]=await client.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_change_requests WHERE request_key=${reference}`;
+  await client.$executeRaw`INSERT INTO finance_tax_policies(request_id,effective_from,issuer,vat_bps,policy_reference,created_at,calculation_policy) VALUES(${request.id},${effectiveFrom},${JSON.stringify(payload.issuer)},${payload.vatBps},${reference},${approvedAt},${calculationPolicy===null?null:JSON.stringify(calculationPolicy)})`;
+  const [row]=await client.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_tax_policies WHERE request_id=${request.id}`;
+  return {id:row.id,requestId:request.id,payload};
+}
+async function storedFiscalSnapshot(orderId:bigint) {
+  const [row]=await client.$queryRaw<{order_id:bigint;policy_id:bigint;request_id:bigint;captured_at:Date;fingerprint:string;snapshot:OrderFiscalSnapshot|string}[]>`SELECT order_id,policy_id,request_id,captured_at,fingerprint,snapshot FROM finance_order_fiscal_snapshots WHERE order_id=${orderId}`;
+  return {...row,snapshot:typeof row.snapshot==='string'?JSON.parse(row.snapshot) as OrderFiscalSnapshot:row.snapshot};
+}
 async function prepared(key='fixture-request-0001') {
   const order=await createOrder(client,input(key),policy);
   const claim=await claimPaymentAttempt(client,{memberId:1n,orderId:order.id,provider:'fixture'});
@@ -55,6 +74,7 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
     await client.$executeRawUnsafe('CREATE TABLE site_settings (k VARCHAR(60) NOT NULL PRIMARY KEY,v TEXT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin');
     for(const ddl of COMMERCE_DDL) await client.$executeRawUnsafe(ddl);
     for(const ddl of SUPPLIER_DDL) await client.$executeRawUnsafe(ddl);
+    for(const ddl of FINANCE_DDL) await client.$executeRawUnsafe(ddl);
     await assertCommerceSchemaReady(client);
   });
   afterAll(async()=>{
@@ -63,12 +83,13 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
     finally {await admin?.$disconnect();}
   });
   beforeEach(async()=>{
-    for(const table of ['commerce_supplier_accruals','commerce_receipts','commerce_order_suppliers','commerce_product_suppliers','commerce_suppliers','commerce_notifications','commerce_audit_events','commerce_payment_attempts','commerce_order_items','commerce_orders','commerce_products']) await client.$executeRawUnsafe(`DELETE FROM ${table}`);
+    for(const table of ['finance_order_fiscal_snapshots','finance_tax_policies','finance_change_requests','commerce_supplier_accruals','commerce_receipts','commerce_order_suppliers','commerce_product_suppliers','commerce_suppliers','commerce_notifications','commerce_audit_events','commerce_payment_attempts','commerce_order_items','commerce_orders','commerce_products']) await client.$executeRawUnsafe(`DELETE FROM ${table}`);
     await client.$executeRaw`INSERT INTO commerce_products (id,title,price_minor,stock_available,stock_reserved,approved,visible,enabled) VALUES (1,'Fixture product',1025,10,0,1,1,1),(2,'Second product',200,0,0,1,1,1)`;
     // The service's purchasing gate is exercised against this newly-created
     // disposable loopback database, never bypassed or changed in production.
     await client.$executeRaw`DELETE FROM site_settings`;
     await client.$executeRaw`INSERT INTO site_settings(k,v) VALUES('commerce_purchasing_enabled','1')`;
+    await approvedFiscalPolicy();
   });
   it.each(['missing','0','false','true'])('fails closed for purchasing gate %s before writing or reserving stock',async flag=>{
     await client.$executeRaw`DELETE FROM site_settings WHERE k='commerce_purchasing_enabled'`;
@@ -83,6 +104,70 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
     expect(orders[0].shipping).toEqual(shipping);
     const [p]=await client.$queryRaw<{stock_available:number;stock_reserved:number}[]>`SELECT stock_available,stock_reserved FROM commerce_products WHERE id=1`;
     expect(p).toEqual({stock_available:8,stock_reserved:2});expect(await count('commerce_orders')).toBe(1);
+    expect(await count('finance_order_fiscal_snapshots')).toBe(1);
+  });
+  it.each(['missing','latest_incomplete','unapproved','approval_mismatch'])('rolls back an order with %s fiscal policy without falling back to defaults',async state=>{
+    if(state==='missing')await client.$executeRaw`DELETE FROM finance_tax_policies`;
+    if(state==='latest_incomplete')await approvedFiscalPolicy({reference:'synthetic-incomplete-policy',effectiveFrom:'2020-01-02',calculationPolicy:null});
+    if(state==='unapproved')await client.$executeRaw`UPDATE finance_change_requests SET status='pending'`;
+    if(state==='approval_mismatch')await client.$executeRaw`UPDATE finance_tax_policies SET vat_bps=1500`;
+    await expect(createOrder(client,input(),policy)).rejects.toThrow(state==='latest_incomplete'?'finance_calculation_policy_invalid':'finance_issuance_not_approved');
+    for(const table of ['commerce_orders','commerce_order_items','finance_order_fiscal_snapshots','commerce_audit_events','commerce_payment_attempts'])expect(await count(table)).toBe(0);
+    expect((await client.$queryRaw<{stock_available:number;stock_reserved:number}[]>`SELECT stock_available,stock_reserved FROM commerce_products WHERE id=1`)[0]).toEqual({stock_available:10,stock_reserved:0});
+  });
+  it('rolls back reserved inventory and source items when the immutable fiscal snapshot cannot be inserted',async()=>{
+    await client.$executeRawUnsafe('ALTER TABLE finance_order_fiscal_snapshots ADD CONSTRAINT fixture_fiscal_insert_failure CHECK(order_id=0)');
+    try {
+      await expect(createOrder(client,input(),policy)).rejects.toThrow();
+      for(const table of ['commerce_orders','commerce_order_items','finance_order_fiscal_snapshots','commerce_audit_events'])expect(await count(table)).toBe(0);
+      expect((await client.$queryRaw<{stock_available:number;stock_reserved:number}[]>`SELECT stock_available,stock_reserved FROM commerce_products WHERE id=1`)[0]).toEqual({stock_available:10,stock_reserved:0});
+    }finally{await client.$executeRawUnsafe('ALTER TABLE finance_order_fiscal_snapshots DROP CHECK fixture_fiscal_insert_failure');}
+    await createOrder(client,input(),policy);expect(await count('finance_order_fiscal_snapshots')).toBe(1);
+  });
+  it('captures server price, customer, supplier allocation and approved policy at the original order timestamp without rewriting on retry',async()=>{
+    await mapped();
+    const order=await createOrder(client,input(),policy),before=await storedFiscalSnapshot(order.id);
+    const [created]=await client.$queryRaw<{created_at:Date}[]>`SELECT created_at FROM commerce_orders WHERE id=${order.id}`;
+    const [approved]=await client.$queryRaw<{id:bigint;request_id:bigint}[]>`SELECT id,request_id FROM finance_tax_policies WHERE policy_reference='synthetic-commerce-zero-rate'`;
+    expect(before).toMatchObject({order_id:order.id,policy_id:approved.id,request_id:approved.request_id,captured_at:created.created_at});
+    expect(before.fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(before.snapshot).toMatchObject({version:2,orderId:String(order.id),capturedAt:created.created_at.toISOString(),currency:'SAR',customer:{name:shipping.name,address:'Fixture street 1، Riyadh، 12345، SA'},policy:{id:String(approved.id),requestId:String(approved.request_id),policyReference:'synthetic-commerce-zero-rate',calculationPolicy:syntheticCalculation},netMinor:2175,vatMinor:0,totalMinor:2175});
+    expect(before.snapshot.lines).toEqual([
+      {key:'1',title:'Fixture product',quantity:2,unitPriceMinor:1025,discountMinor:0,vatBps:0,priceBasis:'inclusive',component:'product',netMinor:2050,vatMinor:0,grossMinor:2050,supplierId:'1',supplierMinor:600},
+      {key:'shipping',title:'الشحن',quantity:1,unitPriceMinor:125,discountMinor:0,vatBps:0,priceBasis:'inclusive',component:'shipping',netMinor:125,vatMinor:0,grossMinor:125},
+    ]);
+    await client.$executeRaw`UPDATE commerce_products SET title='Changed catalog name',price_minor=9999 WHERE id=1`;
+    await approvedFiscalPolicy({reference:'synthetic-replacement-policy',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...syntheticCalculation,priceBasis:'exclusive'}});
+    expect(await createOrder(client,input(),{shippingFeeMinor:900})).toEqual(order);
+    await expect(createOrder(client,{...input(),shipping:{...shipping,name:'Changed customer'}},policy)).rejects.toThrow('request_conflict');
+    expect(await storedFiscalSnapshot(order.id)).toEqual(before);expect(await count('finance_order_fiscal_snapshots')).toBe(1);
+  });
+  it.each([
+    {basis:'inclusive' as const,itemGross:2050,shippingGross:125,total:2175,net:1902,vat:273},
+    {basis:'exclusive' as const,itemGross:2358,shippingGross:131,total:2489,net:2175,vat:314},
+  ])('captures and charges exact $basis item and shipping tax totals',async({basis,itemGross,shippingGross,total,net,vat})=>{
+    await approvedFiscalPolicy({reference:'synthetic-priced-policy',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...syntheticCalculation,priceBasis:basis,shippingPriceBasis:basis,shippingVatBps:500}});
+    const order=await createOrder(client,input(),policy),saved=await storedFiscalSnapshot(order.id);
+    expect(order).toMatchObject({subtotalMinor:itemGross,shippingFeeMinor:shippingGross,totalMinor:total,items:[{unitPriceMinor:1025,totalMinor:itemGross}]});
+    expect(saved.snapshot).toMatchObject({netMinor:net,vatMinor:vat,totalMinor:total});
+    expect(saved.snapshot.lines.map(line=>line.grossMinor)).toEqual([itemGross,shippingGross]);
+    const claim=await claimPaymentAttempt(client,{memberId:1n,orderId:order.id,provider:'fixture'});expect(claim.claimed).toBe(true);expect(claim.attempt.amountMinor).toBe(total);
+  });
+  it('rejects a new payment attempt after the effective policy changes while preserving the original order and reservation',async()=>{
+    const order=await createOrder(client,input(),policy),snapshot=await storedFiscalSnapshot(order.id);
+    await approvedFiscalPolicy({reference:'synthetic-payment-rollover',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...syntheticCalculation,priceBasis:'exclusive'}});
+    await expect(claimPaymentAttempt(client,{memberId:1n,orderId:order.id,provider:'fixture'})).rejects.toThrow('finance_policy_changed_before_payment');
+    expect(await count('commerce_payment_attempts')).toBe(0);expect(await storedFiscalSnapshot(order.id)).toEqual(snapshot);
+    expect((await client.$queryRaw<{status:string;total_minor:number}[]>`SELECT status,total_minor FROM commerce_orders WHERE id=${order.id}`)[0]).toEqual({status:'awaiting_payment',total_minor:2175});
+    expect((await client.$queryRaw<{stock_available:number;stock_reserved:number}[]>`SELECT stock_available,stock_reserved FROM commerce_products WHERE id=1`)[0]).toEqual({stock_available:8,stock_reserved:2});
+  });
+  it('keeps an existing payment attempt retry-safe and records verified money after policy rollover without repricing',async()=>{
+    const {order,claim,evidence}=await prepared(),snapshot=await storedFiscalSnapshot(order.id);
+    await approvedFiscalPolicy({reference:'synthetic-settlement-rollover',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...syntheticCalculation,priceBasis:'exclusive'}});
+    const retry=await claimPaymentAttempt(client,{memberId:1n,orderId:order.id,provider:'fixture'});expect(retry.claimed).toBe(false);expect(retry.attempt.id).toBe(claim.attempt.id);expect(retry.attempt.amountMinor).toBe(2175);
+    await settleVerifiedPayment(client,evidence,targets);
+    expect(await count('commerce_receipts')).toBe(1);expect(await count('commerce_payment_attempts')).toBe(1);expect(await storedFiscalSnapshot(order.id)).toEqual(snapshot);
+    expect((await client.$queryRaw<{amount_minor:number}[]>`SELECT amount_minor FROM commerce_receipts WHERE order_id=${order.id}`)[0].amount_minor).toBe(2175);
   });
   it('installs all five supplier accounting tables idempotently',async()=>{
     const tables=await client.$queryRaw<{name:string}[]>`SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()`;

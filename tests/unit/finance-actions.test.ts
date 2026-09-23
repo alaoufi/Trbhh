@@ -8,8 +8,10 @@ vi.mock('next/navigation',()=>({redirect:(url:string)=>{throw new Error('REDIREC
 vi.mock('next/cache',()=>({revalidatePath:mocks.revalidatePath}));
 vi.mock('@/lib/finance/service',async importOriginal=>({...await importOriginal<object>(),restoreDraftInvoice:mocks.restoreDraftInvoice,recordExpense:mocks.recordExpense,saveBudget:mocks.saveBudget,approveSettlement:mocks.approveSettlement,closeMonth:mocks.closeMonth}));
 import {financeAuditContext} from '@/lib/finance/audit-context';
-import {saveFinanceBudget,approveFinanceSettlement,recordFinanceExpense,closeFinanceMonth,requestFinanceReturn,requestFinanceTaxSettings,requestFinancePeriodReopen,approveFinanceRequest,cancelFinanceRequest,restoreFinanceDraftInvoice} from '@/app/admin/finance/actions';
+import {saveFinanceBudget,approveFinanceSettlement,recordFinanceExpense,closeFinanceMonth,requestFinanceReturn,requestFinanceReturnReversal,requestFinanceTaxSettings,requestFinancePeriodReopen,approveFinanceRequest,cancelFinanceRequest,restoreFinanceDraftInvoice} from '@/app/admin/finance/actions';
 const form=(values:Record<string,string>)=>{const result=new FormData();for(const [key,value] of Object.entries(values))result.set(key,value);return result;};
+const policyFields={priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatPercent:'0',discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42'};
+const taxFields={month:'2026-09',effectiveFrom:'2026-10-01',issuerName:'Issuer',issuerTaxNumber:'300000000000003',issuerAddress:'Address',vatPercent:'15.25',policyReference:'approved-policy',reason:'policy review',requestKey:'request-test-2',...policyFields};
 beforeEach(()=>{vi.clearAllMocks();mocks.requireAccess.mockResolvedValue({uid:9});mocks.accessActor.mockResolvedValue({userId:9,ip:'127.0.0.1',sessionFingerprint:'hashed-session'});});
 describe('finance server action authorization',()=>{
  it('requires exact approval permission before accepting transfer evidence',async()=>{
@@ -60,7 +62,7 @@ describe('finance maker and checker action contracts',()=>{
   expect(mocks.requestFinanceChange).not.toHaveBeenCalled();
  });
  it('preserves exact tax decimal basis points and future policy fields',async()=>{
-  await expect(requestFinanceTaxSettings(form({month:'2026-09',effectiveFrom:'2026-10-01',issuerName:'Issuer',issuerTaxNumber:'300000000000003',issuerAddress:'Address',vatPercent:'15.25',policyReference:'approved-policy',reason:'policy review',requestKey:'request-test-2'}))).rejects.toThrow('saved=1');
+  await expect(requestFinanceTaxSettings(form(taxFields))).rejects.toThrow('saved=1');
   expect(mocks.requireAccess).toHaveBeenCalledWith('tax','manage_settings');
   expect(mocks.requestFinanceChange.mock.calls[0][2].payload.vatBps).toBe(1525);
  });
@@ -78,6 +80,40 @@ describe('finance maker and checker action contracts',()=>{
   await expect(saveFinanceBudget(form({month:'2026-09',category:'hosting',planned:'100',reason:'hosting renewal'}))).rejects.toThrow('saved=1');
   expect(context).toEqual({ip:'127.0.0.1',sessionFingerprint:'hashed-session'});
   expect(mocks.saveBudget.mock.calls[0][2].reason).toBe('hosting renewal');
+ });
+});
+
+describe('prospective policy and source credit action boundaries',()=>{
+ it('passes each explicitly selected calculation field and a named delegate without accepting client snapshots',async()=>{
+  await expect(requestFinanceTaxSettings(form({...taxFields,shippingVatPercent:'5.25',snapshot:'forged',totalMinor:'1'}))).rejects.toThrow('saved=1');
+  expect(mocks.requestFinanceChange.mock.calls[0][2].payload).toEqual({effectiveFrom:'2026-10-01',issuer:{name:'Issuer',taxNumber:'300000000000003',address:'Address'},vatBps:1525,policyReference:'approved-policy',calculationPolicy:{version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatBps:525,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42'}});
+ });
+ it.each(Object.keys(policyFields))('rejects an unset %s before the service',async key=>{
+  await expect(requestFinanceTaxSettings(form({...taxFields,[key]:''}))).rejects.toThrow('error=finance_');
+  expect(mocks.requestFinanceChange).not.toHaveBeenCalled();
+ });
+ it.each([['priceBasis','mixed'],['itemScope','all'],['shippingPriceBasis','default'],['shippingVatPercent','5.255'],['shippingVatPercent','100.01'],['discountTreatment','after_tax'],['rounding','bankers'],['policyRollover','recalculate'],['automationDelegateId','0'],['automationDelegateId','4.2']])('rejects an unsupported %s value',async(key,value)=>{
+  await expect(requestFinanceTaxSettings(form({...taxFields,[key]:value}))).rejects.toThrow('error=finance_');
+  expect(mocks.requestFinanceChange).not.toHaveBeenCalled();
+ });
+ it('requires tax view and settings permission before passing any policy to the service',async()=>{
+  mocks.requireAccess.mockImplementation(async(_module:string,action:string)=>{if(action==='manage_settings')throw Error('DENIED');return {uid:9};});
+  await expect(requestFinanceTaxSettings(form(taxFields))).rejects.toThrow('DENIED');
+  expect(mocks.requireAccess.mock.calls).toEqual([['tax','view'],['tax','manage_settings']]);expect(mocks.requestFinanceChange).not.toHaveBeenCalled();
+ });
+ it('requests a full source-credit reversal with IDs only under returns create permission',async()=>{
+  await expect(requestFinanceReturnReversal(form({month:'2026-09',returnTo:'returns',invoiceId:'11',creditNoteId:'12',reason:'cancel incorrect return',requestKey:'credit-reversal-1',snapshot:'forged',totalMinor:'999999',quantity:'3'}))).rejects.toThrow('saved=1');
+  expect(mocks.requireAccess.mock.calls).toEqual([['returns','view'],['returns','create']]);
+  expect(mocks.requestFinanceChange).toHaveBeenCalledWith({},9n,{kind:'return',targetId:'11',payload:{lines:[],reversalOf:'12'},reason:'cancel incorrect return',requestKey:'credit-reversal-1'});
+ });
+ it('does not let a returns viewer request a credit reversal',async()=>{
+  mocks.requireAccess.mockImplementation(async(_module:string,action:string)=>{if(action==='create')throw Error('DENIED');return {uid:9};});
+  await expect(requestFinanceReturnReversal(form({month:'2026-09',invoiceId:'11',creditNoteId:'12'}))).rejects.toThrow('DENIED');expect(mocks.requestFinanceChange).not.toHaveBeenCalled();
+ });
+ it('does not send malformed source IDs or a failed server reversal as saved',async()=>{
+  await expect(requestFinanceReturnReversal(form({month:'2026-09',invoiceId:'11',creditNoteId:'-12',reason:'correction',requestKey:'credit-reversal-2'}))).rejects.toThrow('error=finance_');expect(mocks.requestFinanceChange).not.toHaveBeenCalled();
+  mocks.requestFinanceChange.mockRejectedValueOnce(Error('finance_refund_already_paid'));
+  await expect(requestFinanceReturnReversal(form({month:'2026-09',invoiceId:'11',creditNoteId:'12',reason:'correction',requestKey:'credit-reversal-2'}))).rejects.toThrow('error=finance_refund_already_paid');
  });
 });
 

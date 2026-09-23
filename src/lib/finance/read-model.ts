@@ -1,6 +1,6 @@
 import 'server-only';
 import type { CommerceDb } from '@/lib/commerce/types';
-import type { BudgetCategory, FinanceData, FinanceInvoice, FinanceOrder, FiscalSnapshot,FinanceChangeRequest,FinanceTaxPolicy,FinanceSettlement } from './types';
+import type { BudgetCategory, FinanceData, FinanceInvoice, FinanceOrder, ArchivedFiscalSnapshot as FiscalSnapshot,FinanceChangeRequest,FinanceTaxPolicy,FinanceSettlement } from './types';
 import { financeSchemaAvailable } from './schema';
 
 type Row = Record<string, unknown>;
@@ -57,7 +57,7 @@ async function readFinanceSnapshot(db: Pick<CommerceDb, '$queryRaw'>): Promise<F
     refunds:[],expenses:[],settlements:[],invoices:[],budgets:[],periods:[],audit:[],requests:[],taxPolicies:[],reconciliations:[],
   };
   if (!ready) return data;
-  const [reviews, expenses, settlements, lines, invoices, budgets, periods, audit, refunds,requests,taxPolicies,reconciliations,checkers] = await Promise.all([
+  const [reviews, expenses, settlements, lines, invoices, budgets, periods, audit, refunds,requests,taxPolicies,reconciliations,checkers,fiscalOrders] = await Promise.all([
     db.$queryRaw<Row[]>`SELECT * FROM finance_accrual_reviews`,
     db.$queryRaw<Row[]>`SELECT * FROM finance_expenses ORDER BY occurred_at,id`,
     db.$queryRaw<Row[]>`SELECT * FROM finance_settlements ORDER BY created_at,id`,
@@ -71,6 +71,7 @@ async function readFinanceSnapshot(db: Pick<CommerceDb, '$queryRaw'>): Promise<F
     db.$queryRaw<Row[]>`SELECT * FROM finance_tax_policies ORDER BY effective_from,id`,
     db.$queryRaw<Row[]>`SELECT id,month,fingerprint,reason,actor_id,created_at FROM finance_reconciliations ORDER BY id DESC`,
     db.$queryRaw<Row[]>`SELECT entity_id,actor_id FROM finance_audit WHERE action='settlement_approved' AND entity='settlement' ORDER BY id`,
+    db.$queryRaw<Row[]>`SELECT snapshot FROM finance_order_fiscal_snapshots ORDER BY order_id`,
   ]);
   const reviewById = new Map(reviews.map(row => [id(row.accrual_id),row]));
   data.accruals = data.accruals.map(accrual => { const review = reviewById.get(accrual.id); return review ? {...accrual,eligibleAt:optionalDate(review.eligible_at),dueAt:optionalDate(review.due_at),holdReason:str(review.hold_reason)} : accrual; });
@@ -83,11 +84,12 @@ async function readFinanceSnapshot(db: Pick<CommerceDb, '$queryRaw'>): Promise<F
   data.audit = audit.map(row => {const payload=financeJson<Record<string,unknown>>(row.payload)??{};return {id:id(row.id),at:at(row.created_at),actorId:id(row.actor_id),action:str(row.action),entity:str(row.entity),entityId:str(row.entity_id),reason:str(row.reason),before:payload.before??null,after:payload.after??null,ip:payload.ip==null?null:str(payload.ip),sessionFingerprint:payload.sessionFingerprint==null?null:str(payload.sessionFingerprint),payload};});
   data.requests=requests.map(row=>({id:id(row.id),kind:str(row.kind) as FinanceChangeRequest['kind'],targetId:str(row.target_id),payload:financeJson<FinanceChangeRequest['payload']>(row.payload),status:str(row.status) as FinanceChangeRequest['status'],makerId:id(row.maker_id),checkerId:row.checker_id==null?null:id(row.checker_id),reason:str(row.reason),approvalReason:str(row.approval_reason),at:at(row.created_at),decidedAt:optionalDate(row.decided_at),result:row.result==null?null:financeJson<FinanceChangeRequest['result']>(row.result)}));
   data.taxPolicies=taxPolicies.map(taxPolicy);
+  data.orderFiscalSnapshots=fiscalOrders.map(row=>financeJson<NonNullable<FinanceData['orderFiscalSnapshots']>[number]>(row.snapshot));
   data.reconciliations=reconciliations.map(row=>({id:id(row.id),month:str(row.month),fingerprint:str(row.fingerprint),reason:str(row.reason),actorId:id(row.actor_id),at:at(row.created_at)}));
   data.refunds = refunds.map(row => ({id:id(row.id),orderId:id(row.order_id),receiptId:id(row.receipt_id),provider:str(row.provider),externalId:str(row.external_id),amountMinor:financeNumber(row.amount_minor),currency:str(row.currency),at:at(row.refunded_at),evidenceRef:str(row.evidence_ref),actorId:id(row.actor_id)}));
   return data;
 }
-function taxPolicy(row:Row):FinanceTaxPolicy{return {id:id(row.id),requestId:id(row.request_id),effectiveFrom:row.effective_from instanceof Date?row.effective_from.toISOString().slice(0,10):str(row.effective_from).slice(0,10),issuer:financeJson<FinanceTaxPolicy['issuer']>(row.issuer),vatBps:financeNumber(row.vat_bps),policyReference:str(row.policy_reference),at:at(row.created_at)};}
+function taxPolicy(row:Row):FinanceTaxPolicy{return {id:id(row.id),requestId:id(row.request_id),effectiveFrom:row.effective_from instanceof Date?row.effective_from.toISOString().slice(0,10):str(row.effective_from).slice(0,10),issuer:financeJson<FinanceTaxPolicy['issuer']>(row.issuer),vatBps:financeNumber(row.vat_bps),policyReference:str(row.policy_reference),at:at(row.created_at),calculationPolicy:row.calculation_policy==null?null:financeJson<FinanceTaxPolicy['calculationPolicy']>(row.calculation_policy)};}
 /** Read-only adapter input: future approvals never rewrite historical invoices or enable issuance. */
 export async function readEffectiveFinanceTaxPolicy(db:Pick<CommerceDb,'$queryRaw'>,date=new Date()):Promise<FinanceTaxPolicy|null>{
   if(!Number.isFinite(date.getTime()))throw new Error('finance_date_invalid');

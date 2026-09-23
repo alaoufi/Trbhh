@@ -1,6 +1,7 @@
 import {describe,expect,it} from 'vitest';
 import {financeNumber,readFinanceData,readEffectiveFinanceTaxPolicy} from '@/lib/finance/read-model';
 import {FINANCE_TABLES} from '@/lib/finance/schema';
+import {financeSchemaColumns} from '../fixtures/finance-schema-columns';
 
 describe('financial source projection consistency',()=>{
   it('reads all source queries through one repeatable-read transaction when a client is supplied',async()=>{
@@ -27,6 +28,7 @@ describe('financial source projection consistency',()=>{
     const tx={$queryRaw:async(sql:TemplateStringsArray)=>{
       const query=sql.join('?');
       if(query.includes('information_schema.TABLES'))return FINANCE_TABLES.map(name=>({name,engine:'InnoDB'}));
+      if(query.includes('information_schema.COLUMNS'))return financeSchemaColumns();
       if(query.includes('FROM finance_invoices'))return [{id:1n,order_id:1n,receipt_id:1n,kind:'invoice',number:'INV-1',parent_id:null,status:'issued',created_at:created,issued_at:issued,net_minor:10000n,vat_minor:1500n,total_minor:11500n,snapshot:null,source_snapshot:{},reason:''}];
       return [];
     }};
@@ -50,6 +52,7 @@ describe('financial source projection consistency',()=>{
     const payload={before:{status:'draft'},after:{status:'approved'},ip:'127.0.0.1',sessionFingerprint:'a'.repeat(64)};
     const db={$queryRaw:async(sql:TemplateStringsArray)=>{
       const query=sql.join('?');if(query.includes('information_schema.TABLES'))return FINANCE_TABLES.map(name=>({name,engine:'InnoDB'}));
+      if(query.includes('information_schema.COLUMNS'))return financeSchemaColumns();
       if(query.includes('reason,payload FROM finance_audit'))return [{id:1n,created_at:new Date('2026-09-22T12:00:00Z'),actor_id:72n,action:'settlement_approved',entity:'settlement',entity_id:'9',reason:'proof checked',payload:JSON.stringify(payload)}];return [];
     }};
     expect((await readFinanceData(db as never)).audit[0]).toMatchObject({...payload,actorId:'72',entityId:'9'});

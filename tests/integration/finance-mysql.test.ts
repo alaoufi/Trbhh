@@ -18,6 +18,8 @@ import {buildFinanceReport} from '@/lib/finance/reports';
 import {recordFinanceReconciliation} from '@/lib/finance/reconciliation';
 import {requestFinanceChange,approveFinanceChange,cancelFinanceChange} from '@/lib/finance/workflows';
 import {withFinanceAuditContext} from '@/lib/finance/audit-context';
+import {issueProspectiveInvoice,issueInvoicesForWorker} from '@/lib/finance/issuance';
+import {readFinanceInvoice} from '@/lib/finance/documents';
 import type {FiscalSnapshot} from '@/lib/finance/types';
 import {isolatedFinanceUrl} from '../../vitest.finance.config';
 
@@ -34,6 +36,9 @@ const financeForeignKeys=[
   ['finance_refunds','order_id','commerce_orders','finance_refund_order_fk'],
   ['finance_refunds','receipt_id','commerce_receipts','finance_refund_receipt_fk'],
   ['finance_tax_policies','request_id','finance_change_requests','finance_tax_request_fk'],
+  ['finance_order_fiscal_snapshots','order_id','commerce_orders','finance_order_fiscal_order_fk'],
+  ['finance_order_fiscal_snapshots','policy_id','finance_tax_policies','finance_order_fiscal_policy_fk'],
+  ['finance_order_fiscal_snapshots','request_id','finance_change_requests','finance_order_fiscal_request_fk'],
 ] as const;
 
 describe('finance isolated test fixture and Prisma contract',()=>{
@@ -81,6 +86,7 @@ const later=new Date('2026-09-15T12:00:00.000Z');
 const gate={enabled:true,approvedPolicyReference:'fixture-approved-policy-v1'};
 const expense:ExpenseInput={category:'hosting',description:'Synthetic hosting expense',netMinor:10000,vatMinor:1500,paidMinor:11500,occurredAt:'2026-08-15',dueAt:'2026-08-15',reference:'fixture-expense-ref',requestKey:'fixture-expense-01'};
 const cleanupTables=[
+  'finance_order_fiscal_snapshots',
   'finance_reconciliations','finance_tax_policies','finance_change_requests',
   'finance_audit','finance_refunds','finance_settlement_lines','finance_settlements','finance_accrual_reviews',
   'finance_invoices','finance_sequences','finance_expenses','finance_budgets','finance_periods',
@@ -134,6 +140,25 @@ async function seedApprovedTaxPolicy(){
   await db.$executeRaw`INSERT INTO finance_change_requests(request_key,fingerprint,kind,target_id,payload,status,maker_id,checker_id,reason,approval_reason,created_at,decided_at) VALUES('fixture-initial-tax-approval',${'a'.repeat(64)},'tax_settings','tax',${JSON.stringify(payload)},'approved',${actor},${checker},'Synthetic initial policy','Synthetic independent approval',${approvedAt},${approvedAt})`;
   const [request]=await db.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_change_requests WHERE request_key='fixture-initial-tax-approval'`;
   await db.$executeRaw`INSERT INTO finance_tax_policies(request_id,effective_from,issuer,vat_bps,policy_reference,created_at) VALUES(${request.id},${payload.effectiveFrom},${JSON.stringify(payload.issuer)},${payload.vatBps},${payload.policyReference},${approvedAt})`;
+}
+/** Real maker/checker approval of an explicitly synthetic prospective policy. */
+async function seedProspectivePolicy(){
+  const approvedAt=new Date(Date.now()-3*86400000);
+  const effectiveFrom=new Date(approvedAt.getTime()+86400000+10800000).toISOString().slice(0,10);
+  const requestId=await requestFinanceChange(db,actor,{kind:'tax_settings',targetId:'tax',reason:'Synthetic future fiscal basis',requestKey:'fixture-prospective-policy',payload:{effectiveFrom,issuer:fiscal().issuer,vatBps:1500,policyReference:'fixture-prospective-v2',calculationPolicy:{version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'inclusive',shippingVatBps:1500,discountTreatment:'none',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:String(actor)}}},approvedAt);
+  await approveFinanceChange(db,checker,requestId,'Synthetic independent basis and delegate approval',approvedAt);
+}
+async function prospectiveReceipt(){
+  await seedProspectivePolicy();
+  await db.$executeRaw`INSERT INTO site_settings(k,v) VALUES('commerce_purchasing_enabled','1')`;
+  await db.$executeRaw`INSERT INTO commerce_products(id,title,price_minor,stock_available,approved,visible,enabled) VALUES(1,'Synthetic small gross',4,6,1,1,1)`;
+  const order=await createOrder(db,{memberId:5n,requestKey:'fixture-v2-small-order',items:[{productId:1n,quantity:3}],shipping:{name:'Synthetic buyer',phone:'+966500000000',addressLine:'Original complete address',city:'Riyadh',postalCode:'12345',country:'SA'}},{shippingFeeMinor:5});
+  const claim=await claimPaymentAttempt(db,{memberId:5n,orderId:order.id,provider:'fixture'});
+  if(!claim.claimed)throw new Error('Synthetic payment claim missing');
+  await recordPaymentReference(db,{attemptId:claim.attempt.id,claimToken:claim.claimToken,reference:'fixture-v2-small-receipt'});
+  await settleVerifiedPayment(db,{verified:true,status:'paid',provider:'fixture',reference:'fixture-v2-small-receipt',merchantOrderId:claim.attempt.merchantOrderId,amountMinor:17,currency:'SAR'},[]);
+  const [receipt]=await db.$queryRaw<{id:bigint;recorded_at:Date}[]>`SELECT id,recorded_at FROM commerce_receipts WHERE order_id=${order.id}`;
+  return {order,receipt,now:new Date(Math.max(Date.now(),receipt.recorded_at.getTime())+1000)};
 }
 function refund(externalId='fixture-refund-01',amountMinor=7000):VerifiedFinanceRefund {
   return {verified:true,status:'refunded',provider:'fixture',externalId,receiptId:'1',orderId:'1',amountMinor,currency:'SAR',refundedAt:at.toISOString(),evidenceRef:'fixture-confirmed-gateway-evidence'};
@@ -236,6 +261,7 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
       await expect(recordExpense(db,uid,expense)).rejects.toThrow('access_forbidden');
       await expect(saveBudget(db,uid,{month:'2026-08',category:'hosting',plannedMinor:100,reason:'Synthetic denied budget'})).rejects.toThrow('access_forbidden');
       await expect(captureInvoices(db,uid)).rejects.toThrow('access_forbidden');
+      await expect(issueProspectiveInvoice(db,1n,{actorId:uid,mode:'automation'},later)).rejects.toThrow('access_forbidden');
       await expect(releaseAccrual(db,uid,1n,'2026-08-15','No grant',at)).rejects.toThrow('access_forbidden');
       await expect(recordVerifiedFinanceRefund(db,uid,refund(),gate,at)).rejects.toThrow('access_forbidden');
       await expect(closeMonth(db,uid,'2026-08',[...CLOSE_CHECKS],'No grant',later)).rejects.toThrow('access_forbidden');
@@ -773,6 +799,7 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     try{
       expect(process.env.SUPPLIER_ALLOW_LIVE_ORDERS).toBe('false');
       expect((await db.$queryRaw<{name:string}[]>`SELECT DATABASE() AS name`)[0].name).toBe('trbhh_finance_test');
+      await seedProspectivePolicy();
       // Only this newly created loopback fixture enables its local checkout gate.
       await db.$executeRaw`INSERT INTO site_settings(k,v) VALUES('commerce_purchasing_enabled','1')`;
       await db.$executeRaw`UPDATE commerce_suppliers SET active=1 WHERE id=1`;
@@ -799,8 +826,15 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
       const today=new Date(clock.getTime()+10800000).toISOString().slice(0,10);
       const [year,monthNumber]=month.split('-').map(Number),nextMonth=new Date(Date.UTC(year,monthNumber,2,12));
       const invoice=await capturedId(order.id);
-      const snapshot:FiscalSnapshot={...fiscal(),...calculateFiscalLines([{key:'1',title:'Synthetic original product',quantity:2,unitNetMinor:10000,discountMinor:0,vatBps:1500,supplierId:'1',supplierMinor:14000}]),paidMinor:23000,sourceOrderId:String(order.id),sourceReceiptId:String(receipt.id)};
-      await issueInvoice(db,actor,invoice,snapshot,gate,clock);
+      vi.stubEnv('FINANCE_ISSUANCE_SECRET','fixture-only-issuance-worker-secret-0001');
+      expect(await issueInvoicesForWorker(db,'Bearer fixture-only-issuance-worker-secret-0001',clock)).toEqual({issued:1,pending:0,failed:0});
+      expect(await issueInvoicesForWorker(peer,'Bearer fixture-only-issuance-worker-secret-0001',clock)).toEqual({issued:0,pending:0,failed:0});
+      const adminCopy=await readFinanceInvoice(db,String(invoice));
+      const customerCopy=await readFinanceInvoice(db,String(invoice),5);
+      expect(adminCopy?.snapshot?.version).toBe(2);expect(customerCopy?.snapshot?.customer.address).toContain('Synthetic fixture address');
+      expect(customerCopy?.source.suppliers).toEqual([]);expect(customerCopy?.snapshot?.lines.some(line=>line.supplierId!==undefined)).toBe(false);
+      expect(customerCopy?.totalMinor).toBe(adminCopy?.totalMinor);expect(customerCopy?.vatMinor).toBe(adminCopy?.vatMinor);
+      expect(await readFinanceInvoice(db,String(invoice),73)).toBeNull();
       // Existing imported-outbox fixture, not a carrier dispatch or supplier API.
       await db.$executeRaw`INSERT INTO supplier_integration_profiles(supplier_id,provider,mode) VALUES(1,'salla','development')`;
       await db.$executeRaw`INSERT INTO supplier_connections(id,supplier_id,provider,external_store_id,status) VALUES(1,1,'salla','fixture-store','connected')`;
@@ -844,6 +878,55 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
       expect((await report(month,nextMonth)).metrics.find(metric=>metric.key==='vat')?.valueMinor).toBe(3000);
       expect((await db.$queryRaw<{stock_available:number;stock_reserved:number}[]>`SELECT stock_available,stock_reserved FROM commerce_products WHERE id=1`)[0]).toEqual({stock_available:3,stock_reserved:0});
       expect(network).not.toHaveBeenCalled();
-    }finally{network.mockRestore();}
+    }finally{network.mockRestore();vi.unstubAllEnvs();}
   },60000);
+  it('issues concurrent adapter retries once, preserves millisecond source time and reverses credits from their actual source',async()=>{
+    const {order,receipt,now}=await prospectiveReceipt();
+    const [stored]=await db.$queryRaw<{captured_at:Date;snapshot:unknown}[]>`SELECT captured_at,snapshot FROM finance_order_fiscal_snapshots WHERE order_id=${order.id}`;
+    const [orderClock]=await db.$queryRaw<{created_at:Date}[]>`SELECT created_at FROM commerce_orders WHERE id=${order.id}`;
+    expect(stored.captured_at.getTime()).toBe(orderClock.created_at.getTime());
+    expect(financeJson<{capturedAt:string}>(stored.snapshot).capturedAt).toBe(stored.captured_at.toISOString());
+    const numbers=await Promise.all([issueProspectiveInvoice(db,receipt.id,{actorId:actor,mode:'automation'},now),issueProspectiveInvoice(peer,receipt.id,{actorId:actor,mode:'automation'},now)]);
+    expect(numbers[0]).toBe(numbers[1]);expect(await count('finance_invoices')).toBe(1);
+    const [invoice]=await db.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_invoices WHERE receipt_id=${receipt.id}`;
+    const original=await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${invoice.id}`;
+    const first=await requestFinanceChange(db,actor,returnInput(invoice.id,'fixture-v2-first-return'),now);
+    expect(await approveFinanceChange(db,checker,first,'Synthetic inspected item',now)).toMatchObject({totalMinor:4,vatMinor:1});
+    const [credit]=await db.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_invoices WHERE parent_id=${invoice.id} AND kind='credit_note'`;
+    const reversalInput={kind:'return' as const,targetId:String(invoice.id),payload:{lines:[],reversalOf:String(credit.id)},reason:'Synthetic return cancelled before refund',requestKey:'fixture-v2-credit-reversal'};
+    const reversal=await requestFinanceChange(db,actor,reversalInput,now);
+    expect(await approveFinanceChange(db,checker,reversal,'Independent reversal review',now)).toMatchObject({totalMinor:4,vatMinor:1,number:expect.stringMatching(/^DBN-/)});
+    await expect(requestFinanceChange(db,actor,{...reversalInput,requestKey:'fixture-v2-duplicate-reversal'},now)).rejects.toThrow('finance_credit_already_reversed');
+    const full=await requestFinanceChange(db,actor,{...returnInput(invoice.id,'fixture-v2-full-return',3),payload:{lines:[{key:'1',quantity:3},{key:'shipping',quantity:1}]}},now);
+    expect(await approveFinanceChange(db,checker,full,'All remaining source values returned',now)).toMatchObject({totalMinor:17,vatMinor:3});
+    await expect(requestFinanceChange(db,actor,returnInput(invoice.id,'fixture-v2-extra-return'),now)).rejects.toThrow('finance_note_exceeds_original');
+    expect(await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${invoice.id}`).toEqual(original);
+    expect(await count('finance_refunds')).toBe(0);expect(await count('finance_invoices')).toBe(4);
+  });
+  it.each(['permission','policy','snapshot','period'] as const)('does not issue or consume numbers after prospective %s changes',async failure=>{
+    const {order,receipt,now}=await prospectiveReceipt();
+    if(failure==='permission')await db.$executeRaw`DELETE FROM access_role_permissions WHERE role_id='fixture-maker' AND permission='invoices:create'`;
+    if(failure==='policy')await db.$executeRaw`UPDATE finance_change_requests SET status='cancelled' WHERE request_key='fixture-prospective-policy'`;
+    if(failure==='snapshot')await db.$executeRaw`UPDATE finance_order_fiscal_snapshots SET snapshot=JSON_SET(snapshot,'$.customer.name','Tampered') WHERE order_id=${order.id}`;
+    if(failure==='period')await db.$executeRaw`INSERT INTO finance_periods(month,closed_at,checks_json,reason) VALUES(${financeMonth(receipt.recorded_at)},${now},'[]','Synthetic closed period')`;
+    await expect(issueProspectiveInvoice(db,receipt.id,{actorId:actor,mode:'automation'},now)).rejects.toThrow(/access_forbidden|finance_/);
+    expect(await count('finance_sequences')).toBe(0);expect(await count('finance_invoices')).toBe(0);expect(await count('commerce_receipts')).toBe(1);
+  });
+  it('keeps historical pending archives unchanged when the prospective worker runs',async()=>{
+    await seedOrder();const invoice=await capturedId();const before=await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${invoice}`;
+    vi.stubEnv('FINANCE_ISSUANCE_SECRET','fixture-only-issuance-worker-secret-0001');
+    try{expect(await issueInvoicesForWorker(db,'Bearer fixture-only-issuance-worker-secret-0001',later)).toEqual({issued:0,pending:0,failed:0});}
+    finally{vi.unstubAllEnvs();}
+    expect(await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${invoice}`).toEqual(before);expect(await count('finance_sequences')).toBe(0);
+  });
+  it('rolls back the new document and number on audit failure while preserving the already verified receipt',async()=>{
+    const {receipt,now}=await prospectiveReceipt();
+    const savedReceipt=await db.$queryRaw`SELECT * FROM commerce_receipts WHERE id=${receipt.id}`;
+    const savedSource=await db.$queryRaw`SELECT * FROM finance_order_fiscal_snapshots`;
+    await failAudit(()=>issueProspectiveInvoice(db,receipt.id,{actorId:actor,mode:'automation'},now));
+    expect(await count('finance_sequences')).toBe(0);expect(await count('finance_invoices')).toBe(0);
+    expect(await db.$queryRaw`SELECT * FROM commerce_receipts WHERE id=${receipt.id}`).toEqual(savedReceipt);
+    expect(await db.$queryRaw`SELECT * FROM finance_order_fiscal_snapshots`).toEqual(savedSource);
+    expect(await issueProspectiveInvoice(db,receipt.id,{actorId:actor,mode:'automation'},now)).toMatch(/00000001$/);
+  });
 });

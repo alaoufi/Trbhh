@@ -2,13 +2,14 @@ import 'server-only';
 import type {Prisma} from '@prisma/client';
 import type {CommerceDb} from '@/lib/commerce/types';
 import {requireFinancePermission} from '@/lib/access-control/financial-authorization';
-import type {FiscalSnapshot} from './types';
+import type {ArchivedFiscalSnapshot as FiscalSnapshot,FiscalSnapshotV2} from './types';
+import {buildReturnSnapshotV2,type PriorV2} from './adjustments-v2';
 import {calculateFiscalLines,checkedFinanceInteger,sumFinanceMoney} from './calculations';
 import {assertFinanceSchemaReady} from './schema';
 import {financeJson,financeNumber} from './read-model';
 import {auditFinance,financeMonth,fingerprint,parseFinanceId,requireOpenPeriod} from './service';
 type NoteKind='credit_note'|'debit_note';
-type PriorNote={kind:NoteKind;snapshot:FiscalSnapshot};
+type PriorNote={id?:string;kind:NoteKind;snapshot:FiscalSnapshot};
 const options={maxWait:10000,timeout:30000};
 
 /** Debit notes restore prior credits only; new charges require their own verified sale. */
@@ -17,11 +18,24 @@ export function validateAdjustment(kind:NoteKind,original:FiscalSnapshot,prior:P
   for(const key of ['issuer','customer','currency','policyReference','sourceOrderId','sourceReceiptId','version'] as const){
     if(fingerprint(original[key])!==fingerprint(proposed[key]))throw new Error('finance_note_identity_invalid');
   }
-  const calc=calculateFiscalLines(proposed.lines);
-  if(calc.totalMinor<=0||fingerprint(calc.lines)!==fingerprint(proposed.lines)||calc.netMinor!==proposed.netMinor||calc.vatMinor!==proposed.vatMinor||calc.totalMinor!==proposed.totalMinor||proposed.paidMinor!==proposed.totalMinor)throw new Error('finance_note_difference');
+  if(proposed.version===2){
+    if(original.version!==2||prior.some(x=>x.snapshot.version!==2))throw new Error('finance_note_identity_invalid');
+    for(const key of ['policyId','policyRequestId','orderSnapshotFingerprint'] as const)if(original[key]!==proposed[key])throw new Error('finance_note_identity_invalid');
+    let expected:FiscalSnapshotV2;
+    if(kind==='credit_note')expected=buildReturnSnapshotV2(original,prior as PriorV2[],{lines:proposed.lines.map(x=>({key:x.key,quantity:x.quantity}))});
+    else{
+      const credit=prior.find(x=>x.id===proposed.reversalOf&&x.kind==='credit_note');
+      if(!proposed.reversalOf||!credit||credit.snapshot.version!==2||prior.some(x=>x.kind==='debit_note'&&x.snapshot.version===2&&x.snapshot.reversalOf===proposed.reversalOf))throw new Error('finance_credit_reversal_invalid');
+      expected={...credit.snapshot,reversalOf:proposed.reversalOf,derivation:'source_allocation'};
+    }
+    if(fingerprint(expected)!==fingerprint(proposed))throw new Error('finance_note_difference');
+  }else{
+    const calc=calculateFiscalLines(proposed.lines);
+    if(calc.totalMinor<=0||fingerprint(calc.lines)!==fingerprint(proposed.lines)||calc.netMinor!==proposed.netMinor||calc.vatMinor!==proposed.vatMinor||calc.totalMinor!==proposed.totalMinor||proposed.paidMinor!==proposed.totalMinor)throw new Error('finance_note_difference');
+  }
   for(const line of proposed.lines){
     const source=original.lines.find(x=>x.key===line.key);
-    if(!source||source.vatBps!==line.vatBps||source.unitNetMinor!==line.unitNetMinor||source.title!==line.title||source.supplierId!==line.supplierId||(source.supplierMinor===undefined)!==(line.supplierMinor===undefined))throw new Error('finance_note_line_invalid');
+    if(!source||source.vatBps!==line.vatBps||('unitNetMinor' in source&&'unitNetMinor' in line?source.unitNetMinor!==line.unitNetMinor:'unitPriceMinor' in source&&'unitPriceMinor' in line?source.unitPriceMinor!==line.unitPriceMinor:true)||source.title!==line.title||source.supplierId!==line.supplierId||(source.supplierMinor===undefined)!==(line.supplierMinor===undefined))throw new Error('finance_note_line_invalid');
     for(const field of ['quantity','netMinor','vatMinor','grossMinor','supplierMinor'] as const){
       const credited=sumFinanceMoney(prior.map(note=>sumFinanceMoney(note.snapshot.lines.filter(x=>x.key===line.key).map(x=>(note.kind==='credit_note'?1:-1)*(x[field]??0)))));
       const next=credited+(kind==='credit_note'?1:-1)*(line[field]??0);
@@ -56,7 +70,7 @@ export async function issueAdjustmentInTransaction(tx:Prisma.TransactionClient,a
       if(existing.kind!==input.kind||existing.reason!==input.reason.trim()||fingerprint(financeJson(existing.snapshot))!==fingerprint(input.snapshot))throw new Error('finance_idempotency_conflict');
       return existing.number;
     }
-    validateAdjustment(input.kind,financeJson<FiscalSnapshot>(original.snapshot),notes.map(x=>({kind:x.kind,snapshot:financeJson<FiscalSnapshot>(x.snapshot)})),input.snapshot);
+    validateAdjustment(input.kind,financeJson<FiscalSnapshot>(original.snapshot),notes.map(x=>({id:String(x.id),kind:x.kind,snapshot:financeJson<FiscalSnapshot>(x.snapshot)})),input.snapshot);
     if(input.kind==='debit_note'){
       const refunds=await tx.$queryRaw<{amount_minor:bigint}[]>`SELECT amount_minor FROM finance_refunds WHERE receipt_id=${original.receipt_id} FOR UPDATE`;
       const netCredit=sumFinanceMoney(notes.map(note=>(note.kind==='credit_note'?1:-1)*financeJson<FiscalSnapshot>(note.snapshot).totalMinor))-input.snapshot.totalMinor;

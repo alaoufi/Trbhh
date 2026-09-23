@@ -1,4 +1,5 @@
 import {calculateFiscalLines, checkedFinanceBigInt, checkedFinanceInteger, sumFinanceMoney} from './calculations';
+import {calculateFiscalLinesV2,fiscalTotalsV2} from './fiscal-v2';
 import type {BudgetCategory, FinanceAccrual, FinanceData, FinanceInvoice, FinanceIssue, FinanceMetric, FinanceQuery, FinanceReport, FinanceSection, StatementMovement, SupplierBalance} from './types';
 export {formatFinanceMoney} from './calculations';
 
@@ -221,7 +222,17 @@ export function buildFinanceReport(data:FinanceData,query:FinanceQuery,now=new D
   duplicates(projection.accruals.map(a=>`${a.orderId}:${a.productId}:${a.supplierId}`),'accrual_duplicate','استحقاق مورد مكرر لنفس بند الطلب.','suppliers');
   for(const order of projection.orders){
     if(order.currency!=='SAR')issue(`order_currency:${order.id}`,'عملة الطلب لا تطابق عملة التقرير.','reconciliation',order.id);
-    for(const item of order.items)difference(`item_total:${order.id}:${item.productId}`,item.totalMinor,checkedFinanceBigInt(BigInt(item.unitMinor)*BigInt(item.quantity)),'قيمة بند الطلب لا تساوي الكمية × سعره المحفوظ.','reconciliation',order.id);
+    const issued=data.invoices.find(x=>x.orderId===order.id&&x.kind==='invoice'&&x.snapshot?.version===2)?.snapshot;
+    const fiscal=data.orderFiscalSnapshots?.find(x=>x.orderId===order.id)??(issued?.version===2?issued:null);
+    for(const item of order.items){
+      let expected=checkedFinanceBigInt(BigInt(item.unitMinor)*BigInt(item.quantity));
+      if(fiscal){
+        const line=fiscal.lines.find(x=>x.key===item.productId&&x.component==='product');
+        if(!line||line.unitPriceMinor!==item.unitMinor||line.quantity!==item.quantity||line.title!==item.title){issue(`item_fiscal_source:${order.id}:${item.productId}`,'بند الطلب لا يطابق لقطة التسعير الضريبي المحفوظة.','reconciliation',order.id);continue;}
+        try{expected=calculateFiscalLinesV2([line]).totalMinor;}catch{issue(`item_fiscal_math:${order.id}:${item.productId}`,'تعذر حساب بند الطلب وفق لقطة التسعير المحفوظة.','reconciliation',order.id);continue;}
+      }
+      difference(`item_total:${order.id}:${item.productId}`,item.totalMinor,expected,'قيمة بند الطلب لا تطابق سعره وكميته وأساسه الضريبي المحفوظ.','reconciliation',order.id);
+    }
     difference(`order_items:${order.id}`,sum(order.items.map(i=>i.totalMinor)),order.subtotalMinor,'مجموع بنود الطلب لا يطابق المجموع الفرعي المحفوظ.','reconciliation',order.id);
     difference(`order_total:${order.id}`,sum([order.subtotalMinor,order.shippingMinor]),order.totalMinor,'المجموع الفرعي والشحن لا يطابقان إجمالي الطلب.','reconciliation',order.id);
     if(!order.paidAt||!projection.known(order.paidAt))continue;
@@ -305,7 +316,10 @@ export function buildFinanceReport(data:FinanceData,query:FinanceQuery,now=new D
     difference(`invoice_net_vat:${invoice.id}`,sum([invoice.netMinor,invoice.vatMinor]),invoice.totalMinor,'صافي الفاتورة وضريبتها لا يطابقان إجماليها.','invoices',invoice.orderId);
     for(const field of ['netMinor','vatMinor','totalMinor'] as const)difference(`invoice_snapshot_${field}:${invoice.id}`,snapshot[field],invoice[field]!,'إجمالي لقطة الفاتورة يختلف عن السجل المالي.','invoices',invoice.orderId);
     try {
-      const calculated=calculateFiscalLines(snapshot.lines);
+      const calculated=snapshot.version===1?calculateFiscalLines(snapshot.lines):snapshot.derivation==='sale'?calculateFiscalLinesV2(snapshot.lines):fiscalTotalsV2(snapshot.lines.map(line=>{
+        for(const value of [line.quantity,line.discountMinor,line.unitPriceMinor,line.netMinor,line.vatMinor,line.grossMinor])checkedFinanceInteger(value);
+        if(line.netMinor+line.vatMinor!==line.grossMinor)throw new Error('finance_note_difference');return line;
+      }));
       for(const field of ['netMinor','vatMinor','totalMinor'] as const)difference(`invoice_lines_${field}:${invoice.id}`,calculated[field],snapshot[field],'مجموع البنود المحسوب لا يطابق لقطة الفاتورة.','invoices',invoice.orderId);
       snapshot.lines.forEach((line,index)=>{
         for(const field of ['netMinor','vatMinor','grossMinor'] as const)difference(`invoice_line_${field}:${invoice.id}:${index}`,line[field],calculated.lines[index][field],'قيمة محفوظة في بند الفاتورة تختلف عن حسابه الصريح حتى الهللة.','invoices',invoice.orderId);
@@ -324,7 +338,7 @@ export function buildFinanceReport(data:FinanceData,query:FinanceQuery,now=new D
     if(netCredit<0||netCredit>invoice.totalMinor||netVat<0||invoice.vatMinor!==null&&netVat>invoice.vatMinor)issue(`credit_exceeds_invoice:${invoice.id}`,'صافي الإشعارات يتجاوز مبلغ الفاتورة أو ضريبتها، أو يعيد أكثر مما سبق تخفيضه.','invoices',invoice.orderId);
     for(const note of notes)for(const line of note.snapshot?.lines??[]){
       const original=invoice.snapshot?.lines.find(l=>l.key===line.key);
-      if(!original||line.title!==original.title||line.unitNetMinor!==original.unitNetMinor||line.vatBps!==original.vatBps||line.supplierId!==original.supplierId||(line.supplierMinor===undefined)!==(original.supplierMinor===undefined))issue(`note_line_identity:${note.id}:${line.key}`,'هوية بند الإشعار أو سياسته لا تطابق بند الفاتورة الأصلية.','invoices',note.orderId);
+      if(!original||line.title!==original.title||('unitNetMinor' in line&&'unitNetMinor' in original?line.unitNetMinor!==original.unitNetMinor:'unitPriceMinor' in line&&'unitPriceMinor' in original?line.unitPriceMinor!==original.unitPriceMinor||line.priceBasis!==original.priceBasis:true)||line.vatBps!==original.vatBps||line.supplierId!==original.supplierId||(line.supplierMinor===undefined)!==(original.supplierMinor===undefined))issue(`note_line_identity:${note.id}:${line.key}`,'هوية بند الإشعار أو سياسته لا تطابق بند الفاتورة الأصلية.','invoices',note.orderId);
     }
     for(const line of invoice.snapshot?.lines??[])for(const field of ['quantity','netMinor','vatMinor','grossMinor','supplierMinor'] as const){
       const net=sum(notes.flatMap(note=>(note.snapshot?.lines??[]).filter(l=>l.key===line.key).map(l=>-fiscalSign(note)*(l[field]??0))));

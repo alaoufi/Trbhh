@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { COMMERCE_DDL } from '@/lib/commerce/schema';
-import { FINANCE_DDL } from '@/lib/finance/schema';
+import { FINANCE_DDL, FINANCE_UPGRADE_DDL } from '@/lib/finance/schema';
 import { ACCESS_CONTROL_DDL } from '@/lib/access-control/schema';
 import { CATEGORY_DDL } from '@/lib/ad-categories/schema';
 import { SUPPLIER_DDL } from '@/lib/suppliers/schema';
@@ -28,6 +28,7 @@ import { CJ_DDL } from '@/lib/cj/schema';
 const STATEMENTS: string[] = [
   ...COMMERCE_DDL,
   ...FINANCE_DDL,
+  ...FINANCE_UPGRADE_DDL,
   ...ACCESS_CONTROL_DDL,
   ...CATEGORY_DDL,
   ...SUPPLIER_DDL,

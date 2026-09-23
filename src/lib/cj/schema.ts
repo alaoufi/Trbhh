@@ -37,6 +37,26 @@ export const CJ_DDL: string[] = [
     KEY cj_products_commerce (commerce_product_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  // قائمة اختيار/تفاوض منفصلة عن الاستيراد والنشر العام.
+  `CREATE TABLE IF NOT EXISTS cj_shortlist (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    cj_product_id VARCHAR(64) NOT NULL,
+    cj_variant_id VARCHAR(64) NOT NULL DEFAULT '',
+    cj_sku VARCHAR(191) NOT NULL DEFAULT '',
+    name VARCHAR(400) NOT NULL DEFAULT '',
+    image VARCHAR(1024) NOT NULL DEFAULT '',
+    category_name VARCHAR(255) NOT NULL DEFAULT '',
+    supplier_cost_minor INT NOT NULL DEFAULT 0,
+    shipping_cost_minor INT NOT NULL DEFAULT 0,
+    sale_price_minor INT NOT NULL DEFAULT 0,
+    margin_bps INT NOT NULL DEFAULT 3000,
+    status VARCHAR(32) NOT NULL DEFAULT 'candidate',
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+    UNIQUE KEY cj_shortlist_product (cj_product_id),
+    KEY cj_shortlist_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   // مخزن أحداث webhooks من CJ (idempotent عبر مفتاح الحدث).
   `CREATE TABLE IF NOT EXISTS cj_webhook_events (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,

@@ -125,6 +125,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
       <div className={card}>
         <h2 className="font-bold">اختبارات القراءة (بلا شراء)</h2>
         {!cfg.configured && <p className="text-sm text-red-700">اضبط متغيّرات CJ في البيئة أولاً لتشغيل الاختبارات.</p>}
+        <p className="text-xs text-muted-foreground">«اختبار الاتصال»: النجاح يعني ظهور <code dir="ltr">connected: true</code> مع البريد (تمّت المصادقة وجُلب التوكن). ظهور البريد بلا خطأ أحمر = الاتصال سليم.</p>
         <div className="flex flex-wrap gap-2">
           <AccessPage href="/admin/suppliers/cj?run=connection"><Link href="/admin/suppliers/cj?run=connection" className={btn}>اختبار الاتصال</Link></AccessPage>
           <AccessPage href="/admin/suppliers/cj?run=products"><Link href="/admin/suppliers/cj?run=products" className={btn}>عيّنة منتجات (٢٠)</Link></AccessPage>

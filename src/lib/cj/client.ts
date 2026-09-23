@@ -111,11 +111,12 @@ async function call<T>(path: string, opts: { method?: 'GET' | 'POST'; query?: Re
 
 /* ------------------------- قراءة فقط ------------------------- */
 
-export async function testConnection(): Promise<CjResult<{ email: string }>> {
+export async function testConnection(): Promise<CjResult<{ connected: true; email: string; accessTokenExpiresAt: string | null }>> {
   const cfg = cjConfig();
   const tok = await accessToken(cfg);
   if (!tok.ok) return tok;
-  return { ok: true, data: { email: cfg.email } };
+  const stored = await readCjAuth(cfg.encryptionKey).catch(() => null);
+  return { ok: true, data: { connected: true, email: cfg.email, accessTokenExpiresAt: stored?.accessExpiresAt ? stored.accessExpiresAt.toISOString() : null } };
 }
 
 export async function listProducts(pageNum = 1, pageSize = 20, filters: { productName?: string; categoryId?: string } = {}): Promise<CjResult<CjProductSummary[]>> {

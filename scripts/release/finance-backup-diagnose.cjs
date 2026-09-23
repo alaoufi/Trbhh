@@ -15,6 +15,26 @@ function summarizeLogs(deploy,operations){
   for(const [pattern,code] of [[/No such container/i,'docker_container_missing'],[/invalid reference format/i,'docker_reference_invalid'],[/command not found/i,'command_unavailable'],[/Finance retained media verification failed/,'retained_media_rejected'],[/Database proof failed/,'database_proof_rejected'],[/Media proof failed/,'media_proof_rejected'],[/Live database dump failed/,'database_dump_failed']])if(pattern.test(logs))codes.push(code);
   return {backupStages,deploymentStages,codes};
 }
+function summarizeMedia(before,current){
+  function manifest(value){
+    if(value?.format!=='trbhh-media-proof-v1'||!Array.isArray(value.entries)||value.entryCount!==value.entries.length)throw Error('media_manifest');
+    const entries=new Map();let fileBytes=0,symlinkBytes=0;
+    for(const item of value.entries){
+      if(typeof item.path!=='string'||!item.path||entries.has(item.path)||!['file','symlink','directory'].includes(item.kind))throw Error('media_manifest');
+      if(item.kind==='file'){if(!Number.isSafeInteger(item.bytes)||item.bytes<0||!/^[a-f0-9]{64}$/.test(item.sha256))throw Error('media_manifest');fileBytes+=item.bytes;}
+      if(item.kind==='symlink'){if(typeof item.target!=='string'||!item.target)throw Error('media_manifest');symlinkBytes+=Buffer.byteLength(item.target);}
+      entries.set(item.path,item);
+    }
+    if(!Number.isSafeInteger(fileBytes+symlinkBytes))throw Error('media_size');
+    return {entries,summary:{entryCount:value.entryCount,capacityEntries:value.entryCount+1,fileBytes,symlinkBytes,totalBytes:fileBytes+symlinkBytes}};
+  }
+  const a=manifest(before),b=current?manifest(current):null;
+  if(!b)return {before:a.summary,current:null};
+  let removed=0,changed=0,added=0;
+  for(const [key,old] of a.entries){const next=b.entries.get(key);if(!next)removed++;else if(old.kind!==next.kind||(old.kind==='file'&&(old.bytes!==next.bytes||old.sha256!==next.sha256))||(old.kind==='symlink'&&old.target!==next.target))changed++;}
+  for(const key of b.entries.keys())if(!a.entries.has(key))added++;
+  return {before:a.summary,current:b.summary,comparison:{compared:a.entries.size,removed,changed,added,exact:removed===0&&changed===0&&added===0}};
+}
 function collect({root='/root',run=spawnSync}={}){
   const prod=path.join(root,'trbhh'),backup=path.join(root,'trbhh-release-backups/finance-'+RUN),tools=path.join(root,'trbhh-release-tools/'+RUN);
   const canonical=value=>{try{return fs.realpathSync(value)===value&&fs.lstatSync(value).isDirectory()&&!fs.lstatSync(value).isSymbolicLink();}catch{return false;}};
@@ -38,9 +58,17 @@ function collect({root='/root',run=spawnSync}={}){
   const names=['capacity.json','media-mode.txt','FINANCE_MEDIA_REFERENCE.json','container-before.json','compose-sources.json','code.tar.gz','image.tar.gz','before.json','full-before.json','supplier-before.json','database.sql.gz','storage-current.json','legacy-current.json','full-current.json','restored.json','full-restored.json','SHA256SUMS','VERIFIED','WATCHDOG_FIRED','CUTOVER_READY','ROLLED_BACK','DEPLOYMENT_VERIFIED'];
   const files=Object.fromEntries(names.map(name=>[name,canonical(backup)?info(path.join(backup,name)):{exists:false}]));
   const timer=command('systemctl',['is-active','trbhh-finance-resume-'+RUN+'.timer']);
-  return {runId:RUN,app,backup:{canonical:canonical(backup),files},activeDeployment:info(path.join(root,'trbhh-release-tools/ACTIVE_DEPLOYMENT')),resumeTimer:['active','inactive','failed','activating','deactivating'].includes(timer)?timer:'unknown',...summarizeLogs(read(path.join(tools,'deploy.log')),read(path.join(backup,'operations.log')))};
+  const media={};
+  for(const label of ['storage','legacy']){try{const before=JSON.parse(read(path.join(backup,label+'-before.json'),64*1024*1024)),current=read(path.join(backup,label+'-current.json'),64*1024*1024);media[label]=summarizeMedia(before,current?JSON.parse(current):null);}catch{media[label]={available:false};}}
+  let capacityMeasurement=null,liveSpace=null;
+  try{const raw=JSON.parse(read(path.join(backup,'capacity.json'))),keys=['databaseBytes','tableCount','mediaBytes','mediaEntries'];if(raw.format!=='trbhh-backup-capacity-v1'||!keys.every(k=>/^\d{1,24}$/.test(String(raw[k]))))throw Error('capacity');capacityMeasurement=Object.fromEntries(keys.map(k=>[k,String(raw[k])]));}catch{}
+  const df=command('df',['-B1','--output=size,used,avail',root]).split(/\r?\n/).slice(1).join(' ').trim().split(/\s+/);
+  if(df.length===3&&df.every(value=>/^\d{1,24}$/.test(value)))liveSpace={totalBytes:df[0],usedBytes:df[1],availableBytes:df[2]};
+  const logSummary=summarizeLogs(read(path.join(tools,'deploy.log')),read(path.join(backup,'operations.log')));
+  if(Object.values(media).some(value=>value.comparison&&!value.comparison.exact))logSummary.codes.push('media_manifest_mismatch');
+  return {runId:RUN,app,backup:{canonical:canonical(backup),files},activeDeployment:info(path.join(root,'trbhh-release-tools/ACTIVE_DEPLOYMENT')),resumeTimer:['active','inactive','failed','activating','deactivating'].includes(timer)?timer:'unknown',media,capacityMeasurement,liveSpace,...logSummary};
 }
 if(require.main===module||(process.argv[1]==='-'&&module.id==='[stdin]')){
   try{if(process.argv.slice(2).length)throw Error('arguments');process.stdout.write(JSON.stringify(collect())+'\n');}catch{process.stderr.write('Finance backup diagnostic unavailable; private details withheld.\n');process.exitCode=1;}
 }
-module.exports={summarizeLogs,collect};
+module.exports={summarizeLogs,summarizeMedia,collect};

@@ -28,15 +28,16 @@ function mediaSize(root,filesystem=fs){
 async function measure(db,env=process.env,filesystem=fs){
   const rows=await db.$queryRawUnsafe("SELECT COALESCE(SUM(COALESCE(DATA_LENGTH,0)+COALESCE(INDEX_LENGTH,0)),0) AS bytes,COUNT(*) AS tables_count FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_TYPE='BASE TABLE'");
   if(rows.length!==1||integer(rows[0].tables_count)<2n)throw Error('backup_capacity_invalid_database');
-  let mediaBytes=0n,mediaEntries=0n;
-  for(const root of [env.STORAGE_DIR||'/app/storage',env.LEGACY_LOCAL_DIR||'']){
+  let mediaBytes=0n,mediaEntries=0n;const mediaRoots=[];
+  for(const [label,root] of [['storage',env.STORAGE_DIR||'/app/storage'],['legacy',env.LEGACY_LOCAL_DIR||'']]){
     if(!root)continue;
-    if(!['/app/storage','/app/legacy'].includes(root))throw Error('backup_capacity_unsupported_media');
+    if(root!=='/app/'+label)throw Error('backup_capacity_unsupported_media');
     const size=mediaSize(root,filesystem);mediaBytes+=integer(size.bytes);mediaEntries+=integer(size.entries);
+    mediaRoots.push({label,bytes:size.bytes,entries:size.entries});
   }
   // MySQL SUM(BIGINT) can be represented as Prisma Decimal. Parse its exact
   // integer string instead of converting through an imprecise JS Number.
-  return {format:'trbhh-backup-capacity-v1',databaseBytes:String(integer(String(rows[0].bytes))),tableCount:String(integer(rows[0].tables_count)),mediaBytes:String(mediaBytes),mediaEntries:String(mediaEntries)};
+  return {format:'trbhh-backup-capacity-v1',databaseBytes:String(integer(String(rows[0].bytes))),tableCount:String(integer(rows[0].tables_count)),mediaBytes:String(mediaBytes),mediaEntries:String(mediaEntries),mediaRoots};
 }
 function filesystemSpace(directory,filesystem=fs){
   if(typeof directory!=='string'||!path.isAbsolute(directory)||filesystem.lstatSync(directory).isSymbolicLink())throw Error('backup_capacity_invalid_path');
@@ -45,7 +46,7 @@ function filesystemSpace(directory,filesystem=fs){
 }
 function checkCapacity(measurement,imageValue,codeValue,backupSpace,dockerSpace,mediaMode='fresh'){
   if(measurement?.format!=='trbhh-backup-capacity-v1')throw Error('backup_capacity_invalid');
-  if(!['fresh','verified-parent'].includes(mediaMode))throw Error('backup_capacity_invalid');
+  if(!['fresh','verified-parent','fresh-storage-retained-legacy'].includes(mediaMode))throw Error('backup_capacity_invalid');
   const image=integer(imageValue),code=integer(codeValue),media=integer(measurement.mediaBytes),entries=integer(measurement.mediaEntries),tables=integer(measurement.tableCount);
   if(image===0n||code===0n||tables<2n)throw Error('backup_capacity_invalid');
   const database=maximum(integer(measurement.databaseBytes),64n*MiB);
@@ -54,10 +55,16 @@ function checkCapacity(measurement,imageValue,codeValue,backupSpace,dockerSpace,
   // and the new app image/build layers. Shared layers only reduce actual use.
   // A verified immutable parent supplies media in-place: only small manifests
   // are copied (covered by the fixed buffer), never archives/extracted files.
-  const freshMedia=mediaMode==='fresh';
-  const backupBytes=image*2n+code*2n+(freshMedia?media*2n+entries*4096n:0n)+database*3n+512n*MiB;
+  let freshBytes=mediaMode==='fresh'?media:0n,freshEntries=mediaMode==='fresh'?entries:0n;
+  if(mediaMode==='fresh-storage-retained-legacy'){
+    const roots=measurement.mediaRoots;
+    if(!Array.isArray(roots)||roots.length!==2||new Set(roots.map(root=>root.label)).size!==2||!roots.every(root=>['storage','legacy'].includes(root.label)&&integer(root.entries)>0n))throw Error('backup_capacity_invalid');
+    if(roots.reduce((sum,root)=>sum+integer(root.bytes),0n)!==media||roots.reduce((sum,root)=>sum+integer(root.entries),0n)!==entries)throw Error('backup_capacity_invalid');
+    const storage=roots.find(root=>root.label==='storage');freshBytes=integer(storage.bytes);freshEntries=integer(storage.entries);
+  }
+  const backupBytes=image*2n+code*2n+freshBytes*2n+freshEntries*4096n+database*3n+512n*MiB;
   const dockerBytes=image*3n+database*3n+GiB;
-  const backupInodes=(freshMedia?entries:0n)+1000n,dockerInodes=tables*20n+100000n;
+  const backupInodes=freshEntries+1000n,dockerInodes=tables*20n+100000n;
   const shared=String(backupSpace.device)===String(dockerSpace.device);
   const requested=[{label:shared?'backup_and_docker':'backup',space:backupSpace,bytes:shared?backupBytes+dockerBytes:backupBytes,inodes:shared?backupInodes+dockerInodes:backupInodes}];
   if(!shared)requested.push({label:'docker',space:dockerSpace,bytes:dockerBytes,inodes:dockerInodes});

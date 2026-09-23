@@ -30,7 +30,7 @@ done
 verify_retained_media() {
   case "$(cat "$backup/media-mode.txt")" in
     fresh) [[ ! -e "$backup/FINANCE_MEDIA_REFERENCE.json" ]] ;;
-    verified-parent) node "$tools_dir/finance-media-reference.cjs" verify "$backup" ;;
+    verified-parent|fresh-storage-retained-legacy) node "$tools_dir/finance-media-reference.cjs" verify "$backup" ;;
     *) return 1 ;;
   esac
 }

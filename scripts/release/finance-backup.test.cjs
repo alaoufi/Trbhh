@@ -124,12 +124,46 @@ test('release safety ordering keeps capacity and archive validation before the b
 });
 test('parent capacity is available only after a successful immutable-parent inspection',()=>{
   const match=read().match(/# MEDIA_CAPACITY_BEGIN\n([\s\S]*?)# MEDIA_CAPACITY_END/);assert(match);
-  for(const [fresh,parent,expected] of [[0,0,'fresh'],[1,0,'verified-parent'],[1,1,null]]){
+  for(const [fresh,parent,expected] of [[0,0,'fresh'],[1,0,'fresh-storage-retained-legacy'],[1,1,null]]){
     const result=spawnSync(bash,['-c',`set -euo pipefail\nexec 3>&1\ntools_dir=/tools; base=/backups; capacity=measured; image_bytes=1; code_bytes=1; docker_root=/docker\nnode(){ printf 'call %s\\n' "$*" >&3; if [[ "$1" == /tools/finance-media-reference.cjs ]]; then return ${parent}; fi; if [[ "\${!#}" == fresh ]]; then return ${fresh}; fi; return 0; }\n${match[1]}\nprintf 'mode=%s\\n' "$media_capacity"`],{encoding:'utf8'});
     assert.equal(result.status,expected?0:1,result.stderr);
     if(expected)assert.match(result.stdout,new RegExp('mode='+expected+'\\n'));
     if(fresh===0)assert.doesNotMatch(result.stdout,/finance-media-reference/);
-    if(parent===1)assert.doesNotMatch(result.stdout,/check[^\n]* verified-parent|mode=/);
-    if(expected==='verified-parent')assert(result.stdout.indexOf('finance-media-reference.cjs inspect')<result.stdout.indexOf('check measured 1 1 /backups /docker verified-parent'));
+    if(parent===1)assert.doesNotMatch(result.stdout,/check[^\n]* fresh-storage-retained-legacy|mode=/);
+    if(expected==='fresh-storage-retained-legacy')assert(result.stdout.indexOf('finance-media-reference.cjs inspect')<result.stdout.indexOf('check measured 1 1 /backups /docker fresh-storage-retained-legacy'));
   }
+});
+
+test('mixed archive loop creates a fresh storage archive and isolated extraction while retaining only legacy',()=>{
+  const fragment=read().match(/# MEDIA_ARCHIVES_BEGIN\n([\s\S]*?)# MEDIA_ARCHIVES_END/);assert(fragment);
+  const backup=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'finance-archive-loop-'));
+  try{
+    fs.writeFileSync(path.join(backup,'legacy.path'),'/app/legacy\n');fs.writeFileSync(path.join(backup,'legacy-before.json'),'sealed-legacy');
+    const result=spawnSync(bash,['-c',`set -euo pipefail
+exec 3>&1
+backup="$FINANCE_TEST_DIRECTORY"; reader=reader; tools_dir=/tools; current_image=old; media_capacity=fresh-storage-retained-legacy
+docker(){
+  printf 'docker %s\\n' "$*" >&3
+  case "$*" in
+    *'STORAGE_DIR /app/storage') printf /app/storage;;
+    *'LEGACY_LOCAL_DIR '*) printf /app/legacy;;
+    'exec -u 0 reader tar -czf - -C /app/storage .') printf fresh-storage-archive;;
+    'run --rm -i --network none '*) cat >/dev/null;;
+    *) return 91;;
+  esac
+}
+gzip(){ return 0; }
+mkdir(){ [[ "$1" == -m && "$2" == 700 ]] || return 1; command mkdir "$3"; }
+node(){ printf fresh-storage-manifest; }
+${fragment[1]}
+`],{encoding:'utf8',env:{...process.env,FINANCE_TEST_DIRECTORY:backup.replace(/\\/g,'/')}});
+    assert.equal(result.status,0,result.stderr);
+    assert.equal(fs.readFileSync(path.join(backup,'storage.tar.gz'),'utf8'),'fresh-storage-archive');
+    assert.equal(fs.readFileSync(path.join(backup,'storage-before.json'),'utf8'),'fresh-storage-manifest');
+    assert.equal(fs.readFileSync(path.join(backup,'legacy-before.json'),'utf8'),'sealed-legacy');
+    assert(!fs.existsSync(path.join(backup,'legacy.tar.gz')));assert(!fs.existsSync(path.join(backup,'legacy-extracted')));
+    assert.match(result.stdout,/--network none --user 0 --read-only/);assert.match(result.stdout,/dst=\/restore --entrypoint tar/);
+    assert.doesNotMatch(result.stdout,/tar -czf - -C \/app\/legacy/);
+    const deploy=fs.readFileSync(path.join(__dirname,'finance-deploy.sh'),'utf8');assert.match(deploy,/verified-parent\|fresh-storage-retained-legacy\) node .*finance-media-reference.cjs" verify/);
+  }finally{fs.rmSync(backup,{recursive:true,force:true});}
 });

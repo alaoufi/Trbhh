@@ -17,6 +17,7 @@ function fixture(){
   for(const [name,data] of Object.entries(sealed))fs.writeFileSync(path.join(checkpoint,name),data,{mode:0o600});
   // The current application's image deliberately differs from the old media parent.
   fs.writeFileSync(path.join(child,'container-before.json'),JSON.stringify([{Image:'sha256:'+'b'.repeat(64)}]));
+  fs.writeFileSync(path.join(child,'media-mode.txt'),'verified-parent\n');
   return {base,parent,checkpoint,child,manifest,cleanup:()=>fs.rmSync(base,{recursive:true,force:true})};
 }
 test('retained parent supplies only pinned manifests without constraining the fresh app image or modifying parent',()=>{
@@ -82,5 +83,57 @@ test('paused current-media comparison avoids archive reads and later sealing det
     const source=fs.readFileSync(path.join(__dirname,'finance-backup.sh'),'utf8');const pause=source.slice(source.indexOf('docker pause "$container"'),source.indexOf('# RESUME_BEFORE_RESTORE'));
     assert.match(pause,/finance-media-reference.cjs" verify-current/);assert.doesNotMatch(pause,/finance-media-reference.cjs" (?:inspect|prepare|verify) /);
     assert(source.indexOf('finance-media-reference.cjs" verify "$backup"')>source.indexOf('docker unpause "$container"'));
+  }finally{f.cleanup();}
+});
+
+test('mixed reference preserves full parent evidence but copies and verifies only sealed legacy media',()=>{
+  const f=fixture();try{
+    fs.writeFileSync(path.join(f.child,'media-mode.txt'),'fresh-storage-retained-legacy\n');
+    const original=helper().inspect(f.parent,f.base);
+    assert.deepEqual(helper().prepare(f.parent,f.child,f.base,'fresh-storage-retained-legacy'),{ok:true,referencedMedia:1});
+    const saved=JSON.parse(fs.readFileSync(path.join(f.child,'FINANCE_MEDIA_REFERENCE.json')));
+    assert.deepEqual(saved.evidence,original);assert.deepEqual(saved.retainedLabels,['legacy']);
+    assert(!fs.existsSync(path.join(f.child,'storage-before.json')));assert(!fs.existsSync(path.join(f.child,'storage.path')));
+    // Fresh storage is independently archived/proved by the backup shell. It is
+    // permitted to differ from the parent's storage without altering that proof.
+    fs.writeFileSync(path.join(f.child,'storage.path'),'/app/storage\n');
+    fs.writeFileSync(path.join(f.child,'storage.tar.gz'),'fresh archive');
+    const current=JSON.parse(f.manifest);current.entries.push({path:'new.jpg',kind:'file',bytes:3,sha256:hash('new')});current.entryCount++;
+    fs.writeFileSync(path.join(f.child,'storage-before.json'),JSON.stringify(current));
+    fs.writeFileSync(path.join(f.child,'legacy-current.json'),f.manifest);
+    assert.equal(helper().verify(f.child,f.base).referencedMedia,1);assert.equal(helper().verifyCurrent(f.child,f.base).ok,true);
+    fs.appendFileSync(path.join(f.parent,'storage.tar.gz'),'changed');assert.throws(()=>helper().verify(f.child,f.base));
+  }finally{f.cleanup();}
+});
+
+test('mixed mode rejects legacy drift, selection tampering and mode-marker mismatch',()=>{
+  for(const mutate of [m=>{m.entries=[];m.entryCount=0;},m=>{m.entries[0].sha256=hash('bad');},m=>{m.entries.push({path:'new.jpg',kind:'file',bytes:3,sha256:hash('new')});m.entryCount++;}]){
+    const f=fixture();try{
+      fs.writeFileSync(path.join(f.child,'media-mode.txt'),'fresh-storage-retained-legacy\n');helper().prepare(f.parent,f.child,f.base,'fresh-storage-retained-legacy');
+      const current=JSON.parse(f.manifest);mutate(current);fs.writeFileSync(path.join(f.child,'legacy-current.json'),JSON.stringify(current));assert.throws(()=>helper().verifyCurrent(f.child,f.base));
+    }finally{f.cleanup();}
+  }
+  for(const change of ['marker','labels','copied-manifest','duplicate-archive']){
+    const f=fixture();try{
+      fs.writeFileSync(path.join(f.child,'media-mode.txt'),'fresh-storage-retained-legacy\n');helper().prepare(f.parent,f.child,f.base,'fresh-storage-retained-legacy');
+      if(change==='marker')fs.writeFileSync(path.join(f.child,'media-mode.txt'),'verified-parent\n');
+      if(change==='labels'){const saved=JSON.parse(fs.readFileSync(path.join(f.child,'FINANCE_MEDIA_REFERENCE.json')));saved.retainedLabels=['storage'];fs.writeFileSync(path.join(f.child,'FINANCE_MEDIA_REFERENCE.json'),JSON.stringify(saved));}
+      if(change==='copied-manifest')fs.writeFileSync(path.join(f.child,'legacy-before.json'),'changed');
+      if(change==='duplicate-archive')fs.writeFileSync(path.join(f.child,'legacy.tar.gz'),'unexpected');
+      assert.throws(()=>helper().verify(f.child,f.base));
+    }finally{f.cleanup();}
+  }
+});
+
+test('existing full-parent references remain verifiable only with their original media mode',()=>{
+  const f=fixture();try{
+    helper().prepare(f.parent,f.child,f.base);
+    // The previous format is the full evidence object without a selection wrapper.
+    fs.writeFileSync(path.join(f.child,'FINANCE_MEDIA_REFERENCE.json'),JSON.stringify(helper().inspect(f.parent,f.base))+'\n');
+    assert.deepEqual(helper().verify(f.child,f.base),{ok:true,referencedMedia:2});
+    for(const label of ['storage','legacy'])fs.writeFileSync(path.join(f.child,label+'-current.json'),f.manifest);
+    assert.equal(helper().verifyCurrent(f.child,f.base).ok,true);
+    fs.writeFileSync(path.join(f.child,'media-mode.txt'),'fresh-storage-retained-legacy\n');
+    assert.throws(()=>helper().verify(f.child,f.base));assert.throws(()=>helper().verifyCurrent(f.child,f.base));
   }finally{f.cleanup();}
 });

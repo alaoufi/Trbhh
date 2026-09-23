@@ -14,23 +14,26 @@ const tables = [
   'finance_settlements', 'finance_settlement_lines', 'finance_invoices',
   'finance_sequences', 'finance_refunds', 'finance_audit',
   'finance_change_requests', 'finance_tax_policies',
+  'finance_order_fiscal_snapshots',
 ];
 
 function proof() {
-  const records = Object.fromEntries(tables.map(name => [name, [
+  const records: Record<string, Record<string, unknown>[]> = Object.fromEntries(tables.map(name => [name, [
     { id: 1, amount_halala: 11500, snapshot: '{"vat":1500}', updated_at: 'original' },
   ]]));
   const names = ['users', 'ads', ...tables];
+  let calculationColumn = false;
   const tx = {
     async $queryRawUnsafe(sql: string) {
       if (sql.includes('SELECT DATABASE()')) return [{ db: 'proof_test', version: 'test', observed_at: 'test' }];
       if (sql.includes('information_schema.TABLES')) return names.map(name => ({ name, engine: 'InnoDB' }));
       if (sql.includes('information_schema.COLUMNS')) return names.flatMap(t =>
-        (tables.includes(t) ? ['id', 'amount_halala', 'snapshot', 'updated_at'] : ['id'])
+        (tables.includes(t) ? ['id', 'amount_halala', 'snapshot', 'updated_at', ...(t==='finance_tax_policies'&&calculationColumn?['calculation_policy']:[])] : ['id'])
           .map(c => ({ t, c, type: 'text', nullable: 'NO', def: null })));
       if (sql.includes('KEY_COLUMN_USAGE')) return names.map(t => ({ t, c: 'id' }));
       const name = sql.match(/FROM `([a-z_]+)`/)?.[1];
       if (!name) throw Error('Unexpected proof query');
+      if(name==='finance_tax_policies'&&!calculationColumn&&sql.includes('`calculation_policy`'))throw Error('Absent column must not be queried');
       const rows = records[name] || [];
       if (sql.startsWith('SELECT COUNT')) return [{ n: rows.length }];
       return rows;
@@ -46,10 +49,28 @@ function proof() {
     process: { env: { DATABASE_URL: 'mysql://test:test@localhost/proof_test' } },
     URL, Buffer, Date, Uint8Array,
   });
-  return { records, ...api };
+  return { records, addCalculationColumn(){calculationColumn=true;}, ...api };
 }
 
 describe('financial release preservation uses values, not only row counts', () => {
+  it('permits only NULL for the explicitly reviewed historical policy addition',async()=>{
+    const api=proof(),before=await api.snapshot();
+    api.addCalculationColumn();api.records.finance_tax_policies[0].calculation_policy=null;
+    expect(api.verify(before,await api.snapshot()).ok).toBe(true);
+    api.records.finance_tax_policies[0].calculation_policy={version:2,automationDelegateId:'1'};
+    expect(api.verify(before,await api.snapshot()).failures).toContainEqual({table:'finance_tax_policies',kind:'protected_rows_changed',count:1});
+  });
+  it('does not hide an old policy value change when adding its nullable calculation field',async()=>{
+    const api=proof(),before=await api.snapshot();
+    api.addCalculationColumn();api.records.finance_tax_policies[0].calculation_policy=null;
+    api.records.finance_tax_policies[0].amount_halala=1;
+    expect(api.verify(before,await api.snapshot()).ok).toBe(false);
+  });
+  it('protects existing V2 policy settings on later releases',async()=>{
+    const api=proof();api.addCalculationColumn();api.records.finance_tax_policies[0].calculation_policy={version:2,automationDelegateId:'1'};
+    const before=await api.snapshot();api.records.finance_tax_policies[0].calculation_policy=null;
+    expect(api.verify(before,await api.snapshot()).ok).toBe(false);
+  });
   it.each(tables)('rejects same-ID amount and snapshot changes in %s', async name => {
     const api = proof();
     const before = await api.snapshot();

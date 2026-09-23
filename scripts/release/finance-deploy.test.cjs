@@ -6,8 +6,25 @@ const file=path.join(__dirname,'finance-deploy.sh');
 const workflow=path.join(__dirname,'../../.github/workflows/deploy.yml');
 // Retain an absolute interpreter when the safety fixture deliberately empties PATH.
 const bash=process.platform==='win32'?'C:/Program Files/Git/bin/bash.exe':'/bin/bash';
-const read=()=>fs.existsSync(file)?fs.readFileSync(file,'utf8'):'';
+const read=()=>fs.existsSync(file)?fs.readFileSync(file,'utf8').replace(/\r\n/g,'\n'):'';
 const sha='a'.repeat(40);
+
+test('runtime allows only a disabled issuance credential addition and preserves every existing secret',()=>{
+  const match=read().match(/# RUNTIME_ENV_PROOF_BEGIN\n\s*node .*?<<'NODE'\n([\s\S]*?)\nNODE\n# RUNTIME_ENV_PROOF_END/);assert(match);
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'finance-issuance-env-proof-'));
+  const base={AUTH_SECRET:'unchanged',FINANCE_CAPTURE_SECRET:'c'.repeat(64),SUPPLIER_ALLOW_LIVE_ORDERS:'false'};
+  const run=(before,after)=>{
+    const files=['before.json','after.json'].map((name,index)=>{const file=path.join(dir,name),env=index?after:before;fs.writeFileSync(file,JSON.stringify([{Config:{Env:Object.entries(env).map(([k,v])=>k+'='+v)}}]));return file;});
+    return spawnSync(process.execPath,['-',...files],{input:match[1],encoding:'utf8'}).status;
+  };
+  try{
+    assert.equal(run(base,{...base,FINANCE_ISSUANCE_SECRET:''}),0);
+    assert.notEqual(run(base,{...base,FINANCE_ISSUANCE_SECRET:'new-active-secret'}),0);
+    assert.notEqual(run({...base,FINANCE_ISSUANCE_SECRET:'existing'},{...base,FINANCE_ISSUANCE_SECRET:''}),0);
+    assert.equal(run({...base,FINANCE_ISSUANCE_SECRET:'existing'},{...base,FINANCE_ISSUANCE_SECRET:'existing'}),0);
+    assert.notEqual(run(base,{...base,FINANCE_ISSUANCE_SECRET:'',AUTH_SECRET:'changed'}),0);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
 test('orchestrator parses as Bash and rejects bad mode, run or revision before external work',()=>{
   assert(fs.existsSync(file),'Finance deployment orchestrator is required');
   assert.equal(spawnSync(bash,['-n',file],{encoding:'utf8'}).status,0);
@@ -18,7 +35,7 @@ test('orchestrator parses as Bash and rejects bad mode, run or revision before e
   }
 });
 test('check policy ignores other SHAs and requires the latest exact-revision run to succeed',()=>{
-  const source=fs.readFileSync(workflow,'utf8'),match=source.match(/\/\/ GATE_POLICY_BEGIN\n([\s\S]*?)\n\s*\/\/ GATE_POLICY_END/);assert(match);
+  const source=fs.readFileSync(workflow,'utf8').replace(/\r\n/g,'\n'),match=source.match(/\/\/ GATE_POLICY_BEGIN\n([\s\S]*?)\n\s*\/\/ GATE_POLICY_END/);assert(match);
   const js=match[1].split('\n').map(line=>line.replace(/^\s{10}/,'')).join('\n');
   const context={};vm.createContext(context);vm.runInContext(js+'\nthis.gate=gate;',context);
   const r=(id,status,conclusion,head_sha=sha)=>({id,status,conclusion,head_sha});

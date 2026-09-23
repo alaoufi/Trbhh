@@ -2,11 +2,14 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { runInNewContext } from 'node:vm';
+import ts from 'typescript';
 import { SignJWT } from 'jose';
 import bcrypt from 'bcryptjs';
 import type { PrismaClient } from '@prisma/client';
 
 const BASELINE = '27b804d13ba884fb7cd3704356eb38c5faa29ab4';
+const FINANCE_BASELINE = '3898689cdce2d58821aaa1ba0936cbfbade710f2';
 const DATABASE = process.env.UPGRADE_SALLA_FIXTURE==='1' ? 'trbhh_upgrade_salla_test' : 'trbhh_upgrade_test';
 // Explicit release allowlist, checked against commerce/schema.ts, ad-categories/schema.ts,
 // cj/schema.ts and Prisma. Do not derive this from the observed database: extra/missing columns must fail.
@@ -23,7 +26,8 @@ const ADDITIVE_TABLE_COLUMNS: Record<string, string[]> = {
   finance_refunds: ["id","order_id","receipt_id","provider","external_id","amount_minor","currency","refunded_at","evidence_ref","actor_id"],
   finance_audit: ["id","created_at","actor_id","action","entity","entity_id","reason","payload"],
   finance_change_requests: ["id","request_key","fingerprint","kind","target_id","payload","status","maker_id","checker_id","reason","approval_reason","result","created_at","decided_at"],
-  finance_tax_policies: ["id","request_id","effective_from","issuer","vat_bps","policy_reference","created_at"],
+  finance_tax_policies: ["id","request_id","effective_from","issuer","vat_bps","policy_reference","created_at","calculation_policy"],
+  finance_order_fiscal_snapshots: ["order_id","policy_id","request_id","captured_at","fingerprint","snapshot"],
   access_control_state: ["id","revision","initialized_at"],
   access_departments: ["id","name","active"],
   access_roles: ["id","name","department_id","active","system_role"],
@@ -186,6 +190,19 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
     expect((await db.mod_log.findUniqueOrThrow({ where: { id: 701 } })).ad_id).toBe(701n);
     expect((await db.mod_log.findUniqueOrThrow({ where: { id: 702 } })).action).toBe('ad_banned');
     expect((await db.mod_log.findUniqueOrThrow({ where: { id: 703 } })).action).toBe('account_deleted');
+    // Real pre-V2 policy DDL, not a candidate-derived approximation. The other
+    // finance tables remain part of the older baseline's additive upgrade.
+    const historicalSource=execFileSync('git',['show',`${FINANCE_BASELINE}:src/lib/finance/schema.ts`],{encoding:'utf8'});
+    const historicalModule={exports:{} as {FINANCE_DDL?:string[]}};
+    runInNewContext(ts.transpileModule(historicalSource,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{
+      module:historicalModule,exports:historicalModule.exports,
+      require:(name:string)=>{if(name==='server-only')return {};throw Error('Unexpected historical schema dependency');},
+    });
+    const historicalPolicyDDL=historicalModule.exports.FINANCE_DDL?.filter(sql=>/^CREATE TABLE IF NOT EXISTS finance_(change_requests|tax_policies) \(/.test(sql));
+    expect(historicalPolicyDDL).toHaveLength(2);
+    for(const statement of historicalPolicyDDL!)await db.$executeRawUnsafe(statement);
+    await insert('finance_change_requests',{id:701,request_key:'legacy-policy-upgrade',fingerprint:'c'.repeat(64),kind:'tax_settings',target_id:'tax',payload:'{"synthetic":"legacy-approved-payload"}',status:'approved',maker_id:702,checker_id:701,reason:'Synthetic historic approved policy',approval_reason:'Preserve original approval',created_at:created,decided_at:created});
+    await insert('finance_tax_policies',{id:701,request_id:701,effective_from:created,issuer:'{"name":"Synthetic historical issuer","address":"Fixture only","taxNumber":"300000000000003"}',vat_bps:1500,policy_reference:'historical-policy-preserved',created_at:created});
     baselineColumns = await columns();
     before = await snapshot(baselineColumns);
     request.token = await new SignJWT({ uid: 701, name: 'عضو اختبار الترقية', type: 'user' }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('1h').sign(new TextEncoder().encode(process.env.AUTH_SECRET));
@@ -210,13 +227,17 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
     const added = candidateColumns.filter((c) => !baselineColumns.some((old) => old.table_name === c.table_name && old.column_name === c.column_name));
     expect(added.map((c) => `${c.table_name}.${c.column_name}`).sort()).toEqual([
       'users.auth_session_version', 'auth_mfa.user_id', 'auth_mfa.secret', 'auth_mfa.recovery_hashes', 'auth_mfa.last_step', 'auth_mfa.version', 'auth_mfa.created_at', 'auth_security_limits.k', 'auth_security_limits.hits', 'auth_security_limits.expires_at',
-      ...Object.entries(ADDITIVE_TABLE_COLUMNS).flatMap(([table, names]) => names.map((name) => `${table}.${name}`)),
+      ...Object.entries(ADDITIVE_TABLE_COLUMNS).flatMap(([table, names]) =>
+        table==='finance_change_requests'?[]:table==='finance_tax_policies'?['finance_tax_policies.calculation_policy']:names.map((name) => `${table}.${name}`)),
     ].sort());
     expect(added.find((c) => c.table_name === 'users')).toMatchObject({ column_type: 'varchar(64)', is_nullable: 'NO', column_default: '0' });
     expect(added.find((c) => c.table_name === 'auth_mfa' && c.column_name === 'last_step')).toMatchObject({ column_type: 'bigint', is_nullable: 'NO', column_default: '-1' });
     expect(added.find((c) => c.table_name === 'cj_products' && c.column_name === 'status')).toMatchObject({ column_type: 'varchar(16)', is_nullable: 'NO', column_default: 'draft' });
     expect(added.find((c) => c.table_name === 'cj_products' && c.column_name === 'hidden')).toMatchObject({ column_type: 'tinyint', is_nullable: 'NO', column_default: '0' });
     expect(added.find((c) => c.table_name === 'cj_products' && c.column_name === 'agent_user_id')).toMatchObject({ column_type: 'bigint unsigned', is_nullable: 'YES', column_default: null });
+    expect(added.find(c=>c.table_name==='finance_tax_policies'&&c.column_name==='calculation_policy')).toMatchObject({column_type:'json',is_nullable:'YES',column_default:null});
+    expect(await db.$queryRaw`SELECT calculation_policy FROM finance_tax_policies WHERE id=701`).toEqual([{calculation_policy:null}]);
+    expect(await db.$queryRaw`SELECT COUNT(*) AS total FROM finance_order_fiscal_snapshots`).toEqual([{total:0n}]);
     const engines = await db.$queryRawUnsafe<{ name: string; engine: string }[]>("SELECT TABLE_NAME AS name,ENGINE AS engine FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('auth_mfa','auth_security_limits') ORDER BY TABLE_NAME");
     expect(engines).toEqual([{ name: 'auth_mfa', engine: 'InnoDB' }, { name: 'auth_security_limits', engine: 'InnoDB' }]);
     const indexes = await db.$queryRawUnsafe<{ table_name: string; index_name: string; column_name: string; non_unique: number | bigint }[]>("SELECT TABLE_NAME AS table_name,INDEX_NAME AS index_name,COLUMN_NAME AS column_name,NON_UNIQUE AS non_unique FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('auth_mfa','auth_security_limits') ORDER BY TABLE_NAME,INDEX_NAME,SEQ_IN_INDEX");

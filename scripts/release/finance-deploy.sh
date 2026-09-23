@@ -196,12 +196,17 @@ prove_preservation() {
   docker exec -i "$container" node - < "$tools_dir/finance-schema-check.cjs"
   docker inspect "$container" > "$backup/container-after.json"
   node "$tools_dir/verify-runtime.cjs" "$backup/container-before.json" "$backup/container-after.json" merchant_oauth
+# RUNTIME_ENV_PROOF_BEGIN
   node - "$backup/container-before.json" "$backup/container-after.json" <<'NODE'
 const fs=require('node:fs'),env=file=>Object.fromEntries(JSON.parse(fs.readFileSync(file))[0].Config.Env.map(v=>{const i=v.indexOf('=');return [v.slice(0,i),v.slice(i+1)];}));
 const before=env(process.argv[2]),after=env(process.argv[3]);
-for(const key of new Set([...Object.keys(before),...Object.keys(after)]))if(!['FINANCE_CAPTURE_SECRET','NODE_VERSION','YARN_VERSION'].includes(key)&&before[key]!==after[key])throw Error('runtime_changed');
+for(const key of new Set([...Object.keys(before),...Object.keys(after)])){
+  if(key==='FINANCE_ISSUANCE_SECRET'&&before[key]===undefined&&after[key]==='')continue;
+  if(!['FINANCE_CAPTURE_SECRET','NODE_VERSION','YARN_VERSION'].includes(key)&&before[key]!==after[key])throw Error('runtime_changed');
+}
 if((after.FINANCE_CAPTURE_SECRET||'').length<32||(before.FINANCE_CAPTURE_SECRET&&before.FINANCE_CAPTURE_SECRET!==after.FINANCE_CAPTURE_SECRET))throw Error('capture_secret_changed');
 NODE
+# RUNTIME_ENV_PROOF_END
   docker exec -i "$container" node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/after.json"
   node "$tools_dir/database-proof.cjs" verify "$backup/before.json" "$backup/after.json"
   docker exec -i "$container" node - snapshot < "$tools_dir/supplier-preservation-proof.cjs" > "$backup/supplier-after.json"

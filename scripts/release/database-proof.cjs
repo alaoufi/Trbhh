@@ -50,8 +50,7 @@ const PROTECTED = {
   admin_roles: ['user_id', 'role'],
   admin_perms: ['user_id', 'perm'],
   auth_mfa: ['user_id', 'secret', 'recovery_hashes', 'last_step', 'version'],
-  // All current columns of financial records are protected; there are no
-  // financial schema additions in this release. A schema mismatch fails closed.
+  // Protect every nonvolatile financial value, including future issuance data.
   wallet_txns: '*',
   wallet_topups: '*',
   wallet_bank_accounts: '*',
@@ -78,9 +77,17 @@ const PROTECTED = {
   finance_audit: '*',
   finance_change_requests: '*',
   finance_tax_policies: '*',
+  finance_order_fiscal_snapshots: '*',
   store_products: '*',
   favorites: '*',
 };
+
+// This single reviewed addition has no historical value except NULL. Include a
+// virtual NULL in the BEFORE digest when the column is absent, then compare it
+// with the actual AFTER value. Never omit the new field or waive a row change.
+// Existing fields remain protected, and strict schema verification checks the
+// actual new column's presence/type/default separately.
+const NULLABLE_ADDITIONS = {finance_tax_policies: ['calculation_policy']};
 
 const VOLATILE_COLUMNS = new Set(['created_at', 'updated_at', 'modified_at', 'last_seen', 'last_seen_at', 'seen', 'seen_at', 'read_at', 'last_login_at', 'views', 'clicks']);
 class ProofError extends Error {}
@@ -214,7 +221,8 @@ async function snapshot(full = false) {
         const available = (byColumn.get(name) || []).map((r) => r.c);
         const pkColumns = byPk.get(name) || [];
         const configured = PROTECTED[name];
-        const protectedColumns = configured === '*' ? available.filter((c) => !VOLATILE_COLUMNS.has(c)) : (configured || []).filter((c) => available.includes(c));
+        const additions = NULLABLE_ADDITIONS[name] || [];
+        const protectedColumns = configured === '*' ? [...available.filter((c) => !VOLATILE_COLUMNS.has(c) && !additions.includes(c)), ...additions] : (configured || []).filter((c) => available.includes(c));
         if (Array.isArray(configured)) {
           const missing = configured.filter((c) => !available.includes(c));
           if (missing.length) notes.push({ table: name, kind: 'optional_protected_columns_absent', columns: missing });
@@ -226,7 +234,7 @@ async function snapshot(full = false) {
           notes.push({ table: name, kind: 'no_primary_key_count_only' });
           assert(!REQUIRED_TABLES.includes(name), 'Required core table has no primary key.');
         } else {
-          const selection = [...new Set([...pkColumns, ...protectedColumns])].map(quoteIdentifier).join(',');
+          const selection = [...new Set([...pkColumns, ...protectedColumns.filter((c) => available.includes(c))])].map(quoteIdentifier).join(',');
           const order = pkColumns.map(quoteIdentifier).join(',');
           let last = null;
           for (;;) {

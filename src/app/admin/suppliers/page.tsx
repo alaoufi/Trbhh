@@ -102,9 +102,34 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
   ]);
   return <div className="space-y-4">
     <h1 className="text-xl font-bold text-primary">الموردون وربط السلع</h1>
-    <AccessPage href="/admin/suppliers/onboarding"><Link href="/admin/suppliers/onboarding" className="inline-block rounded-lg bg-amber-400 px-4 py-2 font-bold text-slate-900">رفع ملف متجر سلة</Link></AccessPage>
-    <AccessPage href="/admin/suppliers/catalog"><Link href="/admin/suppliers/catalog" className="inline-block rounded-lg bg-primary px-4 py-2 font-bold text-white">اختيار منتجات سلة</Link></AccessPage>
-    <AccessPage href="/admin/suppliers/integrations"><Link href="/admin/suppliers/integrations" className="inline-block rounded-lg bg-primary px-4 py-2 text-white">تكامل Salla وكتالوج الموردين</Link></AccessPage>
+
+    {/* الموردون والتكاملات الخارجية — كل مصدر منتجات واضح هنا */}
+    <section className="card-3d space-y-3 rounded-xl p-4">
+      <h2 className="font-bold text-primary">مصادر المنتجات (الموردون والتكاملات)</h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {/* CJdropshipping */}
+        <div className="space-y-2 rounded-xl border border-primary/25 bg-primary/[0.03] p-3">
+          <div className="font-bold">CJdropshipping — منتجات عالمية</div>
+          <p className="text-xs leading-6 text-muted-foreground">تصفّح آلاف السلع من CJ (فلترة بالتصنيف + بحث + صفحات) واستورد المختار إلى تخزين وسيط. <b>قراءة فقط الآن</b> — لا شراء ولا نشر تلقائي.</p>
+          <div className="flex flex-wrap gap-2">
+            <AccessPage href="/admin/suppliers/cj/browse"><Link href="/admin/suppliers/cj/browse" className={button}>تصفّح منتجات CJ واستيرادها ←</Link></AccessPage>
+            <AccessPage href="/admin/suppliers/cj"><Link href="/admin/suppliers/cj" className="rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary">إعدادات/اختبار CJ</Link></AccessPage>
+          </div>
+        </div>
+        {/* متاجر سلة */}
+        <div className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
+          <div className="font-bold">متاجر سلة (Salla) — مثل «شعبيات الأولين»</div>
+          <p className="text-xs leading-6 text-muted-foreground">ربط متجر سلة أو رفع ملفه ثم اختيار منتجاته للعرض في تربح.</p>
+          <div className="flex flex-wrap gap-2">
+            <AccessPage href="/admin/suppliers/integrations"><Link href="/admin/suppliers/integrations" className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white">تكامل Salla وكتالوج الموردين</Link></AccessPage>
+            <AccessPage href="/admin/suppliers/onboarding"><Link href="/admin/suppliers/onboarding" className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-bold text-slate-900">رفع ملف متجر سلة</Link></AccessPage>
+            <AccessPage href="/admin/suppliers/catalog"><Link href="/admin/suppliers/catalog" className="rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary">اختيار منتجات سلة</Link></AccessPage>
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">«الموردون» بالأسفل جهات داخلية في قاعدة تربح (للتسوية والفوترة خارج الموقع)، منفصلة عن تكاملات CJ/سلة أعلاه.</p>
+    </section>
+
     <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">الموردون جهات داخلية لتربح. التنفيذ والتسوية خارج الموقع. لا تحويل أموال ولا اتصال API من هذه الصفحة.</p>
     <nav className="flex flex-wrap gap-4 text-primary underline"><AccessPage href="/admin/commerce"><Link href="/admin/commerce">السلع والطلبات</Link></AccessPage><AccessPage href="/admin/commerce/accounts"><Link href="/admin/commerce/accounts">الإيصالات والاستحقاقات</Link></AccessPage></nav>
     {query.saved === '1' && <p role="status" className="text-emerald-700">تم الحفظ.</p>}

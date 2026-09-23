@@ -27,6 +27,8 @@ export const CJ_DDL: string[] = [
     status VARCHAR(16) NOT NULL DEFAULT 'draft',
     images MEDIUMTEXT NULL,
     details_json MEDIUMTEXT NULL,
+    agent_user_id BIGINT UNSIGNED NULL,
+    agent_claimed_at DATETIME(3) NULL,
     hidden TINYINT NOT NULL DEFAULT 0,
     sale_price_override_minor INT NULL,
     image VARCHAR(1024) NOT NULL DEFAULT '',
@@ -56,6 +58,21 @@ export const CJ_DDL: string[] = [
   `ALTER TABLE cj_products ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'draft'`,
   `ALTER TABLE cj_products ADD COLUMN images MEDIUMTEXT NULL`,
   `ALTER TABLE cj_products ADD COLUMN details_json MEDIUMTEXT NULL`,
+  `ALTER TABLE cj_products ADD COLUMN agent_user_id BIGINT UNSIGNED NULL`,
+  `ALTER TABLE cj_products ADD COLUMN agent_claimed_at DATETIME(3) NULL`,
+  `CREATE INDEX cj_products_agent ON cj_products (agent_user_id)`,
+
+  // ملف الوكيل: عضو مُنح دور وكيل — جواله وواتسه وحصّته الأسبوعية.
+  `CREATE TABLE IF NOT EXISTS cj_agents (
+    user_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    phone VARCHAR(40) NOT NULL DEFAULT '',
+    whatsapp VARCHAR(40) NOT NULL DEFAULT '',
+    weekly_quota INT NOT NULL DEFAULT 0,
+    active TINYINT NOT NULL DEFAULT 1,
+    notes VARCHAR(500) NOT NULL DEFAULT '',
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   // ذاكرة ترجمة مخزَّنة (نص المصدر ← العربية) لتفادي تكرار طلبات الترجمة.
   `CREATE TABLE IF NOT EXISTS cj_translations (

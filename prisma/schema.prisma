@@ -2280,6 +2280,8 @@ model cj_products {
   status              String    @default("draft") @db.VarChar(16)
   images              String?   @db.MediumText
   details_json        String?   @db.MediumText
+  agent_user_id       BigInt?   @db.UnsignedBigInt
+  agent_claimed_at    DateTime? @db.DateTime(3)
   hidden              Int       @default(0) @db.TinyInt
   sale_price_override_minor Int?
   image               String    @default("") @db.VarChar(1024)
@@ -2298,6 +2300,18 @@ model cj_products {
 
   @@unique([cj_product_id, cj_variant_id], map: "cj_product_variant")
   @@index([commerce_product_id], map: "cj_products_commerce")
+  @@index([agent_user_id], map: "cj_products_agent")
+}
+
+model cj_agents {
+  user_id      BigInt   @id @db.UnsignedBigInt
+  phone        String   @default("") @db.VarChar(40)
+  whatsapp     String   @default("") @db.VarChar(40)
+  weekly_quota Int      @default(0)
+  active       Int      @default(1) @db.TinyInt
+  notes        String   @default("") @db.VarChar(500)
+  created_at   DateTime @default(now()) @db.Timestamp(3)
+  updated_at   DateTime @default(now()) @updatedAt @db.Timestamp(3)
 }
 
 model cj_translations {

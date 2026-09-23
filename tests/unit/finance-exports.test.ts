@@ -9,7 +9,7 @@ vi.mock('@/app/admin/finance/actions', () => ({
   reverseFinanceExpense: async () => {}, reverseFinanceSettlement: async () => {}, saveFinanceBudget: async () => {},
 }));
 import { FinanceWorkspace } from '@/components/finance/finance-workspace';
-import { financeExportSheets, financeSectionExportSheets, printableFinanceReport } from '@/lib/finance/exports';
+import { financeExportSheets, financeSectionExportSheets, printableFinanceInvoice, printableFinanceReport } from '@/lib/finance/exports';
 import { financeExportScope, formatFinanceRecordDate } from '@/lib/finance/filters';
 
 function invoice(id: string, at: string, customer: string, supplierId: string, supplierName: string, totalMinor: number): FinanceInvoice {
@@ -51,6 +51,22 @@ function displayedInvoiceIds(html: string): string[] {
 }
 
 describe('finance exports match the visible source records', () => {
+  it.each([false,true])('includes recorded shipping in the pending invoice print breakdown (internal=%s)', internal => {
+    const pending=invoice('shipping','2026-09-11T10:00:00Z','عميل','s1','مورد',11500);
+    pending.number=null;
+    pending.totalMinor=13845;
+    pending.source={...pending.source,shippingMinor:2345,totalMinor:13845};
+    const before=structuredClone(pending);
+    const html=printableFinanceInvoice(pending,internal);
+    const body=html.match(/<tbody>(.*?)<\/tbody>/s)?.[1]||'';
+    const grossAmounts=[...body.matchAll(/<tr>.*?<td>([^<]*)<\/td><\/tr>/gs)].map(match=>match[1]);
+    expect(body).toContain('الشحن المسجل ضمن إجمالي الطلب');
+    expect(grossAmounts).toEqual(['115.00 ر.س','23.45 ر.س']);
+    expect(html).toContain('إجمالي المستند: 138.45 ر.س');
+    expect(html).toContain('ليس فاتورة ضريبية مُصدرة');
+    expect(body.match(/غير مكتمل/g)).toHaveLength(4);
+    expect(pending).toEqual(before);
+  });
   it.each([['budget', ['الميزانية']], ['invoices', ['الفواتير']], ['suppliers', ['الموردون','الحركات']], ['reconciliation', ['المطابقة']], ['overview', ['ملخص']], ['ledger', ['سجل التدقيق']]] as const)('exports only the authorized %s section', (section, names) => {
     expect(financeSectionExportSheets(report({section})).map(sheet=>sheet.name)).toEqual(names);
     if(section==='budget'||section==='ledger') {

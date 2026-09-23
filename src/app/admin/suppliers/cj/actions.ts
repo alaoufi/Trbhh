@@ -9,6 +9,7 @@ import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProdu
 import { translateToArabic, translateManyCached } from '@/lib/cj/translate';
 import { getCategories } from '@/lib/cj/client';
 import { createOrder, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
+import { warmCjTranslations } from '@/lib/cj/translate-warm';
 
 /** حفظ الهامش الافتراضي (٪) — للمشرف فقط. لا شراء ولا اتصال بمورّد هنا. */
 export async function saveCjMargin(form: FormData) {
@@ -179,6 +180,14 @@ export async function translateCjCategories(form: FormData) {
   let done = 0;
   if (cats.ok) { const map = await translateManyCached(cats.data.map((c) => c.name), 120); done = map.size; }
   redirect(withParam(back, `cattr=${done}`));
+}
+
+/** تحديث كل الترجمات الآن (تصنيفات + حقول السلع المستوردة) وتخزينها على الخادم. */
+export async function runCjTranslateWarm(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const back = String(form.get('back') || '/admin/suppliers/cj/browse');
+  const r = await warmCjTranslations({ categoryMax: 150, productMax: 40 });
+  redirect(withParam(back, `warmed=${r.categories}-${r.productNames}`));
 }
 
 /** ترجمة تلقائية جماعية لكل سلعة بلا عنوان عربي بعد (دفعة محدودة). */

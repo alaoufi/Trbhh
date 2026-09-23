@@ -128,6 +128,22 @@ export async function listUntranslatedCjProducts(limit = 40): Promise<CjProductR
   return prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE name_ar='' AND name<>'' ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
 }
 
+/** السلع التي ينقصها اسم/وصف عربي — للتهيئة المجدولة. */
+export async function listProductsNeedingArabic(limit = 100): Promise<CjProductRow[]> {
+  const take = Math.min(Math.max(1, limit), 200);
+  return prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products
+    WHERE (name_ar='' AND name<>'')
+       OR ((display_description_ar IS NULL OR display_description_ar='') AND source_description IS NOT NULL AND source_description<>'')
+    ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
+}
+
+/** تحديث الوصف العربي المعروض. */
+export async function setCjProductDescriptionAr(id: number, descAr: string): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
+  const v = descAr.slice(0, 20000) || null;
+  await prisma.$executeRaw`UPDATE cj_products SET display_description_ar=${v} WHERE id=${BigInt(id)}`.catch(() => {});
+}
+
 export async function countCjProducts(): Promise<number> {
   const rows = await prisma.$queryRaw<{ c: bigint }[]>`SELECT COUNT(*) c FROM cj_products`.catch(() => [] as { c: bigint }[]);
   return Number(rows[0]?.c ?? 0);

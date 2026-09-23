@@ -35,9 +35,17 @@ export async function importCjProductByPid(pid: string, deps: CjImportDeps = {})
   const d = r.data;
   const costMinor = d.sellPrice != null && d.sellPrice > 0 ? Math.round(d.sellPrice * settings.usdToSarX100) : 0;
   const price = computePrice(costMinor, settings.shippingMinor, 0, margin);
-  // ترجمة تلقائية للعنوان إلى العربية (حقل عرض منفصل؛ لا نطمس المصدر). فشلها لا يوقف الاستيراد.
+  // ترجمة تلقائية للعنوان/الوصف/التصنيف إلى العربية (حقول عرض منفصلة؛ لا نطمس المصدر).
   const translate = deps.translate ?? translateToArabic;
-  const nameAr = await translate(d.productName || '').catch(() => null);
-  await upsert({ cjProductId: clean, cjSku: d.productSku || '', name: d.productName || '', nameAr, image: d.productImage || '', price });
+  const [nameAr, descAr, catAr] = await Promise.all([
+    translate(d.productName || '').catch(() => null),
+    translate(d.description || '').catch(() => null),
+    translate(d.categoryName || '').catch(() => null),
+  ]);
+  await upsert({
+    cjProductId: clean, cjSku: d.productSku || '', name: d.productName || '', nameAr,
+    sourceDescription: d.description || null, descriptionAr: descAr,
+    trbhhCategory: catAr || d.categoryName || '', image: d.productImage || '', price,
+  });
   return { ok: true, pid: clean, name: d.productName || '', salePriceMinor: price.salePriceMinor, supplierCostMinor: price.supplierCostMinor };
 }

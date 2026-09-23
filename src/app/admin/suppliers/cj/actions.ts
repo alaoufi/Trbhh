@@ -5,7 +5,7 @@ import { requireAccess } from '@/lib/access-control/guards';
 import { setDefaultMarginBps } from '@/lib/cj/pricing';
 import { saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync';
 import { importCjProductByPid } from '@/lib/cj/import';
-import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts } from '@/lib/cj/mapping';
+import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview } from '@/lib/cj/mapping';
 import { translateToArabic, translateManyCached } from '@/lib/cj/translate';
 import { getCategories } from '@/lib/cj/client';
 
@@ -114,6 +114,25 @@ export async function translateCjProduct(form: FormData) {
   if (row) { const ar = await translateToArabic(row.name).catch(() => null); if (ar) await setCjProductNameAr(id, ar); }
   revalidatePath('/admin/suppliers/cj/browse');
   redirect(withParam(backOf(form), 'edited=1'));
+}
+
+/** حفظ شاشة المراجعة الكاملة لسلعة مستوردة (عنوان/وصف/تصنيف/حالة/سعر/إخفاء). */
+export async function saveCjReview(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const id = Number(String(form.get('id') || ''));
+  await updateCjReview(id, {
+    nameAr: String(form.get('nameAr') || '').trim(),
+    descriptionAr: String(form.get('descriptionAr') || '').trim(),
+    trbhhCategory: String(form.get('trbhhCategory') || '').trim(),
+    status: String(form.get('status') || 'draft'),
+  });
+  const rawPrice = String(form.get('priceSar') || '').trim();
+  if (rawPrice === '') await setCjProductPriceOverride(id, null);
+  else { const v = Number(rawPrice); if (Number.isFinite(v) && v >= 0) await setCjProductPriceOverride(id, Math.round(v * 100)); }
+  await setCjProductHidden(id, String(form.get('hidden') || '') === '1');
+  revalidatePath('/admin/suppliers/cj/browse');
+  revalidatePath('/admin/suppliers/cj/showcase');
+  redirect(`/admin/suppliers/cj/review/${id}?saved=1`);
 }
 
 /** ترجمة أسماء تصنيفات CJ إلى العربية وتخزينها (دفعة محدودة لكل ضغطة). */

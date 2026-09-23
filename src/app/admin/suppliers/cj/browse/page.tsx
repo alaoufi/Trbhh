@@ -187,7 +187,11 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                       <div className="truncate text-xs text-muted-foreground" dir="ltr">{r.name}</div>
                       <div className="text-[11px] text-muted-foreground"><span dir="ltr">PID {r.cj_product_id}</span> · التكلفة {sar(r.supplier_cost_minor + r.shipping_cost_minor)}</div>
                       <div className="text-sm font-extrabold text-primary">السعر: {sar(finalMinor)}{r.sale_price_override_minor != null && <span className="ms-1 text-[10px] font-normal text-amber-700">(معدّل يدوياً)</span>}</div>
-                      {r.hidden === 1 && <span className="inline-block rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">مخفية</span>}
+                      <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                        {r.trbhh_category && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-bold text-primary">{r.trbhh_category}</span>}
+                        <span className={`rounded px-1.5 py-0.5 font-bold ${r.status === 'ready' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{r.status === 'ready' ? 'جاهزة' : 'مسودّة'}</span>
+                        {r.hidden === 1 && <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">مخفية</span>}
+                      </div>
                     </div>
                   </div>
                   {/* تحرير العنوان العربي */}
@@ -197,6 +201,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                     <button className={btn}>حفظ</button>
                   </form>
                   <div className="flex flex-wrap items-center gap-1">
+                    <Link href={`/admin/suppliers/cj/review/${r.id}`} className={btn}>مراجعة / تحرير</Link>
                     {/* تعديل السعر */}
                     <form action={saveCjPrice} className="flex items-center gap-1">
                       <input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} />

@@ -14,6 +14,10 @@ export type CjProductRow = {
   cj_sku: string;
   name: string;
   name_ar: string;
+  source_description: string | null;
+  display_description_ar: string | null;
+  trbhh_category: string;
+  status: string;
   hidden: number;
   sale_price_override_minor: number | null;
   image: string;
@@ -35,6 +39,9 @@ export type UpsertCjInput = {
   cjSku?: string;
   name?: string;
   nameAr?: string | null;
+  sourceDescription?: string | null;
+  descriptionAr?: string | null;
+  trbhhCategory?: string | null;
   image?: string;
   price: PriceBreakdown;
 };
@@ -45,20 +52,36 @@ export type UpsertCjInput = {
 export async function upsertCjProduct(input: UpsertCjInput): Promise<void> {
   const p = input.price;
   const nameAr = (input.nameAr ?? '').trim();
+  const srcDesc = input.sourceDescription ?? null;
+  const descAr = (input.descriptionAr ?? '') || null;
+  const category = (input.trbhhCategory ?? '').trim();
   await prisma.$executeRaw`
     INSERT INTO cj_products
-      (cj_product_id, cj_variant_id, cj_sku, name, name_ar, image,
+      (cj_product_id, cj_variant_id, cj_sku, name, name_ar, source_description, display_description_ar, trbhh_category, image,
        supplier_cost_minor, shipping_cost_minor, other_costs_minor, profit_minor, sale_price_minor, margin_bps, currency, last_sync_at)
     VALUES
-      (${input.cjProductId}, ${input.cjVariantId ?? ''}, ${input.cjSku ?? ''}, ${input.name ?? ''}, ${nameAr}, ${input.image ?? ''},
+      (${input.cjProductId}, ${input.cjVariantId ?? ''}, ${input.cjSku ?? ''}, ${input.name ?? ''}, ${nameAr}, ${srcDesc}, ${descAr}, ${category}, ${input.image ?? ''},
        ${p.supplierCostMinor}, ${p.shippingCostMinor}, ${p.otherCostsMinor}, ${p.profitMinor}, ${p.salePriceMinor}, ${p.marginBps}, ${p.currency}, CURRENT_TIMESTAMP(3))
     ON DUPLICATE KEY UPDATE
       cj_sku=VALUES(cj_sku), name=VALUES(name), image=VALUES(image),
+      source_description=VALUES(source_description),
       name_ar=CASE WHEN cj_products.name_ar='' THEN VALUES(name_ar) ELSE cj_products.name_ar END,
+      display_description_ar=CASE WHEN cj_products.display_description_ar IS NULL OR cj_products.display_description_ar='' THEN VALUES(display_description_ar) ELSE cj_products.display_description_ar END,
+      trbhh_category=CASE WHEN cj_products.trbhh_category='' THEN VALUES(trbhh_category) ELSE cj_products.trbhh_category END,
       supplier_cost_minor=VALUES(supplier_cost_minor), shipping_cost_minor=VALUES(shipping_cost_minor),
       other_costs_minor=VALUES(other_costs_minor), profit_minor=VALUES(profit_minor),
       sale_price_minor=VALUES(sale_price_minor), margin_bps=VALUES(margin_bps), currency=VALUES(currency),
       last_sync_at=CURRENT_TIMESTAMP(3)`;
+}
+
+/** حفظ حقول المراجعة/العرض (عنوان/وصف عربي، تصنيف تربح، الحالة). لا يمسّ المصدر. */
+export async function updateCjReview(id: number, fields: { nameAr?: string; descriptionAr?: string; trbhhCategory?: string; status?: string }): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
+  const nameAr = (fields.nameAr ?? '').slice(0, 400);
+  const descAr = (fields.descriptionAr ?? '').slice(0, 20000) || null;
+  const category = (fields.trbhhCategory ?? '').slice(0, 200);
+  const status = fields.status === 'ready' ? 'ready' : 'draft';
+  await prisma.$executeRaw`UPDATE cj_products SET name_ar=${nameAr}, display_description_ar=${descAr}, trbhh_category=${category}, status=${status} WHERE id=${BigInt(id)}`.catch(() => {});
 }
 
 export async function listCjProducts(limit = 50): Promise<CjProductRow[]> {

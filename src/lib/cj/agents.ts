@@ -67,6 +67,34 @@ export async function listAgentProducts(userId: number | bigint, limit = 200) {
   return prisma.cj_products.findMany({ where: { agent_user_id: bid(userId) }, orderBy: { agent_claimed_at: 'desc' }, take: Math.min(Math.max(1, limit), 500) }).catch(() => []);
 }
 
+/** سلع متاحة للاختيار (بلا وكيل، جاهزة، ظاهرة، ولها صورة). */
+export async function listClaimableProducts(limit = 60) {
+  return prisma.cj_products.findMany({
+    where: { agent_user_id: null, status: 'ready', hidden: 0, NOT: { image: '' } },
+    orderBy: { id: 'desc' }, take: Math.min(Math.max(1, limit), 200),
+  }).catch(() => []);
+}
+
+/**
+ * روابط تواصل الوكيل (واتساب/اتصال) — تُستخدم في href فقط، دون كتابة الرقم علناً.
+ * تُطبَّع الأرقام السعودية إلى صيغة دولية (966) لواتساب.
+ */
+export function agentContactLinks(a: Pick<CjAgent, 'phone' | 'whatsapp'>): { wa: string | null; tel: string | null } {
+  const digits = (s: string) => (s || '').replace(/[^\d+]/g, '');
+  const intl = (s: string) => {
+    let d = digits(s).replace(/^\+/, '');
+    if (!d) return '';
+    if (d.startsWith('00')) d = d.slice(2);
+    if (d.startsWith('966')) return d;
+    if (d.startsWith('0')) return '966' + d.slice(1);
+    if (d.length === 9) return '966' + d; // 5XXXXXXXX
+    return d;
+  };
+  const waNum = intl(a.whatsapp || a.phone);
+  const telNum = intl(a.phone || a.whatsapp);
+  return { wa: waNum ? `https://wa.me/${waNum}` : null, tel: telNum ? `tel:+${telNum}` : null };
+}
+
 /** إسناد سلعة لوكيل (من الإدارة) — يتجاوز الحصّة. */
 export async function assignProductAgent(productId: number, agentUserId: number | bigint): Promise<void> {
   if (!Number.isInteger(productId) || productId <= 0) return;

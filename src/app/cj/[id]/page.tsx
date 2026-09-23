@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ShoppingCart, CreditCard, Truck, Heart, Star, RotateCcw, Lock } from 'lucide-react';
+import { ShoppingCart, CreditCard, Truck, Heart, Star, RotateCcw, Lock, Phone, MessageCircle } from 'lucide-react';
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
-import { isActiveAgent } from '@/lib/cj/agents';
+import { isActiveAgent, getAgent, agentContactLinks } from '@/lib/cj/agents';
 import { cjProductOrderCount } from '@/lib/cj/mapping';
 import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '../../admin/suppliers/cj/actions';
 
@@ -72,6 +72,9 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const isProductAgent = !!(session && p.agent_user_id != null && p.agent_user_id === BigInt(session.uid) && (await isActiveAgent(session.uid)));
   const canManage = isAdmin || isProductAgent;
   const hasActivity = canManage ? (await cjProductOrderCount(p.cj_product_id)) > 0 : false;
+  // تواصل وكيل السلعة (واتساب/اتصال) — يظهر للعميل دون كتابة الرقم علناً، والمورد يبقى مخفياً.
+  const productAgent = p.agent_user_id != null ? await getAgent(p.agent_user_id) : null;
+  const agentContact = productAgent && productAgent.active === 1 ? agentContactLinks(productAgent) : null;
   const description = p.display_description_ar ? cleanDescription(p.display_description_ar) : '';
   const details = parseCjDetails(p);
   const settings = await cjSyncSettings().catch(() => null);
@@ -167,6 +170,26 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
             <div className="text-3xl font-extrabold text-red-700">{sar(price)}</div>
             <div className="pb-1 text-xs text-muted-foreground">شامل تقدير الشحن</div>
           </div>
+
+          {/* تواصل وكيل السلعة — أزرار واتساب/اتصال فقط (بلا كتابة الرقم علناً) */}
+          {agentContact && (agentContact.wa || agentContact.tel) && (
+            <div className="card-3d rounded-2xl p-3">
+              <div className="mb-2 text-sm font-bold text-primary">تواصل مع وكيل السلعة</div>
+              <div className="grid grid-cols-2 gap-2">
+                {agentContact.wa && (
+                  <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white">
+                    <MessageCircle className="h-4 w-4" /> واتساب
+                  </a>
+                )}
+                {agentContact.tel && (
+                  <a href={agentContact.tel} className="flex items-center justify-center gap-1.5 rounded-xl border-2 border-emerald-600/40 px-4 py-3 font-bold text-emerald-700">
+                    <Phone className="h-4 w-4" /> اتصال
+                  </a>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">الوكيل مسؤول عن التواصل ومتابعة الشحن وإتمام البيع.</p>
+            </div>
+          )}
 
           {/* أزرار السلة/الشراء (معطّلة حتى تفعيل الشراء) */}
           <div className="grid grid-cols-2 gap-2">

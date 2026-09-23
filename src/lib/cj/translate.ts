@@ -1,4 +1,6 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
+import { prisma } from '@/lib/prisma';
 
 /**
  * ترجمة آلية إلى العربية لمحتوى سلع CJ (الاسم/الوصف). تستخدم نقطة ترجمة Google
@@ -52,4 +54,49 @@ export async function translateToArabic(text: string | null | undefined): Promis
   } finally {
     clearTimeout(timer);
   }
+}
+
+/* ---------- ترجمة مخزَّنة (cache) لتفادي تكرار الطلبات ---------- */
+
+function keyOf(src: string): string {
+  return createHash('sha1').update('en:ar:' + src.slice(0, MAX_LEN)).digest('hex');
+}
+
+/** يقرأ ترجمات مخزَّنة لمجموعة نصوص دفعةً واحدة (بلا شبكة). يعيد خريطة نص→عربي. */
+export async function getCachedArabic(texts: (string | null | undefined)[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const clean = [...new Set(texts.map((t) => (t ?? '').trim()).filter((t) => t && !arabic.test(t)))];
+  if (!clean.length) return out;
+  const byKey = new Map(clean.map((t) => [keyOf(t), t]));
+  try {
+    const rows = await prisma.cj_translations.findMany({ where: { source_key: { in: [...byKey.keys()] } }, select: { source_key: true, target_ar: true } });
+    for (const r of rows) { const src = byKey.get(r.source_key); if (src) out.set(src, r.target_ar); }
+  } catch { /* المخزن غير جاهز — لا شيء مخزَّن */ }
+  return out;
+}
+
+/** ترجمة نص مع تخزين النتيجة. يعيد العربية أو null. */
+export async function translateToArabicCached(text: string | null | undefined): Promise<string | null> {
+  const src = (text ?? '').trim();
+  if (!src) return null;
+  if (arabic.test(src)) return src;
+  const key = keyOf(src);
+  try {
+    const hit = await prisma.cj_translations.findUnique({ where: { source_key: key }, select: { target_ar: true } });
+    if (hit?.target_ar) return hit.target_ar;
+  } catch { /* تجاهل */ }
+  const ar = await translateToArabic(src);
+  if (ar) await prisma.cj_translations.upsert({ where: { source_key: key }, create: { source_key: key, target_ar: ar }, update: {} }).catch(() => {});
+  return ar;
+}
+
+/** يترجم قائمة نصوص (المفقود منها فقط) ويخزّنها؛ يعيد خريطة نص→عربي شاملة المخزَّن. */
+export async function translateManyCached(texts: (string | null | undefined)[], max = 30): Promise<Map<string, string>> {
+  const map = await getCachedArabic(texts);
+  const missing = [...new Set(texts.map((t) => (t ?? '').trim()).filter((t) => t && !arabic.test(t) && !map.has(t)))].slice(0, max);
+  for (const src of missing) {
+    const ar = await translateToArabic(src);
+    if (ar) { map.set(src, ar); await prisma.cj_translations.upsert({ where: { source_key: keyOf(src) }, create: { source_key: keyOf(src), target_ar: ar }, update: {} }).catch(() => {}); }
+  }
+  return map;
 }

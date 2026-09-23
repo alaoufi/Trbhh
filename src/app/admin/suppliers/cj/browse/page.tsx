@@ -6,7 +6,8 @@ import { sampleOneCjProduct } from '@/lib/cj/sample';
 import { importedCjPids, listCjProducts } from '@/lib/cj/mapping';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
-import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj } from '../actions';
+import { getCachedArabic, translateManyCached } from '@/lib/cj/translate';
+import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, translateCjCategories } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'تصفّح منتجات CJ واستيرادها' };
@@ -32,17 +33,22 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     return <div className="space-y-3"><h1 className="text-xl font-extrabold text-primary">تصفّح منتجات CJ</h1><p className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm">اضبط متغيّرات CJ (البريد والمفتاح) في بيئة الخادم أولاً.</p></div>;
   }
 
+  const wantAr = sp.ar === '1';
   const [settings, marginBps, catsRes] = await Promise.all([cjSyncSettings(), defaultMarginBps(), getCategories()]);
   const categories = catsRes.ok ? catsRes.data : [];
   const listing = await listProductsPage(page, PAGE_SIZE, { productName: q || undefined, categoryId: cat || undefined });
   const items = listing.ok ? listing.data.items : [];
+  // ترجمة العناوين والتصنيفات للعربية قبل الاستيراد (من المخزَّن؛ وإن wantAr نترجم المفقود لهذه الصفحة).
+  const titleTexts = items.map((p) => p.productName);
+  const gridAr = wantAr ? await translateManyCached(titleTexts, 30) : await getCachedArabic(titleTexts);
+  const catAr = await getCachedArabic(categories.map((c) => c.name));
   const total = listing.ok ? listing.data.total : 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const imported = items.length ? await importedCjPids(items.map((p) => p.pid)) : new Set<string>();
   const detail = detailPid ? await sampleOneCjProduct(detailPid) : null;
   const importedList = await listCjProducts(60);
   const salePreview = (u: number | null) => (u != null && u > 0 ? computePrice(Math.round(u * settings.usdToSarX100), settings.shippingMinor, 0, marginBps).salePriceMinor : null);
-  const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`;
+  const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}${wantAr ? '&ar=1' : ''}`;
   const pageHref = (n: number) => `/admin/suppliers/cj/browse?page=${Math.min(Math.max(1, n), totalPages)}${keep}`;
   const backHref = `/admin/suppliers/cj/browse?page=${page}${keep}`;
   const activeCat = categories.find((c) => c.id === cat);
@@ -64,18 +70,26 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       {sp.removed === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حذف المنتج من التخزين الوسيط.</p>}
       {!listing.ok && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر جلب المنتجات من CJ: {listing.error}{listing.status ? ` (HTTP ${listing.status})` : ''}</p>}
 
-      {/* بحث + فلترة بالتصنيف */}
+      {/* بحث + فلترة بالتصنيف (بالعربية عند توفّر الترجمة) */}
       <form method="get" className="flex flex-wrap items-end gap-2">
+        {wantAr && <input type="hidden" name="ar" value="1" />}
         <label className="text-sm">بحث بالاسم<input className={`${input} ms-2 w-56`} name="q" defaultValue={q} placeholder="مثال: jacket, shorts…" /></label>
         <label className="text-sm">التصنيف
-          <select name="cat" defaultValue={cat} className={`${input} ms-2 w-64`}>
+          <select name="cat" defaultValue={cat} className={`${input} ms-2 w-72`}>
             <option value="">كل التصنيفات{total ? ` (${total.toLocaleString('en')})` : ''}</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.path}</option>)}
+            {categories.map((c) => <option key={c.id} value={c.id}>{catAr.get(c.name) ?? c.path}</option>)}
           </select>
         </label>
         <button className={btn}>عرض</button>
         {(q || cat) && <Link href="/admin/suppliers/cj/browse" className={ghost}>مسح الفلاتر</Link>}
       </form>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {wantAr
+          ? <Link href={`/admin/suppliers/cj/browse?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`} className={ghost}>إخفاء ترجمة العناوين</Link>
+          : <Link href={`/admin/suppliers/cj/browse?page=${page}${keep}&ar=1`} className={btn}>ترجمة عناوين هذه الصفحة للعربية</Link>}
+        <form action={translateCjCategories}><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة التصنيفات للعربية</button></form>
+        {typeof sp.cattr === 'string' && <span className="text-emerald-700">خُزّنت ترجمة {sp.cattr} تصنيفاً (اضغط ثانيةً للباقي).</span>}
+      </div>
       {!categories.length && <p className="text-xs text-amber-700">تعذّر جلب شجرة التصنيفات من CJ الآن — البحث بالاسم يعمل، وأعد المحاولة لاحقاً.</p>}
 
       {/* ملخّص النتائج */}
@@ -91,7 +105,9 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
           <div key={p.pid} className={card}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {p.productImage ? <img src={p.productImage} alt="" className="h-36 w-full rounded-lg object-cover" loading="lazy" /> : <div className="flex h-36 w-full items-center justify-center rounded-lg bg-primary/5 text-xs text-muted-foreground">لا صورة</div>}
-            <div className="text-sm font-bold leading-5 line-clamp-2">{p.productName || '—'}</div>
+            {gridAr.get(p.productName)
+              ? <><div className="text-sm font-bold leading-5 line-clamp-2">{gridAr.get(p.productName)}</div><div className="line-clamp-1 text-[11px] text-muted-foreground" dir="ltr">{p.productName}</div></>
+              : <div className="text-sm font-bold leading-5 line-clamp-2" dir="ltr">{p.productName || '—'}</div>}
             <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
               <span>PID: <span dir="ltr">{p.pid}</span></span>
               <span>SKU: <span dir="ltr">{p.productSku || '—'}</span></span>

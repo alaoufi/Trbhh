@@ -2294,6 +2294,12 @@ model cj_products {
   @@index([commerce_product_id], map: "cj_products_commerce")
 }
 
+model cj_translations {
+  source_key String   @id @db.Char(40)
+  target_ar  String   @db.Text
+  created_at DateTime @default(now()) @db.Timestamp(3)
+}
+
 model cj_webhook_events {
   id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
   event_key   String   @unique(map: "cj_webhook_event_key") @db.VarChar(191)

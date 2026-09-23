@@ -6,7 +6,8 @@ import { setDefaultMarginBps } from '@/lib/cj/pricing';
 import { saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync';
 import { importCjProductByPid } from '@/lib/cj/import';
 import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts } from '@/lib/cj/mapping';
-import { translateToArabic } from '@/lib/cj/translate';
+import { translateToArabic, translateManyCached } from '@/lib/cj/translate';
+import { getCategories } from '@/lib/cj/client';
 
 /** حفظ الهامش الافتراضي (٪) — للمشرف فقط. لا شراء ولا اتصال بمورّد هنا. */
 export async function saveCjMargin(form: FormData) {
@@ -113,6 +114,16 @@ export async function translateCjProduct(form: FormData) {
   if (row) { const ar = await translateToArabic(row.name).catch(() => null); if (ar) await setCjProductNameAr(id, ar); }
   revalidatePath('/admin/suppliers/cj/browse');
   redirect(withParam(backOf(form), 'edited=1'));
+}
+
+/** ترجمة أسماء تصنيفات CJ إلى العربية وتخزينها (دفعة محدودة لكل ضغطة). */
+export async function translateCjCategories(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const back = String(form.get('back') || '/admin/suppliers/cj/browse');
+  const cats = await getCategories();
+  let done = 0;
+  if (cats.ok) { const map = await translateManyCached(cats.data.map((c) => c.name), 60); done = map.size; }
+  redirect(withParam(back, `cattr=${done}`));
 }
 
 /** ترجمة تلقائية جماعية لكل سلعة بلا عنوان عربي بعد (دفعة محدودة). */

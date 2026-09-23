@@ -45,6 +45,13 @@ export const CJ_DDL: string[] = [
   `ALTER TABLE cj_products ADD COLUMN hidden TINYINT NOT NULL DEFAULT 0`,
   `ALTER TABLE cj_products ADD COLUMN sale_price_override_minor INT NULL`,
 
+  // ذاكرة ترجمة مخزَّنة (نص المصدر ← العربية) لتفادي تكرار طلبات الترجمة.
+  `CREATE TABLE IF NOT EXISTS cj_translations (
+    source_key CHAR(40) NOT NULL PRIMARY KEY,
+    target_ar TEXT NOT NULL,
+    created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
   // مخزن أحداث webhooks من CJ (idempotent عبر مفتاح الحدث).
   `CREATE TABLE IF NOT EXISTS cj_webhook_events (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,

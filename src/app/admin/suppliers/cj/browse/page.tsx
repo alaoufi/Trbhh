@@ -41,11 +41,13 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   // ترجمة العناوين والتصنيفات للعربية تلقائياً قبل الاستيراد (تُخزَّن فتُصبح فورية لاحقاً؛
   // التصنيفات تُترجَم تدريجياً ٣٠ لكل تحميل حتى تكتمل الشجرة).
   const titleTexts = items.map((p) => p.productName);
+  const cardCats = items.map((p) => p.categoryName ?? '').filter(Boolean);
   const catNames = categories.map((c) => c.name);
   const [gridAr, catAr] = await Promise.all([
-    wantAr ? translateManyCached(titleTexts, 30) : getCachedArabic(titleTexts),
+    wantAr ? translateManyCached([...titleTexts, ...cardCats], 50) : getCachedArabic([...titleTexts, ...cardCats]),
     wantAr ? translateManyCached(catNames, 30) : getCachedArabic(catNames),
   ]);
+  const arText = (t: string | null | undefined) => (t ? gridAr.get(t) ?? catAr.get(t) ?? t : '—');
   const total = listing.ok ? listing.data.total : 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const imported = items.length ? await importedCjPids(items.map((p) => p.pid)) : new Set<string>();
@@ -123,7 +125,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
             <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
               <span>PID: <span dir="ltr">{p.pid}</span></span>
               <span>SKU: <span dir="ltr">{p.productSku || '—'}</span></span>
-              <span>التصنيف: {p.categoryName || '—'}</span>
+              <span>التصنيف: {arText(p.categoryName)}</span>
               <span>سعر CJ: {usd(p.sellPrice)}</span>
             </div>
             <div className="text-sm font-extrabold text-primary">بيع تقديري: {sar(salePreview(p.sellPrice))}</div>

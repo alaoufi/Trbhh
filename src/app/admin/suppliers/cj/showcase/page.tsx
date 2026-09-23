@@ -1,6 +1,9 @@
 import Link from 'next/link';
+import { AccessBoundary } from '@/components/access-boundary';
 import { requireAccess } from '@/lib/access-control/guards';
 import { listVisibleCjProducts } from '@/lib/cj/mapping';
+import { cjStorefrontPublic } from '@/lib/cj/storefront';
+import { setCjStorefront } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'معاينة سلع CJ المختارة', robots: { index: false, follow: false } };
@@ -12,20 +15,43 @@ const sar = (m: number) => `${(m / 100).toLocaleString('en', { minimumFractionDi
  * ببياناتها الحقيقية (اسم عربي + صورة + سعر بالريال). محميّة بصلاحية التكاملات،
  * ولا رابط لها من واجهة العضو. للتجربة الواقعية قبل النشر. لا شراء ولا دفع.
  */
-export default async function CjShowcasePage() {
+export default async function CjShowcasePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAccess('integrations', 'view');
-  const items = await listVisibleCjProducts(200);
+  const sp = await searchParams;
+  const [items, isPublic] = await Promise.all([listVisibleCjProducts(200), cjStorefrontPublic()]);
+  const readyCount = items.filter((r) => r.status === 'ready').length;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-extrabold text-primary">معاينة السلع المختارة</h1>
-        <Link href="/admin/suppliers/cj/browse" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">إدارة/استيراد ←</Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/cj" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">افتح متجر العملاء /cj ←</Link>
+          <Link href="/admin/suppliers/cj/browse" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">إدارة/استيراد ←</Link>
+        </div>
+      </div>
+
+      {/* مفتاح النشر للعامة */}
+      <div className={`rounded-xl border p-3 ${isPublic ? 'border-emerald-300 bg-emerald-50' : 'border-amber-300 bg-amber-50'}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm">
+            حالة متجر CJ للعامة: {isPublic ? <b className="text-emerald-700">مفعّل (ظاهر للجميع)</b> : <b className="text-amber-800">معاينة فقط (غير معلن — المشرفون فقط)</b>}
+            {sp.published === '1' && <span className="ms-2 text-emerald-700">تم التفعيل.</span>}
+            {sp.published === '0' && <span className="ms-2 text-amber-800">تم الإيقاف (رجع للمعاينة).</span>}
+            <div className="text-xs text-muted-foreground">السلع «الجاهزة» التي ستظهر للعامة عند التفعيل: {readyCount} من {items.length}. (الشراء يبقى معطّلاً بمفتاحه المستقل.)</div>
+          </div>
+          <AccessBoundary module={'integrations'} action={'manage_settings'}>
+            <form action={setCjStorefront}>
+              <input type="hidden" name="value" value={isPublic ? '0' : '1'} />
+              <button className={`rounded-lg px-4 py-2 text-sm font-bold text-white ${isPublic ? 'bg-amber-600' : 'bg-emerald-600'}`}>{isPublic ? 'إيقاف الإعلان (رجوع للمعاينة)' : 'تفعيل الإعلان للعامة'}</button>
+            </form>
+          </AccessBoundary>
+        </div>
       </div>
 
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
-        <b>معاينة داخلية فقط</b> — هذه الصفحة غير معلنة وغير ظاهرة للعامة (محميّة بصلاحية الإدارة). تعرض السلع المستوردة غير المخفية
-        ببياناتها الحقيقية من CJ والسعر بالريال. لا شراء ولا دفع ولا نشر تلقائي.
+        هذه الصفحة معاينة داخلية. متجر العملاء الحقيقي على <code>/cj</code> (وصفحة السلعة <code>/cj/[id]</code>) يظهر ضمن شكل الموقع؛
+        وهو <b>غير معلن للعامة</b> حتى تفعيله أعلاه — قبله يراه المشرفون فقط. لا شراء ولا دفع.
       </p>
 
       {!items.length ? (

@@ -10,6 +10,7 @@ import { translateToArabic, translateManyCached } from '@/lib/cj/translate';
 import { getCategories } from '@/lib/cj/client';
 import { createOrder, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
 import { warmCjTranslations } from '@/lib/cj/translate-warm';
+import { setCjStorefrontPublic } from '@/lib/cj/storefront';
 
 /** حفظ الهامش الافتراضي (٪) — للمشرف فقط. لا شراء ولا اتصال بمورّد هنا. */
 export async function saveCjMargin(form: FormData) {
@@ -180,6 +181,16 @@ export async function translateCjCategories(form: FormData) {
   let done = 0;
   if (cats.ok) { const map = await translateManyCached(cats.data.map((c) => c.name), 120); done = map.size; }
   redirect(withParam(back, `cattr=${done}`));
+}
+
+/** تفعيل/إيقاف إظهار متجر CJ للعامة (بعد نجاح التجربة). الشراء يبقى معطّلاً بمفتاحه. */
+export async function setCjStorefront(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const on = String(form.get('value') || '') === '1';
+  await setCjStorefrontPublic(on);
+  revalidatePath('/admin/suppliers/cj/showcase');
+  revalidatePath('/cj');
+  redirect(`/admin/suppliers/cj/showcase?published=${on ? '1' : '0'}`);
 }
 
 /** تحديث كل الترجمات الآن (تصنيفات + حقول السلع المستوردة) وتخزينها على الخادم. */

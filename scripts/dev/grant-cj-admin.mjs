@@ -1,14 +1,21 @@
-// أداة استرداد صلاحية الإدارة لحساب المالك في نظام الوصول الجديد (access-control).
-// تُشغَّل داخل حاوية التطبيق (تقرأ DATABASE_URL من بيئتها). تمنح المستخدم المحدَّد
-// (بالبريد أو الجوال أو اسم الدخول) دورًا بصلاحيات الإدارة + التكاملات (CJ) + المنتجات.
+// أداة تشخيص + استرداد صلاحيات المالك في نظام الوصول الجديد (access-control).
+// تُشغَّل داخل حاوية التطبيق (تقرأ DATABASE_URL من بيئتها).
 // الاستخدام: node /app/grant.mjs "<البريد أو الجوال أو اسم الدخول>"
+//
+// تفعل الآتي بالترتيب مع طباعة تشخيص مفصّل لكل بوابة قبول:
+//   1) تجد الحساب (جوال بآخر ٩ أرقام / بريد / اسم دخول) وتطبع حالة تفعيله.
+//   2) تتأكد أن access_control_state مُهيّأ (initialized_at).
+//   3) تُفعّل قسم executive والدور owner_cj (active=1) — لا مجرّد INSERT IGNORE.
+//   4) تمنح كل الصلاحيات وتُسند الدور.
+//   5) تُعيد تشغيل نفس استعلام القراءة الذي يستخدمه التطبيق للتأكد الفعلي.
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const { PrismaClient } = require('@prisma/client');
 const db = new PrismaClient();
 
 const ident = (process.argv[2] || '').trim();
-// كل الوحدات وإجراءاتها من كتالوج الصلاحيات — منح كامل (مالك).
+
+// كل الوحدات وإجراءاتها — منح كامل (مالك).
 const MODULES = [
   ['dashboard', ['view']], ['search', ['view']],
   ['finance', ['view', 'export']], ['settlements', ['view', 'create', 'edit', 'approve', 'refund', 'export', 'delete']],
@@ -35,46 +42,73 @@ const MODULES = [
 ];
 const PERMS = MODULES.flatMap(([m, acts]) => acts.map((a) => `${m}:${a}`));
 const DEPTS = [['executive', 'الإدارة العليا'], ['integrations', 'المتاجر والتكاملات'], ['supply', 'الموردون والمنتجات'], ['audit', 'التدقيق والمراجعة'], ['technical', 'إدارة النظام التقنية']];
+const ROLE = 'owner_cj';
+const DEPT = 'executive';
+// نفس شرط «الحساب المُفعّل» المستخدم في src/lib/access-control/store.ts
+const ENABLED_SQL = "u.archived_at IS NULL AND COALESCE(u.merged_into,0)=0 AND (COALESCE(u.ban,'no') <> 'checked' OR (u.ban_until IS NOT NULL AND u.ban_until <= UTC_TIMESTAMP()))";
 
-// آخر ٩ أرقام من الجوال (تجاهل 0/966/+966 وأي رموز) — لمطابقة الجوال أياً كان تنسيق تخزينه.
-function phoneTail(v) {
-  const digits = String(v || '').replace(/\D+/g, '');
-  return digits.length >= 9 ? digits.slice(-9) : '';
-}
+// آخر ٩ أرقام من الجوال (تجاهل 0/966/+966 وأي رموز).
+function phoneTail(v) { const d = String(v || '').replace(/\D+/g, ''); return d.length >= 9 ? d.slice(-9) : ''; }
+async function step(label, fn) { try { await fn(); console.log(`   ✓ ${label}`); } catch (e) { console.log(`   ✖ ${label} — ${e?.message || e}`); } }
 
 async function main() {
   if (!ident) { console.error('✖ مرّر معرّف الحساب: البريد أو الجوال أو اسم الدخول.'); process.exit(2); }
-  // مطابقة دقيقة على البريد/اسم الدخول، ومطابقة الجوال بآخر ٩ أرقام (تتسامح مع 0/966/+966).
+
+  // ── 1) إيجاد الحساب ─────────────────────────────────────────────
   const tail = phoneTail(ident);
-  let users;
-  if (tail) {
-    users = await db.$queryRawUnsafe(
-      "SELECT id,name,userName,email,phoneNumber FROM users WHERE email=? OR userName=? OR RIGHT(REGEXP_REPLACE(COALESCE(phoneNumber,''),'[^0-9]',''),9)=? ORDER BY id LIMIT 6",
-      ident, ident, tail,
-    );
-  } else {
-    users = await db.$queryRawUnsafe(
-      'SELECT id,name,userName,email,phoneNumber FROM users WHERE email=? OR userName=? OR name=? ORDER BY id LIMIT 6',
-      ident, ident, ident,
-    );
-  }
-  if (!users.length) { console.error(`✖ لا يوجد حساب مطابق لـ «${ident}». جرّب البريد أو الجوال (آخر ٩ أرقام تكفي) أو اسم الدخول بالضبط.`); process.exit(1); }
+  const users = tail
+    ? await db.$queryRawUnsafe("SELECT id,name,userName,email,phoneNumber FROM users WHERE email=? OR userName=? OR RIGHT(REGEXP_REPLACE(COALESCE(phoneNumber,''),'[^0-9]',''),9)=? ORDER BY id LIMIT 8", ident, ident, tail)
+    : await db.$queryRawUnsafe('SELECT id,name,userName,email,phoneNumber FROM users WHERE email=? OR userName=? OR name=? ORDER BY id LIMIT 8', ident, ident, ident);
+  if (!users.length) { console.error(`✖ لا يوجد حساب مطابق لـ «${ident}». جرّب البريد أو الجوال (آخر ٩ أرقام تكفي) أو اسم الدخول.`); process.exit(1); }
   if (users.length > 1) {
     console.error('✖ أكثر من حساب مطابق — حدّد بدقّة (بالبريد أو الجوال كاملاً):');
     for (const u of users) console.error(`   - id=${String(u.id)} · ${u.name || u.userName || ''} · ${u.email || ''} · ${u.phoneNumber || ''}`);
     process.exit(1);
   }
-  console.log(`• الحساب المطابق: id=${String(users[0].id)} · ${users[0].name || users[0].userName || ''} · ${users[0].email || ''} · ${users[0].phoneNumber || ''}`);
-  const uid = users[0].id;
+  const u = users[0], uid = u.id;
+  console.log(`• الحساب المطابق: id=${String(uid)} · ${u.name || u.userName || ''} · ${u.email || ''} · ${u.phoneNumber || ''}`);
 
-  await db.$executeRawUnsafe('INSERT INTO access_control_state(id,revision,initialized_at) VALUES(1,1,NOW(3)) ON DUPLICATE KEY UPDATE initialized_at=COALESCE(initialized_at,NOW(3))');
-  for (const [id, name] of DEPTS) await db.$executeRawUnsafe('INSERT IGNORE INTO access_departments(id,name,active) VALUES(?,?,1)', id, name);
-  await db.$executeRawUnsafe("INSERT INTO access_roles(id,name,department_id,active,system_role) VALUES('owner_cj','المالك — صلاحيات كاملة','executive',1,1) ON DUPLICATE KEY UPDATE active=1,department_id='executive',name='المالك — صلاحيات كاملة'");
-  for (const p of PERMS) await db.$executeRawUnsafe('INSERT IGNORE INTO access_role_permissions(role_id,permission) VALUES(?,?)', 'owner_cj', p);
-  await db.$executeRawUnsafe('INSERT IGNORE INTO access_user_roles(user_id,role_id) VALUES(?,?)', uid, 'owner_cj');
+  // ── تشخيص: هل الحساب «مُفعّل» بمنظور نظام الوصول؟ ────────────────
+  const en = await db.$queryRawUnsafe(`SELECT (${ENABLED_SQL}) AS enabled, u.archived_at, u.merged_into, u.ban, u.ban_until FROM users u WHERE u.id=?`, uid);
+  const e = en[0] || {};
+  const enabled = Number(e.enabled) === 1;
+  console.log(`• حالة التفعيل: ${enabled ? 'مُفعّل ✓' : '✖ غير مُفعّل'} (archived=${e.archived_at ? 'نعم' : 'لا'} · merged_into=${e.merged_into ?? 0} · ban=${e.ban ?? 'no'})`);
+  if (!enabled) console.log('   ⚠ الحساب محظور/مؤرشف/مدموج — لن تُقرأ صلاحياته حتى يُعالَج ذلك. أبلغني بالتفاصيل أعلاه.');
 
-  const granted = await db.$queryRawUnsafe('SELECT COUNT(*) c FROM access_role_permissions WHERE role_id=?', 'owner_cj');
-  console.log(`✓ تم منح الحساب id=${String(uid)} (${users[0].name || users[0].userName || ''}) دور «owner_cj» بـ ${Number(granted[0].c)} صلاحية.`);
-  console.log('  الآن: سجّل خروجًا ثم دخولًا، وافتح /admin/suppliers/cj/browse');
+  // ── تشخيص الحالة قبل الإصلاح ─────────────────────────────────────
+  const st0 = await db.$queryRawUnsafe('SELECT initialized_at FROM access_control_state WHERE id=1');
+  console.log(`• access_control_state: ${st0.length ? (st0[0].initialized_at ? `مُهيّأ (${st0[0].initialized_at})` : 'موجود لكن غير مُهيّأ (initialized_at=NULL)') : 'غير موجود'}`);
+  const dep0 = await db.$queryRawUnsafe('SELECT active FROM access_departments WHERE id=?', DEPT);
+  console.log(`• قسم ${DEPT}: ${dep0.length ? (Number(dep0[0].active) === 1 ? 'مُفعّل ✓' : '✖ غير مُفعّل (active=0)') : 'غير موجود'}`);
+  const role0 = await db.$queryRawUnsafe('SELECT active,department_id FROM access_roles WHERE id=?', ROLE);
+  console.log(`• دور ${ROLE}: ${role0.length ? `active=${role0[0].active} · department=${role0[0].department_id}` : 'غير موجود'}`);
+  const asg0 = await db.$queryRawUnsafe('SELECT COUNT(*) c FROM access_user_roles WHERE user_id=? AND role_id=?', uid, ROLE);
+  console.log(`• إسناد الدور للحساب: ${Number(asg0[0].c) > 0 ? 'موجود' : 'غير موجود'}`);
+
+  // ── 2..4) الإصلاح (قسري ومتسامح) ────────────────────────────────
+  console.log('— تطبيق الإصلاح —');
+  await step('تهيئة access_control_state', () => db.$executeRawUnsafe('INSERT INTO access_control_state(id,revision,initialized_at) VALUES(1,1,NOW(3)) ON DUPLICATE KEY UPDATE initialized_at=COALESCE(initialized_at,NOW(3))'));
+  for (const [id, name] of DEPTS) await step(`تفعيل قسم ${id}`, () => db.$executeRawUnsafe('INSERT INTO access_departments(id,name,active) VALUES(?,?,1) ON DUPLICATE KEY UPDATE active=1', id, name));
+  await step(`إنشاء/تفعيل دور ${ROLE}`, () => db.$executeRawUnsafe(`INSERT INTO access_roles(id,name,department_id,active,system_role) VALUES(?,?,?,1,1) ON DUPLICATE KEY UPDATE active=1,department_id=?,name=?`, ROLE, 'المالك — صلاحيات كاملة', DEPT, DEPT, 'المالك — صلاحيات كاملة'));
+  let permOk = 0;
+  for (const p of PERMS) { try { await db.$executeRawUnsafe('INSERT IGNORE INTO access_role_permissions(role_id,permission) VALUES(?,?)', ROLE, p); permOk++; } catch { /* تجاهل */ } }
+  console.log(`   ✓ أُدرجت ${permOk}/${PERMS.length} صلاحية في الدور`);
+  await step('إسناد الدور للحساب', () => db.$executeRawUnsafe('INSERT IGNORE INTO access_user_roles(user_id,role_id) VALUES(?,?)', uid, ROLE));
+
+  // ── 5) التحقق بنفس استعلام القراءة الفعلي في التطبيق ─────────────
+  const eff = await db.$queryRawUnsafe(
+    `SELECT p.permission FROM users u JOIN access_user_roles a ON a.user_id=u.id JOIN access_roles r ON r.id=a.role_id AND r.active=1 JOIN access_departments d ON d.id=r.department_id AND d.active=1 LEFT JOIN access_role_permissions p ON p.role_id=r.id WHERE u.id=? AND ${ENABLED_SQL}`,
+    uid,
+  );
+  const keys = new Set(eff.map((r) => r.permission).filter(Boolean));
+  const need = ['integrations:view', 'access_control:view', 'finance:view', 'audit:view'];
+  console.log('— التحقق النهائي (نفس منطق التطبيق) —');
+  console.log(`• عدد الصلاحيات الفعّالة المقروءة: ${keys.size}`);
+  for (const k of need) console.log(`   ${keys.has(k) ? '✓' : '✖'} ${k}`);
+  if (keys.size > 0 && need.every((k) => keys.has(k))) {
+    console.log('\n✅ تم — الحساب يملك الصلاحيات فعلياً الآن. سجّل خروجاً ثم دخولاً وافتح /admin/suppliers/cj/browse');
+  } else {
+    console.log('\n⚠ لم تُقرأ الصلاحيات رغم الإصلاح — الصقْ كل المخرجات أعلاه لأحدّد البوابة المتبقية (غالباً حساب غير مُفعّل أو حساب مختلف).');
+  }
 }
 main().catch((e) => { console.error('ERROR:', e?.message || e); process.exit(1); }).finally(() => db.$disconnect());

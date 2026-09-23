@@ -8,6 +8,7 @@ import { importCjProductByPid } from '@/lib/cj/import';
 import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview } from '@/lib/cj/mapping';
 import { translateToArabic, translateManyCached } from '@/lib/cj/translate';
 import { getCategories } from '@/lib/cj/client';
+import { createOrder, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
 
 /** حفظ الهامش الافتراضي (٪) — للمشرف فقط. لا شراء ولا اتصال بمورّد هنا. */
 export async function saveCjMargin(form: FormData) {
@@ -133,6 +134,41 @@ export async function saveCjReview(form: FormData) {
   revalidatePath('/admin/suppliers/cj/browse');
   revalidatePath('/admin/suppliers/cj/showcase');
   redirect(`/admin/suppliers/cj/review/${id}?saved=1`);
+}
+
+/* ------------------------- طلبات CJ (بنية/اختبار — لا شراء حقيقي) ------------------------- */
+
+/** إنشاء طلب اختبار داخلي لتجربة دورة الحالات (لا اتصال بـ CJ ولا دفع). */
+export async function createTestCjOrder() {
+  const s = await requireAccess('integrations', 'manage_settings');
+  const ref = `TEST-${Date.now()}`;
+  const { id } = await createOrder({ internalRef: ref, userId: s.uid, productName: 'طلب اختبار داخلي', currency: 'SAR' });
+  redirect(`/admin/suppliers/cj/orders/${id}`);
+}
+
+/** تحريك حالة الطلب يدوياً (اختبار آلة الحالات) — يتحقق من صلاحية الانتقال server-side. */
+export async function advanceCjOrder(form: FormData) {
+  const s = await requireAccess('integrations', 'manage_settings');
+  const id = Number(String(form.get('id') || ''));
+  const to = String(form.get('to') || '');
+  const reason = String(form.get('reason') || '').trim();
+  const r = await transitionOrder(id, to, { source: 'internal', actorId: s.uid, reason });
+  const q = r.ok ? 'moved=1' : `err=${encodeURIComponent(r.error)}`;
+  revalidatePath(`/admin/suppliers/cj/orders/${id}`);
+  redirect(`/admin/suppliers/cj/orders/${id}?${q}`);
+}
+
+/** تحديث بيانات التتبّع يدوياً (اختبار) — شركة الشحن ورقم/رابط التتبّع. */
+export async function setCjOrderTracking(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const id = Number(String(form.get('id') || ''));
+  await setOrderTracking(id, {
+    carrier: String(form.get('carrier') || '').trim(),
+    trackingNumber: String(form.get('trackingNumber') || '').trim(),
+    trackingUrl: String(form.get('trackingUrl') || '').trim(),
+  }, { source: 'internal' });
+  revalidatePath(`/admin/suppliers/cj/orders/${id}`);
+  redirect(`/admin/suppliers/cj/orders/${id}?tracked=1`);
 }
 
 /** ترجمة أسماء تصنيفات CJ إلى العربية وتخزينها (دفعة محدودة لكل ضغطة). */

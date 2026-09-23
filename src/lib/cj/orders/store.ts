@@ -95,6 +95,14 @@ export async function getOrderByRef(ref: string) {
 export async function listOrderEvents(orderId: number | bigint) {
   return prisma.cj_order_events.findMany({ where: { order_id: bid(orderId) }, orderBy: { id: 'asc' } }).catch(() => []);
 }
+/** عدد الطلبات لكل حالة (للوحة المراقبة). */
+export async function countOrdersByStatus(): Promise<Record<string, number>> {
+  const rows = await prisma.cj_orders.groupBy({ by: ['status'], _count: { status: true } }).catch(() => [] as { status: string; _count: { status: number } }[]);
+  const out: Record<string, number> = {};
+  for (const r of rows) out[r.status] = r._count.status;
+  return out;
+}
+
 export async function listOrders(opts: { status?: string; limit?: number; offset?: number } = {}) {
   const take = Math.min(Math.max(1, opts.limit ?? 50), 200);
   return prisma.cj_orders.findMany({

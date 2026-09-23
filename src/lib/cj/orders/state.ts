@@ -141,3 +141,20 @@ export function mapCjStatus(raw: string | null | undefined): FlowStatus | null {
   if (!key) return null;
   return CJ_STATUS_MAP[key] ?? null;
 }
+
+/** تجميع الحالات في مراحل للوحة المراقبة (العمود ← الحالات التي يضمّها). */
+export const STAGE_GROUPS: { key: string; title: string; statuses: OrderStatus[] }[] = [
+  { key: 'payment', title: 'الدفع', statuses: ['awaiting_payment', 'paid', 'verifying'] },
+  { key: 'supplier', title: 'المورد', statuses: ['sent_to_cj', 'cj_accepted'] },
+  { key: 'preparing', title: 'التجهيز', statuses: ['preparing'] },
+  { key: 'shipping', title: 'الشحن', statuses: ['shipped'] },
+  { key: 'tracking', title: 'التتبّع', statuses: ['in_transit', 'out_for_delivery'] },
+  { key: 'delivery', title: 'التسليم', statuses: ['delivered', 'completed'] },
+  { key: 'issues', title: 'المشاكل', statuses: [...EXCEPTION_STATUSES] },
+];
+
+/** المرحلة (عمود اللوحة) التي تقع فيها حالة معيّنة. */
+export function stageOf(status: string): string {
+  const g = STAGE_GROUPS.find((s) => (s.statuses as string[]).includes(status));
+  return g ? g.key : 'issues';
+}

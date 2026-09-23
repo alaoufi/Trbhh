@@ -74,7 +74,7 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
                 <button className={btn}>تغيير الحالة</button>
               </form></AccessBoundary>
             ) : <p className="text-sm text-muted-foreground">لا انتقالات متاحة (حالة نهائية).</p>}
-            <AccessBoundary module="shipping" action="edit"><form action={setCjOrderTracking} className="space-y-2 border-t pt-2">
+            <AccessBoundary module="shipping"><AccessBoundary module="shipping" action="edit"><form action={setCjOrderTracking} className="space-y-2 border-t pt-2">
               <input type="hidden" name="id" value={String(order.id)} />
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-sm">شركة الشحن<input className={input} name="carrier" defaultValue={order.carrier} /></label>
@@ -82,7 +82,7 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
               </div>
               <label className="block text-sm">رابط التتبّع<input className={input} name="trackingUrl" defaultValue={order.tracking_url} dir="ltr" placeholder="https://…" /></label>
               <button className={btn}>حفظ التتبّع</button>
-            </form></AccessBoundary>
+            </form></AccessBoundary></AccessBoundary>
           </div>
       </div>
 

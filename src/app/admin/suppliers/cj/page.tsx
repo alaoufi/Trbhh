@@ -86,10 +86,10 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
         <h2 className="font-bold">الهامش الافتراضي (قابل للتعديل)</h2>
         {sp.saved === 'margin' && <p className="text-sm text-emerald-700">تم الحفظ.</p>}
         {sp.error === 'margin' && <p className="text-sm text-red-700">قيمة غير صالحة (0–1000٪).</p>}
-        <AccessBoundary module={'pricing'} action={'manage_settings'}><form action={saveCjMargin} className="flex flex-wrap items-center gap-2">
+        <AccessBoundary module="pricing"><AccessBoundary module={'pricing'} action={'manage_settings'}><form action={saveCjMargin} className="flex flex-wrap items-center gap-2">
           <label className="text-sm">النسبة٪<input className={`${input} ms-2 w-24`} name="marginPercent" inputMode="decimal" defaultValue={(marginBps / 100).toString()} /></label>
           <button className={btn}>حفظ الهامش</button>
-        </form></AccessBoundary>
+        </form></AccessBoundary></AccessBoundary>
         <p className="text-xs text-muted-foreground">مثال حساب: تكلفة ٢٠ + شحن ١٥ ر.س بهامش {(marginBps / 100).toFixed(0)}٪ → ربح {(sample.profitMinor / 100).toFixed(2)} · بيع {(sample.salePriceMinor / 100).toFixed(2)} ر.س. (السعر غير مثبّت في الكود.)</p>
       </div>
 

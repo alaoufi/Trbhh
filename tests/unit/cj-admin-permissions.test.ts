@@ -22,13 +22,14 @@ vi.mock('@/lib/cj/sync', () => ({ saveCjSyncSettings: state.write, cjSyncSetting
 vi.mock('@/lib/cj/import', () => ({ importCjProductByPid: async (...args: unknown[]) => { state.imports(...args); state.write(); return { ok: true, pid: 'CJ4', salePriceMinor: 1200, supplierCostMinor: 900 }; } }));
 vi.mock('@/lib/cj/translate', () => ({ translateToArabic: async () => 'ترجمة', translateManyCached: async () => { state.write(); return new Map([['source', 'ترجمة']]); }, learnTranslation: state.write }));
 vi.mock('@/lib/cj/client', () => ({ getCategories: async () => ({ ok: true, data: [{ name: 'source' }] }) }));
-vi.mock('@/lib/cj/orders/store', () => ({ createOrder: async () => { state.write(); return { id: 7n, created: true }; }, transitionOrder: async () => { state.write(); return { ok: true, from: 'awaiting_payment', to: 'paid' }; }, setOrderTracking: state.write, getOrderById: async () => ({ id: 7n, status: 'awaiting_payment', carrier: 'old', tracking_number: '', tracking_url: '' }) }));
+vi.mock('@/lib/cj/orders/store', () => ({ createOrder: async () => { state.write(); return { id: 7n, created: true }; }, transitionOrder: async () => { state.write(); return { ok: true, from: 'awaiting_payment', to: 'paid' }; }, setOrderTracking: state.write, listOrderEvents: async () => [], getOrderById: async () => ({ id: 7n, status: 'awaiting_payment', carrier: 'old', tracking_number: '', tracking_url: '' }) }));
 vi.mock('@/lib/cj/translate-warm', () => ({ warmCjTranslations: async () => { state.write(); return { categories: 1, productNames: 1 }; }, refreshCjMedia: async () => { state.write(); return { refreshed: 1 }; } }));
 vi.mock('@/lib/cj/storefront', () => ({ setCjStorefrontPublic: state.write, cjStorefrontPublic: async () => false }));
 vi.mock('@/lib/cj/agents', () => ({ upsertAgent: state.write, setDefaultAgentWeeklyQuota: state.write, setAgentActive: state.write, assignProductAgent: state.write, unassignProductAgent: state.write, getAgent: async () => ({ active: 0, weekly_quota: 2 }), defaultAgentWeeklyQuota: async () => 10, isActiveAgent: async () => true }));
 vi.mock('@/lib/cj/sample', () => ({ sampleOneCjProduct: async () => null }));
 import * as actions from '@/app/admin/suppliers/cj/actions';
 import ReviewPage from '@/app/admin/suppliers/cj/review/[id]/page';
+import OrderPage from '@/app/admin/suppliers/cj/orders/[id]/page';
 import { pagePermission } from '@/lib/access-control/catalog';
 import { redactAdminLog } from '@/lib/admin-audit-visibility';
 
@@ -105,6 +106,14 @@ describe('CJ admin granular mutation authorization', () => {
     expect(pagePermission('/admin/suppliers/cj/browse')).toBe('products:view'); expect(pagePermission('/admin/suppliers/cj/review/4')).toBe('products:view');
     expect(pagePermission('/admin/suppliers/cj/showcase')).toBe('products:view'); expect(pagePermission('/admin/suppliers/cj/orders/7')).toBe('orders:view');
     expect(pagePermission('/admin/suppliers/cj/agents')).toBe('integrations:view'); expect(pagePermission('/admin/suppliers/cj-malicious')).toBeNull();
+  });
+  it('renders order status and shipping controls only under their own view and action grants', async () => {
+    const html = async () => renderToStaticMarkup(await OrderPage({ params: Promise.resolve({ id: '7' }), searchParams: Promise.resolve({}) }));
+    state.keys = new Set(['integrations:view', 'integrations:manage_settings']); await expect(html()).rejects.toThrow('access=denied');
+    state.keys = new Set(['orders:view']); expect(await html()).not.toContain('تغيير الحالة'); expect(await html()).not.toContain('حفظ التتبّع');
+    state.keys.add('orders:edit'); expect(await html()).toContain('تغيير الحالة'); expect(await html()).not.toContain('حفظ التتبّع');
+    state.keys.add('shipping:edit'); expect(await html()).not.toContain('حفظ التتبّع');
+    state.keys.add('shipping:view'); expect(await html()).toContain('حفظ التتبّع');
   });
   it('CJ mutation audit details require the recorded source module view', () => {
     const row = { id: 1, adminId: 9, adminName: 'Operator', action: 'تعديل منتجات CJ', target: '4', note: 'before-and-after', at: null };

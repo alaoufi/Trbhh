@@ -210,7 +210,7 @@ export async function issueInvoice(db:CommerceDb,actor:bigint,invoiceId:bigint,s
     if(!header)throw new Error('finance_invoice_difference');
     // Lock source and issue periods in chronological order; a late issue cannot rewrite a closed sale month.
     for(const month of [...new Set([financeMonth(header.created_at),financeMonth(now)])].sort())await requireOpenPeriod(tx,month);
-    const [row]=await tx.$queryRaw<{id:bigint;order_id:bigint;receipt_id:bigint;total_minor:bigint;status:string;number:string|null;snapshot:unknown;source_snapshot:unknown}[]>`SELECT * FROM finance_invoices WHERE id=${invoiceId} FOR UPDATE`;
+    const [row]=await tx.$queryRaw<{id:bigint;order_id:bigint;receipt_id:bigint;created_at:Date;total_minor:bigint;status:string;number:string|null;snapshot:unknown;source_snapshot:unknown}[]>`SELECT * FROM finance_invoices WHERE id=${invoiceId} FOR UPDATE`;
     if(!row||snapshot.sourceOrderId!==String(row.order_id)||snapshot.sourceReceiptId!==String(row.receipt_id)||snapshot.totalMinor!==financeNumber(row.total_minor))throw new Error('finance_invoice_difference');
     if(row.status==='issued'){if(fingerprint(financeJson(row.snapshot))!==fingerprint(snapshot))throw new Error('finance_invoice_immutable');return row.number;}
     if(row.status!=='pending_policy')throw new Error('finance_invoice_state');
@@ -224,13 +224,24 @@ export async function issueInvoice(db:CommerceDb,actor:bigint,invoiceId:bigint,s
       const allocation=source.suppliers.find(supplier=>supplier.productId===line.key);
       if(allocation ? line.supplierId!==allocation.supplierId||line.supplierMinor!==allocation.amountMinor : line.supplierId!==undefined||line.supplierMinor!==undefined)throw new Error('finance_supplier_snapshot_difference');
     }
+    // A caller-supplied gate is not policy authority. Select the policy approved
+    // and effective at the original receipt date, never at a later issue date.
+    // This validates an explicit fiscal snapshot; it does not infer tax basis.
+    const saleDate=new Date(row.created_at.getTime()+10800000).toISOString().slice(0,10);
+    const [policy]=await tx.$queryRaw<{id:bigint;request_id:bigint;issuer:unknown;vat_bps:number;policy_reference:string}[]>`
+      SELECT p.id,p.request_id,p.issuer,p.vat_bps,p.policy_reference FROM finance_tax_policies p
+      INNER JOIN finance_change_requests r ON r.id=p.request_id
+      WHERE r.kind='tax_settings' AND r.target_id='tax' AND r.status='approved'
+        AND p.effective_from<=${saleDate} AND p.created_at<=${row.created_at} AND r.decided_at<=${row.created_at}
+      ORDER BY p.effective_from DESC,p.id DESC LIMIT 1`;
+    if(!policy||policy.policy_reference!==snapshot.policyReference||fingerprint(financeJson(policy.issuer))!==fingerprint(snapshot.issuer)||snapshot.lines.some(line=>line.vatBps!==financeNumber(policy.vat_bps)))throw new Error('finance_issuance_not_approved');
     const series=`INV-${financeMonth(now).slice(0,4)}`;
     await tx.$executeRaw`INSERT INTO finance_sequences(name,next_value) VALUES(${series},1) ON DUPLICATE KEY UPDATE name=name`;
     const [sequence]=await tx.$queryRaw<{next_value:bigint}[]>`SELECT next_value FROM finance_sequences WHERE name=${series} FOR UPDATE`;
     const number=`${series}-${String(sequence.next_value).padStart(8,'0')}`;
     await tx.$executeRaw`UPDATE finance_sequences SET next_value=next_value+1 WHERE name=${series}`;
     await tx.$executeRaw`UPDATE finance_invoices SET status='issued',number=${number},issued_at=${now},net_minor=${snapshot.netMinor},vat_minor=${snapshot.vatMinor},snapshot=${JSON.stringify(snapshot)},reason='' WHERE id=${invoiceId} AND status='pending_policy'`;
-    await audit(tx,actor,'invoice_issued','invoice',String(invoiceId),'اعتماد اللقطة وفق سياسة جهة الإصدار',{before:row,after:{...row,status:'issued',number,issued_at:now,net_minor:snapshot.netMinor,vat_minor:snapshot.vatMinor,snapshot},policyReference:snapshot.policyReference},now);return number;
+    await audit(tx,actor,'invoice_issued','invoice',String(invoiceId),'اعتماد اللقطة وفق سياسة جهة الإصدار',{before:row,after:{...row,status:'issued',number,issued_at:now,net_minor:snapshot.netMinor,vat_minor:snapshot.vatMinor,snapshot},policyReference:snapshot.policyReference,policyId:String(policy.id),policyRequestId:String(policy.request_id)},now);return number;
   },options);
 }
 

@@ -127,6 +127,14 @@ function fiscal(id=1n):FiscalSnapshot {
   const calculated=calculateFiscalLines([{key:String(id),title:'Synthetic original product',quantity:1,unitNetMinor:10000,discountMinor:0,vatBps:1500,supplierId:'1',supplierMinor:7000}]);
   return {version:1,issuer:{name:'Synthetic fixture issuer',taxNumber:'300000000000003',address:'Fixture address'},customer:{name:'Synthetic customer',address:'Fixture address'},currency:'SAR',...calculated,paidMinor:11500,sourceOrderId:String(id),sourceReceiptId:String(id),policyReference:gate.approvedPolicyReference};
 }
+/** Synthetic approval predates every fixture sale; never seeds a live policy. */
+async function seedApprovedTaxPolicy(){
+  const approvedAt=new Date('2026-07-31T12:00:00Z');
+  const payload={effectiveFrom:'2026-08-01',issuer:fiscal().issuer,vatBps:1500,policyReference:gate.approvedPolicyReference};
+  await db.$executeRaw`INSERT INTO finance_change_requests(request_key,fingerprint,kind,target_id,payload,status,maker_id,checker_id,reason,approval_reason,created_at,decided_at) VALUES('fixture-initial-tax-approval',${'a'.repeat(64)},'tax_settings','tax',${JSON.stringify(payload)},'approved',${actor},${checker},'Synthetic initial policy','Synthetic independent approval',${approvedAt},${approvedAt})`;
+  const [request]=await db.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_change_requests WHERE request_key='fixture-initial-tax-approval'`;
+  await db.$executeRaw`INSERT INTO finance_tax_policies(request_id,effective_from,issuer,vat_bps,policy_reference,created_at) VALUES(${request.id},${payload.effectiveFrom},${JSON.stringify(payload.issuer)},${payload.vatBps},${payload.policyReference},${approvedAt})`;
+}
 function refund(externalId='fixture-refund-01',amountMinor=7000):VerifiedFinanceRefund {
   return {verified:true,status:'refunded',provider:'fixture',externalId,receiptId:'1',orderId:'1',amountMinor,currency:'SAR',refundedAt:at.toISOString(),evidenceRef:'fixture-confirmed-gateway-evidence'};
 }
@@ -186,6 +194,7 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     for(const table of supplierCleanup)await db.$executeRawUnsafe(`DELETE FROM ${table}`);
     for(const table of cleanupTables)await db.$executeRawUnsafe(`DELETE FROM ${table}`);
     await seedExplicitAccess();
+    await seedApprovedTaxPolicy();
     await db.$executeRaw`INSERT INTO commerce_suppliers(id,name) VALUES(1,'Synthetic supplier'),(2,'Other synthetic supplier')`;
   });
 
@@ -302,6 +311,51 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     expect(await count('finance_sequences')).toBe(0);
     expect((await readFinanceData(db)).invoices[0].status).toBe('pending_policy');
   });
+  it('rejects a fabricated policy reference or missing persisted policy even with an enabled caller gate',async()=>{
+    await seedOrder();const id=await capturedId(),before=await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${id}`;
+    await expect(issueInvoice(db,actor,id,{...fiscal(),policyReference:'invented-policy'},{enabled:true,approvedPolicyReference:'invented-policy'},at)).rejects.toThrow('finance_issuance_not_approved');
+    await db.$executeRaw`DELETE FROM finance_tax_policies`;
+    await expect(issueInvoice(db,actor,id,fiscal(),gate,at)).rejects.toThrow('finance_issuance_not_approved');
+    expect(await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${id}`).toEqual(before);
+    expect(await count('finance_sequences')).toBe(0);expect(await count('finance_audit')).toBe(1);
+  });
+  it.each(['pending','cancelled'])('rejects a persisted policy whose approval request is %s',async status=>{
+    await seedOrder();const id=await capturedId(),before=await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${id}`;
+    await db.$executeRaw`UPDATE finance_change_requests SET status=${status} WHERE request_key='fixture-initial-tax-approval'`;
+    await expect(issueInvoice(db,actor,id,fiscal(),gate,at)).rejects.toThrow('finance_issuance_not_approved');
+    expect(await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${id}`).toEqual(before);expect(await count('finance_sequences')).toBe(0);
+  });
+  it('rejects a policy that became effective only after the original sale, even during later issuance',async()=>{
+    await seedOrder();const id=await capturedId();
+    await db.$executeRaw`UPDATE finance_tax_policies SET effective_from='2026-09-01'`;
+    await expect(issueInvoice(db,actor,id,fiscal(),gate,later)).rejects.toThrow('finance_issuance_not_approved');
+    expect((await readFinanceData(db)).invoices[0].status).toBe('pending_policy');expect(await count('finance_sequences')).toBe(0);
+  });
+  it.each(['policy_creation','approval_decision'])('rejects a policy backdated to the sale with late %s',async lateField=>{
+    await seedOrder();const id=await capturedId();
+    if(lateField==='policy_creation')await db.$executeRaw`UPDATE finance_tax_policies SET created_at=${later}`;
+    else await db.$executeRaw`UPDATE finance_change_requests SET decided_at=${later} WHERE request_key='fixture-initial-tax-approval'`;
+    await expect(issueInvoice(db,actor,id,fiscal(),gate,later)).rejects.toThrow('finance_issuance_not_approved');
+    expect((await readFinanceData(db)).invoices[0].status).toBe('pending_policy');expect(await count('finance_sequences')).toBe(0);
+  });
+  it('rejects a different issuer or an exact total calculated with an unapproved rate without consuming a number',async()=>{
+    await seedOrder();const id=await capturedId(),before=await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${id}`;
+    const changedIssuer={...fiscal(),issuer:{...fiscal().issuer,address:'Unapproved address'}};
+    const changedRate={...fiscal(),...calculateFiscalLines([{...fiscal().lines[0],vatBps:500,unitNetMinor:10952}])};
+    expect(changedRate.totalMinor).toBe(11500);
+    for(const snapshot of [changedIssuer,changedRate])await expect(issueInvoice(db,actor,id,snapshot,gate,at)).rejects.toThrow('finance_issuance_not_approved');
+    expect(await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${id}`).toEqual(before);expect(await count('finance_sequences')).toBe(0);
+  });
+  it('requires the latest approved policy effective at sale and records its persisted authority',async()=>{
+    const approvalAt=new Date('2026-08-09T12:00:00Z'),reference='fixture-new-effective-policy';
+    const requestId=await requestFinanceChange(db,actor,{kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:'2026-08-10',issuer:fiscal().issuer,vatBps:1500,policyReference:reference},reason:'Synthetic prospective replacement',requestKey:'fixture-replacement-tax'},approvalAt);
+    const approval=await approveFinanceChange(db,checker,requestId,'Synthetic independent review',approvalAt);
+    await seedOrder();const id=await capturedId();
+    await expect(issueInvoice(db,actor,id,fiscal(),gate,at)).rejects.toThrow('finance_issuance_not_approved');
+    expect(await issueInvoice(db,actor,id,{...fiscal(),policyReference:reference},{enabled:true,approvedPolicyReference:reference},at)).toBe('INV-2026-00000001');
+    const audit=(await readFinanceData(db)).audit.find(row=>row.action==='invoice_issued');
+    expect(audit?.payload).toMatchObject({policyId:approval?.policyId,policyRequestId:String(requestId),policyReference:reference});
+  });
   it('rejects missing or mismatched supplier allocation without issuing or consuming a number',async()=>{
     await seedOrder();const id=await capturedId();const before=await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${id}`;
     for(const allocation of [{supplierId:undefined,supplierMinor:undefined},{supplierId:'2',supplierMinor:7000},{supplierId:'1',supplierMinor:6999}]){
@@ -325,6 +379,9 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
   });
   it('issues a prior-month receipt only while both periods are open and retains its accounting date',async()=>{
     await seedOrder();const id=await capturedId();
+    const policyAt=new Date('2026-08-16T12:00:00Z');
+    const requestId=await requestFinanceChange(db,actor,{kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:'2026-09-01',issuer:fiscal().issuer,vatBps:500,policyReference:'fixture-policy-after-sale'},reason:'Synthetic future policy',requestKey:'fixture-late-issue-policy'},policyAt);
+    await approveFinanceChange(db,checker,requestId,'Synthetic independent review',policyAt);
     expect(await issueInvoice(db,actor,id,fiscal(),gate,later)).toBe('INV-2026-00000001');
     const [row]=await db.$queryRaw<{created_at:Date;issued_at:Date}[]>`SELECT created_at,issued_at FROM finance_invoices WHERE id=${id}`;
     expect(row).toEqual({created_at:at,issued_at:later});
@@ -546,7 +603,7 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     const invoice=await issuedOrder(),before=await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${invoice}`;
     const input=returnInput(invoice);
     const ids=await Promise.all([requestFinanceChange(db,actor,input,at),requestFinanceChange(peer,actor,input,at)]);
-    expect(ids[0]).toBe(ids[1]);expect(await count('finance_change_requests')).toBe(1);
+    expect(ids[0]).toBe(ids[1]);expect(await count('finance_change_requests')).toBe(2); // Initial policy plus this return.
     expect(await count('finance_invoices')).toBe(1);
     await expect(approveFinanceChange(db,actor,ids[0],'Maker cannot approve',at)).rejects.toThrow('finance_independent_checker_required');
     const results=await Promise.all([approveFinanceChange(db,checker,ids[0],'Independent review',at),approveFinanceChange(peer,checker,ids[0],'Independent review',at)]);
@@ -565,8 +622,8 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     const failure=results.find(result=>result.status==='rejected');
     expect(failure?.status==='rejected'?String(failure.reason):'').toContain('finance_note_exceeds_original');
     expect(await count('finance_invoices')).toBe(2);
-    expect((await readFinanceData(db)).requests?.filter(row=>row.status==='approved')).toHaveLength(1);
-    expect((await readFinanceData(db)).requests?.filter(row=>row.status==='pending')).toHaveLength(1);
+    expect((await readFinanceData(db)).requests?.filter(row=>row.kind==='return'&&row.status==='approved')).toHaveLength(1);
+    expect((await readFinanceData(db)).requests?.filter(row=>row.kind==='return'&&row.status==='pending')).toHaveLength(1);
     expect((await report('2026-08',at)).suppliers.find(row=>row.id==='1')?.remainingMinor).toBe(0);
   });
   it('checks return approval grants again after request creation and permits cancellation without deleting history',async()=>{
@@ -583,7 +640,7 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
   });
   it('rolls back return request, cancellation and approval plus credit numbering if audit storage fails',async()=>{
     const invoice=await issuedOrder();
-    await failAudit(()=>requestFinanceChange(db,actor,returnInput(invoice),at));expect(await count('finance_change_requests')).toBe(0);
+    await failAudit(()=>requestFinanceChange(db,actor,returnInput(invoice),at));expect(await count('finance_change_requests')).toBe(1); // Initial policy survives.
     const requestId=await requestFinanceChange(db,actor,returnInput(invoice),at);
     const pending=await db.$queryRaw`SELECT * FROM finance_change_requests WHERE id=${requestId}`;
     await failAudit(()=>cancelFinanceChange(db,actor,requestId,'Audit unavailable',at));
@@ -598,13 +655,13 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     const input={kind:'tax_settings' as const,targetId:'tax',payload:{effectiveFrom:'2026-10-01',issuer:fiscal().issuer,vatBps:500,policyReference:'fixture-future-tax'},reason:'Future fixture policy approved offline',requestKey:'fixture-tax-01'};
     await expect(requestFinanceChange(db,73n,input,at)).rejects.toThrow('access_forbidden');
     const id=await requestFinanceChange(db,actor,input,at);
-    expect(await count('finance_tax_policies')).toBe(0);
+    expect(await count('finance_tax_policies')).toBe(1);
     await expect(approveFinanceChange(db,actor,id,'Maker rejected',at)).rejects.toThrow('finance_independent_checker_required');
-    await failAudit(()=>approveFinanceChange(db,checker,id,'Audit unavailable',at));expect(await count('finance_tax_policies')).toBe(0);
+    await failAudit(()=>approveFinanceChange(db,checker,id,'Audit unavailable',at));expect(await count('finance_tax_policies')).toBe(1);
     const result=await approveFinanceChange(db,checker,id,'Policy reviewed',at);
-    expect(result?.policyId).toMatch(/^\d+$/);expect(await count('finance_tax_policies')).toBe(1);
+    expect(result?.policyId).toMatch(/^\d+$/);expect(await count('finance_tax_policies')).toBe(2);
     expect(await approveFinanceChange(peer,checker,id,'Policy reviewed',at)).toEqual(result);
-    expect((await readFinanceData(db)).taxPolicies?.[0]).toMatchObject({effectiveFrom:'2026-10-01',vatBps:500,policyReference:'fixture-future-tax'});
+    expect((await readFinanceData(db)).taxPolicies?.find(policy=>policy.policyReference==='fixture-future-tax')).toMatchObject({effectiveFrom:'2026-10-01',vatBps:500,policyReference:'fixture-future-tax'});
     expect(await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${invoice}`).toEqual(before);
   });
   it('reopens an exact closed-period version only with a second approver and rejects stale requests',async()=>{

@@ -50,6 +50,11 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const imported = items.length ? await importedCjPids(items.map((p) => p.pid)) : new Set<string>();
   const detail = detailPid ? await sampleOneCjProduct(detailPid) : null;
+  // ترجمة حقول لوحة التفاصيل (اسم/تصنيف/أسماء المتغيّرات) — عند الطلب ومخزَّنة.
+  const detailAr = detail && detail.ok
+    ? await translateManyCached([detail.data.name, detail.data.category ?? '', ...detail.data.variants.map((v) => v.name ?? '')], 20)
+    : new Map<string, string>();
+  const arOf = (t: string | null | undefined) => (t ? detailAr.get(t) ?? t : '—');
   const importedList = await listCjProducts(60);
   const salePreview = (u: number | null) => (u != null && u > 0 ? computePrice(Math.round(u * settings.usdToSarX100), settings.shippingMinor, 0, marginBps).salePriceMinor : null);
   const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}${wantAr ? '' : '&ar=0'}`;
@@ -153,17 +158,26 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
         <div id="cj-detail" className={`${card} scroll-mt-20 ring-2 ring-primary/30`}>
           <div className="flex items-center justify-between"><h2 className="font-bold">تفاصيل المنتج · {detailPid}</h2><Link href={backHref} className={ghost}>إغلاق</Link></div>
           {detail && detail.ok ? (
-            <div className="space-y-2 text-sm">
-              <div className="font-bold">{detail.data.name}</div>
+            <div className="space-y-3 text-sm">
+              <div className="font-bold leading-6">{arOf(detail.data.name)}</div>
               <div className="flex flex-wrap gap-1">{detail.data.images.slice(0, 6).map((src, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img key={i} src={src} alt="" className="h-16 w-16 rounded object-cover" loading="lazy" />
               ))}</div>
-              <div className="text-xs text-muted-foreground">التصنيف: {detail.data.category || '—'} · سعر CJ: {usd(detail.data.priceUsd)} · إجمالي المخزون (عيّنة): {detail.data.totalStock}</div>
-              <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-right text-xs"><thead className="bg-primary/5"><tr>{['المتغيّر', 'SKU', 'سعر $', 'وزن(غ)', 'مخزون'].map((h) => <th key={h} className="p-2">{h}</th>)}</tr></thead><tbody>
-                {detail.data.variants.map((v) => <tr key={v.vid} className="border-t"><td className="p-2">{v.name || '—'}</td><td className="p-2" dir="ltr">{v.sku}</td><td className="p-2">{usd(v.priceUsd)}</td><td className="p-2">{v.weight ?? '—'}</td><td className="p-2">{v.stock ?? '—'}</td></tr>)}
-                {!detail.data.variants.length && <tr><td colSpan={5} className="p-3 text-center text-muted-foreground">لا متغيّرات.</td></tr>}
-              </tbody></table></div>
+              {/* أهم الحقائق بوضوح */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">سعر البيع (بعد التحويل)</div><div className="text-base font-extrabold text-primary">{sar(salePreview(detail.data.priceUsd))}</div></div>
+                <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">الشحن التقديري</div><div className="font-bold">{sar(settings.shippingMinor)}</div></div>
+                <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">سعر CJ</div><div className="font-bold">{usd(detail.data.priceUsd)}</div></div>
+                <div className="rounded-lg bg-primary/5 p-2 col-span-2"><div className="text-[11px] text-muted-foreground">التصنيف الجديد</div><div className="font-bold">{arOf(detail.data.category)}</div></div>
+                <div className="rounded-lg bg-primary/5 p-2"><div className="text-[11px] text-muted-foreground">المخزون (عيّنة)</div><div className="font-bold">{detail.data.totalStock.toLocaleString('en')}</div></div>
+              </div>
+              {/* المتغيّرات — مبسّطة ومترجمة */}
+              {detail.data.variants.length > 0 && (
+                <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-right text-xs"><thead className="bg-primary/5"><tr>{['المتغيّر', 'سعر البيع', 'الوزن(غ)', 'المخزون'].map((h) => <th key={h} className="p-2">{h}</th>)}</tr></thead><tbody>
+                  {detail.data.variants.map((v) => <tr key={v.vid} className="border-t"><td className="p-2">{arOf(v.name)}</td><td className="p-2 font-bold text-primary">{sar(salePreview(v.priceUsd))}</td><td className="p-2">{v.weight ?? '—'}</td><td className="p-2">{v.stock ?? '—'}</td></tr>)}
+                </tbody></table></div>
+              )}
             </div>
           ) : <p className="text-sm text-red-700">تعذّر جلب التفاصيل{detail && !detail.ok ? `: ${detail.error}` : ''}.</p>}
         </div>

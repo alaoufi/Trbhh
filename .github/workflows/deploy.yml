@@ -1,72 +1,151 @@
 name: نشر تربح على Hostinger VPS
 
-# نشر تلقائي: عند كل دفع للفرع، يتّصل GitHub بالخادم عبر SSH ويسحب أحدث الكود
-# ويعيد بناء خدمة app في docker compose. يدوياً أيضاً عبر Run workflow.
 on:
   push:
-    branches:
-      - claude/hostinger-vps-project-amw8vb
-    # سجلّ مراقب الأخطاء (ops/) دفتر متابعة فقط — تحديثه لا يستدعي إعادة نشر
-    paths-ignore:
-      - 'ops/**'
+    branches: [claude/hostinger-vps-project-amw8vb]
+    paths-ignore: ['ops/**']
   workflow_dispatch:
 
-# لا تشغّل نشرين متوازيين على نفس الخادم
+permissions:
+  contents: read
+  actions: read
+
 concurrency:
   group: vps-deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb'
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     steps:
-      - name: النشر عبر SSH
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Require successful CI and baseline upgrade on this exact revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          cat > "$RUNNER_TEMP/deployment-gate.cjs" <<'NODE'
+          // GATE_POLICY_BEGIN
+          function gate(runs, sha) {
+            const latest = runs.filter(run => run.head_sha === sha).sort((a, b) => b.id - a.id)[0];
+            if (!latest || latest.status !== 'completed') return 'pending';
+            return latest.conclusion === 'success' ? 'success' : 'failed';
+          }
+          // GATE_POLICY_END
+          const fs = require('node:fs');
+          process.stdout.write(gate(JSON.parse(fs.readFileSync(process.argv[2])).workflow_runs, process.argv[3]));
+          NODE
+          deadline=$((SECONDS + 2700))
+          while (( SECONDS < deadline )); do
+            ready=1
+            for workflow in ci.yml release-upgrade-check.yml; do
+              timeout 25s gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$GITHUB_SHA&per_page=100" > "$RUNNER_TEMP/gate-runs.json"
+              state=$(node "$RUNNER_TEMP/deployment-gate.cjs" "$RUNNER_TEMP/gate-runs.json" "$GITHUB_SHA")
+              if [[ "$state" == failed ]]; then echo "Required workflow $workflow did not succeed for $GITHUB_SHA."; exit 1; fi
+              if [[ "$state" != success ]]; then ready=0; fi
+            done
+            if [[ "$ready" == 1 ]]; then echo "Both required workflows succeeded for $GITHUB_SHA."; exit 0; fi
+            sleep 30
+          done
+          echo 'Exact-revision check deadline exceeded.'
+          exit 1
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Build and test the release verification tools
+        env:
+          DATABASE_URL: mysql://build:build@127.0.0.1:3306/build_only
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          node scripts/release/build-finance-schema-check.cjs "$RUNNER_TEMP/finance-schema-check.cjs"
+          node --test scripts/release/*.test.cjs
+          bash -n scripts/release/finance-backup.sh scripts/release/finance-deploy.sh scripts/release/finance-capture-job.sh
+      - name: Upload private release tools using pinned SSH host keys
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
-          # المفتاح الخاص كنص خام متعدد الأسطر (يُلصق كما هو — بلا أي ترميز يعرّضه للتلف)
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
-          set -e
-          if [ -z "$VPS_SSH_KEY" ]; then
-            echo "❌ السرّ VPS_SSH_KEY غير موجود — أضِفه في إعدادات الأسرار."
-            exit 1
-          fi
-          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
-            echo "❌ VPS_HOST أو VPS_USER غير مضبوط."
-            exit 1
-          fi
-          mkdir -p ~/.ssh
-          test -n "$VPS_KNOWN_HOSTS"
-          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          # نزيل أحرف \r فقط (قد تتسرّب من لوحات مفاتيح الجوال) مع إبقاء الأسطر كما هي
-          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          if ! grep -q "PRIVATE KEY" ~/.ssh/deploy_key; then
-            echo "❌ المفتاح غير صالح — تأكد أن قيمة VPS_SSH_KEY لصقت كاملة بأسطرها (تبدأ بـ BEGIN OPENSSH PRIVATE KEY وتنتهي بـ END OPENSSH PRIVATE KEY)."
-            exit 1
-          fi
-          PORT="${VPS_PORT:-22}"
-          echo "🔗 الاتصال بـ $VPS_USER@$VPS_HOST:$PORT ..."
-          REMOTE_CMD="set -e; cd /root/trbhh && git fetch origin claude/hostinger-vps-project-amw8vb && git reset --hard origin/claude/hostinger-vps-project-amw8vb && docker compose up -d --build app && docker compose ps"
-          # اتصال SSH بالخادم متقطّع أحياناً (Connection timed out) — نعيد المحاولة تلقائياً
-          # حتى ٥ مرات بتراجع تصاعدي بدل فشل النشر على أول انقطاع عابر.
-          n=0
-          until [ "$n" -ge 5 ]; do
-            if ssh -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts \
-                 -o ConnectTimeout=25 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
-                 -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" "$REMOTE_CMD"; then
-              echo "✅ تم النشر."
-              exit 0
-            fi
-            n=$((n + 1))
-            if [ "$n" -lt 5 ]; then
-              wait=$((n * 20))
-              echo "⚠️ تعذّر الاتصال (محاولة $n/5) — إعادة بعد ${wait}s ..."
-              sleep "$wait"
-            fi
-          done
-          echo "❌ فشل الاتصال بالخادم بعد ٥ محاولات — الخادم لا يستجيب لـ SSH حالياً."
-          exit 1
+          set +x +v
+          set -euo pipefail
+          umask 077
+          [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]{0,19}$ && "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ && "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          port=${VPS_PORT:-22}
+          [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
+          [[ -n "$VPS_SSH_KEY" && -n "$VPS_KNOWN_HOSTS" ]]
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$RUNNER_TEMP/finance-ssh-key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/finance-known-hosts"
+          cat > "$RUNNER_TEMP/finance-ssh-config" <<CONFIG
+          Host trbhh-release
+            HostName $VPS_HOST
+            User $VPS_USER
+            Port $port
+            IdentityFile $RUNNER_TEMP/finance-ssh-key
+            UserKnownHostsFile $RUNNER_TEMP/finance-known-hosts
+            StrictHostKeyChecking=yes
+            IdentitiesOnly=yes
+            BatchMode=yes
+            ConnectTimeout=25
+            ServerAliveInterval=15
+            ServerAliveCountMax=4
+          CONFIG
+          chmod 600 "$RUNNER_TEMP/finance-ssh-key" "$RUNNER_TEMP/finance-known-hosts" "$RUNNER_TEMP/finance-ssh-config"
+          ssh -F "$RUNNER_TEMP/finance-ssh-config" trbhh-release "set -eu; umask 077; test ! -L /root/trbhh-release-tools; mkdir -p /root/trbhh-release-tools; chmod 700 /root/trbhh-release-tools; test ! -e /root/trbhh-release-tools/$GITHUB_RUN_ID; mkdir -m 700 /root/trbhh-release-tools/$GITHUB_RUN_ID"
+          scp -F "$RUNNER_TEMP/finance-ssh-config" \
+            scripts/release/finance-deploy.sh scripts/release/finance-backup.sh \
+            scripts/release/database-proof.cjs scripts/release/media-proof.cjs \
+            scripts/release/backup-capacity-proof.cjs scripts/release/supplier-preservation-proof.cjs \
+            scripts/release/verify-runtime.cjs scripts/release/finance-capture-job.sh \
+            "$RUNNER_TEMP/finance-schema-check.cjs" "trbhh-release:/root/trbhh-release-tools/$GITHUB_RUN_ID/"
+      - name: Back up, restore-test, and cut over the exact candidate
+        id: cutover
+        run: |
+          set -euo pipefail
+          echo 'attempted=true' >> "$GITHUB_OUTPUT"
+          ssh -F "$RUNNER_TEMP/finance-ssh-config" trbhh-release "bash '/root/trbhh-release-tools/$GITHUB_RUN_ID/finance-deploy.sh' deploy '$GITHUB_RUN_ID' '$GITHUB_SHA'"
+      - name: Verify public HTTPS revision and unauthenticated protection
+        run: |
+          node <<'NODE'
+          (async () => {
+            const request = (url, init = {}) => fetch(url, {cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(15000), ...init, headers: {'Cache-Control': 'no-cache, no-store'}});
+            const version = await request('https://trbhh.sa/api/version?verification=' + process.env.GITHUB_RUN_ID);
+            if (version.status !== 200 || !(version.headers.get('cache-control') || '').includes('no-store') || (await version.json()).commit !== process.env.GITHUB_SHA) throw Error('public_revision');
+            const home = await request('https://trbhh.sa/');
+            if (home.status !== 200 || (await home.text()).length < 100) throw Error('public_home');
+            const month = new Date().toISOString().slice(0, 7);
+            for (const route of ['/admin/finance', '/admin/access-control', '/admin/finance/export?format=print&section=tax&month=' + month]) {
+              const response = await request('https://trbhh.sa' + route);
+              if ([401, 403].includes(response.status)) continue;
+              if (![301, 302, 303, 307, 308].includes(response.status) || !response.headers.get('location')) throw Error('public_access');
+              const login = new URL(response.headers.get('location'), 'https://trbhh.sa');
+              if (login.origin !== 'https://trbhh.sa' || !['/login', '/account/login'].includes(login.pathname)) throw Error('public_access');
+            }
+            const capture = await request('https://trbhh.sa/api/internal/finance/capture', {method: 'POST'});
+            if (capture.status !== 401) throw Error('public_capture_auth');
+            console.log('Public revision, homepage, protected admin routes, and capture authentication verified.');
+          })().catch(() => {console.error('Public verification failed; response bodies withheld.'); process.exit(1);});
+          NODE
+      - name: Finalize preservation proofs and enable receipt capture
+        id: finalize
+        run: |
+          set -euo pipefail
+          ssh -F "$RUNNER_TEMP/finance-ssh-config" trbhh-release "bash '/root/trbhh-release-tools/$GITHUB_RUN_ID/finance-deploy.sh' finalize '$GITHUB_RUN_ID' '$GITHUB_SHA'"
+      - name: Recover the saved application image on failed verification
+        if: ${{ !cancelled() && failure() && steps.cutover.outputs.attempted == 'true' && steps.finalize.outcome != 'success' }}
+        run: |
+          ssh -F "$RUNNER_TEMP/finance-ssh-config" trbhh-release "bash '/root/trbhh-release-tools/$GITHUB_RUN_ID/finance-deploy.sh' rollback '$GITHUB_RUN_ID' '$GITHUB_SHA'"
+      - name: Remove runner SSH credentials
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/finance-ssh-key" "$RUNNER_TEMP/finance-known-hosts" "$RUNNER_TEMP/finance-ssh-config"

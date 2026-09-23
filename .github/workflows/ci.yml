@@ -57,6 +57,13 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Release backup and rollback safeguards
+        run: |
+          node --test scripts/release/*.test.cjs
+          bash -n scripts/release/finance-backup.sh
+          bash -n scripts/release/finance-deploy.sh
+          bash -n scripts/release/finance-capture-job.sh
+
       - name: Authentication transactions on isolated MySQL
         if: ${{ !cancelled() }}
         run: pnpm exec vitest run tests/integration/auth-mysql.test.ts --maxWorkers=1

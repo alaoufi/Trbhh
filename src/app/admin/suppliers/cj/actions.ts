@@ -6,6 +6,7 @@ import { setDefaultMarginBps } from '@/lib/cj/pricing';
 import { saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync';
 import { importCjProductByPid } from '@/lib/cj/import';
 import { removeCjProductById } from '@/lib/cj/mapping';
+import { addCjProductsToShortlist, updateCjShortlistStatus, removeCjShortlistItem } from '@/lib/cj/shortlist';
 
 /** حفظ الهامش الافتراضي (٪) — للمشرف فقط. لا شراء ولا اتصال بمورّد هنا. */
 export async function saveCjMargin(form: FormData) {
@@ -67,4 +68,39 @@ export async function removeCjProduct(form: FormData) {
   revalidatePath('/admin/suppliers/cj/browse');
   const sep = back.includes('?') ? '&' : '?';
   redirect(`${back}${sep}removed=1`);
+}
+
+
+/** إضافة مجموعة منتجات مختارة إلى قائمة التفاوض — لا استيراد عام ولا نشر. */
+export async function addCjShortlistSelection(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const back = String(form.get('back') || '/admin/suppliers/cj/browse');
+  const pids = form.getAll('pid').map((v) => String(v));
+  const result = await addCjProductsToShortlist(pids);
+  revalidatePath('/admin/suppliers/cj/browse');
+  const sep = back.includes('?') ? '&' : '?';
+  redirect(`${back}${sep}shortlisted=${result.added}&shortlistFailed=${result.failed}`);
+}
+
+/** تغيير مرحلة المنتج داخل قائمة الاختيار/التفاوض فقط. */
+export async function setCjShortlistStatus(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const idRaw = String(form.get('id') || '');
+  const status = String(form.get('status') || '');
+  const back = String(form.get('back') || '/admin/suppliers/cj/browse');
+  if (/^[1-9]\d{0,18}$/.test(idRaw)) await updateCjShortlistStatus(BigInt(idRaw), status);
+  revalidatePath('/admin/suppliers/cj/browse');
+  const sep = back.includes('?') ? '&' : '?';
+  redirect(`${back}${sep}statusUpdated=1`);
+}
+
+/** إزالة عنصر من قائمة التفاوض دون حذف أي منتج مستورد أو منشور. */
+export async function removeCjShortlistSelection(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const idRaw = String(form.get('id') || '');
+  const back = String(form.get('back') || '/admin/suppliers/cj/browse');
+  if (/^[1-9]\d{0,18}$/.test(idRaw)) await removeCjShortlistItem(BigInt(idRaw));
+  revalidatePath('/admin/suppliers/cj/browse');
+  const sep = back.includes('?') ? '&' : '?';
+  redirect(`${back}${sep}shortlistRemoved=1`);
 }

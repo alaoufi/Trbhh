@@ -12,7 +12,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [inspect, cache-audit, cache-cleanup]
+        options: [inspect, diagnose-backup, cache-audit, cache-cleanup]
         default: inspect
         required: true
       baseline_sha:
@@ -35,7 +35,7 @@ jobs:
           persist-credentials: false
       - name: Verify bounded cache operation tools
         run: |
-          node --test scripts/release/finance-cache.test.cjs
+          node --test scripts/release/finance-cache.test.cjs scripts/release/finance-backup-diagnose.test.cjs
           bash -n scripts/release/finance-cache.sh
       - name: Inspect production or run the selected guarded cache operation
         env:
@@ -49,9 +49,9 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          [[ "$PHASE" =~ ^(inspect|cache-audit|cache-cleanup)$ ]]
+          [[ "$PHASE" =~ ^(inspect|diagnose-backup|cache-audit|cache-cleanup)$ ]]
           [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
-          if [[ "$PHASE" != inspect ]]; then [[ "$BASELINE_SHA" =~ ^[0-9a-f]{40}$ ]]; fi
+          if [[ "$PHASE" == cache-* ]]; then [[ "$BASELINE_SHA" =~ ^[0-9a-f]{40}$ ]]; fi
           test -n "$VPS_HOST"; test -n "$VPS_USER"; test -n "$VPS_SSH_KEY"; test -n "$VPS_KNOWN_HOSTS"
           [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ && "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
           mkdir -p ~/.ssh
@@ -60,6 +60,10 @@ jobs:
           port=${VPS_PORT:-22}; [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
           SSH=(ssh -i ~/.ssh/finance_key -p "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=25 -o ServerAliveInterval=15)
           target="$VPS_USER@$VPS_HOST"
+          if [[ "$PHASE" == diagnose-backup ]]; then
+            "${SSH[@]}" "$target" 'node -' < scripts/release/finance-backup-diagnose.cjs
+            exit 0
+          fi
           if [[ "$PHASE" != inspect ]]; then
             "${SSH[@]}" "$target" "bash -s -- '$PHASE' '$GITHUB_RUN_ID' '$BASELINE_SHA'" < scripts/release/finance-cache.sh
             exit 0

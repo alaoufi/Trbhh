@@ -60,5 +60,5 @@ test('cleanup is explicit, bounded, age-filtered and isolated from deploy',()=>{
   const source=read();assert.match(source,/exec 9> \/run\/lock\/trbhh-finance-deploy.lock/);assert.match(source,/ACTIVE_DEPLOYMENT/);
   assert.match(source,/if \[\[ "\$mode" == cache-cleanup \]\]; then[\s\S]*?timeout 600s docker builder prune --all --force --filter until=24h/);
   assert.doesNotMatch(source,/docker (?:system|image|container|volume|network) prune|docker (?:rm|rmi)|\brm\s|compose (?:up|down|restart|stop)|git (?:reset|switch|checkout)|finance-backup.sh/);
-  const workflow=fs.readFileSync(path.join(__dirname,'../../.github/workflows/finance-release.yml'),'utf8');assert.match(workflow,/options: \[inspect, cache-audit, cache-cleanup\]/);assert.match(workflow,/group: vps-deploy/);assert.match(workflow,/baseline_sha/);assert.match(workflow,/finance-cache.test.cjs/);
+  const workflow=fs.readFileSync(path.join(__dirname,'../../.github/workflows/finance-release.yml'),'utf8');assert.match(workflow,/options: \[inspect, diagnose-backup, cache-audit, cache-cleanup\]/);assert.match(workflow,/group: vps-deploy/);assert.match(workflow,/baseline_sha/);assert.match(workflow,/finance-cache.test.cjs/);
 });

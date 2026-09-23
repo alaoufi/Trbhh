@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import { getSetting, setSetting } from '@/lib/settings';
 
 /**
@@ -107,14 +108,44 @@ export async function unassignProductAgent(productId: number): Promise<void> {
 
 export type ClaimResult = { ok: true } | { ok: false; error: 'not_agent' | 'quota_full' | 'taken' | 'not_found' };
 
+/** Serializes quota checks with other claims and administrative agent deactivation. */
+async function lockAgent(tx: Prisma.TransactionClient, uid: bigint) {
+  const [agent] = await tx.$queryRaw<Pick<CjAgent, 'user_id' | 'active' | 'weekly_quota'>[]>`SELECT user_id,active,weekly_quota FROM cj_agents WHERE user_id=${uid} FOR UPDATE`;
+  return agent?.active === 1 ? agent : null;
+}
+
 /** اختيار الوكيل لسلعة ضمن حصّته الأسبوعية (لا يأخذ سلعة لها وكيل آخر). */
 export async function claimProduct(userId: number | bigint, productId: number): Promise<ClaimResult> {
-  if (!Number.isInteger(productId) || productId <= 0) return { ok: false, error: 'not_found' };
-  if (!(await isActiveAgent(userId))) return { ok: false, error: 'not_agent' };
-  if ((await remainingWeeklyQuota(userId)) <= 0) return { ok: false, error: 'quota_full' };
-  const row = await prisma.cj_products.findUnique({ where: { id: BigInt(productId) }, select: { agent_user_id: true } }).catch(() => null);
-  if (!row) return { ok: false, error: 'not_found' };
-  if (row.agent_user_id && row.agent_user_id !== bid(userId)) return { ok: false, error: 'taken' };
-  await prisma.cj_products.update({ where: { id: BigInt(productId) }, data: { agent_user_id: bid(userId), agent_claimed_at: new Date() } }).catch(() => {});
-  return { ok: true };
+  if (!Number.isSafeInteger(productId) || productId <= 0) return { ok: false, error: 'not_found' };
+  const uid = bid(userId), id = BigInt(productId);
+  return prisma.$transaction(async tx => {
+    const agent = await lockAgent(tx, uid);
+    if (!agent) return { ok: false, error: 'not_agent' };
+    const row = await tx.cj_products.findUnique({ where: { id }, select: { agent_user_id: true, status: true, hidden: true, image: true } });
+    if (!row) return { ok: false, error: 'not_found' };
+    if (row.agent_user_id === uid) return { ok: true }; // Repeated request must not reset the claim date.
+    if (row.agent_user_id !== null) return { ok: false, error: 'taken' };
+    if (row.status !== 'ready' || row.hidden !== 0 || !row.image) return { ok: false, error: 'not_found' };
+    const used = await tx.cj_products.count({ where: { agent_user_id: uid, agent_claimed_at: { gte: weekStart() } } });
+    if (used >= agent.weekly_quota) return { ok: false, error: 'quota_full' };
+    const changed = await tx.cj_products.updateMany({ where: { id, agent_user_id: null, status: 'ready', hidden: 0, NOT: { image: '' } }, data: { agent_user_id: uid, agent_claimed_at: new Date() } });
+    return changed.count === 1 ? { ok: true } : { ok: false, error: 'taken' };
+  }, { isolationLevel: 'ReadCommitted', maxWait: 10000, timeout: 15000 });
+}
+
+/** The owner predicate is checked at the write, including after a concurrent reassignment. */
+export async function releaseProduct(userId: number | bigint, productId: number): Promise<{ ok: true } | { ok: false; error: 'not_agent' | 'not_yours' }> {
+  if (!Number.isSafeInteger(productId) || productId <= 0) return { ok: false, error: 'not_yours' };
+  const uid = bid(userId);
+  return prisma.$transaction(async tx => {
+    if (!await lockAgent(tx, uid)) return { ok: false, error: 'not_agent' };
+    const changed = await tx.cj_products.updateMany({ where: { id: BigInt(productId), agent_user_id: uid }, data: { agent_user_id: null, agent_claimed_at: null } });
+    return changed.count === 1 ? { ok: true } : { ok: false, error: 'not_yours' };
+  }, { isolationLevel: 'ReadCommitted', maxWait: 10000, timeout: 15000 });
+}
+
+/** A stale contact form must not restore activation, quota, or administrative notes. */
+export async function updateAgentContact(userId: number | bigint, phone: string, whatsapp: string): Promise<boolean> {
+  const changed = await prisma.cj_agents.updateMany({ where: { user_id: bid(userId), active: 1 }, data: { phone: phone.trim().slice(0, 40), whatsapp: whatsapp.trim().slice(0, 40) } });
+  return changed.count === 1;
 }

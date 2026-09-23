@@ -4,8 +4,8 @@ import { ShoppingCart, CreditCard, Truck, Heart, Star, RotateCcw, Lock, Phone, M
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
-import { hasAnyAdmin } from '@/lib/roles';
-import { isActiveAgent, getAgent, agentContactLinks } from '@/lib/cj/agents';
+import { cjProductCapabilities } from '@/lib/cj/access';
+import { getAgent, agentContactLinks } from '@/lib/cj/agents';
 import { cjProductOrderCount } from '@/lib/cj/mapping';
 import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '../../admin/suppliers/cj/actions';
 
@@ -66,12 +66,11 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       if (gallery.length) await setCjProductGallery(id, gallery);
     }
   }
-  // صلاحية الإدارة: الإدارة (integrations:manage_settings) أو وكيل السلعة النشط.
+  // صلاحيات التعديل والإخفاء والحذف مستقلة، أو وكالة نشطة لهذه السلعة فقط.
   const session = await getSession();
-  const isAdmin = session ? await hasAnyAdmin(session.uid) : false;
-  const isProductAgent = !!(session && p.agent_user_id != null && p.agent_user_id === BigInt(session.uid) && (await isActiveAgent(session.uid)));
-  const canManage = isAdmin || isProductAgent;
-  const hasActivity = canManage ? (await cjProductOrderCount(p.cj_product_id)) > 0 : false;
+  const capabilities = session ? await cjProductCapabilities(session.uid, p.agent_user_id) : { agent: false, edit: false, suspend: false, delete: false };
+  const canManage = capabilities.edit || capabilities.suspend || capabilities.delete;
+  const hasActivity = capabilities.delete ? (await cjProductOrderCount(p.cj_product_id)) > 0 : false;
   // تواصل وكيل السلعة (واتساب/اتصال) — يظهر للعميل دون كتابة الرقم علناً، والمورد يبقى مخفياً.
   const productAgent = p.agent_user_id != null ? await getAgent(p.agent_user_id) : null;
   const agentContact = productAgent && productAgent.active === 1 ? agentContactLinks(productAgent) : null;
@@ -97,15 +96,15 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       {canManage && (
         <div className="card-3d rounded-2xl p-3 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-bold text-primary">إدارة السلعة{isProductAgent && !isAdmin ? ' (وكيلها)' : ''}:</span>
+            <span className="text-sm font-bold text-primary">إدارة السلعة{capabilities.agent ? ' (وكيلها)' : ''}:</span>
             {/* إخفاء/إظهار */}
-            <form action={hideCjStorefront}><input type="hidden" name="id" value={id} /><input type="hidden" name="hidden" value={p.hidden ? '0' : '1'} /><button className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">{p.hidden ? 'إظهار' : 'إخفاء'}</button></form>
+            {capabilities.suspend && <form action={hideCjStorefront}><input type="hidden" name="id" value={id} /><input type="hidden" name="hidden" value={p.hidden ? '0' : '1'} /><button className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">{p.hidden ? 'إظهار' : 'إخفاء'}</button></form>}
             {/* حذف — فقط إن لا نشاط */}
-            {hasActivity
+            {capabilities.delete && (hasActivity
               ? <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">الحذف متعذّر (يوجد نشاط) — الإخفاء متاح</span>
-              : <form action={deleteCjStorefront}><input type="hidden" name="id" value={id} /><button className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-700">حذف</button></form>}
+              : <form action={deleteCjStorefront}><input type="hidden" name="id" value={id} /><button className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-700">حذف</button></form>)}
           </div>
-          <details>
+          {capabilities.edit && <details>
             <summary className="cursor-pointer text-sm font-bold text-primary">✎ تعديل مباشر (يُحفظ ويُعلّم الترجمة)</summary>
             <form action={saveCjStorefrontEdit} className="mt-2 space-y-2 text-sm">
               <input type="hidden" name="id" value={id} />
@@ -120,7 +119,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
                 <span className="text-xs text-muted-foreground">تصحيح العنوان/الوصف يُحفظ في ذاكرة الترجمة ويُطبَّق على السلع المشابهة.</span>
               </div>
             </form>
-          </details>
+          </details>}
         </div>
       )}
 

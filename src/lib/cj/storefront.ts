@@ -1,7 +1,7 @@
 import 'server-only';
 import { getSetting, setSetting } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
-import { hasAnyAdmin } from '@/lib/roles';
+import { hasAccess } from '@/lib/access-control/guards';
 import type { AdCard } from '@/lib/data';
 import type { CjProductRow } from '@/lib/cj/mapping';
 
@@ -57,6 +57,6 @@ export type StorefrontView = { visible: boolean; isPublic: boolean; isStaff: boo
 export async function cjStorefrontView(): Promise<StorefrontView> {
   const isPublic = await cjStorefrontPublic();
   const session = await getSession().catch(() => null);
-  const isStaff = session ? await hasAnyAdmin(session.uid).catch(() => false) : false;
+  const isStaff = session ? await hasAccess(session.uid, 'products', 'view').catch(() => false) : false;
   return { visible: isPublic || isStaff, isPublic, isStaff };
 }

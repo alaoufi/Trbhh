@@ -168,7 +168,18 @@ export async function claimPaymentAttempt(db:CommerceDb,input:{memberId:bigint;o
     const [order]=await tx.$queryRaw<OrderRow[]>`SELECT * FROM commerce_orders WHERE id=${input.orderId} AND member_id=${input.memberId} FOR UPDATE`;
     if(!order) throw new Error('order_not_found');
     const [existing]=await tx.$queryRaw<AttemptRow[]>`SELECT * FROM commerce_payment_attempts WHERE order_id=${order.id} FOR UPDATE`;
-    if(existing) return {claimed:false,attempt:attemptView(existing)};
+    if(existing){
+      const attempt=attemptView(existing);
+      // Reusing a pending gateway URL can still start a real payment. Keep the
+      // durable attempt/evidence intact, but do not re-publish an unapproved quote.
+      if(attempt.status==='pending'&&attempt.redirectUrl){
+        try{
+          const [clock]=await tx.$queryRaw<{now:Date}[]>`SELECT UTC_TIMESTAMP(3) AS now`;
+          await requireOrderFiscalPolicyAtPayment(tx,order.id,clock.now);
+        }catch{return {claimed:false,attempt:{...attempt,redirectUrl:null}};}
+      }
+      return {claimed:false,attempt};
+    }
     if(order.status!=='awaiting_payment') throw new Error('order_not_payable');
     const [clock]=await tx.$queryRaw<{now:Date}[]>`SELECT UTC_TIMESTAMP(3) AS now`;
     await requireOrderFiscalPolicyAtPayment(tx,order.id,clock.now);

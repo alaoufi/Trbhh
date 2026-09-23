@@ -163,8 +163,11 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
   });
   it('keeps an existing payment attempt retry-safe and records verified money after policy rollover without repricing',async()=>{
     const {order,claim,evidence}=await prepared(),snapshot=await storedFiscalSnapshot(order.id);
+    await recordPaymentReference(client,{attemptId:claim.attempt.id,claimToken:claim.claimToken,reference:evidence.reference,redirectUrl:'https://fixture.invalid/existing-checkout'});
     await approvedFiscalPolicy({reference:'synthetic-settlement-rollover',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...syntheticCalculation,priceBasis:'exclusive'}});
     const retry=await claimPaymentAttempt(client,{memberId:1n,orderId:order.id,provider:'fixture'});expect(retry.claimed).toBe(false);expect(retry.attempt.id).toBe(claim.attempt.id);expect(retry.attempt.amountMinor).toBe(2175);
+    expect(retry.attempt.redirectUrl).toBeNull();
+    expect((await client.$queryRaw<{redirect_url:string}[]>`SELECT redirect_url FROM commerce_payment_attempts WHERE id=${claim.attempt.id}`)[0].redirect_url).toBe('https://fixture.invalid/existing-checkout');
     await settleVerifiedPayment(client,evidence,targets);
     expect(await count('commerce_receipts')).toBe(1);expect(await count('commerce_payment_attempts')).toBe(1);expect(await storedFiscalSnapshot(order.id)).toEqual(snapshot);
     expect((await client.$queryRaw<{amount_minor:number}[]>`SELECT amount_minor FROM commerce_receipts WHERE order_id=${order.id}`)[0].amount_minor).toBe(2175);

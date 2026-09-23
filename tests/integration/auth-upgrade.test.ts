@@ -8,8 +8,8 @@ import type { PrismaClient } from '@prisma/client';
 
 const BASELINE = '27b804d13ba884fb7cd3704356eb38c5faa29ab4';
 const DATABASE = process.env.UPGRADE_SALLA_FIXTURE==='1' ? 'trbhh_upgrade_salla_test' : 'trbhh_upgrade_test';
-// Explicit release allowlist, checked against commerce/schema.ts, ad-categories/schema.ts
-// and Prisma. Do not derive this from the observed database: extra/missing columns must fail.
+// Explicit release allowlist, checked against commerce/schema.ts, ad-categories/schema.ts,
+// cj/schema.ts and Prisma. Do not derive this from the observed database: extra/missing columns must fail.
 const ADDITIVE_TABLE_COLUMNS: Record<string, string[]> = {
   finance_reconciliations: ["id","request_key","fingerprint","month","snapshot","reason","actor_id","created_at"],
   finance_periods: ["month","closed_at","checks_json","reason","version"],
@@ -32,7 +32,11 @@ const ADDITIVE_TABLE_COLUMNS: Record<string, string[]> = {
   access_audit: ["id","created_at","actor_id","action","target","reason","before_json","after_json","ip","session_fingerprint"],
   supplier_onboarding: ["supplier_id","registration_number","store_url","encrypted_details","revision","checked_connection_version","checked_at","check_status","check_code","check_sample_count","check_claim","check_claimed_at","created_at","updated_at"],
   cj_auth: ["id","sealed_tokens","access_expires_at","refresh_expires_at","updated_at"],
-  cj_products: ["id","cj_product_id","cj_variant_id","cj_sku","name","image","supplier_cost_minor","shipping_cost_minor","other_costs_minor","profit_minor","sale_price_minor","margin_bps","currency","commerce_product_id","trbhh_variant_id","last_sync_at","created_at","updated_at"],
+  cj_products: ["id","cj_product_id","cj_variant_id","cj_sku","name","name_ar","source_description","display_description_ar","trbhh_category","status","images","details_json","agent_user_id","agent_claimed_at","hidden","sale_price_override_minor","image","supplier_cost_minor","shipping_cost_minor","other_costs_minor","profit_minor","sale_price_minor","margin_bps","currency","commerce_product_id","trbhh_variant_id","last_sync_at","created_at","updated_at"],
+  cj_agents: ["user_id","phone","whatsapp","weekly_quota","active","notes","created_at","updated_at"],
+  cj_translations: ["source_key","target_ar","created_at"],
+  cj_orders: ["id","internal_ref","user_id","cj_product_id","product_name","cj_order_id","status","status_reason","items_total_minor","shipping_total_minor","tax_total_minor","grand_total_minor","currency","carrier","tracking_number","tracking_url","tracking_status","ship_name","ship_phone","ship_country","ship_region","ship_city","ship_address1","ship_address2","ship_zip","placed_at","delivered_at","created_at","updated_at"],
+  cj_order_events: ["id","order_id","event_key","type","source","from_status","to_status","note","actor_id","created_at"],
   cj_webhook_events: ["id","event_key","type","received_at"],
 
   supplier_integration_profiles: ['supplier_id','provider','oauth_generation','oauth_invite_expires_at','oauth_last_attempt_at','oauth_last_error','maintenance','sync_enabled','auto_orders_enabled','mode','last_sync_at','last_error'],
@@ -202,13 +206,17 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
 
   it('preserves every old column and row through two real schema-sync boots', async () => {
     await bootCandidate();
-    const added = (await columns()).filter((c) => !baselineColumns.some((old) => old.table_name === c.table_name && old.column_name === c.column_name));
+    const candidateColumns = await columns();
+    const added = candidateColumns.filter((c) => !baselineColumns.some((old) => old.table_name === c.table_name && old.column_name === c.column_name));
     expect(added.map((c) => `${c.table_name}.${c.column_name}`).sort()).toEqual([
       'users.auth_session_version', 'auth_mfa.user_id', 'auth_mfa.secret', 'auth_mfa.recovery_hashes', 'auth_mfa.last_step', 'auth_mfa.version', 'auth_mfa.created_at', 'auth_security_limits.k', 'auth_security_limits.hits', 'auth_security_limits.expires_at',
       ...Object.entries(ADDITIVE_TABLE_COLUMNS).flatMap(([table, names]) => names.map((name) => `${table}.${name}`)),
     ].sort());
     expect(added.find((c) => c.table_name === 'users')).toMatchObject({ column_type: 'varchar(64)', is_nullable: 'NO', column_default: '0' });
     expect(added.find((c) => c.table_name === 'auth_mfa' && c.column_name === 'last_step')).toMatchObject({ column_type: 'bigint', is_nullable: 'NO', column_default: '-1' });
+    expect(added.find((c) => c.table_name === 'cj_products' && c.column_name === 'status')).toMatchObject({ column_type: 'varchar(16)', is_nullable: 'NO', column_default: 'draft' });
+    expect(added.find((c) => c.table_name === 'cj_products' && c.column_name === 'hidden')).toMatchObject({ column_type: 'tinyint', is_nullable: 'NO', column_default: '0' });
+    expect(added.find((c) => c.table_name === 'cj_products' && c.column_name === 'agent_user_id')).toMatchObject({ column_type: 'bigint unsigned', is_nullable: 'YES', column_default: null });
     const engines = await db.$queryRawUnsafe<{ name: string; engine: string }[]>("SELECT TABLE_NAME AS name,ENGINE AS engine FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('auth_mfa','auth_security_limits') ORDER BY TABLE_NAME");
     expect(engines).toEqual([{ name: 'auth_mfa', engine: 'InnoDB' }, { name: 'auth_security_limits', engine: 'InnoDB' }]);
     const indexes = await db.$queryRawUnsafe<{ table_name: string; index_name: string; column_name: string; non_unique: number | bigint }[]>("SELECT TABLE_NAME AS table_name,INDEX_NAME AS index_name,COLUMN_NAME AS column_name,NON_UNIQUE AS non_unique FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('auth_mfa','auth_security_limits') ORDER BY TABLE_NAME,INDEX_NAME,SEQ_IN_INDEX");
@@ -223,11 +231,37 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
     await assertLegacyData();
     await assertLegacyAuthentication();
 
+    // CJ is additive only: a boot must not enroll agents or create orders. Inert
+    // rows exercise ownership, revoked access, edited content and order history
+    // preservation without credentials, provider calls or payment activation.
+    expect(await db.cj_agents.count()).toBe(0);
+    expect(await db.cj_orders.count()).toBe(0);
+    const created = new Date('2026-01-02T03:04:05Z');
+    await insert('cj_auth', { id: 1, sealed_tokens: 'inert-synthetic-not-a-token', access_expires_at: created, refresh_expires_at: created, updated_at: created });
+    await insert('cj_agents', { user_id: 701, phone: '0000000000', whatsapp: '0000000001', weekly_quota: 7, active: 0, notes: 'وكيل صناعي موقوف — يجب حفظ الإيقاف والحصة', created_at: created, updated_at: created }, ['user_id']);
+    await insert('cj_products', {
+      id: 701, cj_product_id: 'synthetic-cj-product', cj_variant_id: 'synthetic-variant', cj_sku: 'synthetic-sku', name: 'Synthetic preserved product', name_ar: 'منتج صناعي محفوظ',
+      source_description: 'Original synthetic description', display_description_ar: 'وصف معدل محفوظ', trbhh_category: 'synthetic-category', status: 'ready',
+      images: '["https://example.test/synthetic-cj.png"]', details_json: '{"synthetic":true,"weight":123}', agent_user_id: 701, agent_claimed_at: created, hidden: 1, sale_price_override_minor: 17000,
+      image: 'https://example.test/synthetic-cj.png', supplier_cost_minor: 8000, shipping_cost_minor: 2000, other_costs_minor: 500, profit_minor: 3000, sale_price_minor: 13500, margin_bps: 2857,
+      currency: 'SAR', commerce_product_id: null, trbhh_variant_id: 'preserved-variant', last_sync_at: created, created_at: created, updated_at: created,
+    });
+    await insert('cj_translations', { source_key: 'b'.repeat(40), target_ar: 'ترجمة صناعية محفوظة', created_at: created }, ['source_key']);
+    await insert('cj_orders', {
+      id: 701, internal_ref: 'synthetic-upgrade-cj-order', user_id: 701, cj_product_id: 'synthetic-cj-product', product_name: 'اسم محفوظ عند إنشاء الطلب', cj_order_id: 'synthetic-not-a-provider-order',
+      status: 'awaiting_payment', status_reason: 'synthetic-only-no-payment', items_total_minor: 17000, shipping_total_minor: 2000, tax_total_minor: 2850, grand_total_minor: 21850, currency: 'SAR',
+      carrier: 'synthetic-carrier', tracking_number: 'synthetic-tracking', tracking_url: 'https://example.test/synthetic-tracking', tracking_status: 'synthetic-only',
+      ship_name: 'مستلم صناعي', ship_phone: '0000000000', ship_country: 'SA', ship_region: 'منطقة صناعية', ship_city: 'مدينة صناعية', ship_address1: 'عنوان صناعي', ship_address2: 'وحدة صناعية', ship_zip: '00000',
+      placed_at: null, delivered_at: null, created_at: created, updated_at: created,
+    });
+    await insert('cj_order_events', { id: 701, order_id: 701, event_key: 'synthetic-upgrade-cj-event', type: 'note', source: 'internal', from_status: 'awaiting_payment', to_status: 'awaiting_payment', note: 'سجل صناعي محفوظ', actor_id: 702, created_at: created });
+    await insert('cj_webhook_events', { id: 701, event_key: 'synthetic-upgrade-cj-webhook', type: 'synthetic-only', received_at: created });
     await insert('auth_mfa', { user_id: 702, secret: 'synthetic-encrypted-field-preservation-only', recovery_hashes: '["synthetic-hash"]', last_step: 123456, version: 'existing-enrollment-version', created_at: new Date('2026-01-02T03:04:05Z') }, ['user_id']);
     await insert('auth_security_limits', { k: 'synthetic-upgrade-counter', hits: 7, expires_at: new Date('2030-01-01T00:00:00Z') }, ['k']);
     await db.users.update({ where: { id: 702n }, data: { auth_session_version: 'existing-password-version' } });
     const securityBefore = await snapshot(added.filter((c) => c.table_name !== 'users'));
     await bootCandidate();
+    expect(await columns()).toEqual(candidateColumns);
     await assertLegacyData();
     expect(await snapshot(added.filter((c) => c.table_name !== 'users'))).toEqual(securityBefore);
     expect((await db.users.findUniqueOrThrow({ where: { id: 702n } })).auth_session_version).toBe('existing-password-version');

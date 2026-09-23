@@ -1,7 +1,7 @@
 name: Verify baseline database upgrade preserves data
 on:
   push:
-    branches: [codex/trbhh-audit-fixes-20260910, codex/finance-tax-audit-20260922]
+    branches: [codex/trbhh-audit-fixes-20260910, codex/finance-tax-audit-20260922, claude/hostinger-vps-project-amw8vb]
 permissions:
   contents: read
 jobs:

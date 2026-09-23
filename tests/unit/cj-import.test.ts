@@ -13,6 +13,7 @@ function harness(over: Partial<CjImportDeps> = {}) {
     settings: async () => ({ enabled: false, pageSize: 20, maxPages: 3, usdToSarX100: 375, shippingMinor: 500 }),
     marginBps: async () => 3000,
     upsert: async (input) => { upserts.push(input); },
+    translate: async () => 'عنوان مترجم', // بلا شبكة في الاختبار
     ...over,
   };
   return { deps, upserts };

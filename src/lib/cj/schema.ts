@@ -20,6 +20,9 @@ export const CJ_DDL: string[] = [
     cj_variant_id VARCHAR(64) NOT NULL DEFAULT '',
     cj_sku VARCHAR(191) NOT NULL DEFAULT '',
     name VARCHAR(400) NOT NULL DEFAULT '',
+    name_ar VARCHAR(400) NOT NULL DEFAULT '',
+    hidden TINYINT NOT NULL DEFAULT 0,
+    sale_price_override_minor INT NULL,
     image VARCHAR(1024) NOT NULL DEFAULT '',
     supplier_cost_minor INT NOT NULL DEFAULT 0,
     shipping_cost_minor INT NOT NULL DEFAULT 0,
@@ -36,6 +39,11 @@ export const CJ_DDL: string[] = [
     UNIQUE KEY cj_product_variant (cj_product_id, cj_variant_id),
     KEY cj_products_commerce (commerce_product_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // أعمدة إدارة السلعة المستوردة (تُضاف على التثبيتات القائمة عبر schema-sync).
+  `ALTER TABLE cj_products ADD COLUMN name_ar VARCHAR(400) NOT NULL DEFAULT ''`,
+  `ALTER TABLE cj_products ADD COLUMN hidden TINYINT NOT NULL DEFAULT 0`,
+  `ALTER TABLE cj_products ADD COLUMN sale_price_override_minor INT NULL`,
 
   // مخزن أحداث webhooks من CJ (idempotent عبر مفتاح الحدث).
   `CREATE TABLE IF NOT EXISTS cj_webhook_events (

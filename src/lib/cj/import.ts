@@ -3,6 +3,7 @@ import { getProduct as cjGet } from './client';
 import { upsertCjProduct } from './mapping';
 import { computePrice, defaultMarginBps } from './pricing';
 import { cjSyncSettings, type CjSyncSettings } from './sync';
+import { translateToArabic } from './translate';
 import type { CjResult, CjProductDetail } from './types';
 
 /**
@@ -16,6 +17,7 @@ export type CjImportDeps = {
   settings?: () => Promise<CjSyncSettings>;
   marginBps?: () => Promise<number>;
   upsert?: typeof upsertCjProduct;
+  translate?: (text: string | null | undefined) => Promise<string | null>;
 };
 export type CjImportResult =
   | { ok: true; pid: string; name: string; salePriceMinor: number; supplierCostMinor: number }
@@ -33,6 +35,9 @@ export async function importCjProductByPid(pid: string, deps: CjImportDeps = {})
   const d = r.data;
   const costMinor = d.sellPrice != null && d.sellPrice > 0 ? Math.round(d.sellPrice * settings.usdToSarX100) : 0;
   const price = computePrice(costMinor, settings.shippingMinor, 0, margin);
-  await upsert({ cjProductId: clean, cjSku: d.productSku || '', name: d.productName || '', image: d.productImage || '', price });
+  // ترجمة تلقائية للعنوان إلى العربية (حقل عرض منفصل؛ لا نطمس المصدر). فشلها لا يوقف الاستيراد.
+  const translate = deps.translate ?? translateToArabic;
+  const nameAr = await translate(d.productName || '').catch(() => null);
+  await upsert({ cjProductId: clean, cjSku: d.productSku || '', name: d.productName || '', nameAr, image: d.productImage || '', price });
   return { ok: true, pid: clean, name: d.productName || '', salePriceMinor: price.salePriceMinor, supplierCostMinor: price.supplierCostMinor };
 }

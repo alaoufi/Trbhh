@@ -2273,6 +2273,9 @@ model cj_products {
   cj_variant_id       String    @default("") @db.VarChar(64)
   cj_sku              String    @default("") @db.VarChar(191)
   name                String    @default("") @db.VarChar(400)
+  name_ar             String    @default("") @db.VarChar(400)
+  hidden              Int       @default(0) @db.TinyInt
+  sale_price_override_minor Int?
   image               String    @default("") @db.VarChar(1024)
   supplier_cost_minor Int       @default(0)
   shipping_cost_minor Int       @default(0)

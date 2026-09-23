@@ -5,7 +5,8 @@ import { requireAccess } from '@/lib/access-control/guards';
 import { setDefaultMarginBps } from '@/lib/cj/pricing';
 import { saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync';
 import { importCjProductByPid } from '@/lib/cj/import';
-import { removeCjProductById } from '@/lib/cj/mapping';
+import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts } from '@/lib/cj/mapping';
+import { translateToArabic } from '@/lib/cj/translate';
 
 /** حفظ الهامش الافتراضي (٪) — للمشرف فقط. لا شراء ولا اتصال بمورّد هنا. */
 export async function saveCjMargin(form: FormData) {
@@ -67,4 +68,59 @@ export async function removeCjProduct(form: FormData) {
   revalidatePath('/admin/suppliers/cj/browse');
   const sep = back.includes('?') ? '&' : '?';
   redirect(`${back}${sep}removed=1`);
+}
+
+const backOf = (form: FormData) => String(form.get('back') || '/admin/suppliers/cj/browse');
+const withParam = (back: string, kv: string) => `${back}${back.includes('?') ? '&' : '?'}${kv}`;
+
+/** حفظ العنوان العربي المعروض (تحرير يدوي) — لا يمسّ النص المصدر. */
+export async function saveCjArabic(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const id = Number(String(form.get('id') || ''));
+  const nameAr = String(form.get('nameAr') || '').trim();
+  await setCjProductNameAr(id, nameAr);
+  revalidatePath('/admin/suppliers/cj/browse');
+  redirect(withParam(backOf(form), 'edited=1'));
+}
+
+/** تعديل سعر البيع النهائي بالريال (أو تركه فارغاً للعودة للسعر المحسوب). */
+export async function saveCjPrice(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const id = Number(String(form.get('id') || ''));
+  const raw = String(form.get('priceSar') || '').trim();
+  if (raw === '') await setCjProductPriceOverride(id, null);
+  else { const v = Number(raw); if (Number.isFinite(v) && v >= 0) await setCjProductPriceOverride(id, Math.round(v * 100)); }
+  revalidatePath('/admin/suppliers/cj/browse');
+  redirect(withParam(backOf(form), 'edited=1'));
+}
+
+/** إخفاء/إظهار السلعة من المعاينة. */
+export async function toggleCjHidden(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const id = Number(String(form.get('id') || ''));
+  const hidden = String(form.get('hidden') || '') === '1';
+  await setCjProductHidden(id, hidden);
+  revalidatePath('/admin/suppliers/cj/browse');
+  revalidatePath('/admin/suppliers/cj/showcase');
+  redirect(withParam(backOf(form), 'edited=1'));
+}
+
+/** ترجمة تلقائية لعنوان سلعة واحدة (إعادة ترجمة عند الطلب). */
+export async function translateCjProduct(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const id = Number(String(form.get('id') || ''));
+  const row = await getCjProductById(id);
+  if (row) { const ar = await translateToArabic(row.name).catch(() => null); if (ar) await setCjProductNameAr(id, ar); }
+  revalidatePath('/admin/suppliers/cj/browse');
+  redirect(withParam(backOf(form), 'edited=1'));
+}
+
+/** ترجمة تلقائية جماعية لكل سلعة بلا عنوان عربي بعد (دفعة محدودة). */
+export async function translateAllCj(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const rows = await listUntranslatedCjProducts(40);
+  let done = 0;
+  for (const r of rows) { const ar = await translateToArabic(r.name).catch(() => null); if (ar) { await setCjProductNameAr(r.id, ar); done++; } }
+  revalidatePath('/admin/suppliers/cj/browse');
+  redirect(withParam(backOf(form), `translated=${done}`));
 }

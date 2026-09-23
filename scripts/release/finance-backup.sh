@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Run only under the shared vps-deploy lock after inspecting the serving service.
-# Fresh private backup only: no deployment, schema migration or production restore.
+# Fresh private DB/code/image backup; verified retained media may be referenced.
+# No deployment, schema migration or production restore.
 set -Eeuo pipefail
 umask 077
 if [[ $# != 3 || ! ${1:-} =~ ^[1-9][0-9]{0,19}$ || ! ${2:-} =~ ^[0-9a-f]{40}$ || ! ${3:-} =~ ^[0-9a-f]{40}$ || ${2:-} == "${3:-}" ]]; then
@@ -22,7 +23,7 @@ trap 'printf "Finance backup failed at stage %s; no release verification was iss
 mkdir -p "$base"
 chmod 700 "$base"
 [[ "$(realpath "$base")" == "$base" && ! -e "$backup" && ! -L "$backup" ]]
-for helper in database-proof.cjs media-proof.cjs backup-capacity-proof.cjs supplier-preservation-proof.cjs; do
+for helper in database-proof.cjs media-proof.cjs backup-capacity-proof.cjs supplier-preservation-proof.cjs finance-media-reference.cjs merchant-media-reference.cjs; do
   [[ -f "$tools_dir/$helper" && ! -L "$tools_dir/$helper" ]]
 done
 cd "$prod"
@@ -46,16 +47,31 @@ capacity=$(docker exec -i -u 0 "$container" node - measure < "$tools_dir/backup-
 image_bytes=$(docker image inspect -f '{{.Size}}' "$current_image")
 code_bytes=$(git archive --format=tar "$baseline" | wc -c)
 docker_root=$(docker info --format '{{.DockerRootDir}}')
-node "$tools_dir/backup-capacity-proof.cjs" check "$capacity" "$image_bytes" "$code_bytes" "$base" "$docker_root" fresh >&3
+# MEDIA_CAPACITY_BEGIN
+media_capacity=fresh
+media_parent="$base/audit-35603864905"
+if node "$tools_dir/backup-capacity-proof.cjs" check "$capacity" "$image_bytes" "$code_bytes" "$base" "$docker_root" fresh >&3; then
+  :
+else
+  # A verified, retained full backup can supply identical media in place. This
+  # does not relax capacity reserves or reuse any database/code/image archive.
+  stage=parent_media
+  node "$tools_dir/finance-media-reference.cjs" inspect "$media_parent" >&3
+  media_capacity=verified-parent
+  node "$tools_dir/backup-capacity-proof.cjs" check "$capacity" "$image_bytes" "$code_bytes" "$base" "$docker_root" "$media_capacity" >&3
+fi
+# MEDIA_CAPACITY_END
 mkdir -m 700 "$backup"
 # All raw command diagnostics, SQL, configuration and manifests remain private.
 exec >> "$backup/operations.log" 2>&1
 printf '%s\n' "$capacity" > "$backup/capacity.json"
+printf '%s\n' "$media_capacity" > "$backup/media-mode.txt"
 printf '%s\n' "$baseline" > "$backup/commit.txt"
 printf '%s\n' "$candidate" > "$backup/candidate.txt"
 printf '%s\n' "$current_image" > "$backup/image-id.txt"
 printf '%s\n' "$container" > "$backup/container-id.txt"
 docker inspect "$container" > "$backup/container-before.json"
+if [[ "$media_capacity" == verified-parent ]]; then node "$tools_dir/finance-media-reference.cjs" prepare "$media_parent" "$backup"; fi
 cp .env "$backup/environment.env"
 cp docker-compose.yml "$backup/docker-compose.yml"
 cp "$runtime_manifest" "$backup/runtime-twa-manifest.json"
@@ -144,8 +160,12 @@ restore_database=$(docker exec "$reader" node -e 'process.stdout.write(decodeURI
 for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
   IFS=: read -r label env_name fallback <<< "$spec"
   media_path=$(docker exec "$reader" node -e 'process.stdout.write(process.env[process.argv[1]]||process.argv[2]||"")' "$env_name" "$fallback")
-  [[ -n "$media_path" ]] || continue
+  if [[ -z "$media_path" ]]; then [[ ! -e "$backup/$label.path" ]]; continue; fi
   [[ "$media_path" == "/app/$label" ]]
+  if [[ "$media_capacity" == verified-parent ]]; then
+    [[ -f "$backup/$label.path" && -f "$backup/$label-before.json" && "$(cat "$backup/$label.path")" == "$media_path" ]]
+    continue
+  fi
   printf '%s\n' "$media_path" > "$backup/$label.path"
   docker exec -u 0 "$reader" tar -czf - -C "$media_path" . > "$backup/$label.tar.gz"
   gzip -t "$backup/$label.tar.gz"
@@ -179,6 +199,7 @@ for label in storage legacy; do
   node "$tools_dir/media-proof.cjs" verify "$backup/$label-before.json" "$backup/$label-current.json"
   node "$tools_dir/media-proof.cjs" verify "$backup/$label-current.json" "$backup/$label-before.json"
 done
+if [[ "$media_capacity" == verified-parent ]]; then node "$tools_dir/finance-media-reference.cjs" verify-current "$backup"; fi
 # Detect other writers or a prematurely resumed app during the backup window.
 docker exec -i "$reader" node - snapshot-full < "$tools_dir/database-proof.cjs" > "$backup/full-current.json"
 node "$tools_dir/database-proof.cjs" verify-restore-full "$backup/full-before.json" "$backup/full-current.json"
@@ -230,7 +251,7 @@ const sources=JSON.parse(fs.readFileSync(path.join(dir,'compose-sources.json')))
 for(const file of sources.sourceFiles){if(fs.realpathSync(file.source)!==file.source||!fs.readFileSync(file.source).equals(fs.readFileSync(path.join(dir,file.saved))))process.exit(1);}
 NODE
 stage=seal
-(cd "$backup" && sha256sum database.sql.gz *.tar.gz *.json *.txt *.env *.yml *.patch > SHA256SUMS)
+(cd "$backup" && sha256sum database.sql.gz *.tar.gz *.json *.txt *.env *.yml *.patch *.path > SHA256SUMS)
 restored_tables=$(node - "$backup/full-restored.json" <<'NODE'
 const p=JSON.parse(require('node:fs').readFileSync(process.argv[2]));
 process.stdout.write(String(Object.keys(p.tables).length));
@@ -240,6 +261,7 @@ NODE
 # Only the successful EXIT cleanup calls this, after confirming app resume and
 # deleting its own disposable reader, database and internal network.
 seal_backup() {
+  if [[ "$media_capacity" == verified-parent ]]; then node "$tools_dir/finance-media-reference.cjs" verify "$backup" || return 1; fi
   printf '%s\n' "$baseline" > "$backup/VERIFIED" || return 1
   printf 'BACKUP_ID=%s\nROLLBACK_COMMIT=%s\nCANDIDATE_COMMIT=%s\nIMAGE_ID=%s\n' "$backup_id" "$baseline" "$candidate" "$current_image" >&3
   printf '{"restoredTables":%s,"verified":true}\n' "$restored_tables" >&3

@@ -122,3 +122,14 @@ test('release safety ordering keeps capacity and archive validation before the b
   assert.match(source,/media-proof.cjs" verify "\$backup\/\$label-current.json" "\$backup\/\$label-before.json"/);
   assert.doesNotMatch(source,/docker (?:volume rm|system prune)|git (?:reset|switch|checkout)|prisma (?:db push|migrate)|--publish|--network host|curl|wget/);
 });
+test('parent capacity is available only after a successful immutable-parent inspection',()=>{
+  const match=read().match(/# MEDIA_CAPACITY_BEGIN\n([\s\S]*?)# MEDIA_CAPACITY_END/);assert(match);
+  for(const [fresh,parent,expected] of [[0,0,'fresh'],[1,0,'verified-parent'],[1,1,null]]){
+    const result=spawnSync(bash,['-c',`set -euo pipefail\nexec 3>&1\ntools_dir=/tools; base=/backups; capacity=measured; image_bytes=1; code_bytes=1; docker_root=/docker\nnode(){ printf 'call %s\\n' "$*" >&3; if [[ "$1" == /tools/finance-media-reference.cjs ]]; then return ${parent}; fi; if [[ "\${!#}" == fresh ]]; then return ${fresh}; fi; return 0; }\n${match[1]}\nprintf 'mode=%s\\n' "$media_capacity"`],{encoding:'utf8'});
+    assert.equal(result.status,expected?0:1,result.stderr);
+    if(expected)assert.match(result.stdout,new RegExp('mode='+expected+'\\n'));
+    if(fresh===0)assert.doesNotMatch(result.stdout,/finance-media-reference/);
+    if(parent===1)assert.doesNotMatch(result.stdout,/check[^\n]* verified-parent|mode=/);
+    if(expected==='verified-parent')assert(result.stdout.indexOf('finance-media-reference.cjs inspect')<result.stdout.indexOf('check measured 1 1 /backups /docker verified-parent'));
+  }
+});

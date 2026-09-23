@@ -12,7 +12,7 @@ on:
     inputs:
       phase:
         type: choice
-        options: [inspect, cache-audit, cache-cleanup]
+        options: [inspect, diagnose-backup, cache-audit, cache-cleanup]
         default: inspect
         required: true
       baseline_sha:
@@ -35,7 +35,7 @@ jobs:
           persist-credentials: false
       - name: Verify bounded cache operation tools
         run: |
-          node --test scripts/release/finance-cache.test.cjs
+          node --test scripts/release/finance-cache.test.cjs scripts/release/finance-backup-diagnose.test.cjs
           bash -n scripts/release/finance-cache.sh
       - name: Inspect production or run the selected guarded cache operation
         env:
@@ -49,9 +49,9 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          [[ "$PHASE" =~ ^(inspect|cache-audit|cache-cleanup)$ ]]
+          [[ "$PHASE" =~ ^(inspect|diagnose-backup|cache-audit|cache-cleanup)$ ]]
           [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
-          if [[ "$PHASE" != inspect ]]; then [[ "$BASELINE_SHA" =~ ^[0-9a-f]{40}$ ]]; fi
+          if [[ "$PHASE" == cache-* ]]; then [[ "$BASELINE_SHA" =~ ^[0-9a-f]{40}$ ]]; fi
           test -n "$VPS_HOST"; test -n "$VPS_USER"; test -n "$VPS_SSH_KEY"; test -n "$VPS_KNOWN_HOSTS"
           [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ && "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
           mkdir -p ~/.ssh
@@ -60,6 +60,10 @@ jobs:
           port=${VPS_PORT:-22}; [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
           SSH=(ssh -i ~/.ssh/finance_key -p "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=25 -o ServerAliveInterval=15)
           target="$VPS_USER@$VPS_HOST"
+          if [[ "$PHASE" == diagnose-backup ]]; then
+            "${SSH[@]}" "$target" 'node -' < scripts/release/finance-backup-diagnose.cjs
+            exit 0
+          fi
           if [[ "$PHASE" != inspect ]]; then
             "${SSH[@]}" "$target" "bash -s -- '$PHASE' '$GITHUB_RUN_ID' '$BASELINE_SHA'" < scripts/release/finance-cache.sh
             exit 0
@@ -82,8 +86,21 @@ jobs:
             }
             ok=true;
           } catch {}
-          console.log(JSON.stringify({financeMediaParentAvailable:ok}));
-          if(!ok)process.exitCode=1;
+          let historicalSealOk=false, historicalSealSha256;
+          try {
+            const checkpoint='/root/trbhh-release-backups/audit-35607654850',info=fs.lstatSync(checkpoint);
+            if(!info.isDirectory()||info.isSymbolicLink()||fs.realpathSync(checkpoint)!==checkpoint||info.uid!==0||(info.mode&0o777)!==0o700)throw Error('checkpoint_directory');
+            for(const name of ['VERIFIED','commit.txt','candidate.txt','DEPLOYMENT_VERIFIED','SHA256SUMS','PARENT_MEDIA_REFERENCE.json','REUSED_MEDIA_SOURCE','storage.path','legacy.path','storage-before.json','legacy-before.json']) {
+              const item=fs.lstatSync(path.join(checkpoint,name));if(!item.isFile()||item.isSymbolicLink()||item.nlink!==1)throw Error('checkpoint_file');
+            }
+            for(const [name,expected] of [['VERIFIED','5f8dbc01c38bf431a9ae099a581b80536097b346'],['commit.txt','5f8dbc01c38bf431a9ae099a581b80536097b346'],['candidate.txt','415a8fe593522859f4cf85c2fa10e47a7d40109b'],['DEPLOYMENT_VERIFIED','415a8fe593522859f4cf85c2fa10e47a7d40109b'],['REUSED_MEDIA_SOURCE','35603864905']]) {
+              if(fs.readFileSync(path.join(checkpoint,name),'utf8').trim()!==expected)throw Error('checkpoint_marker');
+            }
+            historicalSealSha256=require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(checkpoint,'PARENT_MEDIA_REFERENCE.json'))).digest('hex');
+            historicalSealOk=true;
+          } catch {}
+          console.log(JSON.stringify({financeMediaParentAvailable:ok,financeMediaHistoricalSealAvailable:historicalSealOk,historicalSealSha256}));
+          if(!ok||!historicalSealOk)process.exitCode=1;
           PARENT_NODE
       - name: Remove runner SSH credential
         if: always()

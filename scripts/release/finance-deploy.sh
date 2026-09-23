@@ -23,9 +23,17 @@ exec >> "$tools_dir/deploy.log" 2>&1
 exec 9> /run/lock/trbhh-finance-deploy.lock
 flock -w 600 9
 cd "$prod"
-for helper in finance-backup.sh database-proof.cjs media-proof.cjs backup-capacity-proof.cjs supplier-preservation-proof.cjs verify-runtime.cjs finance-schema-check.cjs finance-capture-job.sh; do
+for helper in finance-backup.sh database-proof.cjs media-proof.cjs backup-capacity-proof.cjs supplier-preservation-proof.cjs verify-runtime.cjs finance-schema-check.cjs finance-capture-job.sh finance-media-reference.cjs merchant-media-reference.cjs; do
   [[ -f "$tools_dir/$helper" && ! -L "$tools_dir/$helper" ]]
 done
+
+verify_retained_media() {
+  case "$(cat "$backup/media-mode.txt")" in
+    fresh) [[ ! -e "$backup/FINANCE_MEDIA_REFERENCE.json" ]] ;;
+    verified-parent) node "$tools_dir/finance-media-reference.cjs" verify "$backup" ;;
+    *) return 1 ;;
+  esac
+}
 
 # CAPTURE_UNITS_BEGIN
 restore_capture_units() {
@@ -134,6 +142,7 @@ rollback_app() {
   [[ "$healthy" == 1 ]] || return 1
   docker inspect "$running" > "$backup/container-rollback.json" || return 1
   node "$tools_dir/verify-runtime.cjs" "$backup/container-before.json" "$backup/container-rollback.json" merchant_oauth || return 1
+  verify_retained_media || return 1
   # Healthy means preserved production data and disabled transaction gates,
   # not merely that the old application image responds. Never import SQL here.
   docker exec -i "$running" node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/rollback-database.json" || return 1
@@ -191,6 +200,7 @@ NODE
 
 prove_preservation() {
   local container
+  verify_retained_media
   check_container
   container=$(docker compose ps -q app)
   docker exec -i "$container" node - < "$tools_dir/finance-schema-check.cjs"
@@ -239,6 +249,7 @@ if [[ "$mode" == deploy ]]; then
   bash "$tools_dir/finance-backup.sh" "$run_id" "$candidate" "$baseline" >&3
   [[ "$(cat "$backup/VERIFIED")" == "$baseline" && "$(cat "$backup/candidate.txt")" == "$candidate" ]]
   (cd "$backup" && sha256sum --check --status SHA256SUMS)
+  verify_retained_media
   stage=runtime_preflight
   prepare_rollback_compose
   # Preserve pre-existing timer configuration before stopping it for cutover.

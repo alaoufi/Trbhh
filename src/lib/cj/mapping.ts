@@ -1,4 +1,5 @@
 import 'server-only';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { PriceBreakdown } from './pricing';
 
@@ -60,4 +61,20 @@ export async function listCjProducts(limit = 50): Promise<CjProductRow[]> {
 export async function countCjProducts(): Promise<number> {
   const rows = await prisma.$queryRaw<{ c: bigint }[]>`SELECT COUNT(*) c FROM cj_products`.catch(() => [] as { c: bigint }[]);
   return Number(rows[0]?.c ?? 0);
+}
+
+/** حذف منتج مستورد من التخزين الوسيط (لا يؤثر على أي منتج عام). */
+export async function removeCjProductById(id: number): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
+  await prisma.$executeRaw`DELETE FROM cj_products WHERE id=${BigInt(id)}`.catch(() => {});
+}
+
+/** مجموعة معرّفات CJ المستوردة مسبقاً من بين قائمة (لتعليم «مستورد» في التصفّح). */
+export async function importedCjPids(pids: string[]): Promise<Set<string>> {
+  const clean = [...new Set(pids.filter((p) => /^[0-9A-Za-z_-]{1,64}$/.test(p)))];
+  if (!clean.length) return new Set();
+  const rows = await prisma.$queryRaw<{ cj_product_id: string }[]>(
+    Prisma.sql`SELECT DISTINCT cj_product_id FROM cj_products WHERE cj_product_id IN (${Prisma.join(clean)})`,
+  ).catch(() => [] as { cj_product_id: string }[]);
+  return new Set(rows.map((r) => r.cj_product_id));
 }

@@ -17,6 +17,25 @@ export type CjSampleDeps = {
   getInventoryByVid?: (vid: string) => Promise<CjResult<CjInventory[]>>;
 };
 
+/** تفاصيل منتج واحد بمعرّفه (getProduct + مخزون لكل متغيّر) — للعرض عند الطلب. */
+export async function sampleOneCjProduct(pid: string, deps: CjSampleDeps = {}): Promise<CjResult<CjSampleProduct>> {
+  const getProduct = deps.getProduct ?? cjGet;
+  const getInventoryByVid = deps.getInventoryByVid ?? cjInvVid;
+  const detail = await getProduct(pid);
+  if (!detail.ok) return detail;
+  const d = detail.data;
+  const rawVariants = Array.isArray(d.variants) ? d.variants : [];
+  const stockByVid = new Map<string, number>();
+  for (const v of rawVariants.slice(0, MAX_VARIANTS_STOCK)) {
+    if (!v.vid) continue;
+    const inv = await getInventoryByVid(v.vid);
+    if (inv.ok) stockByVid.set(v.vid, inv.data.reduce((a, r) => a + (r.storageNum || 0), 0));
+  }
+  const variants = rawVariants.map((v) => ({ vid: v.vid, sku: v.variantSku, name: v.variantName, priceUsd: v.variantSellPrice, weight: v.variantWeight, stock: stockByVid.has(v.vid) ? stockByVid.get(v.vid)! : null }));
+  const images = [...new Set([d.productImage, ...rawVariants.map((v) => v.variantImage)].filter((s): s is string => !!s))];
+  return { ok: true, data: { pid: d.pid, sku: d.productSku, name: d.productName, category: d.categoryName, priceUsd: d.sellPrice, images, variants, totalStock: [...stockByVid.values()].reduce((a, b) => a + b, 0) } };
+}
+
 export async function sampleCjProducts(limit = 3, deps: CjSampleDeps = {}): Promise<CjResult<CjSampleProduct[]>> {
   const listProducts = deps.listProducts ?? cjList;
   const getProduct = deps.getProduct ?? cjGet;

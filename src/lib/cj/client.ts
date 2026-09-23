@@ -117,8 +117,8 @@ export async function testConnection(): Promise<CjResult<{ email: string }>> {
   return { ok: true, data: { email: cfg.email } };
 }
 
-export async function listProducts(pageNum = 1, pageSize = 20): Promise<CjResult<CjProductSummary[]>> {
-  const r = await call<{ list?: unknown[] }>('/product/list', { query: { pageNum, pageSize } });
+export async function listProducts(pageNum = 1, pageSize = 20, filters: { productName?: string; categoryId?: string } = {}): Promise<CjResult<CjProductSummary[]>> {
+  const r = await call<{ list?: unknown[] }>('/product/list', { query: { pageNum, pageSize, productName: filters.productName, categoryId: filters.categoryId } });
   if (!r.ok) return r;
   const list = Array.isArray(r.data?.list) ? r.data!.list! : [];
   return { ok: true, data: list.map((p) => mapSummary(p as Record<string, unknown>)) };

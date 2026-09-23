@@ -7,7 +7,7 @@ import { AccessBoundary } from '@/components/access-boundary';
 import { saveCjStorefrontEdit } from '../../admin/suppliers/cj/actions';
 
 const editInput = 'mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
-import { cjStorefrontView, importedToAdCard } from '@/lib/cj/storefront';
+import { cjStorefrontView, importedToAdCard, cjImg } from '@/lib/cj/storefront';
 import { getStorefrontCjProduct, listStorefrontCjProducts, parseCjImages, setCjProductGallery, parseCjDetails } from '@/lib/cj/mapping';
 import { getProduct } from '@/lib/cj/client';
 import { cjSyncSettings } from '@/lib/cj/sync';
@@ -107,14 +107,14 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
           <div className="card-3d overflow-hidden rounded-2xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {gallery[0]
-              ? <img src={gallery[0]} alt={title} className="aspect-square w-full object-cover" />
+              ? <img src={cjImg(gallery[0])} alt={title} className="aspect-square w-full object-cover" />
               : <div className="grid aspect-square w-full place-items-center bg-primary/5 text-muted-foreground">لا صورة</div>}
           </div>
           {gallery.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {gallery.slice(0, 8).map((src, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={src} alt="" className="h-16 w-16 shrink-0 rounded-lg border border-primary/15 object-cover" loading="lazy" />
+                <img key={i} src={cjImg(src)} alt="" className="h-16 w-16 shrink-0 rounded-lg border border-primary/15 object-cover" loading="lazy" />
               ))}
             </div>
           )}

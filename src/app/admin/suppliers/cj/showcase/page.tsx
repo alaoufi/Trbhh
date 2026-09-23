@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { AccessBoundary } from '@/components/access-boundary';
 import { requireAccess } from '@/lib/access-control/guards';
 import { listVisibleCjProducts } from '@/lib/cj/mapping';
-import { cjStorefrontPublic } from '@/lib/cj/storefront';
+import { cjStorefrontPublic, cjImg } from '@/lib/cj/storefront';
 import { setCjStorefront } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -67,7 +67,7 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
                 <div key={r.id} className="card-3d flex flex-col overflow-hidden rounded-xl">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {r.image
-                    ? <img src={r.image} alt="" className="aspect-square w-full object-cover" loading="lazy" />
+                    ? <img src={cjImg(r.image)} alt="" className="aspect-square w-full object-cover" loading="lazy" />
                     : <div className="grid aspect-square w-full place-items-center bg-primary/5 text-xs text-muted-foreground">لا صورة</div>}
                   <div className="flex flex-1 flex-col gap-1 p-3">
                     <div className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-5">{title}</div>

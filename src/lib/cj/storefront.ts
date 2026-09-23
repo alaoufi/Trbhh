@@ -5,6 +5,13 @@ import { hasAnyAdmin } from '@/lib/roles';
 import type { AdCard } from '@/lib/data';
 import type { CjProductRow } from '@/lib/cj/mapping';
 
+/** يمرّر رابط صورة CJ عبر وسيط الخادم (بلا تخزين) لتفادي منع التحميل. غير CJ يبقى كما هو. */
+export function cjImg(url: string | null | undefined): string {
+  const u = (url ?? '').trim();
+  if (!u) return '';
+  return /^https:\/\/[^/]*(cjdropshipping\.(com|cn)|aliyuncs\.com)\//i.test(u) ? `/api/cj/img?u=${encodeURIComponent(u)}` : u;
+}
+
 /** يحوّل السلعة المستوردة إلى بطاقة إعلان (نفس التصميم) — المورد وبيانات البائع مخفية. */
 export function importedToAdCard(r: CjProductRow): AdCard {
   return {
@@ -13,7 +20,7 @@ export function importedToAdCard(r: CjProductRow): AdCard {
     title: r.name_ar || r.name || 'سلعة',
     price: Math.round((r.sale_price_override_minor ?? r.sale_price_minor) / 100),
     adsType: 'sale',
-    image: r.image,
+    image: cjImg(r.image),
     cityName: null,
     categoryName: r.trbhh_category || null,
     createdAt: null,

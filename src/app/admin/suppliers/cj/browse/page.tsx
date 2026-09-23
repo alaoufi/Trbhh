@@ -7,6 +7,7 @@ import { importedCjPids, listCjProducts } from '@/lib/cj/mapping';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
 import { getCachedArabic, translateManyCached } from '@/lib/cj/translate';
+import { cjImg } from '@/lib/cj/storefront';
 import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, translateCjCategories, runCjTranslateWarm, refreshCjMediaAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -206,7 +207,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                 <div key={r.id} className={`rounded-xl border p-3 space-y-2 ${r.hidden ? 'border-slate-300 bg-slate-50 opacity-80' : 'border-primary/20'}`}>
                   <div className="flex gap-3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {r.image ? <img src={r.image} alt="" className="h-20 w-20 shrink-0 rounded-lg object-cover" loading="lazy" /> : <div className="grid h-20 w-20 shrink-0 place-items-center rounded-lg bg-primary/5 text-[10px] text-muted-foreground">لا صورة</div>}
+                    {r.image ? <img src={cjImg(r.image)} alt="" className="h-20 w-20 shrink-0 rounded-lg object-cover" loading="lazy" /> : <div className="grid h-20 w-20 shrink-0 place-items-center rounded-lg bg-primary/5 text-[10px] text-muted-foreground">لا صورة</div>}
                     <div className="min-w-0 flex-1 space-y-0.5">
                       <div className="truncate text-sm font-bold">{r.name_ar || <span className="text-amber-700">— بلا عنوان عربي —</span>}</div>
                       <div className="truncate text-xs text-muted-foreground" dir="ltr">{r.name}</div>

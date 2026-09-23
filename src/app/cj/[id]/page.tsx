@@ -76,18 +76,9 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const details = parseCjDetails(p);
   const settings = await cjSyncSettings().catch(() => null);
   const shippingText = settings ? sar(settings.shippingMinor) : null;
-  // خيارات المتغيّرات: أسماء CJ تأتي كتوليفات (مثل «أسود-XL») فتظهر عشرات الأسطر
-  // المكرّرة. نفكّكها إلى قيم مفردة مميّزة (لون/مقاس) لتظهر كوسوم قصيرة مرتّبة.
+  // عدد المتغيّرات فقط (يظهر في جدول المواصفات) — لا نعرض قائمة «الخيارات المتاحة»
+  // لأن أسماء CJ توليفات غير مرتّبة؛ الاختيار الفعلي يتم عند تفعيل الشراء.
   const variantNames = [...new Set((details?.variants ?? []).map((v) => v.name).filter(Boolean))];
-  const optionTokens: string[] = [];
-  const seenTok = new Set<string>();
-  for (const nm of variantNames) {
-    for (const tok of nm.split(/[-/,;|·、]+|\s{2,}/).map((t) => t.replace(/[ ​-‍]+/g, ' ').trim()).filter(Boolean)) {
-      const key = tok.toLowerCase();
-      // تجاهُل الوسوم الفارغة/بلا قيمة (رموز فقط) — يجب أن تحوي حرفاً أو رقماً.
-      if (!seenTok.has(key) && tok.length <= 24 && /[\p{L}\p{N}]/u.test(tok)) { seenTok.add(key); optionTokens.push(tok); }
-    }
-  }
   const weightLabel = details && details.weightMin ? (details.weightMax && details.weightMax !== details.weightMin ? `${details.weightMin}–${details.weightMax} غ` : `${details.weightMin} غ`) : null;
   const others = (await listStorefrontCjProducts(readyOnly, 24)).filter((r) => r.image && Number(r.id) !== id).slice(0, 12).map(importedToAdCard);
 
@@ -176,17 +167,6 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
             <div className="text-3xl font-extrabold text-red-700">{sar(price)}</div>
             <div className="pb-1 text-xs text-muted-foreground">شامل تقدير الشحن</div>
           </div>
-
-          {/* خيارات المتغيّرات (ألوان/مقاسات) — قيم مفردة مميّزة */}
-          {optionTokens.length > 1 && (
-            <div className="space-y-1">
-              <div className="text-xs font-bold text-muted-foreground">الخيارات المتاحة:</div>
-              <div className="flex flex-wrap gap-1.5">
-                {optionTokens.slice(0, 16).map((n, i) => <span key={i} className="rounded-lg border border-primary/25 bg-white px-2 py-1 text-xs">{n}</span>)}
-                {optionTokens.length > 16 && <span className="px-1 text-xs text-muted-foreground">+{optionTokens.length - 16}</span>}
-              </div>
-            </div>
-          )}
 
           {/* أزرار السلة/الشراء (معطّلة حتى تفعيل الشراء) */}
           <div className="grid grid-cols-2 gap-2">

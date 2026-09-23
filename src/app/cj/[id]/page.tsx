@@ -4,7 +4,7 @@ import { ShoppingCart, CreditCard, Truck, Heart, Star, RotateCcw, Lock } from 'l
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
 import { getSession } from '@/lib/auth';
-import { hasAccess } from '@/lib/access-control/guards';
+import { hasAnyAdmin } from '@/lib/roles';
 import { isActiveAgent } from '@/lib/cj/agents';
 import { cjProductOrderCount } from '@/lib/cj/mapping';
 import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '../../admin/suppliers/cj/actions';
@@ -68,7 +68,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   }
   // صلاحية الإدارة: الإدارة (integrations:manage_settings) أو وكيل السلعة النشط.
   const session = await getSession();
-  const isAdmin = session ? await hasAccess(session.uid, 'integrations', 'manage_settings') : false;
+  const isAdmin = session ? await hasAnyAdmin(session.uid) : false;
   const isProductAgent = !!(session && p.agent_user_id != null && p.agent_user_id === BigInt(session.uid) && (await isActiveAgent(session.uid)));
   const canManage = isAdmin || isProductAgent;
   const hasActivity = canManage ? (await cjProductOrderCount(p.cj_product_id)) > 0 : false;
@@ -82,9 +82,10 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const optionTokens: string[] = [];
   const seenTok = new Set<string>();
   for (const nm of variantNames) {
-    for (const tok of nm.split(/[-/,;|·、]+|\s{2,}/).map((t) => t.trim()).filter(Boolean)) {
+    for (const tok of nm.split(/[-/,;|·、]+|\s{2,}/).map((t) => t.replace(/[ ​-‍]+/g, ' ').trim()).filter(Boolean)) {
       const key = tok.toLowerCase();
-      if (!seenTok.has(key) && tok.length <= 24) { seenTok.add(key); optionTokens.push(tok); }
+      // تجاهُل الوسوم الفارغة/بلا قيمة (رموز فقط) — يجب أن تحوي حرفاً أو رقماً.
+      if (!seenTok.has(key) && tok.length <= 24 && /[\p{L}\p{N}]/u.test(tok)) { seenTok.add(key); optionTokens.push(tok); }
     }
   }
   const weightLabel = details && details.weightMin ? (details.weightMax && details.weightMax !== details.weightMin ? `${details.weightMin}–${details.weightMax} غ` : `${details.weightMin} غ`) : null;
@@ -134,17 +135,17 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <div className="grid gap-5 md:grid-cols-2">
         {/* معرض الصور */}
         <div className="space-y-2">
-          <div className="card-3d overflow-hidden rounded-2xl">
+          <div className="card-3d overflow-hidden rounded-2xl bg-white">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {gallery[0]
-              ? <img src={cjImg(gallery[0])} alt={title} className="aspect-square w-full object-cover" />
+              ? <img src={cjImg(gallery[0])} alt={title} className="mx-auto aspect-square max-h-[60vh] w-full object-contain" />
               : <div className="grid aspect-square w-full place-items-center bg-primary/5 text-muted-foreground">لا صورة</div>}
           </div>
           {gallery.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {gallery.slice(0, 8).map((src, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={cjImg(src)} alt="" className="h-16 w-16 shrink-0 rounded-lg border border-primary/15 object-cover" loading="lazy" />
+                <img key={i} src={cjImg(src)} alt="" className="h-16 w-16 shrink-0 rounded-lg border border-primary/15 bg-white object-contain" loading="lazy" />
               ))}
             </div>
           )}
@@ -179,7 +180,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
           {/* خيارات المتغيّرات (ألوان/مقاسات) — قيم مفردة مميّزة */}
           {optionTokens.length > 1 && (
             <div className="space-y-1">
-              <div className="text-xs font-bold text-muted-foreground">الخيارات المتاحة ({variantNames.length}):</div>
+              <div className="text-xs font-bold text-muted-foreground">الخيارات المتاحة:</div>
               <div className="flex flex-wrap gap-1.5">
                 {optionTokens.slice(0, 16).map((n, i) => <span key={i} className="rounded-lg border border-primary/25 bg-white px-2 py-1 text-xs">{n}</span>)}
                 {optionTokens.length > 16 && <span className="px-1 text-xs text-muted-foreground">+{optionTokens.length - 16}</span>}

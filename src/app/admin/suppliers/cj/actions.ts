@@ -8,8 +8,8 @@ import { importCjProductByPid } from '@/lib/cj/import';
 import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductDescriptionAr, setCjProductCategory, cjProductOrderCount } from '@/lib/cj/mapping';
 import { translateToArabic, translateManyCached, learnTranslation } from '@/lib/cj/translate';
 import { getSession } from '@/lib/auth';
-import { hasAccess } from '@/lib/access-control/guards';
 import { isActiveAgent } from '@/lib/cj/agents';
+import { hasAnyAdmin } from '@/lib/roles';
 import { getCategories } from '@/lib/cj/client';
 import { createOrder, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
 import { warmCjTranslations, refreshCjMedia } from '@/lib/cj/translate-warm';
@@ -250,7 +250,7 @@ async function ensureCjProductManager(productId: number) {
   const session = await getSession();
   if (!session) redirect('/login');
   const product = await getCjProductById(productId);
-  const admin = await hasAccess(session.uid, 'integrations', 'manage_settings');
+  const admin = await hasAnyAdmin(session.uid);
   const agent = !!product?.agent_user_id && product.agent_user_id === BigInt(session.uid) && (await isActiveAgent(session.uid));
   if (!admin && !agent) redirect('/account?access=denied');
   return { session, product };

@@ -20,6 +20,8 @@ export type CjProductRow = {
   status: string;
   images: string | null;
   details_json: string | null;
+  agent_user_id: bigint | null;
+  agent_claimed_at: Date | null;
   hidden: number;
   sale_price_override_minor: number | null;
   image: string;
@@ -235,6 +237,12 @@ export async function setCjProductDescriptionAr(id: number, descAr: string): Pro
 export async function countCjProducts(): Promise<number> {
   const rows = await prisma.$queryRaw<{ c: bigint }[]>`SELECT COUNT(*) c FROM cj_products`.catch(() => [] as { c: bigint }[]);
   return Number(rows[0]?.c ?? 0);
+}
+
+/** نشاط السلعة (طلبات) — يمنع الحذف إن وُجد. */
+export async function cjProductOrderCount(cjProductId: string): Promise<number> {
+  if (!cjProductId) return 0;
+  return prisma.cj_orders.count({ where: { cj_product_id: cjProductId } }).catch(() => 0);
 }
 
 /** حذف منتج مستورد من التخزين الوسيط (لا يؤثر على أي منتج عام). */

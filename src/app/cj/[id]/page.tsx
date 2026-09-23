@@ -3,8 +3,11 @@ import { notFound } from 'next/navigation';
 import { ShoppingCart, CreditCard, Truck, Heart, Star, RotateCcw, Lock } from 'lucide-react';
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
-import { AccessBoundary } from '@/components/access-boundary';
-import { saveCjStorefrontEdit } from '../../admin/suppliers/cj/actions';
+import { getSession } from '@/lib/auth';
+import { hasAccess } from '@/lib/access-control/guards';
+import { isActiveAgent } from '@/lib/cj/agents';
+import { cjProductOrderCount } from '@/lib/cj/mapping';
+import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '../../admin/suppliers/cj/actions';
 
 const editInput = 'mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
 import { cjStorefrontView, importedToAdCard, cjImg } from '@/lib/cj/storefront';
@@ -63,6 +66,12 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       if (gallery.length) await setCjProductGallery(id, gallery);
     }
   }
+  // صلاحية الإدارة: الإدارة (integrations:manage_settings) أو وكيل السلعة النشط.
+  const session = await getSession();
+  const isAdmin = session ? await hasAccess(session.uid, 'integrations', 'manage_settings') : false;
+  const isProductAgent = !!(session && p.agent_user_id != null && p.agent_user_id === BigInt(session.uid) && (await isActiveAgent(session.uid)));
+  const canManage = isAdmin || isProductAgent;
+  const hasActivity = canManage ? (await cjProductOrderCount(p.cj_product_id)) > 0 : false;
   const description = p.display_description_ar ? cleanDescription(p.display_description_ar) : '';
   const details = parseCjDetails(p);
   const settings = await cjSyncSettings().catch(() => null);
@@ -78,26 +87,38 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm"><b>معاينة إدارية</b> — مخفية عن الأعضاء والزوار.</p>
       )}
       {sp.edited === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حفظ التعديل، وتعلّمت الترجمة التصحيح.</p>}
+      {sp.err === 'has_activity' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">لا يمكن الحذف — للسلعة نشاط (طلبات/تعليقات). يمكنك الإخفاء بدلاً من الحذف.</p>}
 
-      {/* تعديل مباشر لمن يملك صلاحية التكاملات — يُحفظ ويُعلّم الترجمة */}
-      <AccessBoundary module={'integrations'} action={'manage_settings'}>
-        <details className="card-3d rounded-2xl p-3">
-          <summary className="cursor-pointer text-sm font-bold text-primary">✎ تعديل مباشر (يُحفظ ويُعلّم الترجمة)</summary>
-          <form action={saveCjStorefrontEdit} className="mt-2 space-y-2 text-sm">
-            <input type="hidden" name="id" value={id} />
-            <label className="block">العنوان العربي<input name="nameAr" defaultValue={p.name_ar} className={editInput} placeholder="مثال: ساعة يد رجالية" /></label>
-            <label className="block">الوصف العربي<textarea name="descriptionAr" rows={4} defaultValue={p.display_description_ar ?? ''} className={editInput} /></label>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block">التصنيف<input name="trbhhCategory" defaultValue={p.trbhh_category} className={editInput} /></label>
-              <label className="block">السعر (ر.س) — فارغ = المحسوب<input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} /></label>
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="rounded-lg bg-primary px-4 py-2 font-bold text-white">حفظ التعديل</button>
-              <span className="text-xs text-muted-foreground">تصحيح العنوان/الوصف يُحفظ في ذاكرة الترجمة ويُطبَّق على السلع المشابهة.</span>
-            </div>
-          </form>
-        </details>
-      </AccessBoundary>
+      {/* إدارة السلعة: الإدارة أو وكيلها — تعديل/إخفاء/حذف */}
+      {canManage && (
+        <div className="card-3d rounded-2xl p-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-bold text-primary">إدارة السلعة{isProductAgent && !isAdmin ? ' (وكيلها)' : ''}:</span>
+            {/* إخفاء/إظهار */}
+            <form action={hideCjStorefront}><input type="hidden" name="id" value={id} /><input type="hidden" name="hidden" value={p.hidden ? '0' : '1'} /><button className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">{p.hidden ? 'إظهار' : 'إخفاء'}</button></form>
+            {/* حذف — فقط إن لا نشاط */}
+            {hasActivity
+              ? <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">الحذف متعذّر (يوجد نشاط) — الإخفاء متاح</span>
+              : <form action={deleteCjStorefront}><input type="hidden" name="id" value={id} /><button className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-700">حذف</button></form>}
+          </div>
+          <details>
+            <summary className="cursor-pointer text-sm font-bold text-primary">✎ تعديل مباشر (يُحفظ ويُعلّم الترجمة)</summary>
+            <form action={saveCjStorefrontEdit} className="mt-2 space-y-2 text-sm">
+              <input type="hidden" name="id" value={id} />
+              <label className="block">العنوان العربي<input name="nameAr" defaultValue={p.name_ar} className={editInput} placeholder="مثال: ساعة يد رجالية" /></label>
+              <label className="block">الوصف العربي<textarea name="descriptionAr" rows={4} defaultValue={p.display_description_ar ?? ''} className={editInput} /></label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block">التصنيف<input name="trbhhCategory" defaultValue={p.trbhh_category} className={editInput} /></label>
+                <label className="block">السعر (ر.س) — فارغ = المحسوب<input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} /></label>
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="rounded-lg bg-primary px-4 py-2 font-bold text-white">حفظ التعديل</button>
+                <span className="text-xs text-muted-foreground">تصحيح العنوان/الوصف يُحفظ في ذاكرة الترجمة ويُطبَّق على السلع المشابهة.</span>
+              </div>
+            </form>
+          </details>
+        </div>
+      )}
 
       <nav className="text-sm"><Link href="/cj" className="text-primary hover:underline">‹ رجوع للسلع والإعلانات</Link></nav>
 

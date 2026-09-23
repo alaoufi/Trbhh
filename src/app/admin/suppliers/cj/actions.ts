@@ -5,8 +5,11 @@ import { requireAccess } from '@/lib/access-control/guards';
 import { setDefaultMarginBps } from '@/lib/cj/pricing';
 import { saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync';
 import { importCjProductByPid } from '@/lib/cj/import';
-import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductDescriptionAr, setCjProductCategory } from '@/lib/cj/mapping';
+import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductDescriptionAr, setCjProductCategory, cjProductOrderCount } from '@/lib/cj/mapping';
 import { translateToArabic, translateManyCached, learnTranslation } from '@/lib/cj/translate';
+import { getSession } from '@/lib/auth';
+import { hasAccess } from '@/lib/access-control/guards';
+import { isActiveAgent } from '@/lib/cj/agents';
 import { getCategories } from '@/lib/cj/client';
 import { createOrder, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
 import { warmCjTranslations, refreshCjMedia } from '@/lib/cj/translate-warm';
@@ -242,11 +245,21 @@ export async function assignAgentToProduct(form: FormData) {
   redirect(withParam(back, 'edited=1'));
 }
 
-/** تعديل مباشر من صفحة السلعة (لمن يملك صلاحية) — يحدّث العرض ويُعلّم الترجمة. */
+/** تُصرّح الإدارة (integrations:manage_settings) أو وكيل السلعة النشط بإدارتها. */
+async function ensureCjProductManager(productId: number) {
+  const session = await getSession();
+  if (!session) redirect('/login');
+  const product = await getCjProductById(productId);
+  const admin = await hasAccess(session.uid, 'integrations', 'manage_settings');
+  const agent = !!product?.agent_user_id && product.agent_user_id === BigInt(session.uid) && (await isActiveAgent(session.uid));
+  if (!admin && !agent) redirect('/account?access=denied');
+  return { session, product };
+}
+
+/** تعديل مباشر من صفحة السلعة (الإدارة أو وكيل السلعة) — يحدّث العرض ويُعلّم الترجمة. */
 export async function saveCjStorefrontEdit(form: FormData) {
-  await requireAccess('integrations', 'manage_settings');
   const id = Number(String(form.get('id') || ''));
-  const row = await getCjProductById(id);
+  const { product: row } = await ensureCjProductManager(id);
   const nameAr = String(form.get('nameAr') || '').trim();
   const descAr = String(form.get('descriptionAr') || '').trim();
   const cat = String(form.get('trbhhCategory') || '').trim();
@@ -261,6 +274,30 @@ export async function saveCjStorefrontEdit(form: FormData) {
   revalidatePath('/cj');
   revalidatePath('/admin/suppliers/cj/browse');
   redirect(`/cj/${id}?edited=1`);
+}
+
+/** إخفاء/إظهار السلعة من صفحتها (الإدارة أو وكيلها). */
+export async function hideCjStorefront(form: FormData) {
+  const id = Number(String(form.get('id') || ''));
+  await ensureCjProductManager(id);
+  await setCjProductHidden(id, String(form.get('hidden') || '') === '1');
+  revalidatePath(`/cj/${id}`);
+  revalidatePath('/cj');
+  revalidatePath('/admin/suppliers/cj/browse');
+  redirect(`/cj/${id}?edited=1`);
+}
+
+/** حذف السلعة (الإدارة أو وكيلها) — يُمنع إن كان لها نشاط (طلبات/تعليقات). */
+export async function deleteCjStorefront(form: FormData) {
+  const id = Number(String(form.get('id') || ''));
+  const { product } = await ensureCjProductManager(id);
+  if (product && (await cjProductOrderCount(product.cj_product_id)) > 0) {
+    redirect(`/cj/${id}?err=has_activity`);
+  }
+  await removeCjProductById(id);
+  revalidatePath('/cj');
+  revalidatePath('/admin/suppliers/cj/browse');
+  redirect(`/cj?removed=1`);
 }
 
 /** تفعيل/إيقاف إظهار متجر CJ للعامة (بعد نجاح التجربة). الشراء يبقى معطّلاً بمفتاحه. */

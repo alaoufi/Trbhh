@@ -55,3 +55,23 @@ export type CjTrack = {
 
 /** نتيجة موحّدة لاستدعاءات CJ (لا ترمي؛ نميّز النجاح من الفشل). */
 export type CjResult<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
+
+/** عيّنة منتج تفصيلية للقراءة فقط — تجمع الملخّص + المتغيّرات + المخزون. */
+export type CjSampleVariant = {
+  vid: string;
+  sku: string;
+  name: string | null;
+  priceUsd: number | null;
+  weight: number | null;
+  stock: number | null;
+};
+export type CjSampleProduct = {
+  pid: string;
+  sku: string;
+  name: string;
+  category: string | null;
+  priceUsd: number | null;
+  images: string[];
+  variants: CjSampleVariant[];
+  totalStock: number;
+};

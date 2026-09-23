@@ -8,6 +8,7 @@ import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { countCjProducts } from '@/lib/cj/mapping';
 import { testConnection, listProducts, getInventoryByPid, getWarehouses, calculateFreightToKSA } from '@/lib/cj/client';
+import { sampleCjProducts } from '@/lib/cj/sample';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { saveCjMargin, saveCjSync, runCjSync } from './actions';
 
@@ -45,6 +46,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
   if (cfg.configured) {
     if (run === 'connection') result = await testConnection();
     else if (run === 'products') result = await listProducts(1, 20);
+    else if (run === 'sample') result = await sampleCjProducts(3);
     else if (run === 'inventory' && pid) result = await getInventoryByPid(pid);
     else if (run === 'warehouses' && pid) result = await getWarehouses(pid);
     else if (run === 'freight' && vid) result = await calculateFreightToKSA([{ vid, quantity: qty }]);
@@ -123,6 +125,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
         <div className="flex flex-wrap gap-2">
           <AccessPage href="/admin/suppliers/cj?run=connection"><Link href="/admin/suppliers/cj?run=connection" className={btn}>اختبار الاتصال</Link></AccessPage>
           <AccessPage href="/admin/suppliers/cj?run=products"><Link href="/admin/suppliers/cj?run=products" className={btn}>عيّنة منتجات (٢٠)</Link></AccessPage>
+          <AccessPage href="/admin/suppliers/cj?run=sample"><Link href="/admin/suppliers/cj?run=sample" className={btn}>عيّنة تفصيلية (٣: متغيّرات+وزن+مخزون)</Link></AccessPage>
         </div>
         <form method="get" className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="run" value="inventory" />

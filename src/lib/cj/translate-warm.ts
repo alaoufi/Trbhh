@@ -1,7 +1,7 @@
 import 'server-only';
 import { getCategories, getProduct } from './client';
 import { translateManyCached, translateToArabicCached } from './translate';
-import { listProductsNeedingArabic, setCjProductNameAr, setCjProductDescriptionAr, listProductsMissingImage, setCjProductGallery } from './mapping';
+import { listProductsNeedingArabic, setCjProductNameAr, setCjProductDescriptionAr, listProductsMissingImage, setCjProductGallery, setCjProductDetails, buildCjDetails } from './mapping';
 
 /**
  * تهيئة (warming) الترجمات على الخادم — تُشغَّل أسبوعياً (كرون داخلي) أو يدوياً.
@@ -28,13 +28,14 @@ export async function warmCjTranslations(opts: { categoryMax?: number; productMa
     if ((!r.display_description_ar) && r.source_description) { const ar = await translateToArabicCached(r.source_description); if (ar) { await setCjProductDescriptionAr(r.id, ar); out.productDescriptions++; } }
   }
 
-  // 3) تعبئة صور السلع الناقصة من CJ (معرض كامل: صورة المنتج + صور المتغيّرات).
+  // 3) تعبئة صور وتفاصيل السلع الناقصة من CJ (معرض + متغيّرات/مواصفات).
   const missImg = await listProductsMissingImage(opts.imageMax ?? 20);
   for (const r of missImg) {
     const det = await getProduct(r.cj_product_id).catch(() => null);
     if (det && det.ok) {
       const gallery = [...new Set([det.data.productImage, ...(det.data.variants ?? []).map((v) => v.variantImage)].filter((s): s is string => !!s))];
       if (gallery.length) { await setCjProductGallery(r.id, gallery); out.images++; }
+      await setCjProductDetails(r.id, buildCjDetails(det.data.variants ?? []));
     }
   }
   return out;

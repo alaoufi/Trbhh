@@ -1,6 +1,6 @@
 import 'server-only';
 import { getProduct as cjGet } from './client';
-import { upsertCjProduct } from './mapping';
+import { upsertCjProduct, buildCjDetails } from './mapping';
 import { computePrice, defaultMarginBps } from './pricing';
 import { cjSyncSettings, type CjSyncSettings } from './sync';
 import { translateToArabic } from './translate';
@@ -44,10 +44,11 @@ export async function importCjProductByPid(pid: string, deps: CjImportDeps = {})
   ]);
   // معرض الصور: صورة المنتج + صور المتغيّرات (بعض منتجات CJ بلا productImage). الأولى = الرئيسية.
   const gallery = [...new Set([d.productImage, ...(d.variants ?? []).map((v) => v.variantImage)].filter((s): s is string => !!s))];
+  const detailsJson = JSON.stringify(buildCjDetails(d.variants ?? []));
   await upsert({
     cjProductId: clean, cjSku: d.productSku || '', name: d.productName || '', nameAr,
     sourceDescription: d.description || null, descriptionAr: descAr,
-    trbhhCategory: catAr || d.categoryName || '', image: gallery[0] || '', images: gallery, price,
+    trbhhCategory: catAr || d.categoryName || '', image: gallery[0] || '', images: gallery, detailsJson, price,
   });
   return { ok: true, pid: clean, name: d.productName || '', salePriceMinor: price.salePriceMinor, supplierCostMinor: price.supplierCostMinor };
 }

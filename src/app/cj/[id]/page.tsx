@@ -1,9 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ShieldCheck, ShoppingCart, CreditCard } from 'lucide-react';
+import { ShoppingCart, CreditCard, Truck, Heart, Star, RotateCcw, Lock } from 'lucide-react';
+import { ShareButtons } from '@/components/share-buttons';
+import { SITE } from '@/lib/constants';
 import { cjStorefrontView, importedToAdCard } from '@/lib/cj/storefront';
-import { getStorefrontCjProduct, listStorefrontCjProducts, parseCjImages, setCjProductGallery } from '@/lib/cj/mapping';
+import { getStorefrontCjProduct, listStorefrontCjProducts, parseCjImages, setCjProductGallery, parseCjDetails } from '@/lib/cj/mapping';
 import { getProduct } from '@/lib/cj/client';
+import { cjSyncSettings } from '@/lib/cj/sync';
 import { AdGrid } from '@/components/ad-card';
 
 export const dynamic = 'force-dynamic';
@@ -55,6 +58,12 @@ export default async function CjStoreProductPage({ params }: { params: Promise<{
     }
   }
   const description = p.display_description_ar ? cleanDescription(p.display_description_ar) : '';
+  const details = parseCjDetails(p);
+  const settings = await cjSyncSettings().catch(() => null);
+  const shippingText = settings ? sar(settings.shippingMinor) : null;
+  // خيارات المتغيّرات (ألوان/مقاسات) بأسماء مختصرة، وأوزان.
+  const variantNames = [...new Set((details?.variants ?? []).map((v) => v.name).filter(Boolean))].slice(0, 24);
+  const weightLabel = details && details.weightMin ? (details.weightMax && details.weightMax !== details.weightMin ? `${details.weightMin}–${details.weightMax} غ` : `${details.weightMin} غ`) : null;
   const others = (await listStorefrontCjProducts(readyOnly, 24)).filter((r) => r.image && Number(r.id) !== id).slice(0, 12).map(importedToAdCard);
 
   return (
@@ -83,34 +92,77 @@ export default async function CjStoreProductPage({ params }: { params: Promise<{
           )}
         </div>
 
-        {/* المعلومات (بلا بيانات تواصل أو موقع أو بائع) — الفرق: أضف للسلة/شراء */}
+        {/* المعلومات — خلطة هجين (علي/Temu/أمازون): تقييم/مفضّلة/مشاركة/سلة/شحن */}
         <div className="space-y-3">
-          <h1 className="text-xl font-extrabold leading-7">{title}</h1>
+          <div className="flex items-start justify-between gap-2">
+            <h1 className="text-xl font-extrabold leading-7">{title}</h1>
+            <div className="flex shrink-0 items-center gap-1">
+              <button aria-label="أضف للمفضّلة" className="grid h-9 w-9 place-items-center rounded-full border border-primary/20 text-rose-500 hover:bg-rose-50"><Heart className="h-4 w-4" /></button>
+              <ShareButtons url={`https://${SITE.domain}/cj/${id}`} title={title} iconOnly compact />
+            </div>
+          </div>
+
+          {/* تقييم (بلا أرقام وهمية) */}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="flex text-slate-300">{[0, 1, 2, 3, 4].map((i) => <Star key={i} className="h-4 w-4" />)}</span>
+            <span className="text-xs text-muted-foreground">جديد — لا تقييمات بعد</span>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {p.trbhh_category && <span className="rounded-full bg-primary/10 px-2 py-1 font-bold text-primary">{p.trbhh_category}</span>}
             <span className="rounded-full bg-emerald-100 px-2 py-1 font-bold text-emerald-700">متوفّر</span>
-            <span className="rounded-full bg-secondary px-2 py-1 text-muted-foreground">شحن داخل السعودية</span>
           </div>
-          <div className="text-3xl font-extrabold text-primary">{sar(price)}</div>
 
-          {/* أزرار الشراء (معطّلة حتى تفعيل الشراء) */}
+          <div className="flex items-end gap-2">
+            <div className="text-3xl font-extrabold text-primary">{sar(price)}</div>
+            <div className="pb-1 text-xs text-muted-foreground">شامل تقدير الشحن</div>
+          </div>
+
+          {/* خيارات المتغيّرات (ألوان/مقاسات) */}
+          {variantNames.length > 1 && (
+            <div className="space-y-1">
+              <div className="text-xs font-bold text-muted-foreground">الخيارات المتاحة ({variantNames.length}):</div>
+              <div className="flex flex-wrap gap-1.5">
+                {variantNames.slice(0, 16).map((n, i) => <span key={i} className="rounded-lg border border-primary/25 bg-white px-2 py-1 text-xs">{n}</span>)}
+                {variantNames.length > 16 && <span className="px-1 text-xs text-muted-foreground">+{variantNames.length - 16}</span>}
+              </div>
+            </div>
+          )}
+
+          {/* أزرار السلة/الشراء (معطّلة حتى تفعيل الشراء) */}
           <div className="grid grid-cols-2 gap-2">
             <button disabled aria-disabled className="flex cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border-2 border-primary/30 bg-white px-4 py-3 font-bold text-primary/60"><ShoppingCart className="h-4 w-4" /> أضف للسلة</button>
             <button disabled aria-disabled className="flex cursor-not-allowed items-center justify-center gap-1.5 rounded-xl bg-primary/50 px-4 py-3 font-bold text-white"><CreditCard className="h-4 w-4" /> شراء الآن</button>
           </div>
           <p className="rounded-lg bg-amber-50 p-2 text-center text-xs font-bold text-amber-800">الشراء قريباً — قيد التجهيز</p>
 
-          {/* مواصفات سريعة (بأسلوب صفحة الإعلان) */}
-          <div className="card-3d rounded-2xl p-3 text-sm">
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-              <span className="text-muted-foreground">التصنيف</span><span className="font-bold">{p.trbhh_category || '—'}</span>
-              <span className="text-muted-foreground">التوفّر</span><span className="flex items-center gap-1 font-bold text-emerald-700"><ShieldCheck className="h-4 w-4" /> متوفّر</span>
-              <span className="text-muted-foreground">الشحن</span><span className="font-bold">داخل السعودية (يُحتسب عند الطلب)</span>
-              <span className="text-muted-foreground">السعر</span><span className="font-bold text-primary">{sar(price)} شامل تقدير الشحن</span>
-            </div>
+          {/* الشحن والضمان (قائمة بأسلوب التسوّق) */}
+          <div className="card-3d divide-y rounded-2xl text-sm">
+            <div className="flex items-center gap-2 p-3"><Truck className="h-4 w-4 text-emerald-600" /><div><div className="font-bold">الشحن إلى السعودية</div><div className="text-xs text-muted-foreground">تقدير الشحن: {shippingText ?? 'يُحتسب عند الطلب'} · المدة تُحدَّد عند تأكيد الطلب</div></div></div>
+            <div className="flex items-center gap-2 p-3"><RotateCcw className="h-4 w-4 text-emerald-600" /><div><div className="font-bold">إرجاع/استبدال وفق السياسة</div><div className="text-xs text-muted-foreground">تُفصَّل شروط الإرجاع عند تفعيل الشراء</div></div></div>
+            <div className="flex items-center gap-2 p-3"><Lock className="h-4 w-4 text-emerald-600" /><div><div className="font-bold">دفع آمن وحماية للطلب</div><div className="text-xs text-muted-foreground">المدفوعات والبيانات محميّة حتى الاستلام</div></div></div>
           </div>
         </div>
       </div>
+
+      {/* المواصفات (جدول منظّم) */}
+      <section className="space-y-2">
+        <h2 className="text-lg font-extrabold text-primary">المواصفات</h2>
+        <div className="card-3d overflow-hidden rounded-2xl text-sm">
+          {[
+            ['التصنيف', p.trbhh_category || '—'],
+            ['التوفّر', 'متوفّر'],
+            ['عدد الخيارات', details ? String(details.variantCount || variantNames.length || '—') : '—'],
+            ['الوزن', weightLabel ?? '—'],
+            ['بلد الشحن', 'يُشحن إلى السعودية'],
+            ['السعر', `${sar(price)} (شامل تقدير الشحن)`],
+          ].map(([k, v], i) => (
+            <div key={i} className={`flex justify-between gap-3 px-4 py-2.5 ${i % 2 ? 'bg-secondary/30' : ''}`}>
+              <span className="text-muted-foreground">{k}</span><span className="text-left font-bold">{v}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* الوصف — منسّق بفقرات ونقاط */}
       {description && (
@@ -123,6 +175,15 @@ export default async function CjStoreProductPage({ params }: { params: Promise<{
           </div>
         </section>
       )}
+
+      {/* التقييمات (تُفعَّل مع الشراء — بلا أرقام وهمية) */}
+      <section className="space-y-2">
+        <h2 className="text-lg font-extrabold text-primary">التقييمات</h2>
+        <div className="card-3d flex items-center gap-3 rounded-2xl p-4 text-sm">
+          <span className="flex text-slate-300">{[0, 1, 2, 3, 4].map((i) => <Star key={i} className="h-5 w-5" />)}</span>
+          <span className="text-muted-foreground">لا تقييمات بعد — ستظهر تقييمات المشترين بعد تفعيل الشراء.</span>
+        </div>
+      </section>
 
       {/* سلع أخرى (نفس تصميم بطاقات الإعلانات) */}
       {others.length > 0 && (

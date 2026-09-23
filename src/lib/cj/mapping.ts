@@ -19,6 +19,7 @@ export type CjProductRow = {
   trbhh_category: string;
   status: string;
   images: string | null;
+  details_json: string | null;
   hidden: number;
   sale_price_override_minor: number | null;
   image: string;
@@ -45,6 +46,7 @@ export type UpsertCjInput = {
   trbhhCategory?: string | null;
   image?: string;
   images?: string[];
+  detailsJson?: string | null;
   price: PriceBreakdown;
 };
 
@@ -54,6 +56,32 @@ export function parseCjImages(row: Pick<CjProductRow, 'images' | 'image'>): stri
   try { const arr = row.images ? JSON.parse(row.images) : []; if (Array.isArray(arr)) for (const s of arr) if (typeof s === 'string' && s) out.push(s); } catch { /* تجاهل */ }
   if (!out.length && row.image) out.push(row.image);
   return [...new Set(out)];
+}
+
+/** تفاصيل غنية مخزَّنة للسلعة (متغيّرات/مواصفات) — للعرض بلا اتصال حيّ. */
+export type CjDetails = {
+  variants: { name: string; sku: string; priceUsd: number | null; weight: number | null }[];
+  weightMin: number | null;
+  weightMax: number | null;
+  variantCount: number;
+};
+export function parseCjDetails(row: Pick<CjProductRow, 'details_json'>): CjDetails | null {
+  try {
+    const d = row.details_json ? JSON.parse(row.details_json) : null;
+    if (d && typeof d === 'object' && Array.isArray(d.variants)) return d as CjDetails;
+  } catch { /* تجاهل */ }
+  return null;
+}
+/** يبني تفاصيل مخزَّنة من متغيّرات CJ (بلا اتصالات إضافية). */
+export function buildCjDetails(variants: { variantName: string | null; variantSku: string; variantSellPrice: number | null; variantWeight: number | null }[]): CjDetails {
+  const list = (variants ?? []).map((v) => ({ name: (v.variantName ?? '').trim(), sku: v.variantSku, priceUsd: v.variantSellPrice, weight: v.variantWeight }));
+  const weights = list.map((v) => v.weight).filter((w): w is number => typeof w === 'number' && w > 0);
+  return { variants: list, weightMin: weights.length ? Math.min(...weights) : null, weightMax: weights.length ? Math.max(...weights) : null, variantCount: list.length };
+}
+/** تحديث التفاصيل المخزَّنة (تعبئة). */
+export async function setCjProductDetails(id: number, details: CjDetails): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
+  await prisma.$executeRaw`UPDATE cj_products SET details_json=${JSON.stringify(details)} WHERE id=${BigInt(id)}`.catch(() => {});
 }
 
 /** يُدرِج/يحدّث صفّ منتج CJ (idempotent) — لا تكرار بفضل مفتاح التفرّد.
@@ -66,16 +94,18 @@ export async function upsertCjProduct(input: UpsertCjInput): Promise<void> {
   const descAr = (input.descriptionAr ?? '') || null;
   const category = (input.trbhhCategory ?? '').trim();
   const imagesJson = input.images && input.images.length ? JSON.stringify([...new Set(input.images.filter(Boolean))].slice(0, 12)) : null;
+  const detailsJson = input.detailsJson ?? null;
   await prisma.$executeRaw`
     INSERT INTO cj_products
-      (cj_product_id, cj_variant_id, cj_sku, name, name_ar, source_description, display_description_ar, trbhh_category, image, images,
+      (cj_product_id, cj_variant_id, cj_sku, name, name_ar, source_description, display_description_ar, trbhh_category, image, images, details_json,
        supplier_cost_minor, shipping_cost_minor, other_costs_minor, profit_minor, sale_price_minor, margin_bps, currency, last_sync_at)
     VALUES
-      (${input.cjProductId}, ${input.cjVariantId ?? ''}, ${input.cjSku ?? ''}, ${input.name ?? ''}, ${nameAr}, ${srcDesc}, ${descAr}, ${category}, ${input.image ?? ''}, ${imagesJson},
+      (${input.cjProductId}, ${input.cjVariantId ?? ''}, ${input.cjSku ?? ''}, ${input.name ?? ''}, ${nameAr}, ${srcDesc}, ${descAr}, ${category}, ${input.image ?? ''}, ${imagesJson}, ${detailsJson},
        ${p.supplierCostMinor}, ${p.shippingCostMinor}, ${p.otherCostsMinor}, ${p.profitMinor}, ${p.salePriceMinor}, ${p.marginBps}, ${p.currency}, CURRENT_TIMESTAMP(3))
     ON DUPLICATE KEY UPDATE
       cj_sku=VALUES(cj_sku), name=VALUES(name), image=VALUES(image),
       images=CASE WHEN VALUES(images) IS NOT NULL THEN VALUES(images) ELSE cj_products.images END,
+      details_json=CASE WHEN VALUES(details_json) IS NOT NULL THEN VALUES(details_json) ELSE cj_products.details_json END,
       source_description=VALUES(source_description),
       name_ar=CASE WHEN cj_products.name_ar='' THEN VALUES(name_ar) ELSE cj_products.name_ar END,
       display_description_ar=CASE WHEN cj_products.display_description_ar IS NULL OR cj_products.display_description_ar='' THEN VALUES(display_description_ar) ELSE cj_products.display_description_ar END,
@@ -186,7 +216,7 @@ export async function setCjProductGallery(id: number, images: string[]): Promise
 /** السلع بلا صورة/معرض مخزَّن — لتعبئتها من CJ. */
 export async function listProductsMissingImage(limit = 40): Promise<CjProductRow[]> {
   const take = Math.min(Math.max(1, limit), 100);
-  return prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE (image='' OR image IS NULL OR images IS NULL) ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
+  return prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE (image='' OR image IS NULL OR images IS NULL OR details_json IS NULL) ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
 }
 
 /** تحديث الوصف العربي المعروض. */

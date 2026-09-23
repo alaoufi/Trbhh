@@ -104,7 +104,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
         {sp.saved === 'sync' && <p className="text-sm text-emerald-700">تم حفظ إعدادات المزامنة.</p>}
         {sp.synced === '1' && <p className="text-sm text-emerald-700">تمّت المزامنة: استُورد {sp.imported} · صفحات {sp.pages} · تُجووز {sp.skipped}.</p>}
         {typeof sp.syncerr === 'string' && <p className="text-sm text-red-700">تعذّرت المزامنة: {sp.syncerr}</p>}
-        <form action={saveCjSync} className="grid gap-2 sm:grid-cols-2">
+        <AccessBoundary module="integrations" action="manage_settings"><form action={saveCjSync} className="grid gap-2 sm:grid-cols-2">
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
             <input type="checkbox" name="enabled" value="1" defaultChecked={sync.enabled} className="size-4" />
             تفعيل المزامنة المجدولة (كرون)
@@ -114,11 +114,11 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
           <label className="text-sm">سعر صرف الدولار (ر.س)<input className={`${input} ms-2 w-24`} name="usdToSar" inputMode="decimal" defaultValue={(sync.usdToSarX100 / 100).toString()} /></label>
           <label className="text-sm">تقدير الشحن/منتج (ر.س)<input className={`${input} ms-2 w-24`} name="shippingSar" inputMode="decimal" defaultValue={(sync.shippingMinor / 100).toString()} /></label>
           <div className="sm:col-span-2"><button className={btn}>حفظ إعدادات المزامنة</button></div>
-        </form>
-        <form action={runCjSync}>
+        </form></AccessBoundary>
+        <AccessBoundary module="integrations" action="sync"><form action={runCjSync}>
           <button className={btn} disabled={!cfg.configured}>مزامنة الآن (يدوية)</button>
           {!cfg.configured && <span className="ms-2 text-xs text-red-700">اضبط متغيّرات CJ أولاً.</span>}
-        </form>
+        </form></AccessBoundary>
       </div>
 
       {/* اختبارات القراءة */}

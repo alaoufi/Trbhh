@@ -16,7 +16,7 @@ const sar = (m: number) => `${(m / 100).toLocaleString('en', { minimumFractionDi
  * ولا رابط لها من واجهة العضو. للتجربة الواقعية قبل النشر. لا شراء ولا دفع.
  */
 export default async function CjShowcasePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAccess('integrations', 'view');
+  await requireAccess('products', 'view');
   const sp = await searchParams;
   const [items, isPublic] = await Promise.all([listVisibleCjProducts(200), cjStorefrontPublic()]);
   const readyCount = items.filter((r) => r.status === 'ready').length;
@@ -40,7 +40,7 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
             {sp.published === '0' && <span className="ms-2 text-amber-800">تم الإيقاف (رجع للمعاينة).</span>}
             <div className="text-xs text-muted-foreground">السلع «الجاهزة» التي ستظهر للعامة عند التفعيل: {readyCount} من {items.length}. (الشراء يبقى معطّلاً بمفتاحه المستقل.)</div>
           </div>
-          <AccessBoundary module={'integrations'} action={'manage_settings'}>
+          <AccessBoundary module={'products'} action={isPublic ? 'suspend' : 'approve'}>
             <form action={setCjStorefront}>
               <input type="hidden" name="value" value={isPublic ? '0' : '1'} />
               <button className={`rounded-lg px-4 py-2 text-sm font-bold text-white ${isPublic ? 'bg-amber-600' : 'bg-emerald-600'}`}>{isPublic ? 'إيقاف الإعلان (رجوع للمعاينة)' : 'تفعيل الإعلان للعامة'}</button>

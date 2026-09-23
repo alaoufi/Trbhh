@@ -1,3 +1,4 @@
+import { AccessBoundary } from '@/components/access-boundary';
 import Link from 'next/link';
 import { requireAccess } from '@/lib/access-control/guards';
 import { cjConfig } from '@/lib/cj/config';
@@ -22,7 +23,7 @@ const sar = (m: number | null) => (m == null ? '—' : `${(m / 100).toFixed(2)} 
 const usd = (v: number | null) => (v == null ? '—' : `$${v.toFixed(2)}`);
 
 export default async function CjBrowsePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAccess('integrations', 'view');
+  await requireAccess('products', 'view');
   const sp = await searchParams;
   const q = typeof sp.q === 'string' ? sp.q.slice(0, 100) : '';
   const cat = typeof sp.cat === 'string' && /^[0-9A-Za-z_-]{1,64}$/.test(sp.cat) ? sp.cat : '';
@@ -100,9 +101,9 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
         {wantAr
           ? <Link href={`/admin/suppliers/cj/browse?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}&ar=0`} className={ghost}>عرض بالإنجليزية</Link>
           : <Link href={`/admin/suppliers/cj/browse?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`} className={btn}>عرض بالعربية</Link>}
-        <form action={translateCjCategories}><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة كل التصنيفات الآن</button></form>
-        <form action={runCjTranslateWarm}><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الترجمات (خادم)</button></form>
-        <form action={refreshCjMediaAction}><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الصور</button></form>
+        <AccessBoundary module="products" action="edit"><form action={translateCjCategories}><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة كل التصنيفات الآن</button></form></AccessBoundary>
+        <AccessBoundary module="products" action="edit"><form action={runCjTranslateWarm}><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الترجمات (خادم)</button></form></AccessBoundary>
+        <AccessBoundary module="products" action="edit"><form action={refreshCjMediaAction}><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الصور</button></form></AccessBoundary>
         {typeof sp.mediaref === 'string' && <span className="text-emerald-700">حُدّثت صور {sp.mediaref} سلعة.</span>}
         {typeof sp.cattr === 'string' && <span className="text-emerald-700">خُزّنت ترجمة {sp.cattr} تصنيفاً (اضغط ثانيةً للباقي).</span>}
         {typeof sp.warmed === 'string' && <span className="text-emerald-700">تم تحديث الترجمات على الخادم ({sp.warmed}).</span>}
@@ -135,7 +136,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
             <div className="flex flex-wrap gap-2 pt-1">
               {imported.has(p.pid)
                 ? <span className="rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-bold text-emerald-800">مستورد ✓</span>
-                : <form action={importCjProduct}><input type="hidden" name="pid" value={p.pid} /><input type="hidden" name="back" value={backHref} /><button className={btn}>استيراد إلى تربح</button></form>}
+                : <AccessBoundary module="products" action="create"><form action={importCjProduct}><input type="hidden" name="pid" value={p.pid} /><input type="hidden" name="back" value={backHref} /><button className={btn}>استيراد إلى تربح</button></form></AccessBoundary>}
               <Link href={`${backHref}&detail=${encodeURIComponent(p.pid)}#cj-detail`} className={ghost}>تفاصيل</Link>
             </div>
           </div>
@@ -194,7 +195,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
           <h2 className="font-bold">البضائع المستوردة (تخزين وسيط — غير معروضة للعامة): {importedList.length}</h2>
           <div className="flex flex-wrap gap-2">
             <Link href="/admin/suppliers/cj/showcase" className={btn}>معاينة السلع المختارة ←</Link>
-            <form action={translateAllCj}><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة تلقائية للكل</button></form>
+            <AccessBoundary module="products" action="edit"><form action={translateAllCj}><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة تلقائية للكل</button></form></AccessBoundary>
           </div>
         </div>
         {typeof sp.edited === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم الحفظ.</p>}
@@ -221,25 +222,25 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                     </div>
                   </div>
                   {/* تحرير العنوان العربي */}
-                  <form action={saveCjArabic} className="flex items-center gap-1">
+                  <AccessBoundary module="products" action="edit"><form action={saveCjArabic} className="flex items-center gap-1">
                     <input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} />
                     <input className={`${input} flex-1`} name="nameAr" defaultValue={r.name_ar} placeholder="العنوان بالعربية" />
                     <button className={btn}>حفظ</button>
-                  </form>
+                  </form></AccessBoundary>
                   <div className="flex flex-wrap items-center gap-1">
                     <Link href={`/admin/suppliers/cj/review/${r.id}`} className={btn}>مراجعة / تحرير</Link>
                     {/* تعديل السعر */}
-                    <form action={saveCjPrice} className="flex items-center gap-1">
+                    <AccessBoundary module="products" action="edit"><form action={saveCjPrice} className="flex items-center gap-1">
                       <input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} />
                       <input className={`${input} w-24`} name="priceSar" inputMode="decimal" defaultValue={r.sale_price_override_minor != null ? (r.sale_price_override_minor / 100).toString() : ''} placeholder={(r.sale_price_minor / 100).toString()} aria-label="سعر البيع بالريال" />
                       <button className={ghost}>سعر</button>
-                    </form>
+                    </form></AccessBoundary>
                     {/* ترجمة تلقائية لهذه السلعة */}
-                    <form action={translateCjProduct}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة</button></form>
+                    <AccessBoundary module="products" action="edit"><form action={translateCjProduct}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة</button></form></AccessBoundary>
                     {/* إخفاء/إظهار */}
-                    <form action={toggleCjHidden}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="hidden" value={r.hidden ? '0' : '1'} /><input type="hidden" name="back" value={backHref} /><button className={ghost}>{r.hidden ? 'إظهار' : 'إخفاء'}</button></form>
+                    <AccessBoundary module="products" action="suspend"><form action={toggleCjHidden}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="hidden" value={r.hidden ? '0' : '1'} /><input type="hidden" name="back" value={backHref} /><button className={ghost}>{r.hidden ? 'إظهار' : 'إخفاء'}</button></form></AccessBoundary>
                     {/* حذف */}
-                    <form action={removeCjProduct}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><button className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-700">حذف</button></form>
+                    <AccessBoundary module="products" action="delete"><form action={removeCjProduct}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><button className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-700">حذف</button></form></AccessBoundary>
                   </div>
                 </div>
               );

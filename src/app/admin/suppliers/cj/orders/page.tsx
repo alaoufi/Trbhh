@@ -13,7 +13,7 @@ const btn = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
 const sar = (m: number) => `${(m / 100).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س`;
 
 export default async function CjOrdersPage() {
-  await requireAccess('integrations', 'view');
+  await requireAccess('orders', 'view');
   const [counts, recent] = await Promise.all([countOrdersByStatus(), listOrders({ limit: 50 })]);
   const stageCount = (statuses: readonly string[]) => statuses.reduce((a, s) => a + (counts[s] ?? 0), 0);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
@@ -24,7 +24,7 @@ export default async function CjOrdersPage() {
         <h1 className="text-xl font-extrabold text-primary">مراقبة طلبات CJ</h1>
         <div className="flex flex-wrap gap-2">
           <Link href="/admin/suppliers/cj/browse" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">تصفّح/استيراد</Link>
-          <AccessBoundary module={'integrations'} action={'manage_settings'}>
+          <AccessBoundary module={'orders'} action={'create'}>
             <form action={createTestCjOrder}><button className={btn}>+ طلب اختبار</button></form>
           </AccessBoundary>
         </div>

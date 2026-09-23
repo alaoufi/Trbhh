@@ -13,6 +13,7 @@ const btn = 'rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white';
 const input = 'mt-1 min-h-10 w-full rounded-lg border border-primary/25 bg-white px-3 text-sm';
 
 export default async function CjAgentsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await requireAccess('integrations', 'view');
   await requireAccess('integrations', 'manage_settings');
   const sp = await searchParams;
   const [agents, quota] = await Promise.all([listAgents(), defaultAgentWeeklyQuota()]);
@@ -42,24 +43,24 @@ export default async function CjAgentsPage({ searchParams }: { searchParams: Pro
       {/* الحصّة الافتراضية */}
       <div className={card}>
         <h2 className="font-bold">الحصّة الأسبوعية الافتراضية</h2>
-        <form action={saveAgentQuota} className="flex flex-wrap items-end gap-2">
+        <AccessBoundary module="integrations" action="manage_settings"><form action={saveAgentQuota} className="flex flex-wrap items-end gap-2">
           <label className="text-sm">عدد السلع/أسبوع<input className={`${input} ms-2 w-24`} name="weeklyQuota" type="number" min={0} max={1000} defaultValue={quota} /></label>
           <button className={btn}>حفظ</button>
           <span className="text-xs text-muted-foreground">تُطبَّق على الوكلاء الجدد ما لم تُحدَّد لكل وكيل قيمة خاصّة.</span>
-        </form>
+        </form></AccessBoundary>
       </div>
 
       {/* منح وكيل */}
       <div className={card}>
         <h2 className="font-bold">منح عضو دور وكيل</h2>
-        <form action={saveAgent} className="grid gap-2 sm:grid-cols-2">
+        <AccessBoundary module="integrations" action="manage_settings"><form action={saveAgent} className="grid gap-2 sm:grid-cols-2">
           <label className="text-sm">العضو (بريد/جوال/اسم دخول)<input className={input} name="ident" required placeholder="alaoufi@gmail.com أو 05xxxxxxxx" /></label>
           <label className="text-sm">جوال التواصل<input className={input} name="phone" inputMode="tel" placeholder="يُترك فارغاً = جوال حسابه" /></label>
           <label className="text-sm">واتساب<input className={input} name="whatsapp" inputMode="tel" placeholder="يُترك فارغاً = جوال التواصل" /></label>
           <label className="text-sm">حصّة أسبوعية خاصّة<input className={input} name="weeklyQuota" type="number" min={0} max={1000} placeholder={`الافتراضي ${quota}`} /></label>
           <label className="text-sm sm:col-span-2">ملاحظة<input className={input} name="notes" maxLength={500} /></label>
           <div className="sm:col-span-2"><button className={btn}>حفظ الوكيل</button></div>
-        </form>
+        </form></AccessBoundary>
       </div>
 
       {/* قائمة الوكلاء */}

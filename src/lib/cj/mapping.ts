@@ -89,7 +89,7 @@ export async function setCjProductDetails(id: number, details: CjDetails): Promi
 /** يُدرِج/يحدّث صفّ منتج CJ (idempotent) — لا تكرار بفضل مفتاح التفرّد.
  *  ملاحظة: عند إعادة الاستيراد لا نطمس تعديلات المشرف (name_ar/hidden/override) —
  *  نحدّث الاسم الإنجليزي والصورة والتكلفة فقط، ونضع الترجمة الأولية إن كانت فارغة. */
-export async function upsertCjProduct(input: UpsertCjInput): Promise<void> {
+export async function upsertCjProduct(input: UpsertCjInput, opts: { createOnly?: boolean } = {}): Promise<void> {
   const p = input.price;
   const nameAr = (input.nameAr ?? '').trim();
   const srcDesc = input.sourceDescription ?? null;
@@ -104,7 +104,7 @@ export async function upsertCjProduct(input: UpsertCjInput): Promise<void> {
     VALUES
       (${input.cjProductId}, ${input.cjVariantId ?? ''}, ${input.cjSku ?? ''}, ${input.name ?? ''}, ${nameAr}, ${srcDesc}, ${descAr}, ${category}, ${input.image ?? ''}, ${imagesJson}, ${detailsJson},
        ${p.supplierCostMinor}, ${p.shippingCostMinor}, ${p.otherCostsMinor}, ${p.profitMinor}, ${p.salePriceMinor}, ${p.marginBps}, ${p.currency}, CURRENT_TIMESTAMP(3))
-    ON DUPLICATE KEY UPDATE
+    ON DUPLICATE KEY UPDATE ${opts.createOnly ? Prisma.sql`id=id` : Prisma.sql`
       cj_sku=VALUES(cj_sku), name=VALUES(name), image=VALUES(image),
       images=CASE WHEN VALUES(images) IS NOT NULL THEN VALUES(images) ELSE cj_products.images END,
       details_json=CASE WHEN VALUES(details_json) IS NOT NULL THEN VALUES(details_json) ELSE cj_products.details_json END,
@@ -115,7 +115,7 @@ export async function upsertCjProduct(input: UpsertCjInput): Promise<void> {
       supplier_cost_minor=VALUES(supplier_cost_minor), shipping_cost_minor=VALUES(shipping_cost_minor),
       other_costs_minor=VALUES(other_costs_minor), profit_minor=VALUES(profit_minor),
       sale_price_minor=VALUES(sale_price_minor), margin_bps=VALUES(margin_bps), currency=VALUES(currency),
-      last_sync_at=CURRENT_TIMESTAMP(3)`;
+      last_sync_at=CURRENT_TIMESTAMP(3)`}`;
 }
 
 /** حفظ حقول المراجعة/العرض (عنوان/وصف عربي، تصنيف تربح، الحالة). لا يمسّ المصدر. */
@@ -125,7 +125,13 @@ export async function updateCjReview(id: number, fields: { nameAr?: string; desc
   const descAr = (fields.descriptionAr ?? '').slice(0, 20000) || null;
   const category = (fields.trbhhCategory ?? '').slice(0, 200);
   const status = fields.status === 'ready' ? 'ready' : 'draft';
-  await prisma.$executeRaw`UPDATE cj_products SET name_ar=${nameAr}, display_description_ar=${descAr}, trbhh_category=${category}, status=${status} WHERE id=${BigInt(id)}`.catch(() => {});
+  await prisma.$executeRaw`UPDATE cj_products SET name_ar=${nameAr}, display_description_ar=${descAr}, trbhh_category=${category}${fields.status === undefined ? Prisma.empty : Prisma.sql`, status=${status}`} WHERE id=${BigInt(id)}`;
+}
+
+/** Approval changes no editable content, pricing or visibility fields. */
+export async function setCjProductStatus(id: number, status: string): Promise<void> {
+  if (!Number.isSafeInteger(id) || id <= 0 || !['draft', 'ready'].includes(status)) throw new Error('invalid_product_status');
+  await prisma.$executeRaw`UPDATE cj_products SET status=${status} WHERE id=${BigInt(id)}`;
 }
 
 export async function listCjProducts(limit = 50): Promise<CjProductRow[]> {

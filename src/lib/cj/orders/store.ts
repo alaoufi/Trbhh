@@ -48,7 +48,7 @@ export async function appendOrderEvent(orderId: number | bigint, e: EventInput):
 }
 
 /** ينشئ طلباً (idempotent عبر internal_ref). يعيد المعرّف وهل أُنشئ الآن. */
-export async function createOrder(input: CreateOrderInput): Promise<{ id: bigint; created: boolean }> {
+export async function createOrder(input: CreateOrderInput, actorId?: number): Promise<{ id: bigint; created: boolean }> {
   const ref = input.internalRef.trim().slice(0, 64);
   if (!ref) throw new Error('internal_ref_required');
   const existing = await prisma.cj_orders.findUnique({ where: { internal_ref: ref }, select: { id: true } });
@@ -76,7 +76,7 @@ export async function createOrder(input: CreateOrderInput): Promise<{ id: bigint
       },
       select: { id: true },
     });
-    await appendOrderEvent(row.id, { eventKey: `${ref}:created`, type: 'created', note: 'إنشاء الطلب' });
+    await appendOrderEvent(row.id, { eventKey: `${ref}:created`, type: 'created', note: 'إنشاء الطلب', actorId });
     return { id: row.id, created: true };
   } catch {
     // سباق إنشاء متزامن على نفس المرجع — أعد الجلب.
@@ -148,7 +148,7 @@ export async function transitionOrder(
 export async function setOrderTracking(
   orderId: number | bigint,
   t: { carrier?: string; trackingNumber?: string; trackingUrl?: string; trackingStatus?: string; cjOrderId?: string },
-  opts: { eventKey?: string; source?: EventInput['source'] } = {},
+  opts: { eventKey?: string; source?: EventInput['source']; actorId?: number } = {},
 ): Promise<void> {
   await prisma.cj_orders.update({
     where: { id: bid(orderId) },
@@ -160,7 +160,7 @@ export async function setOrderTracking(
       ...(t.cjOrderId !== undefined ? { cj_order_id: t.cjOrderId.slice(0, 64) } : {}),
     },
   }).catch(() => {});
-  await appendOrderEvent(orderId, { eventKey: opts.eventKey ?? `${String(orderId)}:track:${Date.now()}`, type: 'tracking', source: opts.source ?? 'carrier', note: t.trackingStatus ?? '' });
+  await appendOrderEvent(orderId, { eventKey: opts.eventKey ?? `${String(orderId)}:track:${Date.now()}`, type: 'tracking', source: opts.source ?? 'carrier', note: t.trackingStatus ?? '', actorId: opts.actorId });
 }
 
 /**

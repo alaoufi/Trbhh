@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AccessBoundary } from '@/components/access-boundary';
-import { requireAccess } from '@/lib/access-control/guards';
+import { hasAccess, requireAccess } from '@/lib/access-control/guards';
 import { getOrderById, listOrderEvents } from '@/lib/cj/orders/store';
 import { nextStatuses, statusLabel, isException, isStatus } from '@/lib/cj/orders/state';
 import { advanceCjOrder, setCjOrderTracking } from '../../actions';
@@ -16,7 +16,7 @@ const sar = (m: number) => `${(m / 100).toLocaleString('en', { minimumFractionDi
 const dt = (d: Date | null) => (d ? new Date(d).toLocaleString('en-GB', { timeZone: 'Asia/Riyadh' }) : '—');
 
 export default async function CjOrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAccess('integrations', 'view');
+  const session = await requireAccess('orders', 'view');
   const { id: idStr } = await params;
   const sp = await searchParams;
   const id = Number(idStr);
@@ -24,7 +24,8 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
   const order = await getOrderById(id);
   if (!order) notFound();
   const events = await listOrderEvents(id);
-  const nexts = isStatus(order.status) ? nextStatuses(order.status) : [];
+  const canRefund = await hasAccess(session.uid, 'orders', 'refund');
+  const nexts = isStatus(order.status) ? nextStatuses(order.status).filter(status => status !== 'refunded' || canRefund) : [];
 
   return (
     <div className="space-y-4">
@@ -59,11 +60,10 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
         </div>
 
         {/* أدوات الاختبار (تحريك الحالة/التتبّع) */}
-        <AccessBoundary module={'integrations'} action={'manage_settings'}>
           <div className={card}>
             <h2 className="font-bold">أدوات (اختبار الدورة — بلا شراء)</h2>
             {nexts.length ? (
-              <form action={advanceCjOrder} className="space-y-2">
+              <AccessBoundary module="orders" action="edit"><form action={advanceCjOrder} className="space-y-2">
                 <input type="hidden" name="id" value={String(order.id)} />
                 <label className="block text-sm">الانتقال إلى
                   <select name="to" className={input} defaultValue={nexts[0]}>
@@ -72,9 +72,9 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
                 </label>
                 <label className="block text-sm">السبب/ملاحظة<input className={input} name="reason" placeholder="اختياري" /></label>
                 <button className={btn}>تغيير الحالة</button>
-              </form>
+              </form></AccessBoundary>
             ) : <p className="text-sm text-muted-foreground">لا انتقالات متاحة (حالة نهائية).</p>}
-            <form action={setCjOrderTracking} className="space-y-2 border-t pt-2">
+            <AccessBoundary module="shipping" action="edit"><form action={setCjOrderTracking} className="space-y-2 border-t pt-2">
               <input type="hidden" name="id" value={String(order.id)} />
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-sm">شركة الشحن<input className={input} name="carrier" defaultValue={order.carrier} /></label>
@@ -82,9 +82,8 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
               </div>
               <label className="block text-sm">رابط التتبّع<input className={input} name="trackingUrl" defaultValue={order.tracking_url} dir="ltr" placeholder="https://…" /></label>
               <button className={btn}>حفظ التتبّع</button>
-            </form>
+            </form></AccessBoundary>
           </div>
-        </AccessBoundary>
       </div>
 
       {/* الخط الزمني */}

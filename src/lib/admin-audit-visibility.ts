@@ -4,6 +4,11 @@ import type { AccessModule } from './access-control/catalog';
 
 /** Legacy rows lack a source column. Only exact, reviewed action labels are trusted. */
 const groups: readonly { modules: readonly AccessModule[]; actions: readonly string[] }[] = [
+  { modules: ['products'], actions: ['تعديل منتجات CJ'] },
+  { modules: ['orders'], actions: ['تعديل طلبات CJ'] },
+  { modules: ['shipping'], actions: ['تعديل شحن CJ'] },
+  { modules: ['integrations'], actions: ['تعديل وكلاء CJ', 'إعدادات تكامل CJ'] },
+  { modules: ['pricing'], actions: ['تسعير CJ'] },
   { modules: ['wallets'], actions: ['إضافة رصيد', 'خصم رصيد'] },
   { modules: ['pricing', 'wallets'], actions: ['إنشاء خدمة خاصة للمحفظة', 'إلغاء خدمة خاصة قبل القبول'] },
   { modules: ['topups'], actions: ['تأكيد شحن رصيد', 'تحقق مصرفي لطلب شحن إلكتروني', 'تحقق مصرفي جماعي لطلبات الشحن الإلكتروني', 'حذف طلبات دفع إلكتروني تجريبية', 'إلغاء تأكيد شحن', 'رفض شحن رصيد'] },

@@ -13,6 +13,7 @@ import type { CjResult, CjProductDetail } from './types';
  * التكلفة = سعر CJ بالدولار × سعر الصرف، + شحن تقديري، + الهامش الافتراضي.
  */
 export type CjImportDeps = {
+  createOnly?: boolean;
   getProduct?: (pid: string) => Promise<CjResult<CjProductDetail>>;
   settings?: () => Promise<CjSyncSettings>;
   marginBps?: () => Promise<number>;
@@ -51,6 +52,6 @@ export async function importCjProductByPid(pid: string, deps: CjImportDeps = {})
     cjProductId: clean, cjSku: d.productSku || '', name: d.productName || '', nameAr,
     sourceDescription: d.description || null, descriptionAr: descAr,
     trbhhCategory: catAr || d.categoryName || '', image: gallery[0] || '', images: gallery, detailsJson, price,
-  });
+  }, { createOnly: deps.createOnly === true });
   return { ok: true, pid: clean, name: d.productName || '', salePriceMinor: price.salePriceMinor, supplierCostMinor: price.supplierCostMinor };
 }

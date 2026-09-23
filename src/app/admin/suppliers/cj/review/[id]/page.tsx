@@ -1,9 +1,10 @@
+import { AccessBoundary } from '@/components/access-boundary';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireAccess } from '@/lib/access-control/guards';
 import { getCjProductById } from '@/lib/cj/mapping';
 import { sampleOneCjProduct } from '@/lib/cj/sample';
-import { saveCjReview } from '../../actions';
+import { approveCjProduct, saveCjReview } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'مراجعة سلعة CJ', robots: { index: false, follow: false } };
@@ -16,7 +17,7 @@ const sar = (m: number) => `${(m / 100).toLocaleString('en', { minimumFractionDi
 const usd = (v: number | null) => (v == null ? '—' : `$${v.toFixed(2)}`);
 
 export default async function CjReviewPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAccess('integrations', 'manage_settings');
+  await requireAccess('products', 'view');
   const { id: idStr } = await params;
   const sp = await searchParams;
   const id = Number(idStr);
@@ -64,7 +65,7 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
         </div>
 
         {/* بيانات تربح (عربية) — قابلة للتحرير */}
-        <form action={saveCjReview} className={card}>
+        <AccessBoundary module="products" action="edit"><form action={saveCjReview} className={card}>
           <h2 className="font-bold">بيانات العرض في تربح (عربية)</h2>
           <input type="hidden" name="id" value={row.id} />
           <label className="block text-sm">العنوان العربي
@@ -80,19 +81,22 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
             <label className="block text-sm">سعر البيع (ر.س) — فارغ = المحسوب
               <input className={input} name="priceSar" inputMode="decimal" defaultValue={row.sale_price_override_minor != null ? (row.sale_price_override_minor / 100).toString() : ''} placeholder={(row.sale_price_minor / 100).toString()} />
             </label>
-            <label className="block text-sm">الحالة
-              <select className={input} name="status" defaultValue={row.status}>
-                <option value="draft">مسودّة</option>
-                <option value="ready">جاهزة للعرض</option>
-              </select>
-            </label>
           </div>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="hidden" value="1" defaultChecked={row.hidden === 1} /> مخفية من المعاينة</label>
+          <AccessBoundary module="products" action="suspend"><input type="hidden" name="manageVisibility" value="1" /><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="hidden" value="1" defaultChecked={row.hidden === 1} /> مخفية من المعاينة</label></AccessBoundary>
           <div className="flex items-center gap-2 pt-1">
             <button className={btn}>حفظ المراجعة</button>
             <span className="text-sm text-muted-foreground">السعر النهائي الحالي: <b className="text-primary">{sar(finalMinor)}</b></span>
           </div>
-        </form>
+        </form></AccessBoundary>
+        <AccessBoundary module="products" action="approve"><form action={approveCjProduct} className={card}>
+          <input type="hidden" name="id" value={row.id} />
+          <label className="block text-sm">حالة العرض
+            <select className={input} name="status" defaultValue={row.status}>
+              <option value="draft">مسودّة</option><option value="ready">جاهزة للعرض</option>
+            </select>
+          </label>
+          <button className={btn}>اعتماد حالة العرض</button>
+        </form></AccessBoundary>
       </div>
     </div>
   );

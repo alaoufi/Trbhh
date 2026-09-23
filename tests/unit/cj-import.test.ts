@@ -46,4 +46,11 @@ describe('CJ selective import → staging with cost×FX + shipping + margin', ()
     expect(await importCjProductByPid('123456', deps)).toEqual({ ok: false, error: 'cj_http_500' });
     expect(upserts).toHaveLength(0);
   });
+
+  it('passes create-only authorization to the atomic database upsert', async () => {
+    const upsert = vi.fn();
+    const { deps } = harness({ upsert, createOnly: true });
+    expect((await importCjProductByPid('CJ4', deps)).ok).toBe(true);
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ cjProductId: 'CJ4' }), { createOnly: true });
+  });
 });

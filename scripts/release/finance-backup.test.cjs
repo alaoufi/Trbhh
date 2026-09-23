@@ -5,7 +5,9 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const file=path.join(__dirname,'finance-backup.sh');
-const bash=process.platform==='win32'?'C:/Program Files/Git/bin/bash.exe':'bash';
+// The invalid-argument tests deliberately remove PATH; resolve Bash itself
+// absolutely so only the script's external commands are unavailable.
+const bash=process.platform==='win32'?'C:/Program Files/Git/bin/bash.exe':'/bin/bash';
 const read=()=>fs.existsSync(file)?fs.readFileSync(file,'utf8'):'';
 const candidate='a'.repeat(40),baseline='b'.repeat(40);
 

@@ -4,7 +4,8 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=r
 const {spawnSync}=require('node:child_process');
 const file=path.join(__dirname,'finance-deploy.sh');
 const workflow=path.join(__dirname,'../../.github/workflows/deploy.yml');
-const bash=process.platform==='win32'?'C:/Program Files/Git/bin/bash.exe':'bash';
+// Retain an absolute interpreter when the safety fixture deliberately empties PATH.
+const bash=process.platform==='win32'?'C:/Program Files/Git/bin/bash.exe':'/bin/bash';
 const read=()=>fs.existsSync(file)?fs.readFileSync(file,'utf8'):'';
 const sha='a'.repeat(40);
 test('orchestrator parses as Bash and rejects bad mode, run or revision before external work',()=>{

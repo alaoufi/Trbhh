@@ -88,9 +88,7 @@ services:
       SALLA_WEBHOOK_SECRET: ${SALLA_WEBHOOK_SECRET:-}
       SUPPLIER_RECONCILE_SECRET: ${SUPPLIER_RECONCILE_SECRET:-}
       SUPPLIER_ALLOW_LIVE_ORDERS: ${SUPPLIER_ALLOW_LIVE_ORDERS:-false}
-<<<<<<< HEAD
       FINANCE_CAPTURE_SECRET: ${FINANCE_CAPTURE_SECRET:-}
-=======
       # CJdropshipping — قراءة فقط في هذه المرحلة (لا شراء/دفع). تُقرأ من .env على الخادم.
       # الختم يستخدم SUPPLIER_TOKEN_ENCRYPTION_KEY أعلاه.
       CJ_API_BASE: ${CJ_API_BASE:-}
@@ -99,7 +97,6 @@ services:
       CJ_WEBHOOK_SECRET: ${CJ_WEBHOOK_SECRET:-}
       # بريد اختياري لرفع الحصة اليومية المجانية لخدمة الترجمة MyMemory (لا يُخزَّن بالكود).
       MYMEMORY_EMAIL: ${MYMEMORY_EMAIL:-}
->>>>>>> origin/claude/hostinger-vps-project-amw8vb
       NODE_ENV: production
       # كل الأوقات والتواريخ بتوقيت الرياض (+3)
       TZ: Asia/Riyadh

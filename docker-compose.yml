@@ -33,7 +33,11 @@ services:
     networks: [trbhh]
 
   app:
-    build: { context: ., dockerfile: Dockerfile }
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TRBHH_RELEASE_COMMIT: ${TRBHH_RELEASE_COMMIT:-development}
     container_name: trbhh-app
     restart: unless-stopped
     depends_on:

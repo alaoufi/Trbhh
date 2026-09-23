@@ -26,6 +26,8 @@ RUN pnpm build
 # ---- runner ----
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
+ARG TRBHH_RELEASE_COMMIT=development
+LABEL org.opencontainers.image.revision=$TRBHH_RELEASE_COMMIT
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 # openssl for Prisma; fonts-kacst provides Arabic glyphs for the image watermark
@@ -47,6 +49,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 # Kept in the runtime image for the idempotent, admin-only dynamic-ads lab bootstrap.
 COPY --from=builder /app/database ./database
+RUN node -e "const s=process.argv[1];if(s!=='development'&&!/^[a-f0-9]{40}$/.test(s))process.exit(1);require('fs').writeFileSync('/app/RELEASE_COMMIT',s+'\\n')" "$TRBHH_RELEASE_COMMIT"
 
 # Writable, persistent dirs owned by the runtime user. A named volume mounted at
 # /app/storage inherits this ownership, so uploads (ad/classified/promo images)

@@ -3,17 +3,17 @@ import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 
 /**
- * ترجمة آلية إلى العربية لمحتوى سلع CJ (الاسم/الوصف). تستخدم نقطة ترجمة Google
- * المجانية (بلا مفتاح) مع مهلة وتسلسل خفيف. عند أي فشل تُعيد null فيبقى النص كما هو
- * ويستطيع المشرف تحريره يدوياً — لا تُوقِف الاستيراد أبداً.
+ * ترجمة آلية إلى العربية لمحتوى سلع/تصنيفات CJ (قراءة فقط، لا تمسّ بيانات دفع).
+ * المزوّد الأساسي MyMemory (مجاني، مصمّم للاستخدام البرمجي، يُرجع JSON نظيفاً)،
+ * مع محاولة احتياطية عبر نقطة Google المجانية إن فشل. أي فشل/تجاوز حصة → null
+ * فيبقى النص كما هو ويستطيع المشرف تحريره يدوياً — لا تُوقِف الاستيراد أبداً.
  *
- * قراءة فقط لخدمة الترجمة؛ لا تمسّ CJ ولا أي بيانات دفع.
+ * لرفع الحصة اليومية المجانية: اضبط MYMEMORY_EMAIL في بيئة الخادم (اختياري).
  */
 
-const ENDPOINT = 'https://translate.googleapis.com/translate_a/single';
-const TIMEOUT_MS = 8000;
-const MAX_LEN = 1200; // سقف طول الإدخال (أسماء/أوصاف قصيرة)
-const MIN_GAP_MS = 350; // تباعد خفيف بين الطلبات
+const TIMEOUT_MS = 9000;
+const MAX_LEN = 480; // حدّ MyMemory ~500 بايت للطلب الواحد
+const MIN_GAP_MS = 300;
 
 let lastAt = 0;
 let gate: Promise<void> = Promise.resolve();
@@ -28,32 +28,52 @@ function throttle(): Promise<void> {
 
 const arabic = /[؀-ۿ]/;
 
-/** يترجم نصاً إنجليزياً إلى العربية. يُعيد null عند الفشل أو النص الفارغ. */
-export async function translateToArabic(text: string | null | undefined): Promise<string | null> {
-  const src = (text ?? '').trim();
-  if (!src) return null;
-  if (arabic.test(src)) return src; // معرّب أصلاً — لا تُهدر طلباً
-  const clipped = src.slice(0, MAX_LEN);
-  await throttle();
+async function fetchJson(url: string, init: RequestInit = {}): Promise<unknown | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const url = `${ENDPOINT}?client=gtx&sl=en&tl=ar&dt=t&q=${encodeURIComponent(clipped)}`;
-    const res = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const res = await fetch(url, { ...init, signal: controller.signal, headers: { 'User-Agent': 'Mozilla/5.0', ...(init.headers || {}) } });
     if (!res.ok) return null;
-    const body = (await res.json()) as unknown;
-    // الشكل: [[["ترجمة","الأصل",...], ...], ...]
-    if (!Array.isArray(body) || !Array.isArray(body[0])) return null;
-    const out = (body[0] as unknown[])
-      .map((seg) => (Array.isArray(seg) && typeof seg[0] === 'string' ? seg[0] : ''))
-      .join('')
-      .trim();
-    return out || null;
+    return await res.json();
   } catch {
     return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** المزوّد الأساسي: MyMemory. */
+async function viaMyMemory(text: string): Promise<string | null> {
+  const email = process.env.MYMEMORY_EMAIL?.trim();
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ar${email ? `&de=${encodeURIComponent(email)}` : ''}`;
+  const body = (await fetchJson(url)) as { responseStatus?: number; quotaFinished?: boolean; responseData?: { translatedText?: string } } | null;
+  if (!body || body.responseStatus !== 200 || body.quotaFinished) return null;
+  const t = (body.responseData?.translatedText ?? '').trim();
+  if (!t || /MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID (EMAIL|LANGUAGE)/i.test(t)) return null;
+  return t;
+}
+
+/** احتياطي: نقطة Google المجانية (قد تُحجب على بعض الشبكات). */
+async function viaGoogle(text: string): Promise<string | null> {
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ar&dt=t&q=${encodeURIComponent(text)}`;
+  const body = await fetchJson(url);
+  if (!Array.isArray(body) || !Array.isArray(body[0])) return null;
+  const out = (body[0] as unknown[]).map((seg) => (Array.isArray(seg) && typeof seg[0] === 'string' ? seg[0] : '')).join('').trim();
+  return out || null;
+}
+
+/** ترجمة خام بلا تنظيم معدّل (للدُفعات المتوازية). */
+async function translateRaw(text: string): Promise<string | null> {
+  return (await viaMyMemory(text)) ?? (await viaGoogle(text));
+}
+
+/** يترجم نصاً إنجليزياً إلى العربية. يُعيد null عند الفشل أو النص الفارغ. */
+export async function translateToArabic(text: string | null | undefined): Promise<string | null> {
+  const src = (text ?? '').trim();
+  if (!src) return null;
+  if (arabic.test(src)) return src; // معرّب أصلاً
+  await throttle();
+  return translateRaw(src.slice(0, MAX_LEN));
 }
 
 /* ---------- ترجمة مخزَّنة (cache) لتفادي تكرار الطلبات ---------- */
@@ -71,7 +91,7 @@ export async function getCachedArabic(texts: (string | null | undefined)[]): Pro
   try {
     const rows = await prisma.cj_translations.findMany({ where: { source_key: { in: [...byKey.keys()] } }, select: { source_key: true, target_ar: true } });
     for (const r of rows) { const src = byKey.get(r.source_key); if (src) out.set(src, r.target_ar); }
-  } catch { /* المخزن غير جاهز — لا شيء مخزَّن */ }
+  } catch { /* المخزن غير جاهز */ }
   return out;
 }
 
@@ -90,13 +110,22 @@ export async function translateToArabicCached(text: string | null | undefined): 
   return ar;
 }
 
-/** يترجم قائمة نصوص (المفقود منها فقط) ويخزّنها؛ يعيد خريطة نص→عربي شاملة المخزَّن. */
+/** يترجم قائمة نصوص (المفقود منها فقط) ويخزّنها؛ يعيد خريطة نص→عربي شاملة المخزَّن.
+ *  ينفّذ المفقود على دفعات متوازية محدودة لتقليل زمن الانتظار. */
 export async function translateManyCached(texts: (string | null | undefined)[], max = 30): Promise<Map<string, string>> {
   const map = await getCachedArabic(texts);
   const missing = [...new Set(texts.map((t) => (t ?? '').trim()).filter((t) => t && !arabic.test(t) && !map.has(t)))].slice(0, max);
-  for (const src of missing) {
-    const ar = await translateToArabic(src);
-    if (ar) { map.set(src, ar); await prisma.cj_translations.upsert({ where: { source_key: keyOf(src) }, create: { source_key: keyOf(src), target_ar: ar }, update: {} }).catch(() => {}); }
+  const CONCURRENCY = 5;
+  for (let i = 0; i < missing.length; i += CONCURRENCY) {
+    const batch = missing.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(batch.map(async (src) => [src, await translateRaw(src.slice(0, MAX_LEN))] as const));
+    let batchWins = 0;
+    for (const [src, ar] of results) {
+      if (ar) { batchWins++; map.set(src, ar); await prisma.cj_translations.upsert({ where: { source_key: keyOf(src) }, create: { source_key: keyOf(src), target_ar: ar }, update: {} }).catch(() => {}); }
+    }
+    // قاطع دائرة: دفعة كاملة بلا نجاح تعني المزوّد غير متاح/تجاوز الحصة — نتوقف
+    // حتى لا يتعطّل تحميل الصفحة بمحاولات فاشلة متتالية.
+    if (batchWins === 0) break;
   }
   return map;
 }

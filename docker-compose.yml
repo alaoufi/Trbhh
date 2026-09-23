@@ -94,6 +94,8 @@ services:
       CJ_API_EMAIL: ${CJ_API_EMAIL:-}
       CJ_API_KEY: ${CJ_API_KEY:-}
       CJ_WEBHOOK_SECRET: ${CJ_WEBHOOK_SECRET:-}
+      # بريد اختياري لرفع الحصة اليومية المجانية لخدمة الترجمة MyMemory (لا يُخزَّن بالكود).
+      MYMEMORY_EMAIL: ${MYMEMORY_EMAIL:-}
       NODE_ENV: production
       # كل الأوقات والتواريخ بتوقيت الرياض (+3)
       TZ: Asia/Riyadh

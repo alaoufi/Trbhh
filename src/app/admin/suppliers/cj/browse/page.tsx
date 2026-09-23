@@ -33,22 +33,26 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     return <div className="space-y-3"><h1 className="text-xl font-extrabold text-primary">تصفّح منتجات CJ</h1><p className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm">اضبط متغيّرات CJ (البريد والمفتاح) في بيئة الخادم أولاً.</p></div>;
   }
 
-  const wantAr = sp.ar === '1';
+  const wantAr = sp.ar !== '0'; // الترجمة تلقائية افتراضياً (أوقفها بـ ar=0)
   const [settings, marginBps, catsRes] = await Promise.all([cjSyncSettings(), defaultMarginBps(), getCategories()]);
   const categories = catsRes.ok ? catsRes.data : [];
   const listing = await listProductsPage(page, PAGE_SIZE, { productName: q || undefined, categoryId: cat || undefined });
   const items = listing.ok ? listing.data.items : [];
-  // ترجمة العناوين والتصنيفات للعربية قبل الاستيراد (من المخزَّن؛ وإن wantAr نترجم المفقود لهذه الصفحة).
+  // ترجمة العناوين والتصنيفات للعربية تلقائياً قبل الاستيراد (تُخزَّن فتُصبح فورية لاحقاً؛
+  // التصنيفات تُترجَم تدريجياً ٣٠ لكل تحميل حتى تكتمل الشجرة).
   const titleTexts = items.map((p) => p.productName);
-  const gridAr = wantAr ? await translateManyCached(titleTexts, 30) : await getCachedArabic(titleTexts);
-  const catAr = await getCachedArabic(categories.map((c) => c.name));
+  const catNames = categories.map((c) => c.name);
+  const [gridAr, catAr] = await Promise.all([
+    wantAr ? translateManyCached(titleTexts, 30) : getCachedArabic(titleTexts),
+    wantAr ? translateManyCached(catNames, 30) : getCachedArabic(catNames),
+  ]);
   const total = listing.ok ? listing.data.total : 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const imported = items.length ? await importedCjPids(items.map((p) => p.pid)) : new Set<string>();
   const detail = detailPid ? await sampleOneCjProduct(detailPid) : null;
   const importedList = await listCjProducts(60);
   const salePreview = (u: number | null) => (u != null && u > 0 ? computePrice(Math.round(u * settings.usdToSarX100), settings.shippingMinor, 0, marginBps).salePriceMinor : null);
-  const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}${wantAr ? '&ar=1' : ''}`;
+  const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}${wantAr ? '' : '&ar=0'}`;
   const pageHref = (n: number) => `/admin/suppliers/cj/browse?page=${Math.min(Math.max(1, n), totalPages)}${keep}`;
   const backHref = `/admin/suppliers/cj/browse?page=${page}${keep}`;
   const activeCat = categories.find((c) => c.id === cat);
@@ -72,7 +76,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
 
       {/* بحث + فلترة بالتصنيف (بالعربية عند توفّر الترجمة) */}
       <form method="get" className="flex flex-wrap items-end gap-2">
-        {wantAr && <input type="hidden" name="ar" value="1" />}
+        {!wantAr && <input type="hidden" name="ar" value="0" />}
         <label className="text-sm">بحث بالاسم<input className={`${input} ms-2 w-56`} name="q" defaultValue={q} placeholder="مثال: jacket, shorts…" /></label>
         <label className="text-sm">التصنيف
           <select name="cat" defaultValue={cat} className={`${input} ms-2 w-72`}>
@@ -84,10 +88,11 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
         {(q || cat) && <Link href="/admin/suppliers/cj/browse" className={ghost}>مسح الفلاتر</Link>}
       </form>
       <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-xs text-muted-foreground">الترجمة العربية تلقائية{wantAr ? ' (مفعّلة)' : ' (موقّفة)'}.</span>
         {wantAr
-          ? <Link href={`/admin/suppliers/cj/browse?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`} className={ghost}>إخفاء ترجمة العناوين</Link>
-          : <Link href={`/admin/suppliers/cj/browse?page=${page}${keep}&ar=1`} className={btn}>ترجمة عناوين هذه الصفحة للعربية</Link>}
-        <form action={translateCjCategories}><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة التصنيفات للعربية</button></form>
+          ? <Link href={`/admin/suppliers/cj/browse?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}&ar=0`} className={ghost}>عرض بالإنجليزية</Link>
+          : <Link href={`/admin/suppliers/cj/browse?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`} className={btn}>عرض بالعربية</Link>}
+        <form action={translateCjCategories}><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة كل التصنيفات الآن</button></form>
         {typeof sp.cattr === 'string' && <span className="text-emerald-700">خُزّنت ترجمة {sp.cattr} تصنيفاً (اضغط ثانيةً للباقي).</span>}
       </div>
       {!categories.length && <p className="text-xs text-amber-700">تعذّر جلب شجرة التصنيفات من CJ الآن — البحث بالاسم يعمل، وأعد المحاولة لاحقاً.</p>}

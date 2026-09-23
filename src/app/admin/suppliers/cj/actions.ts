@@ -141,7 +141,7 @@ export async function translateCjCategories(form: FormData) {
   const back = String(form.get('back') || '/admin/suppliers/cj/browse');
   const cats = await getCategories();
   let done = 0;
-  if (cats.ok) { const map = await translateManyCached(cats.data.map((c) => c.name), 60); done = map.size; }
+  if (cats.ok) { const map = await translateManyCached(cats.data.map((c) => c.name), 120); done = map.size; }
   redirect(withParam(back, `cattr=${done}`));
 }
 

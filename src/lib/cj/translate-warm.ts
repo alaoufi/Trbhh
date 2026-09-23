@@ -1,7 +1,7 @@
 import 'server-only';
 import { getCategories, getProduct } from './client';
 import { translateManyCached, translateToArabicCached } from './translate';
-import { listProductsNeedingArabic, setCjProductNameAr, setCjProductDescriptionAr, listProductsMissingImage, setCjProductGallery, setCjProductDetails, buildCjDetails } from './mapping';
+import { listProductsNeedingArabic, setCjProductNameAr, setCjProductDescriptionAr, listProductsMissingImage, setCjProductGallery, setCjProductDetails, buildCjDetails, listCjProducts } from './mapping';
 
 /**
  * تهيئة (warming) الترجمات على الخادم — تُشغَّل أسبوعياً (كرون داخلي) أو يدوياً.
@@ -9,6 +9,24 @@ import { listProductsNeedingArabic, setCjProductNameAr, setCjProductDescriptionA
  * قاعدة البيانات (cj_translations + cj_products) — فيصبح التصفّح سريعاً (من المخزَّن)
  * وآمناً (دفعة متحكّم بها لا طلبات حيّة عند كل تحميل). idempotent: المترجَم مسبقاً يُتجاوز.
  */
+/** إعادة جلب معارض الصور والمواصفات لكل السلع (يُصلح روابط الصور القديمة المعطوبة). */
+export async function refreshCjMedia(limit = 30): Promise<{ refreshed: number }> {
+  const rows = await listCjProducts(Math.min(Math.max(1, limit), 60));
+  let refreshed = 0;
+  for (const r of rows) {
+    if (!r.cj_product_id) continue;
+    const det = await getProduct(r.cj_product_id).catch(() => null);
+    if (det && det.ok) {
+      const variantImgs = (det.data.variants ?? []).map((v) => v.variantImage).filter((s): s is string => !!s);
+      const descImgs = (det.data.description || '').match(/https?:\/\/[^"'\s<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
+      const gallery = [...new Set([...variantImgs, ...descImgs, det.data.productImage].filter((s): s is string => !!s))].slice(0, 12);
+      if (gallery.length) { await setCjProductGallery(r.id, gallery); refreshed++; }
+      await setCjProductDetails(r.id, buildCjDetails(det.data.variants ?? []));
+    }
+  }
+  return { refreshed };
+}
+
 export type WarmResult = { categories: number; productNames: number; productDescriptions: number; images: number };
 
 export async function warmCjTranslations(opts: { categoryMax?: number; productMax?: number; imageMax?: number } = {}): Promise<WarmResult> {
@@ -33,8 +51,9 @@ export async function warmCjTranslations(opts: { categoryMax?: number; productMa
   for (const r of missImg) {
     const det = await getProduct(r.cj_product_id).catch(() => null);
     if (det && det.ok) {
+      const variantImgs = (det.data.variants ?? []).map((v) => v.variantImage).filter((s): s is string => !!s);
       const descImgs = (det.data.description || '').match(/https?:\/\/[^"'\s<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
-      const gallery = [...new Set([det.data.productImage, ...(det.data.variants ?? []).map((v) => v.variantImage), ...descImgs].filter((s): s is string => !!s))].slice(0, 12);
+      const gallery = [...new Set([...variantImgs, ...descImgs, det.data.productImage].filter((s): s is string => !!s))].slice(0, 12);
       if (gallery.length) { await setCjProductGallery(r.id, gallery); out.images++; }
       await setCjProductDetails(r.id, buildCjDetails(det.data.variants ?? []));
     }

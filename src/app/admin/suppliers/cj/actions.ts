@@ -9,7 +9,7 @@ import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProdu
 import { translateToArabic, translateManyCached, learnTranslation } from '@/lib/cj/translate';
 import { getCategories } from '@/lib/cj/client';
 import { createOrder, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
-import { warmCjTranslations } from '@/lib/cj/translate-warm';
+import { warmCjTranslations, refreshCjMedia } from '@/lib/cj/translate-warm';
 import { setCjStorefrontPublic } from '@/lib/cj/storefront';
 import { upsertAgent, setDefaultAgentWeeklyQuota, setAgentActive, assignProductAgent, unassignProductAgent } from '@/lib/cj/agents';
 import { prisma } from '@/lib/prisma';
@@ -279,6 +279,14 @@ export async function runCjTranslateWarm(form: FormData) {
   const back = String(form.get('back') || '/admin/suppliers/cj/browse');
   const r = await warmCjTranslations({ categoryMax: 150, productMax: 40 });
   redirect(withParam(back, `warmed=${r.categories}-${r.productNames}`));
+}
+
+/** إعادة جلب صور ومواصفات كل السلع المستوردة (يُصلح الصور المكسورة). */
+export async function refreshCjMediaAction(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const back = String(form.get('back') || '/admin/suppliers/cj/browse');
+  const r = await refreshCjMedia(30);
+  redirect(withParam(back, `mediaref=${r.refreshed}`));
 }
 
 /** ترجمة تلقائية جماعية لكل سلعة بلا عنوان عربي بعد (دفعة محدودة). */

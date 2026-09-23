@@ -43,8 +43,9 @@ export async function importCjProductByPid(pid: string, deps: CjImportDeps = {})
     translate(d.categoryName || '').catch(() => null),
   ]);
   // معرض الصور: صورة المنتج + صور المتغيّرات + صور مضمّنة في الوصف (غالباً الصور الحقيقية).
+  const variantImgs = (d.variants ?? []).map((v) => v.variantImage).filter((s): s is string => !!s);
   const descImgs = (d.description || '').match(/https?:\/\/[^"'\s<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
-  const gallery = [...new Set([d.productImage, ...(d.variants ?? []).map((v) => v.variantImage), ...descImgs].filter((s): s is string => !!s))].slice(0, 12);
+  const gallery = [...new Set([...variantImgs, ...descImgs, d.productImage].filter((s): s is string => !!s))].slice(0, 12);
   const detailsJson = JSON.stringify(buildCjDetails(d.variants ?? []));
   await upsert({
     cjProductId: clean, cjSku: d.productSku || '', name: d.productName || '', nameAr,

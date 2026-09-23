@@ -106,6 +106,7 @@ jobs:
           scp -F "$RUNNER_TEMP/finance-ssh-config" \
             scripts/release/finance-deploy.sh scripts/release/finance-backup.sh \
             scripts/release/database-proof.cjs scripts/release/media-proof.cjs \
+            scripts/release/finance-media-reference.cjs scripts/release/merchant-media-reference.cjs \
             scripts/release/backup-capacity-proof.cjs scripts/release/supplier-preservation-proof.cjs \
             scripts/release/verify-runtime.cjs scripts/release/finance-capture-job.sh \
             "$RUNNER_TEMP/finance-schema-check.cjs" "trbhh-release:/root/trbhh-release-tools/$GITHUB_RUN_ID/"

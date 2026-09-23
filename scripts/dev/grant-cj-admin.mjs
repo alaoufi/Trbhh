@@ -36,18 +36,35 @@ const MODULES = [
 const PERMS = MODULES.flatMap(([m, acts]) => acts.map((a) => `${m}:${a}`));
 const DEPTS = [['executive', 'الإدارة العليا'], ['integrations', 'المتاجر والتكاملات'], ['supply', 'الموردون والمنتجات'], ['audit', 'التدقيق والمراجعة'], ['technical', 'إدارة النظام التقنية']];
 
+// آخر ٩ أرقام من الجوال (تجاهل 0/966/+966 وأي رموز) — لمطابقة الجوال أياً كان تنسيق تخزينه.
+function phoneTail(v) {
+  const digits = String(v || '').replace(/\D+/g, '');
+  return digits.length >= 9 ? digits.slice(-9) : '';
+}
+
 async function main() {
   if (!ident) { console.error('✖ مرّر معرّف الحساب: البريد أو الجوال أو اسم الدخول.'); process.exit(2); }
-  const users = await db.$queryRawUnsafe(
-    'SELECT id,name,userName,email,phoneNumber FROM users WHERE email=? OR phoneNumber=? OR userName=? OR name=? ORDER BY id LIMIT 6',
-    ident, ident, ident, ident,
-  );
-  if (!users.length) { console.error(`✖ لا يوجد حساب مطابق لـ «${ident}». جرّب البريد أو الجوال أو اسم الدخول بالضبط.`); process.exit(1); }
+  // مطابقة دقيقة على البريد/اسم الدخول، ومطابقة الجوال بآخر ٩ أرقام (تتسامح مع 0/966/+966).
+  const tail = phoneTail(ident);
+  let users;
+  if (tail) {
+    users = await db.$queryRawUnsafe(
+      "SELECT id,name,userName,email,phoneNumber FROM users WHERE email=? OR userName=? OR RIGHT(REGEXP_REPLACE(COALESCE(phoneNumber,''),'[^0-9]',''),9)=? ORDER BY id LIMIT 6",
+      ident, ident, tail,
+    );
+  } else {
+    users = await db.$queryRawUnsafe(
+      'SELECT id,name,userName,email,phoneNumber FROM users WHERE email=? OR userName=? OR name=? ORDER BY id LIMIT 6',
+      ident, ident, ident,
+    );
+  }
+  if (!users.length) { console.error(`✖ لا يوجد حساب مطابق لـ «${ident}». جرّب البريد أو الجوال (آخر ٩ أرقام تكفي) أو اسم الدخول بالضبط.`); process.exit(1); }
   if (users.length > 1) {
-    console.error('✖ أكثر من حساب مطابق — حدّد بدقّة (بالبريد مثلاً):');
+    console.error('✖ أكثر من حساب مطابق — حدّد بدقّة (بالبريد أو الجوال كاملاً):');
     for (const u of users) console.error(`   - id=${String(u.id)} · ${u.name || u.userName || ''} · ${u.email || ''} · ${u.phoneNumber || ''}`);
     process.exit(1);
   }
+  console.log(`• الحساب المطابق: id=${String(users[0].id)} · ${users[0].name || users[0].userName || ''} · ${users[0].email || ''} · ${users[0].phoneNumber || ''}`);
   const uid = users[0].id;
 
   await db.$executeRawUnsafe('INSERT INTO access_control_state(id,revision,initialized_at) VALUES(1,1,NOW(3)) ON DUPLICATE KEY UPDATE initialized_at=COALESCE(initialized_at,NOW(3))');

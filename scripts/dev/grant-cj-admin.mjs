@@ -50,23 +50,56 @@ const ENABLED_SQL = "u.archived_at IS NULL AND COALESCE(u.merged_into,0)=0 AND (
 // آخر ٩ أرقام من الجوال (تجاهل 0/966/+966 وأي رموز).
 function phoneTail(v) { const d = String(v || '').replace(/\D+/g, ''); return d.length >= 9 ? d.slice(-9) : ''; }
 async function step(label, fn) { try { await fn(); console.log(`   ✓ ${label}`); } catch (e) { console.log(`   ✖ ${label} — ${e?.message || e}`); } }
+async function tableExists(name) { try { const r = await db.$queryRawUnsafe("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? LIMIT 1", name); return r.length > 0; } catch { return false; } }
+// عدد الصلاحيات الفعّالة كما يقرأها التطبيق تماماً.
+async function effectiveCount(uid) {
+  try {
+    const rows = await db.$queryRawUnsafe(`SELECT COUNT(DISTINCT p.permission) c FROM users u JOIN access_user_roles a ON a.user_id=u.id JOIN access_roles r ON r.id=a.role_id AND r.active=1 JOIN access_departments d ON d.id=r.department_id AND d.active=1 JOIN access_role_permissions p ON p.role_id=r.id WHERE u.id=? AND ${ENABLED_SQL}`, uid);
+    return Number(rows[0].c);
+  } catch { return -1; }
+}
+
+// ── وضع القائمة: اعرض كل الحسابات الإدارية (قديمة/جديدة) ─────────────
+async function listAdmins() {
+  const hasPerms = await tableExists('admin_perms'), hasRoles = await tableExists('admin_roles');
+  const legacy = [hasPerms ? 'EXISTS(SELECT 1 FROM admin_perms p WHERE p.user_id=u.id)' : '0', hasRoles ? 'EXISTS(SELECT 1 FROM admin_roles r WHERE r.user_id=u.id)' : '0'];
+  const where = `u.is_admin>0 OR EXISTS(SELECT 1 FROM access_user_roles a WHERE a.user_id=u.id) OR ${legacy[0]} OR ${legacy[1]}`;
+  const rows = await db.$queryRawUnsafe(`SELECT u.id,u.name,u.userName,u.email,u.phoneNumber,u.is_admin,(SELECT COUNT(*) FROM access_user_roles a WHERE a.user_id=u.id) roleCount FROM users u WHERE ${where} ORDER BY u.is_admin DESC,u.id LIMIT 60`);
+  if (!rows.length) { console.log('لا يوجد أي حساب إداري (is_admin>0) ولا حساب له أدوار في نظام الوصول الجديد.'); return; }
+  console.log(`الحسابات الإدارية (${rows.length}) — [id · is_admin · أدوار جديدة · صلاحيات فعّالة] الاسم · الدخول · البريد · الجوال:`);
+  for (const r of rows) {
+    const eff = await effectiveCount(r.id);
+    console.log(`  id=${String(r.id)} · is_admin=${r.is_admin} · أدوار=${Number(r.roleCount)} · فعّالة=${eff} → ${r.name || ''} · ${r.userName || ''} · ${r.email || ''} · ${r.phoneNumber || ''}`);
+  }
+  console.log('\nالحساب الذي تدخل به وتظهر «فعّالة=0» هو المقفول. امنحه بالمُعرّف: node /app/grant.mjs id:<الرقم>');
+}
 
 async function main() {
-  if (!ident) { console.error('✖ مرّر معرّف الحساب: البريد أو الجوال أو اسم الدخول.'); process.exit(2); }
+  if (!ident) { console.error('✖ مرّر: معرّف الحساب (بريد/جوال/اسم)، أو «list» لعرض الحسابات الإدارية، أو «id:<رقم>» للمنح بالمُعرّف.'); process.exit(2); }
+  if (ident === 'list' || ident === '--list') { await listAdmins(); return; }
 
   // ── 1) إيجاد الحساب ─────────────────────────────────────────────
-  const tail = phoneTail(ident);
-  const users = tail
-    ? await db.$queryRawUnsafe("SELECT id,name,userName,email,phoneNumber FROM users WHERE email=? OR userName=? OR RIGHT(REGEXP_REPLACE(COALESCE(phoneNumber,''),'[^0-9]',''),9)=? ORDER BY id LIMIT 8", ident, ident, tail)
-    : await db.$queryRawUnsafe('SELECT id,name,userName,email,phoneNumber FROM users WHERE email=? OR userName=? OR name=? ORDER BY id LIMIT 8', ident, ident, ident);
-  if (!users.length) { console.error(`✖ لا يوجد حساب مطابق لـ «${ident}». جرّب البريد أو الجوال (آخر ٩ أرقام تكفي) أو اسم الدخول.`); process.exit(1); }
-  if (users.length > 1) {
-    console.error('✖ أكثر من حساب مطابق — حدّد بدقّة (بالبريد أو الجوال كاملاً):');
-    for (const u of users) console.error(`   - id=${String(u.id)} · ${u.name || u.userName || ''} · ${u.email || ''} · ${u.phoneNumber || ''}`);
-    process.exit(1);
+  let u;
+  const idMatch = /^id:(\d+)$/.exec(ident);
+  if (idMatch) {
+    const byId = await db.$queryRawUnsafe('SELECT id,name,userName,email,phoneNumber FROM users WHERE id=?', Number(idMatch[1]));
+    if (!byId.length) { console.error(`✖ لا يوجد حساب بالمُعرّف id=${idMatch[1]}.`); process.exit(1); }
+    u = byId[0];
+  } else {
+    const tail = phoneTail(ident);
+    const users = tail
+      ? await db.$queryRawUnsafe("SELECT id,name,userName,email,phoneNumber FROM users WHERE email=? OR userName=? OR RIGHT(REGEXP_REPLACE(COALESCE(phoneNumber,''),'[^0-9]',''),9)=? ORDER BY id LIMIT 8", ident, ident, tail)
+      : await db.$queryRawUnsafe('SELECT id,name,userName,email,phoneNumber FROM users WHERE email=? OR userName=? OR name=? ORDER BY id LIMIT 8', ident, ident, ident);
+    if (!users.length) { console.error(`✖ لا يوجد حساب مطابق لـ «${ident}». جرّب «list» لعرض كل الحسابات الإدارية ثم امنح بـ id:<رقم>.`); process.exit(1); }
+    if (users.length > 1) {
+      console.error('✖ أكثر من حساب مطابق — امنح بالمُعرّف الدقيق (id:<رقم>):');
+      for (const x of users) console.error(`   - id=${String(x.id)} · ${x.name || x.userName || ''} · ${x.email || ''} · ${x.phoneNumber || ''}`);
+      process.exit(1);
+    }
+    u = users[0];
   }
-  const u = users[0], uid = u.id;
-  console.log(`• الحساب المطابق: id=${String(uid)} · ${u.name || u.userName || ''} · ${u.email || ''} · ${u.phoneNumber || ''}`);
+  const uid = u.id;
+  console.log(`• الحساب المستهدف: id=${String(uid)} · ${u.name || u.userName || ''} · ${u.email || ''} · ${u.phoneNumber || ''}`);
 
   // ── تشخيص: هل الحساب «مُفعّل» بمنظور نظام الوصول؟ ────────────────
   const en = await db.$queryRawUnsafe(`SELECT (${ENABLED_SQL}) AS enabled, u.archived_at, u.merged_into, u.ban, u.ban_until FROM users u WHERE u.id=?`, uid);

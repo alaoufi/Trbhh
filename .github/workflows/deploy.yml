@@ -68,7 +68,7 @@ jobs:
           pnpm install --frozen-lockfile
           node scripts/release/build-finance-schema-check.cjs "$RUNNER_TEMP/finance-schema-check.cjs"
           node --test scripts/release/*.test.cjs
-          bash -n scripts/release/finance-backup.sh scripts/release/finance-deploy.sh scripts/release/finance-capture-job.sh
+          for script in scripts/release/finance-backup.sh scripts/release/finance-deploy.sh scripts/release/finance-capture-job.sh; do bash -n "$script"; done
       - name: Upload private release tools using pinned SSH host keys
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}

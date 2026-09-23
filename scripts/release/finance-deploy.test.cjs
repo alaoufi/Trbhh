@@ -117,6 +117,21 @@ test('capture unit recovery tolerates either partial installation and repeat rol
     }finally{fs.rmSync(dir,{recursive:true,force:true});}
   }
 });
+test('Docker receives only the exact candidate tree, excluding edited and private host files',()=>{
+  const match=read().match(/# BUILD_IMAGE_BEGIN\n([\s\S]*?)# BUILD_IMAGE_END/);assert(match);
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'finance-deploy-context-')),repo=path.join(dir,'repo'),archive=path.join(dir,'context.tar');fs.mkdirSync(repo);
+  const git=(...args)=>{const r=spawnSync('git',args,{cwd:repo,encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stdout.trim();};
+  try{
+    git('init','--quiet');fs.writeFileSync(path.join(repo,'.gitignore'),'.env*\n');fs.writeFileSync(path.join(repo,'source.txt'),'reviewed candidate\n');
+    git('add','.');git('-c','user.email=release-test@example.invalid','-c','user.name=Release Test','commit','--quiet','-m','fixture');const candidate=git('rev-parse','HEAD');
+    fs.writeFileSync(path.join(repo,'source.txt'),'unreviewed tracked edit\n');fs.writeFileSync(path.join(repo,'untracked.ts'),'unreviewed source\n');fs.writeFileSync(path.join(repo,'.env.production'),'AUTH_SECRET=private-host-only\n');
+    const script=`set -euo pipefail\ncandidate=$1; archive_file=$2; image=trbhh-finance:$1\ndocker(){ [[ "$1" == build && "\${!#}" == - ]]; cat > "$archive_file"; }\n${match[1]}`;
+    const built=spawnSync(bash,['-c',script,'test',candidate,archive.replaceAll('\\','/')],{cwd:repo,encoding:'utf8'});assert.equal(built.status,0,built.stderr);
+    const check=spawnSync(bash,['-c','tar -tf - < "$1"; tar -xOf - source.txt < "$1"','test',archive.replaceAll('\\','/')],{encoding:'utf8'});assert.equal(check.status,0,check.stderr);
+    assert.match(check.stdout,/reviewed candidate/);assert.doesNotMatch(check.stdout,/unreviewed|untracked|\.env|private-host-only/);
+    const dockerfile=fs.readFileSync(path.join(__dirname,'../../Dockerfile'),'utf8');assert.match(dockerfile,/RUN pnpm install --frozen-lockfile(?:\r?\n|$)/);assert.doesNotMatch(dockerfile,/pnpm install --frozen-lockfile\s*\|\|/);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
 test('orchestration keeps backup, immutable revision and private proofs before final worker activation',()=>{
   const s=read();assert(s);const at=t=>{const n=s.indexOf(t);assert(n>=0,t);return n;};
   assert(at('finance-backup.sh" "$run_id" "$candidate" "$baseline"')<at('merge --ff-only "$candidate"'));

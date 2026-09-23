@@ -279,7 +279,11 @@ NODE
 # CAPTURE_ENV_END
   stage=build
   image="trbhh-finance:$candidate"
-  docker build --build-arg "TRBHH_RELEASE_COMMIT=$candidate" --tag "$image" .
+  # Build only the reviewed commit's files. Host .env files, ignored/untracked
+  # source and the runtime-only Android manifest can never enter this context.
+# BUILD_IMAGE_BEGIN
+  git archive --format=tar "$candidate" | docker build --build-arg "TRBHH_RELEASE_COMMIT=$candidate" --tag "$image" -
+# BUILD_IMAGE_END
   image_id=$(docker image inspect -f '{{.Id}}' "$image")
   [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]]
   [[ "$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" == "$candidate" ]]

@@ -66,6 +66,25 @@ jobs:
           fi
           "${SSH[@]}" "$target" 'set -eu; cd /root/trbhh; printf "CHECKOUT="; git rev-parse HEAD; git status --short; docker compose ps; id=$(docker compose ps -q app); docker inspect -f "IMAGE={{.Image}} RUNNING={{.State.Running}}" "$id"; docker exec "$id" cat /app/.next/BUILD_ID; df -h /root; find /root/trbhh-release-backups -maxdepth 2 -name VERIFIED -printf "%h\n" | sort | tail -8'
           "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/finance-runtime-inspect.cjs
+          "${SSH[@]}" "$target" 'node -' <<'PARENT_NODE'
+          const fs=require('node:fs'),path=require('node:path');
+          const parent='/root/trbhh-release-backups/audit-35603864905';
+          let ok=false;
+          try {
+            const directory=fs.lstatSync(parent);
+            if(!directory.isDirectory()||directory.isSymbolicLink()||fs.realpathSync(parent)!==parent||directory.uid!==0||(directory.mode&0o777)!==0o700)throw Error('parent_directory');
+            for(const name of ['VERIFIED','commit.txt','DEPLOYMENT_VERIFIED','SHA256SUMS','container-after.json','database.sql.gz','code.tar.gz','image.tar.gz','storage.tar.gz','legacy.tar.gz','storage.path','legacy.path','storage-before.json','legacy-before.json']) {
+              const info=fs.lstatSync(path.join(parent,name));
+              if(!info.isFile()||info.isSymbolicLink()||info.nlink!==1)throw Error('parent_file');
+            }
+            for(const [name,expected] of [['VERIFIED','07d2e9ead8e0b28824102d5c8a31b097e01f9459'],['commit.txt','07d2e9ead8e0b28824102d5c8a31b097e01f9459'],['DEPLOYMENT_VERIFIED','5f8dbc01c38bf431a9ae099a581b80536097b346'],['storage.path','/app/storage'],['legacy.path','/app/legacy']]) {
+              if(fs.readFileSync(path.join(parent,name),'utf8').trim()!==expected)throw Error('parent_marker');
+            }
+            ok=true;
+          } catch {}
+          console.log(JSON.stringify({financeMediaParentAvailable:ok}));
+          if(!ok)process.exitCode=1;
+          PARENT_NODE
       - name: Remove runner SSH credential
         if: always()
         run: rm -f -- "$HOME/.ssh/finance_key"

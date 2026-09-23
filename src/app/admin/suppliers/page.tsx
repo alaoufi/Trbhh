@@ -114,6 +114,7 @@ export default async function Suppliers({ searchParams }: { searchParams: Promis
           <div className="flex flex-wrap gap-2">
             <AccessPage href="/admin/suppliers/cj/browse"><Link href="/admin/suppliers/cj/browse" className={button}>تصفّح منتجات CJ واستيرادها ←</Link></AccessPage>
             <AccessPage href="/admin/suppliers/cj/orders"><Link href="/admin/suppliers/cj/orders" className="rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary">مراقبة الطلبات</Link></AccessPage>
+            <AccessPage href="/admin/suppliers/cj/agents"><Link href="/admin/suppliers/cj/agents" className="rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary">الوكلاء</Link></AccessPage>
             <AccessPage href="/admin/suppliers/cj"><Link href="/admin/suppliers/cj" className="rounded-lg border border-primary/30 px-4 py-2 text-sm font-bold text-primary">إعدادات/اختبار CJ</Link></AccessPage>
           </div>
         </div>

@@ -11,6 +11,8 @@ import { getCategories } from '@/lib/cj/client';
 import { createOrder, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
 import { warmCjTranslations } from '@/lib/cj/translate-warm';
 import { setCjStorefrontPublic } from '@/lib/cj/storefront';
+import { upsertAgent, setDefaultAgentWeeklyQuota, setAgentActive, assignProductAgent, unassignProductAgent } from '@/lib/cj/agents';
+import { prisma } from '@/lib/prisma';
 
 /** حفظ الهامش الافتراضي (٪) — للمشرف فقط. لا شراء ولا اتصال بمورّد هنا. */
 export async function saveCjMargin(form: FormData) {
@@ -181,6 +183,63 @@ export async function translateCjCategories(form: FormData) {
   let done = 0;
   if (cats.ok) { const map = await translateManyCached(cats.data.map((c) => c.name), 120); done = map.size; }
   redirect(withParam(back, `cattr=${done}`));
+}
+
+/* ------------------------- الوكلاء ------------------------- */
+
+const AG = '/admin/suppliers/cj/agents';
+
+/** حفظ الحصّة الأسبوعية الافتراضية للوكلاء. */
+export async function saveAgentQuota(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const n = Number(String(form.get('weeklyQuota') || '').trim());
+  if (Number.isFinite(n) && n >= 0) await setDefaultAgentWeeklyQuota(Math.floor(n));
+  redirect(`${AG}?saved=quota`);
+}
+
+/** منح عضو دور وكيل (بحثاً بالبريد/الجوال/اسم الدخول) مع جواله وواتسه وحصّته. */
+export async function saveAgent(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const ident = String(form.get('ident') || '').trim();
+  if (!ident) redirect(`${AG}?err=no_ident`);
+  const tail = ident.replace(/\D+/g, '').slice(-9);
+  const user = await prisma.users.findFirst({
+    where: { OR: [{ email: ident }, { userName: ident }, ...(tail ? [{ phoneNumber: { endsWith: tail } }] : [])] },
+    select: { id: true, phoneNumber: true },
+  }).catch(() => null);
+  if (!user) redirect(`${AG}?err=not_found`);
+  const phone = String(form.get('phone') || '').trim() || user!.phoneNumber || '';
+  const whatsapp = String(form.get('whatsapp') || '').trim() || phone;
+  const quotaRaw = String(form.get('weeklyQuota') || '').trim();
+  await upsertAgent({
+    userId: user!.id, phone, whatsapp,
+    weeklyQuota: quotaRaw === '' ? undefined : Number(quotaRaw),
+    active: true, notes: String(form.get('notes') || '').trim(),
+  });
+  redirect(`${AG}?saved=agent`);
+}
+
+/** تفعيل/إيقاف وكيل. */
+export async function toggleAgent(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const uid = Number(String(form.get('userId') || ''));
+  const active = String(form.get('active') || '') === '1';
+  if (Number.isInteger(uid) && uid > 0) await setAgentActive(uid, active);
+  redirect(`${AG}?saved=toggle`);
+}
+
+/** إسناد/فك سلعة لوكيل من الإدارة. */
+export async function assignAgentToProduct(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const productId = Number(String(form.get('productId') || ''));
+  const agentUserId = Number(String(form.get('agentUserId') || ''));
+  const back = String(form.get('back') || '/admin/suppliers/cj/browse');
+  if (Number.isInteger(productId) && productId > 0) {
+    if (Number.isInteger(agentUserId) && agentUserId > 0) await assignProductAgent(productId, agentUserId);
+    else await unassignProductAgent(productId);
+  }
+  revalidatePath('/admin/suppliers/cj/browse');
+  redirect(withParam(back, 'edited=1'));
 }
 
 /** تعديل مباشر من صفحة السلعة (لمن يملك صلاحية) — يحدّث العرض ويُعلّم الترجمة. */

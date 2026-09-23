@@ -2,7 +2,7 @@ import {afterAll,beforeAll,beforeEach,describe,expect,it} from 'vitest';
 import {execFileSync} from 'node:child_process';
 import {PrismaClient} from '@prisma/client';
 import {ACCESS_CONTROL_DDL,ACCESS_CONTROL_TABLES,assertAccessControlSchema} from '@/lib/access-control/schema';
-import {initializeAccessControl,readAccess,readAccessAdmin,saveDepartment,saveRole,assignUserRoles,hasStoredAssignments,withUnassignedAccountChange,withAccountStateChange,type AccessActor} from '@/lib/access-control/store';
+import {initializeAccessControl,readAccess,readAccessAdmin,saveDepartment,saveRole,assignUserRoles,hasStoredAssignments,withUnassignedAccountChange,withAccountStateChange,completeStandardDepartments,type AccessActor} from '@/lib/access-control/store';
 import {SENSITIVE_KEYS,DEFAULT_ROLES} from '@/lib/access-control/catalog';
 import {lockAuthPolicy} from '@/lib/auth-policy-lock';
 import {isolatedAccessUrl} from '../../vitest.access-control.config';
@@ -93,6 +93,24 @@ describe.runIf(enabled)('RBAC real isolated MySQL transactions',()=>{
   it('legacy null ban and merged_into zero remain enabled',async()=>{
     await db.$executeRaw`UPDATE users SET ban=NULL,merged_into=0 WHERE id=1`;await setup();
     expect((await readAccess(db,1)).keys.has('access_control:manage_settings')).toBe(true);
+  });
+  it('completes only missing departments, audits the repair and never changes grants or inactive departments',async()=>{
+    await setup();
+    await db.$executeRaw`DELETE p FROM access_role_permissions p JOIN access_roles r ON r.id=p.role_id WHERE r.department_id='shipping'`;
+    await db.$executeRaw`DELETE FROM access_roles WHERE department_id='shipping'`;
+    await db.$executeRaw`DELETE FROM access_departments WHERE id='shipping'`;
+    await db.$executeRaw`UPDATE access_departments SET active=0,name='Customized inactive department' WHERE id='tax'`;
+    const before=await readAccessAdmin(db),keys=(await readAccess(db,1)).keys;
+    await expect(completeStandardDepartments(db,{...actor,userId:5},why)).rejects.toThrow('access_forbidden');
+    expect(await completeStandardDepartments(db,actor,why)).toBe(1);
+    const after=await readAccessAdmin(db);
+    expect(after.departments).toHaveLength(10);
+    expect(after.departments.find(d=>d.id==='tax')).toEqual(before.departments.find(d=>d.id==='tax'));
+    expect(after.roles).toEqual(before.roles);expect(after.assignments).toEqual(before.assignments);
+    expect((await readAccess(db,1)).keys).toEqual(keys);
+    expect(after.audit[0]).toMatchObject({action:'departments.complete',actorId:1,reason:why,ip:actor.ip,sessionFingerprint:actor.sessionFingerprint});
+    expect(await completeStandardDepartments(db,actor,why)).toBe(0);
+    expect((await readAccessAdmin(db)).departments).toEqual(after.departments);
   });
   it('rejects a nonadministrator migration operator before importing anything',async()=>{
     await expect(initializeAccessControl(db,{...actor,userId:5},[5])).rejects.toThrow('access_forbidden');expect(await total('access_roles')).toBe(0);expect(await total('access_audit')).toBe(0);

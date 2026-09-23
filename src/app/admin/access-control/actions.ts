@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { accessActor, requireAccess } from '@/lib/access-control/guards';
-import { assignUserRoles, saveDepartment, saveRole } from '@/lib/access-control/store';
+import { assignUserRoles, saveDepartment, saveRole, completeStandardDepartments } from '@/lib/access-control/store';
 
 const field = (form: FormData, key: string) => typeof form.get(key) === 'string' ? String(form.get(key)).trim() : '';
 async function save(form: FormData, section: string, change: (actor: Awaited<ReturnType<typeof accessActor>>) => Promise<unknown>) {
@@ -20,6 +20,9 @@ async function save(form: FormData, section: string, change: (actor: Awaited<Ret
 }
 export async function saveAccessDepartment(form: FormData) {
   return save(form, 'departments', actor => saveDepartment(prisma, actor, { id: field(form, 'id') || undefined, name: field(form, 'name'), active: form.get('active') === '1', reason: field(form, 'reason') }));
+}
+export async function completeAccessDepartments(form: FormData) {
+  return save(form, 'departments', actor => completeStandardDepartments(prisma, actor, field(form, 'reason')));
 }
 export async function saveAccessRole(form: FormData) {
   return save(form, 'roles', actor => saveRole(prisma, actor, { id: field(form, 'id') || undefined, name: field(form, 'name'), departmentId: field(form, 'departmentId'), active: form.get('active') === '1', permissions: form.getAll('permissions').map(String), reason: field(form, 'reason') }));

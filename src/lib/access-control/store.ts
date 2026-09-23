@@ -135,6 +135,16 @@ export async function saveDepartment(db:PrismaClient,actor:AccessActor,input:Dep
     return id;
   });
 }
+/** Explicit additive repair for older installations; existing names, status and grants stay intact. */
+export async function completeStandardDepartments(db:PrismaClient,actor:AccessActor,reason:string):Promise<number>{
+  return mutate(db,actor,'departments.complete','standard-departments',reason,async tx=>{
+    const rows=await tx.$queryRaw<{id:string}[]>`SELECT id FROM access_departments`;
+    const existing=new Set(rows.map(row=>row.id));
+    const missing=DEPARTMENTS.filter(department=>!existing.has(department.id));
+    for(const department of missing)await tx.$executeRaw`INSERT INTO access_departments(id,name,active) VALUES(${department.id},${department.name},1)`;
+    return missing.length;
+  });
+}
 export async function saveRole(db:PrismaClient,actor:AccessActor,input:RoleInput):Promise<string>{
   const id=input.id?slug(input.id):'role_'+randomUUID(),name=text(input.name,120),department=slug(input.departmentId),enabled=active(input.active),keys=checkedKeys(input.permissions);
   return mutate(db,actor,'role.save',id,input.reason,async tx=>{

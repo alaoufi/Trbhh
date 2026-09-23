@@ -33,7 +33,8 @@ export async function warmCjTranslations(opts: { categoryMax?: number; productMa
   for (const r of missImg) {
     const det = await getProduct(r.cj_product_id).catch(() => null);
     if (det && det.ok) {
-      const gallery = [...new Set([det.data.productImage, ...(det.data.variants ?? []).map((v) => v.variantImage)].filter((s): s is string => !!s))];
+      const descImgs = (det.data.description || '').match(/https?:\/\/[^"'\s<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
+      const gallery = [...new Set([det.data.productImage, ...(det.data.variants ?? []).map((v) => v.variantImage), ...descImgs].filter((s): s is string => !!s))].slice(0, 12);
       if (gallery.length) { await setCjProductGallery(r.id, gallery); out.images++; }
       await setCjProductDetails(r.id, buildCjDetails(det.data.variants ?? []));
     }

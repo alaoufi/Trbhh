@@ -20,12 +20,13 @@ const sar = (m: number) => `${new Intl.NumberFormat('en-US').format(Math.round(m
 
 /** ينظّف وصف CJ (قد يحوي HTML) إلى نص عربي مقروء بفقرات ونقاط. */
 function cleanDescription(raw: string): string {
-  return raw
-    .replace(/<\s*br\s*\/?>/gi, '\n')
-    .replace(/<\s*li[^>]*>/gi, '• ')
-    .replace(/<\/\s*(p|div|li|h[1-6]|tr)\s*>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;/gi, "'")
+  let s = raw;
+  // فكّ الترميز أولاً (وإلا تبقى <p> نصّاً بعد إزالة الوسوم).
+  s = s.replace(/&nbsp;/gi, ' ').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").replace(/&amp;/gi, '&');
+  s = s.replace(/<\s*br\s*\/?>/gi, '\n').replace(/<\s*li[^>]*>/gi, '\n• ').replace(/<\s*\/\s*(p|div|li|h[1-6]|tr|ul|ol)\s*>/gi, '\n');
+  s = s.replace(/<[^>]*>/g, ' ');
+  s = s.replace(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)\S*/gi, '');
+  return s
     .replace(/[ \t ]{2,}/g, ' ')
     .replace(/ *\n */g, '\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -141,7 +142,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
           </div>
 
           <div className="flex items-end gap-2">
-            <div className="text-3xl font-extrabold text-primary">{sar(price)}</div>
+            <div className="text-3xl font-extrabold text-red-700">{sar(price)}</div>
             <div className="pb-1 text-xs text-muted-foreground">شامل تقدير الشحن</div>
           </div>
 

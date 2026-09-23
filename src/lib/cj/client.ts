@@ -18,7 +18,22 @@ const REFRESH_MARGIN_MS = 24 * 60 * 60 * 1000; // جدّد قبل الانتها
 
 type CjEnvelope<T> = { code?: number; result?: boolean; message?: string; data?: T };
 
+// CJ يفرض حدّ معدّل صارم (طلب واحد/ثانية). نسلسل كل الطلبات بفاصل ≥1.1ث لتفادي
+// code=1600200 «Too Many Requests». التسلسل على مستوى العملية يكفي (مثيل واحد).
+const MIN_GAP_MS = 1100;
+let lastAt = 0;
+let gate: Promise<void> = Promise.resolve();
+function throttle(): Promise<void> {
+  gate = gate.then(async () => {
+    const wait = MIN_GAP_MS - (Date.now() - lastAt);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastAt = Date.now();
+  });
+  return gate;
+}
+
 async function fetchJson(url: string, init: RequestInit): Promise<{ status: number; body: unknown }> {
+  await throttle();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {

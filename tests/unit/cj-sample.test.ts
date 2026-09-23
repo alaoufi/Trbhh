@@ -7,21 +7,20 @@ const detail = (pid: string): CjProductDetail => ({ ...summary(pid), description
   { vid: `${pid}-A`, variantSku: `V-${pid}-A`, variantName: 'أحمر', variantSellPrice: 12.5, variantImage: `https://img/${pid}-A.jpg`, variantWeight: 120 },
   { vid: `${pid}-B`, variantSku: `V-${pid}-B`, variantName: 'أزرق', variantSellPrice: 13, variantImage: null, variantWeight: 130 },
 ] });
-const inventory = (pid: string): CjInventory[] => [
-  { vid: `${pid}-A`, areaId: 'CN', areaName: 'China', countryCode: 'CN', storageNum: 40 },
-  { vid: `${pid}-A`, areaId: 'US', areaName: 'US', countryCode: 'US', storageNum: 10 },
-  { vid: `${pid}-B`, areaId: 'CN', areaName: 'China', countryCode: 'CN', storageNum: 7 },
-];
+// مخزون لكل متغيّر (vid): A موزّع على منطقتين (40+10)، B في منطقة واحدة (7).
+const invByVid = (vid: string): CjInventory[] => vid.endsWith('-A')
+  ? [{ vid, areaId: 'CN', areaName: 'China', countryCode: 'CN', storageNum: 40 }, { vid, areaId: 'US', areaName: 'US', countryCode: 'US', storageNum: 10 }]
+  : [{ vid, areaId: 'CN', areaName: 'China', countryCode: 'CN', storageNum: 7 }];
 
 const deps = (over: Partial<CjSampleDeps> = {}): CjSampleDeps => ({
   listProducts: async () => ({ ok: true, data: [summary('1'), summary('2'), summary('3'), summary('4')] } as CjResult<CjProductSummary[]>),
   getProduct: async (pid) => ({ ok: true, data: detail(pid) }),
-  getInventoryByPid: async (pid) => ({ ok: true, data: inventory(pid) }),
+  getInventoryByVid: async (vid) => ({ ok: true, data: invByVid(vid) }),
   ...over,
 });
 
 describe('CJ read-only detailed sample (PID/SKU/name/images/price/variants/weight/stock/category)', () => {
-  it('assembles all requested fields and aggregates stock per variant', async () => {
+  it('assembles all requested fields and aggregates stock per variant (by vid)', async () => {
     const r = await sampleCjProducts(3, deps());
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -30,7 +29,6 @@ describe('CJ read-only detailed sample (PID/SKU/name/images/price/variants/weigh
     expect(p).toMatchObject({ pid: '1', sku: 'SKU-1', name: 'اسم 1', category: 'إلكترونيات', priceUsd: 12.5 });
     expect(p.images).toContain('https://img/1.jpg');
     expect(p.images).toContain('https://img/1-A.jpg');
-    // مخزون المتغيّر A = 40+10 عبر منطقتين، B = 7 ⇒ الإجمالي 57
     expect(p.variants.find((v) => v.vid === '1-A')).toMatchObject({ sku: 'V-1-A', weight: 120, stock: 50 });
     expect(p.variants.find((v) => v.vid === '1-B')).toMatchObject({ weight: 130, stock: 7 });
     expect(p.totalStock).toBe(57);
@@ -43,7 +41,7 @@ describe('CJ read-only detailed sample (PID/SKU/name/images/price/variants/weigh
 
   it('propagates a list failure and degrades gracefully when detail/stock fail', async () => {
     expect(await sampleCjProducts(3, deps({ listProducts: async () => ({ ok: false, error: 'cj_http_401', status: 401 }) }))).toEqual({ ok: false, error: 'cj_http_401', status: 401 });
-    const r = await sampleCjProducts(1, deps({ getProduct: async () => ({ ok: false, error: 'cj_http_500' }), getInventoryByPid: async () => ({ ok: false, error: 'cj_http_500' }) }));
+    const r = await sampleCjProducts(1, deps({ getProduct: async () => ({ ok: false, error: 'cj_http_500' }), getInventoryByVid: async () => ({ ok: false, error: 'cj_http_500' }) }));
     expect(r.ok).toBe(true);
     if (r.ok) { expect(r.data[0].variants).toEqual([]); expect(r.data[0].totalStock).toBe(0); expect(r.data[0].pid).toBe('1'); }
   });

@@ -110,6 +110,15 @@ export async function translateToArabicCached(text: string | null | undefined): 
   return ar;
 }
 
+/** «تعلّم الترجمة»: يحفظ تصحيح المشرف (نص المصدر → العربية الصحيحة) ويستبدل أي ترجمة
+ *  سابقة، فيُعاد استخدامه تلقائياً في السلع المشابهة لاحقاً. */
+export async function learnTranslation(source: string | null | undefined, arabic: string | null | undefined): Promise<void> {
+  const s = (source ?? '').trim(); const a = (arabic ?? '').trim();
+  if (!s || !a) return;
+  const key = keyOf(s);
+  await prisma.cj_translations.upsert({ where: { source_key: key }, create: { source_key: key, target_ar: a }, update: { target_ar: a } }).catch(() => {});
+}
+
 /** يترجم قائمة نصوص (المفقود منها فقط) ويخزّنها؛ يعيد خريطة نص→عربي شاملة المخزَّن.
  *  ينفّذ المفقود على دفعات متوازية محدودة لتقليل زمن الانتظار. */
 export async function translateManyCached(texts: (string | null | undefined)[], max = 30): Promise<Map<string, string>> {

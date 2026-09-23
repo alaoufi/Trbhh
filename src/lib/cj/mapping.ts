@@ -219,6 +219,12 @@ export async function listProductsMissingImage(limit = 40): Promise<CjProductRow
   return prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE (image='' OR image IS NULL OR images IS NULL OR details_json IS NULL) ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
 }
 
+/** تحديث وسم تصنيف تربح. */
+export async function setCjProductCategory(id: number, category: string): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
+  await prisma.$executeRaw`UPDATE cj_products SET trbhh_category=${category.slice(0, 200)} WHERE id=${BigInt(id)}`.catch(() => {});
+}
+
 /** تحديث الوصف العربي المعروض. */
 export async function setCjProductDescriptionAr(id: number, descAr: string): Promise<void> {
   if (!Number.isInteger(id) || id <= 0) return;

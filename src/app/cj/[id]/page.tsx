@@ -3,6 +3,10 @@ import { notFound } from 'next/navigation';
 import { ShoppingCart, CreditCard, Truck, Heart, Star, RotateCcw, Lock } from 'lucide-react';
 import { ShareButtons } from '@/components/share-buttons';
 import { SITE } from '@/lib/constants';
+import { AccessBoundary } from '@/components/access-boundary';
+import { saveCjStorefrontEdit } from '../../admin/suppliers/cj/actions';
+
+const editInput = 'mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
 import { cjStorefrontView, importedToAdCard } from '@/lib/cj/storefront';
 import { getStorefrontCjProduct, listStorefrontCjProducts, parseCjImages, setCjProductGallery, parseCjDetails } from '@/lib/cj/mapping';
 import { getProduct } from '@/lib/cj/client';
@@ -28,7 +32,7 @@ function cleanDescription(raw: string): string {
     .trim();
 }
 
-export default async function CjStoreProductPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CjStoreProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const view = await cjStorefrontView();
   if (!view.visible) {
     return (
@@ -40,6 +44,7 @@ export default async function CjStoreProductPage({ params }: { params: Promise<{
     );
   }
   const { id: idStr } = await params;
+  const sp = await searchParams;
   const id = Number(idStr);
   if (!Number.isInteger(id) || id <= 0) notFound();
   const readyOnly = !view.isStaff;
@@ -71,6 +76,28 @@ export default async function CjStoreProductPage({ params }: { params: Promise<{
       {!view.isPublic && view.isStaff && (
         <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm"><b>معاينة إدارية</b> — مخفية عن الأعضاء والزوار.</p>
       )}
+      {sp.edited === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حفظ التعديل، وتعلّمت الترجمة التصحيح.</p>}
+
+      {/* تعديل مباشر لمن يملك صلاحية التكاملات — يُحفظ ويُعلّم الترجمة */}
+      <AccessBoundary module={'integrations'} action={'manage_settings'}>
+        <details className="card-3d rounded-2xl p-3">
+          <summary className="cursor-pointer text-sm font-bold text-primary">✎ تعديل مباشر (يُحفظ ويُعلّم الترجمة)</summary>
+          <form action={saveCjStorefrontEdit} className="mt-2 space-y-2 text-sm">
+            <input type="hidden" name="id" value={id} />
+            <label className="block">العنوان العربي<input name="nameAr" defaultValue={p.name_ar} className={editInput} placeholder="مثال: ساعة يد رجالية" /></label>
+            <label className="block">الوصف العربي<textarea name="descriptionAr" rows={4} defaultValue={p.display_description_ar ?? ''} className={editInput} /></label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">التصنيف<input name="trbhhCategory" defaultValue={p.trbhh_category} className={editInput} /></label>
+              <label className="block">السعر (ر.س) — فارغ = المحسوب<input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} /></label>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="rounded-lg bg-primary px-4 py-2 font-bold text-white">حفظ التعديل</button>
+              <span className="text-xs text-muted-foreground">تصحيح العنوان/الوصف يُحفظ في ذاكرة الترجمة ويُطبَّق على السلع المشابهة.</span>
+            </div>
+          </form>
+        </details>
+      </AccessBoundary>
+
       <nav className="text-sm"><Link href="/cj" className="text-primary hover:underline">‹ رجوع للسلع والإعلانات</Link></nav>
 
       <div className="grid gap-5 md:grid-cols-2">

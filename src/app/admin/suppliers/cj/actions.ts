@@ -5,8 +5,8 @@ import { requireAccess } from '@/lib/access-control/guards';
 import { setDefaultMarginBps } from '@/lib/cj/pricing';
 import { saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync';
 import { importCjProductByPid } from '@/lib/cj/import';
-import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview } from '@/lib/cj/mapping';
-import { translateToArabic, translateManyCached } from '@/lib/cj/translate';
+import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductDescriptionAr, setCjProductCategory } from '@/lib/cj/mapping';
+import { translateToArabic, translateManyCached, learnTranslation } from '@/lib/cj/translate';
 import { getCategories } from '@/lib/cj/client';
 import { createOrder, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
 import { warmCjTranslations } from '@/lib/cj/translate-warm';
@@ -181,6 +181,27 @@ export async function translateCjCategories(form: FormData) {
   let done = 0;
   if (cats.ok) { const map = await translateManyCached(cats.data.map((c) => c.name), 120); done = map.size; }
   redirect(withParam(back, `cattr=${done}`));
+}
+
+/** تعديل مباشر من صفحة السلعة (لمن يملك صلاحية) — يحدّث العرض ويُعلّم الترجمة. */
+export async function saveCjStorefrontEdit(form: FormData) {
+  await requireAccess('integrations', 'manage_settings');
+  const id = Number(String(form.get('id') || ''));
+  const row = await getCjProductById(id);
+  const nameAr = String(form.get('nameAr') || '').trim();
+  const descAr = String(form.get('descriptionAr') || '').trim();
+  const cat = String(form.get('trbhhCategory') || '').trim();
+  const priceRaw = String(form.get('priceSar') || '').trim();
+  if (nameAr) { await setCjProductNameAr(id, nameAr); if (row?.name) await learnTranslation(row.name, nameAr); }
+  await setCjProductDescriptionAr(id, descAr);
+  if (row?.source_description && descAr) await learnTranslation(row.source_description, descAr);
+  await setCjProductCategory(id, cat);
+  if (priceRaw === '') await setCjProductPriceOverride(id, null);
+  else { const v = Number(priceRaw); if (Number.isFinite(v) && v >= 0) await setCjProductPriceOverride(id, Math.round(v * 100)); }
+  revalidatePath(`/cj/${id}`);
+  revalidatePath('/cj');
+  revalidatePath('/admin/suppliers/cj/browse');
+  redirect(`/cj/${id}?edited=1`);
 }
 
 /** تفعيل/إيقاف إظهار متجر CJ للعامة (بعد نجاح التجربة). الشراء يبقى معطّلاً بمفتاحه. */

@@ -1,32 +1,11 @@
 import Link from 'next/link';
-import { cjStorefrontView } from '@/lib/cj/storefront';
-import { listStorefrontCjProducts, type CjProductRow } from '@/lib/cj/mapping';
+import { cjStorefrontView, importedToAdCard } from '@/lib/cj/storefront';
+import { listStorefrontCjProducts } from '@/lib/cj/mapping';
 import { AdGrid } from '@/components/ad-card';
-import { getHomeLatestAds, type AdCard } from '@/lib/data';
+import { getHomeLatestAds } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'سلع مختارة', robots: { index: false, follow: false } };
-
-/** يحوّل السلعة المستوردة إلى بطاقة إعلان (نفس التصميم) — المورد مخفي، الرابط لصفحة السلعة. */
-function importedToAdCard(r: CjProductRow): AdCard {
-  return {
-    id: Number(r.id),
-    href: `/cj/${r.id}`,
-    title: r.name_ar || r.name || 'سلعة',
-    price: Math.round((r.sale_price_override_minor ?? r.sale_price_minor) / 100),
-    adsType: 'sale',
-    image: r.image,
-    cityName: null,
-    categoryName: r.trbhh_category || null,
-    createdAt: null,
-    special: false,
-    urgent: false,
-    views: 0,
-    sellerName: null,
-    sellerTrusted: false,
-    tier: '',
-  };
-}
 
 /** يمزج قائمتين بالتناوب لتظهر السلع المستوردة بين الإعلانات. */
 function weave<T>(a: T[], b: T[]): T[] {

@@ -2,6 +2,29 @@ import 'server-only';
 import { getSetting, setSetting } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
 import { hasAnyAdmin } from '@/lib/roles';
+import type { AdCard } from '@/lib/data';
+import type { CjProductRow } from '@/lib/cj/mapping';
+
+/** يحوّل السلعة المستوردة إلى بطاقة إعلان (نفس التصميم) — المورد وبيانات البائع مخفية. */
+export function importedToAdCard(r: CjProductRow): AdCard {
+  return {
+    id: Number(r.id),
+    href: `/cj/${r.id}`,
+    title: r.name_ar || r.name || 'سلعة',
+    price: Math.round((r.sale_price_override_minor ?? r.sale_price_minor) / 100),
+    adsType: 'sale',
+    image: r.image,
+    cityName: null,
+    categoryName: r.trbhh_category || null,
+    createdAt: null,
+    special: false,
+    urgent: false,
+    views: 0,
+    sellerName: null,
+    sellerTrusted: false,
+    tier: '',
+  };
+}
 
 /**
  * مفتاح إظهار متجر CJ للعامة (قابل للتحكّم من لوحة الإدارة — لا قيمة ثابتة بالكود).

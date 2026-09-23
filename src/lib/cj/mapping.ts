@@ -18,6 +18,7 @@ export type CjProductRow = {
   display_description_ar: string | null;
   trbhh_category: string;
   status: string;
+  images: string | null;
   hidden: number;
   sale_price_override_minor: number | null;
   image: string;
@@ -43,8 +44,17 @@ export type UpsertCjInput = {
   descriptionAr?: string | null;
   trbhhCategory?: string | null;
   image?: string;
+  images?: string[];
   price: PriceBreakdown;
 };
+
+/** يفكّ معرض صور السلعة المخزَّن (JSON) إلى مصفوفة روابط. */
+export function parseCjImages(row: Pick<CjProductRow, 'images' | 'image'>): string[] {
+  const out: string[] = [];
+  try { const arr = row.images ? JSON.parse(row.images) : []; if (Array.isArray(arr)) for (const s of arr) if (typeof s === 'string' && s) out.push(s); } catch { /* تجاهل */ }
+  if (!out.length && row.image) out.push(row.image);
+  return [...new Set(out)];
+}
 
 /** يُدرِج/يحدّث صفّ منتج CJ (idempotent) — لا تكرار بفضل مفتاح التفرّد.
  *  ملاحظة: عند إعادة الاستيراد لا نطمس تعديلات المشرف (name_ar/hidden/override) —
@@ -55,15 +65,17 @@ export async function upsertCjProduct(input: UpsertCjInput): Promise<void> {
   const srcDesc = input.sourceDescription ?? null;
   const descAr = (input.descriptionAr ?? '') || null;
   const category = (input.trbhhCategory ?? '').trim();
+  const imagesJson = input.images && input.images.length ? JSON.stringify([...new Set(input.images.filter(Boolean))].slice(0, 12)) : null;
   await prisma.$executeRaw`
     INSERT INTO cj_products
-      (cj_product_id, cj_variant_id, cj_sku, name, name_ar, source_description, display_description_ar, trbhh_category, image,
+      (cj_product_id, cj_variant_id, cj_sku, name, name_ar, source_description, display_description_ar, trbhh_category, image, images,
        supplier_cost_minor, shipping_cost_minor, other_costs_minor, profit_minor, sale_price_minor, margin_bps, currency, last_sync_at)
     VALUES
-      (${input.cjProductId}, ${input.cjVariantId ?? ''}, ${input.cjSku ?? ''}, ${input.name ?? ''}, ${nameAr}, ${srcDesc}, ${descAr}, ${category}, ${input.image ?? ''},
+      (${input.cjProductId}, ${input.cjVariantId ?? ''}, ${input.cjSku ?? ''}, ${input.name ?? ''}, ${nameAr}, ${srcDesc}, ${descAr}, ${category}, ${input.image ?? ''}, ${imagesJson},
        ${p.supplierCostMinor}, ${p.shippingCostMinor}, ${p.otherCostsMinor}, ${p.profitMinor}, ${p.salePriceMinor}, ${p.marginBps}, ${p.currency}, CURRENT_TIMESTAMP(3))
     ON DUPLICATE KEY UPDATE
       cj_sku=VALUES(cj_sku), name=VALUES(name), image=VALUES(image),
+      images=CASE WHEN VALUES(images) IS NOT NULL THEN VALUES(images) ELSE cj_products.images END,
       source_description=VALUES(source_description),
       name_ar=CASE WHEN cj_products.name_ar='' THEN VALUES(name_ar) ELSE cj_products.name_ar END,
       display_description_ar=CASE WHEN cj_products.display_description_ar IS NULL OR cj_products.display_description_ar='' THEN VALUES(display_description_ar) ELSE cj_products.display_description_ar END,
@@ -154,6 +166,27 @@ export async function listProductsNeedingArabic(limit = 100): Promise<CjProductR
     WHERE (name_ar='' AND name<>'')
        OR ((display_description_ar IS NULL OR display_description_ar='') AND source_description IS NOT NULL AND source_description<>'')
     ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
+}
+
+/** تحديث صورة السلعة (تعبئة أو إصلاح). */
+export async function setCjProductImage(id: number, url: string): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0 || !url) return;
+  await prisma.$executeRaw`UPDATE cj_products SET image=${url.slice(0, 1024)} WHERE id=${BigInt(id)}`.catch(() => {});
+}
+
+/** تحديث معرض صور السلعة (JSON) + الصورة الرئيسية (أول صورة). */
+export async function setCjProductGallery(id: number, images: string[]): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
+  const clean = [...new Set(images.filter(Boolean))].slice(0, 12);
+  if (!clean.length) return;
+  const json = JSON.stringify(clean);
+  await prisma.$executeRaw`UPDATE cj_products SET images=${json}, image=${clean[0].slice(0, 1024)} WHERE id=${BigInt(id)}`.catch(() => {});
+}
+
+/** السلع بلا صورة/معرض مخزَّن — لتعبئتها من CJ. */
+export async function listProductsMissingImage(limit = 40): Promise<CjProductRow[]> {
+  const take = Math.min(Math.max(1, limit), 100);
+  return prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE (image='' OR image IS NULL OR images IS NULL) ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
 }
 
 /** تحديث الوصف العربي المعروض. */

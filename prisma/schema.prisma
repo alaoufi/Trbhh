@@ -2278,6 +2278,7 @@ model cj_products {
   display_description_ar String? @db.MediumText
   trbhh_category      String    @default("") @db.VarChar(200)
   status              String    @default("draft") @db.VarChar(16)
+  images              String?   @db.MediumText
   hidden              Int       @default(0) @db.TinyInt
   sale_price_override_minor Int?
   image               String    @default("") @db.VarChar(1024)

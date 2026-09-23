@@ -25,6 +25,7 @@ export const CJ_DDL: string[] = [
     display_description_ar MEDIUMTEXT NULL,
     trbhh_category VARCHAR(200) NOT NULL DEFAULT '',
     status VARCHAR(16) NOT NULL DEFAULT 'draft',
+    images MEDIUMTEXT NULL,
     hidden TINYINT NOT NULL DEFAULT 0,
     sale_price_override_minor INT NULL,
     image VARCHAR(1024) NOT NULL DEFAULT '',
@@ -52,6 +53,7 @@ export const CJ_DDL: string[] = [
   `ALTER TABLE cj_products ADD COLUMN display_description_ar MEDIUMTEXT NULL`,
   `ALTER TABLE cj_products ADD COLUMN trbhh_category VARCHAR(200) NOT NULL DEFAULT ''`,
   `ALTER TABLE cj_products ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'draft'`,
+  `ALTER TABLE cj_products ADD COLUMN images MEDIUMTEXT NULL`,
 
   // ذاكرة ترجمة مخزَّنة (نص المصدر ← العربية) لتفادي تكرار طلبات الترجمة.
   `CREATE TABLE IF NOT EXISTS cj_translations (

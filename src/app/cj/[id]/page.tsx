@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ShieldCheck } from 'lucide-react';
 import { cjStorefrontView, importedToAdCard } from '@/lib/cj/storefront';
-import { getStorefrontCjProduct, listStorefrontCjProducts } from '@/lib/cj/mapping';
+import { getStorefrontCjProduct, listStorefrontCjProducts, parseCjImages } from '@/lib/cj/mapping';
 import { AdGrid } from '@/components/ad-card';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +30,7 @@ export default async function CjStoreProductPage({ params }: { params: Promise<{
 
   const price = p.sale_price_override_minor ?? p.sale_price_minor;
   const title = p.name_ar || p.name || 'سلعة';
+  const gallery = parseCjImages(p);
   const others = (await listStorefrontCjProducts(readyOnly, 24)).filter((r) => r.image && Number(r.id) !== id).slice(0, 12).map(importedToAdCard);
 
   return (
@@ -40,12 +41,22 @@ export default async function CjStoreProductPage({ params }: { params: Promise<{
       <nav className="text-sm"><Link href="/cj" className="text-primary hover:underline">‹ رجوع للسلع والإعلانات</Link></nav>
 
       <div className="grid gap-5 md:grid-cols-2">
-        {/* الصورة */}
-        <div className="card-3d overflow-hidden rounded-2xl">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {p.image
-            ? <img src={p.image} alt={title} className="aspect-square w-full object-cover" />
-            : <div className="grid aspect-square w-full place-items-center bg-primary/5 text-muted-foreground">لا صورة</div>}
+        {/* معرض الصور */}
+        <div className="space-y-2">
+          <div className="card-3d overflow-hidden rounded-2xl">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {gallery[0]
+              ? <img src={gallery[0]} alt={title} className="aspect-square w-full object-cover" />
+              : <div className="grid aspect-square w-full place-items-center bg-primary/5 text-muted-foreground">لا صورة</div>}
+          </div>
+          {gallery.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {gallery.slice(0, 8).map((src, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={src} alt="" className="h-16 w-16 shrink-0 rounded-lg border border-primary/15 object-cover" loading="lazy" />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* المعلومات (بلا بيانات تواصل أو موقع أو بائع) */}

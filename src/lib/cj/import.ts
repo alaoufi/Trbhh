@@ -42,10 +42,12 @@ export async function importCjProductByPid(pid: string, deps: CjImportDeps = {})
     translate(d.description || '').catch(() => null),
     translate(d.categoryName || '').catch(() => null),
   ]);
+  // معرض الصور: صورة المنتج + صور المتغيّرات (بعض منتجات CJ بلا productImage). الأولى = الرئيسية.
+  const gallery = [...new Set([d.productImage, ...(d.variants ?? []).map((v) => v.variantImage)].filter((s): s is string => !!s))];
   await upsert({
     cjProductId: clean, cjSku: d.productSku || '', name: d.productName || '', nameAr,
     sourceDescription: d.description || null, descriptionAr: descAr,
-    trbhhCategory: catAr || d.categoryName || '', image: d.productImage || '', price,
+    trbhhCategory: catAr || d.categoryName || '', image: gallery[0] || '', images: gallery, price,
   });
   return { ok: true, pid: clean, name: d.productName || '', salePriceMinor: price.salePriceMinor, supplierCostMinor: price.supplierCostMinor };
 }

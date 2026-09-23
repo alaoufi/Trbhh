@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, LayoutTemplate, Wallet, Users, User, Store, Shield } from 'lucide-react';
+import { Megaphone, Heart, Mail, Sparkles, BarChart3, Star, Flag, Bell, LayoutTemplate, Wallet, Users, User, Store, Shield, Truck } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { getMyStats, getMyIdentityAdCount, getMyIdentityFavCount } from '@/lib/account';
 import { getBalance } from '@/lib/wallet';
@@ -33,11 +33,12 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
   ]);
   const welcomeText = fillTemplate(welcomeTpl, { name: session.name });
   // اكتشاف خدمات هذا الحساب — بالتوازي (بدل جولات متتابعة)
-  const [refReward, myStoreId, isAdmin, linkedCount] = await Promise.all([
+  const [refReward, myStoreId, isAdmin, linkedCount, isAgent] = await Promise.all([
     refOn ? getReferralReward() : Promise.resolve(0),
     import('@/lib/merchant').then((m) => m.storeIdOfUser(session.uid)).catch(() => 0),
     import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false),
     import('@/lib/account-links').then((m) => m.linkedAccounts(session.uid)).then((a) => a.length).catch(() => 0),
+    import('@/lib/cj/agents').then((m) => m.isActiveAgent(session.uid)).catch(() => false),
   ]);
   const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
   const cards = [
@@ -69,7 +70,7 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
       />
 
       {/* 🎭 اكتشاف خدمات هذا الحساب تلقائياً — شريط أفقي منزلق يُظهر الخدمات المخفية بالسحب */}
-      {(myStoreId > 0 || isAdmin || linkedCount > 0) && (
+      {(myStoreId > 0 || isAdmin || linkedCount > 0 || isAgent) && (
         <div className="rounded-xl border border-primary/20 bg-primary/5 p-2">
           <div className="mb-1.5 flex items-center justify-between gap-2 px-0.5">
             <span className="text-[12px] font-extrabold text-primary">🎭 خدمات هذا الحساب</span>
@@ -93,6 +94,13 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
                 <Shield className="h-4 w-4 shrink-0 text-amber-600" />
                 <span className="text-[13px] font-bold text-foreground">الإدارة</span>
                 <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold text-amber-700">دخول ←</span>
+              </Link>
+            )}
+            {isAgent && (
+              <Link href="/account/agent" className="flex shrink-0 items-center gap-2 rounded-lg bg-card px-3 py-1.5 shadow-sm hover:bg-accent">
+                <Truck className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span className="text-[13px] font-bold text-foreground">وكيل</span>
+                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-extrabold text-emerald-700">لوحتي ←</span>
               </Link>
             )}
             {linkedCount > 0 && (

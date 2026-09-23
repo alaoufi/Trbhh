@@ -53,5 +53,40 @@ export type CjTrack = {
   details: { date: string | null; description: string | null }[];
 };
 
+/** تصنيف CJ (مسطَّح للمستوى الثالث مع مساره الكامل) — للفلترة. */
+export type CjCategory = {
+  id: string;         // معرّف التصنيف (المستوى الثالث) المستخدَم في فلترة /product/list
+  name: string;       // اسم التصنيف الأخير
+  path: string;       // المسار الكامل: الأول › الثاني › الثالث
+};
+
+/** صفحة منتجات مع الإجمالي — لتصفّح آلاف السلع بكفاءة. */
+export type CjProductPage = {
+  items: CjProductSummary[];
+  total: number;
+  pageNum: number;
+  pageSize: number;
+};
+
 /** نتيجة موحّدة لاستدعاءات CJ (لا ترمي؛ نميّز النجاح من الفشل). */
 export type CjResult<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
+
+/** عيّنة منتج تفصيلية للقراءة فقط — تجمع الملخّص + المتغيّرات + المخزون. */
+export type CjSampleVariant = {
+  vid: string;
+  sku: string;
+  name: string | null;
+  priceUsd: number | null;
+  weight: number | null;
+  stock: number | null;
+};
+export type CjSampleProduct = {
+  pid: string;
+  sku: string;
+  name: string;
+  category: string | null;
+  priceUsd: number | null;
+  images: string[];
+  variants: CjSampleVariant[];
+  totalStock: number;
+};

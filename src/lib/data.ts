@@ -21,6 +21,8 @@ export type AdCard = {
   priceEnabled?: boolean;
   goodsEnabled?: boolean;
   categoryFields?: PublicCategory['categoryFields'];
+  /** وجهة رابط البطاقة؛ الافتراضي /ads/<id>. تُستخدم لدمج سلع مصادر أخرى ضمن نفس الشبكة. */
+  href?: string;
   id: number;
   title: string;
   price: number;

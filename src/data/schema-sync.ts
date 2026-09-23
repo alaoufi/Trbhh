@@ -921,6 +921,21 @@ async function run(): Promise<void> {
   await backfillAdBanAction();
   await backfillAccountDeletedAction();
   await backfillLegacyReceiptHashes();
+  await seedCjSupplier();
+}
+
+/** بذرة لمرة واحدة: مورد نظام «CJdropshipping» ليظهر ضمن قائمة الموردين مثل بقية
+ *  الموردين، وتُنسب إليه منتجات CJ المستوردة لاحقاً (للتسوية/الفوترة خارج الموقع).
+ *  idempotent — لا يُنشأ إن وُجد مورد بهذا الاسم. قراءة فقط: api_enabled=0 (لا شراء آلي). */
+async function seedCjSupplier(): Promise<void> {
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO commerce_suppliers (name, contact_name, notes, api_credential_ref, active, api_enabled)
+     SELECT 'CJdropshipping', 'CJ API',
+            'مورد تكامل CJdropshipping — قراءة فقط حالياً (لا شراء). تصفّح واستيراد المنتجات من لوحة CJ.',
+            'CJ_API_KEY', 1, 0
+     FROM DUAL
+     WHERE NOT EXISTS (SELECT 1 FROM commerce_suppliers WHERE name = 'CJdropshipping')`,
+  ).catch(() => {});
 }
 
 /** ترقيع لمرة واحدة: سجلات التكرار الآلي القديمة (قبل إضافة عمود ad_id) خزّنت

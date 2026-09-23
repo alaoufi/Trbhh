@@ -8,7 +8,9 @@ import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { countCjProducts } from '@/lib/cj/mapping';
 import { testConnection, listProducts, getInventoryByPid, getWarehouses, calculateFreightToKSA } from '@/lib/cj/client';
-import { saveCjMargin } from './actions';
+import { sampleCjProducts } from '@/lib/cj/sample';
+import { cjSyncSettings } from '@/lib/cj/sync';
+import { saveCjMargin, saveCjSync, runCjSync } from './actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'تكامل CJ — وضع الاختبار' };
@@ -26,10 +28,11 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
   await requireAdminPage('/admin/suppliers/cj');
   const sp = await searchParams;
   const cfg = cjConfig();
-  const [commerce, marginBps, mapped] = await Promise.all([
+  const [commerce, marginBps, mapped, sync] = await Promise.all([
     getCommerceConfig().catch(() => null),
     defaultMarginBps(),
     countCjProducts(),
+    cjSyncSettings(),
   ]);
   const liveAllowed = process.env.SUPPLIER_ALLOW_LIVE_ORDERS === 'true';
   const run = typeof sp.run === 'string' ? sp.run : '';
@@ -43,6 +46,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
   if (cfg.configured) {
     if (run === 'connection') result = await testConnection();
     else if (run === 'products') result = await listProducts(1, 20);
+    else if (run === 'sample') result = await sampleCjProducts(3);
     else if (run === 'inventory' && pid) result = await getInventoryByPid(pid);
     else if (run === 'warehouses' && pid) result = await getWarehouses(pid);
     else if (run === 'freight' && vid) result = await calculateFreightToKSA([{ vid, quantity: qty }]);
@@ -52,7 +56,10 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-extrabold text-primary">تكامل CJdropshipping — وضع الاختبار</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-extrabold text-primary">تكامل CJdropshipping — وضع الاختبار</h1>
+        <Link href="/admin/suppliers/cj/browse" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">تصفّح المنتجات واستيرادها ←</Link>
+      </div>
 
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
         هذه الصفحة لاختبار الاتصال والقراءة فقط (منتجات/مخزون/مستودعات/شحن). <b>لا يُنشأ أي طلب شراء حقيقي</b> —
@@ -86,13 +93,43 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
         <p className="text-xs text-muted-foreground">مثال حساب: تكلفة ٢٠ + شحن ١٥ ر.س بهامش {(marginBps / 100).toFixed(0)}٪ → ربح {(sample.profitMinor / 100).toFixed(2)} · بيع {(sample.salePriceMinor / 100).toFixed(2)} ر.س. (السعر غير مثبّت في الكود.)</p>
       </div>
 
+      {/* مزامنة الكتالوج */}
+      <div className={card}>
+        <h2 className="font-bold">مزامنة كتالوج CJ (قراءة فقط)</h2>
+        <p className="text-xs text-muted-foreground">
+          تجلب منتجات CJ إلى جدول التخزين الوسيط <code>cj_products</code> وتحتسب سعر البيع من التكلفة (سعر CJ بالدولار
+          × سعر الصرف) + الشحن + الهامش الافتراضي. لا يُنشَر أي منتج تلقائياً في المتجر ولا يُشترى شيء. المزامنة المجدولة
+          تعمل فقط عند تفعيلها أدناه (كرون داخلي <code>/api/internal/cj/sync</code>).
+        </p>
+        {sp.saved === 'sync' && <p className="text-sm text-emerald-700">تم حفظ إعدادات المزامنة.</p>}
+        {sp.synced === '1' && <p className="text-sm text-emerald-700">تمّت المزامنة: استُورد {sp.imported} · صفحات {sp.pages} · تُجووز {sp.skipped}.</p>}
+        {typeof sp.syncerr === 'string' && <p className="text-sm text-red-700">تعذّرت المزامنة: {sp.syncerr}</p>}
+        <form action={saveCjSync} className="grid gap-2 sm:grid-cols-2">
+          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" name="enabled" value="1" defaultChecked={sync.enabled} className="size-4" />
+            تفعيل المزامنة المجدولة (كرون)
+          </label>
+          <label className="text-sm">حجم الصفحة<input className={`${input} ms-2 w-24`} name="pageSize" type="number" min={1} max={50} defaultValue={sync.pageSize} /></label>
+          <label className="text-sm">عدد الصفحات<input className={`${input} ms-2 w-24`} name="maxPages" type="number" min={1} max={20} defaultValue={sync.maxPages} /></label>
+          <label className="text-sm">سعر صرف الدولار (ر.س)<input className={`${input} ms-2 w-24`} name="usdToSar" inputMode="decimal" defaultValue={(sync.usdToSarX100 / 100).toString()} /></label>
+          <label className="text-sm">تقدير الشحن/منتج (ر.س)<input className={`${input} ms-2 w-24`} name="shippingSar" inputMode="decimal" defaultValue={(sync.shippingMinor / 100).toString()} /></label>
+          <div className="sm:col-span-2"><button className={btn}>حفظ إعدادات المزامنة</button></div>
+        </form>
+        <form action={runCjSync}>
+          <button className={btn} disabled={!cfg.configured}>مزامنة الآن (يدوية)</button>
+          {!cfg.configured && <span className="ms-2 text-xs text-red-700">اضبط متغيّرات CJ أولاً.</span>}
+        </form>
+      </div>
+
       {/* اختبارات القراءة */}
       <div className={card}>
         <h2 className="font-bold">اختبارات القراءة (بلا شراء)</h2>
         {!cfg.configured && <p className="text-sm text-red-700">اضبط متغيّرات CJ في البيئة أولاً لتشغيل الاختبارات.</p>}
+        <p className="text-xs text-muted-foreground">«اختبار الاتصال»: النجاح يعني ظهور <code dir="ltr">connected: true</code> مع البريد (تمّت المصادقة وجُلب التوكن). ظهور البريد بلا خطأ أحمر = الاتصال سليم.</p>
         <div className="flex flex-wrap gap-2">
           <AccessPage href="/admin/suppliers/cj?run=connection"><Link href="/admin/suppliers/cj?run=connection" className={btn}>اختبار الاتصال</Link></AccessPage>
           <AccessPage href="/admin/suppliers/cj?run=products"><Link href="/admin/suppliers/cj?run=products" className={btn}>عيّنة منتجات (٢٠)</Link></AccessPage>
+          <AccessPage href="/admin/suppliers/cj?run=sample"><Link href="/admin/suppliers/cj?run=sample" className={btn}>عيّنة تفصيلية (٣: متغيّرات+وزن+مخزون)</Link></AccessPage>
         </div>
         <form method="get" className="flex flex-wrap items-end gap-2">
           <input type="hidden" name="run" value="inventory" />

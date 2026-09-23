@@ -2273,6 +2273,17 @@ model cj_products {
   cj_variant_id       String    @default("") @db.VarChar(64)
   cj_sku              String    @default("") @db.VarChar(191)
   name                String    @default("") @db.VarChar(400)
+  name_ar             String    @default("") @db.VarChar(400)
+  source_description     String? @db.MediumText
+  display_description_ar String? @db.MediumText
+  trbhh_category      String    @default("") @db.VarChar(200)
+  status              String    @default("draft") @db.VarChar(16)
+  images              String?   @db.MediumText
+  details_json        String?   @db.MediumText
+  agent_user_id       BigInt?   @db.UnsignedBigInt
+  agent_claimed_at    DateTime? @db.DateTime(3)
+  hidden              Int       @default(0) @db.TinyInt
+  sale_price_override_minor Int?
   image               String    @default("") @db.VarChar(1024)
   supplier_cost_minor Int       @default(0)
   shipping_cost_minor Int       @default(0)
@@ -2289,6 +2300,77 @@ model cj_products {
 
   @@unique([cj_product_id, cj_variant_id], map: "cj_product_variant")
   @@index([commerce_product_id], map: "cj_products_commerce")
+  @@index([agent_user_id], map: "cj_products_agent")
+}
+
+model cj_agents {
+  user_id      BigInt   @id @db.UnsignedBigInt
+  phone        String   @default("") @db.VarChar(40)
+  whatsapp     String   @default("") @db.VarChar(40)
+  weekly_quota Int      @default(0)
+  active       Int      @default(1) @db.TinyInt
+  notes        String   @default("") @db.VarChar(500)
+  created_at   DateTime @default(now()) @db.Timestamp(3)
+  updated_at   DateTime @default(now()) @updatedAt @db.Timestamp(3)
+}
+
+model cj_translations {
+  source_key String   @id @db.Char(40)
+  target_ar  String   @db.Text
+  created_at DateTime @default(now()) @db.Timestamp(3)
+}
+
+model cj_orders {
+  id                   BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  internal_ref         String    @db.VarChar(64)
+  user_id              BigInt?   @db.UnsignedBigInt
+  cj_product_id        String    @default("") @db.VarChar(64)
+  product_name         String    @default("") @db.VarChar(400)
+  cj_order_id          String    @default("") @db.VarChar(64)
+  status               String    @default("awaiting_payment") @db.VarChar(32)
+  status_reason        String    @default("") @db.VarChar(300)
+  items_total_minor    Int       @default(0)
+  shipping_total_minor Int       @default(0)
+  tax_total_minor      Int       @default(0)
+  grand_total_minor    Int       @default(0)
+  currency             String    @default("SAR") @db.VarChar(3)
+  carrier              String    @default("") @db.VarChar(120)
+  tracking_number      String    @default("") @db.VarChar(160)
+  tracking_url         String    @default("") @db.VarChar(1024)
+  tracking_status      String    @default("") @db.VarChar(64)
+  ship_name            String    @default("") @db.VarChar(160)
+  ship_phone           String    @default("") @db.VarChar(40)
+  ship_country         String    @default("SA") @db.VarChar(4)
+  ship_region          String    @default("") @db.VarChar(120)
+  ship_city            String    @default("") @db.VarChar(120)
+  ship_address1        String    @default("") @db.VarChar(400)
+  ship_address2        String    @default("") @db.VarChar(400)
+  ship_zip             String    @default("") @db.VarChar(20)
+  placed_at            DateTime? @db.DateTime(3)
+  delivered_at         DateTime? @db.DateTime(3)
+  created_at           DateTime  @default(now()) @db.Timestamp(3)
+  updated_at           DateTime  @default(now()) @updatedAt @db.Timestamp(3)
+
+  @@unique([internal_ref], map: "cj_orders_ref")
+  @@index([status], map: "cj_orders_status")
+  @@index([user_id], map: "cj_orders_user")
+  @@index([cj_order_id], map: "cj_orders_cjid")
+}
+
+model cj_order_events {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  order_id    BigInt   @db.UnsignedBigInt
+  event_key   String   @db.VarChar(191)
+  type        String   @default("note") @db.VarChar(48)
+  source      String   @default("internal") @db.VarChar(24)
+  from_status String   @default("") @db.VarChar(32)
+  to_status   String   @default("") @db.VarChar(32)
+  note        String   @default("") @db.VarChar(1000)
+  actor_id    BigInt?  @db.UnsignedBigInt
+  created_at  DateTime @default(now()) @db.DateTime(3)
+
+  @@unique([event_key], map: "cj_order_event_key")
+  @@index([order_id, id], map: "cj_order_events_order")
 }
 
 model cj_webhook_events {

@@ -126,6 +126,7 @@ export function pagePermission(href:string,query?:{section?:string;tab?:string})
   else if(/^\/admin\/commerce\/orders\/[^/]+$/.test(path))pageModule='orders';
   else if(/^\/admin\/users\/[^/]+\/permissions$/.test(path))pageModule='access_control';
   else if(/^\/admin\/users\/[^/]+$/.test(path))pageModule='users';
+  else if(path.startsWith('/admin/suppliers/cj'))pageModule='integrations'; // كل صفحات CJ الفرعية
   else if(Object.hasOwn(exactPages,path))pageModule=exactPages[path];
   return pageModule?`${pageModule}:view`:null;
 }

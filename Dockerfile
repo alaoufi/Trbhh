@@ -48,10 +48,12 @@ COPY --from=builder /app/prisma ./prisma
 # Kept in the runtime image for the idempotent, admin-only dynamic-ads lab bootstrap.
 COPY --from=builder /app/database ./database
 
-# Writable, persistent upload dir owned by the runtime user. A named volume
-# mounted here inherits this ownership, so uploads (ad/classified/promo images)
-# can be written even though the app runs as the non-root `nextjs` user.
-RUN mkdir -p /app/storage/uploads && chown -R nextjs:nodejs /app/storage
+# Writable, persistent dirs owned by the runtime user. A named volume mounted at
+# /app/storage inherits this ownership, so uploads (ad/classified/promo images)
+# AND database backups/archives survive redeploys and restarts even though the
+# app runs as the non-root `nextjs` user. Pre-create `backups` so the archival
+# target exists and is writable on a fresh container without relying on runtime mkdir.
+RUN mkdir -p /app/storage/uploads /app/storage/backups && chown -R nextjs:nodejs /app/storage
 
 USER nextjs
 EXPOSE 3000

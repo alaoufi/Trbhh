@@ -4,6 +4,7 @@ import { readCjAuth, writeCjAuth } from './store';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import type {
   CjResult, CjProductSummary, CjProductDetail, CjVariant, CjInventory, CjWarehouse, CjFreightOption, CjTrack,
+  CjCategory, CjProductPage,
 } from './types';
 
 /**
@@ -18,7 +19,22 @@ const REFRESH_MARGIN_MS = 24 * 60 * 60 * 1000; // جدّد قبل الانتها
 
 type CjEnvelope<T> = { code?: number; result?: boolean; message?: string; data?: T };
 
+// CJ يفرض حدّ معدّل صارم (طلب واحد/ثانية). نسلسل كل الطلبات بفاصل ≥1.1ث لتفادي
+// code=1600200 «Too Many Requests». التسلسل على مستوى العملية يكفي (مثيل واحد).
+const MIN_GAP_MS = 1100;
+let lastAt = 0;
+let gate: Promise<void> = Promise.resolve();
+function throttle(): Promise<void> {
+  gate = gate.then(async () => {
+    const wait = MIN_GAP_MS - (Date.now() - lastAt);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastAt = Date.now();
+  });
+  return gate;
+}
+
 async function fetchJson(url: string, init: RequestInit): Promise<{ status: number; body: unknown }> {
+  await throttle();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -95,18 +111,56 @@ async function call<T>(path: string, opts: { method?: 'GET' | 'POST'; query?: Re
 
 /* ------------------------- قراءة فقط ------------------------- */
 
-export async function testConnection(): Promise<CjResult<{ email: string }>> {
+export async function testConnection(): Promise<CjResult<{ connected: true; email: string; accessTokenExpiresAt: string | null }>> {
   const cfg = cjConfig();
   const tok = await accessToken(cfg);
   if (!tok.ok) return tok;
-  return { ok: true, data: { email: cfg.email } };
+  const stored = await readCjAuth(cfg.encryptionKey).catch(() => null);
+  return { ok: true, data: { connected: true, email: cfg.email, accessTokenExpiresAt: stored?.accessExpiresAt ? stored.accessExpiresAt.toISOString() : null } };
 }
 
-export async function listProducts(pageNum = 1, pageSize = 20): Promise<CjResult<CjProductSummary[]>> {
-  const r = await call<{ list?: unknown[] }>('/product/list', { query: { pageNum, pageSize } });
+export async function listProducts(pageNum = 1, pageSize = 20, filters: { productName?: string; categoryId?: string } = {}): Promise<CjResult<CjProductSummary[]>> {
+  const r = await listProductsPage(pageNum, pageSize, filters);
+  if (!r.ok) return r;
+  return { ok: true, data: r.data.items };
+}
+
+/** صفحة منتجات مع الإجمالي (لتصفّح الآلاف: صفحات + قفز). */
+export async function listProductsPage(pageNum = 1, pageSize = 20, filters: { productName?: string; categoryId?: string } = {}): Promise<CjResult<CjProductPage>> {
+  const r = await call<{ list?: unknown[]; total?: unknown }>('/product/list', { query: { pageNum, pageSize, productName: filters.productName, categoryId: filters.categoryId } });
   if (!r.ok) return r;
   const list = Array.isArray(r.data?.list) ? r.data!.list! : [];
-  return { ok: true, data: list.map((p) => mapSummary(p as Record<string, unknown>)) };
+  const total = num(r.data?.total) ?? list.length;
+  return { ok: true, data: { items: list.map((p) => mapSummary(p as Record<string, unknown>)), total, pageNum, pageSize } };
+}
+
+// شجرة التصنيفات نادرة التغيّر — نخزّنها في الذاكرة لتفادي حدّ المعدّل عند كل تحميل.
+let categoryCache: { at: number; data: CjCategory[] } | null = null;
+const CATEGORY_TTL_MS = 6 * 60 * 60 * 1000;
+
+/** تصنيفات CJ مسطَّحة (المستوى الثالث مع المسار الكامل) — للفلترة. مخزّنة ٦ ساعات. */
+export async function getCategories(): Promise<CjResult<CjCategory[]>> {
+  if (categoryCache && Date.now() - categoryCache.at < CATEGORY_TTL_MS) return { ok: true, data: categoryCache.data };
+  const r = await call<unknown>('/product/getCategory', {});
+  if (!r.ok) return r;
+  const out: CjCategory[] = [];
+  const firsts = Array.isArray(r.data) ? r.data : [];
+  for (const f of firsts as Record<string, unknown>[]) {
+    const fName = String(f.categoryFirstName ?? '');
+    const seconds = Array.isArray(f.categoryFirstList) ? (f.categoryFirstList as Record<string, unknown>[]) : [];
+    for (const s of seconds) {
+      const sName = String(s.categorySecondName ?? '');
+      const thirds = Array.isArray(s.categorySecondList) ? (s.categorySecondList as Record<string, unknown>[]) : [];
+      for (const t of thirds) {
+        const id = String(t.categoryId ?? '');
+        const name = String(t.categoryName ?? '');
+        if (id && name) out.push({ id, name, path: [fName, sName, name].filter(Boolean).join(' › ') });
+      }
+    }
+  }
+  out.sort((a, b) => a.path.localeCompare(b.path));
+  categoryCache = { at: Date.now(), data: out };
+  return { ok: true, data: out };
 }
 
 export async function getProduct(pid: string): Promise<CjResult<CjProductDetail>> {
@@ -190,13 +244,23 @@ export async function createCjOrder(input: unknown): Promise<CjResult<{ orderId:
 
 function str(v: unknown): string | null { return typeof v === 'string' && v.trim() ? v : null; }
 function num(v: unknown): number | null { const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN; return Number.isFinite(n) ? n : null; }
+/** سعر CJ قد يأتي رقماً أو نصاً أو نطاقاً «a--b» / «a-b» — نأخذ أدنى قيمة صالحة. */
+function parsePrice(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (!s) return null;
+  const first = s.split(/--|~|,|\s|to/i)[0].split('-')[0].trim();
+  const n = Number(first.replace(/[^0-9.]/g, ''));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 function mapSummary(p: Record<string, unknown>): CjProductSummary {
   return {
     pid: String(p.pid ?? p.productId ?? ''),
     productName: String(p.productNameEn ?? p.productName ?? ''),
     productSku: String(p.productSku ?? p.sku ?? ''),
-    sellPrice: num(p.sellPrice),
+    sellPrice: parsePrice(p.sellPrice ?? p.productPrice ?? p.price),
     productImage: str(p.productImage) || str(p.bigImage),
     categoryName: str(p.categoryName),
   };
@@ -206,7 +270,7 @@ function mapVariant(v: Record<string, unknown>): CjVariant {
     vid: String(v.vid ?? v.variantId ?? ''),
     variantSku: String(v.variantSku ?? v.sku ?? ''),
     variantName: str(v.variantNameEn ?? v.variantName),
-    variantSellPrice: num(v.variantSellPrice ?? v.sellPrice),
+    variantSellPrice: parsePrice(v.variantSellPrice ?? v.sellPrice),
     variantImage: str(v.variantImage),
     variantWeight: num(v.variantWeight),
   };

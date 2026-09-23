@@ -5,13 +5,20 @@ on:
       phase:
         type: string
         default: inspect
+      baseline_sha:
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       phase:
         type: choice
-        options: [inspect]
+        options: [inspect, cache-audit, cache-cleanup]
         default: inspect
         required: true
+      baseline_sha:
+        description: Exact serving checkout SHA required for cache operations
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -21,13 +28,19 @@ jobs:
   operate:
     if: github.ref == 'refs/heads/codex/finance-tax-audit-20260922' || github.ref == 'refs/heads/claude/hostinger-vps-project-amw8vb'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Read-only inspected production state
+      - name: Verify bounded cache operation tools
+        run: |
+          node --test scripts/release/finance-cache.test.cjs
+          bash -n scripts/release/finance-cache.sh
+      - name: Inspect production or run the selected guarded cache operation
         env:
+          PHASE: ${{ inputs.phase || 'inspect' }}
+          BASELINE_SHA: ${{ inputs.baseline_sha }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
@@ -36,12 +49,23 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
+          [[ "$PHASE" =~ ^(inspect|cache-audit|cache-cleanup)$ ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+          if [[ "$PHASE" != inspect ]]; then [[ "$BASELINE_SHA" =~ ^[0-9a-f]{40}$ ]]; fi
           test -n "$VPS_HOST"; test -n "$VPS_USER"; test -n "$VPS_SSH_KEY"; test -n "$VPS_KNOWN_HOSTS"
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ && "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
           mkdir -p ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/finance_key
           printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          port=${VPS_PORT:-22}; [[ "$port" =~ ^[0-9]+$ ]]
+          port=${VPS_PORT:-22}; [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
           SSH=(ssh -i ~/.ssh/finance_key -p "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -o ConnectTimeout=25 -o ServerAliveInterval=15)
           target="$VPS_USER@$VPS_HOST"
+          if [[ "$PHASE" != inspect ]]; then
+            "${SSH[@]}" "$target" "bash -s -- '$PHASE' '$GITHUB_RUN_ID' '$BASELINE_SHA'" < scripts/release/finance-cache.sh
+            exit 0
+          fi
           "${SSH[@]}" "$target" 'set -eu; cd /root/trbhh; printf "CHECKOUT="; git rev-parse HEAD; git status --short; docker compose ps; id=$(docker compose ps -q app); docker inspect -f "IMAGE={{.Image}} RUNNING={{.State.Running}}" "$id"; docker exec "$id" cat /app/.next/BUILD_ID; df -h /root; find /root/trbhh-release-backups -maxdepth 2 -name VERIFIED -printf "%h\n" | sort | tail -8'
           "${SSH[@]}" "$target" 'cd /root/trbhh && docker compose exec -T app node -' < scripts/release/finance-runtime-inspect.cjs
+      - name: Remove runner SSH credential
+        if: always()
+        run: rm -f -- "$HOME/.ssh/finance_key"

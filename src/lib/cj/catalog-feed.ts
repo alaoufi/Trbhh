@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { publicAdCardSelect, publicAdSearchWhere, toPublicAdCards, type AdCard } from '@/lib/data';
 import { cjStorefrontView } from './storefront';
 import type { CjProductRow } from './mapping';
+import { countApprovedCatalog, listApprovedCatalog, type ApprovedPreview } from './approved-catalog';
 
 export const CJ_CATALOG_TABS = [
   { id: 'all', label: 'الكل' },
@@ -14,7 +15,7 @@ export const CJ_CATALOG_TABS = [
 ] as const;
 export type CjCatalogTab = typeof CJ_CATALOG_TABS[number]['id'];
 export type CjCatalogQuery = Record<string, string | string[] | undefined>;
-export type CjCatalogItem = { key: string; source: 'cj'; product: CjProductRow } | { key: string; source: 'ad'; ad: AdCard };
+export type CjCatalogItem = { key: string; source: 'cj'; product: CjProductRow } | { key: string; source: 'commerce'; product: ApprovedPreview } | { key: string; source: 'ad'; ad: AdCard };
 export const CJ_CATALOG_PAGE_SIZE = 24;
 
 export function parseCjCatalogQuery(query: CjCatalogQuery) {
@@ -29,13 +30,14 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
   const { tab, page: requestedPage } = parseCjCatalogQuery(query);
   const imports = tab === 'all' || tab === 'imported';
   const members = tab === 'all' || tab === 'members' || tab === 'verified';
+  const commerceScope = tab === 'all' || tab === 'imported' || tab === 'trbhh' ? tab : null;
   const cjWhere: Prisma.cj_productsWhereInput = { hidden: 0, status: { in: ['draft', 'ready'] } };
   let adWhere: Prisma.adsWhereInput = { id: { in: [] } };
   if (members) {
     const [publicWhere, linked, trusted] = await Promise.all([
       publicAdSearchWhere({}),
-      // Exclude every linked CJ source, even hidden ones: an ad must not bypass its source gate.
-      prisma.$queryRaw<{ ad_id: bigint }[]>`SELECT DISTINCT cp.ad_id FROM commerce_products cp INNER JOIN cj_products cj ON cj.commerce_product_id=cp.id WHERE cp.ad_id IS NOT NULL`,
+      // Exclude linked catalog sources even when hidden: ads cannot bypass a source gate.
+      prisma.$queryRaw<{ ad_id: bigint }[]>`SELECT DISTINCT cp.ad_id FROM commerce_products cp WHERE cp.ad_id IS NOT NULL`,
       tab === 'verified' ? prisma.users.findMany({ where: { trusted: 1 }, select: { id: true } }) : Promise.resolve([]),
     ]);
     adWhere = { AND: [publicWhere,
@@ -47,23 +49,29 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
       ...(tab === 'verified' ? [{ user_id: { in: trusted.map(row => row.id) } }] : []),
     ] };
   }
-  const [cjCount, adCount] = await Promise.all([
+  const [cjCount, commerceCount, adCount] = await Promise.all([
     imports ? prisma.cj_products.count({ where: cjWhere }) : 0,
+    commerceScope ? countApprovedCatalog(commerceScope) : 0,
     members ? prisma.ads.count({ where: adWhere }) : 0,
   ]);
-  const total = cjCount + adCount;
+  const total = cjCount + commerceCount + adCount;
   const pageCount = Math.max(1, Math.ceil(total / CJ_CATALOG_PAGE_SIZE));
   const page = Math.min(requestedPage, pageCount);
   const skip = (page - 1) * CJ_CATALOG_PAGE_SIZE;
   const cjTake = Math.max(0, Math.min(CJ_CATALOG_PAGE_SIZE, cjCount - skip));
-  const adTake = Math.min(CJ_CATALOG_PAGE_SIZE - cjTake, adCount);
-  const [products, rows] = await Promise.all([
+  const commerceSkip = Math.max(0, skip - cjCount);
+  const commerceTake = Math.max(0, Math.min(CJ_CATALOG_PAGE_SIZE - cjTake, commerceCount - commerceSkip));
+  const adSkip = Math.max(0, skip - cjCount - commerceCount);
+  const adTake = Math.max(0, Math.min(CJ_CATALOG_PAGE_SIZE - cjTake - commerceTake, adCount - adSkip));
+  const [products, approved, rows] = await Promise.all([
     cjTake ? prisma.cj_products.findMany({ where: cjWhere, orderBy: { id: 'desc' }, skip, take: cjTake }) : [],
-    adTake ? prisma.ads.findMany({ where: adWhere, orderBy: { id: 'desc' }, skip: Math.max(0, skip - cjCount), take: adTake, select: publicAdCardSelect }) : [],
+    commerceTake && commerceScope ? listApprovedCatalog(commerceScope, commerceTake, commerceSkip) : [],
+    adTake ? prisma.ads.findMany({ where: adWhere, orderBy: { id: 'desc' }, skip: adSkip, take: adTake, select: publicAdCardSelect }) : [],
   ]);
   const ads = rows.length ? await toPublicAdCards(rows) : [];
   const items: CjCatalogItem[] = [
     ...products.map(product => ({ key: `cj:${product.id}`, source: 'cj' as const, product: { ...product, id: Number(product.id) } })),
+    ...approved.map(product => ({ key: product.key, source: 'commerce' as const, product })),
     ...ads.map(ad => ({ key: `ad:${ad.id}`, source: 'ad' as const, ad })),
   ];
   return { tab, page, pageCount, total, items };

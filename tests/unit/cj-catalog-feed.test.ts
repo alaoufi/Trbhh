@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { platformAdPublicWhere } from '@/lib/platform-ad-visibility';
 import { searchCardVisibility } from '@/lib/search-card-visibility';
 
-const state = vi.hoisted(() => ({ staff: true, products: [] as Record<string, unknown>[], ads: [] as Record<string, unknown>[], linked: [] as bigint[], reads: vi.fn(), trusted: [1n] }));
+const state = vi.hoisted(() => ({ staff: true, products: [] as Record<string, unknown>[], ads: [] as Record<string, unknown>[], commerce: [] as { id: string; key: string; imported: boolean }[], linked: [] as bigint[], reads: vi.fn(), trusted: [1n] }));
+vi.mock('@/lib/cj/approved-catalog', () => ({
+  countApprovedCatalog: async (scope: string) => state.commerce.filter(row => scope !== 'imported' || row.imported).length,
+  listApprovedCatalog: async (scope: string, take: number, skip: number) => state.commerce.filter(row => scope !== 'imported' || row.imported).slice(skip, skip + take),
+}));
 vi.mock('@/lib/cj/storefront', () => ({ cjStorefrontView: async () => ({ isStaff: state.staff, isPublic: true }) }));
 vi.mock('@/lib/data', () => ({
   publicAdCardSelect: { id: true },
@@ -38,7 +42,7 @@ import { loadCjCatalog, parseCjCatalogQuery } from '@/lib/cj/catalog-feed';
 
 const product = (id: number, changes = {}) => ({ id: BigInt(id), hidden: 0, status: 'draft', name_ar: `CJ ${id}`, ...changes });
 const ad = (id: number, changes = {}) => ({ id: BigInt(id), user_id: 2n, title: `Ad ${id}`, status: 1, state: 'active', store_only: 0, trbhh_until: null, data_archive: null, data_delete: null, paused_by_owner: 0, publish_at: null, platform_hidden_at: null, platform_archived_at: null, ...changes });
-beforeEach(() => { state.staff = true; state.products = []; state.ads = []; state.linked = []; state.reads.mockClear(); });
+beforeEach(() => { state.staff = true; state.products = []; state.ads = []; state.commerce = []; state.linked = []; state.reads.mockClear(); });
 
 describe('private CJ mixed catalog', () => {
   it('rejects nonstaff before catalog reads even when the legacy public flag is on', async () => {
@@ -91,5 +95,16 @@ describe('private CJ mixed catalog', () => {
   it('never infers Trbhh approval from member, paid or administrator ads', async () => {
     state.ads = [ad(1, { is_admin: 1, adsSpecial: 'checked' })];
     expect((await loadCjCatalog({ tab: 'trbhh' })).items).toEqual([]);
+  });
+  it('pages all three sources exactly once and only puts explicit imported commerce in imported tab', async () => {
+    state.products = Array.from({ length: 25 }, (_, i) => product(i + 1));
+    state.commerce = Array.from({ length: 25 }, (_, i) => ({ id: String(i + 1), key: `commerce:${i + 1}`, imported: i < 5 }));
+    state.ads = Array.from({ length: 25 }, (_, i) => ad(i + 1));
+    const keys: string[] = [];
+    for (let page = 1; page <= 4; page++) { const result = await loadCjCatalog({ page: String(page) }); expect(result.total).toBe(75); keys.push(...result.items.map(item => item.key)); }
+    expect(keys).toHaveLength(75); expect(new Set(keys).size).toBe(75);
+    expect((await loadCjCatalog({ tab: 'imported' })).total).toBe(30);
+    expect((await loadCjCatalog({ tab: 'trbhh' })).total).toBe(25);
+    expect((await loadCjCatalog({ tab: 'members' })).total).toBe(25);
   });
 });

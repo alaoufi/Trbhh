@@ -60,8 +60,10 @@ describe('operator finance capture job',()=>{
   });
   it('distinguishes JSON errors without a category from non-JSON service failures',async()=>{
     const json=await client(credential,503,{error:'finance_capture_unavailable'});
+    const configuration=await client(credential,503,{error:'not_configured'});
     const html=await client(credential,503,'<html>private diagnostic body</html>');
     expect(json.output).toBe('finance_capture status=http_503_category_missing\n');
+    expect(configuration.output).toBe('finance_capture status=http_503_not_configured\n');
     expect(html.output).toBe('finance_capture status=http_503_non_json\n');
     expect(json.output+html.output).not.toContain('private diagnostic body');
   });

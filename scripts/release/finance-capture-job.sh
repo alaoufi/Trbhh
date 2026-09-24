@@ -39,7 +39,9 @@ result=$(timeout 75s docker compose exec -T app node - 2>/dev/null <<'FINANCE_CA
     const text = await response.text();
     let payload; try { payload = JSON.parse(text); } catch { payload = null; }
     if (response.status !== 200) {
-      const category = response.status === 503 && /^[a-z0-9_]{1,64}$/.test(payload?.category || '')
+      const category = response.status === 503 && payload?.error === 'not_configured'
+        ? '_not_configured'
+        : response.status === 503 && /^[a-z0-9_]{1,64}$/.test(payload?.category || '')
         ? '_' + payload.category
         : response.status === 503 && response.headers.get('content-type')?.toLowerCase().includes('application/json')
           ? '_category_missing'

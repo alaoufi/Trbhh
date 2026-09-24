@@ -43,6 +43,31 @@ test('compose error classification recognizes actual bounded exceptions rather t
   }
   assert.equal(helper().summarizeLogs('AssertionError [ERR_ASSERTION]: unapplied_mount_drift\nprivate-source','').composeFailureClass,'unapplied_mount_drift');
 });
+
+test('single-key fallback redacts values and reports literal/escaping relationships only',()=>{
+  const raw="ALRAJHI_TRANPORTAL_PASSWORD='PRIVATE_SENTINEL$token'\nOTHER_SECRET=NEVER_DISPLAY\n";
+  const result=helper().selectedKeyProof(raw,raw,'PRIVATE_SENTINEL$token','PRIVATE_SENTINEL$$token','INHERITED_SENTINEL');
+  assert.equal(result.occurrences,1);assert.equal(result.quoteClass,'single');assert.equal(result.containsDollar,true);assert.equal(result.containsBackslash,false);assert.equal(result.literalEqualsRuntime,true);assert.equal(result.literalDollarDoubledEqualsConfig,true);assert.equal(result.runtimeDollarDoubledEqualsConfig,true);assert.equal(result.inheritedPresent,true);assert.equal(result.inheritedEqualsRuntime,false);
+  assert.doesNotMatch(JSON.stringify(result),/PRIVATE_SENTINEL|token|NEVER_DISPLAY|INHERITED_SENTINEL|length|bytes/);
+  const duplicate=helper().selectedKeyProof(raw+raw,raw,'a','b',undefined);assert.equal(duplicate.occurrences,2);assert.equal(duplicate.literalAvailable,false);assert.equal(duplicate.quoteClass,'ambiguous');
+});
+
+test('exact dollar-encoding diagnosis uses synthetic stdin config without reading any env file',()=>{
+  const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'finance-dollar-diag-'))),backup=path.join(root,'trbhh-release-backups/finance-35934769547'),prod=path.join(root,'trbhh');
+  fs.mkdirSync(backup,{recursive:true});fs.mkdirSync(prod);const id='c'.repeat(64),sha='a'.repeat(40),image='sha256:'+'b'.repeat(64),calls=[];
+  try{
+    const before={Id:id,Image:image,State:{Running:true,Paused:false,StartedAt:'2026-09-23T00:00:00Z'},Mounts:[],Config:{Env:['ALRAJHI_TRANPORTAL_PASSWORD=PRIVATE_SENTINEL$token']}};
+    fs.writeFileSync(path.join(backup,'container-before.json'),JSON.stringify([before]));fs.writeFileSync(path.join(backup,'baseline-compose.json'),JSON.stringify({services:{app:{environment:{ALRAJHI_TRANPORTAL_PASSWORD:'PRIVATE_SENTINEL$$token'},volumes:[]}}}));
+    const run=(command,args,options)=>{
+      calls.push([command,args]);if(command==='git')return {status:0,stdout:sha};if(command==='systemctl')return {status:3,stdout:'inactive'};if(command==='df')return {status:0,stdout:'size used avail\n200 100 100'};
+      if(args[0]==='inspect')return {status:0,stdout:JSON.stringify([before])};if(args.includes('ps'))return {status:0,stdout:id};
+      assert.deepEqual(args,['compose','--project-directory',prod,'--project-name','trbhh-diagnostic','--env-file','/dev/null','-f','-','config','--format','json']);assert.equal(options.env.TRBHH_DIAGNOSTIC_LITERAL,'diagnostic$dollar');assert(!Object.hasOwn(options.env,'ALRAJHI_TRANPORTAL_PASSWORD'));assert.equal(JSON.parse(options.input).services.probe.environment.PROBE,'${TRBHH_DIAGNOSTIC_LITERAL}');
+      return {status:0,stdout:JSON.stringify({services:{probe:{environment:{PROBE:'diagnostic$$dollar',PLAIN:'diagnostic-plain'}}}})};
+    };
+    const report=helper().collect({root,run});assert.equal(report.singleKey.renderedDollarEncoding,true);assert.deepEqual(report.singleKey.syntheticConfig,{success:true,dollarsDoubled:true,plainUnchanged:true});assert.deepEqual(report.singleKey.isolatedConfig,{attempted:false,reason:'representation_match'});
+    assert.equal(calls.filter(([,args])=>args.includes('config')).length,1);assert.doesNotMatch(JSON.stringify(report),/PRIVATE_SENTINEL|token|diagnostic\$|length/);assert(!fs.existsSync(path.join(prod,'.env')));assert(!fs.existsSync(path.join(backup,'environment.env')));
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
 test('media differences expose counts and byte totals only with both-direction semantics',()=>{
   const file=(name,bytes,digest)=>({path:name,kind:'file',bytes,sha256:digest.repeat(64)}),manifest=entries=>({format:'trbhh-media-proof-v1',entryCount:entries.length,entries});
   const before=manifest([file('secret-removed.jpg',3,'a'),file('secret-changed.jpg',4,'b'),{path:'private-link',kind:'symlink',target:'secret-target'}]);

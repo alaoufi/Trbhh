@@ -3,6 +3,7 @@
 // output is permitted; diagnostics are reduced to enumerated codes and states.
 const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process');
 const RUN='35934769547';
+const SINGLE_KEY='ALRAJHI_TRANPORTAL_PASSWORD';
 const BACKUP_STAGES=new Set(['preflight','capacity','parent_media','archives','snapshot','restore','seal','complete']);
 const DEPLOY_STAGES=new Set(['preflight','identity','backup','runtime_preflight','checkout','build','cutover','preservation','finalize','rollback']);
 const CODES=['compose_identity','compose_source','runtime_environment','runtime_network','rollback_compose','rollback_config','unapplied_environment_drift','unapplied_mount_drift','finance_media_reference_invalid','merchant_media_reference_invalid','backup_capacity_invalid','ENOENT','ENOSPC','EACCES','EROFS','ETIMEDOUT'];
@@ -11,6 +12,34 @@ function runtimeEnvironment(container){
   const entries=container.Config.Env.map(value=>{if(typeof value!=='string'||value.indexOf('=')<1)throw Error('diagnostic_environment');const i=value.indexOf('=');return [value.slice(0,i),value.slice(i+1)];});
   if(new Set(entries.map(([key])=>key)).size!==entries.length)throw Error('diagnostic_environment');
   return Object.fromEntries(entries);
+}
+function selectedLiteral(raw){
+  const rows=String(raw).split(/\r?\n/).map(line=>/^\s*(?:export\s+)?ALRAJHI_TRANPORTAL_PASSWORD\s*=\s*(.*)$/.exec(line)).filter(Boolean).map(match=>match[1]);
+  if(rows.length!==1)return {occurrences:rows.length,quoteClass:rows.length?'ambiguous':'absent',available:false};
+  const rawValue=rows[0],quote=rawValue[0],quoteClass=quote==="'"?'single':quote==='"'?'double':'unquoted';
+  let literal;
+  if(quoteClass==='unquoted')literal=rawValue.replace(/\s+#.*$/,'').trimEnd();
+  else{
+    let end=-1;
+    for(let index=1;index<rawValue.length;index++){
+      if(rawValue[index]==='\\'){index++;continue;}
+      if(rawValue[index]===quote){end=index;break;}
+    }
+    if(end<0||!/^\s*(?:#.*)?$/.test(rawValue.slice(end+1)))return {occurrences:1,quoteClass,available:false};
+    literal=rawValue.slice(1,end);
+  }
+  // This is a literal probe, never a replacement for Compose's dotenv parser.
+  return {occurrences:1,quoteClass,available:true,rawValue,literal};
+}
+function selectedKeyProof(savedText,hostText,runtimeValue,configValue,inherited){
+  const saved=selectedLiteral(savedText),host=selectedLiteral(hostText),strings=typeof runtimeValue==='string'&&typeof configValue==='string';
+  const doubled=value=>value.replace(/\$/g,()=> '$$'),collapsed=value=>value.replace(/\$\$/g,'$');
+  const unescaped=value=>value.replace(/\\([\\"'$nrt])/g,(_,c)=>({n:'\n',r:'\r',t:'\t'})[c]||c);
+  const proof={key:SINGLE_KEY,occurrences:saved.occurrences,quoteClass:saved.quoteClass,literalAvailable:saved.available,hostOccurrences:host.occurrences,hostQuoteClass:host.quoteClass,inheritedPresent:typeof inherited==='string'};
+  if(saved.available)Object.assign(proof,{containsDollar:saved.literal.includes('$'),containsBackslash:saved.literal.includes('\\'),rawEqualsRuntime:saved.rawValue===runtimeValue,rawEqualsConfig:saved.rawValue===configValue,literalEqualsRuntime:saved.literal===runtimeValue,literalEqualsConfig:saved.literal===configValue,literalUnescapedEqualsRuntime:unescaped(saved.literal)===runtimeValue,literalUnescapedEqualsConfig:unescaped(saved.literal)===configValue,literalDollarDoubledEqualsRuntime:doubled(saved.literal)===runtimeValue,literalDollarDoubledEqualsConfig:doubled(saved.literal)===configValue,literalDollarCollapsedEqualsRuntime:collapsed(saved.literal)===runtimeValue,literalDollarCollapsedEqualsConfig:collapsed(saved.literal)===configValue,hostLiteralEqualsSaved:host.available&&host.literal===saved.literal});
+  if(strings)Object.assign(proof,{runtimeEqualsConfig:runtimeValue===configValue,runtimeDollarDoubledEqualsConfig:doubled(runtimeValue)===configValue,configDollarCollapsedEqualsRuntime:collapsed(configValue)===runtimeValue,runtimeDollarCollapsedEqualsConfig:collapsed(runtimeValue)===configValue,configDollarDoubledEqualsRuntime:doubled(configValue)===runtimeValue});
+  if(typeof inherited==='string')Object.assign(proof,{inheritedEqualsRuntime:inherited===runtimeValue,inheritedEqualsConfig:inherited===configValue});
+  return proof;
 }
 function summarizeRuntimeConfig(before,config){
   const env=runtimeEnvironment(before),app=config?.services?.app;
@@ -88,13 +117,45 @@ function collect({root='/root',run=spawnSync}={}){
   if(df.length===3&&df.every(value=>/^\d{1,24}$/.test(value)))liveSpace={totalBytes:df[0],usedBytes:df[1],availableBytes:df[2]};
   const logSummary=summarizeLogs(read(path.join(tools,'deploy.log')),read(path.join(backup,'operations.log')));
   if(Object.values(media).some(value=>value.comparison&&!value.comparison.exact))logSummary.codes.push('media_manifest_mismatch');
-  let runtimeConfig={available:false},composeSources={available:false};
+  let runtimeConfig={available:false},composeSources={available:false},singleKey={available:false};
   try{
     const before=JSON.parse(read(path.join(backup,'container-before.json')))[0],current=JSON.parse(command('docker',['inspect',id]))[0];
     const equal=require('node:util').isDeepStrictEqual;
     app.containerMatchesBackup=current.Id===before.Id;app.startedAtMatchesBackup=current.State?.StartedAt===before.State?.StartedAt;
     app.environmentMatchesBackup=equal(runtimeEnvironment(before),runtimeEnvironment(current));app.mountsMatchBackup=equal(before.Mounts,current.Mounts);
-    runtimeConfig=summarizeRuntimeConfig(before,JSON.parse(read(path.join(backup,'baseline-compose.json'))));
+    const config=JSON.parse(read(path.join(backup,'baseline-compose.json')));
+    runtimeConfig=summarizeRuntimeConfig(before,config);
+    if(runtimeConfig.environment?.differences.length===1&&runtimeConfig.environment.differences[0].key===SINGLE_KEY){
+      const runtimeValue=runtimeEnvironment(before)[SINGLE_KEY],configValue=config.services.app.environment[SINGLE_KEY];
+      singleKey={available:true,key:SINGLE_KEY,renderedDollarEncoding:typeof runtimeValue==='string'&&typeof configValue==='string'&&configValue===runtimeValue.replace(/\$/g,()=> '$$')};
+      // A synthetic config operation consumes stdin and /dev/null only. It
+      // creates no file/container and never resolves an image or contacts DBs.
+      const synthetic=run('docker',['compose','--project-directory',prod,'--project-name','trbhh-diagnostic','--env-file','/dev/null','-f','-','config','--format','json'],{cwd:prod,env:{PATH:process.env.PATH,HOME:process.env.HOME,TRBHH_DIAGNOSTIC_LITERAL:'diagnostic$dollar'},input:JSON.stringify({services:{probe:{image:'busybox',environment:{PROBE:'${TRBHH_DIAGNOSTIC_LITERAL}',PLAIN:'diagnostic-plain'}}}}),encoding:'utf8',timeout:15000,maxBuffer:1024*1024});
+      singleKey.syntheticConfig={success:false};
+      if(synthetic?.status===0&&!synthetic.error){const env=JSON.parse(synthetic.stdout)?.services?.probe?.environment;singleKey.syntheticConfig={success:true,dollarsDoubled:env?.PROBE==='diagnostic$$dollar',plainUnchanged:env?.PLAIN==='diagnostic-plain'};}
+      // Re-resolve saved Compose inputs without this one inherited key. This
+      // command reads configuration only; raw stdout/stderr stays in memory.
+      singleKey.isolatedConfig={attempted:false,reason:singleKey.renderedDollarEncoding?'representation_match':'private_inputs_unavailable'};
+      if(!singleKey.renderedDollarEncoding){
+      const savedFile=path.join(backup,'environment.env'),hostFile=path.join(prod,'.env');
+      if(!info(savedFile).regular||!info(hostFile).regular||info(savedFile).bytes>524288||info(hostFile).bytes>524288)throw Error('single_key_file');
+      const savedText=read(savedFile),hostText=read(hostFile);
+      Object.assign(singleKey,selectedKeyProof(savedText,hostText,runtimeValue,configValue,process.env[SINGLE_KEY]));
+      const modified=fs.statSync(hostFile).mtime,started=Date.parse(before.State.StartedAt);
+      if(Number.isFinite(started)){singleKey.hostEnvModifiedAt=modified.toISOString();singleKey.containerStartedAt=new Date(started).toISOString();singleKey.hostEnvModifiedAfterContainerStart=modified.getTime()>started;}
+      const manifest=JSON.parse(read(path.join(backup,'compose-sources.json')));
+      if(!/^[a-z0-9][a-z0-9_-]*$/.test(manifest.project)||!Array.isArray(manifest.sourceFiles)||!manifest.sourceFiles.length||manifest.sourceFiles.length>20)throw Error('single_key_sources');
+      const args=['compose','--project-directory',prod,'--project-name',manifest.project,'--env-file',savedFile];
+      for(const item of manifest.sourceFiles){if(!/^compose-source-[0-9]+\.yml$/.test(item.saved))throw Error('single_key_source');const source=path.join(backup,item.saved);if(!info(source).regular||fs.realpathSync(source)!==source)throw Error('single_key_source');args.push('-f',source);}
+      args.push('config','--format','json');const cleanEnvironment={...process.env};delete cleanEnvironment[SINGLE_KEY];
+      const result=run('docker',args,{cwd:prod,env:cleanEnvironment,encoding:'utf8',timeout:15000,maxBuffer:8*1024*1024});
+      singleKey.isolatedConfig={attempted:true,success:false};
+      if(result?.status===0&&!result.error){
+        const resolved=JSON.parse(result.stdout)?.services?.app?.environment,value=resolved?.[SINGLE_KEY],literal=selectedLiteral(savedText);
+        singleKey.isolatedConfig={attempted:true,success:true,keyPresent:!!resolved&&Object.hasOwn(resolved,SINGLE_KEY),isString:typeof value==='string',empty:value==='',equalsSavedConfig:value===configValue,equalsRuntime:value===runtimeValue,equalsSavedLiteral:literal.available&&value===literal.literal};
+      }
+      }
+    }
   }catch{}
   try{
     const manifest=JSON.parse(read(path.join(backup,'compose-sources.json')));
@@ -108,9 +169,9 @@ function collect({root='/root',run=spawnSync}={}){
     });
     composeSources={available:true,projectNameValid:typeof manifest.project==='string'&&/^[a-z0-9][a-z0-9_-]*$/.test(manifest.project),sourceCount:sources.length,sources};
   }catch{}
-  return {runId:RUN,app,backup:{canonical:canonical(backup),files},activeDeployment:info(path.join(root,'trbhh-release-tools/ACTIVE_DEPLOYMENT')),resumeTimer:['active','inactive','failed','activating','deactivating'].includes(timer)?timer:'unknown',media,capacityMeasurement,liveSpace,runtimeConfig,composeSources,...logSummary};
+  return {runId:RUN,app,backup:{canonical:canonical(backup),files},activeDeployment:info(path.join(root,'trbhh-release-tools/ACTIVE_DEPLOYMENT')),resumeTimer:['active','inactive','failed','activating','deactivating'].includes(timer)?timer:'unknown',media,capacityMeasurement,liveSpace,runtimeConfig,composeSources,singleKey,...logSummary};
 }
 if(require.main===module||(process.argv[1]==='-'&&module.id==='[stdin]')){
   try{if(process.argv.slice(2).length)throw Error('arguments');process.stdout.write(JSON.stringify(collect())+'\n');}catch{process.stderr.write('Finance backup diagnostic unavailable; private details withheld.\n');process.exitCode=1;}
 }
-module.exports={summarizeLogs,summarizeMedia,summarizeRuntimeConfig,collect};
+module.exports={summarizeLogs,summarizeMedia,summarizeRuntimeConfig,selectedKeyProof,collect};

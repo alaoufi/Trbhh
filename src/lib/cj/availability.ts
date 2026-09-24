@@ -72,32 +72,36 @@ function cleanAging(value:string|null):string|null{const clean=value?.trim();ret
 /** Import visibility proof; each variant is quoted independently so one unsupported
  * VID no longer invalidates every otherwise verified option in a 24-variant product. */
 export async function readCjAvailability(pid:string,variants:CjVariant[],deps:AvailabilityDeps={}):Promise<string|null>{
-  const eligible=variants.filter(variant=>/^[A-Za-z0-9_-]{1,64}$/.test(variant.vid));
+  const eligible=variants.filter(variant=>/^[A-Za-z0-9_-]{1,64}$/.test(variant.vid)&&typeof variant.variantSellPrice==='number'&&Number.isFinite(variant.variantSellPrice)&&variant.variantSellPrice>0);
   if(!eligible.length||eligible.length>100)return null;
   const inventory=await (deps.getInventoryByPid??getInventoryByPid)(pid).catch(()=>null);
   if(!inventory?.ok)return null;
   const variantByVid=new Map(eligible.map(variant=>[variant.vid,variant]));
-  const quantityByVid=new Map<string,number>(),originByVid=new Map<string,string[]>();
+  const quantityByVidOrigin=new Map<string,number>();
   for(const row of inventory.data){
     const variant=variantByVid.get(row.vid),origin=row.countryCode?.trim().toUpperCase();
     if(!variant||!origin||!/^[A-Z]{2}$/.test(origin))continue;
     const quantity=safeQuantity(row.cjInventoryQuantity);
     if(!quantity)continue;
-    quantityByVid.set(row.vid,(quantityByVid.get(row.vid)??0)+quantity);
-    originByVid.set(row.vid,[...(originByVid.get(row.vid)??[]),origin]);
+    const key=`${row.vid}\u0000${origin}`;
+    quantityByVidOrigin.set(key,(quantityByVidOrigin.get(key)??0)+quantity);
   }
   const calculate=deps.calculateFreight??calculateFreightToKSA;
-  const verified:{vid:string;stockQuantity:number}[]=[],shippingOptions:SaudiShippingOption[]=[];
-  for(const [vid,stockQuantity] of quantityByVid){
-    for(const originCountry of new Set(originByVid.get(vid)??[])){
+  const shippingByVid=new Map<string,SaudiShippingOption[]>(),sellableStockByVid=new Map<string,number>();
+  for(const [inventoryKey,stockQuantity] of quantityByVidOrigin){
+    const [vid,originCountry]=inventoryKey.split('\u0000');
+    if(!vid||!originCountry)continue;
       const freight=await calculate([{vid,quantity:1}],undefined,originCountry).catch(()=>null);
       if(!freight?.ok)continue;
       const options=freight.data.filter((option:CjFreightOption)=>option.logisticName.trim()&&Number.isFinite(option.logisticPrice)&&option.logisticPrice>=0);
       if(!options.length)continue;
-      if(!verified.some(item=>item.vid===vid))verified.push({vid,stockQuantity});
-      shippingOptions.push(...options.map(option=>{const listedExtra=(option.taxesFeeUsd??0)+(option.clearanceFeeUsd??0),extra=option.totalPostageFeeUsd!=null&&option.totalPostageFeeUsd>option.logisticPrice?option.totalPostageFeeUsd-option.logisticPrice:listedExtra;return {name:option.logisticName.trim().slice(0,80),priceMinor:minorFromUsd(option.logisticPrice,375),additionalMinor:minorFromUsd(extra,375),currency:'SAR' as const,deliveryDays:cleanAging(option.logisticAging),originCountry};}));
-    }
+      sellableStockByVid.set(vid,(sellableStockByVid.get(vid)??0)+stockQuantity);
+      const saved=shippingByVid.get(vid)??[];
+      saved.push(...options.map(option=>{const listedExtra=(option.taxesFeeUsd??0)+(option.clearanceFeeUsd??0),extra=option.totalPostageFeeUsd!=null&&option.totalPostageFeeUsd>option.logisticPrice?option.totalPostageFeeUsd-option.logisticPrice:listedExtra;return {name:option.logisticName.trim().slice(0,80),priceMinor:minorFromUsd(option.logisticPrice,375),additionalMinor:minorFromUsd(extra,375),currency:'SAR' as const,deliveryDays:cleanAging(option.logisticAging),originCountry};}));
+      shippingByVid.set(vid,saved);
   }
+  const verified=[...shippingByVid.entries()].flatMap(([vid,quotes])=>{const stockQuantity=sellableStockByVid.get(vid)??0;return stockQuantity>0&&quotes.length?[{vid,stockQuantity,shippingOptions:quotes}]:[];});
+  const shippingOptions=[...new Map(verified.flatMap(item=>item.shippingOptions).map(option=>[`${option.name}|${option.originCountry}|${option.priceMinor}|${option.deliveryDays}`,option])).values()];
   if(!verified.length||!shippingOptions.length)return null;
   return JSON.stringify({checkedAt:nowIso(),stockQuantity:verified.reduce((total,row)=>total+row.stockQuantity,0),variants:verified,shippingOptions});
 }

@@ -55,4 +55,15 @@ describe('CJ live availability proof',()=>{
     const result=await readCjAvailability('pid',variants,{getInventoryByPid:async()=>ok(variants.map(item=>inventory(item.vid,10))),calculateFreight:async()=>({ok:false,error:'failed'})});
     expect(result).toBeNull();
   });
+  it('persists Saudi freight proof and stock on the exact VID instead of only product totals',async()=>{
+    const variants=[variant('v-good'),variant('v-no-freight')];
+    const saved=await readCjAvailability('pid',variants,{
+      getInventoryByPid:async()=>ok([inventory('v-good',6),inventory('v-no-freight',9)]),
+      calculateFreight:async products=>products[0].vid==='v-good'?ok(options()):ok([]),
+    });
+    const value=JSON.parse(saved!);
+    expect(value.stockQuantity).toBe(6);
+    expect(value.variants).toHaveLength(1);
+    expect(value.variants[0]).toMatchObject({vid:'v-good',stockQuantity:6,shippingOptions:[{name:'Saudi Standard',priceMinor:750,currency:'SAR',originCountry:'CN'}]});
+  });
 });

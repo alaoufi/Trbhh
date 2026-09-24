@@ -4,7 +4,7 @@ import { Phone, MessageCircle } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
 import { getAgent, agentContactLinks } from '@/lib/cj/agents';
-import { cjProductOrderCount, getStorefrontCjProduct, listStorefrontCjProducts, parseCjDetails } from '@/lib/cj/mapping';
+import { cjProductOrderCount, getStorefrontCjProduct, getVerifiedCjVariants, listStorefrontCjProducts, parseCjDetails } from '@/lib/cj/mapping';
 import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '../../admin/suppliers/cj/actions';
 import { cjStorefrontView, cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { CjProductGallery } from '@/components/cj/product-gallery';
@@ -27,7 +27,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const sp = await searchParams;
   const id = Number(idStr);
   if (!Number.isSafeInteger(id) || id <= 0) notFound();
-  const p = await getStorefrontCjProduct(id, !view.isStaff);
+  const p = await getStorefrontCjProduct(id, true);
   if (!p) notFound();
   const session = await getSession();
   const capabilities = session ? await cjProductCapabilities(session.uid, p.agent_user_id) : { agent: false, edit: false, suspend: false, delete: false };
@@ -38,12 +38,13 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const title = cjProductDisplayTitle(p.name_ar);
   const gallery = cjProductImages(p).map(cjImg);
   const details = parseCjDetails(p);
-  const variantCount = details && Number.isSafeInteger(details.variantCount) && details.variantCount > 0 ? details.variantCount : null;
+  const verifiedVariants = getVerifiedCjVariants(p);
+  const variantCount = verifiedVariants.length || null;
   const weightMin = details?.weightMin;
   const weightMax = details?.weightMax;
   const weightLabel = typeof weightMin === 'number' && Number.isFinite(weightMin) && weightMin > 0
     ? `${weightMin}${typeof weightMax === 'number' && Number.isFinite(weightMax) && weightMax > weightMin ? `–${weightMax}` : ''} غ` : 'غير محدد';
-  const others = (await listStorefrontCjProducts(!view.isStaff, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
+  const others = (await listStorefrontCjProducts(true, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
 
   return <div className="mx-auto max-w-6xl min-w-0 space-y-5 px-3 pb-32 pt-5 sm:px-5 md:pb-8 [overflow-wrap:anywhere]" data-cj-trial="product">
     {view.isStaff && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p><b>تجربة CJ الخاصة</b> — تجميع السلع فقط؛ الشراء والدفع غير مفعّلين.</p>{session && <CartLink accountId={session.uid} />}</div>}
@@ -55,7 +56,9 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-4">
         {p.trbhh_category && <p className="text-xs leading-6 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{title}</h1>
-        {view.isStaff && session && <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={(details?.variants ?? []).map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />}
+        {view.isStaff && session && (verifiedVariants.length > 0
+          ? <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={verifiedVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
+          : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">هذه السلعة مخفية عن المشترين: لا يوجد خيار ثبت مخزونه وشحنه إلى السعودية. أعد التحقق من بيانات CJ قبل إتاحتها.</p>)}
         {agentContact && (agentContact.wa || agentContact.tel) && <section className="rounded-2xl border bg-white p-4"><h2 className="mb-3 text-sm font-bold">التواصل مع وكيل السلعة</h2><div className="flex flex-wrap gap-2">{agentContact.wa && <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white"><MessageCircle className="h-4 w-4" />واتساب</a>}{agentContact.tel && <a href={agentContact.tel} className="flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold text-primary"><Phone className="h-4 w-4" />اتصال</a>}</div></section>}
       </section>
     </div>

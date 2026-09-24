@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { publicAdCardSelect, publicAdSearchWhere, toPublicAdCards, type AdCard } from '@/lib/data';
 import { cjStorefrontView } from './storefront';
 import type { CjProductRow } from './mapping';
+import { listStorefrontCjProducts } from './mapping';
 import { countApprovedCatalog, listApprovedCatalog, type ApprovedPreview } from './approved-catalog';
 
 export const CJ_CATALOG_TABS = [
@@ -31,7 +32,6 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
   const imports = tab === 'all' || tab === 'imported';
   const members = tab === 'all' || tab === 'members' || tab === 'verified';
   const commerceScope = tab === 'all' || tab === 'imported' || tab === 'trbhh' ? tab : null;
-  const cjWhere: Prisma.cj_productsWhereInput = { hidden: 0, status: { in: ['draft', 'ready'] } };
   let adWhere: Prisma.adsWhereInput = { id: { in: [] } };
   if (members) {
     const [publicWhere, linked, trusted] = await Promise.all([
@@ -49,11 +49,12 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
       ...(tab === 'verified' ? [{ user_id: { in: trusted.map(row => row.id) } }] : []),
     ] };
   }
-  const [cjCount, commerceCount, adCount] = await Promise.all([
-    imports ? prisma.cj_products.count({ where: cjWhere }) : 0,
+  const [cjProducts, commerceCount, adCount] = await Promise.all([
+    imports ? listStorefrontCjProducts(true, 500) : [],
     commerceScope ? countApprovedCatalog(commerceScope) : 0,
     members ? prisma.ads.count({ where: adWhere }) : 0,
   ]);
+  const cjCount = cjProducts.length;
   const total = cjCount + commerceCount + adCount;
   const pageCount = Math.max(1, Math.ceil(total / CJ_CATALOG_PAGE_SIZE));
   const page = Math.min(requestedPage, pageCount);
@@ -63,11 +64,11 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
   const commerceTake = Math.max(0, Math.min(CJ_CATALOG_PAGE_SIZE - cjTake, commerceCount - commerceSkip));
   const adSkip = Math.max(0, skip - cjCount - commerceCount);
   const adTake = Math.max(0, Math.min(CJ_CATALOG_PAGE_SIZE - cjTake - commerceTake, adCount - adSkip));
-  const [products, approved, rows] = await Promise.all([
-    cjTake ? prisma.cj_products.findMany({ where: cjWhere, orderBy: { id: 'desc' }, skip, take: cjTake }) : [],
+  const [approved, rows] = await Promise.all([
     commerceTake && commerceScope ? listApprovedCatalog(commerceScope, commerceTake, commerceSkip) : [],
     adTake ? prisma.ads.findMany({ where: adWhere, orderBy: { id: 'desc' }, skip: adSkip, take: adTake, select: publicAdCardSelect }) : [],
   ]);
+  const products = cjTake ? cjProducts.slice(skip, skip + cjTake) : [];
   const ads = rows.length ? await toPublicAdCards(rows) : [];
   const items: CjCatalogItem[] = [
     ...products.map(product => ({ key: `cj:${product.id}`, source: 'cj' as const, product: { ...product, id: Number(product.id) } })),

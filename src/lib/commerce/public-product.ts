@@ -50,8 +50,14 @@ function variants(value:unknown,fallbackPrice:number):PublicVariant[]{
 function importedCjVariants(value:unknown,availability:unknown,fallbackPrice:number,parentStock:number):PublicVariant[]{
  const data=json(value);if(!data||typeof data!=='object')return[];const rows=(data as Record<string,unknown>).variants;if(!Array.isArray(rows))return[];
  const proof=parseCjAvailability({availability_json:typeof availability==='string'?availability:availability?JSON.stringify(availability):null});if(!proof)return[];
- const stockByVid=new Map((proof.variants??[]).map(v=>[v.vid,v.stockQuantity]));
- return variants(rows.flatMap(raw=>{if(!raw||typeof raw!=='object')return[];const v=raw as Record<string,unknown>,vid=plain(v.vid,191),quantity=stockByVid.get(vid)||0;if(!vid||quantity<1)return[];const attrs={...attributes(v.attributes),...parseOptionMap(v.optionKey)},candidate={externalId:vid,vid,sku:v.sku,name:v.name,quantity:Math.min(quantity,parentStock),available:true,publicPriceMinor:fallbackPrice,options:attrs,image:typeof v.attributes==='object'&&v.attributes?((v.attributes as Record<string,unknown>).variantImage??(v.attributes as Record<string,unknown>).bigImg):null};return[candidate];}),fallbackPrice);
+ if(!rows.length||proof.variants.length!==rows.length)return[];
+ const stockByVid=new Map(proof.variants.filter(v=>v.shippingOptions.length>0).map(v=>[v.vid,v.stockQuantity]));
+ if(stockByVid.size!==rows.length)return[];
+ const detailVids=rows.flatMap(raw=>raw&&typeof raw==='object'&&typeof(raw as Record<string,unknown>).vid==='string'?[(raw as Record<string,unknown>).vid as string]:[]);
+ if(detailVids.length!==rows.length||new Set(detailVids).size!==rows.length)return[];
+ const candidates=rows.flatMap(raw=>{if(!raw||typeof raw!=='object')return[];const v=raw as Record<string,unknown>,vid=plain(v.vid,64),quantity=stockByVid.get(vid)||0,sourcePrice=Number(v.priceUsd);if(!/^[A-Za-z0-9_-]{1,64}$/.test(vid)||!Number.isFinite(sourcePrice)||sourcePrice<=0||quantity<1)return[];const attrs={...attributes(v.attributes),...parseOptionMap(v.optionKey)},candidate={externalId:vid,vid,sku:v.sku,name:v.name,quantity:Math.min(quantity,parentStock),available:true,publicPriceMinor:fallbackPrice,options:attrs,image:typeof v.attributes==='object'&&v.attributes?((v.attributes as Record<string,unknown>).variantImage??(v.attributes as Record<string,unknown>).bigImg):null};return[candidate];});
+ if(candidates.length!==rows.length)return[];
+ return variants(candidates,fallbackPrice);
 }
 function details(value:unknown):{weightLabel:string|null}{
  const data=json(value);if(!data||typeof data!=='object')return{weightLabel:null};const row=data as Record<string,unknown>,min=Number(row.weightMin),max=Number(row.weightMax);
@@ -65,8 +71,9 @@ function deliveryLabel(value:string|null|undefined):string|null{
  return last===null?`${first} يوم`:`من ${first} إلى ${last} يوم`;
 }
 function product(row:Row):PublicCommerceProduct|null{
- const parentStock=Math.max(0,row.stock_available-row.stock_reserved),supplierVariants=variants(row.variants,row.price_minor).map(variant=>({...variant,stock:Math.min(variant.stock,parentStock)})).filter(variant=>variant.stock>0),cjVariants=importedCjVariants(row.cj_details_json,row.cj_availability_json,row.price_minor,parentStock),availableVariants=row.cj_source_id!==null?cjVariants.length?cjVariants:supplierVariants:supplierVariants,stock=Math.max(0,Math.min(parentStock,row.available===1?(row.quantity??0):0));
+ const parentStock=Math.max(0,row.stock_available-row.stock_reserved),supplierVariants=variants(row.variants,row.price_minor).map(variant=>({...variant,stock:Math.min(variant.stock,parentStock)})).filter(variant=>variant.stock>0),cjVariants=importedCjVariants(row.cj_details_json,row.cj_availability_json,row.price_minor,parentStock),availableVariants=row.cj_source_id!==null?cjVariants:supplierVariants,stock=Math.max(0,Math.min(parentStock,row.available===1?(row.quantity??0):0));
  const optionsParsed=json(row.options),cjDetailParsed=json(row.cj_details_json),cjDetailVariants=cjDetailParsed&&typeof cjDetailParsed==='object'?(cjDetailParsed as Record<string,unknown>).variants:null,requiresVariantSelection=(Array.isArray(json(row.variants))&&(json(row.variants) as unknown[]).length>0)||(Array.isArray(optionsParsed)&&optionsParsed.length>0)||(row.cj_source_id!==null&&Array.isArray(cjDetailVariants)&&cjDetailVariants.length>0);
+ if(row.cj_source_id!==null&&availableVariants.length===0)return null;
  if(row.source_id!==null&&availableVariants.length===0&&(requiresVariantSelection||stock===0))return null;
  if(row.source_id===null&&stock===0)return null;
  const shipping=parseCjAvailability({availability_json:row.cj_availability_json});

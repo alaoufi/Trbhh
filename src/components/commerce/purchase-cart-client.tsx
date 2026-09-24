@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element -- provider image URLs are validated server-side; cart images use native lazy loading. */
 import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import {formatSar} from '@/lib/commerce/money';

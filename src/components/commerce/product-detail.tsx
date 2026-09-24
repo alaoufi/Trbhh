@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element -- provider image URLs are validated server-side; use native lazy-loaded images without a configured remote loader. */
 import Link from 'next/link';
 import {useRef,useState} from 'react';
 import {ChevronLeft,ChevronRight,Expand,X} from 'lucide-react';
@@ -31,7 +32,7 @@ export function CommerceProductDetail({product,shippingFeeMinor,priceBasis,purch
     {!product.requiresVariantSelection&&product.stock>0&&<p className="text-sm font-bold text-emerald-700">متوفر · الكمية المتاحة {product.stock}</p>}
     {product.requiresVariantSelection&&!variant&&<p className="text-sm font-bold text-slate-600">تختلف الخيارات والكمية المتاحة حسب الخيار المحدد.</p>}
     {product.brand&&<p className="text-sm text-slate-600">العلامة التجارية: <b className="text-[#16294a]">{product.brand}</b></p>}
-    <div className="rounded-2xl border border-slate-200 bg-white p-4"><AddCommerceCartItem productId={product.id} variants={product.variants} requiresVariant={product.requiresVariantSelection} maximum={product.stock} selectedVariantKey={selectedVariant} onVariantChange={setSelectedVariant}/><button type="button" disabled={!purchasingEnabled||product.requiresVariantSelection} className="mt-2 hidden min-h-12 w-full rounded-xl border border-[#16294a]/20 bg-white px-4 text-sm font-extrabold text-[#16294a] disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 sm:block">شراء الآن · غير متاح حاليًا</button></div>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4"><AddCommerceCartItem productId={product.id} variants={product.variants} requiresVariant={product.requiresVariantSelection} maximum={product.stock} selectedVariantKey={selectedVariant} onVariantChange={setSelectedVariant}/><button type="button" disabled className="mt-2 hidden min-h-12 w-full cursor-not-allowed rounded-xl border border-[#16294a]/20 bg-slate-100 px-4 text-sm font-extrabold text-slate-400 sm:block">شراء الآن · غير متاح حاليًا</button></div>
     {purchasingEnabled?<p className="text-xs font-semibold text-slate-500">سيُعاد التحقق من السعر والتوفر والشحن قبل إنشاء الطلب.</p>:<p className="rounded-xl bg-amber-50 p-3 text-xs font-bold leading-5 text-amber-900">أضف المنتج إلى سلتك للمراجعة. الشراء والدفع غير متاحين حاليًا.</p>}
     <div className="rounded-2xl border border-slate-200 bg-white p-4"><h2 className="font-extrabold text-[#16294a]">معلومات الشحن</h2>{shippingFeeMinor!==null?<p className="mt-2 text-sm leading-6 text-slate-600">رسوم التوصيل الحالية: <b className="text-[#16294a]">{formatSar(shippingFeeMinor)} ر.س</b> للطلب.</p>:<p className="mt-2 text-sm leading-6 text-slate-600">رسوم التوصيل ومدة الوصول غير متاحة حاليًا.</p>}{shippingTerms&&<p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{shippingTerms}</p>}</div>
    </section>

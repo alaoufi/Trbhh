@@ -9,7 +9,10 @@ import { parseCjImages, type CjProductRow } from '@/lib/cj/mapping';
 export function cjImg(url: string | null | undefined): string {
   const u = (url ?? '').trim();
   if (!u) return '';
-  return /^https:\/\/[^/]*(cjdropshipping\.(com|cn)|aliyuncs\.com)\//i.test(u) ? `/api/cj/img?u=${encodeURIComponent(u)}` : u;
+  const host = (() => { try { return new URL(u).hostname.toLowerCase(); } catch { return ''; } })();
+  const cjCdn = /(^|\.)cjdropshipping\.(com|cn)$/.test(host);
+  const cjOss = /^cc-west-[a-z0-9-]+\.oss-[a-z0-9-]+\.aliyuncs\.com$/.test(host);
+  return u.startsWith('https://') && (cjCdn || cjOss) ? `/api/cj/img?u=${encodeURIComponent(u)}` : u;
 }
 
 /** Saved primary first, followed only by this product's gallery; no network or fallback products. */

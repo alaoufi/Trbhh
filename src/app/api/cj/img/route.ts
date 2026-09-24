@@ -8,8 +8,12 @@ export const dynamic = 'force-dynamic';
 // https://developers.cjdropshipping.com/en/api/api2/api/product.html
 const ALLOWED_HOSTS = new Set([
   'cc-west-usa.oss-us-west-1.aliyuncs.com',
+  'cc-west-eu.oss-eu-central-1.aliyuncs.com',
+  'cc-west-uk.oss-eu-west-1.aliyuncs.com',
   'cf.cjdropshipping.com',
+  'cf.cjdropshipping.cn',
   'oss-cf.cjdropshipping.com',
+  'oss-cf.cjdropshipping.cn',
 ]);
 const RASTER_TYPES = new Set(['image/jpeg','image/png','image/gif','image/webp','image/avif']);
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -39,7 +43,9 @@ export async function GET(request: Request) {
   const u = new URL(request.url).searchParams.get('u') || '';
   let target: URL;
   try { target = new URL(u); } catch { return failure('bad_url',400); }
-  if (target.protocol!=='https:'||target.username||target.password||target.port||!ALLOWED_HOSTS.has(target.hostname)) return failure('forbidden',403);
+  const allowedCjOss = /^cc-west-[a-z0-9-]+\.oss-[a-z0-9-]+\.aliyuncs\.com$/.test(target.hostname);
+  const allowedCjDomain = /(^|\.)cjdropshipping\.(com|cn)$/.test(target.hostname);
+  if (target.protocol!=='https:'||target.username||target.password||target.port||(!ALLOWED_HOSTS.has(target.hostname)&&!allowedCjOss&&!allowedCjDomain)) return failure('forbidden',403);
 
   const res = await fetch(target.toString(), {
     headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://cjdropshipping.com/', Accept: [...RASTER_TYPES].join(', ') },

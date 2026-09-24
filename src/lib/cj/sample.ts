@@ -1,6 +1,7 @@
 import 'server-only';
 import { listProducts as cjList, getProduct as cjGet, getInventoryByVid as cjInvVid } from './client';
 import type { CjResult, CjProductSummary, CjProductDetail, CjInventory, CjSampleProduct } from './types';
+import { collectCjProductImages } from './media';
 
 /**
  * عيّنة قراءة تفصيلية لمنتجات CJ (قراءة فقط، لا طلب ولا دفع ولا تعديل).
@@ -32,7 +33,7 @@ export async function sampleOneCjProduct(pid: string, deps: CjSampleDeps = {}): 
     if (inv.ok) stockByVid.set(v.vid, inv.data.reduce((a, r) => a + (r.storageNum || 0), 0));
   }
   const variants = rawVariants.map((v) => ({ vid: v.vid, sku: v.variantSku, name: v.variantName, priceUsd: v.variantSellPrice, weight: v.variantWeight, stock: stockByVid.has(v.vid) ? stockByVid.get(v.vid)! : null }));
-  const images = [...new Set([d.productImage, ...rawVariants.map((v) => v.variantImage)].filter((s): s is string => !!s))];
+  const images = collectCjProductImages(d);
   return { ok: true, data: { pid: d.pid, sku: d.productSku, name: d.productName, category: d.categoryName, priceUsd: d.sellPrice, images, variants, totalStock: [...stockByVid.values()].reduce((a, b) => a + b, 0) } };
 }
 
@@ -57,7 +58,7 @@ export async function sampleCjProducts(limit = 3, deps: CjSampleDeps = {}): Prom
       if (inv.ok) stockByVid.set(v.vid, inv.data.reduce((a, r) => a + (r.storageNum || 0), 0));
     }
     const variants = rawVariants.map((v) => ({ vid: v.vid, sku: v.variantSku, name: v.variantName, priceUsd: v.variantSellPrice, weight: v.variantWeight, stock: stockByVid.has(v.vid) ? stockByVid.get(v.vid)! : null }));
-    const images = [...new Set([p.productImage, ...rawVariants.map((v) => v.variantImage)].filter((s): s is string => !!s))];
+    const images = detail.ok ? collectCjProductImages(detail.data) : p.productImage ? [p.productImage] : [];
     out.push({
       pid: p.pid, sku: p.productSku, name: p.productName, category: p.categoryName, priceUsd: p.sellPrice,
       images, variants, totalStock: [...stockByVid.values()].reduce((a, b) => a + b, 0),

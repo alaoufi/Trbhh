@@ -2278,9 +2278,12 @@ model cj_products {
   source_description     String? @db.MediumText
   display_description_ar String? @db.MediumText
   trbhh_category      String    @default("") @db.VarChar(200)
+  source_category     String    @default("") @db.VarChar(200)
   status              String    @default("draft") @db.VarChar(16)
   images              String?   @db.MediumText
   details_json        String?   @db.MediumText
+  availability_json   String?   @db.MediumText
+  availability_checked_at DateTime? @db.DateTime(3)
   agent_user_id       BigInt?   @db.UnsignedBigInt
   agent_claimed_at    DateTime? @db.DateTime(3)
   hidden              Int       @default(0) @db.TinyInt

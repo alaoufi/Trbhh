@@ -556,6 +556,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           <Link href={identityHref} className="line-clamp-1 text-sm font-medium hover:underline">
             {identityName}{identityIsStore && <span className="mr-1 rounded bg-primary/10 px-1 text-[10px] font-bold text-primary">متجر</span>}
           </Link>
+          {ad.seller?.trusted && <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800"><BadgeCheck className="h-3.5 w-3.5" /> موثّق</span>}
         </div>
         <InfoItem icon={Star}>{sellerRating.count ? `${sellerRating.avg} (${sellerRating.count})` : '0/0'}</InfoItem>
         <InfoItem icon={Hash}>#{ad.id}</InfoItem>

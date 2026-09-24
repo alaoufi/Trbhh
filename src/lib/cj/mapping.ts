@@ -17,9 +17,12 @@ export type CjProductRow = {
   source_description: string | null;
   display_description_ar: string | null;
   trbhh_category: string;
+  source_category: string;
   status: string;
   images: string | null;
   details_json: string | null;
+  availability_json: string | null;
+  availability_checked_at: Date | null;
   agent_user_id: bigint | null;
   agent_claimed_at: Date | null;
   hidden: number;
@@ -46,11 +49,31 @@ export type UpsertCjInput = {
   sourceDescription?: string | null;
   descriptionAr?: string | null;
   trbhhCategory?: string | null;
+  sourceCategory?: string | null;
   image?: string;
   images?: string[];
   detailsJson?: string | null;
+  availabilityJson?: string | null;
   price: PriceBreakdown;
 };
+
+export type CjAvailability = {
+  checkedAt: string;
+  stockQuantity: number;
+  shippingOptions: { name: string; priceUsd: number; deliveryDays: string | null; originCountry?: string }[];
+};
+
+/** لا نعرض سعراً تقديرياً بديلاً عن إثبات حديث للمخزون وخيارات الشحن. */
+export function parseCjAvailability(row: Pick<CjProductRow, 'availability_json'>, now = Date.now()): CjAvailability | null {
+  try {
+    const value = JSON.parse(row.availability_json ?? '') as Partial<CjAvailability>;
+    const checkedAt = typeof value.checkedAt === 'string' ? Date.parse(value.checkedAt) : NaN;
+    if (!Number.isFinite(checkedAt) || checkedAt > now || now - checkedAt > 6 * 60 * 60 * 1000) return null;
+    if (!Number.isSafeInteger(value.stockQuantity) || (value.stockQuantity ?? 0) < 1 || !Array.isArray(value.shippingOptions) || !value.shippingOptions.length) return null;
+    const shippingOptions = value.shippingOptions.filter(option => option && typeof option.name === 'string' && option.name.trim() && Number.isFinite(option.priceUsd) && option.priceUsd >= 0 && (option.originCountry === undefined || /^[A-Z]{2}$/.test(option.originCountry)));
+    return shippingOptions.length ? { checkedAt: new Date(checkedAt).toISOString(), stockQuantity: value.stockQuantity!, shippingOptions } : null;
+  } catch { return null; }
+}
 
 /** يفكّ معرض صور السلعة المخزَّن (JSON) إلى مصفوفة روابط. */
 export function parseCjImages(row: Pick<CjProductRow, 'images' | 'image'>): string[] {
@@ -99,19 +122,22 @@ export async function upsertCjProduct(input: UpsertCjInput, opts: { createOnly?:
   const detailsJson = input.detailsJson ?? null;
   await prisma.$executeRaw`
     INSERT INTO cj_products
-      (cj_product_id, cj_variant_id, cj_sku, name, name_ar, source_description, display_description_ar, trbhh_category, image, images, details_json,
+      (cj_product_id, cj_variant_id, cj_sku, name, name_ar, source_description, display_description_ar, trbhh_category, source_category, image, images, details_json, availability_json, availability_checked_at,
        supplier_cost_minor, shipping_cost_minor, other_costs_minor, profit_minor, sale_price_minor, margin_bps, currency, last_sync_at)
     VALUES
-      (${input.cjProductId}, ${input.cjVariantId ?? ''}, ${input.cjSku ?? ''}, ${input.name ?? ''}, ${nameAr}, ${srcDesc}, ${descAr}, ${category}, ${input.image ?? ''}, ${imagesJson}, ${detailsJson},
+      (${input.cjProductId}, ${input.cjVariantId ?? ''}, ${input.cjSku ?? ''}, ${input.name ?? ''}, ${nameAr}, ${srcDesc}, ${descAr}, ${category}, ${(input.sourceCategory ?? '').slice(0, 200)}, ${input.image ?? ''}, ${imagesJson}, ${detailsJson}, ${input.availabilityJson ?? null}, ${input.availabilityJson ? Prisma.sql`UTC_TIMESTAMP(3)` : Prisma.sql`NULL`},
        ${p.supplierCostMinor}, ${p.shippingCostMinor}, ${p.otherCostsMinor}, ${p.profitMinor}, ${p.salePriceMinor}, ${p.marginBps}, ${p.currency}, CURRENT_TIMESTAMP(3))
     ON DUPLICATE KEY UPDATE ${opts.createOnly ? Prisma.sql`id=id` : Prisma.sql`
       cj_sku=VALUES(cj_sku), name=VALUES(name), image=VALUES(image),
       images=CASE WHEN VALUES(images) IS NOT NULL THEN VALUES(images) ELSE cj_products.images END,
       details_json=CASE WHEN VALUES(details_json) IS NOT NULL THEN VALUES(details_json) ELSE cj_products.details_json END,
+      availability_json=VALUES(availability_json),
+      availability_checked_at=VALUES(availability_checked_at),
       source_description=VALUES(source_description),
       name_ar=CASE WHEN cj_products.name_ar='' THEN VALUES(name_ar) ELSE cj_products.name_ar END,
       display_description_ar=CASE WHEN cj_products.display_description_ar IS NULL OR cj_products.display_description_ar='' THEN VALUES(display_description_ar) ELSE cj_products.display_description_ar END,
       trbhh_category=CASE WHEN cj_products.trbhh_category='' THEN VALUES(trbhh_category) ELSE cj_products.trbhh_category END,
+      source_category=VALUES(source_category),
       supplier_cost_minor=VALUES(supplier_cost_minor), shipping_cost_minor=VALUES(shipping_cost_minor),
       other_costs_minor=VALUES(other_costs_minor), profit_minor=VALUES(profit_minor),
       sale_price_minor=VALUES(sale_price_minor), margin_bps=VALUES(margin_bps), currency=VALUES(currency),
@@ -151,7 +177,7 @@ export async function listVisibleCjProducts(limit = 120): Promise<CjProductRow[]
 export async function listStorefrontCjProducts(readyOnly: boolean, limit = 120): Promise<CjProductRow[]> {
   const take = Math.min(Math.max(1, limit), 500);
   return readyOnly
-    ? prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE hidden=0 AND status='ready' ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[])
+    ? (await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE hidden=0 AND status='ready' AND availability_checked_at>=UTC_TIMESTAMP(3)-INTERVAL 6 HOUR AND JSON_VALID(availability_json)=1 AND CAST(JSON_UNQUOTE(JSON_EXTRACT(availability_json,'$.stockQuantity')) AS UNSIGNED)>0 AND JSON_LENGTH(JSON_EXTRACT(availability_json,'$.shippingOptions'))>0 ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[])).filter(row => !!parseCjAvailability(row))
     : prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE hidden=0 AND status IN ('draft','ready') ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
 }
 
@@ -159,9 +185,10 @@ export async function listStorefrontCjProducts(readyOnly: boolean, limit = 120):
 export async function getStorefrontCjProduct(id: number, readyOnly: boolean): Promise<CjProductRow | null> {
   if (!Number.isInteger(id) || id <= 0) return null;
   const rows = readyOnly
-    ? await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE id=${BigInt(id)} AND hidden=0 AND status='ready' LIMIT 1`.catch(() => [] as CjProductRow[])
+    ? await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE id=${BigInt(id)} AND hidden=0 AND status='ready' AND availability_checked_at>=UTC_TIMESTAMP(3)-INTERVAL 6 HOUR AND JSON_VALID(availability_json)=1 AND CAST(JSON_UNQUOTE(JSON_EXTRACT(availability_json,'$.stockQuantity')) AS UNSIGNED)>0 AND JSON_LENGTH(JSON_EXTRACT(availability_json,'$.shippingOptions'))>0 LIMIT 1`.catch(() => [] as CjProductRow[])
     : await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE id=${BigInt(id)} AND hidden=0 AND status IN ('draft','ready') LIMIT 1`.catch(() => [] as CjProductRow[]);
-  return rows[0] ?? null;
+  const row = rows[0] ?? null;
+  return row && (!readyOnly || parseCjAvailability(row)) ? row : null;
 }
 
 /** صفّ واحد بمعرّفه. */
@@ -203,6 +230,8 @@ export async function listProductsNeedingArabic(limit = 100): Promise<CjProductR
   return prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products
     WHERE (name_ar='' AND name<>'')
        OR ((display_description_ar IS NULL OR display_description_ar='') AND source_description IS NOT NULL AND source_description<>'')
+       OR (source_category<>'' AND (trbhh_category='' OR trbhh_category=source_category))
+       OR (source_category='' AND trbhh_category REGEXP '[A-Za-z]')
     ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
 }
 
@@ -221,6 +250,12 @@ export async function setCjProductGallery(id: number, images: string[]): Promise
   await prisma.$executeRaw`UPDATE cj_products SET images=${json}, image=${clean[0].slice(0, 1024)} WHERE id=${BigInt(id)}`.catch(() => {});
 }
 
+/** Replace availability proof; null revokes any prior public-display eligibility. */
+export async function setCjProductAvailability(id: number, availabilityJson: string | null): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0) return;
+  await prisma.$executeRaw`UPDATE cj_products SET availability_json=${availabilityJson}, availability_checked_at=${availabilityJson ? Prisma.sql`UTC_TIMESTAMP(3)` : Prisma.sql`NULL`} WHERE id=${BigInt(id)}`.catch(() => {});
+}
+
 /** السلع بلا صورة/معرض مخزَّن — لتعبئتها من CJ. */
 export async function listProductsMissingImage(limit = 40): Promise<CjProductRow[]> {
   const take = Math.min(Math.max(1, limit), 100);
@@ -231,6 +266,12 @@ export async function listProductsMissingImage(limit = 40): Promise<CjProductRow
 export async function setCjProductCategory(id: number, category: string): Promise<void> {
   if (!Number.isInteger(id) || id <= 0) return;
   await prisma.$executeRaw`UPDATE cj_products SET trbhh_category=${category.slice(0, 200)} WHERE id=${BigInt(id)}`.catch(() => {});
+}
+
+/** Preserve a legacy English category as source before replacing its display value. */
+export async function setCjProductSourceCategory(id: number, category: string): Promise<void> {
+  if (!Number.isInteger(id) || id <= 0 || !category) return;
+  await prisma.$executeRaw`UPDATE cj_products SET source_category=${category.slice(0, 200)} WHERE id=${BigInt(id)} AND source_category=''`.catch(() => {});
 }
 
 /** تحديث الوصف العربي المعروض. */

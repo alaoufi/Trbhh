@@ -8,6 +8,7 @@ export type CjProductSummary = {
   productSku: string;
   sellPrice: number | null;
   productImage: string | null;
+  productImages?: string[];
   categoryName: string | null;
 };
 

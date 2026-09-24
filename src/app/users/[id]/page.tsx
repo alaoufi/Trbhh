@@ -64,7 +64,7 @@ export default async function UserProfilePage({ params, searchParams }: { params
   const displayName = user.name || user.userName || 'مستخدم';
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
   const ads = active.map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special,
-        urgent: false, views: 0, sellerName: null, sellerTrusted: false }));
+        urgent: false, views: 0, sellerName: null, sellerTrusted: user.trusted === 1 }));
 
   return (
     <div className="space-y-4">

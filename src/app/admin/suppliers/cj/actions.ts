@@ -5,8 +5,10 @@ import { hasAccess, requireAccess } from '@/lib/access-control/guards';
 import { defaultMarginBps, setDefaultMarginBps } from '@/lib/cj/pricing';
 import { cjSyncSettings, saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync';
 import { importCjProductByPid } from '@/lib/cj/import';
-import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductStatus, setCjProductDescriptionAr, setCjProductCategory, cjProductOrderCount } from '@/lib/cj/mapping';
-import { translateToArabic, translateManyCached, learnTranslation, isArabicText } from '@/lib/cj/translate';
+import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductStatus, setCjProductDescriptionAr, setCjProductCategory, cjProductOrderCount, setCjProductAvailability, setCjProductGallery } from '@/lib/cj/mapping';
+import { translateToArabicCached, translateManyCached, learnTranslation, isArabicText } from '@/lib/cj/translate';
+import { readCjAvailability } from '@/lib/cj/availability';
+import { collectCjProductImages } from '@/lib/cj/media';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
 import { getCategories, getProduct, listProductsPage } from '@/lib/cj/client';
@@ -204,7 +206,7 @@ export async function translateCjProduct(form: FormData) {
   const s = await requireCjAccess('products', 'edit');
   const id = Number(String(form.get('id') || ''));
   const row = await getCjProductById(id);
-  if (row) { const ar = await translateToArabic(row.name).catch(() => null); if (ar) await setCjProductNameAr(id, ar); }
+  if (row) { const ar = await translateToArabicCached(row.name).catch(() => null); if (ar) await setCjProductNameAr(id, ar); }
   if (row) await auditProduct(s.uid, row);
   revalidatePath('/admin/suppliers/cj/browse');
   redirect(withParam(backOf(form), 'edited=1'));
@@ -445,7 +447,7 @@ export async function runCjTranslateWarm(form: FormData) {
   const back = backOf(form);
   const r = await warmCjTranslations({ categoryMax: 150, productMax: 40 });
   await auditCjChange(s.uid, 'products', 'translation-warm', {}, r);
-  redirect(withParam(back, `warmed=${r.categories}-${r.productNames}`));
+  redirect(withParam(back, `warmed=${r.categories}-${r.productNames}-${r.productCategories}`));
 }
 
 /** إعادة جلب صور ومواصفات كل السلع المستوردة (يُصلح الصور المكسورة). */
@@ -457,12 +459,34 @@ export async function refreshCjMediaAction(form: FormData) {
   redirect(withParam(back, `mediaref=${r.refreshed}`));
 }
 
+/** Refresh one imported item's source images, full stock and Saudi shipping proof. */
+export async function refreshCjImportedAvailability(form: FormData) {
+  const s = await requireCjAccess('products', 'edit');
+  const id = Number(String(form.get('id') || ''));
+  const back = backOf(form);
+  const before = await productForChange(id);
+  const detail = await getProduct(before.cj_product_id).catch(() => null);
+  if (!detail?.ok) {
+    await setCjProductAvailability(id, null);
+    await auditProduct(s.uid, before);
+    return redirect(withParam(back, 'availability=missing'));
+  }
+  const images = collectCjProductImages(detail.data);
+  if (images.length) await setCjProductGallery(id, images);
+  const availability = await readCjAvailability(before.cj_product_id, detail.data.variants);
+  await setCjProductAvailability(id, availability);
+  await auditProduct(s.uid, before);
+  revalidatePath('/admin/suppliers/cj/browse');
+  revalidatePath('/admin/suppliers/cj/showcase');
+  redirect(withParam(back, availability ? 'availability=ready' : 'availability=missing'));
+}
+
 /** ترجمة تلقائية جماعية لكل سلعة بلا عنوان عربي بعد (دفعة محدودة). */
 export async function translateAllCj(form: FormData) {
   const s = await requireCjAccess('products', 'edit');
   const rows = await listUntranslatedCjProducts(40);
   let done = 0;
-  for (const r of rows) { const ar = await translateToArabic(r.name).catch(() => null); if (ar) { await setCjProductNameAr(r.id, ar); await auditProduct(s.uid, r); done++; } }
+  for (const r of rows) { const ar = await translateToArabicCached(r.name).catch(() => null); if (ar) { await setCjProductNameAr(r.id, ar); await auditProduct(s.uid, r); done++; } }
   revalidatePath('/admin/suppliers/cj/browse');
   redirect(withParam(backOf(form), `translated=${done}`));
 }

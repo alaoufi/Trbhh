@@ -5,12 +5,12 @@ import { requireAccess } from '@/lib/access-control/guards';
 import { cjConfig } from '@/lib/cj/config';
 import { listProductsPage, getCategories } from '@/lib/cj/client';
 import { sampleOneCjProduct } from '@/lib/cj/sample';
-import { importedCjPids, listCjProducts } from '@/lib/cj/mapping';
+import { importedCjPids, listCjProducts, parseCjAvailability } from '@/lib/cj/mapping';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
 import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
-import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateCjBrowsePage, translateAllCj, translateCjCategories, runCjTranslateWarm, refreshCjMediaAction } from '../actions';
+import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateCjBrowsePage, translateAllCj, translateCjCategories, runCjTranslateWarm, refreshCjMediaAction, refreshCjImportedAvailability } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'تصفّح منتجات CJ واستيرادها' };
@@ -225,6 +225,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
           <div className="grid gap-3 sm:grid-cols-2">
             {importedList.map((r) => {
               const finalMinor = r.sale_price_override_minor ?? r.sale_price_minor;
+              const availability = parseCjAvailability(r);
               return (
                 <div key={r.id} className={`rounded-xl border p-3 space-y-2 ${r.hidden ? 'border-slate-300 bg-slate-50 opacity-80' : 'border-primary/20'}`}>
                   <div className="flex gap-3">
@@ -239,6 +240,9 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                         <span className={`rounded px-1.5 py-0.5 font-bold ${r.status === 'ready' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{r.status === 'ready' ? 'جاهزة' : 'مسودّة'}</span>
                         {r.hidden === 1 && <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">مخفية</span>}
                       </div>
+                      {availability
+                        ? <p className="text-xs font-bold text-emerald-800">مخزون متحقق: {availability.stockQuantity.toLocaleString('en')} · خيارات الشحن: {availability.shippingOptions.length}</p>
+                        : <p className="text-xs font-bold text-amber-800">المخزون أو الشحن غير متحقق حديثًا؛ لن يظهر الإعلان للعامة.</p>}
                     </div>
                   </div>
                   {/* تحرير العنوان العربي */}
@@ -249,6 +253,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                   </form></AccessBoundary>
                   <div className="flex flex-wrap items-center gap-1">
                     <Link href={`/admin/suppliers/cj/review/${r.id}`} className={btn}>مراجعة / تحرير</Link>
+                    <AccessBoundary module="products" action="edit"><form action={refreshCjImportedAvailability}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الصور والمخزون والشحن</button></form></AccessBoundary>
                     {/* تعديل السعر */}
                     <AccessBoundary module="products" action="edit"><form action={saveCjPrice} className="flex items-center gap-1">
                       <input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} />

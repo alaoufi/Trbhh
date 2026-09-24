@@ -737,11 +737,13 @@ export async function collaboratorAds(storeId: number) {
   const ids = await collaboratorStoreIds(storeId);
   if (!ids.length) return [];
   const stores = await prisma.stores.findMany({ where: { AND: [publicStoreWhere(await getStoreSubPricing()), { id: { in: ids.map((n) => BigInt(n)) } }] }, select: { id: true, user_id: true } });
+  const owners = await prisma.users.findMany({ where: { id: { in: stores.map((s) => s.user_id) } }, select: { id: true, trusted: true } });
+  const trustedByOwner = new Map(owners.map((owner) => [toInt(owner.id), owner.trusted === 1]));
   const out: { id: number; title: string; price: number; adsType: string; priceType: string | null; rentPeriod: string | null; image: string; cityName: null; categoryName: null; createdAt: string | null; special: boolean; urgent: boolean; views: number; sellerName: null; sellerTrusted: boolean }[] = [];
   for (const s of stores) {
     const a = (await storeCatalogAds(toInt(s.id), Number(s.user_id))).slice(0, 4);
     for (const x of a) out.push({ id: x.id, title: x.title, price: x.price, adsType: x.adsType, priceType: x.priceType, rentPeriod: x.rentPeriod, image: x.image, cityName: null, categoryName: null, createdAt: x.createdAt, special: x.special,
-      urgent: false, views: 0, sellerName: null, sellerTrusted: false });
+      urgent: false, views: 0, sellerName: null, sellerTrusted: trustedByOwner.get(toInt(s.user_id)) ?? false });
   }
   const vc = await adViewCounts(out.map((o) => o.id));
   for (const o of out) o.views = vc.get(o.id) ?? 0;
@@ -803,7 +805,14 @@ export async function homeFeaturedAds() {
   ]);
   const activeIds = new Set(currentAds.map((ad) => toInt(ad.id)));
   const memberships = new Set(products.map((product) => `${product.store_id}:${product.ad_id}`));
-  return eligible.filter((ad) => activeIds.has(ad.id) && memberships.has(`${ad.storeId}:${ad.id}`));
+  const visible = eligible.filter((ad) => activeIds.has(ad.id) && memberships.has(`${ad.storeId}:${ad.id}`));
+  // Trust can be revoked at any time; resolve it outside the short-lived ad cache.
+  const ownersByStore = await prisma.stores.findMany({ where: { id: { in: [...new Set(visible.map((ad) => ad.storeId))].map(BigInt) } }, select: { id: true, user_id: true } });
+  const ownerIds = [...new Set(ownersByStore.map((store) => store.user_id))];
+  const owners = ownerIds.length ? await prisma.users.findMany({ where: { id: { in: ownerIds } }, select: { id: true, trusted: true } }) : [];
+  const trustedByOwner = new Map(owners.map((owner) => [toInt(owner.id), owner.trusted === 1]));
+  const ownerByStore = new Map(ownersByStore.map((store) => [toInt(store.id), toInt(store.user_id)]));
+  return visible.map((ad) => ({ ...ad, sellerTrusted: trustedByOwner.get(ownerByStore.get(ad.storeId) ?? 0) ?? false }));
 }
 
 async function loadHomeFeaturedAds() {

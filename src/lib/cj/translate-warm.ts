@@ -1,7 +1,8 @@
 import 'server-only';
 import { getCategories, getProduct } from './client';
-import { translateManyCached, translateToArabicCached } from './translate';
-import { listProductsNeedingArabic, setCjProductNameAr, setCjProductDescriptionAr, listProductsMissingImage, setCjProductGallery, setCjProductDetails, buildCjDetails, listCjProducts } from './mapping';
+import { isArabicText, translateManyCached, translateToArabicCached } from './translate';
+import { listProductsNeedingArabic, setCjProductNameAr, setCjProductDescriptionAr, setCjProductCategory, setCjProductSourceCategory, listProductsMissingImage, setCjProductGallery, setCjProductDetails, buildCjDetails, listCjProducts } from './mapping';
+import { collectCjProductImages } from './media';
 
 /**
  * تهيئة (warming) الترجمات على الخادم — تُشغَّل أسبوعياً (كرون داخلي) أو يدوياً.
@@ -17,9 +18,7 @@ export async function refreshCjMedia(limit = 30): Promise<{ refreshed: number }>
     if (!r.cj_product_id) continue;
     const det = await getProduct(r.cj_product_id).catch(() => null);
     if (det && det.ok) {
-      const variantImgs = (det.data.variants ?? []).map((v) => v.variantImage).filter((s): s is string => !!s);
-      const descImgs = (det.data.description || '').match(/https?:\/\/[^"'\s<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
-      const gallery = [...new Set([...variantImgs, ...descImgs, det.data.productImage].filter((s): s is string => !!s))].slice(0, 12);
+      const gallery = collectCjProductImages(det.data);
       if (gallery.length) { await setCjProductGallery(r.id, gallery); refreshed++; }
       await setCjProductDetails(r.id, buildCjDetails(det.data.variants ?? []));
     }
@@ -27,10 +26,10 @@ export async function refreshCjMedia(limit = 30): Promise<{ refreshed: number }>
   return { refreshed };
 }
 
-export type WarmResult = { categories: number; productNames: number; productDescriptions: number; images: number };
+export type WarmResult = { categories: number; productNames: number; productDescriptions: number; productCategories: number; images: number };
 
 export async function warmCjTranslations(opts: { categoryMax?: number; productMax?: number; imageMax?: number } = {}): Promise<WarmResult> {
-  const out: WarmResult = { categories: 0, productNames: 0, productDescriptions: 0, images: 0 };
+  const out: WarmResult = { categories: 0, productNames: 0, productDescriptions: 0, productCategories: 0, images: 0 };
 
   // 1) شجرة التصنيفات (منتهية العدد — تُخزَّن مرّة وتبقى فورية).
   const cats = await getCategories().catch(() => null);
@@ -44,6 +43,12 @@ export async function warmCjTranslations(opts: { categoryMax?: number; productMa
   for (const r of rows) {
     if (!r.name_ar && r.name) { const ar = await translateToArabicCached(r.name); if (ar) { await setCjProductNameAr(r.id, ar); out.productNames++; } }
     if ((!r.display_description_ar) && r.source_description) { const ar = await translateToArabicCached(r.source_description); if (ar) { await setCjProductDescriptionAr(r.id, ar); out.productDescriptions++; } }
+    const sourceCategory = r.source_category || (!isArabicText(r.trbhh_category) ? r.trbhh_category : '');
+    if (sourceCategory && (!r.trbhh_category || r.trbhh_category === sourceCategory || !isArabicText(r.trbhh_category))) {
+      await setCjProductSourceCategory(r.id, sourceCategory);
+      const ar = await translateToArabicCached(sourceCategory);
+      if (ar) { await setCjProductCategory(r.id, ar); out.productCategories++; }
+    }
   }
 
   // 3) تعبئة صور وتفاصيل السلع الناقصة من CJ (معرض + متغيّرات/مواصفات).
@@ -51,9 +56,7 @@ export async function warmCjTranslations(opts: { categoryMax?: number; productMa
   for (const r of missImg) {
     const det = await getProduct(r.cj_product_id).catch(() => null);
     if (det && det.ok) {
-      const variantImgs = (det.data.variants ?? []).map((v) => v.variantImage).filter((s): s is string => !!s);
-      const descImgs = (det.data.description || '').match(/https?:\/\/[^"'\s<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
-      const gallery = [...new Set([...variantImgs, ...descImgs, det.data.productImage].filter((s): s is string => !!s))].slice(0, 12);
+      const gallery = collectCjProductImages(det.data);
       if (gallery.length) { await setCjProductGallery(r.id, gallery); out.images++; }
       await setCjProductDetails(r.id, buildCjDetails(det.data.variants ?? []));
     }

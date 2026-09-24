@@ -82,6 +82,7 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
             <span className={cn('rounded px-2 py-0.5 text-[10px] font-extrabold text-white', isReq ? 'bg-amber-500' : 'bg-primary')}>
               {isReq ? 'طلب' : 'عرض'}
             </span>
+            {ad.sellerTrusted && <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800"><BadgeCheck className="h-3 w-3" /> موثّق</span>}
 
           </span>
           <h3 className="line-clamp-2 break-words text-right text-base font-bold leading-6 text-primary">
@@ -182,6 +183,7 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
         <span className={cn('absolute right-0 top-2 rounded-l-full px-2 py-0.5 text-[10px] font-extrabold text-white shadow', isReq ? 'bg-amber-500' : 'bg-primary')}>
           {isReq ? 'طلب' : 'عرض'}
         </span>
+        {ad.sellerTrusted && <span className="absolute bottom-2 right-2 inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-extrabold text-emerald-800 shadow"><BadgeCheck className="h-3 w-3" /> موثّق</span>}
         {ad.special && <span className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white shadow">مميّز</span>}
         {tier && (
           <span className={cn('absolute left-2 bottom-2 grid h-6 w-6 place-items-center rounded-full shadow', tier === 'gold' ? 'bg-amber-400' : 'bg-slate-300')}>

@@ -1,9 +1,11 @@
 import 'server-only';
 import { getProduct as cjGet } from './client';
+import { readCjAvailability, type AvailabilityDeps } from './availability';
+import { collectCjProductImages } from './media';
 import { upsertCjProduct, buildCjDetails } from './mapping';
 import { computePrice, defaultMarginBps } from './pricing';
 import { cjSyncSettings, type CjSyncSettings } from './sync';
-import { translateToArabic } from './translate';
+import { translateToArabicCached } from './translate';
 import type { CjResult, CjProductDetail } from './types';
 
 /**
@@ -15,6 +17,7 @@ import type { CjResult, CjProductDetail } from './types';
 export type CjImportDeps = {
   createOnly?: boolean;
   getProduct?: (pid: string) => Promise<CjResult<CjProductDetail>>;
+  availability?: AvailabilityDeps;
   settings?: () => Promise<CjSyncSettings>;
   marginBps?: () => Promise<number>;
   upsert?: typeof upsertCjProduct;
@@ -37,21 +40,25 @@ export async function importCjProductByPid(pid: string, deps: CjImportDeps = {})
   const costMinor = d.sellPrice != null && d.sellPrice > 0 ? Math.round(d.sellPrice * settings.usdToSarX100) : 0;
   const price = computePrice(costMinor, settings.shippingMinor, 0, margin);
   // ترجمة تلقائية للعنوان/الوصف/التصنيف إلى العربية (حقول عرض منفصلة؛ لا نطمس المصدر).
-  const translate = deps.translate ?? translateToArabic;
+  const translate = deps.translate ?? translateToArabicCached;
+  const plainDescription = (d.description || '').replace(/<\/(?:p|div|li|br|h[1-6])\s*>/gi, '\n').replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/\s{2,}/g, ' ').trim();
   const [nameAr, descAr, catAr] = await Promise.all([
     translate(d.productName || '').catch(() => null),
-    translate(d.description || '').catch(() => null),
+    translate(plainDescription).catch(() => null),
     translate(d.categoryName || '').catch(() => null),
   ]);
   // معرض الصور: صورة المنتج + صور المتغيّرات + صور مضمّنة في الوصف (غالباً الصور الحقيقية).
-  const variantImgs = (d.variants ?? []).map((v) => v.variantImage).filter((s): s is string => !!s);
-  const descImgs = (d.description || '').match(/https?:\/\/[^"'\s<>]+\.(?:jpg|jpeg|png|webp)/gi) || [];
-  const gallery = [...new Set([...variantImgs, ...descImgs, d.productImage].filter((s): s is string => !!s))].slice(0, 12);
+  const gallery = collectCjProductImages(d);
   const detailsJson = JSON.stringify(buildCjDetails(d.variants ?? []));
+  // Verify stock by the product's full variant inventory and request a Saudi
+  // freight estimate. If either read fails or gives no available route, keep
+  // the product in staff staging but make it ineligible for public display.
+  const availabilityJson = await readCjAvailability(clean, d.variants ?? [], deps.availability);
   await upsert({
     cjProductId: clean, cjSku: d.productSku || '', name: d.productName || '', nameAr,
     sourceDescription: d.description || null, descriptionAr: descAr,
-    trbhhCategory: catAr || d.categoryName || '', image: gallery[0] || '', images: gallery, detailsJson, price,
+    // Never present a failed English translation as an Arabic category label.
+    trbhhCategory: catAr || '', sourceCategory: d.categoryName || '', image: gallery[0] || '', images: gallery, detailsJson, availabilityJson, price,
   }, { createOnly: deps.createOnly === true });
   return { ok: true, pid: clean, name: d.productName || '', salePriceMinor: price.salePriceMinor, supplierCostMinor: price.supplierCostMinor };
 }

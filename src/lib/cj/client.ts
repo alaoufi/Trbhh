@@ -167,8 +167,10 @@ export async function getProduct(pid: string): Promise<CjResult<CjProductDetail>
   const r = await call<Record<string, unknown>>('/product/query', { query: { pid } });
   if (!r.ok) return r;
   const d = r.data || {};
-  const variants = Array.isArray(d.variants) ? (d.variants as Record<string, unknown>[]).map(mapVariant) : [];
-  return { ok: true, data: { ...mapSummary(d), description: str(d.description), variants } };
+  const rawVariants = Array.isArray(d.variants) ? d.variants : Array.isArray(d.stanProducts) ? d.stanProducts : [];
+  const variants = (rawVariants as Record<string, unknown>[]).map(mapVariant);
+  const summary = mapSummary(d);
+  return { ok: true, data: { ...summary, description: str(d.description) || str(d.descriptionEn) || str(d.productDescription), variants } };
 }
 
 export async function getVariants(pid: string): Promise<CjResult<CjVariant[]>> {
@@ -186,28 +188,37 @@ export async function getInventoryByVid(vid: string): Promise<CjResult<CjInvento
 }
 
 export async function getInventoryByPid(pid: string): Promise<CjResult<CjInventory[]>> {
-  const r = await call<unknown[]>('/product/stock/queryByPid', { query: { pid } });
+  const r = await call<Record<string, unknown>>('/product/stock/getInventoryByPid', { query: { pid } });
   if (!r.ok) return r;
-  const list = Array.isArray(r.data) ? r.data : [];
-  return { ok: true, data: list.map((s) => mapInventory(s as Record<string, unknown>)) };
+  // CJ returns inventory grouped under variantInventories, with each VID
+  // containing country/warehouse quantities. Keep the stable VID association.
+  const variants = Array.isArray(r.data?.variantInventories) ? r.data.variantInventories as Record<string, unknown>[] : [];
+  const rows = variants.flatMap((variant) => {
+    const vid = str(variant.vid);
+    const inventory = Array.isArray(variant.inventory) ? variant.inventory as Record<string, unknown>[] : [];
+    return inventory.map((item) => mapInventory({ ...item, vid }));
+  });
+  return { ok: true, data: rows };
 }
 
-/** المستودعات المتاحة تُشتقّ من مخزون منتج (areaId/areaName/countryCode مميّزة). */
+/** المستودعات المتاحة تُشتقّ من جزء inventories في نتيجة CJ الخاصة بالمنتج. */
 export async function getWarehouses(samplePid: string): Promise<CjResult<CjWarehouse[]>> {
-  const r = await getInventoryByPid(samplePid);
+  const r = await call<Record<string, unknown>>('/product/stock/getInventoryByPid', { query: { pid: samplePid } });
   if (!r.ok) return r;
   const seen = new Map<string, CjWarehouse>();
-  for (const inv of r.data) {
-    if (inv.areaId && !seen.has(inv.areaId)) seen.set(inv.areaId, { areaId: inv.areaId, areaEnName: inv.areaName, countryCode: inv.countryCode });
+  const inventories = Array.isArray(r.data?.inventories) ? r.data.inventories as Record<string, unknown>[] : [];
+  for (const inv of inventories) {
+    const areaId = String(inv.areaId ?? '');
+    if (areaId && !seen.has(areaId)) seen.set(areaId, { areaId, areaEnName: str(inv.areaEn ?? inv.areaEnName ?? inv.countryNameEn), countryCode: str(inv.countryCode) });
   }
   return { ok: true, data: [...seen.values()] };
 }
 
 /** احتساب الشحن إلى السعودية (endCountryCode='SA'). */
-export async function calculateFreightToKSA(products: { vid: string; quantity: number }[], zip?: string): Promise<CjResult<CjFreightOption[]>> {
+export async function calculateFreightToKSA(products: { vid: string; quantity: number }[], zip?: string, originCountry = 'CN'): Promise<CjResult<CjFreightOption[]>> {
   const r = await call<unknown[]>('/logistic/freightCalculate', {
     method: 'POST',
-    body: { startCountryCode: 'CN', endCountryCode: 'SA', zip, products: products.map((p) => ({ vid: p.vid, quantity: p.quantity })) },
+    body: { startCountryCode: originCountry, endCountryCode: 'SA', zip, products: products.map((p) => ({ vid: p.vid, quantity: p.quantity })) },
   });
   if (!r.ok) return r;
   const list = Array.isArray(r.data) ? r.data : [];
@@ -256,32 +267,37 @@ function parsePrice(v: unknown): number | null {
 }
 
 function mapSummary(p: Record<string, unknown>): CjProductSummary {
+  const productImages = Array.isArray(p.productImageSet)
+    ? p.productImageSet.filter((value): value is string => typeof value === 'string' && !!value.trim())
+    : typeof p.productImageSet === 'string' ? p.productImageSet.split(',').map(value => value.trim()).filter(Boolean) : [];
+  const productImage = str(p.productImage) || str(p.bigImage) || str(p.bigimg) || str(p.img) || productImages[0] || null;
   return {
-    pid: String(p.pid ?? p.productId ?? ''),
-    productName: String(p.productNameEn ?? p.productName ?? ''),
+    pid: String(p.pid ?? p.productId ?? p.id ?? ''),
+    productName: String(p.productNameEn ?? p.productName ?? p.nameEn ?? p.nameen ?? ''),
     productSku: String(p.productSku ?? p.sku ?? ''),
-    sellPrice: parsePrice(p.sellPrice ?? p.productPrice ?? p.price),
-    productImage: str(p.productImage) || str(p.bigImage),
-    categoryName: str(p.categoryName),
+    sellPrice: parsePrice(p.sellPrice ?? p.sellprice ?? p.productPrice ?? p.price),
+    productImage,
+    productImages,
+    categoryName: str(p.categoryName) || str(p.category) || str(p.categoryEn),
   };
 }
 function mapVariant(v: Record<string, unknown>): CjVariant {
   return {
-    vid: String(v.vid ?? v.variantId ?? ''),
+    vid: String(v.vid ?? v.variantId ?? v.id ?? ''),
     variantSku: String(v.variantSku ?? v.sku ?? ''),
-    variantName: str(v.variantNameEn ?? v.variantName),
-    variantSellPrice: parsePrice(v.variantSellPrice ?? v.sellPrice),
-    variantImage: str(v.variantImage),
-    variantWeight: num(v.variantWeight),
+    variantName: str(v.variantNameEn ?? v.variantName ?? v.nameEn ?? v.nameen ?? v.variantKey),
+    variantSellPrice: parsePrice(v.variantSellPrice ?? v.sellPrice ?? v.sellprice),
+    variantImage: str(v.variantImage) || str(v.bigImg) || str(v.bigimg) || str(v.img),
+    variantWeight: num(v.variantWeight ?? v.weight),
   };
 }
 function mapInventory(s: Record<string, unknown>): CjInventory {
   return {
     vid: String(s.vid ?? ''),
     areaId: str(s.areaId ?? s.storageAreaId),
-    areaName: str(s.areaEnName ?? s.countryNameEn ?? s.areaName),
+    areaName: str(s.areaEn ?? s.areaEnName ?? s.countryNameEn ?? s.areaName),
     countryCode: str(s.countryCode),
-    storageNum: num(s.storageNum ?? s.totalInventoryNum) ?? 0,
+    storageNum: num(s.totalInventory ?? s.storageNum ?? s.totalInventoryNum) ?? 0,
   };
 }
 function mapFreight(o: Record<string, unknown>): CjFreightOption {

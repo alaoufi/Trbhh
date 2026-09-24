@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from '@/lib/prisma';
 import { COMMERCE_DDL } from '@/lib/commerce/schema';
 import { FINANCE_DDL, FINANCE_UPGRADE_DDL } from '@/lib/finance/schema';
+import {ensureFinanceTaxRevisionIndexes} from '@/lib/finance/tax-index-upgrade';
 import { ACCESS_CONTROL_DDL } from '@/lib/access-control/schema';
 import { CATEGORY_DDL } from '@/lib/ad-categories/schema';
 import { SUPPLIER_DDL } from '@/lib/suppliers/schema';
@@ -918,6 +919,8 @@ async function run(): Promise<void> {
     }
   }
 
+  // This reviewed index-only migration must be verified, never swallowed.
+  await ensureFinanceTaxRevisionIndexes(prisma);
   await backfillDupModLogAdIds();
   await backfillAdBanAction();
   await backfillAccountDeletedAction();

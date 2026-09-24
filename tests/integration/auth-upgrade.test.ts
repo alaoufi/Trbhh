@@ -237,6 +237,13 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
     expect(added.find((c) => c.table_name === 'cj_products' && c.column_name === 'agent_user_id')).toMatchObject({ column_type: 'bigint unsigned', is_nullable: 'YES', column_default: null });
     expect(added.find(c=>c.table_name==='finance_tax_policies'&&c.column_name==='calculation_policy')).toMatchObject({column_type:'json',is_nullable:'YES',column_default:null});
     expect(await db.$queryRaw`SELECT calculation_policy FROM finance_tax_policies WHERE id=701`).toEqual([{calculation_policy:null}]);
+    const taxIndexes=await db.$queryRaw<{name:string;c:string;non_unique:number|bigint}[]>`SELECT INDEX_NAME AS name,COLUMN_NAME AS c,NON_UNIQUE AS non_unique FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='finance_tax_policies' ORDER BY INDEX_NAME,SEQ_IN_INDEX`;
+    expect(taxIndexes.map(row=>({...row,non_unique:Number(row.non_unique)}))).toEqual([
+      {name:'finance_tax_effective_lookup',c:'effective_from',non_unique:1},
+      {name:'finance_tax_reference_lookup',c:'policy_reference',non_unique:1},
+      {name:'finance_tax_request',c:'request_id',non_unique:0},
+      {name:'PRIMARY',c:'id',non_unique:0},
+    ]);
     expect(await db.$queryRaw`SELECT COUNT(*) AS total FROM finance_order_fiscal_snapshots`).toEqual([{total:0n}]);
     const engines = await db.$queryRawUnsafe<{ name: string; engine: string }[]>("SELECT TABLE_NAME AS name,ENGINE AS engine FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('auth_mfa','auth_security_limits') ORDER BY TABLE_NAME");
     expect(engines).toEqual([{ name: 'auth_mfa', engine: 'InnoDB' }, { name: 'auth_security_limits', engine: 'InnoDB' }]);

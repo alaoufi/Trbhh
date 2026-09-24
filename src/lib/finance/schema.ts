@@ -1,5 +1,6 @@
 import 'server-only';
 import type { CommerceDb } from '@/lib/commerce/types';
+import {financeTaxRevisionIndexesReady} from './tax-index-upgrade';
 
 const engine = ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin';
 /** Additive only; importing a reader never performs DDL. */
@@ -98,7 +99,7 @@ export const FINANCE_DDL = [
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, request_id BIGINT UNSIGNED NOT NULL,
     effective_from DATE NOT NULL, issuer JSON NOT NULL, vat_bps INT NOT NULL, policy_reference VARCHAR(160) NOT NULL, created_at DATETIME(3) NOT NULL,
     calculation_policy JSON NULL,
-    UNIQUE KEY finance_tax_request(request_id), UNIQUE KEY finance_tax_effective(effective_from), UNIQUE KEY finance_tax_reference(policy_reference),
+    UNIQUE KEY finance_tax_request(request_id), KEY finance_tax_effective_lookup(effective_from), KEY finance_tax_reference_lookup(policy_reference),
     CONSTRAINT finance_tax_request_fk FOREIGN KEY(request_id) REFERENCES finance_change_requests(id) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CHECK(vat_bps>=0 AND vat_bps<=10000)
   )${engine}`,
@@ -130,9 +131,10 @@ export async function assertFinanceSchemaReady(db: Pick<CommerceDb, '$queryRaw'>
  try {
   if (!(await financeSchemaAvailable(db))) throw new Error('finance_schema_not_ready');
   const keys = await db.$queryRaw<{ t:string;name: string;c:string;seq:number;non_unique: bigint | number;prefix:number|null }[]>`SELECT TABLE_NAME AS t,INDEX_NAME AS name,COLUMN_NAME AS c,SEQ_IN_INDEX AS seq,NON_UNIQUE AS non_unique,SUB_PART AS prefix FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME LIKE 'finance\\_%'`;
-  for (const name of ['finance_expense_request','finance_expense_reversal','finance_settlement_request','finance_settlement_reversal','finance_invoice_source','finance_invoice_number','finance_refund_provider_reference','finance_reconciliation_request','finance_change_request','finance_tax_request','finance_tax_effective','finance_tax_reference']) {
+  for (const name of ['finance_expense_request','finance_expense_reversal','finance_settlement_request','finance_settlement_reversal','finance_invoice_source','finance_invoice_number','finance_refund_provider_reference','finance_reconciliation_request','finance_change_request','finance_tax_request']) {
     if (!keys.some(row => row.name === name && Number(row.non_unique) === 0)) throw new Error('finance_schema_not_ready');
   }
+  if(!financeTaxRevisionIndexesReady(keys.filter(row=>row.t==='finance_tax_policies')))throw new Error('finance_schema_not_ready');
   const primary=keys.filter(row=>row.t==='finance_order_fiscal_snapshots'&&row.name==='PRIMARY');
   if(primary.length!==1||primary[0].c!=='order_id'||Number(primary[0].seq)!==1||Number(primary[0].non_unique)!==0||primary[0].prefix!==null)throw new Error('finance_schema_not_ready');
   const relations=await db.$queryRaw<{c:string;p:string;r:string;local_parent:number;deletion:string;updates:string}[]>`SELECT k.COLUMN_NAME AS c,k.REFERENCED_TABLE_NAME AS p,k.REFERENCED_COLUMN_NAME AS r,(k.REFERENCED_TABLE_SCHEMA=DATABASE()) AS local_parent,f.DELETE_RULE AS deletion,f.UPDATE_RULE AS updates FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.REFERENTIAL_CONSTRAINTS f ON f.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA AND f.TABLE_NAME=k.TABLE_NAME AND f.CONSTRAINT_NAME=k.CONSTRAINT_NAME WHERE k.TABLE_SCHEMA=DATABASE() AND k.TABLE_NAME='finance_order_fiscal_snapshots'`;

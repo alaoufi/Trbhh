@@ -2603,13 +2603,15 @@ model finance_tax_policies {
   order_fiscal_snapshots finance_order_fiscal_snapshots[]
   id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
   request_id BigInt @unique(map: "finance_tax_request") @db.UnsignedBigInt
-  effective_from DateTime @unique(map: "finance_tax_effective") @db.Date
+  effective_from DateTime @db.Date
   issuer Json
   calculation_policy Json?
   vat_bps Int
-  policy_reference String @unique(map: "finance_tax_reference") @db.VarChar(160)
+  policy_reference String @db.VarChar(160)
   created_at DateTime @db.DateTime(3)
   request finance_change_requests @relation(fields: [request_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "finance_tax_request_fk")
+  @@index([effective_from], map: "finance_tax_effective_lookup")
+  @@index([policy_reference], map: "finance_tax_reference_lookup")
 }
 
 model finance_order_fiscal_snapshots {

@@ -99,8 +99,10 @@ describe('CJ admin granular mutation authorization', () => {
     state.keys = new Set(['products:view']); expect(await html()).not.toContain('حفظ المراجعة');
     state.keys.add('products:edit'); const editor = await html(); expect(editor).toContain('حفظ المراجعة'); expect(editor).not.toContain('name="status"'); expect(editor).not.toContain('name="hidden"');
     state.keys.add('products:approve'); expect(await html()).toContain('name="status"');
-    state.keys.add('products:suspend'); expect(await html()).toContain('name="manageVisibility"');
-    state.keys.delete('products:edit'); expect(await html()).toContain('اعتماد حالة العرض'); expect(await html()).not.toContain('حفظ المراجعة');
+    state.keys.add('products:suspend'); expect(await html()).toContain('name="hidden"'); expect(await html()).toContain('إظهار في المعاينة');
+    state.keys.add('products:delete'); expect(await html()).toContain('تأكيد الحذف');
+    state.keys.delete('products:delete'); expect(await html()).not.toContain('تأكيد الحذف');
+    state.keys.delete('products:edit'); expect(await html()).toContain('اعتماد حالة العرض'); expect(await html()).not.toContain('حفظ المراجعة'); expect(await html()).toContain('إظهار في المعاينة');
   });
   it('maps nested pages to their module and rejects unknown CJ prefixes', () => {
     expect(pagePermission('/admin/suppliers/cj/browse')).toBe('products:view'); expect(pagePermission('/admin/suppliers/cj/review/4')).toBe('products:view');

@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { requireAccess } from '@/lib/access-control/guards';
 import { getCjProductById } from '@/lib/cj/mapping';
 import { sampleOneCjProduct } from '@/lib/cj/sample';
-import { approveCjProduct, saveCjReview } from '../../actions';
+import { approveCjProduct, removeCjProduct, saveCjReview, toggleCjHidden } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'مراجعة سلعة CJ', robots: { index: false, follow: false } };
@@ -36,6 +36,7 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
         <Link href="/admin/suppliers/cj/browse" className={ghost}>عودة للبضائع المستوردة ←</Link>
       </div>
       {sp.saved === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حفظ المراجعة.</p>}
+      {sp.edited === '1' && <p role="status" className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تحديث حالة السلعة.</p>}
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">تحرير بيانات العرض (عربية) دون المساس ببيانات المصدر من CJ. لا شراء ولا نشر تلقائي؛ السلعة تبقى في التخزين الوسيط.</p>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -82,7 +83,6 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
               <input className={input} name="priceSar" inputMode="decimal" defaultValue={row.sale_price_override_minor != null ? (row.sale_price_override_minor / 100).toString() : ''} placeholder={(row.sale_price_minor / 100).toString()} />
             </label>
           </div>
-          <AccessBoundary module="products" action="suspend"><input type="hidden" name="manageVisibility" value="1" /><label className="flex items-center gap-2 text-sm"><input type="checkbox" name="hidden" value="1" defaultChecked={row.hidden === 1} /> مخفية من المعاينة</label></AccessBoundary>
           <div className="flex items-center gap-2 pt-1">
             <button className={btn}>حفظ المراجعة</button>
             <span className="text-sm text-muted-foreground">السعر النهائي الحالي: <b className="text-primary">{sar(finalMinor)}</b></span>
@@ -96,6 +96,22 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
             </select>
           </label>
           <button className={btn}>اعتماد حالة العرض</button>
+        </form></AccessBoundary>
+        <AccessBoundary module="products" action="suspend"><form action={toggleCjHidden} className={`${card} border border-amber-200 bg-amber-50`}>
+          <input type="hidden" name="id" value={row.id} />
+          <input type="hidden" name="hidden" value={row.hidden === 1 ? '0' : '1'} />
+          <input type="hidden" name="back" value={`/admin/suppliers/cj/review/${row.id}`} />
+          <h2 className="font-bold">إظهار السلعة وإخفاؤها</h2>
+          <p className="text-sm text-slate-600">{row.hidden === 1 ? 'السلعة مخفية حاليًا.' : 'تغيير الإخفاء لا يعتمد السلعة ولا ينشرها تلقائيًا.'}</p>
+          <button className={ghost}>{row.hidden === 1 ? 'إظهار في المعاينة' : 'إخفاء من المعاينة'}</button>
+        </form></AccessBoundary>
+        <AccessBoundary module="products" action="delete"><form action={removeCjProduct} className={`${card} border border-rose-200 bg-rose-50`}>
+          <input type="hidden" name="id" value={row.id} />
+          <input type="hidden" name="back" value="/admin/suppliers/cj/browse" />
+          <h2 className="font-bold text-rose-900">حذف السلعة من تربح</h2>
+          <p className="text-sm leading-6 text-rose-900">يحذف سجل السلعة المستوردة من تربح فقط، ولا يحذفها من CJ. قد يُرفض الحذف إذا كانت مرتبطة بطلبات سابقة.</p>
+          <label className="flex items-start gap-2 text-sm text-rose-900"><input className="mt-1 h-4 w-4" type="checkbox" required />أؤكد حذف هذه السلعة من تربح.</label>
+          <button className="w-fit rounded-lg border border-rose-300 px-4 py-2 text-sm font-bold text-rose-800">تأكيد الحذف</button>
         </form></AccessBoundary>
       </div>
     </div>

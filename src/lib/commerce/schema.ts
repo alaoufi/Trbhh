@@ -18,6 +18,17 @@ export const COMMERCE_DDL = [
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     KEY commerce_products_ad (ad_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS commerce_customer_addresses (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    member_id BIGINT UNSIGNED NOT NULL,
+    label VARCHAR(40) NOT NULL DEFAULT 'عنواني',
+    snapshot JSON NOT NULL,
+    is_default TINYINT NOT NULL DEFAULT 0,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    KEY commerce_customer_addresses_member (member_id,id),
+    KEY commerce_customer_addresses_default (member_id,is_default,id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS commerce_orders (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     member_id BIGINT UNSIGNED NOT NULL,
@@ -147,6 +158,7 @@ const requiredIndexes: Record<string, Record<string, string[]>> = {
   commerce_receipts:{PRIMARY:['id'],commerce_receipt_order:['order_id'],commerce_receipt_reference:['provider','provider_ref']},
   commerce_supplier_accruals:{PRIMARY:['id'],commerce_accrual_item:['order_id','product_id']},
   commerce_products:{PRIMARY:['id']},
+  commerce_customer_addresses:{PRIMARY:['id']},
   commerce_orders:{PRIMARY:['id'],commerce_orders_request:['member_id','request_key']},
   commerce_order_items:{PRIMARY:['id'],commerce_items_product:['order_id','product_id']},
   commerce_payment_attempts:{PRIMARY:['id'],commerce_attempt_order:['order_id'],commerce_attempt_reference:['provider','provider_ref'],commerce_attempt_merchant:['merchant_order_id']},
@@ -160,6 +172,7 @@ const requiredColumns: Record<string,string[]> = {
   commerce_receipts:['id','order_id','provider','provider_ref','amount_minor','currency','recorded_at'],
   commerce_supplier_accruals:['id','order_id','product_id','supplier_id','amount_minor','currency','status','created_at'],
   commerce_products:['id','ad_id','title','price_minor','currency','stock_available','stock_reserved','approved','visible','enabled','created_at','updated_at'],
+  commerce_customer_addresses:['id','member_id','label','snapshot','is_default','created_at','updated_at'],
   commerce_orders:['id','member_id','request_key','request_fingerprint','status','currency','subtotal_minor','shipping_fee_minor','total_minor','shipping','fulfillment_status','created_at','paid_at'],
   commerce_order_items:['id','order_id','product_id','title','quantity','unit_price_minor','total_minor'],
   commerce_payment_attempts:['id','order_id','provider','provider_ref','redirect_url','merchant_order_id','claim_token','amount_minor','currency','status','created_at','paid_at'],

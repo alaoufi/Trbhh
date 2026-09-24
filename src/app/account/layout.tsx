@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { LayoutDashboard, Megaphone, Heart, User, LogOut, UserX, PlusCircle, Building2, ShieldCheck, Wallet, Users } from 'lucide-react';
+import { LayoutDashboard, Megaphone, Heart, User, LogOut, UserX, PlusCircle, Building2, ShieldCheck, Wallet, Users, MapPin } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { AccountNavScroller } from '@/components/account-nav-scroller';
 
@@ -9,6 +9,7 @@ const navGroups = [
     { href: '/account', label: 'لوحة التحكم', icon: LayoutDashboard },
     { href: '/account/identities', label: 'هوياتي', icon: Users },
     { href: '/account/profile', label: 'الملف الشخصي', icon: User },
+    { href: '/account/addresses', label: 'عناوين الشحن', icon: MapPin },
     { href: '/account/verify', label: 'توثيق الحساب', icon: ShieldCheck },
   ] },
   { title: 'الإعلانات والمتجر', items: [

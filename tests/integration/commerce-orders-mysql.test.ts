@@ -134,7 +134,7 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
     const [approved]=await client.$queryRaw<{id:bigint;request_id:bigint}[]>`SELECT id,request_id FROM finance_tax_policies WHERE policy_reference='synthetic-commerce-zero-rate'`;
     expect(before).toMatchObject({order_id:order.id,policy_id:approved.id,request_id:approved.request_id,captured_at:created.created_at});
     expect(before.fingerprint).toMatch(/^[0-9a-f]{64}$/);
-    expect(before.snapshot).toMatchObject({version:2,orderId:String(order.id),capturedAt:created.created_at.toISOString(),currency:'SAR',customer:{name:shipping.name,address:'Fixture street 1، Riyadh، 12345، SA'},policy:{id:String(approved.id),requestId:String(approved.request_id),policyReference:'synthetic-commerce-zero-rate',calculationPolicy:syntheticCalculation},netMinor:2175,vatMinor:0,totalMinor:2175});
+    expect(before.snapshot).toMatchObject({version:2,orderId:String(order.id),capturedAt:created.created_at.toISOString(),currency:'SAR',customer:{name:shipping.name,address:'Fixture district، Fixture street 1، 4، Riyadh، 12345، SA'},policy:{id:String(approved.id),requestId:String(approved.request_id),policyReference:'synthetic-commerce-zero-rate',calculationPolicy:syntheticCalculation},netMinor:2175,vatMinor:0,totalMinor:2175});
     expect(before.snapshot.lines).toEqual([
       {key:'1',title:'Fixture product',quantity:2,unitPriceMinor:1025,discountMinor:0,vatBps:0,priceBasis:'inclusive',component:'product',netMinor:2050,vatMinor:0,grossMinor:2050,supplierId:'1',supplierMinor:600},
       {key:'shipping',title:'الشحن',quantity:1,unitPriceMinor:125,discountMinor:0,vatBps:0,priceBasis:'inclusive',component:'shipping',netMinor:125,vatMinor:0,grossMinor:125},

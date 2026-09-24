@@ -229,6 +229,7 @@ describe.skipIf(process.env.UPGRADE_DB_TESTS !== '1')('baseline to candidate upg
       'users.auth_session_version', 'auth_mfa.user_id', 'auth_mfa.secret', 'auth_mfa.recovery_hashes', 'auth_mfa.last_step', 'auth_mfa.version', 'auth_mfa.created_at', 'auth_security_limits.k', 'auth_security_limits.hits', 'auth_security_limits.expires_at',
       ...Object.entries(ADDITIVE_TABLE_COLUMNS).flatMap(([table, names]) =>
         table==='finance_change_requests'?[]:table==='finance_tax_policies'?['finance_tax_policies.calculation_policy']:names.map((name) => `${table}.${name}`)),
+      'commerce_customer_carts.member_id','commerce_customer_carts.items','commerce_customer_carts.updated_at',
     ].sort());
     expect(added.find((c) => c.table_name === 'users')).toMatchObject({ column_type: 'varchar(64)', is_nullable: 'NO', column_default: '0' });
     expect(added.find((c) => c.table_name === 'auth_mfa' && c.column_name === 'last_step')).toMatchObject({ column_type: 'bigint', is_nullable: 'NO', column_default: '-1' });

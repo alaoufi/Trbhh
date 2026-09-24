@@ -38,13 +38,17 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const priceLabel = cjPriceLabel(p.sale_price_override_minor ?? p.sale_price_minor, p.currency);
   const gallery = cjProductImages(p).map(cjImg);
   const details = parseCjDetails(p);
-  const variantCount = details && Number.isSafeInteger(details.variantCount) && details.variantCount > 0 ? details.variantCount : null;
   const availability = parseCjAvailability(p);
+  const hasSaudiFreightProof = Boolean(availability?.shippingOptions.some(option => option.name.trim() && Number.isFinite(option.priceUsd) && option.priceUsd >= 0));
   const verifiedStocks = new Map((availability?.variants ?? []).map(variant => [variant.vid, variant.stockQuantity]));
   const selectableVariants = (details?.variants ?? []).flatMap(variant => {
     const stock = verifiedStocks.get(variant.vid);
-    return variant.vid && stock ? [{ vid: variant.vid, name: variant.name, optionKey: variant.optionKey, sku: variant.sku, stock }] : [];
+    const validPrice = typeof variant.priceUsd === 'number' && Number.isFinite(variant.priceUsd) && variant.priceUsd > 0;
+    return hasSaudiFreightProof && /^[A-Za-z0-9_-]{1,64}$/.test(variant.vid) && stock && stock > 0 && validPrice
+      ? [{ vid: variant.vid, name: variant.name, optionKey: variant.optionKey, sku: variant.sku, stock }]
+      : [];
   });
+  const variantCount = selectableVariants.length || null;
   const weightMin = details?.weightMin;
   const weightMax = details?.weightMax;
   const weightLabel = typeof weightMin === 'number' && Number.isFinite(weightMin) && weightMin > 0
@@ -65,8 +69,9 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
           <p><PriceText size="detail">{priceLabel}</PriceText></p>
           <p className="mt-2 text-xs leading-6 text-slate-500">سعر معروض للتجربة. لا يُنشئ طلبًا ولا يحجز مخزونًا.</p>
         </div>
-        {variantCount && <section aria-label="خيارات المنتج" className="rounded-2xl border border-slate-200 bg-white p-4"><h2 className="font-extrabold text-primary">خيارات المنتج قبل الإضافة ({variantCount})</h2><p className="mt-1 text-xs leading-6 text-slate-600">راجع اللون أو المقاس أو SKU والتوفر لكل خيار. الخيار غير المتحقق لا يمكن إضافته للسلة التجريبية.</p><ul className="mt-3 space-y-2">{details!.variants.map((variant,index)=>{const stock=verifiedStocks.get(variant.vid);return <li key={variant.vid||`${variant.sku}-${index}`} className="min-w-0 rounded-xl bg-slate-50 p-3 text-sm leading-6"><p className="font-bold text-slate-900">{variant.optionKey||variant.name||variant.sku||`الخيار ${index+1}`}</p><div className="flex flex-wrap gap-x-4 text-slate-600">{variant.sku&&<span>SKU: <b dir="ltr">{variant.sku}</b></span>}{variant.priceUsd!=null&&<span>سعر المورد: <b dir="ltr">${variant.priceUsd.toFixed(2)}</b></span>}{variant.weight!=null&&<span>الوزن: {variant.weight} غ</span>}<span className={stock?'font-bold text-emerald-800':'font-bold text-amber-800'}>{stock?`المتاح الموثق: ${stock}`:'التوفر غير متحقق'}</span></div></li>;})}</ul></section>}
-        {view.isStaff && session && <AddToTrialCart productId={id} accountId={session.uid} variants={selectableVariants} requiresVariant={Boolean(variantCount)} />}
+        {variantCount && <section aria-label="خيارات المنتج" className="rounded-2xl border border-slate-200 bg-white p-4"><h2 className="font-extrabold text-primary">الخيارات المتاحة والمتحقق منها ({variantCount})</h2><p className="mt-1 text-xs leading-6 text-slate-600">تظهر هنا الخيارات التي ثبت لها مخزون وشحن فقط.</p><ul className="mt-3 space-y-2">{selectableVariants.map((variant,index)=><li key={variant.vid} className="min-w-0 rounded-xl bg-slate-50 p-3 text-sm leading-6"><p className="font-bold text-slate-900">{variant.optionKey||variant.name||variant.sku||`الخيار ${index+1}`}</p><div className="flex flex-wrap gap-x-4 text-slate-600">{variant.sku&&<span>SKU: <b dir="ltr">{variant.sku}</b></span>}<span className="font-bold text-emerald-800">المتاح الموثق: {variant.stock}</span></div></li>)}</ul></section>}
+        {!variantCount && (details?.variants.length ?? 0) > 0 && <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">لا توجد خيارات متاحة ومتحقق منها حاليًا؛ أخفينا الخيارات غير المؤكدة ومنعنا إضافتها للسلة التجريبية.</p>}
+        {view.isStaff && session && variantCount && <AddToTrialCart productId={id} accountId={session.uid} variants={selectableVariants} requiresVariant />}
         <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
           <div className="flex items-start gap-3"><Package className="mt-1 h-5 w-5 shrink-0 text-primary" /><div><p className="font-bold">المخزون يحتاج التحقق</p><p className="mt-1 text-xs leading-6 text-slate-500">لا تتوفر كمية مخزون مؤكدة في بيانات العرض المحفوظة.</p></div></div>
           <div className="flex items-start gap-3"><Truck className="mt-1 h-5 w-5 shrink-0 text-primary" /><div><p className="font-bold">الشحن والضريبة</p><p className="mt-1 text-xs leading-6 text-slate-500">السعر المحسوب يتضمن تقدير الشحن المسجل؛ لا يضاف مرة ثانية في السلة. تكلفة الشحن النهائية والضريبة وموعد الوصول غير مؤكدة في التجربة.</p></div></div>
@@ -76,7 +81,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     </div>
     <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="cj-specs"><h2 id="cj-specs" className="mb-3 text-lg font-extrabold text-primary">المواصفات</h2><dl className="divide-y divide-slate-100 text-sm">{[['التصنيف', p.trbhh_category || 'غير محدد'], ['رمز المنتج SKU', p.cj_sku || 'غير محدد'], ['الوزن المسجل', weightLabel], ['عدد الخيارات', variantCount ? String(variantCount) : 'غير محدد']].map(([label, value]) => <div key={label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 py-3"><dt className="text-slate-500">{label}</dt><dd className="min-w-0 font-semibold" dir="auto">{value}</dd></div>)}</dl></section>
     <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="cj-description"><h2 id="cj-description" className="mb-3 text-lg font-extrabold text-primary">تفاصيل المنتج</h2><CjProductDescription text={p.display_description_ar || ''} /></section>
-    {canManage && <details className="min-w-0 rounded-2xl border border-primary/20 bg-slate-50 p-4"><summary className="cursor-pointer text-sm font-bold text-primary">إدارة السلعة — التعديل والإخفاء</summary><div className="mt-4">
+    {canManage && <section aria-labelledby="cj-product-management" className="min-w-0 rounded-2xl border border-primary/20 bg-slate-50 p-4"><h2 id="cj-product-management" className="text-sm font-bold text-primary">إدارة السلعة</h2><div className="mt-4">
       {canManage && (
         <div className="card-3d rounded-2xl p-3 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -88,8 +93,8 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
               ? <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">الحذف متعذّر (يوجد نشاط) — الإخفاء متاح</span>
               : <form action={deleteCjStorefront}><input type="hidden" name="id" value={id} /><button className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-700">حذف</button></form>)}
           </div>
-          {capabilities.edit && <details>
-            <summary className="cursor-pointer text-sm font-bold text-primary">✎ تعديل مباشر (يُحفظ ويُعلّم الترجمة)</summary>
+          {capabilities.edit && <div>
+            <h3 className="text-sm font-bold text-primary">✎ تعديل مباشر</h3>
             <form action={saveCjStorefrontEdit} className="mt-2 space-y-2 text-sm">
               <input type="hidden" name="id" value={id} />
               <label className="block">العنوان العربي<input name="nameAr" defaultValue={p.name_ar} className={editInput} placeholder="مثال: ساعة يد رجالية" /></label>
@@ -103,12 +108,13 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
                 <span className="text-xs text-muted-foreground">تصحيح العنوان/الوصف يُحفظ في ذاكرة الترجمة ويُطبَّق على السلع المشابهة.</span>
               </div>
             </form>
-          </details>}
+          </div>}
         </div>
       )}
 
 
-    </div></details>}
+    </div></section>}
+    {view.isStaff && !canManage && <p role="note" className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">أدوات تعديل هذه السلعة وإخفائها وحذفها تتطلب صلاحيات المنتجات المناسبة. يمكن لمسؤول الصلاحيات مراجعتها من <Link className="font-bold text-primary underline" href="/admin/access-control">إدارة الصلاحيات</Link>.</p>}
     {others.length > 0 && <section className="min-w-0 space-y-3"><h2 className="text-lg font-extrabold text-primary">سلع أخرى في التجربة</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{others.map(product => <CjProductCard key={product.id} product={product} />)}</div></section>}
   </div>;
 }

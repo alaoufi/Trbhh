@@ -8,9 +8,9 @@ import {readApprovedFiscalPolicy,type ApprovedFiscalPolicy} from './fiscal-polic
 import {fingerprint} from './service';
 import {financeJson} from './read-model';
 
-export function quoteFiscalProduct(policy:ApprovedFiscalPolicy,item:{key:string;title:string;quantity:number;unitPriceMinor:number}):CalculatedFiscalLineV2 {
+export function quoteFiscalProduct(policy:ApprovedFiscalPolicy,item:{key:string;title:string;quantity:number;unitPriceMinor:number;discountMinor?:number}):CalculatedFiscalLineV2 {
  const calc=validateCalculationPolicy(policy.calculationPolicy);
- return calculateFiscalLinesV2([{...item,discountMinor:0,vatBps:effectiveFiscalVatBps(policy,'product'),priceBasis:calc.priceBasis,component:'product'}]).lines[0];
+ return calculateFiscalLinesV2([{...item,discountMinor:item.discountMinor??0,vatBps:effectiveFiscalVatBps(policy,'product'),priceBasis:calc.priceBasis,component:'product'}]).lines[0];
 }
 export function quoteFiscalShipping(policy:ApprovedFiscalPolicy,shippingFeeMinor:number):CalculatedFiscalLineV2 {
  const calc=validateCalculationPolicy(policy.calculationPolicy);

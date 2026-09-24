@@ -13,7 +13,7 @@ function request(body:unknown={items:[{id:1,qty:2}]},headers:Record<string,strin
 }
 async function denied(req:Request,status:number,error:string){
   const response=await POST(req);
-  expect(response.status).toBe(status);expect(await response.json()).toEqual({error});
+  expect(response.status,JSON.stringify(await response.clone().json())).toBe(status);expect(await response.json()).toEqual({error});
   expect(mocks.quote).not.toHaveBeenCalled();
 }
 beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('NODE_ENV','production');mocks.session.mockResolvedValue({uid:9});mocks.access.mockResolvedValue(true);mocks.quote.mockResolvedValue(quote);});
@@ -96,7 +96,7 @@ describe('CJ trial cart HTTP trust boundary',()=>{
     const response=await POST(request({items:[]}));expect(response.status).toBe(200);expect(await response.json()).toEqual(empty);expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([]);
   });
   it('rejects an oversized declared length before reading a small body',async()=>{
-    await denied(request(undefined,{'Content-Length':'8193'}),413,'body_too_large');
+    await denied(request(undefined,{'Content-Length':String(256*1024+1)}),413,'body_too_large');
   });
   it('bounds streamed bytes without Content-Length and cancels further consumption',async()=>{
     const cancel=vi.fn();let chunks=0;
@@ -105,11 +105,13 @@ describe('CJ trial cart HTTP trust boundary',()=>{
     await denied(req,413,'body_too_large');expect(cancel).toHaveBeenCalledOnce();
   });
   it('enforces the byte cap for multibyte input rather than counting characters',async()=>{
-    await denied(request({items:[{id:1,qty:2}],extra:'ا'.repeat(4100)}),413,'body_too_large');
+    const stream=new ReadableStream<Uint8Array>({start(controller){controller.enqueue(new TextEncoder().encode(JSON.stringify({items:[{id:1,qty:2}],extra:'ا'.repeat(140_000)})));controller.close();}});
+    const req=new Request(origin+'/api/cj/trial-cart',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:stream,duplex:'half'} as RequestInit&{duplex:'half'});
+    await denied(req,413,'body_too_large');
   });
   it('accepts a valid body at the exact byte limit',async()=>{
     const json=JSON.stringify({items:[{id:1,qty:2}]});
-    const req=new Request(origin+'/api/cj/trial-cart',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:json+' '.repeat(8192-json.length)});
+    const req=new Request(origin+'/api/cj/trial-cart',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:json+' '.repeat(256*1024-json.length)});
     expect((await POST(req)).status).toBe(200);
   });
   it('returns the safe invalid-total error without provider or database details',async()=>{

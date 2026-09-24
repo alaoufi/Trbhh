@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-const state = vi.hoisted(() => ({ keys: new Set<string>(), session: vi.fn(), active: false, assigned: null as bigint | null, write: vi.fn(), public: false, gallery: ['https://example.test/photo.jpg'], sourceFetch: vi.fn(), details: null as any, availability: null as any }));
+const state = vi.hoisted(() => ({ keys: new Set<string>(), session: vi.fn(), active: false, assigned: null as bigint | null, write: vi.fn(), public: false, gallery: ['https://example.test/photo.jpg'], sourceFetch: vi.fn(), details: null as any, verifiedVariants: [] as any[] }));
 vi.mock('@/lib/prisma', () => ({ prisma: {} }));
 vi.mock('@/lib/auth', () => ({ getSession: state.session }));
 vi.mock('@/lib/roles', () => ({ hasAnyAdmin: async () => state.keys.size > 0 }));
@@ -12,7 +12,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/cj/agents', () => ({ isActiveAgent: async () => state.active, getAgent: async () => null, agentContactLinks: vi.fn(), upsertAgent: vi.fn(), setDefaultAgentWeeklyQuota: vi.fn(), setAgentActive: vi.fn(), assignProductAgent: vi.fn(), unassignProductAgent: vi.fn() }));
 vi.mock('@/lib/cj/mapping', () => {
   const product = async () => ({ id: 4n, cj_product_id: 'CJ4', agent_user_id: state.assigned, name: 'Fixture', name_ar: 'سلعة', image: state.gallery[0] || '', sale_price_minor: 1000, currency: 'SAR', hidden: 0 });
-  return { getCjProductById: product, getStorefrontCjProduct: product, listStorefrontCjProducts: async () => [], parseCjImages: () => state.gallery, parseCjDetails: () => state.details, parseCjAvailability: () => state.availability, cjProductOrderCount: async () => 0,
+  return { getCjProductById: product, getStorefrontCjProduct: product, listStorefrontCjProducts: async () => [], getVerifiedCjVariants: () => state.verifiedVariants, parseCjImages: () => state.gallery, parseCjDetails: () => state.details, parseCjAvailability: () => null, cjProductOrderCount: async () => 0,
     removeCjProductById: state.write, setCjProductNameAr: state.write, setCjProductHidden: state.write, setCjProductPriceOverride: state.write, setCjProductDescriptionAr: state.write, setCjProductCategory: state.write, setCjProductGallery: state.write,
     listUntranslatedCjProducts: vi.fn(), updateCjReview: vi.fn() };
 });
@@ -33,7 +33,7 @@ import CatalogPage from '@/app/cj/page';
 const actions = [['edit', saveCjStorefrontEdit], ['suspend', hideCjStorefront], ['delete', deleteCjStorefront]] as const;
 function form() { const f = new FormData(); f.set('id', '4'); f.set('nameAr', 'اسم'); f.set('hidden', '1'); return f; }
 async function html() { return renderToStaticMarkup(await ProductPage({ params: Promise.resolve({ id: '4' }), searchParams: Promise.resolve({}) })); }
-beforeEach(() => { vi.clearAllMocks(); state.keys = new Set(['audit:view']); state.session.mockResolvedValue({ uid: 9 }); state.active = false; state.assigned = null; state.public = false; state.gallery = ['https://example.test/photo.jpg']; state.details = null; state.availability = null; });
+beforeEach(() => { vi.clearAllMocks(); state.keys = new Set(['audit:view']); state.session.mockResolvedValue({ uid: 9 }); state.active = false; state.assigned = null; state.public = false; state.gallery = ['https://example.test/photo.jpg']; state.details = null; state.verifiedVariants = [{ vid: 'test-vid', name: 'Black XL', optionKey: 'Color-Black-Size-XL', sku: 'SKU-1', priceUsd: 2, weight: 100, attributes: {} }]; });
 
 describe('CJ storefront precise capabilities', () => {
   it('an unrelated staff grant does not expose private storefront preview', async () => {
@@ -61,27 +61,27 @@ describe('CJ storefront precise capabilities', () => {
     state.keys = new Set(['products:view', 'products:edit']); const result = await html();
     expect(result).toContain('حفظ التعديل'); expect(result).not.toContain('>حذف</button>'); expect(result).not.toContain('>إخفاء</button>');
   });
-  it('keeps the product management tools expanded and visible to an authorized manager', async () => {
+  it('keeps management controls expanded and visible to an authorized manager', async () => {
     state.keys = new Set(['products:view', 'products:edit', 'products:suspend', 'products:delete']);
     const result = await html();
     expect(result).toContain('حفظ التعديل'); expect(result).toContain('>إخفاء</button>'); expect(result).toContain('>حذف</button>');
     expect(result).not.toContain('<details class="min-w-0 rounded-2xl border border-primary/20');
   });
-  it('explains which administration gate hides management controls from a read-only viewer', async () => {
+  it('explains the permission gate to a read-only product viewer', async () => {
     state.keys = new Set(['products:view']);
     const result = await html();
     expect(result).toContain('أدوات تعديل هذه السلعة وإخفائها وحذفها تتطلب صلاحيات المنتجات المناسبة');
     expect(result).toContain('href="/admin/access-control"');
     expect(result).not.toContain('>حذف</button>');
   });
-  it('does not show CJ variants that have no fresh stock and Saudi shipping proof', async () => {
+  it('does not render unverified CJ options as selectable product variants', async () => {
     state.keys = new Set(['products:view']);
     state.details = { variantCount: 21, variants: Array.from({ length: 21 }, (_, i) => ({ vid: `VID-${i}`, name: `Variant ${i}`, optionKey: `Color: ${i}`, sku: `SKU-${i}`, priceUsd: 7.86, weight: 550 })) };
-    state.availability = null;
+    state.verifiedVariants = [];
     const result = await html();
     expect(result).not.toContain('خيارات المنتج قبل الإضافة');
     expect(result).not.toContain('التوفر غير متحقق');
-    expect(result).toContain('لا توجد خيارات متاحة ومتحقق منها');
+    expect(result).toContain('لا يوجد خيار ثبت مخزونه وشحنه');
   });
   it('keeps the new trial private even if the legacy public switch is enabled', async () => {
     state.public = true; state.keys.clear();

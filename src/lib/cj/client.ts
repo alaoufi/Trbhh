@@ -290,6 +290,7 @@ function mapVariant(v: Record<string, unknown>): CjVariant {
     variantSellPrice: parsePrice(v.variantSellPrice ?? v.sellPrice ?? v.sellprice),
     variantImage: str(v.variantImage) || str(v.bigImg) || str(v.bigimg) || str(v.img),
     variantWeight: num(v.variantWeight ?? v.weight),
+    attributes: Object.fromEntries(Object.entries(v).filter(([,value])=>['string','number','boolean'].includes(typeof value))),
   };
 }
 function mapInventory(s: Record<string, unknown>): CjInventory {
@@ -299,6 +300,8 @@ function mapInventory(s: Record<string, unknown>): CjInventory {
     areaName: str(s.areaEn ?? s.areaEnName ?? s.countryNameEn ?? s.areaName),
     countryCode: str(s.countryCode),
     storageNum: num(s.totalInventory ?? s.storageNum ?? s.totalInventoryNum) ?? 0,
+    cjInventoryQuantity: num(s.cjInventory ?? s.cjInventoryNum) ?? 0,
+    verifiedWarehouse: num(s.verifiedWarehouse),
   };
 }
 function mapFreight(o: Record<string, unknown>): CjFreightOption {
@@ -307,5 +310,8 @@ function mapFreight(o: Record<string, unknown>): CjFreightOption {
     logisticPrice: num(o.logisticPrice) ?? 0,
     logisticAging: str(o.logisticAging),
     logisticPriceCn: num(o.logisticPriceCn),
+    taxesFeeUsd: num(o.taxesFee),
+    clearanceFeeUsd: num(o.clearanceOperationFee),
+    totalPostageFeeUsd: num(o.totalPostageFee),
   };
 }

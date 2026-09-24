@@ -61,7 +61,7 @@ const ADDITIVE_TABLE_COLUMNS: Record<string, string[]> = {
   ad_category_audit: ['id', 'actor_id', 'action', 'payload', 'created_at'],
   commerce_products: ['id', 'ad_id', 'title', 'price_minor', 'currency', 'stock_available', 'stock_reserved', 'approved', 'visible', 'enabled', 'created_at', 'updated_at'],
   commerce_orders: ['id', 'member_id', 'request_key', 'request_fingerprint', 'status', 'currency', 'subtotal_minor', 'shipping_fee_minor', 'total_minor', 'shipping', 'fulfillment_status', 'created_at', 'paid_at'],
-  commerce_order_items: ['id', 'order_id', 'product_id', 'title', 'quantity', 'unit_price_minor', 'total_minor'],
+  commerce_order_items: ['id', 'order_id', 'product_id', 'title', 'quantity', 'unit_price_minor', 'total_minor', 'variant_key', 'variant_snapshot', 'list_unit_price_minor', 'discount_minor'],
   commerce_payment_attempts: ['id', 'order_id', 'provider', 'provider_ref', 'redirect_url', 'merchant_order_id', 'claim_token', 'amount_minor', 'currency', 'status', 'created_at', 'paid_at'],
   commerce_notifications: ['id', 'order_id', 'event', 'channel', 'recipient', 'payload', 'status', 'claim_token', 'last_error', 'created_at', 'claimed_at', 'sent_at'],
   commerce_audit_events: ['id', 'order_id', 'event', 'payload', 'created_at'],

@@ -4,6 +4,7 @@ import { CjProductGallery as Gallery } from '../../src/components/cj/product-gal
 import { CjProductImage as ProductImage } from '../../src/components/cj/product-image';
 import { AddToTrialCart as Add, CartLink as Link } from '../../src/components/cj/cart-controls';
 import { TrialCart as Cart } from '../../src/components/cj/trial-cart';
+import { CjPurchasePanel as Purchase } from '../../src/components/cj/purchase-panel';
 
 let sequence = 0;
 export function resetFixtureIslands() { sequence = 0; }
@@ -17,3 +18,4 @@ export function CjProductImage(props: Parameters<typeof ProductImage>[0]) { retu
 export function AddToTrialCart(props: Parameters<typeof Add>[0]) { return island('add', Add, props); }
 export function CartLink(props: Parameters<typeof Link>[0]) { return island('cart-link', Link, props); }
 export function TrialCart(props: Parameters<typeof Cart>[0]) { return island('cart', Cart, props); }
+export function CjPurchasePanel(props: Parameters<typeof Purchase>[0]) { return island('purchase', Purchase, props); }

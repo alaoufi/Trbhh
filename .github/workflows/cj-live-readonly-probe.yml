@@ -1,0 +1,57 @@
+name: CJ live product 12 read-only probe
+
+on:
+  push:
+    branches: [codex/cj-product-page-20260924]
+    paths:
+      - '.github/workflows/cj-live-readonly-probe.yml'
+      - 'scripts/release/cj-live-readonly-probe.cjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cj-live-readonly-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/codex/cj-product-page-20260924'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Query selected live CJ product and its real Saudi quote (no writes)
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set +x +v
+          set -euo pipefail
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ && "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          port=${VPS_PORT:-22}
+          [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
+          [[ -n "$VPS_SSH_KEY" && -n "$VPS_KNOWN_HOSTS" ]]
+          umask 077
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$RUNNER_TEMP/cj-probe-key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/cj-probe-known-hosts"
+          cat > "$RUNNER_TEMP/cj-probe-ssh-config" <<CONFIG
+          Host trbhh-cj-probe
+            HostName $VPS_HOST
+            User $VPS_USER
+            Port $port
+            IdentityFile $RUNNER_TEMP/cj-probe-key
+            UserKnownHostsFile $RUNNER_TEMP/cj-probe-known-hosts
+            StrictHostKeyChecking=yes
+            IdentitiesOnly=yes
+            BatchMode=yes
+            ConnectTimeout=25
+          CONFIG
+          chmod 600 "$RUNNER_TEMP/cj-probe-key" "$RUNNER_TEMP/cj-probe-known-hosts" "$RUNNER_TEMP/cj-probe-ssh-config"
+          ssh -F "$RUNNER_TEMP/cj-probe-ssh-config" trbhh-cj-probe "cd /root/trbhh && docker compose exec -T app node -" < scripts/release/cj-live-readonly-probe.cjs
+          rm -f -- "$RUNNER_TEMP/cj-probe-key" "$RUNNER_TEMP/cj-probe-known-hosts" "$RUNNER_TEMP/cj-probe-ssh-config"

@@ -61,20 +61,40 @@ export type UpsertCjInput = {
 export type CjAvailability = {
   checkedAt: string;
   stockQuantity: number;
-  variants?: { vid: string; stockQuantity: number }[];
-  shippingOptions: { name: string; priceUsd: number; deliveryDays: string | null; originCountry?: string }[];
+  variants: { vid: string; stockQuantity: number; shippingOptions: { name: string; priceMinor: number; additionalMinor?: number; currency?: 'SAR'; deliveryDays: string | null; originCountry?: string }[] }[];
+  shippingOptions: { name: string; priceMinor: number; additionalMinor?: number; currency?: 'SAR'; deliveryDays: string | null; originCountry?: string }[];
 };
 
-/** لا نعرض سعراً تقديرياً بديلاً عن إثبات حديث للمخزون وخيارات الشحن. */
+function validSaudiQuote(option: unknown): option is CjAvailability['shippingOptions'][number] {
+  if (!option || typeof option !== 'object') return false;
+  const row = option as Record<string, unknown>;
+  const amount = Number.isSafeInteger(row.priceMinor) && Number(row.priceMinor) >= 0 || Number.isFinite(row.priceUsd) && Number(row.priceUsd) >= 0;
+  return typeof row.name === 'string' && !!row.name.trim() && amount &&
+    (row.additionalMinor === undefined || Number.isSafeInteger(row.additionalMinor) && Number(row.additionalMinor) >= 0) &&
+    (row.originCountry === undefined || typeof row.originCountry === 'string' && /^[A-Z]{2}$/.test(row.originCountry));
+}
+function validVariantSaudiQuote(option: unknown): option is CjAvailability['shippingOptions'][number] {
+  return validSaudiQuote(option) && Number.isSafeInteger((option as { priceMinor?: unknown }).priceMinor) &&
+    (option as { currency?: unknown }).currency === 'SAR' && typeof (option as { originCountry?: unknown }).originCountry === 'string' &&
+    /^[A-Z]{2}$/.test((option as { originCountry: string }).originCountry);
+}
+
+/** لا نعرض سعراً تقديرياً بديلاً عن إثبات حديث للمخزون والشحن لكل خيار. */
 export function parseCjAvailability(row: Pick<CjProductRow, 'availability_json'>, now = Date.now()): CjAvailability | null {
   try {
     const value = JSON.parse(row.availability_json ?? '') as Partial<CjAvailability>;
     const checkedAt = typeof value.checkedAt === 'string' ? Date.parse(value.checkedAt) : NaN;
     if (!Number.isFinite(checkedAt) || checkedAt > now || now - checkedAt > 6 * 60 * 60 * 1000) return null;
-    if (!Number.isSafeInteger(value.stockQuantity) || (value.stockQuantity ?? 0) < 1 || !Array.isArray(value.shippingOptions) || !value.shippingOptions.length) return null;
-    const shippingOptions = value.shippingOptions.filter(option => option && typeof option.name === 'string' && option.name.trim() && Number.isFinite(option.priceUsd) && option.priceUsd >= 0 && (option.originCountry === undefined || /^[A-Z]{2}$/.test(option.originCountry)));
-    const variants = Array.isArray(value.variants) ? value.variants.filter(variant => variant && typeof variant.vid === 'string' && variant.vid.length <= 64 && Number.isSafeInteger(variant.stockQuantity) && variant.stockQuantity > 0) : [];
-    return shippingOptions.length ? { checkedAt: new Date(checkedAt).toISOString(), stockQuantity: value.stockQuantity!, variants, shippingOptions } : null;
+    if (!Number.isSafeInteger(value.stockQuantity) || (value.stockQuantity ?? 0) < 1 || !Array.isArray(value.variants) || !Array.isArray(value.shippingOptions)) return null;
+    const variants = value.variants.flatMap(raw => {
+      if (!raw || typeof raw.vid !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(raw.vid) || !Number.isSafeInteger(raw.stockQuantity) || raw.stockQuantity < 1 || !Array.isArray(raw.shippingOptions)) return [];
+      const quotes = raw.shippingOptions.filter(validVariantSaudiQuote);
+      return quotes.length ? [{ ...raw, shippingOptions: quotes }] : [];
+    });
+    const shippingOptions = value.shippingOptions.filter(validSaudiQuote);
+    const verifiedTotal = variants.reduce((total, variant) => total + variant.stockQuantity, 0);
+    if (!variants.length || !shippingOptions.length || verifiedTotal < 1) return null;
+    return { checkedAt: new Date(checkedAt).toISOString(), stockQuantity: verifiedTotal, variants, shippingOptions };
   } catch { return null; }
 }
 
@@ -88,7 +108,7 @@ export function parseCjImages(row: Pick<CjProductRow, 'images' | 'image'>): stri
 
 /** تفاصيل غنية مخزَّنة للسلعة (متغيّرات/مواصفات) — للعرض بلا اتصال حيّ. */
 export type CjDetails = {
-  variants: { vid: string; name: string; optionKey: string; sku: string; priceUsd: number | null; weight: number | null }[];
+  variants: { vid: string; name: string; optionKey: string; sku: string; priceUsd: number | null; weight: number | null;attributes?:Record<string,unknown> }[];
   weightMin: number | null;
   weightMax: number | null;
   variantCount: number;
@@ -102,7 +122,7 @@ export function parseCjDetails(row: Pick<CjProductRow, 'details_json'>): CjDetai
 }
 /** يبني تفاصيل مخزَّنة من متغيّرات CJ (بلا اتصالات إضافية). */
 export function buildCjDetails(variants: CjVariant[]): CjDetails {
-  const list = (variants ?? []).map((v) => ({ vid: v.vid, name: (v.variantName ?? '').trim(), optionKey: (v.variantKey ?? '').trim(), sku: v.variantSku, priceUsd: v.variantSellPrice, weight: v.variantWeight }));
+  const list = (variants ?? []).map((v) => ({ vid: v.vid, name: (v.variantName ?? '').trim(), optionKey: (v.variantKey ?? '').trim(), sku: v.variantSku, priceUsd: v.variantSellPrice, weight: v.variantWeight,attributes:v.attributes??{} }));
   const weights = list.map((v) => v.weight).filter((w): w is number => typeof w === 'number' && w > 0);
   return { variants: list, weightMin: weights.length ? Math.min(...weights) : null, weightMax: weights.length ? Math.max(...weights) : null, variantCount: list.length };
 }
@@ -157,6 +177,20 @@ export async function updateCjReview(id: number, fields: { nameAr?: string; desc
   await prisma.$executeRaw`UPDATE cj_products SET name_ar=${nameAr}, display_description_ar=${descAr}, trbhh_category=${category}${fields.status === undefined ? Prisma.empty : Prisma.sql`, status=${status}`} WHERE id=${BigInt(id)}`;
 }
 
+/** Exact options eligible for display: same stored VID, valid price, live stock and Saudi freight proof. */
+export function getVerifiedCjVariants(row: Pick<CjProductRow, 'details_json' | 'availability_json'>): CjDetails['variants'] {
+  const details = parseCjDetails(row);
+  const availability = parseCjAvailability(row);
+  if (!details || !availability) return [];
+  if (!details.variants.length || availability.variants.length !== details.variants.length) return [];
+  const verified = new Map(availability.variants.map(item => [item.vid, item]));
+  const vids = details.variants.map(variant => variant.vid);
+  if (new Set(vids).size !== vids.length) return [];
+  const allVerified = details.variants.every(variant => typeof variant.vid === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(variant.vid) &&
+    verified.has(variant.vid) && typeof variant.priceUsd === 'number' && Number.isFinite(variant.priceUsd) && variant.priceUsd > 0);
+  return allVerified ? details.variants : [];
+}
+
 /** Approval changes no editable content, pricing or visibility fields. */
 export async function setCjProductStatus(id: number, status: string): Promise<void> {
   if (!Number.isSafeInteger(id) || id <= 0 || !['draft', 'ready'].includes(status)) throw new Error('invalid_product_status');
@@ -180,7 +214,7 @@ export async function listVisibleCjProducts(limit = 120): Promise<CjProductRow[]
 export async function listStorefrontCjProducts(readyOnly: boolean, limit = 120): Promise<CjProductRow[]> {
   const take = Math.min(Math.max(1, limit), 500);
   return readyOnly
-    ? (await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE hidden=0 AND status='ready' AND availability_checked_at>=UTC_TIMESTAMP(3)-INTERVAL 6 HOUR AND JSON_VALID(availability_json)=1 AND CAST(JSON_UNQUOTE(JSON_EXTRACT(availability_json,'$.stockQuantity')) AS UNSIGNED)>0 AND JSON_LENGTH(JSON_EXTRACT(availability_json,'$.shippingOptions'))>0 ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[])).filter(row => !!parseCjAvailability(row))
+    ? (await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE hidden=0 AND status='ready' AND (sale_price_override_minor>0 OR sale_price_minor>0) AND availability_checked_at>=UTC_TIMESTAMP(3)-INTERVAL 6 HOUR AND availability_checked_at<=UTC_TIMESTAMP(3) AND JSON_VALID(availability_json)=1 AND CAST(JSON_UNQUOTE(JSON_EXTRACT(availability_json,'$.stockQuantity')) AS UNSIGNED)>0 AND JSON_LENGTH(JSON_EXTRACT(availability_json,'$.variants'))>0 AND JSON_LENGTH(JSON_EXTRACT(availability_json,'$.shippingOptions'))>0 ORDER BY id DESC LIMIT ${Math.min(take * 5, 2500)}`.catch(() => [] as CjProductRow[])).filter(row => !!parseCjAvailability(row) && getVerifiedCjVariants(row).length > 0).slice(0, take)
     : prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE hidden=0 AND status IN ('draft','ready') ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
 }
 
@@ -188,10 +222,10 @@ export async function listStorefrontCjProducts(readyOnly: boolean, limit = 120):
 export async function getStorefrontCjProduct(id: number, readyOnly: boolean): Promise<CjProductRow | null> {
   if (!Number.isInteger(id) || id <= 0) return null;
   const rows = readyOnly
-    ? await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE id=${BigInt(id)} AND hidden=0 AND status='ready' AND availability_checked_at>=UTC_TIMESTAMP(3)-INTERVAL 6 HOUR AND JSON_VALID(availability_json)=1 AND CAST(JSON_UNQUOTE(JSON_EXTRACT(availability_json,'$.stockQuantity')) AS UNSIGNED)>0 AND JSON_LENGTH(JSON_EXTRACT(availability_json,'$.shippingOptions'))>0 LIMIT 1`.catch(() => [] as CjProductRow[])
+    ? await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE id=${BigInt(id)} AND hidden=0 AND status='ready' AND (sale_price_override_minor>0 OR sale_price_minor>0) AND availability_checked_at>=UTC_TIMESTAMP(3)-INTERVAL 6 HOUR AND availability_checked_at<=UTC_TIMESTAMP(3) AND JSON_VALID(availability_json)=1 AND CAST(JSON_UNQUOTE(JSON_EXTRACT(availability_json,'$.stockQuantity')) AS UNSIGNED)>0 AND JSON_LENGTH(JSON_EXTRACT(availability_json,'$.variants'))>0 AND JSON_LENGTH(JSON_EXTRACT(availability_json,'$.shippingOptions'))>0 LIMIT 1`.catch(() => [] as CjProductRow[])
     : await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE id=${BigInt(id)} AND hidden=0 AND status IN ('draft','ready') LIMIT 1`.catch(() => [] as CjProductRow[]);
   const row = rows[0] ?? null;
-  return row && (!readyOnly || parseCjAvailability(row)) ? row : null;
+  return row && (!readyOnly || parseCjAvailability(row) && getVerifiedCjVariants(row).length > 0) ? row : null;
 }
 
 /** صفّ واحد بمعرّفه. */

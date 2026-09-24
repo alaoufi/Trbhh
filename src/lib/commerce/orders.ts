@@ -10,6 +10,7 @@ import {buildOrderFiscalSnapshot,quoteFiscalProduct,quoteFiscalShipping,saveOrde
 import type {CalculatedFiscalLineV2} from '@/lib/finance/types';
 import {formatAddressLine,normalizeSaudiAddress} from './addresses';
 import type {AttemptStatus, CommerceDb, CreateOrderInput, ExpectedPayment, NotificationChannel, NotificationTarget, OrderLineInput, OrderPolicy, OrderSnapshot, OrderStatus, PaymentAttempt, PaymentClaim, ShippingSnapshot, VerifiedPayment} from './types';
+import {chosenVariantSnapshot} from './variant-snapshot';
 
 type Tx = Prisma.TransactionClient;
 type OrderRow = {id:bigint;member_id:bigint;created_at:Date;request_fingerprint:string;status:OrderStatus;currency:'SAR';subtotal_minor:number;shipping_fee_minor:number;total_minor:number;shipping:ShippingSnapshot|string};
@@ -23,15 +24,18 @@ function identifier(value:string,max:number):void {
 }
 export function normalizeOrderRequest(input:readonly unknown[]):OrderLineInput[] {
   if(!Array.isArray(input)||!input.length||input.length>100) throw new Error('invalid_items');
-  const quantities=new Map<bigint,number>();
+  const quantities=new Map<string,OrderLineInput>();
   for(const raw of input) {
-    if(!raw||typeof raw!=='object'||Object.keys(raw).sort().join(',')!=='productId,quantity') throw new Error('invalid_items');
+    if(!raw||typeof raw!=='object'||!['productId,quantity','productId,quantity,variantKey'].includes(Object.keys(raw).sort().join(','))) throw new Error('invalid_items');
     const item=raw as OrderLineInput;
     id(item.productId);lineTotal(0,item.quantity);
-    const quantity=(quantities.get(item.productId)||0)+item.quantity;
-    lineTotal(0,quantity);quantities.set(item.productId,quantity);
+    if(item.variantKey!==undefined&&(typeof item.variantKey!=='string'||!item.variantKey.trim()||item.variantKey.length>191||/[\u0000-\u001f\u007f]/.test(item.variantKey)))throw new Error('invalid_items');
+    const key=item.productId.toString(),prior=quantities.get(key);
+    if(prior&&prior.variantKey!==item.variantKey)throw new Error('duplicate_product_variant');
+    const quantity=(prior?.quantity||0)+item.quantity;
+    lineTotal(0,quantity);quantities.set(key,{productId:item.productId,quantity,...(item.variantKey?{variantKey:item.variantKey}:{})});
   }
-  return [...quantities].map(([productId,quantity])=>({productId,quantity})).sort((a,b)=>a.productId<b.productId?-1:a.productId>b.productId?1:0);
+  return [...quantities.values()].sort((a,b)=>a.productId<b.productId?-1:a.productId>b.productId?1:0);
 }
 function shippingSnapshot(input:ShippingSnapshot):ShippingSnapshot {
   const keys=['addressLine','alternatePhone','buildingNumber','city','country','deliveryNotes','district','email','name','phone','postalCode','region','secondaryNumber','shortAddress','street'];
@@ -43,7 +47,7 @@ function shippingSnapshot(input:ShippingSnapshot):ShippingSnapshot {
   }catch(error){throw error instanceof Error&&error.message.startsWith('address_')?error:new Error('invalid_shipping');}
 }
 export function requestFingerprint(items:readonly OrderLineInput[],shipping?:ShippingSnapshot):string {
-  const normalized=normalizeOrderRequest(items).map(item=>({productId:item.productId.toString(),quantity:item.quantity}));
+  const normalized=normalizeOrderRequest(items).map(item=>({productId:item.productId.toString(),quantity:item.quantity,variantKey:item.variantKey||null}));
   return createHash('sha256').update(JSON.stringify({version:1,items:normalized,shipping:shipping?shippingSnapshot(shipping):null})).digest('hex');
 }
 export function paymentMatches(expected:ExpectedPayment,evidence:VerifiedPayment):boolean {
@@ -64,8 +68,8 @@ export function normalizeRecipients(input:readonly {recipient:string;channel:str
   return [...output.values()];
 }
 async function readOrder(tx:Tx,row:OrderRow):Promise<OrderSnapshot> {
-  const items=await tx.$queryRaw<{product_id:bigint;title:string;quantity:number;unit_price_minor:number;total_minor:number}[]>`SELECT product_id,title,quantity,unit_price_minor,total_minor FROM commerce_order_items WHERE order_id=${row.id} ORDER BY product_id`;
-  return {id:row.id,memberId:row.member_id,status:row.status,currency:row.currency,subtotalMinor:row.subtotal_minor,shippingFeeMinor:row.shipping_fee_minor,totalMinor:row.total_minor,shipping:typeof row.shipping==='string'?JSON.parse(row.shipping):row.shipping,items:items.map(item=>({productId:item.product_id,title:item.title,quantity:item.quantity,unitPriceMinor:item.unit_price_minor,totalMinor:item.total_minor}))};
+  const items=await tx.$queryRaw<{product_id:bigint;title:string;quantity:number;unit_price_minor:number;list_unit_price_minor:number|null;discount_minor:number;total_minor:number;variant_snapshot:unknown}[]>`SELECT product_id,title,quantity,unit_price_minor,list_unit_price_minor,discount_minor,total_minor,variant_snapshot FROM commerce_order_items WHERE order_id=${row.id} ORDER BY product_id`;
+  return {id:row.id,memberId:row.member_id,status:row.status,currency:row.currency,subtotalMinor:row.subtotal_minor,shippingFeeMinor:row.shipping_fee_minor,totalMinor:row.total_minor,shipping:typeof row.shipping==='string'?JSON.parse(row.shipping):row.shipping,items:items.map(item=>({productId:item.product_id,title:item.title,quantity:item.quantity,unitPriceMinor:item.unit_price_minor,totalMinor:item.total_minor,listUnitPriceMinor:item.list_unit_price_minor,discountMinor:item.discount_minor,variantSnapshot:item.variant_snapshot?(typeof item.variant_snapshot==='string'?JSON.parse(item.variant_snapshot):item.variant_snapshot) as import('./types').ChosenVariantSnapshot:null}))};
 }
 function attemptView(row:AttemptRow):PaymentAttempt {
   return {id:row.id,orderId:row.order_id,provider:row.provider,reference:row.provider_ref,redirectUrl:row.redirect_url,merchantOrderId:row.merchant_order_id,amountMinor:row.amount_minor,currency:row.currency,status:row.status};
@@ -98,11 +102,51 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
     for(const item of items) {
       const [product]=await tx.$queryRaw<{id:bigint;title:string;price_minor:number;currency:string;stock_available:number;stock_reserved:number;approved:number;visible:number;enabled:number}[]>`SELECT id,title,price_minor,currency,stock_available,stock_reserved,approved,visible,enabled FROM commerce_products WHERE id=${item.productId} FOR UPDATE`;
       if(!product||product.approved!==1||product.visible!==1||product.enabled!==1||product.currency!=='SAR'||product.price_minor<=0||product.stock_available<item.quantity) throw new Error('product_unavailable');
+      const [sourceVariant]=await tx.$queryRaw<{variants:unknown;options:unknown}[]>`SELECT variants,options FROM supplier_products WHERE commerce_product_id=${item.productId} FOR SHARE`;
+      let sourceVariantValue:unknown=sourceVariant?.variants;try{if(typeof sourceVariantValue==='string')sourceVariantValue=JSON.parse(sourceVariantValue);}catch{sourceVariantValue=null;}
+      let sourceOptionsValue:unknown=sourceVariant?.options;try{if(typeof sourceOptionsValue==='string')sourceOptionsValue=JSON.parse(sourceOptionsValue);}catch{sourceOptionsValue=null;}
+      const sourceVariants=Array.isArray(sourceVariantValue)?sourceVariantValue:[];
+      if(!item.variantKey){
+        const [cjRequired]=await tx.$queryRaw<{details_json:unknown}[]>`SELECT details_json FROM cj_products WHERE commerce_product_id=${item.productId} AND hidden=0 AND status='ready' ORDER BY id LIMIT 1 FOR SHARE`;
+        let cjDetails:unknown=cjRequired?.details_json;try{if(typeof cjDetails==='string')cjDetails=JSON.parse(cjDetails);}catch{cjDetails=null;}
+        const cjVariantRows=cjDetails&&typeof cjDetails==='object'?(cjDetails as Record<string,unknown>).variants:null;
+        if(Array.isArray(cjVariantRows)&&cjVariantRows.length>0)throw new Error('product_variant_required');
+      }
+      const selectedVariantKey=item.variantKey||'';
+      let rawVariant=selectedVariantKey?sourceVariants.find(raw=>raw&&typeof raw==='object'&&[String((raw as Record<string,unknown>).externalId||''),String((raw as Record<string,unknown>).vid||''),String((raw as Record<string,unknown>).id||'')].includes(selectedVariantKey)):undefined;
+      let cjVariantFound=false;
+      if(selectedVariantKey&&!rawVariant){
+        const [cjSource]=await tx.$queryRaw<{details_json:unknown;availability_json:unknown;availability_checked_at:Date|null}[]>`SELECT details_json,availability_json,availability_checked_at FROM cj_products WHERE commerce_product_id=${item.productId} AND hidden=0 AND status='ready' ORDER BY availability_checked_at DESC,id LIMIT 1 FOR SHARE`;
+        const decode=(value:unknown)=>{if(typeof value!=='string')return value;try{return JSON.parse(value) as unknown;}catch{return null;}};
+        const detail=decode(cjSource?.details_json),availability=decode(cjSource?.availability_json),detailVariants=detail&&typeof detail==='object'&&Array.isArray((detail as Record<string,unknown>).variants)?(detail as Record<string,unknown>).variants as unknown[]:[];
+        const data=availability&&typeof availability==='object'?availability as Record<string,unknown>:null;
+        const checkedAt=cjSource?.availability_checked_at;
+        const isFresh=!!checkedAt&&checkedAt.getTime()<=Date.now()&&Date.now()-checkedAt.getTime()<=6*60*60*1000&&Array.isArray(data?.shippingOptions)&&data!.shippingOptions.length>0;
+        const raw=detailVariants.find(value=>value&&typeof value==='object'&&String((value as Record<string,unknown>).vid||'')===selectedVariantKey);
+        const stockRows=Array.isArray(data?.variants)?data!.variants as Record<string,unknown>[]:[];
+        const stock=Number(stockRows.find(value=>String(value.vid||'')===selectedVariantKey)?.stockQuantity||0);
+        if(isFresh&&raw&&Number.isSafeInteger(stock)&&stock>=item.quantity){rawVariant={...(raw as Record<string,unknown>),quantity:stock,available:true,publicPriceMinor:product.price_minor};cjVariantFound=true;}
+        else if(raw)throw new Error('product_variant_unavailable');
+      }
+      const needsVariant=sourceVariants.length>0||cjVariantFound||Array.isArray(sourceOptionsValue)&&sourceOptionsValue.length>0;
+      if(needsVariant&&!rawVariant)throw new Error(Array.isArray(sourceOptionsValue)&&sourceOptionsValue.length>0?'supplier_variant_checkout_required':'product_variant_required');
+      if(!needsVariant&&selectedVariantKey)throw new Error('product_variant_required');
+      const chosen=rawVariant?chosenVariantSnapshot(selectedVariantKey,rawVariant):null;
+      if(rawVariant&&!chosen)throw new Error('product_variant_invalid');
+      const variantData=rawVariant as Record<string,unknown>|undefined;
+      const variantStock=Number(variantData?.quantity??variantData?.stock);
+      if(variantData&&(variantData.available!==true||!Number.isSafeInteger(variantStock)||variantStock<item.quantity))throw new Error('product_variant_unavailable');
+      const variantPrice=Number(variantData?.publicPriceMinor??variantData?.priceMinor??product.price_minor);
+      if(!Number.isSafeInteger(variantPrice)||variantPrice<=0)throw new Error('product_variant_price_invalid');
+      const unitPriceMinor=variantPrice;
+      const possibleListPrice=Number(variantData?.originalPriceMinor),listUnitPriceMinor=Number.isSafeInteger(possibleListPrice)&&possibleListPrice>unitPriceMinor?possibleListPrice:unitPriceMinor;
+      const discountMinor=checkedMoney((listUnitPriceMinor-unitPriceMinor)*item.quantity);
       checkedMoney(product.stock_available);checkedMoney(product.stock_reserved+item.quantity);
-      const fiscalLine=quoteFiscalProduct(fiscalPolicy,{key:String(item.productId),title:product.title,quantity:item.quantity,unitPriceMinor:product.price_minor});
+      const fiscalLine=quoteFiscalProduct(fiscalPolicy,{key:String(item.productId),title:product.title,quantity:item.quantity,unitPriceMinor:listUnitPriceMinor,discountMinor});
+      if(chosen)fiscalLine.variantSnapshot=chosen;
       const total=checkedMoney(fiscalLine.grossMinor);totals.push(total);
       await tx.$executeRaw`UPDATE commerce_products SET stock_available=stock_available-${item.quantity},stock_reserved=stock_reserved+${item.quantity},updated_at=CURRENT_TIMESTAMP(3) WHERE id=${item.productId}`;
-      await tx.$executeRaw`INSERT INTO commerce_order_items (order_id,product_id,title,quantity,unit_price_minor,total_minor) VALUES (${row.id},${item.productId},${product.title},${item.quantity},${product.price_minor},${total})`;
+      await tx.$executeRaw`INSERT INTO commerce_order_items (order_id,product_id,title,quantity,unit_price_minor,list_unit_price_minor,discount_minor,total_minor,variant_key,variant_snapshot) VALUES (${row.id},${item.productId},${product.title},${item.quantity},${unitPriceMinor},${listUnitPriceMinor>unitPriceMinor?listUnitPriceMinor:null},${discountMinor},${total},${item.variantKey??''},${chosen?JSON.stringify(chosen):null})`;
       // Lock mapping (including its absent-key gap) and profile while snapshotting.
       // Never accept supplier identity/cost from checkout input.
       const [mapping]=await tx.$queryRaw<{supplier_id:bigint;supplier_sku:string;unit_cost_minor:number;currency:string}[]>`SELECT supplier_id,supplier_sku,unit_cost_minor,currency FROM commerce_product_suppliers WHERE product_id=${item.productId} FOR UPDATE`;
@@ -110,7 +154,7 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
         const [supplier]=await tx.$queryRaw<{name:string;active:number}[]>`SELECT name,active FROM commerce_suppliers WHERE id=${mapping.supplier_id} FOR SHARE`;
         if(!supplier||supplier.active!==1) throw new Error('supplier_unavailable');
         if(mapping.currency!=='SAR') throw new Error('supplier_currency_invalid');
-        const cost=await reserveSupplierCost(tx,row.id,item.productId,mapping.supplier_id,item.quantity,mapping.unit_cost_minor,product.price_minor);
+        const cost=await reserveSupplierCost(tx,row.id,item.productId,mapping.supplier_id,item.quantity,mapping.unit_cost_minor,unitPriceMinor);
         supplierCostLines.set(String(item.productId),cost.lines);
         await tx.$executeRaw`INSERT INTO commerce_order_suppliers (order_id,product_id,supplier_id,supplier_name,supplier_sku,quantity,unit_cost_minor,total_cost_minor) VALUES (${row.id},${item.productId},${mapping.supplier_id},${supplier.name},${mapping.supplier_sku},${item.quantity},${cost.unitCostMinor},${cost.totalCostMinor})`;
         fiscalLine.supplierId=String(mapping.supplier_id);fiscalLine.supplierMinor=cost.totalCostMinor;

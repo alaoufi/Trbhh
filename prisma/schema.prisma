@@ -459,7 +459,11 @@ model commerce_order_items {
   title            String @db.VarChar(200)
   quantity         Int
   unit_price_minor Int
+  list_unit_price_minor Int?
+  discount_minor Int @default(0)
   total_minor      Int
+  variant_key      String @default("") @db.VarChar(191)
+  variant_snapshot Json?
   order            commerce_orders @relation(fields: [order_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_items_order_fk")
   product          commerce_products @relation(fields: [product_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "commerce_items_product_fk")
 

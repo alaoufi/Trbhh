@@ -29,11 +29,11 @@ async function main() {
       return null;
     } }],
     resolve: { alias: [
-      ...['@/lib/auth', '@/lib/access-control/guards', '@/lib/settings', '@/lib/prisma', '@/lib/data', '@/lib/cj/catalog-feed', '@/lib/cj/approved-catalog', './approved-catalog', '@/lib/cj/mapping', './mapping', '@/lib/cj/agents', './agents', 'next/navigation', 'next/headers'].map(find => ({ find, replacement: stub })),
+      ...['@/lib/auth', '@/lib/access-control/guards', '@/lib/settings', '@/lib/prisma', '@/lib/data', '@/lib/cj/catalog-feed', '@/lib/cj/approved-catalog', './approved-catalog', '@/lib/cj/mapping', './mapping', '@/lib/cj/agents', './agents', '@/lib/cj/availability', '@/lib/cj/tax-quote', 'next/navigation', 'next/headers'].map(find => ({ find, replacement: stub })),
       { find: 'next/image', replacement: path.join(__dirname, 'cj-fixture-image.tsx') },
       { find: /^.*admin\/suppliers\/cj\/actions(?:\.ts)?$/, replacement: stub },
       { find: 'server-only', replacement: path.join(root, 'tests/stubs/empty.ts') },
-      ...['@/components/cj/product-gallery', '@/components/cj/cart-controls', '@/components/cj/trial-cart'].map(find => ({ find, replacement: islands })),
+      ...['@/components/cj/product-gallery', '@/components/cj/cart-controls', '@/components/cj/trial-cart', '@/components/cj/purchase-panel'].map(find => ({ find, replacement: islands })),
       ...commonAliases,
     ] },
     build: { write: false, minify: false, ssr: path.join(__dirname, 'cj-fixture-render.tsx'), rollupOptions: { output: { format: 'cjs' } } },
@@ -59,7 +59,7 @@ async function main() {
   fs.writeFileSync(path.join(output, 'fixture.css'), css);
   const page = async (pathname, delayed = false) => `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>معاينة CJ محلية — بيانات اختبار</title><link rel="stylesheet" href="/fixture.css"><style>body{margin:0;background:#f8fafc;font-family:Tahoma,Arial,sans-serif}.fixture-notice{padding:12px;background:#fff3ce;color:#16294a;text-align:center;font-size:12px;line-height:1.8}.fixture-nav{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;padding:12px;font-size:12px}.fixture-nav a{text-decoration:underline}</style></head><body><aside class="fixture-notice" aria-label="حدود المعاينة المحلية">معاينة محلية للصفحات والمكونات الفعلية — الأسعار والأوصاف بيانات اختبار، والحساب وهمي بصلاحية عرض المنتجات فقط. صورتا المنتجين 15 و16 من روابط CJ العامة المطابقة للعناوين؛ بقية المنتجات اصطناعية. لا قاعدة بيانات أو طلبات أو دفع أو مزامنة.</aside><nav class="fixture-nav" aria-label="مسارات الاختبار"><a href="/cj">الكتالوج</a><a href="/cj/15">اختبار JPEG</a><a href="/cj/900017">معرض اصطناعي ورابط طويل</a><a href="/cj/900018">صورة مفقودة</a><a href="/cj/cart">السلة</a></nav><div id="fixture-page">${await renderer.renderCjFixture(pathname)}</div><script src="/fixture.js${delayed ? '?delay=1000' : ''}" defer></script></body></html>`;
   for (const route of routes) fs.writeFileSync(path.join(output, `fixture-${route.replaceAll('/', '-').slice(1)}.html`), await page(route));
-  fs.writeFileSync(path.join(output, 'fixture-manifest.json'), JSON.stringify({ fixtureOnly: true, serverMode: 'development', actualServerPages: routes, hydratedComponents: ['CjProductGallery', 'CjProductImage', 'AddToTrialCart', 'CartLink', 'TrialCart'], syntheticPrices: true, databaseAccess: false, supplierOrderAccess: false, outboundImages: [...allowedImages], browserVerified: false }, null, 2));
+    fs.writeFileSync(path.join(output, 'fixture-manifest.json'), JSON.stringify({ fixtureOnly: true, serverMode: 'development', actualServerPages: routes, hydratedComponents: ['CjProductGallery', 'CjProductImage', 'CjPurchasePanel', 'CartLink', 'TrialCart'], syntheticPrices: true, databaseAccess: false, supplierOrderAccess: false, outboundImages: [...allowedImages], browserVerified: false }, null, 2));
   if (!process.argv.includes('--serve')) { console.log(JSON.stringify({ fixtureOnly: true, directory: output, pages: routes.length })); return; }
   const server = http.createServer(async (req, res) => {
     try {
@@ -70,8 +70,14 @@ async function main() {
       res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'");
       if (req.method === 'POST' && url.pathname === '/api/cj/trial-cart') {
         const chunks = []; let size = 0;
-        for await (const chunk of req) { size += chunk.length; if (size > 8192) { res.writeHead(413); res.end('Fixture body too large.'); return; } chunks.push(chunk); }
+        for await (const chunk of req) { size += chunk.length; if (size > 256 * 1024) { res.writeHead(413); res.end('Fixture body too large.'); return; } chunks.push(chunk); }
         const response = await renderer.cartResponse(new Request(url, { method: 'POST', headers: req.headers, body: Buffer.concat(chunks) }));
+        res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer())); return;
+      }
+      if (req.method === 'POST' && /^\/api\/cj\/products\/[1-9]\d*\/verify-variant$/.test(url.pathname)) {
+        const chunks = []; let size = 0;
+        for await (const chunk of req) { size += chunk.length; if (size > 1024) { res.writeHead(413); res.end('Fixture body too large.'); return; } chunks.push(chunk); }
+        const response = await renderer.verifyVariantResponse(new Request(url, { method: 'POST', headers: req.headers, body: Buffer.concat(chunks) }), { params: Promise.resolve({ id: url.pathname.split('/')[4] }) });
         res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer())); return;
       }
       if (req.method !== 'GET') { res.writeHead(405); res.end('Fixture mutations are disabled.'); return; }

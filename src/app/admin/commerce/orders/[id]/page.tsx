@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { formatSar } from '@/lib/commerce/money';
 import type { ShippingSnapshot } from '@/lib/commerce/types';
+import {OrderVariantDetails} from '@/components/commerce/order-variant-details';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'تفاصيل طلب تربح — الإدارة', robots: { index: false, follow: false } };
@@ -14,7 +15,7 @@ type Order = {
   subtotal_minor: number; shipping_fee_minor: number; total_minor: number;
   shipping: ShippingSnapshot | string;
 };
-type Item = { id: bigint; title: string; quantity: number; unit_price_minor: number; total_minor: number };
+type Item = { id: bigint; title: string; quantity: number; unit_price_minor: number;list_unit_price_minor:number|null;discount_minor:number; total_minor: number;variant_snapshot:unknown };
 type SupplierSnapshot = { product_id:bigint; supplier_id:bigint; supplier_name:string; supplier_sku:string; quantity:number; unit_cost_minor:number; total_cost_minor:number };
 const paymentLabels: Record<string, string> = { building: 'قيد الإنشاء', awaiting_payment: 'بانتظار تأكيد الدفع', paid: 'مدفوع — مؤكد خادميًا', cancelled: 'ملغي' };
 const fulfillmentLabels: Record<string, string> = {
@@ -31,7 +32,7 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
   if (!order) notFound();
   // Order creation permits at most 100 lines. Read the purchased snapshots,
   // never the mutable product catalog or the member's current profile.
-  const items = await prisma.$queryRaw<Item[]>`SELECT id,title,quantity,unit_price_minor,total_minor FROM commerce_order_items WHERE order_id=${order.id} ORDER BY id LIMIT 100`;
+  const items = await prisma.$queryRaw<Item[]>`SELECT id,title,quantity,unit_price_minor,list_unit_price_minor,discount_minor,total_minor,variant_snapshot FROM commerce_order_items WHERE order_id=${order.id} ORDER BY id LIMIT 100`;
   const suppliers = keys.has('settlements:view') ? await prisma.$queryRaw<SupplierSnapshot[]>`SELECT product_id,supplier_id,supplier_name,supplier_sku,quantity,unit_cost_minor,total_cost_minor FROM commerce_order_suppliers WHERE order_id=${order.id} ORDER BY product_id LIMIT 100` : [];
   const shipping: ShippingSnapshot = typeof order.shipping === 'string' ? JSON.parse(order.shipping) : order.shipping;
   return <section className="card-3d space-y-4 rounded-xl p-5">
@@ -44,8 +45,8 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
     <div className="overflow-x-auto">
       <table className="w-full text-right text-sm">
         <caption className="mb-2 text-right font-bold">السلع كما حُفظت عند إنشاء الطلب</caption>
-        <thead><tr><th>السلعة</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
-        <tbody>{items.map(item => <tr key={item.id.toString()} className="border-t"><td className="py-2">{item.title}</td><td>{item.quantity}</td><td>{formatSar(item.unit_price_minor)} ر.س</td><td>{formatSar(item.total_minor)} ر.س</td></tr>)}</tbody>
+        <thead><tr><th>السلعة والخيارات</th><th>الكمية</th><th>سعر الوحدة</th><th>الخصم</th><th>الإجمالي</th></tr></thead>
+        <tbody>{items.map(item => <tr key={item.id.toString()} className="border-t"><td className="py-2">{item.title}<OrderVariantDetails value={item.variant_snapshot}/></td><td>{item.quantity}</td><td>{formatSar(item.unit_price_minor)} ر.س{item.list_unit_price_minor&&<><br/><del className="text-xs text-slate-500">{formatSar(item.list_unit_price_minor)} ر.س</del></>}</td><td>{item.discount_minor?formatSar(item.discount_minor)+' ر.س':'—'}</td><td>{formatSar(item.total_minor)} ر.س</td></tr>)}</tbody>
       </table>
     </div>
     <p>قيمة السلع: {formatSar(order.subtotal_minor)} ر.س · التوصيل: {formatSar(order.shipping_fee_minor)} ر.س</p>

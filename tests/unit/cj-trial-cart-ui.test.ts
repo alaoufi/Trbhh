@@ -11,7 +11,7 @@ beforeEach(()=>{vi.clearAllMocks();mock.access.mockResolvedValue({uid:9});});
 describe('private CJ trial cart presentation',()=>{
   it('requires current products view before rendering, regardless of the public storefront flag',async()=>{
     const tree=await CartPage();expect(mock.access).toHaveBeenCalledExactlyOnceWith('products','view');expect(tree.props.accountId).toBe(9);
-    const html=renderToStaticMarkup(tree);expect(html).toContain('سلة التجربة');expect(html).toContain('السعر النهائي والضريبة وموعد الوصول غير مؤكدة');
+    const html=renderToStaticMarkup(tree);expect(html).toContain('سلة التجربة');expect(html).toContain('يعيد التحقق من الخيار والسعر والمخزون والشحن مع CJ');
     expect(html).toContain('role="status"');expect(html).toContain('aria-live="polite"');
     expect(html).not.toMatch(/name="(?:address|phone|payment|requestKey)"|action="|href="\/(?:shop|account\/orders)/);
   });

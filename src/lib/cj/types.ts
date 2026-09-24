@@ -20,6 +20,8 @@ export type CjVariant = {
   variantSellPrice: number | null;
   variantImage: string | null;
   variantWeight: number | null;
+  /** Original variant API properties, kept so new provider options survive imports. */
+  attributes?: Record<string, unknown>;
 };
 
 export type CjProductDetail = CjProductSummary & {
@@ -33,6 +35,9 @@ export type CjInventory = {
   areaName: string | null;
   countryCode: string | null;
   storageNum: number;
+  /** Quantity stocked by CJ itself (factory inventory is not sale-ready stock). */
+  cjInventoryQuantity?: number;
+  verifiedWarehouse?: number | null;
 };
 
 export type CjWarehouse = {
@@ -46,6 +51,9 @@ export type CjFreightOption = {
   logisticPrice: number;
   logisticAging: string | null;
   logisticPriceCn: number | null;
+  taxesFeeUsd?: number | null;
+  clearanceFeeUsd?: number | null;
+  totalPostageFeeUsd?: number | null;
 };
 
 export type CjTrack = {

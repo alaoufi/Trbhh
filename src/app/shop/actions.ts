@@ -8,6 +8,7 @@ import { getCommerceGateway } from '@/lib/commerce/runtime';
 import { createOrder } from '@/lib/commerce/orders';
 import { getMemberAddress } from '@/lib/commerce/address-book';
 import { formatAddressLine } from '@/lib/commerce/addresses';
+import {readPublicCommerceProducts} from '@/lib/commerce/public-product';
 
 export async function createCommerceOrder(_previous: { error: string } | null, form: FormData): Promise<{ error: string }> {
   const session = await requireUser();
@@ -20,6 +21,7 @@ export async function createCommerceOrder(_previous: { error: string } | null, f
   if (!(await takeSecurityAttempt(`commerce-order:${session.uid}`, 6))) return { error: config.text.rateLimit };
   const product = String(form.get('productId') || '');
   const quantity = String(form.get('quantity') || '');
+  const variantKey=String(form.get('variantKey')||'');
   const addressId = String(form.get('addressId') || '');
   const requestKey = String(form.get('requestKey') || '');
   if (!/^[1-9]\d{0,14}$/.test(product) || !/^[1-9]\d{0,3}$/.test(quantity)
@@ -28,9 +30,12 @@ export async function createCommerceOrder(_previous: { error: string } | null, f
   if (!address) return { error: 'اختر عنوان شحن محفوظًا في حسابك قبل متابعة الطلب.' };
   let orderId: bigint;
   try {
+    const publicProduct=(await readPublicCommerceProducts([BigInt(product)])).get(product);
+    const selectedVariant=variantKey?publicProduct?.variants.find(item=>item.key===variantKey):undefined;
+    if(!publicProduct||!publicProduct.saudiShippingAvailable||publicProduct.requiresVariantSelection&&!selectedVariant||selectedVariant&&Number(quantity)>selectedVariant.stock)throw new Error('checkout_product_changed');
     const order = await createOrder(prisma, {
       memberId: BigInt(session.uid), requestKey,
-      items: [{ productId: BigInt(product), quantity: Number(quantity) }],
+      items: [{ productId: BigInt(product), quantity: Number(quantity),...(variantKey?{variantKey}:{}) }],
       shipping: { name: address.snapshot.fullName, phone: address.snapshot.phone,
         addressLine: formatAddressLine(address.snapshot), city: address.snapshot.city, postalCode: address.snapshot.postalCode,
         country: 'SA', region: address.snapshot.region, district: address.snapshot.district, street: address.snapshot.street,

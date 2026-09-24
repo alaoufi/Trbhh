@@ -7,6 +7,7 @@ import { fixtureCatalogProducts } from './cj-fixture-data';
 import { resetFixtureIslands } from './cj-fixture-islands';
 export { GET as imageResponse } from '../../src/app/api/cj/img/route';
 export { POST as cartResponse } from '../../src/app/api/cj/trial-cart/route';
+export { POST as verifyVariantResponse } from '../../src/app/api/cj/products/[id]/verify-variant/route';
 export { publicJpegAlias, publicJpeg } from './cj-fixture-data';
 export const fixtureProductIds = fixtureCatalogProducts.map(row => row.id);
 

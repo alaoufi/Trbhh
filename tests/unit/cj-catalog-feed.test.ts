@@ -8,6 +8,9 @@ vi.mock('@/lib/cj/approved-catalog', () => ({
   listApprovedCatalog: async (scope: string, take: number, skip: number) => state.commerce.filter(row => scope !== 'imported' || row.imported).slice(skip, skip + take),
 }));
 vi.mock('@/lib/cj/storefront', () => ({ cjStorefrontView: async () => ({ isStaff: state.staff, isPublic: true }) }));
+vi.mock('@/lib/cj/mapping', () => ({ listStorefrontCjProducts: async (readyOnly: boolean, limit: number) => state.products
+  .filter(row => row.hidden === 0 && (!readyOnly || row.status === 'ready' && row.catalogReady === true))
+  .sort((a, b) => Number((b.id as bigint) - (a.id as bigint))).slice(0, limit) }));
 vi.mock('@/lib/data', () => ({
   publicAdCardSelect: { id: true },
   publicAdSearchWhere: async () => ({ AND: [platformAdPublicWhere(new Date('2026-09-24'), false), searchCardVisibility({ now: new Date('2026-09-24'), plans: [], subscriptions: [], bannedIds: [9n], defaultDays: 0 })] }),
@@ -40,7 +43,7 @@ vi.mock('@/lib/prisma', () => ({ prisma: {
 } }));
 import { loadCjCatalog, parseCjCatalogQuery } from '@/lib/cj/catalog-feed';
 
-const product = (id: number, changes = {}) => ({ id: BigInt(id), hidden: 0, status: 'draft', name_ar: `CJ ${id}`, ...changes });
+const product = (id: number, changes = {}) => ({ id: BigInt(id), hidden: 0, status: 'ready', catalogReady: true, name_ar: `CJ ${id}`, ...changes });
 const ad = (id: number, changes = {}) => ({ id: BigInt(id), user_id: 2n, title: `Ad ${id}`, status: 1, state: 'active', store_only: 0, trbhh_until: null, data_archive: null, data_delete: null, paused_by_owner: 0, publish_at: null, platform_hidden_at: null, platform_archived_at: null, ...changes });
 beforeEach(() => { state.staff = true; state.products = []; state.ads = []; state.commerce = []; state.linked = []; state.reads.mockClear(); });
 
@@ -68,10 +71,10 @@ describe('private CJ mixed catalog', () => {
     expect(keys).toHaveLength(115); expect(new Set(keys).size).toBe(115);
     expect(keys).toContain('cj:1'); expect(keys).toContain('ad:1');
   });
-  it('filters imported hidden, quarantined, deleted and unknown statuses before counting and paging', async () => {
-    state.products = [product(1), product(2, { status: 'ready' }), product(3, { hidden: 1 }), product(4, { status: 'quarantined' }), product(5, { status: 'deleted' }), product(6, { status: 'unrecognized' })];
+  it('filters imported hidden, unready, unverified, quarantined, deleted and unknown products before counting and paging', async () => {
+    state.products = [product(1, { status: 'draft' }), product(2), product(3, { hidden: 1 }), product(4, { status: 'quarantined' }), product(5, { status: 'deleted' }), product(6, { status: 'unrecognized' }), product(7, { catalogReady: false })];
     const result = await loadCjCatalog({ tab: 'imported' });
-    expect(result.total).toBe(2); expect(result.items.map(item => item.key)).toEqual(['cj:2', 'cj:1']);
+    expect(result.total).toBe(1); expect(result.items.map(item => item.key)).toEqual(['cj:2']);
   });
   it('preserves public visibility, archive/delete, pause, scheduled, ban and store-isolation gates', async () => {
     state.ads = [ad(1), ad(2, { status: 0 }), ad(3, { state: 'inactive' }), ad(4, { data_archive: 'date' }), ad(5, { data_delete: 'date' }), ad(6, { paused_by_owner: 1 }), ad(7, { publish_at: new Date('2099-01-01') }), ad(8, { user_id: 9n }), ad(9, { store_only: 1 }), ad(10, { platform_hidden_at: new Date() }), ad(11, { platform_archived_at: new Date() }), ad(12, { store_only: 1, trbhh_until: new Date('2099-01-01') })];

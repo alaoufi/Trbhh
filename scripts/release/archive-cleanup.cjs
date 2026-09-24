@@ -25,18 +25,21 @@ async function plan(db) {
   });
   const oldAds = expiredArchiveRows(archived);
   const adIds = oldAds.map((row) => row.id);
-  if (!adIds.length) return { oldAds, oldPhotos: [], deleteUploads: [], keepReasons: {} };
-
-  const oldPhotos = await db.photos.findMany({
+  const oldPhotos = adIds.length ? await db.photos.findMany({
     where: { other_id: { in: adIds } },
     select: { photo_path: true, other_id: true },
+  }) : [];
+  const archivedPhotoIds = [...new Set(oldPhotos.map((row) => /^\d+$/.test(row.photo_path) ? row.photo_path : null).filter(Boolean))];
+  const oldAdUploads = await db.uploads.findMany({
+    where: { type: 'ad', created_at: { lt: new Date(cutoff) } },
+    select: { id: true, file_name: true, file_size: true },
   });
-  const uploadIds = [...new Set(oldPhotos.map((row) => /^\d+$/.test(row.photo_path) ? row.photo_path : null).filter(Boolean))];
+  const uploadIds = [...new Set([...archivedPhotoIds, ...oldAdUploads.map((row) => row.id.toString())])];
   if (!uploadIds.length) return { oldAds, oldPhotos, deleteUploads: [], keepReasons: {} };
   const idValues = uploadIds.map((id) => BigInt(id));
-  const [uploads, otherPhotos, videos, users, stores, profiles, categories] = await Promise.all([
+  const [uploads, allPhotoRefs, videos, users, stores, profiles, categories] = await Promise.all([
     db.uploads.findMany({ where: { id: { in: idValues }, type: 'ad' }, select: { id: true, file_name: true, file_size: true } }),
-    db.photos.findMany({ where: { photo_path: { in: uploadIds }, other_id: { notIn: adIds } }, select: { photo_path: true } }),
+    db.photos.findMany({ where: { photo_path: { in: uploadIds } }, select: { photo_path: true, other_id: true } }),
     db.ads.findMany({ where: { video_path: { in: uploadIds } }, select: { video_path: true } }),
     db.users.findMany({ where: { photo_path: { in: uploadIds } }, select: { photo_path: true } }),
     db.stores.findMany({ where: { logo: { in: idValues } }, select: { logo: true } }),
@@ -51,7 +54,7 @@ async function plan(db) {
     select: { id: true, file_name: true },
   }) : [];
   const protectedIds = new Set([
-    ...otherPhotos.map((row) => row.photo_path),
+    ...allPhotoRefs.filter((row) => !adIds.some((id) => id === row.other_id)).map((row) => row.photo_path),
     ...videos.map((row) => row.video_path),
     ...users.map((row) => row.photo_path),
     ...stores.map((row) => row.logo.toString()),
@@ -59,15 +62,18 @@ async function plan(db) {
     ...categories.map((row) => row.photo_path),
   ]);
   const protectedPaths = new Set(samePathRows.filter((row) => !candidateIds.has(row.id.toString())).map((row) => row.file_name));
-  const oldPhotoUploadIds = new Set(uploadIds);
+  const referencedPhotoIds = new Set(allPhotoRefs.map((row) => row.photo_path));
+  const oldArchivePhotoIds = new Set(archivedPhotoIds);
+  const oldAgeOrphanIds = new Set(oldAdUploads.map((row) => row.id.toString()).filter((id) => !referencedPhotoIds.has(id)));
   const deleteUploads = uploads.filter((row) => {
     const id = row.id.toString();
-    return oldPhotoUploadIds.has(id) && !protectedIds.has(id) && row.file_name && !protectedPaths.has(row.file_name);
+    return (oldArchivePhotoIds.has(id) || oldAgeOrphanIds.has(id)) && !protectedIds.has(id) && row.file_name && !protectedPaths.has(row.file_name);
   });
   const keepReasons = {
     nonAdOrMissingUploadRows: Math.max(0, uploadIds.length - uploads.length),
     usedByOtherContent: uploads.filter((row) => protectedIds.has(row.id.toString())).length,
     sharedFilePath: uploads.filter((row) => protectedPaths.has(row.file_name)).length,
+    oldOrphanAdUploads: oldAgeOrphanIds.size,
   };
   return { oldAds, oldPhotos, deleteUploads, keepReasons };
 }
@@ -102,10 +108,9 @@ async function main() {
   const result = await prisma.$transaction(async (tx) => {
     const next = await plan(tx);
     const ids = next.oldAds.map((row) => row.id);
-    if (!ids.length) return { ...next, photosDeleted: 0, adsDeleted: 0, uploadsDeleted: 0 };
     const uploadIds = next.deleteUploads.map((row) => row.id);
-    const photosDeleted = await tx.photos.deleteMany({ where: { other_id: { in: ids } } });
-    const adsDeleted = await tx.ads.deleteMany({ where: { id: { in: ids } } });
+    const photosDeleted = ids.length ? await tx.photos.deleteMany({ where: { other_id: { in: ids } } }) : { count: 0 };
+    const adsDeleted = ids.length ? await tx.ads.deleteMany({ where: { id: { in: ids } } }) : { count: 0 };
     const uploadsDeleted = uploadIds.length ? await tx.uploads.deleteMany({ where: { id: { in: uploadIds }, type: 'ad' } }) : { count: 0 };
     return { ...next, photosDeleted: photosDeleted.count, adsDeleted: adsDeleted.count, uploadsDeleted: uploadsDeleted.count };
   }, { isolationLevel: 'Serializable', timeout: 120000 });

@@ -7,6 +7,12 @@ const SINGLE_KEY='ALRAJHI_TRANPORTAL_PASSWORD';
 const BACKUP_STAGES=new Set(['preflight','capacity','parent_media','archives','snapshot','restore','seal','complete']);
 const DEPLOY_STAGES=new Set(['preflight','identity','backup','runtime_preflight','checkout','build','cutover','preservation','finalize','rollback']);
 const CODES=['compose_identity','compose_source','runtime_environment','runtime_network','rollback_compose','rollback_config','unapplied_environment_drift','unapplied_mount_drift','finance_media_reference_invalid','merchant_media_reference_invalid','backup_capacity_invalid','ENOENT','ENOSPC','EACCES','EROFS','ETIMEDOUT'];
+function compareMounts(before,current){
+  if(!Array.isArray(before)||!Array.isArray(current)||![...before,...current].every(item=>typeof item?.Destination==='string'))throw Error('diagnostic_mounts');
+  const equal=require('node:util').isDeepStrictEqual,ordered=value=>[...value].sort((a,b)=>a.Destination.localeCompare(b.Destination));
+  const rawEqual=equal(before,current),semanticEqual=equal(ordered(before),ordered(current));
+  return {rawEqual,semanticEqual,orderOnlyDifference:!rawEqual&&semanticEqual,beforeCount:before.length,currentCount:current.length};
+}
 function runtimeEnvironment(container){
   if(!Array.isArray(container?.Config?.Env))throw Error('diagnostic_environment');
   const entries=container.Config.Env.map(value=>{if(typeof value!=='string'||value.indexOf('=')<1)throw Error('diagnostic_environment');const i=value.indexOf('=');return [value.slice(0,i),value.slice(i+1)];});
@@ -122,7 +128,7 @@ function collect({root='/root',run=spawnSync}={}){
     const before=JSON.parse(read(path.join(backup,'container-before.json')))[0],current=JSON.parse(command('docker',['inspect',id]))[0];
     const equal=require('node:util').isDeepStrictEqual;
     app.containerMatchesBackup=current.Id===before.Id;app.startedAtMatchesBackup=current.State?.StartedAt===before.State?.StartedAt;
-    app.environmentMatchesBackup=equal(runtimeEnvironment(before),runtimeEnvironment(current));app.mountsMatchBackup=equal(before.Mounts,current.Mounts);
+    app.environmentMatchesBackup=equal(runtimeEnvironment(before),runtimeEnvironment(current));const mounts=compareMounts(before.Mounts,current.Mounts);app.mountsMatchBackup=mounts.semanticEqual;app.mountOrderOnlyDifference=mounts.orderOnlyDifference;
     const config=JSON.parse(read(path.join(backup,'baseline-compose.json')));
     runtimeConfig=summarizeRuntimeConfig(before,config);
     if(runtimeConfig.environment?.differences.length===1&&runtimeConfig.environment.differences[0].key===SINGLE_KEY){
@@ -174,4 +180,4 @@ function collect({root='/root',run=spawnSync}={}){
 if(require.main===module||(process.argv[1]==='-'&&module.id==='[stdin]')){
   try{if(process.argv.slice(2).length)throw Error('arguments');process.stdout.write(JSON.stringify(collect())+'\n');}catch{process.stderr.write('Finance backup diagnostic unavailable; private details withheld.\n');process.exitCode=1;}
 }
-module.exports={summarizeLogs,summarizeMedia,summarizeRuntimeConfig,selectedKeyProof,collect};
+module.exports={summarizeLogs,summarizeMedia,summarizeRuntimeConfig,selectedKeyProof,compareMounts,collect};

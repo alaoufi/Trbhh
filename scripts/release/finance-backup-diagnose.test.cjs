@@ -52,6 +52,13 @@ test('single-key fallback redacts values and reports literal/escaping relationsh
   const duplicate=helper().selectedKeyProof(raw+raw,raw,'a','b',undefined);assert.equal(duplicate.occurrences,2);assert.equal(duplicate.literalAvailable,false);assert.equal(duplicate.quoteClass,'ambiguous');
 });
 
+test('mount diagnostic ignores array ordering but compares every saved mount field',()=>{
+  const before=[{Type:'bind',Source:'/PRIVATE_PATH',Destination:'/app/storage',RW:true,Propagation:'rprivate'},{Type:'volume',Name:'PRIVATE_NAME',Source:'/PRIVATE_VOLUME',Destination:'/app/legacy',RW:false}];
+  assert.deepEqual(helper().compareMounts(before,[...before].reverse()),{rawEqual:false,semanticEqual:true,orderOnlyDifference:true,beforeCount:2,currentCount:2});
+  for(const change of [{RW:false},{Source:'/DIFFERENT'},{Propagation:'shared'}])assert.equal(helper().compareMounts(before,[{...before[0],...change},before[1]]).semanticEqual,false);
+  assert.doesNotMatch(JSON.stringify(helper().compareMounts(before,before)),/PRIVATE|Source|Destination/);
+});
+
 test('exact dollar-encoding diagnosis uses synthetic stdin config without reading any env file',()=>{
   const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'finance-dollar-diag-'))),backup=path.join(root,'trbhh-release-backups/finance-35934769547'),prod=path.join(root,'trbhh');
   fs.mkdirSync(backup,{recursive:true});fs.mkdirSync(prod);const id='c'.repeat(64),sha='a'.repeat(40),image='sha256:'+'b'.repeat(64),calls=[];

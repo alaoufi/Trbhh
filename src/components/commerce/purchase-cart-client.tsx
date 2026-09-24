@@ -2,21 +2,23 @@
 /* eslint-disable @next/next/no-img-element -- provider image URLs are validated server-side; cart images use native lazy loading. */
 import Link from 'next/link';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
+import {ShoppingCart} from 'lucide-react';
 import {formatSar} from '@/lib/commerce/money';
-import {COMMERCE_CART_EVENT,COMMERCE_CART_STORAGE_KEY,addCartLine,normalizeCart,readStoredCart,removeCartLine,setCartQuantity,writeStoredCart,type CartLine} from '@/lib/commerce/cart';
+import {COMMERCE_CART_EVENT,COMMERCE_CART_STORAGE_KEY,addCartLine,countCartUnits,mergeCartLines,normalizeCart,readStoredCart,removeCartLine,setCartQuantity,writeStoredCart,type CartLine} from '@/lib/commerce/cart';
 import type {SaudiAddressSnapshot} from '@/lib/commerce/addresses';
 
-type ResolvedLine=CartLine&{title:string;image:string|null;variantName:string|null;unitPriceMinor:number;totalMinor:number;stock:number;available:boolean};
-type Quote={lines:ResolvedLine[];subtotalMinor:number;discountMinor:number;productVatMinor:number|null;shippingFeeMinor:number|null;shippingVatMinor:number|null;shippingTotalMinor:number|null;totalMinor:number|null;pricingVerified:boolean;purchasingEnabled:boolean;deliveryEstimate:null};
+type ResolvedLine=CartLine&{title:string;image:string|null;variantName:string|null;unitPriceMinor:number;totalMinor:number;stock:number;available:boolean;saudiShippingAvailable:boolean;deliveryEstimate:string|null};
+type Quote={lines:ResolvedLine[];subtotalMinor:number;discountMinor:number;vatEnabled:boolean;productVatMinor:number|null;shippingFeeMinor:number|null;shippingVatMinor:number|null;shippingTotalMinor:number|null;totalMinor:number|null;pricingVerified:boolean;purchasingEnabled:boolean;deliveryEstimate:null};
 function money(value:number){return `${formatSar(value)} ر.س`;}
-function cartCount(){try{return readStoredCart(window.localStorage).reduce((sum,line)=>sum+line.quantity,0);}catch{return 0;}}
+function readClientCart(){return readStoredCart(window.localStorage,window.sessionStorage);}
+function cartCount(){try{return countCartUnits(readClientCart());}catch{return 0;}}
 function subscribeCart(callback:()=>void){window.addEventListener(COMMERCE_CART_EVENT,callback);window.addEventListener('storage',callback);return()=>{window.removeEventListener(COMMERCE_CART_EVENT,callback);window.removeEventListener('storage',callback);};}
 function useCartCount(){return useSyncExternalStore(subscribeCart,cartCount,()=>0);}
 function publishCart(items:CartLine[]){const clean=writeStoredCart(window.localStorage,items);window.dispatchEvent(new Event(COMMERCE_CART_EVENT));return clean;}
 
-export function PurchaseCartLink(){
+export function PurchaseCartLink({compact=false}:{compact?:boolean}){
  const count=useCartCount();
- return <Link href="/shop/cart" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#16294a]/20 bg-white px-4 py-2 text-sm font-extrabold text-[#16294a]">السلة <span className="rounded-full bg-[#16294a] px-2 py-0.5 text-xs text-white">{count}</span></Link>;
+ return <Link href="/shop/cart" aria-label={`سلة المشتريات، ${count} منتج`} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#16294a]/20 bg-white px-3 py-2 text-sm font-extrabold text-[#16294a] ${compact?'shrink-0':''}`}><ShoppingCart className="h-5 w-5" aria-hidden="true"/>{!compact&&'السلة'}<span className="min-w-6 rounded-full bg-[#16294a] px-2 py-0.5 text-xs text-white">{count}</span></Link>;
 }
 
 export function AddCommerceCartItem({productId,variants,requiresVariant,maximum,selectedVariantKey,onVariantChange}:{productId:string;variants:{key:string;name:string;priceMinor:number;stock:number;options:string[]}[];requiresVariant:boolean;maximum:number;selectedVariantKey?:string;onVariantChange?:(key:string)=>void}){
@@ -26,7 +28,7 @@ export function AddCommerceCartItem({productId,variants,requiresVariant,maximum,
   try{
    const qty=Number(quantity);if(!Number.isSafeInteger(qty)||qty<1||qty>(variant?.stock??maximum))throw new Error('quantity');
    if(mustSelect&&!variant)throw new Error('variant');
-   const current=readStoredCart(window.localStorage);
+   const current=readClientCart();
    const next=addCartLine(current,{productId,quantity:qty,...(variant?{variantKey:variant.key}:{})});
    publishCart(next);setStatus('أُضيف المنتج إلى السلة.');
   }catch(error){setStatus(error instanceof Error&&error.message==='variant'?'اختر اللون أو المقاس قبل الإضافة.':'تعذر الإضافة؛ تحقق من الكمية أو حد السلة.');}
@@ -59,8 +61,8 @@ export function PurchaseCart({addresses,signedIn}:{addresses:CartAddress[];signe
   finally{setLoading(false);}
  }
  function save(next:CartLine[]){const clean=publishCart(next);setItems(clean);void refresh(clean);if(signedIn){persistQueue.current=persistQueue.current.catch(()=>{}).then(async()=>{const response=await fetch('/api/shop/cart/state',{method:'PUT',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:clean})});if(!response.ok)throw new Error('cart_sync');});}}
- useEffect(()=>{let cancelled=false;async function load(){let local:CartLine[]=[];try{local=readStoredCart(window.localStorage);}catch{try{window.localStorage.removeItem(COMMERCE_CART_STORAGE_KEY);}catch{}publishCart([]);}
-   if(signedIn){try{const response=await fetch('/api/shop/cart/state',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:local})});if(!response.ok)throw new Error('cart_sync');const data=await response.json() as {items:CartLine[]};local=normalizeCart(data.items);publishCart(local);}catch{if(!cancelled)setError('تعذر مزامنة سلتك مع حسابك الآن؛ تبقى السلة المحفوظة على هذا الجهاز متاحة.');}}
+ useEffect(()=>{let cancelled=false;async function load(){let local:CartLine[]=[];try{local=readClientCart();}catch{try{window.localStorage.removeItem(COMMERCE_CART_STORAGE_KEY);}catch{}publishCart([]);}
+   if(signedIn){try{const response=await fetch('/api/shop/cart/state',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:local})});if(!response.ok)throw new Error('cart_sync');const data=await response.json() as {items:CartLine[]};local=mergeCartLines(local,normalizeCart(data.items));publishCart(local);const saved=await fetch('/api/shop/cart/state',{method:'PUT',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:local})});if(!saved.ok)throw new Error('cart_sync');}catch{if(!cancelled)setError('تعذر مزامنة سلتك مع حسابك الآن؛ تبقى السلة المحفوظة على هذا الجهاز متاحة.');}}
    if(cancelled)return;setItems(local);void refresh(local);
   }void load();return()=>{cancelled=true;};},[signedIn]);
  const totalQuantity=items.reduce((sum,item)=>sum+item.quantity,0),invalid=!!quote?.lines.some(line=>!line.available);
@@ -79,13 +81,14 @@ export function PurchaseCart({addresses,signedIn}:{addresses:CartAddress[];signe
      {line.variantName&&<p className="mt-1 truncate text-xs text-slate-600">الخيار: {line.variantName}</p>}
      <p className="mt-2 text-sm font-bold text-[#c4510b]">{money(line.unitPriceMinor)} <span className="text-xs font-medium text-slate-500">للوحدة</span></p>
      <p className={`mt-1 text-xs font-bold ${line.available?'text-emerald-700':'text-red-700'}`}>{line.available?`متوفر · الكمية المتاحة ${line.stock}`:'الكمية أو الخيار غير متوفر حاليًا'}</p>
-     <div className="mt-3 flex flex-wrap items-center gap-2"><label className="text-xs font-bold text-slate-600">الكمية<input aria-label={`كمية ${line.title}`} type="number" min={1} max={Math.max(1,line.stock)} value={line.quantity} onChange={event=>{const qty=Number(event.target.value);if(Number.isSafeInteger(qty)&&qty>0)save(setCartQuantity(items,line.productId,qty,line.variantKey));}} className="ms-2 h-10 w-16 rounded-lg border border-slate-300 px-2 text-sm"/></label>
+     {line.saudiShippingAvailable&&<p className="mt-1 break-words text-xs leading-5 text-slate-600">الشحن إلى السعودية متاح من بيانات الناقل{line.deliveryEstimate?` · المدة المسجلة ${line.deliveryEstimate}`:''}</p>}
+     <div className="mt-3 flex flex-wrap items-center gap-2"><div className="flex items-center rounded-lg border border-slate-300"><button type="button" disabled={line.quantity<=1} aria-label={`إنقاص كمية ${line.title}`} onClick={()=>save(setCartQuantity(items,line.productId,line.quantity-1,line.variantKey))} className="min-h-10 min-w-10 text-lg font-black disabled:opacity-40">−</button><input aria-label={`كمية ${line.title}`} type="number" min={1} max={Math.max(1,line.stock)} value={line.quantity} onChange={event=>{const qty=Number(event.target.value);if(Number.isSafeInteger(qty)&&qty>0&&qty<=Math.max(1,line.stock))save(setCartQuantity(items,line.productId,qty,line.variantKey));}} className="h-10 w-12 border-x border-slate-200 text-center text-sm"/><button type="button" disabled={!line.available||line.quantity>=line.stock} aria-label={`زيادة كمية ${line.title}`} onClick={()=>save(setCartQuantity(items,line.productId,line.quantity+1,line.variantKey))} className="min-h-10 min-w-10 text-lg font-black disabled:opacity-40">+</button></div>
       <button type="button" onClick={()=>save(removeCartLine(items,line.productId,line.variantKey))} className="min-h-10 rounded-lg px-3 text-xs font-bold text-red-700 hover:bg-red-50">حذف</button><span className="ms-auto text-sm font-extrabold text-[#16294a]">{money(line.totalMinor)}</span></div>
     </div>
    </article>)}</div>
   </section>
-  <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-4 sm:p-5"><h2 className="text-lg font-extrabold text-[#16294a]">ملخص الطلب</h2>
-   <div className="mt-4 space-y-3 text-sm"><div className="flex justify-between gap-2"><span>السلع ({totalQuantity})</span><b>{quote?money(quote.subtotalMinor):'—'}</b></div><div className="flex justify-between gap-2 text-slate-600"><span>الخصومات</span><b>{quote?money(quote.discountMinor):'—'}</b></div><div className="flex justify-between gap-2 text-slate-600"><span>الشحن</span><b>{quote?.shippingFeeMinor===null||quote?.shippingFeeMinor===undefined?'غير متاح بعد':money(quote.shippingFeeMinor)}</b></div><div className="flex justify-between gap-2 text-slate-600"><span>ضريبة السلع والشحن</span><b>{quote?.productVatMinor===null||quote?.productVatMinor===undefined?'بانتظار سياسة معتمدة':money(quote.productVatMinor+(quote.shippingVatMinor||0))}</b></div>
+  <aside id="order-summary" className="h-fit scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-4 sm:p-5"><h2 className="text-lg font-extrabold text-[#16294a]">ملخص الطلب</h2>
+   <div className="mt-4 space-y-3 text-sm"><div className="flex justify-between gap-2"><span>السلع ({totalQuantity})</span><b>{quote?money(quote.subtotalMinor):'—'}</b></div><div className="flex justify-between gap-2 text-slate-600"><span>الخصومات</span><b>{quote?money(quote.discountMinor):'—'}</b></div><div className="flex justify-between gap-2 text-slate-600"><span>الشحن</span><b>{quote?.shippingFeeMinor===null||quote?.shippingFeeMinor===undefined?'غير متاح بعد':money(quote.shippingFeeMinor)}</b></div>{quote?.vatEnabled&&<div className="flex justify-between gap-2 text-slate-600"><span>ضريبة السلع والشحن</span><b>{quote.productVatMinor===null?'بانتظار سياسة معتمدة':money(quote.productVatMinor+(quote.shippingVatMinor||0))}</b></div>}
     <div className="flex items-baseline justify-between gap-2 border-t border-slate-200 pt-3 text-base font-extrabold text-[#c4510b]"><span>الإجمالي</span><b className="text-xl">{quote?.totalMinor===null||quote?.totalMinor===undefined?'غير محسوب':money(quote.totalMinor)}</b></div></div>
    {quote?.deliveryEstimate&&<p className="mt-3 text-xs text-slate-600">التوصيل المتوقع: {quote.deliveryEstimate}</p>}
    <button type="button" disabled className="mt-5 min-h-12 w-full cursor-not-allowed rounded-xl bg-slate-300 px-4 text-sm font-extrabold text-slate-600" aria-disabled="true">الدفع غير متاح حاليًا</button>
@@ -93,6 +96,6 @@ export function PurchaseCart({addresses,signedIn}:{addresses:CartAddress[];signe
    {invalid&&<p className="mt-2 text-xs font-bold text-red-700">عدّل الكميات أو احذف المنتجات غير المتاحة لمتابعة السلة.</p>}
    <div className="mt-4 flex flex-wrap gap-2 text-xs"><Link href="/shop" className="font-bold text-[#16294a] underline">متابعة التصفح</Link><Link href="/account/addresses" className="font-bold text-[#16294a] underline">إدارة عناوين الشحن</Link></div>
   </aside>
-  {items.length>0&&<div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-6px_24px_rgba(15,23,42,.08)] backdrop-blur lg:hidden"><div className="mx-auto flex max-w-xl items-center gap-3"><div className="min-w-0"><p className="text-[10px] font-bold text-slate-500">الإجمالي قبل الدفع</p><p className="truncate text-base font-black text-[#c4510b]">{quote?.totalMinor===null||quote?.totalMinor===undefined?'غير محسوب':money(quote.totalMinor)}</p></div><button type="button" disabled className="min-h-12 flex-1 rounded-xl bg-slate-300 px-3 text-sm font-extrabold text-slate-600">الدفع غير متاح</button></div></div>}
+  {items.length>0&&<div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-6px_24px_rgba(15,23,42,.08)] backdrop-blur lg:hidden"><div className="mx-auto flex max-w-xl items-center gap-3"><div className="min-w-0"><p className="text-[10px] font-bold text-slate-500">الإجمالي قبل الدفع</p><p className="truncate text-base font-black text-[#c4510b]">{quote?.totalMinor===null||quote?.totalMinor===undefined?'غير محسوب':money(quote.totalMinor)}</p></div><button type="button" onClick={()=>document.getElementById('order-summary')?.scrollIntoView({behavior:'smooth',block:'center'})} className="min-h-12 flex-1 rounded-xl bg-[#16294a] px-3 text-sm font-extrabold text-white">مراجعة الطلب</button></div></div>}
  </div>;
 }

@@ -1,7 +1,7 @@
 import {notFound} from 'next/navigation';
 import {getCommerceConfig} from '@/lib/commerce/settings';
 import {prisma} from '@/lib/prisma';
-import {readPublicCommerceProduct} from '@/lib/commerce/public-product';
+import {readPublicCommerceProduct,readSimilarPublicCommerceProducts} from '@/lib/commerce/public-product';
 import {readApprovedFiscalPolicy} from '@/lib/finance/fiscal-policy';
 import {CommerceProductDetail} from '@/components/commerce/product-detail';
 
@@ -13,5 +13,6 @@ export default async function CommerceProductPage({params}:{params:Promise<{id:s
  const policy=await readApprovedFiscalPolicy(prisma,new Date()).catch(()=>null);
  const calculation=policy?.calculationPolicy;
  const vatEnabled=policy?(calculation?.vatControl?.enabled??policy.vatBps>0):false;
- return <CommerceProductDetail product={product} shippingFeeMinor={config.shippingFeeMinor} priceBasis={vatEnabled?(calculation?.priceBasis||null):null} purchasingEnabled={config.purchasingEnabled} shippingTerms={config.text.shippingTerms}/>;
+ const similar=await readSimilarPublicCommerceProducts(BigInt(id),4).catch(()=>[]);
+ return <CommerceProductDetail product={product} similar={similar} shippingFeeMinor={config.shippingFeeMinor} priceBasis={vatEnabled?(calculation?.priceBasis||null):null} purchasingEnabled={config.purchasingEnabled} shippingTerms={config.text.shippingTerms}/>;
 }

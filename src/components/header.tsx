@@ -12,6 +12,8 @@ import { HeaderCta } from '@/components/header-cta';
 import { LiveClock } from '@/components/live-clock';
 import { AdminAlertsBanner } from '@/components/admin-alerts-banner';
 import { ProfileSwitcher } from '@/components/profile-switcher';
+import {PurchaseCartLink} from '@/components/commerce/purchase-cart-client';
+import {getCommerceConfig} from '@/lib/commerce/settings';
 
 export async function Header() {
   const session = await getSession();
@@ -20,6 +22,7 @@ export async function Header() {
   const myStoreId = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // اسم المتجر لمبدّل الهوية (اختياري: يظهر فقط لأصحاب المتاجر)
   const myStoreName = myStoreId ? await import('@/lib/merchant').then((m) => m.getStoreMeta(myStoreId)).then((mt) => mt?.storeName || 'متجري').catch(() => 'متجري') : '';
+  const commerceCartEnabled=await getCommerceConfig().then(config=>config.enabled).catch(()=>false);
   // الهوية الفعّالة الآن (اسمها ونوعها) — لعرض «من أنا» في القائمة، تتغيّر عند التبديل
   const activeProfile = session ? await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).catch(() => null) : null;
   // الحسابات المرتبطة بنفس المالك (للتبديل من مبدّل الهوية) — فارغة إن لا ربط
@@ -50,6 +53,7 @@ export async function Header() {
 
         {/* بحث مصغّر: عدسة تفتح حقل البحث */}
         <HeaderSearch canAdminSearch={access?.keys.has('search:view') ?? false} />
+        {commerceCartEnabled&&<PurchaseCartLink compact/>}
 
         {/* جرس الرسائل والتنبيهات + ساعة حية بتوقيت الرياض تحته */}
         <div className="flex shrink-0 flex-col items-center gap-0.5">

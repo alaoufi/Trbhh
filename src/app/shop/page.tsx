@@ -4,17 +4,16 @@ import { hasAction } from '@/lib/roles';
 import { PLACEHOLDER } from '@/lib/media';
 import { primaryImages } from '@/lib/account';
 import { getCommerceConfig } from '@/lib/commerce/settings';
+import { readPublicCommerceProducts } from '@/lib/commerce/public-product';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 import { getCommerceGateway } from '@/lib/commerce/runtime';
 import { CommerceHome, type CommerceHomeSection, type CommerceBanner, type CommerceCategory } from '@/components/commerce/commerce-home';
 import { firstImageUrl, type CommerceCardItem } from '@/components/commerce/catalog';
 import type { HeroSlide } from '@/components/commerce/commerce-hero';
-import {PurchaseCartLink} from '@/components/commerce/purchase-cart-client';
 
 export const dynamic = 'force-dynamic';
 
 // نفس منطق backend المعتمد (الإعداد/المخطط/الاستعلام/بوّابة الدفع) لم يتغيّر — التغيير في العرض فقط.
-type Row = { id: bigint; title: string; price_minor: number; stock_available: number; images: unknown; description: string | null; featured: number | null };
 
 /**
  * حالة المعاينة الإدارية عند طلب ?preview=1 (فحص منطقي لا يوقف الزائر):
@@ -82,24 +81,25 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
     return <div className="card-3d rounded-xl p-6 text-sm font-bold leading-7 text-[#16294a]">{msg}</div>;
   }
   await assertCommerceSchemaReady(prisma);
-  const [products, gateway] = await Promise.all([
-    prisma.$queryRaw<Row[]>`SELECT cp.id,cp.title,cp.price_minor,cp.stock_available,sp.images,sp.description,sp.featured FROM commerce_products cp LEFT JOIN supplier_products sp ON sp.commerce_product_id=cp.id LEFT JOIN supplier_connections sc ON sc.id=sp.connection_id LEFT JOIN supplier_integration_profiles sip ON sip.supplier_id=sp.supplier_id LEFT JOIN commerce_suppliers s ON s.id=sp.supplier_id WHERE cp.approved=1 AND cp.visible=1 AND cp.enabled=1 AND cp.currency='SAR' AND (sp.id IS NULL OR (sp.active=1 AND sp.visible=1 AND s.active=1 AND sip.maintenance=0 AND sc.status='connected')) ORDER BY COALESCE(sp.featured,0) DESC,cp.id DESC LIMIT 100`,
+  const [candidateIds, gateway] = await Promise.all([
+    prisma.$queryRaw<{id:bigint}[]>`SELECT cp.id FROM commerce_products cp WHERE cp.approved=1 AND cp.visible=1 AND cp.enabled=1 AND cp.currency='SAR' ORDER BY cp.id DESC LIMIT 100`,
     getCommerceGateway(),
   ]);
+  const products=[...(await readPublicCommerceProducts(candidateIds.map(row=>row.id))).values()].sort((a,b)=>Number(b.featured)-Number(a.featured)||Number(b.id)-Number(a.id));
   const canCheckout = config.purchasingEnabled && config.enabled && config.paymentsEnabled && gateway?.ready && config.shippingFeeMinor !== null && !!config.text.shippingTerms;
 
-  const shortInfo = (d: string | null): string | null => {
-    const t = (d ?? '').replace(/\s+/g, ' ').trim();
+  const shortInfo = (d: string): string | null => {
+    const t = d.replace(/\s+/g, ' ').trim();
     return t ? (t.length > 60 ? `${t.slice(0, 57)}…` : t) : null;
   };
 
-  const toCard = (p: Row): CommerceCardItem => ({
-    id: p.id.toString(),
+  const toCard = (p: (typeof products)[number]): CommerceCardItem => ({
+    id: p.id,
     title: p.title,
-    priceMinor: p.price_minor,
-    stock: p.stock_available,
+    priceMinor: p.priceMinor,
+    stock: p.stock,
     image: firstImageUrl(p.images),
-    featured: (p.featured ?? 0) > 0,
+    featured: p.featured,
     info: shortInfo(p.description),
     href: `/shop/${p.id}`,
     buyable: canCheckout,
@@ -165,7 +165,6 @@ export default async function ApprovedShop({ searchParams }: { searchParams: Pro
         <h1 className="text-2xl font-extrabold text-[#16294a] sm:text-3xl">{pageTitle}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{pageDesc}</p>
        </div>
-       {!usingDemoAds&&<PurchaseCartLink/>}
       </div>
       {!canCheckout && !usingDemoAds && <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">{config.text.unavailable}</p>}
       {sourceCards.length === 0

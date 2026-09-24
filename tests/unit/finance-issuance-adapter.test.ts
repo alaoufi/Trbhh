@@ -14,7 +14,7 @@ const policy:ApprovedFiscalPolicy={id:'7',requestId:'8',effectiveFrom:'2026-07-0
 function fixture(vatOff=false){
  const sourcePolicy=vatOff?{...policy,issuer:{...policy.issuer,taxNumber:''},calculationPolicy:{...policy.calculationPolicy,shippingVatBps:1500,vatControl:{enabled:false,registrationConfirmed:false,registrationEffectiveFrom:null,registrationThresholdMinor:37500000}}}:policy;
  const original=buildOrderFiscalSnapshot(2n,createdAt,sourcePolicy,shipping,[{...quoteFiscalProduct(sourcePolicy,{key:'5',title:'Frozen item',quantity:3,unitPriceMinor:4}),supplierId:'6',supplierMinor:6},quoteFiscalShipping(sourcePolicy,5)]);
- const source:FinanceOrder={id:'2',memberId:'9',customerName:shipping.name,status:'paid',createdAt:createdAt.toISOString(),paidAt:paidAt.toISOString(),subtotalMinor:12,shippingMinor:5,totalMinor:17,currency:'SAR',items:[{productId:'5',title:'Frozen item',quantity:3,unitMinor:4,totalMinor:12}],suppliers:[{supplierId:'6',supplierName:'Frozen supplier',productId:'5',amountMinor:6}]};
+ const source:FinanceOrder={id:'2',memberId:'9',customerName:shipping.name,status:'paid',createdAt:createdAt.toISOString(),paidAt:paidAt.toISOString(),subtotalMinor:12,shippingMinor:5,totalMinor:17,currency:'SAR',items:[{productId:'5',title:'Frozen item',quantity:3,unitMinor:4,listUnitMinor:null,discountMinor:0,totalMinor:12,variantSnapshot:null}],suppliers:[{supplierId:'6',supplierName:'Frozen supplier',productId:'5',amountMinor:6}]};
  const state={missing:false,closed:false,policyMismatch:false,receiptAmount:17,snapshot:structuredClone(original),source,savedHash:fingerprint(original),issued:null as FiscalSnapshotV2|null};
  const calls:{sql:string;values:unknown[]}[]=[];
  const query=vi.fn(async(sql:TemplateStringsArray,...values:unknown[])=>{
@@ -23,7 +23,7 @@ function fixture(vatOff=false){
   if(text.includes('FROM finance_tax_policies'))return [{id:7n,request_id:8n,effective_from:'2026-07-01',issuer:sourcePolicy.issuer,vat_bps:1500,policy_reference:sourcePolicy.policyReference,created_at:new Date(sourcePolicy.at),calculation_policy:sourcePolicy.calculationPolicy,approved_payload:{...sourcePolicy,vatBps:state.policyMismatch?500:1500}}];
   if(text.includes('FROM commerce_receipts'))return [{id:3n,order_id:2n,amount_minor:BigInt(state.receiptAmount),currency:'SAR',recorded_at:paidAt}];
   if(text.includes('FROM commerce_orders'))return [{id:2n,member_id:9n,status:'paid',currency:'SAR',created_at:createdAt,paid_at:paidAt,subtotal_minor:12,shipping_fee_minor:5,total_minor:17,shipping}];
-  if(text.includes('FROM commerce_order_items'))return [{product_id:5n,title:'Frozen item',quantity:3,unit_price_minor:4,total_minor:12}];
+  if(text.includes('FROM commerce_order_items'))return [{product_id:5n,title:'Frozen item',quantity:3,unit_price_minor:4,list_unit_price_minor:null,discount_minor:0,total_minor:12,variant_key:'',variant_snapshot:null}];
   if(text.includes('FROM commerce_order_suppliers'))return [{supplier_id:6n,supplier_name:'Frozen supplier',product_id:5n,total_cost_minor:6}];
   if(text.includes('FROM finance_periods'))return [{closed_at:state.closed?issuedAt:null,checks_json:[],reason:'',version:0}];
   if(text.includes('FROM finance_sequences'))return [{next_value:1n}];

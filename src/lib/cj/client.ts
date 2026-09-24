@@ -300,6 +300,8 @@ function mapInventory(s: Record<string, unknown>): CjInventory {
     areaName: str(s.areaEn ?? s.areaEnName ?? s.countryNameEn ?? s.areaName),
     countryCode: str(s.countryCode),
     storageNum: num(s.totalInventory ?? s.storageNum ?? s.totalInventoryNum) ?? 0,
+    cjInventoryQuantity: num(s.cjInventory ?? s.cjInventoryNum) ?? 0,
+    verifiedWarehouse: num(s.verifiedWarehouse),
   };
 }
 function mapFreight(o: Record<string, unknown>): CjFreightOption {

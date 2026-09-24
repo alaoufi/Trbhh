@@ -35,6 +35,9 @@ export type CjInventory = {
   areaName: string | null;
   countryCode: string | null;
   storageNum: number;
+  /** Quantity stocked by CJ itself (factory inventory is not sale-ready stock). */
+  cjInventoryQuantity?: number;
+  verifiedWarehouse?: number | null;
 };
 
 export type CjWarehouse = {

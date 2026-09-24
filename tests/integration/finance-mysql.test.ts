@@ -10,6 +10,7 @@ import {permissionKeySet} from '@/lib/access-control/catalog';
 import {readAccess} from '@/lib/access-control/store';
 import {requireFinancePermission} from '@/lib/access-control/financial-authorization';
 import {FINANCE_DDL,FINANCE_TABLES,assertFinanceSchemaReady} from '@/lib/finance/schema';
+import {CJ_DDL} from '@/lib/cj/schema';
 import {approveSettlement,cancelSettlement,cancelDraftInvoice,restoreDraftInvoice,captureInvoices,closeMonth,CLOSE_CHECKS,financeMonth,issueInvoice,prepareSettlement,recordExpense,releaseAccrual,reverseExpense,reverseSettlement,saveBudget,type ExpenseInput} from '@/lib/finance/service';
 import {calculateFiscalLines} from '@/lib/finance/calculations';
 import {issueAdjustment,recordVerifiedFinanceRefund,type VerifiedFinanceRefund} from '@/lib/finance/adjustments';
@@ -202,7 +203,7 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     for(const mode of [modes.globalMode,modes.sessionMode])expect(mode).toMatch(/\bSTRICT_(?:TRANS|ALL)_TABLES\b/);
     await db.$executeRawUnsafe(`CREATE TABLE users(id BIGINT UNSIGNED NOT NULL PRIMARY KEY,name VARCHAR(255) NULL,userName VARCHAR(255) NULL,phoneNumber VARCHAR(255) NULL,is_admin TINYINT NOT NULL DEFAULT 0,ban ENUM('checked','no') NULL DEFAULT 'no',ban_until DATETIME NULL,archived_at DATETIME NULL,merged_into BIGINT NULL,auth_session_version VARCHAR(64) NOT NULL DEFAULT '0') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`);
     await db.$executeRawUnsafe(`CREATE TABLE site_settings(k VARCHAR(100) NOT NULL PRIMARY KEY,v TEXT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`);
-    for(const ddl of [...ACCESS_CONTROL_DDL,...COMMERCE_DDL,...SUPPLIER_DDL,...FINANCE_DDL])await db.$executeRawUnsafe(ddl);
+    for(const ddl of [...ACCESS_CONTROL_DDL,...COMMERCE_DDL,...CJ_DDL,...SUPPLIER_DDL,...FINANCE_DDL])await db.$executeRawUnsafe(ddl);
     await assertFinanceSchemaReady(db);
   });
   afterAll(async()=>{

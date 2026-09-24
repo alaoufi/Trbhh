@@ -7,7 +7,7 @@ import {formatSar} from '@/lib/commerce/money';
 import {COMMERCE_CART_EVENT,COMMERCE_CART_STORAGE_KEY,addCartLine,countCartUnits,mergeCartLines,normalizeCart,readStoredCart,removeCartLine,setCartQuantity,writeStoredCart,type CartLine} from '@/lib/commerce/cart';
 import type {SaudiAddressSnapshot} from '@/lib/commerce/addresses';
 
-type ResolvedLine=CartLine&{title:string;image:string|null;variantName:string|null;unitPriceMinor:number;totalMinor:number;stock:number;available:boolean;saudiShippingAvailable:boolean;deliveryEstimate:string|null};
+type ResolvedLine=CartLine&{title:string;image:string|null;variantName:string|null;variantKey:string|null;variantSku:string|null;variantVid:string|null;variantAttributes:Record<string,string>;unitPriceMinor:number;originalPriceMinor:number;discountMinor:number;totalMinor:number;stock:number;available:boolean;saudiShippingAvailable:boolean;deliveryEstimate:string|null;shippingFeeMinor:number|null};
 type Quote={lines:ResolvedLine[];subtotalMinor:number;discountMinor:number;vatEnabled:boolean;productVatMinor:number|null;shippingFeeMinor:number|null;shippingVatMinor:number|null;shippingTotalMinor:number|null;totalMinor:number|null;pricingVerified:boolean;purchasingEnabled:boolean;deliveryEstimate:null};
 function money(value:number){return `${formatSar(value)} ر.س`;}
 function readClientCart(){return readStoredCart(window.localStorage,window.sessionStorage);}
@@ -21,17 +21,22 @@ export function PurchaseCartLink({compact=false}:{compact?:boolean}){
  return <Link href="/shop/cart" aria-label={`سلة المشتريات، ${count} منتج`} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#16294a]/20 bg-white px-3 py-2 text-sm font-extrabold text-[#16294a] ${compact?'shrink-0':''}`}><ShoppingCart className="h-5 w-5" aria-hidden="true"/>{!compact&&'السلة'}<span className="min-w-6 rounded-full bg-[#16294a] px-2 py-0.5 text-xs text-white">{count}</span></Link>;
 }
 
-export function AddCommerceCartItem({productId,variants,requiresVariant,maximum,selectedVariantKey,onVariantChange}:{productId:string;variants:{key:string;name:string;priceMinor:number;stock:number;options:string[]}[];requiresVariant:boolean;maximum:number;selectedVariantKey?:string;onVariantChange?:(key:string)=>void}){
- const[internalSelected,setInternalSelected]=useState(''),[quantity,setQuantity]=useState('1'),[status,setStatus]=useState('');
+export function AddCommerceCartItem({productId,variants,requiresVariant,maximum,selectedVariantKey,onVariantChange}:{productId:string;variants:{key:string;name:string;priceMinor:number;stock:number;options:string[];attributes?:Record<string,string>;sku?:string|null;vid?:string|null;image?:string|null;originalPriceMinor?:number|null;shippingMinor?:number|null;deliveryEstimate?:string|null}[];requiresVariant:boolean;maximum:number;selectedVariantKey?:string;onVariantChange?:(key:string)=>void}){
+ const[internalSelected,setInternalSelected]=useState(''),[quantity,setQuantity]=useState('1'),[status,setStatus]=useState(''),[checking,setChecking]=useState(false);
  const selected=selectedVariantKey??internalSelected,variant=variants.find(item=>item.key===selected),mustSelect=requiresVariant;
- function add(){
+ async function add(){
+  if(checking)return;setChecking(true);setStatus('');
   try{
    const qty=Number(quantity);if(!Number.isSafeInteger(qty)||qty<1||qty>(variant?.stock??maximum))throw new Error('quantity');
    if(mustSelect&&!variant)throw new Error('variant');
+   const verify=await fetch('/api/shop/cart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:[{productId,quantity:qty,...(variant?{variantKey:variant.key}:{})}]}),cache:'no-store'});
+   if(!verify.ok)throw new Error('quote');const quote=await verify.json() as {lines?:{available:boolean;saudiShippingAvailable:boolean;unitPriceMinor:number;stock:number}[]};const line=quote.lines?.[0];
+   if(!line?.available||!line.saudiShippingAvailable||qty>line.stock||line.unitPriceMinor!==variant?.priceMinor&&variant)throw new Error('quote');
    const current=readClientCart();
    const next=addCartLine(current,{productId,quantity:qty,...(variant?{variantKey:variant.key}:{})});
    publishCart(next);setStatus('أُضيف المنتج إلى السلة.');
-  }catch(error){setStatus(error instanceof Error&&error.message==='variant'?'اختر اللون أو المقاس قبل الإضافة.':'تعذر الإضافة؛ تحقق من الكمية أو حد السلة.');}
+  }catch(error){setStatus(error instanceof Error&&error.message==='variant'?'اختر اللون أو المقاس قبل الإضافة.':error instanceof Error&&error.message==='quote'?'تعذر التحقق من السعر أو المخزون أو الشحن. حدّث المنتج ثم حاول مجددًا.':'تعذر الإضافة؛ تحقق من الكمية أو حد السلة.');}
+  finally{setChecking(false);}
  }
  const cap=variant?.stock??maximum;
  return <div className="space-y-3">
@@ -40,9 +45,10 @@ export function AddCommerceCartItem({productId,variants,requiresVariant,maximum,
     <option value="">اختر الخيار</option>{variants.map(item=><option key={item.key} value={item.key}>{item.name}{item.options.length&&item.options.join(' / ')!==item.name?` — ${item.options.join(' / ')}`:''} — المتاح {item.stock}</option>)}
    </select>
   </label>}
+  {variant&&<div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs" aria-live="polite"><p className="font-extrabold text-emerald-900">المتغير المحدد · {money(variant.priceMinor)} · متاح {variant.stock}</p>{(variant.vid||variant.sku)&&<p className="mt-1 text-slate-700">{variant.vid?`VID: ${variant.vid}`:''}{variant.vid&&variant.sku?' · ':''}{variant.sku?`SKU: ${variant.sku}`:''}</p>}{Object.entries(variant.attributes||{}).length>0&&<dl className="mt-2 grid grid-cols-2 gap-1">{Object.entries(variant.attributes!).map(([key,value])=><div key={`${key}-${value}`} className="flex gap-1"><dt className="font-bold">{key}:</dt><dd>{value}</dd></div>)}</dl>}{variant.deliveryEstimate&&<p className="mt-1">التوصيل المتوقع: {variant.deliveryEstimate}</p>}</div>}
   <div className="flex flex-wrap items-end gap-3">
    <label className="text-sm font-bold">الكمية<input type="number" min={1} max={cap} step={1} value={quantity} onChange={event=>setQuantity(event.target.value)} className="mt-1 block h-12 w-24 rounded-xl border border-slate-300 px-3"/></label>
-   <button data-add-commerce-cart type="button" onClick={add} disabled={mustSelect&&!variant} className="min-h-12 flex-1 rounded-xl bg-[#ff6a1a] px-5 text-sm font-extrabold text-white shadow-sm hover:bg-[#ea5c10] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">أضف إلى السلة</button>
+   <button data-add-commerce-cart type="button" onClick={add} disabled={checking||mustSelect&&!variant} className="min-h-12 flex-1 rounded-xl bg-[#ff6a1a] px-5 text-sm font-extrabold text-white shadow-sm hover:bg-[#ea5c10] disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">{checking?'جارٍ التحقق…':'أضف إلى السلة'}</button>
   </div>
   <p role="status" aria-live="polite" className="min-h-5 text-sm font-bold text-emerald-700">{status}</p>
  </div>;
@@ -78,10 +84,11 @@ export function PurchaseCart({addresses,signedIn}:{addresses:CartAddress[];signe
    <div className="space-y-3">{quote?.lines.map((line,index)=><article key={`${line.productId}-${line.variantKey||''}-${index}`} className="grid min-w-0 grid-cols-[88px_1fr] gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:grid-cols-[112px_1fr] sm:gap-4 sm:p-4">
     <div className="aspect-square overflow-hidden rounded-xl bg-slate-100">{line.image?<img src={line.image} alt="" loading="lazy" className="h-full w-full object-contain"/>:<div className="grid h-full place-items-center text-xs text-slate-400">لا توجد صورة</div>}</div>
     <div className="min-w-0"><Link href={`/shop/${line.productId}`} className="line-clamp-2 text-sm font-extrabold leading-6 text-[#16294a] sm:text-base">{line.title}</Link>
-     {line.variantName&&<p className="mt-1 truncate text-xs text-slate-600">الخيار: {line.variantName}</p>}
-     <p className="mt-2 text-sm font-bold text-[#c4510b]">{money(line.unitPriceMinor)} <span className="text-xs font-medium text-slate-500">للوحدة</span></p>
+     {line.variantName&&<p className="mt-1 text-xs font-semibold text-slate-600">الخيار: {line.variantName}{line.variantVid?` · VID ${line.variantVid}`:''}{line.variantSku?` · SKU ${line.variantSku}`:''}</p>}
+     {Object.entries(line.variantAttributes||{}).length>0&&<dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg bg-slate-50 p-2 text-xs">{Object.entries(line.variantAttributes).map(([key,value])=><div key={`${key}-${value}`} className="flex min-w-0 gap-1"><dt className="shrink-0 font-bold text-slate-500">{key}:</dt><dd className="min-w-0 break-words font-semibold text-[#16294a]">{value}</dd></div>)}</dl>}
+     <p className="mt-2 text-sm font-bold text-[#c4510b]">{money(line.unitPriceMinor)} <span className="text-xs font-medium text-slate-500">للوحدة</span>{line.originalPriceMinor>line.unitPriceMinor&&<><del className="ms-2 text-xs font-medium text-slate-500">{money(line.originalPriceMinor)}</del><span className="ms-2 rounded-full bg-red-50 px-2 py-1 text-xs font-extrabold text-red-700">خصم {money(line.discountMinor)}</span></>}</p>
      <p className={`mt-1 text-xs font-bold ${line.available?'text-emerald-700':'text-red-700'}`}>{line.available?`متوفر · الكمية المتاحة ${line.stock}`:'الكمية أو الخيار غير متوفر حاليًا'}</p>
-     {line.saudiShippingAvailable&&<p className="mt-1 break-words text-xs leading-5 text-slate-600">الشحن إلى السعودية متاح من بيانات الناقل{line.deliveryEstimate?` · المدة المسجلة ${line.deliveryEstimate}`:''}</p>}
+     {line.saudiShippingAvailable&&<p className="mt-1 break-words text-xs leading-5 text-slate-600">الشحن إلى السعودية متاح من بيانات الناقل{line.deliveryEstimate?` · المدة المسجلة ${line.deliveryEstimate}`:''}{line.shippingFeeMinor!==null?` · ${money(line.shippingFeeMinor)}`:''}</p>}
      <div className="mt-3 flex flex-wrap items-center gap-2"><div className="flex items-center rounded-lg border border-slate-300"><button type="button" disabled={line.quantity<=1} aria-label={`إنقاص كمية ${line.title}`} onClick={()=>save(setCartQuantity(items,line.productId,line.quantity-1,line.variantKey))} className="min-h-10 min-w-10 text-lg font-black disabled:opacity-40">−</button><input aria-label={`كمية ${line.title}`} type="number" min={1} max={Math.max(1,line.stock)} value={line.quantity} onChange={event=>{const qty=Number(event.target.value);if(Number.isSafeInteger(qty)&&qty>0&&qty<=Math.max(1,line.stock))save(setCartQuantity(items,line.productId,qty,line.variantKey));}} className="h-10 w-12 border-x border-slate-200 text-center text-sm"/><button type="button" disabled={!line.available||line.quantity>=line.stock} aria-label={`زيادة كمية ${line.title}`} onClick={()=>save(setCartQuantity(items,line.productId,line.quantity+1,line.variantKey))} className="min-h-10 min-w-10 text-lg font-black disabled:opacity-40">+</button></div>
       <button type="button" onClick={()=>save(removeCartLine(items,line.productId,line.variantKey))} className="min-h-10 rounded-lg px-3 text-xs font-bold text-red-700 hover:bg-red-50">حذف</button><span className="ms-auto text-sm font-extrabold text-[#16294a]">{money(line.totalMinor)}</span></div>
     </div>

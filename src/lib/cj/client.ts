@@ -290,6 +290,7 @@ function mapVariant(v: Record<string, unknown>): CjVariant {
     variantSellPrice: parsePrice(v.variantSellPrice ?? v.sellPrice ?? v.sellprice),
     variantImage: str(v.variantImage) || str(v.bigImg) || str(v.bigimg) || str(v.img),
     variantWeight: num(v.variantWeight ?? v.weight),
+    attributes: Object.fromEntries(Object.entries(v).filter(([,value])=>['string','number','boolean'].includes(typeof value))),
   };
 }
 function mapInventory(s: Record<string, unknown>): CjInventory {

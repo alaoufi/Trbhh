@@ -9,6 +9,7 @@ import {createOrder, claimPaymentAttempt, recordPaymentReference, markPaymentUnc
 import {dispatchPaidNotification} from '@/lib/commerce/notifications';
 import {commerceConfigFromRows} from '@/lib/commerce/config';
 import {updateCommerceProduct} from '@/lib/commerce/products';
+import {CJ_DDL} from '@/lib/cj/schema';
 
 const enabled=process.env.COMMERCE_DB_TESTS==='1';
 const supplierForeignKeys = [
@@ -74,6 +75,7 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
     expect((await client.$queryRaw<{name:string}[]>`SELECT DATABASE() AS name`)[0].name).toBe('trbhh_commerce_test');
     await client.$executeRawUnsafe('CREATE TABLE site_settings (k VARCHAR(60) NOT NULL PRIMARY KEY,v TEXT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin');
     for(const ddl of COMMERCE_DDL) await client.$executeRawUnsafe(ddl);
+    for(const ddl of CJ_DDL) await client.$executeRawUnsafe(ddl);
     for(const ddl of SUPPLIER_DDL) await client.$executeRawUnsafe(ddl);
     for(const ddl of FINANCE_DDL) await client.$executeRawUnsafe(ddl);
     await assertCommerceSchemaReady(client);

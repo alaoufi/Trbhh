@@ -88,7 +88,7 @@ export function parseCjImages(row: Pick<CjProductRow, 'images' | 'image'>): stri
 
 /** تفاصيل غنية مخزَّنة للسلعة (متغيّرات/مواصفات) — للعرض بلا اتصال حيّ. */
 export type CjDetails = {
-  variants: { vid: string; name: string; optionKey: string; sku: string; priceUsd: number | null; weight: number | null }[];
+  variants: { vid: string; name: string; optionKey: string; sku: string; priceUsd: number | null; weight: number | null;attributes?:Record<string,unknown> }[];
   weightMin: number | null;
   weightMax: number | null;
   variantCount: number;
@@ -102,7 +102,7 @@ export function parseCjDetails(row: Pick<CjProductRow, 'details_json'>): CjDetai
 }
 /** يبني تفاصيل مخزَّنة من متغيّرات CJ (بلا اتصالات إضافية). */
 export function buildCjDetails(variants: CjVariant[]): CjDetails {
-  const list = (variants ?? []).map((v) => ({ vid: v.vid, name: (v.variantName ?? '').trim(), optionKey: (v.variantKey ?? '').trim(), sku: v.variantSku, priceUsd: v.variantSellPrice, weight: v.variantWeight }));
+  const list = (variants ?? []).map((v) => ({ vid: v.vid, name: (v.variantName ?? '').trim(), optionKey: (v.variantKey ?? '').trim(), sku: v.variantSku, priceUsd: v.variantSellPrice, weight: v.variantWeight,attributes:v.attributes??{} }));
   const weights = list.map((v) => v.weight).filter((w): w is number => typeof w === 'number' && w > 0);
   return { variants: list, weightMin: weights.length ? Math.min(...weights) : null, weightMax: weights.length ? Math.max(...weights) : null, variantCount: list.length };
 }

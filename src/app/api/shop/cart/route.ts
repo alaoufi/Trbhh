@@ -19,22 +19,23 @@ export async function POST(request:Request){
   if(!(await takeSecurityAttempt(`commerce-cart-quote:${clientKey}`,60)))return NextResponse.json({error:'rate_limited'},{status:429,headers:{'Cache-Control':'no-store'}});
   const products=await readPublicCommerceProducts(items.map(item=>BigInt(item.productId)));
   const lines=items.map(item=>{
-   const product=products.get(item.productId);if(!product)return {productId:item.productId,quantity:item.quantity,title:'منتج غير متاح',image:null,variantName:null,unitPriceMinor:0,totalMinor:0,stock:0,available:false,saudiShippingAvailable:false,deliveryEstimate:null};
+   const product=products.get(item.productId);if(!product)return {productId:item.productId,quantity:item.quantity,title:'منتج غير متاح',image:null,variantKey:null,variantName:null,variantSku:null,variantVid:null,variantAttributes:{},unitPriceMinor:0,originalPriceMinor:0,discountMinor:0,totalMinor:0,stock:0,available:false,saudiShippingAvailable:false,deliveryEstimate:null,shippingFeeMinor:null};
    const variant=item.variantKey?product.variants.find(v=>v.key===item.variantKey):undefined;
    const validVariant=product.requiresVariantSelection?!!variant:!item.variantKey;
    const unitPriceMinor=variant?.priceMinor??product.priceMinor,stock=variant?.stock??product.stock;
-   return {productId:item.productId,quantity:item.quantity,title:product.title,image:product.images[0]||null,variantName:variant?.name||null,unitPriceMinor,totalMinor:checkedMoney(unitPriceMinor*item.quantity),stock,available:validVariant&&item.quantity<=stock,saudiShippingAvailable:product.saudiShippingAvailable,deliveryEstimate:product.deliveryEstimate};
+   const originalPriceMinor=variant?.originalPriceMinor&&variant.originalPriceMinor>unitPriceMinor?variant.originalPriceMinor:unitPriceMinor,discountMinor=checkedMoney((originalPriceMinor-unitPriceMinor)*item.quantity);
+   return {productId:item.productId,quantity:item.quantity,title:product.title,image:variant?.image||product.images[0]||null,variantKey:variant?.key||null,variantName:variant?.name||null,variantSku:variant?.sku||null,variantVid:variant?.vid||null,variantAttributes:variant?.attributes||{},unitPriceMinor,originalPriceMinor,discountMinor,totalMinor:checkedMoney(unitPriceMinor*item.quantity),stock,available:validVariant&&item.quantity<=stock,saudiShippingAvailable:product.saudiShippingAvailable,deliveryEstimate:variant?.deliveryEstimate||product.deliveryEstimate,shippingFeeMinor:variant?.shippingMinor??null};
   });
   const [config,gateway,policy]=await Promise.all([getCommerceConfig(),getCommerceGateway(),readApprovedFiscalPolicy(prisma,new Date()).catch(()=>null)]);
   const vatEnabled=policy?(policy.calculationPolicy?.vatControl?.enabled??policy.vatBps>0):false;
   let productVatMinor:number|null=null,shippingVatMinor:number|null=null,shippingTotalMinor:number|null=null,totalMinor:number|null=null;
   if(policy){
-   const fiscal=lines.filter(line=>line.available).map(line=>quoteFiscalProduct(policy,{key:line.productId,title:line.title,quantity:line.quantity,unitPriceMinor:line.unitPriceMinor}));
+   const fiscal=lines.filter(line=>line.available).map(line=>quoteFiscalProduct(policy,{key:line.productId,title:line.title,quantity:line.quantity,unitPriceMinor:line.originalPriceMinor,discountMinor:line.discountMinor}));
    productVatMinor=fiscal.reduce((sum,line)=>sum+line.vatMinor,0);
    if(config.shippingFeeMinor!==null){const shipping=quoteFiscalShipping(policy,config.shippingFeeMinor);shippingVatMinor=shipping.vatMinor;shippingTotalMinor=shipping.grossMinor;totalMinor=checkedMoney([...fiscal.map(line=>line.grossMinor),shipping.grossMinor].reduce((sum,value)=>sum+value,0));}
   }
-  const subtotalMinor=lines.filter(line=>line.available).reduce((sum,line)=>checkedMoney(sum+line.totalMinor),0);
+  const subtotalMinor=lines.filter(line=>line.available).reduce((sum,line)=>checkedMoney(sum+line.totalMinor),0),discountMinor=lines.filter(line=>line.available).reduce((sum,line)=>checkedMoney(sum+(line.discountMinor||0)),0);
   const checkoutReady=config.purchasingEnabled&&config.enabled&&config.paymentsEnabled&&!!gateway?.ready&&config.shippingFeeMinor!==null&&!!config.text.shippingTerms.trim()&&!!policy&&totalMinor!==null;
-  return NextResponse.json({lines,subtotalMinor,discountMinor:0,vatEnabled,productVatMinor,shippingFeeMinor:config.shippingFeeMinor,shippingVatMinor,shippingTotalMinor,totalMinor,pricingVerified:!!policy&&totalMinor!==null,checkoutReady,deliveryEstimate:null},{headers:{'Cache-Control':'no-store'}});
+  return NextResponse.json({lines,subtotalMinor,discountMinor,vatEnabled,productVatMinor,shippingFeeMinor:config.shippingFeeMinor,shippingVatMinor,shippingTotalMinor,totalMinor,pricingVerified:!!policy&&totalMinor!==null,checkoutReady,deliveryEstimate:null},{headers:{'Cache-Control':'no-store'}});
  }catch{return NextResponse.json({error:'cart_unavailable'},{status:400,headers:{'Cache-Control':'no-store'}});}
 }

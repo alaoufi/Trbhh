@@ -20,6 +20,8 @@ export type CjVariant = {
   variantSellPrice: number | null;
   variantImage: string | null;
   variantWeight: number | null;
+  /** Original variant API properties, kept so new provider options survive imports. */
+  attributes?: Record<string, unknown>;
 };
 
 export type CjProductDetail = CjProductSummary & {

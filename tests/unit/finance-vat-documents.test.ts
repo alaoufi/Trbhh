@@ -18,6 +18,14 @@ function document(enabled: boolean | undefined): FinanceInvoice {
 }
 
 describe('immutable VAT-off invoice presentation', () => {
+  it('prints the exact dynamically selected CJ attributes in customer and admin copies',()=>{
+    const invoice=document(false),snapshot=invoice.snapshot as FiscalSnapshotV2;
+    snapshot.lines[0].variantSnapshot={key:'vid-8401',vid:'vid-8401',sku:'SKU-BLK-XL',attributes:{Color:'Black',Size:'XL',Voltage:'220V',Plug:'EU'}};
+    const customer=renderToStaticMarkup(createElement(FinanceInvoiceView,{invoice,internal:false}));
+    const admin=renderToStaticMarkup(createElement(FinanceInvoiceView,{invoice,internal:true}));
+    const pdf=printableFinanceInvoice(invoice,false);
+    for(const output of [customer,admin,pdf])for(const value of ['Black','XL','220V','EU','SKU-BLK-XL','vid-8401'])expect(output).toContain(value);
+  });
   it.each([false, true])('shows explicit non-added VAT without a registration claim (internal=%s)', internal => {
     const html = renderToStaticMarkup(createElement(FinanceInvoiceView, { invoice: document(false), internal }));
     expect(html).toContain('ضريبة القيمة المضافة غير مضافة على هذا المستند');

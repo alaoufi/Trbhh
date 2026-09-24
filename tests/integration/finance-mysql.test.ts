@@ -831,7 +831,7 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
       expect(await issueInvoicesForWorker(peer,'Bearer fixture-only-issuance-worker-secret-0001',clock)).toEqual({issued:0,pending:0,failed:0});
       const adminCopy=await readFinanceInvoice(db,String(invoice));
       const customerCopy=await readFinanceInvoice(db,String(invoice),5);
-      expect(adminCopy?.snapshot?.version).toBe(2);expect(customerCopy?.snapshot?.customer.address).toContain('Synthetic fixture address');
+      expect(adminCopy?.snapshot?.version).toBe(2);expect(customerCopy?.snapshot?.customer.address).toContain('Test district، Test street، 1، Riyadh، 12345، SA');
       expect(customerCopy?.source.suppliers).toEqual([]);expect(customerCopy?.snapshot?.lines.some(line=>line.supplierId!==undefined)).toBe(false);
       expect(customerCopy?.totalMinor).toBe(adminCopy?.totalMinor);expect(customerCopy?.vatMinor).toBe(adminCopy?.vatMinor);
       expect(await readFinanceInvoice(db,String(invoice),73)).toBeNull();

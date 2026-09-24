@@ -53,8 +53,9 @@ async function main() {
     };
     const normalize = v => ({ vid: String(v.vid || v.variantId || v.id || ''), sku: String(v.variantSku || v.sku || ''), name: safe(v.variantNameEn || v.variantName || v.nameEn || v.variantKey), key: safe(v.variantKey || v.variantKeyEn || v.variantProperty), price: number(v.variantSellPrice ?? v.sellPrice ?? v.sellprice), image: safe(v.variantImage || v.bigImg || v.bigimg || v.img, 1000), attributes: Object.fromEntries(Object.entries(v).filter(([,x]) => ['string','number','boolean'].includes(typeof x)).slice(0,30)) });
     const targetDetails = target.details_json ? JSON.parse(target.details_json) : {};
-    const queryRows = await db.$queryRawUnsafe("SELECT MIN(id) AS id,cj_product_id,MAX(last_sync_at) AS latest FROM cj_products WHERE status='ready' AND hidden=0 AND cj_product_id<>? GROUP BY cj_product_id ORDER BY latest DESC LIMIT 10", String(target.cj_product_id));
+    const queryRows = await db.$queryRawUnsafe("SELECT MIN(id) AS id,cj_product_id,MAX(last_sync_at) AS latest FROM cj_products WHERE status='ready' AND hidden=0 AND cj_product_id<>? GROUP BY cj_product_id ORDER BY latest DESC LIMIT 50", String(target.cj_product_id));
     const candidateIds = [String(target.id), ...queryRows.map(row => String(row.id)).filter(id => id !== String(target.id))];
+    const inventoryDiagnostics = [];
     let product = null, rawProduct = null, mapped = [], inventoryByVid = new Map(), selectedStockRows = [], chosen = null, usableStock = [];
     for (const id of candidateIds) {
       const rows = await db.$queryRawUnsafe('SELECT id,cj_product_id,cj_variant_id,cj_sku,name,name_ar,image,images,details_json FROM cj_products WHERE id=? LIMIT 1', BigInt(id));
@@ -74,6 +75,7 @@ async function main() {
         const inventory = Array.isArray(group.inventory) ? group.inventory : [];
         byVid.set(vid, inventory.map(r => ({ vid, country: safe(r.countryCode, 2)?.toUpperCase() || '', warehouse: safe(r.areaEn || r.areaEnName || r.countryNameEn), cjStock: number(r.cjInventory ?? r.cjInventoryNum) || 0, totalInventory: number(r.totalInventory ?? r.storageNum ?? r.totalInventoryNum) || 0 })));
       }
+      inventoryDiagnostics.push({ internalId: String(row.id), variantGroups: groups.length, inventoryRows: [...byVid.values()].reduce((n,list)=>n+list.length,0), variantsWithPositiveCjStock: [...byVid.values()].filter(list=>list.some(r=>r.cjStock>0)).length, totalCjStock: [...byVid.values()].flat().reduce((n,r)=>n+r.cjStock,0), totalReportedStock: [...byVid.values()].flat().reduce((n,r)=>n+r.totalInventory,0), inventoryFieldNames: [...new Set(groups.flatMap(g=>(Array.isArray(g.inventory)?g.inventory:[]).flatMap(r=>Object.keys(r))))].sort().slice(0,30) });
       const validCandidates = liveVariants.filter(v => v.price > 0 && (byVid.get(v.vid) || []).some(r => /^[A-Z]{2}$/.test(r.country) && r.cjStock > 0));
       for (const v of validCandidates.slice(0, 4)) {
         const rawRows = await api(`/product/stock/queryByVid?vid=${encodeURIComponent(v.vid)}`);
@@ -83,7 +85,22 @@ async function main() {
       }
       if (chosen) break;
     }
-    if (!product || !rawProduct || !chosen) throw Error('no_live_variant_with_verified_cj_stock_in_first_10_ready_products');
+    if (!product || !rawProduct || !chosen) {
+      for (const [name,detail] of [
+        ['live_product_matches_linked_pid','no live PID with a verified stocked variant among 50 ready catalog products'],
+        ['all_live_variants_loaded','no candidate with live variant inventory could be selected'],
+        ['selected_live_variant_exists','no selected VID had current CJ-managed stock'],
+        ['variant_has_valid_price_and_identity','no in-stock variant with live SKU and price'],
+        ['inventory_rows_match_exact_vid','no exact-Vid positive inventory response'],
+        ['selected_variant_has_cj_managed_stock','zero matching live CJ stock in scanned products'],
+        ['freight_quote_available_for_sa','freight was not requested without sellable stock'],
+        ['freight_quote_has_actual_price','freight was not requested without sellable stock'],
+        ['alternate_variant_refreshes_price_image_and_stock_payload','no sellable variant pair to compare'],
+      ]) check(name,false,detail);
+      process.stdout.write(JSON.stringify({ error: 'no_live_variant_with_verified_cj_stock_in_first_50_ready_products', product: { originalTarget: '12', pid: String(target.cj_product_id) }, inventoryDiagnostics, checks, passed: checks.filter(x => x.ok).length, total: 12 }, null, 2) + '\n');
+      process.exitCode = 1;
+      return;
+    }
     check('live_product_matches_linked_pid', String(rawProduct.pid || rawProduct.productId || '') === String(product.cj_product_id), safe(rawProduct.productNameEn || rawProduct.productName || 'name_unavailable'));
     check('all_live_variants_loaded', mapped.length > 0, `${mapped.length} variants`);
     const alternate = mapped.find(v => v.vid !== chosen.vid && v.price > 0 && ((inventoryByVid.get(v.vid) || []).some(r => r.cjStock !== usableStock.reduce((n,x) => n+x.cjStock,0)) || v.price !== chosen.price || v.image !== chosen.image)) || mapped.find(v => v.vid !== chosen.vid && v.price > 0);

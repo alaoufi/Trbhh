@@ -64,7 +64,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     </div>
     {(p.trbhh_category||details?.weightMin||variantCount||p.cj_sku)&&<section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="cj-specs"><h2 id="cj-specs" className="mb-3 text-lg font-extrabold text-primary">المواصفات</h2><dl className="divide-y divide-slate-100 text-sm">{[["التصنيف",p.trbhh_category],['الوزن',details?.weightMin?weightLabel:null],['عدد الخيارات',variantCount?String(variantCount):null],...(view.isStaff&&p.cj_sku?[['SKU',p.cj_sku]]:[])].filter((entry):entry is [string,string]=>Boolean(entry[1])).map(([label,value])=><div key={label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 py-3"><dt className="text-slate-500">{label}</dt><dd className="min-w-0 font-semibold" dir="auto">{value}</dd></div>)}</dl></section>}
     {!!p.display_description_ar&&<section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="cj-description"><h2 id="cj-description" className="mb-3 text-lg font-extrabold text-primary">تفاصيل المنتج</h2><CjProductDescription text={cleanCjDisplayDescription(p.display_description_ar)} /></section>}
-    {canManage && <details className="min-w-0 rounded-2xl border border-primary/20 bg-slate-50 p-4"><summary className="cursor-pointer text-sm font-bold text-primary">إدارة السلعة — التعديل والإخفاء</summary><div className="mt-4">
+    {canManage && <section aria-labelledby="cj-product-management" className="min-w-0 rounded-2xl border border-primary/20 bg-slate-50 p-4"><h2 id="cj-product-management" className="text-sm font-bold text-primary">إدارة السلعة</h2><div className="mt-4">
       {canManage && (
         <div className="card-3d rounded-2xl p-3 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -76,8 +76,8 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
               ? <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800">الحذف متعذّر (يوجد نشاط) — الإخفاء متاح</span>
               : <form action={deleteCjStorefront}><input type="hidden" name="id" value={id} /><button className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-700">حذف</button></form>)}
           </div>
-          {capabilities.edit && <details>
-            <summary className="cursor-pointer text-sm font-bold text-primary">✎ تعديل مباشر (يُحفظ ويُعلّم الترجمة)</summary>
+          {capabilities.edit && <div>
+            <h3 className="text-sm font-bold text-primary">✎ تعديل مباشر</h3>
             <form action={saveCjStorefrontEdit} className="mt-2 space-y-2 text-sm">
               <input type="hidden" name="id" value={id} />
               <label className="block">العنوان العربي<input name="nameAr" defaultValue={p.name_ar} className={editInput} placeholder="مثال: ساعة يد رجالية" /></label>
@@ -91,12 +91,13 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
                 <span className="text-xs text-muted-foreground">تصحيح العنوان/الوصف يُحفظ في ذاكرة الترجمة ويُطبَّق على السلع المشابهة.</span>
               </div>
             </form>
-          </details>}
+          </div>}
         </div>
       )}
 
 
-    </div></details>}
+    </div></section>}
+    {view.isStaff && !canManage && <p role="note" className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600">أدوات تعديل هذه السلعة وإخفائها وحذفها تتطلب صلاحيات المنتجات المناسبة. يمكن لمسؤول الصلاحيات مراجعتها من <Link className="font-bold text-primary underline" href="/admin/access-control">إدارة الصلاحيات</Link>.</p>}
     {others.length > 0 && <section className="min-w-0 space-y-3"><h2 className="text-lg font-extrabold text-primary">سلع أخرى في التجربة</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{others.map(product => <CjProductCard key={product.id} product={product} />)}</div></section>}
   </div>;
 }

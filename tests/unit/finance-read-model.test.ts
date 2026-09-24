@@ -23,6 +23,17 @@ describe('financial source projection consistency',()=>{
     const report=await readFinanceData(transaction as never);
     expect(report.ready).toBe(false);expect(reads).toBe(7);
   });
+  it('keeps the exact dynamic variant and discount fields in the finance order projection',async()=>{
+    const variantSnapshot={key:'vid-black-xl',vid:'vid-black-xl',sku:'CJ-BLK-XL',attributes:{Color:'Black',Size:'XL',Voltage:'220V',Plug:'EU',Material:'Steel'}};
+    const db={$queryRaw:async(sql:TemplateStringsArray)=>{
+      const query=sql.join('?');
+      if(query.includes('FROM commerce_orders'))return [{id:9n,member_id:2n,status:'paid',created_at:new Date('2026-09-24T10:00:00Z'),paid_at:null,subtotal_minor:10000,shipping_fee_minor:0,total_minor:10000,currency:'SAR',shipping:{name:'Buyer'}}];
+      if(query.includes('FROM commerce_order_items'))return [{order_id:9n,product_id:5n,title:'Product',quantity:1,unit_price_minor:10000,list_unit_price_minor:12000,discount_minor:2000,total_minor:10000,variant_snapshot:variantSnapshot}];
+      return [];
+    }};
+    const order=(await readFinanceData(db as never)).orders[0];
+    expect(order.items[0]).toMatchObject({unitMinor:10000,listUnitMinor:12000,discountMinor:2000,variantSnapshot});
+  });
   it('preserves the receipt accounting date separately from a later actual invoice issue date',async()=>{
     const created=new Date('2026-08-20T12:00:00Z'),issued=new Date('2026-09-02T12:00:00Z');
     const tx={$queryRaw:async(sql:TemplateStringsArray)=>{

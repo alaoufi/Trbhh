@@ -129,7 +129,8 @@ export async function createOrder(db:CommerceDb,input:CreateOrderInput,policy:Or
         else if(raw)throw new Error('product_variant_unavailable');
       }
       const needsVariant=sourceVariants.length>0||cjVariantFound||Array.isArray(sourceOptionsValue)&&sourceOptionsValue.length>0;
-      if((needsVariant&&!rawVariant)||(!needsVariant&&selectedVariantKey))throw new Error('product_variant_required');
+      if(needsVariant&&!rawVariant)throw new Error(Array.isArray(sourceOptionsValue)&&sourceOptionsValue.length>0?'supplier_variant_checkout_required':'product_variant_required');
+      if(!needsVariant&&selectedVariantKey)throw new Error('product_variant_required');
       const chosen=rawVariant?chosenVariantSnapshot(selectedVariantKey,rawVariant):null;
       if(rawVariant&&!chosen)throw new Error('product_variant_invalid');
       const variantData=rawVariant as Record<string,unknown>|undefined;

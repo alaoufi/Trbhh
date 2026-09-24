@@ -29,7 +29,7 @@ export async function readFinanceData(db: Pick<CommerceDb, '$queryRaw'> & Partia
 async function readFinanceSnapshot(db: Pick<CommerceDb, '$queryRaw'>): Promise<FinanceData> {
   const [orderRows, items, costs, receipts, suppliers, accruals, ready] = await Promise.all([
     db.$queryRaw<Row[]>`SELECT id,member_id,status,created_at,paid_at,subtotal_minor,shipping_fee_minor,total_minor,currency,shipping FROM commerce_orders ORDER BY id`,
-    db.$queryRaw<Row[]>`SELECT order_id,product_id,title,quantity,unit_price_minor,total_minor FROM commerce_order_items ORDER BY order_id,product_id`,
+    db.$queryRaw<Row[]>`SELECT order_id,product_id,title,quantity,unit_price_minor,list_unit_price_minor,discount_minor,total_minor,variant_snapshot FROM commerce_order_items ORDER BY order_id,product_id`,
     db.$queryRaw<Row[]>`SELECT order_id,product_id,supplier_id,supplier_name,total_cost_minor FROM commerce_order_suppliers ORDER BY order_id,product_id`,
     db.$queryRaw<Row[]>`SELECT id,order_id,provider,amount_minor,currency,provider_ref,recorded_at FROM commerce_receipts ORDER BY id`,
     db.$queryRaw<Row[]>`SELECT id,name FROM commerce_suppliers ORDER BY name,id`,
@@ -39,7 +39,7 @@ async function readFinanceSnapshot(db: Pick<CommerceDb, '$queryRaw'>): Promise<F
   const orderItems = new Map<string, FinanceOrder['items']>();
   for (const row of items) {
     const list = orderItems.get(id(row.order_id)) || [];
-    list.push({productId:id(row.product_id),title:str(row.title),quantity:financeNumber(row.quantity),unitMinor:financeNumber(row.unit_price_minor),totalMinor:financeNumber(row.total_minor)});
+    list.push({productId:id(row.product_id),title:str(row.title),quantity:financeNumber(row.quantity),unitMinor:financeNumber(row.unit_price_minor),listUnitMinor:row.list_unit_price_minor==null?null:financeNumber(row.list_unit_price_minor),discountMinor:financeNumber(row.discount_minor),totalMinor:financeNumber(row.total_minor),variantSnapshot:row.variant_snapshot==null?null:financeJson<NonNullable<FinanceOrder['items'][number]['variantSnapshot']>>(row.variant_snapshot)});
     orderItems.set(id(row.order_id),list);
   }
   const orderSuppliers = new Map<string, FinanceOrder['suppliers']>();

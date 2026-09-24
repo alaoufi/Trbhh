@@ -4,7 +4,7 @@ on:
     inputs:
       mode:
         type: choice
-        options: [audit, cleanup]
+        options: [audit, cleanup, archive-audit, archive-cleanup]
         default: audit
         required: true
 permissions:
@@ -29,6 +29,15 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
+          if [[ "$MODE" == archive-audit || "$MODE" == archive-cleanup ]]; then
+            archive_mode=${MODE#archive-}
+            mkdir -p ~/.ssh
+            printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/key
+            test -n "$VPS_KNOWN_HOSTS"
+            printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+            ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -o ServerAliveInterval=15 "$VPS_USER@$VPS_HOST" "cd /root/trbhh && docker compose exec -T app node - '$archive_mode'" < scripts/release/archive-cleanup.cjs
+            exit 0
+          fi
           mkdir -p ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/key
           test -n "$VPS_KNOWN_HOSTS"

@@ -35,6 +35,10 @@ function parseOptionMap(value:unknown):Record<string,string>{
  return Object.keys(out).length?out:{الخيار:plain(value,200)};
 }
 function image(value:unknown):string|null{const url=plain(value,2000);return url.startsWith('https://')||url.startsWith('/media/')?url:null;}
+function optionDescriptions(value:unknown):string[]{
+ const parsed=json(value);if(!Array.isArray(parsed))return[];
+ return parsed.flatMap(raw=>{if(!raw||typeof raw!=='object')return[];const option=raw as Record<string,unknown>,name=plain(option.name??option.label,100),rawValues=option.values??option.choices??option.options,values=Array.isArray(rawValues)?rawValues.flatMap(item=>{if(typeof item==='string'||typeof item==='number')return[plain(String(item),120)];if(item&&typeof item==='object'){const entry=item as Record<string,unknown>,label=plain(entry.name??entry.label??entry.value,120);return label?[label]:[];}return[];}):typeof rawValues==='string'?rawValues.split(/[،,|]/).map(item=>plain(item,120)):[];const unique=[...new Set(values.filter(Boolean))];return name&&unique.length?[`${name}: ${unique.join('، ')}`]:[];});
+}
 function variants(value:unknown,fallbackPrice:number):PublicVariant[]{
  const parsed=json(value);if(!Array.isArray(parsed))return[];
  return parsed.slice(0,100).flatMap(raw=>{
@@ -72,14 +76,13 @@ function deliveryLabel(value:string|null|undefined):string|null{
 }
 function product(row:Row):PublicCommerceProduct|null{
  const parentStock=Math.max(0,row.stock_available-row.stock_reserved),supplierVariants=variants(row.variants,row.price_minor).map(variant=>({...variant,stock:Math.min(variant.stock,parentStock)})).filter(variant=>variant.stock>0),cjVariants=importedCjVariants(row.cj_details_json,row.cj_availability_json,row.price_minor,parentStock),availableVariants=row.cj_source_id!==null?cjVariants:supplierVariants,stock=Math.max(0,Math.min(parentStock,row.available===1?(row.quantity??0):0));
- const optionsParsed=json(row.options),cjDetailParsed=json(row.cj_details_json),cjDetailVariants=cjDetailParsed&&typeof cjDetailParsed==='object'?(cjDetailParsed as Record<string,unknown>).variants:null,requiresVariantSelection=(Array.isArray(json(row.variants))&&(json(row.variants) as unknown[]).length>0)||(Array.isArray(optionsParsed)&&optionsParsed.length>0)||(row.cj_source_id!==null&&Array.isArray(cjDetailVariants)&&cjDetailVariants.length>0);
+ const optionNames=optionDescriptions(row.options),productVariants=json(row.variants),hasVariantRecords=Array.isArray(productVariants)&&productVariants.length>0,cjDetailParsed=json(row.cj_details_json),cjDetailVariants=cjDetailParsed&&typeof cjDetailParsed==='object'?(cjDetailParsed as Record<string,unknown>).variants:null,requiresVariantSelection=hasVariantRecords||optionNames.length>0||(row.cj_source_id!==null&&Array.isArray(cjDetailVariants)&&cjDetailVariants.length>0);
  if(row.cj_source_id!==null&&availableVariants.length===0)return null;
- if(row.source_id!==null&&availableVariants.length===0&&(requiresVariantSelection||stock===0))return null;
+ if(requiresVariantSelection&&availableVariants.length===0)return null;
  if(row.source_id===null&&stock===0)return null;
  const shipping=parseCjAvailability({availability_json:row.cj_availability_json});
  if(row.cj_source_id!==null&&(!shipping||row.price_minor<=0||row.stock_available-row.stock_reserved<1))return null;
  if(!Number.isSafeInteger(row.price_minor)||row.price_minor<=0||!plain(row.title,200))return null;
- const optionNames=Array.isArray(optionsParsed)?optionsParsed.flatMap(entry=>entry&&typeof entry==='object'&&typeof(entry as Record<string,unknown>).name==='string'?[plain((entry as Record<string,unknown>).name,100)]:[]):[];
  return{id:row.id.toString(),title:plain(row.title,200),priceMinor:row.price_minor,stock:requiresVariantSelection?availableVariants.reduce((max,v)=>Math.max(max,v.stock),0):stock,images:safeImages(row.images),description:plain(row.description,12000),brand:plain(row.brand,100)||null,options:optionNames,variants:availableVariants,requiresVariantSelection,featured:Number(row.featured)>0,saudiShippingAvailable:row.cj_source_id===null||!!shipping,deliveryEstimate:deliveryLabel(shipping?.shippingOptions.map(item=>item.deliveryDays).find((item):item is string=>!!item)),weightLabel:details(row.cj_details_json).weightLabel};
 }
 const SELECT=Prisma.sql`SELECT cp.id,cp.title,cp.price_minor,cp.stock_available,cp.stock_reserved,sp.images,sp.description,sp.brand,sp.options,sp.variants,sp.available,sp.quantity,sp.featured,sp.id AS source_id,

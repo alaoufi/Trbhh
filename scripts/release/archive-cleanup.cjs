@@ -19,10 +19,23 @@ function expiredArchiveRows(rows) {
 }
 
 async function plan(db) {
-  const archived = await db.ads.findMany({
+  const [archived, staleActiveAds] = await Promise.all([db.ads.findMany({
     where: { NOT: [{ data_archive: null }, { data_archive: '' }] },
     select: { id: true, data_archive: true },
-  });
+  }), db.ads.findMany({
+    where: {
+      status: 1, state: 'active', store_only: 0,
+      OR: [{ data_archive: null }, { data_archive: '' }],
+      AND: [
+        { OR: [{ bumped_at: { lt: new Date(cutoff) } }, { bumped_at: null }] },
+        { OR: [{ created_at: { lt: new Date(cutoff) } }, { created_at: null }] },
+      ],
+    },
+    select: { id: true },
+  })]);
+  const staleActiveAdPhotos = staleActiveAds.length
+    ? await db.photos.count({ where: { other_id: { in: staleActiveAds.map((row) => row.id) } } })
+    : 0;
   const oldAds = expiredArchiveRows(archived);
   const adIds = oldAds.map((row) => row.id);
   const oldPhotos = adIds.length ? await db.photos.findMany({
@@ -35,7 +48,7 @@ async function plan(db) {
     select: { id: true, file_name: true, file_size: true },
   });
   const uploadIds = [...new Set([...archivedPhotoIds, ...oldAdUploads.map((row) => row.id.toString())])];
-  if (!uploadIds.length) return { oldAds, oldPhotos, deleteUploads: [], keepReasons: {} };
+  if (!uploadIds.length) return { oldAds, oldPhotos, staleActiveAds, staleActiveAdPhotos, deleteUploads: [], keepReasons: {} };
   const idValues = uploadIds.map((id) => BigInt(id));
   const [uploads, allPhotoRefs, videos, users, stores, profiles, categories] = await Promise.all([
     db.uploads.findMany({ where: { id: { in: idValues }, type: 'ad' }, select: { id: true, file_name: true, file_size: true } }),
@@ -75,7 +88,7 @@ async function plan(db) {
     sharedFilePath: uploads.filter((row) => protectedPaths.has(row.file_name)).length,
     oldOrphanAdUploads: oldAgeOrphanIds.size,
   };
-  return { oldAds, oldPhotos, deleteUploads, keepReasons };
+  return { oldAds, oldPhotos, staleActiveAds, staleActiveAdPhotos, deleteUploads, keepReasons };
 }
 
 async function measureFiles(rows) {
@@ -100,6 +113,7 @@ async function main() {
     const result = await plan(prisma);
     const files = await measureFiles(result.deleteUploads);
     console.log(JSON.stringify({ mode, retentionDays: 180, expiredArchivedAds: result.oldAds.length,
+      staleActiveStandardAds: result.staleActiveAds.length, photosOnStaleActiveAds: result.staleActiveAdPhotos,
       photosOnExpiredAds: result.oldPhotos.length, orphanedAdUploadRows: result.deleteUploads.length,
       removableFiles: files.fileCount, removableBytes: files.bytes, protected: result.keepReasons }));
     return;

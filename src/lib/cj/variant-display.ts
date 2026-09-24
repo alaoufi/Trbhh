@@ -1,11 +1,11 @@
 import type {CjVariant} from './types';
 
 export type DisplayOption={label:string;value:string;source:'attribute'|'parsed'};
-const SIZE=/^(?:xxs|xs|s|m|l|xl|xxl|xxxl|\d{1,3}(?:xs|xl)|\d+(?:\.\d+)?(?:cm|mm|inch|in))$/i;
+const SIZE=/^(?:xxs|xs|s|m|l|xl|xxl|xxxl|\d{1,3}(?:xs|xl)|\d{1,2}|\d+(?:\.\d+)?(?:cm|mm|inch|in))$/i;
 const LABELS:[RegExp,string][]=[[/color|colour/i,'اللون'],[/size/i,'المقاس'],[/voltage|volt/i,'الفولت'],[/plug|socket/i,'القابس'],[/model/i,'الموديل'],[/capacity|volume/i,'السعة'],[/material|fabric/i,'الخامة'],[/warehouse|area/i,'المستودع']];
-const VALUES=new Map(Object.entries({black:'أسود',white:'أبيض',red:'أحمر',blue:'أزرق',green:'أخضر',yellow:'أصفر',pink:'وردي',purple:'بنفسجي',orange:'برتقالي',brown:'بني',grey:'رمادي',gray:'رمادي',silver:'فضي',gold:'ذهبي',beige:'بيج',navy:'كحلي',eu:'أوروبي',european:'أوروبي',us:'أمريكي',uk:'بريطاني',china:'صيني'}));
-const COLOR_KEYS=['black','white','red','blue','green','yellow','pink','purple','orange','brown','grey','gray','silver','gold','beige','navy'];
-const SIZE_SUFFIX='(?:xxxs|xxs|xxl|xxxl|xs|xl|s|m|l|\\d{1,3}(?:xs|xl)|\\d+(?:\\.\\d+)?(?:cm|mm|inch|in))';
+const VALUES=new Map(Object.entries({black:'أسود',white:'أبيض',red:'أحمر',blue:'أزرق',green:'أخضر',yellow:'أصفر',pink:'وردي',purple:'بنفسجي',orange:'برتقالي',brown:'بني',grey:'رمادي',gray:'رمادي',silver:'فضي',gold:'ذهبي',beige:'بيج',navy:'كحلي','navy blue':'كحلي','dark blue':'أزرق داكن','light blue':'أزرق فاتح',eu:'أوروبي',european:'أوروبي',us:'أمريكي',uk:'بريطاني',china:'صيني'}));
+const COLOR_KEYS=['navy blue','dark blue','light blue','black','white','red','blue','green','yellow','pink','purple','orange','brown','grey','gray','silver','gold','beige','navy'];
+const SIZE_SUFFIX='(?:xxxs|xxs|xxl|xxxl|xs|xl|s|m|l|\\d{1,3}(?:xs|xl)|\\d{1,2}|\\d+(?:\\.\\d+)?(?:cm|mm|inch|in))';
 function labelFor(key:string):string{return LABELS.find(([pattern])=>pattern.test(key))?.[1]??key.trim().replace(/[_-]+/g,' ');}
 function safeText(value:unknown):string|null{if(typeof value!=='string'&&typeof value!=='number'&&typeof value!=='boolean')return null;const text=String(value).trim();return text&&text.length<=160?text:null;}
 function translateKnownValue(value:string):string{return VALUES.get(value.trim().toLowerCase())??value;}

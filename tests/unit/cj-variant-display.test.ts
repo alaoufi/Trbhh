@@ -14,6 +14,13 @@ describe('CJ product customer display',()=>{
       {label:'المقاس',value:'S',source:'parsed'},
     ]);
   });
+  it('extracts numeric footwear sizes from the supplier title shown in the latest report',()=>{
+    const source='Arrival Comfortable Flat Womens Sandals With Delicate Straps Versatile And Easy to Match Black 36';
+    expect(cjVariantDisplayOptions({variantKey:'',variantName:source})).toEqual([
+      {label:'اللون',value:'أسود',source:'parsed'},
+      {label:'المقاس',value:'36',source:'parsed'},
+    ]);
+  });
   it('renders dynamic named source attributes with Arabic labels and arbitrary options',()=>{
     expect(cjVariantDisplayOptions({variantKey:'',variantName:'',attributes:{color:'Black',plugType:'EU',voltage:'220V',capacity:64,customFinish:'Matte'}})).toEqual([
       {label:'اللون',value:'أسود',source:'attribute'},{label:'القابس',value:'أوروبي',source:'attribute'},{label:'الفولت',value:'220V',source:'attribute'},{label:'السعة',value:'64',source:'attribute'},{label:'customFinish',value:'Matte',source:'attribute'},

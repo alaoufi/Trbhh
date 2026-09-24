@@ -46,7 +46,7 @@ async function plan(db) {
     db.photos.findMany({ where: { photo_path: { in: uploadIds } }, select: { photo_path: true, other_id: true } }),
     db.ads.findMany({ where: { video_path: { in: uploadIds } }, select: { video_path: true } }),
     db.users.findMany({ where: { photo_path: { in: uploadIds } }, select: { photo_path: true } }),
-    db.stores.findMany({ where: { logo: { in: idValues } }, select: { logo: true } }),
+    db.stores.findMany({ where: { logo: { in: uploadIds.map(Number) } }, select: { logo: true } }),
     db.profiles.findMany({ where: { avatar: { in: uploadIds.map(Number) } }, select: { avatar: true } }),
     db.categories.findMany({ where: { photo_path: { in: uploadIds } }, select: { photo_path: true } }),
   ]);

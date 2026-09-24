@@ -1,4 +1,5 @@
 import 'server-only';
+import type {Prisma} from '@prisma/client';
 import {prisma} from '@/lib/prisma';
 import {assertCommerceSchemaReady} from './schema';
 import {normalizeSaudiAddress,type SaudiAddressInput,type SaudiAddressSnapshot} from './addresses';
@@ -6,6 +7,10 @@ import {normalizeSaudiAddress,type SaudiAddressInput,type SaudiAddressSnapshot} 
 export type SavedAddress={id:bigint;label:string;isDefault:boolean;snapshot:SaudiAddressSnapshot;updatedAt:Date};
 type Row={id:bigint;label:string;is_default:number;snapshot:SaudiAddressSnapshot|string;updated_at:Date};
 function view(row:Row):SavedAddress{return{id:row.id,label:row.label,isDefault:Number(row.is_default)===1,snapshot:typeof row.snapshot==='string'?JSON.parse(row.snapshot):row.snapshot,updatedAt:row.updated_at};}
+async function lockOwner(tx:Prisma.TransactionClient,memberId:bigint){
+  const [owner]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM users WHERE id=${memberId} FOR UPDATE`;
+  if(!owner)throw new Error('address_member_invalid');
+}
 
 export async function listMemberAddresses(memberId:bigint):Promise<SavedAddress[]>{
   if(memberId<=0n)throw new Error('address_member_invalid');
@@ -18,6 +23,7 @@ export async function saveMemberAddress(memberId:bigint,input:SaudiAddressInput,
   const snapshot=normalizeSaudiAddress(input);
   await assertCommerceSchemaReady(prisma);
   return prisma.$transaction(async tx=>{
+    await lockOwner(tx,memberId);
     const rows=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM commerce_customer_addresses WHERE member_id=${memberId} FOR UPDATE`;
     const isDefault=makeDefault||rows.length===0;
     if(isDefault)await tx.$executeRaw`UPDATE commerce_customer_addresses SET is_default=0,updated_at=CURRENT_TIMESTAMP(3) WHERE member_id=${memberId}`;
@@ -31,6 +37,7 @@ export async function setMemberDefaultAddress(memberId:bigint,addressId:bigint):
   if(memberId<=0n||addressId<=0n)throw new Error('address_invalid');
   await assertCommerceSchemaReady(prisma);
   await prisma.$transaction(async tx=>{
+    await lockOwner(tx,memberId);
     const [owned]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM commerce_customer_addresses WHERE id=${addressId} AND member_id=${memberId} FOR UPDATE`;
     if(!owned)throw new Error('address_not_found');
     await tx.$executeRaw`UPDATE commerce_customer_addresses SET is_default=0,updated_at=CURRENT_TIMESTAMP(3) WHERE member_id=${memberId}`;
@@ -41,6 +48,7 @@ export async function deleteMemberAddress(memberId:bigint,addressId:bigint):Prom
   if(memberId<=0n||addressId<=0n)throw new Error('address_invalid');
   await assertCommerceSchemaReady(prisma);
   await prisma.$transaction(async tx=>{
+    await lockOwner(tx,memberId);
     const [existing]=await tx.$queryRaw<{id:bigint;is_default:number}[]>`SELECT id,is_default FROM commerce_customer_addresses WHERE id=${addressId} AND member_id=${memberId} FOR UPDATE`;
     if(!existing)throw new Error('address_not_found');
     await tx.$executeRaw`DELETE FROM commerce_customer_addresses WHERE id=${addressId} AND member_id=${memberId}`;

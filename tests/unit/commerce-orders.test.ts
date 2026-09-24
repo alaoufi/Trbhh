@@ -15,9 +15,14 @@ describe('commerce request identity', () => {
   it('rejects client prices and excess keys instead of signing ignored content', () => {
     expect(() => normalizeOrderRequest([{productId:1n,quantity:1,price:1}])).toThrow();
   });
+  it('binds every shipping detail into the order idempotency fingerprint and rejects legacy incomplete addresses',()=>{
+    const complete={name:'Buyer',phone:'+966500000000',addressLine:'District، Street، 4',city:'Riyadh',postalCode:'12345',country:'SA' as const,region:'Riyadh Region',district:'District',street:'Street',buildingNumber:'4',secondaryNumber:'',alternatePhone:null,email:'',shortAddress:'',deliveryNotes:''};
+    expect(requestFingerprint([{productId:1n,quantity:1}],complete)).not.toBe(requestFingerprint([{productId:1n,quantity:1}],{...complete,district:'Changed district',addressLine:'Changed district، Street، 4'}));
+    expect(()=>requestFingerprint([{productId:1n,quantity:1}],{name:'Buyer',phone:'+966500000000',addressLine:'Address',city:'Riyadh',postalCode:'12345',country:'SA'})).toThrow();
+  });
   it('rejects untrusted ID/key before database access', async () => {
     const tx=vi.fn();const db={$transaction:tx} as unknown as CommerceDb;
-    await expect(createOrder(db,{memberId:0n,requestKey:'bad',items:[{productId:1n,quantity:1}],shipping:{name:'Test',phone:'+966500000000',addressLine:'Test',city:'Riyadh',postalCode:'12345',country:'SA'}},{shippingFeeMinor:0})).rejects.toThrow();
+    await expect(createOrder(db,{memberId:0n,requestKey:'bad',items:[{productId:1n,quantity:1}],shipping:{name:'Test',phone:'+966500000000',addressLine:'District، Test، 1',city:'Riyadh',postalCode:'12345',country:'SA',region:'Riyadh',district:'District',street:'Test',buildingNumber:'1',secondaryNumber:'',alternatePhone:null,email:'',shortAddress:'',deliveryNotes:''}},{shippingFeeMinor:0})).rejects.toThrow();
     expect(tx).not.toHaveBeenCalled();
   });
 });

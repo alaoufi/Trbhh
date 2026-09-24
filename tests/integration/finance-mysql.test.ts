@@ -152,7 +152,7 @@ async function prospectiveReceipt(vatOff=false){
   await seedProspectivePolicy(vatOff);
   await db.$executeRaw`INSERT INTO site_settings(k,v) VALUES('commerce_purchasing_enabled','1')`;
   await db.$executeRaw`INSERT INTO commerce_products(id,title,price_minor,stock_available,approved,visible,enabled) VALUES(1,'Synthetic small gross',4,6,1,1,1)`;
-  const order=await createOrder(db,{memberId:5n,requestKey:'fixture-v2-small-order',items:[{productId:1n,quantity:3}],shipping:{name:'Synthetic buyer',phone:'+966500000000',addressLine:'Original complete address',city:'Riyadh',postalCode:'12345',country:'SA'}},{shippingFeeMinor:5});
+  const order=await createOrder(db,{memberId:5n,requestKey:'fixture-v2-small-order',items:[{productId:1n,quantity:3}],shipping:{name:'Synthetic buyer',phone:'+966500000000',addressLine:'Test district، Test street، 1',city:'Riyadh',postalCode:'12345',country:'SA',region:'Riyadh Region',district:'Test district',street:'Test street',buildingNumber:'1',secondaryNumber:'',alternatePhone:null,email:'',shortAddress:'',deliveryNotes:''}},{shippingFeeMinor:5});
   const claim=await claimPaymentAttempt(db,{memberId:5n,orderId:order.id,provider:'fixture'});
   if(!claim.claimed)throw new Error('Synthetic payment claim missing');
   await recordPaymentReference(db,{attemptId:claim.attempt.id,claimToken:claim.claimToken,reference:'fixture-v2-small-receipt'});
@@ -805,7 +805,7 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
       await db.$executeRaw`UPDATE commerce_suppliers SET active=1 WHERE id=1`;
       await db.$executeRaw`INSERT INTO commerce_products(id,title,price_minor,stock_available,approved,visible,enabled) VALUES(1,'Synthetic original product',11500,5,1,1,1)`;
       await db.$executeRaw`INSERT INTO commerce_product_suppliers(product_id,supplier_id,supplier_sku,unit_cost_minor) VALUES(1,1,'FIXTURE-SKU',7000)`;
-      const shipping={name:'Synthetic customer',phone:'+966500000000',addressLine:'Synthetic fixture address',city:'Riyadh',postalCode:'12345',country:'SA' as const};
+      const shipping={name:'Synthetic customer',phone:'+966500000000',addressLine:'Test district، Test street، 1',city:'Riyadh',postalCode:'12345',country:'SA' as const,region:'Riyadh Region',district:'Test district',street:'Test street',buildingNumber:'1',secondaryNumber:'',alternatePhone:null,email:'',shortAddress:'',deliveryNotes:''};
       const orderInput={memberId:5n,requestKey:'fixture-actual-checkout-01',items:[{productId:1n,quantity:2}],shipping};
       const order=await createOrder(db,orderInput,{shippingFeeMinor:0});
       expect(await createOrder(peer,orderInput,{shippingFeeMinor:0})).toEqual(order);
@@ -912,7 +912,7 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
       const original=await db.$queryRaw<{id:bigint;snapshot:unknown}[]>`SELECT id,snapshot FROM finance_invoices WHERE receipt_id=${receipt.id}`;
       expect(financeJson<FiscalSnapshotV2>(original[0].snapshot)).toMatchObject({netMinor:17,vatMinor:0,totalMinor:17,issuer:{taxNumber:''},vatControl:{enabled:false}});
       const savedOffSource=await db.$queryRaw`SELECT * FROM finance_order_fiscal_snapshots WHERE order_id=${order.id}`;
-      const shipping={name:'Synthetic buyer',phone:'+966500000000',addressLine:'Original complete address',city:'Riyadh',postalCode:'12345',country:'SA' as const};
+      const shipping={name:'Synthetic buyer',phone:'+966500000000',addressLine:'Test district، Test street، 1',city:'Riyadh',postalCode:'12345',country:'SA' as const,region:'Riyadh Region',district:'Test district',street:'Test street',buildingNumber:'1',secondaryNumber:'',alternatePhone:null,email:'',shortAddress:'',deliveryNotes:''};
       const pending=await createOrder(db,{memberId:5n,requestKey:'fixture-before-central-switch',items:[{productId:1n,quantity:1}],shipping},{shippingFeeMinor:5});
       const active=(await readFinanceData(db)).taxPolicies!.find(policy=>policy.policyReference==='fixture-prospective-v2')!;
       const changeAt=new Date(Math.max(Date.now(),receipt.recorded_at.getTime()+1)),today=new Date(changeAt.getTime()+10800000).toISOString().slice(0,10);

@@ -33,7 +33,7 @@ it('Prisma migrate diff emits all seven supplier FKs matching additive DDL',()=>
 });
 const raw=process.env.COMMERCE_TEST_DATABASE_URL;
 let client:PrismaClient, admin:PrismaClient, created=false;
-const shipping={name:'Fixture Member',phone:'+966500000000',addressLine:'Fixture street 1',city:'Riyadh',postalCode:'12345',country:'SA' as const};
+const shipping={name:'Fixture Member',phone:'+966500000000',addressLine:'Fixture district، Fixture street 1، 4',city:'Riyadh',postalCode:'12345',country:'SA' as const,region:'Riyadh Region',district:'Fixture district',street:'Fixture street 1',buildingNumber:'4',secondaryNumber:'',alternatePhone:null,email:'',shortAddress:'',deliveryNotes:''};
 const input=(requestKey='fixture-request-0001',quantity=2,memberId=1n)=>({memberId,requestKey,items:[{productId:1n,quantity}],shipping});
 const policy={shippingFeeMinor:125};
 const targets=[{recipient:'member:1',channel:'in_app' as const},{recipient:'+966500000000',channel:'sms' as const},{recipient:'+966500000000',channel:'whatsapp' as const}];

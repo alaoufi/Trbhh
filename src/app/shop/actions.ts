@@ -6,8 +6,8 @@ import { prisma } from '@/lib/prisma';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { getCommerceGateway } from '@/lib/commerce/runtime';
 import { createOrder } from '@/lib/commerce/orders';
-import { saudiCommercePhone } from '@/lib/commerce/config';
-import { isSaudiShippingArea } from '@/lib/commerce/shipping';
+import { getMemberAddress } from '@/lib/commerce/address-book';
+import { formatAddressLine } from '@/lib/commerce/addresses';
 
 export async function createCommerceOrder(_previous: { error: string } | null, form: FormData): Promise<{ error: string }> {
   const session = await requireUser();
@@ -20,23 +20,23 @@ export async function createCommerceOrder(_previous: { error: string } | null, f
   if (!(await takeSecurityAttempt(`commerce-order:${session.uid}`, 6))) return { error: config.text.rateLimit };
   const product = String(form.get('productId') || '');
   const quantity = String(form.get('quantity') || '');
-  const phone = saudiCommercePhone(String(form.get('phone') || ''));
-  const area = String(form.get('area_id') || '');
-  const region = String(form.get('city_id') || '');
-  if (!/^[1-9]\d{0,14}$/.test(product) || !/^[1-9]\d{0,3}$/.test(quantity) || !phone
-    || !/^[1-9]\d{0,9}$/.test(area) || !/^[1-9]\d{0,9}$/.test(region) || form.get('terms') !== '1') return { error: config.text.checkoutError };
-  const city = await prisma.areas.findUnique({ where: { id: BigInt(area) } });
-  const regionRow = await prisma.cities.findUnique({ where: { id: BigInt(region) } });
-  const country = regionRow ? await prisma.countries.findUnique({ where: { id: regionRow.country_id } }) : null;
-  if (!city || !isSaudiShippingArea(city, regionRow, country)) return { error: config.text.locationError };
+  const addressId = String(form.get('addressId') || '');
+  const requestKey = String(form.get('requestKey') || '');
+  if (!/^[1-9]\d{0,14}$/.test(product) || !/^[1-9]\d{0,3}$/.test(quantity)
+    || !/^[1-9]\d{0,19}$/.test(addressId) || !/^[\x21-\x7e]{16,80}$/.test(requestKey) || form.get('terms') !== '1') return { error: config.text.checkoutError };
+  const address = await getMemberAddress(BigInt(session.uid), BigInt(addressId)).catch(() => null);
+  if (!address) return { error: 'اختر عنوان شحن محفوظًا في حسابك قبل متابعة الطلب.' };
   let orderId: bigint;
   try {
     const order = await createOrder(prisma, {
-      memberId: BigInt(session.uid), requestKey: String(form.get('requestKey') || ''),
+      memberId: BigInt(session.uid), requestKey,
       items: [{ productId: BigInt(product), quantity: Number(quantity) }],
-      shipping: { name: String(form.get('name') || '').trim(), phone: `+${phone}`,
-        addressLine: String(form.get('address') || '').trim(), city: city.name,
-        postalCode: String(form.get('postalCode') || '').trim(), country: 'SA' },
+      shipping: { name: address.snapshot.fullName, phone: address.snapshot.phone,
+        addressLine: formatAddressLine(address.snapshot), city: address.snapshot.city, postalCode: address.snapshot.postalCode,
+        country: 'SA', region: address.snapshot.region, district: address.snapshot.district, street: address.snapshot.street,
+        buildingNumber: address.snapshot.buildingNumber, secondaryNumber: address.snapshot.secondaryNumber,
+        alternatePhone: address.snapshot.alternatePhone, email: address.snapshot.email, shortAddress: address.snapshot.shortAddress,
+        deliveryNotes: address.snapshot.deliveryNotes },
     }, { shippingFeeMinor: config.shippingFeeMinor });
     orderId = order.id;
   } catch { return { error: config.text.checkoutError }; }

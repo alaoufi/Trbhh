@@ -10,7 +10,7 @@ const longReference = `https://example.invalid/fixture-reference/${'long-source-
 const base: CjProductRow = {
   id: 0, cj_product_id: 'LOCAL_FIXTURE_ONLY', cj_variant_id: '', cj_sku: 'FIXTURE-SKU', name: 'Synthetic fixture', name_ar: '',
   source_description: null, display_description_ar: `وصف عربي تجريبي لا يثبت مواصفات أو مخزونًا.\n\nرابط مرجعي طويل لاختبار التنسيق: ${longReference}`,
-  trbhh_category: 'بيانات اختبار محلية', status: 'draft', images: null, details_json: null, agent_user_id: null, agent_claimed_at: null,
+  trbhh_category: 'بيانات اختبار محلية', source_category: 'Synthetic fixture category', status: 'draft', images: null, details_json: null, availability_json: null, availability_checked_at: null, agent_user_id: null, agent_claimed_at: null,
   hidden: 0, sale_price_override_minor: null, image: '', supplier_cost_minor: 5000, shipping_cost_minor: 1000, other_costs_minor: 0,
   profit_minor: 1234, sale_price_minor: 7234, margin_bps: 2000, currency: 'SAR', commerce_product_id: null, trbhh_variant_id: '', last_sync_at: null,
 };

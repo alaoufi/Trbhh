@@ -10,9 +10,9 @@ const field='h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-s
 const label='mb-1 block text-xs font-bold text-slate-700';
 const messages:Record<string,string>={address_fullName_required:'أدخل الاسم الكامل.',address_phone_required:'أدخل رقم الجوال.',address_region_required:'اختر المنطقة.',address_city_required:'أدخل المدينة.',address_district_required:'أدخل الحي.',address_street_required:'أدخل اسم الشارع.',address_buildingNumber_required:'أدخل رقم المبنى.',address_postalCode_required:'أدخل الرمز البريدي.',address_country_invalid:'العنوان يجب أن يكون داخل السعودية.',address_phone_invalid:'رقم الجوال غير صحيح.',address_alternate_phone_invalid:'رقم الجوال البديل غير صحيح.',address_email_invalid:'البريد الإلكتروني غير صحيح.',address_field_invalid:'راجع الحقول؛ يوجد حقل فارغ أو أطول من المسموح.',address_not_found:'تعذر العثور على العنوان لهذا الحساب.',address_invalid:'تعذر التحقق من بيانات العنوان.'};
 
-export default async function AddressesPage({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){
+export default async function AddressesPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}){
  const session=await requireUser(),sp=await searchParams,addresses=await listMemberAddresses(BigInt(session.uid));
- const error=sp.error?messages[sp.error]||'تعذر حفظ بيانات العنوان. راجع الحقول وحاول مرة أخرى.':null;
+ const error=typeof sp.error==='string'?messages[sp.error]||'تعذر حفظ بيانات العنوان. راجع الحقول وحاول مرة أخرى.':null;
  return <div className="mx-auto max-w-4xl space-y-6 pb-8">
   <header className="rounded-2xl bg-[#16294a] p-5 text-white sm:p-7"><div className="flex items-center gap-3"><MapPin className="h-6 w-6 text-[#ff9a45]"/><div><h1 className="text-xl font-extrabold sm:text-2xl">عناوين الشحن</h1><p className="mt-1 text-sm text-white/75">احفظ عناوينك واختر عنوانًا افتراضيًا للطلبات القادمة.</p></div></div></header>
   {sp.saved&&<p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800">تم حفظ العنوان.</p>}

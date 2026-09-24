@@ -8,6 +8,7 @@ import {snapshotSupplierOrders} from '@/lib/suppliers/orders';
 import {readApprovedFiscalPolicy} from '@/lib/finance/fiscal-policy';
 import {buildOrderFiscalSnapshot,quoteFiscalProduct,quoteFiscalShipping,saveOrderFiscalSnapshot,requireOrderFiscalPolicyAtPayment} from '@/lib/finance/order-fiscal-snapshot';
 import type {CalculatedFiscalLineV2} from '@/lib/finance/types';
+import {formatAddressLine,normalizeSaudiAddress} from './addresses';
 import type {AttemptStatus, CommerceDb, CreateOrderInput, ExpectedPayment, NotificationChannel, NotificationTarget, OrderLineInput, OrderPolicy, OrderSnapshot, OrderStatus, PaymentAttempt, PaymentClaim, ShippingSnapshot, VerifiedPayment} from './types';
 
 type Tx = Prisma.TransactionClient;
@@ -33,13 +34,13 @@ export function normalizeOrderRequest(input:readonly unknown[]):OrderLineInput[]
   return [...quantities].map(([productId,quantity])=>({productId,quantity})).sort((a,b)=>a.productId<b.productId?-1:a.productId>b.productId?1:0);
 }
 function shippingSnapshot(input:ShippingSnapshot):ShippingSnapshot {
-  if(!input||typeof input!=='object'||Object.keys(input).sort().join(',')!=='addressLine,city,country,name,phone,postalCode') throw new Error('invalid_shipping');
-  for(const [key,max] of [['name',100],['addressLine',300],['city',100],['postalCode',10],['phone',16]] as const) {
-    const value=input[key];
-    if(typeof value!=='string'||!value.trim()||value!==value.trim()||value.length>max||/[\u0000-\u001f\u007f]/.test(value)) throw new Error('invalid_shipping');
-  }
-  if(input.country!=='SA'||!/^\+9665\d{8}$/.test(input.phone)||!/^\d{5}$/.test(input.postalCode)) throw new Error('invalid_shipping');
-  return {name:input.name,phone:input.phone,addressLine:input.addressLine,city:input.city,postalCode:input.postalCode,country:'SA'};
+  const keys=['addressLine','alternatePhone','buildingNumber','city','country','deliveryNotes','district','email','name','phone','postalCode','region','secondaryNumber','shortAddress','street'];
+  if(!input||typeof input!=='object'||Object.keys(input).sort().join(',')!==keys.sort().join(','))throw new Error('invalid_shipping');
+  try{
+    const normalized=normalizeSaudiAddress({label:'عنوان الطلب',fullName:input.name,phone:input.phone,alternatePhone:input.alternatePhone||'',email:input.email||'',country:input.country,region:input.region||'',city:input.city,district:input.district||'',street:input.street||'',buildingNumber:input.buildingNumber||'',secondaryNumber:input.secondaryNumber||'',postalCode:input.postalCode,shortAddress:input.shortAddress||'',deliveryNotes:input.deliveryNotes||''});
+    if(input.addressLine!==formatAddressLine(normalized))throw new Error('invalid_shipping');
+    return {name:normalized.fullName,phone:normalized.phone,addressLine:input.addressLine,city:normalized.city,postalCode:normalized.postalCode,country:'SA',region:normalized.region,district:normalized.district,street:normalized.street,buildingNumber:normalized.buildingNumber,secondaryNumber:normalized.secondaryNumber,alternatePhone:normalized.alternatePhone,email:normalized.email,shortAddress:normalized.shortAddress,deliveryNotes:normalized.deliveryNotes};
+  }catch(error){throw error instanceof Error&&error.message.startsWith('address_')?error:new Error('invalid_shipping');}
 }
 export function requestFingerprint(items:readonly OrderLineInput[],shipping?:ShippingSnapshot):string {
   const normalized=normalizeOrderRequest(items).map(item=>({productId:item.productId.toString(),quantity:item.quantity}));

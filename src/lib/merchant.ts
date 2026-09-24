@@ -796,8 +796,8 @@ export async function homeFeaturedStores(limit = 6): Promise<{ userId: number; s
 export async function homeFeaturedAds() {
   // one getMyAds round per merchant — cache the assembled showcase briefly
   const ads = await cached('stores:home-ads', 120, () => loadHomeFeaturedAds());
-  const visible = await visiblePlacementIds(ads.map((ad) => ad.storeId), true);
-  const eligible = ads.filter((ad) => visible.has(ad.storeId));
+  const visibleStoreIds = await visiblePlacementIds(ads.map((ad) => ad.storeId), true);
+  const eligible = ads.filter((ad) => visibleStoreIds.has(ad.storeId));
   if (!eligible.length) return [];
   const [currentAds, products] = await Promise.all([
     prisma.ads.findMany({ where: { id: { in: eligible.map((ad) => BigInt(ad.id)) }, status: 1, state: 'active', OR: [{ data_archive: null }, { data_archive: '' }] }, select: { id: true } }),
@@ -805,14 +805,14 @@ export async function homeFeaturedAds() {
   ]);
   const activeIds = new Set(currentAds.map((ad) => toInt(ad.id)));
   const memberships = new Set(products.map((product) => `${product.store_id}:${product.ad_id}`));
-  const visible = eligible.filter((ad) => activeIds.has(ad.id) && memberships.has(`${ad.storeId}:${ad.id}`));
+  const visibleAds = eligible.filter((ad) => activeIds.has(ad.id) && memberships.has(`${ad.storeId}:${ad.id}`));
   // Trust can be revoked at any time; resolve it outside the short-lived ad cache.
-  const ownersByStore = await prisma.stores.findMany({ where: { id: { in: [...new Set(visible.map((ad) => ad.storeId))].map(BigInt) } }, select: { id: true, user_id: true } });
+  const ownersByStore = await prisma.stores.findMany({ where: { id: { in: [...new Set(visibleAds.map((ad) => ad.storeId))].map((id) => BigInt(id)) } }, select: { id: true, user_id: true } });
   const ownerIds = [...new Set(ownersByStore.map((store) => store.user_id))];
   const owners = ownerIds.length ? await prisma.users.findMany({ where: { id: { in: ownerIds } }, select: { id: true, trusted: true } }) : [];
   const trustedByOwner = new Map(owners.map((owner) => [toInt(owner.id), owner.trusted === 1]));
   const ownerByStore = new Map(ownersByStore.map((store) => [toInt(store.id), toInt(store.user_id)]));
-  return visible.map((ad) => ({ ...ad, sellerTrusted: trustedByOwner.get(ownerByStore.get(ad.storeId) ?? 0) ?? false }));
+  return visibleAds.map((ad) => ({ ...ad, sellerTrusted: trustedByOwner.get(ownerByStore.get(ad.storeId) ?? 0) ?? false }));
 }
 
 async function loadHomeFeaturedAds() {

@@ -1,19 +1,21 @@
 'use client';
 /* eslint-disable @next/next/no-img-element -- provider image URLs are validated server-side; cart images use native lazy loading. */
 import Link from 'next/link';
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {formatSar} from '@/lib/commerce/money';
-import {normalizeCart,removeCartLine,setCartQuantity,type CartLine} from '@/lib/commerce/cart';
+import {COMMERCE_CART_EVENT,COMMERCE_CART_STORAGE_KEY,addCartLine,normalizeCart,readStoredCart,removeCartLine,setCartQuantity,writeStoredCart,type CartLine} from '@/lib/commerce/cart';
 import type {SaudiAddressSnapshot} from '@/lib/commerce/addresses';
 
 type ResolvedLine=CartLine&{title:string;image:string|null;variantName:string|null;unitPriceMinor:number;totalMinor:number;stock:number;available:boolean};
 type Quote={lines:ResolvedLine[];subtotalMinor:number;discountMinor:number;productVatMinor:number|null;shippingFeeMinor:number|null;shippingVatMinor:number|null;shippingTotalMinor:number|null;totalMinor:number|null;pricingVerified:boolean;purchasingEnabled:boolean;deliveryEstimate:null};
-const STORAGE_KEY='trbhh-commerce-cart-v1';
 function money(value:number){return `${formatSar(value)} ر.س`;}
+function cartCount(){try{return readStoredCart(window.localStorage).reduce((sum,line)=>sum+line.quantity,0);}catch{return 0;}}
+function subscribeCart(callback:()=>void){window.addEventListener(COMMERCE_CART_EVENT,callback);window.addEventListener('storage',callback);return()=>{window.removeEventListener(COMMERCE_CART_EVENT,callback);window.removeEventListener('storage',callback);};}
+function useCartCount(){return useSyncExternalStore(subscribeCart,cartCount,()=>0);}
+function publishCart(items:CartLine[]){const clean=writeStoredCart(window.localStorage,items);window.dispatchEvent(new Event(COMMERCE_CART_EVENT));return clean;}
 
 export function PurchaseCartLink(){
- const[count,setCount]=useState(0);
- useEffect(()=>{try{const parsed=normalizeCart(JSON.parse(sessionStorage.getItem(STORAGE_KEY)||'[]'));setCount(parsed.reduce((sum,line)=>sum+line.quantity,0));}catch{setCount(0);}},[]);
+ const count=useCartCount();
  return <Link href="/shop/cart" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#16294a]/20 bg-white px-4 py-2 text-sm font-extrabold text-[#16294a]">السلة <span className="rounded-full bg-[#16294a] px-2 py-0.5 text-xs text-white">{count}</span></Link>;
 }
 
@@ -24,9 +26,9 @@ export function AddCommerceCartItem({productId,variants,requiresVariant,maximum,
   try{
    const qty=Number(quantity);if(!Number.isSafeInteger(qty)||qty<1||qty>(variant?.stock??maximum))throw new Error('quantity');
    if(mustSelect&&!variant)throw new Error('variant');
-   const current=normalizeCart(JSON.parse(sessionStorage.getItem(STORAGE_KEY)||'[]'));
-   const next=normalizeCart([...current,{productId,quantity:qty,...(variant?{variantKey:variant.key}:{})}]);
-   sessionStorage.setItem(STORAGE_KEY,JSON.stringify(next));setStatus('أُضيف المنتج إلى السلة.');
+   const current=readStoredCart(window.localStorage);
+   const next=addCartLine(current,{productId,quantity:qty,...(variant?{variantKey:variant.key}:{})});
+   publishCart(next);setStatus('أُضيف المنتج إلى السلة.');
   }catch(error){setStatus(error instanceof Error&&error.message==='variant'?'اختر اللون أو المقاس قبل الإضافة.':'تعذر الإضافة؛ تحقق من الكمية أو حد السلة.');}
  }
  const cap=variant?.stock??maximum;
@@ -47,6 +49,7 @@ export function AddCommerceCartItem({productId,variants,requiresVariant,maximum,
 type CartAddress={id:string;label:string;isDefault:boolean;snapshot:SaudiAddressSnapshot};
 export function PurchaseCart({addresses,signedIn}:{addresses:CartAddress[];signedIn:boolean}){
  const[items,setItems]=useState<CartLine[]>([]),[quote,setQuote]=useState<Quote|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
+ const persistQueue=useRef<Promise<void>>(Promise.resolve());
  const[selectedAddress,setSelectedAddress]=useState(addresses.find(address=>address.isDefault)?.id||addresses[0]?.id||'');
  async function refresh(lines:CartLine[]){
   if(!lines.length){setQuote(null);setLoading(false);return;}
@@ -55,8 +58,11 @@ export function PurchaseCart({addresses,signedIn}:{addresses:CartAddress[];signe
   catch{setError('لم نتمكن من تحديث الأسعار والتوفر الآن. أعد المحاولة قبل متابعة الشراء.');setQuote(null);}
   finally{setLoading(false);}
  }
- function save(next:CartLine[]){setItems(next);sessionStorage.setItem(STORAGE_KEY,JSON.stringify(next));void refresh(next);}
- useEffect(()=>{let loaded:CartLine[]=[];try{loaded=normalizeCart(JSON.parse(sessionStorage.getItem(STORAGE_KEY)||'[]'));sessionStorage.setItem(STORAGE_KEY,JSON.stringify(loaded));}catch{sessionStorage.removeItem(STORAGE_KEY);}setItems(loaded);void refresh(loaded);},[]);
+ function save(next:CartLine[]){const clean=publishCart(next);setItems(clean);void refresh(clean);if(signedIn){persistQueue.current=persistQueue.current.catch(()=>{}).then(async()=>{const response=await fetch('/api/shop/cart/state',{method:'PUT',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:clean})});if(!response.ok)throw new Error('cart_sync');});}}
+ useEffect(()=>{let cancelled=false;async function load(){let local:CartLine[]=[];try{local=readStoredCart(window.localStorage);}catch{try{window.localStorage.removeItem(COMMERCE_CART_STORAGE_KEY);}catch{}publishCart([]);}
+   if(signedIn){try{const response=await fetch('/api/shop/cart/state',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:local})});if(!response.ok)throw new Error('cart_sync');const data=await response.json() as {items:CartLine[]};local=normalizeCart(data.items);publishCart(local);}catch{if(!cancelled)setError('تعذر مزامنة سلتك مع حسابك الآن؛ تبقى السلة المحفوظة على هذا الجهاز متاحة.');}}
+   if(cancelled)return;setItems(local);void refresh(local);
+  }void load();return()=>{cancelled=true;};},[signedIn]);
  const totalQuantity=items.reduce((sum,item)=>sum+item.quantity,0),invalid=!!quote?.lines.some(line=>!line.available);
  return <div className="mx-auto grid max-w-6xl gap-5 pb-28 lg:grid-cols-[1fr_340px] lg:pb-0">
   <section className="min-w-0 space-y-4"><header><p className="text-sm font-bold text-[#ff6a1a]">متجر تربح</p><h1 className="mt-1 text-2xl font-extrabold text-[#16294a] sm:text-3xl">سلة مشترياتك</h1><p className="mt-1 text-sm text-slate-500">نراجع السعر والتوفر من بيانات تربح الحالية في كل مرة تفتح فيها السلة.</p></header>

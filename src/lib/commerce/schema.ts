@@ -29,6 +29,11 @@ export const COMMERCE_DDL = [
     KEY commerce_customer_addresses_member (member_id,id),
     KEY commerce_customer_addresses_default (member_id,is_default,id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS commerce_customer_carts (
+    member_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    items JSON NOT NULL,
+    updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS commerce_orders (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     member_id BIGINT UNSIGNED NOT NULL,

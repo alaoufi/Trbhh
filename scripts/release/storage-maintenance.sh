@@ -3,7 +3,7 @@ set -euo pipefail
 mode=${1:-audit}
 [[ "$mode" == audit || "$mode" == cleanup ]] || exit 1
 if [[ "$mode" == cleanup ]]; then
-  # Fixed inventory reviewed on 2026-09-22; never auto-select delete targets.
+  # Fixed inventory reviewed on 2026-09-24; never auto-select delete targets.
   base=/root/trbhh-release-backups
   # This is the self-contained full backup at the root of the active Salla and
   # supplier-release chain. All newer compact checkpoints ultimately bind to it.
@@ -35,6 +35,8 @@ if [[ "$mode" == cleanup ]]; then
   fi
   targets=(
     /root/trbhh-release-backups/audit-35465592273
+    /root/trbhh-release-backups/audit-35471003685
+    /root/trbhh-release-backups/audit-35498778390
   )
   # Validate every exact target and all mounts before the first deletion.
   mounts=$(findmnt -rn -o TARGET)

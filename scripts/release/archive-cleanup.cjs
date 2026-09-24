@@ -41,8 +41,8 @@ async function plan(db) {
   const uploadIds = [...new Set([...archivedPhotoIds, ...oldAdUploads.map((row) => row.id.toString())])];
   if (!uploadIds.length) return { oldAds, oldPhotos, staleActiveAds, staleActiveAdPhotos, deleteUploads: [], keepReasons: {} };
   const idValues = uploadIds.map((id) => BigInt(id));
-  const [uploads, allPhotoRefs, videos, users, stores, profiles, categories] = await Promise.all([
-    db.uploads.findMany({ where: { id: { in: idValues }, type: 'ad' }, select: { id: true, file_name: true, file_size: true } }),
+  const [relatedUploads, allPhotoRefs, videos, users, stores, profiles, categories] = await Promise.all([
+    db.uploads.findMany({ where: { id: { in: idValues } }, select: { id: true, type: true, file_name: true, file_size: true } }),
     db.photos.findMany({ where: { photo_path: { in: uploadIds } }, select: { photo_path: true, other_id: true } }),
     db.ads.findMany({ where: { video_path: { in: uploadIds } }, select: { video_path: true } }),
     db.users.findMany({ where: { photo_path: { in: uploadIds } }, select: { photo_path: true } }),
@@ -51,6 +51,15 @@ async function plan(db) {
     db.categories.findMany({ where: { photo_path: { in: uploadIds } }, select: { photo_path: true } }),
   ]);
 
+  const uploads = relatedUploads.filter((row) => row.type === 'ad');
+  const relatedUploadTypes = {};
+  const relatedFileRoots = {};
+  for (const row of relatedUploads) {
+    const type = row.type || '(null)';
+    relatedUploadTypes[type] = (relatedUploadTypes[type] || 0) + 1;
+    const fileRoot = typeof row.file_name === 'string' ? row.file_name.split('/')[0] || '(empty)' : '(missing)';
+    relatedFileRoots[fileRoot] = (relatedFileRoots[fileRoot] || 0) + 1;
+  }
   const candidateIds = new Set(uploads.map((row) => row.id.toString()));
   const candidatePaths = [...new Set(uploads.map((row) => row.file_name).filter((name) => typeof name === 'string' && name))];
   const samePathRows = candidatePaths.length ? await db.uploads.findMany({
@@ -75,6 +84,8 @@ async function plan(db) {
   });
   const keepReasons = {
     nonAdOrMissingUploadRows: Math.max(0, uploadIds.length - uploads.length),
+    relatedUploadTypes,
+    relatedFileRoots,
     usedByOtherContent: uploads.filter((row) => protectedIds.has(row.id.toString())).length,
     sharedFilePath: uploads.filter((row) => protectedPaths.has(row.file_name)).length,
     oldOrphanAdUploads: oldAgeOrphanIds.size,

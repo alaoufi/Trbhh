@@ -55,12 +55,19 @@ async function main() {
     const targetDetails = target.details_json ? JSON.parse(target.details_json) : {};
     const queryRows = await db.$queryRawUnsafe("SELECT MIN(id) AS id,cj_product_id,MAX(last_sync_at) AS latest FROM cj_products WHERE status='ready' AND hidden=0 AND cj_product_id<>? GROUP BY cj_product_id ORDER BY latest DESC LIMIT 50", String(target.cj_product_id));
     const candidateIds = [String(target.id), ...queryRows.map(row => String(row.id)).filter(id => id !== String(target.id))];
-    const inventoryDiagnostics = [];
-    let product = null, rawProduct = null, mapped = [], inventoryByVid = new Map(), selectedStockRows = [], chosen = null, usableStock = [];
+    const catalogPage = await api('/product/list?pageNum=1&pageSize=20');
+    const catalogItems = Array.isArray(catalogPage?.list) ? catalogPage.list : Array.isArray(catalogPage) ? catalogPage : [];
+    const catalogCandidates = catalogItems.map(item => ({ id: null, cj_product_id: String(item.pid || item.productId || item.id || ''), cj_variant_id: '', details_json: null })).filter(item => item.cj_product_id && item.cj_product_id !== String(target.cj_product_id)).slice(0, 20);
+    const dbCandidates = [];
     for (const id of candidateIds) {
       const rows = await db.$queryRawUnsafe('SELECT id,cj_product_id,cj_variant_id,cj_sku,name,name_ar,image,images,details_json FROM cj_products WHERE id=? LIMIT 1', BigInt(id));
-      const row = rows[0];
-      if (!row) continue;
+      if (rows[0]) dbCandidates.push(rows[0]);
+    }
+    const seenPids = new Set(dbCandidates.map(row => String(row.cj_product_id)));
+    const allCandidates = [...dbCandidates, ...catalogCandidates.filter(row => !seenPids.has(row.cj_product_id))];
+    const inventoryDiagnostics = [];
+    let product = null, rawProduct = null, mapped = [], inventoryByVid = new Map(), selectedStockRows = [], chosen = null, usableStock = [];
+    for (const row of allCandidates) {
       const liveProduct = await api(`/product/query?pid=${encodeURIComponent(row.cj_product_id)}`);
       if (!liveProduct || String(liveProduct.pid || liveProduct.productId || '') !== String(row.cj_product_id)) continue;
       const rawVariants = await api(`/product/variant/query?pid=${encodeURIComponent(row.cj_product_id)}`);
@@ -75,7 +82,7 @@ async function main() {
         const inventory = Array.isArray(group.inventory) ? group.inventory : [];
         byVid.set(vid, inventory.map(r => ({ vid, country: safe(r.countryCode, 2)?.toUpperCase() || '', warehouse: safe(r.areaEn || r.areaEnName || r.countryNameEn), cjStock: number(r.cjInventory ?? r.cjInventoryNum) || 0, totalInventory: number(r.totalInventory ?? r.storageNum ?? r.totalInventoryNum) || 0 })));
       }
-      inventoryDiagnostics.push({ internalId: String(row.id), variantGroups: groups.length, inventoryRows: [...byVid.values()].reduce((n,list)=>n+list.length,0), variantsWithPositiveCjStock: [...byVid.values()].filter(list=>list.some(r=>r.cjStock>0)).length, totalCjStock: [...byVid.values()].flat().reduce((n,r)=>n+r.cjStock,0), totalReportedStock: [...byVid.values()].flat().reduce((n,r)=>n+r.totalInventory,0), inventoryFieldNames: [...new Set(groups.flatMap(g=>(Array.isArray(g.inventory)?g.inventory:[]).flatMap(r=>Object.keys(r))))].sort().slice(0,30) });
+      inventoryDiagnostics.push({ internalId: row.id == null ? 'CJ catalog only' : String(row.id), pid: row.cj_product_id, variantGroups: groups.length, inventoryRows: [...byVid.values()].reduce((n,list)=>n+list.length,0), variantsWithPositiveCjStock: [...byVid.values()].filter(list=>list.some(r=>r.cjStock>0)).length, totalCjStock: [...byVid.values()].flat().reduce((n,r)=>n+r.cjStock,0), totalReportedStock: [...byVid.values()].flat().reduce((n,r)=>n+r.totalInventory,0), inventoryFieldNames: [...new Set(groups.flatMap(g=>(Array.isArray(g.inventory)?g.inventory:[]).flatMap(r=>Object.keys(r))))].sort().slice(0,30) });
       const validCandidates = liveVariants.filter(v => v.price > 0 && (byVid.get(v.vid) || []).some(r => /^[A-Z]{2}$/.test(r.country) && r.cjStock > 0));
       for (const v of validCandidates.slice(0, 4)) {
         const rawRows = await api(`/product/stock/queryByVid?vid=${encodeURIComponent(v.vid)}`);
@@ -97,7 +104,7 @@ async function main() {
         ['freight_quote_has_actual_price','freight was not requested without sellable stock'],
         ['alternate_variant_refreshes_price_image_and_stock_payload','no sellable variant pair to compare'],
       ]) check(name,false,detail);
-      process.stdout.write(JSON.stringify({ error: 'no_live_variant_with_verified_cj_stock_in_first_50_ready_products', product: { originalTarget: '12', pid: String(target.cj_product_id) }, inventoryDiagnostics, checks, passed: checks.filter(x => x.ok).length, total: 12 }, null, 2) + '\n');
+      process.stdout.write(JSON.stringify({ error: 'no_live_variant_with_verified_cj_stock_in_first_50_ready_or_first_20_cj_catalog_products', product: { originalTarget: '12', pid: String(target.cj_product_id) }, scannedCjCatalogProducts: catalogCandidates.length, inventoryDiagnostics, checks, passed: checks.filter(x => x.ok).length, total: 12 }, null, 2) + '\n');
       process.exitCode = 1;
       return;
     }
@@ -126,7 +133,7 @@ async function main() {
     const alternateImage = alternate.image || safe(rawProduct.productImage || rawProduct.bigImage || rawProduct.img, 1000);
     check('alternate_variant_refreshes_price_image_and_stock_payload', chosen.vid !== alternate.vid && chosen.price > 0 && alternate.price > 0 && typeof selectedImage === 'string' && typeof alternateImage === 'string' && Number.isSafeInteger(stock) && Number.isSafeInteger(altStock) && (chosen.price !== alternate.price || selectedImage !== alternateImage || stock !== altStock), `selected ${chosen.vid}: $${chosen.price}, image ${selectedImage ? 'available' : 'missing'}, stock ${stock}; alternate ${alternate.vid}: $${alternate.price}, image ${alternateImage ? 'available' : 'missing'}, stock ${altStock}`);
 
-    process.stdout.write(JSON.stringify({ product: { internalId: String(product.id), pid: String(product.cj_product_id), name: safe(rawProduct.productNameEn || rawProduct.productName), variantCount: mapped.length, originalTarget: String(target.id), targetStoredVariantCount: Array.isArray(targetDetails.variants) ? targetDetails.variants.length : 0 }, selected: { vid: chosen.vid, sku: chosen.sku, name: chosen.name, optionKey: chosen.key, priceUsd: chosen.price, image: selectedImage, attributes: chosen.attributes, stock, warehouses: usableStock, freight: quote }, alternate: { vid: alternate.vid, sku: alternate.sku, name: alternate.name, priceUsd: alternate.price, image: alternateImage, stock: altStock }, gates: { commerce_purchasing_enabled: flags.commerce_purchasing_enabled || '0', commerce_payments_enabled: flags.commerce_payments_enabled || '0', SUPPLIER_ALLOW_LIVE_ORDERS: process.env.SUPPLIER_ALLOW_LIVE_ORDERS || 'unset' }, checks, passed: checks.filter(x => x.ok).length, total: checks.length }, null, 2) + '\n');
+    process.stdout.write(JSON.stringify({ product: { internalId: product.id == null ? 'CJ catalog only' : String(product.id), pid: String(product.cj_product_id), name: safe(rawProduct.productNameEn || rawProduct.productName), variantCount: mapped.length, originalTarget: String(target.id), targetStoredVariantCount: Array.isArray(targetDetails.variants) ? targetDetails.variants.length : 0 }, selected: { vid: chosen.vid, sku: chosen.sku, name: chosen.name, optionKey: chosen.key, priceUsd: chosen.price, image: selectedImage, attributes: chosen.attributes, stock, warehouses: usableStock, freight: quote }, alternate: { vid: alternate.vid, sku: alternate.sku, name: alternate.name, priceUsd: alternate.price, image: alternateImage, stock: altStock }, gates: { commerce_purchasing_enabled: flags.commerce_purchasing_enabled || '0', commerce_payments_enabled: flags.commerce_payments_enabled || '0', SUPPLIER_ALLOW_LIVE_ORDERS: process.env.SUPPLIER_ALLOW_LIVE_ORDERS || 'unset' }, checks, passed: checks.filter(x => x.ok).length, total: checks.length }, null, 2) + '\n');
     if (checks.some(x => !x.ok)) process.exitCode = 1;
   } finally { await db.$disconnect(); }
 }

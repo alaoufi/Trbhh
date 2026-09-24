@@ -51,6 +51,9 @@ export type CjFreightOption = {
   logisticPrice: number;
   logisticAging: string | null;
   logisticPriceCn: number | null;
+  taxesFeeUsd?: number | null;
+  clearanceFeeUsd?: number | null;
+  totalPostageFeeUsd?: number | null;
 };
 
 export type CjTrack = {

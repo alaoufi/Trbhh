@@ -10,9 +10,9 @@ export type AvailabilityDeps = {
   getVariants?: typeof getVariants;
 };
 export type VariantCheckStatus = 'available'|'out_of_stock'|'quantity_exceeds_stock'|'inventory_error'|'variant_changed'|'no_shipping'|'freight_error'|'invalid_price';
-export type SaudiShippingOption = {name:string;priceMinor:number;currency:'SAR';deliveryDays:string|null;originCountry:string};
+export type SaudiShippingOption = {name:string;priceMinor:number;additionalMinor:number;currency:'SAR';deliveryDays:string|null;originCountry:string};
 export type VariantCheck =
-  | {status:'available';vid:string;sku:string;variantName:string|null;optionKey:string|null;stockQuantity:number;warehouses:{id:string|null;name:string|null;quantity:number;originCountry:string}[];supplierPriceMinor:number;salePriceMinor:number;shippingOptions:SaudiShippingOption[];checkedAt:string}
+  | {status:'available';vid:string;sku:string;variantName:string|null;optionKey:string|null;stockQuantity:number;priceChanged:boolean;warehouses:{id:string|null;name:string|null;quantity:number;originCountry:string}[];supplierPriceMinor:number;salePriceMinor:number;shippingOptions:SaudiShippingOption[];checkedAt:string}
   | {status:Exclude<VariantCheckStatus,'available'>;checkedAt:string};
 
 const nowIso=()=>new Date().toISOString();
@@ -49,7 +49,9 @@ export async function verifyCjVariantForSaudi(pid:string,selected:CjVariant,quan
     if(!result?.ok){hadFreightFailure=true;continue;}
     for(const option of result.data){
       if(!option.logisticName.trim()||!Number.isFinite(option.logisticPrice)||option.logisticPrice<0)continue;
-      shippingOptions.push({name:option.logisticName.trim().slice(0,80),priceMinor:minorFromUsd(option.logisticPrice,usdToSarX100),currency:'SAR',deliveryDays:cleanAging(option.logisticAging),originCountry});
+      const listedExtra=(Number.isFinite(option.taxesFeeUsd)?option.taxesFeeUsd??0:0)+(Number.isFinite(option.clearanceFeeUsd)?option.clearanceFeeUsd??0:0);
+      const totalExtra=Number.isFinite(option.totalPostageFeeUsd)&&option.totalPostageFeeUsd!>option.logisticPrice?option.totalPostageFeeUsd!-option.logisticPrice:listedExtra;
+      shippingOptions.push({name:option.logisticName.trim().slice(0,80),priceMinor:minorFromUsd(option.logisticPrice,usdToSarX100),additionalMinor:minorFromUsd(totalExtra,usdToSarX100),currency:'SAR',deliveryDays:cleanAging(option.logisticAging),originCountry});
     }
   }
   if(!shippingOptions.length)return {status:hadFreightFailure?'freight_error':'no_shipping',checkedAt};
@@ -61,7 +63,7 @@ export async function verifyCjVariantForSaudi(pid:string,selected:CjVariant,quan
   if(pricing?.saleOverrideMinor!=null)salePriceMinor=pricing.saleOverrideMinor;
   else salePriceMinor=computePrice(supplierPriceMinor,0,pricing?.otherCostsMinor??0,pricing?.marginBps??3000).salePriceMinor;
   if(!Number.isSafeInteger(salePriceMinor)||salePriceMinor<=0)return {status:'invalid_price',checkedAt};
-  return {status:'available',vid:liveVariant.vid,sku:liveVariant.variantSku,variantName:liveVariant.variantName,optionKey:liveVariant.variantKey,stockQuantity,warehouses,supplierPriceMinor,salePriceMinor,shippingOptions,checkedAt};
+  return {status:'available',vid:liveVariant.vid,sku:liveVariant.variantSku,variantName:liveVariant.variantName??null,optionKey:liveVariant.variantKey??null,stockQuantity,priceChanged:typeof selected.variantSellPrice==='number'&&Number.isFinite(selected.variantSellPrice)&&selected.variantSellPrice!==liveVariant.variantSellPrice,warehouses,supplierPriceMinor,salePriceMinor,shippingOptions,checkedAt};
 }
 
 function validOrigin(value:string|null):boolean{return typeof value==='string'&&/^[A-Za-z]{2}$/.test(value.trim());}
@@ -93,7 +95,7 @@ export async function readCjAvailability(pid:string,variants:CjVariant[],deps:Av
       const options=freight.data.filter((option:CjFreightOption)=>option.logisticName.trim()&&Number.isFinite(option.logisticPrice)&&option.logisticPrice>=0);
       if(!options.length)continue;
       if(!verified.some(item=>item.vid===vid))verified.push({vid,stockQuantity});
-      shippingOptions.push(...options.map(option=>({name:option.logisticName.trim().slice(0,80),priceMinor:minorFromUsd(option.logisticPrice,375),currency:'SAR' as const,deliveryDays:cleanAging(option.logisticAging),originCountry})));
+      shippingOptions.push(...options.map(option=>{const listedExtra=(option.taxesFeeUsd??0)+(option.clearanceFeeUsd??0),extra=option.totalPostageFeeUsd!=null&&option.totalPostageFeeUsd>option.logisticPrice?option.totalPostageFeeUsd-option.logisticPrice:listedExtra;return {name:option.logisticName.trim().slice(0,80),priceMinor:minorFromUsd(option.logisticPrice,375),additionalMinor:minorFromUsd(extra,375),currency:'SAR' as const,deliveryDays:cleanAging(option.logisticAging),originCountry};}));
     }
   }
   if(!verified.length||!shippingOptions.length)return null;

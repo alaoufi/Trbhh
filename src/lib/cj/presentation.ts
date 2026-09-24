@@ -26,6 +26,16 @@ export function cjPriceLabel(minor: number, currency = 'SAR'): string {
   try { return `${formatSar(minor)} ر.س`; } catch { return 'السعر قيد المراجعة'; }
 }
 
+/** Commercially cleaner display-only title; source names remain untouched in CJ storage. */
+export function cjProductDisplayTitle(raw:string|null|undefined):string{
+  const plain=cjDescriptionText(raw??'').replace(/كل\s+مباراة/gu,'متعدد الاستخدامات').replace(/\s{2,}/g,' ').trim();
+  const parts=plain.split(/\s*(?:[|｜]|[،,])\s*/u).filter(Boolean),unique:string[]=[];
+  for(const part of parts)if(!unique.length||part.toLocaleLowerCase()!==unique[unique.length-1].toLocaleLowerCase())unique.push(part);
+  let title=unique.join('، ');
+  if(title.length>160){const shortened=title.slice(0,160),breakAt=shortened.lastIndexOf(' ');title=shortened.slice(0,breakAt>80?breakAt:160).trim();}
+  return title||'بيانات المنتج قيد المراجعة';
+}
+
 export function cjSourceLink(raw: string): { href: string; label: string } | null {
   try {
     const url = new URL(raw);

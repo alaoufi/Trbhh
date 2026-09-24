@@ -8,7 +8,7 @@ import {primaryOrigin} from '@/lib/public-origin';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
-const MAX_BYTES=8192;
+const MAX_BYTES=256*1024;
 function error(code:string,status:number){return NextResponse.json({error:code},{status,headers});}
 function trustedOrigin(origin:string|null,requestUrl:string):boolean{
   // Standalone Next uses its internal bind host in request.url behind the proxy.
@@ -24,7 +24,7 @@ async function boundedBody(request:Request):Promise<unknown>{
   if(length!==null&&(!/^\d+$/.test(length)||Number(length)>MAX_BYTES))throw Error('body_too_large');
   if(!request.body)throw Error('invalid_cart');
   const reader=request.body.getReader();let bytes=0;const parts:Uint8Array[]=[];
-  try{while(true){const {done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>MAX_BYTES){await reader.cancel();throw Error('body_too_large');}parts.push(value);}}finally{reader.releaseLock();}
+  try{while(true){const {done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>MAX_BYTES){void reader.cancel().catch(()=>{});throw Error('body_too_large');}parts.push(value);}}finally{reader.releaseLock();}
   const body=new Uint8Array(bytes);let offset=0;for(const part of parts){body.set(part,offset);offset+=part.length;}
   try{return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(body));}catch{throw Error('invalid_cart');}
 }

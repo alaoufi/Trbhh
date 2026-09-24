@@ -310,5 +310,8 @@ function mapFreight(o: Record<string, unknown>): CjFreightOption {
     logisticPrice: num(o.logisticPrice) ?? 0,
     logisticAging: str(o.logisticAging),
     logisticPriceCn: num(o.logisticPriceCn),
+    taxesFeeUsd: num(o.taxesFee),
+    clearanceFeeUsd: num(o.clearanceOperationFee),
+    totalPostageFeeUsd: num(o.totalPostageFee),
   };
 }

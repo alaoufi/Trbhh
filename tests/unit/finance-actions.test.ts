@@ -10,7 +10,7 @@ vi.mock('@/lib/finance/service',async importOriginal=>({...await importOriginal<
 import {financeAuditContext} from '@/lib/finance/audit-context';
 import {saveFinanceBudget,approveFinanceSettlement,recordFinanceExpense,closeFinanceMonth,requestFinanceReturn,requestFinanceReturnReversal,requestFinanceTaxSettings,requestFinancePeriodReopen,approveFinanceRequest,cancelFinanceRequest,restoreFinanceDraftInvoice} from '@/app/admin/finance/actions';
 const form=(values:Record<string,string>)=>{const result=new FormData();for(const [key,value] of Object.entries(values))result.set(key,value);return result;};
-const policyFields={priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatPercent:'0',discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42'};
+const policyFields={priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42',vatEnabled:'off'};
 const taxFields={month:'2026-09',effectiveFrom:'2026-10-01',issuerName:'Issuer',issuerTaxNumber:'300000000000003',issuerAddress:'Address',vatPercent:'15.25',policyReference:'approved-policy',reason:'policy review',requestKey:'request-test-2',...policyFields};
 beforeEach(()=>{vi.clearAllMocks();mocks.requireAccess.mockResolvedValue({uid:9});mocks.accessActor.mockResolvedValue({userId:9,ip:'127.0.0.1',sessionFingerprint:'hashed-session'});});
 describe('finance server action authorization',()=>{
@@ -86,15 +86,25 @@ describe('finance maker and checker action contracts',()=>{
 describe('prospective policy and source credit action boundaries',()=>{
  it('passes each explicitly selected calculation field and a named delegate without accepting client snapshots',async()=>{
   await expect(requestFinanceTaxSettings(form({...taxFields,shippingVatPercent:'5.25',snapshot:'forged',totalMinor:'1'}))).rejects.toThrow('saved=1');
-  expect(mocks.requestFinanceChange.mock.calls[0][2].payload).toEqual({effectiveFrom:'2026-10-01',issuer:{name:'Issuer',taxNumber:'300000000000003',address:'Address'},vatBps:1525,policyReference:'approved-policy',calculationPolicy:{version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatBps:525,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42'}});
+  expect(mocks.requestFinanceChange.mock.calls[0][2].payload).toEqual({effectiveFrom:'2026-10-01',issuer:{name:'Issuer',taxNumber:'300000000000003',address:'Address'},vatBps:1525,policyReference:'approved-policy',calculationPolicy:{version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatBps:1525,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42',vatControl:{enabled:false,registrationConfirmed:false,registrationEffectiveFrom:null,registrationThresholdMinor:37500000}}});
  });
  it.each(Object.keys(policyFields))('rejects an unset %s before the service',async key=>{
   await expect(requestFinanceTaxSettings(form({...taxFields,[key]:''}))).rejects.toThrow('error=finance_');
   expect(mocks.requestFinanceChange).not.toHaveBeenCalled();
  });
- it.each([['priceBasis','mixed'],['itemScope','all'],['shippingPriceBasis','default'],['shippingVatPercent','5.255'],['shippingVatPercent','100.01'],['discountTreatment','after_tax'],['rounding','bankers'],['policyRollover','recalculate'],['automationDelegateId','0'],['automationDelegateId','4.2']])('rejects an unsupported %s value',async(key,value)=>{
+ it.each([['priceBasis','mixed'],['itemScope','all'],['shippingPriceBasis','default'],['vatPercent','5.255'],['vatPercent','100.01'],['discountTreatment','after_tax'],['rounding','bankers'],['policyRollover','recalculate'],['automationDelegateId','0'],['automationDelegateId','4.2'],['vatEnabled','true'],['registrationThreshold','0'],['registrationThreshold','375000.001'],['registrationConfirmed','yes']])('rejects an unsupported %s value',async(key,value)=>{
   await expect(requestFinanceTaxSettings(form({...taxFields,[key]:value}))).rejects.toThrow('error=finance_');
   expect(mocks.requestFinanceChange).not.toHaveBeenCalled();
+ });
+ it('defaults an OFF rate to zero without requiring a fabricated tax number and records exact threshold settings',async()=>{
+  await expect(requestFinanceTaxSettings(form({...taxFields,issuerTaxNumber:'',vatPercent:'',registrationThreshold:'375001.25'}))).rejects.toThrow('saved=1');
+  expect(mocks.requestFinanceChange.mock.calls[0][2].payload).toMatchObject({issuer:{taxNumber:''},vatBps:0,calculationPolicy:{shippingVatBps:0,vatControl:{enabled:false,registrationConfirmed:false,registrationEffectiveFrom:null,registrationThresholdMinor:37500125}}});
+ });
+ it('forwards registration evidence and server-derived audit metadata for an explicit ON proposal',async()=>{
+  let audit:unknown;mocks.requestFinanceChange.mockImplementation(async()=>{audit=financeAuditContext();});
+  await expect(requestFinanceTaxSettings(form({...taxFields,vatEnabled:'on',registrationConfirmed:'1',registrationEffectiveFrom:'2026-10-01',ip:'forged',sessionFingerprint:'forged'}))).rejects.toThrow('saved=1');
+  expect(mocks.requestFinanceChange.mock.calls[0][2].payload.calculationPolicy.vatControl).toEqual({enabled:true,registrationConfirmed:true,registrationEffectiveFrom:'2026-10-01',registrationThresholdMinor:37500000});
+  expect(audit).toEqual({ip:'127.0.0.1',sessionFingerprint:'hashed-session'});
  });
  it('requires tax view and settings permission before passing any policy to the service',async()=>{
   mocks.requireAccess.mockImplementation(async(_module:string,action:string)=>{if(action==='manage_settings')throw Error('DENIED');return {uid:9};});

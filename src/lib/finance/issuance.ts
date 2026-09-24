@@ -22,8 +22,8 @@ export async function issueProspectiveInvoice(db:CommerceDb,receiptId:bigint,aut
   const [receipt]=await tx.$queryRaw<{id:bigint;order_id:bigint;amount_minor:bigint;currency:string;recorded_at:Date}[]>`SELECT id,order_id,amount_minor,currency,recorded_at FROM commerce_receipts WHERE id=${receiptId}`;
   if(!receipt||receipt.currency!=='SAR'||receipt.recorded_at>now)throw new Error('finance_invoice_difference');
   const saved=await readOrderFiscalSnapshot(tx,receipt.order_id);
-  const policyAtOrder=await readApprovedFiscalPolicy(tx,new Date(saved.snapshot.capturedAt));
-  const policyAtSale=await readApprovedFiscalPolicy(tx,receipt.recorded_at);
+  const policyAtOrder=await readApprovedFiscalPolicy(tx,new Date(saved.snapshot.capturedAt),{historicalSnapshot:true});
+  const policyAtSale=await readApprovedFiscalPolicy(tx,receipt.recorded_at,{historicalSnapshot:true});
   if(fingerprint(policyAtOrder)!==fingerprint(saved.snapshot.policy)||fingerprint(policyAtSale)!==fingerprint(saved.snapshot.policy))throw new Error('finance_policy_changed_at_sale');
   if(authority.mode==='automation'&&String(authority.actorId)!==saved.snapshot.policy.calculationPolicy.automationDelegateId)throw new Error('finance_automation_delegate_mismatch');
   const [order]=await tx.$queryRaw<{id:bigint;member_id:bigint;status:string;currency:string;created_at:Date;paid_at:Date|null;subtotal_minor:number;shipping_fee_minor:number;total_minor:number;shipping:unknown}[]>`SELECT id,member_id,status,currency,created_at,paid_at,subtotal_minor,shipping_fee_minor,total_minor,shipping FROM commerce_orders WHERE id=${receipt.order_id}`;
@@ -42,6 +42,7 @@ export async function issueProspectiveInvoice(db:CommerceDb,receiptId:bigint,aut
   }
   const source:FinanceOrder={id:String(order.id),memberId:String(order.member_id),customerName:saved.snapshot.customer.name,status:order.status,createdAt:order.created_at.toISOString(),paidAt:order.paid_at?.toISOString()??null,subtotalMinor:order.subtotal_minor,shippingMinor:order.shipping_fee_minor,totalMinor:amount,currency:'SAR',items:items.map(x=>({productId:String(x.product_id),title:x.title,quantity:x.quantity,unitMinor:x.unit_price_minor,totalMinor:x.total_minor})),suppliers:suppliers.map(x=>({supplierId:String(x.supplier_id),supplierName:x.supplier_name,productId:String(x.product_id),amountMinor:x.total_cost_minor}))};
   const snapshot:FiscalSnapshotV2={version:2,issuer:saved.snapshot.policy.issuer,customer:saved.snapshot.customer,currency:'SAR',lines:saved.snapshot.lines,netMinor:saved.snapshot.netMinor,vatMinor:saved.snapshot.vatMinor,totalMinor:amount,paidMinor:amount,sourceOrderId:String(order.id),sourceReceiptId:String(receiptId),policyReference:saved.snapshot.policy.policyReference,policyId:saved.snapshot.policy.id,policyRequestId:saved.snapshot.policy.requestId,orderSnapshotFingerprint:saved.fingerprint,derivation:'sale'};
+  if(saved.snapshot.policy.calculationPolicy.vatControl)snapshot.vatControl={enabled:saved.snapshot.policy.calculationPolicy.vatControl.enabled};
   for(const month of [...new Set([financeMonth(receipt.recorded_at),financeMonth(now)])].sort())await requireOpenPeriod(tx,month);
   const sourceKey=`receipt:${receiptId}`;
   // The unique receipt key handles concurrent archive capture. Never replace a saved source.

@@ -1,10 +1,34 @@
-import type {CalculatedFiscalLineV2,FiscalCalculationPolicy,FiscalLineV2} from './types';
+import type {CalculatedFiscalLineV2,FiscalCalculationPolicy,FiscalLineV2,FiscalVatControl,FinanceTaxPayload} from './types';
 import {checkedFinanceBigInt,checkedFinanceInteger,sumFinanceMoney} from './calculations';
 
 export function validateCalculationPolicy(value:unknown):FiscalCalculationPolicy {
  const p=value as FiscalCalculationPolicy;
  if(!p||typeof p!=='object'||Array.isArray(p)||p.version!==2||!['inclusive','exclusive'].includes(p.priceBasis)||p.itemScope!=='uniform_catalog'||!['inclusive','exclusive'].includes(p.shippingPriceBasis)||!Number.isSafeInteger(p.shippingVatBps)||p.shippingVatBps<0||p.shippingVatBps>10000||!['none','before_tax'].includes(p.discountTreatment)||p.rounding!=='line_half_up'||p.policyRollover!=='hold_for_review'||typeof p.automationDelegateId!=='string'||! /^[1-9]\d{0,14}$/.test(p.automationDelegateId))throw new Error('finance_calculation_policy_invalid');
- return {version:2,priceBasis:p.priceBasis,itemScope:p.itemScope,shippingPriceBasis:p.shippingPriceBasis,shippingVatBps:p.shippingVatBps,discountTreatment:p.discountTreatment,rounding:p.rounding,policyRollover:p.policyRollover,automationDelegateId:p.automationDelegateId};
+ return {version:2,priceBasis:p.priceBasis,itemScope:p.itemScope,shippingPriceBasis:p.shippingPriceBasis,shippingVatBps:p.shippingVatBps,discountTreatment:p.discountTreatment,rounding:p.rounding,policyRollover:p.policyRollover,automationDelegateId:p.automationDelegateId,...(p.vatControl===undefined?{}:{vatControl:validateFiscalVatControl(p.vatControl)})};
+}
+
+function validDate(value:unknown):value is string {
+ if(typeof value!=='string'||!/^20\d{2}-\d{2}-\d{2}$/.test(value))return false;
+ const date=new Date(`${value}T00:00:00Z`);
+ return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value;
+}
+export function validateFiscalVatControl(value:unknown):FiscalVatControl {
+ const p=value as FiscalVatControl;
+ if(!p||typeof p!=='object'||Array.isArray(p)||typeof p.enabled!=='boolean'||typeof p.registrationConfirmed!=='boolean'||!Number.isSafeInteger(p.registrationThresholdMinor)||p.registrationThresholdMinor<=0||(p.registrationEffectiveFrom!==null&&!validDate(p.registrationEffectiveFrom))||(p.enabled&&(!p.registrationConfirmed||!p.registrationEffectiveFrom)))throw new Error('finance_tax_policy_invalid');
+ return {enabled:p.enabled,registrationConfirmed:p.registrationConfirmed,registrationEffectiveFrom:p.registrationEffectiveFrom,registrationThresholdMinor:p.registrationThresholdMinor};
+}
+/** Legacy fields are accepted only when reading a previously saved historical source. */
+export function validateFiscalTaxPolicy(policy:Pick<FinanceTaxPayload,'issuer'|'vatBps'|'effectiveFrom'|'calculationPolicy'>,allowLegacy=false):void {
+ const calc=validateCalculationPolicy(policy.calculationPolicy),control=calc.vatControl;
+ if(!Number.isSafeInteger(policy.vatBps)||policy.vatBps<0||policy.vatBps>10000||typeof policy.issuer?.taxNumber!=='string')throw new Error('finance_tax_policy_invalid');
+ if(!control){if(!allowLegacy||!/^3\d{13}3$/.test(policy.issuer.taxNumber))throw new Error('finance_tax_policy_invalid');return;}
+ if(calc.shippingVatBps!==policy.vatBps||(policy.issuer.taxNumber!==''&&!/^3\d{13}3$/.test(policy.issuer.taxNumber))||(control.enabled&&(!/^3\d{13}3$/.test(policy.issuer.taxNumber)||!validDate(policy.effectiveFrom)||control.registrationEffectiveFrom!>policy.effectiveFrom)))throw new Error('finance_tax_policy_invalid');
+}
+/** The stored configured rate is never charged while the explicit switch is OFF. */
+export function effectiveFiscalVatBps(policy:Pick<FinanceTaxPayload,'vatBps'|'calculationPolicy'>,component:'product'|'shipping'):number {
+ const calc=validateCalculationPolicy(policy.calculationPolicy);
+ if(calc.vatControl)return calc.vatControl.enabled?policy.vatBps:0;
+ return component==='shipping'?calc.shippingVatBps:policy.vatBps;
 }
 
 /** Positive integer rational rounding; the approved mode is explicitly per-line half-up. */

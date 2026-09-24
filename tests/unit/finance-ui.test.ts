@@ -163,9 +163,26 @@ describe('finance request controls and preserved records',()=>{
    const select=formHtml.match(new RegExp(`<select(?=[^>]*name="${field}")[^>]*>[\\s\\S]*?</select>`))?.[0];expect(select).toContain('required=""');
    expect(select).toMatch(/<option(?=[^>]*value="")(?=[^>]*selected="")[^>]*>/);expect(select?.match(/selected=""/g)).toHaveLength(1);
   }
-  for(const field of ['issuerName','issuerTaxNumber','issuerAddress','vatPercent','shippingVatPercent','automationDelegateId']){expect(formHtml).toContain(`name="${field}"`);expect(formHtml).not.toMatch(new RegExp(`<input(?=[^>]*name="${field}")(?=[^>]*value="[^"]+")[^>]*>`));}
+  for(const field of ['issuerName','issuerTaxNumber','issuerAddress','vatPercent','automationDelegateId']){expect(formHtml).toContain(`name="${field}"`);expect(formHtml).not.toMatch(new RegExp(`<input(?=[^>]*name="${field}")(?=[^>]*value="[^"]+")[^>]*>`));}
+  expect(formHtml).not.toContain('name="shippingVatPercent"');
   expect(html).toContain('بيانات حساب موظف موجود');expect(html).toContain('لم تُحدد سياسة حساب للإصدار المستقبلي');
   const reader=workflow('tax',{canApprove:true},source);expect(reader).not.toContain('name="automationDelegateId"');
+ });
+ it('starts VAT OFF, allows a blank registration number and exposes explicit registration evidence with one central rate',()=>{
+  const html=workflow('tax',{canManageTax:true});
+  const select=html.match(/<select(?=[^>]*name="vatEnabled")[^>]*>[\s\S]*?<\/select>/)?.[0];
+  expect(select).toMatch(/<option(?=[^>]*value="off")(?=[^>]*selected="")[^>]*>/);
+  expect(html).not.toMatch(/<input(?=[^>]*name="issuerTaxNumber")(?=[^>]*required)[^>]*>/);
+  expect(html).toContain('name="registrationConfirmed"');expect(html).toContain('name="registrationEffectiveFrom"');expect(html).toContain('name="registrationThreshold"');
+  expect(html).toContain('value="375000"');expect(html).not.toContain('name="shippingVatPercent"');expect(html).toContain('لا يُفعّل التنبيه الضريبة تلقائيًا');
+ });
+ it('prefills the explicit current approved policy so a threshold-only proposal preserves all other decisions',()=>{
+  const source=data();source.taxPolicies=[{id:'7',requestId:'8',at:invoice.at,effectiveFrom:'2026-09-01',issuer:{name:'Approved issuer',taxNumber:'300000000000003',address:'Approved address'},vatBps:1525,policyReference:'existing-approved-reference',calculationPolicy:{version:2,priceBasis:'exclusive',itemScope:'uniform_catalog',shippingPriceBasis:'inclusive',shippingVatBps:1525,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42',vatControl:{enabled:true,registrationConfirmed:true,registrationEffectiveFrom:'2026-09-01',registrationThresholdMinor:41000000}}}];
+  const html=workflow('tax',{canManageTax:true},source),formHtml=html.slice(html.indexOf('<form'));
+  for(const value of ['Approved issuer','Approved address','300000000000003','15.25','410000','existing-approved-reference'])expect(formHtml).toContain(`value="${value}"`);
+  expect(formHtml.match(/<select(?=[^>]*name="vatEnabled")[^>]*>[\s\S]*?<\/select>/)?.[0]).toMatch(/<option(?=[^>]*value="on")(?=[^>]*selected="")[^>]*>/);
+  expect(formHtml).toMatch(/<input(?=[^>]*name="registrationConfirmed")(?=[^>]*checked="")[^>]*>/);
+  expect(formHtml).toContain('name="reason"');expect(formHtml).not.toContain('value="375000"');
  });
  it('shows the full proposed calculation and automation policy for independent review',()=>{
   const source=data();source.requests=[{id:'32',kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:'2026-10-01',issuer:{name:'Issuer',taxNumber:'300000000000003',address:'Address'},vatBps:1500,policyReference:'future-policy',calculationPolicy:{version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatBps:525,discountTreatment:'before_tax',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42'}},status:'pending',makerId:'9',checkerId:null,reason:'policy evidence',approvalReason:'',at:invoice.at,decidedAt:null,result:null}];

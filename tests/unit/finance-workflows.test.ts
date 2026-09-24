@@ -23,10 +23,11 @@ describe('reviewed financial changes',()=>{
   const full=buildReturnSnapshot(source,[],{lines:[{key:'7',quantity:2}]});
   expect(full).toMatchObject({totalMinor:7,netMinor:6,vatMinor:1});
  });
- it('tax policy must be explicit and future dated, and reopen carries a version',()=>{
+ it('tax policy must be explicit and never backdated before today in Riyadh, and reopen carries a version',()=>{
   const base={kind:'tax_settings' as const,targetId:'tax',reason:'approved future policy',requestKey:'tax-test-001',payload:{effectiveFrom:'2026-10-01',issuer:original().issuer,vatBps:1500,policyReference:'tax-policy-2'}};
   expect(()=>validateFinanceChange(base,new Date('2026-09-22'))).not.toThrow();
-  expect(()=>validateFinanceChange({...base,payload:{...base.payload,effectiveFrom:'2026-09-22'}},new Date('2026-09-22'))).toThrow();
+  expect(()=>validateFinanceChange({...base,payload:{...base.payload,effectiveFrom:'2026-09-22'}},new Date('2026-09-22'))).not.toThrow();
+  expect(()=>validateFinanceChange({...base,payload:{...base.payload,effectiveFrom:'2026-09-21'}},new Date('2026-09-22'))).toThrow();
   expect(()=>validateFinanceChange({...base,payload:{...base.payload,vatBps:undefined}},new Date('2026-09-22'))).toThrow();
   expect(()=>validateFinanceChange({kind:'reopen_period',targetId:'2026-08',payload:{expectedVersion:-1},reason:'review',requestKey:'reopen-test-001'})).toThrow();
  });

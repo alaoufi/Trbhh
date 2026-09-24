@@ -11,15 +11,16 @@ import type {FinanceOrder,FiscalSnapshotV2} from '@/lib/finance/types';
 const createdAt=new Date('2026-08-01T00:00:00.123Z'),paidAt=new Date('2026-08-01T00:01:00.456Z'),issuedAt=new Date('2026-08-02T00:00:00Z');
 const shipping={name:'Synthetic buyer',phone:'+966500000000',addressLine:'Synthetic street',city:'Test city',postalCode:'12345',country:'SA' as const};
 const policy:ApprovedFiscalPolicy={id:'7',requestId:'8',effectiveFrom:'2026-07-01',at:'2026-06-01T00:00:00.000Z',issuer:{name:'Synthetic issuer',address:'Synthetic issuer address',taxNumber:'300000000000003'},vatBps:1500,policyReference:'fixture-v2-policy',calculationPolicy:{version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'exclusive',shippingVatBps:0,discountTreatment:'none',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'71'}};
-function fixture(){
- const original=buildOrderFiscalSnapshot(2n,createdAt,policy,shipping,[{...quoteFiscalProduct(policy,{key:'5',title:'Frozen item',quantity:3,unitPriceMinor:4}),supplierId:'6',supplierMinor:6},quoteFiscalShipping(policy,5)]);
+function fixture(vatOff=false){
+ const sourcePolicy=vatOff?{...policy,issuer:{...policy.issuer,taxNumber:''},calculationPolicy:{...policy.calculationPolicy,shippingVatBps:1500,vatControl:{enabled:false,registrationConfirmed:false,registrationEffectiveFrom:null,registrationThresholdMinor:37500000}}}:policy;
+ const original=buildOrderFiscalSnapshot(2n,createdAt,sourcePolicy,shipping,[{...quoteFiscalProduct(sourcePolicy,{key:'5',title:'Frozen item',quantity:3,unitPriceMinor:4}),supplierId:'6',supplierMinor:6},quoteFiscalShipping(sourcePolicy,5)]);
  const source:FinanceOrder={id:'2',memberId:'9',customerName:shipping.name,status:'paid',createdAt:createdAt.toISOString(),paidAt:paidAt.toISOString(),subtotalMinor:12,shippingMinor:5,totalMinor:17,currency:'SAR',items:[{productId:'5',title:'Frozen item',quantity:3,unitMinor:4,totalMinor:12}],suppliers:[{supplierId:'6',supplierName:'Frozen supplier',productId:'5',amountMinor:6}]};
  const state={missing:false,closed:false,policyMismatch:false,receiptAmount:17,snapshot:structuredClone(original),source,savedHash:fingerprint(original),issued:null as FiscalSnapshotV2|null};
  const calls:{sql:string;values:unknown[]}[]=[];
  const query=vi.fn(async(sql:TemplateStringsArray,...values:unknown[])=>{
   const text=sql.join('?');calls.push({sql:text,values});
   if(text.includes('FROM finance_order_fiscal_snapshots'))return state.missing?[]:[{policy_id:7n,request_id:8n,captured_at:createdAt,fingerprint:state.savedHash,snapshot:state.snapshot}];
-  if(text.includes('FROM finance_tax_policies'))return [{id:7n,request_id:8n,effective_from:'2026-07-01',issuer:policy.issuer,vat_bps:1500,policy_reference:policy.policyReference,created_at:new Date(policy.at),calculation_policy:policy.calculationPolicy,approved_payload:{...policy,vatBps:state.policyMismatch?500:1500}}];
+  if(text.includes('FROM finance_tax_policies'))return [{id:7n,request_id:8n,effective_from:'2026-07-01',issuer:sourcePolicy.issuer,vat_bps:1500,policy_reference:sourcePolicy.policyReference,created_at:new Date(sourcePolicy.at),calculation_policy:sourcePolicy.calculationPolicy,approved_payload:{...sourcePolicy,vatBps:state.policyMismatch?500:1500}}];
   if(text.includes('FROM commerce_receipts'))return [{id:3n,order_id:2n,amount_minor:BigInt(state.receiptAmount),currency:'SAR',recorded_at:paidAt}];
   if(text.includes('FROM commerce_orders'))return [{id:2n,member_id:9n,status:'paid',currency:'SAR',created_at:createdAt,paid_at:paidAt,subtotal_minor:12,shipping_fee_minor:5,total_minor:17,shipping}];
   if(text.includes('FROM commerce_order_items'))return [{product_id:5n,title:'Frozen item',quantity:3,unit_price_minor:4,total_minor:12}];
@@ -40,6 +41,11 @@ function fixture(){
 beforeEach(()=>{vi.clearAllMocks();boundary.permission.mockResolvedValue(undefined);vi.unstubAllEnvs();});
 const authority={actorId:71n,mode:'automation' as const};
 describe('prospective trusted issuance adapter',()=>{
+ it('issues a zero-VAT invoice from an approved OFF source without inventing a tax number or exposing registration-monitor settings',async()=>{
+  const f=fixture(true);await issueProspectiveInvoice(f.db as never,3n,authority,issuedAt);
+  expect(f.state.issued).toMatchObject({netMinor:17,vatMinor:0,totalMinor:17,vatControl:{enabled:false},issuer:{taxNumber:''}});
+  expect(f.state.issued?.vatControl).toEqual({enabled:false});expect(f.state.issued?.lines.every(line=>line.vatBps===0&&line.vatMinor===0)).toBe(true);
+ });
  it('builds the real document from saved source and exact receipt, including original address and shipping',async()=>{
   const f=fixture();expect(await issueProspectiveInvoice(f.db as never,3n,authority,issuedAt)).toBe('INV-2026-00000001');
   expect(f.state.issued).toMatchObject({version:2,netMinor:15,vatMinor:2,totalMinor:17,sourceOrderId:'2',sourceReceiptId:'3',orderSnapshotFingerprint:f.state.savedHash,customer:{name:shipping.name,address:'Synthetic street، Test city، 12345، SA'}});

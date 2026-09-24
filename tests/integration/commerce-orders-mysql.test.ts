@@ -38,7 +38,8 @@ const input=(requestKey='fixture-request-0001',quantity=2,memberId=1n)=>({member
 const policy={shippingFeeMinor:125};
 const targets=[{recipient:'member:1',channel:'in_app' as const},{recipient:'+966500000000',channel:'sms' as const},{recipient:'+966500000000',channel:'whatsapp' as const}];
 const count=async(table:string)=>Number((await client.$queryRawUnsafe<{n:bigint}[]>(`SELECT COUNT(*) AS n FROM ${table}`))[0].n);
-const syntheticCalculation:FiscalCalculationPolicy={version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'inclusive',shippingVatBps:0,discountTreatment:'none',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42'};
+const syntheticCalculation:FiscalCalculationPolicy={version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'inclusive',shippingVatBps:0,discountTreatment:'none',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:'42',vatControl:{enabled:false,registrationConfirmed:false,registrationEffectiveFrom:null,registrationThresholdMinor:37500000}};
+const enabledCalculation:FiscalCalculationPolicy={...syntheticCalculation,shippingVatBps:1500,vatControl:{enabled:true,registrationConfirmed:true,registrationEffectiveFrom:'2020-01-01',registrationThresholdMinor:37500000}};
 /** Disposable, explicitly approved zero-rate fixture; never a production policy/default. */
 async function approvedFiscalPolicy(options:{reference?:string;effectiveFrom?:string;vatBps?:number;calculationPolicy?:FiscalCalculationPolicy|null}={}) {
   const reference=options.reference??'synthetic-commerce-zero-rate',effectiveFrom=options.effectiveFrom??'2020-01-01';
@@ -106,12 +107,14 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
     expect(p).toEqual({stock_available:8,stock_reserved:2});expect(await count('commerce_orders')).toBe(1);
     expect(await count('finance_order_fiscal_snapshots')).toBe(1);
   });
-  it.each(['missing','latest_incomplete','unapproved','approval_mismatch'])('rolls back an order with %s fiscal policy without falling back to defaults',async state=>{
+  it.each(['missing','latest_incomplete','unapproved','approval_mismatch','legacy_control','invalid_registration'])('rolls back an order with %s fiscal policy without falling back to defaults',async state=>{
     if(state==='missing')await client.$executeRaw`DELETE FROM finance_tax_policies`;
     if(state==='latest_incomplete')await approvedFiscalPolicy({reference:'synthetic-incomplete-policy',effectiveFrom:'2020-01-02',calculationPolicy:null});
     if(state==='unapproved')await client.$executeRaw`UPDATE finance_change_requests SET status='pending'`;
     if(state==='approval_mismatch')await client.$executeRaw`UPDATE finance_tax_policies SET vat_bps=1500`;
-    await expect(createOrder(client,input(),policy)).rejects.toThrow(state==='latest_incomplete'?'finance_calculation_policy_invalid':'finance_issuance_not_approved');
+    if(state==='legacy_control'){const {vatControl:_historical,...legacy}=syntheticCalculation;await approvedFiscalPolicy({reference:'synthetic-legacy-control',effectiveFrom:'2020-01-02',calculationPolicy:legacy});}
+    if(state==='invalid_registration')await approvedFiscalPolicy({reference:'synthetic-invalid-registration',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...enabledCalculation,vatControl:{...enabledCalculation.vatControl!,registrationConfirmed:false}}});
+    await expect(createOrder(client,input(),policy)).rejects.toThrow(state==='latest_incomplete'?'finance_calculation_policy_invalid':['legacy_control','invalid_registration'].includes(state)?'finance_tax_policy_invalid':'finance_issuance_not_approved');
     for(const table of ['commerce_orders','commerce_order_items','finance_order_fiscal_snapshots','commerce_audit_events','commerce_payment_attempts'])expect(await count(table)).toBe(0);
     expect((await client.$queryRaw<{stock_available:number;stock_reserved:number}[]>`SELECT stock_available,stock_reserved FROM commerce_products WHERE id=1`)[0]).toEqual({stock_available:10,stock_reserved:0});
   });
@@ -137,25 +140,33 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
       {key:'shipping',title:'الشحن',quantity:1,unitPriceMinor:125,discountMinor:0,vatBps:0,priceBasis:'inclusive',component:'shipping',netMinor:125,vatMinor:0,grossMinor:125},
     ]);
     await client.$executeRaw`UPDATE commerce_products SET title='Changed catalog name',price_minor=9999 WHERE id=1`;
-    await approvedFiscalPolicy({reference:'synthetic-replacement-policy',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...syntheticCalculation,priceBasis:'exclusive'}});
+    await approvedFiscalPolicy({reference:'synthetic-replacement-policy',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...enabledCalculation,priceBasis:'exclusive'}});
     expect(await createOrder(client,input(),{shippingFeeMinor:900})).toEqual(order);
     await expect(createOrder(client,{...input(),shipping:{...shipping,name:'Changed customer'}},policy)).rejects.toThrow('request_conflict');
     expect(await storedFiscalSnapshot(order.id)).toEqual(before);expect(await count('finance_order_fiscal_snapshots')).toBe(1);
   });
   it.each([
-    {basis:'inclusive' as const,itemGross:2050,shippingGross:125,total:2175,net:1902,vat:273},
-    {basis:'exclusive' as const,itemGross:2358,shippingGross:131,total:2489,net:2175,vat:314},
+    {basis:'inclusive' as const,itemGross:2050,shippingGross:125,total:2175,net:1892,vat:283},
+    {basis:'exclusive' as const,itemGross:2358,shippingGross:144,total:2502,net:2175,vat:327},
   ])('captures and charges exact $basis item and shipping tax totals',async({basis,itemGross,shippingGross,total,net,vat})=>{
-    await approvedFiscalPolicy({reference:'synthetic-priced-policy',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...syntheticCalculation,priceBasis:basis,shippingPriceBasis:basis,shippingVatBps:500}});
+    await approvedFiscalPolicy({reference:'synthetic-priced-policy',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...enabledCalculation,priceBasis:basis,shippingPriceBasis:basis}});
     const order=await createOrder(client,input(),policy),saved=await storedFiscalSnapshot(order.id);
     expect(order).toMatchObject({subtotalMinor:itemGross,shippingFeeMinor:shippingGross,totalMinor:total,items:[{unitPriceMinor:1025,totalMinor:itemGross}]});
     expect(saved.snapshot).toMatchObject({netMinor:net,vatMinor:vat,totalMinor:total});
     expect(saved.snapshot.lines.map(line=>line.grossMinor)).toEqual([itemGross,shippingGross]);
     const claim=await claimPaymentAttempt(client,{memberId:1n,orderId:order.id,provider:'fixture'});expect(claim.claimed).toBe(true);expect(claim.attempt.amountMinor).toBe(total);
   });
+  it.each(['inclusive','exclusive'] as const)('OFF charges no VAT on either products or shipping despite a configured positive %s rate',async basis=>{
+    await approvedFiscalPolicy({reference:'synthetic-positive-rate-off',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...syntheticCalculation,priceBasis:basis,shippingPriceBasis:basis,shippingVatBps:1500}});
+    const order=await createOrder(client,input(),policy),saved=await storedFiscalSnapshot(order.id);
+    expect(order).toMatchObject({subtotalMinor:2050,shippingFeeMinor:125,totalMinor:2175});
+    expect(saved.snapshot).toMatchObject({netMinor:2175,vatMinor:0,totalMinor:2175,policy:{vatBps:1500,calculationPolicy:{vatControl:{enabled:false}}}});
+    expect(saved.snapshot.lines.every(line=>line.vatMinor===0&&line.vatBps===0)).toBe(true);
+    expect((await claimPaymentAttempt(client,{memberId:1n,orderId:order.id,provider:'fixture'})).attempt.amountMinor).toBe(2175);
+  });
   it('rejects a new payment attempt after the effective policy changes while preserving the original order and reservation',async()=>{
     const order=await createOrder(client,input(),policy),snapshot=await storedFiscalSnapshot(order.id);
-    await approvedFiscalPolicy({reference:'synthetic-payment-rollover',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...syntheticCalculation,priceBasis:'exclusive'}});
+    await approvedFiscalPolicy({reference:'synthetic-payment-rollover',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...enabledCalculation,priceBasis:'exclusive'}});
     await expect(claimPaymentAttempt(client,{memberId:1n,orderId:order.id,provider:'fixture'})).rejects.toThrow('finance_policy_changed_before_payment');
     expect(await count('commerce_payment_attempts')).toBe(0);expect(await storedFiscalSnapshot(order.id)).toEqual(snapshot);
     expect((await client.$queryRaw<{status:string;total_minor:number}[]>`SELECT status,total_minor FROM commerce_orders WHERE id=${order.id}`)[0]).toEqual({status:'awaiting_payment',total_minor:2175});
@@ -164,7 +175,7 @@ describe.skipIf(!enabled)('commerce isolated MySQL transactions',()=>{
   it('keeps an existing payment attempt retry-safe and records verified money after policy rollover without repricing',async()=>{
     const {order,claim,evidence}=await prepared(),snapshot=await storedFiscalSnapshot(order.id);
     await recordPaymentReference(client,{attemptId:claim.attempt.id,claimToken:claim.claimToken,reference:evidence.reference,redirectUrl:'https://fixture.invalid/existing-checkout'});
-    await approvedFiscalPolicy({reference:'synthetic-settlement-rollover',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...syntheticCalculation,priceBasis:'exclusive'}});
+    await approvedFiscalPolicy({reference:'synthetic-settlement-rollover',effectiveFrom:'2020-01-02',vatBps:1500,calculationPolicy:{...enabledCalculation,priceBasis:'exclusive'}});
     const retry=await claimPaymentAttempt(client,{memberId:1n,orderId:order.id,provider:'fixture'});expect(retry.claimed).toBe(false);expect(retry.attempt.id).toBe(claim.attempt.id);expect(retry.attempt.amountMinor).toBe(2175);
     expect(retry.attempt.redirectUrl).toBeNull();
     expect((await client.$queryRaw<{redirect_url:string}[]>`SELECT redirect_url FROM commerce_payment_attempts WHERE id=${claim.attempt.id}`)[0].redirect_url).toBe('https://fixture.invalid/existing-checkout');

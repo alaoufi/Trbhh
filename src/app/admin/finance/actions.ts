@@ -10,6 +10,8 @@ import { financeField as field, parseFinanceSar, publicFinanceError } from '@/li
 import { approveSettlement, cancelDraftInvoice, cancelSettlement, captureInvoices, closeMonth, financeMonth, parseFinanceId, parseFinanceMonth, prepareSettlement, recordExpense, releaseAccrual, restoreDraftInvoice, reverseExpense, reverseSettlement, saveBudget } from '@/lib/finance/service';
 import { recordFinanceReconciliation } from '@/lib/finance/reconciliation';
 import { approveFinanceChange, cancelFinanceChange, readFinanceChangeKind, requestFinanceChange } from '@/lib/finance/workflows';
+import { validateFiscalVatControl } from '@/lib/finance/fiscal-v2';
+import { DEFAULT_REGISTRATION_THRESHOLD_MINOR } from '@/lib/finance/tax-registration';
 
 async function run(form:FormData,module:AccessModule,permission:AccessAction,work:(actor:bigint)=>Promise<unknown>):Promise<never> {
   await requireAccess(module,'view');
@@ -96,18 +98,24 @@ function policySelection<T extends string>(form:FormData,name:string,choices:rea
 }
 export async function requestFinanceTaxSettings(form:FormData) {
   return run(form,'tax','manage_settings',actor=>{
-    const shippingVatBps=parseFinanceSar(field(form,'shippingVatPercent'));
-    if(shippingVatBps>10000)throw new Error('finance_calculation_policy_invalid');
+    const enabled=policySelection(form,'vatEnabled',['off','on'] as const)==='on';
+    const vatBps=parseFinanceSar(field(form,'vatPercent')||(enabled?'':'0'));
+    if(vatBps>10000)throw new Error('finance_calculation_policy_invalid');
+    const optional=(name:string)=>form.has(name)?field(form,name):'';
+    const confirmed=optional('registrationConfirmed'),threshold=optional('registrationThreshold');
+    if(!['','1'].includes(confirmed))throw new Error('finance_tax_policy_invalid');
+    const vatControl=validateFiscalVatControl({enabled,registrationConfirmed:confirmed==='1',registrationEffectiveFrom:optional('registrationEffectiveFrom')||null,registrationThresholdMinor:threshold?parseFinanceSar(threshold):DEFAULT_REGISTRATION_THRESHOLD_MINOR});
     const calculationPolicy={version:2 as const,
       priceBasis:policySelection(form,'priceBasis',['inclusive','exclusive'] as const),
       itemScope:policySelection(form,'itemScope',['uniform_catalog'] as const),
-      shippingPriceBasis:policySelection(form,'shippingPriceBasis',['inclusive','exclusive'] as const),shippingVatBps,
+      shippingPriceBasis:policySelection(form,'shippingPriceBasis',['inclusive','exclusive'] as const),shippingVatBps:vatBps,
       discountTreatment:policySelection(form,'discountTreatment',['none','before_tax'] as const),
       rounding:policySelection(form,'rounding',['line_half_up'] as const),
       policyRollover:policySelection(form,'policyRollover',['hold_for_review'] as const),
       automationDelegateId:String(parseFinanceId(field(form,'automationDelegateId'))),
+      vatControl,
     };
-    return requestFinanceChange(prisma,actor,{kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:field(form,'effectiveFrom'),issuer:{name:field(form,'issuerName'),taxNumber:field(form,'issuerTaxNumber'),address:field(form,'issuerAddress')},vatBps:parseFinanceSar(field(form,'vatPercent')),policyReference:field(form,'policyReference'),calculationPolicy},reason:field(form,'reason'),requestKey:field(form,'requestKey')});
+    return requestFinanceChange(prisma,actor,{kind:'tax_settings',targetId:'tax',payload:{effectiveFrom:field(form,'effectiveFrom'),issuer:{name:field(form,'issuerName'),taxNumber:field(form,'issuerTaxNumber'),address:field(form,'issuerAddress')},vatBps,policyReference:field(form,'policyReference'),calculationPolicy},reason:field(form,'reason'),requestKey:field(form,'requestKey')});
   });
 }
 export async function requestFinancePeriodReopen(form:FormData) {

@@ -3,23 +3,23 @@ import type {Prisma} from '@prisma/client';
 import type {ShippingSnapshot} from '@/lib/commerce/types';
 import {checkedMoney} from '@/lib/commerce/money';
 import type {CalculatedFiscalLineV2,FiscalLineV2,OrderFiscalSnapshot} from './types';
-import {calculateFiscalLinesV2,validateCalculationPolicy} from './fiscal-v2';
+import {calculateFiscalLinesV2,validateCalculationPolicy,effectiveFiscalVatBps} from './fiscal-v2';
 import {readApprovedFiscalPolicy,type ApprovedFiscalPolicy} from './fiscal-policy';
 import {fingerprint} from './service';
 import {financeJson} from './read-model';
 
 export function quoteFiscalProduct(policy:ApprovedFiscalPolicy,item:{key:string;title:string;quantity:number;unitPriceMinor:number}):CalculatedFiscalLineV2 {
  const calc=validateCalculationPolicy(policy.calculationPolicy);
- return calculateFiscalLinesV2([{...item,discountMinor:0,vatBps:policy.vatBps,priceBasis:calc.priceBasis,component:'product'}]).lines[0];
+ return calculateFiscalLinesV2([{...item,discountMinor:0,vatBps:effectiveFiscalVatBps(policy,'product'),priceBasis:calc.priceBasis,component:'product'}]).lines[0];
 }
 export function quoteFiscalShipping(policy:ApprovedFiscalPolicy,shippingFeeMinor:number):CalculatedFiscalLineV2 {
  const calc=validateCalculationPolicy(policy.calculationPolicy);
- return calculateFiscalLinesV2([{key:'shipping',title:'الشحن',quantity:1,unitPriceMinor:shippingFeeMinor,discountMinor:0,vatBps:calc.shippingVatBps,priceBasis:calc.shippingPriceBasis,component:'shipping'}]).lines[0];
+ return calculateFiscalLinesV2([{key:'shipping',title:'الشحن',quantity:1,unitPriceMinor:shippingFeeMinor,discountMinor:0,vatBps:effectiveFiscalVatBps(policy,'shipping'),priceBasis:calc.shippingPriceBasis,component:'shipping'}]).lines[0];
 }
 export function buildOrderFiscalSnapshot(orderId:bigint,at:Date,policy:ApprovedFiscalPolicy,shipping:ShippingSnapshot,lines:FiscalLineV2[]):OrderFiscalSnapshot {
  const calc=validateCalculationPolicy(policy.calculationPolicy);
  for(const line of lines){
-  if(line.priceBasis!==(line.component==='shipping'?calc.shippingPriceBasis:calc.priceBasis)||line.vatBps!==(line.component==='shipping'?calc.shippingVatBps:policy.vatBps)||(calc.discountTreatment==='none'&&line.discountMinor!==0))throw new Error('finance_calculation_policy_mismatch');
+  if(line.priceBasis!==(line.component==='shipping'?calc.shippingPriceBasis:calc.priceBasis)||line.vatBps!==effectiveFiscalVatBps(policy,line.component)||(calc.discountTreatment==='none'&&line.discountMinor!==0))throw new Error('finance_calculation_policy_mismatch');
  }
  const totals=calculateFiscalLinesV2(lines);
  checkedMoney(totals.totalMinor);for(const line of totals.lines)checkedMoney(line.grossMinor);
@@ -39,7 +39,7 @@ export async function readOrderFiscalSnapshot(tx:Pick<Prisma.TransactionClient,'
  if(snapshot.version!==2||snapshot.orderId!==String(orderId)||snapshot.policy.id!==String(row.policy_id)||snapshot.policy.requestId!==String(row.request_id)||snapshot.capturedAt!==row.captured_at.toISOString()||fingerprint(snapshot)!==row.fingerprint)throw new Error('finance_order_snapshot_changed');
  const totals=calculateFiscalLinesV2(snapshot.lines);
  const policy=validateCalculationPolicy(snapshot.policy.calculationPolicy);
- if(snapshot.currency!=='SAR'||snapshot.lines.filter(line=>line.component==='shipping').length!==1||snapshot.lines.some(line=>line.priceBasis!==(line.component==='shipping'?policy.shippingPriceBasis:policy.priceBasis)||line.vatBps!==(line.component==='shipping'?policy.shippingVatBps:snapshot.policy.vatBps)||(policy.discountTreatment==='none'&&line.discountMinor!==0)))throw new Error('finance_calculation_policy_mismatch');
+ if(snapshot.currency!=='SAR'||snapshot.lines.filter(line=>line.component==='shipping').length!==1||snapshot.lines.some(line=>line.priceBasis!==(line.component==='shipping'?policy.shippingPriceBasis:policy.priceBasis)||line.vatBps!==effectiveFiscalVatBps(snapshot.policy,line.component)||(policy.discountTreatment==='none'&&line.discountMinor!==0)))throw new Error('finance_calculation_policy_mismatch');
  checkedMoney(snapshot.totalMinor);
  if(fingerprint(totals)!==fingerprint({lines:snapshot.lines,netMinor:snapshot.netMinor,vatMinor:snapshot.vatMinor,totalMinor:snapshot.totalMinor}))throw new Error('finance_order_snapshot_changed');
  return {snapshot,fingerprint:row.fingerprint};

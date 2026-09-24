@@ -20,7 +20,7 @@ import {requestFinanceChange,approveFinanceChange,cancelFinanceChange} from '@/l
 import {withFinanceAuditContext} from '@/lib/finance/audit-context';
 import {issueProspectiveInvoice,issueInvoicesForWorker} from '@/lib/finance/issuance';
 import {readFinanceInvoice} from '@/lib/finance/documents';
-import type {FiscalSnapshot} from '@/lib/finance/types';
+import type {FiscalSnapshot,FiscalSnapshotV2,FinanceTaxPayload,OrderFiscalSnapshot} from '@/lib/finance/types';
 import {isolatedFinanceUrl} from '../../vitest.finance.config';
 
 const financeForeignKeys=[
@@ -142,14 +142,14 @@ async function seedApprovedTaxPolicy(){
   await db.$executeRaw`INSERT INTO finance_tax_policies(request_id,effective_from,issuer,vat_bps,policy_reference,created_at) VALUES(${request.id},${payload.effectiveFrom},${JSON.stringify(payload.issuer)},${payload.vatBps},${payload.policyReference},${approvedAt})`;
 }
 /** Real maker/checker approval of an explicitly synthetic prospective policy. */
-async function seedProspectivePolicy(){
+async function seedProspectivePolicy(vatOff=false){
   const approvedAt=new Date(Date.now()-3*86400000);
   const effectiveFrom=new Date(approvedAt.getTime()+86400000+10800000).toISOString().slice(0,10);
-  const requestId=await requestFinanceChange(db,actor,{kind:'tax_settings',targetId:'tax',reason:'Synthetic future fiscal basis',requestKey:'fixture-prospective-policy',payload:{effectiveFrom,issuer:fiscal().issuer,vatBps:1500,policyReference:'fixture-prospective-v2',calculationPolicy:{version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'inclusive',shippingVatBps:1500,discountTreatment:'none',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:String(actor)}}},approvedAt);
+  const requestId=await requestFinanceChange(db,actor,{kind:'tax_settings',targetId:'tax',reason:'Synthetic future fiscal basis',requestKey:'fixture-prospective-policy',payload:{effectiveFrom,issuer:{...fiscal().issuer,taxNumber:vatOff?'':fiscal().issuer.taxNumber},vatBps:1500,policyReference:'fixture-prospective-v2',calculationPolicy:{version:2,priceBasis:'inclusive',itemScope:'uniform_catalog',shippingPriceBasis:'inclusive',shippingVatBps:1500,discountTreatment:'none',rounding:'line_half_up',policyRollover:'hold_for_review',automationDelegateId:String(actor),vatControl:{enabled:!vatOff,registrationConfirmed:!vatOff,registrationEffectiveFrom:vatOff?null:effectiveFrom,registrationThresholdMinor:37500000}}}},approvedAt);
   await approveFinanceChange(db,checker,requestId,'Synthetic independent basis and delegate approval',approvedAt);
 }
-async function prospectiveReceipt(){
-  await seedProspectivePolicy();
+async function prospectiveReceipt(vatOff=false){
+  await seedProspectivePolicy(vatOff);
   await db.$executeRaw`INSERT INTO site_settings(k,v) VALUES('commerce_purchasing_enabled','1')`;
   await db.$executeRaw`INSERT INTO commerce_products(id,title,price_minor,stock_available,approved,visible,enabled) VALUES(1,'Synthetic small gross',4,6,1,1,1)`;
   const order=await createOrder(db,{memberId:5n,requestKey:'fixture-v2-small-order',items:[{productId:1n,quantity:3}],shipping:{name:'Synthetic buyer',phone:'+966500000000',addressLine:'Original complete address',city:'Riyadh',postalCode:'12345',country:'SA'}},{shippingFeeMinor:5});
@@ -903,6 +903,59 @@ describe.skipIf(!enabled)('isolated finance MySQL transaction proof',()=>{
     expect(await db.$queryRaw`SELECT * FROM finance_invoices WHERE id=${invoice.id}`).toEqual(original);
     expect(await count('finance_refunds')).toBe(0);expect(await count('finance_invoices')).toBe(4);
   });
+  it('approves same-day OFF/ON revisions with a reused reference, preserves old invoices and holds stale payment attempts',async()=>{
+    const network=vi.spyOn(globalThis,'fetch').mockImplementation(async()=>{throw Error('External network forbidden in VAT fixture');});
+    const context={ip:'203.0.113.15',sessionFingerprint:'fixture-hashed-vat-session'};
+    try{
+      const {order,receipt,now}=await prospectiveReceipt(true);
+      await capturedId(order.id);await issueProspectiveInvoice(db,receipt.id,{actorId:actor,mode:'automation'},now);
+      const original=await db.$queryRaw<{id:bigint;snapshot:unknown}[]>`SELECT id,snapshot FROM finance_invoices WHERE receipt_id=${receipt.id}`;
+      expect(financeJson<FiscalSnapshotV2>(original[0].snapshot)).toMatchObject({netMinor:17,vatMinor:0,totalMinor:17,issuer:{taxNumber:''},vatControl:{enabled:false}});
+      const savedOffSource=await db.$queryRaw`SELECT * FROM finance_order_fiscal_snapshots WHERE order_id=${order.id}`;
+      const shipping={name:'Synthetic buyer',phone:'+966500000000',addressLine:'Original complete address',city:'Riyadh',postalCode:'12345',country:'SA' as const};
+      const pending=await createOrder(db,{memberId:5n,requestKey:'fixture-before-central-switch',items:[{productId:1n,quantity:1}],shipping},{shippingFeeMinor:5});
+      const active=(await readFinanceData(db)).taxPolicies!.find(policy=>policy.policyReference==='fixture-prospective-v2')!;
+      const changeAt=new Date(Math.max(Date.now(),receipt.recorded_at.getTime()+1)),today=new Date(changeAt.getTime()+10800000).toISOString().slice(0,10);
+      const enabled:FinanceTaxPayload={effectiveFrom:today,issuer:fiscal().issuer,vatBps:1500,policyReference:active.policyReference,calculationPolicy:{...active.calculationPolicy!,vatControl:{enabled:true,registrationConfirmed:true,registrationEffectiveFrom:today,registrationThresholdMinor:37500000}}};
+      const enableId=await withFinanceAuditContext(context,()=>requestFinanceChange(db,actor,{kind:'tax_settings',targetId:'tax',payload:enabled,reason:'Synthetic registration reviewed before activation',requestKey:'fixture-central-enable'},changeAt));
+      await expect(approveFinanceChange(db,actor,enableId,'Cannot self-approve activation',changeAt)).rejects.toThrow('finance_independent_checker_required');
+      await withFinanceAuditContext(context,()=>approveFinanceChange(db,checker,enableId,'Independent VAT activation approval',changeAt));
+      await expect(claimPaymentAttempt(db,{memberId:5n,orderId:pending.id,provider:'fixture'})).rejects.toThrow('finance_policy_changed_before_payment');
+      const taxed=await createOrder(db,{memberId:5n,requestKey:'fixture-after-central-enable',items:[{productId:1n,quantity:1}],shipping},{shippingFeeMinor:5});
+      const [taxedSource]=await db.$queryRaw<{snapshot:unknown}[]>`SELECT snapshot FROM finance_order_fiscal_snapshots WHERE order_id=${taxed.id}`;
+      expect(financeJson<OrderFiscalSnapshot>(taxedSource.snapshot)).toMatchObject({netMinor:7,vatMinor:2,totalMinor:9,policy:{calculationPolicy:{vatControl:{enabled:true}}}});
+      const claim=await claimPaymentAttempt(db,{memberId:5n,orderId:taxed.id,provider:'fixture'});if(!claim.claimed)throw Error('Synthetic VAT claim missing');
+      await recordPaymentReference(db,{attemptId:claim.attempt.id,claimToken:claim.claimToken,reference:'fixture-central-taxed-receipt'});
+      await settleVerifiedPayment(db,{verified:true,status:'paid',provider:'fixture',reference:'fixture-central-taxed-receipt',merchantOrderId:claim.attempt.merchantOrderId,amountMinor:9,currency:'SAR'},[]);
+      const [taxedReceipt]=await db.$queryRaw<{id:bigint;recorded_at:Date}[]>`SELECT id,recorded_at FROM commerce_receipts WHERE order_id=${taxed.id}`;
+      await issueProspectiveInvoice(db,taxedReceipt.id,{actorId:actor,mode:'automation'},new Date(Math.max(Date.now(),taxedReceipt.recorded_at.getTime())));
+      const [taxedInvoice]=await db.$queryRaw<{id:bigint;snapshot:unknown}[]>`SELECT id,snapshot FROM finance_invoices WHERE receipt_id=${taxedReceipt.id}`;
+      const disableAt=new Date(Math.max(Date.now(),taxedReceipt.recorded_at.getTime()+1));
+      const disabled:FinanceTaxPayload={...enabled,issuer:{...enabled.issuer,taxNumber:''},calculationPolicy:{...enabled.calculationPolicy!,vatControl:{enabled:false,registrationConfirmed:false,registrationEffectiveFrom:null,registrationThresholdMinor:40000000}}};
+      const disableId=await withFinanceAuditContext(context,()=>requestFinanceChange(db,actor,{kind:'tax_settings',targetId:'tax',payload:disabled,reason:'Synthetic reviewed VAT disable and threshold revision',requestKey:'fixture-central-disable'},disableAt));
+      await withFinanceAuditContext(context,()=>approveFinanceChange(db,checker,disableId,'Independent VAT disable approval',disableAt));
+      expect((await db.$queryRaw<{n:bigint}[]>`SELECT COUNT(*) n FROM finance_tax_policies WHERE effective_from=${today} AND policy_reference=${active.policyReference}`)[0].n).toBe(2n);
+      const finalOrder=await createOrder(db,{memberId:5n,requestKey:'fixture-after-central-disable',items:[{productId:1n,quantity:1}],shipping},{shippingFeeMinor:5});
+      const [finalSource]=await db.$queryRaw<{snapshot:unknown}[]>`SELECT snapshot FROM finance_order_fiscal_snapshots WHERE order_id=${finalOrder.id}`;
+      expect(financeJson<OrderFiscalSnapshot>(finalSource.snapshot)).toMatchObject({netMinor:9,vatMinor:0,totalMinor:9,policy:{vatBps:1500,calculationPolicy:{vatControl:{enabled:false,registrationThresholdMinor:40000000}}}});
+      await issueProspectiveInvoice(db,receipt.id,{actorId:actor,mode:'automation'},new Date(Math.max(Date.now(),now.getTime())));
+      await issueProspectiveInvoice(db,taxedReceipt.id,{actorId:actor,mode:'automation'},new Date(Math.max(Date.now(),now.getTime())));
+      expect(await db.$queryRaw`SELECT * FROM finance_order_fiscal_snapshots WHERE order_id=${order.id}`).toEqual(savedOffSource);
+      expect(await db.$queryRaw`SELECT id,snapshot FROM finance_invoices WHERE receipt_id=${receipt.id}`).toEqual(original);
+      expect((await db.$queryRaw<{snapshot:unknown}[]>`SELECT snapshot FROM finance_invoices WHERE id=${taxedInvoice.id}`)[0].snapshot).toEqual(taxedInvoice.snapshot);
+      const reportAt=new Date(Math.max(Date.now(),now.getTime()));
+      expect((await report(financeMonth(reportAt),reportAt)).metrics.find(metric=>metric.key==='vat')?.valueMinor).toBe(2);
+      const audits=await db.$queryRaw<{actor_id:bigint;reason:string;payload:unknown}[]>`SELECT actor_id,reason,payload FROM finance_audit WHERE action='tax_policy_approved' AND entity_id IN (SELECT CAST(id AS CHAR) FROM finance_tax_policies WHERE request_id IN (${enableId},${disableId})) ORDER BY id`;
+      expect(audits).toHaveLength(2);
+      for(const[index,row]of audits.entries()){
+        expect(row.actor_id).toBe(checker);expect(row.reason).toBe(index===0?'Independent VAT activation approval':'Independent VAT disable approval');
+        expect(financeJson(row.payload)).toMatchObject({...context,makerId:String(actor),checkerId:String(checker),before:{calculationPolicy:{vatControl:{enabled:index!==0}}},after:{calculationPolicy:{vatControl:{enabled:index===0}}}});
+      }
+      const returned=await requestFinanceChange(db,actor,{kind:'return',targetId:String(taxedInvoice.id),payload:{lines:[{key:'1',quantity:1},{key:'shipping',quantity:1}]},reason:'Return original taxed source after current VAT disabled',requestKey:'fixture-central-historic-return'},reportAt);
+      expect(await approveFinanceChange(db,checker,returned,'Preserve original source VAT on return',reportAt)).toMatchObject({totalMinor:9,vatMinor:2});
+      expect(network).not.toHaveBeenCalled();
+    }finally{network.mockRestore();}
+  },60000);
   it.each(['permission','policy','snapshot','period'] as const)('does not issue or consume numbers after prospective %s changes',async failure=>{
     const {order,receipt,now}=await prospectiveReceipt();
     if(failure==='permission')await db.$executeRaw`DELETE FROM access_role_permissions WHERE role_id='fixture-maker' AND permission='invoices:create'`;

@@ -3,11 +3,11 @@ import type {Prisma} from '@prisma/client';
 import type {CommerceDb} from '@/lib/commerce/types';
 import {requireFinancePermission,enforceFinanceChecker} from '@/lib/access-control/financial-authorization';
 import type {FinanceChangeKind,FinanceChangeRequest,FinanceReturnPayload,FinanceTaxPayload,FinanceReopenPayload,ArchivedFiscalSnapshot as FiscalSnapshot} from './types';
-import {validateCalculationPolicy} from './fiscal-v2';
+import {validateCalculationPolicy,validateFiscalTaxPolicy} from './fiscal-v2';
 import {buildReturnSnapshotV2,type PriorV2} from './adjustments-v2';
 import {calculateFiscalLines,checkedFinanceBigInt,checkedFinanceInteger,sumFinanceMoney} from './calculations';
 import {assertFinanceSchemaReady} from './schema';
-import {financeJson,financeNumber} from './read-model';
+import {financeJson,financeNumber,readEffectiveFinanceTaxPolicy} from './read-model';
 import {auditFinance,financeMonth,fingerprint,parseFinanceId,parseFinanceMonth,requireOpenPeriod} from './service';
 import {issueAdjustmentInTransaction,validateAdjustment} from './adjustments';
 type Tx=Prisma.TransactionClient;
@@ -39,8 +39,11 @@ export function validateFinanceChange(input:FinanceChangeInput,now=new Date()){
  }
  const issuer=object(payload.issuer),effectiveFrom=String(payload.effectiveFrom||''),rate=payload.vatBps,policy=String(payload.policyReference||'').trim();
  const date=new Date(`${effectiveFrom}T00:00:00+03:00`);
- if(input.targetId!=='tax'||!/^20\d{2}-\d{2}-\d{2}$/.test(effectiveFrom)||!Number.isFinite(date.getTime())||new Date(date.getTime()+10800000).toISOString().slice(0,10)!==effectiveFrom||date<=now||!Number.isSafeInteger(rate)||Number(rate)<0||Number(rate)>10000||!policy||policy.length>160||typeof issuer.name!=='string'||!issuer.name.trim()||issuer.name.length>200||typeof issuer.address!=='string'||!issuer.address.trim()||issuer.address.length>500||typeof issuer.taxNumber!=='string'||!/^3\d{13}3$/.test(issuer.taxNumber))throw new Error('finance_tax_policy_invalid');
- return {...input,reason,payload:{effectiveFrom,issuer:{name:issuer.name.trim(),address:issuer.address.trim(),taxNumber:issuer.taxNumber},vatBps:Number(rate),policyReference:policy,...(payload.calculationPolicy==null?{}:{calculationPolicy:validateCalculationPolicy(payload.calculationPolicy)})} as FinanceTaxPayload};
+ if(input.targetId!=='tax'||!/^20\d{2}-\d{2}-\d{2}$/.test(effectiveFrom)||!Number.isFinite(date.getTime())||new Date(date.getTime()+10800000).toISOString().slice(0,10)!==effectiveFrom||!Number.isFinite(now.getTime())||effectiveFrom<new Date(now.getTime()+10800000).toISOString().slice(0,10)||!Number.isSafeInteger(rate)||Number(rate)<0||Number(rate)>10000||!policy||policy.length>160||typeof issuer.name!=='string'||!issuer.name.trim()||issuer.name.length>200||typeof issuer.address!=='string'||!issuer.address.trim()||issuer.address.length>500||typeof issuer.taxNumber!=='string')throw new Error('finance_tax_policy_invalid');
+ const validated:FinanceTaxPayload={effectiveFrom,issuer:{name:issuer.name.trim(),address:issuer.address.trim(),taxNumber:issuer.taxNumber},vatBps:Number(rate),policyReference:policy,...(payload.calculationPolicy==null?{}:{calculationPolicy:validateCalculationPolicy(payload.calculationPolicy)})};
+ if(validated.calculationPolicy)validateFiscalTaxPolicy(validated);
+ else if(!/^3\d{13}3$/.test(issuer.taxNumber))throw new Error('finance_tax_policy_invalid');
+ return {...input,reason,payload:validated};
 }
 
 /** Derive a note exclusively from immutable issued lines. Rounding that cannot reconcile requires review. */
@@ -138,8 +141,10 @@ export async function approveFinanceChange(db:CommerceDb,actor:bigint,id:bigint,
   }else if(kind==='tax_settings'){
    const validated=validateFinanceChange({kind,targetId:row.target_id,payload,reason:row.reason,requestKey:`tax-approval:${id}`},now).payload as FinanceTaxPayload;
    if(validated.calculationPolicy)await requireFinancePermission(tx,BigInt(validated.calculationPolicy.automationDelegateId),'invoices:create');
+   const previous=await readEffectiveFinanceTaxPolicy(tx,new Date(`${validated.effectiveFrom}T00:00:00+03:00`));
    await tx.$executeRaw`INSERT INTO finance_tax_policies(request_id,effective_from,issuer,vat_bps,policy_reference,created_at,calculation_policy) VALUES(${id},${validated.effectiveFrom},${JSON.stringify(validated.issuer)},${validated.vatBps},${validated.policyReference},${now},${validated.calculationPolicy?JSON.stringify(validated.calculationPolicy):null})`;
    const [policy]=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM finance_tax_policies WHERE request_id=${id}`;result.policyId=String(policy.id);
+   await auditFinance(tx,actor,'tax_policy_approved','tax',String(policy.id),reason,{before:previous,after:{...validated,id:String(policy.id),requestId:String(id)},...checker},now);
   }else{
    const expected=(payload as FinanceReopenPayload).expectedVersion;
    const [period]=await tx.$queryRaw<{version:number;closed_at:Date|null;checks_json:unknown;reason:string}[]>`SELECT version,closed_at,checks_json,reason FROM finance_periods WHERE month=${row.target_id} FOR UPDATE`;

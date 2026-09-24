@@ -117,27 +117,7 @@ jobs:
           echo 'attempted=true' >> "$GITHUB_OUTPUT"
           ssh -F "$RUNNER_TEMP/finance-ssh-config" trbhh-release "bash '/root/trbhh-release-tools/$GITHUB_RUN_ID/finance-deploy.sh' deploy '$GITHUB_RUN_ID' '$GITHUB_SHA'"
       - name: Verify public HTTPS revision and unauthenticated protection
-        run: |
-          node <<'NODE'
-          (async () => {
-            const request = (url, init = {}) => fetch(url, {cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(15000), ...init, headers: {'Cache-Control': 'no-cache, no-store'}});
-            const version = await request('https://trbhh.sa/api/version?verification=' + process.env.GITHUB_RUN_ID);
-            if (version.status !== 200 || !(version.headers.get('cache-control') || '').includes('no-store') || (await version.json()).commit !== process.env.GITHUB_SHA) throw Error('public_revision');
-            const home = await request('https://trbhh.sa/');
-            if (home.status !== 200 || (await home.text()).length < 100) throw Error('public_home');
-            const month = new Date().toISOString().slice(0, 7);
-            for (const route of ['/admin/finance', '/admin/access-control', '/admin/finance/export?format=print&section=tax&month=' + month]) {
-              const response = await request('https://trbhh.sa' + route);
-              if ([401, 403].includes(response.status)) continue;
-              if (![301, 302, 303, 307, 308].includes(response.status) || !response.headers.get('location')) throw Error('public_access');
-              const login = new URL(response.headers.get('location'), 'https://trbhh.sa');
-              if (login.origin !== 'https://trbhh.sa' || !['/login', '/account/login'].includes(login.pathname)) throw Error('public_access');
-            }
-            const capture = await request('https://trbhh.sa/api/internal/finance/capture', {method: 'POST'});
-            if (capture.status !== 401) throw Error('public_capture_auth');
-            console.log('Public revision, homepage, protected admin routes, and capture authentication verified.');
-          })().catch(() => {console.error('Public verification failed; response bodies withheld.'); process.exit(1);});
-          NODE
+        run: node scripts/release/finance-public-verify.cjs
       - name: Finalize preservation proofs and enable receipt capture
         id: finalize
         run: |

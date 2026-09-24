@@ -1,5 +1,8 @@
 'use strict';
 /** Actual CJ pages + hydrated client islands. No database, env files, orders, payment or browser automation. */
+// This loopback-only fixture deliberately exercises the API's nonproduction origin branch.
+// Set before Vite loads; never change the production API to accommodate a local preview.
+process.env.NODE_ENV = 'development';
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
@@ -55,7 +58,7 @@ async function main() {
   fs.writeFileSync(path.join(output, 'fixture.css'), css);
   const page = async (pathname, delayed = false) => `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>معاينة CJ محلية — بيانات اختبار</title><link rel="stylesheet" href="/fixture.css"><style>body{margin:0;background:#f8fafc;font-family:Tahoma,Arial,sans-serif}.fixture-notice{padding:12px;background:#fff3ce;color:#16294a;text-align:center;font-size:12px;line-height:1.8}.fixture-nav{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;padding:12px;font-size:12px}.fixture-nav a{text-decoration:underline}</style></head><body><aside class="fixture-notice" aria-label="حدود المعاينة المحلية">معاينة محلية للصفحات والمكونات الفعلية — الأسعار والأوصاف بيانات اختبار، والحساب وهمي بصلاحية عرض المنتجات فقط. صورتا المنتجين 15 و16 من روابط CJ العامة المطابقة للعناوين؛ بقية المنتجات اصطناعية. لا قاعدة بيانات أو طلبات أو دفع أو مزامنة.</aside><nav class="fixture-nav" aria-label="مسارات الاختبار"><a href="/cj">الكتالوج</a><a href="/cj/15">اختبار JPEG</a><a href="/cj/900017">معرض اصطناعي ورابط طويل</a><a href="/cj/900018">صورة مفقودة</a><a href="/cj/cart">السلة</a></nav><div id="fixture-page">${await renderer.renderCjFixture(pathname)}</div><script src="/fixture.js${delayed ? '?delay=1000' : ''}" defer></script></body></html>`;
   for (const route of routes) fs.writeFileSync(path.join(output, `fixture-${route.replaceAll('/', '-').slice(1)}.html`), await page(route));
-  fs.writeFileSync(path.join(output, 'fixture-manifest.json'), JSON.stringify({ fixtureOnly: true, actualServerPages: routes, hydratedComponents: ['CjProductGallery', 'CjProductImage', 'AddToTrialCart', 'CartLink', 'TrialCart'], syntheticPrices: true, databaseAccess: false, supplierOrderAccess: false, outboundImages: [...allowedImages], browserVerified: false }, null, 2));
+  fs.writeFileSync(path.join(output, 'fixture-manifest.json'), JSON.stringify({ fixtureOnly: true, serverMode: 'development', actualServerPages: routes, hydratedComponents: ['CjProductGallery', 'CjProductImage', 'AddToTrialCart', 'CartLink', 'TrialCart'], syntheticPrices: true, databaseAccess: false, supplierOrderAccess: false, outboundImages: [...allowedImages], browserVerified: false }, null, 2));
   if (!process.argv.includes('--serve')) { console.log(JSON.stringify({ fixtureOnly: true, directory: output, pages: routes.length })); return; }
   const server = http.createServer(async (req, res) => {
     try {

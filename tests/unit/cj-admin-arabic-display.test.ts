@@ -62,6 +62,7 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
     expect(withoutSourceDetails(html)).toContain('الترجمة العربية غير متاحة');expect(withoutSourceDetails(html)).not.toContain('Cotton Summer Shirt');
     expect(html).toContain('النص الأصلي من المصدر');expect(html).toContain('Cotton Summer Shirt');expect(state.translate).not.toHaveBeenCalled();
     expect(html).toContain('src="https://example.test/saved-gallery.jpg"');
+    expect(html).toContain('التعميم غير مفعّل');expect(html).not.toContain('تفعيل الإعلان للعامة');
   });
   it('keeps the review source section explicitly labeled and collapsed',async()=>{
     const html=renderToStaticMarkup(await Review({params:Promise.resolve({id:'1'}),searchParams:Promise.resolve({})}));

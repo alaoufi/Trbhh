@@ -25,7 +25,7 @@ export function TrialCart({accountId}:{accountId:number}){
   useEffect(()=>{
     const current=++generation.current;if(!ready)return;
     const controller=new AbortController();
-    if(!items.length){setQuote(null);setBusy(false);setError('');return()=>controller.abort();}
+    if(!items.length){setQuote(null);setBusy(false);setError('');setFeedback('');return()=>controller.abort();}
     setQuote(null);setBusy(true);setError('');
     const timeout=window.setTimeout(()=>{if(generation.current===current){setError('انتهت مهلة تحديث السلة. أعد المحاولة.');setBusy(false);controller.abort();}},15000);
     (async()=>{

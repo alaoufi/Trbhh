@@ -1,10 +1,8 @@
 import Link from 'next/link';
-import { AccessBoundary } from '@/components/access-boundary';
 import { CjProductImage } from '@/components/cj/product-image';
 import { requireAccess } from '@/lib/access-control/guards';
 import { listVisibleCjProducts } from '@/lib/cj/mapping';
-import { cjStorefrontPublic, cjImg, cjProductImages } from '@/lib/cj/storefront';
-import { setCjStorefront } from '../actions';
+import { cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +18,7 @@ const sar = (m: number) => `${(m / 100).toLocaleString('en', { minimumFractionDi
 export default async function CjShowcasePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAccess('products', 'view');
   const sp = await searchParams;
-  const [items, isPublic] = await Promise.all([listVisibleCjProducts(200), cjStorefrontPublic()]);
+  const items = await listVisibleCjProducts(200);
   const translations = await getCachedArabic(items.map(r => r.name));
   const readyCount = items.filter((r) => r.status === 'ready').length;
 
@@ -29,32 +27,19 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-extrabold text-primary">معاينة السلع المختارة</h1>
         <div className="flex flex-wrap gap-2">
-          <Link href="/cj" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">افتح متجر العملاء /cj ←</Link>
+          <Link href="/cj" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">افتح تجربة CJ الخاصة ←</Link>
           <Link href="/admin/suppliers/cj/browse" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">إدارة/استيراد ←</Link>
         </div>
       </div>
 
-      {/* مفتاح النشر للعامة */}
-      <div className={`rounded-xl border p-3 ${isPublic ? 'border-emerald-300 bg-emerald-50' : 'border-amber-300 bg-amber-50'}`}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-sm">
-            حالة متجر CJ للعامة: {isPublic ? <b className="text-emerald-700">مفعّل (ظاهر للجميع)</b> : <b className="text-amber-800">معاينة فقط (غير معلن — المشرفون فقط)</b>}
-            {sp.published === '1' && <span className="ms-2 text-emerald-700">تم التفعيل.</span>}
-            {sp.published === '0' && <span className="ms-2 text-amber-800">تم الإيقاف (رجع للمعاينة).</span>}
-            <div className="text-xs text-muted-foreground">السلع «الجاهزة» التي ستظهر للعامة عند التفعيل: {readyCount} من {items.length}. (الشراء يبقى معطّلاً بمفتاحه المستقل.)</div>
-          </div>
-          <AccessBoundary module={'products'} action={isPublic ? 'suspend' : 'approve'}>
-            <form action={setCjStorefront}>
-              <input type="hidden" name="value" value={isPublic ? '0' : '1'} />
-              <button className={`rounded-lg px-4 py-2 text-sm font-bold text-white ${isPublic ? 'bg-amber-600' : 'bg-emerald-600'}`}>{isPublic ? 'إيقاف الإعلان (رجوع للمعاينة)' : 'تفعيل الإعلان للعامة'}</button>
-            </form>
-          </AccessBoundary>
-        </div>
+      <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm leading-7">
+        <b>تجربة خاصة بالمشرفين — التعميم غير مفعّل.</b>
+        <p>السلع المراجعة: {readyCount} من {items.length}. اعتماد السلعة هنا لا ينشرها للعامة ولا يفعّل شراءها.</p>
+        {sp.published !== undefined && <p>إعدادات النشر السابقة لا تتيح هذه النسخة للعامة؛ المرحلة الحالية تجربة خاصة فقط.</p>}
       </div>
 
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
-        هذه الصفحة معاينة داخلية. متجر العملاء الحقيقي على <code>/cj</code> (وصفحة السلعة <code>/cj/[id]</code>) يظهر ضمن شكل الموقع؛
-        وهو <b>غير معلن للعامة</b> حتى تفعيله أعلاه — قبله يراه المشرفون فقط. لا شراء ولا دفع.
+        افتح تجربة CJ لمراجعة الصور وتفاصيل الجوال وتجميع السلع في السلة. يتطلب الوصول صلاحية عرض المنتجات؛ لا شراء ولا دفع.
       </p>
 
       {!items.length ? (

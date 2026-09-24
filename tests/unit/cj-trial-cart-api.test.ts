@@ -1,4 +1,4 @@
-import {beforeEach,describe,expect,it,vi} from 'vitest';
+import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 
 const mocks=vi.hoisted(()=>({session:vi.fn(),access:vi.fn(),quote:vi.fn()}));
 vi.mock('@/lib/auth',()=>({getSession:mocks.session}));
@@ -16,7 +16,8 @@ async function denied(req:Request,status:number,error:string){
   expect(response.status).toBe(status);expect(await response.json()).toEqual({error});
   expect(mocks.quote).not.toHaveBeenCalled();
 }
-beforeEach(()=>{vi.clearAllMocks();mocks.session.mockResolvedValue({uid:9});mocks.access.mockResolvedValue(true);mocks.quote.mockResolvedValue(quote);});
+beforeEach(()=>{vi.clearAllMocks();vi.stubEnv('NODE_ENV','production');mocks.session.mockResolvedValue({uid:9});mocks.access.mockResolvedValue(true);mocks.quote.mockResolvedValue(quote);});
+afterEach(()=>vi.unstubAllEnvs());
 
 describe('CJ trial cart HTTP trust boundary',()=>{
   it('returns only the server quote with private no-store caching after fresh access checks',async()=>{
@@ -32,7 +33,7 @@ describe('CJ trial cart HTTP trust boundary',()=>{
   it('requires products:view independently of any other staff or public storefront status',async()=>{
     mocks.access.mockResolvedValue(false);await denied(request(),403,'forbidden');
   });
-  it.each(['https://other.example','https://trbhh.sa.evil.example','null','http://trbhh.sa'])('rejects untrusted Origin %s',async value=>{
+  it.each(['https://other.example','https://trbhh.sa.evil.example','null','http://trbhh.sa','not an origin','https://trbhh.sa/','https://trbhh.sa/path','https://user@trbhh.sa','https://trbhh.sa, https://other.example'])('rejects untrusted Origin %s',async value=>{
     await denied(request(undefined,{Origin:value}),403,'forbidden');
   });
   it('rejects a missing Origin and does not trust forwarded headers',async()=>{
@@ -44,9 +45,33 @@ describe('CJ trial cart HTTP trust boundary',()=>{
   it('allows omitted browser metadata when the required Origin and session are valid',async()=>{
     const req=request();req.headers.delete('sec-fetch-site');expect((await POST(req)).status).toBe(200);
   });
-  it('uses the request origin for a private localhost trial',async()=>{
-    const req=new Request('http://localhost:3000/api/cj/trial-cart',{method:'POST',headers:{Origin:'http://localhost:3000','Content-Type':'application/json'},body:JSON.stringify({items:[{id:1,qty:2}]})});
+  it('accepts the canonical browser origin behind the production standalone bind host',async()=>{
+    const req=new Request('https://0.0.0.0:3000/api/cj/trial-cart',{method:'POST',headers:{Origin:origin,'Sec-Fetch-Site':'same-origin','Content-Type':'application/json'},body:JSON.stringify({items:[{id:1,qty:2}]})});
     expect((await POST(req)).status).toBe(200);
+    expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([{id:1,qty:2}]);
+  });
+  it('rejects an attacker origin even when request and spoofed proxy headers appear to match',async()=>{
+    const req=new Request('https://attacker.example/api/cj/trial-cart',{method:'POST',headers:{Origin:'https://attacker.example',Host:'trbhh.sa','X-Forwarded-Host':'trbhh.sa','X-Forwarded-Proto':'https','Sec-Fetch-Site':'same-origin','Content-Type':'application/json'},body:JSON.stringify({items:[{id:1,qty:2}]})});
+    await denied(req,403,'forbidden');
+  });
+  it.each(['http://localhost:3000','http://127.0.0.1:4325','https://[::1]:3000'])('rejects loopback origin %s in production',async local=>{
+    const req=new Request(local+'/api/cj/trial-cart',{method:'POST',headers:{Origin:local,'Content-Type':'application/json'},body:JSON.stringify({items:[{id:1,qty:2}]})});
+    await denied(req,403,'forbidden');
+  });
+  it.each(['http://localhost:3000','https://localhost:3000','http://127.0.0.1:4325','https://127.0.0.1:4325','http://[::1]:3000','https://[::1]:3000'])('allows an exact loopback origin %s only in nonproduction',async local=>{
+    vi.stubEnv('NODE_ENV','development');
+    const req=new Request(local+'/api/cj/trial-cart',{method:'POST',headers:{Origin:local,'Content-Type':'application/json'},body:JSON.stringify({items:[{id:1,qty:2}]})});
+    expect((await POST(req)).status).toBe(200);
+  });
+  it.each(['http://0.0.0.0:3000','http://192.168.1.10:3000','http://localhost.attacker.example:3000','https://preview.example'])('does not trust matching nonloopback development origin %s',async local=>{
+    vi.stubEnv('NODE_ENV','development');
+    const req=new Request(local+'/api/cj/trial-cart',{method:'POST',headers:{Origin:local,'Content-Type':'application/json'},body:JSON.stringify({items:[{id:1,qty:2}]})});
+    await denied(req,403,'forbidden');
+  });
+  it('requires the exact local request origin rather than a different loopback host or port',async()=>{
+    vi.stubEnv('NODE_ENV','development');
+    const req=new Request('http://127.0.0.1:4325/api/cj/trial-cart',{method:'POST',headers:{Origin:'http://127.0.0.1:4326','Content-Type':'application/json'},body:JSON.stringify({items:[{id:1,qty:2}]})});
+    await denied(req,403,'forbidden');
   });
   it.each(['text/plain','application/x-www-form-urlencoded','multipart/form-data'])('rejects non-JSON content type %s',async type=>{
     await denied(request(undefined,{'Content-Type':type}),415,'json_required');

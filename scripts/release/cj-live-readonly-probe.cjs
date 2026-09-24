@@ -55,9 +55,18 @@ async function main() {
     const targetDetails = target.details_json ? JSON.parse(target.details_json) : {};
     const queryRows = await db.$queryRawUnsafe("SELECT MIN(id) AS id,cj_product_id,MAX(last_sync_at) AS latest FROM cj_products WHERE status='ready' AND hidden=0 AND cj_product_id<>? GROUP BY cj_product_id ORDER BY latest DESC LIMIT 50", String(target.cj_product_id));
     const candidateIds = [String(target.id), ...queryRows.map(row => String(row.id)).filter(id => id !== String(target.id))];
+    // CJ documents listV2 filters for country, verified warehouse, and minimum
+    // warehouse inventory; use these first to avoid testing factory-only items.
+    const verifiedPages = [];
+    for (const countryCode of ['US','CN']) {
+      const page = await api(`/product/listV2?page=1&size=20&countryCode=${countryCode}&startWarehouseInventory=1&verifiedWarehouse=1&orderBy=4&sort=desc`);
+      const groups = Array.isArray(page?.content) ? page.content : [];
+      verifiedPages.push(...groups.flatMap(group => Array.isArray(group.productList) ? group.productList : []));
+    }
     const catalogPage = await api('/product/list?pageNum=1&pageSize=20');
     const catalogItems = Array.isArray(catalogPage?.list) ? catalogPage.list : Array.isArray(catalogPage) ? catalogPage : [];
-    const catalogCandidates = catalogItems.map(item => ({ id: null, cj_product_id: String(item.pid || item.productId || item.id || ''), cj_variant_id: '', details_json: null })).filter(item => item.cj_product_id && item.cj_product_id !== String(target.cj_product_id)).slice(0, 20);
+    const catalogSeen = new Set([String(target.cj_product_id)]);
+    const catalogCandidates = [...verifiedPages, ...catalogItems].map(item => ({ id: null, cj_product_id: String(item.pid || item.productId || item.id || ''), cj_variant_id: '', details_json: null })).filter(item => { if (!item.cj_product_id || catalogSeen.has(item.cj_product_id)) return false; catalogSeen.add(item.cj_product_id); return true; }).slice(0, 40);
     const dbCandidates = [];
     for (const id of candidateIds) {
       const rows = await db.$queryRawUnsafe('SELECT id,cj_product_id,cj_variant_id,cj_sku,name,name_ar,image,images,details_json FROM cj_products WHERE id=? LIMIT 1', BigInt(id));

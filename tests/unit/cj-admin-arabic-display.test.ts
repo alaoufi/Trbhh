@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {renderToStaticMarkup} from 'react-dom/server';
 import type {ReactNode} from 'react';
 
-const state=vi.hoisted(()=>({allowed:true,edit:false,cache:new Map<string,string>(),savedRows:new Map<string,string>(),read:vi.fn(),write:vi.fn(),translate:vi.fn(),translateSearch:vi.fn(async()=> 'diamond'),list:vi.fn(async()=>({ok:true as const,data:{total:1,items:[{pid:'PID-1',productSku:'SKU-1',productName:state.sourceName,categoryName:state.category,productImage:null,sellPrice:10}]}})),sourceName:'Cotton Summer Shirt',nameAr:'',category:'Summer Clothing',categoryPath:'Clothing > Summer Clothing',variantName:'Blue Large'}));
+const state=vi.hoisted(()=>({allowed:true,edit:false,suspend:false,remove:false,cache:new Map<string,string>(),savedRows:new Map<string,string>(),read:vi.fn(),write:vi.fn(),translate:vi.fn(),translateSearch:vi.fn(async()=> 'diamond'),list:vi.fn(async()=>({ok:true as const,data:{total:1,items:[{pid:'PID-1',productSku:'SKU-1',productName:state.sourceName,categoryName:state.category,productImage:null,sellPrice:10}]}})),sourceName:'Cotton Summer Shirt',nameAr:'',category:'Summer Clothing',categoryPath:'Clothing > Summer Clothing',variantName:'Blue Large'}));
 vi.mock('@/lib/prisma',()=>({prisma:{cj_translations:{
   findMany:async(arg:{where:{source_key:{in:string[]}}})=>{
     const saved=new Map([...state.cache].map(([source,target])=>[createHash('sha1').update('en:ar:'+source).digest('hex'),target]));
@@ -18,7 +18,7 @@ vi.mock('@/lib/prisma',()=>({prisma:{cj_translations:{
   },
 }}}));
 vi.mock('@/lib/access-control/guards',()=>({requireAccess:async(module:string,action:string)=>{if(!state.allowed||module!=='products'||action!=='view')throw Error('denied');return {uid:9};}}));
-vi.mock('@/components/access-boundary',()=>({AccessBoundary:({children,action}:{children:ReactNode;action?:string})=>action==='view'||(action==='edit'&&state.edit)?children:null}));
+vi.mock('@/components/access-boundary',()=>({AccessBoundary:({children,action}:{children:ReactNode;action?:string})=>action==='view'||(action==='edit'&&state.edit)||(action==='suspend'&&state.suspend)||(action==='delete'&&state.remove)?children:null}));
 vi.mock('@/lib/cj/config',()=>({cjConfig:()=>({configured:true})}));
 vi.mock('@/lib/cj/sync',()=>({cjSyncSettings:async()=>({shippingMinor:500,usdToSarX100:375})}));
 vi.mock('@/lib/cj/pricing',()=>({defaultMarginBps:async()=>3000,computePrice:()=>({salePriceMinor:5525})}));
@@ -41,7 +41,7 @@ import Review from '@/app/admin/suppliers/cj/review/[id]/page';
 import {learnTranslation} from '@/lib/cj/translate';
 const withoutSourceDetails=(html:string)=>html.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g,'');
 async function browse(params:Record<string,string|undefined>={}){return renderToStaticMarkup(await Browse({searchParams:Promise.resolve(params)}));}
-beforeEach(()=>{vi.clearAllMocks();state.allowed=true;state.edit=false;state.cache=new Map();state.savedRows.clear();state.sourceName='Cotton Summer Shirt';state.nameAr='';state.category='Summer Clothing';state.categoryPath='Clothing > Summer Clothing';state.variantName='Blue Large';state.list.mockImplementation(async()=>({ok:true,data:{total:1,items:[{pid:'PID-1',productSku:'SKU-1',productName:state.sourceName,categoryName:state.category,productImage:null,sellPrice:10}]}}));state.translateSearch.mockResolvedValue('diamond');});
+beforeEach(()=>{vi.clearAllMocks();state.allowed=true;state.edit=false;state.suspend=false;state.remove=false;state.cache=new Map();state.savedRows.clear();state.sourceName='Cotton Summer Shirt';state.nameAr='';state.category='Summer Clothing';state.categoryPath='Clothing > Summer Clothing';state.variantName='Blue Large';state.list.mockImplementation(async()=>({ok:true,data:{total:1,items:[{pid:'PID-1',productSku:'SKU-1',productName:state.sourceName,categoryName:state.category,productImage:null,sellPrice:10}]}}));state.translateSearch.mockResolvedValue('diamond');});
 
 describe('CJ admin Arabic display uses only saved translations on GET',()=>{
   it('translates Arabic product-name searches to the CJ source language before querying the catalog',async()=>{
@@ -113,5 +113,10 @@ describe('CJ admin Arabic display uses only saved translations on GET',()=>{
     const html=renderToStaticMarkup(await Review({params:Promise.resolve({id:'1'}),searchParams:Promise.resolve({})}));
     expect(html).toMatch(/<details[^>]*><summary[^>]*>بيانات المصدر الأصلية/);expect(html).not.toMatch(/<details[^>]*\bopen\b/);
     expect(withoutSourceDetails(html)).not.toContain('Cotton Summer Shirt');expect(state.write).not.toHaveBeenCalled();
+  });
+  it('shows edit, visibility, and confirmed delete controls on the imported product detail to authorized admins',async()=>{
+    state.edit=true;state.suspend=true;state.remove=true;
+    const html=renderToStaticMarkup(await Review({params:Promise.resolve({id:'1'}),searchParams:Promise.resolve({})}));
+    expect(html).toContain('حفظ المراجعة');expect(html).toContain('إخفاء من المعاينة');expect(html).toContain('تأكيد الحذف');expect(html).toContain('حذف السلعة من تربح');
   });
 });

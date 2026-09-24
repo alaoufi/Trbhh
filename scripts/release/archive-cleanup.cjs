@@ -1,47 +1,38 @@
 /* One-time archive cleanup for the live marketplace. Defaults to read-only audit.
- * Only ads already archived for more than the app's 180-day retention period
- * are eligible. Only ad uploads exclusively referenced by those ads are eligible. */
+ * Only standard marketplace ads with no activity for more than 365 days are
+ * eligible. Store listings and ad uploads referenced by other content are kept. */
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 const mode = process.argv[2] || 'audit';
-const cutoff = Date.now() - 180 * 86400_000;
+const retentionDays = 365;
+const cutoff = Date.now() - retentionDays * 86400_000;
 const storageRoot = path.resolve(process.env.STORAGE_DIR || '/app/storage');
 
-function expiredArchiveRows(rows) {
-  return rows.filter((row) => {
-    if (!row.data_archive) return false;
-    const time = new Date(row.data_archive).getTime();
-    return Number.isFinite(time) && time < cutoff;
-  });
+function isOldStandardAd(row, cutoffTime = cutoff) {
+  if (!row || (row.store_only !== 0 && row.store_only !== '0')) return false;
+  const times = [row.created_at, row.bumped_at]
+    .map((value) => value ? new Date(value).getTime() : NaN)
+    .filter(Number.isFinite);
+  return times.length > 0 && Math.max(...times) < cutoffTime;
 }
 
 async function plan(db) {
-  const [archived, staleActiveAds] = await Promise.all([db.ads.findMany({
-    where: { NOT: [{ data_archive: null }, { data_archive: '' }] },
-    select: { id: true, data_archive: true },
-  }), db.ads.findMany({
-    where: {
-      status: 1, state: 'active', store_only: 0,
-      OR: [{ data_archive: null }, { data_archive: '' }],
-      AND: [
-        { OR: [{ bumped_at: { lt: new Date(cutoff) } }, { bumped_at: null }] },
-        { OR: [{ created_at: { lt: new Date(cutoff) } }, { created_at: null }] },
-      ],
-    },
-    select: { id: true },
-  })]);
-  const staleActiveAdPhotos = staleActiveAds.length
-    ? await db.photos.count({ where: { other_id: { in: staleActiveAds.map((row) => row.id) } } })
-    : 0;
-  const oldAds = expiredArchiveRows(archived);
+  const allAds = await db.ads.findMany({
+    select: { id: true, created_at: true, bumped_at: true, store_only: true, status: true, state: true, data_archive: true },
+  });
+  const oldAds = allAds.filter((row) => isOldStandardAd(row));
   const adIds = oldAds.map((row) => row.id);
   const oldPhotos = adIds.length ? await db.photos.findMany({
     where: { other_id: { in: adIds } },
     select: { photo_path: true, other_id: true },
   }) : [];
+  const staleActiveAds = oldAds.filter((row) => row.status === 1 && row.state === 'active' && !row.data_archive);
+  const staleActiveAdPhotos = staleActiveAds.length
+    ? await db.photos.count({ where: { other_id: { in: staleActiveAds.map((row) => row.id) } } })
+    : 0;
   const archivedPhotoIds = [...new Set(oldPhotos.map((row) => /^\d+$/.test(row.photo_path) ? row.photo_path : null).filter(Boolean))];
   const oldAdUploads = await db.uploads.findMany({
     where: { type: 'ad', created_at: { lt: new Date(cutoff) } },
@@ -112,9 +103,9 @@ async function main() {
   if (mode === 'audit') {
     const result = await plan(prisma);
     const files = await measureFiles(result.deleteUploads);
-    console.log(JSON.stringify({ mode, retentionDays: 180, expiredArchivedAds: result.oldAds.length,
+    console.log(JSON.stringify({ mode, retentionDays, oldStandardAds: result.oldAds.length,
       staleActiveStandardAds: result.staleActiveAds.length, photosOnStaleActiveAds: result.staleActiveAdPhotos,
-      photosOnExpiredAds: result.oldPhotos.length, orphanedAdUploadRows: result.deleteUploads.length,
+      photosOnOldAds: result.oldPhotos.length, removableAdUploadRows: result.deleteUploads.length,
       removableFiles: files.fileCount, removableBytes: files.bytes, protected: result.keepReasons }));
     return;
   }
@@ -153,12 +144,16 @@ async function main() {
       bytesDeleted += st.size;
     } catch { /* report successful row cleanup separately from media unlink */ }
   }
-  console.log(JSON.stringify({ mode, retentionDays: 180, adsDeleted: result.adsDeleted,
+  console.log(JSON.stringify({ mode, retentionDays, adsDeleted: result.adsDeleted,
     photosDeleted: result.photosDeleted, adUploadRowsDeleted: result.uploadsDeleted,
     filesDeleted, bytesDeleted, protected: result.keepReasons }));
 }
 
-main().catch((error) => {
-  console.error(`archive cleanup failed: ${error && error.message ? error.message : 'unknown'}`);
-  process.exitCode = 1;
-}).finally(() => prisma.$disconnect());
+if (process.argv[1] === '-') {
+  main().catch((error) => {
+    console.error(`archive cleanup failed: ${error && error.message ? error.message : 'unknown'}`);
+    process.exitCode = 1;
+  }).finally(() => prisma.$disconnect());
+}
+
+module.exports = { isOldStandardAd };

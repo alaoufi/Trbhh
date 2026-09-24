@@ -14,10 +14,10 @@ tools_dir=$(cd "$(dirname "$0")" && pwd -P)
 branch=claude/hostinger-vps-project-amw8vb
 watchdog="trbhh-finance-rollback-$run_id"
 active_release=/root/trbhh-release-tools/ACTIVE_DEPLOYMENT
-stage=preflight; mutated=0
+stage=preflight; substep=preflight; mutated=0
 exec 3>&1 4>&2
 exec 2>/dev/null
-trap 'printf "Finance deployment failed at stage %s.\n" "$stage" >&4' ERR
+trap 'printf "Finance deployment failed at stage %s substep %s.\n" "$stage" "$substep" >&4' ERR
 [[ "$tools_dir" == "/root/trbhh-release-tools/$run_id" && "$(realpath "$prod")" == "$prod" ]]
 exec >> "$tools_dir/deploy.log" 2>&1
 exec 9> /run/lock/trbhh-finance-deploy.lock
@@ -327,21 +327,35 @@ NODE
   exit 0
 fi
 
-stage=finalize
+stage=finalize; substep=finalize_preflight
 [[ -f "$active_release" && ! -L "$active_release" && "$(cat "$active_release")" == "$run_id" ]]
 [[ -f "$backup/CUTOVER_READY" && "$(cat "$backup/CUTOVER_READY")" == "$candidate" ]]
 [[ ! -e "$backup/DEPLOYMENT_VERIFIED" ]]
 mutated=1
+substep=finalize_health_check
 check_container
 container=$(docker compose ps -q app)
+substep=finance_schema_check
 docker exec -i "$container" node - < "$tools_dir/finance-schema-check.cjs"
 # FINALIZE_WORKER: caller has now verified public HTTPS outside the SSH host.
 for attempt in 1 2; do
-  result=$(bash "$tools_dir/finance-capture-job.sh")
-  [[ "$result" =~ ^finance_capture\ status=ok\ captured=[0-9]+$ ]]
+  substep=finance_capture_attempt_$attempt
+  if result=$(bash "$tools_dir/finance-capture-job.sh"); then
+    if [[ ! "$result" =~ ^finance_capture\ status=ok\ captured=[0-9]+$ ]]; then
+      if [[ "$result" =~ ^finance_capture\ status=([a-z0-9_]+)(\ captured=[0-9]+)?$ ]]; then capture_status=${BASH_REMATCH[1]}; else capture_status=unexpected_output; fi
+      printf 'Finance receipt capture blocked finalization; status=%s.\n' "$capture_status" >&4
+      exit 1
+    fi
+  else
+    if [[ "$result" =~ ^finance_capture\ status=([a-z0-9_]+)(\ captured=[0-9]+)?$ ]]; then capture_status=${BASH_REMATCH[1]}; else capture_status=unavailable; fi
+    printf 'Finance receipt capture failed finalization; status=%s.\n' "$capture_status" >&4
+    exit 1
+  fi
   printf '%s\n' "$result" >&3
 done
+substep=post_capture_preservation
 prove_preservation
+substep=prepare_capture_units
 cat > "$backup/capture-service.new" <<UNIT
 # trbhh-finance-release=$run_id
 [Unit]
@@ -369,17 +383,22 @@ WantedBy=timers.target
 UNIT
 # Mark before installation, so even a partially installed pair is recoverable.
 touch "$backup/UNIT_FILES_INSTALLED"
+substep=install_capture_units
 for unit in service timer; do
   [[ ! -L "/etc/systemd/system/trbhh-finance-capture.$unit" ]]
   install -m 644 "$backup/capture-$unit.new" "/etc/systemd/system/trbhh-finance-capture.$unit"
 done
 systemctl daemon-reload
+substep=enable_capture_timer
 systemctl enable --now trbhh-finance-capture.timer
 systemctl is-active --quiet trbhh-finance-capture.timer
+substep=final_container_check
 check_container
+substep=stop_rollback_watchdog
 systemctl stop "$watchdog.timer"
 systemctl stop "$watchdog.service" >/dev/null 2>&1 || true
 [[ ! -e "$tools_dir/ROLLBACK_REQUESTED" ]]
+substep=write_verified_marker
 printf '%s\n' "$candidate" > "$backup/DEPLOYMENT_VERIFIED"
 rm -f -- "$active_release"
 printf 'DEPLOYMENT_VERIFIED=%s\nRUN_ID=%s\nCAPTURE_TIMER_ENABLED=true\n' "$candidate" "$run_id" >&3

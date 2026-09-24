@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { requireAccess } from '@/lib/access-control/guards';
 import { cjConfig } from '@/lib/cj/config';
 import { listProductsPage, getCategories } from '@/lib/cj/client';
+import { translateArabicCjSearch } from '@/lib/cj/search';
 import { sampleOneCjProduct } from '@/lib/cj/sample';
 import { importedCjPids, listCjProducts, parseCjAvailability } from '@/lib/cj/mapping';
 import { cjSyncSettings } from '@/lib/cj/sync';
@@ -46,7 +47,11 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
 
   const [settings, marginBps, catsRes] = await Promise.all([cjSyncSettings(), defaultMarginBps(), getCategories()]);
   const categories = catsRes.ok ? catsRes.data : [];
-  const listing = await listProductsPage(page, PAGE_SIZE, { productName: q || undefined, categoryId: cat || undefined });
+  // CJ indexes product names in its source language, while admins commonly
+  // search using the saved Arabic display title. Translate only the query;
+  // keep the Arabic text in the URL and search box.
+  const sourceQuery = q ? await translateArabicCjSearch(q) : '';
+  const listing = await listProductsPage(page, PAGE_SIZE, { productName: sourceQuery || q || undefined, categoryId: cat || undefined });
   const items = listing.ok ? listing.data.items : [];
   // صلاحية العرض تقرأ الترجمات المحفوظة فقط؛ الترجمة والكتابة إجراءات تحرير صريحة.
   const importedList = await listCjProducts(60);
@@ -105,7 +110,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
 
       {/* بحث + فلترة بالتصنيف (بالعربية عند توفّر الترجمة) */}
       <form method="get" className="flex flex-wrap items-end gap-2">
-        <label className="text-sm">بحث بالاسم<input className={`${input} ms-2 w-56`} name="q" defaultValue={q} placeholder="اسم المنتج كما يظهر في المصدر" /></label>
+        <label className="text-sm">بحث بالاسم<input className={`${input} ms-2 w-56`} name="q" defaultValue={q} placeholder="اكتب اسم المنتج بالعربية أو الإنجليزية" /></label>
         <label className="text-sm">التصنيف
           <select name="cat" defaultValue={cat} className={`${input} ms-2 w-72`}>
             <option value="">كل التصنيفات{total ? ` (${total.toLocaleString('en')})` : ''}</option>
@@ -115,6 +120,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
         <button className={btn}>عرض</button>
         {(q || cat) && <Link href="/admin/suppliers/cj/browse" className={ghost}>مسح الفلاتر</Link>}
       </form>
+      {q && /\p{Script=Arabic}/u.test(q) && <p role="status" className="text-xs text-muted-foreground">{sourceQuery ? 'تم البحث عن الاسم العربي باستخدام اسمه في مصدر CJ.' : 'تعذّرت ترجمة عبارة البحث الآن؛ أعد المحاولة أو ابحث بالاسم كما يظهر في المصدر.'}</p>}
       {categories.length > 0 && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer font-bold">أسماء التصنيفات الأصلية من المصدر</summary><ul className="mt-2 space-y-1">{categories.map((c, index) => <li key={c.id}>التصنيف {index + 1}: <span dir="auto">{c.path}</span> — <code>{c.id}</code></li>)}</ul></details>}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-xs text-muted-foreground">تُعرض الترجمات العربية المحفوظة. الترجمة الجديدة تتطلب إجراءً صريحًا بصلاحية التحرير.</span>

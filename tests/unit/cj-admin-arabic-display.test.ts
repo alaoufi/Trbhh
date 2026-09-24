@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {renderToStaticMarkup} from 'react-dom/server';
 import type {ReactNode} from 'react';
 
-const state=vi.hoisted(()=>({allowed:true,edit:false,cache:new Map<string,string>(),savedRows:new Map<string,string>(),read:vi.fn(),write:vi.fn(),translate:vi.fn(),sourceName:'Cotton Summer Shirt',nameAr:'',category:'Summer Clothing',categoryPath:'Clothing > Summer Clothing',variantName:'Blue Large'}));
+const state=vi.hoisted(()=>({allowed:true,edit:false,cache:new Map<string,string>(),savedRows:new Map<string,string>(),read:vi.fn(),write:vi.fn(),translate:vi.fn(),translateSearch:vi.fn(async()=> 'diamond'),list:vi.fn(async()=>({ok:true as const,data:{total:1,items:[{pid:'PID-1',productSku:'SKU-1',productName:state.sourceName,categoryName:state.category,productImage:null,sellPrice:10}]}})),sourceName:'Cotton Summer Shirt',nameAr:'',category:'Summer Clothing',categoryPath:'Clothing > Summer Clothing',variantName:'Blue Large'}));
 vi.mock('@/lib/prisma',()=>({prisma:{cj_translations:{
   findMany:async(arg:{where:{source_key:{in:string[]}}})=>{
     const saved=new Map([...state.cache].map(([source,target])=>[createHash('sha1').update('en:ar:'+source).digest('hex'),target]));
@@ -22,7 +22,8 @@ vi.mock('@/components/access-boundary',()=>({AccessBoundary:({children,action}:{
 vi.mock('@/lib/cj/config',()=>({cjConfig:()=>({configured:true})}));
 vi.mock('@/lib/cj/sync',()=>({cjSyncSettings:async()=>({shippingMinor:500,usdToSarX100:375})}));
 vi.mock('@/lib/cj/pricing',()=>({defaultMarginBps:async()=>3000,computePrice:()=>({salePriceMinor:5525})}));
-vi.mock('@/lib/cj/client',()=>({getCategories:async()=>({ok:true,data:[{id:'CAT-1',name:state.category,path:state.categoryPath}]}),listProductsPage:async()=>({ok:true,data:{total:1,items:[{pid:'PID-1',productSku:'SKU-1',productName:state.sourceName,categoryName:state.category,productImage:null,sellPrice:10}]}})}));
+vi.mock('@/lib/cj/client',()=>({getCategories:async()=>({ok:true,data:[{id:'CAT-1',name:state.category,path:state.categoryPath}]}),listProductsPage:state.list}));
+vi.mock('@/lib/cj/search',()=>({translateArabicCjSearch:state.translateSearch}));
 vi.mock('@/lib/cj/sample',()=>({sampleOneCjProduct:async()=>({ok:true,data:{name:state.sourceName,category:state.category,priceUsd:10,totalStock:7,images:[],variants:[{vid:'VID-1',sku:'SKU-BLUE',name:state.variantName,priceUsd:10,weight:100,stock:7}]}})}));
 vi.mock('@/lib/cj/mapping',()=>{
   const row=()=>({id:1,cj_product_id:'PID-1',cj_sku:'SKU-1',name:state.sourceName,name_ar:state.nameAr,trbhh_category:state.category,image:'',sale_price_minor:5525,sale_price_override_minor:null,supplier_cost_minor:3750,shipping_cost_minor:500,hidden:0,status:'draft',source_description:null,display_description_ar:null});
@@ -40,16 +41,22 @@ import Review from '@/app/admin/suppliers/cj/review/[id]/page';
 import {learnTranslation} from '@/lib/cj/translate';
 const withoutSourceDetails=(html:string)=>html.replace(/<details\b[^>]*>[\s\S]*?<\/details>/g,'');
 async function browse(params:Record<string,string|undefined>={}){return renderToStaticMarkup(await Browse({searchParams:Promise.resolve(params)}));}
-beforeEach(()=>{vi.clearAllMocks();state.allowed=true;state.edit=false;state.cache=new Map();state.savedRows.clear();state.sourceName='Cotton Summer Shirt';state.nameAr='';state.category='Summer Clothing';state.categoryPath='Clothing > Summer Clothing';state.variantName='Blue Large';});
+beforeEach(()=>{vi.clearAllMocks();state.allowed=true;state.edit=false;state.cache=new Map();state.savedRows.clear();state.sourceName='Cotton Summer Shirt';state.nameAr='';state.category='Summer Clothing';state.categoryPath='Clothing > Summer Clothing';state.variantName='Blue Large';state.list.mockImplementation(async()=>({ok:true,data:{total:1,items:[{pid:'PID-1',productSku:'SKU-1',productName:state.sourceName,categoryName:state.category,productImage:null,sellPrice:10}]}}));state.translateSearch.mockResolvedValue('diamond');});
 
 describe('CJ admin Arabic display uses only saved translations on GET',()=>{
+  it('translates Arabic product-name searches to the CJ source language before querying the catalog',async()=>{
+    const html=await browse({q:'الماس'});
+    expect(state.translateSearch).toHaveBeenCalledWith('الماس');
+    expect(state.list).toHaveBeenCalledWith(1,24,{productName:'diamond',categoryId:undefined});
+    expect(html).toContain('بحث بالاسم');
+  });
   it.each([{}, {ar:'0'}, {detail:'PID-1'}])('reading browse %j never translates or writes',async params=>{
     const html=await browse(params);expect(html).toContain('تُعرض الترجمات العربية المحفوظة');
     expect(state.read).toHaveBeenCalled();expect(state.translate).not.toHaveBeenCalled();expect(state.write).not.toHaveBeenCalled();
   });
   it('shows missing Arabic clearly while retaining original text only in labeled source details',async()=>{
     const html=await browse({detail:'PID-1'}),visible=withoutSourceDetails(html);
-    expect(visible).toContain('الترجمة العربية غير متاحة');expect(visible).toContain('اسم المنتج كما يظهر في المصدر');
+    expect(visible).toContain('الترجمة العربية غير متاحة');expect(visible).toContain('اكتب اسم المنتج بالعربية أو الإنجليزية');
     for(const source of ['Cotton Summer Shirt','Summer Clothing','Blue Large']){expect(html).toContain(source);expect(visible).not.toContain(source);}
     expect(html).toContain('النص الأصلي من المصدر');expect(visible).toContain('PID-1');expect(visible).toContain('SKU-1');
     const options=html.match(/<option\b[^>]*>[\s\S]*?<\/option>/g)??[];expect(options.join('')).toContain('value="CAT-1"');expect(options.join('')).not.toContain('Summer Clothing');expect(options.join('')).not.toContain('>الترجمة العربية غير متاحة · CAT-1');

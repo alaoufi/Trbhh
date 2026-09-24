@@ -36,7 +36,14 @@ jobs:
             test -n "$VPS_KNOWN_HOSTS"
             printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
             if [[ "$MODE" == archive-cleanup ]]; then
-              ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -o ServerAliveInterval=15 "$VPS_USER@$VPS_HOST" 'set -eu; cd /root/trbhh; app=$(docker compose ps -q app); test -n "$app"; test "$(docker inspect -f "{{.State.Running}} {{.State.Paused}}" "$app")" = "true false"; keep=/root/trbhh-release-backups/audit-35603864905; test "$(cat "$keep/VERIFIED")" = 07d2e9ead8e0b28824102d5c8a31b097e01f9459; test "$(cat "$keep/DEPLOYMENT_VERIFIED")" = 5f8dbc01c38bf431a9ae099a581b80536097b346; test -s "$keep/full-restored.json"; test -s "$keep/database.sql.gz"; test -s "$keep/storage.tar.gz"; test -s "$keep/legacy.tar.gz"; echo CLEANUP_PREFLIGHT=PASS'
+              ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -o ServerAliveInterval=15 "$VPS_USER@$VPS_HOST" 'set -eu; cd /root/trbhh; app=$(docker compose ps -q app); test -n "$app"; test "$(docker inspect -f "{{.State.Running}} {{.State.Paused}}" "$app")" = "true false"; keep=/root/trbhh-release-backups/audit-35603864905; test "$(cat "$keep/VERIFIED")" = 07d2e9ead8e0b28824102d5c8a31b097e01f9459; test "$(cat "$keep/DEPLOYMENT_VERIFIED")" = 5f8dbc01c38bf431a9ae099a581b80536097b346; test -s "$keep/full-restored.json"; test -s "$keep/database.sql.gz"; test -s "$keep/storage.tar.gz"; test -s "$keep/legacy.tar.gz"; (cd "$keep" && sha256sum --strict --check SHA256SUMS >/dev/null); gzip -t "$keep/database.sql.gz" "$keep/storage.tar.gz" "$keep/legacy.tar.gz"; echo CLEANUP_PREFLIGHT=PASS'
+            fi
+            if [[ "$MODE" == archive-cleanup ]]; then
+              [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]{0,19}$ ]]
+              result_path="/root/trbhh-release-backups/archive-cleanup-${GITHUB_RUN_ID}.json"
+              ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -o ServerAliveInterval=15 "$VPS_USER@$VPS_HOST" "umask 077; cd /root/trbhh; test ! -e '$result_path'; docker compose exec -T app node - cleanup > '$result_path'" < scripts/release/archive-cleanup.cjs
+              ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -o ServerAliveInterval=15 "$VPS_USER@$VPS_HOST" "node - '$result_path'" < scripts/release/archive-cleanup-legacy.cjs
+              exit 0
             fi
             ssh -i ~/.ssh/key -p "${VPS_PORT:-22}" -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -o ServerAliveInterval=15 "$VPS_USER@$VPS_HOST" "cd /root/trbhh && docker compose exec -T app node - '$archive_mode'" < scripts/release/archive-cleanup.cjs
             exit 0

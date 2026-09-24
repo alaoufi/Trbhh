@@ -10,6 +10,8 @@ const mode = process.argv[2] || 'audit';
 const retentionDays = 365;
 const cutoff = Date.now() - retentionDays * 86400_000;
 const storageRoot = path.resolve(process.env.STORAGE_DIR || '/app/storage');
+const legacyRoot = path.resolve('/app/legacy');
+const allowedOldUploadTypes = new Set([null, 'ad', 'others']);
 
 function isOldStandardAd(row, cutoffTime = cutoff) {
   if (!row || (row.store_only !== 0 && row.store_only !== '0')) return false;
@@ -41,7 +43,7 @@ async function plan(db) {
   const uploadIds = [...new Set([...archivedPhotoIds, ...oldAdUploads.map((row) => row.id.toString())])];
   if (!uploadIds.length) return { oldAds, oldPhotos, staleActiveAds, staleActiveAdPhotos, deleteUploads: [], keepReasons: {} };
   const idValues = uploadIds.map((id) => BigInt(id));
-  const [relatedUploads, allPhotoRefs, videos, users, stores, profiles, categories] = await Promise.all([
+  const [relatedUploads, allPhotoRefs, videos, users, stores, profiles, categories, nameRequests] = await Promise.all([
     db.uploads.findMany({ where: { id: { in: idValues } }, select: { id: true, type: true, file_name: true, file_size: true } }),
     db.photos.findMany({ where: { photo_path: { in: uploadIds } }, select: { photo_path: true, other_id: true } }),
     db.ads.findMany({ where: { video_path: { in: uploadIds } }, select: { video_path: true } }),
@@ -49,9 +51,10 @@ async function plan(db) {
     db.stores.findMany({ where: { logo: { in: uploadIds.map(Number) } }, select: { logo: true } }),
     db.profiles.findMany({ where: { avatar: { in: uploadIds.map(Number) } }, select: { avatar: true } }),
     db.categories.findMany({ where: { photo_path: { in: uploadIds } }, select: { photo_path: true } }),
+    db.name_requests.findMany({ where: { doc: { in: uploadIds.map(Number) } }, select: { doc: true } }),
   ]);
 
-  const uploads = relatedUploads.filter((row) => row.type === 'ad');
+  const uploads = relatedUploads.filter((row) => allowedOldUploadTypes.has(row.type));
   const relatedUploadTypes = {};
   const relatedFileRoots = {};
   for (const row of relatedUploads) {
@@ -66,6 +69,12 @@ async function plan(db) {
     where: { file_name: { in: candidatePaths } },
     select: { id: true, file_name: true },
   }) : [];
+  const otherPathRefs = candidatePaths.length ? await Promise.all([
+    db.classified_ads.findMany({ where: { image: { in: candidatePaths } }, select: { image: true } }),
+    db.ads_prices.findMany({ where: { OR: [{ image: { in: candidatePaths } }, { video: { in: candidatePaths } }] }, select: { image: true, video: true } }),
+    db.wallet_topups.findMany({ where: { receipt: { in: candidatePaths } }, select: { receipt: true } }),
+    db.categories.findMany({ where: { photo_path: { in: candidatePaths } }, select: { photo_path: true } }),
+  ]) : [[], [], []];
   const protectedIds = new Set([
     ...allPhotoRefs.filter((row) => !adIds.some((id) => id === row.other_id)).map((row) => row.photo_path),
     ...videos.map((row) => row.video_path),
@@ -73,8 +82,12 @@ async function plan(db) {
     ...stores.map((row) => row.logo.toString()),
     ...profiles.map((row) => String(row.avatar)),
     ...categories.map((row) => row.photo_path),
+    ...nameRequests.map((row) => String(row.doc)),
   ]);
-  const protectedPaths = new Set(samePathRows.filter((row) => !candidateIds.has(row.id.toString())).map((row) => row.file_name));
+  const protectedPaths = new Set([
+    ...samePathRows.filter((row) => !candidateIds.has(row.id.toString())).map((row) => row.file_name),
+    ...otherPathRefs.flatMap((rows) => rows.flatMap((row) => Object.values(row).filter((value) => typeof value === 'string'))),
+  ]);
   const referencedPhotoIds = new Set(allPhotoRefs.map((row) => row.photo_path));
   const oldArchivePhotoIds = new Set(archivedPhotoIds);
   const oldAgeOrphanIds = new Set(oldAdUploads.map((row) => row.id.toString()).filter((id) => !referencedPhotoIds.has(id)));
@@ -83,7 +96,7 @@ async function plan(db) {
     return (oldArchivePhotoIds.has(id) || oldAgeOrphanIds.has(id)) && !protectedIds.has(id) && row.file_name && !protectedPaths.has(row.file_name);
   });
   const keepReasons = {
-    nonAdOrMissingUploadRows: Math.max(0, uploadIds.length - uploads.length),
+    nonEligibleOrMissingUploadRows: Math.max(0, uploadIds.length - uploads.length),
     relatedUploadTypes,
     relatedFileRoots,
     usedByOtherContent: uploads.filter((row) => protectedIds.has(row.id.toString())).length,
@@ -94,19 +107,20 @@ async function plan(db) {
 }
 
 async function measureFiles(rows) {
-  let fileCount = 0;
-  let bytes = 0;
+  const files = [];
   for (const row of rows) {
     const rel = row.file_name;
-    if (typeof rel !== 'string' || !/^uploads\/[A-Za-z0-9._-]+$/.test(rel)) continue;
-    const abs = path.resolve(storageRoot, rel);
-    if (!abs.startsWith(storageRoot + path.sep)) continue;
-    try {
-      const st = await fs.lstat(abs);
-      if (st.isFile() && !st.isSymbolicLink()) { fileCount++; bytes += st.size; }
-    } catch { /* missing files are reported through the DB row count */ }
+    if (typeof rel !== 'string' || !/^(uploads|file_upload|images)\/[A-Za-z0-9._-]+$/.test(rel)) continue;
+    for (const [scope, root] of [['storage', storageRoot], ['legacy', legacyRoot]]) {
+      const abs = path.resolve(root, rel);
+      if (!abs.startsWith(root + path.sep)) continue;
+      try {
+        const st = await fs.lstat(abs);
+        if (st.isFile() && !st.isSymbolicLink()) { files.push({ rel, scope, size: st.size }); break; }
+      } catch { /* probe the next known media root */ }
+    }
   }
-  return { fileCount, bytes };
+  return files;
 }
 
 async function main() {
@@ -114,10 +128,15 @@ async function main() {
   if (mode === 'audit') {
     const result = await plan(prisma);
     const files = await measureFiles(result.deleteUploads);
+    const storageFiles = files.filter((file) => file.scope === 'storage');
+    const legacyFiles = files.filter((file) => file.scope === 'legacy');
     console.log(JSON.stringify({ mode, retentionDays, oldStandardAds: result.oldAds.length,
       staleActiveStandardAds: result.staleActiveAds.length, photosOnStaleActiveAds: result.staleActiveAdPhotos,
       photosOnOldAds: result.oldPhotos.length, removableAdUploadRows: result.deleteUploads.length,
-      removableFiles: files.fileCount, removableBytes: files.bytes, protected: result.keepReasons }));
+      removableFiles: files.length, removableBytes: files.reduce((sum, file) => sum + file.size, 0),
+      storageFiles: storageFiles.length, storageBytes: storageFiles.reduce((sum, file) => sum + file.size, 0),
+      legacyFiles: legacyFiles.length, legacyBytes: legacyFiles.reduce((sum, file) => sum + file.size, 0),
+      protected: result.keepReasons }));
     return;
   }
 
@@ -127,24 +146,31 @@ async function main() {
     const uploadIds = next.deleteUploads.map((row) => row.id);
     const photosDeleted = ids.length ? await tx.photos.deleteMany({ where: { other_id: { in: ids } } }) : { count: 0 };
     const adsDeleted = ids.length ? await tx.ads.deleteMany({ where: { id: { in: ids } } }) : { count: 0 };
-    const uploadsDeleted = uploadIds.length ? await tx.uploads.deleteMany({ where: { id: { in: uploadIds }, type: 'ad' } }) : { count: 0 };
+    const uploadsDeleted = uploadIds.length ? await tx.uploads.deleteMany({ where: { id: { in: uploadIds } } }) : { count: 0 };
     return { ...next, photosDeleted: photosDeleted.count, adsDeleted: adsDeleted.count, uploadsDeleted: uploadsDeleted.count };
   }, { isolationLevel: 'Serializable', timeout: 120000 });
 
   let filesDeleted = 0;
   let bytesDeleted = 0;
+  const legacyFiles = [];
   for (const row of result.deleteUploads) {
     const rel = row.file_name;
-    if (typeof rel !== 'string' || !/^uploads\/[A-Za-z0-9._-]+$/.test(rel)) continue;
+    if (typeof rel !== 'string' || !/^(uploads|file_upload|images)\/[A-Za-z0-9._-]+$/.test(rel)) continue;
     // Re-check after DB commit so a file reused by another row/content is retained.
-    const [stillUploaded, stillReferenced, exactExternalRefs, videoRefs, categoryRefs] = await Promise.all([
+    const [stillUploaded, stillReferenced, exactExternalRefs, videoRefs, categoryRefs, storeRefs, profileRefs, nameRefs, classifiedRefs, promoRefs, receiptRefs] = await Promise.all([
       prisma.uploads.count({ where: { file_name: rel } }),
       prisma.photos.count({ where: { photo_path: row.id.toString() } }),
       prisma.users.count({ where: { photo_path: rel } }),
       prisma.ads.count({ where: { video_path: rel } }),
       prisma.categories.count({ where: { photo_path: rel } }),
+      prisma.stores.count({ where: { logo: Number(row.id) } }),
+      prisma.profiles.count({ where: { avatar: Number(row.id) } }),
+      prisma.name_requests.count({ where: { doc: Number(row.id) } }),
+      prisma.classified_ads.count({ where: { image: rel } }),
+      prisma.ads_prices.count({ where: { OR: [{ image: rel }, { video: rel }] } }),
+      prisma.wallet_topups.count({ where: { receipt: rel } }),
     ]);
-    if (stillUploaded || stillReferenced || exactExternalRefs || videoRefs || categoryRefs) continue;
+    if (stillUploaded || stillReferenced || exactExternalRefs || videoRefs || categoryRefs || storeRefs || profileRefs || nameRefs || classifiedRefs || promoRefs || receiptRefs) continue;
     const abs = path.resolve(storageRoot, rel);
     if (!abs.startsWith(storageRoot + path.sep)) continue;
     try {
@@ -153,11 +179,19 @@ async function main() {
       await fs.unlink(abs);
       filesDeleted++;
       bytesDeleted += st.size;
-    } catch { /* report successful row cleanup separately from media unlink */ }
+    } catch (storageError) {
+      if (storageError && storageError.code !== 'ENOENT') continue;
+      const legacy = path.resolve(legacyRoot, rel);
+      if (!legacy.startsWith(legacyRoot + path.sep)) continue;
+      try {
+        const st = await fs.lstat(legacy);
+        if (st.isFile() && !st.isSymbolicLink()) legacyFiles.push(rel);
+      } catch { /* missing files do not stop safe database cleanup */ }
+    }
   }
   console.log(JSON.stringify({ mode, retentionDays, adsDeleted: result.adsDeleted,
     photosDeleted: result.photosDeleted, adUploadRowsDeleted: result.uploadsDeleted,
-    filesDeleted, bytesDeleted, protected: result.keepReasons }));
+    filesDeleted, bytesDeleted, legacyFiles, protected: result.keepReasons }));
 }
 
 if (process.argv[1] === '-') {

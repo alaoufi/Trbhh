@@ -4,6 +4,8 @@ export type DisplayOption={label:string;value:string;source:'attribute'|'parsed'
 const SIZE=/^(?:xxs|xs|s|m|l|xl|xxl|xxxl|\d{1,3}(?:xs|xl)|\d+(?:\.\d+)?(?:cm|mm|inch|in))$/i;
 const LABELS:[RegExp,string][]=[[/color|colour/i,'اللون'],[/size/i,'المقاس'],[/voltage|volt/i,'الفولت'],[/plug|socket/i,'القابس'],[/model/i,'الموديل'],[/capacity|volume/i,'السعة'],[/material|fabric/i,'الخامة'],[/warehouse|area/i,'المستودع']];
 const VALUES=new Map(Object.entries({black:'أسود',white:'أبيض',red:'أحمر',blue:'أزرق',green:'أخضر',yellow:'أصفر',pink:'وردي',purple:'بنفسجي',orange:'برتقالي',brown:'بني',grey:'رمادي',gray:'رمادي',silver:'فضي',gold:'ذهبي',beige:'بيج',navy:'كحلي',eu:'أوروبي',european:'أوروبي',us:'أمريكي',uk:'بريطاني',china:'صيني'}));
+const COLOR_KEYS=['black','white','red','blue','green','yellow','pink','purple','orange','brown','grey','gray','silver','gold','beige','navy'];
+const SIZE_SUFFIX='(?:xxxs|xxs|xxl|xxxl|xs|xl|s|m|l|\\d{1,3}(?:xs|xl)|\\d+(?:\\.\\d+)?(?:cm|mm|inch|in))';
 function labelFor(key:string):string{return LABELS.find(([pattern])=>pattern.test(key))?.[1]??key.trim().replace(/[_-]+/g,' ');}
 function safeText(value:unknown):string|null{if(typeof value!=='string'&&typeof value!=='number'&&typeof value!=='boolean')return null;const text=String(value).trim();return text&&text.length<=160?text:null;}
 function translateKnownValue(value:string):string{return VALUES.get(value.trim().toLowerCase())??value;}
@@ -28,6 +30,17 @@ export function cjVariantDisplayOptions(variant:Pick<CjVariant,'variantKey'|'var
     const sizeIndex=SIZE.test(parts[0])?0:SIZE.test(parts[1])?1:-1;
     if(sizeIndex>=0)return [{label:'اللون',value:translateKnownValue(parts[1-sizeIndex]),source:'parsed'},{label:'المقاس',value:parts[sizeIndex],source:'parsed'}];
   }
+  // CJ sometimes repeats the complete product title in every variant, with the
+  // actual option values appended (for example "... Coat For Men Red S").
+  // Parse only a known color/size suffix; never show that full source title as
+  // a customer-facing option when we cannot safely interpret it.
+  const colorPattern=COLOR_KEYS.join('|');
+  const suffix=new RegExp(`(?:^|[\\s_-])(${colorPattern})(?:[\\s_-]+(${SIZE_SUFFIX}))?$`,'i').exec(source);
+  if(suffix){
+    const color=suffix[1];
+    return [{label:'اللون',value:translateKnownValue(color),source:'parsed'},...(suffix[2]?[{label:'المقاس',value:suffix[2].toUpperCase(),source:'parsed' as const}]:[])];
+  }
+  if(source.length>60)return [];
   return [{label:'الخيار',value:source,source:'parsed'}];
 }
 

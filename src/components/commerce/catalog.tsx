@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { formatSar } from '@/lib/commerce/money';
 import { homeGridClass, type HomeLayout } from '@/lib/commerce/home-layout';
+import { PriceText } from '@/components/price-text';
 
 /**
  * الكتالوج البصري لمتجر تربح — بأسلوب متجر معدّات احترافي (كحلي/برتقالي):
@@ -80,7 +81,7 @@ function PriceBlock({ item }: { item: CommerceCardItem }) {
   return (
     <div className="flex items-baseline justify-center gap-2">
       {hasCompare && <span className="text-xs font-bold text-[#16294a]/40 line-through">{formatSar(item.compareAtMinor as number)}</span>}
-      <span className="text-xl font-extrabold text-[#ff6a1a]">{formatSar(item.priceMinor)} <span className="text-xs font-bold text-[#ff6a1a]/70">ر.س</span></span>
+      <PriceText>{formatSar(item.priceMinor)} <span className="text-sm">ر.س</span></PriceText>
     </div>
   );
 }

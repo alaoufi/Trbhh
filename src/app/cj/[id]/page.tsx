@@ -12,6 +12,7 @@ import { CjProductGallery } from '@/components/cj/product-gallery';
 import { CjProductDescription } from '@/components/cj/product-description';
 import { CjProductCard } from '@/components/cj/product-card';
 import { AddToTrialCart, CartLink } from '@/components/cj/cart-controls';
+import { PriceText } from '@/components/price-text';
 
 const editInput = 'mt-1 w-full min-w-0 rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
 export const dynamic = 'force-dynamic';
@@ -55,7 +56,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         {p.trbhh_category && <p className="text-xs leading-6 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{title}</h1>
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <p className="text-3xl font-extrabold text-primary">{priceLabel}</p>
+          <p><PriceText size="detail">{priceLabel}</PriceText></p>
           <p className="mt-2 text-xs leading-6 text-slate-500">سعر معروض للتجربة. لا يُنشئ طلبًا ولا يحجز مخزونًا.</p>
         </div>
         {variantCount && <div className="rounded-xl bg-slate-100 p-3 text-sm leading-7"><b>{variantCount} خيارات مسجلة لدى المورد.</b> يلزم تأكيد اللون والمقاس والخيار المناسب قبل الشراء مستقبلًا؛ السلة الحالية تجمع المنتج الأساسي فقط.</div>}

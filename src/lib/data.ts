@@ -554,6 +554,9 @@ async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type
   };
 }
 
+// Private mixed catalogs reuse the same public eligibility and card projection.
+export { buildSearchWhere as publicAdSearchWhere, adSelect as publicAdCardSelect, toCards as toPublicAdCards };
+
 /** إجمالي نتائج البحث — للترقيم المرقّم. */
 export async function countSearchAds(params: SearchParamsT): Promise<number> {
   return prisma.ads.count({ where: await buildSearchWhere(params) }).catch(() => 0);

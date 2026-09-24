@@ -6,6 +6,7 @@ import type { AdCard as AdCardType } from '@/lib/data';
 import { adPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
 import { timeAgo, cn } from '@/lib/utils';
 import { homeGridClass, pickHomeLayout } from '@/lib/commerce/home-layout';
+import { PriceText } from '@/components/price-text';
 
 function timeShort(iso: string | null) {
   const s = timeAgo(iso); // e.g. "قبل 3 يوم"
@@ -147,7 +148,7 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
 
 function CardPrice({ ad }: { ad: AdCardType }) {
   return <div className="mt-1 flex flex-wrap items-baseline gap-1.5">
-    <span className={cn('text-sm font-extrabold', ad.price > 0 ? 'text-primary' : 'text-muted-foreground')}>{adPriceLabel(ad)}</span>
+    <PriceText muted={ad.price <= 0 || ad.priceEnabled === false}>{adPriceLabel(ad)}</PriceText>
     <OldPrice ad={ad} /><DiscountChip ad={ad} />
   </div>;
 }
@@ -262,7 +263,7 @@ export function AdCardMarketplace({ ad }: { ad: AdCardType }) {
       </div>
     </div>
     <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
-      <div className="flex flex-wrap items-baseline gap-1.5"><strong className="text-base font-extrabold text-[#16294a] sm:text-xl">{adPriceLabel(ad)}</strong><OldPrice ad={ad} /><DiscountChip ad={ad} /></div>
+      <div className="flex flex-wrap items-baseline gap-1.5"><PriceText muted={ad.price <= 0 || ad.priceEnabled === false}>{adPriceLabel(ad)}</PriceText><OldPrice ad={ad} /><DiscountChip ad={ad} /></div>
       <h3 className="line-clamp-2 min-h-10 break-words text-sm font-bold leading-5 text-slate-800">{compactAdTitle(ad.title)}</h3>
       {ad.storeName && <StoreTag name={ad.storeName} />}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">

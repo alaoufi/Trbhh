@@ -27,17 +27,38 @@ try {
   const dockerRootReal = fs.realpathSync(dockerRoot);
   check(root !== dockerRootReal && !root.startsWith(dockerRootReal + path.sep), 'legacy_not_docker_root');
 
-  let deletedFiles = 0;
-  let bytesDeleted = 0;
+  const targets = [];
   for (const rel of [...new Set(result.legacyFiles)]) {
     check(typeof rel === 'string' && /^(file_upload|uploads|images)\/[A-Za-z0-9._-]+$/.test(rel), 'relative_file');
     const target = path.resolve(root, rel);
-    check(target.startsWith(root + path.sep) && fs.realpathSync(target) === target, 'target_realpath');
-    const info = fs.lstatSync(target);
+    check(target.startsWith(root + path.sep), 'target_path');
+    let info;
+    try {
+      check(fs.realpathSync(target) === target, 'target_realpath');
+      info = fs.lstatSync(target);
+    } catch (error) {
+      if (error && error.code === 'ENOENT') continue;
+      throw error;
+    }
     check(info.isFile() && !info.isSymbolicLink() && info.nlink === 1, 'target_file');
+    fs.accessSync(path.dirname(target), fs.constants.W_OK);
+    targets.push({ target, rel, size: info.size });
+  }
+
+  let deletedFiles = 0;
+  let bytesDeleted = 0;
+  for (const { target, size } of targets) {
+    let current;
+    try {
+      current = fs.lstatSync(target);
+    } catch (error) {
+      if (error && error.code === 'ENOENT') continue;
+      throw error;
+    }
+    check(current.isFile() && !current.isSymbolicLink() && current.nlink === 1 && fs.realpathSync(target) === target, 'target_changed');
     fs.unlinkSync(target);
     deletedFiles++;
-    bytesDeleted += info.size;
+    bytesDeleted += size;
   }
 
   fs.unlinkSync(resultPath);

@@ -44,8 +44,7 @@ export async function GET(request: Request) {
   let target: URL;
   try { target = new URL(u); } catch { return failure('bad_url',400); }
   const allowedCjOss = /^cc-west-[a-z0-9-]+\.oss-[a-z0-9-]+\.aliyuncs\.com$/.test(target.hostname);
-  const allowedCjDomain = /(^|\.)cjdropshipping\.(com|cn)$/.test(target.hostname);
-  if (target.protocol!=='https:'||target.username||target.password||target.port||(!ALLOWED_HOSTS.has(target.hostname)&&!allowedCjOss&&!allowedCjDomain)) return failure('forbidden',403);
+  if (target.protocol!=='https:'||target.username||target.password||target.port||(!ALLOWED_HOSTS.has(target.hostname)&&!allowedCjOss)) return failure('forbidden',403);
 
   const res = await fetch(target.toString(), {
     headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://cjdropshipping.com/', Accept: [...RASTER_TYPES].join(', ') },

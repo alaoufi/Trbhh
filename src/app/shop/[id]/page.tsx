@@ -8,9 +8,10 @@ import {CommerceProductDetail} from '@/components/commerce/product-detail';
 export const dynamic='force-dynamic';
 export default async function CommerceProductPage({params}:{params:Promise<{id:string}>}){
  const {id}=await params;if(!/^[1-9]\d{0,14}$/.test(id))notFound();
- const [config,product]=await Promise.all([getCommerceConfig(),readPublicCommerceProduct(BigInt(id))]);
- if(!config.enabled||!product)notFound();
+ const config=await getCommerceConfig();if(!config.enabled)notFound();
+ const product=await readPublicCommerceProduct(BigInt(id));if(!product)notFound();
  const policy=await readApprovedFiscalPolicy(prisma,new Date()).catch(()=>null);
  const calculation=policy?.calculationPolicy;
- return <CommerceProductDetail product={product} shippingFeeMinor={config.shippingFeeMinor} priceBasis={calculation?.priceBasis||null} purchasingEnabled={config.purchasingEnabled} shippingTerms={config.text.shippingTerms}/>;
+ const vatEnabled=policy?(calculation?.vatControl?.enabled??policy.vatBps>0):false;
+ return <CommerceProductDetail product={product} shippingFeeMinor={config.shippingFeeMinor} priceBasis={vatEnabled?(calculation?.priceBasis||null):null} purchasingEnabled={config.purchasingEnabled} shippingTerms={config.text.shippingTerms}/>;
 }

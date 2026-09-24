@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state = vi.hoisted(() => ({ rows: [] as { id: bigint; status: string; hidden: number }[], read: vi.fn() }));
+const state = vi.hoisted(() => ({ rows: [] as { id: bigint; status: string; hidden: number; availability_json:string|null; availability_checked_at:Date|null }[], read: vi.fn() }));
 vi.mock('@/lib/prisma', () => ({ prisma: { $queryRaw: state.read } }));
 import { getStorefrontCjProduct, listStorefrontCjProducts } from '@/lib/cj/mapping';
 
 beforeEach(() => {
   state.rows = [
-    { id: 1n, status: 'draft', hidden: 0 }, { id: 2n, status: 'ready', hidden: 0 },
-    { id: 3n, status: 'quarantined', hidden: 0 }, { id: 4n, status: 'deleted', hidden: 0 },
-    { id: 5n, status: 'unrecognized', hidden: 0 }, { id: 6n, status: '', hidden: 0 },
-    { id: 7n, status: 'ready', hidden: 1 },
+    { id: 1n, status: 'draft', hidden: 0, availability_json:null,availability_checked_at:null }, { id: 2n, status: 'ready', hidden: 0, availability_json:JSON.stringify({checkedAt:new Date().toISOString(),stockQuantity:4,shippingOptions:[{name:'Fixture shipping',priceUsd:1,deliveryDays:'test'}]}),availability_checked_at:new Date() },
+    { id: 3n, status: 'quarantined', hidden: 0, availability_json:null,availability_checked_at:null }, { id: 4n, status: 'deleted', hidden: 0, availability_json:null,availability_checked_at:null },
+    { id: 5n, status: 'unrecognized', hidden: 0, availability_json:null,availability_checked_at:null }, { id: 6n, status: '', hidden: 0, availability_json:null,availability_checked_at:null },
+    { id: 7n, status: 'ready', hidden: 1, availability_json:null,availability_checked_at:null },
   ];
   state.read.mockReset();
   // Interpret the small SELECT predicate subset over fixtures, before LIMIT.

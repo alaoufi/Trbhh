@@ -6,10 +6,10 @@ import { defaultMarginBps, setDefaultMarginBps } from '@/lib/cj/pricing';
 import { cjSyncSettings, saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync';
 import { importCjProductByPid } from '@/lib/cj/import';
 import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductStatus, setCjProductDescriptionAr, setCjProductCategory, cjProductOrderCount } from '@/lib/cj/mapping';
-import { translateToArabic, translateManyCached, learnTranslation } from '@/lib/cj/translate';
+import { translateToArabic, translateManyCached, learnTranslation, isArabicText } from '@/lib/cj/translate';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
-import { getCategories } from '@/lib/cj/client';
+import { getCategories, getProduct, listProductsPage } from '@/lib/cj/client';
 import { createOrder, getOrderById, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
 import { warmCjTranslations, refreshCjMedia } from '@/lib/cj/translate-warm';
 import { cjStorefrontPublic, setCjStorefrontPublic } from '@/lib/cj/storefront';
@@ -112,6 +112,54 @@ const backOf = (form: FormData) => {
   return raw;
 };
 const withParam = (back: string, kv: string) => `${back}${back.includes('?') ? '&' : '?'}${kv}`;
+
+/** Explicit editor action: translate only server-fetched browse names, never posted product content. */
+export async function translateCjBrowsePage(form: FormData) {
+  const session = await requireCjAccess('products', 'edit');
+  const back = backOf(form);
+  const values = ['page', 'q', 'cat', 'detail'].map(key => form.get(key) ?? (key === 'page' ? '1' : ''));
+  if (values.some(value => typeof value !== 'string') || ['page', 'q', 'cat', 'detail'].some(key => form.getAll(key).length > 1)) redirect(withParam(back, 'page_translation=invalid'));
+  const [rawPage, q, cat, detail] = values as string[];
+  const page = Number(rawPage);
+  if (!/^[1-9]\d{0,4}$/.test(rawPage) || page > 10000 || q.length > 100 || /[\u0000-\u001f\u007f]/.test(q) || [cat, detail].some(value => value && !/^[0-9A-Za-z_-]{1,64}$/.test(value))) redirect(withParam(back, 'page_translation=invalid'));
+  const queryFingerprint = cjAuditFingerprint(JSON.stringify({ page, q, cat, detail }));
+  let requested = 0, available = 0;
+  let outcome: 'complete' | 'partial' | 'empty' | 'unavailable' = 'unavailable';
+  try {
+    const result = await listProductsPage(page, 24, { productName: q || undefined, categoryId: cat || undefined });
+    if (!result.ok) throw new Error('browse_unavailable');
+    const items = result.data.items.slice(0, 24);
+    const names = new Set<string>();
+    const add = (value: string | null | undefined) => {
+      if (typeof value !== 'string' || !value.trim() || names.size >= 100 || Buffer.byteLength(value, 'utf8') > 20000) return;
+      names.add(value.trim());
+    };
+    for (const product of items) { add(product.productName); add(product.categoryName); }
+    // Optional details must belong to this server-fetched page. No inventory,
+    // imports, product updates, publishing or order calls are involved.
+    if (detail && items.some(product => product.pid === detail)) {
+      const selected = await getProduct(detail);
+      if (selected.ok && selected.data.pid === detail) {
+        add(selected.data.productName); add(selected.data.categoryName);
+        for (const variant of selected.data.variants.slice(0, 48)) add(variant.variantName);
+      }
+    }
+    const sources = [...names]; requested = sources.length;
+    if (!sources.length) outcome = items.length ? 'unavailable' : 'empty';
+    else {
+      // Collect at most 98 page/detail names, but translate only 48 missing
+      // entries per action. Repeated clicks advance through the remaining set.
+      const translated = await translateManyCached(sources, 48);
+      available = sources.filter(source => isArabicText(source) || isArabicText(translated.get(source))).length;
+      outcome = available === requested ? 'complete' : available ? 'partial' : 'unavailable';
+    }
+  } catch { /* Provider/cache diagnostics never enter the redirect or audit. */ }
+  try {
+    await auditCjChange(session.uid, 'products', 'browse-translation', {}, { queryFingerprint, requested, available });
+  } catch { outcome = 'unavailable'; }
+  revalidatePath('/admin/suppliers/cj/browse');
+  redirect(withParam(back, `page_translation=${outcome}`));
+}
 
 /** حفظ العنوان العربي المعروض (تحرير يدوي) — لا يمسّ النص المصدر. */
 export async function saveCjArabic(form: FormData) {

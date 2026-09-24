@@ -139,18 +139,35 @@ function keyOf(src: string): string {
   // prefix, so leave those rows intact but never reuse them for ambiguous text.
   return createHash('sha1').update((src.length <= MAX_LEN ? 'en:ar:' : 'en:ar:full-v2:') + src).digest('hex');
 }
+const automaticKeyOf = (src: string) => createHash('sha1').update('en:ar:auto-v3:' + src).digest('hex');
 
 /** يقرأ ترجمات مخزَّنة لمجموعة نصوص دفعةً واحدة (بلا شبكة). يعيد خريطة نص→عربي. */
 export async function getCachedArabic(texts: (string | null | undefined)[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const clean = [...new Set(texts.map((t) => (t ?? '').trim()).filter((t) => t && !isArabicText(t)))];
   if (!clean.length) return out;
-  const byKey = new Map(clean.map((t) => [keyOf(t), t]));
+  const keys = clean.flatMap(src => [keyOf(src), automaticKeyOf(src)]);
   try {
-    const rows = await prisma.cj_translations.findMany({ where: { source_key: { in: [...byKey.keys()] } }, select: { source_key: true, target_ar: true } });
-    for (const r of rows) { const src = byKey.get(r.source_key); if (src && isArabicText(r.target_ar)) out.set(src, r.target_ar); }
+    const rows = await prisma.cj_translations.findMany({ where: { source_key: { in: keys } }, select: { source_key: true, target_ar: true } });
+    const saved = new Map(rows.map(row => [row.source_key, row.target_ar]));
+    for (const src of clean) {
+      // Existing valid/manual corrections always win, including a correction
+      // written concurrently with an automatic translation.
+      const original = saved.get(keyOf(src)), automatic = saved.get(automaticKeyOf(src));
+      if (isArabicText(original)) out.set(src, original!);
+      else if (isArabicText(automatic)) out.set(src, automatic!);
+    }
   } catch { /* المخزن غير جاهز */ }
   return out;
+}
+
+async function saveAutomaticTranslation(src: string, arabic: string): Promise<string | null> {
+  const key = automaticKeyOf(src);
+  try {
+    await prisma.cj_translations.upsert({ where: { source_key: key }, create: { source_key: key, target_ar: arabic }, update: {} });
+  } catch { return null; }
+  // A provider response is not proof that the result became available to GET.
+  return (await getCachedArabic([src])).get(src) ?? null;
 }
 
 /** ترجمة نص مع تخزين النتيجة. يعيد العربية أو null. */
@@ -158,14 +175,10 @@ export async function translateToArabicCached(text: string | null | undefined): 
   const src = (text ?? '').trim();
   if (!src) return null;
   if (isArabicText(src)) return src;
-  const key = keyOf(src);
-  try {
-    const hit = await prisma.cj_translations.findUnique({ where: { source_key: key }, select: { target_ar: true } });
-    if (isArabicText(hit?.target_ar)) return hit!.target_ar;
-  } catch { /* تجاهل */ }
+  const hit = (await getCachedArabic([src])).get(src);
+  if (hit) return hit;
   const ar = await translateToArabic(src);
-  if (ar) await prisma.cj_translations.upsert({ where: { source_key: key }, create: { source_key: key, target_ar: ar }, update: {} }).catch(() => {});
-  return ar;
+  return ar ? saveAutomaticTranslation(src, ar) : null;
 }
 
 /** «تعلّم الترجمة»: يحفظ تصحيح المشرف (نص المصدر → العربية الصحيحة) ويستبدل أي ترجمة
@@ -188,7 +201,10 @@ export async function translateManyCached(texts: (string | null | undefined)[], 
     const results = await Promise.all(batch.map(async (src) => [src, await translateRaw(src)] as const));
     let batchWins = 0;
     for (const [src, ar] of results) {
-      if (ar) { batchWins++; map.set(src, ar); await prisma.cj_translations.upsert({ where: { source_key: keyOf(src) }, create: { source_key: keyOf(src), target_ar: ar }, update: {} }).catch(() => {}); }
+      if (ar) {
+        const saved = await saveAutomaticTranslation(src, ar);
+        if (saved) { batchWins++; map.set(src, saved); }
+      }
     }
     // قاطع دائرة: دفعة كاملة بلا نجاح تعني المزوّد غير متاح/تجاوز الحصة — نتوقف
     // حتى لا يتعطّل تحميل الصفحة بمحاولات فاشلة متتالية.

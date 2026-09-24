@@ -1,16 +1,26 @@
 import {createHash} from 'node:crypto';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 
-const db=vi.hoisted(()=>({findMany:vi.fn(),findUnique:vi.fn(),upsert:vi.fn()}));
+const db=vi.hoisted(()=>({findMany:vi.fn(),upsert:vi.fn()}));
 vi.mock('@/lib/prisma',()=>({prisma:{cj_translations:db}}));
 import {getCachedArabic,isArabicText,learnTranslation,translateManyCached,translateToArabic,translateToArabicCached} from '@/lib/cj/translate';
 
 const fetchMock=vi.fn();let clock=Date.now();
+const cache=new Map<string,string>();
 const legacyKey=(s:string)=>createHash('sha1').update('en:ar:'+s.slice(0,480)).digest('hex');
 const memory=(translatedText:string)=>new Response(JSON.stringify({responseStatus:200,responseData:{translatedText}}),{status:200});
+type CacheWrite={where:{source_key:string};create:{source_key:string;target_ar:string};update:{target_ar?:string}};
+function persist(arg:CacheWrite){
+  const key=arg.where.source_key;
+  if(!cache.has(key))cache.set(key,arg.create.target_ar);
+  else if(arg.update.target_ar!==undefined)cache.set(key,arg.update.target_ar);
+  return{source_key:key,target_ar:cache.get(key)};
+}
 beforeEach(()=>{
   vi.clearAllMocks();clock+=100000;vi.spyOn(Date,'now').mockImplementation(()=>clock+=400);
-  db.findMany.mockResolvedValue([]);db.findUnique.mockResolvedValue(null);db.upsert.mockResolvedValue({});
+  cache.clear();
+  db.findMany.mockImplementation(async(arg:{where:{source_key:{in:string[]}}})=>arg.where.source_key.in.filter(key=>cache.has(key)).map(key=>({source_key:key,target_ar:cache.get(key)!})));
+  db.upsert.mockImplementation(async(arg:CacheWrite)=>persist(arg));
   fetchMock.mockReset();fetchMock.mockImplementation(async()=>memory('ترجمة عربية مكتملة'));
   vi.stubGlobal('fetch',fetchMock);
 });
@@ -26,7 +36,7 @@ describe('CJ Arabic translation integrity',()=>{
   it('preserves an explicit Arabic manual correction containing brand and technical tokens',async()=>{
     const target='آلة FlashLabel الحرارية من Kupono بواجهة USB';
     await learnTranslation('Original printer',target);expect(db.upsert.mock.calls[0][0].update).toEqual({target_ar:target});
-    db.findUnique.mockResolvedValue({target_ar:target});expect(await translateToArabicCached('Original printer')).toBe(target);expect(fetchMock).not.toHaveBeenCalled();
+    expect(await translateToArabicCached('Original printer')).toBe(target);expect(fetchMock).not.toHaveBeenCalled();
   });
   it('does not call one Arabic letter plus English prose a localized title',()=>{
     expect(isArabicText('ب FlashLabel Summer Thermal Label Printer')).toBe(false);expect(isArabicText('قميص cotton summer shirt for daily use')).toBe(false);
@@ -79,9 +89,9 @@ describe('CJ Arabic translation integrity',()=>{
     const keys=db.findMany.mock.calls[0][0].where.source_key.in;expect(keys).not.toContain(legacyKey(source));expect(db.upsert).not.toHaveBeenCalled();
   });
   it('continues using existing exact short-source manual cache without overwriting it',async()=>{
-    db.findUnique.mockResolvedValue({target_ar:'تصحيح الموظف'});
+    cache.set(legacyKey('Cotton shirt'),'تصحيح الموظف');
     expect(await translateToArabicCached('Cotton shirt')).toBe('تصحيح الموظف');
-    expect(db.findUnique).toHaveBeenCalledWith({where:{source_key:legacyKey('Cotton shirt')},select:{target_ar:true}});
+    expect(db.findMany.mock.calls[0][0].where.source_key.in).toContain(legacyKey('Cotton shirt'));
     expect(fetchMock).not.toHaveBeenCalled();expect(db.upsert).not.toHaveBeenCalled();
   });
   it('read-only cache reads include mixed sources and ignore invalid English cache output',async()=>{
@@ -89,10 +99,51 @@ describe('CJ Arabic translation integrity',()=>{
     db.findMany.mockResolvedValue([{source_key:legacyKey(mixed),target_ar:'قميص قطني'},{source_key:legacyKey(english),target_ar:'Summer shirt'}]);
     expect(await getCachedArabic([mixed,english])).toEqual(new Map([[mixed,'قميص قطني']]));expect(fetchMock).not.toHaveBeenCalled();expect(db.upsert).not.toHaveBeenCalled();
   });
-  it('does not replace a cached row automatically even when it contains invalid output',async()=>{
-    db.findUnique.mockResolvedValue({target_ar:'Untranslated original'});
+  it.each(['Untranslated original','قميص Summer Cotton Shirt'])('repairs invalid legacy output %s through a separate readable automatic key',async invalid=>{
+    cache.set(legacyKey('Cotton shirt'),invalid);
     expect(await translateToArabicCached('Cotton shirt')).toBe('ترجمة عربية مكتملة');
     expect(db.upsert.mock.calls[0][0].update).toEqual({});
+    expect(db.upsert.mock.calls[0][0].where.source_key).not.toBe(legacyKey('Cotton shirt'));
+    expect(cache.get(legacyKey('Cotton shirt'))).toBe(invalid);
+    expect((await getCachedArabic(['Cotton shirt'])).get('Cotton shirt')).toBe('ترجمة عربية مكتملة');
+    expect(await translateToArabicCached('Cotton shirt')).toBe('ترجمة عربية مكتملة');expect(fetchMock).toHaveBeenCalledOnce();
+  });
+  it('uses a later manual correction before an existing automatic result',async()=>{
+    expect(await translateToArabicCached('Cotton shirt')).toBe('ترجمة عربية مكتملة');
+    await learnTranslation('Cotton shirt','تصحيح الموظف');
+    expect((await getCachedArabic(['Cotton shirt'])).get('Cotton shirt')).toBe('تصحيح الموظف');
+    expect(await translateToArabicCached('Cotton shirt')).toBe('تصحيح الموظف');expect(fetchMock).toHaveBeenCalledOnce();
+    expect(cache.size).toBe(2);
+  });
+  it('makes a batch repair readable on the next GET while retaining every invalid legacy row',async()=>{
+    const invalid=new Map([['Cotton shirt','Untranslated original'],['Summer shirt','قميص Summer Cotton Shirt']]);
+    for(const [source,target]of invalid)cache.set(legacyKey(source),target);
+    expect(await translateManyCached([...invalid.keys()],2)).toEqual(new Map([...invalid.keys()].map(source=>[source,'ترجمة عربية مكتملة'])));
+    expect(await getCachedArabic([...invalid.keys()])).toEqual(new Map([...invalid.keys()].map(source=>[source,'ترجمة عربية مكتملة'])));
+    for(const [source,target]of invalid)expect(cache.get(legacyKey(source))).toBe(target);
+    expect(db.upsert.mock.calls.every(([arg])=>Object.keys(arg.update).length===0)).toBe(true);
+  });
+  it('returns and preserves a manual correction written during automatic persistence',async()=>{
+    db.upsert.mockImplementation(async(arg:CacheWrite)=>{
+      cache.set(legacyKey('Cotton shirt'),'تصحيح يدوي متزامن');
+      return persist(arg);
+    });
+    expect(await translateToArabicCached('Cotton shirt')).toBe('تصحيح يدوي متزامن');
+    expect(cache.get(legacyKey('Cotton shirt'))).toBe('تصحيح يدوي متزامن');
+    expect(db.upsert.mock.calls[0][0].update).toEqual({});
+    expect((await getCachedArabic(['Cotton shirt'])).get('Cotton shirt')).toBe('تصحيح يدوي متزامن');
+  });
+  it('does not claim a single or batch translation was saved when storage fails',async()=>{
+    db.upsert.mockRejectedValue(new Error('private database failure'));
+    expect(await translateToArabicCached('Cotton shirt')).toBeNull();
+    expect(await translateManyCached(['Summer shirt'],1)).toEqual(new Map());
+    expect(cache.size).toBe(0);expect(await getCachedArabic(['Cotton shirt','Summer shirt'])).toEqual(new Map());
+  });
+  it('does not claim success when the persisted translation cannot be read back',async()=>{
+    db.upsert.mockImplementation(async(arg:CacheWrite)=>{
+      const row=persist(arg);db.findMany.mockRejectedValue(new Error('private read failure'));return row;
+    });
+    expect(await translateToArabicCached('Cotton shirt')).toBeNull();
   });
   it('explicit learning never stores an English-only correction as Arabic',async()=>{
     await learnTranslation('Original product','Still English');expect(db.upsert).not.toHaveBeenCalled();

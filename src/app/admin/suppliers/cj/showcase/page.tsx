@@ -50,7 +50,7 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
           <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {items.map((r) => {
               const priceMinor = r.sale_price_override_minor ?? r.sale_price_minor;
-              const saved = isArabicText(r.name_ar) ? r.name_ar : translations.get(r.name);
+              const saved = isArabicText(r.name_ar) ? r.name_ar : translations.get(r.name.trim());
               const title = isArabicText(saved) ? saved! : 'الترجمة العربية غير متاحة';
               return (
                 <div key={r.id} className="card-3d flex flex-col overflow-hidden rounded-xl">

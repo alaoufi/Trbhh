@@ -10,7 +10,7 @@ import { cjSyncSettings } from '@/lib/cj/sync';
 import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
 import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
-import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, translateCjCategories, runCjTranslateWarm, refreshCjMediaAction } from '../actions';
+import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateCjBrowsePage, translateAllCj, translateCjCategories, runCjTranslateWarm, refreshCjMediaAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'تصفّح منتجات CJ واستيرادها' };
@@ -22,10 +22,18 @@ const ghost = 'rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold
 const input = 'min-h-9 rounded-lg border border-primary/25 bg-white px-2 py-1 text-sm';
 const sar = (m: number | null) => (m == null ? '—' : `${(m / 100).toFixed(2)} ر.س`);
 const usd = (v: number | null) => (v == null ? '—' : `$${v.toFixed(2)}`);
+const translationFeedback = {
+  complete: 'أصبحت ترجمات منتجات هذه الصفحة متاحة من المخزن.',
+  partial: 'توفّر بعض الترجمات. يمكنك إعادة المحاولة لاستكمال الباقي.',
+  empty: 'لا توجد منتجات لترجمتها في هذه الصفحة.',
+  invalid: 'تعذّر تحديد الصفحة أو مرشحات البحث. أعد فتح الصفحة وحاول مجددًا.',
+  unavailable: 'تعذّر استكمال ترجمة الصفحة الآن. بقيت بيانات المنتجات الأصلية دون تغيير؛ حاول لاحقًا.',
+};
 
 export default async function CjBrowsePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAccess('products', 'view');
   const sp = await searchParams;
+  const translationNotice = typeof sp.page_translation === 'string' && Object.hasOwn(translationFeedback, sp.page_translation) ? translationFeedback[sp.page_translation as keyof typeof translationFeedback] : null;
   const q = typeof sp.q === 'string' ? sp.q.slice(0, 100) : '';
   const cat = typeof sp.cat === 'string' && /^[0-9A-Za-z_-]{1,64}$/.test(sp.cat) ? sp.cat : '';
   const page = Math.max(1, parseInt(typeof sp.page === 'string' ? sp.page : '1') || 1);
@@ -52,13 +60,13 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   const arText = (t: string | null | undefined) => {
     if (!t) return '—';
     if (isArabicText(t)) return t;
-    const saved = gridAr.get(t) ?? catAr.get(t);
+    const saved = gridAr.get(t.trim()) ?? catAr.get(t.trim());
     return isArabicText(saved) ? saved! : 'الترجمة العربية غير متاحة';
   };
   const categoryLabels = new Map(categories.map((c, index) => {
-    const translatedPath = isArabicText(c.path) ? c.path : catAr.get(c.path);
-    const pathParts = c.path.split(/\s*[›>]\s*/).map(part => isArabicText(part) ? part : catAr.get(part));
-    const translatedName = isArabicText(c.name) ? c.name : catAr.get(c.name);
+    const translatedPath = isArabicText(c.path) ? c.path : catAr.get(c.path.trim());
+    const pathParts = c.path.split(/\s*[›>]\s*/).map(part => isArabicText(part) ? part : catAr.get(part.trim()));
+    const translatedName = isArabicText(c.name) ? c.name : catAr.get(c.name.trim());
     const label = isArabicText(translatedPath) ? translatedPath! : pathParts.length > 1 && pathParts.every(isArabicText) ? pathParts.join(' › ') : isArabicText(translatedName) ? translatedName! : `تصنيف بانتظار الترجمة (${index + 1})`;
     return [c.id, label];
   }));
@@ -70,7 +78,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   const detailAr = detail && detail.ok
     ? await getCachedArabic([detail.data.name, detail.data.category ?? '', ...detail.data.variants.map((v) => v.name ?? '')])
     : new Map<string, string>();
-  const arOf = (t: string | null | undefined) => t && isArabicText(detailAr.get(t)) ? detailAr.get(t)! : arText(t);
+  const arOf = (t: string | null | undefined) => t && isArabicText(detailAr.get(t.trim())) ? detailAr.get(t.trim())! : arText(t);
   const salePreview = (u: number | null) => (u != null && u > 0 ? computePrice(Math.round(u * settings.usdToSarX100), settings.shippingMinor, 0, marginBps).salePriceMinor : null);
   const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`;
   const pageHref = (n: number) => `/admin/suppliers/cj/browse?page=${Math.min(Math.max(1, n), totalPages)}${keep}`;
@@ -89,6 +97,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       </p>
 
       {/* تنبيهات */}
+      {translationNotice && <p role="status" className="rounded-lg bg-amber-50 p-2 text-sm text-amber-900">{translationNotice}</p>}
       {typeof sp.imported === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم استيراد المنتج {sp.imported} إلى التخزين الوسيط ✓ (لم يُعرض للعامة).</p>}
       {typeof sp.imperr === 'string' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر استيراد المنتج. أعد المحاولة من إجراء الاستيراد.</p>}
       {sp.removed === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حذف المنتج من التخزين الوسيط.</p>}
@@ -109,6 +118,12 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       {categories.length > 0 && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer font-bold">أسماء التصنيفات الأصلية من المصدر</summary><ul className="mt-2 space-y-1">{categories.map((c, index) => <li key={c.id}>التصنيف {index + 1}: <span dir="auto">{c.path}</span> — <code>{c.id}</code></li>)}</ul></details>}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-xs text-muted-foreground">تُعرض الترجمات العربية المحفوظة. الترجمة الجديدة تتطلب إجراءً صريحًا بصلاحية التحرير.</span>
+        <AccessBoundary module="products" action="edit"><form action={translateCjBrowsePage}>
+          <input type="hidden" name="page" value={page} /><input type="hidden" name="q" value={q} /><input type="hidden" name="cat" value={cat} />
+          {detailPid && <input type="hidden" name="detail" value={detailPid} />}
+          <input type="hidden" name="back" value={`${backHref}${detailPid ? `&detail=${encodeURIComponent(detailPid)}` : ''}`} />
+          <button className={btn} disabled={!items.length}>ترجمة منتجات هذه الصفحة</button>
+        </form></AccessBoundary>
         <AccessBoundary module="products" action="edit"><form action={translateCjCategories}><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة كل التصنيفات الآن</button></form></AccessBoundary>
         <AccessBoundary module="products" action="edit"><form action={runCjTranslateWarm}><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الترجمات (خادم)</button></form></AccessBoundary>
         <AccessBoundary module="products" action="edit"><form action={refreshCjMediaAction}><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الصور</button></form></AccessBoundary>

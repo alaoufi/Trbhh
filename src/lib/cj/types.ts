@@ -16,6 +16,7 @@ export type CjVariant = {
   vid: string;
   variantSku: string;
   variantName: string | null;
+  variantKey?: string | null;
   variantSellPrice: number | null;
   variantImage: string | null;
   variantWeight: number | null;

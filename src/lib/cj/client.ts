@@ -286,6 +286,7 @@ function mapVariant(v: Record<string, unknown>): CjVariant {
     vid: String(v.vid ?? v.variantId ?? v.id ?? ''),
     variantSku: String(v.variantSku ?? v.sku ?? ''),
     variantName: str(v.variantNameEn ?? v.variantName ?? v.nameEn ?? v.nameen ?? v.variantKey),
+    variantKey: str(v.variantKey ?? v.variantKeyEn ?? v.variantProperty),
     variantSellPrice: parsePrice(v.variantSellPrice ?? v.sellPrice ?? v.sellprice),
     variantImage: str(v.variantImage) || str(v.bigImg) || str(v.bigimg) || str(v.img),
     variantWeight: num(v.variantWeight ?? v.weight),

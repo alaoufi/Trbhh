@@ -4,7 +4,7 @@ import { Phone, MessageCircle, Package, Truck } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
 import { getAgent, agentContactLinks } from '@/lib/cj/agents';
-import { cjProductOrderCount, getStorefrontCjProduct, listStorefrontCjProducts, parseCjDetails } from '@/lib/cj/mapping';
+import { cjProductOrderCount, getStorefrontCjProduct, listStorefrontCjProducts, parseCjAvailability, parseCjDetails } from '@/lib/cj/mapping';
 import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '../../admin/suppliers/cj/actions';
 import { cjStorefrontView, cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { cjPriceLabel } from '@/lib/cj/presentation';
@@ -39,6 +39,12 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const gallery = cjProductImages(p).map(cjImg);
   const details = parseCjDetails(p);
   const variantCount = details && Number.isSafeInteger(details.variantCount) && details.variantCount > 0 ? details.variantCount : null;
+  const availability = parseCjAvailability(p);
+  const verifiedStocks = new Map((availability?.variants ?? []).map(variant => [variant.vid, variant.stockQuantity]));
+  const selectableVariants = (details?.variants ?? []).flatMap(variant => {
+    const stock = verifiedStocks.get(variant.vid);
+    return variant.vid && stock ? [{ vid: variant.vid, name: variant.name, optionKey: variant.optionKey, sku: variant.sku, stock }] : [];
+  });
   const weightMin = details?.weightMin;
   const weightMax = details?.weightMax;
   const weightLabel = typeof weightMin === 'number' && Number.isFinite(weightMin) && weightMin > 0
@@ -59,8 +65,8 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
           <p><PriceText size="detail">{priceLabel}</PriceText></p>
           <p className="mt-2 text-xs leading-6 text-slate-500">سعر معروض للتجربة. لا يُنشئ طلبًا ولا يحجز مخزونًا.</p>
         </div>
-        {variantCount && <div className="rounded-xl bg-slate-100 p-3 text-sm leading-7"><b>{variantCount} خيارات مسجلة لدى المورد.</b> يلزم تأكيد اللون والمقاس والخيار المناسب قبل الشراء مستقبلًا؛ السلة الحالية تجمع المنتج الأساسي فقط.</div>}
-        {view.isStaff && session && <AddToTrialCart productId={id} accountId={session.uid} />}
+        {variantCount && <section aria-label="خيارات المنتج" className="rounded-2xl border border-slate-200 bg-white p-4"><h2 className="font-extrabold text-primary">خيارات المنتج قبل الإضافة ({variantCount})</h2><p className="mt-1 text-xs leading-6 text-slate-600">راجع اللون أو المقاس أو SKU والتوفر لكل خيار. الخيار غير المتحقق لا يمكن إضافته للسلة التجريبية.</p><ul className="mt-3 space-y-2">{details!.variants.map((variant,index)=>{const stock=verifiedStocks.get(variant.vid);return <li key={variant.vid||`${variant.sku}-${index}`} className="min-w-0 rounded-xl bg-slate-50 p-3 text-sm leading-6"><p className="font-bold text-slate-900">{variant.optionKey||variant.name||variant.sku||`الخيار ${index+1}`}</p><div className="flex flex-wrap gap-x-4 text-slate-600">{variant.sku&&<span>SKU: <b dir="ltr">{variant.sku}</b></span>}{variant.priceUsd!=null&&<span>سعر المورد: <b dir="ltr">${variant.priceUsd.toFixed(2)}</b></span>}{variant.weight!=null&&<span>الوزن: {variant.weight} غ</span>}<span className={stock?'font-bold text-emerald-800':'font-bold text-amber-800'}>{stock?`المتاح الموثق: ${stock}`:'التوفر غير متحقق'}</span></div></li>;})}</ul></section>}
+        {view.isStaff && session && <AddToTrialCart productId={id} accountId={session.uid} variants={selectableVariants} requiresVariant={Boolean(variantCount)} />}
         <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
           <div className="flex items-start gap-3"><Package className="mt-1 h-5 w-5 shrink-0 text-primary" /><div><p className="font-bold">المخزون يحتاج التحقق</p><p className="mt-1 text-xs leading-6 text-slate-500">لا تتوفر كمية مخزون مؤكدة في بيانات العرض المحفوظة.</p></div></div>
           <div className="flex items-start gap-3"><Truck className="mt-1 h-5 w-5 shrink-0 text-primary" /><div><p className="font-bold">الشحن والضريبة</p><p className="mt-1 text-xs leading-6 text-slate-500">السعر المحسوب يتضمن تقدير الشحن المسجل؛ لا يضاف مرة ثانية في السلة. تكلفة الشحن النهائية والضريبة وموعد الوصول غير مؤكدة في التجربة.</p></div></div>

@@ -26,6 +26,7 @@ export async function readCjAvailability(pid: string, variants: CjVariant[], dep
     stockByOrigin.set(origin, products);
   }
   let stockQuantity = 0;
+  const verifiedVariantStock = new Map<string, number>();
   const shippingOptions = [] as { name: string; priceUsd: number; deliveryDays: string | null; originCountry: string }[];
   for (const [originCountry, products] of stockByOrigin) {
     const freight = await (deps.calculateFreight ?? calculateFreightToKSA)([...products.keys()].map(vid => ({ vid, quantity: 1 })), undefined, originCountry).catch(() => null);
@@ -35,8 +36,10 @@ export async function readCjAvailability(pid: string, variants: CjVariant[], dep
       .map(option => ({ name: option.logisticName.trim().slice(0, 80), priceUsd: option.logisticPrice, deliveryDays: option.logisticAging?.slice(0, 40) ?? null, originCountry }));
     if (options.length) {
       stockQuantity += [...products.values()].reduce((sum, quantity) => sum + quantity, 0);
+      for (const [vid, quantity] of products) verifiedVariantStock.set(vid, (verifiedVariantStock.get(vid) ?? 0) + quantity);
       shippingOptions.push(...options);
     }
   }
-  return stockQuantity > 0 && shippingOptions.length ? JSON.stringify({ checkedAt: new Date().toISOString(), stockQuantity, shippingOptions }) : null;
+  const variantsWithStock = [...verifiedVariantStock].map(([vid, quantity]) => ({ vid, stockQuantity: quantity }));
+  return stockQuantity > 0 && shippingOptions.length ? JSON.stringify({ checkedAt: new Date().toISOString(), stockQuantity, variants: variantsWithStock, shippingOptions }) : null;
 }

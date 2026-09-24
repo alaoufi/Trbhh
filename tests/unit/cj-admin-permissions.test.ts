@@ -13,14 +13,14 @@ vi.mock('next/navigation', () => ({ redirect: (path: string) => { throw Error('r
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/components/access-boundary', () => ({ AccessBoundary: ({ children, module, action = 'view' }: { children: ReactNode; module: string; action?: string }) => state.keys.has(`${module}:${action}`) ? children : null }));
 vi.mock('@/lib/prisma', () => ({ prisma: { users: { findFirst: async () => ({ id: 3n, phoneNumber: '' }) }, cj_products: { findMany: async () => state.existing } } }));
-vi.mock('@/lib/cj/mapping', () => ({ getCjProductById: async () => ({ ...state.product }), cjProductOrderCount: async () => 0,
+vi.mock('@/lib/cj/mapping', () => ({ getCjProductById: async () => ({ ...state.product }), parseCjAvailability: () => null, cjProductOrderCount: async () => 0,
   removeCjProductById: state.write, setCjProductNameAr: state.write, setCjProductHidden: state.write, setCjProductStatus: state.write, setCjProductPriceOverride: async (id: number, minor: number | null) => { state.write(id, minor); state.product.sale_price_override_minor = minor; }, updateCjReview: state.write,
   setCjProductDescriptionAr: state.write, setCjProductCategory: state.write, listUntranslatedCjProducts: async () => [state.product],
 }));
 vi.mock('@/lib/cj/pricing', () => ({ setDefaultMarginBps: state.write, defaultMarginBps: async () => 3000 }));
 vi.mock('@/lib/cj/sync', () => ({ saveCjSyncSettings: state.write, cjSyncSettings: async () => ({ enabled: false }), syncCjCatalog: async () => { state.write(); return { ok: true, imported: 1, pages: 1, skipped: 0 }; } }));
 vi.mock('@/lib/cj/import', () => ({ importCjProductByPid: async (...args: unknown[]) => { state.imports(...args); state.write(); return { ok: true, pid: 'CJ4', salePriceMinor: 1200, supplierCostMinor: 900 }; } }));
-vi.mock('@/lib/cj/translate', () => ({ translateToArabic: async () => 'ترجمة', translateManyCached: async () => { state.write(); return new Map([['source', 'ترجمة']]); }, learnTranslation: state.write }));
+vi.mock('@/lib/cj/translate', () => ({ translateToArabic: async () => 'ترجمة', translateToArabicCached: async () => 'ترجمة', translateManyCached: async () => { state.write(); return new Map([['source', 'ترجمة']]); }, learnTranslation: state.write }));
 vi.mock('@/lib/cj/client', () => ({ getCategories: async () => ({ ok: true, data: [{ name: 'source' }] }) }));
 vi.mock('@/lib/cj/orders/store', () => ({ createOrder: async () => { state.write(); return { id: 7n, created: true }; }, transitionOrder: async () => { state.write(); return { ok: true, from: 'awaiting_payment', to: 'paid' }; }, setOrderTracking: state.write, listOrderEvents: async () => [], getOrderById: async () => ({ id: 7n, status: 'awaiting_payment', carrier: 'old', tracking_number: '', tracking_url: '' }) }));
 vi.mock('@/lib/cj/translate-warm', () => ({ warmCjTranslations: async () => { state.write(); return { categories: 1, productNames: 1 }; }, refreshCjMedia: async () => { state.write(); return { refreshed: 1 }; } }));

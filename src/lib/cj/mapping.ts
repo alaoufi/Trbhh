@@ -2,6 +2,7 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { PriceBreakdown } from './pricing';
+import type { CjVariant } from './types';
 
 /**
  * ربط منتجات CJ بمنتجات تربح (والاحتفاظ بتفصيل التسعير) في جدول cj_products.
@@ -60,6 +61,7 @@ export type UpsertCjInput = {
 export type CjAvailability = {
   checkedAt: string;
   stockQuantity: number;
+  variants?: { vid: string; stockQuantity: number }[];
   shippingOptions: { name: string; priceUsd: number; deliveryDays: string | null; originCountry?: string }[];
 };
 
@@ -71,7 +73,8 @@ export function parseCjAvailability(row: Pick<CjProductRow, 'availability_json'>
     if (!Number.isFinite(checkedAt) || checkedAt > now || now - checkedAt > 6 * 60 * 60 * 1000) return null;
     if (!Number.isSafeInteger(value.stockQuantity) || (value.stockQuantity ?? 0) < 1 || !Array.isArray(value.shippingOptions) || !value.shippingOptions.length) return null;
     const shippingOptions = value.shippingOptions.filter(option => option && typeof option.name === 'string' && option.name.trim() && Number.isFinite(option.priceUsd) && option.priceUsd >= 0 && (option.originCountry === undefined || /^[A-Z]{2}$/.test(option.originCountry)));
-    return shippingOptions.length ? { checkedAt: new Date(checkedAt).toISOString(), stockQuantity: value.stockQuantity!, shippingOptions } : null;
+    const variants = Array.isArray(value.variants) ? value.variants.filter(variant => variant && typeof variant.vid === 'string' && variant.vid.length <= 64 && Number.isSafeInteger(variant.stockQuantity) && variant.stockQuantity > 0) : [];
+    return shippingOptions.length ? { checkedAt: new Date(checkedAt).toISOString(), stockQuantity: value.stockQuantity!, variants, shippingOptions } : null;
   } catch { return null; }
 }
 
@@ -85,7 +88,7 @@ export function parseCjImages(row: Pick<CjProductRow, 'images' | 'image'>): stri
 
 /** تفاصيل غنية مخزَّنة للسلعة (متغيّرات/مواصفات) — للعرض بلا اتصال حيّ. */
 export type CjDetails = {
-  variants: { name: string; sku: string; priceUsd: number | null; weight: number | null }[];
+  variants: { vid: string; name: string; optionKey: string; sku: string; priceUsd: number | null; weight: number | null }[];
   weightMin: number | null;
   weightMax: number | null;
   variantCount: number;
@@ -98,8 +101,8 @@ export function parseCjDetails(row: Pick<CjProductRow, 'details_json'>): CjDetai
   return null;
 }
 /** يبني تفاصيل مخزَّنة من متغيّرات CJ (بلا اتصالات إضافية). */
-export function buildCjDetails(variants: { variantName: string | null; variantSku: string; variantSellPrice: number | null; variantWeight: number | null }[]): CjDetails {
-  const list = (variants ?? []).map((v) => ({ name: (v.variantName ?? '').trim(), sku: v.variantSku, priceUsd: v.variantSellPrice, weight: v.variantWeight }));
+export function buildCjDetails(variants: CjVariant[]): CjDetails {
+  const list = (variants ?? []).map((v) => ({ vid: v.vid, name: (v.variantName ?? '').trim(), optionKey: (v.variantKey ?? '').trim(), sku: v.variantSku, priceUsd: v.variantSellPrice, weight: v.variantWeight }));
   const weights = list.map((v) => v.weight).filter((w): w is number => typeof w === 'number' && w > 0);
   return { variants: list, weightMin: weights.length ? Math.min(...weights) : null, weightMax: weights.length ? Math.max(...weights) : null, variantCount: list.length };
 }

@@ -8,6 +8,12 @@ describe('CJ parent-product trial cart',()=>{
     expect(addTrialCartItem([{id:4,qty:2}],{id:4,qty:3})).toEqual([{id:4,qty:5}]);
     expect(setTrialCartQuantity([{id:4,qty:5}],4,2)).toEqual([{id:4,qty:2}]);
   });
+  it('keeps different variants of one parent as separate cart lines',()=>{
+    const selected=[{id:4,qty:1,variantId:'vid-blue-s'},{id:4,qty:2,variantId:'vid-red-m'}];
+    expect(validateTrialCart(selected)).toEqual(selected);
+    expect(addTrialCartItem(selected,{id:4,qty:2,variantId:'vid-blue-s'})).toEqual([{id:4,qty:3,variantId:'vid-blue-s'},{id:4,qty:2,variantId:'vid-red-m'}]);
+    expect(setTrialCartQuantity(selected,4,5,'vid-red-m')).toEqual([{id:4,qty:1,variantId:'vid-blue-s'},{id:4,qty:5,variantId:'vid-red-m'}]);
+  });
   it.each([null,{},[{id:'4',qty:1}],[{id:4,qty:0}],[{id:4,qty:1.5}],[{id:4,qty:100}],[{id:0,qty:1}],[{id:Number.MAX_SAFE_INTEGER+1,qty:1}],[{id:4,qty:1,price:1}],[{id:4,qty:50},{id:4,qty:50}],Array.from({length:51},(_,id)=>({id:id+1,qty:1}))])('rejects malformed, excessive or caller-priced lines %#',value=>{
     expect(()=>validateTrialCart(value)).toThrow('invalid_cart');
   });
@@ -30,6 +36,8 @@ describe('CJ parent-product trial cart',()=>{
     expect(readTrialCart(storage,10)).toEqual({items:[],problem:null});
     expect(readTrialCart(storage,9)).toEqual({items:[{id:4,qty:2}],problem:null});
     writeTrialCart(storage,9,[]);expect(readTrialCart(storage,9).items).toEqual([]);
+    writeTrialCart(storage,9,[{id:4,qty:1,variantId:'blue-s'}]);
+    expect(readTrialCart(storage,9).items).toEqual([{id:4,qty:1,variantId:'blue-s'}]);
   });
   it('drops corrupt or forged stored prices and reports blocked storage',()=>{
     let value='[{"id":4,"qty":1,"unitMinor":1}]';

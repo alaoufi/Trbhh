@@ -5,12 +5,13 @@ const mock=vi.hoisted(()=>({access:vi.fn()}));
 vi.mock('@/lib/access-control/guards',()=>({requireAccess:mock.access}));
 import CartPage from '@/app/cj/cart/page';
 import {AddToTrialCart,CartLink} from '@/components/cj/cart-controls';
+import {TrialCart} from '@/components/cj/trial-cart';
 beforeEach(()=>{vi.clearAllMocks();mock.access.mockResolvedValue({uid:9});});
 
 describe('private CJ trial cart presentation',()=>{
   it('requires current products view before rendering, regardless of the public storefront flag',async()=>{
     const tree=await CartPage();expect(mock.access).toHaveBeenCalledExactlyOnceWith('products','view');expect(tree.props.accountId).toBe(9);
-    const html=renderToStaticMarkup(tree);expect(html).toContain('سلة التجربة');expect(html).toContain('الضريبة والشحن النهائي غير مؤكدين');
+    const html=renderToStaticMarkup(tree);expect(html).toContain('سلة التجربة');expect(html).toContain('السعر النهائي والضريبة وموعد الوصول غير مؤكدة');
     expect(html).toContain('role="status"');expect(html).toContain('aria-live="polite"');
     expect(html).not.toMatch(/name="(?:address|phone|payment|requestKey)"|action="|href="\/(?:shop|account\/orders)/);
   });
@@ -18,10 +19,18 @@ describe('private CJ trial cart presentation',()=>{
     mock.access.mockRejectedValue(Error('redirect:/login'));await expect(CartPage()).rejects.toThrow('redirect:/login');
   });
   it('renders an accessible parent-product quantity control without any purchase action',()=>{
-    const html=renderToStaticMarkup(createElement(AddToTrialCart,{productId:4,accountId:9}));
+    const html=renderToStaticMarkup(createElement(AddToTrialCart,{productId:4,accountId:9,variants:[]}));
     expect(html).toContain('type="number"');expect(html).toContain('min="1"');expect(html).toContain('max="99"');
-    expect(html).toContain('أضف لسلة التجربة');expect(html).toContain('disabled=""');expect(html).toContain('لا يمثل المخزون');
+    expect(html).toContain('أضف لسلة التجربة');expect(html).toContain('disabled=""');expect(html).toContain('لا يحجز المخزون');
     expect(html).not.toContain('<form');expect(html).not.toMatch(/href="\/(?:shop|account\/orders)/);
     expect(renderToStaticMarkup(createElement(CartLink,{accountId:9}))).toContain('href="/cj/cart"');
+  });
+  it('shows selectable variant information before the add action',()=>{
+    const html=renderToStaticMarkup(createElement(AddToTrialCart,{productId:4,accountId:9,variants:[{vid:'blue-s',name:'أزرق صغير',optionKey:'اللون: أزرق، المقاس: S',sku:'SKU-BS',stock:2}]}));
+    expect(html).toContain('اللون: أزرق، المقاس: S');expect(html).toContain('SKU-BS');expect(html).toContain('المتاح الموثق: 2');expect(html).toContain('اختر اللون أو المقاس');
+  });
+  it('renders payment as explicitly unavailable in the trial cart',()=>{
+    const html=renderToStaticMarkup(createElement(TrialCart,{accountId:9}));
+    expect(html).toContain('الدفع غير مفعّل');expect(html).toContain('disabled=""');
   });
 });

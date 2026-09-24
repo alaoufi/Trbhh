@@ -27,6 +27,11 @@ describe('CJ trial cart HTTP trust boundary',()=>{
     expect(mocks.session).toHaveBeenCalledOnce();expect(mocks.access).toHaveBeenCalledWith(9,'products','view');
     expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([{id:1,qty:2}]);
   });
+  it('accepts a selected CJ variant but forwards no client-supplied price',async()=>{
+    const selected={currency:'SAR',lines:[],totalMinor:0,rejected:[]};mocks.quote.mockResolvedValue(selected);
+    const response=await POST(request({items:[{id:4,qty:2,variantId:'blue-s'}]}));
+    expect(response.status).toBe(200);expect(mocks.quote).toHaveBeenCalledExactlyOnceWith([{id:4,qty:2,variantId:'blue-s'}]);
+  });
   it('requires authentication even when a cart contains valid product IDs',async()=>{
     mocks.session.mockResolvedValue(null);await denied(request(),401,'unauthorized');expect(mocks.access).not.toHaveBeenCalled();
   });

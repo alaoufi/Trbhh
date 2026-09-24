@@ -26,14 +26,14 @@ vi.mock('@/lib/cj/client',()=>({getCategories:async()=>({ok:true,data:[{id:'CAT-
 vi.mock('@/lib/cj/sample',()=>({sampleOneCjProduct:async()=>({ok:true,data:{name:state.sourceName,category:state.category,priceUsd:10,totalStock:7,images:[],variants:[{vid:'VID-1',sku:'SKU-BLUE',name:state.variantName,priceUsd:10,weight:100,stock:7}]}})}));
 vi.mock('@/lib/cj/mapping',()=>{
   const row=()=>({id:1,cj_product_id:'PID-1',cj_sku:'SKU-1',name:state.sourceName,name_ar:state.nameAr,trbhh_category:state.category,image:'',sale_price_minor:5525,sale_price_override_minor:null,supplier_cost_minor:3750,shipping_cost_minor:500,hidden:0,status:'draft',source_description:null,display_description_ar:null});
-  return {importedCjPids:async()=>new Set(),listCjProducts:async()=>[row()],listVisibleCjProducts:async()=>[row()],getCjProductById:async()=>row()};
+  return {importedCjPids:async()=>new Set(),listCjProducts:async()=>[row()],listVisibleCjProducts:async()=>[row()],getCjProductById:async()=>row(),parseCjAvailability:()=>null};
 });
 vi.mock('@/lib/cj/storefront',()=>({cjImg:(value:string)=>value,cjProductImages:()=>['https://example.test/saved-gallery.jpg'],cjStorefrontPublic:async()=>false}));
 vi.mock('@/lib/cj/translate',async(importOriginal)=>{
   const actual=await importOriginal<typeof import('@/lib/cj/translate')>();
   return {...actual,getCachedArabic:async(texts:string[])=>{state.read(texts);return actual.getCachedArabic(texts);},translateManyCached:state.translate,translateToArabic:state.translate};
 });
-vi.mock('@/app/admin/suppliers/cj/actions',()=>({importCjProduct:state.write,removeCjProduct:state.write,saveCjArabic:state.write,saveCjPrice:state.write,toggleCjHidden:state.write,translateCjProduct:state.write,translateCjBrowsePage:state.write,translateAllCj:state.write,translateCjCategories:state.write,runCjTranslateWarm:state.write,refreshCjMediaAction:state.write,setCjStorefront:state.write,approveCjProduct:state.write,saveCjReview:state.write}));
+vi.mock('@/app/admin/suppliers/cj/actions',()=>({importCjProduct:state.write,removeCjProduct:state.write,saveCjArabic:state.write,saveCjPrice:state.write,toggleCjHidden:state.write,translateCjProduct:state.write,translateCjBrowsePage:state.write,translateAllCj:state.write,translateCjCategories:state.write,runCjTranslateWarm:state.write,refreshCjMediaAction:state.write,refreshCjImportedAvailability:state.write,setCjStorefront:state.write,approveCjProduct:state.write,saveCjReview:state.write}));
 import Browse from '@/app/admin/suppliers/cj/browse/page';
 import Showcase from '@/app/admin/suppliers/cj/showcase/page';
 import Review from '@/app/admin/suppliers/cj/review/[id]/page';

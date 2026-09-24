@@ -39,7 +39,11 @@ result=$(timeout 75s docker compose exec -T app node - 2>/dev/null <<'FINANCE_CA
     const text = await response.text();
     let payload; try { payload = JSON.parse(text); } catch { payload = null; }
     if (response.status !== 200) {
-      const category = /^[a-z0-9_]{1,64}$/.test(payload?.category || '') ? '_' + payload.category : '';
+      const category = response.status === 503 && /^[a-z0-9_]{1,64}$/.test(payload?.category || '')
+        ? '_' + payload.category
+        : response.status === 503 && response.headers.get('content-type')?.toLowerCase().includes('application/json')
+          ? '_category_missing'
+          : response.status === 503 ? '_non_json' : '';
       report('http_' + response.status + category); return;
     }
     if (!Number.isSafeInteger(payload?.captured) || payload.captured < 0) { report('invalid_response'); return; }

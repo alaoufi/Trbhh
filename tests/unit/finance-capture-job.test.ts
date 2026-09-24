@@ -11,7 +11,7 @@ async function client(secret=credential,status=200,body:unknown={captured:3},fai
   const source=script().match(/<<'FINANCE_CAPTURE_NODE'\r?\n([\s\S]*?)\r?\nFINANCE_CAPTURE_NODE/)?.[1];
   expect(source,'container program must be supplied on stdin').toBeDefined();
   let output='';const process={env:{FINANCE_CAPTURE_SECRET:secret},exitCode:0,stdout:{write:(value:string)=>{output+=value;}}};
-  const fetch=vi.fn(async()=>{if(failure)throw Error(credential);return {status,text:async()=>JSON.stringify(body)};});
+  const fetch=vi.fn(async()=>{if(failure)throw Error(credential);return {status,headers:{get:(name:string)=>name==='content-type'?(typeof body==='string'?'text/html':'application/json'):null},text:async()=>typeof body==='string'?body:JSON.stringify(body)};});
   const timeout=vi.fn(()=>({timeout:true}));
   await runInNewContext(source!,{process,fetch,AbortSignal:{timeout}},{timeout:1000});
   return {output,process,fetch,timeout};
@@ -47,7 +47,8 @@ describe('operator finance capture job',()=>{
     const result=await client(secret);expect(result.fetch).not.toHaveBeenCalled();expect(result.process.exitCode).toBe(1);
     expect(result.output).toBe('finance_capture status=not_configured\n');
   });
-  it.each([401,503])('reports HTTP %i without exposing response contents',async status=>{
+  it('reports HTTP 401 without exposing response contents',async()=>{
+    const status=401;
     const result=await client(credential,status,{error:credential});expect(result.process.exitCode).toBe(1);
     expect(result.output).toBe(`finance_capture status=http_${status}\n`);expect(result.output).not.toContain(credential);
   });
@@ -56,6 +57,13 @@ describe('operator finance capture job',()=>{
     expect(result.process.exitCode).toBe(1);
     expect(result.output).toBe('finance_capture status=http_503_finance_period_closed\n');
     expect(result.output).not.toContain(credential);
+  });
+  it('distinguishes JSON errors without a category from non-JSON service failures',async()=>{
+    const json=await client(credential,503,{error:'finance_capture_unavailable'});
+    const html=await client(credential,503,'<html>private diagnostic body</html>');
+    expect(json.output).toBe('finance_capture status=http_503_category_missing\n');
+    expect(html.output).toBe('finance_capture status=http_503_non_json\n');
+    expect(json.output+html.output).not.toContain('private diagnostic body');
   });
   it.each([{captured:-1},{captured:1.5},{captured:credential},{captured:Number.MAX_SAFE_INTEGER+1},null])('rejects malformed counts',async body=>{
     const result=await client(credential,200,body);expect(result.process.exitCode).toBe(1);

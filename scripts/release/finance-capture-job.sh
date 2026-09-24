@@ -36,8 +36,12 @@ result=$(timeout 75s docker compose exec -T app node - 2>/dev/null <<'FINANCE_CA
       redirect: 'error',
       signal: AbortSignal.timeout(55000),
     });
-    if (response.status !== 200) { report('http_' + response.status); return; }
-    const payload = await response.json();
+    const text = await response.text();
+    let payload; try { payload = JSON.parse(text); } catch { payload = null; }
+    if (response.status !== 200) {
+      const category = /^[a-z0-9_]{1,64}$/.test(payload?.category || '') ? '_' + payload.category : '';
+      report('http_' + response.status + category); return;
+    }
     if (!Number.isSafeInteger(payload?.captured) || payload.captured < 0) { report('invalid_response'); return; }
     report('ok', payload.captured);
   } catch {
@@ -53,7 +57,7 @@ if [[ "$docker_status" -eq 0 && "$result" =~ ^finance_capture\ status=ok\ captur
   printf '%s\n' "$result"
   exit 0
 fi
-if [[ "$result" =~ ^finance_capture\ status=http_[1-5][0-9]{2}$ ]] ||
+if [[ "$result" =~ ^finance_capture\ status=http_[1-5][0-9]{2}(_[a-z0-9_]{1,64})?$ ]] ||
    [[ "$result" == 'finance_capture status=not_configured' || "$result" == 'finance_capture status=invalid_response' ]]; then
   printf '%s\n' "$result"
   exit 1

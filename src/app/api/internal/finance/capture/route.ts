@@ -3,6 +3,7 @@ import {isIP} from 'node:net';
 import {prisma} from '@/lib/prisma';
 import {captureInvoicesForWorker} from '@/lib/finance/service';
 import {withFinanceAuditContext} from '@/lib/finance/audit-context';
+import {financeCaptureErrorCategory} from '@/lib/finance/capture-error';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
@@ -18,6 +19,6 @@ export async function POST(request:Request){
     const code=error instanceof Error?error.message:'';
     if(code==='finance_capture_not_configured')return NextResponse.json({error:'not_configured'},{status:503,headers});
     if(code==='finance_capture_unauthorized')return NextResponse.json({error:'unauthorized'},{status:401,headers});
-    return NextResponse.json({error:'finance_capture_unavailable'},{status:503,headers});
+    return NextResponse.json({error:'finance_capture_unavailable',category:financeCaptureErrorCategory(error)},{status:503,headers});
   }
 }

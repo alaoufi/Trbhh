@@ -11,7 +11,7 @@ async function client(secret=credential,status=200,body:unknown={captured:3},fai
   const source=script().match(/<<'FINANCE_CAPTURE_NODE'\r?\n([\s\S]*?)\r?\nFINANCE_CAPTURE_NODE/)?.[1];
   expect(source,'container program must be supplied on stdin').toBeDefined();
   let output='';const process={env:{FINANCE_CAPTURE_SECRET:secret},exitCode:0,stdout:{write:(value:string)=>{output+=value;}}};
-  const fetch=vi.fn(async()=>{if(failure)throw Error(credential);return {status,json:async()=>body};});
+  const fetch=vi.fn(async()=>{if(failure)throw Error(credential);return {status,text:async()=>JSON.stringify(body)};});
   const timeout=vi.fn(()=>({timeout:true}));
   await runInNewContext(source!,{process,fetch,AbortSignal:{timeout}},{timeout:1000});
   return {output,process,fetch,timeout};
@@ -51,6 +51,12 @@ describe('operator finance capture job',()=>{
     const result=await client(credential,status,{error:credential});expect(result.process.exitCode).toBe(1);
     expect(result.output).toBe(`finance_capture status=http_${status}\n`);expect(result.output).not.toContain(credential);
   });
+  it('reports an approved failure category without exposing response contents',async()=>{
+    const result=await client(credential,503,{error:'finance_capture_unavailable',category:'finance_period_closed'});
+    expect(result.process.exitCode).toBe(1);
+    expect(result.output).toBe('finance_capture status=http_503_finance_period_closed\n');
+    expect(result.output).not.toContain(credential);
+  });
   it.each([{captured:-1},{captured:1.5},{captured:credential},{captured:Number.MAX_SAFE_INTEGER+1},null])('rejects malformed counts',async body=>{
     const result=await client(credential,200,body);expect(result.process.exitCode).toBe(1);
     expect(result.output).toBe('finance_capture status=invalid_response\n');
@@ -74,6 +80,10 @@ describe('operator finance capture job',()=>{
   it('preserves a recognized failure without printing diagnostics',()=>{
     const result=host('finance_capture status=http_503',1);expect(result.status).toBe(1);
     expect(result.stdout).toBe('finance_capture status=http_503\n');expect(result.stderr).toBe('');
+  });
+  it('preserves a classified failure without printing diagnostics',()=>{
+    const result=host('finance_capture status=http_503_finance_period_closed',1);expect(result.status).toBe(1);
+    expect(result.stdout).toBe('finance_capture status=http_503_finance_period_closed\n');expect(result.stderr).toBe('');
   });
   it('rejects command arguments instead of accepting alternate destinations or credentials',()=>{
     const result=host(credential,0,false,'unexpected');expect(result.status).toBe(1);

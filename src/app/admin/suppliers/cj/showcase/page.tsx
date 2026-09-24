@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import { AccessBoundary } from '@/components/access-boundary';
+import { CjProductImage } from '@/components/cj/product-image';
 import { requireAccess } from '@/lib/access-control/guards';
 import { listVisibleCjProducts } from '@/lib/cj/mapping';
-import { cjStorefrontPublic, cjImg } from '@/lib/cj/storefront';
+import { cjStorefrontPublic, cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { setCjStorefront } from '../actions';
+import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'معاينة سلع CJ المختارة', robots: { index: false, follow: false } };
@@ -12,13 +14,14 @@ const sar = (m: number) => `${(m / 100).toLocaleString('en', { minimumFractionDi
 
 /**
  * صفحة معاينة داخلية (غير معلنة، غير عامة) تعرض السلع المختارة فعلياً من CJ
- * ببياناتها الحقيقية (اسم عربي + صورة + سعر بالريال). محميّة بصلاحية التكاملات،
+ * ببياناتها الحقيقية (اسم عربي + صورة + سعر بالريال). محميّة بصلاحية عرض المنتجات،
  * ولا رابط لها من واجهة العضو. للتجربة الواقعية قبل النشر. لا شراء ولا دفع.
  */
 export default async function CjShowcasePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAccess('products', 'view');
   const sp = await searchParams;
   const [items, isPublic] = await Promise.all([listVisibleCjProducts(200), cjStorefrontPublic()]);
+  const translations = await getCachedArabic(items.map(r => r.name));
   const readyCount = items.filter((r) => r.status === 'ready').length;
 
   return (
@@ -62,17 +65,16 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
           <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {items.map((r) => {
               const priceMinor = r.sale_price_override_minor ?? r.sale_price_minor;
-              const title = r.name_ar || r.name || '—';
+              const saved = isArabicText(r.name_ar) ? r.name_ar : translations.get(r.name);
+              const title = isArabicText(saved) ? saved! : 'الترجمة العربية غير متاحة';
               return (
                 <div key={r.id} className="card-3d flex flex-col overflow-hidden rounded-xl">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {r.image
-                    ? <img src={cjImg(r.image)} alt="" className="aspect-square w-full object-cover" loading="lazy" />
-                    : <div className="grid aspect-square w-full place-items-center bg-primary/5 text-xs text-muted-foreground">لا صورة</div>}
+                  <CjProductImage src={cjImg(cjProductImages(r)[0])} alt={title} className="aspect-square w-full object-cover" />
                   <div className="flex flex-1 flex-col gap-1 p-3">
                     <div className="line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-5">{title}</div>
+                    <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">النص الأصلي من المصدر</summary><p dir="auto">{r.name}</p></details>
                     <div className="mt-auto text-base font-extrabold text-primary">{sar(priceMinor)}</div>
-                    {!r.name_ar && <span className="w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">بلا عنوان عربي</span>}
+                    {!isArabicText(saved) && <span className="w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">بلا عنوان عربي</span>}
                   </div>
                 </div>
               );

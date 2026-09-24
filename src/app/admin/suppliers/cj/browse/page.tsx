@@ -1,4 +1,5 @@
 import { AccessBoundary } from '@/components/access-boundary';
+import { CjProductImage } from '@/components/cj/product-image';
 import Link from 'next/link';
 import { requireAccess } from '@/lib/access-control/guards';
 import { cjConfig } from '@/lib/cj/config';
@@ -7,8 +8,8 @@ import { sampleOneCjProduct } from '@/lib/cj/sample';
 import { importedCjPids, listCjProducts } from '@/lib/cj/mapping';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
-import { getCachedArabic, translateManyCached } from '@/lib/cj/translate';
-import { cjImg } from '@/lib/cj/storefront';
+import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
+import { cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateAllCj, translateCjCategories, runCjTranslateWarm, refreshCjMediaAction } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -35,33 +36,43 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
     return <div className="space-y-3"><h1 className="text-xl font-extrabold text-primary">تصفّح منتجات CJ</h1><p className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm">اضبط متغيّرات CJ (البريد والمفتاح) في بيئة الخادم أولاً.</p></div>;
   }
 
-  const wantAr = sp.ar !== '0'; // الترجمة تلقائية افتراضياً (أوقفها بـ ar=0)
   const [settings, marginBps, catsRes] = await Promise.all([cjSyncSettings(), defaultMarginBps(), getCategories()]);
   const categories = catsRes.ok ? catsRes.data : [];
   const listing = await listProductsPage(page, PAGE_SIZE, { productName: q || undefined, categoryId: cat || undefined });
   const items = listing.ok ? listing.data.items : [];
-  // ترجمة العناوين والتصنيفات للعربية تلقائياً قبل الاستيراد (تُخزَّن فتُصبح فورية لاحقاً؛
-  // التصنيفات تُترجَم تدريجياً ٣٠ لكل تحميل حتى تكتمل الشجرة).
+  // صلاحية العرض تقرأ الترجمات المحفوظة فقط؛ الترجمة والكتابة إجراءات تحرير صريحة.
+  const importedList = await listCjProducts(60);
   const titleTexts = items.map((p) => p.productName);
   const cardCats = items.map((p) => p.categoryName ?? '').filter(Boolean);
-  const catNames = categories.map((c) => c.name);
+  const catNames = categories.flatMap(c => [c.name, c.path, ...c.path.split(/\s*[›>]\s*/)]);
   const [gridAr, catAr] = await Promise.all([
-    wantAr ? translateManyCached([...titleTexts, ...cardCats], 50) : getCachedArabic([...titleTexts, ...cardCats]),
-    wantAr ? translateManyCached(catNames, 30) : getCachedArabic(catNames),
+    getCachedArabic([...titleTexts, ...cardCats, ...importedList.flatMap(r => [r.name, r.trbhh_category])]),
+    getCachedArabic(catNames),
   ]);
-  const arText = (t: string | null | undefined) => (t ? gridAr.get(t) ?? catAr.get(t) ?? t : '—');
+  const arText = (t: string | null | undefined) => {
+    if (!t) return '—';
+    if (isArabicText(t)) return t;
+    const saved = gridAr.get(t) ?? catAr.get(t);
+    return isArabicText(saved) ? saved! : 'الترجمة العربية غير متاحة';
+  };
+  const categoryLabels = new Map(categories.map((c, index) => {
+    const translatedPath = isArabicText(c.path) ? c.path : catAr.get(c.path);
+    const pathParts = c.path.split(/\s*[›>]\s*/).map(part => isArabicText(part) ? part : catAr.get(part));
+    const translatedName = isArabicText(c.name) ? c.name : catAr.get(c.name);
+    const label = isArabicText(translatedPath) ? translatedPath! : pathParts.length > 1 && pathParts.every(isArabicText) ? pathParts.join(' › ') : isArabicText(translatedName) ? translatedName! : `تصنيف بانتظار الترجمة (${index + 1})`;
+    return [c.id, label];
+  }));
   const total = listing.ok ? listing.data.total : 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const imported = items.length ? await importedCjPids(items.map((p) => p.pid)) : new Set<string>();
   const detail = detailPid ? await sampleOneCjProduct(detailPid) : null;
-  // ترجمة حقول لوحة التفاصيل (اسم/تصنيف/أسماء المتغيّرات) — عند الطلب ومخزَّنة.
+  // تفاصيل المصدر قد تُقرأ من CJ؛ لا اتصال بمزوّد ترجمة ولا كتابة أثناء GET.
   const detailAr = detail && detail.ok
-    ? await translateManyCached([detail.data.name, detail.data.category ?? '', ...detail.data.variants.map((v) => v.name ?? '')], 20)
+    ? await getCachedArabic([detail.data.name, detail.data.category ?? '', ...detail.data.variants.map((v) => v.name ?? '')])
     : new Map<string, string>();
-  const arOf = (t: string | null | undefined) => (t ? detailAr.get(t) ?? t : '—');
-  const importedList = await listCjProducts(60);
+  const arOf = (t: string | null | undefined) => t && isArabicText(detailAr.get(t)) ? detailAr.get(t)! : arText(t);
   const salePreview = (u: number | null) => (u != null && u > 0 ? computePrice(Math.round(u * settings.usdToSarX100), settings.shippingMinor, 0, marginBps).salePriceMinor : null);
-  const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}${wantAr ? '' : '&ar=0'}`;
+  const keep = `${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`;
   const pageHref = (n: number) => `/admin/suppliers/cj/browse?page=${Math.min(Math.max(1, n), totalPages)}${keep}`;
   const backHref = `/admin/suppliers/cj/browse?page=${page}${keep}`;
   const activeCat = categories.find((c) => c.id === cat);
@@ -79,28 +90,25 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
 
       {/* تنبيهات */}
       {typeof sp.imported === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم استيراد المنتج {sp.imported} إلى التخزين الوسيط ✓ (لم يُعرض للعامة).</p>}
-      {typeof sp.imperr === 'string' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الاستيراد: {sp.imperr}</p>}
+      {typeof sp.imperr === 'string' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر استيراد المنتج. أعد المحاولة من إجراء الاستيراد.</p>}
       {sp.removed === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم حذف المنتج من التخزين الوسيط.</p>}
-      {!listing.ok && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر جلب المنتجات من CJ: {listing.error}{listing.status ? ` (HTTP ${listing.status})` : ''}</p>}
+      {!listing.ok && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر جلب المنتجات من CJ الآن. أعد المحاولة لاحقًا.</p>}
 
       {/* بحث + فلترة بالتصنيف (بالعربية عند توفّر الترجمة) */}
       <form method="get" className="flex flex-wrap items-end gap-2">
-        {!wantAr && <input type="hidden" name="ar" value="0" />}
-        <label className="text-sm">بحث بالاسم<input className={`${input} ms-2 w-56`} name="q" defaultValue={q} placeholder="مثال: jacket, shorts…" /></label>
+        <label className="text-sm">بحث بالاسم<input className={`${input} ms-2 w-56`} name="q" defaultValue={q} placeholder="اسم المنتج كما يظهر في المصدر" /></label>
         <label className="text-sm">التصنيف
           <select name="cat" defaultValue={cat} className={`${input} ms-2 w-72`}>
             <option value="">كل التصنيفات{total ? ` (${total.toLocaleString('en')})` : ''}</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{catAr.get(c.name) ?? c.path}</option>)}
+            {categories.map((c) => <option key={c.id} value={c.id}>{categoryLabels.get(c.id)}</option>)}
           </select>
         </label>
         <button className={btn}>عرض</button>
         {(q || cat) && <Link href="/admin/suppliers/cj/browse" className={ghost}>مسح الفلاتر</Link>}
       </form>
+      {categories.length > 0 && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer font-bold">أسماء التصنيفات الأصلية من المصدر</summary><ul className="mt-2 space-y-1">{categories.map((c, index) => <li key={c.id}>التصنيف {index + 1}: <span dir="auto">{c.path}</span> — <code>{c.id}</code></li>)}</ul></details>}
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-xs text-muted-foreground">الترجمة العربية تلقائية{wantAr ? ' (مفعّلة)' : ' (موقّفة)'}.</span>
-        {wantAr
-          ? <Link href={`/admin/suppliers/cj/browse?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}&ar=0`} className={ghost}>عرض بالإنجليزية</Link>
-          : <Link href={`/admin/suppliers/cj/browse?page=${page}${q ? `&q=${encodeURIComponent(q)}` : ''}${cat ? `&cat=${encodeURIComponent(cat)}` : ''}`} className={btn}>عرض بالعربية</Link>}
+        <span className="text-xs text-muted-foreground">تُعرض الترجمات العربية المحفوظة. الترجمة الجديدة تتطلب إجراءً صريحًا بصلاحية التحرير.</span>
         <AccessBoundary module="products" action="edit"><form action={translateCjCategories}><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة كل التصنيفات الآن</button></form></AccessBoundary>
         <AccessBoundary module="products" action="edit"><form action={runCjTranslateWarm}><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الترجمات (خادم)</button></form></AccessBoundary>
         <AccessBoundary module="products" action="edit"><form action={refreshCjMediaAction}><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الصور</button></form></AccessBoundary>
@@ -113,7 +121,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       {/* ملخّص النتائج */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="text-muted-foreground">
-          {listing.ok ? <>إجمالي المنتجات{activeCat ? ` في «${activeCat.name}»` : ''}{q ? ` للبحث «${q}»` : ''}: <b className="text-primary">{total.toLocaleString('en')}</b> · صفحة {page.toLocaleString('en')} من {totalPages.toLocaleString('en')}</> : '—'}
+          {listing.ok ? <>إجمالي المنتجات{activeCat ? ` في «${categoryLabels.get(activeCat.id)}»` : ''}{q ? ` للبحث «${q}»` : ''}: <b className="text-primary">{total.toLocaleString('en')}</b> · صفحة {page.toLocaleString('en')} من {totalPages.toLocaleString('en')}</> : '—'}
         </span>
       </div>
 
@@ -121,11 +129,9 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((p) => (
           <div key={p.pid} className={card}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {p.productImage ? <img src={p.productImage} alt="" className="h-36 w-full rounded-lg object-cover" loading="lazy" /> : <div className="flex h-36 w-full items-center justify-center rounded-lg bg-primary/5 text-xs text-muted-foreground">لا صورة</div>}
-            {gridAr.get(p.productName)
-              ? <><div className="text-sm font-bold leading-5 line-clamp-2">{gridAr.get(p.productName)}</div><div className="line-clamp-1 text-[11px] text-muted-foreground" dir="ltr">{p.productName}</div></>
-              : <div className="text-sm font-bold leading-5 line-clamp-2" dir="ltr">{p.productName || '—'}</div>}
+            <CjProductImage src={cjImg(p.productImage)} alt={arText(p.productName)} className="h-36 w-full rounded-lg object-cover" />
+            <div className="text-sm font-bold leading-5 line-clamp-2">{arText(p.productName)}</div>
+            <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">النص الأصلي من المصدر</summary><p dir="auto">{p.productName}</p>{p.categoryName && <p dir="auto">{p.categoryName}</p>}</details>
             <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
               <span>PID: <span dir="ltr">{p.pid}</span></span>
               <span>SKU: <span dir="ltr">{p.productSku || '—'}</span></span>
@@ -166,9 +172,9 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
           {detail && detail.ok ? (
             <div className="space-y-3 text-sm">
               <div className="font-bold leading-6">{arOf(detail.data.name)}</div>
+              <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">النصوص الأصلية من المصدر</summary><p dir="auto">{detail.data.name}</p><p dir="auto">{detail.data.category}</p><ul>{detail.data.variants.map(v => <li key={v.vid}><code>{v.sku}</code> — <span dir="auto">{v.name}</span></li>)}</ul></details>
               <div className="flex flex-wrap gap-1">{detail.data.images.slice(0, 6).map((src, i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={src} alt="" className="h-16 w-16 rounded object-cover" loading="lazy" />
+                <CjProductImage key={i} src={cjImg(src)} alt={arOf(detail.data.name)} className="h-16 w-16 rounded object-cover" />
               ))}</div>
               {/* أهم الحقائق بوضوح */}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -185,7 +191,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                 </tbody></table></div>
               )}
             </div>
-          ) : <p className="text-sm text-red-700">تعذّر جلب التفاصيل{detail && !detail.ok ? `: ${detail.error}` : ''}.</p>}
+          ) : <p className="text-sm text-red-700">تعذّر جلب تفاصيل المنتج الآن. أعد المحاولة لاحقًا.</p>}
         </div>
       )}
 
@@ -207,15 +213,14 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
               return (
                 <div key={r.id} className={`rounded-xl border p-3 space-y-2 ${r.hidden ? 'border-slate-300 bg-slate-50 opacity-80' : 'border-primary/20'}`}>
                   <div className="flex gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {r.image ? <img src={cjImg(r.image)} alt="" className="h-20 w-20 shrink-0 rounded-lg object-cover" loading="lazy" /> : <div className="grid h-20 w-20 shrink-0 place-items-center rounded-lg bg-primary/5 text-[10px] text-muted-foreground">لا صورة</div>}
+                    <CjProductImage src={cjImg(cjProductImages(r)[0])} alt={isArabicText(r.name_ar) ? r.name_ar : arText(r.name)} className="h-20 w-20 shrink-0 rounded-lg object-cover" />
                     <div className="min-w-0 flex-1 space-y-0.5">
-                      <div className="truncate text-sm font-bold">{r.name_ar || <span className="text-amber-700">— بلا عنوان عربي —</span>}</div>
-                      <div className="truncate text-xs text-muted-foreground" dir="ltr">{r.name}</div>
+                      <div className="truncate text-sm font-bold">{isArabicText(r.name_ar) ? r.name_ar : arText(r.name)}</div>
+                      <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">النص الأصلي من المصدر</summary><p dir="auto">{r.name}</p><p dir="auto">{r.trbhh_category}</p></details>
                       <div className="text-[11px] text-muted-foreground"><span dir="ltr">PID {r.cj_product_id}</span> · التكلفة {sar(r.supplier_cost_minor + r.shipping_cost_minor)}</div>
                       <div className="text-sm font-extrabold text-primary">السعر: {sar(finalMinor)}{r.sale_price_override_minor != null && <span className="ms-1 text-[10px] font-normal text-amber-700">(معدّل يدوياً)</span>}</div>
                       <div className="flex flex-wrap items-center gap-1 text-[10px]">
-                        {r.trbhh_category && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-bold text-primary">{r.trbhh_category}</span>}
+                        {r.trbhh_category && <span className="rounded bg-primary/10 px-1.5 py-0.5 font-bold text-primary">{arText(r.trbhh_category)}</span>}
                         <span className={`rounded px-1.5 py-0.5 font-bold ${r.status === 'ready' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{r.status === 'ready' ? 'جاهزة' : 'مسودّة'}</span>
                         {r.hidden === 1 && <span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">مخفية</span>}
                       </div>

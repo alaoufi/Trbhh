@@ -40,8 +40,8 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* بيانات المصدر (CJ) — للقراءة */}
-        <div className={card}>
-          <h2 className="font-bold">بيانات المصدر (CJ) — للقراءة فقط</h2>
+        <details className={card}>
+          <summary className="cursor-pointer font-bold">بيانات المصدر الأصلية (CJ) — للقراءة فقط</summary>
           <div className="flex flex-wrap gap-1">
             {(detail && detail.ok ? detail.data.images : [row.image].filter(Boolean)).slice(0, 8).map((src, i) => (
               // eslint-disable-next-line @next/next/no-img-element
@@ -62,7 +62,7 @@ export default async function CjReviewPage({ params, searchParams }: { params: P
             </tbody></table></div>
           )}
           <div className="text-xs text-muted-foreground">التكلفة (سلعة+شحن): {sar(row.supplier_cost_minor + row.shipping_cost_minor)} · السعر المحسوب: {sar(row.sale_price_minor)}</div>
-        </div>
+        </details>
 
         {/* بيانات تربح (عربية) — قابلة للتحرير */}
         <AccessBoundary module="products" action="edit"><form action={saveCjReview} className={card}>

@@ -50,7 +50,9 @@ export async function GET(request: Request) {
   if (!res) return failure('not_found',404);
   const reject=async(message:string,status:number)=>{await res.body?.cancel().catch(()=>{});return failure(message,status);};
   if(!res.ok||res.redirected)return reject('not_found',404);
-  const ct=(res.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
+  const upstreamType=(res.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
+  // CJ's quick/product CDN labels JPEG bytes image/jpg; retain the JPEG signature check.
+  const ct=upstreamType==='image/jpg'?'image/jpeg':upstreamType;
   if(!RASTER_TYPES.has(ct))return reject('not_image',415);
   if(Number(res.headers.get('content-length'))>MAX_BYTES)return reject('too_large',413);
   if(!res.body)return failure('not_image',415);

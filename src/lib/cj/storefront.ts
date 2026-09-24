@@ -3,13 +3,28 @@ import { getSetting, setSetting } from '@/lib/settings';
 import { getSession } from '@/lib/auth';
 import { hasAccess } from '@/lib/access-control/guards';
 import type { AdCard } from '@/lib/data';
-import type { CjProductRow } from '@/lib/cj/mapping';
+import { parseCjImages, type CjProductRow } from '@/lib/cj/mapping';
 
 /** يمرّر رابط صورة CJ عبر وسيط الخادم (بلا تخزين) لتفادي منع التحميل. غير CJ يبقى كما هو. */
 export function cjImg(url: string | null | undefined): string {
   const u = (url ?? '').trim();
   if (!u) return '';
   return /^https:\/\/[^/]*(cjdropshipping\.(com|cn)|aliyuncs\.com)\//i.test(u) ? `/api/cj/img?u=${encodeURIComponent(u)}` : u;
+}
+
+/** Saved primary first, followed only by this product's gallery; no network or fallback products. */
+export function cjProductImages(row: Pick<CjProductRow, 'image' | 'images'>): string[] {
+  const images = new Set<string>();
+  for (const value of [row.image, ...parseCjImages(row)]) {
+    const image = typeof value === 'string' ? value.trim() : '';
+    if (!image) continue;
+    try {
+      const url = new URL(image);
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) continue;
+      images.add(image);
+    } catch { /* Ignore malformed saved image URLs. */ }
+  }
+  return [...images];
 }
 
 /** يحوّل السلعة المستوردة إلى بطاقة إعلان (نفس التصميم) — المورد وبيانات البائع مخفية. */
@@ -20,7 +35,7 @@ export function importedToAdCard(r: CjProductRow): AdCard {
     title: r.name_ar || r.name || 'سلعة',
     price: Math.round((r.sale_price_override_minor ?? r.sale_price_minor) / 100),
     adsType: 'sale',
-    image: cjImg(r.image),
+    image: cjImg(cjProductImages(r)[0]),
     cityName: null,
     categoryName: r.trbhh_category || null,
     createdAt: null,

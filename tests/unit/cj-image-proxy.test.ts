@@ -22,6 +22,18 @@ describe('CJ raster image proxy security',()=>{
     expect(fetchImage).toHaveBeenCalledTimes(1);
     expect(fetchImage.mock.calls[0][1]).toMatchObject({redirect:'error',cache:'no-store'});
   });
+  it.each(['image/jpg','IMAGE/JPG; charset=binary'])('normalizes CJ JPEG alias %s after verifying the bytes',async type=>{
+    fetchImage.mockResolvedValue(upstream(jpeg,type));
+    const response=await GET(request('https://cf.cjdropshipping.com/quick/product/fixture.jpg'));
+    expect(response.status).toBe(200);expect(new Uint8Array(await response.arrayBuffer())).toEqual(jpeg);
+    expect(response.headers.get('Content-Type')).toBe('image/jpeg');protectedResponse(response);
+    expect(fetchImage.mock.calls[0][1]).toMatchObject({redirect:'error',cache:'no-store'});
+  });
+  it.each(['<svg xmlns="http://www.w3.org/2000/svg"/>','<!doctype html><script>alert(1)</script>'])('rejects active content disguised as image/jpg: %s',async body=>{
+    fetchImage.mockResolvedValue(upstream(body,'image/jpg'));
+    const response=await GET(request());expect(response.status).toBe(415);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');protectedResponse(response);
+  });
   it.each([
     'https://attacker-bucket.oss-us-west-1.aliyuncs.com/active.svg',
     'https://aliyuncs.com/image.jpg','https://unreviewed.cjdropshipping.com/image.jpg',

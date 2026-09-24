@@ -147,12 +147,12 @@ export async function listVisibleCjProducts(limit = 120): Promise<CjProductRow[]
 
 /** سلع متجر CJ:
  *  - العرض العام (readyOnly=true): غير مخفية وحالتها «جاهزة».
- *  - معاينة المشرف (readyOnly=false): كل غير المخفية. */
+ *  - معاينة المشرف (readyOnly=false): المسودة والجاهزة غير المخفية فقط. */
 export async function listStorefrontCjProducts(readyOnly: boolean, limit = 120): Promise<CjProductRow[]> {
   const take = Math.min(Math.max(1, limit), 500);
   return readyOnly
     ? prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE hidden=0 AND status='ready' ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[])
-    : prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE hidden=0 ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
+    : prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE hidden=0 AND status IN ('draft','ready') ORDER BY id DESC LIMIT ${take}`.catch(() => [] as CjProductRow[]);
 }
 
 /** سلعة متجر واحدة بمعرّفها ضمن قيود الرؤية (readyOnly للعامة). */
@@ -160,7 +160,7 @@ export async function getStorefrontCjProduct(id: number, readyOnly: boolean): Pr
   if (!Number.isInteger(id) || id <= 0) return null;
   const rows = readyOnly
     ? await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE id=${BigInt(id)} AND hidden=0 AND status='ready' LIMIT 1`.catch(() => [] as CjProductRow[])
-    : await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE id=${BigInt(id)} AND hidden=0 LIMIT 1`.catch(() => [] as CjProductRow[]);
+    : await prisma.$queryRaw<CjProductRow[]>`SELECT * FROM cj_products WHERE id=${BigInt(id)} AND hidden=0 AND status IN ('draft','ready') LIMIT 1`.catch(() => [] as CjProductRow[]);
   return rows[0] ?? null;
 }
 

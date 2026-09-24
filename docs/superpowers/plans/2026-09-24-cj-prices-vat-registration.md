@@ -19,17 +19,23 @@
 
 ## Implementation checkpoints
 
-- [ ] Display: separate price color/weight/size, reused across CJ cards/details and shared store cards; no global theme rewrite.
-- [ ] Catalog: الكل / السلع المستوردة / اعلانات الاعضاء / اعلانات موثقة / اعلانات تربح. Reuse authoritative source/verification/official classifications, deterministic pagination and source-qualified keys. Do not mislabel promotion as verification or infer ownership solely from an uploader's admin role.
-- [ ] VAT: extend existing approved policy and admin forms with explicit enable state, configured rate and registration/effective-date checks; server authorization, audit before/after/reason/session; preserve historical documents and revalidate new payment attempts against their captured policy.
-- [ ] Registration monitor: trailing twelve calendar months, integer amounts, credits/returns and deduplication; expose coverage/source gaps rather than present an incomplete aggregate as complete. Show total, percentage, remaining amount, as-of time and 70/85/95/100 percent alerts. Forecast from an explicitly stated recent sales rate without enabling VAT.
-- [ ] Admin wiring and guidance: show monitor/control in the existing tax workspace with read/manage permissions; update relevant guide content without exposing private preview to ordinary members.
+- [x] Display: separate price color/weight/size, reused across CJ cards/details and shared store cards; no global theme rewrite.
+- [x] Catalog: الكل / السلع المستوردة / اعلانات الاعضاء / اعلانات موثقة / اعلانات تربح. Reuse authoritative source/verification/official classifications, deterministic pagination and source-qualified keys. Do not mislabel promotion as verification or infer ownership solely from an uploader's admin role.
+- [x] VAT: extend existing approved policy and admin forms with explicit enable state, configured rate and registration/effective-date checks; server authorization, audit before/after/reason/session; preserve historical documents and revalidate new payment attempts against their captured policy.
+- [x] Registration monitor: trailing twelve calendar months, integer amounts, credits/returns and deduplication; expose coverage/source gaps rather than present an incomplete aggregate as complete. Show total, percentage, remaining amount, as-of time and 70/85/95/100 percent alerts. Forecast from an explicitly stated recent sales rate without enabling VAT.
+- [x] Admin wiring and guidance: show monitor/control in the existing tax workspace with read/manage permissions; update relevant guide content without exposing private preview to ordinary members.
 
 ## Validation and delivery
 
-- [ ] Write and observe failing behavior tests for calculation/filtering/security changes, then implement and run focused suites.
-- [ ] Independent review of VAT historical compatibility, source coverage, roll-window boundaries, forecast limits and visibility/authorization.
-- [ ] Commit and push stable stages to the feature branch; never force push or leave finished chunks uncommitted.
+- [x] Write and observe failing behavior tests for calculation/filtering/security changes, then implement and run focused suites.
+- [x] Independent review of VAT historical compatibility, source coverage, roll-window boundaries, forecast limits and visibility/authorization.
+- [x] Commit and push stable stages to the feature branch; never force push or leave finished chunks uncommitted.
 - [ ] Run all unit/integration suites, TypeScript, lint and production build. Use isolated CI MySQL and baseline preservation checks; do not claim a DB-less local build passed.
 - [ ] Only after exact-SHA gates pass, deliver through the established protected release path with backup/restore/capacity and rollback proof. No public catalog activation.
 - [ ] Verify actual serving SHA, authenticated mobile/desktop catalog and admin controls, unauthorized access denial, VAT still OFF and purchase gates unchanged. Report any outstanding source coverage or external dependency honestly.
+
+## Reviewed implementation detail
+
+Same-day setting revisions retain immutable policy/request IDs and every historical row. Only the two legacy unique date/reference indexes become ordinary lookup indexes through one metadata-verified atomic ALTER; request uniqueness remains. Baseline MySQL upgrade and release row-preservation proofs must pass before delivery.
+
+Visual review used synthetic loopback fixtures: desktop finance monitor, 390px CJ tabs/member/approved cards and approved detail, with green bold prices and no horizontal overflow. Private CJ direct detail/related/cart readers now share the draft/ready status allowlist to prevent quarantined sources bypassing tabs.

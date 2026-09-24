@@ -175,6 +175,6 @@ test('orchestration keeps backup, immutable revision and private proofs before f
   const y=fs.readFileSync(workflow,'utf8');assert.match(y,/actions: read/);assert.match(y,/head_sha=\$GITHUB_SHA/);
   assert.match(y,/ci\.yml release-upgrade-check\.yml/);assert.match(y,/SECONDS \+ 2700/);assert.match(y,/sleep 30/);
   assert.match(y,/StrictHostKeyChecking=yes/);assert.doesNotMatch(y,/StrictHostKeyChecking=no/);
-  assert(y.indexOf('https://trbhh.sa/api/version')>y.indexOf('finance-deploy.sh\' deploy'));
-  assert(y.indexOf('https://trbhh.sa/api/version')<y.indexOf('finance-deploy.sh\' finalize'));
+  assert(y.indexOf('node scripts/release/finance-public-verify.cjs')>y.indexOf('finance-deploy.sh\' deploy'));
+  assert(y.indexOf('node scripts/release/finance-public-verify.cjs')<y.indexOf('finance-deploy.sh\' finalize'));
 });

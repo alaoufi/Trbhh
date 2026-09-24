@@ -12,7 +12,11 @@ export function cjDescriptionText(raw: string): string {
     .replace(/<\s*br\s*\/?>/gi, '\n').replace(/<\s*li\b[^>]*>/gi, '\n• ')
     .replace(/<\s*\/\s*(p|div|li|h[1-6]|tr|ul|ol)\s*>/gi, '\n')
     .replace(/<!--[\s\S]*?(?:-->|$)/g, '')
-    .replace(/<\s*\/?\s*[a-z][^>]*(?:>|$)/gi, ' ')
+    .replace(/[<＜](?:[/／]\s*)?\p{L}[^<＜>＞]*(?:[>＞]|$)/gu, (fragment: string, offset: number, source: string) => {
+      // Keep a bare comparison such as x<y; translated/unfinished tags are display noise.
+      if (/^[<＜]\p{L}[\p{L}\p{N}]*$/u.test(fragment) && offset > 0 && /[\p{L}\p{N}]/u.test(source[offset - 1])) return fragment;
+      return ' ';
+    })
     .replace(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?/gi, '')
     .replace(/[ \t\u00a0]{2,}/g, ' ').replace(/ *\n */g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }

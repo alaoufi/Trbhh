@@ -94,8 +94,9 @@ test('container revision check consumes stdin and rejects a wrong runtime revisi
 test('rollback pins original runtime secrets and mounts, rejecting unapplied host configuration drift',()=>{
   const match=read().match(/# BASELINE_CONFIG_BEGIN\nnode - "\$backup" <<'NODE'\n([\s\S]*?)\nNODE\n# BASELINE_CONFIG_END/);assert(match);
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'finance-deploy-baseline-'));
-  const container={Config:{Env:['AUTH_SECRET=old$private${VALUE}','CJ_API_KEY=cj$private','NODE_ENV=production']},Mounts:[{Type:'volume',Name:'trbhh_storage',Destination:'/app/storage',RW:true},{Type:'bind',Source:'/old/media',Destination:'/app/legacy',RW:false}]};
-  const config={name:'trbhh',services:{app:{build:{context:'/root/trbhh'},image:'mutable-old-tag',environment:{AUTH_SECRET:'old$private${VALUE}',CJ_API_KEY:'cj$private'},volumes:[{type:'volume',source:'storage',target:'/app/storage'},{type:'bind',source:'/old/media',target:'/app/legacy',read_only:true}]}},volumes:{storage:{name:'trbhh_storage'}}};
+  const container={Config:{Env:['AUTH_SECRET=old$private${VALUE}','CJ_API_KEY=cj$private','ALRAJHI_TRANPORTAL_PASSWORD=$literal$$pair${NAME}','NODE_ENV=production']},Mounts:[{Type:'volume',Name:'trbhh_storage',Destination:'/app/storage',RW:true},{Type:'bind',Source:'/old/media',Destination:'/app/legacy',RW:false}]};
+  // Compose config renders literal dollars doubled in JSON as well as YAML.
+  const config={name:'trbhh',services:{app:{build:{context:'/root/trbhh'},image:'mutable-old-tag',environment:{AUTH_SECRET:'old$$private$${VALUE}',CJ_API_KEY:'cj$$private',ALRAJHI_TRANPORTAL_PASSWORD:'$$literal$$$$pair$${NAME}'},healthcheck:{test:['CMD-SHELL','test -n "$$TOKEN"']},volumes:[{type:'volume',source:'storage',target:'/app/storage'},{type:'bind',source:'/old/media',target:'/app/legacy',read_only:true}]}},volumes:{storage:{name:'trbhh_storage'}}};
   const image='sha256:'+'c'.repeat(64);
   try{
     fs.writeFileSync(path.join(dir,'container-before.json'),JSON.stringify([container]));fs.writeFileSync(path.join(dir,'image-id.txt'),image+'\n');
@@ -103,9 +104,17 @@ test('rollback pins original runtime secrets and mounts, rejecting unapplied hos
     let result=run();assert.equal(result.status,0,result.stderr);assert.equal(result.stdout,'');
     const saved=JSON.parse(fs.readFileSync(path.join(dir,'rollback-compose.json')));
     assert.equal(saved.services.app.environment.AUTH_SECRET,'old$$private$${VALUE}');assert.equal(saved.services.app.environment.CJ_API_KEY,'cj$$private');
+    assert.equal(saved.services.app.environment.ALRAJHI_TRANPORTAL_PASSWORD,'$$literal$$$$pair$${NAME}');
+    assert.deepEqual(saved.services.app.healthcheck,config.services.app.healthcheck,'already-rendered commands must not be escaped twice');
     assert.equal(saved.services.app.environment.NODE_ENV,'production');assert.equal(saved.services.app.image,image);assert.equal(saved.services.app.build,undefined);
     config.services.app.environment.AUTH_SECRET='unapplied-new-secret';assert.notEqual(run().status,0);
-    config.services.app.environment.AUTH_SECRET='old$private${VALUE}';config.services.app.volumes[1].source='/different/media';assert.notEqual(run().status,0);
+    config.services.app.environment.AUTH_SECRET='old$$private$${VALUE}';
+    for(const changed of ['',null,'$literal$$pair${NAME}','$$literal$$pair$${NAME}','different-nonempty']){
+      config.services.app.environment.ALRAJHI_TRANPORTAL_PASSWORD=changed;assert.notEqual(run().status,0);
+    }
+    config.services.app.environment.ALRAJHI_TRANPORTAL_PASSWORD='$$literal$$$$pair$${NAME}';
+    config.services.app.environment.UNKNOWN_SECRET='';assert.notEqual(run().status,0);delete config.services.app.environment.UNKNOWN_SECRET;
+    config.services.app.volumes[1].source='/different/media';assert.notEqual(run().status,0);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 test('capture unit recovery tolerates either partial installation and repeat rollback, but rejects foreign changes',()=>{

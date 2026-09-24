@@ -84,15 +84,18 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const before=JSON.parse(fs.readFileSync(path.join(dir,'container-before.json')))[0],config=JSON.parse(fs.readFileSync(path.join(dir,'baseline-compose.json')));
 const env=Object.fromEntries(before.Config.Env.map(v=>{const i=v.indexOf('=');return [v.slice(0,i),v.slice(i+1)];}));
 const app=config.services?.app;if(!app||!app.environment)throw Error('rollback_config');
-for(const [key,value] of Object.entries(app.environment))if(typeof value!=='string'||env[key]!==value)throw Error('unapplied_environment_drift');
+// `compose config --format json` doubles literal dollars for re-consumption.
+// Compare that exact representation; never accept a changed runtime value.
+const escapeDollar=value=>value.replaceAll('$',()=> '$$');
+for(const [key,value] of Object.entries(app.environment))if(typeof value!=='string'||typeof env[key]!=='string'||escapeDollar(env[key])!==value)throw Error('unapplied_environment_drift');
 const expected=(app.volumes||[]).map(v=>({Type:v.type,Source:v.type==='volume'?config.volumes?.[v.source]?.name:v.source,Destination:v.target,RW:!v.read_only}));
 const actual=before.Mounts.map(v=>({Type:v.Type,Source:v.Type==='volume'?v.Name:v.Source,Destination:v.Destination,RW:v.RW}));
 const sorted=v=>v.sort((a,b)=>a.Destination.localeCompare(b.Destination));assert.deepEqual(sorted(expected),sorted(actual),'unapplied_mount_drift');
-// Resolve once against saved inputs. Use the complete original runtime env,
-// and escape dollar signs because Compose parses this private file again.
-app.environment=env;app.image=fs.readFileSync(path.join(dir,'image-id.txt'),'utf8').trim();delete app.build;
-const literal=v=>typeof v==='string'?v.replaceAll('$',()=> '$$'):Array.isArray(v)?v.map(literal):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,literal(x)])):v;
-fs.writeFileSync(path.join(dir,'rollback-compose.json'),JSON.stringify(literal(config)),{mode:0o600});
+// Inject the complete raw runtime env encoded once. Other fields are already
+// rendered Compose values; escaping them again would alter commands/healthchecks.
+app.environment=Object.fromEntries(Object.entries(env).map(([key,value])=>[key,escapeDollar(value)]));
+app.image=fs.readFileSync(path.join(dir,'image-id.txt'),'utf8').trim();delete app.build;
+fs.writeFileSync(path.join(dir,'rollback-compose.json'),JSON.stringify(config),{mode:0o600});
 NODE
 # BASELINE_CONFIG_END
 }

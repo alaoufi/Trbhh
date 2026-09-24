@@ -34,6 +34,24 @@ test('orchestrator parses as Bash and rejects bad mode, run or revision before e
     assert.doesNotMatch(result.stderr,/command not found|\.\.\//);
   }
 });
+
+test('a verified explicit rollback reports success while a refused rollback still fails',()=>{
+  const match=read().match(/(if \[\[ "\$mode" == rollback \]\]; then[\s\S]*?\nfi)\n\nif \[\[ "\$mode" == deploy/);assert(match);
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'finance-rollback-result-'));
+  try{
+    for(const status of [0,1]){
+      const script=`set -euo pipefail\nmode=rollback; backup=$1; candidate=$2; run_id=123\nexec 3>&1 4>&2\nrollback_app(){ return ${status}; }\n${match[1]}`;
+      const result=spawnSync(bash,['-c',script,'test',dir.replaceAll('\\','/'),sha],{encoding:'utf8'});
+      assert.equal(result.status,status);
+      assert.equal(result.stdout,status===0?'ROLLBACK_HEALTHY=true\nRUN_ID=123\n':'');
+      assert.equal(result.stderr,status===0?'':'ROLLBACK_HEALTHY=false\nRUN_ID=123\n');
+    }
+  }finally{
+    assert.equal(path.dirname(path.resolve(dir)),path.resolve(os.tmpdir()));
+    assert(path.basename(dir).startsWith('finance-rollback-result-'));
+    fs.rmSync(dir,{recursive:true,force:true});
+  }
+});
 test('check policy ignores other SHAs and requires the latest exact-revision run to succeed',()=>{
   const source=fs.readFileSync(workflow,'utf8').replace(/\r\n/g,'\n'),match=source.match(/\/\/ GATE_POLICY_BEGIN\n([\s\S]*?)\n\s*\/\/ GATE_POLICY_END/);assert(match);
   const js=match[1].split('\n').map(line=>line.replace(/^\s{10}/,'')).join('\n');

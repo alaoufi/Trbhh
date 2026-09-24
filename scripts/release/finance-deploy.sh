@@ -235,7 +235,11 @@ NODE
 if [[ "$mode" == rollback ]]; then
   if [[ -f "$backup/DEPLOYMENT_VERIFIED" && "$(cat "$backup/DEPLOYMENT_VERIFIED")" == "$candidate" ]]; then exit 0; fi
   stage=rollback
-  if rollback_app; then printf 'ROLLBACK_HEALTHY=true\nRUN_ID=%s\n' "$run_id" >&3; else printf 'ROLLBACK_HEALTHY=false\nRUN_ID=%s\n' "$run_id" >&4; fi
+  if rollback_app; then
+    printf 'ROLLBACK_HEALTHY=true\nRUN_ID=%s\n' "$run_id" >&3
+    exit 0
+  fi
+  printf 'ROLLBACK_HEALTHY=false\nRUN_ID=%s\n' "$run_id" >&4
   exit 1
 fi
 

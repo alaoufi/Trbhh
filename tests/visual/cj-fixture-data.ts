@@ -1,4 +1,6 @@
 import type { CjProductRow } from '../../src/lib/cj/mapping';
+import type { AdCard } from '../../src/lib/data';
+import type { ApprovedPreview } from '../../src/lib/cj/approved-catalog';
 
 export const fixtureAccountId = 900001;
 export const publicJpegAlias = 'https://cf.cjdropshipping.com/quick/product/18cabc1b-057b-4c05-8e1c-c97427953c76.jpg';
@@ -21,3 +23,7 @@ export const fixtureProducts: CjProductRow[] = [
   { ...base, id: 900018, name_ar: 'منتج اصطناعي بدون صورة — لا تُستبدل بصورة منتج آخر', image: '', images: null, sale_price_minor: 5099 },
   { ...base, id: 900019, name_ar: 'منتج اصطناعي بصورة معطلة لاختبار رسالة عدم التوفر', image: `${origin}/fixture-image/missing.jpg`, images: null, sale_price_minor: 2099 },
 ];
+
+export const fixtureCatalogProducts = [...fixtureProducts, ...Array.from({ length: 60 }, (_, index) => ({ ...base, id: 910001 + index, name_ar: `سلعة اصطناعية لاختبار الترقيم ${index + 1}`, sale_price_minor: 1901 + index }))];
+export const fixtureAds: AdCard[] = Array.from({ length: 6 }, (_, index) => ({ id: 920001 + index, title: `إعلان عضو اصطناعي ${index + 1}`, price: 123.45 + index, adsType: 'offer', image: '/fixture-image/synthetic-front.svg', cityName: 'مدينة اختبار', categoryName: null, createdAt: null, special: false, urgent: false, views: 0, sellerName: 'عضو اختبار', sellerTrusted: index < 2 }));
+export const fixtureApproved: ApprovedPreview[] = [false, true].map((imported, index) => ({ id: String(930001 + index), key: `commerce:${930001 + index}`, title: imported ? 'سلعة مورد معتمدة — بيانات اختبار' : 'سلعة تربح معتمدة — بيانات اختبار', priceMinor: 23456 + index, stock: 2, images: ['/fixture-image/synthetic-front.svg'], description: 'وصف اصطناعي لصفحة المعاينة الخاصة. لا يمثل مخزونًا أو سلعة فعلية.', imported, href: `/cj/approved/${930001 + index}` }));

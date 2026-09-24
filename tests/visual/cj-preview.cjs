@@ -16,7 +16,7 @@ const origin = 'http://127.0.0.1:4325';
 const stub = path.join(__dirname, 'cj-fixture-server-stubs.ts');
 const islands = path.join(__dirname, 'cj-fixture-islands.tsx');
 const link = path.join(__dirname, 'cj-fixture-link.tsx');
-const routes = ['/cj', '/cj/15', '/cj/16', '/cj/900017', '/cj/900018', '/cj/900019', '/cj/cart'];
+const routes = ['/cj', '/cj/15', '/cj/16', '/cj/900017', '/cj/900018', '/cj/900019', '/cj/cart', '/cj/approved/930001', '/cj/approved/930002'];
 const commonAliases = [{ find: 'next/link', replacement: link }, { find: '@', replacement: path.join(root, 'src') }];
 
 async function main() {
@@ -25,11 +25,12 @@ async function main() {
   const common = { root, configFile: false, envDir: false, logLevel: 'warn', oxc: { jsx: { runtime: 'automatic' } } };
   const serverBuild = await build({ ...common,
     plugins: [{ name: 'cj-fixture-card-image-island', enforce: 'pre', resolveId(source, importer) {
-      if (source === './product-image' && importer?.replaceAll('\\', '/').endsWith('/src/components/cj/product-card.tsx')) return islands;
+      if (source === './product-image' && /\/src\/components\/cj\/(?:product-card|approved-card)\.tsx$/.test(importer?.replaceAll('\\', '/') || '')) return islands;
       return null;
     } }],
     resolve: { alias: [
-      ...['@/lib/auth', '@/lib/access-control/guards', '@/lib/settings', '@/lib/prisma', '@/lib/cj/mapping', './mapping', '@/lib/cj/agents', './agents', 'next/navigation'].map(find => ({ find, replacement: stub })),
+      ...['@/lib/auth', '@/lib/access-control/guards', '@/lib/settings', '@/lib/prisma', '@/lib/data', '@/lib/cj/catalog-feed', '@/lib/cj/approved-catalog', './approved-catalog', '@/lib/cj/mapping', './mapping', '@/lib/cj/agents', './agents', 'next/navigation', 'next/headers'].map(find => ({ find, replacement: stub })),
+      { find: 'next/image', replacement: path.join(__dirname, 'cj-fixture-image.tsx') },
       { find: /^.*admin\/suppliers\/cj\/actions(?:\.ts)?$/, replacement: stub },
       { find: 'server-only', replacement: path.join(root, 'tests/stubs/empty.ts') },
       ...['@/components/cj/product-gallery', '@/components/cj/cart-controls', '@/components/cj/trial-cart'].map(find => ({ find, replacement: islands })),
@@ -54,7 +55,7 @@ async function main() {
   const clientOutput = (Array.isArray(clientBuild) ? clientBuild : [clientBuild]).flatMap(result => result.output);
   fs.writeFileSync(path.join(output, 'fixture.js'), clientOutput.find(file => file.type === 'chunk').code);
   const config = loadConfig(path.join(root, 'tailwind.config.ts'));
-  const css = (await postcss([tailwind({ ...config, content: [path.join(root, 'src/app/cj/**/*.{ts,tsx}'), path.join(root, 'src/components/cj/**/*.{ts,tsx}'), path.join(__dirname, 'cj-*.{cjs,ts,tsx}')] })]).process(fs.readFileSync(path.join(root, 'src/app/globals.css'), 'utf8'), { from: path.join(root, 'src/app/globals.css') })).css;
+  const css = (await postcss([tailwind({ ...config, content: [path.join(root, 'src/app/cj/**/*.{ts,tsx}'), path.join(root, 'src/components/cj/**/*.{ts,tsx}'), path.join(root, 'src/components/price-text.tsx'), path.join(root, 'src/components/ad-card.tsx'), path.join(__dirname, 'cj-*.{cjs,ts,tsx}')] })]).process(fs.readFileSync(path.join(root, 'src/app/globals.css'), 'utf8'), { from: path.join(root, 'src/app/globals.css') })).css;
   fs.writeFileSync(path.join(output, 'fixture.css'), css);
   const page = async (pathname, delayed = false) => `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>معاينة CJ محلية — بيانات اختبار</title><link rel="stylesheet" href="/fixture.css"><style>body{margin:0;background:#f8fafc;font-family:Tahoma,Arial,sans-serif}.fixture-notice{padding:12px;background:#fff3ce;color:#16294a;text-align:center;font-size:12px;line-height:1.8}.fixture-nav{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;padding:12px;font-size:12px}.fixture-nav a{text-decoration:underline}</style></head><body><aside class="fixture-notice" aria-label="حدود المعاينة المحلية">معاينة محلية للصفحات والمكونات الفعلية — الأسعار والأوصاف بيانات اختبار، والحساب وهمي بصلاحية عرض المنتجات فقط. صورتا المنتجين 15 و16 من روابط CJ العامة المطابقة للعناوين؛ بقية المنتجات اصطناعية. لا قاعدة بيانات أو طلبات أو دفع أو مزامنة.</aside><nav class="fixture-nav" aria-label="مسارات الاختبار"><a href="/cj">الكتالوج</a><a href="/cj/15">اختبار JPEG</a><a href="/cj/900017">معرض اصطناعي ورابط طويل</a><a href="/cj/900018">صورة مفقودة</a><a href="/cj/cart">السلة</a></nav><div id="fixture-page">${await renderer.renderCjFixture(pathname)}</div><script src="/fixture.js${delayed ? '?delay=1000' : ''}" defer></script></body></html>`;
   for (const route of routes) fs.writeFileSync(path.join(output, `fixture-${route.replaceAll('/', '-').slice(1)}.html`), await page(route));
@@ -88,7 +89,8 @@ async function main() {
         res.end(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800"><rect width="800" height="800" fill="${back ? '#e8edf3' : '#fff1dc'}"/><rect x="160" y="160" width="480" height="400" rx="40" fill="none" stroke="#16294a" stroke-width="12"/><text x="400" y="650" text-anchor="middle" font-family="Arial" font-size="34" fill="#16294a">SYNTHETIC ${back ? 'BACK' : 'FRONT'}</text></svg>`); return;
       }
       const pathname = url.pathname === '/' ? '/cj' : url.pathname;
-      if (routes.includes(pathname)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(await page(pathname, url.searchParams.get('hydrate') === 'delayed')); return; }
+      const knownProduct = /^\/cj\/[1-9]\d*$/.test(pathname) && renderer.fixtureProductIds.includes(Number(pathname.split('/').pop()));
+      if (routes.includes(pathname) || knownProduct) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(await page(pathname + url.search, url.searchParams.get('hydrate') === 'delayed')); return; }
       res.writeHead(404); res.end('Local CJ fixture route only.');
     } catch { if (!res.headersSent) res.writeHead(500); res.end('CJ fixture rendering failed; no live action was attempted.'); }
   });

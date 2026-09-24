@@ -13,6 +13,7 @@ export const captureFinanceInvoices = unavailable;
 export const cancelFinanceSettlement = unavailable;
 export const cancelFinanceDraftInvoice = unavailable;
 export const requestFinanceReturn = unavailable;
+export const requestFinanceReturnReversal = unavailable;
 export const requestFinanceTaxSettings = unavailable;
 export const requestFinancePeriodReopen = unavailable;
 export const approveFinanceRequest = unavailable;

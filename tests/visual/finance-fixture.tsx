@@ -1,10 +1,12 @@
-import { createElement } from 'react';
+import { createElement, Fragment } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { FinanceWorkspace } from '@/components/finance/finance-workspace';
 import { FinanceInvoiceView } from '@/components/finance/finance-invoice-view';
 import { buildFinanceReport, parseFinanceQuery } from '@/lib/finance/reports';
 import { calculateFiscalLines } from '@/lib/finance/calculations';
 import type { FinanceData, FinanceOrder } from '@/lib/finance/types';
+import {TaxRegistrationMonitor} from '@/components/finance/tax-registration-monitor';
+import {calculateTaxRegistration} from '@/lib/finance/tax-registration';
 
 /** All identities, amounts and references below are synthetic and clearly labeled in the preview. */
 export function financeFixtureData(): FinanceData {
@@ -58,5 +60,8 @@ export function renderFinanceFixture(pathname: string, entries: Record<string, s
   }
   const query = parseFinanceQuery({ month: '2026-09', ...entries }, new Date('2026-09-22T12:00:00+03:00'));
   const report = buildFinanceReport(data, query, new Date('2026-09-22T12:00:00+03:00'));
-  return renderToStaticMarkup(createElement(FinanceWorkspace, { report, canEdit: true, canApprove: true, canClose: true, canExport: true, canRefund:true, canCancel:true, canManageTax:true, canReopen:true, canReconcile:true, currentUserId:'999', visibleSections:['overview','suppliers','settlements','budget','month-end','cashflow','close','invoices','reconciliation','tax','ledger','expenses','returns'], viewFinance:true, viewSettlements:true, viewReconciliation:true, actionKey: '4ae04525-d45c-4d94-b880-116cf6d014c1' }));
+  const monitor=calculateTaxRegistration({gaps:[],now:new Date('2026-09-24T12:00:00+03:00'),events:[{sourceKey:'synthetic-monitor-only',origin:'invoice',kind:'supply',classification:'standard',netMinor:32500000,at:'2026-06-01T09:00:00Z'}]});
+  return renderToStaticMarkup(createElement(Fragment,null,
+    ['overview','tax'].includes(query.section)?createElement(TaxRegistrationMonitor,{report:monitor}):null,
+    createElement(FinanceWorkspace, { report, canEdit: true, canApprove: true, canClose: true, canExport: true, canRefund:true, canCancel:true, canManageTax:true, canReopen:true, canReconcile:true, currentUserId:'999', visibleSections:['overview','suppliers','settlements','budget','month-end','cashflow','close','invoices','reconciliation','tax','ledger','expenses','returns'], viewFinance:true, viewSettlements:true, viewReconciliation:true, actionKey: '4ae04525-d45c-4d94-b880-116cf6d014c1' })));
 }

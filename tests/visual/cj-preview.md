@@ -7,17 +7,20 @@ node tests/visual/cj-preview.cjs
 node tests/visual/cj-preview.cjs --serve
 ```
 
-The first command rebuilds seven HTML fixtures and the client bundle. The second rebuilds and serves only `http://127.0.0.1:4325/cj`. Use CUA for browser checks; this script never starts or controls a browser. Restart it after source changes. Generated output is ignored under `docs/screenshots/cj-trial/generated/`.
+The first command rebuilds nine HTML fixtures and the client bundle. The second rebuilds and serves only `http://127.0.0.1:4325/cj`. Use CUA for browser checks; this script never starts or controls a browser. Restart it after source changes. Generated output is ignored under `docs/screenshots/cj-trial/generated/`.
 
 The fixture sets `NODE_ENV=development` inside its own Node process **before loading Vite**, so its loopback cart requests use the API's explicit nonproduction allowance. It does not read environment files, alter the parent shell or deployed environment, trust forwarded headers, or weaken the production API. Production still accepts only the trusted platform origin. The browser component bundle keeps its explicit production React build; the fixture server and mocked data are development-only.
 
-The fixture renders the actual `/cj`, `/cj/[id]`, and `/cj/cart` server pages. `CjProductGallery`, `CjProductImage`, `AddToTrialCart`, `CartLink`, and `TrialCart` are rendered and hydrated as real interactive components. Next's link prefetch is replaced with ordinary local anchors. Authentication is a synthetic account with only `products:view`; database access and all mutation actions throw. This does not verify production authentication, middleware, the complete app shell, or a real catalog.
+The fixture renders the actual `/cj`, `/cj/[id]`, `/cj/approved/[id]`, and `/cj/cart` server pages. `CjProductGallery`, `CjProductImage`, `AddToTrialCart`, `CartLink`, and `TrialCart` are rendered and hydrated as real interactive components. Next's link prefetch is replaced with ordinary local anchors and Next Image with a local native image. Authentication is a synthetic account with only `products:view`; database access and all mutation actions throw. The catalog reader is a synthetic fixture stub: 65 CJ products, two approved products, and six member ads (two trusted). It preserves tab/page query strings for visual checks; production SQL eligibility is covered separately. Member-ad detail routes are outside this local fixture. This does not verify production authentication, middleware, the complete app shell, or a real catalog.
 
 Every amount and description is synthetic and labelled on every page. Product 15 and 16 pair the observed title with its corresponding public CJ image; their prices are deliberately test values. The only outbound requests permitted are GET requests to those two exact images through the actual CJ proxy route. No supplier API, translation provider, database, order, payment, sync, or live environment file is used. Other routes and POST actions are denied. The cart POST executes the actual route/quote logic with fixture rows only.
 
 | Route | Check |
 | --- | --- |
-| `/cj` | Five cards, exact test-price decimals, primary-image identity, missing-image fallback |
+| `/cj` | 24 cards per page, shared distinct price styling, primary-image identity, missing-image fallback |
+| `/cj?tab=members` / `/cj?tab=verified` | Six synthetic member ads / two synthetic trusted-seller ads |
+| `/cj?tab=imported&page=3` | Third page beyond the previous 60-product limit, only fixture import sources |
+| `/cj?tab=trbhh` / `/cj/approved/930001` | Two synthetic approved products and informational detail without checkout |
 | `/cj/15` | Previously rejected `image/jpg` source now served as verified `image/jpeg` |
 | `/cj/16` | The corresponding existing `image/jpeg` source remains correct |
 | `/cj/900017` | Clearly synthetic two-image gallery, next/previous/thumb controls, enlargement, long SKU and reference link |

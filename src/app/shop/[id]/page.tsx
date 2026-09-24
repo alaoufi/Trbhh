@@ -9,6 +9,7 @@ import { formatSar } from '@/lib/commerce/money';
 import { getCities, getAreas, getCountries } from '@/lib/data';
 import { CommerceCheckoutForm } from '@/components/commerce-checkout-form';
 import {readApprovedFiscalPolicy} from '@/lib/finance/fiscal-policy';
+import {effectiveFiscalVatBps} from '@/lib/finance/fiscal-v2';
 
 export const dynamic = 'force-dynamic';
 export default async function ProductCheckout({ params }: { params: Promise<{ id: string }> }) {
@@ -25,14 +26,15 @@ export default async function ProductCheckout({ params }: { params: Promise<{ id
   if (!product || product.stock_available <= 0) notFound();
   const policy=await readApprovedFiscalPolicy(prisma,new Date()).catch(()=>null);
   if(!policy)return <div className="card-3d rounded-xl p-5">{config.text.unavailable}</div>;
+  const vatEnabled=policy.calculationPolicy.vatControl?.enabled;
   const [countries, cities, areas] = await Promise.all([getCountries(), getCities(), getAreas()]);
   const saudi = countries.find(c => /سعود/.test(c.name));
   return <section className="card-3d mx-auto max-w-2xl space-y-3 rounded-xl p-5">
     <h1 className="text-xl font-bold text-primary">{product.title}</h1>
-    <p>{formatSar(product.price_minor)} ر.س للقطعة ({policy.calculationPolicy.priceBasis==='inclusive'?'شامل الضريبة':'قبل الضريبة'}) · رسوم التوصيل: {formatSar(config.shippingFeeMinor)} ر.س للطلب ({policy.calculationPolicy.shippingPriceBasis==='inclusive'?'شاملة الضريبة':'قبل الضريبة'})</p>
+    <p>{formatSar(product.price_minor)} ر.س للقطعة{vatEnabled!==false&&<> ({policy.calculationPolicy.priceBasis==='inclusive'?'شامل الضريبة':'قبل الضريبة'})</>} · رسوم التوصيل: {formatSar(config.shippingFeeMinor)} ر.س للطلب{vatEnabled!==false&&<> ({policy.calculationPolicy.shippingPriceBasis==='inclusive'?'شاملة الضريبة':'قبل الضريبة'})</>}</p>
     <p className="text-sm">{config.text.shippingTerms}</p>
     <CommerceCheckoutForm id={id} requestKey={randomUUID()} memberName={session.name} maximum={Math.min(9999, product.stock_available)}
       regions={cities.filter(c => c.countryId === saudi?.id)} areas={areas} submitLabel={config.text.buy}
-      fiscalQuote={{unitPriceMinor:product.price_minor,priceBasis:policy.calculationPolicy.priceBasis,vatBps:policy.vatBps,shippingFeeMinor:config.shippingFeeMinor,shippingPriceBasis:policy.calculationPolicy.shippingPriceBasis,shippingVatBps:policy.calculationPolicy.shippingVatBps}} />
+      fiscalQuote={{unitPriceMinor:product.price_minor,priceBasis:policy.calculationPolicy.priceBasis,vatBps:effectiveFiscalVatBps(policy,'product'),shippingFeeMinor:config.shippingFeeMinor,shippingPriceBasis:policy.calculationPolicy.shippingPriceBasis,shippingVatBps:effectiveFiscalVatBps(policy,'shipping'),vatEnabled}} />
   </section>;
 }

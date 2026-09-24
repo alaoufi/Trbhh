@@ -8,7 +8,7 @@ const postcss = require('postcss');
 const tailwind = require('tailwindcss');
 const loadConfig = require('tailwindcss/loadConfig');
 const root = path.resolve(__dirname, '../..');
-const output = path.join(root, 'docs/screenshots/finance');
+const output = path.join(root, 'scratchpad/finance-vat-preview');
 const sections = ['overview', 'suppliers', 'settlements', 'budget', 'month-end', 'cashflow', 'close', 'invoices', 'reconciliation', 'tax', 'ledger', 'expenses', 'returns'];
 
 async function main() {

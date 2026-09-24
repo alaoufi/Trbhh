@@ -52,3 +52,6 @@ scratchpad/
 # Reproducible local finance fixture output; retain reviewed screenshots only.
 /docs/screenshots/finance/fixture*
 /docs/screenshots/finance/*.html
+
+# Reproducible loopback-only CJ fixture output; screenshots remain separately reviewable.
+/docs/screenshots/cj-trial/generated/

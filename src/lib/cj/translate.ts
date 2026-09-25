@@ -9,17 +9,24 @@ import { getSetting } from '@/lib/settings';
  *  - cj_mymemory_email: بريد لرفع حصّة MyMemory المجانية (احتياطي).
  * كاش قصير لتفادي قراءة القاعدة في كل نداء ترجمة.
  */
-let providerCfg: { at: number; deeplKey: string; email: string } | null = null;
-async function translationProviders(): Promise<{ deeplKey: string; email: string }> {
+let providerCfg: { at: number; libreUrl: string; libreKey: string; deeplKey: string; email: string } | null = null;
+async function translationProviders(): Promise<{ libreUrl: string; libreKey: string; deeplKey: string; email: string }> {
   if (providerCfg && Date.now() - providerCfg.at < 60_000) return providerCfg;
+  let libreUrl = (process.env.LIBRETRANSLATE_URL || '').trim();
+  let libreKey = '';
   let deeplKey = '';
   let email = (process.env.MYMEMORY_EMAIL || '').trim();
   try {
-    const [k, e] = await Promise.all([getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', '')]);
+    const [u, lk, k, e] = await Promise.all([
+      getSetting('cj_libretranslate_url', ''), getSetting('cj_libretranslate_key', ''),
+      getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', ''),
+    ]);
+    if (u.trim()) libreUrl = u.trim();
+    if (lk.trim()) libreKey = lk.trim();
     if (k.trim()) deeplKey = k.trim();
     if (e.trim()) email = e.trim();
   } catch { /* القاعدة غير جاهزة — نكمل بالقيم الافتراضية */ }
-  providerCfg = { at: Date.now(), deeplKey, email };
+  providerCfg = { at: Date.now(), libreUrl: libreUrl.replace(/\/+$/, ''), libreKey, deeplKey, email };
   return providerCfg;
 }
 
@@ -107,7 +114,21 @@ async function fetchJson(url: string, deadline: number, init: RequestInit = {}):
   }
 }
 
-/** المزوّد الأساسي الموثوق: DeepL (يُفعَّل عند ضبط المفتاح في لوحة التحكم). */
+/** المزوّد الأساسي: LibreTranslate الذاتي على الخادم (بلا إنترنت/اشتراك/حصّة). */
+async function viaLibreTranslate(text: string, deadline: number): Promise<string | null> {
+  const { libreUrl, libreKey } = await translationProviders();
+  if (!libreUrl) return null;
+  const body = (await fetchJson(`${libreUrl}/translate`, deadline, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ q: text, source: 'en', target: 'ar', format: 'text', ...(libreKey ? { api_key: libreKey } : {}) }),
+  })) as { translatedText?: string } | null;
+  const raw = body?.translatedText;
+  const t = typeof raw === 'string' ? raw.trim() : '';
+  return validOutput(t) ? t : null;
+}
+
+/** مزوّد موثوق بمفتاح: DeepL (يُفعَّل عند ضبط المفتاح في لوحة التحكم). */
 async function viaDeepL(text: string, deadline: number): Promise<string | null> {
   const { deeplKey } = await translationProviders();
   if (!deeplKey) return null;
@@ -154,7 +175,7 @@ async function translateRaw(text: string): Promise<string | null> {
     if (Date.now() >= deadline) return null;
     await throttle();
     if (Date.now() >= deadline) return null;
-    const result = (await viaDeepL(chunk, deadline)) ?? (await viaMyMemory(chunk, deadline)) ?? (await viaGoogle(chunk, deadline));
+    const result = (await viaLibreTranslate(chunk, deadline)) ?? (await viaDeepL(chunk, deadline)) ?? (await viaMyMemory(chunk, deadline)) ?? (await viaGoogle(chunk, deadline));
     if (!result || Date.now() >= deadline) return null;
     translated.push(result);
   }

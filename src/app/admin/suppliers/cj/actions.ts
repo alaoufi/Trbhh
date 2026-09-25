@@ -486,8 +486,12 @@ export async function refreshCjImportedAvailability(form: FormData) {
 export async function saveCjTranslationSettings(form: FormData) {
   await requireCjAccess('integrations', 'manage_settings');
   const { setSetting } = await import('@/lib/settings');
+  const libreUrl = String(form.get('libreUrl') || '').trim();
+  const libreKey = String(form.get('libreKey') || '').trim();
   const deeplKey = String(form.get('deeplKey') || '').trim();
   const email = String(form.get('mymemoryEmail') || '').trim();
+  await setSetting('cj_libretranslate_url', libreUrl.slice(0, 300));
+  if (libreKey) await setSetting('cj_libretranslate_key', libreKey.slice(0, 200));
   if (deeplKey) await setSetting('cj_deepl_api_key', deeplKey.slice(0, 200));
   await setSetting('cj_mymemory_email', email.slice(0, 120));
   revalidatePath('/admin/suppliers/cj/browse');

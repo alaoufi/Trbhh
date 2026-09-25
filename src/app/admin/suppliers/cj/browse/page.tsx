@@ -47,7 +47,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   }
 
   const [settings, marginBps, catsRes] = await Promise.all([cjSyncSettings(), defaultMarginBps(), getCategories()]);
-  const [deeplKeySet, memEmail] = await Promise.all([getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', '')]);
+  const [deeplKeySet, memEmail, libreUrl] = await Promise.all([getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', ''), getSetting('cj_libretranslate_url', '')]);
   const categories = catsRes.ok ? catsRes.data : [];
   // CJ indexes product names in its source language, while admins commonly
   // search using the saved Arabic display title. Translate only the query;
@@ -141,10 +141,16 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
         {sp.transcfg === '1' && <span className="text-emerald-700">حُفظت إعدادات مزوّد الترجمة.</span>}
       </div>
       <AccessBoundary module="integrations" action="manage_settings"><details className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
-        <summary className="cursor-pointer font-bold text-primary">مزوّد الترجمة (لترجمة موثوقة دائمة) — {deeplKeySet ? 'DeepL مُفعّل ✅' : 'DeepL غير مُفعّل'}</summary>
+        <summary className="cursor-pointer font-bold text-primary">مزوّد الترجمة — {libreUrl ? 'LibreTranslate ذاتي ✅' : deeplKeySet ? 'DeepL مُفعّل ✅' : 'خارجي مجاني (محدود)'}</summary>
         <form action={saveCjTranslationSettings} className="mt-3 space-y-2">
           <input type="hidden" name="back" value={backHref} />
-          <p className="text-xs text-muted-foreground">DeepL يعطي ترجمة موثوقة (٥٠٠ ألف حرف/شهر مجاناً). سجّل في deepl.com/pro-api واحصل على المفتاح المجاني (ينتهي بـ <code>:fx</code>). عند ضبطه يصبح المزوّد الأساسي وMyMemory احتياطياً.</p>
+          <p className="text-xs text-muted-foreground">الأفضل: <b>LibreTranslate ذاتي على الخادم</b> — بلا إنترنت/اشتراك/حصّة، أسرع وأكثر أماناً. شغّله على الخادم ثم ضع رابطه هنا (مثل <code>http://libretranslate:5000</code>). عند ضبطه يصبح المزوّد الأساسي. ترتيب المزوّدات: LibreTranslate ← DeepL ← MyMemory.</p>
+          <label className="block">رابط LibreTranslate الذاتي (الأفضل)
+            <input name="libreUrl" type="url" autoComplete="off" defaultValue={libreUrl} placeholder="http://libretranslate:5000" className="mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2" />
+          </label>
+          <label className="block">مفتاح LibreTranslate (اختياري)
+            <input name="libreKey" type="password" autoComplete="off" placeholder="اتركه فارغاً إن لم يُطلب" className="mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2" />
+          </label>
           <label className="block">مفتاح DeepL API {deeplKeySet && <span className="text-emerald-700">(مضبوط — اتركه فارغاً للإبقاء عليه)</span>}
             <input name="deeplKey" type="password" autoComplete="off" placeholder={deeplKeySet ? '•••••••• (محفوظ)' : 'xxxxxxxx-xxxx-...:fx'} className="mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2" />
           </label>

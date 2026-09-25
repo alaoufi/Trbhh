@@ -13,12 +13,12 @@ prod=/root/trbhh
 base=/root/trbhh-release-backups
 backup="$base/finance-$backup_id"
 tools_dir=$(cd "$(dirname "$0")" && pwd -P)
-stage=preflight
+stage=preflight; substep=preflight
 exec 3>&1 4>&2
 # Preflight failures report only their stage; Compose diagnostics can include
 # private configuration. Later diagnostics have a protected log destination.
 exec 2>/dev/null
-trap 'printf "Finance backup failed at stage %s; no release verification was issued.\n" "$stage" >&4' ERR
+trap 'printf "Finance backup failed at stage %s substep %s; no release verification was issued.\n" "$stage" "$substep" >&4' ERR
 [[ "$(realpath "$prod")" == "$prod" && ! -L "$base" ]]
 mkdir -p "$base"
 chmod 700 "$base"
@@ -115,7 +115,7 @@ cleanup() {
   else
     # Preserve all diagnostic resources and the independent timer when normal
     # resume fails. Never declare success or disarm recovery in this state.
-    printf 'Finance backup failed at stage %s; resume remains guarded.\n' "$stage" >&4
+    printf 'Finance backup failed at stage %s substep %s; resume remains guarded.\n' "$stage" "$substep" >&4
     exit 1
   fi
   if [[ "$(docker inspect -f '{{index .Config.Labels "trbhh.finance-backup"}}' "$restore_name" 2>/dev/null)" == "$backup_id" ]]; then
@@ -128,7 +128,7 @@ cleanup() {
     docker rm -f "$reader" >/dev/null 2>&1 || result=1
   fi
   if [[ "$result" == 0 && "$stage" == complete ]]; then seal_backup || result=1; fi
-  if [[ "$result" != 0 ]]; then printf 'Finance backup failed at stage %s; no release verification was issued.\n' "$stage" >&4; fi
+  if [[ "$result" != 0 ]]; then printf 'Finance backup failed at stage %s substep %s; no release verification was issued.\n' "$stage" "$substep" >&4; fi
   exit "$result"
 }
 # CLEANUP_END
@@ -137,10 +137,12 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-stage=archives
+stage=archives; substep=archive_code
 git archive --format=tar "$baseline" | gzip > "$backup/code.tar.gz"
+substep=archive_image
 docker tag "$current_image" "trbhh-rollback:finance-$backup_id"
 docker image save "$current_image" | gzip > "$backup/image.tar.gz"
+substep=verify_archives
 gzip -t "$backup/code.tar.gz" "$backup/image.tar.gz"
 # Pull/resolve the isolated restore image before the guarded pause.
 if ! docker image inspect mysql:8.0 >/dev/null 2>&1; then docker pull mysql:8.0 >/dev/null; fi
@@ -179,33 +181,44 @@ for spec in 'storage:STORAGE_DIR:/app/storage' 'legacy:LEGACY_LOCAL_DIR:'; do
 done
 # MEDIA_ARCHIVES_END
 
-stage=snapshot
+stage=snapshot; substep=snapshot_arm_watchdog
 # Timer survives a killed shell. A fired timer invalidates this backup proof.
 systemd-run --unit="$watchdog" --on-active=15m /bin/sh -c 'touch "$1"; exec /usr/bin/docker unpause "$2"' sh "$backup/WATCHDOG_FIRED" "$container" >/dev/null
 paused=1
+substep=snapshot_pause_app
 docker pause "$container" >/dev/null
+substep=snapshot_verify_paused
 [[ "$(docker inspect -f '{{.State.Paused}}' "$container")" == true ]]
+substep=snapshot_protected_database
 docker exec -i "$reader" node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/before.json"
+substep=snapshot_full_database
 docker exec -i "$reader" node - snapshot-full < "$tools_dir/database-proof.cjs" > "$backup/full-before.json"
+substep=snapshot_supplier_data
 docker exec -i "$reader" node - snapshot < "$tools_dir/supplier-preservation-proof.cjs" > "$backup/supplier-before.json"
+substep=snapshot_database_invariants
 node - "$backup/before.json" <<'NODE'
 const p=JSON.parse(require('node:fs').readFileSync(process.argv[2]));
 if(p.nonTransactionalTables.length||(p.controls.archiveAutoDeleteEnabled&&p.controls.expiredArchivedCandidates>0))process.exit(1);
 NODE
 docker exec -i "$reader" node - dump < "$tools_dir/database-proof.cjs" | gzip > "$backup/database.sql.gz"
+substep=snapshot_validate_database_dump
 gzip -t "$backup/database.sql.gz"
 [[ $(stat -c %s "$backup/database.sql.gz") -gt 1000 ]]
 for label in storage legacy; do
   [[ -f "$backup/$label.path" ]] || continue
+  substep=snapshot_media_verify_${label}
   media_path=$(cat "$backup/$label.path")
   docker exec -i -u 0 "$reader" node - snapshot "$media_path" < "$tools_dir/media-proof.cjs" > "$backup/$label-current.json"
   node "$tools_dir/media-proof.cjs" verify "$backup/$label-before.json" "$backup/$label-current.json"
   node "$tools_dir/media-proof.cjs" verify "$backup/$label-current.json" "$backup/$label-before.json"
 done
-if [[ "$media_capacity" == fresh-storage-retained-legacy ]]; then node "$tools_dir/finance-media-reference.cjs" verify-current "$backup"; fi
+if [[ "$media_capacity" == fresh-storage-retained-legacy ]]; then substep=snapshot_parent_media_verify; node "$tools_dir/finance-media-reference.cjs" verify-current "$backup"; fi
 # Detect other writers or a prematurely resumed app during the backup window.
+substep=snapshot_concurrent_writer_check
 docker exec -i "$reader" node - snapshot-full < "$tools_dir/database-proof.cjs" > "$backup/full-current.json"
+substep=snapshot_database_equality_check
 node "$tools_dir/database-proof.cjs" verify-restore-full "$backup/full-before.json" "$backup/full-current.json"
+substep=snapshot_watchdog_check
 [[ ! -e "$backup/WATCHDOG_FIRED" && "$(docker inspect -f '{{.State.Paused}}' "$container")" == true ]]
 # RESUME_BEFORE_RESTORE: the immutable dump is now independent of live traffic.
 docker unpause "$container" >/dev/null

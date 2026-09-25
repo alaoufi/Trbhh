@@ -7,6 +7,7 @@ describe('production backup gates', () => {
   const workflow = readFileSync('.github/workflows/release-safeguards.yml', 'utf8');
   const script = readFileSync('scripts/release/safeguards.sh', 'utf8');
   const deploy = readFileSync('scripts/release/finance-deploy.sh', 'utf8');
+  const financeBackup = readFileSync('scripts/release/finance-backup.sh', 'utf8');
   it('requires a pinned SSH host identity', () => {
     expect(workflow).toContain('secrets.VPS_KNOWN_HOSTS');
     expect(workflow).toContain('test -n "$VPS_KNOWN_HOSTS"');
@@ -34,6 +35,13 @@ describe('production backup gates', () => {
     expect(deploy).toContain('finance-backup.sh" "$run_id" "$candidate" "$baseline" >&3 2>&4');
     expect(deploy).toContain('raw database/configuration diagnostics remain in its private operations log');
     expect(deploy).not.toContain('cat "$backup/operations.log"');
+  });
+  it('reports a safe snapshot substep without forwarding the protected operations log', () => {
+    expect(financeBackup).toContain('Finance backup failed at stage %s substep %s');
+    expect(financeBackup).toContain('substep=snapshot_protected_database');
+    expect(financeBackup).toContain('substep=snapshot_full_database');
+    expect(financeBackup).toContain('substep=snapshot_database_invariants');
+    expect(financeBackup).not.toContain('cat "$backup/operations.log"');
   });
   it('accepts media reuse only from a distinct numeric before-run source', () => {
     expect(workflow).toContain('reuse_media_id:');

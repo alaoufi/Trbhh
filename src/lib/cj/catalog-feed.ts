@@ -27,7 +27,12 @@ export function parseCjCatalogQuery(query: CjCatalogQuery) {
 
 /** Read-only private catalog. The public listing predicates run before count/offset. */
 export async function loadCjCatalog(query: CjCatalogQuery) {
-  if (!(await cjStorefrontView()).isStaff) throw Error('cj_catalog_access_denied');
+  const view = await cjStorefrontView();
+  if (!view.isStaff) throw Error('cj_catalog_access_denied');
+  // معاينة المشرف (المتجر العام مغلق): تُعرض كل السلع المستوردة غير المخفية كما هي
+  // ليراجعها المشرف. البوابة الصارمة (شحن ومخزون محقّقان خلال 6 ساعات) تُطبَّق فقط
+  // على العرض العام الفعلي عند تفعيله. الشراء يبقى معطّلاً بمفتاحه المستقل.
+  const readyOnly = view.isPublic;
   const { tab, page: requestedPage } = parseCjCatalogQuery(query);
   const imports = tab === 'all' || tab === 'imported';
   const members = tab === 'all' || tab === 'members' || tab === 'verified';
@@ -50,7 +55,7 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
     ] };
   }
   const [cjProducts, commerceCount, adCount] = await Promise.all([
-    imports ? listStorefrontCjProducts(true, 500) : [],
+    imports ? listStorefrontCjProducts(readyOnly, 500) : [],
     commerceScope ? countApprovedCatalog(commerceScope) : 0,
     members ? prisma.ads.count({ where: adWhere }) : 0,
   ]);

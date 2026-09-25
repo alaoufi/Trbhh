@@ -27,7 +27,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const sp = await searchParams;
   const id = Number(idStr);
   if (!Number.isSafeInteger(id) || id <= 0) notFound();
-  const p = await getStorefrontCjProduct(id, true);
+  const p = await getStorefrontCjProduct(id, view.isPublic);
   if (!p) notFound();
   const session = await getSession();
   const capabilities = session ? await cjProductCapabilities(session.uid, p.agent_user_id) : { agent: false, edit: false, suspend: false, delete: false };
@@ -39,7 +39,10 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const gallery = cjProductImages(p).map(cjImg);
   const details = parseCjDetails(p);
   const verifiedVariants = getVerifiedCjVariants(p);
-  const variantCount = verifiedVariants.length || null;
+  // في معاينة المشرف (بلا شحن حيّ محقّق) نعرض الخيارات من التفاصيل المخزّنة (details_json)
+  // حتى تظهر المقاسات/الألوان كاملة كما في المصدر؛ العرض العام يبقى على المتغيّرات المحقّقة.
+  const displayVariants = verifiedVariants.length ? verifiedVariants : (details?.variants ?? []);
+  const variantCount = displayVariants.length || null;
   const weightMin = details?.weightMin;
   const weightMax = details?.weightMax;
   const weightLabel = typeof weightMin === 'number' && Number.isFinite(weightMin) && weightMin > 0
@@ -54,13 +57,13 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   // خيارات السلعة المميّزة (مقاس/لون/قابس...) مستخرجة من مفاتيح الخيارات، بلا تكرار أو رموز فارغة.
   const optionTokens: string[] = [];
   const seenOpt = new Set<string>();
-  for (const v of verifiedVariants) {
+  for (const v of displayVariants) {
     for (const tok of (v.optionKey || v.name || '').split(/[-/,;|:·、]+|\s{2,}/).map(t => t.trim()).filter(Boolean)) {
       const k = tok.toLowerCase();
       if (!seenOpt.has(k) && tok.length <= 24 && /[\p{L}\p{N}]/u.test(tok)) { seenOpt.add(k); optionTokens.push(tok); }
     }
   }
-  const others = (await listStorefrontCjProducts(true, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
+  const others = (await listStorefrontCjProducts(view.isPublic, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
 
   return <div className="mx-auto max-w-6xl min-w-0 space-y-5 px-3 pb-32 pt-5 sm:px-5 md:pb-8 [overflow-wrap:anywhere]" data-cj-trial="product">
     {view.isStaff && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p><b>تجربة CJ الخاصة</b> — تجميع السلع فقط؛ الشراء والدفع غير مفعّلين.</p>{session && <CartLink accountId={session.uid} />}</div>}
@@ -75,7 +78,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         {view.isStaff && session && (verifiedVariants.length > 0
           ? <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={verifiedVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
           : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">هذه السلعة مخفية عن المشترين: لا يوجد خيار ثبت مخزونه وشحنه إلى السعودية. أعد التحقق من بيانات CJ قبل إتاحتها.</p>)}
-        {optionTokens.length > 0 && <div className="min-w-0"><h2 className="mb-2 text-sm font-bold text-slate-700">الخيارات المتاحة ({verifiedVariants.length})</h2><div className="flex flex-wrap gap-1.5">{optionTokens.slice(0, 24).map((tok, i) => <span key={i} className="rounded-lg border border-primary/25 bg-white px-2 py-1 text-xs font-semibold">{tok}</span>)}{optionTokens.length > 24 && <span className="px-1 text-xs text-slate-500">+{optionTokens.length - 24}</span>}</div></div>}
+        {optionTokens.length > 0 && <div className="min-w-0"><h2 className="mb-2 text-sm font-bold text-slate-700">الخيارات المتاحة ({variantCount})</h2><div className="flex flex-wrap gap-1.5">{optionTokens.slice(0, 24).map((tok, i) => <span key={i} className="rounded-lg border border-primary/25 bg-white px-2 py-1 text-xs font-semibold">{tok}</span>)}{optionTokens.length > 24 && <span className="px-1 text-xs text-slate-500">+{optionTokens.length - 24}</span>}</div></div>}
         {availability && <div className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><h2 className="mb-3 text-sm font-bold text-emerald-900">الشحن إلى السعودية</h2><ul className="space-y-2 text-sm">{shipOptions.slice(0, 5).map((o, i) => <li key={i} className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-2 last:border-0 last:pb-0"><span className="font-semibold text-slate-800">{o.name}{o.deliveryDays ? <span className="ms-2 text-xs font-normal text-slate-500">مدّة التوصيل: {o.deliveryDays}</span> : null}</span><span className="font-extrabold text-emerald-800">{sar(o.priceMinor)}</span></li>)}</ul><p className="mt-2 text-xs text-emerald-800">المخزون المتوفّر: {new Intl.NumberFormat('en-US').format(availability.stockQuantity)} · {shipCheapest ? `يبدأ الشحن من ${sar(shipCheapest.priceMinor)}` : ''}</p></div>}
         {agentContact && (agentContact.wa || agentContact.tel) && <section className="rounded-2xl border bg-white p-4"><h2 className="mb-3 text-sm font-bold">التواصل مع وكيل السلعة</h2><div className="flex flex-wrap gap-2">{agentContact.wa && <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white"><MessageCircle className="h-4 w-4" />واتساب</a>}{agentContact.tel && <a href={agentContact.tel} className="flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold text-primary"><Phone className="h-4 w-4" />اتصال</a>}</div></section>}
       </section>

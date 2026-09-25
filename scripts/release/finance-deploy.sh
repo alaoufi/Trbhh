@@ -168,6 +168,45 @@ NODE
   if [[ -f "$active_release" && "$(cat "$active_release")" == "$run_id" ]]; then rm -f -- "$active_release" || return 1; fi
 }
 
+# A failed historical rollback can leave ACTIVE_DEPLOYMENT behind even after
+# the old image is serving. Reclaim that marker only when the saved backup,
+# checkout, running image, and in-container revision all prove the same
+# baseline. Never restore SQL or alter application data here.
+recover_stale_active_release() {
+  [[ -e "$active_release" || -L "$active_release" ]] || return 0
+  [[ -f "$active_release" && ! -L "$active_release" ]] || return 1
+  local stale stale_backup stale_baseline stale_candidate stale_image running running_image stale_watchdog file
+  stale=$(cat "$active_release") || return 1
+  [[ "$stale" =~ ^[1-9][0-9]{0,19}$ && "$stale" != "$run_id" ]] || return 1
+  stale_backup="/root/trbhh-release-backups/finance-$stale"
+  [[ -d "$stale_backup" && ! -L "$stale_backup" ]] || return 1
+  for file in VERIFIED commit.txt candidate.txt image-id.txt SHA256SUMS; do
+    [[ -f "$stale_backup/$file" && ! -L "$stale_backup/$file" ]] || return 1
+  done
+  (cd "$stale_backup" && sha256sum --check --status SHA256SUMS) || return 1
+  stale_baseline=$(cat "$stale_backup/commit.txt") || return 1
+  stale_candidate=$(cat "$stale_backup/candidate.txt") || return 1
+  stale_image=$(cat "$stale_backup/image-id.txt") || return 1
+  [[ "$(cat "$stale_backup/VERIFIED")" == "$stale_baseline" ]] || return 1
+  [[ "$stale_baseline" =~ ^[0-9a-f]{40}$ && "$stale_candidate" =~ ^[0-9a-f]{40}$ && "$stale_candidate" != "$stale_baseline" ]] || return 1
+  [[ "$stale_image" =~ ^sha256:[0-9a-f]{64}$ && "$(git rev-parse HEAD)" == "$stale_baseline" ]] || return 1
+  running=$(docker compose ps -q app) || return 1
+  [[ "$running" =~ ^[0-9a-f]{12,64}$ ]] || return 1
+  running_image=$(docker inspect -f '{{.Image}}' "$running") || return 1
+  [[ "$running_image" == "$stale_image" && "$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$running_image")" == "$stale_baseline" ]] || return 1
+  docker exec -i "$running" node - "$stale_baseline" <<'NODE' || return 1
+(async()=>{try{const r=await fetch('http://127.0.0.1:3000/api/version',{cache:'no-store',redirect:'error',signal:AbortSignal.timeout(5000)});if(r.status!==200||(await r.json()).commit!==process.argv[2])process.exit(1);}catch{process.exit(1);}})();
+NODE
+  docker exec -i "$running" node - <<'NODE' || return 1
+const {PrismaClient}=require('@prisma/client');const db=new PrismaClient({log:[]});
+(async()=>{try{const rows=await db.$queryRawUnsafe("SELECT v FROM site_settings WHERE k IN ('commerce_purchasing_enabled','commerce_payments_enabled','commerce_enabled')");if(rows.some(r=>!['0','false',null].includes(r.v))||process.env.SUPPLIER_ALLOW_LIVE_ORDERS!=='false')throw Error('unsafe_gate');}catch{process.exitCode=1;}finally{await db.$disconnect();}})();
+NODE
+  stale_watchdog="trbhh-finance-rollback-$stale"
+  systemctl stop "$stale_watchdog.timer" >/dev/null 2>&1 || true
+  rm -f -- "$active_release" || return 1
+  printf 'STALE_RELEASE_RECOVERED=true\n' >&3
+}
+
 finish() {
   local result=$?
   trap - EXIT
@@ -256,6 +295,9 @@ fi
 
 if [[ "$mode" == deploy ]]; then
   stage=identity
+  substep=recover_stale_release
+  recover_stale_active_release
+  substep=release_identity
   [[ ! -e "$active_release" && ! -L "$active_release" ]]
   [[ ! -e "$backup" && ! -L "$backup" ]]
   baseline=$(git rev-parse HEAD)

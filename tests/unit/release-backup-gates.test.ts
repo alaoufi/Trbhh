@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 describe('production backup gates', () => {
   const workflow = readFileSync('.github/workflows/release-safeguards.yml', 'utf8');
   const script = readFileSync('scripts/release/safeguards.sh', 'utf8');
+  const deploy = readFileSync('scripts/release/finance-deploy.sh', 'utf8');
   it('requires a pinned SSH host identity', () => {
     expect(workflow).toContain('secrets.VPS_KNOWN_HOSTS');
     expect(workflow).toContain('test -n "$VPS_KNOWN_HOSTS"');
@@ -18,6 +19,16 @@ describe('production backup gates', () => {
     expect(script).toContain('"$current_commit" == 021c5fe43f9a6361f7a0df66bf35e92f38e0cf06');
     expect(script).toContain('verify-restore "$backup/before.json" "$backup/restored.json"');
     expect(script).toContain('--event-scheduler=OFF');
+  });
+  it('reclaims a stale deployment marker only after proving the exact old image and baseline', () => {
+    const recovery = deploy.slice(deploy.indexOf('recover_stale_active_release() {'), deploy.indexOf('\nfinish() {'));
+    expect(recovery).toContain('sha256sum --check --status SHA256SUMS');
+    expect(recovery).toContain('$(git rev-parse HEAD)" == "$stale_baseline"');
+    expect(recovery).toContain('docker image inspect -f');
+    expect(recovery).toContain('/api/version');
+    expect(recovery).toContain('commerce_purchasing_enabled');
+    expect(recovery.indexOf('rm -f -- "$active_release"')).toBeGreaterThan(recovery.indexOf('commerce_purchasing_enabled'));
+    expect(deploy.indexOf('recover_stale_active_release') < deploy.indexOf('[[ ! -e "$active_release"')).toBe(true);
   });
   it('accepts media reuse only from a distinct numeric before-run source', () => {
     expect(workflow).toContain('reuse_media_id:');

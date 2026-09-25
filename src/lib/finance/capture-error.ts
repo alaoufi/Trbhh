@@ -14,6 +14,17 @@ export function financeCaptureErrorCategory(error: unknown): string {
   if (knownCaptureErrors.has(error.message)) return error.message;
   if ('code' in error && typeof error.code === 'string' && /^P\d{4}$/.test(error.code)) {
     const code=error.code;
+    if(code==='P2010'){
+      const meta='meta' in error&&error.meta&&typeof error.meta==='object'?error.meta as Record<string,unknown>:{};
+      const message=typeof meta.message==='string'?meta.message:'';
+      const missingColumn=message.match(/unknown column\s+['"`]([A-Za-z0-9_.$`]+)['"`]/i)?.[1];
+      if(missingColumn){const identifier=missingColumn.split(/[.`]/).filter(Boolean).at(-1)||'';if(/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(identifier))return `database_missing_column_${identifier.toLowerCase()}`;}
+      const missingTable=message.match(/table\s+['"`]([A-Za-z0-9_.$`]+)['"`]\s+doesn't exist/i)?.[1];
+      if(missingTable){const identifier=missingTable.split(/[.`]/).filter(Boolean).at(-1)||'';if(/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(identifier))return `database_missing_table_${identifier.toLowerCase()}`;}
+      const driverCode=typeof meta.code==='string'?meta.code:'';
+      if(/^[0-9]{3,5}$/.test(driverCode))return `database_p2010_mysql_${driverCode}`;
+      return 'database_p2010';
+    }
     if(code==='P2022'||code==='P2021'){
       const property=code==='P2022'?'column':'table';
       const meta='meta' in error&&error.meta&&typeof error.meta==='object'?error.meta as Record<string,unknown>:{};

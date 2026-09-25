@@ -63,6 +63,12 @@ export async function saveCjSync(form: FormData) {
     usdToSarX100: rate !== undefined ? Math.round(rate * 100) : undefined,
     shippingMinor: (() => { const s = numField(form, 'shippingSar'); return s !== undefined ? Math.round(s * 100) : undefined; })(),
   });
+  // مدّة التوصيل التقديرية (نصّ قابل للتحكّم من الإدارة) — تُعرض على صفحة السلعة حين
+  // لا يوفّر CJ مدّة حيّة. تُخزَّن كإعداد مستقل حتى لا تمسّ شكل إعدادات المزامنة.
+  if (form.has('deliveryDays')) {
+    const { setSetting } = await import('@/lib/settings');
+    await setSetting('cj_delivery_days_text', String(form.get('deliveryDays') || '').trim().slice(0, 60));
+  }
   await auditCjChange(s.uid, 'integrations', 'sync', before, await cjSyncSettings());
   revalidatePath('/admin/suppliers/cj');
   redirect('/admin/suppliers/cj?saved=sync');

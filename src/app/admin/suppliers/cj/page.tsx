@@ -10,6 +10,7 @@ import { countCjProducts } from '@/lib/cj/mapping';
 import { testConnection, listProducts, getInventoryByPid, getWarehouses, calculateFreightToKSA } from '@/lib/cj/client';
 import { sampleCjProducts } from '@/lib/cj/sample';
 import { cjSyncSettings } from '@/lib/cj/sync';
+import { getSetting } from '@/lib/settings';
 import { saveCjMargin, saveCjSync, runCjSync } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -28,11 +29,12 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
   await requireAdminPage('/admin/suppliers/cj');
   const sp = await searchParams;
   const cfg = cjConfig();
-  const [commerce, marginBps, mapped, sync] = await Promise.all([
+  const [commerce, marginBps, mapped, sync, deliveryDays] = await Promise.all([
     getCommerceConfig().catch(() => null),
     defaultMarginBps(),
     countCjProducts(),
     cjSyncSettings(),
+    getSetting('cj_delivery_days_text', '٧–١٥ يوم عمل'),
   ]);
   const liveAllowed = process.env.SUPPLIER_ALLOW_LIVE_ORDERS === 'true';
   const run = typeof sp.run === 'string' ? sp.run : '';
@@ -113,6 +115,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
           <label className="text-sm">عدد الصفحات<input className={`${input} ms-2 w-24`} name="maxPages" type="number" min={1} max={20} defaultValue={sync.maxPages} /></label>
           <label className="text-sm">سعر صرف الدولار (ر.س)<input className={`${input} ms-2 w-24`} name="usdToSar" inputMode="decimal" defaultValue={(sync.usdToSarX100 / 100).toString()} /></label>
           <label className="text-sm">تقدير الشحن/منتج (ر.س)<input className={`${input} ms-2 w-24`} name="shippingSar" inputMode="decimal" defaultValue={(sync.shippingMinor / 100).toString()} /></label>
+          <label className="text-sm sm:col-span-2">مدّة التوصيل التقديرية (نصّ يظهر للعميل)<input className={`${input} ms-2 w-48`} name="deliveryDays" defaultValue={deliveryDays} placeholder="مثال: ٧–١٥ يوم عمل" /></label>
           <div className="sm:col-span-2"><button className={btn}>حفظ إعدادات المزامنة</button></div>
         </form></AccessBoundary>
         <AccessBoundary module="integrations" action="sync"><form action={runCjSync}>

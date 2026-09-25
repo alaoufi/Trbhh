@@ -102,10 +102,6 @@ services:
       CJ_WEBHOOK_SECRET: ${CJ_WEBHOOK_SECRET:-}
       # بريد اختياري لرفع الحصة اليومية المجانية لخدمة الترجمة MyMemory (لا يُخزَّن بالكود).
       MYMEMORY_EMAIL: ${MYMEMORY_EMAIL:-}
-      # خدمة الترجمة الذاتية LibreTranslate على نفس شبكة compose (بلا اشتراك/حصّة/إنترنت).
-      # القيمة الافتراضية تشير للحاوية الداخلية libretranslate:5000 فتعمل الترجمة تلقائياً
-      # دون أي ضبط يدوي؛ قابلة للتجاوز من .env أو من إعداد cj_libretranslate_url في لوحة الإدارة.
-      LIBRETRANSLATE_URL: ${LIBRETRANSLATE_URL:-http://libretranslate:5000}
       NODE_ENV: production
       # كل الأوقات والتواريخ بتوقيت الرياض (+3)
       TZ: Asia/Riyadh

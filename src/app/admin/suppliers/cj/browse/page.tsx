@@ -9,7 +9,7 @@ import { sampleOneCjProduct } from '@/lib/cj/sample';
 import { importedCjPids, listCjProducts, parseCjAvailability } from '@/lib/cj/mapping';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
-import { getCachedArabic, isArabicText } from '@/lib/cj/translate';
+import { getCachedArabic, isArabicText, DEFAULT_LIBRETRANSLATE_URL } from '@/lib/cj/translate';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateCjBrowsePage, translateAllCj, translateCjCategories, runCjTranslateWarm, refreshCjMediaAction, refreshCjImportedAvailability, saveCjTranslationSettings } from '../actions';
 import { getSetting } from '@/lib/settings';
@@ -47,7 +47,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
   }
 
   const [settings, marginBps, catsRes] = await Promise.all([cjSyncSettings(), defaultMarginBps(), getCategories()]);
-  const [deeplKeySet, memEmail, libreUrl] = await Promise.all([getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', ''), getSetting('cj_libretranslate_url', '')]);
+  const [deeplKeySet, memEmail, libreUrl] = await Promise.all([getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', ''), getSetting('cj_libretranslate_url', DEFAULT_LIBRETRANSLATE_URL)]);
   const categories = catsRes.ok ? catsRes.data : [];
   // CJ indexes product names in its source language, while admins commonly
   // search using the saved Arabic display title. Translate only the query;

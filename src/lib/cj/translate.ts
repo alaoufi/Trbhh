@@ -9,6 +9,13 @@ import { getSetting } from '@/lib/settings';
  *  - cj_mymemory_email: بريد لرفع حصّة MyMemory المجانية (احتياطي).
  * كاش قصير لتفادي قراءة القاعدة في كل نداء ترجمة.
  */
+/** المزوّد الافتراضي: حاوية LibreTranslate الذاتية على شبكة compose الداخلية.
+ *  يجعل الترجمة الآلية تعمل تلقائياً دون أي ضبط يدوي من المشرف. يُتجاوَز بإعداد
+ *  cj_libretranslate_url (قيمة مخصّصة) في لوحة الإدارة، ويُعطَّل بحفظ قيمة فارغة،
+ *  أو يُضبط عبر LIBRETRANSLATE_URL في البيئة. ليس إعداداً في الكود بل قيمة
+ *  افتراضية قابلة للتغيير بالكامل من لوحة الإدارة (القاعدة #1). */
+export const DEFAULT_LIBRETRANSLATE_URL = 'http://libretranslate:5000';
+
 let providerCfg: { at: number; libreUrl: string; libreKey: string; deeplKey: string; email: string } | null = null;
 async function translationProviders(): Promise<{ libreUrl: string; libreKey: string; deeplKey: string; email: string }> {
   if (providerCfg && Date.now() - providerCfg.at < 60_000) return providerCfg;
@@ -18,7 +25,7 @@ async function translationProviders(): Promise<{ libreUrl: string; libreKey: str
   let email = (process.env.MYMEMORY_EMAIL || '').trim();
   try {
     const [u, lk, k, e] = await Promise.all([
-      getSetting('cj_libretranslate_url', ''), getSetting('cj_libretranslate_key', ''),
+      getSetting('cj_libretranslate_url', DEFAULT_LIBRETRANSLATE_URL), getSetting('cj_libretranslate_key', ''),
       getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', ''),
     ]);
     if (u.trim()) libreUrl = u.trim();

@@ -47,10 +47,17 @@ function inspectVerifiedFinanceBackup(parent,base){
   for(const [name,digest] of sums)check(hash(read(path.join(parent,name)))===digest);
   const canonicalFull=raw=>{
     const value=JSON.parse(raw);check(value?.format==='trbhh-database-full-proof-v1'&&value.tables&&typeof value.tables==='object'&&!Array.isArray(value.tables));
+    check(Object.hasOwn(value.tables,'users')&&Object.hasOwn(value.tables,'ads'));
     const tables={};for(const name of Object.keys(value.tables).sort()){
-      const table=value.tables[name];check(table&&Array.isArray(table.rowHashes));tables[name]={...table,rowHashes:[...table.rowHashes].sort()};
+      const table=value.tables[name],validNames=list=>Array.isArray(list)&&new Set(list).size===list.length&&list.every(item=>typeof item==='string'&&/^[A-Za-z0-9_]+$/.test(item));
+      check(table&&Number.isSafeInteger(table.count)&&table.count>=0&&typeof table.engine==='string'&&table.engine.length>0&&/^[a-f0-9]{64}$/.test(table.schemaSha256));
+      check(validNames(table.columns)&&table.columns.length>0&&validNames(table.primaryKeyColumns)&&table.primaryKeyColumns.every(column=>table.columns.includes(column)));
+      check(Array.isArray(table.rowHashes)&&table.rowHashes.length===table.count&&table.rowHashes.every(value=>/^[a-f0-9]{64}$/.test(value)));
+      // Match the official restore proof: capture timestamps are irrelevant and
+      // row-hash ordering is normalized before comparing table contents.
+      tables[name]={count:table.count,engine:table.engine,columns:table.columns,primaryKeyColumns:table.primaryKeyColumns,schemaSha256:table.schemaSha256,rowHashes:[...table.rowHashes].sort()};
     }
-    return {...value,tables};
+    return tables;
   };
   const before=canonicalFull(read(path.join(parent,'full-before.json'))),restored=canonicalFull(read(path.join(parent,'full-restored.json')));check(isDeepStrictEqual(before,restored));
   const media=[];

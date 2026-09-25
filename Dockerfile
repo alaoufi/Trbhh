@@ -21,6 +21,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
+# DATABASE_URL وهمية لمرحلة البناء فقط: Prisma يتطلب المتغيّر عند إنشاء العميل أثناء
+# `next build` (تجميع بيانات الصفحات)، ولا يتّصل فعلياً (الصفحات ديناميكية وقت التشغيل).
+# التشغيل الإنتاجي يستخدم DATABASE_URL الحقيقية من docker-compose/.env في مرحلة runner.
+ENV DATABASE_URL="mysql://build:build@127.0.0.1:3306/trbhh_build_placeholder"
 RUN pnpm build
 
 # ---- runner ----

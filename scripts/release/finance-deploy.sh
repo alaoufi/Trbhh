@@ -203,10 +203,14 @@ NODE
 
 prove_preservation() {
   local container
+  substep=preservation_media_preflight
   verify_retained_media
+  substep=preservation_candidate_health
   check_container
   container=$(docker compose ps -q app)
+  substep=preservation_commerce_schema
   docker exec -i "$container" node - < "$tools_dir/finance-schema-check.cjs"
+  substep=preservation_runtime
   docker inspect "$container" > "$backup/container-after.json"
   node "$tools_dir/verify-runtime.cjs" "$backup/container-before.json" "$backup/container-after.json" merchant_oauth
 # RUNTIME_ENV_PROOF_BEGIN
@@ -220,15 +224,22 @@ for(const key of new Set([...Object.keys(before),...Object.keys(after)])){
 if((after.FINANCE_CAPTURE_SECRET||'').length<32||(before.FINANCE_CAPTURE_SECRET&&before.FINANCE_CAPTURE_SECRET!==after.FINANCE_CAPTURE_SECRET))throw Error('capture_secret_changed');
 NODE
 # RUNTIME_ENV_PROOF_END
+  substep=preservation_database_snapshot
   docker exec -i "$container" node - snapshot < "$tools_dir/database-proof.cjs" > "$backup/after.json"
+  substep=preservation_database_values
   node "$tools_dir/database-proof.cjs" verify "$backup/before.json" "$backup/after.json"
+  substep=preservation_supplier_snapshot
   docker exec -i "$container" node - snapshot < "$tools_dir/supplier-preservation-proof.cjs" > "$backup/supplier-after.json"
+  substep=preservation_supplier_values
   node "$tools_dir/supplier-preservation-proof.cjs" verify "$backup/supplier-before.json" "$backup/supplier-after.json"
   for label in storage legacy; do
     [[ -f "$backup/$label.path" ]] || continue
+    substep=preservation_${label}_snapshot
     docker exec -i -u 0 "$container" node - snapshot "$(cat "$backup/$label.path")" < "$tools_dir/media-proof.cjs" > "$backup/$label-after.json"
+    substep=preservation_${label}_values
     node "$tools_dir/media-proof.cjs" verify "$backup/$label-before.json" "$backup/$label-after.json"
   done
+  substep=preservation_final_health
   check_container
 }
 

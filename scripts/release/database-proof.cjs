@@ -82,12 +82,20 @@ const PROTECTED = {
   favorites: '*',
 };
 
-// This single reviewed addition has no historical value except NULL. Include a
-// virtual NULL in the BEFORE digest when the column is absent, then compare it
-// with the actual AFTER value. Never omit the new field or waive a row change.
-// Existing fields remain protected, and strict schema verification checks the
-// actual new column's presence/type/default separately.
-const NULLABLE_ADDITIONS = {finance_tax_policies: ['calculation_policy']};
+// Reviewed additive columns are included in row proofs even before they exist.
+// Their migration defaults are projected into the old snapshot, so the exact
+// old-row values remain comparable after ADD COLUMN. Any non-default value on
+// an existing row is still a protected-row change. The release schema check
+// separately verifies column type, nullability, and default.
+const ADDITIVE_DEFAULTS = {
+  finance_tax_policies: {calculation_policy: null},
+  commerce_order_items: {
+    list_unit_price_minor: null,
+    discount_minor: 0,
+    variant_key: '',
+    variant_snapshot: null,
+  },
+};
 
 const VOLATILE_COLUMNS = new Set(['created_at', 'updated_at', 'modified_at', 'last_seen', 'last_seen_at', 'seen', 'seen_at', 'read_at', 'last_login_at', 'views', 'clicks']);
 class ProofError extends Error {}
@@ -221,8 +229,9 @@ async function snapshot(full = false) {
         const available = (byColumn.get(name) || []).map((r) => r.c);
         const pkColumns = byPk.get(name) || [];
         const configured = PROTECTED[name];
-        const additions = NULLABLE_ADDITIONS[name] || [];
-        const protectedColumns = configured === '*' ? [...available.filter((c) => !VOLATILE_COLUMNS.has(c) && !additions.includes(c)), ...additions] : (configured || []).filter((c) => available.includes(c));
+        const additions = ADDITIVE_DEFAULTS[name] || {};
+        const additionColumns = Object.keys(additions);
+        const protectedColumns = configured === '*' ? [...available.filter((c) => !VOLATILE_COLUMNS.has(c) && !additionColumns.includes(c)), ...additionColumns] : (configured || []).filter((c) => available.includes(c));
         if (Array.isArray(configured)) {
           const missing = configured.filter((c) => !available.includes(c));
           if (missing.length) notes.push({ table: name, kind: 'optional_protected_columns_absent', columns: missing });
@@ -244,7 +253,7 @@ async function snapshot(full = false) {
               const key = fingerprint(pkColumns.map((c) => record[c]));
               assert(!(key in proof.rowFingerprints), 'Unexpected duplicate primary key fingerprint.');
               proof.primaryKeys.push(key);
-              if (protectedColumns.length) proof.rowFingerprints[key] = fingerprint(protectedColumns.map((c) => [c, record[c]]));
+              if (protectedColumns.length) proof.rowFingerprints[key] = fingerprint(protectedColumns.map((c) => [c, available.includes(c) ? record[c] : additions[c]]));
             }
             if (rows.length < PAGE_SIZE) break;
             last = pkColumns.map((c) => rows[rows.length - 1][c]);

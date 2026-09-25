@@ -23,17 +23,23 @@ function proof() {
   ]]));
   const names = ['users', 'ads', ...tables];
   let calculationColumn = false;
+  let orderItemSnapshotColumns = false;
   const tx = {
     async $queryRawUnsafe(sql: string) {
       if (sql.includes('SELECT DATABASE()')) return [{ db: 'proof_test', version: 'test', observed_at: 'test' }];
       if (sql.includes('information_schema.TABLES')) return names.map(name => ({ name, engine: 'InnoDB' }));
       if (sql.includes('information_schema.COLUMNS')) return names.flatMap(t =>
-        (tables.includes(t) ? ['id', 'amount_halala', 'snapshot', 'updated_at', ...(t==='finance_tax_policies'&&calculationColumn?['calculation_policy']:[])] : ['id'])
+        (tables.includes(t) ? [
+          'id', 'amount_halala', 'snapshot', 'updated_at',
+          ...(t==='finance_tax_policies'&&calculationColumn?['calculation_policy']:[]),
+          ...(t==='commerce_order_items'&&orderItemSnapshotColumns?['list_unit_price_minor','discount_minor','variant_key','variant_snapshot']:[]),
+        ] : ['id'])
           .map(c => ({ t, c, type: 'text', nullable: 'NO', def: null })));
       if (sql.includes('KEY_COLUMN_USAGE')) return names.map(t => ({ t, c: 'id' }));
       const name = sql.match(/FROM `([a-z_]+)`/)?.[1];
       if (!name) throw Error('Unexpected proof query');
       if(name==='finance_tax_policies'&&!calculationColumn&&sql.includes('`calculation_policy`'))throw Error('Absent column must not be queried');
+      if(name==='commerce_order_items'&&!orderItemSnapshotColumns&&sql.includes('`list_unit_price_minor`'))throw Error('Absent order snapshot columns must not be queried');
       const rows = records[name] || [];
       if (sql.startsWith('SELECT COUNT')) return [{ n: rows.length }];
       return rows;
@@ -49,7 +55,7 @@ function proof() {
     process: { env: { DATABASE_URL: 'mysql://test:test@localhost/proof_test' } },
     URL, Buffer, Date, Uint8Array,
   });
-  return { records, addCalculationColumn(){calculationColumn=true;}, ...api };
+  return { records, addCalculationColumn(){calculationColumn=true;}, addOrderItemSnapshotColumns(){orderItemSnapshotColumns=true;}, ...api };
 }
 
 describe('financial release preservation uses values, not only row counts', () => {
@@ -65,6 +71,22 @@ describe('financial release preservation uses values, not only row counts', () =
     api.addCalculationColumn();api.records.finance_tax_policies[0].calculation_policy=null;
     api.records.finance_tax_policies[0].amount_halala=1;
     expect(api.verify(before,await api.snapshot()).ok).toBe(false);
+  });
+  it('allows the reviewed additive legacy order-item columns only at their migration defaults', async () => {
+    const api = proof(), before = await api.snapshot();
+    api.addOrderItemSnapshotColumns();
+    Object.assign(api.records.commerce_order_items[0], {
+      list_unit_price_minor: null,
+      discount_minor: 0,
+      variant_key: '',
+      variant_snapshot: null,
+    });
+    expect(api.verify(before, await api.snapshot()).ok).toBe(true);
+
+    api.records.commerce_order_items[0].variant_key = 'unexpected';
+    const changed = api.verify(before, await api.snapshot());
+    expect(changed.ok).toBe(false);
+    expect(changed.failures).toContainEqual({ table: 'commerce_order_items', kind: 'protected_rows_changed', count: 1 });
   });
   it('protects existing V2 policy settings on later releases',async()=>{
     const api=proof();api.addCalculationColumn();api.records.finance_tax_policies[0].calculation_policy={version:2,automationDelegateId:'1'};

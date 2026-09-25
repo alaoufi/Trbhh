@@ -8,6 +8,7 @@ const BASE='/root/trbhh-release-backups',PARENT_ID='35603864905',SEAL_ID='356076
 const SELECTED_FORMAT='trbhh-finance-media-selection-v1',MIXED='fresh-storage-retained-legacy';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 let parentCheckStage='not_applicable';
+let parentCheckFile=null;
 function check(value){if(!value)throw Error('finance_media_reference_invalid');}
 function directory(value,base){
   const info=fs.lstatSync(value);check(info.isDirectory()&&!info.isSymbolicLink()&&fs.realpathSync(value)===value);
@@ -50,7 +51,7 @@ function inspectVerifiedFinanceBackup(parent,base){
   const required=['code.tar.gz','database.sql.gz','image.tar.gz','storage.tar.gz','legacy.tar.gz','container-before.json','full-before.json','full-restored.json','commit.txt','candidate.txt','legacy.path','legacy-before.json','storage.path','storage-before.json'];
   for(const name of required)check(sums.has(name));
   parentCheckStage='parent_file_hashes';
-  for(const [name,digest] of sums)check(hash(read(path.join(parent,name)))===digest);
+  for(const [name,digest] of sums){parentCheckFile=name;check(hash(read(path.join(parent,name)))===digest);}
   parentCheckStage='parent_restore_proof';
   const canonicalFull=raw=>{
     const value=JSON.parse(raw);check(value?.format==='trbhh-database-full-proof-v1'&&value.tables&&typeof value.tables==='object'&&!Array.isArray(value.tables));
@@ -148,7 +149,7 @@ if(require.main===module){
     process.stdout.write(JSON.stringify(result)+'\n');
   }catch{
     const [mode,first]=process.argv.slice(2);
-    if(mode==='inspect'&&first===path.join(BASE,'finance-'+FINANCE_PARENT_ID))process.stdout.write(JSON.stringify({ok:false,stage:parentCheckStage})+'\n');
+    if(mode==='inspect'&&first===path.join(BASE,'finance-'+FINANCE_PARENT_ID))process.stdout.write(JSON.stringify({ok:false,stage:parentCheckStage,file:parentCheckFile})+'\n');
     else process.stderr.write('Finance retained media verification failed; preserve all backups. Private details withheld.\n');
     process.exitCode=1;
   }

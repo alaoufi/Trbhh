@@ -1,5 +1,5 @@
 import 'server-only';
-import { getProduct as cjGet } from './client';
+import { getProduct as cjGet, getVariants as cjGetVariants } from './client';
 import { readCjAvailability, type AvailabilityDeps } from './availability';
 import { collectCjProductImages } from './media';
 import { upsertCjProduct, buildCjDetails } from './mapping';
@@ -17,6 +17,7 @@ import type { CjResult, CjProductDetail } from './types';
 export type CjImportDeps = {
   createOnly?: boolean;
   getProduct?: (pid: string) => Promise<CjResult<CjProductDetail>>;
+  getVariants?: typeof cjGetVariants;
   availability?: AvailabilityDeps;
   settings?: () => Promise<CjSyncSettings>;
   marginBps?: () => Promise<number>;
@@ -49,11 +50,18 @@ export async function importCjProductByPid(pid: string, deps: CjImportDeps = {})
   ]);
   // معرض الصور: صورة المنتج + صور المتغيّرات + صور مضمّنة في الوصف (غالباً الصور الحقيقية).
   const gallery = collectCjProductImages(d);
-  const detailsJson = JSON.stringify(buildCjDetails(d.variants ?? []));
+  // خيارات السلعة كاملة (لون/مقاس/قابس...): نقطة المتغيّرات المخصّصة هي المصدر الموثوق
+  // للقائمة الكاملة؛ قد تكون المضمّنة في تفاصيل المنتج ناقصة. نأخذ الأكثر اكتمالاً،
+  // ونتراجع بأمان إلى المضمّنة عند فشل/تعذّر النداء (لا نفقد أي خيار).
+  const detailVariants = d.variants ?? [];
+  const variantsRes = await (deps.getVariants ?? cjGetVariants)(clean).catch(() => null);
+  const queryVariants = variantsRes?.ok ? variantsRes.data : [];
+  const fullVariants = queryVariants.length >= detailVariants.length ? queryVariants : detailVariants;
+  const detailsJson = JSON.stringify(buildCjDetails(fullVariants));
   // Verify stock by the product's full variant inventory and request a Saudi
   // freight estimate. If either read fails or gives no available route, keep
   // the product in staff staging but make it ineligible for public display.
-  const availabilityJson = await readCjAvailability(clean, d.variants ?? [], deps.availability);
+  const availabilityJson = await readCjAvailability(clean, fullVariants, deps.availability);
   await upsert({
     cjProductId: clean, cjSku: d.productSku || '', name: d.productName || '', nameAr,
     sourceDescription: d.description || null, descriptionAr: descAr,

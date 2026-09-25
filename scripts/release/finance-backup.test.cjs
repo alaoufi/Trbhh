@@ -135,6 +135,7 @@ test('parent capacity is available only after a successful immutable-parent insp
 });
 test('retained legacy media resolves only from the exact verified finance checkpoint',()=>{
   const source=read();assert.match(source,/media_parent="\$base\/finance-36082393573"/);
+  assert.match(source,/stage=parent_media\n  substep=parent_inspect/);
   assert.match(source,/finance-media-reference\.cjs" inspect "\$media_parent"/);
   assert.match(source,/finance-media-reference\.cjs" prepare-legacy "\$media_parent"/);
 });

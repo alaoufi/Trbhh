@@ -57,6 +57,7 @@ else
   # storage remains freshly archived; each measured root keeps its own budget.
   # Database/code/image allocation and all reserves remain unchanged.
   stage=parent_media
+  substep=parent_inspect
   node "$tools_dir/finance-media-reference.cjs" inspect "$media_parent" >&3
   media_capacity=fresh-storage-retained-legacy
   node "$tools_dir/backup-capacity-proof.cjs" check "$capacity" "$image_bytes" "$code_bytes" "$base" "$docker_root" "$media_capacity" >&3
@@ -72,7 +73,7 @@ printf '%s\n' "$candidate" > "$backup/candidate.txt"
 printf '%s\n' "$current_image" > "$backup/image-id.txt"
 printf '%s\n' "$container" > "$backup/container-id.txt"
 docker inspect "$container" > "$backup/container-before.json"
-if [[ "$media_capacity" == fresh-storage-retained-legacy ]]; then node "$tools_dir/finance-media-reference.cjs" prepare-legacy "$media_parent" "$backup"; fi
+if [[ "$media_capacity" == fresh-storage-retained-legacy ]]; then substep=parent_prepare; node "$tools_dir/finance-media-reference.cjs" prepare-legacy "$media_parent" "$backup"; fi
 cp .env "$backup/environment.env"
 cp docker-compose.yml "$backup/docker-compose.yml"
 cp "$runtime_manifest" "$backup/runtime-twa-manifest.json"

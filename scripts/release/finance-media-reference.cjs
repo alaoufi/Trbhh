@@ -7,6 +7,7 @@ const {validateManifest,verify:verifyMedia}=require('./media-proof.cjs');
 const BASE='/root/trbhh-release-backups',PARENT_ID='35603864905',SEAL_ID='35607654850',FINANCE_PARENT_ID='36082393573',FINANCE_PARENT_COMMIT='353ae4c023e1183452b38be3f6fe8b9284d047c8',FINANCE_PARENT_CANDIDATE='19e4c6f72c35f4adf2cb96600da094ef46788e2b',FORMAT='trbhh-finance-media-reference-v1';
 const SELECTED_FORMAT='trbhh-finance-media-selection-v1',MIXED='fresh-storage-retained-legacy';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+let parentCheckStage='not_applicable';
 function check(value){if(!value)throw Error('finance_media_reference_invalid');}
 function directory(value,base){
   const info=fs.lstatSync(value);check(info.isDirectory()&&!info.isSymbolicLink()&&fs.realpathSync(value)===value);
@@ -34,17 +35,23 @@ function historicalSeal(parent,base){
   return {checkpointId:SEAL_ID,markers,referenceSha256:hash(raw),checksumsSha256:hash(sumsRaw)};
 }
 function inspectVerifiedFinanceBackup(parent,base){
+  parentCheckStage='parent_directory';
   const expectedPath=path.join(base,'finance-'+FINANCE_PARENT_ID);check(parent===expectedPath);directory(base,base);directory(parent,base);
+  parentCheckStage='parent_markers';
   for(const [name,value] of [['VERIFIED',FINANCE_PARENT_COMMIT],['commit.txt',FINANCE_PARENT_COMMIT],['candidate.txt',FINANCE_PARENT_CANDIDATE]])check(read(path.join(parent,name)).toString().trim()===value);
   check(!fs.existsSync(path.join(parent,'WATCHDOG_FIRED')));
+  parentCheckStage='parent_checksum_manifest';
   const sumsRaw=read(path.join(parent,'SHA256SUMS')),sums=new Map();
   for(const line of sumsRaw.toString().trimEnd().split('\n')){
     const match=/^([a-f0-9]{64})  ([A-Za-z0-9_.-]+)$/.exec(line);check(match&&!['.','..'].includes(match[2])&&!sums.has(match[2]));
     sums.set(match[2],match[1]);
   }
+  parentCheckStage='parent_required_files';
   const required=['code.tar.gz','database.sql.gz','image.tar.gz','storage.tar.gz','legacy.tar.gz','container-before.json','full-before.json','full-restored.json','commit.txt','candidate.txt','legacy.path','legacy-before.json','storage.path','storage-before.json'];
   for(const name of required)check(sums.has(name));
+  parentCheckStage='parent_file_hashes';
   for(const [name,digest] of sums)check(hash(read(path.join(parent,name)))===digest);
+  parentCheckStage='parent_restore_proof';
   const canonicalFull=raw=>{
     const value=JSON.parse(raw);check(value?.format==='trbhh-database-full-proof-v1'&&value.tables&&typeof value.tables==='object'&&!Array.isArray(value.tables));
     check(Object.hasOwn(value.tables,'users')&&Object.hasOwn(value.tables,'ads'));
@@ -60,12 +67,14 @@ function inspectVerifiedFinanceBackup(parent,base){
     return tables;
   };
   const before=canonicalFull(read(path.join(parent,'full-before.json'))),restored=canonicalFull(read(path.join(parent,'full-restored.json')));check(isDeepStrictEqual(before,restored));
+  parentCheckStage='parent_media_manifests';
   const media=[];
   for(const label of ['storage','legacy']){
     const mediaPath=read(path.join(parent,label+'.path')),manifest=read(path.join(parent,label+'-before.json'));
     check(mediaPath.toString().trim()==='/app/'+label);validateManifest(JSON.parse(manifest));
     media.push({label,archive:label+'.tar.gz',archiveSha256:sums.get(label+'.tar.gz'),pathSha256:hash(mediaPath),manifestSha256:hash(manifest)});
   }
+  parentCheckStage='parent_complete';
   return {format:'trbhh-verified-finance-backup-media-v1',parentId:FINANCE_PARENT_ID,parentPath:parent,parentCommit:FINANCE_PARENT_COMMIT,parentCandidate:FINANCE_PARENT_CANDIDATE,checksumsSha256:hash(sumsRaw),media};
 }
 function inspect(parent,base=BASE){
@@ -137,6 +146,11 @@ if(require.main===module){
     else if(mode==='verify-current'&&first&&!second)result=verifyCurrent(first);
     else throw Error('arguments');
     process.stdout.write(JSON.stringify(result)+'\n');
-  }catch{process.stderr.write('Finance retained media verification failed; preserve all backups. Private details withheld.\n');process.exitCode=1;}
+  }catch{
+    const [mode,first]=process.argv.slice(2);
+    if(mode==='inspect'&&first===path.join(BASE,'finance-'+FINANCE_PARENT_ID))process.stdout.write(JSON.stringify({ok:false,stage:parentCheckStage})+'\n');
+    else process.stderr.write('Finance retained media verification failed; preserve all backups. Private details withheld.\n');
+    process.exitCode=1;
+  }
 }
 module.exports={inspect,prepare,verify,verifyCurrent,FINANCE_PARENT_ID};

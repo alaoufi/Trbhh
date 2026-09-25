@@ -19,10 +19,10 @@ export function financeCaptureErrorCategory(error: unknown): string {
       const meta='meta' in error&&error.meta&&typeof error.meta==='object'?error.meta as Record<string,unknown>:{};
       const raw=typeof meta[property]==='string'?meta[property]:'';
       const identifier=raw.split(/[.`]/).filter(Boolean).at(-1)||'';
-      if(/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(identifier))return `database_missing_${property}_${identifier}`;
+      if(/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(identifier))return `database_missing_${property}_${identifier.toLowerCase()}`;
       return `database_missing_${property}`;
     }
-    return `database_${code}`;
+    return `database_${code.toLowerCase()}`;
   }
   return 'unknown_error';
 }

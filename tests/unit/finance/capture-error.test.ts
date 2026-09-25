@@ -10,6 +10,7 @@ describe('financeCaptureErrorCategory',()=>{
   it('does not expose exception text or database details',()=>{
     expect(financeCaptureErrorCategory(new Error('secret=top-secret customer@example.com'))).toBe('unknown_error');
     expect(financeCaptureErrorCategory(Object.assign(new Error('query leaked private values'),{code:'P2022',meta:{column:'db.finance_order_items.variant_snapshot'}}))).toBe('database_missing_column_variant_snapshot');
-    expect(financeCaptureErrorCategory(Object.assign(new Error('query leaked private values'),{code:'P2010'}))).toBe('database_P2010');
+    expect(financeCaptureErrorCategory(Object.assign(new Error('query leaked private values'),{code:'P2010'}))).toBe('database_p2010');
+    expect(financeCaptureErrorCategory(Object.assign(new Error('query leaked private values'),{code:'P2022',meta:{column:'db.finance_order_items.variantSnapshot'}}))).toBe('database_missing_column_variantsnapshot');
   });
 });

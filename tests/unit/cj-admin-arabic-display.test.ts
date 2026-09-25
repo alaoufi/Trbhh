@@ -30,11 +30,12 @@ vi.mock('@/lib/cj/mapping',()=>{
   return {importedCjPids:async()=>new Set(),listCjProducts:async()=>[row()],listVisibleCjProducts:async()=>[row()],getCjProductById:async()=>row(),parseCjAvailability:()=>null};
 });
 vi.mock('@/lib/cj/storefront',()=>({cjImg:(value:string)=>value,cjProductImages:()=>['https://example.test/saved-gallery.jpg'],cjStorefrontPublic:async()=>false}));
+vi.mock('@/lib/settings',()=>({getSetting:async(_k:string,fallback='')=>fallback}));
 vi.mock('@/lib/cj/translate',async(importOriginal)=>{
   const actual=await importOriginal<typeof import('@/lib/cj/translate')>();
   return {...actual,getCachedArabic:async(texts:string[])=>{state.read(texts);return actual.getCachedArabic(texts);},translateManyCached:state.translate,translateToArabic:state.translate};
 });
-vi.mock('@/app/admin/suppliers/cj/actions',()=>({importCjProduct:state.write,removeCjProduct:state.write,saveCjArabic:state.write,saveCjPrice:state.write,toggleCjHidden:state.write,translateCjProduct:state.write,translateCjBrowsePage:state.write,translateAllCj:state.write,translateCjCategories:state.write,runCjTranslateWarm:state.write,refreshCjMediaAction:state.write,refreshCjImportedAvailability:state.write,setCjStorefront:state.write,approveCjProduct:state.write,saveCjReview:state.write}));
+vi.mock('@/app/admin/suppliers/cj/actions',()=>({importCjProduct:state.write,removeCjProduct:state.write,saveCjArabic:state.write,saveCjPrice:state.write,toggleCjHidden:state.write,translateCjProduct:state.write,translateCjBrowsePage:state.write,translateAllCj:state.write,translateCjCategories:state.write,runCjTranslateWarm:state.write,refreshCjMediaAction:state.write,refreshCjImportedAvailability:state.write,saveCjTranslationSettings:state.write,setCjStorefront:state.write,approveCjProduct:state.write,saveCjReview:state.write}));
 import Browse from '@/app/admin/suppliers/cj/browse/page';
 import Showcase from '@/app/admin/suppliers/cj/showcase/page';
 import Review from '@/app/admin/suppliers/cj/review/[id]/page';

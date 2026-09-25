@@ -22,16 +22,17 @@ export const metadata = { title: 'تفاصيل السلعة — تجربة CJ', 
 
 export default async function CjStoreProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const view = await cjStorefrontView();
-  // This iteration is an explicitly private CJ trial, even if the old public flag changes.
-  if (!view.isStaff) notFound();
   const { id: idStr } = await params;
   const sp = await searchParams;
   const id = Number(idStr);
   if (!Number.isSafeInteger(id) || id <= 0) notFound();
+  const session = await getSession();
   const p = await getStorefrontCjProduct(id, view.isPublic);
   if (!p) notFound();
-  const session = await getSession();
   const capabilities = session ? await cjProductCapabilities(session.uid, p.agent_user_id) : { agent: false, edit: false, suspend: false, delete: false };
+  // صفحة السلعة خاصة (تجربة CJ): يفتحها الموظّف، أو وكيل السلعة النشط لإدارة سلعته
+  // (يختارها/يعدّلها/يتابع شحنها/تصله رسائل الشراء) حتى لو لم يكن موظّفاً. غيرهما ممنوع.
+  if (!view.isStaff && !capabilities.agent) notFound();
   const canManage = capabilities.edit || capabilities.suspend || capabilities.delete;
   const hasActivity = capabilities.delete ? (await cjProductOrderCount(p.cj_product_id)) > 0 : false;
   const productAgent = p.agent_user_id != null ? await getAgent(p.agent_user_id) : null;

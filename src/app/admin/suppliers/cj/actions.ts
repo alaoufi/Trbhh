@@ -5,13 +5,13 @@ import { hasAccess, requireAccess } from '@/lib/access-control/guards';
 import { defaultMarginBps, setDefaultMarginBps } from '@/lib/cj/pricing';
 import { cjSyncSettings, saveCjSyncSettings, syncCjCatalog } from '@/lib/cj/sync';
 import { importCjProductByPid } from '@/lib/cj/import';
-import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductStatus, setCjProductDescriptionAr, setCjProductCategory, cjProductOrderCount, setCjProductAvailability, setCjProductGallery } from '@/lib/cj/mapping';
+import { removeCjProductById, setCjProductNameAr, setCjProductHidden, setCjProductPriceOverride, getCjProductById, listUntranslatedCjProducts, updateCjReview, setCjProductStatus, setCjProductDescriptionAr, setCjProductCategory, cjProductOrderCount, setCjProductAvailability, setCjProductGallery, setCjProductDetails, buildCjDetails } from '@/lib/cj/mapping';
 import { translateToArabicCached, translateManyCached, learnTranslation, isArabicText } from '@/lib/cj/translate';
 import { readCjAvailability } from '@/lib/cj/availability';
 import { collectCjProductImages } from '@/lib/cj/media';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
-import { getCategories, getProduct, listProductsPage } from '@/lib/cj/client';
+import { getCategories, getProduct, listProductsPage, getVariants as cjGetVariants } from '@/lib/cj/client';
 import { createOrder, getOrderById, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
 import { warmCjTranslations, refreshCjMedia } from '@/lib/cj/translate-warm';
 import { cjStorefrontPublic, setCjStorefrontPublic } from '@/lib/cj/storefront';
@@ -473,8 +473,22 @@ export async function refreshCjImportedAvailability(form: FormData) {
   }
   const images = collectCjProductImages(detail.data);
   if (images.length) await setCjProductGallery(id, images);
-  const availability = await readCjAvailability(before.cj_product_id, detail.data.variants);
+  // إعادة استيراد قائمة المتغيّرات/الخيارات كاملة من الـ API (نقطة المتغيّرات المخصّصة
+  // أكمل من المضمّنة)، وتحديث التفاصيل المخزّنة (details_json) فتظهر الخيارات في العرض.
+  const detailVariants = detail.data.variants ?? [];
+  const variantsRes = await cjGetVariants(before.cj_product_id).catch(() => null);
+  const queryVariants = variantsRes?.ok ? variantsRes.data : [];
+  const fullVariants = queryVariants.length >= detailVariants.length ? queryVariants : detailVariants;
+  await setCjProductDetails(id, buildCjDetails(fullVariants));
+  const availability = await readCjAvailability(before.cj_product_id, fullVariants);
   await setCjProductAvailability(id, availability);
+  // ترجمة الحقول العربية الناقصة تلقائياً (اسم/وصف/تصنيف) فيكفي زر واحد لمعالجة السلعة كاملة.
+  if (!before.name_ar && before.name) { const ar = await translateToArabicCached(before.name).catch(() => null); if (ar) await setCjProductNameAr(id, ar); }
+  if (!before.display_description_ar && before.source_description) {
+    const plain = String(before.source_description).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/\s{2,}/g, ' ').trim();
+    const ar = plain ? await translateToArabicCached(plain).catch(() => null) : null; if (ar) await setCjProductDescriptionAr(id, ar);
+  }
+  if (before.source_category && !isArabicText(before.trbhh_category)) { const ar = await translateToArabicCached(before.source_category).catch(() => null); if (ar) await setCjProductCategory(id, ar); }
   await auditProduct(s.uid, before);
   revalidatePath('/admin/suppliers/cj/browse');
   revalidatePath('/admin/suppliers/cj/showcase');

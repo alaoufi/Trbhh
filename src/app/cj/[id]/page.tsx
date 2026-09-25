@@ -12,7 +12,7 @@ import { CjProductDescription } from '@/components/cj/product-description';
 import { CjProductCard } from '@/components/cj/product-card';
 import { CartLink } from '@/components/cj/cart-controls';
 import { CjPurchasePanel } from '@/components/cj/purchase-panel';
-import { cleanCjDisplayDescription } from '@/lib/cj/variant-display';
+import { cleanCjDisplayDescription, cjVariantDisplayOptions } from '@/lib/cj/variant-display';
 import { cjProductDisplayTitle } from '@/lib/cj/presentation';
 
 const editInput = 'mt-1 w-full min-w-0 rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
@@ -54,15 +54,18 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
     ? [...new Map(availability.shippingOptions.map(o => [o.name, o])).values()].sort((a, b) => a.priceMinor - b.priceMinor)
     : [];
   const shipCheapest = shipOptions[0] ?? null;
-  // خيارات السلعة المميّزة (مقاس/لون/قابس...) مستخرجة من مفاتيح الخيارات، بلا تكرار أو رموز فارغة.
-  const optionTokens: string[] = [];
-  const seenOpt = new Set<string>();
+  // خيارات السلعة (اللون/المقاس/القابس...) مجمّعة بالعربية من المحلّل المُختبَر
+  // cjVariantDisplayOptions (يقرأ سمات المتغيّر أو يستنتج اللون/المقاس من اسمه/مفتاحه،
+  // ويتجاهل الضجيج). تُعرض من التفاصيل المخزّنة فتظهر حتى بلا توفّر حيّ محقّق.
+  const optionGroups = new Map<string, string[]>();
   for (const v of displayVariants) {
-    for (const tok of (v.optionKey || v.name || '').split(/[-/,;|:·、]+|\s{2,}/).map(t => t.trim()).filter(Boolean)) {
-      const k = tok.toLowerCase();
-      if (!seenOpt.has(k) && tok.length <= 24 && /[\p{L}\p{N}]/u.test(tok)) { seenOpt.add(k); optionTokens.push(tok); }
+    for (const opt of cjVariantDisplayOptions({ variantKey: v.optionKey, variantName: v.name, attributes: v.attributes })) {
+      const values = optionGroups.get(opt.label) ?? [];
+      if (!values.includes(opt.value)) values.push(opt.value);
+      optionGroups.set(opt.label, values);
     }
   }
+  const optionGroupList = [...optionGroups.entries()].map(([label, values]) => ({ label, values: values.slice(0, 40) })).slice(0, 8);
   const others = (await listStorefrontCjProducts(view.isPublic, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
 
   return <div className="mx-auto max-w-6xl min-w-0 space-y-5 px-3 pb-32 pt-5 sm:px-5 md:pb-8 [overflow-wrap:anywhere]" data-cj-trial="product">
@@ -78,7 +81,14 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         {view.isStaff && session && (verifiedVariants.length > 0
           ? <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={verifiedVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
           : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">هذه السلعة مخفية عن المشترين: لا يوجد خيار ثبت مخزونه وشحنه إلى السعودية. أعد التحقق من بيانات CJ قبل إتاحتها.</p>)}
-        {optionTokens.length > 0 && <div className="min-w-0"><h2 className="mb-2 text-sm font-bold text-slate-700">الخيارات المتاحة ({variantCount})</h2><div className="flex flex-wrap gap-1.5">{optionTokens.slice(0, 24).map((tok, i) => <span key={i} className="rounded-lg border border-primary/25 bg-white px-2 py-1 text-xs font-semibold">{tok}</span>)}{optionTokens.length > 24 && <span className="px-1 text-xs text-slate-500">+{optionTokens.length - 24}</span>}</div></div>}
+        {optionGroupList.length > 0 && <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-bold text-slate-700">الخيارات المتاحة</h2>
+          {optionGroupList.map(group => <div key={group.label} className="min-w-0">
+            <h3 className="mb-1.5 text-xs font-bold text-slate-500">{group.label}</h3>
+            <div className="flex flex-wrap gap-1.5">{group.values.map((val, i) => <span key={i} className="rounded-lg border border-primary/25 bg-white px-2.5 py-1 text-xs font-semibold">{val}</span>)}</div>
+          </div>)}
+        </div>}
+        {!availability && <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 text-sm"><h2 className="mb-1 text-sm font-bold text-slate-700">الشحن إلى السعودية</h2><p className="leading-6 text-slate-600">الشحن مشمول ضمن السعر المعروض ويُوصَّل داخل السعودية. تظهر تفاصيل خيارات الشحن (المدّة والسعر) عند تحقّق التوفّر من CJ لهذه السلعة.</p></div>}
         {availability && <div className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><h2 className="mb-3 text-sm font-bold text-emerald-900">الشحن إلى السعودية</h2><ul className="space-y-2 text-sm">{shipOptions.slice(0, 5).map((o, i) => <li key={i} className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-2 last:border-0 last:pb-0"><span className="font-semibold text-slate-800">{o.name}{o.deliveryDays ? <span className="ms-2 text-xs font-normal text-slate-500">مدّة التوصيل: {o.deliveryDays}</span> : null}</span><span className="font-extrabold text-emerald-800">{sar(o.priceMinor)}</span></li>)}</ul><p className="mt-2 text-xs text-emerald-800">المخزون المتوفّر: {new Intl.NumberFormat('en-US').format(availability.stockQuantity)} · {shipCheapest ? `يبدأ الشحن من ${sar(shipCheapest.priceMinor)}` : ''}</p></div>}
         {agentContact && (agentContact.wa || agentContact.tel) && <section className="rounded-2xl border bg-white p-4"><h2 className="mb-3 text-sm font-bold">التواصل مع وكيل السلعة</h2><div className="flex flex-wrap gap-2">{agentContact.wa && <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white"><MessageCircle className="h-4 w-4" />واتساب</a>}{agentContact.tel && <a href={agentContact.tel} className="flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold text-primary"><Phone className="h-4 w-4" />اتصال</a>}</div></section>}
       </section>

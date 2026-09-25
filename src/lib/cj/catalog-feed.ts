@@ -27,8 +27,7 @@ export function parseCjCatalogQuery(query: CjCatalogQuery) {
 
 /** Read-only private catalog. The public listing predicates run before count/offset. */
 export async function loadCjCatalog(query: CjCatalogQuery) {
-  const view = await cjStorefrontView();
-  if (!view.isStaff) throw Error('cj_catalog_access_denied');
+  if (!(await cjStorefrontView()).isStaff) throw Error('cj_catalog_access_denied');
   const { tab, page: requestedPage } = parseCjCatalogQuery(query);
   const imports = tab === 'all' || tab === 'imported';
   const members = tab === 'all' || tab === 'members' || tab === 'verified';
@@ -51,7 +50,7 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
     ] };
   }
   const [cjProducts, commerceCount, adCount] = await Promise.all([
-    imports ? listStorefrontCjProducts(!view.isStaff, 500) : [],
+    imports ? listStorefrontCjProducts(true, 500) : [],
     commerceScope ? countApprovedCatalog(commerceScope) : 0,
     members ? prisma.ads.count({ where: adWhere }) : 0,
   ]);

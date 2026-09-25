@@ -1,0 +1,80 @@
+name: تنظيف مساحة قرص VPS (يدوي)
+
+# يعمل يدوياً فقط (workflow_dispatch) — لا يُطلق تلقائياً على أي push.
+# يستخدم نفس أسرار SSH الخاصة بالنشر، ويشغّل ops/vps-disk-cleanup.sh على الخادم
+# من مسار مؤقت خارج /root/trbhh (حتى لا يلمس شجرة git للإنتاج).
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'apply للتنفيذ الفعلي، أو dry-run للفحص فقط'
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+      keep_backups:
+        description: 'عدد أحدث النسخ الاحتياطية التي تُحفظ'
+        default: '3'
+
+permissions:
+  contents: read
+
+# نفس قفل النشر: لا يعمل التنظيف أثناء نشر جارٍ (تفادي حذف نسخة قيد الاستخدام).
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: التحقق من صحة المدخلات
+        env:
+          MODE: ${{ inputs.mode }}
+          KEEP: ${{ inputs.keep_backups }}
+        run: |
+          set -euo pipefail
+          [[ "$MODE" == dry-run || "$MODE" == apply ]]
+          [[ "$KEEP" =~ ^[1-9][0-9]?$ ]]
+      - name: تشغيل التنظيف على الخادم عبر SSH مثبّت المفاتيح
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          MODE: ${{ inputs.mode }}
+          KEEP: ${{ inputs.keep_backups }}
+        run: |
+          set +x +v
+          set -euo pipefail
+          umask 077
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ && "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          port=${VPS_PORT:-22}
+          [[ "$port" =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 ))
+          [[ -n "$VPS_SSH_KEY" && -n "$VPS_KNOWN_HOSTS" ]]
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > "$RUNNER_TEMP/vps-key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/vps-known-hosts"
+          cat > "$RUNNER_TEMP/vps-ssh-config" <<CONFIG
+          Host trbhh-vps
+            HostName $VPS_HOST
+            User $VPS_USER
+            Port $port
+            IdentityFile $RUNNER_TEMP/vps-key
+            UserKnownHostsFile $RUNNER_TEMP/vps-known-hosts
+            StrictHostKeyChecking=yes
+            IdentitiesOnly=yes
+            BatchMode=yes
+            ConnectTimeout=25
+          CONFIG
+          chmod 600 "$RUNNER_TEMP/vps-key" "$RUNNER_TEMP/vps-known-hosts" "$RUNNER_TEMP/vps-ssh-config"
+          # مسار مؤقت خارج /root/trbhh حتى لا نلمس شجرة git للإنتاج.
+          remote="/root/.trbhh-cleanup-${GITHUB_RUN_ID}.sh"
+          scp -F "$RUNNER_TEMP/vps-ssh-config" ops/vps-disk-cleanup.sh "trbhh-vps:$remote"
+          flag=""; [[ "$MODE" == apply ]] && flag="--apply"
+          ssh -F "$RUNNER_TEMP/vps-ssh-config" trbhh-vps \
+            "set -e; KEEP_BACKUPS='$KEEP' bash '$remote' $flag; rm -f -- '$remote'"
+      - name: إزالة بيانات اعتماد SSH من الرَّانر
+        if: always()
+        run: rm -f -- "$RUNNER_TEMP/vps-key" "$RUNNER_TEMP/vps-known-hosts" "$RUNNER_TEMP/vps-ssh-config" 2>/dev/null || true

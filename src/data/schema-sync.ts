@@ -28,6 +28,13 @@ import { CJ_DDL } from '@/lib/cj/schema';
 
 const STATEMENTS: string[] = [
   ...COMMERCE_DDL,
+  // Additive upgrades for order-item tables that predate price/variant snapshots.
+  // Existing orders remain intact: old rows get a null list price/snapshot and
+  // zero discount/empty variant key, while new checkouts persist full snapshots.
+  `ALTER TABLE commerce_order_items ADD COLUMN list_unit_price_minor INT NULL`,
+  `ALTER TABLE commerce_order_items ADD COLUMN discount_minor INT NOT NULL DEFAULT 0`,
+  `ALTER TABLE commerce_order_items ADD COLUMN variant_key VARCHAR(191) COLLATE utf8mb4_bin NOT NULL DEFAULT ''`,
+  `ALTER TABLE commerce_order_items ADD COLUMN variant_snapshot JSON NULL`,
   ...FINANCE_DDL,
   ...FINANCE_UPGRADE_DDL,
   ...ACCESS_CONTROL_DDL,

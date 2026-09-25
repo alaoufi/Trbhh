@@ -306,7 +306,9 @@ if [[ "$mode" == deploy ]]; then
   [[ "$(git rev-parse "refs/remotes/origin/$branch")" == "$candidate" ]]
   git merge-base --is-ancestor "$baseline" "$candidate"
   stage=backup
-  bash "$tools_dir/finance-backup.sh" "$run_id" "$candidate" "$baseline" >&3
+  # Preserve only the backup script's sanitized stage message on fd 4; all
+  # raw database/configuration diagnostics remain in its private operations log.
+  bash "$tools_dir/finance-backup.sh" "$run_id" "$candidate" "$baseline" >&3 2>&4
   [[ "$(cat "$backup/VERIFIED")" == "$baseline" && "$(cat "$backup/candidate.txt")" == "$candidate" ]]
   (cd "$backup" && sha256sum --check --status SHA256SUMS)
   verify_retained_media

@@ -30,6 +30,11 @@ describe('production backup gates', () => {
     expect(recovery.indexOf('rm -f -- "$active_release"')).toBeGreaterThan(recovery.indexOf('commerce_purchasing_enabled'));
     expect(deploy.indexOf('recover_stale_active_release') < deploy.indexOf('[[ ! -e "$active_release"')).toBe(true);
   });
+  it('reports only the backup stage while keeping private diagnostics in the protected log', () => {
+    expect(deploy).toContain('finance-backup.sh" "$run_id" "$candidate" "$baseline" >&3 2>&4');
+    expect(deploy).toContain('raw database/configuration diagnostics remain in its private operations log');
+    expect(deploy).not.toContain('cat "$backup/operations.log"');
+  });
   it('accepts media reuse only from a distinct numeric before-run source', () => {
     expect(workflow).toContain('reuse_media_id:');
     expect(workflow).toContain('REUSE_MEDIA_ID: ${{ inputs.reuse_media_id }}');

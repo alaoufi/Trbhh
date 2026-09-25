@@ -59,7 +59,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   // ويتجاهل الضجيج). تُعرض من التفاصيل المخزّنة فتظهر حتى بلا توفّر حيّ محقّق.
   const optionGroups = new Map<string, string[]>();
   for (const v of displayVariants) {
-    for (const opt of cjVariantDisplayOptions({ variantKey: v.optionKey, variantName: v.name, attributes: v.attributes })) {
+    for (const opt of cjVariantDisplayOptions({ variantKey: v.optionKey, variantName: v.name })) {
       const values = optionGroups.get(opt.label) ?? [];
       if (!values.includes(opt.value)) values.push(opt.value);
       optionGroups.set(opt.label, values);

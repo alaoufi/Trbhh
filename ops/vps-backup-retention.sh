@@ -30,17 +30,30 @@ find "$BACKUPS" -maxdepth 2 -type d -name '*-extracted' -prune 2>/dev/null | whi
   echo "[$(ts)] حذف extracted: $ex"; rm -rf -- "$ex" || true
 done
 
+# مجلد(ات) النسخ التي تشير إليها الحاوية العاملة عبر compose config_files —
+# النشر يتحقّق من وجودها في كل مرة، فحذفها يكسر كل النشرات. لا تُحذف أبداً مهما قدُمت.
+PROTECTED=" "
+_cid=$(docker compose -f "$PROD/docker-compose.yml" ps -q app 2>/dev/null || true)
+if [[ -n "$_cid" ]]; then
+  _label=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.config_files"}}' "$_cid" 2>/dev/null || true)
+  while IFS= read -r ref; do
+    [[ "$ref" == "$BACKUPS/"* ]] || continue
+    PROTECTED+="$(echo "$ref" | sed -E "s#($BACKUPS/[^/]+)/.*#\1#") "
+  done < <(printf '%s' "$_label" | tr ',' '\n')
+fi
+
 KEEP_IMG_IDS=""
 if [[ "$ACTIVE_DEPLOY" == 0 && -d "$BACKUPS" ]]; then
-  # (2) احتفظ بأحدث KEEP_BACKUPS من finance-*، واحذف الأقدم
+  # (2) احتفظ بأحدث KEEP_BACKUPS من finance-* + المجلد المرجعي للحاوية العاملة، واحذف الأقدم
   idx=0
   while IFS= read -r d; do
     [[ -z "$d" ]] && continue
     idx=$((idx+1))
-    if [[ $idx -le $KEEP_BACKUPS ]]; then
+    if [[ $idx -le $KEEP_BACKUPS || "$PROTECTED" == *" ${d%/} "* ]]; then
       for f in image-id.txt candidate-image-id.txt; do
         [[ -f "$d/$f" ]] && KEEP_IMG_IDS+=" $(cat "$d/$f" 2>/dev/null || true)"
       done
+      [[ "$PROTECTED" == *" ${d%/} "* && $idx -gt $KEEP_BACKUPS ]] && echo "[$(ts)] حماية (مرجع الحاوية العاملة): $(basename "$d")"
     else
       echo "[$(ts)] حذف نسخة قديمة: $(basename "$d")"; rm -rf -- "$d" || true
     fi

@@ -94,8 +94,20 @@ if [[ -d "$BACKUPS" ]]; then
   done < <(find "$BACKUPS" -maxdepth 2 -type d -name '*-extracted' 2>/dev/null)
 fi
 
-# (ب) نسخ finance-* القديمة: احتفظ بأحدث KEEP_BACKUPS، احذف الأقدم
-say "(ب) حذف نسخ finance-* الأقدم (الاحتفاظ بأحدث $KEEP_BACKUPS)"
+# مجلد(ات) النسخ التي تشير إليها الحاوية العاملة (compose config_files) — لا تُحذف أبداً،
+# لأن النشر يتحقّق من وجودها؛ حذفها يكسر كل النشرات اللاحقة.
+PROTECTED=" "
+_cid=$(docker compose -f "$PROD/docker-compose.yml" ps -q app 2>/dev/null || true)
+if [[ -n "$_cid" ]]; then
+  _label=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.config_files"}}' "$_cid" 2>/dev/null || true)
+  while IFS= read -r ref; do
+    [[ "$ref" == "$BACKUPS/"* ]] || continue
+    PROTECTED+="$(echo "$ref" | sed -E "s#($BACKUPS/[^/]+)/.*#\1#") "
+  done < <(printf '%s' "$_label" | tr ',' '\n')
+fi
+
+# (ب) نسخ finance-* القديمة: احتفظ بأحدث KEEP_BACKUPS + مرجع الحاوية العاملة، احذف الأقدم
+say "(ب) حذف نسخ finance-* الأقدم (الاحتفاظ بأحدث $KEEP_BACKUPS + مرجع الحاوية العاملة)"
 KEEP_IMG_IDS=""
 if [[ -d "$BACKUPS" ]]; then
   mapfile -t ALL < <(ls -1dt "$BACKUPS"/finance-* 2>/dev/null || true)
@@ -103,11 +115,11 @@ if [[ -d "$BACKUPS" ]]; then
   for d in "${ALL[@]}"; do
     idx=$((idx+1))
     # اجمع معرّفات الصور التي تحتاجها النسخ المحفوظة (لحمايتها من حذف الصور لاحقاً)
-    if [[ $idx -le $KEEP_BACKUPS ]]; then
+    if [[ $idx -le $KEEP_BACKUPS || "$PROTECTED" == *" ${d%/} "* ]]; then
       for f in image-id.txt candidate-image-id.txt; do
         [[ -f "$d/$f" ]] && KEEP_IMG_IDS+=" $(cat "$d/$f" 2>/dev/null)"
       done
-      echo "  [حفظ] $(basename "$d")"
+      if [[ "$PROTECTED" == *" ${d%/} "* && $idx -gt $KEEP_BACKUPS ]]; then echo "  [حماية — مرجع الحاوية العاملة] $(basename "$d")"; else echo "  [حفظ] $(basename "$d")"; fi
     else
       sz=$(du -sh "$d" 2>/dev/null | cut -f1)
       echo "  [حذف] $(basename "$d") ($sz)"

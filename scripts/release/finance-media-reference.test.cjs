@@ -2,6 +2,16 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{createHash}=require('node:crypto');
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const helper=()=>require('./finance-media-reference.cjs');
+function verifiedFinanceParent(f){
+  const parent=path.join(f.base,'finance-36082393573');fs.mkdirSync(parent,{mode:0o700});
+  const manifest=f.manifest,full={format:'trbhh-database-full-proof-v1',tables:{users:{count:1,engine:'InnoDB',columns:['id'],primaryKeyColumns:['id'],schemaSha256:hash('schema'),rowHashes:[hash('user')]},ads:{count:1,engine:'InnoDB',columns:['id'],primaryKeyColumns:['id'],schemaSha256:hash('schema'),rowHashes:[hash('ad')]}}};
+  const files={'commit.txt':'353ae4c023e1183452b38be3f6fe8b9284d047c8\n','candidate.txt':'19e4c6f72c35f4adf2cb96600da094ef46788e2b\n','container-before.json':'[]','legacy.path':'/app/legacy\n','storage.path':'/app/storage\n','legacy-before.json':manifest,'storage-before.json':manifest,'legacy.tar.gz':'legacy-media','storage.tar.gz':'storage-media','code.tar.gz':'code','database.sql.gz':'database','image.tar.gz':'image','full-before.json':JSON.stringify(full),'full-restored.json':JSON.stringify(full)};
+  for(const [name,data] of Object.entries(files))fs.writeFileSync(path.join(parent,name),data,{mode:0o600});
+  files.SHA256SUMS=Object.entries(files).map(([name,data])=>`${hash(data)}  ${name}\n`).join('');
+  fs.writeFileSync(path.join(parent,'SHA256SUMS'),files.SHA256SUMS,{mode:0o600});
+  fs.writeFileSync(path.join(parent,'VERIFIED'),'353ae4c023e1183452b38be3f6fe8b9284d047c8\n',{mode:0o600});
+  return parent;
+}
 function fixture(){
   const base=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'finance-media-reference-'))),parent=path.join(base,'audit-35603864905'),child=path.join(base,'finance-123');
   fs.chmodSync(base,0o700);fs.mkdirSync(parent,{mode:0o700});fs.mkdirSync(child,{mode:0o700});
@@ -28,6 +38,23 @@ test('retained parent supplies only pinned manifests without constraining the fr
     const names=fs.readdirSync(f.child);assert(names.includes('FINANCE_MEDIA_REFERENCE.json'));assert(!names.some(n=>n.endsWith('.tar.gz')||n.endsWith('-extracted')));
     assert.deepEqual(before,fs.readdirSync(f.parent).map(n=>[n,hash(fs.readFileSync(path.join(f.parent,n)))]));
   }finally{f.cleanup();}
+});
+test('a verified complete finance backup may supply exactly matching retained legacy media',()=>{
+  const f=fixture();try{
+    const parent=verifiedFinanceParent(f);assert.equal(helper().inspect(parent,f.base).parent.parentId,'36082393573');
+    fs.writeFileSync(path.join(f.child,'media-mode.txt'),'fresh-storage-retained-legacy\n');
+    assert.deepEqual(helper().prepare(parent,f.child,f.base,'fresh-storage-retained-legacy'),{ok:true,referencedMedia:1});
+    assert.equal(helper().verify(f.child,f.base).ok,true);
+    fs.writeFileSync(path.join(f.child,'legacy-current.json'),f.manifest);
+    assert.equal(helper().verifyCurrent(f.child,f.base).ok,true);
+    const changed=JSON.parse(f.manifest);changed.entries[0].sha256=hash('other');
+    fs.writeFileSync(path.join(f.child,'legacy-current.json'),JSON.stringify(changed));assert.throws(()=>helper().verifyCurrent(f.child,f.base));
+  }finally{f.cleanup();}
+});
+test('verified finance checkpoint rejects changed markers, archives, restore proof and checksums',()=>{
+  for(const file of ['candidate.txt','legacy.tar.gz','legacy-before.json','full-restored.json','SHA256SUMS']){
+    const f=fixture();try{const parent=verifiedFinanceParent(f);fs.appendFileSync(path.join(parent,file),'tampered');assert.throws(()=>helper().inspect(parent,f.base));}finally{f.cleanup();}
+  }
 });
 test('missing or corrupted parent archives fail before creating a reference and after a checkpoint is prepared',()=>{
   for(const file of ['storage.tar.gz','legacy.tar.gz','database.sql.gz','image.tar.gz'])for(const change of ['remove','corrupt']){

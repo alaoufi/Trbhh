@@ -133,6 +133,11 @@ test('parent capacity is available only after a successful immutable-parent insp
     if(expected==='fresh-storage-retained-legacy')assert(result.stdout.indexOf('finance-media-reference.cjs inspect')<result.stdout.indexOf('check measured 1 1 /backups /docker fresh-storage-retained-legacy'));
   }
 });
+test('retained legacy media resolves only from the exact verified finance checkpoint',()=>{
+  const source=read();assert.match(source,/media_parent="\$base\/finance-36082393573"/);
+  assert.match(source,/finance-media-reference\.cjs" inspect "\$media_parent"/);
+  assert.match(source,/finance-media-reference\.cjs" prepare-legacy "\$media_parent"/);
+});
 
 test('mixed archive loop creates a fresh storage archive and isolated extraction while retaining only legacy',()=>{
   const fragment=read().match(/# MEDIA_ARCHIVES_BEGIN\n([\s\S]*?)# MEDIA_ARCHIVES_END/);assert(fragment);

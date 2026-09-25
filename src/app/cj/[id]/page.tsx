@@ -27,7 +27,8 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const sp = await searchParams;
   const id = Number(idStr);
   if (!Number.isSafeInteger(id) || id <= 0) notFound();
-  const p = await getStorefrontCjProduct(id, true);
+  // معاينة المشرف الخاصة تعرض المسودّة/الجاهزة دون بوابة التوفّر؛ البوابة المتشدّدة للعامة فقط.
+  const p = await getStorefrontCjProduct(id, !view.isStaff);
   if (!p) notFound();
   const session = await getSession();
   const capabilities = session ? await cjProductCapabilities(session.uid, p.agent_user_id) : { agent: false, edit: false, suspend: false, delete: false };
@@ -44,7 +45,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const weightMax = details?.weightMax;
   const weightLabel = typeof weightMin === 'number' && Number.isFinite(weightMin) && weightMin > 0
     ? `${weightMin}${typeof weightMax === 'number' && Number.isFinite(weightMax) && weightMax > weightMin ? `–${weightMax}` : ''} غ` : 'غير محدد';
-  const others = (await listStorefrontCjProducts(true, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
+  const others = (await listStorefrontCjProducts(!view.isStaff, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
 
   return <div className="mx-auto max-w-6xl min-w-0 space-y-5 px-3 pb-32 pt-5 sm:px-5 md:pb-8 [overflow-wrap:anywhere]" data-cj-trial="product">
     {view.isStaff && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p><b>تجربة CJ الخاصة</b> — تجميع السلع فقط؛ الشراء والدفع غير مفعّلين.</p>{session && <CartLink accountId={session.uid} />}</div>}

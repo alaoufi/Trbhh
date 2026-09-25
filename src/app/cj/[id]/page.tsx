@@ -78,9 +78,14 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-4">
         {p.trbhh_category && <p className="text-xs leading-6 text-slate-500">{p.trbhh_category}</p>}
         <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{title}</h1>
-        {view.isStaff && session && (verifiedVariants.length > 0
-          ? <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={verifiedVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
-          : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">هذه السلعة مخفية عن المشترين: لا يوجد خيار ثبت مخزونه وشحنه إلى السعودية. أعد التحقق من بيانات CJ قبل إتاحتها.</p>)}
+        {/* مُنتقي اللون/المقاس (تجريبي — بلا طلب أو دفع). يظهر لأي سلعة لها خيارات
+            مخزّنة؛ عند اختيار الخيار يتحقّق النظام حيّاً من المخزون والشحن من CJ. */}
+        {view.isStaff && session && (displayVariants.length > 0
+          ? <>
+              <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={displayVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
+              {verifiedVariants.length === 0 && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">وضع تجربة: اختر اللون والمقاس ليتحقّق النظام من التوفّر والشحن مباشرةً من CJ. لا يُنشأ طلب ولا دفع.</p>}
+            </>
+          : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">لا توجد خيارات مخزّنة لهذه السلعة بعد — اضغط «تحديث الصور والمخزون والشحن» في لوحة الإدارة لاستيرادها من CJ.</p>)}
         {optionGroupList.length > 0 && <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
           <h2 className="text-sm font-bold text-slate-700">الخيارات المتاحة</h2>
           {optionGroupList.map(group => <div key={group.label} className="min-w-0">

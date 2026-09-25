@@ -481,6 +481,19 @@ export async function refreshCjImportedAvailability(form: FormData) {
   redirect(withParam(back, availability ? 'availability=ready' : 'availability=missing'));
 }
 
+/** حفظ مفاتيح مزوّدي الترجمة من لوحة التحكم (لا أسرار في الكود/‏.env). المفتاح الفارغ
+ *  يُبقي القيمة الحالية (تفادي مسح المفتاح بالخطأ)؛ البريد يُحفظ كما هو (غير سرّي). */
+export async function saveCjTranslationSettings(form: FormData) {
+  await requireCjAccess('integrations', 'manage_settings');
+  const { setSetting } = await import('@/lib/settings');
+  const deeplKey = String(form.get('deeplKey') || '').trim();
+  const email = String(form.get('mymemoryEmail') || '').trim();
+  if (deeplKey) await setSetting('cj_deepl_api_key', deeplKey.slice(0, 200));
+  await setSetting('cj_mymemory_email', email.slice(0, 120));
+  revalidatePath('/admin/suppliers/cj/browse');
+  redirect(withParam(backOf(form), 'transcfg=1'));
+}
+
 /** ترجمة تلقائية جماعية لكل سلعة بلا عنوان عربي بعد (دفعة محدودة). */
 export async function translateAllCj(form: FormData) {
   const s = await requireCjAccess('products', 'edit');

@@ -1,6 +1,27 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
+import { getSetting } from '@/lib/settings';
+
+/**
+ * إعدادات مزوّدي الترجمة من لوحة التحكم (جدول settings — لا أسرار في الكود ولا .env):
+ *  - cj_deepl_api_key: مفتاح DeepL (المزوّد الأساسي الموثوق، 500 ألف حرف/شهر مجاناً).
+ *  - cj_mymemory_email: بريد لرفع حصّة MyMemory المجانية (احتياطي).
+ * كاش قصير لتفادي قراءة القاعدة في كل نداء ترجمة.
+ */
+let providerCfg: { at: number; deeplKey: string; email: string } | null = null;
+async function translationProviders(): Promise<{ deeplKey: string; email: string }> {
+  if (providerCfg && Date.now() - providerCfg.at < 60_000) return providerCfg;
+  let deeplKey = '';
+  let email = (process.env.MYMEMORY_EMAIL || '').trim();
+  try {
+    const [k, e] = await Promise.all([getSetting('cj_deepl_api_key', ''), getSetting('cj_mymemory_email', '')]);
+    if (k.trim()) deeplKey = k.trim();
+    if (e.trim()) email = e.trim();
+  } catch { /* القاعدة غير جاهزة — نكمل بالقيم الافتراضية */ }
+  providerCfg = { at: Date.now(), deeplKey, email };
+  return providerCfg;
+}
 
 /**
  * ترجمة آلية إلى العربية لمحتوى سلع/تصنيفات CJ (قراءة فقط، لا تمسّ بيانات دفع).
@@ -86,9 +107,25 @@ async function fetchJson(url: string, deadline: number, init: RequestInit = {}):
   }
 }
 
-/** المزوّد الأساسي: MyMemory. */
+/** المزوّد الأساسي الموثوق: DeepL (يُفعَّل عند ضبط المفتاح في لوحة التحكم). */
+async function viaDeepL(text: string, deadline: number): Promise<string | null> {
+  const { deeplKey } = await translationProviders();
+  if (!deeplKey) return null;
+  // مفاتيح DeepL المجانية تنتهي بـ ":fx" وتستخدم نطاق api-free؛ المدفوعة تستخدم api.
+  const host = deeplKey.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
+  const body = (await fetchJson(`https://${host}/v2/translate`, deadline, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `DeepL-Auth-Key ${deeplKey}` },
+    body: `text=${encodeURIComponent(text)}&source_lang=EN&target_lang=AR`,
+  })) as { translations?: { text?: string }[] } | null;
+  const raw = body?.translations?.[0]?.text;
+  const t = typeof raw === 'string' ? raw.trim() : '';
+  return validOutput(t) ? t : null;
+}
+
+/** احتياطي: MyMemory (البريد من لوحة التحكم يرفع الحصّة اليومية). */
 async function viaMyMemory(text: string, deadline: number): Promise<string | null> {
-  const email = process.env.MYMEMORY_EMAIL?.trim();
+  const { email } = await translationProviders();
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ar${email ? `&de=${encodeURIComponent(email)}` : ''}`;
   const body = (await fetchJson(url, deadline)) as { responseStatus?: number; quotaFinished?: boolean; responseData?: { translatedText?: string } } | null;
   if (!body || body.responseStatus !== 200 || body.quotaFinished) return null;
@@ -117,7 +154,7 @@ async function translateRaw(text: string): Promise<string | null> {
     if (Date.now() >= deadline) return null;
     await throttle();
     if (Date.now() >= deadline) return null;
-    const result = (await viaMyMemory(chunk, deadline)) ?? (await viaGoogle(chunk, deadline));
+    const result = (await viaDeepL(chunk, deadline)) ?? (await viaMyMemory(chunk, deadline)) ?? (await viaGoogle(chunk, deadline));
     if (!result || Date.now() >= deadline) return null;
     translated.push(result);
   }

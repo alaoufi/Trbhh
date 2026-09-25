@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {spawnSync}=require('node:child_process');
-const file=path.join(__dirname,'finance-cache.sh'),read=()=>fs.readFileSync(file,'utf8');
+const file=path.join(__dirname,'finance-cache.sh'),read=()=>fs.readFileSync(file,'utf8').replace(/\r\n/g,'\n');
 const bash=process.platform==='win32'?'C:/Program Files/Git/bin/bash.exe':'/bin/bash',sha='a'.repeat(40);
 test('cache operations reject ambiguous arguments before any external command',()=>{
   assert(fs.existsSync(file));assert.equal(spawnSync(bash,['-n',file],{encoding:'utf8'}).status,0);
@@ -39,13 +39,13 @@ test('inventory publishes numeric totals and fingerprints without leaking raw ca
     rows[3].Size='unrecognized';fs.writeFileSync(path.join(dir,'before-docker.jsonl'),rows.map(r=>JSON.stringify(r)).join('\n'));assert.notEqual(run().status,0);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
-test('audit invokes no cleanup and explicit cleanup calls only the bounded age-filtered builder operation',()=>{
+test('audit invokes no cleanup and explicit cleanup calls only the isolated builder-cache operation',()=>{
   const match=read().match(/# CACHE_ACTION_BEGIN\n([\s\S]*?)# CACHE_ACTION_END/);assert(match);
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'finance-cache-action-'));
   try{
     for(const mode of ['cache-audit','cache-cleanup']){
       const result=spawnSync(bash,['-c',`set -euo pipefail\nexec 3>&1\nmode=$1; private=$2\ntimeout(){ printf '%s\\n' "$*" >&3; }\n${match[1]}`,'test',mode,dir.replaceAll('\\','/')],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);
-      assert.equal(result.stdout,mode==='cache-audit'?'':'600s docker builder prune --all --force --filter until=24h\n');
+      assert.equal(result.stdout,mode==='cache-audit'?'':'600s docker builder prune --all --force\n');
     }
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
@@ -56,9 +56,9 @@ test('failed cache cleanup still checks live state and never reports success',()
     assert.notEqual(r.status,0);assert.match(r.stdout,/runtime_checked/);assert.match(r.stdout,/inventory_checked/);assert.doesNotMatch(r.stdout,/SHOULD_NOT_REPORT|CACHE_OPERATION_VERIFIED/);assert.match(r.stderr,/Finance cache operation failed/);
   }
 });
-test('cleanup is explicit, bounded, age-filtered and isolated from deploy',()=>{
+test('cleanup is explicit, bounded to builder cache and isolated from deploy',()=>{
   const source=read();assert.match(source,/exec 9> \/run\/lock\/trbhh-finance-deploy.lock/);assert.match(source,/ACTIVE_DEPLOYMENT/);
-  assert.match(source,/if \[\[ "\$mode" == cache-cleanup \]\]; then[\s\S]*?timeout 600s docker builder prune --all --force --filter until=24h/);
+  assert.match(source,/if \[\[ "\$mode" == cache-cleanup \]\]; then[\s\S]*?timeout 600s docker builder prune --all --force >/);
   assert.doesNotMatch(source,/docker (?:system|image|container|volume|network) prune|docker (?:rm|rmi)|\brm\s|compose (?:up|down|restart|stop)|git (?:reset|switch|checkout)|finance-backup.sh/);
   const workflow=fs.readFileSync(path.join(__dirname,'../../.github/workflows/finance-release.yml'),'utf8');assert.match(workflow,/options: \[inspect, diagnose-backup, cache-audit, cache-cleanup\]/);assert.match(workflow,/group: vps-deploy/);assert.match(workflow,/baseline_sha/);assert.match(workflow,/finance-cache.test.cjs/);
 });

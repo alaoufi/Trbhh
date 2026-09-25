@@ -108,7 +108,9 @@ collect_inventory before
 # CACHE_ACTION_BEGIN
 if [[ "$mode" == cache-cleanup ]]; then
   stage=builder_cache
-  timeout 600s docker builder prune --all --force --filter until=24h > "$private/builder-prune.log" 2>&1
+  # Build cache is reproducible and inactive; reclaim it without touching images,
+  # containers, volumes, databases, application files or uploaded media.
+  timeout 600s docker builder prune --all --force > "$private/builder-prune.log" 2>&1
 fi
 # CACHE_ACTION_END
 stage=complete

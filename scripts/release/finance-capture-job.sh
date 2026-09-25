@@ -43,8 +43,10 @@ result=$(timeout 75s docker compose exec -T app node - 2>/dev/null <<'FINANCE_CA
         ? '_not_configured'
         : response.status === 503 && /^[a-z0-9_]{1,64}$/.test(payload?.category || '')
         ? '_' + payload.category
+        : response.status === 503 && payload?.error === 'finance_capture_unavailable'
+          ? '_capture_category_missing'
         : response.status === 503 && response.headers.get('content-type')?.toLowerCase().includes('application/json')
-          ? '_category_missing'
+          ? '_unexpected_json_error'
           : response.status === 503 ? '_non_json' : '';
       report('http_' + response.status + category); return;
     }

@@ -134,7 +134,14 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
               <label className="block">العنوان العربي<input name="nameAr" defaultValue={p.name_ar} className={editInput} placeholder="مثال: ساعة يد رجالية" /></label>
               <label className="block">الوصف العربي<textarea name="descriptionAr" rows={4} defaultValue={p.display_description_ar ? cjDescriptionText(p.display_description_ar) : ''} className={editInput} /></label>
               <div className="grid grid-cols-2 gap-2">
-                <label className="block">التصنيف<input name="trbhhCategory" list="cj-cat-options" defaultValue={p.trbhh_category} className={editInput} placeholder="اكتب قسماً أو اختر من القائمة" autoComplete="off" />{categoryOptions.length > 0 && <datalist id="cj-cat-options">{categoryOptions.map(option => <option key={option} value={option} />)}</datalist>}</label>
+                <label className="block">التصنيف
+                  <select name="trbhhCategory" defaultValue={p.trbhh_category || ''} className={editInput}>
+                    <option value="">— اختر التصنيف —</option>
+                    {p.trbhh_category && !categoryOptions.includes(p.trbhh_category) && <option value={p.trbhh_category}>{p.trbhh_category}</option>}
+                    {categoryOptions.map(option => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                  {categoryOptions.length === 0 && <span className="mt-1 block text-xs text-amber-700">لا توجد تصنيفات بعد — أضِفها من لوحة الإدارة (إعدادات CJ ← التصنيفات).</span>}
+                </label>
                 <label className="block">السعر (ر.س) — فارغ = المحسوب<input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} /></label>
               </div>
               <div className="flex items-center gap-2">

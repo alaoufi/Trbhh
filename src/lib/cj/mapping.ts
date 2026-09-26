@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { PriceBreakdown } from './pricing';
 import type { CjVariant } from './types';
+import { translateToArabicCached, isArabicText } from './translate';
 
 /**
  * ربط منتجات CJ بمنتجات تربح (والاحتفاظ بتفصيل التسعير) في جدول cj_products.
@@ -333,6 +334,52 @@ export async function setCjProductDescriptionAr(id: number, descAr: string): Pro
   if (!Number.isInteger(id) || id <= 0) return;
   const v = descAr.slice(0, 20000) || null;
   await prisma.$executeRaw`UPDATE cj_products SET display_description_ar=${v} WHERE id=${BigInt(id)}`.catch(() => {});
+}
+
+/**
+ * الاسم العربي للعرض — ترجمة فورية عند التحميل بلا أزرار: إن كان name_ar عربياً
+ * صالحاً يُستخدم كما هو، وإلا يُترجَم الاسم المصدر عبر المترجم الذاتي (ذاكرة تخزين
+ * تجعل أول تحميل يترجم والبقية فورية). عند نجاح ترجمة جديدة تُحفظ دائماً (persist)
+ * فتُصلَح حتى السلع التي خُزّن اسمها العربي إنجليزياً من محاولة سابقة فاشلة.
+ * إن كان المترجم متوقّفاً تُعاد القيمة الحالية دون أعطال.
+ */
+export async function cjArabicName(row: Pick<CjProductRow, 'id' | 'name' | 'name_ar'>, persist = false): Promise<string> {
+  if (isArabicText(row.name_ar)) return row.name_ar;
+  const source = (row.name || '').trim() || (row.name_ar || '').trim();
+  const ar = source ? await translateToArabicCached(source).catch(() => null) : null;
+  if (ar && isArabicText(ar)) {
+    if (persist && ar !== row.name_ar) await setCjProductNameAr(Number(row.id), ar).catch(() => {});
+    return ar;
+  }
+  return row.name_ar || row.name || '';
+}
+
+/** الوصف العربي للعرض بنفس منطق الترجمة الفورية (يُترجَم المصدر عند غياب عربي صالح). */
+export async function cjArabicDescription(row: Pick<CjProductRow, 'id' | 'display_description_ar' | 'source_description'>, persist = false): Promise<string> {
+  const current = (row.display_description_ar || '').trim();
+  if (current && isArabicText(current)) return current;
+  const raw = (row.source_description || '').trim();
+  if (!raw) return current;
+  const plain = raw.replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/\s{2,}/g, ' ').trim();
+  const ar = plain ? await translateToArabicCached(plain).catch(() => null) : null;
+  if (ar && isArabicText(ar)) {
+    if (persist && ar !== row.display_description_ar) await setCjProductDescriptionAr(Number(row.id), ar).catch(() => {});
+    return ar;
+  }
+  return current;
+}
+
+/**
+ * يترجم أسماء قائمة سلع للعرض دفعةً (متوازٍ محدود) مع الحفظ الدائم، ويحدّث name_ar في
+ * الكائنات نفسها فتظهر الكروت/القوائم بالعربية في نفس الطلب — للقوائم بلا أزرار.
+ */
+export async function hydrateCjArabicNames<T extends Pick<CjProductRow, 'id' | 'name' | 'name_ar'>>(rows: T[]): Promise<void> {
+  const pending = rows.filter(r => !isArabicText(r.name_ar));
+  const CONCURRENCY = 6;
+  for (let i = 0; i < pending.length; i += CONCURRENCY) {
+    const batch = pending.slice(i, i + CONCURRENCY);
+    await Promise.all(batch.map(async r => { r.name_ar = await cjArabicName(r, true); }));
+  }
 }
 
 export async function countCjProducts(): Promise<number> {

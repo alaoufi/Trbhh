@@ -12,7 +12,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/cj/agents', () => ({ isActiveAgent: async () => state.active, getAgent: async () => null, agentContactLinks: vi.fn(), upsertAgent: vi.fn(), setDefaultAgentWeeklyQuota: vi.fn(), setAgentActive: vi.fn(), assignProductAgent: vi.fn(), unassignProductAgent: vi.fn() }));
 vi.mock('@/lib/cj/mapping', () => {
   const product = async () => ({ id: 4n, cj_product_id: 'CJ4', agent_user_id: state.assigned, name: 'Fixture', name_ar: 'سلعة', image: state.gallery[0] || '', sale_price_minor: 1000, currency: 'SAR', hidden: 0 });
-  return { getCjProductById: product, getStorefrontCjProduct: product, listStorefrontCjProducts: async () => [], getVerifiedCjVariants: () => state.verifiedVariants, parseCjImages: () => state.gallery, parseCjDetails: () => state.details, parseCjAvailability: () => null, cjProductOrderCount: async () => 0,
+  return { getCjProductById: product, getStorefrontCjProduct: product, listStorefrontCjProducts: async () => [], getVerifiedCjVariants: () => state.verifiedVariants, parseCjImages: () => state.gallery, parseCjDetails: () => state.details, parseCjAvailability: () => null, cjShipEstimateFromAvailability: () => null, cjArabicName: async (r: { name_ar?: string; name?: string }) => r.name_ar || r.name || '', cjArabicDescription: async () => '', cjProductOrderCount: async () => 0,
     removeCjProductById: state.write, setCjProductNameAr: state.write, setCjProductHidden: state.write, setCjProductPriceOverride: state.write, setCjProductDescriptionAr: state.write, setCjProductCategory: state.write, setCjProductGallery: state.write,
     listUntranslatedCjProducts: vi.fn(), updateCjReview: vi.fn() };
 });

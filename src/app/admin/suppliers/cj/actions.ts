@@ -514,10 +514,10 @@ export async function refreshCjImportedAvailability(form: FormData) {
   await setCjProductAvailability(id, availability);
   // ترجمة الحقول العربية الناقصة تلقائياً (اسم/وصف فقط) فيكفي زر واحد لمعالجة السلعة كاملة.
   // التصنيف لا يُملأ من المورد إطلاقاً — يوحَّد يدوياً من تصنيفات تربح (لوحة الإدارة).
-  if (!before.name_ar && before.name) { const ar = await translateToArabicCached(before.name).catch(() => null); if (ar) await setCjProductNameAr(id, ar); }
-  if (!before.display_description_ar && before.source_description) {
+  if (before.name && !isArabicText(before.name_ar)) { const ar = await translateToArabicCached(before.name).catch(() => null); if (ar && isArabicText(ar)) await setCjProductNameAr(id, ar); }
+  if (before.source_description && !isArabicText(before.display_description_ar)) {
     const plain = String(before.source_description).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/\s{2,}/g, ' ').trim();
-    const ar = plain ? await translateToArabicCached(plain).catch(() => null) : null; if (ar) await setCjProductDescriptionAr(id, ar);
+    const ar = plain ? await translateToArabicCached(plain).catch(() => null) : null; if (ar && isArabicText(ar)) await setCjProductDescriptionAr(id, ar);
   }
   await auditProduct(s.uid, before);
   revalidatePath('/admin/suppliers/cj/browse');
@@ -560,10 +560,11 @@ export async function processAllCjImported() {
     const availability = await readCjAvailability(before.cj_product_id, fullVariants);
     await setCjProductAvailability(id, availability);
     if (availability) shipped++;
-    if (!before.name_ar && before.name) { const ar = await translateToArabicCached(before.name).catch(() => null); if (ar) { await setCjProductNameAr(id, ar); translated++; } }
-    if (!before.display_description_ar && before.source_description) {
+    // ترجمة تُصلح الحقول غير العربية (منها اسم عربي خُزّن إنجليزياً من محاولة فاشلة سابقة).
+    if (before.name && !isArabicText(before.name_ar)) { const ar = await translateToArabicCached(before.name).catch(() => null); if (ar && isArabicText(ar)) { await setCjProductNameAr(id, ar); translated++; } }
+    if (before.source_description && !isArabicText(before.display_description_ar)) {
       const plain = String(before.source_description).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/\s{2,}/g, ' ').trim();
-      const ar = plain ? await translateToArabicCached(plain).catch(() => null) : null; if (ar) await setCjProductDescriptionAr(id, ar);
+      const ar = plain ? await translateToArabicCached(plain).catch(() => null) : null; if (ar && isArabicText(ar)) await setCjProductDescriptionAr(id, ar);
     }
     processed++;
   }

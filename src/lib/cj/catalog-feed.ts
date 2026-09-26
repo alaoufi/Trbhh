@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { publicAdCardSelect, publicAdSearchWhere, toPublicAdCards, type AdCard } from '@/lib/data';
 import { cjStorefrontView } from './storefront';
 import type { CjProductRow } from './mapping';
-import { listStorefrontCjProducts } from './mapping';
+import { listStorefrontCjProducts, hydrateCjArabicNames } from './mapping';
 import { countApprovedCatalog, listApprovedCatalog, type ApprovedPreview } from './approved-catalog';
 
 export const CJ_CATALOG_TABS = [
@@ -74,6 +74,7 @@ export async function loadCjCatalog(query: CjCatalogQuery) {
     adTake ? prisma.ads.findMany({ where: adWhere, orderBy: { id: 'desc' }, skip: adSkip, take: adTake, select: publicAdCardSelect }) : [],
   ]);
   const products = cjTake ? cjProducts.slice(skip, skip + cjTake) : [];
+  await hydrateCjArabicNames(products); // ترجمة فورية لأسماء سلع الصفحة المعروضة (بلا أزرار)
   const ads = rows.length ? await toPublicAdCards(rows) : [];
   const items: CjCatalogItem[] = [
     ...products.map(product => ({ key: `cj:${product.id}`, source: 'cj' as const, product: { ...product, id: Number(product.id) } })),

@@ -8,7 +8,7 @@ vi.mock('@/lib/cj/approved-catalog', () => ({
   listApprovedCatalog: async (scope: string, take: number, skip: number) => state.commerce.filter(row => scope !== 'imported' || row.imported).slice(skip, skip + take),
 }));
 vi.mock('@/lib/cj/storefront', () => ({ cjStorefrontView: async () => ({ isStaff: state.staff, isPublic: true }) }));
-vi.mock('@/lib/cj/mapping', () => ({ listStorefrontCjProducts: async (readyOnly: boolean, limit: number) => state.products
+vi.mock('@/lib/cj/mapping', () => ({ hydrateCjArabicNames: async () => {}, listStorefrontCjProducts: async (readyOnly: boolean, limit: number) => state.products
   .filter(row => row.hidden === 0 && (!readyOnly || row.status === 'ready' && row.catalogReady === true))
   .sort((a, b) => Number((b.id as bigint) - (a.id as bigint))).slice(0, limit) }));
 vi.mock('@/lib/data', () => ({

@@ -4,7 +4,7 @@ import { Phone, MessageCircle } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
 import { getAgent, agentContactLinks } from '@/lib/cj/agents';
-import { cjProductOrderCount, getStorefrontCjProduct, getVerifiedCjVariants, listStorefrontCjProducts, parseCjDetails, parseCjAvailability, cjShipEstimateFromAvailability } from '@/lib/cj/mapping';
+import { cjProductOrderCount, getStorefrontCjProduct, getVerifiedCjVariants, listStorefrontCjProducts, parseCjDetails, parseCjAvailability, cjShipEstimateFromAvailability, cjArabicName, cjArabicDescription } from '@/lib/cj/mapping';
 import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '../../admin/suppliers/cj/actions';
 import { cjStorefrontView, cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { CjProductGallery } from '@/components/cj/product-gallery';
@@ -39,7 +39,11 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const hasActivity = capabilities.delete ? (await cjProductOrderCount(p.cj_product_id)) > 0 : false;
   const productAgent = p.agent_user_id != null ? await getAgent(p.agent_user_id) : null;
   const agentContact = productAgent?.active === 1 ? agentContactLinks(productAgent) : null;
-  const title = cjProductDisplayTitle(p.name_ar);
+  // ترجمة فورية عند التحميل بلا أزرار: العنوان والوصف يُعرضان بالعربية متى كان المترجم شغّالاً
+  // (يُحفظان دائماً بعد أول ترجمة). إن كان name_ar إنجليزياً من محاولة سابقة يُصحَّح هنا.
+  const arabicName = await cjArabicName(p, true);
+  const title = cjProductDisplayTitle(arabicName);
+  const descriptionAr = await cjArabicDescription(p, true);
   const gallery = cjProductImages(p).map(cjImg);
   const details = parseCjDetails(p);
   const verifiedVariants = getVerifiedCjVariants(p);
@@ -122,7 +126,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
       </section>
     </div>
     {(p.trbhh_category||details?.weightMin)&&<section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="cj-specs"><h2 id="cj-specs" className="mb-3 text-lg font-extrabold text-primary">المواصفات</h2><dl className="divide-y divide-slate-100 text-sm">{[["التصنيف",p.trbhh_category],['الوزن',details?.weightMin?weightLabel:null]].filter((entry):entry is [string,string]=>Boolean(entry[1])).map(([label,value])=><div key={label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 py-3"><dt className="text-slate-500">{label}</dt><dd className="min-w-0 font-semibold" dir="auto">{value}</dd></div>)}</dl></section>}
-    {!!p.display_description_ar&&<section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="cj-description"><h2 id="cj-description" className="mb-3 text-lg font-extrabold text-primary">تفاصيل المنتج</h2><CjProductDescription text={cleanCjDisplayDescription(p.display_description_ar)} /></section>}
+    {!!descriptionAr&&<section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="cj-description"><h2 id="cj-description" className="mb-3 text-lg font-extrabold text-primary">تفاصيل المنتج</h2><CjProductDescription text={cleanCjDisplayDescription(descriptionAr)} /></section>}
     {canManage && <section aria-labelledby="cj-product-management" className="min-w-0 rounded-2xl border border-primary/20 bg-slate-50 p-4"><h2 id="cj-product-management" className="text-sm font-bold text-primary">إدارة السلعة</h2><div className="mt-4">
       {canManage && (
         <div className="card-3d rounded-2xl p-3 space-y-2">

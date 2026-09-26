@@ -35,6 +35,10 @@ export async function placeCjTrialOrder(form: FormData): Promise<void> {
   const shippingTotalMinor = Math.max(0, grandTotalMinor - itemsTotalMinor - taxTotalMinor);
   const productName = lines.length > 1 ? `طلب (${lines.length} أصناف)` : lines[0].title;
   const internalRef = `cjt-${session.uid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  // بنود الإرسال للمورد: المورد يحتاج vid (وهو variantId في السلة) + الكمية، ومسار الشحن.
+  const orderLines = lines
+    .filter(l => l.variantId)
+    .map(l => ({ vid: String(l.variantId), quantity: l.qty || 1, sku: l.variantSku || undefined, logisticName: l.shippingName || undefined }));
 
   const { id } = await createOrder({
     internalRef,
@@ -46,6 +50,7 @@ export async function placeCjTrialOrder(form: FormData): Promise<void> {
     taxTotalMinor,
     grandTotalMinor,
     currency: 'SAR',
+    lines: orderLines,
     ship: { name: shipName, phone: shipPhone, country: 'SA', city: shipCity, region: s(form.get('shipRegion'), 120), address1: shipAddress1, address2: s(form.get('shipAddress2'), 400) },
   }, session.uid);
 

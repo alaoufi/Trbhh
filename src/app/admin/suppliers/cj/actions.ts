@@ -13,6 +13,7 @@ import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
 import { getCategories, getProduct, listProductsPage, getVariants as cjGetVariants } from '@/lib/cj/client';
 import { createOrder, getOrderById, transitionOrder, setOrderTracking } from '@/lib/cj/orders/store';
+import { dispatchOrderToCj } from '@/lib/cj/orders/dispatch';
 import { warmCjTranslations, refreshCjMedia } from '@/lib/cj/translate-warm';
 import { cjStorefrontPublic, setCjStorefrontPublic } from '@/lib/cj/storefront';
 import { getAgent, defaultAgentWeeklyQuota, upsertAgent, setDefaultAgentWeeklyQuota, setAgentActive, assignProductAgent, unassignProductAgent } from '@/lib/cj/agents';
@@ -280,6 +281,21 @@ export async function advanceCjOrder(form: FormData) {
   const r = await transitionOrder(id, to, { source: 'internal', actorId: s.uid, reason });
   if (r.ok) await auditCjChange(s.uid, 'orders', id, { status: r.from }, { status: r.to });
   const q = r.ok ? 'moved=1' : `err=${encodeURIComponent(r.error)}`;
+  revalidatePath(`/admin/suppliers/cj/orders/${id}`);
+  redirect(`/admin/suppliers/cj/orders/${id}?${q}`);
+}
+
+/**
+ * إرسال الطلب المُكتمَل دفعه إلى المورد. الإرسال الفعلي مقفل خلف حارسي الشراء داخل
+ * createCjOrder؛ ما دام معطّلاً يُسجَّل «جاهز للإرسال» بلا أي اتصال أو شراء حقيقي.
+ */
+export async function dispatchCjOrderToSupplier(form: FormData) {
+  const s = await requireCjAccess('orders', 'edit');
+  const id = Number(String(form.get('id') || ''));
+  const before = await getOrderById(id);
+  const r = await dispatchOrderToCj(id, s.uid);
+  if (r.ok) await auditCjChange(s.uid, 'orders', id, { status: before?.status ?? null, cj_order_id: cjAuditFingerprint(before?.cj_order_id ?? null) }, { status: 'sent_to_cj', cj_order_id: cjAuditFingerprint(r.cjOrderId) });
+  const q = r.ok ? 'sent=1' : `senderr=${encodeURIComponent(r.reason)}`;
   revalidatePath(`/admin/suppliers/cj/orders/${id}`);
   redirect(`/admin/suppliers/cj/orders/${id}?${q}`);
 }

@@ -9,6 +9,9 @@ import { canTransition, isStatus, mapCjStatus, type OrderStatus } from './state'
  * إرسال الطلب فعلياً إلى CJ خطوة منفصلة ومقفلة (تُبنى لاحقاً خلف حارسي الشراء).
  */
 
+/** بند طلب لإرساله للمورد لاحقاً — CJ يحتاج vid + الكمية (لا الـPID). */
+export type OrderLine = { vid: string; quantity: number; sku?: string; logisticName?: string };
+
 export type CreateOrderInput = {
   internalRef: string;
   userId?: number | bigint | null;
@@ -19,8 +22,35 @@ export type CreateOrderInput = {
   taxTotalMinor?: number;
   grandTotalMinor?: number;
   currency?: string;
+  lines?: OrderLine[];
   ship?: Partial<{ name: string; phone: string; country: string; region: string; city: string; address1: string; address2: string; zip: string }>;
 };
+
+/** يُطهّر بنود الطلب قبل التخزين (vid والكمية إلزاميان؛ حدود واضحة). */
+export function sanitizeOrderLines(value: unknown): OrderLine[] {
+  if (!Array.isArray(value)) return [];
+  const out: OrderLine[] = [];
+  for (const raw of value.slice(0, 50)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const vid = String(r.vid ?? '').trim().slice(0, 64);
+    const quantity = Math.trunc(Number(r.quantity));
+    if (!vid || !Number.isFinite(quantity) || quantity < 1 || quantity > 999) continue;
+    const line: OrderLine = { vid, quantity };
+    const sku = String(r.sku ?? '').trim().slice(0, 191);
+    const logisticName = String(r.logisticName ?? '').trim().slice(0, 120);
+    if (sku) line.sku = sku;
+    if (logisticName) line.logisticName = logisticName;
+    out.push(line);
+  }
+  return out;
+}
+
+/** يقرأ بنود الطلب المخزَّنة (JSON) بأمان. */
+export function parseOrderLines(json: string | null | undefined): OrderLine[] {
+  if (!json) return [];
+  try { return sanitizeOrderLines(JSON.parse(json)); } catch { return []; }
+}
 
 export type EventInput = {
   eventKey: string;
@@ -60,6 +90,7 @@ export async function createOrder(input: CreateOrderInput, actorId?: number): Pr
         user_id: input.userId == null ? null : bid(input.userId),
         cj_product_id: (input.cjProductId ?? '').slice(0, 64),
         product_name: (input.productName ?? '').slice(0, 400),
+        cj_lines_json: input.lines?.length ? JSON.stringify(sanitizeOrderLines(input.lines)) : null,
         items_total_minor: input.itemsTotalMinor ?? 0,
         shipping_total_minor: input.shippingTotalMinor ?? 0,
         tax_total_minor: input.taxTotalMinor ?? 0,

@@ -82,6 +82,7 @@ export const CJ_DDL: string[] = [
     cj_product_id VARCHAR(64) NOT NULL DEFAULT '',
     product_name VARCHAR(400) NOT NULL DEFAULT '',
     cj_order_id VARCHAR(64) NOT NULL DEFAULT '',
+    cj_lines_json TEXT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'awaiting_payment',
     status_reason VARCHAR(300) NOT NULL DEFAULT '',
     items_total_minor INT NOT NULL DEFAULT 0,
@@ -110,6 +111,10 @@ export const CJ_DDL: string[] = [
     KEY cj_orders_user (user_id),
     KEY cj_orders_cjid (cj_order_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  // بنود الطلب لإرسالها للمورد (JSON: [{vid,quantity,sku,logisticName}]) — لازمة
+  // لبناء طلب CJ عند الإرسال (المورد يحتاج vid + الكمية، لا الـPID). تُضاف على القائم.
+  `ALTER TABLE cj_orders ADD COLUMN cj_lines_json TEXT NULL`,
 
   // سجل أحداث/خط زمني للطلب — event_key فريد يجعل استقبال الأحداث/الـwebhooks idempotent.
   `CREATE TABLE IF NOT EXISTS cj_order_events (

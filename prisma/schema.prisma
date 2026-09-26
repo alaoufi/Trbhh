@@ -2335,6 +2335,7 @@ model cj_orders {
   cj_product_id        String    @default("") @db.VarChar(64)
   product_name         String    @default("") @db.VarChar(400)
   cj_order_id          String    @default("") @db.VarChar(64)
+  cj_lines_json        String?   @db.Text
   status               String    @default("awaiting_payment") @db.VarChar(32)
   status_reason        String    @default("") @db.VarChar(300)
   items_total_minor    Int       @default(0)

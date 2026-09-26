@@ -4,7 +4,9 @@ import { AccessBoundary } from '@/components/access-boundary';
 import { hasAccess, requireAccess } from '@/lib/access-control/guards';
 import { getOrderById, listOrderEvents } from '@/lib/cj/orders/store';
 import { nextStatuses, statusLabel, isException, isStatus } from '@/lib/cj/orders/state';
-import { advanceCjOrder, setCjOrderTracking } from '../../actions';
+import { parseOrderLines } from '@/lib/cj/orders/store';
+import { canDispatch } from '@/lib/cj/orders/dispatch';
+import { advanceCjOrder, setCjOrderTracking, dispatchCjOrderToSupplier } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'طلب CJ', robots: { index: false, follow: false } };
@@ -26,6 +28,8 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
   const events = await listOrderEvents(id);
   const canRefund = await hasAccess(session.uid, 'orders', 'refund');
   const nexts = isStatus(order.status) ? nextStatuses(order.status).filter(status => status !== 'refunded' || canRefund) : [];
+  const orderLines = parseOrderLines(order.cj_lines_json);
+  const dispatchable = canDispatch(order.status) && !order.cj_order_id && orderLines.length > 0;
 
   return (
     <div className="space-y-4">
@@ -35,6 +39,10 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
       </div>
       {sp.moved === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تغيير الحالة.</p>}
       {sp.tracked === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم تحديث التتبّع.</p>}
+      {sp.created === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">أُنشئ الطلب بحالة «بانتظار الدفع». لا خصم ولا دفع.</p>}
+      {sp.sent === '1' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">أُرسل الطلب إلى المورد.</p>}
+      {sp.senderr === 'blocked' && <p className="rounded-lg bg-amber-50 p-2 text-sm text-amber-800">الشراء الحيّ غير مفعّل — الطلب جاهز للإرسال، ولن يُرسَل فعلياً للمورد إلا بعد التفعيل اليدوي. لم يحدث أي خصم أو شراء.</p>}
+      {typeof sp.senderr === 'string' && sp.senderr !== 'blocked' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الإرسال: {sp.senderr === 'not_ready' ? 'الطلب ليس بحالة مؤكَّدة الدفع بعد' : sp.senderr === 'no_lines' ? 'لا توجد بنود قابلة للإرسال' : sp.senderr}</p>}
       {typeof sp.err === 'string' && <p className="rounded-lg bg-red-50 p-2 text-sm text-red-700">تعذّر الانتقال: {sp.err === 'invalid_transition' ? 'انتقال غير مسموح من الحالة الحالية' : sp.err}</p>}
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -51,6 +59,8 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
             <li>السلع: {sar(order.items_total_minor)} · الشحن: {sar(order.shipping_total_minor)} · الضريبة: {sar(order.tax_total_minor)}</li>
             <li className="font-bold text-primary">الإجمالي: {sar(order.grand_total_minor)}</li>
             <li className="text-xs text-muted-foreground">أُرسل للمورد: {dt(order.placed_at)} · سُلّم: {dt(order.delivered_at)}</li>
+            {order.cj_order_id && <li className="text-xs text-muted-foreground" dir="ltr">معرّف طلب المورد: {order.cj_order_id}</li>}
+            {orderLines.length > 0 && <li className="text-xs text-muted-foreground">بنود الإرسال: {orderLines.length} · {orderLines.reduce((n, l) => n + l.quantity, 0)} قطعة</li>}
           </ul>
           <div className="border-t pt-2 text-sm">
             <div className="font-bold">التتبّع</div>
@@ -62,6 +72,14 @@ export default async function CjOrderPage({ params, searchParams }: { params: Pr
         {/* أدوات الاختبار (تحريك الحالة/التتبّع) */}
           <div className={card}>
             <h2 className="font-bold">أدوات (اختبار الدورة — بلا شراء)</h2>
+            {dispatchable && (
+              <AccessBoundary module="orders" action="edit"><form action={dispatchCjOrderToSupplier} className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-2">
+                <input type="hidden" name="id" value={String(order.id)} />
+                <p className="text-sm font-bold text-amber-900">إرسال الطلب إلى المورد</p>
+                <p className="text-xs text-amber-800">يُرسَل الطلب فعلياً فقط عند تفعيل الشراء الحيّ؛ وإلا يُسجَّل «جاهز للإرسال» بلا أي خصم أو شراء.</p>
+                <button className={btn}>إرسال إلى المورد</button>
+              </form></AccessBoundary>
+            )}
             {nexts.length ? (
               <AccessBoundary module="orders" action="edit"><form action={advanceCjOrder} className="space-y-2">
                 <input type="hidden" name="id" value={String(order.id)} />

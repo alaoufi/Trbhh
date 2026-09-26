@@ -100,6 +100,7 @@ items.push(
  { href: '/admin/finance?section=reconciliation', label: 'المطابقة المالية', icon: ScrollText, perm: 'finance' },
  { href: '/admin/finance?section=close', label: 'إقفال الفترات', icon: Archive, perm: 'finance' },
  { href: '/admin/suppliers/catalog', label: 'كتالوج الموردين', icon: Store, perm: 'suppliers' },
+ { href: '/admin/suppliers/cj/browse', label: 'منتجات CJ — الاستيراد والمعالجة', icon: Store, perm: 'commerce', description: 'تصفّح واستيراد منتجات CJ، المعالجة الشاملة (ترجمة/صور/شحن)، والسلع المستوردة', keywords: ['CJ', 'سي جيه', 'استيراد', 'معالجة شاملة', 'دروبشيبينغ', 'مورد صيني'] },
  { href: '/admin/suppliers/integrations', label: 'ربط المتاجر والمزامنة', icon: LinkIcon, perm: 'suppliers' },
  { href: '/admin/shipping', label: 'الشحن والتتبع', icon: Store, perm: 'commerce' },
  { href: '/admin/ratings', label: 'تقييمات المنصة', icon: MessagesSquare, perm: null },

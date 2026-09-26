@@ -420,7 +420,10 @@ export async function saveCjStorefrontEdit(form: FormData) {
   if (nameAr) { await setCjProductNameAr(id, nameAr); if (row?.name) await learnTranslation(row.name, nameAr); }
   await setCjProductDescriptionAr(id, descAr);
   if (row?.source_description && descAr) await learnTranslation(row.source_description, descAr);
-  await setCjProductCategory(id, cat);
+  // توحيد التصنيف: لا يُحفظ إلا تصنيف من قائمة تصنيفات تربح المعتمدة (أو تفريغه). لا تصنيف مورد.
+  const { getCjCategoryOptions } = await import('@/lib/cj/categories');
+  const trbhhCategories = await getCjCategoryOptions();
+  await setCjProductCategory(id, cat && trbhhCategories.includes(cat) ? cat : '');
   if (priceRaw === '') await setCjProductPriceOverride(id, null);
   else { const v = Number(priceRaw); if (Number.isFinite(v) && v >= 0) await setCjProductPriceOverride(id, Math.round(v * 100)); }
   await auditProduct(session.uid, row);
@@ -509,13 +512,13 @@ export async function refreshCjImportedAvailability(form: FormData) {
   await setCjProductDetails(id, buildCjDetails(fullVariants));
   const availability = await readCjAvailability(before.cj_product_id, fullVariants);
   await setCjProductAvailability(id, availability);
-  // ترجمة الحقول العربية الناقصة تلقائياً (اسم/وصف/تصنيف) فيكفي زر واحد لمعالجة السلعة كاملة.
+  // ترجمة الحقول العربية الناقصة تلقائياً (اسم/وصف فقط) فيكفي زر واحد لمعالجة السلعة كاملة.
+  // التصنيف لا يُملأ من المورد إطلاقاً — يوحَّد يدوياً من تصنيفات تربح (لوحة الإدارة).
   if (!before.name_ar && before.name) { const ar = await translateToArabicCached(before.name).catch(() => null); if (ar) await setCjProductNameAr(id, ar); }
   if (!before.display_description_ar && before.source_description) {
     const plain = String(before.source_description).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/\s{2,}/g, ' ').trim();
     const ar = plain ? await translateToArabicCached(plain).catch(() => null) : null; if (ar) await setCjProductDescriptionAr(id, ar);
   }
-  if (before.source_category && !isArabicText(before.trbhh_category)) { const ar = await translateToArabicCached(before.source_category).catch(() => null); if (ar) await setCjProductCategory(id, ar); }
   await auditProduct(s.uid, before);
   revalidatePath('/admin/suppliers/cj/browse');
   revalidatePath('/admin/suppliers/cj/showcase');

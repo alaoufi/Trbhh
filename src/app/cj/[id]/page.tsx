@@ -13,7 +13,7 @@ import { CjProductCard } from '@/components/cj/product-card';
 import { CartLink } from '@/components/cj/cart-controls';
 import { CjPurchasePanel } from '@/components/cj/purchase-panel';
 import { cleanCjDisplayDescription, cjVariantDisplayOptions } from '@/lib/cj/variant-display';
-import { cjProductDisplayTitle } from '@/lib/cj/presentation';
+import { cjProductDisplayTitle, cjDescriptionText } from '@/lib/cj/presentation';
 import { getSetting } from '@/lib/settings';
 
 const editInput = 'mt-1 w-full min-w-0 rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
@@ -131,7 +131,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
             <form action={saveCjStorefrontEdit} className="mt-2 space-y-2 text-sm">
               <input type="hidden" name="id" value={id} />
               <label className="block">العنوان العربي<input name="nameAr" defaultValue={p.name_ar} className={editInput} placeholder="مثال: ساعة يد رجالية" /></label>
-              <label className="block">الوصف العربي<textarea name="descriptionAr" rows={4} defaultValue={p.display_description_ar ?? ''} className={editInput} /></label>
+              <label className="block">الوصف العربي<textarea name="descriptionAr" rows={4} defaultValue={p.display_description_ar ? cjDescriptionText(p.display_description_ar) : ''} className={editInput} /></label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block">التصنيف<input name="trbhhCategory" defaultValue={p.trbhh_category} className={editInput} /></label>
                 <label className="block">السعر (ر.س) — فارغ = المحسوب<input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} /></label>

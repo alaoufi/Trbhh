@@ -74,5 +74,6 @@ export async function GET(request: Request) {
   finally{reader.releaseLock();}
   const buf=Buffer.concat(chunks,total);
   if(!matchesRaster(buf,ct))return failure('not_image',415);
-  return new NextResponse(buf, { headers: { ...SECURITY_HEADERS, 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400, immutable' } });
+  // الصور تُستورَد حيّة من المصدر عند كل عرض بلا تخزين على الخادم وبلا كاش في المتصفّح.
+  return new NextResponse(buf, { headers: { ...SECURITY_HEADERS, 'Content-Type': ct, 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' } });
 }

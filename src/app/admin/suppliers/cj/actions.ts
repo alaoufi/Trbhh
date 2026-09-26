@@ -69,6 +69,11 @@ export async function saveCjSync(form: FormData) {
     const { setSetting } = await import('@/lib/settings');
     await setSetting('cj_delivery_days_text', String(form.get('deliveryDays') || '').trim().slice(0, 60));
   }
+  // شجرة التصنيفات البسيطة (سطر لكل قسم رئيسي: أقسامه الفرعية) — تُختار على السلعة.
+  if (form.has('categoryTree')) {
+    const { setCjCategoryText } = await import('@/lib/cj/categories');
+    await setCjCategoryText(String(form.get('categoryTree') || ''));
+  }
   await auditCjChange(s.uid, 'integrations', 'sync', before, await cjSyncSettings());
   revalidatePath('/admin/suppliers/cj');
   redirect('/admin/suppliers/cj?saved=sync');

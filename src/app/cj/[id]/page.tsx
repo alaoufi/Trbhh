@@ -71,6 +71,10 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   // جدول الخيارات بتفاصيلها (كل خيار + وزنه) + شحن تقديري (سعر ثابت من الإدارة + مدّة نصّية).
   const [shipMinorRaw, deliveryDaysText, categoryOptions] = await Promise.all([getSetting('cj_sync_shipping_minor', '0'), getSetting('cj_delivery_days_text', '٧–١٥ يوم عمل'), getCjCategoryOptions()]);
   const flatShipMinor = Math.max(0, Math.round(Number(shipMinorRaw) || 0));
+  // قيمة شحن حقيقية واحدة (تربح هي البائع): تقدير الإدارة أولاً، وإلا أرخص شحن حقيقي
+  // محقّق من التوفّر. لا تُعرض «مجاني» لقيمة غير مضبوطة — تُعرض «يُحسب حسب الوجهة».
+  const realShipMinor = flatShipMinor > 0 ? flatShipMinor : (shipCheapest?.priceMinor ?? 0);
+  const shipDeliveryText = (deliveryDaysText || '').trim() || shipCheapest?.deliveryDays || '';
   const variantRows = displayVariants.map(v => {
     const opts = cjVariantDisplayOptions({ variantKey: v.optionKey, variantName: v.name }).map(o => `${o.label}: ${o.value}`).join(' · ');
     return { key: v.vid, label: opts || (v.name || v.optionKey || '').trim() || '—', weight: v.weight };
@@ -103,13 +107,13 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
             {variantRows.map(r => <tr key={r.key} className="border-t"><td className="p-2" dir="auto">{r.label}</td><td className="p-2 text-slate-600">{r.weight != null ? `${r.weight} غ` : '—'}</td></tr>)}
           </tbody></table></div>
         </details>}
-        {!availability && <div className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm"><h2 className="mb-2 text-sm font-bold text-emerald-900">الشحن إلى السعودية</h2>
+        <div className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm"><h2 className="mb-2 text-sm font-bold text-emerald-900">الشحن إلى السعودية</h2>
           <ul className="space-y-1.5">
-            <li className="flex items-center justify-between gap-2"><span className="text-slate-700">الشحن</span><b className="text-emerald-800">{flatShipMinor > 0 ? sar(flatShipMinor) : 'شحن مجاني'}</b></li>
-            <li className="flex items-center justify-between gap-2"><span className="text-slate-700">مدّة التوصيل</span><b className="text-emerald-800" dir="auto">{deliveryDaysText}</b></li>
+            <li className="flex items-center justify-between gap-2"><span className="text-slate-700">الشحن</span><b className="text-emerald-800">{realShipMinor > 0 ? sar(realShipMinor) : 'يُحسب حسب الوجهة عند الطلب'}</b></li>
+            <li className="flex items-center justify-between gap-2"><span className="text-slate-700">مدّة التوصيل</span><b className="text-emerald-800" dir="auto">{shipDeliveryText}</b></li>
+            {availability && <li className="flex items-center justify-between gap-2"><span className="text-slate-700">المخزون المتوفّر</span><b className="text-emerald-800">{new Intl.NumberFormat('en-US').format(availability.stockQuantity)}</b></li>}
           </ul>
-        </div>}
-        {availability && <div className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><h2 className="mb-3 text-sm font-bold text-emerald-900">الشحن إلى السعودية</h2><ul className="space-y-2 text-sm">{shipOptions.slice(0, 5).map((o, i) => <li key={i} className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-2 last:border-0 last:pb-0"><span className="font-semibold text-slate-800">{o.name}{o.deliveryDays ? <span className="ms-2 text-xs font-normal text-slate-500">مدّة التوصيل: {o.deliveryDays}</span> : null}</span><span className="font-extrabold text-emerald-800">{sar(o.priceMinor)}</span></li>)}</ul><p className="mt-2 text-xs text-emerald-800">المخزون المتوفّر: {new Intl.NumberFormat('en-US').format(availability.stockQuantity)} · {shipCheapest ? `يبدأ الشحن من ${sar(shipCheapest.priceMinor)}` : ''}</p></div>}
+        </div>
         {agentContact && (agentContact.wa || agentContact.tel) && <section className="rounded-2xl border bg-white p-4"><h2 className="mb-3 text-sm font-bold">التواصل مع وكيل السلعة</h2><div className="flex flex-wrap gap-2">{agentContact.wa && <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white"><MessageCircle className="h-4 w-4" />واتساب</a>}{agentContact.tel && <a href={agentContact.tel} className="flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold text-primary"><Phone className="h-4 w-4" />اتصال</a>}</div></section>}
       </section>
     </div>

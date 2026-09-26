@@ -110,7 +110,12 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
             <SubmitButton className={`${btn} min-h-11 px-5 text-base`} pendingText="جارٍ المعالجة…">معالجة شاملة الآن</SubmitButton>
           </form>
         </div>
-        {sp.bulk === '1' && <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">عولجت {sp.processed} سلعة · ظهر شحن حقيقي لـ{sp.shipped} · تُرجمت {sp.tr} · {sp.done === '1' ? 'اكتملت معالجة كل السلع ✅' : `متبقٍّ ${sp.remaining} — اضغط مجدداً للمتابعة.`}</p>}
+        {sp.bulk === '1' && <div className="mt-2 space-y-1">
+          <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">عولجت {sp.processed} سلعة · شحن حقيقي لـ{sp.shipped} · تُرجمت {sp.tr}{Number(sp.failed) > 0 ? ` · تعذّر ${sp.failed}` : ''} · {sp.done === '1' ? 'اكتملت معالجة كل السلع ✅' : `متبقٍّ ${sp.remaining} — اضغط مجدداً للمتابعة.`}</p>
+          {sp.processed === '0' && sp.failed === '0' && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">لا توجد سلع مستوردة لمعالجتها بعد — استورد سلعاً من الكتالوج أدناه أولاً.</p>}
+          {Number(sp.failed) > 0 && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">تعذّر جلب {sp.failed} سلعة من المورد (قد تكون مفاتيح CJ غير مضبوطة أو حدّ الطلبات). البيانات القائمة لم تُمسح. تأكّد من ضبط CJ في الإعدادات وأعد المحاولة.</p>}
+          {sp.shipped === '0' && sp.processed !== '0' && <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-900">لم يُحتسب شحن حقيقي لأي سلعة في هذه الدفعة — تحقّق من أن مفاتيح CJ تعمل («اختبار الاتصال» في الإعدادات) ومن توفّر شحن للسعودية.</p>}
+        </div>}
       </div></AccessBoundary>
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
         عرض مباشر من CJ API (قراءة فقط). <b>لا يُستورد أو يُنشر أي منتج تلقائياً</b> — الاستيراد للمنتجات المختارة فقط،

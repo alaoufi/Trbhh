@@ -12,6 +12,7 @@ import { CjProductDescription } from '@/components/cj/product-description';
 import { CjProductCard } from '@/components/cj/product-card';
 import { CartLink } from '@/components/cj/cart-controls';
 import { CjPurchasePanel } from '@/components/cj/purchase-panel';
+import { SubmitButton } from '@/components/cj/submit-button';
 import { cleanCjDisplayDescription, cjVariantDisplayOptions } from '@/lib/cj/variant-display';
 import { cjProductDisplayTitle, cjDescriptionText } from '@/lib/cj/presentation';
 import { getSetting } from '@/lib/settings';
@@ -153,7 +154,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
                 <label className="block">السعر (ر.س) — فارغ = المحسوب<input name="priceSar" inputMode="decimal" defaultValue={p.sale_price_override_minor != null ? (p.sale_price_override_minor / 100).toString() : ''} placeholder={(p.sale_price_minor / 100).toString()} className={editInput} /></label>
               </div>
               <div className="flex items-center gap-2">
-                <button className="rounded-lg bg-primary px-4 py-2 font-bold text-white">حفظ التعديل</button>
+                <SubmitButton className="rounded-lg bg-primary px-4 py-2 font-bold text-white" pendingText="جارٍ الحفظ…">حفظ التعديل</SubmitButton>
                 <span className="text-xs text-muted-foreground">تصحيح العنوان/الوصف يُحفظ في ذاكرة الترجمة ويُطبَّق على السلع المشابهة.</span>
               </div>
             </form>

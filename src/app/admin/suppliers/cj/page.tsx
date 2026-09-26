@@ -12,7 +12,8 @@ import { sampleCjProducts } from '@/lib/cj/sample';
 import { cjSyncSettings } from '@/lib/cj/sync';
 import { getSetting } from '@/lib/settings';
 import { getCjCategoryText } from '@/lib/cj/categories';
-import { saveCjMargin, saveCjSync, runCjSync, processAllCjImported } from './actions';
+import { saveCjMargin, saveCjSync, runCjSync } from './actions';
+import { SubmitButton } from '@/components/cj/submit-button';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'تكامل CJ — وضع الاختبار' };
@@ -92,7 +93,7 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
         {sp.error === 'margin' && <p className="text-sm text-red-700">قيمة غير صالحة (0–1000٪).</p>}
         <AccessBoundary module="pricing"><AccessBoundary module={'pricing'} action={'manage_settings'}><form action={saveCjMargin} className="flex flex-wrap items-center gap-2">
           <label className="text-sm">النسبة٪<input className={`${input} ms-2 w-24`} name="marginPercent" inputMode="decimal" defaultValue={(marginBps / 100).toString()} /></label>
-          <button className={btn}>حفظ الهامش</button>
+          <SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ الهامش</SubmitButton>
         </form></AccessBoundary></AccessBoundary>
         <p className="text-xs text-muted-foreground">مثال حساب: تكلفة ٢٠ + شحن ١٥ ر.س بهامش {(marginBps / 100).toFixed(0)}٪ → ربح {(sample.profitMinor / 100).toFixed(2)} · بيع {(sample.salePriceMinor / 100).toFixed(2)} ر.س. (السعر غير مثبّت في الكود.)</p>
       </div>
@@ -122,22 +123,14 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
             <textarea className="mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm" name="categoryTree" rows={6} defaultValue={categoryTree} placeholder={"المنزل والحديقة: وسائد، سجاد، ستائر\nملابس رجالية: ستُرات، أحذية\nإلكترونيات: سماعات، شواحن"} dir="rtl" />
             <span className="mt-1 block text-xs text-muted-foreground">تُعرض هذه الأقسام للاختيار على السلعة (قسم رئيسي أو «رئيسي / فرعي»)، ويمكن كتابة قيمة جديدة أيضاً.</span>
           </label>
-          <div className="sm:col-span-2"><button className={btn}>حفظ إعدادات المزامنة</button></div>
+          <div className="sm:col-span-2"><SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ إعدادات المزامنة</SubmitButton></div>
         </form></AccessBoundary>
         <AccessBoundary module="integrations" action="sync"><form action={runCjSync}>
-          <button className={btn} disabled={!cfg.configured}>مزامنة الآن (يدوية)</button>
+          <SubmitButton className={btn} disabled={!cfg.configured} pendingText="جارٍ المزامنة…">مزامنة الآن (يدوية)</SubmitButton>
           {!cfg.configured && <span className="ms-2 text-xs text-red-700">اضبط متغيّرات CJ أولاً.</span>}
         </form></AccessBoundary>
 
-        <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
-          <h3 className="text-sm font-bold text-primary">معالجة شاملة للسلع المستوردة (زر واحد)</h3>
-          <p className="mt-1 text-xs text-muted-foreground">يطبّق على المستورد لتربح: تحديث الصور والخيارات والتفاصيل، احتساب <b>الشحن الحقيقي من المورد</b>، وترجمة الاسم والوصف الناقصين. يعالج دفعة (١٠) لكل ضغطة ويكمل الباقي بالضغط ثانيةً حتى تكتمل الدورة. التصنيف يبقى يدوياً على تصنيفات تربح.</p>
-          {sp.bulk === '1' && <p className="mt-2 text-sm text-emerald-700">عولجت {sp.processed} سلعة · ظهر شحن حقيقي لـ{sp.shipped} · تُرجمت {sp.tr} · {sp.done === '1' ? 'اكتملت معالجة كل السلع.' : `متبقٍّ ${sp.remaining} — اضغط مجدداً للمتابعة.`}</p>}
-          <AccessBoundary module="products" action="edit"><form action={processAllCjImported} className="mt-2">
-            <button className={btn} disabled={!cfg.configured}>معالجة شاملة الآن</button>
-            {!cfg.configured && <span className="ms-2 text-xs text-red-700">اضبط متغيّرات CJ أولاً.</span>}
-          </form></AccessBoundary>
-        </div>
+        <p className="mt-2 text-xs text-muted-foreground">زر «المعالجة الشاملة» (ترجمة + بيانات + صور + شحن حقيقي) موجود أعلى قائمة <Link href="/admin/suppliers/cj/browse" className="font-bold text-primary underline">المنتجات المستوردة</Link>.</p>
       </div>
 
       {/* اختبارات القراءة */}

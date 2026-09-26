@@ -11,7 +11,8 @@ import { cjSyncSettings } from '@/lib/cj/sync';
 import { defaultMarginBps, computePrice } from '@/lib/cj/pricing';
 import { getCachedArabic, isArabicText, DEFAULT_LIBRETRANSLATE_URL } from '@/lib/cj/translate';
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
-import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateCjBrowsePage, translateAllCj, translateCjCategories, runCjTranslateWarm, refreshCjMediaAction, refreshCjImportedAvailability, saveCjTranslationSettings } from '../actions';
+import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateCjBrowsePage, translateAllCj, translateCjCategories, runCjTranslateWarm, refreshCjMediaAction, refreshCjImportedAvailability, saveCjTranslationSettings, processAllCjImported } from '../actions';
+import { SubmitButton } from '@/components/cj/submit-button';
 import { getSetting } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
@@ -130,11 +131,11 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
           <input type="hidden" name="page" value={page} /><input type="hidden" name="q" value={q} /><input type="hidden" name="cat" value={cat} />
           {detailPid && <input type="hidden" name="detail" value={detailPid} />}
           <input type="hidden" name="back" value={`${backHref}${detailPid ? `&detail=${encodeURIComponent(detailPid)}` : ''}`} />
-          <button className={btn} disabled={!items.length}>ترجمة منتجات هذه الصفحة</button>
+          <SubmitButton className={btn} disabled={!items.length} pendingText="جارٍ الترجمة…">ترجمة منتجات هذه الصفحة</SubmitButton>
         </form></AccessBoundary>
-        <AccessBoundary module="products" action="edit"><form action={translateCjCategories}><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة كل التصنيفات الآن</button></form></AccessBoundary>
-        <AccessBoundary module="products" action="edit"><form action={runCjTranslateWarm}><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الترجمات (خادم)</button></form></AccessBoundary>
-        <AccessBoundary module="products" action="edit"><form action={refreshCjMediaAction}><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الصور</button></form></AccessBoundary>
+        <AccessBoundary module="products" action="edit"><form action={translateCjCategories}><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ الترجمة…">ترجمة كل التصنيفات الآن</SubmitButton></form></AccessBoundary>
+        <AccessBoundary module="products" action="edit"><form action={runCjTranslateWarm}><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ التحديث…">تحديث الترجمات (خادم)</SubmitButton></form></AccessBoundary>
+        <AccessBoundary module="products" action="edit"><form action={refreshCjMediaAction}><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ التحديث…">تحديث الصور</SubmitButton></form></AccessBoundary>
         {typeof sp.mediaref === 'string' && <span className="text-emerald-700">حُدّثت صور {sp.mediaref} سلعة.</span>}
         {typeof sp.cattr === 'string' && <span className="text-emerald-700">خُزّنت ترجمة {sp.cattr} تصنيفاً (اضغط ثانيةً للباقي).</span>}
         {typeof sp.warmed === 'string' && <span className="text-emerald-700">تم تحديث الترجمات على الخادم ({sp.warmed}).</span>}
@@ -157,7 +158,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
           <label className="block">بريد MyMemory (اختياري — يرفع الحصّة المجانية للاحتياطي)
             <input name="mymemoryEmail" type="email" autoComplete="off" defaultValue={memEmail} placeholder="you@example.com" className="mt-1 w-full rounded-lg border border-primary/25 bg-white px-3 py-2" />
           </label>
-          <button className={btn}>حفظ إعدادات الترجمة</button>
+          <SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ إعدادات الترجمة</SubmitButton>
         </form>
       </details></AccessBoundary>
       <div className="hidden">
@@ -188,7 +189,7 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
             <div className="flex flex-wrap gap-2 pt-1">
               {imported.has(p.pid)
                 ? <span className="rounded-lg bg-emerald-100 px-3 py-1.5 text-sm font-bold text-emerald-800">مستورد ✓</span>
-                : <AccessBoundary module="products" action="create"><form action={importCjProduct}><input type="hidden" name="pid" value={p.pid} /><input type="hidden" name="back" value={backHref} /><button className={btn}>استيراد إلى تربح</button></form></AccessBoundary>}
+                : <AccessBoundary module="products" action="create"><form action={importCjProduct}><input type="hidden" name="pid" value={p.pid} /><input type="hidden" name="back" value={backHref} /><SubmitButton className={btn} pendingText="جارٍ الاستيراد…">استيراد إلى تربح</SubmitButton></form></AccessBoundary>}
               <Link href={`${backHref}&detail=${encodeURIComponent(p.pid)}#cj-detail`} className={ghost}>تفاصيل</Link>
             </div>
           </div>
@@ -247,8 +248,21 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
           <h2 className="font-bold">البضائع المستوردة (تخزين وسيط — غير معروضة للعامة): {importedList.length}</h2>
           <div className="flex flex-wrap gap-2">
             <Link href="/admin/suppliers/cj/showcase" className={btn}>معاينة السلع المختارة ←</Link>
-            <AccessBoundary module="products" action="edit"><form action={translateAllCj}><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة تلقائية للكل</button></form></AccessBoundary>
+            <AccessBoundary module="products" action="edit"><form action={translateAllCj}><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ الترجمة…">ترجمة تلقائية للكل</SubmitButton></form></AccessBoundary>
           </div>
+        </div>
+        {/* معالجة شاملة (زر واحد) أعلى المنتجات المستوردة */}
+        <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-primary">معالجة شاملة (زر واحد)</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">تحديث الصور والخيارات والتفاصيل + <b>الشحن الحقيقي من المورد</b> + ترجمة الاسم/الوصف الناقصين. يعالج دفعة (١٠) لكل ضغطة، اضغط ثانيةً للباقي حتى تكتمل الدورة.</p>
+            </div>
+            <AccessBoundary module="products" action="edit"><form action={processAllCjImported}>
+              <SubmitButton className={btn} pendingText="جارٍ المعالجة…">معالجة شاملة الآن</SubmitButton>
+            </form></AccessBoundary>
+          </div>
+          {sp.bulk === '1' && <p className="mt-2 text-sm text-emerald-700">عولجت {sp.processed} سلعة · ظهر شحن حقيقي لـ{sp.shipped} · تُرجمت {sp.tr} · {sp.done === '1' ? 'اكتملت معالجة كل السلع ✅' : `متبقٍّ ${sp.remaining} — اضغط مجدداً للمتابعة.`}</p>}
         </div>
         {typeof sp.edited === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم الحفظ.</p>}
         {typeof sp.translated === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تمّت ترجمة {sp.translated} سلعة تلقائياً.</p>}
@@ -280,23 +294,23 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
                   <AccessBoundary module="products" action="edit"><form action={saveCjArabic} className="flex items-center gap-1">
                     <input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} />
                     <input className={`${input} flex-1`} name="nameAr" defaultValue={r.name_ar} placeholder="العنوان بالعربية" />
-                    <button className={btn}>حفظ</button>
+                    <SubmitButton className={btn} pendingText="جارٍ الحفظ…">حفظ</SubmitButton>
                   </form></AccessBoundary>
                   <div className="flex flex-wrap items-center gap-1">
                     <Link href={`/admin/suppliers/cj/review/${r.id}`} className={btn}>مراجعة / تحرير</Link>
-                    <AccessBoundary module="products" action="edit"><form action={refreshCjImportedAvailability}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><button className={ghost}>تحديث الصور والمخزون والشحن</button></form></AccessBoundary>
+                    <AccessBoundary module="products" action="edit"><form action={refreshCjImportedAvailability}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ التحديث…">تحديث الصور والمخزون والشحن</SubmitButton></form></AccessBoundary>
                     {/* تعديل السعر */}
                     <AccessBoundary module="products" action="edit"><form action={saveCjPrice} className="flex items-center gap-1">
                       <input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} />
                       <input className={`${input} w-24`} name="priceSar" inputMode="decimal" defaultValue={r.sale_price_override_minor != null ? (r.sale_price_override_minor / 100).toString() : ''} placeholder={(r.sale_price_minor / 100).toString()} aria-label="سعر البيع بالريال" />
-                      <button className={ghost}>سعر</button>
+                      <SubmitButton className={ghost} pendingText="جارٍ…">سعر</SubmitButton>
                     </form></AccessBoundary>
                     {/* ترجمة تلقائية لهذه السلعة */}
-                    <AccessBoundary module="products" action="edit"><form action={translateCjProduct}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><button className={ghost}>ترجمة</button></form></AccessBoundary>
+                    <AccessBoundary module="products" action="edit"><form action={translateCjProduct}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ الترجمة…">ترجمة</SubmitButton></form></AccessBoundary>
                     {/* إخفاء/إظهار */}
-                    <AccessBoundary module="products" action="suspend"><form action={toggleCjHidden}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="hidden" value={r.hidden ? '0' : '1'} /><input type="hidden" name="back" value={backHref} /><button className={ghost}>{r.hidden ? 'إظهار' : 'إخفاء'}</button></form></AccessBoundary>
+                    <AccessBoundary module="products" action="suspend"><form action={toggleCjHidden}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="hidden" value={r.hidden ? '0' : '1'} /><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ…">{r.hidden ? 'إظهار' : 'إخفاء'}</SubmitButton></form></AccessBoundary>
                     {/* حذف */}
-                    <AccessBoundary module="products" action="delete"><form action={removeCjProduct}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><button className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-700">حذف</button></form></AccessBoundary>
+                    <AccessBoundary module="products" action="delete"><form action={removeCjProduct}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value={backHref} /><SubmitButton className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-700" pendingText="جارٍ الحذف…">حذف</SubmitButton></form></AccessBoundary>
                   </div>
                 </div>
               );

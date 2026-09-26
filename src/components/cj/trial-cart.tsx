@@ -36,7 +36,7 @@ export function TrialCart({accountId}:{accountId:number}){
         const result=await response.json() as TrialCartQuote;
         if(controller.signal.aborted||generation.current!==current)return;
         setQuoteKey(JSON.stringify(items));setQuote(result);
-        setFeedback(result.rejected.length?'تغيّر السعر أو المخزون أو الشحن، أو تعذر التحقق. راجع الخيار من صفحة المنتج وأعد إضافته بعد التحقق.':'تمت إعادة التحقق من كل خيار لدى CJ؛ لا يزال الطلب والدفع غير مفعّلين.');
+        setFeedback(result.rejected.length?'تغيّر السعر أو المخزون أو الشحن، أو تعذر التحقق. راجع الخيار من صفحة المنتج وأعد إضافته بعد التحقق.':'تمت إعادة التحقق من كل خيار؛ لا يزال الطلب والدفع غير مفعّلين.');
       }catch(cause){if(!controller.signal.aborted&&generation.current===current)setError(cause instanceof Error&&cause.message==='permission'?'انتهت الجلسة أو لم تعد صلاحية عرض المنتجات متاحة. أعد تسجيل الدخول.':'تعذر تحديث السلة. لا يوجد إجمالي معتمد؛ أعد المحاولة.');}
       finally{window.clearTimeout(timeout);if(!controller.signal.aborted&&generation.current===current)setBusy(false);}
     })();return()=>{window.clearTimeout(timeout);controller.abort();};
@@ -54,7 +54,7 @@ export function TrialCart({accountId}:{accountId:number}){
     <p role="status" aria-live="polite" className="text-sm text-primary">{[notice,feedback].filter(Boolean).join(' ')}</p>
     {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {!ready?<p>جارٍ تحميل السلة المحلية…</p>:!items.length?<p className="rounded-xl border border-dashed border-primary/25 p-8 text-center">السلة فارغة. أضف منتجًا لتجربة الكميات والإجمالي.</p>:<>
-      <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>{setQuote(null);setRefresh(value=>value+1);}} disabled={busy} className="min-h-11 rounded-xl border border-primary/25 px-4 py-2 font-bold disabled:opacity-50">إعادة التحقق من CJ</button><button type="button" onClick={()=>{save([],'أُفرغت سلة التجربة.');setQuote(null);}} className="min-h-11 rounded-xl border border-red-300 px-4 py-2 font-bold text-red-700">إفراغ السلة</button></div>
+      <div className="flex flex-wrap gap-2"><button type="button" onClick={()=>{setQuote(null);setRefresh(value=>value+1);}} disabled={busy} className="min-h-11 rounded-xl border border-primary/25 px-4 py-2 font-bold disabled:opacity-50">إعادة التحقق</button><button type="button" onClick={()=>{save([],'أُفرغت سلة التجربة.');setQuote(null);}} className="min-h-11 rounded-xl border border-red-300 px-4 py-2 font-bold text-red-700">إفراغ السلة</button></div>
       <section aria-label="منتجات سلة التجربة" aria-busy={busy} className="space-y-3">
         {items.map((item,index)=>{const line=currentQuote?.lines.find(line=>line.id===item.id&&line.variantId===item.variantId),rejected=currentQuote?.rejected.find(line=>line.id===item.id&&line.variantId===item.variantId),label=line?.title||`المنتج ${index+1}`;return <article key={`${item.id}:${item.variantId??''}`} className="grid grid-cols-[64px_minmax(0,1fr)] gap-3 rounded-2xl border border-primary/15 bg-white p-4 sm:grid-cols-[96px_minmax(0,1fr)]">
           <CjProductImage src={line?.image} alt={line?.title||'صورة المنتج'} className="h-16 w-16 rounded-xl object-contain sm:row-span-2 sm:h-24 sm:w-24"/>
@@ -68,6 +68,6 @@ export function TrialCart({accountId}:{accountId:number}){
       </section>
       {currentQuote&&!currentQuote.rejected.length&&!busy&&!error&&<section aria-label="إجمالي السلة" className="rounded-2xl border-2 border-primary bg-primary p-5 text-white shadow-sm"><p className="text-sm font-bold text-white/80">الإجمالي بعد التحقق الحي · السلع + الشحن</p><p className="mt-1 text-3xl font-black tracking-tight">{formatSar(currentQuote.totalMinor)} <span className="text-lg">ر.س</span></p><p className="mt-2 text-xs leading-5 text-white/75">تجربة فقط، وليس مبلغًا مستحقًا أو طلب شراء.</p></section>}
     </>}
-    <section aria-label="الدفع" className="rounded-2xl border border-slate-200 bg-white p-4"><button type="button" disabled aria-disabled="true" title="الدفع غير مفعّل في تجربة CJ" className="flex min-h-14 w-full cursor-not-allowed items-center justify-center rounded-xl bg-slate-300 px-4 text-lg font-extrabold text-slate-600">الدفع غير مفعّل</button><p className="mt-2 text-center text-xs text-slate-600">لن يتم تحصيل مبلغ أو إنشاء طلب. يظل الزر معطّلًا حتى اعتماد تفعيل الدفع.</p></section>
+    <section aria-label="الدفع" className="rounded-2xl border border-slate-200 bg-white p-4"><button type="button" disabled aria-disabled="true" title="الدفع غير مفعّل" className="flex min-h-14 w-full cursor-not-allowed items-center justify-center rounded-xl bg-slate-300 px-4 text-lg font-extrabold text-slate-600">الدفع غير مفعّل</button><p className="mt-2 text-center text-xs text-slate-600">لن يتم تحصيل مبلغ أو إنشاء طلب. يظل الزر معطّلًا حتى اعتماد تفعيل الدفع.</p></section>
   </div>;
 }

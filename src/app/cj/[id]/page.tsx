@@ -18,7 +18,7 @@ import { getSetting } from '@/lib/settings';
 
 const editInput = 'mt-1 w-full min-w-0 rounded-lg border border-primary/25 bg-white px-3 py-2 text-sm';
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'تفاصيل السلعة — تجربة CJ', robots: { index: false, follow: false } };
+export const metadata = { title: 'تفاصيل السلعة', robots: { index: false, follow: false } };
 
 export default async function CjStoreProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const view = await cjStorefrontView();
@@ -77,10 +77,10 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   const others = (await listStorefrontCjProducts(view.isPublic, 24)).filter(row => Number(row.id) !== id).slice(0, 6);
 
   return <div className="mx-auto max-w-6xl min-w-0 space-y-5 px-3 pb-32 pt-5 sm:px-5 md:pb-8 [overflow-wrap:anywhere]" data-cj-trial="product">
-    {view.isStaff && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p><b>تجربة CJ الخاصة</b> — تجميع السلع فقط؛ الشراء والدفع غير مفعّلين.</p>{session && <CartLink accountId={session.uid} />}</div>}
+    {view.isStaff && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><p><b>معاينة خاصة</b> — تجميع السلع فقط؛ الشراء والدفع غير مفعّلين.</p>{session && <CartLink accountId={session.uid} />}</div>}
     {sp.edited === '1' && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">تم حفظ تعديل السلعة.</p>}
     {sp.err === 'has_activity' && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">تعذّر الحذف لوجود نشاط على السلعة. يمكنك إخفاؤها.</p>}
-    <nav aria-label="مسار التنقل" className="flex flex-wrap items-center gap-2 text-sm text-slate-500"><Link href="/cj" className="font-bold text-primary hover:underline">سلع CJ التجريبية</Link><span aria-hidden="true">/</span><span>تفاصيل المنتج</span></nav>
+    <nav aria-label="مسار التنقل" className="flex flex-wrap items-center gap-2 text-sm text-slate-500"><Link href="/cj" className="font-bold text-primary hover:underline">المتجر</Link><span aria-hidden="true">/</span><span>تفاصيل المنتج</span></nav>
     <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-8">
       <CjProductGallery key={id} images={gallery} title={title} />
       <section aria-label="معلومات المنتج" className="min-w-0 space-y-4">
@@ -88,7 +88,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         <h1 className="text-xl font-extrabold leading-8 text-primary sm:text-2xl">{title}</h1>
         {view.isStaff && session && (verifiedVariants.length > 0
           ? <CjPurchasePanel productId={id} productPid={p.cj_product_id} productName={title} accountId={session.uid} isStaff={view.isStaff} variants={verifiedVariants.map(variant=>({vid:variant.vid,variantSku:variant.sku,variantName:variant.name,variantKey:variant.optionKey,variantSellPrice:variant.priceUsd,variantImage:null,variantWeight:variant.weight,attributes:variant.attributes}))} />
-          : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">هذه السلعة مخفية عن المشترين: لا يوجد خيار ثبت مخزونه وشحنه إلى السعودية. أعد التحقق من بيانات CJ قبل إتاحتها.</p>)}
+          : <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">هذه السلعة مخفية عن المشترين: لا يوجد خيار ثبت مخزونه وشحنه إلى السعودية. أعد التحقق من التوفّر قبل إتاحتها.</p>)}
         {optionGroupList.length > 0 && <div className="min-w-0 space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
           <h2 className="text-sm font-bold text-slate-700">الخيارات المتاحة</h2>
           {optionGroupList.map(group => <div key={group.label} className="min-w-0">
@@ -102,13 +102,11 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
             {variantRows.map(r => <tr key={r.key} className="border-t"><td className="p-2" dir="auto">{r.label}</td><td className="p-2 text-slate-600">{r.weight != null ? `${r.weight} غ` : '—'}</td></tr>)}
           </tbody></table></div>
         </details>}
-        {!availability && <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 text-sm"><h2 className="mb-2 text-sm font-bold text-slate-700">الشحن إلى السعودية</h2>
-          {flatShipMinor > 0
-            ? <ul className="space-y-1.5">
-                <li className="flex items-center justify-between gap-2"><span className="text-slate-700">الشحن (تقدير الإدارة)</span><b className="text-emerald-800">{sar(flatShipMinor)}</b></li>
-                <li className="flex items-center justify-between gap-2"><span className="text-slate-700">المدّة التقديرية</span><b className="text-emerald-800" dir="auto">{deliveryDaysText}</b></li>
-              </ul>
-            : <p className="leading-6 text-slate-600">يُحسب <b>الشحن الحقيقي</b> (السعر والمدّة) من CJ عند اختيار الخيار وتأكيد الطلب — لا نلتزم بسعر شحن قبل التحقّق الحيّ.{deliveryDaysText ? ` المدّة التقديرية: ${deliveryDaysText}.` : ''}</p>}
+        {!availability && <div className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm"><h2 className="mb-2 text-sm font-bold text-emerald-900">الشحن إلى السعودية</h2>
+          <ul className="space-y-1.5">
+            <li className="flex items-center justify-between gap-2"><span className="text-slate-700">الشحن</span><b className="text-emerald-800">{flatShipMinor > 0 ? sar(flatShipMinor) : 'شحن مجاني'}</b></li>
+            <li className="flex items-center justify-between gap-2"><span className="text-slate-700">مدّة التوصيل</span><b className="text-emerald-800" dir="auto">{deliveryDaysText}</b></li>
+          </ul>
         </div>}
         {availability && <div className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4"><h2 className="mb-3 text-sm font-bold text-emerald-900">الشحن إلى السعودية</h2><ul className="space-y-2 text-sm">{shipOptions.slice(0, 5).map((o, i) => <li key={i} className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-100 pb-2 last:border-0 last:pb-0"><span className="font-semibold text-slate-800">{o.name}{o.deliveryDays ? <span className="ms-2 text-xs font-normal text-slate-500">مدّة التوصيل: {o.deliveryDays}</span> : null}</span><span className="font-extrabold text-emerald-800">{sar(o.priceMinor)}</span></li>)}</ul><p className="mt-2 text-xs text-emerald-800">المخزون المتوفّر: {new Intl.NumberFormat('en-US').format(availability.stockQuantity)} · {shipCheapest ? `يبدأ الشحن من ${sar(shipCheapest.priceMinor)}` : ''}</p></div>}
         {agentContact && (agentContact.wa || agentContact.tel) && <section className="rounded-2xl border bg-white p-4"><h2 className="mb-3 text-sm font-bold">التواصل مع وكيل السلعة</h2><div className="flex flex-wrap gap-2">{agentContact.wa && <a href={agentContact.wa} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-bold text-white"><MessageCircle className="h-4 w-4" />واتساب</a>}{agentContact.tel && <a href={agentContact.tel} className="flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold text-primary"><Phone className="h-4 w-4" />اتصال</a>}</div></section>}

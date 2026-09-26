@@ -932,6 +932,7 @@ async function run(): Promise<void> {
   await backfillAdBanAction();
   await backfillAccountDeletedAction();
   await backfillLegacyReceiptHashes();
+  await backfillLegacyNotificationReadAt();
   await seedCjSupplier();
 }
 
@@ -991,6 +992,19 @@ async function backfillLegacyReceiptHashes(): Promise<void> {
   await prisma.$executeRawUnsafe(
     `UPDATE wallet_topups SET receipt_hash = NULL WHERE receipt_hash IS NOT NULL AND receipt_hash != '-' AND CHAR_LENGTH(receipt_hash) < 100`,
   ).catch(() => {});
+}
+
+/** ترقيع لمرة واحدة: إضافة عمود notfications.read_at جعلت كل الإشعارات القديمة بـ
+ *  read_at=NULL، فظهرت كأنها «جديدة» (بعضها قبل سنتين). نؤرشفها مرّة واحدة (read_at=
+ *  تاريخ الإنشاء) لكل إشعار غير مقروء أقدم من يومين وقت الترقيع، ونحفظ علامة في
+ *  site_settings كي لا يتكرّر فيؤرشف الإشعارات الجديدة الحقيقية لاحقاً. */
+async function backfillLegacyNotificationReadAt(): Promise<void> {
+  const done = await prisma.site_settings.findUnique({ where: { k: 'notif_readat_backfilled' } }).catch(() => null);
+  if (done) return;
+  await prisma.$executeRawUnsafe(
+    `UPDATE notfications SET read_at = COALESCE(created_at, UTC_TIMESTAMP()) WHERE read_at IS NULL AND (created_at IS NULL OR created_at < UTC_TIMESTAMP() - INTERVAL 2 DAY)`,
+  ).catch(() => {});
+  await prisma.site_settings.upsert({ where: { k: 'notif_readat_backfilled' }, create: { k: 'notif_readat_backfilled', v: '1' }, update: { v: '1' } }).catch(() => {});
 }
 
 /** Idempotent schema sync — shared promise so concurrent callers run it once. */

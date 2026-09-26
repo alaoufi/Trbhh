@@ -508,3 +508,32 @@ export async function convertPointsAction() {
   revalidatePath('/account/wallet');
   redirect(r.ok ? `/account/wallet?pts=${r.sar}` : '/account/wallet?error=pts');
 }
+
+/** عرض إعلان العضو الموثوق للبيع المباشر (سعر + شحن + كمية) — بانتظار اعتماد الإدارة.
+ *  لا خصم ولا دفع؛ الشراء الفعلي مقفل خلف حارس الشراء وبوابة الدفع (غير مسجّلة بعد). */
+export async function listAdForDirectSaleAction(formData: FormData) {
+  const session = await requireUser();
+  const adId = String(formData.get('adId') || '');
+  if (!/^[1-9]\d{0,14}$/.test(adId)) redirect('/account/ads?error=sale');
+  const priceMinor = Math.round((Number(String(formData.get('priceSar') || '')) || 0) * 100);
+  const shippingMinor = Math.round((Number(String(formData.get('shipSar') || '0')) || 0) * 100);
+  const quantity = Math.trunc(Number(String(formData.get('qty') || '1'))) || 1;
+  const { listAdForDirectSale } = await import('@/lib/commerce/member-sell');
+  const r = await listAdForDirectSale(session.uid, BigInt(adId), priceMinor, shippingMinor, quantity);
+  revalidatePath('/account/ads');
+  revalidatePath('/shop');
+  redirect(r.ok ? '/account/ads?sale=1' : `/account/ads?error=${r.error}`);
+}
+
+/** إيقاف عرض سلعة العضو للبيع المباشر (تُخفى فقط، لا تُحذف). */
+export async function stopDirectSaleAction(formData: FormData) {
+  const session = await requireUser();
+  const adId = String(formData.get('adId') || '');
+  if (/^[1-9]\d{0,14}$/.test(adId)) {
+    const { stopMemberSale } = await import('@/lib/commerce/member-sell');
+    await stopMemberSale(session.uid, BigInt(adId));
+  }
+  revalidatePath('/account/ads');
+  revalidatePath('/shop');
+  redirect('/account/ads?salestopped=1');
+}

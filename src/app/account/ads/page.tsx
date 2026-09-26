@@ -11,12 +11,14 @@ import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmSubmit } from '@/components/confirm-submit';
-import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction, bumpAdAction, restoreArchivedAdAction, archiveAdAction } from '../actions';
+import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction, bumpAdAction, restoreArchivedAdAction, archiveAdAction, listAdForDirectSaleAction, stopDirectSaleAction } from '../actions';
+import { canMemberSellDirectly } from '@/lib/commerce/seller-types';
+import { listMemberSaleProducts, type MemberSaleRow } from '@/lib/commerce/member-sell';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
 
-export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string; censored?: string }> }) {
+export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string; censored?: string; sale?: string; salestopped?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee, memberWindows, active, lifecycleOn] = await Promise.all([
@@ -25,6 +27,10 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
     getAdRestoreFee(), getMemberWindows(), getActiveProfile(session.uid).catch(() => null), getSettingBool('platform_ad_lifecycle_enabled', false),
   ]);
   const periodStats = await getAdPeriodStats(contactStatsOn ? ads.map((a) => a.id) : []);
+  // البيع المباشر للعضو الموثوق: مسموح فقط عند تفعيل المفتاح الإداري + كون العضو موثوقاً.
+  const directSaleAllowed = await canMemberSellDirectly(session.uid);
+  const saleProducts = directSaleAllowed ? await listMemberSaleProducts(session.uid) : new Map<string, MemberSaleRow>();
+  const sar2 = (m: number) => (m / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const now = Date.now();
   const featuredSold = serviceHasPrice(servicePricing.featured);
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
@@ -55,6 +61,11 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {sp.scheduled === '1' && <div className="rounded-lg border border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🕒 حُفظ إعلانك وسيُنشر تلقائياً في الموعد الذي حددته.</div>}
       {sp.censored === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">✳️ نُشر إعلانك للعامة بعد حجب كلمات مخالفة بنجمات. إن رأيت المنع خطأً راسل الإدارة.</div>}
       {sp.restored === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">📤 أُعيد إعلانك للظهور من الأرشيف وعاد لمقدمة القوائم.</div>}
+      {sp.sale === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🛒 عُرضت سلعتك للبيع المباشر — بانتظار اعتماد الإدارة قبل ظهورها في المتجر.</div>}
+      {sp.salestopped === '1' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">تم إيقاف عرض السلعة للبيع المباشر.</div>}
+      {sp.error === 'bad_price' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">أدخل سعراً صحيحاً أكبر من صفر.</div>}
+      {sp.error === 'bad_shipping' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">أدخل قيمة شحن صحيحة (يمكن أن تكون صفراً لشحن مجاني).</div>}
+      {sp.error === 'not_allowed' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">البيع المباشر متاح للأعضاء الموثوقين فقط وعند تفعيله من الإدارة.</div>}
       {sp.error === 'adminhidden' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">🚫 هذا الإعلان أخفته الإدارة عن النشر لمخالفة — لا يمكنك إعادة نشره بنفسك. عالِج سبب المخالفة (المذكور تحت الإعلان) وراسل الإدارة لإعادة نشره.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? <> (المطلوب {sp.price} ر.س</> : ''}{sp.bal !== undefined ? <>، ورصيدك {sp.bal} ر.س)</> : ')'}. <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
       {sp.urgentneed === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 حُفظ إعلانك، لكن رصيدك لا يغطي شارة «عاجل» — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم فعّلها بزر «🔥 عاجل» أسفل الإعلان.</div>}
@@ -179,6 +190,24 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                     <Pencil className="h-3 w-3" /> تعديل{editState.label ? ` (${editState.label})` : ''}
                   </Link>
                 )}
+                {directSaleAllowed && ad.status === 1 && !ad.storeOnly && (() => {
+                  const sale = saleProducts.get(String(ad.id));
+                  const statusLabel = sale ? (sale.visible === 1 && sale.approved === 1 ? 'معروضة للبيع ✅' : 'بانتظار اعتماد الإدارة') : '';
+                  return (
+                    <details className="w-full rounded-md border border-emerald-300 bg-emerald-50/60 p-2 text-xs">
+                      <summary className="cursor-pointer font-bold text-emerald-800">🛒 بيع مباشر{sale ? ` — ${statusLabel}` : ''}</summary>
+                      <form action={listAdForDirectSaleAction} className="mt-2 flex flex-wrap items-end gap-2">
+                        <input type="hidden" name="adId" value={ad.id} />
+                        <label className="flex flex-col gap-0.5">السعر (ر.س)<input name="priceSar" inputMode="decimal" required defaultValue={sale ? sar2(sale.price_minor) : ''} className="w-24 rounded border px-2 py-1" /></label>
+                        <label className="flex flex-col gap-0.5">الشحن (ر.س)<input name="shipSar" inputMode="decimal" defaultValue={sale ? sar2(sale.shipping_minor) : '0'} className="w-24 rounded border px-2 py-1" /></label>
+                        <label className="flex flex-col gap-0.5">الكمية<input name="qty" type="number" min={1} max={999} defaultValue={sale ? sale.stock_available : 1} className="w-16 rounded border px-2 py-1" /></label>
+                        <button className="rounded-md bg-emerald-600 px-3 py-1.5 font-bold text-white">{sale ? 'تحديث' : 'اعرض للبيع'}</button>
+                      </form>
+                      {sale && <form action={stopDirectSaleAction} className="mt-1"><input type="hidden" name="adId" value={ad.id} /><button className="rounded-md border border-red-300 px-2 py-1 font-bold text-red-700">إيقاف البيع</button></form>}
+                      <p className="mt-1 text-[11px] leading-5 text-emerald-900/80">تُعرض بسعر وشحن محدّدين. الشراء يتطلب جوال العميل وعنوان الشحن. لا خصم فعلي حتى تفعيل الدفع.</p>
+                    </details>
+                  );
+                })()}
                 {bumpOn && ad.status === 1 && !ad.storeOnly && (() => {
                   const last = new Date(ad.bumpedAt || ad.createdAt || 0);
                   const daysSince = (now - last.getTime()) / 86400_000;

@@ -32,6 +32,29 @@ services:
       - ./docker/redis-data:/data
     networks: [trbhh]
 
+  # مترجم ذاتي على الخادم (LibreTranslate) — يجعل الترجمة العربية تلقائية وفورية
+  # عند الاستيراد دون إنترنت خارجي أو اشتراك أو حصّة. التطبيق يستخدمه تلقائياً عبر
+  # http://libretranslate:5000 (القيمة الافتراضية في src/lib/cj/translate.ts) بلا أي
+  # إعداد إضافي. يحمّل نموذجي الإنجليزية والعربية فقط (أخفّ وأسرع) ويحفظهما في volume.
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: trbhh-libretranslate
+    restart: unless-stopped
+    environment:
+      LT_LOAD_ONLY: "en,ar"
+      LT_UPDATE_MODELS: "false"
+      LT_DISABLE_WEB_UI: "true"
+    volumes:
+      - trbhh-lt-models:/home/libretranslate/.local
+    expose: ["5000"]
+    networks: [trbhh]
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5000/languages').getcode()==200 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
   app:
     build:
       context: .
@@ -146,6 +169,8 @@ services:
 volumes:
   # persistent uploaded media (ad/classified/promo images)
   trbhh-storage:
+  # نماذج الترجمة المحمّلة (en,ar) تبقى بين عمليات النشر فلا تُعاد التنزيلات
+  trbhh-lt-models:
 
 networks:
   trbhh:

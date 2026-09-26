@@ -215,10 +215,15 @@ export async function getWarehouses(samplePid: string): Promise<CjResult<CjWareh
 }
 
 /** احتساب الشحن إلى السعودية (endCountryCode='SA'). */
+/** رمز بريدي سعودي افتراضي (الرياض) لحساب الشحن — كثير من مسارات CJ إلى السعودية
+ *  تُعيد نتائج فارغة بلا رمز بريدي للوجهة، فنمرّر رمزاً صالحاً افتراضياً للتقدير. */
+export const DEFAULT_KSA_DEST_ZIP = '11564';
+
 export async function calculateFreightToKSA(products: { vid: string; quantity: number }[], zip?: string, originCountry = 'CN'): Promise<CjResult<CjFreightOption[]>> {
+  const destZip = (zip && zip.trim()) || DEFAULT_KSA_DEST_ZIP;
   const r = await call<unknown[]>('/logistic/freightCalculate', {
     method: 'POST',
-    body: { startCountryCode: originCountry, endCountryCode: 'SA', zip, products: products.map((p) => ({ vid: p.vid, quantity: p.quantity })) },
+    body: { startCountryCode: originCountry, endCountryCode: 'SA', zip: destZip, products: products.map((p) => ({ vid: p.vid, quantity: p.quantity })) },
   });
   if (!r.ok) return r;
   const list = Array.isArray(r.data) ? r.data : [];

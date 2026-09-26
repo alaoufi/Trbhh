@@ -525,6 +525,60 @@ export async function refreshCjImportedAvailability(form: FormData) {
   redirect(withParam(back, availability ? 'availability=ready' : 'availability=missing'));
 }
 
+/**
+ * زر واحد «معالجة شاملة»: يطبّق على السلع المستوردة دفعةً بدفعة (مؤشّر دوّار عبر
+ * الإعدادات) كل شيء — تحديث الصور والمتغيّرات/الخيارات والتفاصيل، احتساب الشحن
+ * الحقيقي من المورد (API) وتخزين التوفّر، وترجمة الاسم/الوصف العربيين الناقصين.
+ * التصنيف لا يُملأ من المورد (يوحَّد يدوياً على تصنيفات تربح). لا شراء ولا دفع.
+ * يعالج دفعة محدودة لكل ضغطة ويكمل الباقي بالضغطات التالية حتى تكتمل دورة كاملة.
+ */
+export async function processAllCjImported() {
+  const s = await requireCjAccess('products', 'edit');
+  const { getSetting, setSetting } = await import('@/lib/settings');
+  const BATCH = 10;
+  const CURSOR_KEY = 'cj_bulk_process_cursor';
+  const cursor = BigInt(Math.max(0, Math.floor(Number(await getSetting(CURSOR_KEY, '0')) || 0)));
+  const rows = await prisma.cj_products.findMany({
+    where: { id: { gt: cursor } }, orderBy: { id: 'asc' }, take: BATCH,
+    select: { id: true, cj_product_id: true, name: true, name_ar: true, source_description: true, display_description_ar: true },
+  }).catch(() => [] as { id: bigint; cj_product_id: string; name: string; name_ar: string; source_description: string | null; display_description_ar: string | null }[]);
+
+  let processed = 0, shipped = 0, translated = 0;
+  for (const before of rows) {
+    const id = Number(before.id);
+    if (!before.cj_product_id) continue;
+    const detail = await getProduct(before.cj_product_id).catch(() => null);
+    if (!detail?.ok) { await setCjProductAvailability(id, null); processed++; continue; }
+    const images = collectCjProductImages(detail.data);
+    if (images.length) await setCjProductGallery(id, images);
+    const detailVariants = detail.data.variants ?? [];
+    const variantsRes = await cjGetVariants(before.cj_product_id).catch(() => null);
+    const queryVariants = variantsRes?.ok ? variantsRes.data : [];
+    const fullVariants = queryVariants.length >= detailVariants.length ? queryVariants : detailVariants;
+    await setCjProductDetails(id, buildCjDetails(fullVariants));
+    const availability = await readCjAvailability(before.cj_product_id, fullVariants);
+    await setCjProductAvailability(id, availability);
+    if (availability) shipped++;
+    if (!before.name_ar && before.name) { const ar = await translateToArabicCached(before.name).catch(() => null); if (ar) { await setCjProductNameAr(id, ar); translated++; } }
+    if (!before.display_description_ar && before.source_description) {
+      const plain = String(before.source_description).replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').replace(/&amp;/gi, '&').replace(/\s{2,}/g, ' ').trim();
+      const ar = plain ? await translateToArabicCached(plain).catch(() => null) : null; if (ar) await setCjProductDescriptionAr(id, ar);
+    }
+    processed++;
+  }
+
+  const wrapped = rows.length < BATCH; // انتهت السلع بعد المؤشّر ⇒ اكتملت دورة كاملة
+  const lastId = rows.length ? rows[rows.length - 1].id : cursor;
+  await setSetting(CURSOR_KEY, wrapped ? '0' : String(lastId));
+  const remaining = wrapped ? 0 : await prisma.cj_products.count({ where: { id: { gt: lastId } } }).catch(() => 0);
+  await auditCjChange(s.uid, 'products', 'bulk-process', {}, { processed, shipped, translated, remaining, wrapped });
+  revalidatePath('/admin/suppliers/cj');
+  revalidatePath('/admin/suppliers/cj/browse');
+  revalidatePath('/admin/suppliers/cj/showcase');
+  revalidatePath('/cj');
+  redirect(`/admin/suppliers/cj?bulk=1&processed=${processed}&shipped=${shipped}&tr=${translated}&remaining=${remaining}&done=${wrapped ? 1 : 0}`);
+}
+
 /** حفظ مفاتيح مزوّدي الترجمة من لوحة التحكم (لا أسرار في الكود/‏.env). المفتاح الفارغ
  *  يُبقي القيمة الحالية (تفادي مسح المفتاح بالخطأ)؛ البريد يُحفظ كما هو (غير سرّي). */
 export async function saveCjTranslationSettings(form: FormData) {

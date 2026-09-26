@@ -8,6 +8,9 @@ export const COMMERCE_DEFAULTS = {
   // والمزامنة والاختبارات الداخلية تبقى متاحة. يفعّله المشرف يدوياً فقط.
   commerce_purchasing_enabled: '0',
   commerce_notifications_enabled: '0',
+  // السماح للأعضاء الموثوقين بعرض سلعهم للبيع المباشر (بسعر وشحن محدّدين، بانتظار اعتماد
+  // الإدارة). افتراضي معطّل. لا يفعّل أي دفع فعلي — الشراء يبقى مقفلاً بحارس الشراء.
+  verified_direct_sale_enabled: '0',
   commerce_admin_phone: '',
   commerce_title: 'سلع تربح المعتمدة',
   commerce_description: 'شراء مباشر من تربح. الإعلانات الأخرى للتواصل والاتفاق خارج الموقع.',

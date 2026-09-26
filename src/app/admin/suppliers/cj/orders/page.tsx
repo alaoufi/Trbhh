@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CjAdminNav } from '@/components/cj/admin-nav';
 import { AccessBoundary } from '@/components/access-boundary';
 import { requireAccess } from '@/lib/access-control/guards';
 import { listOrders, countOrdersByStatus } from '@/lib/cj/orders/store';
@@ -20,6 +21,7 @@ export default async function CjOrdersPage() {
 
   return (
     <div className="space-y-4">
+      <CjAdminNav current="orders" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-extrabold text-primary">مراقبة طلبات CJ</h1>
         <div className="flex flex-wrap gap-2">

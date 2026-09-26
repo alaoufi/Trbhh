@@ -14,6 +14,7 @@ import { getSetting } from '@/lib/settings';
 import { getCjCategoryText } from '@/lib/cj/categories';
 import { saveCjMargin, saveCjSync, runCjSync } from './actions';
 import { SubmitButton } from '@/components/cj/submit-button';
+import { CjAdminNav } from '@/components/cj/admin-nav';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'تكامل CJ — وضع الاختبار' };
@@ -61,10 +62,8 @@ export default async function CjTestPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold text-primary">تكامل CJdropshipping — وضع الاختبار</h1>
-        <Link href="/admin/suppliers/cj/browse" className="rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white">تصفّح المنتجات واستيرادها ←</Link>
-      </div>
+      <CjAdminNav current="settings" />
+      <h1 className="text-xl font-extrabold text-primary">تكامل CJdropshipping — وضع الاختبار</h1>
 
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
         هذه الصفحة لاختبار الاتصال والقراءة فقط (منتجات/مخزون/مستودعات/شحن). <b>لا يُنشأ أي طلب شراء حقيقي</b> —

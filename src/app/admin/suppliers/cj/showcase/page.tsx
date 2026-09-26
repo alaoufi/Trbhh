@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CjAdminNav } from '@/components/cj/admin-nav';
 import { CjProductImage } from '@/components/cj/product-image';
 import { requireAccess } from '@/lib/access-control/guards';
 import { listVisibleCjProducts } from '@/lib/cj/mapping';
@@ -24,6 +25,7 @@ export default async function CjShowcasePage({ searchParams }: { searchParams: P
 
   return (
     <div className="space-y-4">
+      <CjAdminNav current="showcase" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-extrabold text-primary">معاينة السلع المختارة</h1>
         <div className="flex flex-wrap gap-2">

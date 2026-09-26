@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CjAdminNav } from '@/components/cj/admin-nav';
 import { AccessBoundary } from '@/components/access-boundary';
 import { requireAccess } from '@/lib/access-control/guards';
 import { prisma } from '@/lib/prisma';
@@ -30,6 +31,7 @@ export default async function CjAgentsPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-4">
+      <CjAdminNav current="agents" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-extrabold text-primary">وكلاء المنصّة</h1>
         <Link href="/admin/suppliers/cj/browse" className="rounded-lg border border-primary/30 px-3 py-1.5 text-sm font-bold text-primary">تصفّح/استيراد ←</Link>

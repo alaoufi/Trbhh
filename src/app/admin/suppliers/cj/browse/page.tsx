@@ -13,6 +13,7 @@ import { getCachedArabic, isArabicText, DEFAULT_LIBRETRANSLATE_URL } from '@/lib
 import { cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { importCjProduct, removeCjProduct, saveCjArabic, saveCjPrice, toggleCjHidden, translateCjProduct, translateCjBrowsePage, translateAllCj, translateCjCategories, runCjTranslateWarm, refreshCjMediaAction, refreshCjImportedAvailability, saveCjTranslationSettings, processAllCjImported } from '../actions';
 import { SubmitButton } from '@/components/cj/submit-button';
+import { CjAdminNav } from '@/components/cj/admin-nav';
 import { getSetting } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
@@ -95,10 +96,22 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-extrabold text-primary">تصفّح منتجات CJ واستيرادها</h1>
-        <Link href="/admin/suppliers/cj" className={ghost}>لوحة CJ (اختبار/إعدادات)</Link>
-      </div>
+      <CjAdminNav current="browse" />
+      <h1 className="text-xl font-extrabold text-primary">تصفّح منتجات CJ واستيرادها</h1>
+
+      {/* معالجة شاملة (زر واحد) — أعلى الصفحة ليسهُل إيجادها */}
+      <AccessBoundary module="products" action="edit"><div className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-base font-extrabold text-primary">⚙️ معالجة شاملة للسلع المستوردة (زر واحد)</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">تحديث الصور والخيارات والتفاصيل + <b>الشحن الحقيقي من المورد</b> + ترجمة الاسم/الوصف الناقصين. يعالج دفعة (١٠) لكل ضغطة — اضغط ثانيةً للباقي حتى تكتمل الدورة.</p>
+          </div>
+          <form action={processAllCjImported}>
+            <SubmitButton className={`${btn} min-h-11 px-5 text-base`} pendingText="جارٍ المعالجة…">معالجة شاملة الآن</SubmitButton>
+          </form>
+        </div>
+        {sp.bulk === '1' && <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">عولجت {sp.processed} سلعة · ظهر شحن حقيقي لـ{sp.shipped} · تُرجمت {sp.tr} · {sp.done === '1' ? 'اكتملت معالجة كل السلع ✅' : `متبقٍّ ${sp.remaining} — اضغط مجدداً للمتابعة.`}</p>}
+      </div></AccessBoundary>
       <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm">
         عرض مباشر من CJ API (قراءة فقط). <b>لا يُستورد أو يُنشر أي منتج تلقائياً</b> — الاستيراد للمنتجات المختارة فقط،
         وتبقى في التخزين الوسيط ولا تظهر للعامة حتى ربطها واعتمادها. سعر البيع أدناه تقديري (تكلفة×صرف {(settings.usdToSarX100 / 100).toFixed(2)} + شحن {sar(settings.shippingMinor)} + هامش {(marginBps / 100).toFixed(0)}٪).
@@ -250,19 +263,6 @@ export default async function CjBrowsePage({ searchParams }: { searchParams: Pro
             <Link href="/admin/suppliers/cj/showcase" className={btn}>معاينة السلع المختارة ←</Link>
             <AccessBoundary module="products" action="edit"><form action={translateAllCj}><input type="hidden" name="back" value={backHref} /><SubmitButton className={ghost} pendingText="جارٍ الترجمة…">ترجمة تلقائية للكل</SubmitButton></form></AccessBoundary>
           </div>
-        </div>
-        {/* معالجة شاملة (زر واحد) أعلى المنتجات المستوردة */}
-        <div className="rounded-xl border border-primary/25 bg-primary/5 p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0">
-              <h3 className="text-sm font-bold text-primary">معالجة شاملة (زر واحد)</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">تحديث الصور والخيارات والتفاصيل + <b>الشحن الحقيقي من المورد</b> + ترجمة الاسم/الوصف الناقصين. يعالج دفعة (١٠) لكل ضغطة، اضغط ثانيةً للباقي حتى تكتمل الدورة.</p>
-            </div>
-            <AccessBoundary module="products" action="edit"><form action={processAllCjImported}>
-              <SubmitButton className={btn} pendingText="جارٍ المعالجة…">معالجة شاملة الآن</SubmitButton>
-            </form></AccessBoundary>
-          </div>
-          {sp.bulk === '1' && <p className="mt-2 text-sm text-emerald-700">عولجت {sp.processed} سلعة · ظهر شحن حقيقي لـ{sp.shipped} · تُرجمت {sp.tr} · {sp.done === '1' ? 'اكتملت معالجة كل السلع ✅' : `متبقٍّ ${sp.remaining} — اضغط مجدداً للمتابعة.`}</p>}
         </div>
         {typeof sp.edited === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تم الحفظ.</p>}
         {typeof sp.translated === 'string' && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">تمّت ترجمة {sp.translated} سلعة تلقائياً.</p>}

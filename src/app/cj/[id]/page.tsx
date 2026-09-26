@@ -4,7 +4,7 @@ import { Phone, MessageCircle } from 'lucide-react';
 import { getSession } from '@/lib/auth';
 import { cjProductCapabilities } from '@/lib/cj/access';
 import { getAgent, agentContactLinks } from '@/lib/cj/agents';
-import { cjProductOrderCount, getStorefrontCjProduct, getVerifiedCjVariants, listStorefrontCjProducts, parseCjDetails, parseCjAvailability } from '@/lib/cj/mapping';
+import { cjProductOrderCount, getStorefrontCjProduct, getVerifiedCjVariants, listStorefrontCjProducts, parseCjDetails, parseCjAvailability, cjShipEstimateFromAvailability } from '@/lib/cj/mapping';
 import { saveCjStorefrontEdit, hideCjStorefront, deleteCjStorefront } from '../../admin/suppliers/cj/actions';
 import { cjStorefrontView, cjImg, cjProductImages } from '@/lib/cj/storefront';
 import { CjProductGallery } from '@/components/cj/product-gallery';
@@ -71,10 +71,13 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
   // جدول الخيارات بتفاصيلها (كل خيار + وزنه) + شحن تقديري (سعر ثابت من الإدارة + مدّة نصّية).
   const [shipMinorRaw, deliveryDaysText, categoryOptions] = await Promise.all([getSetting('cj_sync_shipping_minor', '0'), getSetting('cj_delivery_days_text', '٧–١٥ يوم عمل'), getCjCategoryOptions()]);
   const flatShipMinor = Math.max(0, Math.round(Number(shipMinorRaw) || 0));
-  // قيمة شحن حقيقية واحدة (تربح هي البائع): تقدير الإدارة أولاً، وإلا أرخص شحن حقيقي
-  // محقّق من التوفّر. لا تُعرض «مجاني» لقيمة غير مضبوطة — تُعرض «يُحسب حسب الوجهة».
-  const realShipMinor = flatShipMinor > 0 ? flatShipMinor : (shipCheapest?.priceMinor ?? 0);
-  const shipDeliveryText = (deliveryDaysText || '').trim() || shipCheapest?.deliveryDays || '';
+  // قيمة شحن حقيقية واحدة (تربح هي البائع): تُؤخذ من المورد عبر الـAPI. أرخص شحن
+  // محقّق حيّ أولاً، وإلا تقدير الشحن المحفوظ من الـAPI (يبقى ظاهراً بعد نافذة النضارة
+  // ٦ ساعات لأن سعر الشحن مستقرّ)، وإلا تقدير الإدارة الاحتياطي. لا تُعرض «مجاني»
+  // لقيمة غير معروفة — تُعرض «يُحسب حسب الوجهة» ريثما يُحدَّث التوفّر من المورد.
+  const shipEstimate = cjShipEstimateFromAvailability(p);
+  const realShipMinor = shipCheapest?.priceMinor ?? shipEstimate?.minor ?? flatShipMinor;
+  const shipDeliveryText = shipCheapest?.deliveryDays || shipEstimate?.deliveryDays || (deliveryDaysText || '').trim() || '';
   const variantRows = displayVariants.map(v => {
     const opts = cjVariantDisplayOptions({ variantKey: v.optionKey, variantName: v.name }).map(o => `${o.label}: ${o.value}`).join(' · ');
     return { key: v.vid, label: opts || (v.name || v.optionKey || '').trim() || '—', weight: v.weight };

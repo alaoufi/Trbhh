@@ -98,6 +98,23 @@ export function parseCjAvailability(row: Pick<CjProductRow, 'availability_json'>
   } catch { return null; }
 }
 
+/**
+ * قيمة الشحن الحقيقية (المحسوبة من المورد عبر الـAPI) للعرض فقط — تُقرأ من
+ * availability_json بلا حارس النضارة (٦ ساعات). سعر الشحن مستقرّ ولا يحتاج نضارة
+ * المخزون/السعر؛ فيبقى ظاهراً كتقدير حقيقي حتى بعد انتهاء نافذة النضارة. لا يُستخدم
+ * إطلاقاً للبيع أو التحقق الحيّ — ذاك يبقى على parseCjAvailability الصارمة.
+ */
+export function cjShipEstimateFromAvailability(row: Pick<CjProductRow, 'availability_json'>): { minor: number; deliveryDays: string | null } | null {
+  if (!row.availability_json) return null;
+  try {
+    const value = JSON.parse(row.availability_json) as { shippingOptions?: unknown };
+    const options = Array.isArray(value.shippingOptions) ? value.shippingOptions.filter(validSaudiQuote) : [];
+    if (!options.length) return null;
+    const cheapest = options.reduce((a, b) => (b.priceMinor < a.priceMinor ? b : a));
+    return { minor: Math.max(0, Math.round(cheapest.priceMinor)), deliveryDays: cheapest.deliveryDays ?? null };
+  } catch { return null; }
+}
+
 /** يفكّ معرض صور السلعة المخزَّن (JSON) إلى مصفوفة روابط. */
 export function parseCjImages(row: Pick<CjProductRow, 'images' | 'image'>): string[] {
   const out: string[] = [];

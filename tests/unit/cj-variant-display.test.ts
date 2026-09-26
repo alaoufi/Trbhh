@@ -21,6 +21,18 @@ describe('CJ product customer display',()=>{
       {label:'المقاس',value:'36',source:'parsed'},
     ]);
   });
+  it('extracts a dimension size and constant color from a repeated CJ mat title',()=>{
+    const source='Fur Sofa Cushion Bay Window Mat Living Room Bedroom White 70x100cm';
+    expect(cjVariantDisplayOptions({variantKey:'',variantName:source})).toEqual([
+      {label:'اللون',value:'أبيض',source:'parsed'},
+      {label:'المقاس',value:'70×100cm',source:'parsed'},
+    ]);
+  });
+  it('extracts a bare dimension option key as the size',()=>{
+    expect(cjVariantDisplayOptions({variantKey:'100×200 cm',variantName:''})).toEqual([
+      {label:'المقاس',value:'100×200cm',source:'parsed'},
+    ]);
+  });
   it('renders dynamic named source attributes with Arabic labels and arbitrary options',()=>{
     expect(cjVariantDisplayOptions({variantKey:'',variantName:'',attributes:{color:'Black',plugType:'EU',voltage:'220V',capacity:64,customFinish:'Matte'}})).toEqual([
       {label:'اللون',value:'أسود',source:'attribute'},{label:'القابس',value:'أوروبي',source:'attribute'},{label:'الفولت',value:'220V',source:'attribute'},{label:'السعة',value:'64',source:'attribute'},{label:'customFinish',value:'Matte',source:'attribute'},

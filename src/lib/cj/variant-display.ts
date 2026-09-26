@@ -40,6 +40,15 @@ export function cjVariantDisplayOptions(variant:Pick<CjVariant,'variantKey'|'var
     const color=suffix[1];
     return [{label:'اللون',value:translateKnownValue(color),source:'parsed'},...(suffix[2]?[{label:'المقاس',value:suffix[2].toUpperCase(),source:'parsed' as const}]:[])];
   }
+  // مقاس بصيغة أبعاد (مثل 70x100cm / 50×50 / 100 x 200 cm) في نهاية الاسم — يُستخرج
+  // كمقاس، مع لون معروف إن وُجد. يعالج المتغيّرات التي يكرّر فيها المورد كامل الاسم.
+  const dimension=/(\d+(?:\.\d+)?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s*(cm|mm|m|inch|in)?\s*$/i.exec(source);
+  if(dimension){
+    const unit=(dimension[3]||'').toLowerCase();
+    const size=`${dimension[1]}×${dimension[2]}${unit}`;
+    const colorHit=new RegExp(`(?:^|[\\s_-])(${colorPattern})(?:[\\s_-]|$)`,'i').exec(source);
+    return [...(colorHit?[{label:'اللون',value:translateKnownValue(colorHit[1]),source:'parsed' as const}]:[]),{label:'المقاس',value:size,source:'parsed'}];
+  }
   if(source.length>60)return [];
   return [{label:'الخيار',value:source,source:'parsed'}];
 }

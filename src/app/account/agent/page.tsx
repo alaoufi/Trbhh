@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
-import { getAgent, remainingWeeklyQuota, agentClaimsThisWeek, listAgentProducts, listClaimableProducts } from '@/lib/cj/agents';
+import { getAgent, remainingWeeklyQuota, agentClaimsThisWeek, listAgentProducts, listClaimableProducts, listAgentSoldOrders } from '@/lib/cj/agents';
 import { cjImg } from '@/lib/cj/storefront';
+import { statusLabel, isException } from '@/lib/cj/orders/state';
 import { claimProductAction, releaseProductAction, updateMyAgentContactAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -55,13 +56,15 @@ export default async function AgentDashboardPage({ searchParams }: { searchParam
     );
   }
 
-  const [remaining, usedThisWeek, myProducts, claimable] = await Promise.all([
+  const [remaining, usedThisWeek, myProducts, claimable, soldOrders] = await Promise.all([
     remainingWeeklyQuota(session.uid),
     agentClaimsThisWeek(session.uid),
     listAgentProducts(session.uid, 200),
     listClaimableProducts(60),
+    listAgentSoldOrders(session.uid, 100),
   ]);
   const canClaim = remaining > 0;
+  const dt = (d: Date | null) => (d ? new Date(d).toLocaleDateString('en-GB', { timeZone: 'Asia/Riyadh' }) : '—');
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 px-4 py-5">
@@ -112,6 +115,38 @@ export default async function AgentDashboardPage({ searchParams }: { searchParam
                 </div>
                 {r.hidden === 1 && <span className="w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">مخفية</span>}
               </ProductTile>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* بضائعي المباعة ومتابعة الشحن */}
+      <section className="space-y-2">
+        <h2 className="text-lg font-extrabold text-primary">بضائعي المباعة ومتابعة الشحن ({soldOrders.length})</h2>
+        {!soldOrders.length ? (
+          <p className="rounded-xl bg-white p-6 text-center text-sm text-muted-foreground">لا مبيعات بعد لسلعك. تظهر هنا الطلبات المؤكَّدة مع حالتها وتتبّع شحنها.</p>
+        ) : (
+          <div className="space-y-2">
+            {soldOrders.map(({ order, product }) => (
+              <div key={String(order.id)} className="card-3d rounded-xl p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {product?.id
+                      ? <Link href={`/cj/${product.id}`} className="text-sm font-bold text-primary hover:underline [overflow-wrap:anywhere]">{product.name_ar || product.name || order.product_name || 'سلعة'}</Link>
+                      : <span className="text-sm font-bold [overflow-wrap:anywhere]">{order.product_name || 'سلعة'}</span>}
+                    <span className="text-xs text-muted-foreground" dir="ltr">#{String(order.id)}</span>
+                  </div>
+                  <span className={`rounded px-2 py-0.5 text-xs font-bold ${isException(order.status as never) ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'}`}>{statusLabel(order.status)}</span>
+                </div>
+                <div className="mt-1 grid gap-x-4 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-2">
+                  <div>العميل: {order.ship_name || '—'}{order.ship_city ? ` · ${order.ship_city}` : ''}</div>
+                  <div>الإجمالي: <b className="text-red-700">{sar(order.grand_total_minor)}</b> · التاريخ: {dt(order.created_at)}</div>
+                  <div>الشحن: {order.carrier || '—'}{order.tracking_number ? <> · رقم <span dir="ltr">{order.tracking_number}</span></> : ''}</div>
+                  {order.tracking_url
+                    ? <a href={order.tracking_url} target="_blank" rel="noreferrer" className="font-bold text-primary underline" dir="ltr">تتبّع الشحنة</a>
+                    : <span>لا يوجد رابط تتبّع بعد</span>}
+                </div>
+              </div>
             ))}
           </div>
         )}

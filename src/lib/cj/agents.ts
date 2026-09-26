@@ -68,6 +68,24 @@ export async function listAgentProducts(userId: number | bigint, limit = 200) {
   return prisma.cj_products.findMany({ where: { agent_user_id: bid(userId) }, orderBy: { agent_claimed_at: 'desc' }, take: Math.min(Math.max(1, limit), 500) }).catch(() => []);
 }
 
+/**
+ * بضائع الوكيل المباعة + متابعة الشحن: الطلبات المرتبطة بسلع الوكيل والتي تجاوزت
+ * «بانتظار الدفع» (أي بيع مؤكَّد قيد التنفيذ/الشحن). الربط عبر cj_orders.cj_product_id
+ * الذي يحمل معرّف السلعة الداخلي. تُرجَع مع بيانات عرض السلعة للوكيل.
+ */
+export async function listAgentSoldOrders(userId: number | bigint, limit = 100) {
+  const products = await prisma.cj_products
+    .findMany({ where: { agent_user_id: bid(userId) }, select: { id: true, name_ar: true, name: true, image: true } })
+    .catch(() => [] as { id: bigint; name_ar: string; name: string; image: string }[]);
+  if (!products.length) return [];
+  const idStrs = products.map(p => String(p.id));
+  const orders = await prisma.cj_orders
+    .findMany({ where: { cj_product_id: { in: idStrs }, NOT: { status: 'awaiting_payment' } }, orderBy: { id: 'desc' }, take: Math.min(Math.max(1, limit), 300) })
+    .catch(() => []);
+  const byId = new Map(products.map(p => [String(p.id), p]));
+  return orders.map(o => ({ order: o, product: byId.get(o.cj_product_id) ?? null }));
+}
+
 /** سلع متاحة للاختيار (بلا وكيل، جاهزة، ظاهرة، ولها صورة). */
 export async function listClaimableProducts(limit = 60) {
   return prisma.cj_products.findMany({

@@ -105,7 +105,7 @@ export default async function CjStoreProductPage({ params, searchParams }: { par
         </details>}
         {!availability && <div className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm"><h2 className="mb-2 text-sm font-bold text-emerald-900">الشحن إلى السعودية</h2>
           <ul className="space-y-1.5">
-            <li className="flex items-center justify-between gap-2"><span className="text-slate-700">السعر</span><b className="text-emerald-800">{flatShipMinor > 0 ? sar(flatShipMinor) : 'مشمول في السعر'}</b></li>
+            <li className="flex items-center justify-between gap-2"><span className="text-slate-700">السعر</span><b className="text-emerald-800">{flatShipMinor > 0 ? sar(flatShipMinor) : 'شحن مجاني'}</b></li>
             <li className="flex items-center justify-between gap-2"><span className="text-slate-700">المدّة التقديرية</span><b className="text-emerald-800" dir="auto">{deliveryDaysText}</b></li>
           </ul>
           <p className="mt-2 text-xs text-slate-500">تقدير للتوصيل داخل السعودية؛ وتظهر خيارات شحن CJ التفصيلية عند تحقّق التوفّر.</p></div>}

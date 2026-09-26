@@ -416,6 +416,9 @@ model commerce_products {
   approved        Int      @default(0) @db.TinyInt
   visible         Int      @default(0) @db.TinyInt
   enabled         Int      @default(0) @db.TinyInt
+  seller_type     String   @default("trbhh") @db.VarChar(24)
+  seller_member_id BigInt?  @db.UnsignedBigInt
+  shipping_minor  Int      @default(0)
   created_at      DateTime @default(now()) @db.DateTime(3)
   updated_at      DateTime @default(now()) @db.DateTime(3)
   items           commerce_order_items[]

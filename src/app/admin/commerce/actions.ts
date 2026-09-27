@@ -59,6 +59,16 @@ export async function saveCommerceProduct(form: FormData) {
     }
     await tx.admin_log.create({ data: { admin_id: BigInt(session.uid), action: 'حفظ سلعة معتمدة', target: idRaw || 'سلعة جديدة', note: `اعتماد=${data.approved}; سعر=${data.priceMinor} هللة; ${idRaw ? `تعديل المخزون=${stockDelta}` : `مخزون أولي=${data.stock}`}` } });
   });
+  // إعادة المخزون/الاعتماد: أشعِر من طلب التذكير عند توفّر السلعة (تُحدَّد بعد الحفظ).
+  if (idRaw) {
+    try {
+      const [p] = await prisma.$queryRaw<{ a: number; v: number; e: number; avail: number }[]>`SELECT approved a, visible v, enabled e, (stock_available-stock_reserved) avail FROM commerce_products WHERE id=${BigInt(idRaw)}`;
+      if (p && p.a === 1 && p.v === 1 && p.e === 1 && Number(p.avail) > 0) {
+        const { notifyRestock } = await import('@/lib/commerce/stock-reminders');
+        await notifyRestock(BigInt(idRaw));
+      }
+    } catch { /* الإشعار لا يعطّل الحفظ */ }
+  }
   revalidatePath('/admin/commerce'); revalidatePath('/shop');
   redirect('/admin/commerce?saved=1');
 }

@@ -10,6 +10,18 @@ import { getMemberAddress } from '@/lib/commerce/address-book';
 import { formatAddressLine } from '@/lib/commerce/addresses';
 import {readPublicCommerceProducts} from '@/lib/commerce/public-product';
 
+/** «احجز/ذكّرني عند التوفر» لسلعة نفد مخزونها — يسجّل طلب تذكير العضو ويُشعَر عند إعادة المخزون. */
+export async function remindRestockAction(form: FormData) {
+  const session = await requireUser();
+  const productId = String(form.get('productId') || '');
+  const back = String(form.get('back') || '/shop');
+  const safeBack = /^\/(shop|ads)\/[1-9]\d{0,18}$/.test(back) ? back : '/shop';
+  if (!/^[1-9]\d{0,14}$/.test(productId)) redirect(safeBack);
+  const { addStockReminder } = await import('@/lib/commerce/stock-reminders');
+  await addStockReminder(BigInt(productId), session.uid);
+  redirect(`${safeBack}?reminded=1`);
+}
+
 export async function createCommerceOrder(_previous: { error: string } | null, form: FormData): Promise<{ error: string }> {
   const session = await requireUser();
   const config = await getCommerceConfig();

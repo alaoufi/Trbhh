@@ -51,6 +51,17 @@ export const COMMERCE_DDL = [
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     KEY commerce_member_payouts_member (member_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  /* تذكيرات نفاد المخزون: العميل يطلب تذكيره عند توفر السلعة مجدداً. عند إعادة المخزون
+     يُشعَر أصحاب هذه الطلبات (notified=1). فهرس فريد يمنع تكرار طلب نفس العضو للسلعة. */
+  `CREATE TABLE IF NOT EXISTS commerce_stock_reminders (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT UNSIGNED NOT NULL,
+    member_id BIGINT UNSIGNED NOT NULL,
+    notified TINYINT NOT NULL DEFAULT 0,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY commerce_stock_reminder_uniq (product_id,member_id),
+    KEY commerce_stock_reminder_product (product_id,notified)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS commerce_customer_addresses (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     member_id BIGINT UNSIGNED NOT NULL,

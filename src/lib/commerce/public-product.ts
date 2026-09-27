@@ -82,7 +82,8 @@ function product(row:Row):PublicCommerceProduct|null{
  const optionNames=optionDescriptions(row.options),productVariants=json(row.variants),hasVariantRecords=Array.isArray(productVariants)&&productVariants.length>0,cjDetailParsed=json(row.cj_details_json),cjDetailVariants=cjDetailParsed&&typeof cjDetailParsed==='object'?(cjDetailParsed as Record<string,unknown>).variants:null,requiresVariantSelection=hasVariantRecords||optionNames.length>0||(row.cj_source_id!==null&&Array.isArray(cjDetailVariants)&&cjDetailVariants.length>0);
  if(row.cj_source_id!==null&&availableVariants.length===0)return null;
  if(requiresVariantSelection&&availableVariants.length===0)return null;
- if(row.source_id===null&&stock===0)return null;
+ // سلعة العضو الموثوق تبقى ظاهرة حتى بمخزون صفر (لعرض «احجز/ذكّرني عند التوفر»)؛ غيرها يُخفى عند النفاد.
+ if(row.source_id===null&&stock===0&&!ownGoods)return null;
  const shipping=parseCjAvailability({availability_json:row.cj_availability_json});
  if(row.cj_source_id!==null&&(!shipping||row.price_minor<=0||row.stock_available-row.stock_reserved<1))return null;
  if(!Number.isSafeInteger(row.price_minor)||row.price_minor<=0||!plain(row.title,200))return null;

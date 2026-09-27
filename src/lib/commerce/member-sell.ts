@@ -72,15 +72,14 @@ export async function listMemberSoldOrders(memberId: number | bigint): Promise<M
 /** سلعة العضو الموثوق المعتمدة والمتاحة للشراء المباشر المرتبطة بإعلان — لعرض زر «شراء مباشر»
  *  والإجمالي فقط على صفحة الإعلان وبطاقته بالرئيسية. تُرجع null إن لم تكن معتمدة/ظاهرة/متاحة
  *  أو نفد مخزونها. الإجمالي price_minor يشمل الشحن (يرى العميل الإجمالي فقط). */
-export type DirectSaleAd = { productId: string; priceMinor: number };
+export type DirectSaleAd = { productId: string; priceMinor: number; inStock: boolean };
 export async function directSaleForAd(adId: number | bigint): Promise<DirectSaleAd | null> {
-  const rows = await prisma.$queryRaw<{ id: bigint; price_minor: number }[]>`
-    SELECT id, price_minor FROM commerce_products
+  const rows = await prisma.$queryRaw<{ id: bigint; price_minor: number; in_stock: number }[]>`
+    SELECT id, price_minor, (stock_available>stock_reserved) AS in_stock FROM commerce_products
     WHERE ad_id=${BigInt(adId)} AND seller_type='verified_member'
-      AND approved=1 AND visible=1 AND enabled=1 AND currency='SAR'
-      AND price_minor>0 AND stock_available>stock_reserved
-    ORDER BY id DESC LIMIT 1`.catch(() => [] as { id: bigint; price_minor: number }[]);
-  return rows[0] ? { productId: String(rows[0].id), priceMinor: rows[0].price_minor } : null;
+      AND approved=1 AND visible=1 AND enabled=1 AND currency='SAR' AND price_minor>0
+    ORDER BY id DESC LIMIT 1`.catch(() => [] as { id: bigint; price_minor: number; in_stock: number }[]);
+  return rows[0] ? { productId: String(rows[0].id), priceMinor: rows[0].price_minor, inStock: Number(rows[0].in_stock) === 1 } : null;
 }
 
 /** خرائط الشراء المباشر لعدة إعلانات دفعة واحدة (لبطاقات القوائم/الرئيسية) — بمعرّف الإعلان. */
@@ -94,7 +93,8 @@ export async function directSaleForAds(adIds: readonly (number | bigint)[]): Pro
       AND price_minor>0 AND stock_available>stock_reserved
     ORDER BY id DESC`.catch(() => [] as { ad_id: bigint; id: bigint; price_minor: number }[]);
   const map = new Map<string, DirectSaleAd>();
-  for (const r of rows) if (r.ad_id != null && !map.has(String(r.ad_id))) map.set(String(r.ad_id), { productId: String(r.id), priceMinor: r.price_minor });
+  // البطاقات لا تعرض شارة الشراء إلا لسلعة متوفّرة، فالاستعلام يقيّد على المخزون → inStock دائماً true.
+  for (const r of rows) if (r.ad_id != null && !map.has(String(r.ad_id))) map.set(String(r.ad_id), { productId: String(r.id), priceMinor: r.price_minor, inStock: true });
   return map;
 }
 

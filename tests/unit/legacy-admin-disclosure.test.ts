@@ -13,7 +13,7 @@ vi.mock('@/lib/account-links', () => ({ linkedAccounts: async () => [] }));
 vi.mock('@/lib/content-guard', () => ({ CATEGORY_LABEL: {} }));
 vi.mock('@/lib/member-disposition', () => ({ inspectMemberDependencies: state.dependencies, dispositionFor: () => 'archive' }));
 vi.mock('@/components/confirm-submit', () => ({ ConfirmSubmit: ({ children }: { children: ReactNode }) => children }));
-vi.mock('@/app/admin/actions', () => ({ updateUserAction: vi.fn(), sendUserPasswordAction: vi.fn(), setUserPasswordAction: vi.fn(), adjustUserBalanceAction: vi.fn(), unlinkMemberAccountAction: vi.fn(), disposeMemberAccountAction: vi.fn(), toggleDirectSaleApprovalAction: vi.fn() }));
+vi.mock('@/app/admin/actions', () => ({ updateUserAction: vi.fn(), sendUserPasswordAction: vi.fn(), setUserPasswordAction: vi.fn(), adjustUserBalanceAction: vi.fn(), unlinkMemberAccountAction: vi.fn(), disposeMemberAccountAction: vi.fn(), toggleDirectSaleApprovalAction: vi.fn(), adjustMemberDepositAction: vi.fn() }));
 import AuditPage from '@/app/admin/audit/page';
 import UserPage from '@/app/admin/users/[id]/page';
 

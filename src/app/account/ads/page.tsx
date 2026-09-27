@@ -228,7 +228,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                         <label className="flex flex-col gap-0.5">الشحن (ر.س)<input name="shipSar" inputMode="decimal" defaultValue={sale ? sar2(sale.shipping_minor) : '0'} className="w-24 rounded border px-2 py-1" /></label>
                         <label className="flex flex-col gap-0.5">عمولة الموقع (ر.س)<input name="siteCommSar" inputMode="decimal" defaultValue={sale ? sar2(sale.site_commission_minor) : '0'} className="w-24 rounded border px-2 py-1" /></label>
                         <label className="flex flex-col gap-0.5">عمولة العضو (ر.س)<input name="memberCommSar" inputMode="decimal" defaultValue={sale ? sar2(sale.member_commission_minor) : '0'} className="w-24 rounded border px-2 py-1" /></label>
-                        <label className="flex flex-col gap-0.5">الكمية<input name="qty" type="number" min={1} max={999} defaultValue={sale ? sale.stock_available : 1} className="w-16 rounded border px-2 py-1" /></label>
+                        <label className="flex flex-col gap-0.5">المخزون (المتاح للبيع)<input name="qty" type="number" min={1} max={999} defaultValue={sale ? sale.stock_available : 1} className="w-20 rounded border px-2 py-1" /></label>
                         <button className="rounded-md bg-emerald-600 px-3 py-1.5 font-bold text-white">{sale ? 'تحديث' : 'اعرض للبيع'}</button>
                       </form>
                       {sale && <p className="mt-1 font-bold text-emerald-900">الإجمالي المعروض للعميل: {sar2(sale.price_minor)} ر.س</p>}

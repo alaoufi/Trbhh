@@ -47,6 +47,7 @@ import { Breadcrumb } from '@/components/breadcrumb';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { directSaleForAd } from '@/lib/commerce/member-sell';
 import { formatSar } from '@/lib/commerce/money';
+import { remindRestockAction } from '@/app/shop/actions';
 import { ShoppingBag } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -101,7 +102,7 @@ function fmtAdminMsgDate(iso: string | null) {
   return isNaN(d.getTime()) ? '' : `— ${new Intl.DateTimeFormat('ar', { dateStyle: 'medium', timeStyle: 'short' }).format(d)}`;
 }
 
-export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string; adshow?: string; dupid?: string; price?: string; rated?: string; rerror?: string; banerr?: string }> }) {
+export default async function AdPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<{ cblocked?: string; cdup?: string; cbanned?: string; cflood?: string; urgent?: string; urgentneed?: string; featured?: string; featuredneed?: string; bumped?: string; bumpwait?: string; bumpneed?: string; error?: string; hours?: string; adminmsg?: string; adshow?: string; dupid?: string; price?: string; rated?: string; rerror?: string; banerr?: string; reminded?: string }> }) {
   const { id } = await params;
   const spx = searchParams ? await searchParams : {};
   const ad = await getAd(Number(id));
@@ -618,9 +619,25 @@ export default async function AdPage({ params, searchParams }: { params: Promise
             <span className="text-2xl font-black text-emerald-700">{formatSar(directSale.priceMinor)} <span className="text-base">ر.س</span></span>
             <span className="text-xs font-bold text-emerald-700">شامل الشحن</span>
           </div>
-          <Link href={`/shop/${directSale.productId}`} className="btn-3d flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white hover:bg-emerald-700">
-            <ShoppingBag className="h-5 w-5" /> شراء الآن
-          </Link>
+          {directSale.inStock ? (
+            <Link href={`/shop/${directSale.productId}`} className="btn-3d flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white hover:bg-emerald-700">
+              <ShoppingBag className="h-5 w-5" /> شراء الآن
+            </Link>
+          ) : session ? (
+            <form action={remindRestockAction}>
+              <input type="hidden" name="productId" value={directSale.productId} />
+              <input type="hidden" name="back" value={`/ads/${ad.id}`} />
+              <p className="mb-1 text-sm font-bold text-amber-700">نفد المخزون حالياً.</p>
+              <button className="btn-3d flex w-full items-center justify-center gap-2 rounded-xl border-2 border-emerald-600 bg-white py-3 text-sm font-extrabold text-emerald-700 hover:bg-emerald-50">
+                🔔 احجز / ذكّرني عند التوفر
+              </button>
+            </form>
+          ) : (
+            <Link href={`/login?next=${encodeURIComponent(`/ads/${ad.id}`)}`} className="btn-3d flex w-full items-center justify-center gap-2 rounded-xl border-2 border-emerald-600 bg-white py-3 text-sm font-extrabold text-emerald-700 hover:bg-emerald-50">
+              🔔 نفد المخزون — سجّل الدخول للتذكير عند التوفر
+            </Link>
+          )}
+          {spx.reminded === '1' && <p className="text-xs font-bold text-emerald-700">✅ سنذكّرك عند توفّر السلعة.</p>}
         </div>
       )}
 

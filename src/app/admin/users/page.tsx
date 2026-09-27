@@ -103,6 +103,9 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
         <h1 className="text-xl font-bold text-primary">الأعضاء</h1>
         {/* طلبات الأعضاء المعلّقة — وصول مباشر من نفس الصفحة */}
         <div className="flex flex-wrap gap-2">
+          <AccessBoundary module={'users'} action={'create'}><Link href="/admin/users/new" className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-bold text-white hover:bg-primary/90">
+            ＋ إضافة عضو
+          </Link></AccessBoundary>
           <AccessPage href="/admin/verifications"><Link href="/admin/verifications" className={`flex items-center gap-1.5 rounded-lg border-2 px-3 py-1.5 text-sm font-bold ${pendingVerify > 0 ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-primary/25 text-primary hover:bg-secondary'}`}>
             <ShieldCheck className="h-4 w-4" /> طلبات التوثيق
             {pendingVerify > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-xs text-white">{pendingVerify}</span>}

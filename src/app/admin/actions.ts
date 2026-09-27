@@ -23,6 +23,7 @@ import { approvePromo, rejectPromo, deletePromo, createPromoPackage, updatePromo
 import { createBackup, restoreBackup, deleteBackup } from '@/lib/backup';
 import { MSG_KEYS, TAQNYAT_URL, toLocalSaudi, sendNewPasswordToUser } from '@/lib/sms';
 import { hashPassword, newPasswordError } from '@/lib/auth';
+import { normalizeSaudiRegistrationPhone } from '@/lib/phone-registration';
 import { bustAdCaches } from '@/lib/data';
 import { toInt } from '@/lib/utils';
 import { logAdmin } from '@/lib/audit';
@@ -2003,4 +2004,28 @@ export async function saveProviderCredsAction(formData: FormData) {
   }
   revalidatePath('/admin/payments');
   redirect('/admin/payments?saved=1');
+}
+
+/** إنشاء عضو جديد من لوحة الإدارة (اسم + جوال سعودي + كلمة مرور).
+ *  جوال سعودي فقط (05XXXXXXXX)، يُستخدم اسم دخول أيضاً؛ يُرفض المكرّر. */
+export async function createMemberAction(formData: FormData) {
+  const session = await requireAccess('users', 'create');
+  const err = (m: string) => redirect(`/admin/users/new?error=${encodeURIComponent(m)}`);
+  const name = String(formData.get('name') || '').trim().slice(0, 120);
+  const phone = normalizeSaudiRegistrationPhone(String(formData.get('phone') || ''));
+  const pass = String(formData.get('password') || '');
+  if (!name) err('اكتب اسم العضو.');
+  if (!phone) err('أدخل جوالاً سعودياً صحيحاً بصيغة 05XXXXXXXX.');
+  const passErr = await newPasswordError(pass);
+  if (passErr) err(passErr);
+  const exists = await prisma.users.findFirst({ where: { OR: [{ phoneNumber: phone! }, { userName: phone! }] }, select: { id: true } }).catch(() => null);
+  if (exists) err('يوجد عضو مسجّل بهذا الجوال بالفعل.');
+  const hash = await hashPassword(pass);
+  const created = await prisma.users.create({
+    data: { name, userName: phone!, phoneNumber: phone!, password: hash, type: 'user', ban: 'no', trusted: 0, allow_phone: 1, whatsapp: 1, step: 0, forget: 0, is_admin: 0 },
+  }).catch(() => null);
+  if (!created) err('تعذّر إنشاء العضو، حاول مجدداً.');
+  await logAdmin(session.uid, 'إنشاء عضو من الإدارة', `العضو #${toInt(created!.id)} · ${phone}`);
+  revalidatePath('/admin/users');
+  redirect(`/admin/users/${toInt(created!.id)}?created=1`);
 }

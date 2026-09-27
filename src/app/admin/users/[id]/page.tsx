@@ -32,11 +32,11 @@ const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
   account: { label: 'حذف حساب', icon: Trash2 },
 };
 
-export default async function AdminUserDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; sent?: string; error?: string; setpass?: string; bal?: string; linked?: string; dsale?: string }> }) {
+export default async function AdminUserDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; sent?: string; error?: string; setpass?: string; bal?: string; linked?: string; dsale?: string; created?: string }> }) {
   const session = await requireAdminPage('/admin/users/[id]');
   const {keys} = await readActorAccess(session.uid);
   const { id } = await params;
-  const { saved, sent, error, setpass, bal, linked, dsale } = await searchParams;
+  const { saved, sent, error, setpass, bal, linked, dsale, created } = await searchParams;
   const uid = Number(id);
   const [u, adsCount, balance, txns, modLog, rawAdminLog, strikes, dupRow, linkedMembers, dependencies] = await Promise.all([
     prisma.users.findUnique({ where: { id: BigInt(uid) } }).catch(() => null),
@@ -117,6 +117,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
       {saved === '1' && <Banner ok>تم حفظ التعديلات.</Banner>}
       {sent === '1' && <Banner ok>تم إرسال كلمة مرور جديدة للعضو عبر رسالة نصية.</Banner>}
       {setpass === '1' && <Banner ok>تم تعيين كلمة المرور. أبلغ العضو بها ليدخل.</Banner>}
+      {created === '1' && <Banner ok>تم إنشاء العضو. يمكنه الدخول بجواله وكلمة المرور التي حددتها.</Banner>}
       {bal === '1' && <Banner ok>تم تحديث رصيد العضو.</Banner>}
       {linked === 'unlinked' && <Banner ok>تم فك الحساب من الدخول الموحّد فقط. بقيت الإعلانات والمحفظة والسجل كما هي.</Banner>}
       {error && <Banner>{decodeURIComponent(error)}</Banner>}

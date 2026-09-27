@@ -20,6 +20,7 @@ type Notice = { id: bigint; order_id: bigint; channel: string; status: string };
 const labels: Record<string, string> = {
   commerce_enabled: 'عرض كتالوج السلع المعتمدة', commerce_payments_enabled: 'تفعيل الدفع المباشر بعد اجتياز اختبارات البنك',
   commerce_purchasing_enabled: 'تفعيل الشراء (المفتاح المركزي — يبقى معطّلاً حتى اكتمال التجهيز والاختبار)',
+  commerce_gateway_enabled: 'تسجيل بوابة الدفع للتجارة (الراجحي — يتطلب اكتمال المفاتيح؛ اختبِر في الساندبوكس أولاً)',
   commerce_purchasing_disabled_text: 'نص تعطيل الشراء (يظهر عند محاولة الشراء فقط)',
   commerce_notifications_enabled: 'إرسال تنبيهات الطلب عبر القنوات المتاحة',
   verified_direct_sale_enabled: 'السماح للأعضاء الموثوقين بالبيع المباشر (سعر وشحن محدّدان، بانتظار اعتماد الإدارة)',

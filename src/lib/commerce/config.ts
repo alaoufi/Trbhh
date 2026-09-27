@@ -8,6 +8,9 @@ export const COMMERCE_DEFAULTS = {
   // والمزامنة والاختبارات الداخلية تبقى متاحة. يفعّله المشرف يدوياً فقط.
   commerce_purchasing_enabled: '0',
   commerce_notifications_enabled: '0',
+  // تسجيل بوابة الدفع للتجارة (الراجحي) — يتطلب اكتمال مفاتيح الراجحي في البيئة. افتراضي
+  // معطّل. لا يبدأ دفع فعلي إلا بعد تفعيل commerce_payments_enabled وcommerce_purchasing_enabled.
+  commerce_gateway_enabled: '0',
   // السماح للأعضاء الموثوقين بعرض سلعهم للبيع المباشر (بسعر وشحن محدّدين، بانتظار اعتماد
   // الإدارة). افتراضي معطّل. لا يفعّل أي دفع فعلي — الشراء يبقى مقفلاً بحارس الشراء.
   verified_direct_sale_enabled: '0',

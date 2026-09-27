@@ -14,7 +14,7 @@ import { redactAdminLog } from '@/lib/admin-audit-visibility';
 import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { updateUserAction, sendUserPasswordAction, setUserPasswordAction, adjustUserBalanceAction, unlinkMemberAccountAction, disposeMemberAccountAction } from '../../actions';
+import { updateUserAction, sendUserPasswordAction, setUserPasswordAction, adjustUserBalanceAction, unlinkMemberAccountAction, disposeMemberAccountAction, toggleDirectSaleApprovalAction } from '../../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { linkedAccounts } from '@/lib/account-links';
 import { dispositionFor, inspectMemberDependencies } from '@/lib/member-disposition';
@@ -32,11 +32,11 @@ const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
   account: { label: 'حذف حساب', icon: Trash2 },
 };
 
-export default async function AdminUserDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; sent?: string; error?: string; setpass?: string; bal?: string; linked?: string }> }) {
+export default async function AdminUserDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; sent?: string; error?: string; setpass?: string; bal?: string; linked?: string; dsale?: string }> }) {
   const session = await requireAdminPage('/admin/users/[id]');
   const {keys} = await readActorAccess(session.uid);
   const { id } = await params;
-  const { saved, sent, error, setpass, bal, linked } = await searchParams;
+  const { saved, sent, error, setpass, bal, linked, dsale } = await searchParams;
   const uid = Number(id);
   const [u, adsCount, balance, txns, modLog, rawAdminLog, strikes, dupRow, linkedMembers, dependencies] = await Promise.all([
     prisma.users.findUnique({ where: { id: BigInt(uid) } }).catch(() => null),
@@ -128,9 +128,28 @@ export default async function AdminUserDetail({ params, searchParams }: { params
         <div className="col-span-2 flex items-center gap-2">
           {u.ban === 'checked' ? <Badge variant="muted">محظور{u.ban_until ? ` حتى ${fmtDate(u.ban_until.toISOString())}` : ' نهائياً'}</Badge> : <Badge variant="trusted">نشط</Badge>}
           {u.trusted === 1 && <Badge variant="trusted">موثّق</Badge>}
-
+          {u.direct_sale_approved === 1 && <Badge variant="special">بيع مباشر مفعّل</Badge>}
         </div>
       </div>
+
+      {/* تفعيل البيع المباشر لعضو موثوق — بضاعته تُنشر في الرئيسي بعد اعتماد سلعها */}
+      <AccessBoundary module={'verifications'} action={'approve'}>
+        <section className="space-y-2 rounded-2xl border-2 border-emerald-200 bg-emerald-50/60 p-4">
+          <div className="text-sm font-extrabold text-emerald-900">البيع المباشر للعضو</div>
+          {dsale === '1' && <p className="text-xs font-bold text-emerald-700">تم تفعيل البيع المباشر لهذا العضو.</p>}
+          {dsale === '0' && <p className="text-xs font-bold text-amber-700">تم إيقاف البيع المباشر لهذا العضو.</p>}
+          {error === 'nottrusted' && <p className="text-xs font-bold text-red-700">لا يُفعَّل البيع المباشر إلا لعضو موثّق.</p>}
+          <p className="text-xs text-muted-foreground">يسمح لهذا العضو الموثوق بعرض سلعه للبيع المباشر (بسعر وشحن وعمولات محدّدة، بانتظار اعتماد كل سلعة). يتطلب أيضاً تفعيل المفتاح العام في «تجارة تربح».</p>
+          <form action={toggleDirectSaleApprovalAction}>
+            <input type="hidden" name="userId" value={uid} />
+            <input type="hidden" name="on" value={u.direct_sale_approved === 1 ? '0' : '1'} />
+            <button className={`rounded-lg px-3 py-2 text-xs font-bold text-white ${u.direct_sale_approved === 1 ? 'bg-amber-600' : 'bg-emerald-600'}`} disabled={u.trusted !== 1 && u.direct_sale_approved !== 1}>
+              {u.direct_sale_approved === 1 ? 'إيقاف البيع المباشر' : 'تفعيل البيع المباشر'}
+            </button>
+            {u.trusted !== 1 && <span className="ms-2 text-xs text-red-700">(العضو غير موثّق)</span>}
+          </form>
+        </section>
+      </AccessBoundary>
 
       <section className="space-y-3 rounded-2xl border-2 border-primary/15 bg-card p-4">
         <div className="flex items-center gap-2 text-sm font-extrabold text-primary"><User className="h-4 w-4" /> الحسابات الموحّدة</div>

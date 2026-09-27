@@ -1063,6 +1063,22 @@ export async function trustUserAction(formData: FormData) {
   revalidatePath('/admin/verifications');
 }
 
+/** تفعيل/إيقاف صلاحية «البيع المباشر» لعضو موثوق (من صفحة تفاصيل العضو). لا يبيع
+ *  العضو مباشرةً إلا بهذا التفعيل + كونه موثوقاً + تفعيل المفتاح العام في تجارة تربح. */
+export async function toggleDirectSaleApprovalAction(formData: FormData) {
+  const session = await requireAccess('verifications', 'approve');
+  const id = BigInt(String(formData.get('userId')));
+  const on = String(formData.get('on')) === '1';
+  const u = await prisma.users.findUnique({ where: { id }, select: { trusted: true, direct_sale_approved: true } }).catch(() => null);
+  if (!u) redirect(`/admin/users/${toInt(id)}`);
+  // لا يُفعّل إلا لعضو موثوق (البيع المباشر حصري للموثوقين).
+  if (on && Number(u!.trusted) !== 1) redirect(`/admin/users/${toInt(id)}?error=nottrusted`);
+  await prisma.users.update({ where: { id }, data: { direct_sale_approved: on ? 1 : 0 } }).catch(() => {});
+  await logAdmin(session.uid, on ? 'تفعيل البيع المباشر لعضو' : 'إيقاف البيع المباشر لعضو', `العضو #${toInt(id)}`);
+  revalidatePath(`/admin/users/${toInt(id)}`);
+  redirect(`/admin/users/${toInt(id)}?dsale=${on ? '1' : '0'}`);
+}
+
 /** إلغاء التوثيق بسبب إلزامي يُحفظ ويصل العضو — وإن كان توثيقاً مدفوعاً نشطاً
  *  يمر عبر مسار الإلغاء المدفوع فيُعاد للرصيد قيمة الأيام غير المستخدمة تلقائياً. */
 async function untrustCore(adminId: number, id: number, reason: string) {

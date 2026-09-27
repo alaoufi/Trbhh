@@ -30,10 +30,11 @@ export async function verifiedDirectSaleEnabled(): Promise<boolean> {
   return (await getSetting('verified_direct_sale_enabled', '0').catch(() => '0')) === '1';
 }
 
-/** هل يستطيع هذا العضو البيع المباشر؟ يجب أن يكون موثوقاً والمفتاح مفعّلاً. */
+/** هل يستطيع هذا العضو البيع المباشر؟ يجب: المفتاح العام مفعّل + العضو موثوق +
+ *  تفعيل الإدارة له من صفحة تفاصيل العضو (direct_sale_approved). */
 export async function canMemberSellDirectly(userId: number | bigint | null | undefined): Promise<boolean> {
   if (!userId) return false;
   if (!(await verifiedDirectSaleEnabled())) return false;
-  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { trusted: true } }).catch(() => null);
-  return Number(u?.trusted) === 1;
+  const u = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { trusted: true, direct_sale_approved: true } }).catch(() => null);
+  return Number(u?.trusted) === 1 && Number(u?.direct_sale_approved) === 1;
 }

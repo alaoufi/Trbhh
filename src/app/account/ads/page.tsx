@@ -63,8 +63,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {sp.restored === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">📤 أُعيد إعلانك للظهور من الأرشيف وعاد لمقدمة القوائم.</div>}
       {sp.sale === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🛒 عُرضت سلعتك للبيع المباشر — بانتظار اعتماد الإدارة قبل ظهورها في المتجر.</div>}
       {sp.salestopped === '1' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">تم إيقاف عرض السلعة للبيع المباشر.</div>}
-      {sp.error === 'bad_price' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">أدخل سعراً صحيحاً أكبر من صفر.</div>}
-      {sp.error === 'bad_shipping' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">أدخل قيمة شحن صحيحة (يمكن أن تكون صفراً لشحن مجاني).</div>}
+      {sp.error === 'bad_amounts' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">أدخل سعر سلعة أكبر من صفر، وقيماً صحيحة للشحن والعمولات (يمكن أن تكون صفراً).</div>}
       {sp.error === 'not_allowed' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">البيع المباشر متاح للأعضاء الموثوقين فقط وعند تفعيله من الإدارة.</div>}
       {sp.error === 'adminhidden' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">🚫 هذا الإعلان أخفته الإدارة عن النشر لمخالفة — لا يمكنك إعادة نشره بنفسك. عالِج سبب المخالفة (المذكور تحت الإعلان) وراسل الإدارة لإعادة نشره.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? <> (المطلوب {sp.price} ر.س</> : ''}{sp.bal !== undefined ? <>، ورصيدك {sp.bal} ر.س)</> : ')'}. <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
@@ -198,13 +197,16 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                       <summary className="cursor-pointer font-bold text-emerald-800">🛒 بيع مباشر{sale ? ` — ${statusLabel}` : ''}</summary>
                       <form action={listAdForDirectSaleAction} className="mt-2 flex flex-wrap items-end gap-2">
                         <input type="hidden" name="adId" value={ad.id} />
-                        <label className="flex flex-col gap-0.5">السعر (ر.س)<input name="priceSar" inputMode="decimal" required defaultValue={sale ? sar2(sale.price_minor) : ''} className="w-24 rounded border px-2 py-1" /></label>
+                        <label className="flex flex-col gap-0.5">سعر السلعة (ر.س)<input name="itemSar" inputMode="decimal" required defaultValue={sale ? sar2(sale.item_price_minor) : ''} className="w-24 rounded border px-2 py-1" /></label>
                         <label className="flex flex-col gap-0.5">الشحن (ر.س)<input name="shipSar" inputMode="decimal" defaultValue={sale ? sar2(sale.shipping_minor) : '0'} className="w-24 rounded border px-2 py-1" /></label>
+                        <label className="flex flex-col gap-0.5">عمولة الموقع (ر.س)<input name="siteCommSar" inputMode="decimal" defaultValue={sale ? sar2(sale.site_commission_minor) : '0'} className="w-24 rounded border px-2 py-1" /></label>
+                        <label className="flex flex-col gap-0.5">عمولة العضو (ر.س)<input name="memberCommSar" inputMode="decimal" defaultValue={sale ? sar2(sale.member_commission_minor) : '0'} className="w-24 rounded border px-2 py-1" /></label>
                         <label className="flex flex-col gap-0.5">الكمية<input name="qty" type="number" min={1} max={999} defaultValue={sale ? sale.stock_available : 1} className="w-16 rounded border px-2 py-1" /></label>
                         <button className="rounded-md bg-emerald-600 px-3 py-1.5 font-bold text-white">{sale ? 'تحديث' : 'اعرض للبيع'}</button>
                       </form>
+                      {sale && <p className="mt-1 font-bold text-emerald-900">الإجمالي المعروض للعميل: {sar2(sale.price_minor)} ر.س</p>}
                       {sale && <form action={stopDirectSaleAction} className="mt-1"><input type="hidden" name="adId" value={ad.id} /><button className="rounded-md border border-red-300 px-2 py-1 font-bold text-red-700">إيقاف البيع</button></form>}
-                      <p className="mt-1 text-[11px] leading-5 text-emerald-900/80">تُعرض بسعر وشحن محدّدين. الشراء يتطلب جوال العميل وعنوان الشحن. لا خصم فعلي حتى تفعيل الدفع.</p>
+                      <p className="mt-1 text-[11px] leading-5 text-emerald-900/80">الإجمالي = سعر السلعة + الشحن + عمولة الموقع + عمولة العضو. <b>العميل يرى الإجمالي فقط.</b> الشراء يتطلب جواله وعنوان الشحن. لا خصم فعلي حتى تفعيل الدفع.</p>
                     </details>
                   );
                 })()}

@@ -515,11 +515,11 @@ export async function listAdForDirectSaleAction(formData: FormData) {
   const session = await requireUser();
   const adId = String(formData.get('adId') || '');
   if (!/^[1-9]\d{0,14}$/.test(adId)) redirect('/account/ads?error=sale');
-  const priceMinor = Math.round((Number(String(formData.get('priceSar') || '')) || 0) * 100);
-  const shippingMinor = Math.round((Number(String(formData.get('shipSar') || '0')) || 0) * 100);
+  const minor = (name: string) => Math.round((Number(String(formData.get(name) || '0')) || 0) * 100);
+  const parts = { itemMinor: minor('itemSar'), shippingMinor: minor('shipSar'), siteCommMinor: minor('siteCommSar'), memberCommMinor: minor('memberCommSar') };
   const quantity = Math.trunc(Number(String(formData.get('qty') || '1'))) || 1;
   const { listAdForDirectSale } = await import('@/lib/commerce/member-sell');
-  const r = await listAdForDirectSale(session.uid, BigInt(adId), priceMinor, shippingMinor, quantity);
+  const r = await listAdForDirectSale(session.uid, BigInt(adId), parts, quantity);
   revalidatePath('/account/ads');
   revalidatePath('/shop');
   redirect(r.ok ? '/account/ads?sale=1' : `/account/ads?error=${r.error}`);

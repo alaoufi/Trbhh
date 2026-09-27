@@ -51,6 +51,9 @@ const STATEMENTS: string[] = [
   `ALTER TABLE supplier_orders ADD COLUMN external_order_url VARCHAR(2048) NOT NULL DEFAULT ''`,
   `ALTER TABLE supplier_orders ADD COLUMN external_customer_id VARCHAR(191) NULL`,
   `ALTER TABLE users ADD COLUMN auth_session_version VARCHAR(64) NOT NULL DEFAULT '0'`,
+  /* تفعيل الإدارة للبيع المباشر لهذا العضو الموثوق (من صفحة تفاصيل العضو). لا يبيع
+     العضو مباشرةً إلا بهذا التفعيل + كونه موثوقاً + تفعيل المفتاح العام. */
+  `ALTER TABLE users ADD COLUMN direct_sale_approved TINYINT NOT NULL DEFAULT 0`,
   /* Authentication: encrypted confirmed TOTP credentials and durable attempt limits. */
   `CREATE TABLE IF NOT EXISTS auth_mfa (
     user_id BIGINT UNSIGNED PRIMARY KEY,

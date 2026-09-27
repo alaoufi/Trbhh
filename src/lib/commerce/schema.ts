@@ -17,6 +17,9 @@ export const COMMERCE_DDL = [
     seller_type VARCHAR(24) NOT NULL DEFAULT 'trbhh',
     seller_member_id BIGINT UNSIGNED NULL,
     shipping_minor INT NOT NULL DEFAULT 0,
+    item_price_minor INT NOT NULL DEFAULT 0,
+    site_commission_minor INT NOT NULL DEFAULT 0,
+    member_commission_minor INT NOT NULL DEFAULT 0,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     KEY commerce_products_ad (ad_id)
@@ -27,6 +30,12 @@ export const COMMERCE_DDL = [
   `ALTER TABLE commerce_products ADD COLUMN seller_type VARCHAR(24) NOT NULL DEFAULT 'trbhh'`,
   `ALTER TABLE commerce_products ADD COLUMN seller_member_id BIGINT UNSIGNED NULL`,
   `ALTER TABLE commerce_products ADD COLUMN shipping_minor INT NOT NULL DEFAULT 0`,
+  /* تفصيل سعر سلعة العضو الموثوق (لا يُعرض للعميل إطلاقاً — للكشف والمحاسبة فقط):
+     price_minor الإجمالي = item_price_minor + shipping_minor + site_commission_minor
+     + member_commission_minor. العميل يرى الإجمالي فقط. */
+  `ALTER TABLE commerce_products ADD COLUMN item_price_minor INT NOT NULL DEFAULT 0`,
+  `ALTER TABLE commerce_products ADD COLUMN site_commission_minor INT NOT NULL DEFAULT 0`,
+  `ALTER TABLE commerce_products ADD COLUMN member_commission_minor INT NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS commerce_customer_addresses (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     member_id BIGINT UNSIGNED NOT NULL,

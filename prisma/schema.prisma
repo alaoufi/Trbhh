@@ -419,6 +419,9 @@ model commerce_products {
   seller_type     String   @default("trbhh") @db.VarChar(24)
   seller_member_id BigInt?  @db.UnsignedBigInt
   shipping_minor  Int      @default(0)
+  item_price_minor Int     @default(0)
+  site_commission_minor Int @default(0)
+  member_commission_minor Int @default(0)
   created_at      DateTime @default(now()) @db.DateTime(3)
   updated_at      DateTime @default(now()) @db.DateTime(3)
   items           commerce_order_items[]
@@ -1761,6 +1764,7 @@ model users {
   work_permit               Int?
   sajal_madaniun            String?
   trusted                   Int        @default(0) @db.TinyInt
+  direct_sale_approved      Int        @default(0) @db.TinyInt
   allow_phone               Int        @default(0) @db.TinyInt
   whatsapp                  Int        @default(0) @db.TinyInt
   step                      Int        @default(0) @db.TinyInt

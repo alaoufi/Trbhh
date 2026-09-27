@@ -112,9 +112,8 @@ export const CJ_DDL: string[] = [
     KEY cj_orders_cjid (cj_order_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
-  // بنود الطلب لإرسالها للمورد (JSON: [{vid,quantity,sku,logisticName}]) — لازمة
-  // لبناء طلب CJ عند الإرسال (المورد يحتاج vid + الكمية، لا الـPID). تُضاف على القائم.
-  `ALTER TABLE cj_orders ADD COLUMN cj_lines_json TEXT NULL`,
+  // بنود الطلب (cj_lines_json) تُنشأ ضمن CREATE أعلاه؛ ترقية القواعد القائمة عبر ALTER
+  // مبتلَع في src/data/schema-sync.ts (لتبقى CJ_DDL قابلة لإعادة التطبيق بلا خطأ).
 
   // سجل أحداث/خط زمني للطلب — event_key فريد يجعل استقبال الأحداث/الـwebhooks idempotent.
   `CREATE TABLE IF NOT EXISTS cj_order_events (

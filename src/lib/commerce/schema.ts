@@ -25,21 +25,9 @@ export const COMMERCE_DDL = [
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     KEY commerce_products_ad (ad_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  /* نوع البائع للسلعة القابلة للشراء المباشر: trbhh (مبيعات تربح) · verified_member
-     (عضو موثوق يبيع بسعره) · imported (مستورد من مورد). seller_member_id = العضو
-     البائع عند verified_member. shipping_minor = قيمة شحن واضحة ومحدّدة للسلعة. */
-  `ALTER TABLE commerce_products ADD COLUMN seller_type VARCHAR(24) NOT NULL DEFAULT 'trbhh'`,
-  `ALTER TABLE commerce_products ADD COLUMN seller_member_id BIGINT UNSIGNED NULL`,
-  `ALTER TABLE commerce_products ADD COLUMN shipping_minor INT NOT NULL DEFAULT 0`,
-  /* تفصيل سعر سلعة العضو الموثوق (لا يُعرض للعميل إطلاقاً — للكشف والمحاسبة فقط):
-     price_minor الإجمالي = item_price_minor + shipping_minor + site_commission_minor
-     + member_commission_minor. العميل يرى الإجمالي فقط. */
-  `ALTER TABLE commerce_products ADD COLUMN item_price_minor INT NOT NULL DEFAULT 0`,
-  `ALTER TABLE commerce_products ADD COLUMN site_commission_minor INT NOT NULL DEFAULT 0`,
-  `ALTER TABLE commerce_products ADD COLUMN member_commission_minor INT NOT NULL DEFAULT 0`,
-  /* sale_listed=1 عندما يعرض العضو سلعته للبيع المباشر (معلّقة أو حيّة)، =0 عند إيقافها.
-     يُحتسب «سقف التأمين» على السلع المعروضة (sale_listed=1) دون الموقوفة. */
-  `ALTER TABLE commerce_products ADD COLUMN sale_listed TINYINT NOT NULL DEFAULT 1`,
+  /* أعمدة نوع البائع/التفصيل/العرض تُنشأ ضمن CREATE أعلاه (لتبقى DDL هذه قابلة لإعادة
+     التطبيق بلا خطأ في اختبارات MySQL)؛ ترقية القواعد القائمة تتم عبر ALTER مبتلَع في
+     src/data/schema-sync.ts. */
   /* سجل تحويلات عمولات الأعضاء الموثوقين (كشف الموقع): كل تحويل «تم التحويل» يُسجَّل
      لضبط الحسابات. المستحقّ يُحتسب من عمولة العضو في الطلبات المدفوعة ناقص التحويلات. */
   `CREATE TABLE IF NOT EXISTS commerce_member_payouts (
@@ -97,10 +85,6 @@ export const COMMERCE_DDL = [
     paid_at DATETIME(3) NULL,
     UNIQUE KEY commerce_orders_request (member_id,request_key)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
-  /* تتبّع شحن طلب التجارة — يضيفه البائع بعد الدفع فيُرسَل واتساب للعميل. */
-  `ALTER TABLE commerce_orders ADD COLUMN carrier VARCHAR(120) NOT NULL DEFAULT ''`,
-  `ALTER TABLE commerce_orders ADD COLUMN tracking_number VARCHAR(160) NOT NULL DEFAULT ''`,
-  `ALTER TABLE commerce_orders ADD COLUMN shipped_at DATETIME(3) NULL`,
   `CREATE TABLE IF NOT EXISTS commerce_order_items (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     order_id BIGINT UNSIGNED NOT NULL,

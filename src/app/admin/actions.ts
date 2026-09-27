@@ -2006,6 +2006,25 @@ export async function saveProviderCredsAction(formData: FormData) {
   redirect('/admin/payments?saved=1');
 }
 
+/** تعديل تأمين رصيد العضو الموثوق (بالريال): إضافة مبلغ أو تعيين قيمة مطلقة.
+ *  التأمين ضمانٌ يُعوَّض منه العميل عند إخلال العضو، ويحدّ سقف السلع المعروضة. */
+export async function adjustMemberDepositAction(formData: FormData) {
+  const session = await requireAccess('users', 'edit');
+  const id = BigInt(String(formData.get('userId') || '0'));
+  const back = `/admin/users/${toInt(id)}`;
+  const amountSar = Number(String(formData.get('amountSar') || '0'));
+  const mode = String(formData.get('mode') || 'add') === 'set' ? 'set' : 'add';
+  if (!Number.isFinite(amountSar) || amountSar < 0 || amountSar > 100_000_000) redirect(`${back}?error=${encodeURIComponent('مبلغ التأمين غير صالح.')}`);
+  const amtMinor = BigInt(Math.round(amountSar * 100));
+  const u = await prisma.users.findUnique({ where: { id }, select: { sale_deposit_minor: true } }).catch(() => null);
+  if (!u) redirect(back);
+  const next = mode === 'set' ? amtMinor : BigInt(u!.sale_deposit_minor) + amtMinor;
+  await prisma.users.update({ where: { id }, data: { sale_deposit_minor: next < 0n ? 0n : next } }).catch(() => {});
+  await logAdmin(session.uid, 'تعديل تأمين رصيد عضو', `العضو #${toInt(id)} · ${mode === 'set' ? 'تعيين' : 'إضافة'} ${amountSar} ر.س`);
+  revalidatePath(back);
+  redirect(`${back}?depositok=1`);
+}
+
 /** إنشاء عضو جديد من لوحة الإدارة (اسم + جوال سعودي + كلمة مرور).
  *  جوال سعودي فقط (05XXXXXXXX)، يُستخدم اسم دخول أيضاً؛ يُرفض المكرّر. */
 export async function createMemberAction(formData: FormData) {

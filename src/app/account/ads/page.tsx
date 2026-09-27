@@ -11,14 +11,15 @@ import { getBalance } from '@/lib/wallet';
 import { formatPrice, timeAgo } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmSubmit } from '@/components/confirm-submit';
-import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction, bumpAdAction, restoreArchivedAdAction, archiveAdAction, listAdForDirectSaleAction, stopDirectSaleAction } from '../actions';
+import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction, bumpAdAction, restoreArchivedAdAction, archiveAdAction, listAdForDirectSaleAction, stopDirectSaleAction, fundSaleDepositAction } from '../actions';
 import { canMemberSellDirectly } from '@/lib/commerce/seller-types';
 import { listMemberSaleProducts, type MemberSaleRow } from '@/lib/commerce/member-sell';
+import { memberDepositSummary } from '@/lib/commerce/deposit';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
 
-export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string; censored?: string; sale?: string; salestopped?: string }> }) {
+export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string; censored?: string; sale?: string; salestopped?: string; depositok?: string; depositerr?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee, memberWindows, active, lifecycleOn] = await Promise.all([
@@ -30,6 +31,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
   // البيع المباشر للعضو الموثوق: مسموح فقط عند تفعيل المفتاح الإداري + كون العضو موثوقاً.
   const directSaleAllowed = await canMemberSellDirectly(session.uid);
   const saleProducts = directSaleAllowed ? await listMemberSaleProducts(session.uid) : new Map<string, MemberSaleRow>();
+  const deposit = directSaleAllowed ? await memberDepositSummary(session.uid) : null;
   const sar2 = (m: number) => (m / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const now = Date.now();
   const featuredSold = serviceHasPrice(servicePricing.featured);
@@ -64,6 +66,11 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {sp.restored === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">📤 أُعيد إعلانك للظهور من الأرشيف وعاد لمقدمة القوائم.</div>}
       {sp.sale === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">🛒 عُرضت سلعتك للبيع المباشر — بانتظار اعتماد الإدارة قبل ظهورها في المتجر.</div>}
       {sp.salestopped === '1' && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">تم إيقاف عرض السلعة للبيع المباشر.</div>}
+      {sp.depositok === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✅ تم شحن تأمين رصيدك من محفظتك. يمكنك الآن عرض سلع بقيمة أكبر.</div>}
+      {sp.depositerr === 'balance' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيد محفظتك لا يكفي لشحن هذا المبلغ في التأمين. <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك</Link> ثم أعد المحاولة.</div>}
+      {sp.depositerr === 'amount' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">أدخل مبلغ تأمين صحيحاً (ريالات كاملة أكبر من صفر).</div>}
+      {sp.depositerr === 'failed' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر شحن التأمين وأُعيد المبلغ لرصيدك. حاول مجدداً.</div>}
+      {sp.error === 'deposit_exceeded' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">🛡️ تأمين رصيدك لا يغطي قيمة السلع المعروضة (السعر × المخزون). اشحن التأمين أدناه، أو قلّل السعر/الكمية.</div>}
       {sp.error === 'bad_amounts' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">أدخل سعر سلعة أكبر من صفر، وقيماً صحيحة للشحن والعمولات (يمكن أن تكون صفراً).</div>}
       {sp.error === 'not_allowed' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">البيع المباشر متاح للأعضاء الموثوقين فقط وعند تفعيله من الإدارة.</div>}
       {sp.error === 'adminhidden' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">🚫 هذا الإعلان أخفته الإدارة عن النشر لمخالفة — لا يمكنك إعادة نشره بنفسك. عالِج سبب المخالفة (المذكور تحت الإعلان) وراسل الإدارة لإعادة نشره.</div>}
@@ -78,6 +85,25 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {sp.error === 'deleteWindow' && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           انتهت المدة المسموح بها لحذف الإعلان{sp.hours ? ` (${sp.hours} ساعة من النشر)` : ''} حسب إعدادات الموقع. للحذف بعد هذه المدة تواصل مع الإدارة.
+        </div>
+      )}
+      {/* تأمين رصيد البيع المباشر — ضمانٌ يُعوَّض منه العميل عند الإخلال، ويحدّ قيمة السلع المعروضة */}
+      {deposit && (
+        <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50/60 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-extrabold text-emerald-900">🛡️ تأمين رصيد البيع المباشر</div>
+            <div className="flex flex-wrap gap-2 text-xs font-bold">
+              <span className="rounded-full bg-white px-2 py-0.5 text-emerald-800">التأمين: {sar2(deposit.depositMinor)} ر.س</span>
+              <span className="rounded-full bg-white px-2 py-0.5 text-amber-700">المستخدَم: {sar2(deposit.exposureMinor)} ر.س</span>
+              <span className="rounded-full bg-white px-2 py-0.5 text-primary">المتاح: {sar2(Math.max(0, deposit.remainingMinor))} ر.س</span>
+            </div>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-5 text-emerald-900/80">لا تُعرض سلعك ما لم يغطِّ التأمين قيمتها (السعر × المخزون) — لأن العميل يُعوَّض منه عند الإخلال بشروط السلعة. زِد تأمينك من رصيدك (المشحون عبر مدى) أو اطلب من الإدارة إضافته.</p>
+          <form action={fundSaleDepositAction} className="mt-2 flex flex-wrap items-end gap-2 text-xs">
+            <label className="flex flex-col gap-0.5">مبلغ الشحن من رصيدي (ر.س)<input name="amountSar" type="number" min={1} max={1000000} required className="w-28 rounded border px-2 py-1" placeholder="مثال: 500" /></label>
+            <button className="rounded-md bg-emerald-600 px-3 py-1.5 font-bold text-white">شحن التأمين من رصيدي</button>
+            <span className="text-emerald-900/70">رصيد محفظتك الآن: {balance} ر.س</span>
+          </form>
         </div>
       )}
       {ads.length === 0 && <p className="py-8 text-center text-muted-foreground">لا توجد إعلانات بعد.</p>}

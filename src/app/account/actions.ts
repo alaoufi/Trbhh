@@ -538,6 +538,28 @@ export async function stopDirectSaleAction(formData: FormData) {
   redirect('/account/ads?salestopped=1');
 }
 
+/** شحن تأمين رصيد البيع المباشر من رصيد العضو (المموَّل عبر مدى).
+ *  التأمين ضمانٌ يُعوَّض منه العميل عند الإخلال، ويرفع سقف السلع التي يعرضها العضو. */
+export async function fundSaleDepositAction(formData: FormData) {
+  const session = await requireUser();
+  const amountSar = Math.floor(Number(String(formData.get('amountSar') || '0')) || 0);
+  if (!(amountSar > 0) || amountSar > 1_000_000) redirect('/account/ads?depositerr=amount');
+  const { canMemberSellDirectly } = await import('@/lib/commerce/seller-types');
+  if (!(await canMemberSellDirectly(session.uid))) redirect('/account/ads?depositerr=notallowed');
+  const r = await charge(session.uid, amountSar, 'member_service', 'شحن تأمين رصيد البيع المباشر');
+  if (!r.ok) redirect('/account/ads?depositerr=balance');
+  try {
+    await prisma.users.update({ where: { id: BigInt(session.uid) }, data: { sale_deposit_minor: { increment: BigInt(amountSar * 100) } } });
+  } catch {
+    // تعذّر إضافة التأمين بعد الخصم → نُعيد المبلغ للرصيد حفاظاً على المال.
+    const { adjustBalance } = await import('@/lib/wallet');
+    await adjustBalance(session.uid, amountSar, 'refund', { note: 'تعذّر شحن تأمين البيع المباشر — استرداد' });
+    redirect('/account/ads?depositerr=failed');
+  }
+  revalidatePath('/account/ads');
+  redirect('/account/ads?depositok=1');
+}
+
 /** العضو الموثوق يضيف شركة الشحن ورقم التتبّع لطلب من مبيعاته (مدفوع) → واتساب للعميل. */
 export async function setSaleTrackingAction(formData: FormData) {
   const session = await requireUser();

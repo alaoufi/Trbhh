@@ -14,7 +14,8 @@ import { redactAdminLog } from '@/lib/admin-audit-visibility';
 import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { updateUserAction, sendUserPasswordAction, setUserPasswordAction, adjustUserBalanceAction, unlinkMemberAccountAction, disposeMemberAccountAction, toggleDirectSaleApprovalAction } from '../../actions';
+import { updateUserAction, sendUserPasswordAction, setUserPasswordAction, adjustUserBalanceAction, unlinkMemberAccountAction, disposeMemberAccountAction, toggleDirectSaleApprovalAction, adjustMemberDepositAction } from '../../actions';
+import { memberSaleExposure } from '@/lib/commerce/deposit';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { linkedAccounts } from '@/lib/account-links';
 import { dispositionFor, inspectMemberDependencies } from '@/lib/member-disposition';
@@ -32,11 +33,11 @@ const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
   account: { label: 'حذف حساب', icon: Trash2 },
 };
 
-export default async function AdminUserDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; sent?: string; error?: string; setpass?: string; bal?: string; linked?: string; dsale?: string; created?: string }> }) {
+export default async function AdminUserDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string; sent?: string; error?: string; setpass?: string; bal?: string; linked?: string; dsale?: string; created?: string; depositok?: string }> }) {
   const session = await requireAdminPage('/admin/users/[id]');
   const {keys} = await readActorAccess(session.uid);
   const { id } = await params;
-  const { saved, sent, error, setpass, bal, linked, dsale, created } = await searchParams;
+  const { saved, sent, error, setpass, bal, linked, dsale, created, depositok } = await searchParams;
   const uid = Number(id);
   const [u, adsCount, balance, txns, modLog, rawAdminLog, strikes, dupRow, linkedMembers, dependencies] = await Promise.all([
     prisma.users.findUnique({ where: { id: BigInt(uid) } }).catch(() => null),
@@ -52,6 +53,10 @@ export default async function AdminUserDetail({ params, searchParams }: { params
   ]);
   const adminLog = redactAdminLog(rawAdminLog, keys);
   if (!u) notFound();
+  // تأمين البيع المباشر: المسجَّل + المستخدَم (قيمة السلع المعروضة) — لعرضه في قسم البيع المباشر.
+  const depositMinor = Number(u.sale_deposit_minor ?? 0n);
+  const exposureMinor = await memberSaleExposure(uid).catch(() => 0);
+  const sarM = (m: number) => (m / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const field = 'h-10 w-full rounded-lg border bg-background px-3 text-sm';
   const fmtDate = (iso: string | null) => { if (!iso) return ''; const d = new Date(iso); return isNaN(d.getTime()) ? '' : new Intl.DateTimeFormat('ar', { dateStyle: 'short', timeStyle: 'short' }).format(d); };
 
@@ -118,6 +123,7 @@ export default async function AdminUserDetail({ params, searchParams }: { params
       {sent === '1' && <Banner ok>تم إرسال كلمة مرور جديدة للعضو عبر رسالة نصية.</Banner>}
       {setpass === '1' && <Banner ok>تم تعيين كلمة المرور. أبلغ العضو بها ليدخل.</Banner>}
       {created === '1' && <Banner ok>تم إنشاء العضو. يمكنه الدخول بجواله وكلمة المرور التي حددتها.</Banner>}
+      {depositok === '1' && <Banner ok>تم تحديث تأمين رصيد البيع المباشر للعضو.</Banner>}
       {bal === '1' && <Banner ok>تم تحديث رصيد العضو.</Banner>}
       {linked === 'unlinked' && <Banner ok>تم فك الحساب من الدخول الموحّد فقط. بقيت الإعلانات والمحفظة والسجل كما هي.</Banner>}
       {error && <Banner>{decodeURIComponent(error)}</Banner>}
@@ -149,6 +155,29 @@ export default async function AdminUserDetail({ params, searchParams }: { params
             </button>
             {u.trusted !== 1 && <span className="ms-2 text-xs text-red-700">(العضو غير موثّق)</span>}
           </form>
+
+          {/* تأمين رصيد البيع المباشر — ضمانٌ يُعوَّض منه العميل عند الإخلال، ويحدّ قيمة السلع المعروضة */}
+          <div className="mt-3 space-y-2 rounded-xl border border-emerald-300 bg-white/70 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-sm font-extrabold text-emerald-900">🛡️ تأمين رصيد البيع المباشر</div>
+              <div className="flex flex-wrap gap-2 text-xs font-bold">
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-800">التأمين: {sarM(depositMinor)} ر.س</span>
+                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">المستخدَم: {sarM(exposureMinor)} ر.س</span>
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">المتاح: {sarM(Math.max(0, depositMinor - exposureMinor))} ر.س</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">أضِف مبلغاً للتأمين أو عيّن قيمته المطلقة. لا تُعرض سلع العضو ما لم يغطِّ التأمين قيمتها (السعر × المخزون).</p>
+            <AccessBoundary module={'users'} action={'edit'}>
+              <form action={adjustMemberDepositAction} className="flex flex-wrap items-end gap-2 text-xs">
+                <input type="hidden" name="userId" value={uid} />
+                <label className="flex flex-col gap-0.5">المبلغ (ر.س)<input name="amountSar" inputMode="decimal" required className="w-28 rounded border px-2 py-1" placeholder="مثال: 1000" /></label>
+                <label className="flex flex-col gap-0.5">الإجراء
+                  <select name="mode" className="rounded border px-2 py-1"><option value="add">إضافة</option><option value="set">تعيين قيمة</option></select>
+                </label>
+                <button className="rounded-md bg-emerald-700 px-3 py-1.5 font-bold text-white">حفظ التأمين</button>
+              </form>
+            </AccessBoundary>
+          </div>
         </section>
       </AccessBoundary>
 

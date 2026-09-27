@@ -54,6 +54,10 @@ const STATEMENTS: string[] = [
   /* تفعيل الإدارة للبيع المباشر لهذا العضو الموثوق (من صفحة تفاصيل العضو). لا يبيع
      العضو مباشرةً إلا بهذا التفعيل + كونه موثوقاً + تفعيل المفتاح العام. */
   `ALTER TABLE users ADD COLUMN direct_sale_approved TINYINT NOT NULL DEFAULT 0`,
+  /* تأمين رصيد العضو الموثوق (بالهللة): ضمان يُعوَّض منه العميل عند إخلال العضو بشروط
+     السلعة. يُضاف من الإدارة أو يشحنه العضو من رصيده. لا تُعرض سلع مجموع (السعر×المخزون)
+     يتجاوز هذا التأمين. */
+  `ALTER TABLE users ADD COLUMN sale_deposit_minor BIGINT NOT NULL DEFAULT 0`,
   /* Authentication: encrypted confirmed TOTP credentials and durable attempt limits. */
   `CREATE TABLE IF NOT EXISTS auth_mfa (
     user_id BIGINT UNSIGNED PRIMARY KEY,

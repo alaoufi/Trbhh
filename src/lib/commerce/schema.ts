@@ -20,6 +20,7 @@ export const COMMERCE_DDL = [
     item_price_minor INT NOT NULL DEFAULT 0,
     site_commission_minor INT NOT NULL DEFAULT 0,
     member_commission_minor INT NOT NULL DEFAULT 0,
+    sale_listed TINYINT NOT NULL DEFAULT 1,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     KEY commerce_products_ad (ad_id)
@@ -36,6 +37,9 @@ export const COMMERCE_DDL = [
   `ALTER TABLE commerce_products ADD COLUMN item_price_minor INT NOT NULL DEFAULT 0`,
   `ALTER TABLE commerce_products ADD COLUMN site_commission_minor INT NOT NULL DEFAULT 0`,
   `ALTER TABLE commerce_products ADD COLUMN member_commission_minor INT NOT NULL DEFAULT 0`,
+  /* sale_listed=1 عندما يعرض العضو سلعته للبيع المباشر (معلّقة أو حيّة)، =0 عند إيقافها.
+     يُحتسب «سقف التأمين» على السلع المعروضة (sale_listed=1) دون الموقوفة. */
+  `ALTER TABLE commerce_products ADD COLUMN sale_listed TINYINT NOT NULL DEFAULT 1`,
   /* سجل تحويلات عمولات الأعضاء الموثوقين (كشف الموقع): كل تحويل «تم التحويل» يُسجَّل
      لضبط الحسابات. المستحقّ يُحتسب من عمولة العضو في الطلبات المدفوعة ناقص التحويلات. */
   `CREATE TABLE IF NOT EXISTS commerce_member_payouts (

@@ -2,6 +2,7 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { canMemberSellDirectly } from './seller-types';
+import { memberSaleDeposit, memberSaleExposure } from './deposit';
 
 /**
  * البيع المباشر للعضو الموثوق: يعرض إعلانه كسلعة قابلة للشراء المباشر داخل تربح
@@ -22,7 +23,7 @@ export async function listMemberSaleProducts(memberId: number | bigint): Promise
 
 /** مكوّنات سعر سلعة العضو (بالهللة). الإجمالي المعروض للعميل = مجموعها. */
 export type SalePriceParts = { itemMinor: number; shippingMinor: number; siteCommMinor: number; memberCommMinor: number };
-export type ListSaleResult = { ok: true } | { ok: false; error: 'not_allowed' | 'not_owner' | 'bad_amounts' | 'ad_missing' };
+export type ListSaleResult = { ok: true } | { ok: false; error: 'not_allowed' | 'not_owner' | 'bad_amounts' | 'ad_missing' | 'deposit_exceeded' };
 
 const okMinor = (n: number, max: number) => Number.isSafeInteger(n) && n >= 0 && n <= max;
 
@@ -40,14 +41,18 @@ export async function listAdForDirectSale(memberId: number | bigint, adId: numbe
   const ad = await prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { id: true, user_id: true, title: true } }).catch(() => null);
   if (!ad) return { ok: false, error: 'ad_missing' };
   if (Number(ad.user_id) !== Number(memberId)) return { ok: false, error: 'not_owner' };
+  // سقف التأمين: مجموع (السعر × المخزون) لكل سلع العضو المعروضة لا يتجاوز تأمين رصيده المسجّل.
+  // نستثني هذا الإعلان من الحساب الحالي ونضيف قيمته الجديدة (السعر الإجمالي × الكمية).
+  const [deposit, otherExposure] = await Promise.all([memberSaleDeposit(memberId), memberSaleExposure(memberId, adId)]);
+  if (otherExposure + priceMinor * qty > deposit) return { ok: false, error: 'deposit_exceeded' };
   const title = (ad.title || 'سلعة').slice(0, 200);
   const existing = await prisma.$queryRaw<{ id: bigint }[]>`
     SELECT id FROM commerce_products WHERE ad_id=${BigInt(adId)} AND seller_type='verified_member' AND seller_member_id=${BigInt(memberId)} LIMIT 1`.catch(() => []);
   if (existing[0]) {
-    await prisma.$executeRaw`UPDATE commerce_products SET title=${title}, price_minor=${priceMinor}, shipping_minor=${shippingMinor}, item_price_minor=${itemMinor}, site_commission_minor=${siteCommMinor}, member_commission_minor=${memberCommMinor}, stock_available=${qty}, approved=0, visible=0, enabled=0, updated_at=CURRENT_TIMESTAMP(3) WHERE id=${existing[0].id}`.catch(() => {});
+    await prisma.$executeRaw`UPDATE commerce_products SET title=${title}, price_minor=${priceMinor}, shipping_minor=${shippingMinor}, item_price_minor=${itemMinor}, site_commission_minor=${siteCommMinor}, member_commission_minor=${memberCommMinor}, stock_available=${qty}, approved=0, visible=0, enabled=0, sale_listed=1, updated_at=CURRENT_TIMESTAMP(3) WHERE id=${existing[0].id}`.catch(() => {});
   } else {
-    await prisma.$executeRaw`INSERT INTO commerce_products (title, price_minor, shipping_minor, item_price_minor, site_commission_minor, member_commission_minor, stock_available, ad_id, seller_type, seller_member_id, approved, visible, enabled)
-      VALUES (${title}, ${priceMinor}, ${shippingMinor}, ${itemMinor}, ${siteCommMinor}, ${memberCommMinor}, ${qty}, ${BigInt(adId)}, 'verified_member', ${BigInt(memberId)}, 0, 0, 0)`.catch(() => {});
+    await prisma.$executeRaw`INSERT INTO commerce_products (title, price_minor, shipping_minor, item_price_minor, site_commission_minor, member_commission_minor, stock_available, ad_id, seller_type, seller_member_id, approved, visible, enabled, sale_listed)
+      VALUES (${title}, ${priceMinor}, ${shippingMinor}, ${itemMinor}, ${siteCommMinor}, ${memberCommMinor}, ${qty}, ${BigInt(adId)}, 'verified_member', ${BigInt(memberId)}, 0, 0, 0, 1)`.catch(() => {});
   }
   return { ok: true };
 }
@@ -95,6 +100,6 @@ export async function directSaleForAds(adIds: readonly (number | bigint)[]): Pro
 
 /** إيقاف عرض سلعة العضو للبيع المباشر (تُخفى فقط, لا تُحذف بياناتها). */
 export async function stopMemberSale(memberId: number | bigint, adId: number | bigint): Promise<void> {
-  await prisma.$executeRaw`UPDATE commerce_products SET visible=0, enabled=0, updated_at=CURRENT_TIMESTAMP(3)
+  await prisma.$executeRaw`UPDATE commerce_products SET visible=0, enabled=0, sale_listed=0, updated_at=CURRENT_TIMESTAMP(3)
     WHERE ad_id=${BigInt(adId)} AND seller_type='verified_member' AND seller_member_id=${BigInt(memberId)}`.catch(() => {});
 }

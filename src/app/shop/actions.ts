@@ -33,6 +33,9 @@ export async function createCommerceOrder(_previous: { error: string } | null, f
     const publicProduct=(await readPublicCommerceProducts([BigInt(product)])).get(product);
     const selectedVariant=variantKey?publicProduct?.variants.find(item=>item.key===variantKey):undefined;
     if(!publicProduct||!publicProduct.saudiShippingAvailable||publicProduct.requiresVariantSelection&&!selectedVariant||selectedVariant&&Number(quantity)>selectedVariant.stock)throw new Error('checkout_product_changed');
+    // سلعة العضو الموثوق: الشحن مشمول في السعر الإجمالي (price_minor) — لا نضيف رسوم التوصيل
+    // العامة فوقه حتى لا يُحسب الشحن مرتين، ويرى العميل الإجمالي المعروض فقط.
+    const shippingFeeMinor=publicProduct.bundledShipping?0:config.shippingFeeMinor;
     const order = await createOrder(prisma, {
       memberId: BigInt(session.uid), requestKey,
       items: [{ productId: BigInt(product), quantity: Number(quantity),...(variantKey?{variantKey}:{}) }],
@@ -42,7 +45,7 @@ export async function createCommerceOrder(_previous: { error: string } | null, f
         buildingNumber: address.snapshot.buildingNumber, secondaryNumber: address.snapshot.secondaryNumber,
         alternatePhone: address.snapshot.alternatePhone, email: address.snapshot.email, shortAddress: address.snapshot.shortAddress,
         deliveryNotes: address.snapshot.deliveryNotes },
-    }, { shippingFeeMinor: config.shippingFeeMinor });
+    }, { shippingFeeMinor });
     orderId = order.id;
   } catch { return { error: config.text.checkoutError }; }
   redirect(`/account/orders/${orderId}`);

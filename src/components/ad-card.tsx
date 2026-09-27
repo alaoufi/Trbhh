@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { cookies } from 'next/headers';
-import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown, Store } from 'lucide-react';
+import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown, Store, ShoppingBag } from 'lucide-react';
 import type { AdCard as AdCardType } from '@/lib/data';
 import { adPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
 import { timeAgo, cn } from '@/lib/utils';
@@ -150,8 +150,14 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
 function CardPrice({ ad }: { ad: AdCardType }) {
   return <div className="mt-1 flex flex-wrap items-baseline gap-1.5">
     <PriceText muted={ad.price <= 0 || ad.priceEnabled === false}>{adPriceLabel(ad)}</PriceText>
-    <OldPrice ad={ad} /><DiscountChip ad={ad} />
+    <OldPrice ad={ad} /><DiscountChip ad={ad} /><DirectBuyChip ad={ad} />
   </div>;
+}
+
+/** شارة «شراء مباشر» — سلعة العضو الموثوق المعتمدة (الشراء داخل تربح بالدفع الإلكتروني). */
+function DirectBuyChip({ ad }: { ad: AdCardType }) {
+  if (!ad.directBuy) return null;
+  return <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold text-white"><ShoppingBag className="h-3 w-3" /> شراء مباشر</span>;
 }
 
 function Cell({ children }: { children: React.ReactNode }) {
@@ -265,7 +271,7 @@ export function AdCardMarketplace({ ad }: { ad: AdCardType }) {
       </div>
     </div>
     <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
-      <div className="flex flex-wrap items-baseline gap-1.5"><PriceText muted={ad.price <= 0 || ad.priceEnabled === false}>{adPriceLabel(ad)}</PriceText><OldPrice ad={ad} /><DiscountChip ad={ad} /></div>
+      <div className="flex flex-wrap items-baseline gap-1.5"><PriceText muted={ad.price <= 0 || ad.priceEnabled === false}>{adPriceLabel(ad)}</PriceText><OldPrice ad={ad} /><DiscountChip ad={ad} /><DirectBuyChip ad={ad} /></div>
       <h3 className="line-clamp-2 min-h-10 break-words text-sm font-bold leading-5 text-slate-800">{compactAdTitle(ad.title)}</h3>
       {ad.storeName && <StoreTag name={ad.storeName} />}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">

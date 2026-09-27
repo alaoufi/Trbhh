@@ -46,6 +46,8 @@ export type AdCard = {
   /** تقييم الإعلان (تجارب العملاء) — متوسط النجوم وعددها؛ يظهر كدليل اجتماعي على البطاقة */
   ratingAvg?: number;
   ratingCount?: number;
+  /** شراء مباشر: سلعة العضو الموثوق المعتمدة المرتبطة بالإعلان (الإجمالي شامل الشحن — يرى العميل الإجمالي فقط). */
+  directBuy?: { productId: string; priceMinor: number } | null;
 };
 
 async function sellerInfo(ids: bigint[]): Promise<Map<number, { name: string; trusted: boolean; banned: boolean }>> {
@@ -141,6 +143,13 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
     prisma.areas.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.area_id || 0).filter(Boolean))] } }, select: { id: true, name: true } }).catch(() => []),
   ]);
   const areaNames = new Map(areas.map((area) => [Number(area.id), area.name]));
+  // شراء مباشر: نجلب سلع العضو الموثوق المعتمدة المرتبطة بهذه الإعلانات (دفعة واحدة) متى كان
+  // كتالوج تربح مفعّلاً، لعرض شارة «شراء مباشر» والإجمالي على البطاقة (الإجمالي شامل الشحن).
+  const { getSettingBool } = await import('./settings');
+  const commerceOn = await getSettingBool('commerce_enabled', false).catch(() => false);
+  const directBuys: Map<string, { productId: string; priceMinor: number }> = commerceOn
+    ? await import('./commerce/member-sell').then((m) => m.directSaleForAds(ids)).catch(() => new Map<string, { productId: string; priceMinor: number }>())
+    : new Map<string, { productId: string; priceMinor: number }>();
   await loadBanned();
   const now = Date.now();
   return rows
@@ -181,6 +190,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         oldPrice: categoryData.get(toInt(r.id))?.goodsEnabled === false ? 0 : (r.old_price && r.old_price > r.price ? r.old_price : 0),
         ratingAvg: ratings.get(toInt(r.id))?.avg ?? 0,
         ratingCount: ratings.get(toInt(r.id))?.count ?? 0,
+        directBuy: directBuys.get(String(toInt(r.id))) ?? null,
       };
     });
 }

@@ -1,4 +1,5 @@
 import 'server-only';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { canMemberSellDirectly } from './seller-types';
 
@@ -61,6 +62,35 @@ export async function listMemberSoldOrders(memberId: number | bigint): Promise<M
     JOIN commerce_products p ON p.id=i.product_id
     WHERE p.seller_type='verified_member' AND p.seller_member_id=${BigInt(memberId)} AND o.status='paid'
     ORDER BY o.id DESC LIMIT 100`.catch(() => [] as MemberSoldOrder[]);
+}
+
+/** سلعة العضو الموثوق المعتمدة والمتاحة للشراء المباشر المرتبطة بإعلان — لعرض زر «شراء مباشر»
+ *  والإجمالي فقط على صفحة الإعلان وبطاقته بالرئيسية. تُرجع null إن لم تكن معتمدة/ظاهرة/متاحة
+ *  أو نفد مخزونها. الإجمالي price_minor يشمل الشحن (يرى العميل الإجمالي فقط). */
+export type DirectSaleAd = { productId: string; priceMinor: number };
+export async function directSaleForAd(adId: number | bigint): Promise<DirectSaleAd | null> {
+  const rows = await prisma.$queryRaw<{ id: bigint; price_minor: number }[]>`
+    SELECT id, price_minor FROM commerce_products
+    WHERE ad_id=${BigInt(adId)} AND seller_type='verified_member'
+      AND approved=1 AND visible=1 AND enabled=1 AND currency='SAR'
+      AND price_minor>0 AND stock_available>stock_reserved
+    ORDER BY id DESC LIMIT 1`.catch(() => [] as { id: bigint; price_minor: number }[]);
+  return rows[0] ? { productId: String(rows[0].id), priceMinor: rows[0].price_minor } : null;
+}
+
+/** خرائط الشراء المباشر لعدة إعلانات دفعة واحدة (لبطاقات القوائم/الرئيسية) — بمعرّف الإعلان. */
+export async function directSaleForAds(adIds: readonly (number | bigint)[]): Promise<Map<string, DirectSaleAd>> {
+  const ids = [...new Set(adIds.map(a => BigInt(a)).filter(a => a > 0n))];
+  if (!ids.length) return new Map();
+  const rows = await prisma.$queryRaw<{ ad_id: bigint; id: bigint; price_minor: number }[]>`
+    SELECT ad_id, id, price_minor FROM commerce_products
+    WHERE seller_type='verified_member' AND ad_id IN (${Prisma.join(ids)})
+      AND approved=1 AND visible=1 AND enabled=1 AND currency='SAR'
+      AND price_minor>0 AND stock_available>stock_reserved
+    ORDER BY id DESC`.catch(() => [] as { ad_id: bigint; id: bigint; price_minor: number }[]);
+  const map = new Map<string, DirectSaleAd>();
+  for (const r of rows) if (r.ad_id != null && !map.has(String(r.ad_id))) map.set(String(r.ad_id), { productId: String(r.id), priceMinor: r.price_minor });
+  return map;
 }
 
 /** إيقاف عرض سلعة العضو للبيع المباشر (تُخفى فقط, لا تُحذف بياناتها). */

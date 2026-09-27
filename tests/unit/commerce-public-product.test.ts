@@ -1,7 +1,7 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 const state=vi.hoisted(()=>({query:vi.fn(),ready:vi.fn()}));
 vi.mock('@/lib/prisma',()=>({prisma:{$queryRaw:state.query}}));
-vi.mock('@/lib/commerce/schema',()=>({assertCommerceSchemaReady:state.ready}));
+vi.mock('@/lib/commerce/schema',()=>({assertCommerceSchemaReady:state.ready,COMMERCE_DDL:[]}));
 import {readPublicCommerceProduct} from '@/lib/commerce/public-product';
 const row={id:20n,title:'<b>مطرقة اختبار</b>',price_minor:1000,stock_available:10,stock_reserved:1,images:['http://unsafe.test/x.webp','https://images.example/a.webp','/media/b.webp'],description:'<script>bad()</script> وصف صحيح',brand:'علامة',options:[{name:'اللون',values:['أسود','أحمر']}],variants:[{externalId:'variant-4',name:'أسود / XL / 220V / EU',sku:'CJ-XL-BLK',publicPriceMinor:1200,quantity:5,available:true,image:'https://images.example/black-xl.webp',options:{Color:'Black',Size:'XL',Voltage:'220V',Plug:'EU',Material:'Steel'}}],available:1,quantity:8,featured:1,source_id:8n,cj_source_id:null,cj_availability_json:null,cj_details_json:null};
 const cjProof=(vid='VID-1',stock=7)=>JSON.stringify({checkedAt:new Date().toISOString(),stockQuantity:stock,variants:[{vid,stockQuantity:stock,shippingOptions:[{name:'CJ Packet',priceMinor:1575,currency:'SAR',deliveryDays:'8-15 days',originCountry:'CN'}]}],shippingOptions:[{name:'CJ Packet',priceMinor:1575,currency:'SAR',deliveryDays:'8-15 days',originCountry:'CN'}]});

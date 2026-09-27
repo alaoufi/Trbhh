@@ -44,6 +44,10 @@ import { getAdAudio } from '@/lib/ad-media';
 import { mediaUrl } from '@/lib/media';
 import { AdGallery } from '@/components/ad-gallery';
 import { Breadcrumb } from '@/components/breadcrumb';
+import { getCommerceConfig } from '@/lib/commerce/settings';
+import { directSaleForAd } from '@/lib/commerce/member-sell';
+import { formatSar } from '@/lib/commerce/money';
+import { ShoppingBag } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -191,6 +195,12 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     : waLink(ad.seller?.whatsapp, waMsg);
   // صاحب الإعلان لا يرى المراسلة/البلاغ/التقييم على إعلانه (لا يراسل/يبلّغ/يقيّم نفسه)
   const isAdOwner = !!(session && ad.seller && session.uid === ad.seller.id);
+  // شراء مباشر: سلعة العضو الموثوق المعتمدة المرتبطة بهذا الإعلان — تظهر للعميل (لا لصاحبها)
+  // متى كان كتالوج تربح مفعّلاً. الإجمالي يشمل الشحن (يرى العميل الإجمالي فقط)، والشراء
+  // الفعلي محمي خلف حارس الشراء وبوابة الدفع في صفحة السلعة.
+  const directSale = !isAdOwner
+    ? await getCommerceConfig().then(cfg => (cfg.enabled ? directSaleForAd(ad.id) : null)).catch(() => null)
+    : null;
   // "مراسلة" available to non-owners; WhatsApp/call only when provided
   const contactCols = (isAdOwner ? 0 : 1) + (waNumber ? 1 : 0) + (callPhone ? 1 : 0);
   const mobileContactOn = !isAdOwner && !inStore && await getSettingBool('ad_mobile_contact_on', true);
@@ -596,6 +606,23 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <AdCategorySummary fields={ad.categoryFields}/>
         <ExpandableDetail text={ad.detail || ""} />
       </div>
+
+      {/* شراء مباشر — سلعة العضو الموثوق المعتمدة: الإجمالي شامل الشحن (يرى العميل الإجمالي فقط) */}
+      {directSale && (
+        <div className="card-3d space-y-3 rounded-2xl border-2 border-emerald-300 bg-emerald-50/70 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1 text-xs font-extrabold text-white"><ShoppingBag className="h-4 w-4" /> شراء مباشر</span>
+            <span className="text-sm font-bold text-emerald-800">اشترِ الآن وادفع إلكترونيًا — يُشحن إليك بعد الدفع.</span>
+          </div>
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="text-2xl font-black text-emerald-700">{formatSar(directSale.priceMinor)} <span className="text-base">ر.س</span></span>
+            <span className="text-xs font-bold text-emerald-700">شامل الشحن</span>
+          </div>
+          <Link href={`/shop/${directSale.productId}`} className="btn-3d flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white hover:bg-emerald-700">
+            <ShoppingBag className="h-5 w-5" /> شراء الآن
+          </Link>
+        </div>
+      )}
 
       {/* إخلاء المسؤولية: يظهر فقط في تفاصيل إعلان عضو غير معتمد (ليس متجراً ولا بائعاً
           موثّقاً ولا سلعة تربح/مورّد)، لتنبيه الطرفين أن المنصّة تعرض وتربط فقط.

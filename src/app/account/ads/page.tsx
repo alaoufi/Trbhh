@@ -51,6 +51,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
         </div>
         <div className="flex items-center gap-2">
           <Link href="/account/wallet" className="flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2 text-xs font-bold text-primary"><Wallet className="h-4 w-4" /> رصيدي: {balance} ر.س</Link>
+          {directSaleAllowed && <Link href="/account/sales" className="rounded-lg border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">🛒 مبيعاتي</Link>}
           <Link href="/ads/new" className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">أضف إعلان</Link>
         </div>
       </div>

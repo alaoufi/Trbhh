@@ -64,10 +64,17 @@ export const COMMERCE_DDL = [
     total_minor INT NOT NULL DEFAULT 0,
     shipping JSON NOT NULL,
     fulfillment_status VARCHAR(32) NOT NULL DEFAULT 'awaiting_payment',
+    carrier VARCHAR(120) NOT NULL DEFAULT '',
+    tracking_number VARCHAR(160) NOT NULL DEFAULT '',
+    shipped_at DATETIME(3) NULL,
     created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     paid_at DATETIME(3) NULL,
     UNIQUE KEY commerce_orders_request (member_id,request_key)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  /* تتبّع شحن طلب التجارة — يضيفه البائع بعد الدفع فيُرسَل واتساب للعميل. */
+  `ALTER TABLE commerce_orders ADD COLUMN carrier VARCHAR(120) NOT NULL DEFAULT ''`,
+  `ALTER TABLE commerce_orders ADD COLUMN tracking_number VARCHAR(160) NOT NULL DEFAULT ''`,
+  `ALTER TABLE commerce_orders ADD COLUMN shipped_at DATETIME(3) NULL`,
   `CREATE TABLE IF NOT EXISTS commerce_order_items (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     order_id BIGINT UNSIGNED NOT NULL,

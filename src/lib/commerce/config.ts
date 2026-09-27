@@ -31,6 +31,7 @@ export const COMMERCE_DEFAULTS = {
   commerce_payment_unavailable_text: 'خدمة الدفع أو التحقق غير متاحة حاليًا. حاول التحقق لاحقًا أو تواصل مع دعم تربح؛ هذه الرسالة لا تؤكد نجاح الدفع أو فشله.',
   commerce_payment_confirmed_text: 'تم تأكيد دفع طلبك لدى تربح.',
   commerce_paid_message: 'تربح: تم تأكيد دفع الطلب {order} بمبلغ {amount} ر.س. مرجع الدفع: {reference}',
+  commerce_shipment_message: 'تربح: شُحن طلبك رقم {order} عبر {carrier}. رقم التتبّع: {tracking}. تابع شحنتك لدى شركة الشحن. شكراً لثقتك.',
 } as const;
 
 export type CommerceSettingKey = keyof typeof COMMERCE_DEFAULTS;

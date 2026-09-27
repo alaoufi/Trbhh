@@ -51,7 +51,19 @@ export async function listAdForDirectSale(memberId: number | bigint, adId: numbe
   return { ok: true };
 }
 
-/** إيقاف عرض سلعة العضو للبيع المباشر (تُخفى فقط، لا تُحذف بياناتها). */
+/** طلبات بيع العضو المدفوعة (مبيعاته) — لعرضها في «مبيعاتي» وإضافة تتبّع الشحن. */
+export type MemberSoldOrder = { id: bigint; total_minor: number; fulfillment_status: string; carrier: string; tracking_number: string; paid_at: Date | null; shipping: unknown };
+export async function listMemberSoldOrders(memberId: number | bigint): Promise<MemberSoldOrder[]> {
+  return prisma.$queryRaw<MemberSoldOrder[]>`
+    SELECT DISTINCT o.id, o.total_minor, o.fulfillment_status, o.carrier, o.tracking_number, o.paid_at, o.shipping
+    FROM commerce_orders o
+    JOIN commerce_order_items i ON i.order_id=o.id
+    JOIN commerce_products p ON p.id=i.product_id
+    WHERE p.seller_type='verified_member' AND p.seller_member_id=${BigInt(memberId)} AND o.status='paid'
+    ORDER BY o.id DESC LIMIT 100`.catch(() => [] as MemberSoldOrder[]);
+}
+
+/** إيقاف عرض سلعة العضو للبيع المباشر (تُخفى فقط, لا تُحذف بياناتها). */
 export async function stopMemberSale(memberId: number | bigint, adId: number | bigint): Promise<void> {
   await prisma.$executeRaw`UPDATE commerce_products SET visible=0, enabled=0, updated_at=CURRENT_TIMESTAMP(3)
     WHERE ad_id=${BigInt(adId)} AND seller_type='verified_member' AND seller_member_id=${BigInt(memberId)}`.catch(() => {});

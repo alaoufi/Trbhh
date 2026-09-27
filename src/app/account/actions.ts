@@ -537,3 +537,16 @@ export async function stopDirectSaleAction(formData: FormData) {
   revalidatePath('/shop');
   redirect('/account/ads?salestopped=1');
 }
+
+/** العضو الموثوق يضيف شركة الشحن ورقم التتبّع لطلب من مبيعاته (مدفوع) → واتساب للعميل. */
+export async function setSaleTrackingAction(formData: FormData) {
+  const session = await requireUser();
+  const orderId = String(formData.get('orderId') || '');
+  if (!/^[1-9]\d{0,18}$/.test(orderId)) redirect('/account/sales?error=track');
+  const carrier = String(formData.get('carrier') || '');
+  const tracking = String(formData.get('tracking') || '');
+  const { setCommerceOrderTracking } = await import('@/lib/commerce/tracking');
+  const r = await setCommerceOrderTracking(BigInt(orderId), carrier, tracking, { sellerMemberId: BigInt(session.uid) });
+  revalidatePath('/account/sales');
+  redirect(r.ok ? `/account/sales?tracked=1&wa=${r.whatsapp}` : `/account/sales?error=${r.error}`);
+}

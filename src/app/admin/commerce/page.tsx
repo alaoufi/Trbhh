@@ -28,6 +28,7 @@ const labels: Record<string, string> = {
   commerce_title: 'عنوان الكتالوج', commerce_description: 'وصف الكتالوج', commerce_buy_label: 'نص متابعة الطلب',
   commerce_unavailable_text: 'نص عدم الإتاحة', commerce_shipping_terms: 'شروط التوصيل', commerce_shipping_fee_sar: 'رسوم التوصيل بالريال — حدد 0.00 إذا كان مجانيًا',
   commerce_payment_pending_text: 'نص انتظار التحقق', commerce_payment_confirmed_text: 'نص تأكيد الدفع', commerce_paid_message: 'قالب تنبيه الدفع: {order} {amount} {reference}',
+  commerce_shipment_message: 'قالب واتساب الشحن للعميل: {order} {carrier} {tracking}',
   commerce_checkout_error_text: 'خطأ إنشاء الطلب', commerce_rate_limit_text: 'تنبيه كثرة المحاولات', commerce_location_error_text: 'خطأ المنطقة والمدينة',
   commerce_payment_action_required_text: 'نص الحاجة لمراجعة نتيجة الدفع', commerce_payment_rate_limit_text: 'نص حد محاولات التحقق من الدفع', commerce_payment_unavailable_text: 'نص تعذر الدفع أو التحقق',
 };

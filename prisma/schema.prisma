@@ -447,6 +447,9 @@ model commerce_orders {
   total_minor         Int      @default(0)
   shipping            Json
   fulfillment_status  String   @default("awaiting_payment") @db.VarChar(32)
+  carrier             String   @default("") @db.VarChar(120)
+  tracking_number     String   @default("") @db.VarChar(160)
+  shipped_at          DateTime? @db.DateTime(3)
   created_at          DateTime @default(now()) @db.DateTime(3)
   paid_at             DateTime? @db.DateTime(3)
   items               commerce_order_items[]

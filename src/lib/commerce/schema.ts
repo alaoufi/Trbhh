@@ -36,6 +36,17 @@ export const COMMERCE_DDL = [
   `ALTER TABLE commerce_products ADD COLUMN item_price_minor INT NOT NULL DEFAULT 0`,
   `ALTER TABLE commerce_products ADD COLUMN site_commission_minor INT NOT NULL DEFAULT 0`,
   `ALTER TABLE commerce_products ADD COLUMN member_commission_minor INT NOT NULL DEFAULT 0`,
+  /* سجل تحويلات عمولات الأعضاء الموثوقين (كشف الموقع): كل تحويل «تم التحويل» يُسجَّل
+     لضبط الحسابات. المستحقّ يُحتسب من عمولة العضو في الطلبات المدفوعة ناقص التحويلات. */
+  `CREATE TABLE IF NOT EXISTS commerce_member_payouts (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    member_id BIGINT UNSIGNED NOT NULL,
+    amount_minor INT NOT NULL,
+    note VARCHAR(300) NOT NULL DEFAULT '',
+    admin_id BIGINT UNSIGNED NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    KEY commerce_member_payouts_member (member_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
   `CREATE TABLE IF NOT EXISTS commerce_customer_addresses (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     member_id BIGINT UNSIGNED NOT NULL,

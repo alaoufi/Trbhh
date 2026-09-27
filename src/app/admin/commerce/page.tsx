@@ -70,7 +70,7 @@ export default async function CommerceAdminPage({ searchParams }: { searchParams
     {sp.saved && <p className="text-emerald-700">تم الحفظ.</p>}
     {sp.error && <p role="alert" className="text-red-700">لم يتم الحفظ. تحقق من الحقول وجاهزية البوابة.</p>}
     {sp.delivery && <p role="status">نتيجة الإرسال: {String(sp.delivery)}. لا تؤثر على حالة الدفع.</p>}
-    <nav className="flex flex-wrap gap-4 text-primary underline"><Link href="/shop">معاينة كتالوج السلع المعتمدة</Link><AccessPage href="/admin/suppliers"><Link href="/admin/suppliers">الموردون وربط السلع</Link></AccessPage><AccessPage href="/admin/suppliers/cj"><Link href="/admin/suppliers/cj">تكامل CJ (اختبار)</Link></AccessPage><AccessPage href="/admin/commerce/accounts"><Link href="/admin/commerce/accounts">الإيصالات والاستحقاقات</Link></AccessPage></nav>
+    <nav className="flex flex-wrap gap-4 text-primary underline"><Link href="/shop">معاينة كتالوج السلع المعتمدة</Link><AccessPage href="/admin/suppliers"><Link href="/admin/suppliers">الموردون وربط السلع</Link></AccessPage><AccessPage href="/admin/suppliers/cj"><Link href="/admin/suppliers/cj">تكامل CJ (اختبار)</Link></AccessPage><AccessPage href="/admin/commerce/accounts"><Link href="/admin/commerce/accounts">الإيصالات والاستحقاقات</Link></AccessPage><AccessPage href="/admin/commerce/commissions"><Link href="/admin/commerce/commissions">كشف عمولات الأعضاء</Link></AccessPage></nav>
     <details className="card-3d rounded-xl p-4"><summary className="cursor-pointer font-bold">الإعدادات والنصوص</summary>
       <AccessBoundary module={'products'} action={'manage_settings'}><form action={saveCommerceSettings} className="mt-3 grid gap-3 sm:grid-cols-2">
         {Object.entries(COMMERCE_DEFAULTS).map(([key, fallback]) => {

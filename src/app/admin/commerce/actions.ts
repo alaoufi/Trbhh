@@ -77,3 +77,16 @@ export async function deliverCommerceNotification(form: FormData) {
   revalidatePath('/admin/commerce');
   redirect(`/admin/commerce?delivery=${result}`);
 }
+
+/** تسجيل «تم التحويل» لعمولة عضو (كشف الموقع) — لضبط الحسابات. */
+export async function recordMemberPayoutAction(form: FormData) {
+  const session = await requireAccess('settlements', 'create');
+  const memberId = String(form.get('memberId') || '');
+  if (!/^[1-9]\d{0,18}$/.test(memberId)) redirect('/admin/commerce/commissions?error=payout');
+  const amountMinor = Math.round((Number(String(form.get('amountSar') || '0')) || 0) * 100);
+  const note = String(form.get('note') || '');
+  const { recordMemberPayout } = await import('@/lib/commerce/commissions');
+  const ok = await recordMemberPayout(BigInt(memberId), amountMinor, note, session.uid);
+  revalidatePath('/admin/commerce/commissions');
+  redirect(ok ? '/admin/commerce/commissions?paid=1' : '/admin/commerce/commissions?error=payout');
+}

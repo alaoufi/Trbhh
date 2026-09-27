@@ -402,6 +402,17 @@ model commerce_supplier_accruals {
   @@unique([order_id, product_id], map: "commerce_accrual_item")
 }
 
+model commerce_member_payouts {
+  id          BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  member_id   BigInt   @db.UnsignedBigInt
+  amount_minor Int
+  note        String   @default("") @db.VarChar(300)
+  admin_id    BigInt?  @db.UnsignedBigInt
+  created_at  DateTime @default(now()) @db.DateTime(3)
+
+  @@index([member_id], map: "commerce_member_payouts_member")
+}
+
 model commerce_products {
   supplier_products supplier_products? @relation("supplier_product_commerce_fk")
   supplier_reservation_allocations supplier_reservation_allocations[] @relation("supplier_allocation_product_fk")

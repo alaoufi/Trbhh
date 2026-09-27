@@ -101,7 +101,7 @@ const exactPages:Record<string,AccessModule> = {
   '/admin/categories':'categories','/admin/promos':'promos','/admin/promos/packages':'packages','/admin/packages':'packages',
   '/admin/suppliers':'suppliers','/admin/suppliers/onboarding':'suppliers','/admin/suppliers/catalog':'products',
   '/admin/suppliers/integrations':'integrations','/admin/suppliers/cj':'integrations',
-  '/admin/commerce':'products','/admin/commerce/accounts':'settlements','/admin/stores':'stores','/admin/shipping':'shipping','/admin/orders':'orders',
+  '/admin/commerce':'products','/admin/commerce/accounts':'settlements','/admin/commerce/commissions':'settlements','/admin/stores':'stores','/admin/shipping':'shipping','/admin/orders':'orders',
   '/admin/users':'users','/admin/international-registrations':'users','/admin/links':'users','/admin/name-requests':'users',
   '/admin/verifications':'verifications','/admin/reports':'reports','/admin/moderation':'reports','/admin/ratings':'comments',
   '/admin/messages':'messages','/admin/notifs':'notifications','/admin/words':'words','/admin/guard-words':'words',

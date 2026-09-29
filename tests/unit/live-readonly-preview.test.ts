@@ -49,8 +49,11 @@ describe('Hostinger live-data read-only preview', () => {
     expect(workflow).toContain('github.sha');
     expect(workflow).toContain('docker exec -i "$container" node -');
     expect(workflow).toContain('docker cp "$readonly_script" "$prod_container:$container_script"');
+    expect(workflow).toContain('-e NODE_PATH=/app/node_modules');
     expect(workflow).toContain('"$prod_container" node "$container_script"');
     expect(workflow).not.toContain('"$prod_container" node - < "$readonly_script"');
+    expect(workflow).toContain("SELECT COUNT(*) AS count FROM categories");
+    expect(workflow).not.toContain("SELECT COUNT(*) AS count FROM ad_categories");
     expect(workflow).toContain('grants.flatMap((row)=>Object.values(row).map(String))');
     expect(workflow).not.toMatch(/prisma\s+migrate\s+(dev|reset|deploy)/);
     expect(workflow).not.toMatch(/prisma\s+db\s+push/);

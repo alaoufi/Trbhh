@@ -115,6 +115,7 @@ jobs:
             docker cp "$readonly_script" "$prod_container:$container_script"
             docker exec -u 0 "$prod_container" chmod 644 "$container_script"
             docker exec \
+              -e NODE_PATH=/app/node_modules \
               -e PREVIEW_READONLY_USER="$readonly_user" \
               -e PREVIEW_READONLY_PASSWORD="$readonly_password" \
               "$prod_container" node "$container_script"
@@ -166,7 +167,7 @@ jobs:
             if(!text.includes('SELECT')||!text.includes('SHOW VIEW')||/\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRIGGER|EXECUTE|GRANT OPTION)\b/.test(text))throw Error('preview_grants_not_readonly');
             const [ads,categories,products,suppliers]=await Promise.all([
               db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM ads'),
-              db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM ad_categories'),
+              db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM categories'),
               db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM commerce_products'),
               db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM commerce_suppliers'),
             ]);

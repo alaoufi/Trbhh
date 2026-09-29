@@ -111,10 +111,14 @@ jobs:
 
             readonly_user=trbhh_preview_ro
             readonly_password=$(openssl rand -hex 24)
-            docker exec -i \
+            container_script=/tmp/trbhh-configure-live-readonly-preview.cjs
+            docker cp "$readonly_script" "$prod_container:$container_script"
+            docker exec -u 0 "$prod_container" chmod 644 "$container_script"
+            docker exec \
               -e PREVIEW_READONLY_USER="$readonly_user" \
               -e PREVIEW_READONLY_PASSWORD="$readonly_password" \
-              "$prod_container" node - < "$readonly_script"
+              "$prod_container" node "$container_script"
+            docker exec -u 0 "$prod_container" rm -f "$container_script"
 
             readonly_url=$(docker exec \
               -e PREVIEW_READONLY_USER="$readonly_user" \

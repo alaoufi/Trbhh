@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 import { verifyPassword } from './auth';
 import { isUserBanned } from './moderation';
 import { toInt } from './utils';
+import { isReadOnlyPreview } from './read-only-preview';
 
 export type LoginResult = { ok: true; uid: number; name: string; type: string; authVersion: string; mfaVersion?: string } | { ok: false; error: string };
 
@@ -18,6 +19,7 @@ export async function verifyLogin(identifier: string, password: string, factorCo
 
   // تحديد المعدّل: نمنع تخمين كلمة المرور بعد عدة محاولات فاشلة لنفس المُعرِّف.
   const { rateGet, rateHit, rateReset } = await import('./redis');
+  const readOnlyPreview = isReadOnlyPreview();
   const rlKey = `rl:login:${identifier.toLowerCase().replace(/\s+/g, '')}`;
   if ((await rateGet(rlKey)) >= 8) {
     return { ok: false, error: 'محاولات دخول كثيرة، انتظر قليلاً ثم أعد المحاولة' };
@@ -45,7 +47,13 @@ export async function verifyLogin(identifier: string, password: string, factorCo
   }
 
   const { takeSecurityAttempt, clearSecurityAttempts, getMfaCredential, consumeMfa, isPrivilegedAccount } = await import('./auth-security');
-  if (user && !(await takeSecurityAttempt(`password:${user.id}`))) return { ok: false, error: 'محاولات دخول كثيرة؛ انتظر عشر دقائق ثم أعد المحاولة.' };
+  const previewAttemptKey = user ? `rl:preview-password:${user.id}` : '';
+  if (user) {
+    const allowed = readOnlyPreview
+      ? (await rateHit(previewAttemptKey, 600)) <= 8
+      : await takeSecurityAttempt(`password:${user.id}`);
+    if (!allowed) return { ok: false, error: 'محاولات دخول كثيرة؛ انتظر عشر دقائق ثم أعد المحاولة.' };
+  }
   if (!user || !(await verifyPassword(password, user.password))) {
     await rateHit(rlKey, 600); // احتسب المحاولة الفاشلة ضمن نافذة ١٠ دقائق
     return { ok: false, error: 'بيانات الدخول غير صحيحة' };
@@ -57,10 +65,12 @@ export async function verifyLogin(identifier: string, password: string, factorCo
     return { ok: false, error: 'هذا الحساب مدموج في حسابك الموحّد — ادخل بالحساب الأساسي.' };
   }
   if (await isUserBanned(uid)) return { ok: false, error: 'هذا الحساب محظور' };
-  await clearSecurityAttempts(`password:${uid}`);
+  if (readOnlyPreview) await rateReset(previewAttemptKey);
+  else await clearSecurityAttempts(`password:${uid}`);
   const credential = await getMfaCredential(uid);
   let mfaVersion: string | undefined;
   if (credential) {
+    if (readOnlyPreview) return { ok: false, error: 'الحساب المحمي برمز تحقق لا يُفتح في معاينة القراءة فقط؛ استخدم الموقع الآمن.' };
     if (!factorCode) return { ok: false, error: 'أدخل رمز تطبيق التحقق أو أحد رموز الاسترداد المحفوظة.' };
     mfaVersion = (await consumeMfa(uid, factorCode)) || undefined;
     if (!mfaVersion) return { ok: false, error: 'رمز التحقق غير صحيح أو مستخدم سابقاً؛ بعد المحاولات المتكررة انتظر عشر دقائق.' };

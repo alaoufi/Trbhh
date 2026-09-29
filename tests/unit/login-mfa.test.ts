@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
-  credential: vi.fn(), consume: vi.fn(), privileged: vi.fn(), settings: vi.fn(), attempt: vi.fn(), clear: vi.fn(), password: vi.fn(),
+  credential: vi.fn(), consume: vi.fn(), privileged: vi.fn(), settings: vi.fn(), attempt: vi.fn(), clear: vi.fn(), password: vi.fn(), rateHit: vi.fn(), rateReset: vi.fn(),
 }));
 vi.mock('@/lib/prisma', () => ({ prisma: { users: { findFirst: async () => ({ id: 7n, name: 'Admin', password: 'hash', auth_session_version: 'verified-v1', type: 'user', archived_at: null, merged_into: null }) } } }));
 vi.mock('@/lib/auth', () => ({ verifyPassword: mocks.password }));
 vi.mock('@/data/schema-sync', () => ({ ensureSchema: async () => {} }));
 vi.mock('@/lib/moderation', () => ({ isUserBanned: async () => false }));
-vi.mock('@/lib/redis', () => ({ rateGet: async () => 0, rateHit: async () => 1, rateReset: async () => {} }));
+vi.mock('@/lib/redis', () => ({ rateGet: async () => 0, rateHit: mocks.rateHit, rateReset: mocks.rateReset }));
 vi.mock('@/lib/settings', () => ({ getAuthSecuritySettings: mocks.settings }));
 vi.mock('@/lib/auth-security', () => ({ getMfaCredential: mocks.credential, consumeMfa: mocks.consume, isPrivilegedAccount: mocks.privileged, takeSecurityAttempt: mocks.attempt, clearSecurityAttempts: mocks.clear }));
 import { verifyLogin } from '@/lib/login-core';
 beforeEach(() => {
-  vi.clearAllMocks(); mocks.password.mockResolvedValue(true); mocks.credential.mockResolvedValue({ version: 'v1' }); mocks.consume.mockResolvedValue(null); mocks.privileged.mockResolvedValue(true); mocks.settings.mockResolvedValue({ requireAdminMfa: false, passwordMinimum: 12 }); mocks.attempt.mockResolvedValue(true);
+  vi.clearAllMocks(); vi.unstubAllEnvs(); mocks.password.mockResolvedValue(true); mocks.credential.mockResolvedValue({ version: 'v1' }); mocks.consume.mockResolvedValue(null); mocks.privileged.mockResolvedValue(true); mocks.settings.mockResolvedValue({ requireAdminMfa: false, passwordMinimum: 12 }); mocks.attempt.mockResolvedValue(true); mocks.rateHit.mockResolvedValue(1); mocks.rateReset.mockResolvedValue(undefined);
 });
 describe('login second factor enforcement', () => {
   it('does not grant an enrolled account a password-only login', async () => {
@@ -35,6 +35,20 @@ describe('login second factor enforcement', () => {
   it('never spends a second factor before the password has been verified', async () => {
     mocks.password.mockResolvedValue(false);
     expect((await verifyLogin('admin', 'wrong', '123456')).ok).toBe(false);
+    expect(mocks.consume).not.toHaveBeenCalled();
+  });
+  it('uses Redis-only attempt tracking for an unenrolled account in live read-only preview', async () => {
+    vi.stubEnv('TRBHH_READ_ONLY_PREVIEW', '1');
+    mocks.credential.mockResolvedValue(null);
+    expect((await verifyLogin('admin', 'correct password')).ok).toBe(true);
+    expect(mocks.attempt).not.toHaveBeenCalled();
+    expect(mocks.clear).not.toHaveBeenCalled();
+    expect(mocks.rateHit).toHaveBeenCalledWith('rl:preview-password:7', 600);
+  });
+  it('does not consume production MFA state from the read-only preview', async () => {
+    vi.stubEnv('TRBHH_READ_ONLY_PREVIEW', '1');
+    const result = await verifyLogin('admin', 'correct password', '123456');
+    expect(result).toMatchObject({ ok: false });
     expect(mocks.consume).not.toHaveBeenCalled();
   });
 });

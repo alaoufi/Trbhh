@@ -10,7 +10,8 @@ const INSECURE_DEFAULT = 'dev-insecure-secret-change-me-in-production-please';
 const AUTH_SECRET = process.env.AUTH_SECRET || '';
 
 /** HTTPS is mandatory in production; local development can opt into it explicitly. */
-export function shouldUseSecureCookies(env: { NODE_ENV?: string; COOKIE_SECURE?: string } = process.env): boolean {
+export function shouldUseSecureCookies(env: { NODE_ENV?: string; COOKIE_SECURE?: string; TRBHH_READ_ONLY_PREVIEW?: string } = process.env): boolean {
+  if (env.TRBHH_READ_ONLY_PREVIEW === '1' && env.COOKIE_SECURE === 'false') return false;
   return env.NODE_ENV === 'production' || env.COOKIE_SECURE === 'true';
 }
 // أمان: لا تُشغّل الإنتاج بمفتاح توقيع افتراضي/ضعيف — وإلا أمكن تزوير الجلسات

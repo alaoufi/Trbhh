@@ -20,7 +20,7 @@ function storeSubdomain(hostname: string): string {
 const SUB_ALLOWED = /^\/(companies\/|store-login|store-forgot|login|logout|forgot|media\/|api\/|p\/|_next|play\/|guide\/how)/;
 
 export function middleware(req: NextRequest) {
-  const blocked = readOnlyPreviewResponse(req.method);
+  const blocked = readOnlyPreviewResponse(req.method, req.nextUrl.pathname);
   if (blocked) return blocked;
 
   const hostname = requestHostname(

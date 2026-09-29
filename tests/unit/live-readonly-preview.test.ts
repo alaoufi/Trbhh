@@ -1,10 +1,19 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
+import { readOnlyPreviewResponse } from '@/lib/read-only-preview';
 
 const root = process.cwd();
 
 describe('Hostinger live-data read-only preview', () => {
+  test('allows only login actions while keeping every other write blocked', () => {
+    process.env.TRBHH_READ_ONLY_PREVIEW = '1';
+    expect(readOnlyPreviewResponse('POST', '/login')).toBeNull();
+    expect(readOnlyPreviewResponse('POST', '/store-login')).toBeNull();
+    expect(readOnlyPreviewResponse('POST', '/register')?.status).toBe(405);
+    expect(readOnlyPreviewResponse('POST', '/api/integrations/salla/webhooks')?.status).toBe(405);
+  });
+
   test('disables boot-time schema writes and rejects non-read HTTP methods', () => {
     const instrumentation = readFileSync(path.join(root, 'src/instrumentation.ts'), 'utf8');
     const schemaSync = readFileSync(path.join(root, 'src/data/schema-sync.ts'), 'utf8');
@@ -13,7 +22,7 @@ describe('Hostinger live-data read-only preview', () => {
 
     expect(instrumentation).toContain('isReadOnlyPreview()');
     expect(schemaSync).toContain('if (isReadOnlyPreview()) return Promise.resolve();');
-    expect(middleware).toContain('readOnlyPreviewResponse(req.method)');
+    expect(middleware).toContain('readOnlyPreviewResponse(req.method, req.nextUrl.pathname)');
     expect(middleware).toContain("'X-Trbhh-Preview-Mode', 'read-only'");
     expect(commerceConfig).toContain("purchasingEnabled: process.env.TRBHH_READ_ONLY_PREVIEW !== '1'");
   });
@@ -48,6 +57,8 @@ describe('Hostinger live-data read-only preview', () => {
     expect(workflow).toContain('live_read_only');
     expect(workflow).toContain('set_env TRBHH_READ_ONLY_PREVIEW 1');
     expect(workflow).toContain('set_env SUPPLIER_ALLOW_LIVE_ORDERS false');
+    expect(workflow).toContain('set_env AUTH_SECRET "$staging_auth_secret" .env');
+    expect(workflow).toContain("(process.env.AUTH_SECRET||'').length<32");
     expect(workflow).toContain('github.sha');
     expect(workflow).toContain('docker exec -i "$container" node -');
     expect(workflow).toContain('docker cp "$readonly_script" "$prod_container:$container_script"');

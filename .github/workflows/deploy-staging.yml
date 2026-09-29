@@ -100,6 +100,13 @@ jobs:
             mv "$tmp" "$file"
           }
 
+          staging_auth_secret=$(grep -m1 '^AUTH_SECRET=' .env | cut -d= -f2- || true)
+          if (( ${#staging_auth_secret} < 32 )); then
+            staging_auth_secret=$(openssl rand -hex 32)
+          fi
+          set_env AUTH_SECRET "$staging_auth_secret" .env
+          unset staging_auth_secret
+
           if [[ "$live_read_only" == true ]]; then
             test -f "$readonly_script"
             prod=/root/trbhh
@@ -201,6 +208,7 @@ jobs:
           container=$(docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps -q app)
           test -n "$container"
           test "$(docker inspect -f '{{.State.Running}}' "$container")" = true
+          docker exec "$container" node -e "if((process.env.AUTH_SECRET||'').length<32)process.exit(1)"
           if [[ "$live_read_only" == true ]]; then
             docker exec -i "$container" node - <<'VERIFY'
           const {PrismaClient}=require('@prisma/client');

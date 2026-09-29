@@ -10,4 +10,12 @@ describe('secure cookie policy', () => {
     expect(shouldUseSecureCookies({ NODE_ENV: 'development', COOKIE_SECURE: 'true' })).toBe(true);
     expect(shouldUseSecureCookies({ NODE_ENV: 'development', COOKIE_SECURE: 'false' })).toBe(false);
   });
+
+  it('allows the isolated Hostinger HTTP preview to keep its session cookie', () => {
+    expect(shouldUseSecureCookies({
+      NODE_ENV: 'production',
+      COOKIE_SECURE: 'false',
+      TRBHH_READ_ONLY_PREVIEW: '1',
+    })).toBe(false);
+  });
 });

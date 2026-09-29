@@ -37,6 +37,7 @@ import { CommerceHero } from '@/components/commerce/commerce-hero';
 import { publicHomeHero } from '@/lib/public-home';
 import { isNationalDayCampaignActive, NATIONAL_DAY_HERO_INTERVAL_MS, nationalDayHeroSlides } from '@/lib/national-day';
 import { NationalDayBanner, NationalDayEntry, NationalDayHeroFrame } from '@/components/national-day-banner';
+import { customerServiceContactPolicy } from '@/lib/contact-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,8 +91,19 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const feedSearchHref = selectedCategory ? `/search?category=${selectedCategory.id}` : '/search';
   const feedTexts = await getFeedBannerItems().catch(() => []);
   // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
-  const homeActionsOn = await getSettingBool('home_actions_on', true).catch(() => true);
-  const siteDigits = SITE.phone.replace(/\D/g, '').replace(/^00/, '');
+  const [homeActionsOn, supportWhatsappOn, supportPhoneOn, supportWhatsapp, supportPhone] = await Promise.all([
+    getSettingBool('home_actions_on', true).catch(() => true),
+    getSettingBool('customer_service_whatsapp_on', true).catch(() => true),
+    getSettingBool('customer_service_phone_on', true).catch(() => true),
+    getSetting('customer_service_whatsapp_number', SITE.phone).catch(() => SITE.phone),
+    getSetting('customer_service_phone_number', SITE.phone).catch(() => SITE.phone),
+  ]);
+  const supportContact = customerServiceContactPolicy({
+    whatsappEnabled: supportWhatsappOn,
+    phoneEnabled: supportPhoneOn,
+    whatsapp: supportWhatsapp,
+    phone: supportPhone,
+  });
   const storeCards = (await homeStoreCards().catch(() => [])) as StoreCardData[];
   const myStore = session ? await storeIdOfUser(session.uid).catch(() => 0) : 0;
   // الرصيد الترحيبي — بانر للزوار فقط عندما يحدد التحكم مبلغاً أكبر من صفر
@@ -214,12 +226,12 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
           <Link href={session ? '/notifications' : '/register'} aria-label="تابع تربح" title={session ? 'تابع تربح — تنبيهاتك' : 'تابع تربح — سجّل الآن'} className="grid h-11 flex-1 place-items-center rounded-xl bg-primary text-white shadow-sm">
             <Heart className="h-5 w-5 fill-white" />
           </Link>
-          <a href={`https://wa.me/${siteDigits}`} target="_blank" rel="noopener noreferrer" aria-label="واتساب تربح" title="راسلنا واتساب — للاستفسار والملاحظات" className="grid h-11 flex-1 place-items-center rounded-xl bg-[#25D366] text-white shadow-sm">
+          {supportContact.whatsappHref && <a href={supportContact.whatsappHref} target="_blank" rel="noopener noreferrer" aria-label="واتساب تربح" title="راسلنا واتساب — للاستفسار والملاحظات" className="grid h-11 flex-1 place-items-center rounded-xl bg-[#25D366] text-white shadow-sm">
             <MessageCircle className="h-5 w-5" />
-          </a>
-          <a href={`tel:+${siteDigits}`} aria-label="اتصل بتربح" title="اتصل بنا — للاستفسار والملاحظات" className="grid h-11 flex-1 place-items-center rounded-xl border bg-white text-primary shadow-sm">
+          </a>}
+          {supportContact.phoneHref && <a href={supportContact.phoneHref} aria-label="اتصل بتربح" title="اتصل بنا — للاستفسار والملاحظات" className="grid h-11 flex-1 place-items-center rounded-xl border bg-white text-primary shadow-sm">
             <Phone className="h-5 w-5" />
-          </a>
+          </a>}
           <span className="h-11 flex-1 rounded-xl border bg-white text-primary shadow-sm" title="شارك تربح">
             <ShareButtons
               url={`https://${SITE.domain}`}

@@ -17,13 +17,13 @@ import { hasAnyAdmin } from '@/lib/roles';
 import { getStoreMeta } from '@/lib/merchant';
 import { storeProductAccess } from '@/lib/store-product-access';
 import { formatPrice, timeAgo } from '@/lib/utils';
-import { waLink } from '@/lib/classified-theme';
 import { AdGallery } from '@/components/ad-gallery';
 import { AdMedia } from '@/components/ad-media-view';
 import { ShareButtons } from '@/components/share-buttons';
 import { StoreBottomNav } from '@/components/store-bottomnav';
 import { StoreContactLink } from '@/components/store-contact-link';
 import { getAdAudio } from '@/lib/ad-media';
+import { sellerContactPolicy } from '@/lib/contact-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,9 +84,22 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
   const storeHome = `/companies/${meta.handle || storeId}`;
   const shareUrl = `https://${SITE.domain}/companies/${storeId}/p/${ad.id}`;
   // نص واتساب: نص المتجر إن وُجد، وإلا نصّ افتراضي يذكر المنتج + رابط المنتج
-  const { parseTemplates, fillTemplate } = await import('@/lib/settings');
+  const { parseTemplates, fillTemplate, getSettingBool } = await import('@/lib/settings');
   const baseTpl = parseTemplates(meta.msgTemplates)[0] || 'السلام عليكم، لديّ استفسار حول: {name}';
-  const wa = waLink(ad.seller?.whatsapp, fillTemplate(baseTpl, { link: shareUrl, name: ad.title, appendLink: true }));
+  const [sellerWhatsappOn, sellerPhoneOn] = await Promise.all([
+    getSettingBool('seller_whatsapp_on', true).catch(() => true),
+    getSettingBool('seller_phone_on', true).catch(() => true),
+  ]);
+  const storeContact = sellerContactPolicy({
+    isOwner,
+    whatsappEnabled: sellerWhatsappOn,
+    phoneEnabled: sellerPhoneOn,
+    whatsapp: s.whatsapp || ad.seller?.whatsapp,
+    phone: meta.phone || s.phone || ad.seller?.phone,
+    message: fillTemplate(baseTpl, { link: shareUrl, name: ad.title, appendLink: true }),
+  });
+  const wa = storeContact.whatsappHref;
+  const storePhoneHref = storeContact.phoneHref;
   const audioPath = await getAdAudio(ad.id).catch(() => null);
   // حالة التوفر + السعر قبل الخصم (تفعيلهما العام من التحكم)
   const xtr = await import('@/lib/store-extras');
@@ -220,15 +233,15 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
         )}
 
         {/* التواصل — واتساب/اتصال المتجر */}
-        {(wa || ad.seller?.phone) && (
-          <div className={`grid gap-3 ${wa && ad.seller?.phone ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {(wa || storePhoneHref) && (
+          <div className={`grid gap-3 ${wa && storePhoneHref ? 'grid-cols-2' : 'grid-cols-1'}`}>
             {wa && (
               <StoreContactLink storeId={storeId} kind="whatsapp" href={wa} target="_blank" className="flex flex-col items-center gap-1 rounded-2xl bg-white py-3 text-sm font-bold text-[#25D366] shadow-sm ring-1 ring-black/5">
                 <MessageCircle className="h-6 w-6" /> واتساب
               </StoreContactLink>
             )}
-            {ad.seller?.phone && (
-              <StoreContactLink storeId={storeId} kind="call" href={`tel:${ad.seller.phone}`} className="flex flex-col items-center gap-1 rounded-2xl bg-white py-3 text-sm font-bold shadow-sm ring-1 ring-black/5" style={{ color: brand }}>
+            {storePhoneHref && (
+              <StoreContactLink storeId={storeId} kind="call" href={storePhoneHref} className="flex flex-col items-center gap-1 rounded-2xl bg-white py-3 text-sm font-bold shadow-sm ring-1 ring-black/5" style={{ color: brand }}>
                 <Phone className="h-6 w-6" /> اتصال
               </StoreContactLink>
             )}

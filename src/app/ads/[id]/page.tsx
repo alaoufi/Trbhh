@@ -15,7 +15,6 @@ import { getSession } from '@/lib/auth';
 import { isFavorited } from '@/lib/account';
 import { adPriceLabel } from '@/lib/ad-presentation';
 import { formatPrice, timeAgo } from '@/lib/utils';
-import { waLink } from '@/lib/classified-theme';
 import { getSettingBool, getAdNotice, getAdMsgTemplates, parseTemplates, fillTemplate, getMemberWindows, adWindowState, DUR_DAYS } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
@@ -44,6 +43,7 @@ import { getAdAudio } from '@/lib/ad-media';
 import { mediaUrl } from '@/lib/media';
 import { AdGallery } from '@/components/ad-gallery';
 import { Breadcrumb } from '@/components/breadcrumb';
+import { sellerContactPolicy } from '@/lib/contact-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,6 +114,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const admin = canArchive || canDeleteAd || canBanSeller;
   // إعلان غير نشط (بانتظار الموافقة/مؤرشف/موقوف): لا يراه إلا صاحبه أو الإدارة
   const ownerViewing = !!(session && ad.seller && session.uid === ad.seller.id);
+  const isAdOwner = ownerViewing;
   // إضافات الإعلان المدفوعة (تمييز/عاجل/عرض/تحديث) — تُعرض للإدارة ولصاحب الإعلان فقط
   const addons = admin || ownerViewing ? await getAdAddons(ad.id).catch(() => null) : null;
   // رسائل سابقة من أي مشرف لصاحب الإعلان — تمنع تكرار نفس الرسالة من مسؤول آخر
@@ -183,12 +184,20 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const identityName = identityIsStore ? (storeMeta?.storeName || 'المتجر') : (ad.seller?.name || 'مستخدم');
   const identityHref = identityIsStore ? (storeUrl || `/companies/${sellerStoreId}`) : `/users/${ad.seller?.id}`;
   const storePhone = identityIsStore ? (storeMeta?.phone || null) : null;
-  const callPhone = storePhone || ad.seller?.phone || null;
-  const waNumber = identityIsStore
-    ? (storePhone ? waLink(storePhone, waMsg) : null)
-    : waLink(ad.seller?.whatsapp, waMsg);
-  // صاحب الإعلان لا يرى المراسلة/البلاغ/التقييم على إعلانه (لا يراسل/يبلّغ/يقيّم نفسه)
-  const isAdOwner = !!(session && ad.seller && session.uid === ad.seller.id);
+  const [sellerWhatsappOn, sellerPhoneOn] = await Promise.all([
+    getSettingBool('seller_whatsapp_on', true).catch(() => true),
+    getSettingBool('seller_phone_on', true).catch(() => true),
+  ]);
+  const sellerContact = sellerContactPolicy({
+    isOwner: isAdOwner,
+    whatsappEnabled: sellerWhatsappOn,
+    phoneEnabled: sellerPhoneOn,
+    whatsapp: identityIsStore ? storePhone : ad.seller?.whatsapp,
+    phone: storePhone || ad.seller?.phone,
+    message: waMsg,
+  });
+  const waNumber = sellerContact.whatsappHref;
+  const callPhone = sellerContact.phoneHref;
   // "مراسلة" available to non-owners; WhatsApp/call only when provided
   const contactCols = (isAdOwner ? 0 : 1) + (waNumber ? 1 : 0) + (callPhone ? 1 : 0);
   const mobileContactOn = !isAdOwner && !inStore && await getSettingBool('ad_mobile_contact_on', true);
@@ -645,7 +654,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 border-t bg-card/95 px-3 py-2 shadow-sm backdrop-blur md:hidden" aria-label="التواصل مع المعلن">
           <div className="mx-auto flex max-w-2xl items-center gap-2">
             {waNumber && <TrackedContact adId={ad.id} kind="whatsapp" href={waNumber} target="_blank" className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-3 text-sm font-bold text-white"><MessageCircle className="h-5 w-5" /> واتساب</TrackedContact>}
-            {callPhone && <TrackedContact adId={ad.id} kind="call" href={`tel:${callPhone}`} className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground"><Phone className="h-5 w-5" /> اتصال</TrackedContact>}
+            {callPhone && <TrackedContact adId={ad.id} kind="call" href={callPhone} className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground"><Phone className="h-5 w-5" /> اتصال</TrackedContact>}
             {!waNumber && !callPhone && <Link href={session && ad.seller ? `/messages/${ad.seller.id}` : `/login?next=${encodeURIComponent(`/ads/${ad.id}`)}`} className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground"><Send className="h-5 w-5" /> مراسلة المعلن</Link>}
           </div>
         </div>
@@ -658,7 +667,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
           </TrackedContact>
         )}
         {callPhone && (
-          <TrackedContact adId={ad.id} kind="call" href={`tel:${callPhone}`} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
+          <TrackedContact adId={ad.id} kind="call" href={callPhone} className="card-3d flex flex-col items-center gap-1 rounded-2xl py-3 text-sm font-medium text-primary">
             <Phone className="h-6 w-6" /> اتصال
           </TrackedContact>
         )}

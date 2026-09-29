@@ -18,7 +18,7 @@ vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('NOT_FOUND
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/lib/ad-media', () => ({ getAdAudio: async () => null }));
 vi.mock('@/lib/store-extras', () => ({ stockEnabled: async () => false, dealsEnabled: async () => false }));
-vi.mock('@/lib/settings', () => ({ parseTemplates: () => [], fillTemplate: () => '', SETTING_SUB_ENABLED: 'sub_store_enabled', SETTING_SUB_GRACE_DAYS: 'sub_grace_days', SETTING_STORE_SHIELD: 'store_shield_on' }));
+vi.mock('@/lib/settings', () => ({ getSettingBool: async () => true, parseTemplates: () => [], fillTemplate: () => '', SETTING_SUB_ENABLED: 'sub_store_enabled', SETTING_SUB_GRACE_DAYS: 'sub_grace_days', SETTING_STORE_SHIELD: 'store_shield_on' }));
 import Page, { generateMetadata } from '@/app/companies/[id]/p/[adId]/page';
 
 const params = () => ({ params: Promise.resolve({ id: '1', adId: '7' }) });

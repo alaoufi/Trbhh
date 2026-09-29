@@ -22,11 +22,11 @@ import { StoreBottomNav } from '@/components/store-bottomnav';
 import { StoreContactLink } from '@/components/store-contact-link';
 import { StoreCatalog } from '@/components/store-catalog';
 import { InstallPrompt } from '@/components/install-prompt';
-import { waLink } from '@/lib/classified-theme';
 import { bannerBackground, storeTier, isLightColor, layoutTokens, isCatalogStyle, DEFAULT_CATALOG_FIELDS } from '@/lib/store-style';
 import { timeAgo } from '@/lib/utils';
 import { followStoreAction, rateStoreAction, sendCollabAction, requestTransferAction, messageStoreOwnerAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
+import { sellerContactPolicy } from '@/lib/contact-policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -193,10 +193,23 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
   const allActive = inStoreAds.map((a) => ({ id: a.id, title: a.title, price: a.price, adsType: a.adsType, image: a.image, cityName: null, categoryName: null, createdAt: a.createdAt, special: a.special, views: viewsById.get(a.id) ?? 0, sellerName: null, sellerTrusted: false, oldPrice: dealsOn ? a.oldPrice : 0, stockState: stockOn ? a.stockState : 0 }));
   const active = query ? allActive.filter((a) => (a.title || '').includes(query)) : allActive;
   // نص واتساب للمتجر: نص المتجر إن وُجد، وإلا نصّ افتراضي (لا يظهر فارغاً)
-  const { parseTemplates, fillTemplate } = await import('@/lib/settings');
+  const { parseTemplates, fillTemplate, getSettingBool } = await import('@/lib/settings');
   const storeUrl = `https://${SITE.domain}/companies/${meta.handle || storeId}`;
   const baseTpl = parseTemplates(meta.msgTemplates)[0] || 'السلام عليكم، لديّ استفسار عن متجر {name}';
-  const wa = waLink(s.whatsapp, fillTemplate(baseTpl, { link: storeUrl, name: meta.storeName || s.name }));
+  const [sellerWhatsappOn, sellerPhoneOn] = await Promise.all([
+    getSettingBool('seller_whatsapp_on', true).catch(() => true),
+    getSettingBool('seller_phone_on', true).catch(() => true),
+  ]);
+  const storeContact = sellerContactPolicy({
+    isOwner,
+    whatsappEnabled: sellerWhatsappOn,
+    phoneEnabled: sellerPhoneOn,
+    whatsapp: s.whatsapp,
+    phone: meta.phone || s.phone,
+    message: fillTemplate(baseTpl, { link: storeUrl, name: meta.storeName || s.name }),
+  });
+  const wa = storeContact.whatsappHref;
+  const storePhoneHref = storeContact.phoneHref;
   // مشاهدات المتجر = عدد مرّات دخول/تحديث صفحة المتجر (مشاهدة واحدة لكل زيارة)
   const storeViews = await getStoreViews(storeId).catch(() => 0);
   // collaboration: can this viewer (a merchant) invite this store?
@@ -416,8 +429,8 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
                   <MessageCircle className="h-5 w-5" />
                 </StoreContactLink>
               )}
-              {s.phone && (
-                <StoreContactLink storeId={storeId} kind="call" href={`tel:${s.phone}`} className="grid h-11 flex-1 place-items-center rounded-xl border bg-white shadow-sm">
+              {storePhoneHref && (
+                <StoreContactLink storeId={storeId} kind="call" href={storePhoneHref} className="grid h-11 flex-1 place-items-center rounded-xl border bg-white shadow-sm">
                   <Phone className="h-5 w-5" style={{ color: brand }} />
                 </StoreContactLink>
               )}
@@ -498,7 +511,7 @@ export default async function CompanyPage({ params, searchParams }: { params: Pr
           <h2 className="font-bold" style={{ color: brand }}>التواصل مع المتجر</h2>
           {(meta.phone || meta.email || meta.contacts) && (
             <div className="grid gap-2 sm:grid-cols-2">
-              {meta.phone && <StoreContactLink storeId={storeId} kind="call" href={`tel:${meta.phone}`} className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90"><Phone className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr">{meta.phone}</span></StoreContactLink>}
+              {storePhoneHref && meta.phone && <StoreContactLink storeId={storeId} kind="call" href={storePhoneHref} className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90"><Phone className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr">{meta.phone}</span></StoreContactLink>}
               {meta.email && <a href={`mailto:${meta.email}`} className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90"><Mail className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr" className="truncate">{meta.email}</span></a>}
               {meta.contacts && <div className="flex items-center gap-2 rounded-xl bg-secondary/40 p-3 text-sm font-bold text-foreground/90 sm:col-span-2"><Link2 className="h-4 w-4 shrink-0" style={{ color: brand }} /> <span dir="ltr" className="truncate">{meta.contacts}</span></div>}
             </div>

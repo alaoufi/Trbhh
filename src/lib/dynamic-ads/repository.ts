@@ -130,6 +130,7 @@ export async function createDynamicGroup(input: { entityId: number; key: string;
   await prisma.$executeRawUnsafe('INSERT INTO dynamic_entity_groups (entity_id, group_key, label_ar, input_order, display_order) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE label_ar=VALUES(label_ar), input_order=VALUES(input_order), display_order=VALUES(display_order), is_active=1', input.entityId, input.key, input.label.slice(0, 120), input.inputOrder ?? 999, input.displayOrder ?? 999);
 }
 export async function setDynamicFieldActive(id: number, active: boolean) { await ensureDynamicAdsSchema(); await prisma.$executeRawUnsafe('UPDATE dynamic_entity_fields SET is_active=? WHERE id=?', active ? 1 : 0, id); }
+export async function setDynamicFieldRequired(id: number, required: boolean) { await ensureDynamicAdsSchema(); await prisma.$executeRawUnsafe('UPDATE dynamic_entity_fields SET required_flag=? WHERE id=?', required ? 1 : 0, id); }
 export async function deleteDynamicField(id: number) { await ensureDynamicAdsSchema(); await prisma.$executeRawUnsafe('DELETE FROM dynamic_entity_fields WHERE id=?', id); }
 export async function reorderDynamicField(id: number, inputOrder: number, displayOrder: number) { await ensureDynamicAdsSchema(); await prisma.$executeRawUnsafe('UPDATE dynamic_entity_fields SET input_order=?, display_order=? WHERE id=?', Math.max(0, Math.trunc(inputOrder)), Math.max(0, Math.trunc(displayOrder)), id); }
 

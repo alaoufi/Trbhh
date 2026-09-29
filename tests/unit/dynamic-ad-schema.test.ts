@@ -29,6 +29,8 @@ describe('dynamic advertisement schema', () => {
     const repository = fs.readFileSync(path.join(process.cwd(), 'src/lib/dynamic-ads/repository.ts'), 'utf8');
     expect(repository).toContain("'input_visible_flag'");
     expect(repository).toContain("'display_visible_flag'");
+    expect(repository).toContain('setDynamicFieldRequired');
+    expect(fs.readFileSync(path.join(process.cwd(), 'src/app/admin/smart-ads/actions.ts'), 'utf8')).toContain('toggleDynamicFieldRequiredAction');
   });
 
   it('validates selected multiple options and preserves their order', () => {

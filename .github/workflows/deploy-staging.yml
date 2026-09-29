@@ -53,7 +53,7 @@ jobs:
           REMOTE_CMD="set -e; cd '$DIR' && git fetch origin staging && git reset --hard origin/staging && docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis && timeout 180s docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml exec -T -e STAGING_CATEGORY_SEED=1 app node scripts/release/seed-staging-categories.cjs && docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps"
           n=0
           until [ "$n" -ge 5 ]; do
-            if ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            if timeout 600s ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                  -o ConnectTimeout=25 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
                  -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" "$REMOTE_CMD"; then
               echo "✅ تم نشر بيئة التجريب."

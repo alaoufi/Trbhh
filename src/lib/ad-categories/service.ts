@@ -5,6 +5,8 @@ import {getSetting} from '@/lib/settings';
 import {CATEGORY_LABELS, categoryEnabled, categoryId, categoryPolicy, parseCategorySubmission, type CategoryFormConfig, type SubcategoryOption} from './contracts';
 import {CategoryValidationError, validateDefinition, visibleCategoryValues, type CategoryValues} from './validation';
 import {CATEGORY_LATEST_TEMPLATES_SETTING, categoryFieldsFingerprint, resolveCategoryDefinition} from './template-upgrade';
+import {applyPreviewCategoryVisibility,isReadOnlyPreview,parsePreviewCategoryVisibility,PREVIEW_CATEGORY_VISIBILITY_KEY} from '@/lib/read-only-preview';
+import {previewHashGetAll} from '@/lib/redis';
 type Tx=Prisma.TransactionClient;
 type DefinitionRow={subcategory_id:bigint;version:number;kind:string;price_enabled:number;goods_enabled:number;fields_json:unknown};
 const json=(v:unknown):unknown=>typeof v==='string'?JSON.parse(v):v;
@@ -23,7 +25,13 @@ export async function getCategoryFormConfig(admin=false):Promise<CategoryFormCon
   const [cats,subs,defs]=await Promise.all([prisma.categories.findMany({orderBy:{ordered:'asc'}}),prisma.sub_categories.findMany({orderBy:{order:'asc'}}),prisma.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions`]);
   const dm=new Map(defs.map(d=>[Number(d.subcategory_id),d]));
   const catById=new Map(cats.map(c=>[Number(c.id),c]));
-  return {enabled,useLatestTemplates,labels,categories:cats.filter(c=>admin||c.is_active==='yes').map(c=>({id:Number(c.id),name:c.name,active:c.is_active==='yes',order:c.ordered})),subcategories:subs.filter(s=>admin||(s.active===1&&dm.has(Number(s.id))&&cats.some(c=>Number(c.id)===s.category_id&&c.is_active==='yes'))).map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?definition(dm.get(Number(s.id))!,{categoryName:catById.get(s.category_id)?.name||'',subcategoryName:s.name,useLatestTemplates}):{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[]})}))};
+  const baseCategories=cats.map(c=>({id:Number(c.id),name:c.name,active:c.is_active==='yes',order:c.ordered}));
+  const baseSubcategories=subs.map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?definition(dm.get(Number(s.id))!,{categoryName:catById.get(s.category_id)?.name||'',subcategoryName:s.name,useLatestTemplates}):{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[]})}));
+  const resolved=isReadOnlyPreview()
+    ?applyPreviewCategoryVisibility(baseCategories,baseSubcategories,parsePreviewCategoryVisibility(await previewHashGetAll(PREVIEW_CATEGORY_VISIBILITY_KEY)))
+    :{categories:baseCategories,subcategories:baseSubcategories};
+  const activeCategoryIds=new Set(resolved.categories.filter(c=>c.active).map(c=>c.id));
+  return {enabled,useLatestTemplates,labels,categories:resolved.categories.filter(c=>admin||c.active),subcategories:resolved.subcategories.filter(s=>admin||(s.active&&dm.has(s.id)&&activeCategoryIds.has(s.categoryId)))};
 }
 export type CategorySelection={category_id:bigint;subcategory_id:number;cat_reviewed:number;priceEnabled:boolean;goodsEnabled:boolean};
 export type CategoryEditContext={adId:bigint;memberId:bigint};
@@ -76,7 +84,15 @@ export async function getPublicCategories(ids:bigint[]):Promise<Map<number,Publi
   const out=new Map<number,PublicCategory>();
   const [enabledValue,latestTemplatesValue]=await Promise.all([getSetting('categories_v2_enabled',process.env.CATEGORIES_DEFAULT_ENABLED==='1'?'1':'0'),getSetting(CATEGORY_LATEST_TEMPLATES_SETTING,'1')]);
   if(!ids.length||!categoryEnabled(enabledValue)) return out;
-  const rows=await prisma.$queryRaw<(DefinitionRow&{ad_id:bigint;values_json:unknown;subcategory_name:string;category_name:string;active:number;is_active:string})[]>(Prisma.sql`SELECT a.id AS ad_id,d.*,v.values_json,s.name AS subcategory_name,c.name AS category_name,s.active,c.is_active FROM ads a JOIN sub_categories s ON s.id=a.subcategory_id AND s.category_id=a.category_id JOIN categories c ON c.id=a.category_id JOIN ad_category_definitions d ON d.subcategory_id=s.id LEFT JOIN ad_category_values v ON v.ad_id=a.id AND v.subcategory_id=s.id WHERE a.id IN (${Prisma.join(ids)})`);
-  for(const r of rows){const d=definition(r,{categoryName:r.category_name,subcategoryName:r.subcategory_name,useLatestTemplates:categoryEnabled(latestTemplatesValue)});out.set(Number(r.ad_id),{priceEnabled:d.priceEnabled,goodsEnabled:d.goodsEnabled,subcategoryName:r.active===1&&r.is_active==='yes'?r.subcategory_name:undefined,categoryFields:r.active===1&&r.is_active==='yes'?visibleCategoryValues(d.fields,(json(r.values_json)||{}) as CategoryValues):[]});}
+  const [rows,previewVisibility]=await Promise.all([
+    prisma.$queryRaw<(DefinitionRow&{ad_id:bigint;category_id:bigint;values_json:unknown;subcategory_name:string;category_name:string;active:number;is_active:string})[]>(Prisma.sql`SELECT a.id AS ad_id,c.id AS category_id,d.*,v.values_json,s.name AS subcategory_name,c.name AS category_name,s.active,c.is_active FROM ads a JOIN sub_categories s ON s.id=a.subcategory_id AND s.category_id=a.category_id JOIN categories c ON c.id=a.category_id JOIN ad_category_definitions d ON d.subcategory_id=s.id LEFT JOIN ad_category_values v ON v.ad_id=a.id AND v.subcategory_id=s.id WHERE a.id IN (${Prisma.join(ids)})`),
+    isReadOnlyPreview()?previewHashGetAll(PREVIEW_CATEGORY_VISIBILITY_KEY).then(parsePreviewCategoryVisibility):Promise.resolve(parsePreviewCategoryVisibility({})),
+  ]);
+  for(const r of rows){
+    const d=definition(r,{categoryName:r.category_name,subcategoryName:r.subcategory_name,useLatestTemplates:categoryEnabled(latestTemplatesValue)});
+    const visibility=applyPreviewCategoryVisibility([{id:Number(r.category_id),active:r.is_active==='yes'}],[{id:Number(r.subcategory_id),active:r.active===1}],previewVisibility);
+    const active=visibility.categories[0].active&&visibility.subcategories[0].active;
+    out.set(Number(r.ad_id),{priceEnabled:d.priceEnabled,goodsEnabled:d.goodsEnabled,subcategoryName:active?r.subcategory_name:undefined,categoryFields:active?visibleCategoryValues(d.fields,(json(r.values_json)||{}) as CategoryValues):[]});
+  }
   return out;
 }

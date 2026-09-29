@@ -78,6 +78,30 @@ export async function cacheDelPattern(pattern: string): Promise<void> {
    يعمل عبر Redis عند توفّره، وإلا يسقط لعدّاد في الذاكرة داخل العملية (احتياط
    يظلّ يحدّ من محاولات التخمين على العقدة الواحدة). */
 const rlMem = new Map<string, { n: number; exp: number }>();
+const previewHashMem = new Map<string, Record<string, string>>();
+
+/** Small mutable preview state. Redis is preferred; memory keeps local preview usable if it is unavailable. */
+export async function previewHashGetAll(key: string): Promise<Record<string, string>> {
+  if (redis) {
+    try {
+      const values = await redis.hgetall(key);
+      previewHashMem.set(key, values);
+      return values;
+    } catch { /* fall through */ }
+  }
+  return { ...(previewHashMem.get(key) ?? {}) };
+}
+
+export async function previewHashSet(key: string, field: string, value: string): Promise<void> {
+  const current = previewHashMem.get(key) ?? {};
+  previewHashMem.set(key, { ...current, [field]: value });
+  if (redis) {
+    try {
+      await redis.hset(key, field, value);
+      await redis.expire(key, 60 * 60 * 24 * 30);
+    } catch { /* memory fallback already contains the value */ }
+  }
+}
 
 /** زِد عدّاد المفتاح وأعد قيمته الحالية (يضبط انتهاء النافذة عند أول زيادة). */
 export async function rateHit(key: string, windowSec: number): Promise<number> {

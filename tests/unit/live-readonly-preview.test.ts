@@ -10,8 +10,61 @@ describe('Hostinger live-data read-only preview', () => {
     process.env.TRBHH_READ_ONLY_PREVIEW = '1';
     expect(readOnlyPreviewResponse('POST', '/login')).toBeNull();
     expect(readOnlyPreviewResponse('POST', '/store-login')).toBeNull();
+    expect(readOnlyPreviewResponse('POST', '/admin/categories')).toBeNull();
     expect(readOnlyPreviewResponse('POST', '/register')?.status).toBe(405);
     expect(readOnlyPreviewResponse('POST', '/api/integrations/salla/webhooks')?.status).toBe(405);
+  });
+
+  test('applies preview-only category visibility without changing the database records', async () => {
+    const preview = await import('@/lib/read-only-preview') as Record<string, unknown>;
+    const apply = preview.applyPreviewCategoryVisibility;
+    const parse = preview.parsePreviewCategoryVisibility;
+    expect(typeof apply).toBe('function');
+    expect(typeof parse).toBe('function');
+    if (typeof apply !== 'function' || typeof parse !== 'function') return;
+
+    const categories = [
+      { id: 10, name: 'ظاهر في القاعدة', active: true, order: 1 },
+      { id: 20, name: 'مخفي في القاعدة', active: false, order: 2 },
+    ];
+    const subcategories = [
+      { id: 101, categoryId: 10, name: 'فرع ظاهر', active: true, order: 1 },
+      { id: 102, categoryId: 10, name: 'فرع مخفي', active: false, order: 2 },
+    ];
+    const overrides = parse({
+      'category:10': '0',
+      'category:20': '1',
+      'subcategory:101': '0',
+      'subcategory:102': '1',
+      invalid: '1',
+    });
+
+    expect(apply(categories, subcategories, overrides)).toEqual({
+      categories: [
+        { ...categories[0], active: false },
+        { ...categories[1], active: true },
+      ],
+      subcategories: [
+        { ...subcategories[0], active: false },
+        { ...subcategories[1], active: true },
+      ],
+    });
+    expect(categories[0].active).toBe(true);
+    expect(subcategories[0].active).toBe(true);
+  });
+
+  test('persists isolated preview state outside MySQL', async () => {
+    const cache = await import('@/lib/redis') as Record<string, unknown>;
+    const read = cache.previewHashGetAll;
+    const write = cache.previewHashSet;
+    expect(typeof read).toBe('function');
+    expect(typeof write).toBe('function');
+    if (typeof read !== 'function' || typeof write !== 'function') return;
+
+    const key = `test:preview:${crypto.randomUUID()}`;
+    await write(key, 'category:10', '0');
+    await write(key, 'subcategory:101', '1');
+    expect(await read(key)).toEqual({ 'category:10': '0', 'subcategory:101': '1' });
   });
 
   test('disables boot-time schema writes and rejects non-read HTTP methods', () => {
@@ -25,6 +78,12 @@ describe('Hostinger live-data read-only preview', () => {
     expect(middleware).toContain('readOnlyPreviewResponse(req.method, req.nextUrl.pathname)');
     expect(middleware).toContain("'X-Trbhh-Preview-Mode', 'read-only'");
     expect(commerceConfig).toContain("purchasingEnabled: process.env.TRBHH_READ_ONLY_PREVIEW !== '1'");
+  });
+
+  test('explains preview-only category changes without implying production was edited', () => {
+    const page = readFileSync(path.join(root, 'src/app/admin/categories/page.tsx'), 'utf8');
+    expect(page).toContain('تم تحديث الظهور في المعاينة فقط');
+    expect(page).toContain('قاعدة الإنتاج لم تتغير');
   });
 
   test('creates a database principal with read privileges only and redacts its secret', async () => {

@@ -108,7 +108,11 @@ CREATE TABLE IF NOT EXISTS dynamic_analysis_feedback (
 
 INSERT INTO dynamic_entities (entity_key, name_ar, icon, display_order) VALUES
   ('vehicle', 'مركبة', '🚗', 10), ('property', 'عقار', '🏠', 20), ('livestock', 'حلال', '🐪', 30),
-  ('product', 'أجهزة ومنتجات', '📱', 40), ('service', 'خدمات', '🛠️', 50), ('equipment', 'معدات', '🚜', 60), ('other', 'أخرى', '📦', 70)
+  ('product', 'أجهزة ومنتجات', '📱', 40), ('service', 'خدمات', '🛠️', 50), ('equipment', 'معدات', '🚜', 60),
+  ('agriculture', 'زراعة ومشاتل وأعلاف', '🌱', 70), ('livestock_supplies', 'مواشي ومستلزماته', '🐑', 80),
+  ('household', 'أواني منزلية', '🍽️', 90), ('home_decor', 'ديكورات منزلية', '🛋️', 100),
+  ('construction', 'مواد بناء ومقاولات', '🧱', 110), ('heavy_transport', 'نقليات ومعدات ثقيلة', '🚛', 120),
+  ('vehicle_parts', 'سيارات ومستلزماتها', '🔧', 130), ('other', 'أخرى', '📦', 140)
 ON DUPLICATE KEY UPDATE name_ar=VALUES(name_ar), icon=VALUES(icon), display_order=VALUES(display_order);
 
 INSERT INTO dynamic_entity_groups (entity_id, group_key, label_ar, input_order, display_order)

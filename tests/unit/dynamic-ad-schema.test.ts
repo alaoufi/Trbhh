@@ -5,7 +5,7 @@ import { DEFAULT_ENTITY_FIELDS, INITIAL_ENTITY_KEYS, normalizeDynamicFieldLayout
 
 describe('dynamic advertisement schema', () => {
   it('ships the seven initial entity templates', () => {
-    expect(INITIAL_ENTITY_KEYS).toEqual(['vehicle', 'property', 'livestock', 'product', 'service', 'equipment', 'other']);
+    expect(INITIAL_ENTITY_KEYS).toEqual(['vehicle', 'property', 'livestock', 'product', 'service', 'equipment', 'agriculture', 'livestock_supplies', 'household', 'home_decor', 'construction', 'heavy_transport', 'vehicle_parts', 'other']);
   });
 
   it('rejects a missing required field and normalises a number value', () => {
@@ -48,6 +48,13 @@ describe('dynamic advertisement schema', () => {
     expect(DEFAULT_ENTITY_FIELDS.vehicle.map((field) => field.key)).toEqual(expect.arrayContaining(['vehicle_type', 'manufacturer', 'model', 'year', 'fuel', 'transmission', 'notes']));
     expect(DEFAULT_ENTITY_FIELDS.property.map((field) => field.key)).toEqual(expect.arrayContaining(['property_type', 'offer_type', 'area_sqm', 'city', 'district', 'map_location', 'rooms']));
     expect(DEFAULT_ENTITY_FIELDS.livestock.map((field) => field.key)).toEqual(expect.arrayContaining(['livestock_type', 'breed', 'health_status', 'vaccinations', 'sire', 'dam']));
+    expect(DEFAULT_ENTITY_FIELDS.agriculture.map((field) => field.key)).toEqual(expect.arrayContaining(['agriculture_type', 'irrigation', 'soil_type', 'area_sqm', 'production']));
+    expect(DEFAULT_ENTITY_FIELDS.livestock_supplies.map((field) => field.key)).toEqual(expect.arrayContaining(['supply_type', 'brand', 'condition', 'quantity']));
+    expect(DEFAULT_ENTITY_FIELDS.household.map((field) => field.key)).toEqual(expect.arrayContaining(['product_type', 'material', 'condition', 'quantity']));
+    expect(DEFAULT_ENTITY_FIELDS.home_decor.map((field) => field.key)).toEqual(expect.arrayContaining(['decor_type', 'style', 'material', 'condition']));
+    expect(DEFAULT_ENTITY_FIELDS.construction.map((field) => field.key)).toEqual(expect.arrayContaining(['material_type', 'grade', 'quantity', 'origin']));
+    expect(DEFAULT_ENTITY_FIELDS.heavy_transport.map((field) => field.key)).toEqual(expect.arrayContaining(['equipment_type', 'manufacturer', 'model', 'year', 'hours']));
+    expect(DEFAULT_ENTITY_FIELDS.vehicle_parts.map((field) => field.key)).toEqual(expect.arrayContaining(['part_type', 'vehicle_compatibility', 'condition', 'warranty']));
   });
 
   it('keeps interactive entity selection out of the server-rendered admin page', () => {

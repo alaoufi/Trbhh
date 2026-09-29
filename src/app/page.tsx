@@ -85,7 +85,12 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   // أيضاً عبر معرّف زيارته الدائم (trbhh_vid)، لا الأعضاء فقط.
   const vid = (await cookies()).get('trbhh_vid')?.value;
   const viewerKey = session ? `u${session.uid}` : vid ? `g${vid}` : null;
-  const personalizedAds = selectedCategory ? [] : await getPersonalizedAds(viewerKey, session?.uid || 0, 8).catch(() => []);
+  const personalizedDiscoveryOn = selectedCategory
+    ? false
+    : await getSettingBool('personalized_discovery_on', true).catch(() => true);
+  const personalizedAds = personalizedDiscoveryOn
+    ? await getPersonalizedAds(viewerKey, session?.uid || 0, 8).catch(() => [])
+    : [];
   const storeAds = selectedCategory ? [] : await homeFeaturedAds().catch(() => []);
   const feedAds = selectedCategory ? latest : mergeHomeAds(featured, latest, storeAds, mostViewed, topRated);
   const feedSearchHref = selectedCategory ? `/search?category=${selectedCategory.id}` : '/search';
@@ -200,7 +205,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
 
       {/* 🎯 يهمّك الآن — تغذية مخصّصة بدلالة ما تصفّحه وبحث عنه فعلياً،
           تظهر أول محتوى في الصفحة لمن له تصفّح سابق. */}
-      {!selectedCategory && personalizedAds.length > 0 && (
+      {personalizedDiscoveryOn && personalizedAds.length > 0 && (
         <CollapsibleSection title="🎯 يهمّك الآن" defaultOpen={false}>
           <AdGrid ads={personalizedAds} appearance="marketplace" />
         </CollapsibleSection>

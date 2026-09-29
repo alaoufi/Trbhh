@@ -51,6 +51,18 @@ it('does not fall back to unrelated ads for an empty active category',async()=>{
  expect(tree.filter(e=>e.type===AdGrid)).toHaveLength(0);
  expect(tree.some(e=>e.props.children===CATEGORY_LABELS.emptyText)).toBe(true);
 });
+it('loads personalized discovery only when its independent admin switch is enabled',async()=>{
+ const settings=await import('@/lib/settings');
+ const flag=vi.spyOn(settings,'getSettingBool').mockImplementation(async key=>key==='personalized_discovery_on');
+ try {
+  await HomePage({searchParams:Promise.resolve({})});
+  expect(state.personalized).toHaveBeenCalledWith('u1',1,8);
+  state.personalized.mockClear();
+  flag.mockResolvedValue(false);
+  await HomePage({searchParams:Promise.resolve({})});
+  expect(state.personalized).not.toHaveBeenCalled();
+ } finally {flag.mockRestore();}
+});
 it('retains only the validated category in the homepage search form',async()=>{
  // Enable the discovery section without changing other setting behavior.
  const settings=await import('@/lib/settings');

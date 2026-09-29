@@ -16,4 +16,9 @@ describe('member account guide links', () => {
     expect(read('src/app/admin/guide/page.tsx')).toContain('واتساب البائع');
     expect(read('src/app/admin/guide/page.tsx')).toContain('رقم واتساب خدمة العملاء');
   });
+
+  it('documents the admin-controlled personalized discovery feed', () => {
+    expect(read('src/app/guide/page.tsx')).toContain('يمكن للإدارة إيقاف قسم «يهمّك الآن»');
+    expect(read('src/app/admin/guide/page.tsx')).toContain('التوصيات المخصصة «يهمّك الآن»');
+  });
 });

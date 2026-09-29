@@ -19,7 +19,7 @@ describe('continuous home feed', () => {
     const page=readFileSync('src/app/page.tsx','utf8');
     expect(page).toContain('searchAds({ categoryId: selectedCategory.id, take: 24, skip: 0 })');
     expect(page).toMatch(/<AdGrid\s+ads=\{feedAds\}(?:\s+appearance="marketplace")?\s*\/>/);
-    expect(page).toContain('!selectedCategory && personalizedAds.length');
+    expect(page).toContain('personalizedDiscoveryOn && personalizedAds.length');
     expect(page).toContain('category=${selectedCategory.id}');
   });
   it('places featured first and removes duplicates without mutating sources', () => {

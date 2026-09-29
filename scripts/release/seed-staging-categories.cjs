@@ -11,7 +11,8 @@ async function main() {
   const db = new PrismaClient({ log: [] });
   try {
     const [{ db: database }] = await db.$queryRawUnsafe('SELECT DATABASE() AS db');
-    if (!database || !/(staging|test)/i.test(String(database))) throw new Error('non_staging_database_refused');
+    const expectedDatabase = process.env.STAGING_DATABASE_NAME;
+    if (!expectedDatabase || String(database) !== expectedDatabase) throw new Error('non_staging_database_refused');
     const result = { categoriesAdded: 0, subcategoriesAdded: 0, definitionsAdded: 0, definitionsPreserved: 0 };
     await db.$transaction(async tx => {
       for (const template of payload.templates) {

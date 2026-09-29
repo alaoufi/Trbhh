@@ -23,5 +23,6 @@ services:
     container_name: trbhh-staging-app
     environment:
       CATEGORIES_DEFAULT_ENABLED: "1"
+      STAGING_DATABASE_NAME: "trbhhdb"
     # المنفذ يُضبط من APP_PORT في .env التجريب (=3081). لا نضيف ports هنا حتى لا
     # تُدمَج قائمتا المنافذ فيُفتح منفذ الإنتاج أيضاً بالخطأ.

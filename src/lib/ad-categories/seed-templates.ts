@@ -1,9 +1,10 @@
 import type { CategoryField, CategoryFieldType } from './validation';
+import {defaultListingPolicy,type ListingPolicy} from './listing-policy';
 
 export type CategorySeedTemplate = {
   key: string; categoryName: string; name: string;
   kind: 'goods' | 'property' | 'jobs' | 'service' | 'livestock' | 'plants';
-  priceEnabled: boolean; goodsEnabled: boolean; fields: CategoryField[];
+  priceEnabled: boolean; goodsEnabled: boolean; fields: CategoryField[]; listingPolicy:ListingPolicy;
 };
 type SeedField = Omit<CategoryField, 'order'>;
 const f = (key: string, label: string, type: CategoryFieldType = 'text', options: string[] = [], group = 'المواصفات', unit?: string): SeedField =>
@@ -64,7 +65,7 @@ const equipment = [f('manufacturer', 'المصنع'), f('model', 'الطراز')
   yes('operator_included', 'يشمل المشغل'), s('rate_basis', 'أساس السعر', ['كامل المعدة', 'ساعة', 'يوم', 'شهر']), ...delivery];
 function template(key: string, categoryName: string, name: string, kind: CategorySeedTemplate['kind'], fields: SeedField[], requiredKeys: string[]): CategorySeedTemplate {
   const required = new Set(requiredKeys);
-  return { key, categoryName, name, kind, priceEnabled: kind !== 'jobs', goodsEnabled: kind === 'goods',
+  return { key, categoryName, name, kind, priceEnabled: kind !== 'jobs', goodsEnabled: kind === 'goods', listingPolicy:defaultListingPolicy(kind),
     fields: fields.map((field, order) => ({ ...field, required: field.required || required.has(field.key), order })) };
 }
 

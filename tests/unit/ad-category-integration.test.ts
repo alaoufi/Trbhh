@@ -1,5 +1,7 @@
 import {describe, expect, it} from 'vitest';
+import fs from 'node:fs';
 import {categoryEnabled, categoryPolicy, parseCategorySubmission, projectCategory} from '@/lib/ad-categories/contracts';
+import {CATEGORY_DDL} from '@/lib/ad-categories/schema';
 const field={key:'salary',label:'الراتب',type:'number' as const,group:'الوظيفة',required:false,visible:true,order:0,options:[]};
 describe('real ad category contracts',()=>{
   it('enables only explicit 1',()=>{for(const v of [undefined,null,'','0','false','true','yes']) expect(categoryEnabled(v)).toBe(false);expect(categoryEnabled('1')).toBe(true);});
@@ -11,4 +13,11 @@ describe('real ad category contracts',()=>{
     fd.set('category_values','{"salary":5000}');expect(parseCategorySubmission(fd,{categoryId:12,id:34,version:3,fields:[field]})).toEqual({salary:5000});
   });
   it('omits hidden and unused optional data publicly',()=>expect(projectCategory([field,{...field,key:'private',visible:false}],{private:5})).toEqual([]));
+  it('keeps additive listing policy and exact listing type columns in schema sync and Prisma',()=>{
+    expect(CATEGORY_DDL.join('\n')).toContain('listing_types_json');
+    expect(CATEGORY_DDL.join('\n')).toContain('ALTER TABLE ads ADD COLUMN listing_type');
+    const schema=fs.readFileSync('prisma/schema.prisma','utf8');
+    expect(schema).toContain('listing_types_json');
+    expect(schema).toContain('listing_type');
+  });
 });

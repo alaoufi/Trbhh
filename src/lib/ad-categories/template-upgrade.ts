@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { CategoryKind } from './contracts';
 import type { CategoryField } from './validation';
 import { CATEGORY_SEED_TEMPLATES } from './seed-templates';
+import type {ListingPolicy} from './listing-policy';
 
 export const CATEGORY_LATEST_TEMPLATES_SETTING = 'categories_v2_latest_templates';
 
@@ -11,6 +12,7 @@ type ResolvableDefinition = {
   priceEnabled: boolean;
   goodsEnabled: boolean;
   fields: CategoryField[];
+  listingPolicy?: ListingPolicy;
   fieldsFingerprint?: string;
 };
 
@@ -78,6 +80,7 @@ export function resolveCategoryDefinition(
     priceEnabled: template.priceEnabled,
     goodsEnabled: template.goodsEnabled,
     fields: template.fields.map(field => ({ ...field, options: [...field.options] })),
+    listingPolicy: template.listingPolicy,
     upgradedFromBuiltInV1: true,
   };
 }

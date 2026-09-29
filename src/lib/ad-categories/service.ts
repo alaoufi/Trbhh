@@ -7,12 +7,13 @@ import {CategoryValidationError, validateDefinition, visibleCategoryValues, type
 import {CATEGORY_LATEST_TEMPLATES_SETTING, categoryFieldsFingerprint, resolveCategoryDefinition} from './template-upgrade';
 import {applyPreviewCategoryVisibility,isReadOnlyPreview,parsePreviewCategoryVisibility,PREVIEW_CATEGORY_VISIBILITY_KEY} from '@/lib/read-only-preview';
 import {previewHashGetAll} from '@/lib/redis';
+import {defaultListingPolicy,validateListingPolicy} from './listing-policy';
 type Tx=Prisma.TransactionClient;
-type DefinitionRow={subcategory_id:bigint;version:number;kind:string;price_enabled:number;goods_enabled:number;fields_json:unknown};
+type DefinitionRow={subcategory_id:bigint;version:number;kind:string;price_enabled:number;goods_enabled:number;fields_json:unknown;listing_types_json:unknown|null};
 const json=(v:unknown):unknown=>typeof v==='string'?JSON.parse(v):v;
 function definition(r:DefinitionRow, names?:{categoryName:string;subcategoryName:string;useLatestTemplates:boolean}) {
   const rawFields=json(r.fields_json);
-  const base={version:r.version,kind:r.kind as SubcategoryOption['kind'],...categoryPolicy({kind:r.kind,priceEnabled:r.price_enabled===1,goodsEnabled:r.goods_enabled===1}),fields:validateDefinition(rawFields),fieldsFingerprint:categoryFieldsFingerprint(rawFields)};
+  const base={version:r.version,kind:r.kind as SubcategoryOption['kind'],...categoryPolicy({kind:r.kind,priceEnabled:r.price_enabled===1,goodsEnabled:r.goods_enabled===1}),fields:validateDefinition(rawFields),listingPolicy:r.listing_types_json?validateListingPolicy(json(r.listing_types_json)):defaultListingPolicy(r.kind),fieldsFingerprint:categoryFieldsFingerprint(rawFields)};
   return names?resolveCategoryDefinition(base,names.categoryName,names.subcategoryName,names.useLatestTemplates):{...base,upgradedFromBuiltInV1:false};
 }
 export async function getCategoryFormConfig(admin=false):Promise<CategoryFormConfig> {
@@ -26,7 +27,7 @@ export async function getCategoryFormConfig(admin=false):Promise<CategoryFormCon
   const dm=new Map(defs.map(d=>[Number(d.subcategory_id),d]));
   const catById=new Map(cats.map(c=>[Number(c.id),c]));
   const baseCategories=cats.map(c=>({id:Number(c.id),name:c.name,active:c.is_active==='yes',order:c.ordered}));
-  const baseSubcategories=subs.map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?definition(dm.get(Number(s.id))!,{categoryName:catById.get(s.category_id)?.name||'',subcategoryName:s.name,useLatestTemplates}):{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[]})}));
+  const baseSubcategories=subs.map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?definition(dm.get(Number(s.id))!,{categoryName:catById.get(s.category_id)?.name||'',subcategoryName:s.name,useLatestTemplates}):{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[],listingPolicy:defaultListingPolicy('other')})}));
   const resolved=isReadOnlyPreview()
     ?applyPreviewCategoryVisibility(baseCategories,baseSubcategories,parsePreviewCategoryVisibility(await previewHashGetAll(PREVIEW_CATEGORY_VISIBILITY_KEY)))
     :{categories:baseCategories,subcategories:baseSubcategories};

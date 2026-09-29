@@ -66,7 +66,7 @@ export async function saveSubcategory(fd:FormData){
         if(Number(fd.get('version'))!==(defs[0]?.version??0))throw new CategoryValidationError('','تغيّر التعريف');
         sid=BigInt(id);await tx.sub_categories.update({where:{id:sid},data:{name,order}});
       }else sid=(await tx.sub_categories.create({data:{name,order,category_id:cid,active:0}})).id;
-      await tx.$executeRaw`INSERT INTO ad_category_definitions(subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (${sid},1,${def.kind},${Number(def.priceEnabled)},${Number(def.goodsEnabled)},${JSON.stringify(def.fields)}) ON DUPLICATE KEY UPDATE version=version+1,kind=VALUES(kind),price_enabled=VALUES(price_enabled),goods_enabled=VALUES(goods_enabled),fields_json=VALUES(fields_json)`;
+      await tx.$executeRaw`INSERT INTO ad_category_definitions(subcategory_id,version,kind,price_enabled,goods_enabled,fields_json,listing_types_json) VALUES (${sid},1,${def.kind},${Number(def.priceEnabled)},${Number(def.goodsEnabled)},${JSON.stringify(def.fields)},${JSON.stringify(def.listingPolicy)}) ON DUPLICATE KEY UPDATE version=version+1,kind=VALUES(kind),price_enabled=VALUES(price_enabled),goods_enabled=VALUES(goods_enabled),fields_json=VALUES(fields_json),listing_types_json=VALUES(listing_types_json)`;
       await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'save_subcategory',${JSON.stringify({id:Number(sid),categoryId:cid,name,...def})})`;
     });
   }catch(e){if(e instanceof CategoryValidationError)redirect('/admin/categories?error=input');throw e;}

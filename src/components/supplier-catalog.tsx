@@ -6,6 +6,7 @@ import {Check, CheckCircle2, ChevronLeft, ChevronRight, Eye, EyeOff, ImageOff, L
 import {formatSar} from '@/lib/commerce/money';
 import {CATALOG_SELECTION_LIMIT, type CatalogActions, type CatalogDetail, type CatalogPage, type CatalogProduct, type CatalogReview, type CatalogSearch} from '@/lib/suppliers/catalog-selection';
 import {catalogPriceDrafts, catalogPriceErrors, catalogSelections, changeCatalogSelection, normalizeCatalogPrice, type PriceDrafts} from './supplier-catalog-state';
+import {supplierTrustBadges} from '@/lib/suppliers/trust-badges';
 
 const primary = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#16294a] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#233d65] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b97d16] disabled:cursor-not-allowed disabled:opacity-45';
 const secondary = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#16294a] transition hover:border-amber-400 hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b97d16] disabled:cursor-not-allowed disabled:opacity-45';
@@ -27,7 +28,7 @@ function ProductImage({src, name, sizes = '(max-width: 640px) 100vw, 300px'}: {s
     : <div className="flex h-full min-h-20 flex-col items-center justify-center gap-2 bg-slate-50 text-slate-400"><ImageOff aria-hidden="true" className="h-9 w-9"/><span className="text-xs">لا توجد صورة متاحة</span></div>;
 }
 function Price({minor}: {minor: number}) {return <span className="whitespace-nowrap"><bdi>{formatSar(minor)}</bdi> <span className="text-xs font-medium">ر.س</span></span>;}
-function Status({product}: {product: CatalogProduct}) {return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusStyle[product.status]}`}>{product.statusLabel}</span>;}
+function Status({product}: {product: CatalogProduct}) {const badges=supplierTrustBadges({supplierVerified:false,connected:product.status!=='disconnected',featured:product.status==='published',available:product.available});return <div className="flex flex-wrap items-center gap-1.5"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusStyle[product.status]}`}>{product.statusLabel}</span>{badges.map(badge=><span key={badge.key} className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-900">{badge.label}</span>)}</div>;}
 function Spinner({label}: {label: string}) {return <div role="status" className="flex min-h-48 flex-col items-center justify-center gap-4 text-slate-600"><Loader2 className="h-7 w-7 animate-spin text-[#b97d16]" aria-hidden="true"/>{label}</div>;}
 
 function CatalogDialog({title, children, onClose, saving, returnFocus, fallbackFocus}: {title: string; children: ReactNode; onClose: () => void; saving: boolean; returnFocus: HTMLElement | null; fallbackFocus: HTMLElement | null}) {

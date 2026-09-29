@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { hashPassword, verifyPassword } from '@/lib/auth';
 
-vi.mock('@/lib/settings', () => ({ getAuthSecuritySettings: async () => ({ passwordMinimum: 12, requireAdminMfa: false }) }));
+vi.mock('@/lib/settings', () => ({ getAuthSecuritySettings: async () => ({ passwordMinimum: 6, requireAdminMfa: false }) }));
 
 describe('new password policy', () => {
-  it('rejects the legacy four-digit password when creating a new hash', async () => {
+  it('requires six characters but accepts a simple six-digit password', async () => {
     await expect(hashPassword('4826')).rejects.toThrow();
+    const hash = await hashPassword('482613');
+    expect(await verifyPassword('482613', hash)).toBe(true);
   });
   it('rejects bcrypt truncation beyond 72 UTF-8 bytes', async () => {
     await expect(hashPassword('عبارة آمنة '.repeat(10))).rejects.toThrow();

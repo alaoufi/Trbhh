@@ -854,8 +854,8 @@ export async function getAuthSecuritySettings(): Promise<{ requireAdminMfa: bool
   await ensure();
   const rows = await prisma.site_settings.findMany({ where: { k: { in: [AUTH_REQUIRE_ADMIN_MFA, AUTH_PASSWORD_MIN] } } });
   const values = new Map(rows.map((r) => [r.k, r.v]));
-  const minimum = Number(values.get(AUTH_PASSWORD_MIN) || 12);
-  return { requireAdminMfa: values.get(AUTH_REQUIRE_ADMIN_MFA) === '1', passwordMinimum: Math.max(12, Math.min(64, Number.isFinite(minimum) ? Math.floor(minimum) : 12)) };
+  const minimum = Number(values.get(AUTH_PASSWORD_MIN) || 6);
+  return { requireAdminMfa: values.get(AUTH_REQUIRE_ADMIN_MFA) === '1', passwordMinimum: Math.max(6, Math.min(64, Number.isFinite(minimum) ? Math.floor(minimum) : 6)) };
 }
 
 

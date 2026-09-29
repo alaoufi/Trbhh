@@ -81,4 +81,12 @@ describe('homepage category discovery', () => {
     expect(html).not.toContain('قسم مخفي');
     expect(html).not.toContain('/shop');
   });
+  it('keeps the visual category card compact while preserving touch-sized controls', async () => {
+    const html = renderToStaticMarkup(await HomeCategoryNavigation({ visual: true }));
+    const section = html.match(/<section[^>]*data-testid="home-category-navigation"[^>]*>/)?.[0] || '';
+    expect(section).toContain('space-y-2');
+    expect(section).toContain('p-3');
+    expect(html.match(/<select[^>]*name="category"[^>]*>/)?.[0]).toContain('h-10');
+    expect(html.match(/<button[^>]*type="submit"[^>]*>/)?.[0]).toContain('min-h-10');
+  });
 });

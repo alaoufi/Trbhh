@@ -31,16 +31,16 @@ function Fixture() {
         <button type="button" className="rounded border px-3 py-2" onClick={() => setSingle(false)}>عرض ثلاث شرائح</button>
       </div></details>
     </aside>
-    <div className="commerce-scope public-marketplace-home space-y-7 sm:space-y-10" data-fixture="public-home-components">
+    <div className="commerce-scope public-marketplace-home space-y-4 sm:space-y-5" data-fixture="public-home-components">
       {nationalDay && <NationalDayEntry active />}
       {nationalDay && <NationalDayBanner />}
-      <section className="space-y-4" aria-label="اكتشف سوق تربح">
+      <section className="space-y-3" aria-label="اكتشف سوق تربح">
         <NationalDayHeroFrame active={nationalDay}><CommerceHero compact headingLevel={1} label={nationalDay ? 'احتفال تربح باليوم الوطني' : 'اكتشف تربح'} slides={single ? hero.slice(0, 1) : hero} /></NationalDayHeroFrame>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-extrabold text-[#16294a]">وش تبحث عنه اليوم؟</h2><span className="inline-flex min-h-11 items-center rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-white">أضف إعلانك</span></div>
-          <form onSubmit={event => event.preventDefault()} role="search" aria-label="نموذج تجريبي للبحث" className="space-y-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-extrabold text-[#16294a]">وش تبحث عنه اليوم؟</h2><span className="inline-flex min-h-11 items-center rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-white">أضف إعلانك</span></div>
+          <form onSubmit={event => event.preventDefault()} role="search" aria-label="نموذج تجريبي للبحث" className="space-y-2">
             <div className="flex items-end gap-2"><label className="min-w-0 flex-1 space-y-1 text-xs font-semibold">البحث في الإعلانات<input type="search" placeholder="ماذا تبحث عنه؟" className="h-11 w-full rounded-lg border bg-background px-3 text-sm" /></label><button className="h-11 rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground">بحث</button></div>
-            <details className="rounded-lg border bg-background px-3 py-2"><summary className="cursor-pointer text-sm font-semibold">المنطقة والمدينة · نوع الإعلان · السعر</summary><div className="mt-3 grid grid-cols-2 gap-3 text-sm"><label>المنطقة<select className="mt-1 h-11 w-full rounded-lg border px-2"><option>جميع المناطق</option><option>الرياض</option></select></label><label>نوع الإعلان<select className="mt-1 h-11 w-full rounded-lg border px-2"><option>عرض وطلب</option><option>عروض</option><option>طلبات</option></select></label></div></details>
+            <details className="rounded-lg border bg-background px-3 py-1.5"><summary className="cursor-pointer text-sm font-semibold">المنطقة والمدينة · نوع الإعلان · السعر</summary><div className="mt-3 grid grid-cols-2 gap-3 text-sm"><label>المنطقة<select className="mt-1 h-11 w-full rounded-lg border px-2"><option>جميع المناطق</option><option>الرياض</option></select></label><label>نوع الإعلان<select className="mt-1 h-11 w-full rounded-lg border px-2"><option>عرض وطلب</option><option>عروض</option><option>طلبات</option></select></label></div></details>
           </form>
         </div>
       </section>

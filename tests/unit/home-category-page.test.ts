@@ -91,6 +91,22 @@ it('renders the approved presentation at the public root while retaining the sam
   expect(tree.find(e=>e.type===AdGrid)?.props).toMatchObject({appearance:'marketplace',ads:[{id:2},{id:3},{id:30}]});
  } finally {flag.mockRestore();clock.mockRestore();}
 });
+it('keeps the discovery controls and homepage sections visually compact',async()=>{
+ const settings=await import('@/lib/settings');
+ const flag=vi.spyOn(settings,'getSettingBool').mockImplementation(async key=>key==='home_discovery_on');
+ try {
+  const tree=elements(await HomePage({searchParams:Promise.resolve({})}));
+  const root=tree.find(e=>e.props['data-home-version']==='marketplace-v2');
+  expect(root?.props.className).toContain('space-y-4 sm:space-y-5');
+  const discovery=tree.find(e=>e.props['aria-label']==='اكتشف سوق تربح');
+  expect(discovery?.props.className).toContain('space-y-3');
+  const searchCard=tree.find(e=>typeof e.props.className==='string'&&e.props.className.includes('border-slate-200'));
+  expect(searchCard?.props.className).toContain('p-3');
+  expect(searchCard?.props.className).toContain('sm:p-4');
+  const searchHeadingRow=tree.find(e=>typeof e.props.className==='string'&&e.props.className.includes('flex-wrap items-center justify-between'));
+  expect(searchHeadingRow?.props.className).toContain('mb-2');
+ } finally {flag.mockRestore();}
+});
 it.each([
  ['2026-09-20T20:59:59.999Z',false],
  ['2026-09-20T21:00:00.000Z',true],

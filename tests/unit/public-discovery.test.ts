@@ -82,4 +82,9 @@ describe('public search form controls', () => {
     expect(html).not.toContain('>الخرج<');
     expect(html).toMatch(/name="area"[^>]*disabled/);
   });
+  it('uses tighter vertical rhythm only in the compact homepage form', () => {
+    const html = renderToStaticMarkup(createElement(PublicSearchForm, { ...location, compact: true }));
+    expect(html.match(/<form[^>]*role="search"[^>]*>/)?.[0]).toContain('space-y-2');
+    expect(html.match(/<details[^>]*>/)?.[0]).toContain('py-1.5');
+  });
 });

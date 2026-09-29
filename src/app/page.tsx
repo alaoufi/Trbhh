@@ -143,7 +143,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const heroSlides = nationalDayActive ? nationalDayHeroSlides() : marketplaceHeroSlides;
 
   return (
-    <div className="commerce-scope public-marketplace-home space-y-7 sm:space-y-10" data-home-version="marketplace-v2" data-home-campaign={nationalDayActive ? 'saudi-national-day-2026' : undefined}>
+    <div className="commerce-scope public-marketplace-home space-y-4 sm:space-y-5" data-home-version="marketplace-v2" data-home-campaign={nationalDayActive ? 'saudi-national-day-2026' : undefined}>
       {nationalDayActive && <NationalDayEntry active />}
       {/* ✅ تأكيد نشر الإعلان — يظهر بعد النشر الناجح والتحويل للرئيسية */}
       {sp.published && (
@@ -156,7 +156,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
       {nationalDayActive && <NationalDayBanner />}
 
       {discoveryOn && (
-        <section className="space-y-4" aria-label="اكتشف سوق تربح">
+        <section className="space-y-3" aria-label="اكتشف سوق تربح">
           <NationalDayHeroFrame active={nationalDayActive}>
             <CommerceHero
               compact
@@ -166,8 +166,8 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
               slides={heroSlides}
             />
           </NationalDayHeroFrame>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-extrabold text-[#16294a]">وش تبحث عنه اليوم؟</h2>
               <Link href="/ads/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>
             </div>

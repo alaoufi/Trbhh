@@ -8,12 +8,14 @@ import {bustAdCaches} from '@/lib/data';
 import {categoryId,CATEGORY_LABELS} from '@/lib/ad-categories/contracts';
 import {parseSubcategoryDefinition} from '@/lib/ad-categories/admin-input';
 import {CategoryValidationError} from '@/lib/ad-categories/validation';
+import {CATEGORY_LATEST_TEMPLATES_SETTING} from '@/lib/ad-categories/template-upgrade';
 
 async function refresh(){await bustAdCaches();revalidatePath('/admin/categories');revalidatePath('/ads/new');revalidatePath('/ads/[id]','page');revalidatePath('/companies/[id]/p/[adId]','page');}
 function nameAndOrder(fd:FormData){const name=String(fd.get('name')||'').trim(),order=Number(fd.get('order')||0);if(!name||name.length>200||!Number.isSafeInteger(order)||order<0||order>10000)throw new CategoryValidationError('','الاسم أو الترتيب غير صالح');return {name,order};}
 export async function saveCategorySettings(fd:FormData){
   await requireAction('categories','edit');
   await setSetting('categories_v2_enabled',fd.get('enabled')==='1'?'1':'0');
+  await setSetting(CATEGORY_LATEST_TEMPLATES_SETTING,fd.get('latest_templates')==='1'?'1':'0');
   for(const [k,fallback] of Object.entries(CATEGORY_LABELS)) await setSetting(`categories_v2_label_${k}`,String(fd.get(`label_${k}`)||fallback).trim().slice(0,500));
   await refresh();redirect('/admin/categories?saved=1');
 }

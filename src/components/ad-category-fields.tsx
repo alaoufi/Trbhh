@@ -19,9 +19,14 @@ export function AdCategoryFields({ fields, values, onChange }: {
         {active.filter(f => f.group === group).map(f => {
           const value = current[f.key];
           const id = `category-field-${f.key}`;
-          const label = `${f.label}${f.unit ? ` (${f.unit})` : ''}${f.required ? ' *' : ''}`;
+          const label = `${f.label}${f.unit ? ` (${f.unit})` : ''}`;
           return <div key={f.key} className={f.type === 'textarea' ? 'sm:col-span-2' : ''}>
-            <label htmlFor={id} className="text-sm font-medium">{label}</label>
+            <label htmlFor={id} className="flex items-center gap-1.5 text-sm font-medium">
+              <span>{label}</span>
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${f.required ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-600'}`}>
+                {f.required ? 'مطلوب' : 'اختياري'}
+              </span>
+            </label>
             {f.type === 'select' || f.type === 'multiselect'
               ? <select id={id} className={control} required={f.required} multiple={f.type === 'multiselect'}
                 value={f.type === 'multiselect' ? (Array.isArray(value) ? value : []) : String(value ?? '')}

@@ -49,6 +49,14 @@ async function run(){
       await sub.selectOption(land);
       assert.equal(await page.locator('#category-field-job_title').count(),0);
       assert((await page.locator('[id^="category-field-"]').count())>=6);
+      assert.equal(await page.locator('#category-field-area_m2').getAttribute('required'),'');
+      assert((await page.getByText('مطلوب',{exact:true}).count())>0);
+      assert((await page.getByText('اختياري',{exact:true}).count())>0);
+      const commercial=await sub.locator('option').evaluateAll(os=>os.find(o=>/محلات|مكاتب|مستودعات/.test(o.textContent))?.value);
+      await sub.selectOption(commercial);
+      assert.equal(await page.locator('#category-field-frontage_m').count(),1);
+      assert.equal(await page.locator('#category-field-ceiling_height_m').count(),1);
+      assert.equal(await page.locator('#category-field-north_boundary').count(),0);
       await page.setViewportSize({width:390,height:844});
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
       await page.screenshot({path:path.join(artifacts,'land-form-mobile.png'),fullPage:true});

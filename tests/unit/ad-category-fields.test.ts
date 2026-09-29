@@ -18,6 +18,10 @@ describe('single-page grouped category fields', () => {
     expect(html).not.toContain('مستعمل');
     expect(html).not.toContain('مخفي');
     expect(html).toContain('name="category_values"');
+    expect(html).toContain('نوع العقد');
+    expect(html).toContain('مطلوب');
+    expect(html).toContain('المهارات');
+    expect(html).toContain('اختياري');
   });
   it('does not submit stale or hidden values after switching subcategory', () => {
     const html = renderToStaticMarkup(createElement(AdCategoryFields, { fields, values: { hidden: 'SECRET', old: 'OLD', contract: 'دائم' }, onChange: () => {} }));

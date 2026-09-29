@@ -329,7 +329,7 @@ export function AdForm({
             </select></label>
           </div>
           <input type="hidden" name="category_version" value={selectedSub?.version || ''}/>
-          {selectedSub && <AdCategoryFields fields={selectedSub.fields} values={categoryValues} onChange={setCategoryValues}/>}
+          {selectedSub && <AdCategoryFields key={`${selectedSub.id}:${selectedSub.version}`} fields={selectedSub.fields} values={categoryValues} onChange={setCategoryValues}/>}
           </>}
         </fieldset>}
         <div>

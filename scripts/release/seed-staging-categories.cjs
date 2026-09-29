@@ -19,6 +19,7 @@ async function main() {
         const cats = await tx.$queryRawUnsafe('SELECT id,name FROM categories WHERE name=? LIMIT 2', template.categoryName);
         if (cats.length > 1) throw new Error('ambiguous_category');
         let category = cats[0];
+        const categoryCreated = !category;
         if (!category) {
           category = (await tx.$queryRawUnsafe("INSERT INTO categories (name,photo_path,is_active,ordered) VALUES (?, '', 'yes', 0)", template.categoryName),
             (await tx.$queryRawUnsafe('SELECT id,name FROM categories WHERE name=? ORDER BY id DESC LIMIT 1', template.categoryName))[0]);
@@ -27,6 +28,7 @@ async function main() {
         const subs = await tx.$queryRawUnsafe('SELECT id,name FROM sub_categories WHERE category_id=? AND name=? LIMIT 2', category.id, template.name);
         if (subs.length > 1) throw new Error('ambiguous_subcategory');
         let sub = subs[0];
+        const subcategoryCreated = !sub;
         if (!sub) {
           await tx.$executeRawUnsafe('INSERT INTO sub_categories (category_id,name,`order`,active) VALUES (?, ?, 0, 1)', category.id, template.name);
           sub = (await tx.$queryRawUnsafe('SELECT id,name FROM sub_categories WHERE category_id=? AND name=? ORDER BY id DESC LIMIT 1', category.id, template.name))[0];
@@ -38,8 +40,9 @@ async function main() {
           await tx.$executeRawUnsafe('INSERT INTO ad_category_definitions (subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (?,1,?,?,?,?)', sub.id, template.kind, Number(template.priceEnabled), Number(template.goodsEnabled), JSON.stringify(template.fields));
           result.definitionsAdded++;
         }
-        await tx.$executeRawUnsafe("UPDATE categories SET is_active='yes' WHERE id=?", category.id);
-        await tx.$executeRawUnsafe('UPDATE sub_categories SET active=1 WHERE id=?', sub.id);
+        // Existing admin visibility is authoritative; only newly-created rows get defaults.
+        if (categoryCreated) await tx.$executeRawUnsafe("UPDATE categories SET is_active='yes' WHERE id=?", category.id);
+        if (subcategoryCreated) await tx.$executeRawUnsafe('UPDATE sub_categories SET active=1 WHERE id=?', sub.id);
       }
       await tx.$executeRawUnsafe("INSERT INTO site_settings (k,v) VALUES ('categories_v2_enabled','1') ON DUPLICATE KEY UPDATE v='1'");
     });

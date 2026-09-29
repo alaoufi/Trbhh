@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, PlusCircle, Mail, Building2, Search, LogIn, Share2, Users, Phone, MessageCircle, Send, Wallet, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { SITE } from '@/lib/constants';
 
 type NavItem = { href: string; label: string; icon: LucideIcon; primary?: boolean; badge?: boolean };
 
@@ -28,15 +27,18 @@ const guestItems: NavItem[] = [
   { href: '/search', label: 'بحث', icon: Search },
 ];
 
-export function MobileNav({ unread = 0, isAuthed = false }: { unread?: number; isAuthed?: boolean }) {
+export function MobileNav({ unread = 0, isAuthed = false, supportWhatsappHref = null, supportPhoneHref = null }: {
+  unread?: number;
+  isAuthed?: boolean;
+  supportWhatsappHref?: string | null;
+  supportPhoneHref?: string | null;
+}) {
   const path = usePathname();
   const items = isAuthed ? authedItems : guestItems;
   const [contactOpen, setContactOpen] = useState(false);
-  const waPhone = SITE.phone.replace(/\D/g, '').replace(/^00/, '');
-  const telPhone = '+' + waPhone;
   const contactLinks = [
-    { label: 'اتصال هاتفي', href: `tel:${telPhone}`, icon: Phone, cls: 'text-red-600' },
-    { label: 'واتساب', href: `https://wa.me/${waPhone}`, icon: MessageCircle, cls: 'text-[#25D366]' },
+    ...(supportPhoneHref ? [{ label: 'اتصال بخدمة عملاء تربح', href: supportPhoneHref, icon: Phone, cls: 'text-red-600' }] : []),
+    ...(supportWhatsappHref ? [{ label: 'واتساب خدمة عملاء تربح', href: supportWhatsappHref, icon: MessageCircle, cls: 'text-[#25D366]' }] : []),
     { label: 'مراسلة الإدارة', href: '/messages/admin', icon: Send, cls: 'text-primary' },
   ];
 

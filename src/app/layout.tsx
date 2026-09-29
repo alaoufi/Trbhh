@@ -13,7 +13,7 @@ import { ForceUpdateGate } from '@/components/force-update-gate';
 import { InstallPrompt } from '@/components/install-prompt';
 import { ClassifiedSplash } from '@/components/classified-splash';
 import { getSplashClassifieds } from '@/lib/classified';
-import { getClassifiedSplashSeconds } from '@/lib/settings';
+import { getClassifiedSplashSeconds, getSetting, getSettingBool } from '@/lib/settings';
 import { SITE } from '@/lib/constants';
 import { primaryOrigin } from '@/lib/public-origin';
 import { getSession } from '@/lib/auth';
@@ -22,6 +22,7 @@ import { AdPixels } from '@/components/ad-pixels';
 import { VerifySeal } from '@/components/verify-seal';
 import { SealReposition } from '@/components/seal-reposition';
 import { NavigationProgress } from '@/components/navigation-progress';
+import { customerServiceContactPolicy } from '@/lib/contact-policy';
 
 const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', display: 'swap' });
 
@@ -74,11 +75,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const ck = await cookies();
   const theme = ck.get('theme')?.value || '';
   const design = ck.get('design')?.value || '';
-  const [unread, isAdminUser, splashSeconds] = await Promise.all([
+  const [unread, isAdminUser, splashSeconds, supportWhatsappOn, supportPhoneOn, supportWhatsapp, supportPhone] = await Promise.all([
     session ? getMyStats(session.uid).then((s) => s.unread).catch(() => 0) : Promise.resolve(0),
     session ? import('@/lib/roles').then((m) => m.hasAnyAdmin(session.uid)).catch(() => false) : Promise.resolve(false),
     getClassifiedSplashSeconds().catch(() => 5),
+    getSettingBool('customer_service_whatsapp_on', true).catch(() => true),
+    getSettingBool('customer_service_phone_on', true).catch(() => true),
+    getSetting('customer_service_whatsapp_number', SITE.phone).catch(() => SITE.phone),
+    getSetting('customer_service_phone_number', SITE.phone).catch(() => SITE.phone),
   ]);
+  const supportContact = customerServiceContactPolicy({
+    whatsappEnabled: supportWhatsappOn,
+    phoneEnabled: supportPhoneOn,
+    whatsapp: supportWhatsapp,
+    phone: supportPhone,
+    message: 'خدمة عملاء تربح',
+  });
   // شاشة المبوّبات الافتتاحية تُحجب كلياً عن أعضاء الإدارة (لا تعيقهم عن عملهم)
   let splashAds: Awaited<ReturnType<typeof getSplashClassifieds>> = [];
   if (!isAdminUser) {
@@ -135,7 +147,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             the shared header/menu/footer, even across client-side navigation. */}
         <ChromeGate
           header={<Header />}
-          footer={<><VerifySeal /><Footer /><MobileNav unread={unread} isAuthed={!!session} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
+          footer={<><VerifySeal /><Footer /><MobileNav unread={unread} isAuthed={!!session} supportWhatsappHref={supportContact.whatsappHref} supportPhoneHref={supportContact.phoneHref} /><ClassifiedSplash ads={splashAds} seconds={splashSeconds} /></>}
         >
           {children}
         </ChromeGate>

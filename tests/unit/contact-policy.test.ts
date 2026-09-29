@@ -75,10 +75,17 @@ describe('public contact policy', () => {
     const storePage = readFileSync('src/app/companies/[id]/page.tsx', 'utf8');
     const storeProductPage = readFileSync('src/app/companies/[id]/p/[adId]/page.tsx', 'utf8');
     const homePage = readFileSync('src/app/page.tsx', 'utf8');
+    const layout = readFileSync('src/app/layout.tsx', 'utf8');
+    const mobileNav = readFileSync('src/components/mobile-nav.tsx', 'utf8');
     expect(adPage).toContain('sellerContactPolicy(');
     expect(storePage).toContain('sellerContactPolicy(');
     expect(storeProductPage).toContain('sellerContactPolicy(');
     expect(homePage).toContain('customerServiceContactPolicy(');
     expect(homePage).not.toContain("SITE.phone.replace(/\\D/g, '').replace(/^00/, '')");
+    expect(layout).toContain('customerServiceContactPolicy(');
+    expect(layout).toContain('supportWhatsappHref={supportContact.whatsappHref}');
+    expect(mobileNav).toContain('supportWhatsappHref');
+    expect(mobileNav).toContain('supportPhoneHref');
+    expect(mobileNav).not.toContain('SITE.phone');
   });
 });

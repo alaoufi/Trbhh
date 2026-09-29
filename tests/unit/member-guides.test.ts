@@ -15,6 +15,7 @@ describe('member account guide links', () => {
     expect(read('src/app/guide/store/page.tsx')).toContain('رقم خدمة عملاء تربح مستقل');
     expect(read('src/app/admin/guide/page.tsx')).toContain('واتساب البائع');
     expect(read('src/app/admin/guide/page.tsx')).toContain('رقم واتساب خدمة العملاء');
+    expect(read('src/app/guide/page.tsx')).toContain('قائمة الجوال السفلية');
   });
 
   it('documents the admin-controlled personalized discovery feed', () => {

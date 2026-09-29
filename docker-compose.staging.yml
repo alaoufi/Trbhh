@@ -24,5 +24,7 @@ services:
     environment:
       CATEGORIES_DEFAULT_ENABLED: "1"
       STAGING_DATABASE_NAME: "trbhhdb"
+      # Preview is accessed directly over HTTP on port 3081; Secure cookies would loop back to login.
+      COOKIE_SECURE: "false"
     # المنفذ يُضبط من APP_PORT في .env التجريب (=3081). لا نضيف ports هنا حتى لا
     # تُدمَج قائمتا المنافذ فيُفتح منفذ الإنتاج أيضاً بالخطأ.

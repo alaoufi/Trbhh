@@ -282,7 +282,6 @@ model ad_category_definitions {
   price_enabled Int @default(1) @db.TinyInt
   goods_enabled Int @default(0) @db.TinyInt
   fields_json Json
-  listing_types_json Json?
 }
 
 model ad_category_values {
@@ -560,7 +559,6 @@ model ads {
   stock_state      Int            @default(0) @db.TinyInt
   old_price        Float          @default(0)
   rent_period      String?        @db.VarChar(20)
-  listing_type     String?        @db.VarChar(24)
   data_archive     String?
   data_delete      String?
   price            Float          @default(0)

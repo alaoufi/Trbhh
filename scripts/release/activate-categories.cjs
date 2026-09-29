@@ -41,7 +41,7 @@ async function activate(db,payload,options){
   check(payload.format==='trbhh-category-activation-v1' && /^[a-f0-9]{64}$/.test(payload.sourceSha256||'') && Array.isArray(payload.templates) && payload.templates.length>0 && payload.templates.length<=100,'payload_invalid');
   const seen=new Set();
   for(const t of payload.templates){
-    check(t && /^[a-z][a-z0-9_]{0,63}$/.test(t.key) && !seen.has(t.key) && typeof t.name==='string' && t.name.length>0 && t.name.length<=255 && typeof t.categoryName==='string' && t.categoryName.length>0 && t.categoryName.length<=255 && Array.isArray(t.fields) && t.fields.length<=80 && ['goods','property','jobs','service','livestock','plants'].includes(t.kind) && typeof t.priceEnabled==='boolean' && typeof t.goodsEnabled==='boolean','payload_invalid');
+    check(t && /^[a-z][a-z0-9_]{0,63}$/.test(t.key) && !seen.has(t.key) && typeof t.name==='string' && t.name.length>0 && t.name.length<=255 && typeof t.categoryName==='string' && t.categoryName.length>0 && t.categoryName.length<=255 && Array.isArray(t.fields) && t.fields.length<=80 && t.listingPolicy && Array.isArray(t.listingPolicy.types) && t.listingPolicy.types.length>0 && ['goods','property','jobs','service','livestock','plants'].includes(t.kind) && typeof t.priceEnabled==='boolean' && typeof t.goodsEnabled==='boolean','payload_invalid');
     seen.add(t.key);
   }
   return db.$transaction(async tx=>{
@@ -87,7 +87,8 @@ async function activate(db,payload,options){
       }
       check(BigInt(sub.id)<=2147483647n,'subcategory_id_overflow');
       if(!defs.some(d=>BigInt(d.subcategory_id)===BigInt(sub.id))){
-        await tx.$executeRawUnsafe('INSERT INTO ad_category_definitions (subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (?,1,?,?,?,?)',sub.id,t.kind,Number(t.priceEnabled),Number(t.goodsEnabled),JSON.stringify(t.fields));
+        const stored={schemaVersion:2,fields:t.fields,listingPolicy:t.listingPolicy};
+        await tx.$executeRawUnsafe('INSERT INTO ad_category_definitions (subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (?,1,?,?,?,?)',sub.id,t.kind,Number(t.priceEnabled),Number(t.goodsEnabled),JSON.stringify(stored));
         defs.push({subcategory_id:sub.id});result.definitionsAdded++;
       }else result.definitionsPreserved++;
       await tx.$executeRawUnsafe("UPDATE categories SET is_active='yes' WHERE id=?",cat.id);

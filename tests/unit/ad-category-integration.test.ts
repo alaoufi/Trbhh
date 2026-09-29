@@ -13,11 +13,12 @@ describe('real ad category contracts',()=>{
     fd.set('category_values','{"salary":5000}');expect(parseCategorySubmission(fd,{categoryId:12,id:34,version:3,fields:[field]})).toEqual({salary:5000});
   });
   it('omits hidden and unused optional data publicly',()=>expect(projectCategory([field,{...field,key:'private',visible:false}],{private:5})).toEqual([]));
-  it('keeps additive listing policy and exact listing type columns in schema sync and Prisma',()=>{
-    expect(CATEGORY_DDL.join('\n')).toContain('listing_types_json');
-    expect(CATEGORY_DDL.join('\n')).toContain('ALTER TABLE ads ADD COLUMN listing_type');
+  it('stores policy without adding preview-breaking database columns',()=>{
+    expect(CATEGORY_DDL.join('\n')).not.toContain('listing_types_json');
+    expect(CATEGORY_DDL.join('\n')).not.toContain('ADD COLUMN listing_type');
     const schema=fs.readFileSync('prisma/schema.prisma','utf8');
-    expect(schema).toContain('listing_types_json');
-    expect(schema).toContain('listing_type');
+    expect(schema).not.toContain('listing_types_json');
+    expect(schema).not.toContain('listing_type');
+    expect(schema).toContain('sale_type');
   });
 });

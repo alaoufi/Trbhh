@@ -789,6 +789,7 @@ export async function getAdForEdit(id: number, userId: number) {
     stockState: ad.stock_state ?? 0,
     priceType: ad.price_type ?? null,
     rentPeriod: ad.rent_period ?? null,
+    listingType: ad.sale_type ?? null,
   };
 }
 

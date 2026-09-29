@@ -37,7 +37,8 @@ async function main() {
         const defs = await tx.$queryRawUnsafe('SELECT subcategory_id FROM ad_category_definitions WHERE subcategory_id=? LIMIT 1', sub.id);
         if (defs.length) result.definitionsPreserved++;
         else {
-          await tx.$executeRawUnsafe('INSERT INTO ad_category_definitions (subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (?,1,?,?,?,?)', sub.id, template.kind, Number(template.priceEnabled), Number(template.goodsEnabled), JSON.stringify(template.fields));
+          const stored = { schemaVersion: 2, fields: template.fields, listingPolicy: template.listingPolicy };
+          await tx.$executeRawUnsafe('INSERT INTO ad_category_definitions (subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (?,1,?,?,?,?)', sub.id, template.kind, Number(template.priceEnabled), Number(template.goodsEnabled), JSON.stringify(stored));
           result.definitionsAdded++;
         }
         // Existing admin visibility is authoritative; only newly-created rows get defaults.

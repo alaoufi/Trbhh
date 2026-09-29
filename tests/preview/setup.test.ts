@@ -37,7 +37,8 @@ it('seeds only an empty dedicated loopback preview with synthetic accounts', asy
         categoryId = cat.id; cats.set(seed.categoryName, categoryId);
       }
       const sub = await db.sub_categories.create({ data: { name: seed.name, category_id: Number(categoryId), active: 1 } });
-      await db.$executeRaw`INSERT INTO ad_category_definitions (subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (${sub.id},1,${seed.kind},${Number(seed.priceEnabled)},${Number(seed.goodsEnabled)},${JSON.stringify(seed.fields)})`;
+      const stored={schemaVersion:2,fields:seed.fields,listingPolicy:seed.listingPolicy};
+      await db.$executeRaw`INSERT INTO ad_category_definitions (subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (${sub.id},1,${seed.kind},${Number(seed.priceEnabled)},${Number(seed.goodsEnabled)},${JSON.stringify(stored)})`;
       if (seed.key === 'job') {
         // Prisma's active enum maps to the database value '1'.
         const ad = await db.ads.create({ data: { title: 'وظيفة محاسب — إعلان اختبار محلي', detail: 'فرصة عمل تجريبية للتحقق من عرض حقول الوظيفة دون حالة سلعة أو سعر بيع.', adsType: 'offer', user_id: 2n, city_id: 1n, category_id: categoryId, subcategory_id: Number(sub.id), video_path: '', adsSpecial: 'no', status: 1, state: 'active', created_at: new Date() } });

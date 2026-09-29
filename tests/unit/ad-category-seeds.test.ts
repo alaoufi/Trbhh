@@ -1,14 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORY_SEED_TEMPLATES } from '@/lib/ad-categories/seed-templates';
 import { validateDefinition } from '@/lib/ad-categories/validation';
+import {validateListingPolicy} from '@/lib/ad-categories/listing-policy';
 describe('editable specialist subcategory seed templates', () => {
   it('has unique keys and valid domain-specific definitions for each requested group', () => {
     expect(new Set(CATEGORY_SEED_TEMPLATES.map(t => t.key)).size).toBe(CATEGORY_SEED_TEMPLATES.length);
     expect(CATEGORY_SEED_TEMPLATES.length).toBeGreaterThanOrEqual(24);
     for (const template of CATEGORY_SEED_TEMPLATES) {
       expect(validateDefinition(template.fields).length).toBeGreaterThanOrEqual(6);
+      expect(validateListingPolicy(template.listingPolicy).types.length).toBeGreaterThan(0);
       expect(template.fields.some(field => field.required), `${template.key} needs required fields`).toBe(true);
       expect(template.fields.some(field => !field.required), `${template.key} needs optional fields`).toBe(true);
+    }
+  });
+  it('separates transaction pricing from equipment attributes',()=>{
+    for(const key of ['earthmoving','lifting','commercial_vehicles']){
+      const template=CATEGORY_SEED_TEMPLATES.find(t=>t.key===key)!;
+      expect(template.fields.map(f=>f.key)).not.toEqual(expect.arrayContaining(['offer_mode','rate_basis']));
+      const sale=template.listingPolicy.types.find(type=>type.key==='sale')!;
+      const rent=template.listingPolicy.types.find(type=>type.key==='rent')!;
+      expect(sale.pricing).toEqual(['fixed','bidding']);
+      expect(rent.pricing).toEqual(expect.arrayContaining(['day','month','project']));
+      if(key!=='commercial_vehicles')expect(rent.pricing).toContain('hour');
+    }
+  });
+  it('uses reusable conditions for used vehicles and rental equipment',()=>{
+    const car=CATEGORY_SEED_TEMPLATES.find(t=>t.key==='car')!;
+    expect(car.fields.find(f=>f.key==='odometer_km')).toMatchObject({dependsOn:'condition',dependencyOperator:'in',dependencyValue:['مستعمل','مجدد']});
+    const lifting=CATEGORY_SEED_TEMPLATES.find(t=>t.key==='lifting')!;
+    expect(lifting.fields.find(f=>f.key==='operator_included')).toMatchObject({dependsOn:'listing_type',dependencyValue:'rent'});
+    expect(lifting.fields.map(f=>f.key)).toEqual(expect.arrayContaining(['power_source','capacity_t','lift_height_m','mast_stages','boom_length_m','platform_capacity_kg']));
+  });
+  it('does not duplicate property rental price and period inside attributes',()=>{
+    for(const template of CATEGORY_SEED_TEMPLATES.filter(t=>t.kind==='property')){
+      expect(template.fields.map(f=>f.key)).not.toEqual(expect.arrayContaining(['rent_amount','rent_period']));
+      expect(template.listingPolicy.types.map(t=>t.key)).toEqual(expect.arrayContaining(['sale','rent','wanted','wanted_rent']));
     }
   });
   it('gives every subcategory its own precise field definition', () => {
@@ -31,7 +57,7 @@ describe('editable specialist subcategory seed templates', () => {
   it('includes deeper land, villa and car attributes instead of a generic product form', () => {
     const keys = (key: string) => CATEGORY_SEED_TEMPLATES.find(t => t.key === key)!.fields.map(f => f.key);
     expect(keys('land')).toEqual(expect.arrayContaining(['land_use', 'terrain', 'area_m2', 'north_boundary', 'south_boundary', 'east_boundary', 'west_boundary']));
-    expect(keys('villa')).toEqual(expect.arrayContaining(['rooms', 'bathrooms', 'floors', 'finish', 'rent_amount']));
+    expect(keys('villa')).toEqual(expect.arrayContaining(['rooms', 'bathrooms', 'floors', 'finish']));
     expect(keys('car')).toEqual(expect.arrayContaining(['make', 'model', 'year', 'odometer_km', 'specification', 'accident_history']));
     expect(CATEGORY_SEED_TEMPLATES.find(t => t.key === 'apartment')!.fields.filter(f => f.required).map(f => f.key))
       .toEqual(expect.arrayContaining(['area_m2', 'rooms', 'bathrooms', 'floor_number']));

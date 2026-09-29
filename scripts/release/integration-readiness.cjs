@@ -6,7 +6,8 @@ async function main() {
   const categories = await db.$queryRawUnsafe("SELECT c.id,c.name,c.is_active,COUNT(DISTINCT s.id) AS subcategories,COUNT(DISTINCT d.subcategory_id) AS definitions FROM categories c LEFT JOIN sub_categories s ON s.category_id=c.id AND s.active=1 LEFT JOIN ad_category_definitions d ON d.subcategory_id=s.id GROUP BY c.id,c.name,c.is_active ORDER BY c.ordered,c.id");
   const definitions = await db.$queryRawUnsafe("SELECT s.id,s.name,d.kind,d.price_enabled,d.goods_enabled,d.fields_json FROM sub_categories s JOIN ad_category_definitions d ON d.subcategory_id=s.id WHERE s.active=1");
   const summary = definitions.map(d => {
-    const fields = typeof d.fields_json === 'string' ? JSON.parse(d.fields_json) : d.fields_json;
+    const stored = typeof d.fields_json === 'string' ? JSON.parse(d.fields_json) : d.fields_json;
+    const fields = Array.isArray(stored) ? stored : stored.fields;
     return {id:d.id,name:d.name,kind:d.kind,price:d.price_enabled,condition:d.goods_enabled,fieldCount:fields.length,fields:fields.map(f => ({key:f.key,label:f.label,type:f.type,required:f.required,hidden:f.hidden}))};
   });
   const counts = await db.$queryRawUnsafe('SELECT (SELECT COUNT(*) FROM ads) AS ads,(SELECT COUNT(*) FROM users) AS members,(SELECT COUNT(*) FROM stores) AS stores');

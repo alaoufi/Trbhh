@@ -7,10 +7,11 @@ import {setSetting} from '@/lib/settings';
 import {bustAdCaches} from '@/lib/data';
 import {categoryId,CATEGORY_LABELS} from '@/lib/ad-categories/contracts';
 import {parseSubcategoryDefinition} from '@/lib/ad-categories/admin-input';
-import {CategoryValidationError} from '@/lib/ad-categories/validation';
+import {CategoryValidationError,validateDefinition} from '@/lib/ad-categories/validation';
 import {CATEGORY_LATEST_TEMPLATES_SETTING} from '@/lib/ad-categories/template-upgrade';
 import {isReadOnlyPreview,PREVIEW_CATEGORY_VISIBILITY_KEY} from '@/lib/read-only-preview';
 import {previewHashSet} from '@/lib/redis';
+import {decodeStoredCategoryDefinition,encodeStoredCategoryDefinition} from '@/lib/ad-categories/storage';
 
 async function refresh(){await bustAdCaches();revalidatePath('/admin/categories');revalidatePath('/ads/new');revalidatePath('/ads/[id]','page');revalidatePath('/companies/[id]/p/[adId]','page');}
 function nameAndOrder(fd:FormData){const name=String(fd.get('name')||'').trim(),order=Number(fd.get('order')||0);if(!name||name.length>200||!Number.isSafeInteger(order)||order<0||order>10000)throw new CategoryValidationError('','الاسم أو الترتيب غير صالح');return {name,order};}
@@ -62,11 +63,20 @@ export async function saveSubcategory(fd:FormData){
       if(id){
         const subs=await tx.$queryRaw<{category_id:number}[]>`SELECT category_id FROM sub_categories WHERE id=${id} FOR UPDATE`;
         if(!subs.length||subs[0].category_id!==cid)throw new CategoryValidationError('','لا يمكن نقل القسم الفرعي');
-        const defs=await tx.$queryRaw<{version:number}[]>`SELECT version FROM ad_category_definitions WHERE subcategory_id=${id} FOR UPDATE`;
+        const defs=await tx.$queryRaw<{version:number;fields_json:unknown}[]>`SELECT version,fields_json FROM ad_category_definitions WHERE subcategory_id=${id} FOR UPDATE`;
         if(Number(fd.get('version'))!==(defs[0]?.version??0))throw new CategoryValidationError('','تغيّر التعريف');
+        if(defs[0]){
+          const previous=validateDefinition(decodeStoredCategoryDefinition(defs[0].fields_json).fields),nextByKey=new Map(def.fields.map(field=>[field.key,field]));
+          const changedType=previous.some(field=>nextByKey.has(field.key)&&nextByKey.get(field.key)!.type!==field.type);
+          if(changedType){
+            const [{count}]=await tx.$queryRaw<{count:bigint}[]>`SELECT COUNT(*) AS count FROM ad_category_values WHERE subcategory_id=${id} FOR SHARE`;
+            if(count>0n)throw new CategoryValidationError('','لا يمكن تغيير نوع حقل مستخدم؛ أنشئ حقلًا جديدًا وأخفِ القديم');
+          }
+        }
         sid=BigInt(id);await tx.sub_categories.update({where:{id:sid},data:{name,order}});
       }else sid=(await tx.sub_categories.create({data:{name,order,category_id:cid,active:0}})).id;
-      await tx.$executeRaw`INSERT INTO ad_category_definitions(subcategory_id,version,kind,price_enabled,goods_enabled,fields_json,listing_types_json) VALUES (${sid},1,${def.kind},${Number(def.priceEnabled)},${Number(def.goodsEnabled)},${JSON.stringify(def.fields)},${JSON.stringify(def.listingPolicy)}) ON DUPLICATE KEY UPDATE version=version+1,kind=VALUES(kind),price_enabled=VALUES(price_enabled),goods_enabled=VALUES(goods_enabled),fields_json=VALUES(fields_json),listing_types_json=VALUES(listing_types_json)`;
+      const stored=encodeStoredCategoryDefinition(def.fields,def.listingPolicy);
+      await tx.$executeRaw`INSERT INTO ad_category_definitions(subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (${sid},1,${def.kind},${Number(def.priceEnabled)},${Number(def.goodsEnabled)},${JSON.stringify(stored)}) ON DUPLICATE KEY UPDATE version=version+1,kind=VALUES(kind),price_enabled=VALUES(price_enabled),goods_enabled=VALUES(goods_enabled),fields_json=VALUES(fields_json)`;
       await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'save_subcategory',${JSON.stringify({id:Number(sid),categoryId:cid,name,...def})})`;
     });
   }catch(e){if(e instanceof CategoryValidationError)redirect('/admin/categories?error=input');throw e;}

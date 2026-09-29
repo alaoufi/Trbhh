@@ -11,7 +11,7 @@ import {writeAdWithCategory,getPublicCategories} from '@/lib/ad-categories/servi
 const enabled=process.env.CATEGORIES_DB_TESTS==='1';
 let client:PrismaClient,admin:PrismaClient,created=false;
 const f={key:'condition',label:'الحالة',type:'select',group:'المواصفات',required:true,visible:true,order:0,options:['جديد','مستعمل']};
-function form(version='1'){const fd=new FormData();for(const [k,v] of Object.entries({category_id:'12',subcategory_id:'34',category_version:version,category_values:'{"condition":"جديد"}'}))fd.set(k,v);return fd;}
+function form(version='1'){const fd=new FormData();for(const [k,v] of Object.entries({category_id:'12',subcategory_id:'34',category_version:version,category_values:'{"condition":"جديد"}',listingType:'sale',pricingMode:'fixed',price:'50'}))fd.set(k,v);return fd;}
 const base={title:'Fixture ad',detail:'Original details',price:50,adsType:'offer' as const,user_id:1n,city_id:1n,category_id:12n,video_path:'',adsSpecial:'no' as const,state:'active' as const};
 const create=(fd=form())=>writeAdWithCategory(client,fd,(tx,s)=>tx.ads.create({data:{...base,...(s?{category_id:s.category_id,subcategory_id:s.subcategory_id}: {})}}));
 describe.skipIf(!enabled)('real ad category MySQL integration',()=>{
@@ -32,7 +32,8 @@ describe.skipIf(!enabled)('real ad category MySQL integration',()=>{
     await client.site_settings.create({data:{k:'categories_v2_enabled',v:'1'}});
     await client.categories.create({data:{id:12n,name:'سلع',photo_path:'',is_active:'yes'}});
     await client.sub_categories.create({data:{id:34n,category_id:12,name:'أثاث',active:1}});
-    await client.$executeRaw`INSERT INTO ad_category_definitions VALUES (34,1,'goods',1,1,${JSON.stringify([f])})`;
+    const stored={schemaVersion:2,fields:[f],listingPolicy:{types:[{key:'sale',label:'للبيع',pricing:['fixed','bidding']}]}};
+    await client.$executeRaw`INSERT INTO ad_category_definitions (subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (34,1,'goods',1,1,${JSON.stringify(stored)})`;
   });
   it('creates and edits actual ads with matching values, preserves IDs and title during field projection',async()=>{
     const ad=await create();expect(ad.category_id).toBe(12n);

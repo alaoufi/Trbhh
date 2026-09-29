@@ -1,5 +1,5 @@
 import type { CategoryField, CategoryFieldType } from './validation';
-import {defaultListingPolicy,type ListingPolicy} from './listing-policy';
+import type {ListingPolicy,ListingTypeKey,PricingModeKey} from './listing-policy';
 
 export type CategorySeedTemplate = {
   key: string; categoryName: string; name: string;
@@ -13,6 +13,7 @@ const n = (key: string, label: string, unit?: string, group?: string) => f(key, 
 const s = (key: string, label: string, options: string[], group?: string) => f(key, label, 'select', options, group);
 const m = (key: string, label: string, options: string[], group?: string) => f(key, label, 'multiselect', options, group);
 const yes = (key: string, label: string, group?: string) => f(key, label, 'boolean', [], group);
+const when=(dependsOn:string,dependencyValue:string|string[])=>({dependsOn,dependencyOperator:Array.isArray(dependencyValue)?'in' as const:'equals' as const,dependencyValue});
 const condition = s('condition', 'الحالة', ['جديد', 'مستعمل', 'مجدد']);
 const dimensions = [n('length_cm', 'الطول', 'سم'), n('width_cm', 'العرض', 'سم'), n('height_cm', 'الارتفاع', 'سم')];
 const delivery = [yes('delivery_available', 'التوصيل متاح', 'التوريد'), n('lead_time_days', 'مدة التجهيز', 'يوم', 'التوريد')];
@@ -35,13 +36,11 @@ const propertyRooms = [
   s('finish', 'التشطيب', ['عظم', 'نصف تشطيب', 'اقتصادي', 'جيد', 'فاخر', 'فاخر جدًا', 'يحتاج تجديد'], 'تفاصيل البناء'),
   s('furnished', 'التأثيث', ['مفروش', 'غير مفروش', 'مفروش جزئيًا'], 'التجهيزات'),
   m('amenities', 'المرافق', ['مصعد', 'مواقف', 'حديقة', 'مسبح', 'غرفة سائق', 'غرفة عاملة', 'مستودع', 'مدخل مستقل'], 'التجهيزات'),
-  n('rent_amount', 'قيمة الإيجار إن كان متاحًا', 'ر.س', 'العرض والإيجار'),
-  s('rent_period', 'فترة الإيجار', ['شهري', 'سنوي', 'يومي'], 'العرض والإيجار'),
 ];
 const vehicle = [
   { ...f('make', 'الشركة المصنعة'), required: true }, { ...f('model', 'الطراز'), required: true },
   { ...n('year', 'سنة الصنع', 'ميلادي'), min: 1900, max: 2100 }, condition,
-  n('odometer_km', 'المسافة المقطوعة', 'كم'), s('specification', 'المواصفات الإقليمية', ['سعودي', 'خليجي', 'أمريكي', 'أوروبي', 'ياباني', 'كوري', 'أخرى']),
+  { ...n('odometer_km', 'المسافة المقطوعة', 'كم'), ...when('condition',['مستعمل','مجدد']) }, s('specification', 'المواصفات الإقليمية', ['سعودي', 'خليجي', 'أمريكي', 'أوروبي', 'ياباني', 'كوري', 'أخرى']),
   s('transmission', 'ناقل الحركة', ['أوتوماتيك', 'يدوي', 'CVT']), s('fuel', 'الوقود', ['بنزين', 'ديزل', 'هجين', 'كهرباء']),
   s('drive', 'نظام الدفع', ['أمامي', 'خلفي', 'رباعي', 'كلي']),
   f('color', 'اللون الخارجي'), n('engine_l', 'سعة المحرك', 'لتر'), n('cylinders', 'الأسطوانات'),
@@ -61,12 +60,41 @@ const decor = [condition, m('material', 'المادة', ['صوف', 'قطن', 'أ
   s('placement', 'مكان الاستخدام', ['داخلي', 'خارجي', 'كلاهما']), ...delivery];
 const equipment = [f('manufacturer', 'المصنع'), f('model', 'الطراز'), { ...n('year', 'سنة الصنع'), min: 1900, max: 2100 }, condition,
   n('operating_hours', 'ساعات التشغيل', 'ساعة'), n('engine_power_kw', 'قدرة المحرك', 'كيلوواط'),
-  n('operating_weight_t', 'الوزن التشغيلي', 'طن'), s('offer_mode', 'طبيعة العرض', ['بيع', 'تأجير']),
-  yes('operator_included', 'يشمل المشغل'), s('rate_basis', 'أساس السعر', ['كامل المعدة', 'ساعة', 'يوم', 'شهر']), ...delivery];
+  n('operating_weight_t', 'الوزن التشغيلي', 'طن'), s('power_source', 'مصدر الطاقة', ['ديزل','بنزين','غاز','كهرباء','هجين','أخرى']),
+  {...yes('operator_included', 'يشمل المشغل','الإيجار'),...when('listing_type','rent')},
+  {...yes('transport_included','يشمل نقل المعدة','الإيجار'),...when('listing_type','rent')},
+  {...n('minimum_rental_period','الحد الأدنى لمدة الإيجار',undefined,'الإيجار'),...when('listing_type','rent')}, ...delivery];
+
+const pricing=(key:ListingTypeKey,label:string,modes:PricingModeKey[])=>({key,label,pricing:modes});
+const policy=(...types:ReturnType<typeof pricing>[]):ListingPolicy=>({types});
+const sale=()=>pricing('sale','للبيع',['fixed','bidding']);
+const wanted=()=>pricing('wanted','مطلوب شراء',['budget_optional']);
+const rent=(modes:PricingModeKey[]=['hour','day','week','month','year','project'])=>pricing('rent','للإيجار',modes);
+const wantedRent=()=>pricing('wanted_rent','مطلوب للإيجار',['budget_optional']);
+const service=(modes:PricingModeKey[]=['fixed','hour','day','project','quote'])=>pricing('service','تقديم خدمة',modes);
+const serviceRequest=()=>pricing('service_request','طلب خدمة',['budget_optional']);
+const TEMPLATE_LISTING_POLICIES:Record<string,ListingPolicy>={
+  land:policy(sale(),rent(['month','year','project']),wanted(),wantedRent()),villa:policy(sale(),rent(['day','month','year']),wanted(),wantedRent()),
+  apartment:policy(sale(),rent(['day','month','year']),wanted(),wantedRent()),commercial_property:policy(sale(),rent(['month','year','project']),wanted(),wantedRent()),
+  car:policy(sale(),wanted(),pricing('transfer','للتنازل',['fixed','bidding','quote'])),car_parts:policy(sale(),wanted()),
+  job:policy(pricing('job','وظيفة',['salary_optional']),pricing('job_seeker','باحث عن عمل',['salary_optional'])),
+  plants:policy(sale(),wanted()),feed:policy(sale(),wanted()),irrigation:policy(sale(),wanted()),garden_service:policy(service(),serviceRequest()),
+  sheep_goats:policy(sale(),wanted()),camels_cattle:policy(sale(),wanted()),poultry:policy(sale(),wanted()),livestock_equipment:policy(sale(),wanted()),
+  cookware:policy(sale(),wanted()),tableware:policy(sale(),wanted()),storage:policy(sale(),wanted()),rugs:policy(sale(),wanted()),curtains:policy(sale(),wanted()),wall_decor:policy(sale(),wanted()),decor_service:policy(service(),serviceRequest()),
+  tiles:policy(sale(),wanted()),building_materials:policy(sale(),wanted()),sanitary:policy(sale(),wanted()),contracting:policy(service(['fixed','day','project','quote']),serviceRequest()),
+  earthmoving:policy(sale(),rent(),wanted(),wantedRent()),lifting:policy(sale(),rent(),wanted(),wantedRent()),commercial_vehicles:policy(sale(),rent(['day','week','month','year','project']),wanted(),wantedRent()),
+  transport_service:policy(service(['fixed','hour','day','month','trip','project','quote']),serviceRequest()),
+};
+const SEARCHABLE_KEYS=new Set(['manufacturer','brand','make','model','part_number','compatible_make','compatible_model','breed','job_title','employer','specialty']);
+const FILTERABLE_KEYS=new Set(['condition','year','fuel','power_source','equipment_kind','truck_type','property_use','land_use','rooms','bathrooms','area_m2','capacity_t','lift_height_m','operating_hours','service_kind','contract','workplace','species','feed_kind','material_kind']);
+const CARD_KEYS=new Set(['condition','year','make','manufacturer','model','area_m2','rooms','capacity_t','lift_height_m','equipment_kind','service_kind','head_count']);
+const COMPARABLE_KEYS=new Set([...FILTERABLE_KEYS,'engine_power_kw','operating_weight_t','odometer_km','building_age_years','quantity','minimum_order']);
 function template(key: string, categoryName: string, name: string, kind: CategorySeedTemplate['kind'], fields: SeedField[], requiredKeys: string[]): CategorySeedTemplate {
   const required = new Set(requiredKeys);
-  return { key, categoryName, name, kind, priceEnabled: kind !== 'jobs', goodsEnabled: kind === 'goods', listingPolicy:defaultListingPolicy(kind),
-    fields: fields.map((field, order) => ({ ...field, required: field.required || required.has(field.key), order })) };
+  const listingPolicy=TEMPLATE_LISTING_POLICIES[key];if(!listingPolicy)throw new Error(`missing_listing_policy:${key}`);
+  return { key, categoryName, name, kind, priceEnabled: kind !== 'jobs', goodsEnabled: kind === 'goods', listingPolicy,
+    fields: fields.map((field, order) => ({ ...field, required: field.required || required.has(field.key), order,
+      searchable:SEARCHABLE_KEYS.has(field.key),filterable:FILTERABLE_KEYS.has(field.key),comparable:COMPARABLE_KEYS.has(field.key),showInCard:CARD_KEYS.has(field.key),showInDetails:true })) };
 }
 
 /** Optional administrator-applied seeds, NOT startup migrations or automatic ad classification.
@@ -84,8 +112,6 @@ export const CATEGORY_SEED_TEMPLATES: CategorySeedTemplate[] = [
     s('furnished', 'التأثيث', ['مفروش', 'غير مفروش', 'مفروش جزئيًا'], 'التجهيزات'),
     m('amenities', 'المرافق', ['مصعد', 'مواقف', 'سطح', 'مدخل مستقل', 'غرفة سائق', 'غرفة عاملة', 'مستودع'], 'التجهيزات'),
     s('ownership_document', 'وثيقة الملكية', ['صك إلكتروني', 'صك ورقي', 'عقد انتفاع', 'أخرى'], 'الملكية والعرض'),
-    n('rent_amount', 'قيمة الإيجار إن كان متاحًا', 'ر.س', 'الملكية والعرض'),
-    s('rent_period', 'فترة الإيجار', ['شهري', 'سنوي', 'يومي'], 'الملكية والعرض'),
   ], ['area_m2', 'floor_number', 'rooms', 'bathrooms']),
   template('commercial_property', 'عقارات', 'محلات ومكاتب ومستودعات', 'property', [
     n('area_m2', 'المساحة', 'م²', 'المساحة والاستخدام'),
@@ -95,7 +121,6 @@ export const CATEGORY_SEED_TEMPLATES: CategorySeedTemplate[] = [
     yes('loading_access', 'مدخل تحميل وتنزيل', 'التجهيزات'), yes('parking_available', 'مواقف متاحة', 'التجهيزات'),
     s('finish', 'التشطيب', ['عظم', 'نصف تشطيب', 'اقتصادي', 'جيد', 'فاخر', 'يحتاج تجديد'], 'التجهيزات'),
     n('electric_power_amp', 'قدرة الكهرباء', 'أمبير', 'الخدمات'), m('utilities', 'الخدمات المتاحة', ['كهرباء', 'ماء', 'صرف صحي', 'ألياف بصرية'], 'الخدمات'),
-    n('rent_amount', 'قيمة الإيجار إن كان متاحًا', 'ر.س', 'العرض'), s('rent_period', 'فترة الإيجار', ['شهري', 'سنوي'], 'العرض'),
   ], ['area_m2', 'property_use']),
   template('car', 'سيارات ومستلزماتها', 'سيارات', 'goods', [...vehicle, s('body_type', 'شكل الهيكل', ['سيدان', 'دفع رباعي', 'هاتشباك', 'كوبيه', 'بيك أب', 'فان', 'أخرى']), n('seats', 'المقاعد')], ['make', 'model', 'year', 'condition']),
   template('car_parts', 'سيارات ومستلزماتها', 'قطع غيار وإكسسوارات', 'goods', [f('part_kind', 'نوع القطعة'), f('part_number', 'رقم القطعة'), f('compatible_make', 'الشركة المتوافقة'), f('compatible_model', 'الطراز المتوافق'), f('compatible_years', 'السنوات المتوافقة'), condition, s('origin', 'تصنيف القطعة', ['أصلية', 'بديلة', 'تجارية', 'غير معروف']), ...delivery], ['part_kind', 'compatible_make', 'condition']),
@@ -128,8 +153,13 @@ export const CATEGORY_SEED_TEMPLATES: CategorySeedTemplate[] = [
   template('building_materials', 'مواد بناء ومقاولات', 'مواد بناء أساسية', 'goods', [s('material_kind', 'نوع المادة', ['أسمنت', 'بلوك', 'طوب', 'حديد', 'رمل', 'حصى', 'أخرى']), f('brand', 'المصنع'), f('grade_spec', 'الدرجة أو المواصفة من المصنع'), n('quantity', 'الكمية'), s('supply_unit', 'وحدة التوريد', ['م²', 'م³', 'كيس', 'طن', 'قطعة', 'متر طولي']), f('dimensions_spec', 'الأبعاد أو المقاس'), ...delivery], ['material_kind', 'quantity', 'supply_unit']),
   template('sanitary', 'مواد بناء ومقاولات', 'أدوات صحية', 'goods', [s('item_kind', 'نوع الأداة', ['مغسلة', 'خلاط', 'مرحاض', 'دش', 'أخرى']), ...home, f('connection_size', 'مقاس التوصيل'), f('installation', 'طريقة التركيب')], ['item_kind', 'condition']),
   template('contracting', 'مواد بناء ومقاولات', 'مقاولات وتشطيبات', 'service', [m('trade', 'التخصص', ['عظم', 'تشطيب', 'بلاط', 'دهان', 'سباكة', 'كهرباء', 'عزل']), n('work_area_m2', 'مساحة الأعمال', 'م²'), s('contract_scope', 'نطاق التعاقد', ['عمل فقط', 'مواد وعمل', 'توريد فقط']), s('pricing_basis', 'أساس التسعير', ['للمشروع', 'للمتر المربع', 'للمتر الطولي', 'باليوم']), n('duration_days', 'مدة التنفيذ', 'يوم'), f('service_coverage', 'نطاق التغطية'), f('warranty', 'ضمان العمل')], ['trade', 'contract_scope', 'pricing_basis']),
-  template('earthmoving', 'نقليات ومعدات ثقيلة', 'معدات حفر وتحميل', 'goods', [s('equipment_kind', 'نوع المعدة', ['حفار', 'شيول', 'بلدوزر', 'أخرى']), ...equipment, m('attachments', 'الملحقات', ['باكت', 'مطرقة', 'شوك', 'أخرى']), n('bucket_m3', 'سعة الباكت', 'م³')], ['equipment_kind', 'manufacturer', 'model', 'year', 'condition', 'offer_mode']),
-  template('lifting', 'نقليات ومعدات ثقيلة', 'رافعات ومناولة', 'goods', [s('equipment_kind', 'نوع المعدة', ['رافعة', 'رافعة شوكية', 'مناولة تلسكوبية']), ...equipment, n('capacity_t', 'حمولة الرفع المقننة', 'طن'), n('lift_height_m', 'ارتفاع الرفع', 'متر')], ['equipment_kind', 'manufacturer', 'model', 'year', 'condition', 'capacity_t']),
+  template('earthmoving', 'نقليات ومعدات ثقيلة', 'معدات حفر وتحميل', 'goods', [s('equipment_kind', 'نوع المعدة', ['حفار', 'شيول', 'بلدوزر', 'أخرى']), ...equipment, m('attachments', 'الملحقات', ['باكت', 'مطرقة', 'شوك', 'أخرى']), {...n('bucket_m3', 'سعة الباكت', 'م³'),...when('equipment_kind',['حفار','شيول'])},{...n('blade_width_m','عرض الشفرة','متر'),...when('equipment_kind','بلدوزر')}], ['equipment_kind', 'manufacturer', 'model', 'year', 'condition','power_source']),
+  template('lifting', 'نقليات ومعدات ثقيلة', 'رافعات ومناولة', 'goods', [s('equipment_kind', 'نوع المعدة', ['رافعة', 'رافعة شوكية', 'مناولة تلسكوبية','رافعة مقصية','رافعة أشخاص']), ...equipment,
+    {...n('capacity_t', 'حمولة الرفع المقننة', 'طن'),...when('equipment_kind',['رافعة','رافعة شوكية','مناولة تلسكوبية'])},
+    n('lift_height_m', 'ارتفاع الرفع أو العمل', 'متر'),
+    {...n('mast_stages','عدد مراحل السارية','مرحلة'),...when('equipment_kind','رافعة شوكية')},
+    {...n('boom_length_m','طول الذراع','متر'),...when('equipment_kind',['رافعة','مناولة تلسكوبية'])},
+    {...n('platform_capacity_kg','حمولة المنصة','كجم'),...when('equipment_kind',['رافعة مقصية','رافعة أشخاص'])}], ['equipment_kind', 'manufacturer', 'model', 'year', 'condition','power_source','lift_height_m']),
   template('commercial_vehicles', 'نقليات ومعدات ثقيلة', 'شاحنات ومقطورات', 'goods', [...vehicle, s('truck_type', 'النوع', ['قلاب', 'سطحة', 'قاطرة', 'مقطورة', 'براد', 'صهريج', 'أخرى']), n('capacity_t', 'الحمولة', 'طن'), n('axles', 'عدد المحاور')], ['make', 'model', 'year', 'condition', 'truck_type']),
   template('transport_service', 'نقليات ومعدات ثقيلة', 'خدمات نقل وتشغيل', 'service', [s('service_kind', 'الخدمة', ['نقل بضائع', 'نقل معدات', 'نقل أثاث', 'تشغيل معدات']), f('service_route', 'مسار النقل'), n('capacity_t', 'الحمولة', 'طن'), yes('operator_included', 'يشمل المشغل'), yes('loading_included', 'يشمل التحميل والتنزيل'), s('rate_basis', 'أساس السعر', ['رحلة', 'ساعة', 'يوم', 'شهر']), f('availability', 'مواعيد التوفر')], ['service_kind', 'service_route', 'rate_basis']),
 ];

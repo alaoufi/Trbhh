@@ -398,7 +398,7 @@ export async function createAdAction(formData: FormData) {
 
   const ad = await writeAdWithCategory(prisma, formData, (tx, category) => tx.ads.create({
     data: {
-      title: finalTitle, detail: finalDetail, price, adsType,
+      title: finalTitle, detail: finalDetail, price:category?.listing.price??price, adsType:category?.listing.adsType??adsType,
       category_id: catId,
       subcategory_id: null,
       city_id: BigInt(cityId || '0'),
@@ -415,10 +415,11 @@ export async function createAdAction(formData: FormData) {
       state: 'active',
       status: requireApproval ? 0 : 1,
       flag_terms: flagTerms || null,
-      price_type: priceType,
-      rent_period: rentPeriod,
+      price_type: category?category.listing.priceType:priceType,
+      rent_period: category?category.listing.rentPeriod:rentPeriod,
+      sale_type: category?.listing.listingType??null,
       // عروض اليوم + حالة التوفر (يظهر الحقلان عند تفعيلهما من التحكم)
-      old_price: priceType === 'som' ? 0 : Math.max(0, parseFloat(String(formData.get('old_price') || '0')) || 0),
+      old_price: (category?category.listing.priceType:priceType) === 'som' ? 0 : Math.max(0, parseFloat(String(formData.get('old_price') || '0')) || 0),
       stock_state: [0, 1, 2].includes(Number(formData.get('stock_state'))) ? Number(formData.get('stock_state')) : 0,
       store_only: dest === 'store' ? 1 : 0, // عزل تام: إعلان المتجر لا يظهر في تربح
       cat_reviewed: aiClassified ? 0 : 1, // تصنيف آلي؟ ينتظر مراجعة الإدارة
@@ -584,11 +585,12 @@ export async function updateAdAction(formData: FormData) {
       title: eFinalTitle,
       detail: eFinalDetail,
       flag_terms: eFlagTerms || null,
-      price: newPrice,
-      adsType: eType,
-      price_type: ePriceType,
-      rent_period: eRentPeriod,
-      ...(ePriceType === 'som' ? { old_price: 0 } : {}),
+      price: category?.listing.price??newPrice,
+      adsType: category?.listing.adsType??eType,
+      price_type: category?category.listing.priceType:ePriceType,
+      rent_period: category?category.listing.rentPeriod:eRentPeriod,
+      sale_type: category?.listing.listingType??ad.sale_type,
+      ...((category?category.listing.priceType:ePriceType) === 'som' ? { old_price: 0 } : {}),
       // Category changes are applied only from the transaction's validated selection.
       city_id: BigInt(String(formData.get('city_id') || '0')),
       area_id: formData.get('area_id') ? Number(formData.get('area_id')) : null,

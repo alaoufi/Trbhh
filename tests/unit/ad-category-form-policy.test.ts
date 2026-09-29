@@ -19,7 +19,9 @@ it('active category forms never duplicate legacy extras even for goods',()=>{
 });
 it('new unconfigured editor starts without price or goods defaults',()=>{
   const html=renderToStaticMarkup(React.createElement(AdCategoryEditor,{categoryId:12,action:async()=>{}}));
-  expect(html).not.toContain('checked=""');expect(html).toContain('استبدال حقول المحرر بالقالب المختار');
+  expect(html).not.toContain('name="price_enabled" value="1" checked');
+  expect(html).not.toContain('name="goods_enabled" value="1" checked');
+  expect(html).toContain('استبدال الحقول والسياسة بالقالب المختار');
 });
 it('shows stale-category error even after the global feature is switched off',()=>{
   const html=renderToStaticMarkup(React.createElement(AdForm,{action:async()=>{},countries:[],cities:[],submitLabel:'حفظ',error:'category',categoryConfig:{...cfg,enabled:false}}));

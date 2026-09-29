@@ -19,6 +19,8 @@ import { AdCategorySummary } from '@/components/ad-category-summary';
 import { visibleCategoryValues } from '@/lib/ad-categories/validation';
 import type { CategoryFormConfig } from '@/lib/ad-categories/contracts';
 import type { CategoryValues } from '@/lib/ad-categories/validation';
+import {AdListingPolicyFields} from '@/components/ad-listing-policy-fields';
+import {defaultListingPolicy,inferLegacyListingType,inferLegacyPricingMode,isRequestListingType,PRICING_LABELS,type ListingTypeKey,type PricingModeKey} from '@/lib/ad-categories/listing-policy';
 
 const MAX_VIDEO = 25 * 1024 * 1024; // 25MB
 
@@ -46,7 +48,7 @@ type Initial = Partial<{
   phoneAllow: boolean; commentAllow: boolean; phone: string; whatsapp: string;
   lat: string | null; lng: string | null;
   oldPrice: number; stockState: number;
-  priceType: string | null; rentPeriod: string | null;
+  priceType: string | null; rentPeriod: string | null;listingType:string|null;
   categoryValues: CategoryValues;
 }>;
 
@@ -88,7 +90,8 @@ export function AdForm({
   const catLabel = ({ immoral: 'محتوى غير أخلاقي', drugs: 'مخدرات أو مسكرات', weapons: 'أسلحة أو محتوى أمني', political: 'محتوى سياسي مشبوه', charity: 'جمع تبرعات أو نشاط جمعية غير مرخّص' } as Record<string, string>)[blockCat || ''] || 'محتوى مخالف';
   const rejection = error ? adPublishRejection(error as AdPublishRejectionCode) : null;
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
-  const isReq = adsType === 'request';
+  const [listingType,setListingType]=useState<ListingTypeKey>(inferLegacyListingType({listingType:initial?.listingType,adsType:initial?.adsType,priceType:initial?.priceType}));
+  const [pricingMode,setPricingMode]=useState<PricingModeKey>(inferLegacyPricingMode({priceType:initial?.priceType,rentPeriod:initial?.rentPeriod}));
   const [categoryId, setCategoryId] = useState(String(initial?.categoryId || ''));
   const [subcategoryId, setSubcategoryId] = useState(String(initial?.subcategoryId || ''));
   const [categoryValues, setCategoryValues] = useState<CategoryValues>(initial?.categoryValues || {});
@@ -99,6 +102,12 @@ export function AdForm({
   const canPreserveCategory = !!initial?.id && !categoryConfig?.subcategories.some(s => s.id === initial.subcategoryId && s.categoryId === initial.categoryId && s.active && s.version > 0 && categoryConfig.categories.some(c => c.id === s.categoryId && c.active));
   const [categoryMode, setCategoryMode] = useState(canPreserveCategory ? 'preserve' : 'select');
   const preservingCategory = categoryOn && canPreserveCategory && categoryMode === 'preserve';
+  const listingPolicy=selectedSub?.listingPolicy??defaultListingPolicy(selectedSub?.kind||'other');
+  const selectedListingPolicy=listingPolicy.types.find(type=>type.key===listingType)??listingPolicy.types[0];
+  const effectiveListingType=selectedListingPolicy.key;
+  const effectivePricingMode=selectedListingPolicy.pricing.includes(pricingMode)?pricingMode:selectedListingPolicy.pricing[0];
+  const categoryListingActive=categoryOn&&!preservingCategory&&!!selectedSub;
+  const isReq=categoryListingActive?isRequestListingType(effectiveListingType):adsType==='request';
   const priceEnabled = !categoryOn || (!preservingCategory && selectedSub?.priceEnabled === true);
   const goodsEnabled = !categoryOn || (!preservingCategory && selectedSub?.goodsEnabled === true);
   // نوع السعر للمعروض: تأجير (سعر + مدة) / بيع (سعر) / على السوم (بلا سعر)
@@ -107,6 +116,7 @@ export function AdForm({
       : initial?.priceType === 'sale' || (initial?.price ?? 0) > 0 ? 'sale'
       : initial?.id ? 'som' : 'sale',
   );
+  const previewPricingLabel=categoryListingActive?PRICING_LABELS[effectivePricingMode]:priceMode==='rent'?'تأجير':priceMode==='sale'?'بيع':'على السوم';
   // الموقع موجّه للسعودية فقط
   const saudiId = useMemo(() => countries.find((c) => /سعود/.test(c.name))?.id ?? countries[0]?.id ?? 1, [countries]);
   const [geo, setGeo] = useState<{ lat: string; lng: string } | null>(
@@ -301,8 +311,8 @@ export function AdForm({
         </div>
       )}
 
-      <input type="hidden" name="adsType" value={adsType} />
-      <div className="grid grid-cols-2 gap-2">
+      <input type="hidden" name="adsType" value={isReq?'request':'offer'} />
+      {!categoryOn&&<><div className="grid grid-cols-2 gap-2">
         {([{ v: 'offer', l: 'عرض', cls: 'border-primary bg-primary text-white' }, { v: 'request', l: 'طلب', cls: 'border-amber-500 bg-amber-500 text-white' }] as const).map((t) => (
           <button type="button" key={t.v} onClick={() => setAdsType(t.v)}
             className={`rounded-lg border-2 p-2.5 text-sm font-extrabold transition ${adsType === t.v ? t.cls : 'border-primary/25 bg-white text-foreground'}`}>
@@ -312,7 +322,7 @@ export function AdForm({
       </div>
       <div className={`rounded-lg p-2 text-center text-xs font-bold ${isReq ? 'bg-amber-100 text-amber-900' : 'bg-primary/10 text-primary'}`}>
         {isReq ? 'إعلان طلب: تصف ما تبحث عنه، والصور والسعر اختيارية.' : 'إعلان عرض: تعرض منتجك أو خدمتك للبيع/الإيجار.'}
-      </div>
+      </div></>}
 
       <Section icon={Tag} title={isReq ? 'بيانات الطلب' : 'بيانات العرض'}>
         {categoryOn && <fieldset className="space-y-2 rounded-xl border border-primary/20 p-3">
@@ -324,19 +334,20 @@ export function AdForm({
             <label className={lbl}>{categoryConfig.labels.category}<select className={field} name="category_id" required value={categoryId} onChange={e=>{setCategoryId(e.target.value);setSubcategoryId('');setCategoryValues({});}}>
               <option value="">{categoryConfig.labels.choose}</option>{eligibleCategories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
             </select></label>
-            <label className={lbl}>{categoryConfig.labels.subcategory}<select className={field} name="subcategory_id" required value={subcategoryId} onChange={e=>{setSubcategoryId(e.target.value);setCategoryValues({});}}>
+            <label className={lbl}>{categoryConfig.labels.subcategory}<select className={field} name="subcategory_id" required value={subcategoryId} onChange={e=>{const value=e.target.value;setSubcategoryId(value);setCategoryValues({});const next=eligibleSubs.find(s=>String(s.id)===value);const nextPolicy=next?.listingPolicy??defaultListingPolicy(next?.kind||'other');setListingType(nextPolicy.types[0].key);setPricingMode(nextPolicy.types[0].pricing[0]);}}>
               <option value="">{categoryConfig.labels.choose}</option>{eligibleSubs.filter(s=>String(s.categoryId)===categoryId).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
             </select></label>
           </div>
           <input type="hidden" name="category_version" value={selectedSub?.version || ''}/>
-          {selectedSub && <AdCategoryFields key={`${selectedSub.id}:${selectedSub.version}`} fields={selectedSub.fields} values={categoryValues} onChange={setCategoryValues}/>}
+          {selectedSub&&<AdListingPolicyFields policy={listingPolicy} listingType={effectiveListingType} pricingMode={effectivePricingMode} onListingType={value=>{setListingType(value);setCategoryValues({});}} onPricingMode={setPricingMode} initialPrice={initial?.price} priceEnabled={priceEnabled}/>} 
+          {selectedSub && <AdCategoryFields key={`${selectedSub.id}:${selectedSub.version}:${effectiveListingType}`} fields={selectedSub.fields} values={categoryValues} onChange={setCategoryValues} listingType={effectiveListingType}/>}
           </>}
         </fieldset>}
         <div>
           <label className={lbl}>{isReq ? 'ماذا تطلب؟' : 'عنوان الإعلان'}</label>
           <input name="title" required defaultValue={initial?.title} maxLength={255} className={field} placeholder={isReq ? 'مثال: مطلوب سيارة للشراء' : 'مثال: سيارة للبيع'} />
         </div>
-        {priceEnabled && (isReq ? (
+        {!categoryListingActive&&priceEnabled && (isReq ? (
           <div>
             <label className={lbl}>الميزانية المتوقّعة</label>
             <input name="price" type="number" min="0" step="any" defaultValue={initial?.price || ''} className={field} placeholder="اختياري — إن تركته فارغاً يظهر «مطلوب» فقط" />
@@ -383,7 +394,7 @@ export function AdForm({
             )}
           </div>
         ))}
-        {goodsEnabled && priceEnabled && allowOldPrice && !isReq && priceMode !== 'som' && (
+        {goodsEnabled && priceEnabled && allowOldPrice && !isReq && (categoryListingActive?effectivePricingMode!=='bidding':priceMode !== 'som') && (
           <div>
             <label className={lbl}>السعر قبل الخصم <span className="font-normal text-muted-foreground">(اختياري — لعروض اليوم)</span></label>
             <input name="old_price" type="number" min="0" step="any" defaultValue={initial?.oldPrice || ''} className={field} placeholder="إن كان أعلى من السعر يظهر الخصم ويدخل إعلانك «عروض اليوم»" />
@@ -407,7 +418,7 @@ export function AdForm({
 
       {!categoryOn && <Section icon={Tag} title="تفاصيل إضافية">
         <AdExtraFields
-          hideNegotiable={priceMode === 'som'}
+          hideNegotiable={categoryListingActive?effectivePricingMode==='bidding':priceMode === 'som'}
           initial={{
             negotiable: initial?.priceType === 'negotiable',
             condition: (initial?.stockState === 0 ? 'new' : initial?.stockState === 1 ? 'used' : 'refurbished') as 'new' | 'used' | 'refurbished',
@@ -627,8 +638,7 @@ export function AdForm({
                 {preview.urgent && <span className="mb-2 inline-block animate-pulse rounded-full bg-red-600 px-3 py-1 text-xs font-extrabold text-white shadow">🔥 عاجل</span>}
                 {priceEnabled && <div className="mb-3 flex flex-wrap items-baseline gap-2">
                   {(preview.price > 0 || isReq) && <span className="text-2xl font-bold text-primary">{preview.price > 0 ? formatPrice(preview.price) : 'مطلوب'}</span>}
-                  {preview.price > 0 && priceMode === 'rent' && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">🔑 تأجير {(formRef.current?.querySelector('[name="rentPeriod"]') as HTMLSelectElement | null)?.value || 'شهري'}</span>}
-                  {preview.price > 0 && priceMode === 'sale' && <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-800">💰 بيع</span>}
+                  {preview.price > 0 && <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-extrabold text-primary">{previewPricingLabel}</span>}
                   {preview.oldPrice > preview.price && preview.price > 0 && (
                     <>
                       <span className="text-sm text-muted-foreground line-through" dir="ltr">{formatPrice(preview.oldPrice)}</span>

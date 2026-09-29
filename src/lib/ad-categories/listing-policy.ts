@@ -14,7 +14,7 @@ const ALLOWED_PRICING:Record<ListingTypeKey,readonly PricingModeKey[]>={
   service:['fixed','hour','day','week','month','trip','project','quote'],service_request:['budget_optional'],
   job:['salary_optional'],job_seeker:['salary_optional'],transfer:['fixed','bidding','quote'],
 };
-const LABELS:Record<ListingTypeKey,string>={sale:'للبيع',wanted:'مطلوب شراء',rent:'للإيجار',wanted_rent:'مطلوب للإيجار',service:'تقديم خدمة',service_request:'طلب خدمة',job:'وظيفة',job_seeker:'باحث عن عمل',transfer:'للتنازل'};
+export const LISTING_TYPE_LABELS:Record<ListingTypeKey,string>={sale:'للبيع',wanted:'مطلوب شراء',rent:'للإيجار',wanted_rent:'مطلوب للإيجار',service:'تقديم خدمة',service_request:'طلب خدمة',job:'وظيفة',job_seeker:'باحث عن عمل',transfer:'للتنازل'};
 export const PRICING_LABELS:Record<PricingModeKey,string>={fixed:'سعر محدد',bidding:'على السوم',hour:'بالساعة',day:'باليوم',week:'بالأسبوع',month:'بالشهر',year:'بالسنة',trip:'بالرحلة',project:'للمدة أو المشروع كاملًا',quote:'حسب الاتفاق',budget_optional:'ميزانية اختيارية',salary_optional:'الراتب اختياري'};
 const PERIODS:Partial<Record<PricingModeKey,string>>={hour:'بالساعة',day:'يومي',week:'أسبوعي',month:'شهري',year:'سنوي',trip:'بالرحلة',project:'للمشروع'};
 const REQUEST_TYPES=new Set<ListingTypeKey>(['wanted','wanted_rent','service_request','job_seeker']);
@@ -44,8 +44,9 @@ export function defaultListingPolicy(kind:string):ListingPolicy{
       :kind==='jobs'?['job','job_seeker']
         :kind==='other'?['sale','wanted','service','service_request']
           :['sale','wanted'];
-  return {types:keys.map(key=>({key,label:LABELS[key],pricing:[...ALLOWED_PRICING[key]]}))};
+  return {types:keys.map(key=>({key,label:LISTING_TYPE_LABELS[key],pricing:[...ALLOWED_PRICING[key]]}))};
 }
+export const allowedPricingModes=(key:ListingTypeKey)=>[...ALLOWED_PRICING[key]];
 
 function numericPrice(value:unknown){
   const text=String(value??'').trim();
@@ -76,4 +77,13 @@ export function inferLegacyListingType(value:{listingType?:string|null;adsType?:
   if(value.listingType&&LISTING_TYPE_KEYS.includes(value.listingType as ListingTypeKey))return value.listingType as ListingTypeKey;
   if(value.adsType==='request')return value.priceType==='rent'?'wanted_rent':'wanted';
   return value.priceType==='rent'?'rent':'sale';
+}
+
+export const isRequestListingType=(value:ListingTypeKey)=>REQUEST_TYPES.has(value);
+export const pricingRequiresAmount=(value:PricingModeKey)=>!OPTIONAL_PRICE.has(value);
+export function inferLegacyPricingMode(value:{priceType?:string|null;rentPeriod?:string|null}):PricingModeKey{
+  if(value.priceType==='som')return 'bidding';
+  if(value.priceType!=='rent')return 'fixed';
+  const entry=Object.entries(PERIODS).find(([,label])=>label===value.rentPeriod);
+  return (entry?.[0] as PricingModeKey|undefined)??'month';
 }

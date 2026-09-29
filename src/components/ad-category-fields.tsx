@@ -1,13 +1,13 @@
 'use client';
 import React from 'react';
-import type { CategoryField, CategoryValues, CategoryValue } from '@/lib/ad-categories/validation';
+import {fieldApplies,type CategoryField, type CategoryValues, type CategoryValue, type CategoryRange } from '@/lib/ad-categories/validation';
 
 const control = 'mt-1 min-h-9 w-full rounded-lg border border-primary/25 bg-white px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-primary/30';
 
-export function AdCategoryFields({ fields, values, onChange }: {
-  fields: CategoryField[]; values: CategoryValues; onChange: (next: CategoryValues) => void;
+export function AdCategoryFields({ fields, values, onChange, listingType }: {
+  fields: CategoryField[]; values: CategoryValues; onChange: (next: CategoryValues) => void;listingType?:string;
 }) {
-  const active = fields.filter(f => f.visible).sort((a, b) => a.order - b.order);
+  const active = fields.filter(f => fieldApplies(f,{listingType,values})).sort((a, b) => a.order - b.order);
   const current = Object.fromEntries(active.filter(f => Object.hasOwn(values, f.key)).map(f => [f.key, values[f.key]]));
   const groups = [...new Set(active.map(f => f.group))];
   function update(key: string, value: CategoryValue) { onChange({ ...current, [key]: value }); }
@@ -31,19 +31,22 @@ export function AdCategoryFields({ fields, values, onChange }: {
               ? <select id={id} className={control} required={f.required} multiple={f.type === 'multiselect'}
                 value={f.type === 'multiselect' ? (Array.isArray(value) ? value : []) : String(value ?? '')}
                 onChange={e => update(f.key, f.type === 'multiselect' ? [...e.currentTarget.selectedOptions].map(o => o.value) : e.target.value)}>
-                {f.type === 'select' && <option value="">—</option>}
+                {f.type !== 'multiselect' && <option value="">—</option>}
                 {f.options.map(option => <option key={option} value={option}>{option}</option>)}
               </select>
+              :f.type==='radio'?<div className="mt-2 flex flex-wrap gap-2">{f.options.map(option=><label key={option} className={`rounded-lg border px-3 py-2 text-sm ${value===option?'border-primary bg-primary/10':'bg-white'}`}><input type="radio" name={`category_${f.key}`} required={f.required} checked={value===option} onChange={()=>update(f.key,option)} className="ml-1"/>{option}</label>)}</div>
               : f.type === 'boolean' ? <select id={id} className={control} required={f.required} value={typeof value === 'boolean' ? String(value) : ''}
                 onChange={e => {
                   if (!e.target.value) { const next = { ...current }; delete next[f.key]; onChange(next); }
                   else update(f.key, e.target.value === 'true');
                 }}><option value="">—</option><option value="true">نعم</option><option value="false">لا</option></select>
-                : f.type === 'textarea' ? <textarea id={id} className={control} required={f.required} maxLength={3000} rows={3}
+                : f.type === 'textarea' ? <textarea id={id} className={control} required={f.required} maxLength={3000} rows={3} placeholder={f.placeholder}
                   value={String(value ?? '')} onChange={e => update(f.key, e.target.value)} />
-                  : <input id={id} className={control} required={f.required} type={f.type} min={f.min} max={f.max}
-                    step={f.type === 'number' ? 'any' : undefined} maxLength={f.type === 'text' ? 500 : undefined}
+                  :f.type==='range'?<div className="grid grid-cols-2 gap-2"><input aria-label={`${f.label} من`} className={control} type="number" min={f.min} max={f.max} value={String((value as CategoryRange|undefined)?.min??'')} onChange={e=>update(f.key,{min:Number(e.target.value),max:Number((value as CategoryRange|undefined)?.max??e.target.value)})}/><input aria-label={`${f.label} إلى`} className={control} type="number" min={f.min} max={f.max} value={String((value as CategoryRange|undefined)?.max??'')} onChange={e=>update(f.key,{min:Number((value as CategoryRange|undefined)?.min??e.target.value),max:Number(e.target.value)})}/></div>
+                  : <input id={id} className={control} required={f.required} type={f.type==='year'?'number':f.type} min={f.min} max={f.max}
+                    placeholder={f.placeholder} step={f.type === 'number'||f.type==='decimal' ? 'any' : undefined} maxLength={f.type === 'text' ? 500 : undefined}
                     value={String(value ?? '')} onChange={e => update(f.key, e.target.value)} />}
+            {f.helpText&&<p className="mt-1 text-xs text-muted-foreground">{f.helpText}</p>}
           </div>;
         })}
       </div>

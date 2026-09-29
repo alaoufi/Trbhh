@@ -11,7 +11,8 @@ function definition(r:DefinitionRow) {
   return {version:r.version,kind:r.kind as SubcategoryOption['kind'],...categoryPolicy({kind:r.kind,priceEnabled:r.price_enabled===1,goodsEnabled:r.goods_enabled===1}),fields:validateDefinition(json(r.fields_json))};
 }
 export async function getCategoryFormConfig(admin=false):Promise<CategoryFormConfig> {
-  const enabled=categoryEnabled(await getSetting('categories_v2_enabled','0'));
+  const defaultEnabled=process.env.CATEGORIES_DEFAULT_ENABLED==='1';
+  const enabled=categoryEnabled(await getSetting('categories_v2_enabled',defaultEnabled?'1':'0'));
   const labels={...CATEGORY_LABELS};
   for(const k of Object.keys(labels) as (keyof typeof labels)[]) labels[k]=await getSetting(`categories_v2_label_${k}`,labels[k]);
   if(!enabled&&!admin) return {enabled,labels,categories:[],subcategories:[]};
@@ -60,14 +61,14 @@ export async function writeAdWithCategory<T extends {id:bigint}>(db:PrismaClient
   });
 }
 export async function getCategoryEditValues(id:bigint):Promise<CategoryValues> {
-  if(!categoryEnabled(await getSetting('categories_v2_enabled','0'))) return {};
+  if(!categoryEnabled(await getSetting('categories_v2_enabled',process.env.CATEGORIES_DEFAULT_ENABLED==='1'?'1':'0'))) return {};
   const rows=await prisma.$queryRaw<{values_json:unknown}[]>`SELECT values_json FROM ad_category_values WHERE ad_id=${id}`;
   return rows.length?json(rows[0].values_json) as CategoryValues:{};
 }
 export type PublicCategory={priceEnabled:boolean;goodsEnabled:boolean;categoryFields:ReturnType<typeof visibleCategoryValues>;subcategoryName?:string};
 export async function getPublicCategories(ids:bigint[]):Promise<Map<number,PublicCategory>> {
   const out=new Map<number,PublicCategory>();
-  if(!ids.length||!categoryEnabled(await getSetting('categories_v2_enabled','0'))) return out;
+  if(!ids.length||!categoryEnabled(await getSetting('categories_v2_enabled',process.env.CATEGORIES_DEFAULT_ENABLED==='1'?'1':'0'))) return out;
   const rows=await prisma.$queryRaw<(DefinitionRow&{ad_id:bigint;values_json:unknown;name:string;active:number;is_active:string})[]>(Prisma.sql`SELECT a.id AS ad_id,d.*,v.values_json,s.name,s.active,c.is_active FROM ads a JOIN sub_categories s ON s.id=a.subcategory_id AND s.category_id=a.category_id JOIN categories c ON c.id=a.category_id JOIN ad_category_definitions d ON d.subcategory_id=s.id LEFT JOIN ad_category_values v ON v.ad_id=a.id AND v.subcategory_id=s.id WHERE a.id IN (${Prisma.join(ids)})`);
   for(const r of rows){const d=definition(r);out.set(Number(r.ad_id),{priceEnabled:d.priceEnabled,goodsEnabled:d.goodsEnabled,subcategoryName:r.active===1&&r.is_active==='yes'?r.name:undefined,categoryFields:r.active===1&&r.is_active==='yes'?visibleCategoryValues(d.fields,(json(r.values_json)||{}) as CategoryValues):[]});}
   return out;

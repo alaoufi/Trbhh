@@ -38,4 +38,10 @@ describe('member account guide links', () => {
     expect(read('src/app/guide/store/page.tsx')).toContain('نتائج قريبة بدل الصفحة الفارغة');
     expect(read('src/app/admin/guide/page.tsx')).toContain('استعادة نتائج البحث الصفرية');
   });
+
+  it('documents admin-managed search synonyms', () => {
+    expect(read('src/app/guide/page.tsx')).toContain('مرادفات البحث');
+    expect(read('src/app/guide/store/page.tsx')).toContain('جوال وموبايل وهاتف');
+    expect(read('src/app/admin/guide/page.tsx')).toContain('قاموس مرادفات البحث');
+  });
 });

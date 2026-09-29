@@ -9,12 +9,13 @@ import { ensureSaudiAreas } from './seed-areas';
 import { getProfileDisplay } from './profiles';
 import { toInt } from './utils';
 import { currentPlatformAdPublicWhere, platformDealAdPublicWhere } from './platform-ad-visibility';
-import { getPlatformAdLifecycleConfig, getStoreSubPricing } from './settings';
+import { getPlatformAdLifecycleConfig, getSetting, getStoreSubPricing } from './settings';
 import { publicStoreWhere } from './store-subscription-access';
 import { equivalentAreaIds, normalizePriceRange } from './search-filters';
 import { compactAdTitle } from './ad-presentation';
 import { searchCardVisibility } from './search-card-visibility';
 import { featuredSearchPage } from './featured-search-page';
+import { DEFAULT_SEARCH_SYNONYMS, expandSearchToken, parseSearchSynonyms } from './search-synonyms';
 import { getPublicCategories, getCategoryEditValues, type PublicCategory } from './ad-categories/service';
 
 export type AdCard = {
@@ -534,8 +535,13 @@ async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type
   const norm = (w: string) => w.replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه');
   const tokens = (q || '').trim().split(/\s+/).filter((w) => w.length >= 2).slice(0, 6);
   if (!tokens.length && (q || '').trim()) tokens.push((q as string).trim());
+  const synonymsOn = await getSetting('search_synonyms_on', '1').then((value) => value !== '0').catch(() => true);
+  const synonymGroups = synonymsOn
+    ? parseSearchSynonyms(await getSetting('search_synonyms', DEFAULT_SEARCH_SYNONYMS).catch(() => DEFAULT_SEARCH_SYNONYMS))
+    : new Map<string, string[]>();
   const textClauses = tokens.map((t) => {
-    const variants = Array.from(new Set([t, norm(t), t.replace(/ه$/, 'ة'), t.replace(/ة$/, 'ه'), t.replace(/ي$/, 'ى'), t.replace(/ى$/, 'ي')]));
+    const variants = Array.from(new Set(expandSearchToken(t, synonymGroups).flatMap((term) =>
+      [term, norm(term), term.replace(/ه$/, 'ة'), term.replace(/ة$/, 'ه'), term.replace(/ي$/, 'ى'), term.replace(/ى$/, 'ي')])));
     return { OR: variants.flatMap((v) => [{ title: { contains: v } }, { detail: { contains: v } }]) };
   });
   const textFilter = textMatch === 'any' && textClauses.length ? [{ OR: textClauses }] : textClauses;

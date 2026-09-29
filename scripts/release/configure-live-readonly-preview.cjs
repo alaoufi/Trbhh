@@ -32,6 +32,10 @@ function validateGrantReport(grants, database) {
   });
 }
 
+function emitSql({ database, username, password }) {
+  return `${buildStatements({ database, username, password }).join(';\n')};\n`;
+}
+
 async function main() {
   const { PrismaClient } = require('@prisma/client');
   const parsed = new URL(process.env.DATABASE_URL || '');
@@ -52,8 +56,23 @@ async function main() {
   }
 }
 
-module.exports = { buildStatements, validateGrantReport };
-if (require.main === module) main().catch((error) => {
-  console.error(error instanceof Error ? error.message : 'preview_readonly_failed');
-  process.exitCode = 1;
-});
+module.exports = { buildStatements, emitSql, validateGrantReport };
+if (require.main === module) {
+  if (process.argv.includes('--emit-sql')) {
+    try {
+      process.stdout.write(emitSql({
+        database: process.env.PREVIEW_DATABASE || '',
+        username: process.env.PREVIEW_READONLY_USER || '',
+        password: process.env.PREVIEW_READONLY_PASSWORD || '',
+      }));
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : 'preview_readonly_failed');
+      process.exitCode = 1;
+    }
+  } else {
+    main().catch((error) => {
+      console.error(error instanceof Error ? error.message : 'preview_readonly_failed');
+      process.exitCode = 1;
+    });
+  }
+}

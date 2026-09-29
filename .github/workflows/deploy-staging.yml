@@ -114,11 +114,55 @@ jobs:
             container_script=/tmp/trbhh-configure-live-readonly-preview.cjs
             docker cp "$readonly_script" "$prod_container:$container_script"
             docker exec -u 0 "$prod_container" chmod 644 "$container_script"
-            docker exec \
-              -e NODE_PATH=/app/node_modules \
+
+            live_database=$(docker exec "$prod_container" node -e '
+              const url = new URL(process.env.DATABASE_URL);
+              const database = decodeURIComponent(url.pathname.slice(1));
+              if (!/^[A-Za-z0-9_]{1,64}$/.test(database)) process.exit(1);
+              process.stdout.write(database);
+            ')
+            test -n "$live_database"
+
+            master_credentials=$(clpctl db:show:master-credentials)
+            read_master_value() {
+              local label=$1
+              printf '%s\n' "$master_credentials" | tr -d '\r' | awk -F'|' -v label="$label" '
+                { key=$2; gsub(/^[ \t]+|[ \t]+$/, "", key) }
+                key == label { value=$3; gsub(/^[ \t]+|[ \t]+$/, "", value); print value; exit }
+              '
+            }
+            master_host=$(read_master_value Host)
+            master_user=$(read_master_value 'User Name')
+            master_password=$(read_master_value Password)
+            master_port=$(read_master_value Port)
+            unset master_credentials
+            test -n "$master_host"
+            test -n "$master_user"
+            test -n "$master_password"
+            [[ "$master_port" =~ ^[0-9]+$ ]]
+
+            readonly_sql=$(docker exec \
+              -e PREVIEW_DATABASE="$live_database" \
               -e PREVIEW_READONLY_USER="$readonly_user" \
               -e PREVIEW_READONLY_PASSWORD="$readonly_password" \
-              "$prod_container" node "$container_script"
+              "$prod_container" node "$container_script" --emit-sql)
+            grant_report=$(
+              {
+                printf '%s\n' "$readonly_sql"
+                printf "SHOW GRANTS FOR '%s'@'%%';\n" "$readonly_user"
+              } | MYSQL_PWD="$master_password" mysql \
+                --host="$master_host" --port="$master_port" --user="$master_user" \
+                --batch --skip-column-names
+            )
+            unset readonly_sql master_password master_host master_user master_port
+            grant_upper=$(printf '%s' "$grant_report" | tr '[:lower:]' '[:upper:]')
+            [[ "$grant_upper" == *SELECT* ]]
+            [[ "$grant_upper" == *'SHOW VIEW'* ]]
+            if printf '%s' "$grant_upper" | grep -Eq '\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRIGGER|EXECUTE|FILE|PROCESS|SUPER|RELOAD|SHUTDOWN|GRANT OPTION)\b'; then
+              echo preview_readonly_grants_rejected >&2
+              exit 1
+            fi
+            unset grant_report grant_upper live_database
             docker exec -u 0 "$prod_container" rm -f "$container_script"
 
             readonly_url=$(docker exec \

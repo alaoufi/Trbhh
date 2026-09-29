@@ -23,8 +23,9 @@ describe('Hostinger live-data read-only preview', () => {
     expect(existsSync(script)).toBe(true);
     if (!existsSync(script)) return;
 
-    const { buildStatements, validateGrantReport } = await import(script) as {
+    const { buildStatements, emitSql, validateGrantReport } = await import(script) as {
       buildStatements(input: { database: string; username: string; password: string }): string[];
+      emitSql(input: { database: string; username: string; password: string }): string;
       validateGrantReport(grants: string[], database: string): boolean;
     };
     const statements = buildStatements({ database: 'trbhh_live', username: 'trbhh_preview_ro', password: 'Secret123456' });
@@ -37,6 +38,7 @@ describe('Hostinger live-data read-only preview', () => {
     expect(() => buildStatements({ database: 'trbhh_live', username: 'trbhh_preview_ro', password: "bad'pass" })).toThrow();
     expect(validateGrantReport(["GRANT SELECT, SHOW VIEW ON `trbhh_live`.* TO `trbhh_preview_ro`@`%`"], 'trbhh_live')).toBe(true);
     expect(validateGrantReport(["GRANT SELECT, INSERT ON `trbhh_live`.* TO `trbhh_preview_ro`@`%`"], 'trbhh_live')).toBe(false);
+    expect(emitSql({ database: 'trbhh_live', username: 'trbhh_preview_ro', password: 'Secret123456' })).toMatch(/;\n$/);
     expect(JSON.stringify({ statements: statements.map((statement) => statement.replace(/IDENTIFIED BY '.+?'/, "IDENTIFIED BY '[REDACTED]'")) })).not.toContain('Secret123456');
   });
 
@@ -49,8 +51,9 @@ describe('Hostinger live-data read-only preview', () => {
     expect(workflow).toContain('github.sha');
     expect(workflow).toContain('docker exec -i "$container" node -');
     expect(workflow).toContain('docker cp "$readonly_script" "$prod_container:$container_script"');
-    expect(workflow).toContain('-e NODE_PATH=/app/node_modules');
-    expect(workflow).toContain('"$prod_container" node "$container_script"');
+    expect(workflow).toContain('master_credentials=$(clpctl db:show:master-credentials)');
+    expect(workflow).toContain('MYSQL_PWD="$master_password" mysql');
+    expect(workflow).toContain('"$prod_container" node "$container_script" --emit-sql');
     expect(workflow).not.toContain('"$prod_container" node - < "$readonly_script"');
     expect(workflow).toContain("SELECT COUNT(*) AS count FROM categories");
     expect(workflow).not.toContain("SELECT COUNT(*) AS count FROM ad_categories");

@@ -2,11 +2,13 @@
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { getSettingBool } from '@/lib/settings';
 
 const COOKIE = 'trbhh_compare';
 const MAX = 4;
 
 export async function readCompareIds(): Promise<number[]> {
+  if (!(await getSettingBool('compare_on', true).catch(() => true))) return [];
   const raw = (await cookies()).get(COOKIE)?.value || '';
   return raw.split(',').map((s) => Number(s)).filter((n) => n > 0).slice(0, MAX);
 }
@@ -15,6 +17,7 @@ export async function readCompareIds(): Promise<number[]> {
 export async function toggleCompareAction(formData: FormData) {
   const adId = Number(formData.get('adId') || 0);
   const back = String(formData.get('back') || (adId ? `/ads/${adId}` : '/'));
+  if (!(await getSettingBool('compare_on', true).catch(() => true))) redirect(back);
   if (!adId) redirect(back);
   const ids = await readCompareIds();
   const next = ids.includes(adId) ? ids.filter((x) => x !== adId) : [...ids, adId].slice(-MAX);

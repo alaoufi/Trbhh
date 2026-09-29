@@ -21,4 +21,9 @@ describe('member account guide links', () => {
     expect(read('src/app/guide/page.tsx')).toContain('يمكن للإدارة إيقاف قسم «يهمّك الآن»');
     expect(read('src/app/admin/guide/page.tsx')).toContain('التوصيات المخصصة «يهمّك الآن»');
   });
+
+  it('documents the server-side comparison feature switch', () => {
+    expect(read('src/app/guide/page.tsx')).toContain('حتى أربعة إعلانات جنباً إلى جنب');
+    expect(read('src/app/admin/guide/page.tsx')).toContain('مقارنة الإعلانات');
+  });
 });

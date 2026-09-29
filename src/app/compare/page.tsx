@@ -5,6 +5,8 @@ import { readCompareIds, clearCompareAction, toggleCompareAction } from './actio
 import { getAdsByIdsCards } from '@/lib/data';
 import { formatPrice } from '@/lib/utils';
 import { Breadcrumb } from '@/components/breadcrumb';
+import { notFound } from 'next/navigation';
+import { getSettingBool } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'مقارنة الإعلانات' };
@@ -19,6 +21,7 @@ function Row({ label, values }: { label: string; values: React.ReactNode[] }) {
 }
 
 export default async function ComparePage() {
+  if (!(await getSettingBool('compare_on', true).catch(() => true))) notFound();
   const ids = await readCompareIds();
   const ads = await getAdsByIdsCards(ids);
   return (

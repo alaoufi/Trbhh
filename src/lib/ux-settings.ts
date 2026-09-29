@@ -2,6 +2,7 @@
 export const AUDIT_UX_FLAGS = [
   ['home_discovery_on', 'إظهار البحث والإضافة في مقدمة الرئيسية'],
   ['personalized_discovery_on', 'إظهار التوصيات المخصصة «يهمّك الآن»'],
+  ['compare_on', 'تفعيل مقارنة الإعلانات'],
   ['search_price_filter_on', 'إظهار فلتر السعر في البحث'],
   ['ad_mobile_contact_on', 'شريط التواصل في صفحة الإعلان على الجوال'],
   ['seller_whatsapp_on', 'إظهار واتساب البائع والمتجر'],

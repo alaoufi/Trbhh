@@ -40,7 +40,7 @@ function Section({ title, icon: Icon, children }: { title: string; icon: React.E
 }
 
 type LinkedAcct = { id: number; name: string; hasStore: boolean; storeName: string | null; isAdmin: boolean };
-export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, auctionsOn = false, myStoreId = 0, myStoreName = '', currentUid = 0, activeName = '', activeType = 'personal', linkedAccounts = [] }: { isAuthed: boolean; isAdmin: boolean; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; myStoreId?: number; myStoreName?: string; currentUid?: number; activeName?: string; activeType?: 'personal' | 'store'; linkedAccounts?: LinkedAcct[] }) {
+export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, auctionsOn = false, compareOn = true, myStoreId = 0, myStoreName = '', currentUid = 0, activeName = '', activeType = 'personal', linkedAccounts = [] }: { isAuthed: boolean; isAdmin: boolean; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; compareOn?: boolean; myStoreId?: number; myStoreName?: string; currentUid?: number; activeName?: string; activeType?: 'personal' | 'store'; linkedAccounts?: LinkedAcct[] }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname() || '';
@@ -171,7 +171,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
             <Item href="/" icon={Home} onClick={close}>الرئيسية</Item>
             <Item href="/companies" icon={Store} onClick={close}>المتاجر</Item>
             <Item href="/requests" icon={HandCoins} onClick={close}>سوق الطلبات</Item>
-            <Item href="/compare" icon={Scale} onClick={close}>مقارنة الإعلانات</Item>
+            {compareOn && <Item href="/compare" icon={Scale} onClick={close}>مقارنة الإعلانات</Item>}
             {isAuthed && (
               <Link href="/account/profiles" onClick={close} className="mb-1 flex items-center gap-3 rounded-lg border-2 border-violet-400/40 bg-violet-500/15 px-3 py-3 text-[15px] font-extrabold text-violet-700 hover:bg-violet-500/25">
                 <Users className="h-5 w-5 shrink-0" /> <span>الحسابات الموحدة</span>

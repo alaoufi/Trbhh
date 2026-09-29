@@ -150,7 +150,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
     ad.seller ? getSellerCredibility(ad.seller.id) : Promise.resolve({ avg: 0, trust: 0, count: 0 }),
     ad.seller ? getResponseSpeed(ad.seller.id) : Promise.resolve(null),
   ]);
-  const compareIds = await readCompareIds().catch(() => [] as number[]);
+  const compareOn = await getSettingBool('compare_on', true).catch(() => true);
+  const compareIds = compareOn ? await readCompareIds().catch(() => [] as number[]) : [];
   // «ذات صلة» لنفس المعلن — و«المشابهة» بلا تكرار لما ظهر في إعلانات المعلن
   const sellerAdIds = new Set(sellerAds.map((a) => a.id));
   const similar = similarRaw.filter((a) => !sellerAdIds.has(a.id));
@@ -692,7 +693,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       )}
 
       {/* قارن هذا الإعلان — مقارنة جنباً لجنب (حتى ٤ إعلانات) */}
-      {!isAdOwner && (() => {
+      {compareOn && !isAdOwner && (() => {
         const inCompare = compareIds.includes(ad.id);
         return (
           <div className="flex flex-wrap items-center gap-2">

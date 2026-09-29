@@ -32,4 +32,10 @@ describe('member account guide links', () => {
     expect(read('src/app/guide/store/page.tsx')).toContain('تابع «سوق الطلبات»');
     expect(read('src/app/admin/guide/page.tsx')).toContain('رابط سوق الطلبات');
   });
+
+  it('documents zero-result search recovery for members, stores and admins', () => {
+    expect(read('src/app/guide/page.tsx')).toContain('نتائج قريبة بعد تخفيف الفلاتر');
+    expect(read('src/app/guide/store/page.tsx')).toContain('نتائج قريبة بدل الصفحة الفارغة');
+    expect(read('src/app/admin/guide/page.tsx')).toContain('استعادة نتائج البحث الصفرية');
+  });
 });

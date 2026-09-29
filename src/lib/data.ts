@@ -502,6 +502,7 @@ type SearchParamsT = {
   skip?: number;
   minPrice?: number;
   maxPrice?: number;
+  textMatch?: 'all' | 'any';
 };
 
 const getSearchCardVisibility = cache(async () => {
@@ -525,7 +526,7 @@ const getSearchAreaIds = cache(async (areaId: number, cityId: number) => {
   return equivalentAreaIds(areas.map((area) => ({ id: toInt(area.id), name: area.name, cityId: area.city_id })), areaId, cityId);
 });
 
-async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special, minPrice, maxPrice }: SearchParamsT) {
+async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special, minPrice, maxPrice, textMatch = 'all' }: SearchParamsT) {
   const range = normalizePriceRange(minPrice, maxPrice);
   const visibility = await activeAdWhere();
   // بحث ذكي: تُقسَّم العبارة كلمات، وكل كلمة تُطابق العنوان أو التفاصيل بأي ترتيب،
@@ -537,9 +538,10 @@ async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type
     const variants = Array.from(new Set([t, norm(t), t.replace(/ه$/, 'ة'), t.replace(/ة$/, 'ه'), t.replace(/ي$/, 'ى'), t.replace(/ى$/, 'ي')]));
     return { OR: variants.flatMap((v) => [{ title: { contains: v } }, { detail: { contains: v } }]) };
   });
+  const textFilter = textMatch === 'any' && textClauses.length ? [{ OR: textClauses }] : textClauses;
   return {
     ...visibility,
-    AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textClauses],
+    AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textFilter],
     ...(categoryId ? { category_id: BigInt(categoryId) } : {}),
     ...(countryId ? { country_id: countryId } : {}),
     ...(cityId ? { city_id: BigInt(cityId) } : {}),
@@ -585,6 +587,27 @@ export async function searchAds(params: SearchParamsT) {
     select: adSelect,
   });
   return toCards(rows);
+}
+
+/**
+ * نتائج مساندة عند فشل البحث الصارم: نحافظ على المنطقة ونوع الإعلان، ونزيل
+ * الفلاتر الاختيارية الضيقة، ثم نطابق أي كلمة بدلاً من اشتراط جميع الكلمات.
+ */
+export async function searchAdsRelaxed(params: SearchParamsT) {
+  const hasOriginalFilter = !!(
+    params.q?.trim() || params.categoryId || params.cityId || params.areaId || params.type ||
+    params.special || params.minPrice !== undefined || params.maxPrice !== undefined
+  );
+  if (!hasOriginalFilter) return [];
+  return searchAds({
+    q: params.q,
+    cityId: params.cityId,
+    type: params.type,
+    textMatch: 'any',
+    sort: 'newest',
+    take: Math.min(Math.max(1, params.take ?? 8), 12),
+    skip: 0,
+  });
 }
 
 async function getAdImpl(id: number) {

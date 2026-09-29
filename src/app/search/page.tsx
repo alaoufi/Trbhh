@@ -3,14 +3,14 @@ import { normalizeSearchParams, positiveSearchId } from '@/lib/search-filters';
 import { getSettingBool } from '@/lib/settings';
 import { PublicSearchForm } from '@/components/public-search-form';
 import { Bell, Trash2 } from 'lucide-react';
-import { searchAds, countSearchAds, getCities, getAreas } from '@/lib/data';
+import { searchAds, searchAdsRelaxed, countSearchAds, getCities, getAreas } from '@/lib/data';
 
 import { AdminPager } from '@/components/admin-pager';
 import { AdGrid } from '@/components/ad-card';
 
 import { Breadcrumb } from '@/components/breadcrumb';
 import { getSession } from '@/lib/auth';
-import { listSavedSearches, savedSearchEnabled } from '@/lib/saved-search';
+import { listSavedSearches, savedSearchEnabled, searchSuggestEnabled } from '@/lib/saved-search';
 import { saveSearchAction, deleteSavedSearchAction } from './actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 
@@ -25,11 +25,11 @@ export default async function SearchPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const sp = await searchParams;
-  const [cities, areas, session, alertsOn] = await Promise.all([
-    getCities(), getAreas(), getSession(), savedSearchEnabled(),
+  const [cities, areas, session, alertsOn, recoveryOn, priceOn] = await Promise.all([
+    getCities(), getAreas(), getSession(), savedSearchEnabled(), searchSuggestEnabled(),
+    getSettingBool('search_price_filter_on', true),
   ]);
   const saved = session && alertsOn ? await listSavedSearches(session.uid) : [];
-  const priceOn = await getSettingBool('search_price_filter_on', true);
   const sq = normalizeSearchParams(priceOn ? sp : { ...sp, minPrice: undefined, maxPrice: undefined });
   // Accept only Saudi regions and a city belonging to that region.
   const cityId = cities.some((item) => item.countryId === 1 && item.id === sq.cityId) ? sq.cityId : undefined;
@@ -40,13 +40,14 @@ export default async function SearchPage({
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(positiveSearchId(sp.page) || 1, pages);
   const ads = await searchAds({ ...query, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE });
+  const hasFilters = !!(query.categoryId || query.q || cityId || query.type || query.special || query.minPrice !== undefined || query.maxPrice !== undefined);
+  const relaxedAds = ads.length === 0 && hasFilters && recoveryOn ? await searchAdsRelaxed(query) : [];
   const params = {
     category: query.categoryId?.toString(),
     q: query.q, city: cityId?.toString(), area: areaId?.toString(), type: query.type,
     sort: query.sort, special: query.special ? '1' : undefined,
     minPrice: query.minPrice?.toString(), maxPrice: query.maxPrice?.toString(),
   };
-  const hasFilters = !!(query.categoryId || query.q || cityId || query.type || query.special || query.minPrice !== undefined || query.maxPrice !== undefined);
   return (
     <div className="space-y-4">
       <Breadcrumb items={[{ label: 'بحث متقدم' }]} />
@@ -85,9 +86,18 @@ export default async function SearchPage({
       )}
 
       <p className="text-sm text-muted-foreground">النتائج: {total}</p>
-      {ads.length > 0 ? <AdGrid ads={ads} /> : <div className="rounded-xl border border-dashed p-8 text-center"><p className="font-semibold">لا توجد إعلانات تطابق بحثك.</p><Link href="/search" className="mt-3 inline-block text-sm text-primary underline">امسح الفلاتر لتصفح جميع الإعلانات</Link></div>}
+      {ads.length > 0 ? <AdGrid ads={ads} /> : relaxedAds.length > 0 ? (
+        <section className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+          <div>
+            <h2 className="font-extrabold text-foreground">نتائج قريبة بعد تخفيف الفلاتر</h2>
+            <p className="mt-1 text-sm text-muted-foreground">لم نجد تطابقاً كاملاً، فخففنا المدينة والسعر وبعض شروط الكلمات مع إبقاء المنطقة ونوع الإعلان.</p>
+          </div>
+          <AdGrid ads={relaxedAds} />
+          <Link href="/search" className="inline-block text-sm font-semibold text-primary underline underline-offset-4">تصفح جميع الإعلانات</Link>
+        </section>
+      ) : <div className="rounded-xl border border-dashed p-8 text-center"><p className="font-semibold">لا توجد إعلانات تطابق بحثك.</p><Link href="/search" className="mt-3 inline-block text-sm text-primary underline">امسح الفلاتر لتصفح جميع الإعلانات</Link></div>}
 
-      <AdminPager basePath="/search" page={page} pages={pages} total={total} params={params} />
+      {total > 0 && <AdminPager basePath="/search" page={page} pages={pages} total={total} params={params} />}
     </div>
   );
 }

@@ -17,7 +17,7 @@ vi.mock('@/lib/packages', () => ({
   sweepExpiredFeatured: vi.fn(), getFeaturedTierMap: vi.fn(), getUsersAdMeta: async () => new Map(),
   getPackages: async () => [], getDefaultPackage: async () => ({ adDays: 0 }), FREE_FALLBACK: { adDays: 0 },
 }));
-import { countSearchAds, searchAds } from '@/lib/data';
+import { countSearchAds, searchAds, searchAdsRelaxed } from '@/lib/data';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -96,6 +96,24 @@ describe('public search query integration', () => {
     expect(await searchAds({take:24,skip:48})).toEqual([]);
     expect(db.ads.findMany).toHaveBeenCalledTimes(1);
     expect(db.ads.findMany.mock.calls[0][0]).toMatchObject({take:24,skip:48,where:{AND:expect.arrayContaining([{adsSpecial:{not:'checked'}}])}});
+    vi.useRealTimers();
+  });
+  it('loosens optional filters and matches any query token for zero-result recovery', async () => {
+    db.ads.count.mockResolvedValue(0);
+    db.ads.findMany.mockResolvedValue([]);
+    await searchAdsRelaxed({
+      q: 'رافعة شوكية جديدة', categoryId: 32, cityId: 1, areaId: 2,
+      minPrice: 1000, maxPrice: 3000, special: true, type: 'offer', take: 8,
+    });
+    const base = db.ads.findMany.mock.calls[0][0].where.AND[0];
+    expect(base).toMatchObject({ status: 1, city_id: 1n, adsType: 'offer' });
+    expect(base).not.toHaveProperty('category_id');
+    expect(base).not.toHaveProperty('area_id');
+    expect(base).not.toHaveProperty('price');
+    expect(base).not.toHaveProperty('adsSpecial');
+    const tokenGroup = base.AND.find((part: { OR?: unknown[] }) =>
+      Array.isArray(part.OR) && part.OR.some((clause) => typeof clause === 'object' && clause !== null && 'OR' in clause));
+    expect(tokenGroup.OR).toHaveLength(3);
     vi.useRealTimers();
   });
 });

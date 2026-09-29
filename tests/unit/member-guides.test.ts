@@ -26,4 +26,10 @@ describe('member account guide links', () => {
     expect(read('src/app/guide/page.tsx')).toContain('حتى أربعة إعلانات جنباً إلى جنب');
     expect(read('src/app/admin/guide/page.tsx')).toContain('مقارنة الإعلانات');
   });
+
+  it('documents requests-market visibility for members, stores and admins', () => {
+    expect(read('src/app/guide/page.tsx')).toContain('سوق الطلبات يجمع إعلانات «طلب»');
+    expect(read('src/app/guide/store/page.tsx')).toContain('تابع «سوق الطلبات»');
+    expect(read('src/app/admin/guide/page.tsx')).toContain('رابط سوق الطلبات');
+  });
 });

@@ -12,9 +12,7 @@ export async function HomeCategoryNavigation({ selectedCategory, config: supplie
   const { browse: browseLabel, clear: clearLabel } = config.labels;
   const selected = selectedHomeCategory(config, selectedCategory);
   return <section data-testid="home-category-navigation" aria-label={config.labels.category} className="card-3d space-y-3 rounded-xl p-3">
-    {visual && <><h2 className="text-lg font-extrabold text-[#16294a]">تصفح حسب التصنيف</h2><nav aria-label="تصنيفات السوق" className="flex gap-2 overflow-x-auto pb-2 sm:flex-wrap">
-      {categories.map(category => <Link key={category.id} href={`/?category=${category.id}`} aria-current={selected?.id === category.id ? 'page' : undefined} className={`shrink-0 rounded-full border px-4 py-3 text-sm font-bold ${selected?.id === category.id ? 'border-[#16294a] bg-[#16294a] text-white' : 'border-slate-200 bg-white text-[#16294a] hover:border-[#ff6a1a]'}`}>{category.name}</Link>)}
-    </nav></>}
+    {visual && <h2 className="text-lg font-extrabold text-[#16294a]">تصفح حسب التصنيف</h2>}
     <form key={selected?.id.toString() || ''} action="/" method="get" className="flex flex-wrap items-end gap-2">
       <label className="min-w-0 basis-full space-y-1 text-xs font-semibold text-foreground sm:flex-1 sm:basis-auto">{config.labels.category}
         <select name="category" defaultValue={selected?.id.toString() || ''} className="h-11 w-full rounded-lg border bg-background px-3 text-sm text-foreground">

@@ -73,10 +73,11 @@ describe('homepage category discovery', () => {
     expect(isValidElement(clearedForm) && clearedForm.key).not.toContain('12');
     expect(isValidElement(invalidForm) && invalidForm.key).toBe(isValidElement(clearedForm) && clearedForm.key);
   });
-  it('keeps visual category links on the public home and excludes inactive categories', async () => {
+  it('uses one category control on the public home and excludes inactive categories', async () => {
     const html = renderToStaticMarkup(await HomeCategoryNavigation({ selectedCategory: '12', visual: true }));
-    expect(html).toContain('href="/?category=12"');
-    expect(html).toContain('aria-current="page"');
+    expect(html).toMatch(/<select[^>]*name="category"/);
+    expect(html).not.toContain('href="/?category=12"');
+    expect(html).not.toContain('aria-current="page"');
     expect(html).not.toContain('قسم مخفي');
     expect(html).not.toContain('/shop');
   });

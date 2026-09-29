@@ -1,12 +1,18 @@
-export type CategoryFieldType = 'text' | 'textarea' | 'number' | 'select' | 'multiselect' | 'boolean' | 'date';
+export type CategoryFieldType = 'text' | 'textarea' | 'number' | 'decimal' | 'select' | 'multiselect' | 'boolean' | 'radio' | 'date' | 'year' | 'range';
+export type DependencyOperator = 'equals' | 'not_equals' | 'in' | 'not_in' | 'truthy';
 export type CategoryField = {
   key: string; label: string; type: CategoryFieldType; group: string;
   required: boolean; visible: boolean; order: number;
   options: string[]; min?: number; max?: number; unit?: string;
+  placeholder?: string; helpText?: string;
+  searchable?: boolean; filterable?: boolean; comparable?: boolean; showInCard?: boolean; showInDetails?: boolean;
+  dependsOn?: string; dependencyOperator?: DependencyOperator; dependencyValue?: string | number | boolean | string[];
 };
-export type CategoryValue = string | number | boolean | string[];
+export type CategoryRange = {min:number;max:number};
+export type CategoryValue = string | number | boolean | string[] | CategoryRange;
 export type CategoryValues = Record<string, CategoryValue>;
-const TYPES = new Set(['text', 'textarea', 'number', 'select', 'multiselect', 'boolean', 'date']);
+const TYPES = new Set(['text', 'textarea', 'number', 'decimal', 'select', 'multiselect', 'boolean', 'radio', 'date', 'year', 'range']);
+const DEPENDENCY_OPERATORS = new Set<DependencyOperator>(['equals','not_equals','in','not_in','truthy']);
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 export class CategoryValidationError extends Error {
@@ -35,7 +41,7 @@ export function validateDefinition(raw: unknown): CategoryField[] {
       throw new CategoryValidationError(key, 'خيارات الحقل غير صالحة');
     }
     const options = [...new Set((f.options as string[]).map(o => o.trim()))];
-    if (['select', 'multiselect'].includes(String(f.type)) && !options.length) throw new CategoryValidationError(key, 'أضف خيارات الحقل');
+    if (['select', 'multiselect','radio'].includes(String(f.type)) && !options.length) throw new CategoryValidationError(key, 'أضف خيارات الحقل');
     for (const prop of ['min', 'max'] as const) {
       if (f[prop] !== undefined && (typeof f[prop] !== 'number' || !Number.isFinite(f[prop]))) {
         throw new CategoryValidationError(key, 'حدود الحقل غير صالحة');
@@ -43,10 +49,19 @@ export function validateDefinition(raw: unknown): CategoryField[] {
     }
     if (typeof f.min === 'number' && typeof f.max === 'number' && f.min > f.max) throw new CategoryValidationError(key, 'الحد الأدنى أكبر من الأعلى');
     if (f.unit !== undefined && (typeof f.unit !== 'string' || f.unit.length > 30)) throw new CategoryValidationError(key, 'وحدة القياس غير صالحة');
+    for(const prop of ['placeholder','helpText'] as const)if(f[prop]!==undefined&&(typeof f[prop]!=='string'||f[prop].length>(prop==='helpText'?500:160)))throw new CategoryValidationError(key,'النص الإرشادي غير صالح');
+    for(const prop of ['searchable','filterable','comparable','showInCard','showInDetails'] as const)if(f[prop]!==undefined&&typeof f[prop]!=='boolean')throw new CategoryValidationError(key,'خصائص العرض غير صالحة');
+    if(f.dependsOn!==undefined&&(typeof f.dependsOn!=='string'||(f.dependsOn!=='listing_type'&&!/^[a-z][a-z0-9_]{0,47}$/.test(f.dependsOn))))throw new CategoryValidationError(key,'الحقل المتحكم غير صالح');
+    if(f.dependsOn!==undefined&&(!DEPENDENCY_OPERATORS.has(f.dependencyOperator as DependencyOperator)||f.dependencyValue===undefined))throw new CategoryValidationError(key,'شرط الحقل غير مكتمل');
+    if(f.dependencyValue!==undefined&&!['string','number','boolean'].includes(typeof f.dependencyValue)&&!(Array.isArray(f.dependencyValue)&&f.dependencyValue.every(v=>typeof v==='string')))throw new CategoryValidationError(key,'قيمة الشرط غير صالحة');
     return { key, label: f.label.trim(), type: f.type as CategoryFieldType, group: f.group.trim(),
       required: f.required, visible: f.visible, order: f.order as number, options,
       ...(typeof f.min === 'number' ? { min: f.min } : {}), ...(typeof f.max === 'number' ? { max: f.max } : {}),
       ...(typeof f.unit === 'string' ? { unit: f.unit.trim() } : {}),
+      ...(typeof f.placeholder==='string'&&f.placeholder.trim()?{placeholder:f.placeholder.trim()}:{}),
+      ...(typeof f.helpText==='string'&&f.helpText.trim()?{helpText:f.helpText.trim()}:{}),
+      searchable:f.searchable===true,filterable:f.filterable===true,comparable:f.comparable===true,showInCard:f.showInCard===true,showInDetails:f.showInDetails!==false,
+      ...(typeof f.dependsOn==='string'?{dependsOn:f.dependsOn,dependencyOperator:f.dependencyOperator as DependencyOperator,dependencyValue:f.dependencyValue as CategoryField['dependencyValue']}:{}),
     };
   }).sort((a, b) => a.order - b.order);
 }
@@ -55,12 +70,27 @@ function empty(value: unknown) {
   return value === undefined || value === null || (typeof value === 'string' && !value.trim()) || (Array.isArray(value) && value.length === 0);
 }
 
-export function validateCategoryValues(fields: CategoryField[], raw: unknown): CategoryValues {
+export type CategoryFieldContext={listingType?:string;values?:CategoryValues};
+function equal(a:unknown,b:unknown){return String(a)===String(b);}
+export function fieldApplies(field:CategoryField,context:CategoryFieldContext):boolean{
+  if(!field.visible)return false;
+  if(!field.dependsOn)return true;
+  const source=field.dependsOn==='listing_type'?context.listingType:context.values?.[field.dependsOn];
+  const expected=field.dependencyValue,operator=field.dependencyOperator;
+  if(operator==='truthy')return Boolean(source);
+  const list=Array.isArray(expected)?expected:[expected];
+  const includes=list.some(value=>equal(source,value));
+  return operator==='not_equals'||operator==='not_in'?!includes:includes;
+}
+
+export function validateCategoryValues(fields: CategoryField[], raw: unknown, context:CategoryFieldContext={}): CategoryValues {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).length > 80) throw new CategoryValidationError('', 'بيانات الحقول غير صالحة');
   const input = raw as Record<string, unknown>;
-  const active = new Map(fields.filter(f => f.visible).map(f => [f.key, f]));
+  const known = new Map(fields.filter(f => f.visible).map(f => [f.key, f]));
+  const conditionValues={...(context.values||{}),...input} as CategoryValues;
+  const active = new Map(fields.filter(f => fieldApplies(f,{...context,values:conditionValues})).map(f => [f.key, f]));
   for (const key of Object.keys(input)) {
-    if (!active.has(key) || UNSAFE_KEYS.has(key)) throw new CategoryValidationError(key, 'حقل غير متاح لهذا القسم الفرعي');
+    if (!known.has(key) || UNSAFE_KEYS.has(key)) throw new CategoryValidationError(key, 'حقل غير متاح لهذا القسم الفرعي');
   }
   const out: CategoryValues = {};
   for (const f of active.values()) {
@@ -71,7 +101,7 @@ export function validateCategoryValues(fields: CategoryField[], raw: unknown): C
     }
     const fail = () => { throw new CategoryValidationError(f.key, `قيمة غير صالحة: ${f.label}`); };
     switch (f.type) {
-      case 'number': {
+      case 'number': case 'decimal': case 'year': {
         if (typeof value !== 'number' && (typeof value !== 'string' || !/^-?\d+(?:\.\d+)?$/.test(value.trim()))) fail();
         const n = Number(value);
         if (!Number.isFinite(n) || Math.abs(n) > Number.MAX_SAFE_INTEGER || (f.min !== undefined && n < f.min) || (f.max !== undefined && n > f.max)) fail();
@@ -83,9 +113,17 @@ export function validateCategoryValues(fields: CategoryField[], raw: unknown): C
         out[f.key] = value as boolean;
         break;
       case 'select':
+      case 'radio':
         if (typeof value !== 'string' || !f.options.includes(value)) fail();
         out[f.key] = value as string;
         break;
+      case 'range': {
+        if(!value||typeof value!=='object'||Array.isArray(value))fail();
+        const range=value as Record<string,unknown>,min=Number(range.min),max=Number(range.max);
+        if(!Number.isFinite(min)||!Number.isFinite(max)||min>max||(f.min!==undefined&&min<f.min)||(f.max!==undefined&&max>f.max))fail();
+        out[f.key]={min,max};
+        break;
+      }
       case 'multiselect':
         if (!Array.isArray(value) || value.length > 200 || value.some(v => typeof v !== 'string' || !f.options.includes(v))) fail();
         out[f.key] = [...new Set(value as string[])];
@@ -106,12 +144,12 @@ export function validateCategoryValues(fields: CategoryField[], raw: unknown): C
 }
 
 /** Preserve historical storage, but only render values compatible with today's definition. */
-export function visibleCategoryValues(fields: CategoryField[], values: CategoryValues) {
-  return fields.filter(f => f.visible && Object.hasOwn(values, f.key) && !empty(values[f.key]))
+export function visibleCategoryValues(fields: CategoryField[], values: CategoryValues, context:CategoryFieldContext={}) {
+  return fields.filter(f => f.showInDetails!==false&&fieldApplies(f,{...context,values}) && Object.hasOwn(values, f.key) && !empty(values[f.key]))
     .sort((a, b) => a.order - b.order)
     .flatMap(f => {
       try {
-        const valid = validateCategoryValues([f], { [f.key]: values[f.key] });
+        const valid = validateCategoryValues([f], { [f.key]: values[f.key] },{...context,values});
         return [{ key: f.key, label: f.label, group: f.group, unit: f.unit, value: valid[f.key] }];
       } catch (error) {
         if (error instanceof CategoryValidationError) return [];

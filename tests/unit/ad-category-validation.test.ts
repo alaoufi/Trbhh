@@ -45,6 +45,11 @@ describe('real-ad subcategory field validation', () => {
     expect(() => validateDefinition([{ ...field(), type: ['select'] }])).toThrow();
     expect(() => validateDefinition([{ ...field(), type: { toString: () => 'select' } }])).toThrow();
   });
+  it('normalizes display, search and help metadata while preserving old definitions', () => {
+    const [normalized] = validateDefinition([{...field(), placeholder:'اختر الاستخدام', helpText:'اختر الأقرب', searchable:true, filterable:true, comparable:true, showInCard:true, showInDetails:false}]);
+    expect(normalized).toMatchObject({placeholder:'اختر الاستخدام',helpText:'اختر الأقرب',searchable:true,filterable:true,comparable:true,showInCard:true,showInDetails:false});
+    expect(validateDefinition([field()])[0]).toMatchObject({searchable:false,filterable:false,comparable:false,showInCard:false,showInDetails:true});
+  });
   it('omits saved values incompatible with the current definition without changing storage', () => {
     const original = {use:'تجاري'};
     expect(visibleCategoryValues([field({options:['سكني']})], original)).toEqual([]);

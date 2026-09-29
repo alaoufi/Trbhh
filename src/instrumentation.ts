@@ -6,6 +6,8 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { isReadOnlyPreview } = await import('@/lib/read-only-preview');
+    if (isReadOnlyPreview()) return;
     const { ensureSchema } = await import('@/data/schema-sync');
     await ensureSchema().catch((e) => console.error('[schema-sync] failed at boot:', e));
   }

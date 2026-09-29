@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { redirectLegacyApex, requestHostname } from '@/lib/public-origin';
 import { SITE } from '@/lib/constants';
+import { isReadOnlyPreview, readOnlyPreviewResponse } from '@/lib/read-only-preview';
 
 // subdomains that are the platform itself, never a store handle
 const RESERVED_SUB = new Set(['www', 'api', 'm', 'admin', 'mail', 'ftp', 'cdn', 'static', 'assets', 'app', 'apps', 'store', 'stores', 'trbhh', 'ns1', 'ns2', 'blog', 'help', 'support', 'dev', 'test', 'staging']);
@@ -19,6 +20,9 @@ function storeSubdomain(hostname: string): string {
 const SUB_ALLOWED = /^\/(companies\/|store-login|store-forgot|login|logout|forgot|media\/|api\/|p\/|_next|play\/|guide\/how)/;
 
 export function middleware(req: NextRequest) {
+  const blocked = readOnlyPreviewResponse(req.method);
+  if (blocked) return blocked;
+
   const hostname = requestHostname(
     req.headers.get('x-forwarded-host'),
     req.headers.get('host'),
@@ -73,6 +77,7 @@ export function middleware(req: NextRequest) {
     res.headers.set('Cache-Control', 'private, no-store, must-revalidate');
     res.headers.set('Vary', 'Cookie');
   }
+  if (isReadOnlyPreview()) res.headers.set('X-Trbhh-Preview-Mode', 'read-only');
   return res;
 }
 

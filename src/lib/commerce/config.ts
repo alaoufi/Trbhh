@@ -45,7 +45,7 @@ export function commerceConfigFromRows(rows: SettingRow[]) {
   return {
     enabled: get('commerce_enabled') === '1',
     paymentsEnabled: get('commerce_payments_enabled') === '1',
-    purchasingEnabled: get('commerce_purchasing_enabled') === '1',
+    purchasingEnabled: process.env.TRBHH_READ_ONLY_PREVIEW !== '1' && get('commerce_purchasing_enabled') === '1',
     notificationsEnabled: get('commerce_notifications_enabled') === '1',
     adminPhone: saudiCommercePhone(get('commerce_admin_phone')),
     shippingFeeMinor,

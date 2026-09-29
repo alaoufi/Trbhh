@@ -5,6 +5,7 @@ import { CATEGORY_DDL } from '@/lib/ad-categories/schema';
 import { SUPPLIER_DDL } from '@/lib/suppliers/schema';
 import { ONBOARDING_DDL } from '@/lib/suppliers/onboarding-schema';
 import { CJ_DDL } from '@/lib/cj/schema';
+import { isReadOnlyPreview } from '@/lib/read-only-preview';
 
 /**
  * Single source of truth for every column/table the app self-provisions on the
@@ -965,6 +966,7 @@ async function backfillLegacyReceiptHashes(): Promise<void> {
 
 /** Idempotent schema sync — shared promise so concurrent callers run it once. */
 export function ensureSchema(): Promise<void> {
+  if (isReadOnlyPreview()) return Promise.resolve();
   if (!syncPromise) {
     syncPromise = run().catch((e) => {
       syncPromise = null; // allow retry on a later call

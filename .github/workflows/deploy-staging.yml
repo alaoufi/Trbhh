@@ -1,70 +1,189 @@
 name: نشر بيئة التجريب (Staging)
 
-# نشر تلقائي لبيئة التجريب المعزولة: عند كل دفع لفرع staging يتّصل GitHub بالخادم عبر SSH
-# ويسحب أحدث كود الفرع في دليل التجريب المنفصل (/root/trbhh-staging) ويعيد بناء الحاوية
-# التجريبية — بمشروع Docker منفصل فلا يمسّ الإنتاج إطلاقاً. يدوياً أيضاً عبر Run workflow.
-#
-# لا يعمل هذا المسار إلا بعد تجهيز الخادم لبيئة التجريب مرّة واحدة (راجع ops/staging.md).
 on:
   push:
-    branches:
-      - staging
-    paths-ignore:
-      - 'ops/**'
+    branches: [staging]
+    paths-ignore: ['ops/**']
   workflow_dispatch:
+    inputs:
+      live_read_only:
+        description: ربط المعاينة ببيانات الإنتاج عبر مستخدم MySQL للقراءة فقط
+        type: boolean
+        default: false
 
-# لا تشغّل نشرين متوازيين لبيئة التجريب
+permissions:
+  contents: read
+
 concurrency:
   group: vps-deploy-staging
   cancel-in-progress: true
 
 jobs:
   deploy-staging:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.ref == 'refs/heads/codex/trbhh-platform-enhancement-20260929')
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - name: النشر عبر SSH (بيئة التجريب)
+      - uses: actions/checkout@v4
+
+      - name: نشر commit الفرع المطلوب على Hostinger
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-          # دليل التجريب على الخادم (افتراضي /root/trbhh-staging) — يمكن تغييره بسرّ اختياري
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
           STAGING_DIR: ${{ secrets.STAGING_DIR }}
+          LIVE_READ_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.live_read_only }}
+          DEPLOY_SHA: ${{ github.sha }}
+          DEPLOY_REF: ${{ github.ref_name }}
         run: |
-          set -e
-          if [ -z "$VPS_SSH_KEY" ]; then
-            echo "❌ السرّ VPS_SSH_KEY غير موجود — أضِفه في إعدادات الأسرار."
-            exit 1
+          set -euo pipefail
+          umask 077
+          test -n "$VPS_HOST"
+          test -n "$VPS_USER"
+          test -n "$VPS_SSH_KEY"
+          test -n "$VPS_KNOWN_HOSTS"
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DEPLOY_REF" =~ ^[A-Za-z0-9._/-]+$ ]]
+          if [[ "$LIVE_READ_ONLY" == 'true' ]]; then
+            test "$DEPLOY_REF" = 'codex/trbhh-platform-enhancement-20260929'
           fi
-          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
-            echo "❌ VPS_HOST أو VPS_USER غير مضبوط."
-            exit 1
-          fi
+
           mkdir -p ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          if ! grep -q "PRIVATE KEY" ~/.ssh/deploy_key; then
-            echo "❌ المفتاح غير صالح — تأكد أن VPS_SSH_KEY لصق كاملاً بأسطره."
-            exit 1
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          port="${VPS_PORT:-22}"
+          [[ "$port" =~ ^[0-9]+$ ]]
+          dir="${STAGING_DIR:-/root/trbhh-staging}"
+          test "$dir" = '/root/trbhh-staging'
+          target="$VPS_USER@$VPS_HOST"
+          ssh_args=(-i ~/.ssh/deploy_key -p "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -o ConnectTimeout=25 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+
+          remote_script="/tmp/trbhh-preview-readonly-$GITHUB_RUN_ID.cjs"
+          if [[ "$LIVE_READ_ONLY" == 'true' ]]; then
+            scp -i ~/.ssh/deploy_key -P "$port" -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts \
+              scripts/release/configure-live-readonly-preview.cjs "$target:$remote_script"
           fi
-          PORT="${VPS_PORT:-22}"
-          DIR="${STAGING_DIR:-/root/trbhh-staging}"
-          echo "🔗 نشر التجريب على $VPS_USER@$VPS_HOST:$PORT ($DIR) ..."
-          REMOTE_CMD="set -e; cd '$DIR' && git fetch origin staging && git reset --hard origin/staging && docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis && timeout 180s docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml exec -T -e STAGING_CATEGORY_SEED=1 -e STAGING_DATABASE_NAME=trbhhdb app node scripts/release/seed-staging-categories.cjs && docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps"
-          n=0
-          until [ "$n" -ge 5 ]; do
-            if timeout 600s ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                 -o ConnectTimeout=25 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
-                 -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" "$REMOTE_CMD"; then
-              echo "✅ تم نشر بيئة التجريب."
-              exit 0
-            fi
-            n=$((n + 1))
-            if [ "$n" -lt 5 ]; then
-              wait=$((n * 20))
-              echo "⚠️ تعذّر الاتصال (محاولة $n/5) — إعادة بعد ${wait}s ..."
-              sleep "$wait"
-            fi
+
+          ssh "${ssh_args[@]}" "$target" bash -s -- "$dir" "$DEPLOY_REF" "$DEPLOY_SHA" "$LIVE_READ_ONLY" "$remote_script" <<'REMOTE'
+          set -euo pipefail
+          umask 077
+          dir=$1
+          ref=$2
+          sha=$3
+          live_read_only=$4
+          readonly_script=$5
+          test "$dir" = /root/trbhh-staging
+          test ! -L "$dir"
+          test "$(realpath "$dir")" = "$dir"
+          cd "$dir"
+          git fetch --no-tags origin "$ref"
+          test "$(git rev-parse FETCH_HEAD)" = "$sha"
+          git reset --hard "$sha"
+
+          set_env() {
+            key=$1
+            value=$2
+            file=$3
+            [[ "$key" =~ ^[A-Z0-9_]+$ ]]
+            test -f "$file"
+            test ! -L "$file"
+            tmp=$(mktemp "$dir/.env.XXXXXX")
+            grep -v "^${key}=" "$file" > "$tmp" || true
+            printf '%s=%s\n' "$key" "$value" >> "$tmp"
+            chmod 600 "$tmp"
+            mv "$tmp" "$file"
+          }
+
+          if [[ "$live_read_only" == true ]]; then
+            test -f "$readonly_script"
+            prod=/root/trbhh
+            test ! -L "$prod"
+            test "$(realpath "$prod")" = "$prod"
+            prod_container=$(cd "$prod" && docker compose ps -q app)
+            test -n "$prod_container"
+            test "$(docker inspect -f '{{.State.Running}}' "$prod_container")" = true
+
+            readonly_user=trbhh_preview_ro
+            readonly_password=$(openssl rand -hex 24)
+            docker exec -i \
+              -e PREVIEW_READONLY_USER="$readonly_user" \
+              -e PREVIEW_READONLY_PASSWORD="$readonly_password" \
+              "$prod_container" node - < "$readonly_script"
+
+            readonly_url=$(docker exec \
+              -e PREVIEW_READONLY_USER="$readonly_user" \
+              -e PREVIEW_READONLY_PASSWORD="$readonly_password" \
+              "$prod_container" node -e '
+                const url = new URL(process.env.DATABASE_URL);
+                url.username = process.env.PREVIEW_READONLY_USER;
+                url.password = process.env.PREVIEW_READONLY_PASSWORD;
+                url.searchParams.delete("connection_limit");
+                url.searchParams.delete("pool_timeout");
+                process.stdout.write(url.toString());
+              ')
+            test -n "$readonly_url"
+
+            set_env DATABASE_URL "$readonly_url" .env
+            set_env TRBHH_READ_ONLY_PREVIEW 1 .env
+            set_env SUPPLIER_ALLOW_LIVE_ORDERS false .env
+            set_env CATEGORIES_DEFAULT_ENABLED 0 .env
+            set_env COOKIE_SECURE false .env
+            set_env APP_PORT 3081 .env
+            set_env LEGACY_MEDIA_BASE https://trbhh.sa/media .env
+            set_env NEXT_PUBLIC_MEDIA_BASE https://trbhh.sa .env
+          else
+            set_env TRBHH_READ_ONLY_PREVIEW 0 .env
+            set_env SUPPLIER_ALLOW_LIVE_ORDERS false .env
+          fi
+
+          docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis
+          if [[ "$live_read_only" != true ]]; then
+            timeout 180s docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml \
+              exec -T -e STAGING_CATEGORY_SEED=1 -e STAGING_DATABASE_NAME=trbhhdb app \
+              node scripts/release/seed-staging-categories.cjs
+          fi
+
+          container=$(docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps -q app)
+          test -n "$container"
+          test "$(docker inspect -f '{{.State.Running}}' "$container")" = true
+          if [[ "$live_read_only" == true ]]; then
+            docker exec -i "$container" node - <<'VERIFY'
+          const {PrismaClient}=require('@prisma/client');
+          const db=new PrismaClient();
+          (async()=>{
+            const grants=await db.$queryRawUnsafe('SHOW GRANTS FOR CURRENT_USER()');
+            const text=grants.flatMap((row)=>Object.values(row).map(String)).join(' ').toUpperCase();
+            if(!text.includes('SELECT')||!text.includes('SHOW VIEW')||/\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRIGGER|EXECUTE|GRANT OPTION)\b/.test(text))throw Error('preview_grants_not_readonly');
+            const [ads,categories,products,suppliers]=await Promise.all([
+              db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM ads'),
+              db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM ad_categories'),
+              db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM commerce_products'),
+              db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM commerce_suppliers'),
+            ]);
+            const count=(rows)=>String(rows[0]?.count??0);
+            console.log(JSON.stringify({readOnly:true,ads:count(ads),categories:count(categories),products:count(products),suppliers:count(suppliers)}));
+          })().finally(()=>db.$disconnect());
+          VERIFY
+          fi
+          rm -f "$readonly_script"
+          docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps
+          REMOTE
+
+          status=000
+          for attempt in $(seq 1 30); do
+            status=$(curl -sS -o /tmp/trbhh-preview-home.html -w '%{http_code}' "http://$VPS_HOST:3081/" || true)
+            if [[ "$status" == 200 ]]; then break; fi
+            sleep 3
           done
-          echo "❌ فشل الاتصال بالخادم بعد ٥ محاولات."
-          exit 1
+          test "$status" = 200
+          if [[ "$LIVE_READ_ONLY" == 'true' ]]; then
+            test "$(curl -sSI "http://$VPS_HOST:3081/" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-trbhh-preview-mode"{print tolower($2)}' | tail -1)" = read-only
+            test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST "http://$VPS_HOST:3081/api/integrations/salla/webhooks")" = 405
+          fi
+          printf '### معاينة Hostinger\n\n- URL: http://%s:3081/\n- Commit: `%s`\n- Live read-only: `%s`\n' "$VPS_HOST" "$DEPLOY_SHA" "$LIVE_READ_ONLY" >> "$GITHUB_STEP_SUMMARY"

@@ -16,7 +16,7 @@ on:
 # لا تشغّل نشرين متوازيين لبيئة التجريب
 concurrency:
   group: vps-deploy-staging
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy-staging:

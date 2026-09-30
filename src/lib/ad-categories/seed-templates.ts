@@ -272,12 +272,25 @@ export const CATEGORY_SEED_TEMPLATES: CategorySeedTemplate[] = [
   ...LEGACY_CATEGORY_SEED_TEMPLATES,
 ];
 
+function normalizeCategoryPathPart(value: string) {
+  return value
+    .normalize('NFKC')
+    .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const categorySeedPath = (categoryName: string, subcategoryName: string) =>
+  `${normalizeCategoryPathPart(categoryName)}\u0000${normalizeCategoryPathPart(subcategoryName)}`;
+
 const CATEGORY_SEED_TEMPLATE_BY_PATH = new Map(
-  CATEGORY_SEED_TEMPLATES.map(template => [`${template.categoryName}\u0000${template.name}`, template] as const),
+  CATEGORY_SEED_TEMPLATES.map(template => [categorySeedPath(template.categoryName, template.name), template] as const),
 );
 
 export function findCategorySeedTemplate(categoryName: string, subcategoryName: string) {
-  return CATEGORY_SEED_TEMPLATE_BY_PATH.get(`${categoryName}\u0000${subcategoryName}`);
+  return CATEGORY_SEED_TEMPLATE_BY_PATH.get(categorySeedPath(categoryName, subcategoryName));
 }
 
 export function categorySeedDefinition(template: CategorySeedTemplate) {

@@ -75,6 +75,10 @@ describe('editable specialist subcategory seed templates', () => {
     expect(categorySeedDefinition(template!)).toMatchObject({version: 1, kind: 'goods', goodsEnabled: true});
     expect(findCategorySeedTemplate('الكترونيات', 'قسم غير معروف')).toBeUndefined();
   });
+  it('matches legacy database names despite harmless Arabic and spacing differences', () => {
+    expect(findCategorySeedTemplate('أثاث   مفروشات ديكورات ', ' مفروشات\u200f')?.key).toBe('legacy_furniture');
+    expect(findCategorySeedTemplate('اثاث\u00a0مفروشات\u00a0ديكورات', 'ديكورات')?.key).toBe('legacy_decor');
+  });
   it('has unique keys and valid domain-specific definitions for each requested group', () => {
     expect(new Set(CATEGORY_SEED_TEMPLATES.map(t => t.key)).size).toBe(CATEGORY_SEED_TEMPLATES.length);
     expect(CATEGORY_SEED_TEMPLATES.length).toBeGreaterThanOrEqual(24);

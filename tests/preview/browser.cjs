@@ -50,6 +50,16 @@ async function run(){
       assert.equal(await page.locator('#category-field-job_title').count(),0);
       assert((await page.locator('[id^="category-field-"]').count())>=6);
       assert.equal(await page.locator('#category-field-area_m2').getAttribute('required'),'');
+      assert((await page.locator('[data-field-group]').count())>0);
+      const requiredArea=page.locator('[data-field-key="area_m2"]');
+      assert.equal(await requiredArea.getAttribute('data-required'),'true');
+      assert((await requiredArea.getAttribute('class')).includes('bg-red-50/70'));
+      const optionalField=page.locator('[data-required="false"]').first();
+      assert(await optionalField.count(),'optional category field exists');
+      assert((await optionalField.getAttribute('class')).includes('bg-emerald-50/60'));
+      await page.locator('#category-field-area_m2').evaluate(element=>element.reportValidity());
+      assert.equal(await requiredArea.getAttribute('data-invalid'),'true');
+      assert((await requiredArea.getAttribute('class')).includes('border-red-500'));
       assert((await page.getByText('مطلوب',{exact:true}).count())>0);
       assert((await page.getByText('اختياري',{exact:true}).count())>0);
       const commercial=await sub.locator('option').evaluateAll(os=>os.find(o=>/محلات|مكاتب|مستودعات/.test(o.textContent))?.value);

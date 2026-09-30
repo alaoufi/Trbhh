@@ -61,13 +61,14 @@ export function buildPublicCategoryTaxonomy(categories:readonly CategoryOption[]
   });
   const groupByKey=new Map<string,CategoryGroupOption>();
   const knownGroups=new Map<string,(typeof CLASSIFIED_TAXONOMY_GROUPS)[number]>(CLASSIFIED_TAXONOMY_GROUPS.map(item=>[item.key,item]));
-  for(const item of publicSubcategories){
+  for(const item of eligible){
     const category=activeCategories.get(item.categoryId)!;
-    const known=knownGroups.get(item.groupKey!);
-    const current=groupByKey.get(item.groupKey!);
+    const groupKey=(item.templateKey&&templateTaxonomyGroup(item.templateKey))||`category-${item.categoryId}`;
+    const known=knownGroups.get(groupKey);
+    const current=groupByKey.get(groupKey);
     const categoryIds=new Set([...(current?.categoryIds||[]),item.categoryId]);
-    groupByKey.set(item.groupKey!,{
-      key:item.groupKey!,name:known?.name||category.name,order:known?.order??1000+category.order,categoryIds:[...categoryIds],
+    groupByKey.set(groupKey,{
+      key:groupKey,name:known?.name||category.name,order:known?.order??1000+category.order,categoryIds:[...categoryIds],
     });
   }
   const groups=[...groupByKey.values()].sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'ar'));

@@ -126,6 +126,8 @@ describe('Hostinger live-data read-only preview', () => {
     expect(workflow).toContain('"$prod_container" node "$container_script" --emit-sql');
     expect(workflow).not.toContain('"$prod_container" node - < "$readonly_script"');
     expect(workflow).toContain("SELECT COUNT(*) AS count FROM categories");
+    expect(workflow).toContain('COUNT(a.id) AS ad_count');
+    expect(workflow).toContain('GROUP BY c.id,c.name,c.is_active');
     expect(workflow).not.toContain("SELECT COUNT(*) AS count FROM ad_categories");
     expect(workflow).toContain('grants.flatMap((row)=>Object.values(row).map(String))');
     expect(workflow).not.toMatch(/prisma\s+migrate\s+(dev|reset|deploy)/);

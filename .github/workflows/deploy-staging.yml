@@ -217,14 +217,16 @@ jobs:
             const grants=await db.$queryRawUnsafe('SHOW GRANTS FOR CURRENT_USER()');
             const text=grants.flatMap((row)=>Object.values(row).map(String)).join(' ').toUpperCase();
             if(!text.includes('SELECT')||!text.includes('SHOW VIEW')||/\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRIGGER|EXECUTE|GRANT OPTION)\b/.test(text))throw Error('preview_grants_not_readonly');
-            const [ads,categories,products,suppliers]=await Promise.all([
+            const [ads,categories,products,suppliers,categoryUsage]=await Promise.all([
               db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM ads'),
               db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM categories'),
               db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM commerce_products'),
               db.$queryRawUnsafe('SELECT COUNT(*) AS count FROM commerce_suppliers'),
+              db.$queryRawUnsafe('SELECT c.id,c.name,c.is_active,COUNT(a.id) AS ad_count FROM categories c LEFT JOIN ads a ON a.category_id=c.id GROUP BY c.id,c.name,c.is_active ORDER BY c.ordered,c.id'),
             ]);
             const count=(rows)=>String(rows[0]?.count??0);
             console.log(JSON.stringify({readOnly:true,ads:count(ads),categories:count(categories),products:count(products),suppliers:count(suppliers)}));
+            console.log(JSON.stringify({categoryUsage:categoryUsage.map((row)=>({id:String(row.id),name:row.name,active:row.is_active,ads:String(row.ad_count)}))}));
           })().finally(()=>db.$disconnect());
           VERIFY
           fi

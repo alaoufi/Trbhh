@@ -36,6 +36,7 @@ describe('public classified taxonomy',()=>{
     );
     expect(result.subcategories).toHaveLength(1);
     expect(result.subcategories[0]).toEqual(expect.objectContaining({id:11,categoryId:1,sourceSubcategoryIds:[11,22]}));
+    expect(result.groups).toEqual([expect.objectContaining({key:'vehicles-equipment',categoryIds:[1,2]})]);
   });
 
   it('keeps the legacy leaf when its canonical replacement is unavailable',()=>{

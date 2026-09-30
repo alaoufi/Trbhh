@@ -84,11 +84,12 @@ git push -u origin staging
 تسجيل الدخول والحفظ والإدارة وإضافة الإعلانات مقصودة أن تكون معطلة فيه؛ استخدم قاعدة staging
 المنفصلة لأي اختبار يحتاج كتابة.
 
-ينشئ النشر كذلك حاوية `trbhh-staging-tunnel` مستقلة، تمرر المعاينة عبر رابط HTTPS مؤقت من
-Cloudflare على المنفذ القياسي 443. يفحص GitHub Runner الرابط من خارج الخادم ويتأكد من استجابة
-HTTP ومن رأس `x-trbhh-preview-mode: read-only` قبل نجاح مهمة النشر. لا يغيّر هذا النفق DNS أو
-Nginx/CloudPanel ولا يمر عبر حاويات الإنتاج. يظهر الرابط النهائي في ملخص مهمة GitHub Actions،
-وقد يتغير فقط عند إعادة إنشاء حاوية النفق.
+ينشئ النشر موقع Reverse Proxy مستقلاً في CloudPanel باسم
+`preview.88-223-92-124.sslip.io` مع شهادة Let's Encrypt ويوجهه إلى `127.0.0.1:3081`.
+لا يمر هذا الرابط عبر Cloudflare ولا يحتوي Basic Auth أو Access Policy. يفحص GitHub Runner
+الرابط من خارج الخادم بطلب GET مجهول (دون Cookie أو Authorization، ومع User-Agent لأداة مراجعة)
+ويتطلب HTTP 200 ورأس `x-trbhh-preview-mode: read-only` قبل نجاح النشر. موقع الإنتاج وملفاته
+وحاوياته لا تتغير. نقطة التراجع للمدخل وحده هي حذف هذا الموقع المستقل من CloudPanel.
 
 ## ملاحظات
 - النشر التلقائي للإنتاج والتجريب يستخدمان نفس أسرار الخادم (VPS_HOST/USER/PORT/KEY).

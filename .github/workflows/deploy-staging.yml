@@ -200,7 +200,7 @@ jobs:
             set_env SUPPLIER_ALLOW_LIVE_ORDERS false .env
           fi
 
-          docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis preview-tunnel
+          docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis
           if [[ "$live_read_only" != true ]]; then
             timeout 180s docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml \
               exec -T -e STAGING_CATEGORY_SEED=1 -e STAGING_DATABASE_NAME=trbhhdb app \
@@ -227,16 +227,24 @@ jobs:
           for service in nginx caddy traefik; do
             if systemctl is-active --quiet "$service" 2>/dev/null; then echo "$service=active"; else echo "$service=inactive-or-unavailable"; fi
           done
-          echo 'previewTlsToolsAudit'
-          for command_name in nginx certbot acme.sh clpctl; do
-            if command -v "$command_name" >/dev/null 2>&1; then
-              printf '%s=%s\n' "$command_name" "$(command -v "$command_name")"
-            else
-              printf '%s=unavailable\n' "$command_name"
-            fi
-          done
-          clpctl site:add:reverse-proxy --help 2>&1 | head -80 || true
-          clpctl lets-encrypt:install:certificate --help 2>&1 | head -80 || true
+          preview_domain='preview.88-223-92-124.sslip.io'
+          preview_url="https://$preview_domain"
+          test "$(getent ahostsv4 "$preview_domain" | awk 'NR==1{print $1}')" = "$public_host"
+          if ! nginx -T 2>&1 | grep -Eq "server_name[[:space:]]+$preview_domain([[:space:];]|$)"; then
+            preview_site_password=$(openssl rand -hex 24)
+            clpctl site:add:reverse-proxy \
+              --domainName="$preview_domain" \
+              --reverseProxyUrl='http://127.0.0.1:3081' \
+              --siteUser=trbhhpreview \
+              --siteUserPassword="$preview_site_password"
+            unset preview_site_password
+          fi
+          if ! curl -fsSI --max-time 25 "$preview_url/" -o /dev/null; then
+            clpctl lets-encrypt:install:certificate --domainName="$preview_domain"
+          fi
+          nginx -t
+          systemctl reload nginx
+          curl -fsS --max-time 25 "$preview_url/" -o /dev/null
           docker exec "$container" node -e "if((process.env.AUTH_SECRET||'').length<32)process.exit(1)"
           if [[ "$live_read_only" == true ]]; then
             docker exec -i "$container" node - <<'VERIFY'
@@ -260,16 +268,8 @@ jobs:
           VERIFY
           fi
           rm -f "$readonly_script"
+          docker rm -f trbhh-staging-tunnel >/dev/null 2>&1 || true
           docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps
-
-          preview_url=''
-          for attempt in $(seq 1 36); do
-            preview_url=$(docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml logs --no-color preview-tunnel 2>&1 \
-              | grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' | tail -1 || true)
-            if [[ -n "$preview_url" ]] && curl -fsS --max-time 25 "$preview_url/" -o /dev/null; then break; fi
-            sleep 5
-          done
-          [[ "$preview_url" =~ ^https://[a-zA-Z0-9-]+\.trycloudflare\.com$ ]]
           printf 'PREVIEW_URL=%s\n' "$preview_url"
           REMOTE
 
@@ -282,12 +282,23 @@ jobs:
           test "$status" = 200
           preview_url=$(sed -n 's/^PREVIEW_URL=//p' "$remote_log" | tail -1)
           rm -f "$remote_log"
-          [[ "$preview_url" =~ ^https://[a-zA-Z0-9-]+\.trycloudflare\.com$ ]]
-          curl -fsS --max-time 25 "$preview_url/" -o /tmp/trbhh-external-preview.html
+          test "$preview_url" = 'https://preview.88-223-92-124.sslip.io'
+          anonymous_headers=$(mktemp)
+          anonymous_status=$(curl -sS --max-time 30 \
+            -D "$anonymous_headers" \
+            -o /tmp/trbhh-external-preview.html \
+            -w '%{http_code}' \
+            -H 'Cookie:' \
+            -H 'Authorization:' \
+            -A 'GPTBot/1.0' \
+            "$preview_url/")
+          test "$anonymous_status" = 200
+          ! grep -qi '^www-authenticate:' "$anonymous_headers"
+          rm -f "$anonymous_headers"
           if [[ "$LIVE_READ_ONLY" == 'true' ]]; then
             external_preview_mode=$(curl -sSI --max-time 25 "$preview_url/" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-trbhh-preview-mode"{print tolower($2)}' | tail -1)
             test "$external_preview_mode" = read-only
             test "$(curl -sSI "http://$VPS_HOST:3081/" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-trbhh-preview-mode"{print tolower($2)}' | tail -1)" = read-only
             test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST "http://$VPS_HOST:3081/api/integrations/salla/webhooks")" = 405
           fi
-          printf '### معاينة Hostinger\n\n- HTTPS URL: %s\n- Direct URL: http://%s:3081/\n- Commit: `%s`\n- Live read-only: `%s`\n- External verification: `HTTP 200 + x-trbhh-preview-mode=read-only`\n' "$preview_url" "$VPS_HOST" "$DEPLOY_SHA" "$LIVE_READ_ONLY" >> "$GITHUB_STEP_SUMMARY"
+          printf '### معاينة Hostinger\n\n- HTTPS URL: %s\n- Direct URL: http://%s:3081/\n- Commit: `%s`\n- Live read-only: `%s`\n- External verification: `anonymous GPTBot GET = HTTP 200, no Authorization/Cookie`\n' "$preview_url" "$VPS_HOST" "$DEPLOY_SHA" "$LIVE_READ_ONLY" >> "$GITHUB_STEP_SUMMARY"

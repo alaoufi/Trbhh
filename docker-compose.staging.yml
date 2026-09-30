@@ -7,7 +7,7 @@
 #
 # التشغيل اليدوي (احتياطي — النشر التلقائي عبر deploy-staging.yml):
 #   cd /root/trbhh-staging
-#   docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis preview-tunnel
+#   docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis
 #
 # ملاحظات العزل:
 #   • container_name مختلف هنا → لا تصادم مع حاويات الإنتاج على نفس الخادم.
@@ -29,15 +29,3 @@ services:
       COOKIE_SECURE: "false"
     # المنفذ يُضبط من APP_PORT في .env التجريب (=3081). لا نضيف ports هنا حتى لا
     # تُدمَج قائمتا المنافذ فيُفتح منفذ الإنتاج أيضاً بالخطأ.
-
-  # رابط HTTPS عام للمعاينة فقط. يستخدم اتصالاً خارجياً صادراً إلى Cloudflare،
-  # لذلك لا يحتاج فتح منفذ جديد أو تعديل Nginx/CloudPanel الخاص بالإنتاج.
-  preview-tunnel:
-    image: cloudflare/cloudflared:latest
-    container_name: trbhh-staging-tunnel
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --url http://app:3000
-    depends_on:
-      app:
-        condition: service_started
-    networks: [trbhh]

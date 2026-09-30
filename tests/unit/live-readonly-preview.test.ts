@@ -134,19 +134,28 @@ describe('Hostinger live-data read-only preview', () => {
     expect(workflow).not.toMatch(/prisma\s+db\s+push/);
   });
 
-  test('publishes the read-only preview through an externally verified HTTPS tunnel', () => {
+  test('publishes the read-only preview through a direct public HTTPS reverse proxy', () => {
     const compose = readFileSync(path.join(root, 'docker-compose.staging.yml'), 'utf8');
     const workflow = readFileSync(path.join(root, '.github/workflows/deploy-staging.yml'), 'utf8');
 
-    expect(compose).toContain('preview-tunnel:');
-    expect(compose).toContain('cloudflare/cloudflared:latest');
-    expect(compose).toContain('tunnel --no-autoupdate --url http://app:3000');
-    expect(compose).toContain('container_name: trbhh-staging-tunnel');
-    expect(workflow).toContain('up -d --build app redis preview-tunnel');
-    expect(workflow).toContain("grep -oE 'https://[a-zA-Z0-9-]+\\.trycloudflare\\.com'");
-    expect(workflow).toContain('curl -fsS --max-time 25 "$preview_url/"');
+    expect(compose).not.toContain('cloudflare/cloudflared');
+    expect(workflow).toContain("preview_domain='preview.88-223-92-124.sslip.io'");
+    expect(workflow).toContain('site:add:reverse-proxy');
+    expect(workflow).toContain("--reverseProxyUrl='http://127.0.0.1:3081'");
+    expect(workflow).toContain('lets-encrypt:install:certificate');
+    expect(workflow).toContain("preview_url=\"https://$preview_domain\"");
     expect(workflow).toContain('test "$external_preview_mode" = read-only');
     expect(workflow).toContain('PREVIEW_URL=');
+  });
+
+  test('requires an anonymous external GET to return 200 even for review bots', () => {
+    const workflow = readFileSync(path.join(root, '.github/workflows/deploy-staging.yml'), 'utf8');
+
+    expect(workflow).toContain("-H 'Cookie:'");
+    expect(workflow).toContain("-H 'Authorization:'");
+    expect(workflow).toContain("-A 'GPTBot/1.0'");
+    expect(workflow).toContain('test "$anonymous_status" = 200');
+    expect(workflow).toContain("! grep -qi '^www-authenticate:'");
   });
 
   test('records listener, Docker publication and firewall diagnostics without changing production', () => {

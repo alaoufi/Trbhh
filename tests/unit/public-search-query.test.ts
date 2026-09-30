@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
-  ads: { findMany: vi.fn(), count: vi.fn() }, users: { findMany: vi.fn() },
+  ads: { findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn() }, users: { findMany: vi.fn() },
   areas: { findMany: vi.fn() }, cities: { findMany: vi.fn() }, categories: { findMany: vi.fn() },
   photos: { findMany: vi.fn() }, ads_views: { groupBy: vi.fn() }, $queryRaw: vi.fn(),
 }));
@@ -17,7 +17,7 @@ vi.mock('@/lib/packages', () => ({
   sweepExpiredFeatured: vi.fn(), getFeaturedTierMap: vi.fn(), getUsersAdMeta: async () => new Map(),
   getPackages: async () => [], getDefaultPackage: async () => ({ adDays: 0 }), FREE_FALLBACK: { adDays: 0 },
 }));
-import { countSearchAds, searchAds, searchAdsRelaxed } from '@/lib/data';
+import { countSearchAds, getSimilarAds, searchAds, searchAdsRelaxed } from '@/lib/data';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -25,6 +25,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-09-10T12:00:00Z'));
   db.ads.count.mockResolvedValue(1);
   db.ads.findMany.mockResolvedValue([{ id: 42n, user_id: 1n, city_id: 1n, area_id: 2, category_id: 1n, title: 'شاليه', price: 500, price_type: 'rent', rent_period: 'يومي', adsType: 'offer', adsSpecial: '', created_at: new Date(), expires_at: null }]);
+  db.ads.findUnique.mockResolvedValue(null);
   db.users.findMany.mockImplementation(({ where }) => Promise.resolve(where.ban ? [] : [{ id: 1n, name: 'المعلن', trusted: 0, ban: '' }]));
   db.cities.findMany.mockResolvedValue([{ id: 1n, name: 'الرياض' }]);
   db.areas.findMany.mockResolvedValue([{ id: 2, name: 'الخرج', city_id: 1 }]);
@@ -35,6 +36,20 @@ beforeEach(() => {
 });
 
 describe('public search query integration', () => {
+  it('prioritizes the same leaf and nearby location in similar ads',async()=>{
+    db.ads.findUnique.mockResolvedValue({title:'رافعة شوكية',detail:'معدات مستعملة',subcategory_id:5,city_id:1n,area_id:2,price:1000});
+    const row=(id:number,subcategoryId:number,cityId:bigint,areaId:number,price:number)=>({
+      id:BigInt(id),subcategory_id:subcategoryId,user_id:1n,city_id:cityId,area_id:areaId,category_id:10n,title:'معدات',price,price_type:'sale',rent_period:null,adsType:'offer',adsSpecial:'',created_at:new Date(),expires_at:null,
+    });
+    db.ads.findMany.mockImplementation(async({where})=>{
+      if(where.subcategory_id===5)return [row(2,5,1n,2,1100)];
+      if(where.category_id===10n)return [row(3,6,2n,20,1000)];
+      return [];
+    });
+    const cards=await getSimilarAds(1,10,2);
+    expect(cards.map(card=>card.id)).toEqual([2,3]);
+    vi.useRealTimers();
+  });
   it('queries every source category and legacy leaf represented by the public taxonomy',async()=>{
     await countSearchAds({categoryIds:[10,20]});
     expect(db.ads.count.mock.calls[0][0].where).toMatchObject({category_id:{in:[10n,20n]}});

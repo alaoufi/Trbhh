@@ -19,6 +19,7 @@ import { searchCardVisibility } from './search-card-visibility';
 import { featuredSearchPage } from './featured-search-page';
 import { DEFAULT_SEARCH_SYNONYMS, expandSearchToken, parseSearchSynonyms } from './search-synonyms';
 import { getPublicCategories, getCategoryEditValues, type PublicCategory } from './ad-categories/service';
+import { safeDealDiscount } from './ads/deals';
 
 export type AdCard = {
   priceEnabled?: boolean;
@@ -404,7 +405,12 @@ export async function getDealAds(take = 60) {
       take: take * 2,
       select: adSelect,
     });
-    const cards = await toCards(rows.filter((r) => (r.old_price ?? 0) > r.price && r.price > 0));
+    const cards = await toCards(rows.filter((r) => safeDealDiscount({
+      currentPrice:r.price,
+      oldPrice:r.old_price??0,
+      adsType:r.adsType,
+      priceType:r.price_type,
+    })!==null));
     return cards.slice(0, take);
   });
 }
@@ -897,32 +903,39 @@ function simTokens(text: string): string[] {
  * تشابه نصي كافٍ نكمل بأحدث إعلانات القسم كما سبق.
  */
 export async function getSimilarAds(adId: number, categoryId: number, take = 6) {
-  const src = await prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { title: true, detail: true } }).catch(() => null);
+  const src = await prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { title: true, detail: true,subcategory_id:true,city_id:true,area_id:true,price:true } }).catch(() => null);
   const titleTokens = new Set(simTokens(src?.title || ''));
   const detailTokens = new Set(simTokens((src?.detail || '').slice(0, 400)));
 
-  // مرشحون: أحدث إعلانات نفس القسم + إعلانات تحمل أهم كلمات العنوان من أي قسم
+  // مرشحون: نفس الورقة أولاً، ثم القسم الأب، ثم عناوين متشابهة كخيار أخير.
   const topWords = [...titleTokens].sort((a, b) => b.length - a.length).slice(0, 3);
-  const [sameCat, byTitle] = await Promise.all([
+  const visibility=await activeAdWhere();
+  const [sameLeaf,sameCat, byTitle] = await Promise.all([
+    src?.subcategory_id?prisma.ads.findMany({
+      where:{...visibility,subcategory_id:src.subcategory_id,id:{not:BigInt(adId)}},
+      orderBy:{id:'desc'},take:150,select:{...adSelect,subcategory_id:true},
+    }):Promise.resolve([]),
     prisma.ads.findMany({
-      where: { ...(await activeAdWhere()), category_id: BigInt(categoryId), id: { not: BigInt(adId) } },
+      where: { ...visibility, category_id: BigInt(categoryId), id: { not: BigInt(adId) } },
       orderBy: { id: 'desc' },
-      take: 200,
-      select: { ...adSelect },
+      take: 150,
+      select: { ...adSelect,subcategory_id:true },
     }),
     topWords.length
       ? prisma.ads.findMany({
-          where: { ...(await activeAdWhere()), id: { not: BigInt(adId) }, OR: topWords.map((w) => ({ title: { contains: w } })) },
+          where: { ...visibility, id: { not: BigInt(adId) }, OR: topWords.map((w) => ({ title: { contains: w } })) },
           orderBy: { id: 'desc' },
-          take: 100,
-          select: { ...adSelect },
+          take: 75,
+          select: { ...adSelect,subcategory_id:true },
         }).catch(() => [])
       : Promise.resolve([]),
   ]);
   const seen = new Set<number>();
-  const candidates = [...sameCat, ...byTitle].filter((r) => (seen.has(toInt(r.id)) ? false : (seen.add(toInt(r.id)), true)));
+  const candidates = [...sameLeaf,...sameCat, ...byTitle].filter((r) => (seen.has(toInt(r.id)) ? false : (seen.add(toInt(r.id)), true)));
+  const categoryValues=await getPublicCategories([BigInt(adId),...candidates.map(item=>item.id)]).catch(()=>new Map<number,PublicCategory>());
+  const sourceComparable=new Map((categoryValues.get(adId)?.comparableCategoryFields||[]).map(field=>[field.key,JSON.stringify(field.value)]));
 
-  // الترتيب: كلمة عنوان مشتركة = نقطتان، كلمة تفاصيل = نقطة — ثم الأحدث
+  // الترتيب: نفس الورقة ثم الموقع والمواصفات والسعر القريب، مع تشابه النص.
   const scored = candidates
     .map((r) => {
       const ct = simTokens(r.title || '');
@@ -931,14 +944,20 @@ export async function getSimilarAds(adId: number, categoryId: number, take = 6) 
         if (titleTokens.has(t)) score += 2;
         else if (detailTokens.has(t)) score += 1;
       }
+      if(src?.subcategory_id&&r.subcategory_id===src.subcategory_id)score+=100;
+      if(src?.area_id&&r.area_id===src.area_id)score+=25;
+      else if(src?.city_id&&r.city_id===src.city_id)score+=15;
+      const comparable=categoryValues.get(toInt(r.id))?.comparableCategoryFields||[];
+      score+=comparable.filter(field=>sourceComparable.get(field.key)===JSON.stringify(field.value)).length*8;
+      if((src?.price||0)>0&&r.price>0){
+        const ratio=Math.abs(Math.log(r.price/src!.price));
+        if(ratio<=0.25)score+=10;else if(ratio<=0.7)score+=5;
+      }
       return { r, score };
     })
     .sort((a, b) => b.score - a.score || toInt(b.r.id) - toInt(a.r.id));
 
-  const withSim = scored.filter((s) => s.score > 0).slice(0, take).map((s) => s.r);
-  // إكمال العدد بأحدث إعلانات القسم عند قلة المتشابهات
-  const fill = scored.filter((s) => s.score === 0 && toInt(s.r.category_id) === categoryId).map((s) => s.r);
-  const rows = [...withSim, ...fill].slice(0, take);
+  const rows = scored.slice(0, take).map(item=>item.r);
   return toCards(rows);
 }
 

@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { normalizeCategoryAttributeFilters, normalizePriceRange, normalizeSearchParams, positiveSearchId } from '@/lib/search-filters';
+import { normalizeCategoryAttributeFilters, normalizePriceRange, normalizeSaudiAreaSelection, normalizeSearchParams, positiveSearchId } from '@/lib/search-filters';
 import { adPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
 import { allowAutomaticPrompt, claimPromptSession, PROMPT_SESSION_KEY } from '@/lib/prompt-policy';
 import { PublicSearchForm } from '@/components/public-search-form';
@@ -124,5 +124,15 @@ describe('subcategory attribute filters',()=>{
       {key:'features',mode:'array_contains_any',value:['GPS','مكيف']},
     ]);
     expect(normalized.params).toMatchObject({attr_reach_min:'20',attr_reach_max:'40',attr_features:'GPS,مكيف'});
+  });
+});
+
+describe('nearby location selection',()=>{
+  const regions=[{id:1,countryId:1},{id:2,countryId:1},{id:3,countryId:2}];
+  const areas=[{id:10,cityId:1},{id:20,cityId:2}];
+  it('accepts only a Saudi region and a city that belongs to it',()=>{
+    expect(normalizeSaudiAreaSelection(regions,areas,'1','10')).toEqual({cityId:1,areaId:10});
+    expect(normalizeSaudiAreaSelection(regions,areas,'1','20')).toEqual({cityId:1,areaId:undefined});
+    expect(normalizeSaudiAreaSelection(regions,areas,'3','10')).toEqual({cityId:undefined,areaId:undefined});
   });
 });

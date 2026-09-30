@@ -2,30 +2,36 @@ import Link from 'next/link';
 import { MapPin } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import { searchAds, getCities, getAreas } from '@/lib/data';
+import { searchAds, countSearchAds, getCities, getAreas } from '@/lib/data';
 import { AdGrid } from '@/components/ad-card';
 import { SearchAreaPicker } from '@/components/search-area-picker';
 import { toInt } from '@/lib/utils';
+import { normalizeSaudiAreaSelection, positiveSearchId } from '@/lib/search-filters';
+import { AdminPager } from '@/components/admin-pager';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'قريب منك' };
 
-export default async function NearbyPage({ searchParams }: { searchParams: Promise<{ city?: string; area?: string }> }) {
+export default async function NearbyPage({ searchParams }: { searchParams: Promise<{ city?: string; area?: string; page?: string }> }) {
   const sp = await searchParams;
   const session = await getSession();
   const [allCities, areas] = await Promise.all([getCities(), getAreas()]);
   const cities = allCities.filter((c) => c.countryId === 1); // السعودية فقط
 
   // المنطقة المعروضة: من الرابط، وإلا منطقة العضو المسجّلة
-  let cityId = sp.city ? Number(sp.city) : 0;
-  const areaId = sp.area ? Number(sp.area) : 0;
+  let {cityId,areaId}=normalizeSaudiAreaSelection(cities,areas,sp.city,sp.area);
   if (!cityId && session) {
     const u = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { city_id: true } }).catch(() => null);
-    cityId = u?.city_id ? toInt(u.city_id) : 0;
+    const saved=u?.city_id?toInt(u.city_id):0;
+    cityId=cities.some(city=>city.id===saved)?saved:undefined;
   }
   const region = cities.find((c) => c.id === cityId);
-  const area = areas.find((a) => a.id === areaId);
-  const ads = cityId ? await searchAds({ cityId, areaId: areaId || undefined, take: 48 }) : [];
+  const area = areas.find((a) => a.id === areaId && a.cityId === cityId);
+  const pageSize=48;
+  const total=cityId?await countSearchAds({cityId,areaId}):0;
+  const pages=Math.max(1,Math.ceil(total/pageSize));
+  const page=Math.min(positiveSearchId(sp.page)||1,pages);
+  const ads = cityId ? await searchAds({ cityId, areaId, take: pageSize,skip:(page-1)*pageSize }) : [];
   const label = area?.name || region?.name || 'منطقتك';
 
   return (
@@ -51,13 +57,14 @@ export default async function NearbyPage({ searchParams }: { searchParams: Promi
         <>
           <div className="flex items-center justify-between">
             <div className="text-sm font-bold text-foreground">إعلانات {label}</div>
-            <span className="text-sm text-muted-foreground">{ads.length} إعلان</span>
+            <span className="text-sm text-muted-foreground">{total} إعلان</span>
           </div>
           {ads.length === 0 ? (
             <p className="py-10 text-center text-muted-foreground">لا توجد إعلانات في {label} بعد — <Link href="/ads/new" className="font-bold text-primary underline">كن أول من يعلن</Link>.</p>
           ) : (
             <AdGrid ads={ads} />
           )}
+          {total>0&&<AdminPager basePath="/nearby" page={page} pages={pages} total={total} params={{city:String(cityId),area:areaId?String(areaId):undefined}}/>}
         </>
       )}
     </div>

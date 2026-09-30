@@ -91,4 +91,17 @@ export function equivalentAreaIds(areas: { id: number; name: string; cityId: num
   const canonical = canonicalAreaName(selected.name);
   return [...new Set(areas.filter((area) => area.cityId === regionId && canonicalAreaName(area.name) === canonical).map((area) => area.id))];
 }
+
+export function normalizeSaudiAreaSelection(
+  regions: {id:number;countryId?:number}[],
+  areas: {id:number;cityId:number}[],
+  rawRegion: unknown,
+  rawArea: unknown,
+): {cityId:number|undefined;areaId:number|undefined} {
+  const requestedRegion=positiveSearchId(typeof rawRegion==='string'?rawRegion:undefined);
+  const cityId=requestedRegion&&regions.some(region=>region.id===requestedRegion&&region.countryId===1)?requestedRegion:undefined;
+  const requestedArea=positiveSearchId(typeof rawArea==='string'?rawArea:undefined);
+  const areaId=cityId&&requestedArea&&areas.some(area=>area.id===requestedArea&&area.cityId===cityId)?requestedArea:undefined;
+  return {cityId,areaId};
+}
 import {fieldApplies,type CategoryField} from './ad-categories/validation';

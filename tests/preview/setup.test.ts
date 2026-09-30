@@ -6,6 +6,10 @@ import { CATEGORY_SEED_TEMPLATES } from '@/lib/ad-categories/seed-templates';
 import { CATEGORY_DDL } from '@/lib/ad-categories/schema';
 import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 
+// Keep the seeded discovery card outside publish anti-flood windows. The E2E
+// member still owns it, but can create a fresh synthetic ad immediately.
+const PREVIEW_SEEDED_AD_AGE_MS = 2 * 60 * 60 * 1000;
+
 it('seeds only an empty dedicated loopback preview with synthetic accounts', async () => {
   if (process.env.COMMERCE_PREVIEW_FIXTURE !== '1') throw new Error('Explicit fixture opt-in required');
   const url = new URL(process.env.COMMERCE_PREVIEW_DATABASE_URL || process.env.DATABASE_URL || '');
@@ -41,7 +45,7 @@ it('seeds only an empty dedicated loopback preview with synthetic accounts', asy
       await db.$executeRaw`INSERT INTO ad_category_definitions (subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (${sub.id},1,${seed.kind},${Number(seed.priceEnabled)},${Number(seed.goodsEnabled)},${JSON.stringify(stored)})`;
       if (seed.key === 'job') {
         // Prisma's active enum maps to the database value '1'.
-        const ad = await db.ads.create({ data: { title: 'وظيفة محاسب — إعلان اختبار محلي', detail: 'فرصة عمل تجريبية للتحقق من عرض حقول الوظيفة دون حالة سلعة أو سعر بيع.', adsType: 'offer', user_id: 2n, city_id: 1n, category_id: categoryId, subcategory_id: Number(sub.id), video_path: '', adsSpecial: 'no', status: 1, state: 'active', created_at: new Date() } });
+        const ad = await db.ads.create({ data: { title: 'وظيفة محاسب — إعلان اختبار محلي', detail: 'فرصة عمل تجريبية للتحقق من عرض حقول الوظيفة دون حالة سلعة أو سعر بيع.', adsType: 'offer', user_id: 2n, city_id: 1n, category_id: categoryId, subcategory_id: Number(sub.id), video_path: '', adsSpecial: 'no', status: 1, state: 'active', created_at: new Date(Date.now() - PREVIEW_SEEDED_AD_AGE_MS) } });
         await db.$executeRaw`INSERT INTO ad_category_values (ad_id,subcategory_id,definition_version,values_json) VALUES (${ad.id},${sub.id},1,${JSON.stringify({ job_title: 'محاسب', contract: 'دوام كامل', salary_min: 6000, workplace: 'حضوري' })})`;
       }
     }

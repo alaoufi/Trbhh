@@ -13,6 +13,7 @@ describe('isolated pre-production browser gate', () => {
     expect(setup).toContain("url.pathname !== '/trbhh_commerce_preview_20260919'");
     expect(setup).toContain("COMMERCE_PREVIEW_FIXTURE !== '1'");
     expect(setup).toContain("'commerce_receipts'");
+    expect(setup).toContain('PREVIEW_SEEDED_AD_AGE_MS');
   });
 
   it('runs the browser journey in CI and keeps its screenshots', () => {

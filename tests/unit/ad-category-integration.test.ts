@@ -2,6 +2,8 @@ import {describe, expect, it} from 'vitest';
 import fs from 'node:fs';
 import {categoryEnabled, categoryPolicy, parseCategorySubmission, projectCategory} from '@/lib/ad-categories/contracts';
 import {CATEGORY_DDL} from '@/lib/ad-categories/schema';
+import {decodeStoredCategoryDefinition,encodeStoredCategoryDefinition} from '@/lib/ad-categories/storage';
+import {defaultListingPolicy} from '@/lib/ad-categories/listing-policy';
 const field={key:'salary',label:'الراتب',type:'number' as const,group:'الوظيفة',required:false,visible:true,order:0,options:[]};
 describe('real ad category contracts',()=>{
   it('enables only explicit 1',()=>{for(const v of [undefined,null,'','0','false','true','yes']) expect(categoryEnabled(v)).toBe(false);expect(categoryEnabled('1')).toBe(true);});
@@ -20,5 +22,10 @@ describe('real ad category contracts',()=>{
     expect(schema).not.toContain('listing_types_json');
     expect(schema).not.toContain('listing_type');
     expect(schema).toContain('sale_type');
+  });
+  it('reads legacy field arrays and the v2 policy envelope without losing fields',()=>{
+    expect(decodeStoredCategoryDefinition([field])).toEqual({fields:[field]});
+    const policy=defaultListingPolicy('goods'),stored=encodeStoredCategoryDefinition([field],policy);
+    expect(decodeStoredCategoryDefinition(JSON.stringify(stored))).toEqual({fields:[field],listingPolicy:policy});
   });
 });

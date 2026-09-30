@@ -51,6 +51,16 @@ const LEGACY_V1_FIELD_FINGERPRINTS: Record<string, string> = {
   transport_service: '056707ec061ed2aa18dfd97dc6c30e209fa2818ad8199eab9fabb19ea1a75ec1',
 };
 
+// قوالب فرع المعاينة قبل إدخال سياسة أنواع الإعلان. اعتماد البصمة يمنع لمس أي
+// تعريف عدلته الإدارة، لكنه يسمح للنسخة النظامية المنشورة بالحصول على السياسة الجديدة.
+const PRE_POLICY_FIELD_FINGERPRINTS:Record<string,string>={
+  land:'2743b960a5200645e21d624392dded88a30f96be89e5f70c3354cf0f68743bc3',villa:'74f573b9fee4a88a2c2f02572363100159e1d82b1991fab696ffacd250663cc5',apartment:'d17ebb24efff434dcbfb719f850de8a00effa82b0a30d14edbdcc30fefef0068',commercial_property:'ff2526111a88ae4ba4d2a1594f3de99f794339239742f25e429a0174fdb576ca',
+  car:'c76c888cd7ac42bedd851008361e310c99daead800099c7130bd7d3216dbf6c2',car_parts:'6c019863b0516aa454c9a5256bb606f6ad8a6f4816511b06beae5ab7f8c40d7e',job:'2517627cad6118b090420620a8251ea5670fce26d0e9cb4299a2492bbec1f048',plants:'e42b4c5be6c3ca9c6beceb98a77edcb1965ad9eb58cd362ab6adb668279bfa4f',feed:'faa9c0e2b92b7f8a3082b8ec5344bab7dc005bc57eaf13fb6834544f3f024168',irrigation:'ff44eb8528ce7d9fb6b0c80c64757aca5ac17a6d04a7407381a4683faff85ff5',garden_service:'e1f92a85dbd04e2ed3614df060fc4ba9edd600afc2059981a2bd0619b1214fc4',
+  sheep_goats:'e55896099f5c32e8ba5203d0db4f431d5cd5b6165e7389a8ac93083726228a8c',camels_cattle:'569e6b6e2cc3260df07d85ddeb3b3e7752763d929281d07f8386d12f0dc619b6',poultry:'82f741a164e8b7d727e655b3b93776861cbfbdcc0aaaa0da9c39c3d7d56fc47d',livestock_equipment:'a6a6bb601fc02249fa20f12841ac8c229323af0dbf8185170abcfffed112992f',cookware:'2832a16ae41a79d6faa619e2481543f9701c04d39f15ea012c5f1ac9b703cd07',tableware:'83b7fda7a77540b56835feadf91730689112d121f37335db4fa957e7495dd1ae',storage:'289000a1e16933fdee752e5880a72a06132d06b940e86018a80e93f22d312df1',
+  rugs:'113fb07cc356af4c61632f31e253beb87c4b620c47335bad663da886feedbda9',curtains:'83b88ef18fe74dd0ecce233025e1e9cbe416aaca01b36465e5ef9c7ec2ce1944',wall_decor:'55fe060b4e94147f9eb905f39481d5c281b51572a0cd6318e0456c873fbd00bb',decor_service:'5b3836805837a2b2356935660724cbfb440a814a8d08c262927ac5711c76fc57',tiles:'e5b9a80d61a6c17a40425138e2e4584351f1d56ba00df2c913528fb2aefa2ccf',building_materials:'63fe02ecab84b487de803593a2ad39f917f935050d4bf888956d9d7321537230',sanitary:'402b9f68bc82616981bf077b9f6206143e0cd29b2ad131f29d1d87f58c13d4ed',contracting:'370a4d47859183729837faeeccc49c2176c67dcef0f14b125e4bbe9c102b7f50',
+  earthmoving:'9e0a13cd90f35063a2c407c11c56c30059d617190677a1c082a80cc735323e41',lifting:'9d5f62072037611f0423d812094f7a6a38771741f229fac823ce057846a84bf6',commercial_vehicles:'d3d36e4bf9fc19f7155e7e959f1da53e2ef4b6c04053a95d4e72f2dd4d635e2a',transport_service:'5accaaf8999cd974db086ad9a5bc175802e161a18a6bdaec1124007a79284f70',
+};
+
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -71,7 +81,7 @@ export function resolveCategoryDefinition(
 ) {
   const template = CATEGORY_SEED_TEMPLATES.find(item => item.categoryName === categoryName && item.name === subcategoryName);
   const untouchedBuiltInV1 = useLatestTemplates && definition.version === 1 && template
-    && definition.fieldsFingerprint === LEGACY_V1_FIELD_FINGERPRINTS[template.key];
+    && [LEGACY_V1_FIELD_FINGERPRINTS[template.key],PRE_POLICY_FIELD_FINGERPRINTS[template.key]].includes(definition.fieldsFingerprint||'');
   const { fieldsFingerprint: _fingerprint, ...visibleDefinition } = definition;
   if (!untouchedBuiltInV1 || !template) return { ...visibleDefinition, upgradedFromBuiltInV1: false };
   return {

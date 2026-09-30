@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORY_SEED_TEMPLATES } from '@/lib/ad-categories/seed-templates';
-import { validateDefinition } from '@/lib/ad-categories/validation';
+import { fieldApplies, validateCategoryValues, validateDefinition } from '@/lib/ad-categories/validation';
 import {validateListingPolicy} from '@/lib/ad-categories/listing-policy';
 describe('editable specialist subcategory seed templates', () => {
   it('has unique keys and valid domain-specific definitions for each requested group', () => {
@@ -23,6 +23,31 @@ describe('editable specialist subcategory seed templates', () => {
       expect(rent.pricing).toEqual(expect.arrayContaining(['day','month','project']));
       if(key!=='commercial_vehicles')expect(rent.pricing).toContain('hour');
     }
+    for(const key of ['contracting','transport_service'])expect(CATEGORY_SEED_TEMPLATES.find(t=>t.key===key)!.fields.map(f=>f.key)).not.toEqual(expect.arrayContaining(['pricing_basis','rate_basis']));
+  });
+  it('keeps job-only requirements away from job seekers',()=>{
+    const jobs=CATEGORY_SEED_TEMPLATES.find(t=>t.key==='job')!;
+    const employer=jobs.fields.find(field=>field.key==='employer')!;
+    expect(employer).toMatchObject({required:true,dependsOn:'listing_type',dependencyValue:'job'});
+    expect(fieldApplies(employer,{listingType:'job_seeker'})).toBe(false);
+    expect(()=>validateCategoryValues(jobs.fields,{job_title:'مصمم',contract:'عمل حر',workplace:'عن بُعد'},{listingType:'job_seeker'})).not.toThrow();
+  });
+  it('adds optional B2B supply controls only to supply-heavy goods',()=>{
+    for(const key of ['plants','feed','tiles','building_materials']){
+      const template=CATEGORY_SEED_TEMPLATES.find(item=>item.key===key)!;
+      expect(template.fields.map(field=>field.key)).toEqual(expect.arrayContaining(['sale_channel','minimum_order','recurring_supply','supply_area']));
+      expect(template.fields.find(field=>field.key==='minimum_order')?.required).toBe(false);
+    }
+    expect(CATEGORY_SEED_TEMPLATES.find(item=>item.key==='car')!.fields.map(field=>field.key)).not.toContain('minimum_order');
+  });
+  it('validates representative sale and rental scenarios without leaking hidden values',()=>{
+    const car=CATEGORY_SEED_TEMPLATES.find(item=>item.key==='car')!;
+    const fresh=validateCategoryValues(car.fields,{make:'تويوتا',model:'كامري',year:2026,condition:'جديد',odometer_km:15},{listingType:'sale'});
+    expect(fresh).not.toHaveProperty('odometer_km');
+    const lifting=CATEGORY_SEED_TEMPLATES.find(item=>item.key==='lifting')!;
+    const base={equipment_kind:'رافعة شوكية',manufacturer:'تويوتا',model:'8FG',year:2022,condition:'مستعمل',power_source:'غاز',lift_height_m:4};
+    expect(validateCategoryValues(lifting.fields,{...base,operator_included:true},{listingType:'sale'})).not.toHaveProperty('operator_included');
+    expect(validateCategoryValues(lifting.fields,{...base,operator_included:true,transport_included:false,minimum_rental_period:1},{listingType:'rent'})).toMatchObject({operator_included:true,transport_included:false});
   });
   it('uses reusable conditions for used vehicles and rental equipment',()=>{
     const car=CATEGORY_SEED_TEMPLATES.find(t=>t.key==='car')!;

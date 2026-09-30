@@ -12,18 +12,18 @@ const policy={types:[
 ]};
 
 it('never offers hourly pricing while sale is selected',()=>{
-  const html=renderToStaticMarkup(<AdListingPolicyFields policy={policy} listingType="sale" pricingMode="fixed" onListingType={()=>{}} onPricingMode={()=>{}}/>);
+  const html=renderToStaticMarkup(React.createElement(AdListingPolicyFields,{policy,listingType:'sale',pricingMode:'fixed',onListingType:()=>{},onPricingMode:()=>{}}));
   expect(html).toContain('سعر محدد');expect(html).toContain('على السوم');expect(html).not.toContain('بالساعة');
 });
 
 it('offers rental units and requires a price for an hourly rental',()=>{
-  const html=renderToStaticMarkup(<AdListingPolicyFields policy={policy} listingType="rent" pricingMode="hour" onListingType={()=>{}} onPricingMode={()=>{}}/>);
+  const html=renderToStaticMarkup(React.createElement(AdListingPolicyFields,{policy,listingType:'rent',pricingMode:'hour',onListingType:()=>{},onPricingMode:()=>{}}));
   expect(html).toContain('بالساعة');expect(html).toContain('بالشهر');expect(html).toContain('name="price"');expect(html).toContain('required=""');
 });
 
 it('shows rental-only attributes only for rental listings',()=>{
   const fields:CategoryField[]=[{key:'operator',label:'يشمل المشغل',type:'boolean',group:'الإيجار',required:false,visible:true,order:1,options:[],dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent'}];
-  const sale=renderToStaticMarkup(<AdCategoryFields fields={fields} values={{}} listingType="sale" onChange={()=>{}}/>);
-  const rent=renderToStaticMarkup(<AdCategoryFields fields={fields} values={{}} listingType="rent" onChange={()=>{}}/>);
+  const sale=renderToStaticMarkup(React.createElement(AdCategoryFields,{fields,values:{},listingType:'sale',onChange:()=>{}}));
+  const rent=renderToStaticMarkup(React.createElement(AdCategoryFields,{fields,values:{},listingType:'rent',onChange:()=>{}}));
   expect(sale).not.toContain('يشمل المشغل');expect(rent).toContain('يشمل المشغل');
 });

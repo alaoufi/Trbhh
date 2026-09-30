@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 const setup = readFileSync('tests/preview/setup.test.ts', 'utf8');
 const browser = readFileSync('tests/preview/browser.cjs', 'utf8');
+const vitestConfig = readFileSync('vitest.config.ts', 'utf8');
 
 describe('isolated pre-production browser gate', () => {
   it('keeps the synthetic fixture on the dedicated loopback database', () => {
@@ -17,6 +18,8 @@ describe('isolated pre-production browser gate', () => {
     expect(workflow).toContain('Seed isolated browser preview');
     expect(workflow).toContain('Browser end-to-end on isolated preview');
     expect(workflow).toContain('Category transactions on isolated MySQL');
+    expect(vitestConfig).toContain("process.env.CATEGORIES_DB_TESTS === '1'");
+    expect(vitestConfig).toContain("'/trbhh_categories_test'");
     expect(workflow).toContain('upload-artifact@v4');
     expect(workflow).toContain('SUPPLIER_ALLOW_LIVE_ORDERS: \'false\'');
   });

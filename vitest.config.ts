@@ -3,10 +3,18 @@ import path from 'node:path';
 
 const authDbTests = process.env.AUTH_DB_TESTS === '1';
 const authTestUrl = process.env.AUTH_TEST_DATABASE_URL || '';
+const categoriesDbTests = process.env.CATEGORIES_DB_TESTS === '1';
+const categoriesTestUrl = process.env.CATEGORIES_TEST_DATABASE_URL || '';
 if (authDbTests) {
   const url = new URL(authTestUrl);
   if (url.protocol !== 'mysql:' || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) || !['/ci', '/trbhh_auth_test'].includes(url.pathname)) {
     throw new Error('AUTH_DB_TESTS requires an explicit disposable MySQL database on loopback');
+  }
+}
+if (categoriesDbTests) {
+  const url = new URL(categoriesTestUrl);
+  if (url.protocol !== 'mysql:' || url.hostname !== '127.0.0.1' || url.port !== '33309' || url.pathname !== '/trbhh_categories_test' || url.search || url.hash) {
+    throw new Error('CATEGORIES_DB_TESTS requires the dedicated disposable MySQL database on loopback');
   }
 }
 export default defineConfig({
@@ -21,7 +29,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     // Never import database integration modules during the default unit run.
-    include: authDbTests ? ['tests/integration/**/*.test.ts'] : ['tests/unit/**/*.test.ts'],
+    include: categoriesDbTests
+      ? ['tests/integration/ad-categories-mysql.test.ts']
+      : authDbTests ? ['tests/integration/**/*.test.ts'] : ['tests/unit/**/*.test.ts'],
     env: {
       // Pure-logic tests never query the DB, but some modules construct a
       // Prisma client at import time — give it a harmless URL.

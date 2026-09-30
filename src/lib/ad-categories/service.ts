@@ -9,6 +9,7 @@ import {applyPreviewCategoryVisibility,isReadOnlyPreview,parsePreviewCategoryVis
 import {previewHashGetAll} from '@/lib/redis';
 import {defaultListingPolicy,inferLegacyListingType,normalizeListingSubmission,validateListingPolicy,type NormalizedListingSubmission} from './listing-policy';
 import {decodeStoredCategoryDefinition} from './storage';
+import {categorySeedDefinition,findCategorySeedTemplate} from './seed-templates';
 type Tx=Prisma.TransactionClient;
 type DefinitionRow={subcategory_id:bigint;version:number;kind:string;price_enabled:number;goods_enabled:number;fields_json:unknown};
 const json=(v:unknown):unknown=>typeof v==='string'?JSON.parse(v):v;
@@ -16,6 +17,10 @@ function definition(r:DefinitionRow, names?:{categoryName:string;subcategoryName
   const stored=decodeStoredCategoryDefinition(r.fields_json);
   const base={version:r.version,kind:r.kind as SubcategoryOption['kind'],...categoryPolicy({kind:r.kind,priceEnabled:r.price_enabled===1,goodsEnabled:r.goods_enabled===1}),fields:validateDefinition(stored.fields),listingPolicy:stored.listingPolicy?validateListingPolicy(stored.listingPolicy):defaultListingPolicy(r.kind),fieldsFingerprint:categoryFieldsFingerprint(stored.fields)};
   return names?resolveCategoryDefinition(base,names.categoryName,names.subcategoryName,names.useLatestTemplates):{...base,upgradedFromBuiltInV1:false};
+}
+function seededDefinition(categoryName:string,subcategoryName:string){
+  const template=findCategorySeedTemplate(categoryName,subcategoryName);
+  return template?categorySeedDefinition(template):undefined;
 }
 export async function getCategoryFormConfig(admin=false):Promise<CategoryFormConfig> {
   const defaultEnabled=process.env.CATEGORIES_DEFAULT_ENABLED==='1';
@@ -28,12 +33,18 @@ export async function getCategoryFormConfig(admin=false):Promise<CategoryFormCon
   const dm=new Map(defs.map(d=>[Number(d.subcategory_id),d]));
   const catById=new Map(cats.map(c=>[Number(c.id),c]));
   const baseCategories=cats.map(c=>({id:Number(c.id),name:c.name,active:c.is_active==='yes',order:c.ordered}));
-  const baseSubcategories=subs.map(s=>({id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(dm.has(Number(s.id))?definition(dm.get(Number(s.id))!,{categoryName:catById.get(s.category_id)?.name||'',subcategoryName:s.name,useLatestTemplates}):{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[],listingPolicy:defaultListingPolicy('other')})}));
+  const baseSubcategories=subs.map(s=>{
+    const categoryName=catById.get(s.category_id)?.name||'';
+    const configured=dm.has(Number(s.id))
+      ?definition(dm.get(Number(s.id))!,{categoryName,subcategoryName:s.name,useLatestTemplates})
+      :seededDefinition(categoryName,s.name);
+    return {id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(configured??{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[],listingPolicy:defaultListingPolicy('other')})};
+  });
   const resolved=isReadOnlyPreview()
     ?applyPreviewCategoryVisibility(baseCategories,baseSubcategories,parsePreviewCategoryVisibility(await previewHashGetAll(PREVIEW_CATEGORY_VISIBILITY_KEY)))
     :{categories:baseCategories,subcategories:baseSubcategories};
   const activeCategoryIds=new Set(resolved.categories.filter(c=>c.active).map(c=>c.id));
-  return {enabled,useLatestTemplates,labels,categories:resolved.categories.filter(c=>admin||c.active),subcategories:resolved.subcategories.filter(s=>admin||(s.active&&dm.has(s.id)&&activeCategoryIds.has(s.categoryId)))};
+  return {enabled,useLatestTemplates,labels,categories:resolved.categories.filter(c=>admin||c.active),subcategories:resolved.subcategories.filter(s=>admin||(s.active&&s.version>0&&activeCategoryIds.has(s.categoryId)))};
 }
 export type CategorySelection={category_id:bigint;subcategory_id:number;cat_reviewed:number;priceEnabled:boolean;goodsEnabled:boolean;listing:NormalizedListingSubmission};
 export type CategoryEditContext={adId:bigint;memberId:bigint};
@@ -49,10 +60,10 @@ export async function writeAdWithCategory<T extends {id:bigint}>(db:PrismaClient
     if(fd.get('category_mode')==='preserve') {
       if(!existing||!edit) throw new CategoryValidationError('','إبقاء التصنيف متاح للتعديل فقط');
       if(['category_id','subcategory_id','category_version','category_values'].some(k=>fd.has(k))) throw new CategoryValidationError('','لا يمكن تغيير التصنيف في وضع الإبقاء');
-      const cats=await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM categories WHERE id=${existing.category_id} AND is_active='yes' FOR SHARE`;
-      const subs=existing.subcategory_id===null?[]:await tx.$queryRaw<{id:bigint}[]>`SELECT id FROM sub_categories WHERE id=${existing.subcategory_id} AND category_id=${existing.category_id} AND active=1 FOR SHARE`;
+      const cats=await tx.$queryRaw<{id:bigint;name:string}[]>`SELECT id,name FROM categories WHERE id=${existing.category_id} AND is_active='yes' FOR SHARE`;
+      const subs=existing.subcategory_id===null?[]:await tx.$queryRaw<{id:bigint;name:string}[]>`SELECT id,name FROM sub_categories WHERE id=${existing.subcategory_id} AND category_id=${existing.category_id} AND active=1 FOR SHARE`;
       const defs=existing.subcategory_id===null?[]:await tx.$queryRaw<{subcategory_id:bigint}[]>`SELECT subcategory_id FROM ad_category_definitions WHERE subcategory_id=${existing.subcategory_id} FOR SHARE`;
-      if(cats.length&&subs.length&&defs.length) throw new CategoryValidationError('','التصنيف نشط؛ يجب التحقق من حقوله');
+      if(cats.length&&subs.length&&(defs.length||seededDefinition(cats[0].name,subs[0].name))) throw new CategoryValidationError('','التصنيف نشط؛ يجب التحقق من حقوله');
       const {price,price_type,rent_period,sale_type,old_price,stock_state}=existing;
       const ad=await write(tx,null,{price,price_type,rent_period,sale_type,old_price,stock_state});
       if(ad.id!==edit.adId) throw new CategoryValidationError('','الإعلان غير مطابق');
@@ -68,8 +79,11 @@ export async function writeAdWithCategory<T extends {id:bigint}>(db:PrismaClient
     const cats=await tx.$queryRaw<{id:bigint;name:string}[]>`SELECT id,name FROM categories WHERE id=${cid} AND is_active='yes' FOR SHARE`;
     const subs=await tx.$queryRaw<{id:bigint;name:string}[]>`SELECT id,name FROM sub_categories WHERE id=${sid} AND category_id=${cid} AND active=1 FOR SHARE`;
     const defs=await tx.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions WHERE subcategory_id=${sid} FOR SHARE`;
-    if(!cats.length||!subs.length||!defs.length) throw new CategoryValidationError('','القسم غير متاح');
-    const def=definition(defs[0],{categoryName:cats[0].name,subcategoryName:subs[0].name,useLatestTemplates:categoryEnabled(settings.get(CATEGORY_LATEST_TEMPLATES_SETTING)??'1')});
+    if(!cats.length||!subs.length) throw new CategoryValidationError('','القسم غير متاح');
+    const def=defs.length
+      ?definition(defs[0],{categoryName:cats[0].name,subcategoryName:subs[0].name,useLatestTemplates:categoryEnabled(settings.get(CATEGORY_LATEST_TEMPLATES_SETTING)??'1')})
+      :seededDefinition(cats[0].name,subs[0].name);
+    if(!def) throw new CategoryValidationError('','القسم غير متاح');
     const listing=normalizeListingSubmission(def.listingPolicy,{listingType:fd.get('listingType'),pricingMode:fd.get('pricingMode'),price:fd.get('price')});
     let grandfatherMissingRequired:ReadonlySet<string>|undefined;
     if(edit&&existing&&Number(existing.category_id)===cid&&existing.subcategory_id===sid){
@@ -94,12 +108,15 @@ export async function getPublicCategories(ids:bigint[]):Promise<Map<number,Publi
   const [enabledValue,latestTemplatesValue]=await Promise.all([getSetting('categories_v2_enabled',process.env.CATEGORIES_DEFAULT_ENABLED==='1'?'1':'0'),getSetting(CATEGORY_LATEST_TEMPLATES_SETTING,'1')]);
   if(!ids.length||!categoryEnabled(enabledValue)) return out;
   const [rows,previewVisibility]=await Promise.all([
-    prisma.$queryRaw<(DefinitionRow&{ad_id:bigint;category_id:bigint;values_json:unknown;subcategory_name:string;category_name:string;active:number;is_active:string;sale_type:string|null;adsType:string;price_type:string|null})[]>(Prisma.sql`SELECT a.id AS ad_id,a.sale_type,a.adsType,a.price_type,c.id AS category_id,d.*,v.values_json,s.name AS subcategory_name,c.name AS category_name,s.active,c.is_active FROM ads a JOIN sub_categories s ON s.id=a.subcategory_id AND s.category_id=a.category_id JOIN categories c ON c.id=a.category_id JOIN ad_category_definitions d ON d.subcategory_id=s.id LEFT JOIN ad_category_values v ON v.ad_id=a.id AND v.subcategory_id=s.id WHERE a.id IN (${Prisma.join(ids)})`),
+    prisma.$queryRaw<((Omit<DefinitionRow,'subcategory_id'|'version'|'kind'|'price_enabled'|'goods_enabled'> & {subcategory_id:bigint|null;version:number|null;kind:string|null;price_enabled:number|null;goods_enabled:number|null})&{ad_id:bigint;category_id:bigint;selected_subcategory_id:bigint;values_json:unknown;subcategory_name:string;category_name:string;active:number;is_active:string;sale_type:string|null;adsType:string;price_type:string|null})[]>(Prisma.sql`SELECT a.id AS ad_id,a.sale_type,a.adsType,a.price_type,c.id AS category_id,s.id AS selected_subcategory_id,d.*,v.values_json,s.name AS subcategory_name,c.name AS category_name,s.active,c.is_active FROM ads a JOIN sub_categories s ON s.id=a.subcategory_id AND s.category_id=a.category_id JOIN categories c ON c.id=a.category_id LEFT JOIN ad_category_definitions d ON d.subcategory_id=s.id LEFT JOIN ad_category_values v ON v.ad_id=a.id AND v.subcategory_id=s.id WHERE a.id IN (${Prisma.join(ids)})`),
     isReadOnlyPreview()?previewHashGetAll(PREVIEW_CATEGORY_VISIBILITY_KEY).then(parsePreviewCategoryVisibility):Promise.resolve(parsePreviewCategoryVisibility({})),
   ]);
   for(const r of rows){
-    const d=definition(r,{categoryName:r.category_name,subcategoryName:r.subcategory_name,useLatestTemplates:categoryEnabled(latestTemplatesValue)});
-    const visibility=applyPreviewCategoryVisibility([{id:Number(r.category_id),active:r.is_active==='yes'}],[{id:Number(r.subcategory_id),active:r.active===1}],previewVisibility);
+    const d=r.subcategory_id===null
+      ?seededDefinition(r.category_name,r.subcategory_name)
+      :definition(r as DefinitionRow,{categoryName:r.category_name,subcategoryName:r.subcategory_name,useLatestTemplates:categoryEnabled(latestTemplatesValue)});
+    if(!d)continue;
+    const visibility=applyPreviewCategoryVisibility([{id:Number(r.category_id),active:r.is_active==='yes'}],[{id:Number(r.selected_subcategory_id),active:r.active===1}],previewVisibility);
     const active=visibility.categories[0].active&&visibility.subcategories[0].active;
     const values=(json(r.values_json)||{}) as CategoryValues,listingType=inferLegacyListingType({listingType:r.sale_type,adsType:r.adsType,priceType:r.price_type});
     const context={listingType};

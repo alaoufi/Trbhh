@@ -96,19 +96,33 @@ const SEARCHABLE_KEYS=new Set(['manufacturer','brand','make','model','part_numbe
 const FILTERABLE_KEYS=new Set(['condition','year','fuel','power_source','equipment_kind','truck_type','property_use','land_use','rooms','bathrooms','area_m2','capacity_t','lift_height_m','operating_hours','service_kind','contract','workplace','species','feed_kind','material_kind','sale_channel','supply_unit','brand','make','manufacturer','model']);
 const CARD_KEYS=new Set(['condition','year','make','manufacturer','model','area_m2','rooms','capacity_t','lift_height_m','equipment_kind','service_kind','head_count']);
 const COMPARABLE_KEYS=new Set([...FILTERABLE_KEYS,'engine_power_kw','operating_weight_t','odometer_km','building_age_years','quantity','minimum_order']);
-function template(key: string, categoryName: string, name: string, kind: CategorySeedTemplate['kind'], fields: SeedField[], requiredKeys: string[]): CategorySeedTemplate {
+function template(
+  key: string,
+  categoryName: string,
+  name: string,
+  kind: CategorySeedTemplate['kind'],
+  fields: SeedField[],
+  requiredKeys: string[],
+  policyOverride?: ListingPolicy,
+): CategorySeedTemplate {
   const required = new Set(requiredKeys);
-  const listingPolicy=TEMPLATE_LISTING_POLICIES[key];if(!listingPolicy)throw new Error(`missing_listing_policy:${key}`);
+  const listingPolicy=policyOverride??TEMPLATE_LISTING_POLICIES[key];if(!listingPolicy)throw new Error(`missing_listing_policy:${key}`);
   return { key, categoryName, name, kind, priceEnabled: kind !== 'jobs', goodsEnabled: kind === 'goods', listingPolicy,
-    fields: fields.map((field, order) => ({ ...field, required: field.required || required.has(field.key), order,
-      searchable:SEARCHABLE_KEYS.has(field.key),filterable:FILTERABLE_KEYS.has(field.key),comparable:COMPARABLE_KEYS.has(field.key),showInCard:CARD_KEYS.has(field.key),showInDetails:true })) };
+    fields: fields.map((field, order) => {
+      const primaryFacet=order===0&&['select','radio'].includes(field.type);
+      return { ...field, required: field.required || required.has(field.key), order,
+        searchable:field.searchable??SEARCHABLE_KEYS.has(field.key),
+        filterable:field.filterable??(FILTERABLE_KEYS.has(field.key)||primaryFacet),
+        comparable:field.comparable??(COMPARABLE_KEYS.has(field.key)||primaryFacet),
+        showInCard:field.showInCard??(CARD_KEYS.has(field.key)||primaryFacet),showInDetails:field.showInDetails??true };
+    }) };
 }
 
 /** Optional administrator-applied seeds, NOT startup migrations or automatic ad classification.
  * Source observations and Saudi adaptations: docs/CATEGORY_FIELD_RESEARCH.md.
  * Labels/options/required/visibility/groups remain editable after applying.
  */
-export const CATEGORY_SEED_TEMPLATES: CategorySeedTemplate[] = [
+const CORE_CATEGORY_SEED_TEMPLATES: CategorySeedTemplate[] = [
   template('land', 'عقارات', 'أراضٍ', 'property', land, ['area_m2', 'land_use']),
   template('villa', 'عقارات', 'فلل', 'property', [...land, ...propertyRooms], ['area_m2', 'land_use', 'built_area_m2', 'rooms', 'bathrooms']),
   template('apartment', 'عقارات', 'شقق وأدوار', 'property', [
@@ -170,3 +184,112 @@ export const CATEGORY_SEED_TEMPLATES: CategorySeedTemplate[] = [
   template('commercial_vehicles', 'نقليات ومعدات ثقيلة', 'شاحنات ومقطورات', 'goods', [...vehicle, s('truck_type', 'النوع', ['قلاب', 'سطحة', 'قاطرة', 'مقطورة', 'براد', 'صهريج', 'أخرى']), n('capacity_t', 'الحمولة', 'طن'), n('axles', 'عدد المحاور')], ['make', 'model', 'year', 'condition', 'truck_type']),
   template('transport_service', 'نقليات ومعدات ثقيلة', 'خدمات نقل وتشغيل', 'service', [s('service_kind', 'الخدمة', ['نقل بضائع', 'نقل معدات', 'نقل أثاث', 'تشغيل معدات']), f('service_route', 'مسار النقل'), n('capacity_t', 'الحمولة', 'طن'), yes('operator_included', 'يشمل المشغل'), yes('loading_included', 'يشمل التحميل والتنزيل'), f('availability', 'مواعيد التوفر')], ['service_kind', 'service_route']),
 ];
+
+const goodsPolicy=policy(sale(),wanted());
+const rentableGoodsPolicy=policy(sale(),rent(),wanted(),wantedRent());
+const servicesPolicy=policy(service(),serviceRequest());
+const apparel=[f('brand','العلامة التجارية'),condition,f('size','المقاس'),f('color','اللون'),
+  m('material','الخامة',['قطن','صوف','جلد','بوليستر','مخلوط','أخرى']),n('quantity','الكمية المتاحة','قطعة'),...delivery];
+const electronics=[f('brand','العلامة التجارية'),f('model','الموديل'),condition,
+  f('specification','المواصفات الأساسية','textarea'),f('warranty','الضمان إن وجد'),
+  m('included_accessories','الملحقات المرفقة',['الشاحن','الكرتون','الريموت','الحامل','كابلات','أخرى']),...delivery];
+const appliance=[f('brand','العلامة التجارية'),f('model','الموديل'),condition,n('capacity_value','السعة'),
+  s('energy_source','مصدر الطاقة',['كهرباء','غاز','ديزل','أخرى']),f('warranty','الضمان إن وجد'),...delivery];
+const serviceFields=[f('service_scope','وصف نطاق الخدمة','textarea'),n('experience_years','سنوات الخبرة','سنة'),
+  f('service_coverage','نطاق التغطية'),f('availability','مواعيد التوفر'),n('lead_time_days','مدة التنفيذ المتوقعة','يوم'),
+  s('materials_included','المواد أو المستلزمات',['شاملة','عمل فقط','حسب الاتفاق'])];
+const foodSupply=[f('brand','الاسم التجاري إن وجد'),n('quantity','الكمية المتاحة'),
+  s('supply_unit','وحدة البيع',['قطعة','علبة','كرتون','كجم','لتر','طلب']),f('production_date','تاريخ الإنتاج','date'),
+  f('expiry_date','تاريخ الانتهاء','date'),f('ingredients','المكونات أو مسببات الحساسية','textarea'),...b2bSupply,...delivery];
+const beautyGoods=[f('brand','العلامة التجارية'),condition,f('usage','الاستخدام المناسب'),
+  f('size_or_volume','الحجم أو السعة'),f('expiry_date','تاريخ الانتهاء إن وجد','date'),n('quantity','الكمية المتاحة'),...delivery];
+const furniture=[s('furniture_kind','نوع القطعة',['كنب','سرير','طاولة','خزانة','كرسي','مجلس','أخرى']),condition,
+  m('material','الخامة',['خشب','معدن','قماش','جلد','زجاج','أخرى']),f('color','اللون'),...dimensions,...delivery];
+
+const LEGACY_CATEGORY_SEED_TEMPLATES:CategorySeedTemplate[]=[
+  template('legacy_medical_devices','الصحة واللياقة','اجهزة طبية','goods',[
+    s('medical_device_kind','نوع الجهاز',['قياس ومراقبة','تنفس','حركة وتأهيل','مختبر','مستهلك طبي','أخرى']),f('brand','العلامة'),f('model','الموديل'),condition,
+    s('intended_use','الاستخدام',['منزلي','عيادة','مستشفى','مختبر']),f('regulatory_status','بيانات التسجيل أو الترخيص إن وجدت'),n('quantity','الكمية المتاحة'),...delivery,
+  ],['medical_device_kind','condition'],goodsPolicy),
+  template('legacy_vehicles','نقليات سيارات معدات','سيارات','goods',[s('vehicle_type','نوع المركبة',['سيدان','دفع رباعي','بيك أب','فان','شاحنة خفيفة','أخرى']),...vehicle],['vehicle_type','make','model','year','condition'],policy(sale(),wanted(),pricing('transfer','للتنازل',['fixed','bidding','quote']))),
+  template('legacy_menswear','ملابس وعطورات','ملابس رجالية','goods',[s('menswear_kind','نوع الملابس',['ثوب','شماغ وغترة','جاكيت','قميص','بنطال','ملابس رياضية','أخرى']),...apparel],['menswear_kind','condition','size'],goodsPolicy),
+  template('legacy_government_services','الخدمات العامة والتعقيب','تعقيب مراجعات','service',[s('transaction_kind','نوع المعاملة',['تعقيب','مراجعات حكومية','استخراج تصاريح','تجديد وثائق','خدمات أعمال','أخرى']),...serviceFields],['transaction_kind','service_scope','service_coverage'],servicesPolicy),
+  template('legacy_produce','المزارع و منتجاتها','خضار وفواكه','plants',[s('produce_kind','نوع المنتج',['خضار','فواكه','تمور','أعشاب','أخرى']),f('variety','الصنف'),s('grade','الدرجة',['ممتاز','أولى','ثانية','مختلط']),f('harvest_date','تاريخ الحصاد','date'),n('quantity','الكمية المتاحة'),s('supply_unit','وحدة البيع',['كجم','صندوق','سلة','طن']),...b2bSupply,...delivery],['produce_kind','variety','quantity','supply_unit'],goodsPolicy),
+  template('legacy_phones','الكترونيات','جوالات','goods',[s('phone_kind','نوع الجهاز',['هاتف ذكي','هاتف عادي','هاتف قابل للطي','أخرى']),...electronics,n('storage_gb','سعة التخزين','جيجابايت'),s('sim','شرائح الاتصال',['شريحة','شريحتان','eSIM','أخرى'])],['phone_kind','brand','model','condition','storage_gb'],goodsPolicy),
+  template('legacy_nursery_plants','المشاتل ومستلزماتها','شتلات','plants',[s('nursery_plant_kind','نوع الشتلة',['مثمر','زينة','ظل','خضار','نخيل','أخرى']),f('variety','الصنف'),n('plant_height_cm','ارتفاع الشتلة','سم'),n('pot_volume_l','حجم الأصيص','لتر'),s('sun_exposure','الإضاءة',['شمس','ظل جزئي','ظل']),n('quantity','الكمية المتاحة','شتلة'),...delivery],['nursery_plant_kind','variety','quantity'],goodsPolicy),
+  template('legacy_garden_tools','المشاتل ومستلزماتها','ادوات الحدائق','goods',[s('garden_tool_kind','نوع الأداة',['أداة يدوية','آلة قص','رشاش','مضخة','خرطوم وري','أصيص','أخرى']),f('brand','العلامة'),condition,s('power_source','مصدر الطاقة',['يدوي','كهرباء','بطارية','بنزين','أخرى']),f('size_spec','المقاس أو المواصفة'),n('quantity','الكمية'),...delivery],['garden_tool_kind','condition'],goodsPolicy),
+  template('legacy_home_food','الأسر المنتجة','اطعمة ومأكولات','goods',[s('food_kind','نوع المنتج',['وجبات','حلويات','مخبوزات','تمور','مخللات','أخرى']),...foodSupply],['food_kind','supply_unit'],goodsPolicy),
+  template('legacy_childrenswear','ملابس وعطورات','ملابس اطفال','goods',[s('childrenswear_kind','نوع الملابس',['مواليد','أطفال','مدرسي','مناسبات','رياضي','أخرى']),s('age_group','الفئة العمرية',['مواليد','1-3 سنوات','4-6 سنوات','7-12 سنة','13-16 سنة']),...apparel],['childrenswear_kind','age_group','condition','size'],goodsPolicy),
+  template('legacy_heavy_equipment','نقليات سيارات معدات','معدات','goods',[s('legacy_equipment_kind','نوع المعدة',['حفار','شيول','بلدوزر','رافعة','رافعة شوكية','مولد','أخرى']),...equipment,n('capacity_t','الحمولة','طن'),n('lift_height_m','ارتفاع العمل','متر')],['legacy_equipment_kind','manufacturer','model','year','condition','power_source'],rentableGoodsPolicy),
+  template('legacy_sheep','المواشي والحيوانات ومستلزماتها','ضأن','livestock',[s('sheep_kind','نوع الضأن',['نعيمي','نجدي','حري','سواكني','بربري','أخرى']),...animal],['sheep_kind','breed','head_count','sale_basis'],goodsPolicy),
+  template('legacy_furniture','اثاث مفروشات ديكورات','مفروشات','goods',[...furniture,f('style','الطراز')],['furniture_kind','condition','material'],goodsPolicy),
+  template('legacy_farm_feed','المزارع و منتجاتها','اعلاف','plants',[s('farm_feed_kind','نوع العلف',['برسيم','تبن','شعير','مركب','أخرى']),m('target_animals','الحيوانات المستهدفة',['أغنام','ماعز','إبل','أبقار','خيل','دواجن']),n('package_weight_kg','وزن العبوة أو البالة','كجم'),n('quantity','الكمية'),s('supply_unit','وحدة البيع',['كيس','بالة','كجم','طن']),...b2bSupply,...delivery],['farm_feed_kind','package_weight_kg','quantity','supply_unit'],goodsPolicy),
+  template('legacy_womens_salon','مشاغل نسائية وتجميل','مشاغل نسائية','service',[s('salon_service_kind','نوع الخدمة',['شعر','مكياج','عناية بالبشرة','أظافر','خدمة منزلية','أخرى']),...serviceFields,s('appointment_mode','طريقة الخدمة',['في المشغل','منزلية','كلاهما'])],['salon_service_kind','service_scope','service_coverage'],servicesPolicy),
+  template('legacy_cooling','اجهزة كهربائية','مكيفات وثلاجات','goods',[s('cooling_appliance_kind','نوع الجهاز',['مكيف سبليت','مكيف شباك','مكيف مركزي','ثلاجة','فريزر','برادة','أخرى']),...appliance,n('cooling_capacity','سعة التبريد','وحدة'),s('installation','التركيب',['مشمول','غير مشمول','حسب الاتفاق'])],['cooling_appliance_kind','brand','model','condition'],goodsPolicy),
+  template('legacy_programming','برمجة وتصميم','برمجه','service',[s('programming_kind','نوع البرمجة',['مواقع','تطبيقات جوال','أنظمة أعمال','متاجر إلكترونية','تكامل API','أخرى']),...serviceFields,m('technology','التقنيات',['ويب','iOS','Android','قواعد بيانات','سحابة','أخرى'])],['programming_kind','service_scope'],servicesPolicy),
+  template('legacy_graphic_design','دعاية واعلان','رسم وتصميم','service',[s('graphic_design_kind','نوع العمل',['شعار وهوية','رسم رقمي','مطبوعات','تصميم إعلانات','واجهات','أخرى']),...serviceFields,f('deliverables','المخرجات المطلوبة')],['graphic_design_kind','service_scope'],servicesPolicy),
+  template('legacy_camels','المواشي والحيوانات ومستلزماتها','ابل','livestock',[s('camel_kind','نوع الإبل',['مجاهيم','مغاتير','حمر','صفر','وضح','أخرى']),...animal,f('identification_tag','رقم الوسم أو التعريف')],['camel_kind','breed','head_count','sale_basis'],goodsPolicy),
+  template('legacy_hospitals','الصحة واللياقة','مستشفيات وعيادات','service',[s('health_facility_kind','نوع المنشأة أو الخدمة',['مستشفى','عيادة','مجمع طبي','مختبر','رعاية منزلية','أخرى']),f('specialty','التخصص'),...serviceFields,f('license_reference','بيانات الترخيص إن وجدت')],['health_facility_kind','specialty','service_scope'],servicesPolicy),
+  template('legacy_televisions','الكترونيات','تلفزيونات','goods',[s('television_kind','نوع الشاشة',['LED','OLED','QLED','بروجكتر','أخرى']),...electronics,n('screen_size_in','مقاس الشاشة','بوصة'),s('resolution','الدقة',['HD','Full HD','4K','8K','أخرى'])],['television_kind','brand','model','condition','screen_size_in'],goodsPolicy),
+  template('legacy_gaming','الكترونيات','العاب الكترونية','goods',[s('gaming_kind','نوع المنتج',['جهاز ألعاب','لعبة','يد تحكم','ملحق','حساب أو كود نظامي','أخرى']),...electronics,s('platform','المنصة',['PlayStation','Xbox','Nintendo','PC','جوال','أخرى'])],['gaming_kind','brand','model','condition'],goodsPolicy),
+  template('legacy_womenswear','ملابس وعطورات','ملابس نسائية','goods',[s('womenswear_kind','نوع الملابس',['عباية','فستان','جلابية','طقم','ملابس رياضية','أخرى']),...apparel],['womenswear_kind','condition','size'],goodsPolicy),
+  template('legacy_accessories','ملابس وعطورات','اكسسوارات','goods',[s('accessory_kind','نوع الإكسسوار',['ساعة','حقيبة','حزام','نظارة','إكسسوار شعر','مجوهرات تقليدية','أخرى']),f('brand','العلامة'),condition,m('material','الخامة',['معدن','جلد','قماش','بلاستيك','خشب','أخرى']),f('color','اللون'),n('quantity','الكمية'),...delivery],['accessory_kind','condition'],goodsPolicy),
+  template('legacy_legal','الخدمات العامة والتعقيب','محاماة','service',[s('legal_service_kind','نوع الخدمة',['استشارة','صياغة عقود','قضايا','تحكيم','تأسيس شركات','أخرى']),...serviceFields,f('specialty','التخصص القانوني')],['legal_service_kind','service_scope'],servicesPolicy),
+  template('legacy_computers','الكترونيات','كمبيوتر ولابتوب','goods',[s('computer_kind','نوع الجهاز',['لابتوب','مكتبي','خادم','قطعة كمبيوتر','ملحق','أخرى']),...electronics,f('processor','المعالج'),n('memory_gb','الذاكرة','جيجابايت'),n('storage_gb','التخزين','جيجابايت')],['computer_kind','brand','model','condition'],goodsPolicy),
+  template('legacy_drinks','الأسر المنتجة','عصائر ومشروبات','goods',[s('drink_kind','نوع المشروب',['عصير طازج','مشروب ساخن','قهوة','شاي','شراب مركز','أخرى']),...foodSupply,s('packaging','نوع العبوة',['كوب','زجاجة','عبوة','كرتون','أخرى'])],['drink_kind','supply_unit'],goodsPolicy),
+  template('legacy_tablets','الكترونيات','تابلت','goods',[s('tablet_kind','نوع الجهاز',['تابلت','قارئ إلكتروني','جهاز تعليمي','أخرى']),...electronics,n('storage_gb','سعة التخزين','جيجابايت'),s('connectivity','الاتصال',['Wi‑Fi','شريحة وWi‑Fi','أخرى'])],['tablet_kind','brand','model','condition','storage_gb'],goodsPolicy),
+  template('legacy_decor','اثاث مفروشات ديكورات','ديكورات','goods',[s('decor_kind','نوع الديكور',['لوحة','مرآة','إضاءة','تحفة','ستارة','سجاد','أخرى']),...decor],['decor_kind','condition','material'],goodsPolicy),
+  template('legacy_goats','المواشي والحيوانات ومستلزماتها','ماعز','livestock',[s('goat_kind','نوع الماعز',['عارضي','شامي','هولندي','قزم','أخرى']),...animal],['goat_kind','breed','head_count','sale_basis'],goodsPolicy),
+  template('legacy_perfumes','ملابس وعطورات','عطورات','goods',[s('perfume_kind','نوع العطر',['عطر','دهن عود','بخور','مسك','معطر منزلي','أخرى']),f('brand','العلامة'),condition,n('volume_ml','السعة','مل'),s('concentration','التركيز',['بارفان','أو دو بارفان','أو دو تواليت','زيتي','أخرى']),n('quantity','الكمية'),...delivery],['perfume_kind','condition','volume_ml'],goodsPolicy),
+  template('legacy_horses','المواشي والحيوانات ومستلزماتها','خيول ومستلزماتها','livestock',[s('horse_listing_kind','نوع المعروض',['خيل','سرج','لجام','عناية وتغذية','معدات إسطبل','أخرى']),f('breed','السلالة أو العلامة'),s('item_state','حالة المعروض',['جديد','مستعمل','لا ينطبق']),s('sex','الجنس',['ذكر','أنثى','لا ينطبق']),n('age_months','العمر','شهر'),f('health_notes','الحالة أو الملاحظات','textarea'),...delivery],['horse_listing_kind','item_state'],goodsPolicy),
+  template('legacy_birds','المواشي والحيوانات ومستلزماتها','طيور','livestock',[s('bird_kind','نوع الطيور',['دواجن','حمام','طيور زينة','صقور','أخرى']),f('breed','السلالة'),s('sex','الجنس',['ذكر','أنثى','مجموعة مختلطة']),n('head_count','العدد','طائر'),n('age_months','العمر','شهر'),f('health_notes','الحالة الصحية بحسب إفادة المعلن','textarea'),...delivery],['bird_kind','breed','head_count'],goodsPolicy),
+  template('legacy_equipment_rental','نقليات سيارات معدات','تأجير','service',[s('rental_equipment_kind','نوع المعدة المؤجرة',['رافعة','رافعة شوكية','حفار','شيول','مولد','شاحنة','أخرى']),f('brand','العلامة أو المصنع'),f('model','الموديل'),n('year','سنة الصنع'),n('capacity_t','الحمولة','طن'),n('work_height_m','ارتفاع العمل','متر'),yes('operator_included','يشمل المشغل'),yes('transport_included','يشمل النقل')],['rental_equipment_kind'],policy(service(['hour','day','week','month','project','quote']),serviceRequest())),
+  template('legacy_fitness','الصحة واللياقة','رياضة ولياقة','goods',[s('fitness_item_kind','نوع المعروض',['جهاز رياضي','أوزان','ملابس رياضية','اشتراك','خدمة تدريب','أخرى']),f('brand','العلامة'),condition,f('size_or_capacity','المقاس أو السعة'),f('usage_notes','الاستخدام أو الحالة','textarea'),n('quantity','الكمية'),...delivery],['fitness_item_kind','condition'],policy(sale(),wanted(),service(),serviceRequest())),
+  template('legacy_ad_campaigns','دعاية واعلان','حملات اعلانية','service',[s('campaign_kind','نوع الحملة',['رقمية','شبكات اجتماعية','بحث','ميدانية','إطلاق منتج','أخرى']),...serviceFields,f('target_audience','الجمهور المستهدف'),f('campaign_channels','القنوات المطلوبة')],['campaign_kind','service_scope'],servicesPolicy),
+  template('legacy_device_repair','الكترونيات','صيانة اجهزة','service',[s('repair_device_kind','نوع الجهاز',['جوال','تابلت','كمبيوتر','تلفزيون','جهاز منزلي','أخرى']),...serviceFields,m('service_kind','الخدمة',['فحص','إصلاح','تركيب','برمجة','استبدال قطع'])],['repair_device_kind','service_scope'],servicesPolicy),
+  template('legacy_design','برمجة وتصميم','تصميم','service',[s('digital_design_kind','نوع التصميم',['هوية بصرية','واجهات وتجربة مستخدم','مطبوعات','ثلاثي الأبعاد','موشن','أخرى']),...serviceFields,f('deliverables','المخرجات المطلوبة')],['digital_design_kind','service_scope'],servicesPolicy),
+  template('legacy_beauty_tools_salon','مشاغل نسائية وتجميل','ادوات تجميل','goods',[s('salon_beauty_tool_kind','نوع الأداة',['شعر','بشرة','أظافر','تعقيم','أثاث مشغل','أخرى']),...beautyGoods],['salon_beauty_tool_kind','condition'],goodsPolicy),
+  template('legacy_building_tools','مقاولات مواد بناء','ادوات بناء','goods',[s('building_tool_kind','نوع الأداة',['يدوية','كهربائية','قياس','سلامة','سقالات','أخرى']),f('brand','العلامة'),f('model','الموديل'),condition,s('power_source','مصدر الطاقة',['يدوي','كهرباء','بطارية','بنزين','هواء','أخرى']),n('quantity','الكمية'),...delivery],['building_tool_kind','condition'],goodsPolicy),
+  template('legacy_beauty_tools_apparel','ملابس وعطورات','ادوات تجميل','goods',[s('personal_beauty_tool_kind','نوع أداة التجميل',['مكياج','فرش','شعر','عناية بالبشرة','أظافر','أخرى']),...beautyGoods],['personal_beauty_tool_kind','condition'],goodsPolicy),
+  template('legacy_training_centers','الصحة واللياقة','مراكز اللياقة والتدريب','service',[s('training_kind','نوع التدريب',['لياقة','سباحة','فنون قتالية','تأهيل','تدريب شخصي','أخرى']),...serviceFields,s('attendance_mode','الحضور',['حضوري','عن بعد','كلاهما'])],['training_kind','service_scope','service_coverage'],servicesPolicy),
+  template('legacy_kitchen_appliances','اجهزة كهربائية','اجهزة مطبخ','goods',[s('kitchen_appliance_kind','نوع الجهاز',['فرن','موقد','غسالة صحون','خلاط','قلاية','ماكينة قهوة','أخرى']),...appliance,n('capacity_l','السعة','لتر')],['kitchen_appliance_kind','brand','model','condition'],goodsPolicy),
+  template('legacy_ads','دعاية واعلان','اعلانات','service',[s('advertising_service_kind','نوع الإعلان',['رقمي','لوحات خارجية','صحف ومجلات','إذاعة وتلفزيون','توزيع','أخرى']),...serviceFields,f('target_audience','الجمهور المستهدف')],['advertising_service_kind','service_scope'],servicesPolicy),
+  template('legacy_shoes_bags','ملابس وعطورات','احذية وشنط','goods',[s('shoes_bags_kind','نوع المنتج',['حذاء','شنطة','محفظة','حزام','أخرى']),f('brand','العلامة'),condition,f('size','المقاس'),f('color','اللون'),m('material','الخامة',['جلد طبيعي','جلد صناعي','قماش','مطاط','أخرى']),n('quantity','الكمية'),...delivery],['shoes_bags_kind','condition','size'],goodsPolicy),
+  template('legacy_tiles','مقاولات مواد بناء','بلاط سيراميك رخام','goods',[s('legacy_tile_kind','نوع المادة',['سيراميك','بورسلين','رخام','جرانيت','حجر','أخرى']),f('brand','المصنع'),m('application','الاستخدام',['أرضيات','جدران','واجهات','داخلي','خارجي']),n('length_mm','الطول','مم'),n('width_mm','العرض','مم'),n('thickness_mm','السماكة','مم'),n('quantity_m2','الكمية','م²'),...b2bSupply,...delivery],['legacy_tile_kind','application','quantity_m2'],goodsPolicy),
+  template('legacy_beauty_clinics','مشاغل نسائية وتجميل','عيادات التجميل','service',[s('beauty_clinic_service_kind','نوع الخدمة',['جلدية','ليزر','أسنان تجميلي','حقن تجميلية','عناية بالبشرة','أخرى']),f('specialty','التخصص'),...serviceFields,f('license_reference','بيانات الترخيص إن وجدت')],['beauty_clinic_service_kind','specialty','service_scope'],servicesPolicy),
+  template('legacy_optics','الصحة واللياقة','بصريات نظارات عدسات','goods',[s('optical_item_kind','نوع المنتج',['نظارة طبية','نظارة شمسية','عدسات لاصقة','إطار','ملحق','أخرى']),f('brand','العلامة'),condition,f('lens_spec','مواصفات العدسة أو المقاس'),f('frame_material','خامة الإطار'),n('quantity','الكمية'),...delivery],['optical_item_kind','condition'],goodsPolicy),
+  template('legacy_audio_wearables','الكترونيات','سماعات وساعات','goods',[s('wearable_audio_kind','نوع المنتج',['سماعات رأس','سماعات أذن','مكبر صوت','ساعة ذكية','سوار ذكي','أخرى']),...electronics,s('connectivity','الاتصال',['Bluetooth','سلكي','Wi‑Fi','خلوي','أخرى'])],['wearable_audio_kind','brand','model','condition'],goodsPolicy),
+  template('legacy_handmade_textiles','الأسر المنتجة','مشغولات ومنسوجات','goods',[s('handmade_kind','نوع المنتج',['تطريز','كروشيه','نسيج','خياطة','هدايا','أخرى']),f('material','الخامة'),f('dimensions_spec','المقاس أو الأبعاد'),s('made_to_order','التنفيذ',['جاهز','حسب الطلب','كلاهما']),n('quantity','الكمية'),...delivery],['handmade_kind','material'],goodsPolicy),
+  template('legacy_motors_generators','اجهزة كهربائية','مواطير ومولدات','goods',[s('motor_generator_kind','نوع الجهاز',['مولد كهربائي','محرك كهربائي','مضخة','كمبروسر','أخرى']),...appliance,n('power_kw','القدرة','كيلوواط'),n('voltage_v','الجهد','فولت'),s('phase','الأطوار',['أحادي','ثلاثي','غير محدد'])],['motor_generator_kind','brand','model','condition','power_kw'],rentableGoodsPolicy),
+  template('legacy_underwear','ملابس وعطورات','ملابس داخلية','goods',[s('underwear_kind','نوع الملابس',['رجالي','نسائي','أطفال','رياضي','أخرى']),...apparel,s('packaging','التغليف',['مفرد','طقم','عبوة'])],['underwear_kind','condition','size'],goodsPolicy),
+  template('legacy_pets','المواشي والحيوانات ومستلزماتها','حيوانات اليفة','livestock',[s('pet_kind','نوع الحيوان',['قطط','كلاب','أرانب','أسماك','زواحف','أخرى']),f('breed','السلالة'),s('sex','الجنس',['ذكر','أنثى','غير محدد']),n('age_months','العمر','شهر'),s('vaccination_status','التحصين',['مكتمل بحسب المعلن','جزئي','غير محصن','غير معروف']),f('health_notes','الحالة الصحية بحسب إفادة المعلن','textarea'),...delivery],['pet_kind','breed','age_months'],goodsPolicy),
+  template('legacy_calligraphy','دعاية واعلان','خطاط','service',[s('calligraphy_kind','نوع الخط أو العمل',['عربي','لاتيني','لوحات','مناسبات','نقش','أخرى']),...serviceFields,f('deliverables','الخامة أو المخرج المطلوب')],['calligraphy_kind','service_scope'],servicesPolicy),
+  template('legacy_art_direction','دعاية واعلان','تصميم واخراج','service',[s('art_direction_kind','نوع العمل',['إخراج مطبوع','إخراج رقمي','فيديو','عرض تقديمي','هوية حملة','أخرى']),...serviceFields,f('deliverables','المخرجات المطلوبة')],['art_direction_kind','service_scope'],servicesPolicy),
+];
+
+export const CATEGORY_SEED_TEMPLATES: CategorySeedTemplate[] = [
+  ...CORE_CATEGORY_SEED_TEMPLATES,
+  ...LEGACY_CATEGORY_SEED_TEMPLATES,
+];
+
+const CATEGORY_SEED_TEMPLATE_BY_PATH = new Map(
+  CATEGORY_SEED_TEMPLATES.map(template => [`${template.categoryName}\u0000${template.name}`, template] as const),
+);
+
+export function findCategorySeedTemplate(categoryName: string, subcategoryName: string) {
+  return CATEGORY_SEED_TEMPLATE_BY_PATH.get(`${categoryName}\u0000${subcategoryName}`);
+}
+
+export function categorySeedDefinition(template: CategorySeedTemplate) {
+  return {
+    version: 1,
+    kind: template.kind,
+    priceEnabled: template.priceEnabled,
+    goodsEnabled: template.goodsEnabled,
+    fields: template.fields.map(field => ({ ...field, options: [...field.options] })),
+    listingPolicy: {
+      types: template.listingPolicy.types.map(type => ({ ...type, pricing: [...type.pricing] })),
+    },
+    upgradedFromBuiltInV1: false,
+  };
+}

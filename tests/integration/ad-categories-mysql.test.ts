@@ -7,7 +7,7 @@ import {CATEGORY_DDL} from '@/lib/ad-categories/schema';
 const fixture=vi.hoisted(()=>({client:undefined as PrismaClient|undefined}));
 vi.mock('@/lib/prisma',()=>({get prisma(){return fixture.client;}}));
 vi.mock('@/lib/settings',()=>({getSetting:async(k:string,fallback:string)=>{const r=await fixture.client!.site_settings.findUnique({where:{k}});return r?.v??fallback;}}));
-import {writeAdWithCategory,getPublicCategories} from '@/lib/ad-categories/service';
+import {writeAdWithCategory,getCategoryFormConfig,getPublicCategories} from '@/lib/ad-categories/service';
 const enabled=process.env.CATEGORIES_DB_TESTS==='1';
 let client:PrismaClient,admin:PrismaClient,created=false;
 const f={key:'condition',label:'الحالة',type:'select',group:'المواصفات',required:true,visible:true,order:0,options:['جديد','مستعمل']};
@@ -42,6 +42,19 @@ describe.skipIf(!enabled)('real ad category MySQL integration',()=>{
     const values=await client.ad_category_values.findUnique({where:{ad_id:ad.id}});expect(values?.values_json).toEqual({condition:'مستعمل'});
     expect((await getPublicCategories([ad.id])).get(Number(ad.id))?.categoryFields[0].value).toBe('مستعمل');
     expect((await client.ads.findUnique({where:{id:ad.id}}))?.title).toBe('Fixture ad');
+  });
+  it('uses an exact built-in schema for a live legacy subcategory without a definition row',async()=>{
+    await client.categories.update({where:{id:12n},data:{name:'الكترونيات'}});
+    await client.sub_categories.update({where:{id:34n},data:{name:'جوالات'}});
+    await client.ad_category_definitions.delete({where:{subcategory_id:34n}});
+    const configured=(await getCategoryFormConfig()).subcategories.find(item=>item.id===34);
+    expect(configured).toMatchObject({version:1,kind:'goods'});
+    const fd=new FormData();
+    for(const [key,value] of Object.entries({
+      category_id:'12',subcategory_id:'34',category_version:'1',listingType:'sale',pricingMode:'fixed',price:'50',
+      category_values:JSON.stringify({phone_kind:'هاتف ذكي',brand:'Apple',model:'iPhone',condition:'مستعمل',storage_gb:128}),
+    }))fd.set(key,value);
+    await expect(create(fd)).resolves.toMatchObject({category_id:12n,subcategory_id:34});
   });
   it('operator activation twice preserves real old ads, definitions, values and protected settings',async()=>{
     const payload=activation.buildPayload();

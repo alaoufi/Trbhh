@@ -1,13 +1,86 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORY_SEED_TEMPLATES } from '@/lib/ad-categories/seed-templates';
+import { CATEGORY_SEED_TEMPLATES, categorySeedDefinition, findCategorySeedTemplate } from '@/lib/ad-categories/seed-templates';
 import { fieldApplies, validateCategoryValues, validateDefinition } from '@/lib/ad-categories/validation';
 import {validateListingPolicy} from '@/lib/ad-categories/listing-policy';
+
+const LEGACY_ACTIVE_SUBCATEGORIES = [
+  ['الصحة واللياقة', 'اجهزة طبية'],
+  ['نقليات سيارات معدات', 'سيارات'],
+  ['ملابس وعطورات', 'ملابس رجالية'],
+  ['الخدمات العامة والتعقيب', 'تعقيب مراجعات'],
+  ['المزارع و منتجاتها', 'خضار وفواكه'],
+  ['الكترونيات', 'جوالات'],
+  ['المشاتل ومستلزماتها', 'شتلات'],
+  ['المشاتل ومستلزماتها', 'ادوات الحدائق'],
+  ['الأسر المنتجة', 'اطعمة ومأكولات'],
+  ['ملابس وعطورات', 'ملابس اطفال'],
+  ['نقليات سيارات معدات', 'معدات'],
+  ['المواشي والحيوانات ومستلزماتها', 'ضأن'],
+  ['اثاث مفروشات ديكورات', 'مفروشات'],
+  ['المزارع و منتجاتها', 'اعلاف'],
+  ['مشاغل نسائية وتجميل', 'مشاغل نسائية'],
+  ['اجهزة كهربائية', 'مكيفات وثلاجات'],
+  ['برمجة وتصميم', 'برمجه'],
+  ['دعاية واعلان', 'رسم وتصميم'],
+  ['المواشي والحيوانات ومستلزماتها', 'ابل'],
+  ['الصحة واللياقة', 'مستشفيات وعيادات'],
+  ['الكترونيات', 'تلفزيونات'],
+  ['الكترونيات', 'العاب الكترونية'],
+  ['ملابس وعطورات', 'ملابس نسائية'],
+  ['ملابس وعطورات', 'اكسسوارات'],
+  ['الخدمات العامة والتعقيب', 'محاماة'],
+  ['الكترونيات', 'كمبيوتر ولابتوب'],
+  ['الأسر المنتجة', 'عصائر ومشروبات'],
+  ['الكترونيات', 'تابلت'],
+  ['اثاث مفروشات ديكورات', 'ديكورات'],
+  ['المواشي والحيوانات ومستلزماتها', 'ماعز'],
+  ['ملابس وعطورات', 'عطورات'],
+  ['المواشي والحيوانات ومستلزماتها', 'خيول ومستلزماتها'],
+  ['المواشي والحيوانات ومستلزماتها', 'طيور'],
+  ['نقليات سيارات معدات', 'تأجير'],
+  ['الصحة واللياقة', 'رياضة ولياقة'],
+  ['دعاية واعلان', 'حملات اعلانية'],
+  ['الكترونيات', 'صيانة اجهزة'],
+  ['برمجة وتصميم', 'تصميم'],
+  ['مشاغل نسائية وتجميل', 'ادوات تجميل'],
+  ['مقاولات مواد بناء', 'ادوات بناء'],
+  ['ملابس وعطورات', 'ادوات تجميل'],
+  ['الصحة واللياقة', 'مراكز اللياقة والتدريب'],
+  ['اجهزة كهربائية', 'اجهزة مطبخ'],
+  ['دعاية واعلان', 'اعلانات'],
+  ['ملابس وعطورات', 'احذية وشنط'],
+  ['مقاولات مواد بناء', 'بلاط سيراميك رخام'],
+  ['مشاغل نسائية وتجميل', 'عيادات التجميل'],
+  ['الصحة واللياقة', 'بصريات نظارات عدسات'],
+  ['الكترونيات', 'سماعات وساعات'],
+  ['الأسر المنتجة', 'مشغولات ومنسوجات'],
+  ['اجهزة كهربائية', 'مواطير ومولدات'],
+  ['ملابس وعطورات', 'ملابس داخلية'],
+  ['المواشي والحيوانات ومستلزماتها', 'حيوانات اليفة'],
+  ['دعاية واعلان', 'خطاط'],
+  ['دعاية واعلان', 'تصميم واخراج'],
+] as const;
 describe('editable specialist subcategory seed templates', () => {
+  it('covers every active legacy database subcategory explicitly', () => {
+    const pairs = new Set(CATEGORY_SEED_TEMPLATES.map(template => `${template.categoryName}\u0000${template.name}`));
+    expect(LEGACY_ACTIVE_SUBCATEGORIES).toHaveLength(55);
+    for (const [categoryName, subcategoryName] of LEGACY_ACTIVE_SUBCATEGORIES) {
+      expect(pairs.has(`${categoryName}\u0000${subcategoryName}`), `${categoryName} / ${subcategoryName}`).toBe(true);
+    }
+    expect(CATEGORY_SEED_TEMPLATES.length).toBeGreaterThanOrEqual(85);
+  });
+  it('resolves an exact built-in definition without requiring a database seed row', () => {
+    const template = findCategorySeedTemplate('الكترونيات', 'جوالات');
+    expect(template?.key).toBe('legacy_phones');
+    expect(categorySeedDefinition(template!)).toMatchObject({version: 1, kind: 'goods', goodsEnabled: true});
+    expect(findCategorySeedTemplate('الكترونيات', 'قسم غير معروف')).toBeUndefined();
+  });
   it('has unique keys and valid domain-specific definitions for each requested group', () => {
     expect(new Set(CATEGORY_SEED_TEMPLATES.map(t => t.key)).size).toBe(CATEGORY_SEED_TEMPLATES.length);
     expect(CATEGORY_SEED_TEMPLATES.length).toBeGreaterThanOrEqual(24);
     for (const template of CATEGORY_SEED_TEMPLATES) {
-      expect(validateDefinition(template.fields).length).toBeGreaterThanOrEqual(6);
+      expect(() => validateDefinition(template.fields), template.key).not.toThrow();
+      expect(template.fields.length, template.key).toBeGreaterThanOrEqual(6);
       expect(validateListingPolicy(template.listingPolicy).types.length).toBeGreaterThan(0);
       expect(template.fields.some(field => field.required), `${template.key} needs required fields`).toBe(true);
       expect(template.fields.some(field => !field.required), `${template.key} needs optional fields`).toBe(true);

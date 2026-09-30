@@ -8,7 +8,7 @@ import { assertCommerceSchemaReady } from '@/lib/commerce/schema';
 
 it('seeds only an empty dedicated loopback preview with synthetic accounts', async () => {
   if (process.env.COMMERCE_PREVIEW_FIXTURE !== '1') throw new Error('Explicit fixture opt-in required');
-  const url = new URL(process.env.DATABASE_URL || '');
+  const url = new URL(process.env.COMMERCE_PREVIEW_DATABASE_URL || process.env.DATABASE_URL || '');
   if (url.hostname !== '127.0.0.1' || url.port !== '33309' || url.pathname !== '/trbhh_commerce_preview_20260919') throw new Error('Refusing non-isolated preview DB');
   const db = new PrismaClient({ datasourceUrl: url.href });
   try {

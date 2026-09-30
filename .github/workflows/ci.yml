@@ -77,3 +77,31 @@ jobs:
 
       - name: Production build
         run: pnpm build
+
+      - name: Create isolated browser preview schema
+        env:
+          DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_commerce_preview_20260919
+        run: |
+          mysql -h127.0.0.1 -P33309 -uroot -pci_root_password -e "CREATE DATABASE trbhh_commerce_preview_20260919 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+          pnpm prisma db push --skip-generate
+
+      - name: Seed isolated browser preview
+        env:
+          COMMERCE_PREVIEW_FIXTURE: '1'
+          COMMERCE_PREVIEW_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_commerce_preview_20260919
+        run: pnpm exec vitest run --config vitest.preview.config.ts
+
+      - name: Browser end-to-end on isolated preview
+        env:
+          COMMERCE_PREVIEW_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_commerce_preview_20260919
+          PREVIEW_ARTIFACTS_DIR: artifacts/preproduction-e2e
+          SUPPLIER_ALLOW_LIVE_ORDERS: 'false'
+        run: node tests/preview/browser.cjs
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preproduction-browser-evidence
+          path: artifacts/preproduction-e2e
+          if-no-files-found: warn

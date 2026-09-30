@@ -8,8 +8,15 @@ const repo=path.resolve(__dirname,'../..');
 const origin='http://127.0.0.1:4197';
 const artifacts=process.env.PREVIEW_ARTIFACTS_DIR?path.resolve(process.env.PREVIEW_ARTIFACTS_DIR):path.resolve(repo,'artifacts/preproduction-e2e');
 const database=process.env.COMMERCE_PREVIEW_DATABASE_URL||'mysql://root:local_disposable_root_only@127.0.0.1:33309/trbhh_commerce_preview_20260919';
+const responsiveWidths=[360,390,412,768,1024,1440];
 let server,browser,logs='';
 const supplierNames=[];
+async function assertResponsive(page,label,widths=responsiveWidths){
+  for(const width of widths){
+    await page.setViewportSize({width,height:width<768?844:1000});
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${label} ${width}px overflow`);
+  }
+}
 async function run(){
   await mkdir(artifacts,{recursive:true});
   const url=new URL(database);
@@ -61,8 +68,10 @@ async function run(){
       await page.goto(origin+`/ads/${adId}`);
       await page.getByText(createdTitle,{exact:true}).first().waitFor({state:'visible'});
       await page.screenshot({path:path.join(artifacts,'synthetic-ad-details.png'),fullPage:true});
+      await assertResponsive(page,'ad details');
       console.log(JSON.stringify({journey:'ad-details',status:'passed',adId}));
       await page.goto(origin+`/ads/${adId}/edit`);
+      await assertResponsive(page,'edit ad');
       await page.locator('[name="title"]').fill(editedTitle);
       await page.locator('[name="detail"]').fill('تم تعديل الإعلان الاصطناعي داخل قاعدة الاختبار المعزولة للتحقق من دورة الحياة كاملة.');
       await page.locator('[name="pledge"]').check();
@@ -79,6 +88,7 @@ async function run(){
       await page.getByRole('dialog').getByRole('button',{name:'موافق',exact:true}).click();
       await page.waitForURL(u=>u.pathname==='/account/ads',{timeout:30000});
       assert.equal(await page.getByText(editedTitle,{exact:true}).count(),0);
+      await assertResponsive(page,'account ads');
       console.log(JSON.stringify({journey:'delete-ad',status:'passed',adId}));
       await page.goto(origin+'/ads/new');
       await cat.waitFor({state:'visible'});
@@ -106,10 +116,7 @@ async function run(){
       assert.equal(await page.locator('#category-field-frontage_m').count(),1);
       assert.equal(await page.locator('#category-field-ceiling_height_m').count(),1);
       assert.equal(await page.locator('#category-field-north_boundary').count(),0);
-      for(const width of [360,390,412,768]){
-        await page.setViewportSize({width,height:844});
-        assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`form ${width}px overflow`);
-      }
+      await assertResponsive(page,'add form');
       await page.setViewportSize({width:390,height:844});
       await page.screenshot({path:path.join(artifacts,'land-form-mobile.png'),fullPage:true});
       await page.goto(origin+'/ads/1');
@@ -118,6 +125,11 @@ async function run(){
       await page.goto(origin+'/admin/suppliers');
       await page.waitForURL(u=>u.pathname==='/');
       assert.equal(await page.locator('[name="apiCredentialRef"]').count(),0);
+      await page.goto(origin+'/logout');
+      await page.waitForURL(u=>u.pathname==='/'||u.pathname==='/login');
+      await page.goto(origin+'/account');
+      await page.waitForURL(u=>u.pathname==='/login');
+      console.log(JSON.stringify({journey:'logout-and-auth-guard',status:'passed'}));
     }else{
       assert((await page.locator('body').innerText()).includes('إدارة الأقسام والحقول'));
       await page.locator('summary').filter({hasText:/^وظائف —/}).click();
@@ -215,11 +227,17 @@ async function run(){
   assert.equal(await homeCategory.inputValue(),'');
   assert.equal(await categorySection.locator('h2').count(),0,'cleared filter removes category result grid');
   assert.deepEqual(homeErrors,[]);
-  for(const width of [390,412,768,1280]){
-    await page.setViewportSize({width,height:900});
-    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`homepage ${width}px document overflow`);
+  await assertResponsive(page,'homepage');
+  for(const route of ['/search','/companies','/login','/register','/forgot']){
+    await page.goto(origin+route);
+    await assertResponsive(page,route);
   }
-  console.log(JSON.stringify({guestHomeCategories:'passed',selectedCategoryFiltering:'passed',responsiveWidths:[360,390,412,768,1280],clearCategoryFilter:'passed'}));
+  for(const route of ['/pages/about','/pages/faq','/pages/terms','/pages/privacy','/pages/contact','/site-map','/guide']){
+    const response=await page.goto(origin+route);
+    assert.equal(response?.status(),200,`${route} status`);
+    assert(!(await page.locator('body').innerText()).includes('حدث خطأ غير متوقع'),`${route} public error`);
+  }
+  console.log(JSON.stringify({guestHomeCategories:'passed',selectedCategoryFiltering:'passed',responsiveWidths,clearCategoryFilter:'passed',publicPages:'passed'}));
   await context.close();
 }
 run().catch(e=>{console.error(e.stack);console.error(logs.slice(-3000));process.exitCode=1;}).finally(async()=>{

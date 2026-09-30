@@ -75,6 +75,12 @@ jobs:
           SUPPLIER_DB_TESTS: '1'
           SUPPLIER_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_supplier_test
 
+      - name: Category transactions on isolated MySQL
+        run: pnpm exec vitest run tests/integration/ad-categories-mysql.test.ts --maxWorkers=1
+        env:
+          CATEGORIES_DB_TESTS: '1'
+          CATEGORIES_TEST_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_categories_test
+
       - name: Production build
         run: pnpm build
 

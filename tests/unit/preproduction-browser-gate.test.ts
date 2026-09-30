@@ -16,8 +16,18 @@ describe('isolated pre-production browser gate', () => {
   it('runs the browser journey in CI and keeps its screenshots', () => {
     expect(workflow).toContain('Seed isolated browser preview');
     expect(workflow).toContain('Browser end-to-end on isolated preview');
+    expect(workflow).toContain('Category transactions on isolated MySQL');
     expect(workflow).toContain('upload-artifact@v4');
     expect(workflow).toContain('SUPPLIER_ALLOW_LIVE_ORDERS: \'false\'');
+  });
+
+  it('makes preview deployment prove read-only audit and noindex behavior', () => {
+    const deploy = readFileSync('.github/workflows/deploy-staging.yml', 'utf8');
+    expect(deploy).toContain('audit-live-ad-quality.cjs');
+    expect(deploy).toContain('AD_QUALITY_SUMMARY=');
+    expect(deploy).toContain('x-robots-tag');
+    expect(deploy).toContain('noindex, nofollow, noarchive');
+    expect(deploy).toContain("'/search' '/deals' '/nearby' '/companies' '/shop' '/guide' '/site-map'");
   });
 
   it('covers create, details, edit, search, and delete for a synthetic ad', () => {
@@ -27,5 +37,6 @@ describe('isolated pre-production browser gate', () => {
     expect(browser).toContain("journey:'search-ad'");
     expect(browser).toContain("journey:'delete-ad'");
     expect(browser).toContain('PREVIEW_ARTIFACTS_DIR');
+    for (const width of [360, 390, 412, 768, 1024, 1440]) expect(browser).toContain(String(width));
   });
 });

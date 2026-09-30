@@ -144,6 +144,8 @@ describe('Hostinger live-data read-only preview', () => {
     expect(workflow).toContain("--reverseProxyUrl='http://127.0.0.1:3081'");
     expect(workflow).toContain('lets-encrypt:install:certificate');
     expect(workflow).toContain("preview_url=\"https://$preview_domain\"");
+    expect(workflow).toContain('for attempt in $(seq 1 12)');
+    expect(workflow).toContain('test "$preview_https_status" = 200');
     expect(workflow).toContain('test "$external_preview_mode" = read-only');
     expect(workflow).toContain('PREVIEW_URL=');
   });

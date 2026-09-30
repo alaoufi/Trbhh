@@ -244,7 +244,13 @@ jobs:
           fi
           nginx -t
           systemctl reload nginx
-          curl -fsS --max-time 25 "$preview_url/" -o /dev/null
+          preview_https_status=000
+          for attempt in $(seq 1 12); do
+            preview_https_status=$(curl -sS --max-time 25 -o /dev/null -w '%{http_code}' "$preview_url/" || true)
+            if [[ "$preview_https_status" == 200 ]]; then break; fi
+            sleep 2
+          done
+          test "$preview_https_status" = 200
           docker exec "$container" node -e "if((process.env.AUTH_SECRET||'').length<32)process.exit(1)"
           if [[ "$live_read_only" == true ]]; then
             docker exec -i "$container" node - <<'VERIFY'

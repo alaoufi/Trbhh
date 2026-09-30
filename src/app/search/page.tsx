@@ -40,8 +40,9 @@ export default async function SearchPage({
   const requestedSubcategory=positiveSearchId(sp.subcategory);
   const selectedSubcategory=categoryConfig.subcategories.find(item=>item.active&&item.version>0&&item.id===requestedSubcategory&&(!sq.categoryId||item.categoryId===sq.categoryId));
   const listingType=selectedSubcategory?.listingPolicy?.types.some(item=>item.key===sp.listingType)?sp.listingType:undefined;
-  const visibleFilterFields=(selectedSubcategory?.fields||[]).filter(field=>field.filterable&&fieldApplies(field,{listingType}));
-  const attributes=normalizeCategoryAttributeFilters(visibleFilterFields,sp,listingType);
+  const dependencyValues=Object.fromEntries(Object.entries(sp).filter(([key,value])=>key.startsWith('attr_')&&!key.endsWith('_min')&&!key.endsWith('_max')&&value).map(([key,value])=>[key.slice(5),value!]));
+  const visibleFilterFields=(selectedSubcategory?.fields||[]).filter(field=>field.filterable&&fieldApplies(field,{listingType,values:dependencyValues}));
+  const attributes=normalizeCategoryAttributeFilters(visibleFilterFields,sp,listingType,dependencyValues);
   const query = { ...sq,categoryId:selectedSubcategory?.categoryId??sq.categoryId,subcategoryId:selectedSubcategory?.id,listingType,attributeFilters:attributes.filters,searchableFields:(selectedSubcategory?.fields||[]).filter(field=>field.searchable).map(field=>({key:field.key})), cityId, areaId };
   const PAGE_SIZE = 48;
   const total = await countSearchAds(query);

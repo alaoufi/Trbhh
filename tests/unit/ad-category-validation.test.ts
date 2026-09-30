@@ -68,4 +68,8 @@ describe('real-ad subcategory field validation', () => {
     expect(cardCategoryValues(fields,values).map(item=>item.key)).toEqual(['make']);
     expect(comparableCategoryValues(fields,values).map(item=>item.key)).toEqual(['make']);
   });
+  it('grandfathers only explicitly missing required fields for legacy edits',()=>{
+    expect(validateCategoryValues([field()],{},{grandfatherMissingRequired:new Set(['use'])})).toEqual({});
+    expect(()=>validateCategoryValues([field()],{},{})).toThrow('الحقل مطلوب');
+  });
 });

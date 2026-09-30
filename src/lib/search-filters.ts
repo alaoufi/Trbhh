@@ -43,9 +43,9 @@ const safeDecimal=(value:string|undefined)=>{
 };
 
 /** URL attribute filters are accepted only when the active subcategory definition allows them. */
-export function normalizeCategoryAttributeFilters(fields:CategoryField[],sp:Record<string,string|undefined>,listingType?:string){
+export function normalizeCategoryAttributeFilters(fields:CategoryField[],sp:Record<string,string|undefined>,listingType?:string,dependencyValues:Record<string,string>={}){
   const filters:CategoryAttributeFilter[]=[],params:Record<string,string>={};
-  for(const field of fields.filter(item=>item.filterable&&fieldApplies(item,{listingType}))){
+  for(const field of fields.filter(item=>item.filterable&&fieldApplies(item,{listingType,values:dependencyValues}))){
     const name=`attr_${field.key}`;
     if(['number','decimal','year','range'].includes(field.type)){
       for(const [suffix,mode] of [['_min','min'],['_max','max']] as const){

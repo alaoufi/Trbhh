@@ -85,6 +85,13 @@ describe.skipIf(!enabled)('real ad category MySQL integration',()=>{
     await expect(writeAdWithCategory(client,form(),tx=>tx.ads.update({where:{id:ad.id},data:{title:'bad'}}))).rejects.toThrow('تغيّر');
     expect((await client.ads.findUnique({where:{id:ad.id}}))?.title).toBe('Fixture ad');
   });
+  it('allows a legacy ad missing a newly required field to be edited without weakening new ads',async()=>{
+    const ad=await create();
+    await client.ad_category_values.update({where:{ad_id:ad.id},data:{values_json:{}}});
+    const fd=form();fd.set('category_values','{}');
+    await expect(writeAdWithCategory(client,fd,tx=>tx.ads.update({where:{id:ad.id},data:{detail:'Legacy correction'}}),{adId:ad.id,memberId:1n})).resolves.toMatchObject({detail:'Legacy correction'});
+    await expect(create(fd)).rejects.toThrow('الحقل مطلوب');
+  });
   it('rolls back ads.create if saving values fails',async()=>{
     await client.$executeRawUnsafe('ALTER TABLE ad_category_values ADD CONSTRAINT fixture_reject_values CHECK (definition_version > 100)');
     try{await expect(create()).rejects.toThrow();expect(await client.ads.count()).toBe(0);}finally{await client.$executeRawUnsafe('ALTER TABLE ad_category_values DROP CHECK fixture_reject_values');}

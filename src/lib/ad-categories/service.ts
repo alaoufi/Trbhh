@@ -71,7 +71,13 @@ export async function writeAdWithCategory<T extends {id:bigint}>(db:PrismaClient
     if(!cats.length||!subs.length||!defs.length) throw new CategoryValidationError('','القسم غير متاح');
     const def=definition(defs[0],{categoryName:cats[0].name,subcategoryName:subs[0].name,useLatestTemplates:categoryEnabled(settings.get(CATEGORY_LATEST_TEMPLATES_SETTING)??'1')});
     const listing=normalizeListingSubmission(def.listingPolicy,{listingType:fd.get('listingType'),pricingMode:fd.get('pricingMode'),price:fd.get('price')});
-    const values=parseCategorySubmission(fd,{...def,id:sid,categoryId:cid},listing.listingType);
+    let grandfatherMissingRequired:ReadonlySet<string>|undefined;
+    if(edit&&existing&&Number(existing.category_id)===cid&&existing.subcategory_id===sid){
+      const previousRows=await tx.$queryRaw<{values_json:unknown}[]>`SELECT values_json FROM ad_category_values WHERE ad_id=${edit.adId} AND subcategory_id=${sid} FOR SHARE`;
+      const previous=(previousRows.length?json(previousRows[0].values_json):{}) as CategoryValues;
+      grandfatherMissingRequired=new Set(def.fields.filter(field=>field.required&&!Object.hasOwn(previous,field.key)).map(field=>field.key));
+    }
+    const values=parseCategorySubmission(fd,{...def,id:sid,categoryId:cid},listing.listingType,grandfatherMissingRequired);
     const ad=await write(tx,{category_id:BigInt(cid),subcategory_id:sid,cat_reviewed:1,priceEnabled:def.priceEnabled,goodsEnabled:def.goodsEnabled,listing});
     await tx.$executeRaw`INSERT INTO ad_category_values (ad_id,subcategory_id,definition_version,values_json) VALUES (${ad.id},${sid},${def.version},${JSON.stringify(values)}) ON DUPLICATE KEY UPDATE subcategory_id=VALUES(subcategory_id),definition_version=VALUES(definition_version),values_json=VALUES(values_json)`;
     return ad;

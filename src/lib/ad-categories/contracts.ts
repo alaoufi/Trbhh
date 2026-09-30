@@ -15,12 +15,12 @@ export function categoryId(value:unknown):number {
   if(!/^[1-9]\d*$/.test(s)||!Number.isSafeInteger(Number(s))||Number(s)>2147483647) throw new CategoryValidationError('','معرف القسم غير صالح');
   return Number(s);
 }
-export function parseCategorySubmission(fd:FormData, sub:Pick<SubcategoryOption,'id'|'categoryId'|'version'|'fields'>,listingType?:string):CategoryValues {
+export function parseCategorySubmission(fd:FormData, sub:Pick<SubcategoryOption,'id'|'categoryId'|'version'|'fields'>,listingType?:string,grandfatherMissingRequired?:ReadonlySet<string>):CategoryValues {
   if(categoryId(fd.get('category_id'))!==sub.categoryId||categoryId(fd.get('subcategory_id'))!==sub.id) throw new CategoryValidationError('','القسم الفرعي غير تابع للقسم');
   if(categoryId(fd.get('category_version'))!==sub.version) throw new CategoryValidationError('','تغيّر تعريف القسم؛ أعد تحميل الصفحة');
   const raw=String(fd.get('category_values')??'{}');
   if(raw.length>100000) throw new CategoryValidationError('','البيانات كبيرة جداً');
   let values:unknown;try{values=JSON.parse(raw);}catch{throw new CategoryValidationError('','بيانات الحقول غير صالحة');}
-  return validateCategoryValues(sub.fields,values,{listingType});
+  return validateCategoryValues(sub.fields,values,{listingType,grandfatherMissingRequired});
 }
 export const projectCategory=visibleCategoryValues;

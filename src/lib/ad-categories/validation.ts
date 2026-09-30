@@ -70,7 +70,7 @@ function empty(value: unknown) {
   return value === undefined || value === null || (typeof value === 'string' && !value.trim()) || (Array.isArray(value) && value.length === 0);
 }
 
-export type CategoryFieldContext={listingType?:string;values?:CategoryValues};
+export type CategoryFieldContext={listingType?:string;values?:CategoryValues;grandfatherMissingRequired?:ReadonlySet<string>};
 function equal(a:unknown,b:unknown){return String(a)===String(b);}
 export function fieldApplies(field:CategoryField,context:CategoryFieldContext):boolean{
   if(!field.visible)return false;
@@ -96,7 +96,7 @@ export function validateCategoryValues(fields: CategoryField[], raw: unknown, co
   for (const f of active.values()) {
     const value = Object.hasOwn(input, f.key) ? input[f.key] : undefined;
     if (empty(value)) {
-      if (f.required) throw new CategoryValidationError(f.key, `الحقل مطلوب: ${f.label}`);
+      if (f.required&&!context.grandfatherMissingRequired?.has(f.key)) throw new CategoryValidationError(f.key, `الحقل مطلوب: ${f.label}`);
       continue;
     }
     const fail = () => { throw new CategoryValidationError(f.key, `قيمة غير صالحة: ${f.label}`); };

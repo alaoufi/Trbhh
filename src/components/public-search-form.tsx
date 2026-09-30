@@ -76,8 +76,24 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
 
 function CategoryFilterField({field,params,inputClass}:{field:CategoryField;params:Record<string,string|undefined>;inputClass:string}){
   const name=`attr_${field.key}`;
-  if(['number','decimal','year','range'].includes(field.type))return <div className="grid grid-cols-2 gap-2"><label className="space-y-1 text-xs font-semibold">{field.label} من<input name={`${name}_min`} type="number" step="any" min={field.min} max={field.max} defaultValue={params[`${name}_min`]||''} className={inputClass}/></label><label className="space-y-1 text-xs font-semibold">{field.label} إلى<input name={`${name}_max`} type="number" step="any" min={field.min} max={field.max} defaultValue={params[`${name}_max`]||''} className={inputClass}/></label></div>;
-  if(field.type==='select'||field.type==='radio'||field.type==='multiselect')return <label className="space-y-1 text-xs font-semibold">{field.label}<select name={name} defaultValue={params[name]||''} className={inputClass}><option value="">الكل</option>{field.options.map(option=><option key={option} value={option}>{option}</option>)}</select></label>;
+  const label=field.unit?`${field.label} (${field.unit})`:field.label;
+  if(['number','decimal','year','range'].includes(field.type))return <div className="grid grid-cols-2 gap-2"><label className="space-y-1 text-xs font-semibold">{label} من<input name={`${name}_min`} type="number" step={field.step??'any'} min={field.min} max={field.max} defaultValue={params[`${name}_min`]||''} className={inputClass}/></label><label className="space-y-1 text-xs font-semibold">{label} إلى<input name={`${name}_max`} type="number" step={field.step??'any'} min={field.min} max={field.max} defaultValue={params[`${name}_max`]||''} className={inputClass}/></label></div>;
+  if(field.type==='multiselect')return <MultiSelectCategoryFilter field={field} name={name} initial={params[name]||''}/>;
+  if(field.type==='select'||field.type==='radio')return <label className="space-y-1 text-xs font-semibold">{label}<select name={name} defaultValue={params[name]||''} className={inputClass}><option value="">الكل</option>{field.options.map(option=><option key={option} value={option}>{option}</option>)}</select></label>;
   if(field.type==='boolean')return <label className="space-y-1 text-xs font-semibold">{field.label}<select name={name} defaultValue={params[name]||''} className={inputClass}><option value="">الكل</option><option value="1">نعم</option><option value="0">لا</option></select></label>;
   return <label className="space-y-1 text-xs font-semibold">{field.label}<input name={name} defaultValue={params[name]||''} maxLength={120} className={inputClass}/></label>;
+}
+
+function MultiSelectCategoryFilter({field,name,initial}:{field:CategoryField;name:string;initial:string}){
+  const [selected,setSelected]=useState(()=>initial.split(',').filter(value=>field.options.includes(value)));
+  const toggle=(value:string)=>setSelected(current=>current.includes(value)?current.filter(item=>item!==value):[...current,value]);
+  return <fieldset className="rounded-lg border bg-background p-2">
+    <legend className="px-1 text-xs font-semibold">{field.label}</legend>
+    <input type="hidden" name={name} value={selected.join(',')}/>
+    <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
+      {field.options.map(option=><label key={option} className={`cursor-pointer rounded-full border px-2 py-1 text-xs font-semibold ${selected.includes(option)?'border-primary bg-primary text-white':'bg-white text-foreground'}`}>
+        <input type="checkbox" className="sr-only" checked={selected.includes(option)} onChange={()=>toggle(option)}/>{option}
+      </label>)}
+    </div>
+  </fieldset>;
 }

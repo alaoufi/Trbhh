@@ -522,8 +522,18 @@ async function categoryAttributeAdIds(subcategoryIds:number[],filters:CategoryAt
     const path=`$.${filter.key}`;
     if(filter.mode==='min')return Prisma.sql`CAST(JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) AS DECIMAL(30,4)) >= ${filter.value}`;
     if(filter.mode==='max')return Prisma.sql`CAST(JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) AS DECIMAL(30,4)) <= ${filter.value}`;
+    // A stored range is {min,max}. Search bounds use overlap semantics:
+    // stored.max >= requested minimum AND stored.min <= requested maximum.
+    if(filter.mode==='range_min')return Prisma.sql`CAST(JSON_UNQUOTE(JSON_EXTRACT(values_json, ${`${path}.max`})) AS DECIMAL(30,4)) >= ${filter.value}`;
+    if(filter.mode==='range_max')return Prisma.sql`CAST(JSON_UNQUOTE(JSON_EXTRACT(values_json, ${`${path}.min`})) AS DECIMAL(30,4)) <= ${filter.value}`;
     if(filter.mode==='contains')return Prisma.sql`JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) LIKE ${`%${String(filter.value)}%`}`;
     if(filter.mode==='array_contains')return Prisma.sql`JSON_CONTAINS(JSON_EXTRACT(values_json, ${path}), JSON_QUOTE(${String(filter.value)})) = 1`;
+    if(filter.mode==='array_contains_any'){
+      const values=Array.isArray(filter.value)?filter.value:[];
+      return values.length
+        ? Prisma.sql`(${Prisma.join(values.map(value=>Prisma.sql`JSON_CONTAINS(JSON_EXTRACT(values_json, ${path}), JSON_QUOTE(${value})) = 1`),' OR ')})`
+        : Prisma.sql`0 = 1`;
+    }
     return Prisma.sql`JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) = ${String(filter.value)}`;
   });
   const rows=await prisma.$queryRaw<{ad_id:bigint}[]>(Prisma.sql`SELECT ad_id FROM ad_category_values WHERE subcategory_id IN (${Prisma.join(subcategoryIds)}) AND ${Prisma.join(clauses,' AND ')}`);

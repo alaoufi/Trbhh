@@ -104,6 +104,8 @@ describe('subcategory attribute filters',()=>{
     {key:'power',label:'الطاقة',type:'select' as const,group:'فني',required:false,visible:true,order:2,options:['ديزل','كهرباء'],filterable:true},
     {key:'operator',label:'المشغل',type:'boolean' as const,group:'إيجار',required:false,visible:true,order:3,options:[],filterable:true,dependsOn:'listing_type',dependencyOperator:'equals' as const,dependencyValue:'rent'},
     {key:'private',label:'خاص',type:'text' as const,group:'',required:false,visible:true,order:4,options:[],filterable:false},
+    {key:'reach',label:'النطاق',type:'range' as const,group:'فني',required:false,visible:true,order:5,options:[],min:1,max:200,filterable:true},
+    {key:'features',label:'المزايا',type:'multiselect' as const,group:'فني',required:false,visible:true,order:6,options:['GPS','مكيف','كاميرا'],filterable:true},
   ];
   it('accepts only configured values and active conditional fields',()=>{
     const input={attr_capacity_min:'5',attr_capacity_max:'999',attr_power:'ديزل',attr_operator:'1',attr_private:'leak',attr_forged:'x'};
@@ -111,5 +113,16 @@ describe('subcategory attribute filters',()=>{
     expect(sale.filters).toEqual([{key:'capacity',mode:'min',value:5},{key:'power',mode:'equals',value:'ديزل'}]);
     const rent=normalizeCategoryAttributeFilters(fields,input,'rent');
     expect(rent.params).toEqual({attr_capacity_min:'5',attr_power:'ديزل',attr_operator:'1'});
+  });
+  it('normalizes stored range overlap and multiple selected options safely',()=>{
+    const normalized=normalizeCategoryAttributeFilters(fields,{
+      attr_reach_min:'20',attr_reach_max:'40',attr_features:'GPS,مكيف,غير-مسموح',
+    });
+    expect(normalized.filters).toEqual([
+      {key:'reach',mode:'range_min',value:20},
+      {key:'reach',mode:'range_max',value:40},
+      {key:'features',mode:'array_contains_any',value:['GPS','مكيف']},
+    ]);
+    expect(normalized.params).toMatchObject({attr_reach_min:'20',attr_reach_max:'40',attr_features:'GPS,مكيف'});
   });
 });

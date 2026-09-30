@@ -34,7 +34,11 @@ export function normalizeSearchParams(sp: Record<string, string | undefined>) {
   } as const;
 }
 
-export type CategoryAttributeFilter={key:string;mode:'equals'|'contains'|'array_contains'|'min'|'max';value:string|number|boolean};
+export type CategoryAttributeFilter={
+  key:string;
+  mode:'equals'|'contains'|'array_contains'|'array_contains_any'|'min'|'max'|'range_min'|'range_max';
+  value:string|number|boolean|string[];
+};
 
 const safeDecimal=(value:string|undefined)=>{
   if(!value||!(/^-?\d+(?:\.\d{1,2})?$/).test(value.trim()))return undefined;
@@ -52,7 +56,8 @@ export function normalizeCategoryAttributeFilters(fields:CategoryField[],sp:Reco
         const raw=sp[`${name}${suffix}`],value=safeDecimal(raw);
         if(value===undefined)continue;
         if(field.min!==undefined&&value<field.min||field.max!==undefined&&value>field.max)continue;
-        filters.push({key:field.key,mode,value});params[`${name}${suffix}`]=String(value);
+        const normalizedMode=field.type==='range'?(mode==='min'?'range_min':'range_max'):mode;
+        filters.push({key:field.key,mode:normalizedMode,value});params[`${name}${suffix}`]=String(value);
       }
       continue;
     }
@@ -61,9 +66,14 @@ export function normalizeCategoryAttributeFilters(fields:CategoryField[],sp:Reco
       if(raw!=='1'&&raw!=='0')continue;
       filters.push({key:field.key,mode:'equals',value:raw==='1'});params[name]=raw;continue;
     }
-    if(field.type==='select'||field.type==='radio'||field.type==='multiselect'){
+    if(field.type==='multiselect'){
+      const selected=[...new Set(raw.split(',').map(value=>value.trim()).filter(value=>field.options.includes(value)))];
+      if(!selected.length)continue;
+      filters.push({key:field.key,mode:'array_contains_any',value:selected});params[name]=selected.join(',');continue;
+    }
+    if(field.type==='select'||field.type==='radio'){
       if(!field.options.includes(raw))continue;
-      filters.push({key:field.key,mode:field.type==='multiselect'?'array_contains':'equals',value:raw});params[name]=raw;continue;
+      filters.push({key:field.key,mode:'equals',value:raw});params[name]=raw;continue;
     }
     if(raw.length<=120){filters.push({key:field.key,mode:'contains',value:raw});params[name]=raw;}
   }

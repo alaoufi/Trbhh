@@ -159,10 +159,16 @@ async function run(){
       await page.locator('summary').filter({hasText:/^وظائف —/}).click();
       await page.locator('summary').filter({hasText:/^فرص عمل —/}).click();
       const editor=page.locator('form').filter({has:page.locator('input[name="name"][value="فرص عمل"]')});
-      const before=await editor.locator('fieldset').count();
-      for(let n=0;n<3;n++)await editor.getByRole('button',{name:'إضافة حقل',exact:true}).click();
-      await editor.locator('fieldset').nth(before+1).getByRole('button',{name:'إزالة الحقل'}).click();
+      const editableFields=editor.locator('fieldset').filter({has:page.getByRole('button',{name:/إزالة من التعريف/})});
+      const before=await editableFields.count();
+      for(let n=0;n<3;n++){
+        await editor.getByRole('button',{name:'إضافة حقل',exact:true}).click();
+        await editableFields.nth(before+n).waitFor({state:'visible'});
+      }
+      await editableFields.nth(before+1).getByRole('button',{name:/إزالة من التعريف/}).click();
+      assert.equal(await editableFields.count(),before+2);
       await editor.getByRole('button',{name:'إضافة حقل',exact:true}).click();
+      await editableFields.nth(before+2).waitFor({state:'visible'});
       const edited=JSON.parse(await editor.locator('[name="fields_json"]').inputValue());
       assert.equal(new Set(edited.map(f=>f.key)).size,edited.length,'field keys remain unique after deletion');
       // Client-only interaction: do not save these empty test fields.

@@ -17,6 +17,29 @@ async function assertResponsive(page,label,widths=responsiveWidths){
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${label} ${width}px overflow`);
   }
 }
+async function fillRequiredCategoryFields(page){
+  const fields=page.locator('[data-field-key][data-required="true"]');
+  for(let index=0;index<await fields.count();index++){
+    const field=fields.nth(index);
+    const control=field.locator('input:not([type="hidden"]),select,textarea').first();
+    if(!await control.count())continue;
+    const tag=await control.evaluate(element=>element.tagName.toLowerCase());
+    if(tag==='select'){
+      const value=await control.locator('option').evaluateAll(options=>options.find(option=>option.value)?.value||'');
+      if(value)await control.selectOption(value);
+      continue;
+    }
+    const type=(await control.getAttribute('type')||'text').toLowerCase();
+    if(type==='checkbox'||type==='radio'){await control.check();continue;}
+    if(type==='date'){await control.fill('2026-10-01');continue;}
+    if(type==='number'){
+      const min=await control.getAttribute('min');
+      await control.fill(min!==null&&Number(min)>0?min:'1');
+      continue;
+    }
+    await control.fill(`قيمة اختبار ${index+1}`);
+  }
+}
 async function run(){
   await mkdir(artifacts,{recursive:true});
   const url=new URL(database);
@@ -57,6 +80,7 @@ async function run(){
       const editedTitle=`${createdTitle} محدث`;
       await page.locator('[name="title"]').fill(createdTitle);
       await page.locator('[name="detail"]').fill('إعلان اصطناعي معزول لاختبار رحلة الإنشاء والتفاصيل والتعديل والبحث والحذف دون المساس بأي بيانات حقيقية.');
+      await fillRequiredCategoryFields(page);
       await page.locator('#category-field-job_title').fill('محاسب اختبار');
       await page.locator('[name="phone"]').fill('0500000002');
       await page.locator('[name="pledge"]').check();

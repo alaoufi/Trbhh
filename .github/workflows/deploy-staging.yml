@@ -70,7 +70,8 @@ jobs:
               scripts/release/configure-live-readonly-preview.cjs "$target:$remote_script"
           fi
 
-          ssh "${ssh_args[@]}" "$target" bash -s -- "$dir" "$DEPLOY_REF" "$DEPLOY_SHA" "$LIVE_READ_ONLY" "$remote_script" <<'REMOTE'
+          remote_log=$(mktemp)
+          ssh "${ssh_args[@]}" "$target" bash -s -- "$dir" "$DEPLOY_REF" "$DEPLOY_SHA" "$LIVE_READ_ONLY" "$remote_script" "$VPS_HOST" <<'REMOTE' | tee "$remote_log"
           set -euo pipefail
           umask 077
           dir=$1
@@ -78,6 +79,7 @@ jobs:
           sha=$3
           live_read_only=$4
           readonly_script=$5
+          public_host=$6
           test "$dir" = /root/trbhh-staging
           test ! -L "$dir"
           test "$(realpath "$dir")" = "$dir"
@@ -198,7 +200,7 @@ jobs:
             set_env SUPPLIER_ALLOW_LIVE_ORDERS false .env
           fi
 
-          docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis
+          docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis preview-tunnel
           if [[ "$live_read_only" != true ]]; then
             timeout 180s docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml \
               exec -T -e STAGING_CATEGORY_SEED=1 -e STAGING_DATABASE_NAME=trbhhdb app \
@@ -208,6 +210,23 @@ jobs:
           container=$(docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps -q app)
           test -n "$container"
           test "$(docker inspect -f '{{.State.Running}}' "$container")" = true
+          published_ports=$(docker port "$container" 3000)
+          printf 'previewDockerPorts=%s\n' "$(printf '%s' "$published_ports" | tr '\n' ' ')"
+          printf '%s\n' "$published_ports" | grep -Fx '0.0.0.0:3081'
+          ss -lntp | grep -E '(^|:)3081\b'
+          curl -fsS --max-time 20 http://127.0.0.1:3081/ -o /dev/null
+          curl -fsS --max-time 20 "http://$public_host:3081/" -o /dev/null
+
+          echo 'previewFirewallAudit=ufw'
+          if command -v ufw >/dev/null 2>&1; then ufw status verbose || true; else echo 'ufw unavailable'; fi
+          echo 'previewFirewallAudit=iptables'
+          if command -v iptables >/dev/null 2>&1; then iptables -S || true; else echo 'iptables unavailable'; fi
+          echo 'previewFirewallAudit=nftables'
+          if command -v nft >/dev/null 2>&1; then nft list ruleset || true; else echo 'nft unavailable'; fi
+          echo 'previewReverseProxyAudit'
+          for service in nginx caddy traefik; do
+            if systemctl is-active --quiet "$service" 2>/dev/null; then echo "$service=active"; else echo "$service=inactive-or-unavailable"; fi
+          done
           docker exec "$container" node -e "if((process.env.AUTH_SECRET||'').length<32)process.exit(1)"
           if [[ "$live_read_only" == true ]]; then
             docker exec -i "$container" node - <<'VERIFY'
@@ -232,6 +251,16 @@ jobs:
           fi
           rm -f "$readonly_script"
           docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps
+
+          preview_url=''
+          for attempt in $(seq 1 36); do
+            preview_url=$(docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml logs --no-color preview-tunnel 2>&1 \
+              | grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' | tail -1 || true)
+            if [[ -n "$preview_url" ]] && curl -fsS --max-time 25 "$preview_url/" -o /dev/null; then break; fi
+            sleep 5
+          done
+          [[ "$preview_url" =~ ^https://[a-zA-Z0-9-]+\.trycloudflare\.com$ ]]
+          printf 'PREVIEW_URL=%s\n' "$preview_url"
           REMOTE
 
           status=000
@@ -241,8 +270,14 @@ jobs:
             sleep 3
           done
           test "$status" = 200
+          preview_url=$(sed -n 's/^PREVIEW_URL=//p' "$remote_log" | tail -1)
+          rm -f "$remote_log"
+          [[ "$preview_url" =~ ^https://[a-zA-Z0-9-]+\.trycloudflare\.com$ ]]
+          curl -fsS --max-time 25 "$preview_url/" -o /tmp/trbhh-external-preview.html
           if [[ "$LIVE_READ_ONLY" == 'true' ]]; then
+            external_preview_mode=$(curl -sSI --max-time 25 "$preview_url/" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-trbhh-preview-mode"{print tolower($2)}' | tail -1)
+            test "$external_preview_mode" = read-only
             test "$(curl -sSI "http://$VPS_HOST:3081/" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-trbhh-preview-mode"{print tolower($2)}' | tail -1)" = read-only
             test "$(curl -sS -o /dev/null -w '%{http_code}' -X POST "http://$VPS_HOST:3081/api/integrations/salla/webhooks")" = 405
           fi
-          printf '### معاينة Hostinger\n\n- URL: http://%s:3081/\n- Commit: `%s`\n- Live read-only: `%s`\n' "$VPS_HOST" "$DEPLOY_SHA" "$LIVE_READ_ONLY" >> "$GITHUB_STEP_SUMMARY"
+          printf '### معاينة Hostinger\n\n- HTTPS URL: %s\n- Direct URL: http://%s:3081/\n- Commit: `%s`\n- Live read-only: `%s`\n- External verification: `HTTP 200 + x-trbhh-preview-mode=read-only`\n' "$preview_url" "$VPS_HOST" "$DEPLOY_SHA" "$LIVE_READ_ONLY" >> "$GITHUB_STEP_SUMMARY"

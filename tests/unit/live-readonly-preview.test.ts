@@ -133,4 +133,31 @@ describe('Hostinger live-data read-only preview', () => {
     expect(workflow).not.toMatch(/prisma\s+migrate\s+(dev|reset|deploy)/);
     expect(workflow).not.toMatch(/prisma\s+db\s+push/);
   });
+
+  test('publishes the read-only preview through an externally verified HTTPS tunnel', () => {
+    const compose = readFileSync(path.join(root, 'docker-compose.staging.yml'), 'utf8');
+    const workflow = readFileSync(path.join(root, '.github/workflows/deploy-staging.yml'), 'utf8');
+
+    expect(compose).toContain('preview-tunnel:');
+    expect(compose).toContain('cloudflare/cloudflared:latest');
+    expect(compose).toContain('tunnel --no-autoupdate --url http://app:3000');
+    expect(compose).toContain('container_name: trbhh-staging-tunnel');
+    expect(workflow).toContain('up -d --build app redis preview-tunnel');
+    expect(workflow).toContain("grep -oE 'https://[a-zA-Z0-9-]+\\.trycloudflare\\.com'");
+    expect(workflow).toContain('curl -fsS --max-time 25 "$preview_url/"');
+    expect(workflow).toContain('test "$external_preview_mode" = read-only');
+    expect(workflow).toContain('PREVIEW_URL=');
+  });
+
+  test('records listener, Docker publication and firewall diagnostics without changing production', () => {
+    const workflow = readFileSync(path.join(root, '.github/workflows/deploy-staging.yml'), 'utf8');
+
+    expect(workflow).toContain("ss -lntp | grep -E '(^|:)3081\\b'");
+    expect(workflow).toContain('docker compose -p trbhh-staging');
+    expect(workflow).toContain('docker port "$container" 3000');
+    expect(workflow).toContain('ufw status verbose');
+    expect(workflow).toContain('iptables -S');
+    expect(workflow).toContain('nft list ruleset');
+    expect(workflow).not.toContain('ufw allow 3081');
+  });
 });

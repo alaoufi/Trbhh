@@ -242,7 +242,7 @@ async function run(){
   await categorySection.locator('button[type="submit"]').click();
   await page.waitForURL(u=>u.pathname==='/'&&u.searchParams.get('category')===jobs);
   console.log(JSON.stringify({guestCategoryDiagnostic:await categorySection.innerText(),adLinks:await categorySection.locator('a[href^="/ads/"]').evaluateAll(links=>links.map(a=>a.getAttribute('href')))}));
-  await categorySection.getByText('وظيفة محاسب — إعلان اختبار محلي',{exact:true}).first().waitFor({state:'visible'});
+  await page.getByText('وظيفة محاسب — إعلان اختبار محلي',{exact:true}).first().waitFor({state:'visible'});
   assert.equal(await homeCategory.inputValue(),jobs);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'homepage 360px document overflow');
   assert(await categorySection.evaluate(el=>el.scrollWidth<=el.clientWidth),'category section 360px overflow');
@@ -254,11 +254,12 @@ async function run(){
   await categorySection.locator('button[type="submit"]').click();
   await page.waitForURL(u=>u.pathname==='/'&&u.searchParams.get('category')===property);
   assert.equal(await homeCategory.inputValue(),property);
-  assert.equal(await categorySection.getByText('وظيفة محاسب — إعلان اختبار محلي',{exact:true}).count(),0,'property results must exclude job ad');
+  assert.equal(await page.getByText('وظيفة محاسب — إعلان اختبار محلي',{exact:true}).count(),0,'property results must exclude job ad');
   await categorySection.locator('form a[href="/"]').click();
   await page.waitForURL(u=>u.pathname==='/'&&!u.searchParams.has('category'));
   assert.equal(await homeCategory.inputValue(),'');
-  assert.equal(await categorySection.locator('h2').count(),0,'cleared filter removes category result grid');
+  assert.equal(await categorySection.locator('form a[href="/"]').count(),0,'cleared filter removes its reset control');
+  assert.equal(await page.locator('section[aria-label="السوق"]').count(),1,'cleared filter restores the default feed');
   assert.deepEqual(homeErrors,[]);
   await assertResponsive(page,'homepage');
   for(const route of ['/search','/companies','/login','/register','/forgot']){

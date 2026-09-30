@@ -80,7 +80,7 @@ export function AdCategoryFields({ fields, values, onChange, listingType }: {
                 <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
                   <span className="min-w-0 truncate">{Array.isArray(value)&&value.length?value.join('، '):'اختر من القائمة'}</span><span aria-hidden="true">⌄</span>
                 </summary>
-                <div className="grid gap-1 border-t p-2 sm:grid-cols-2" role="group" aria-label={f.label} aria-required={required}>
+                <div className="grid gap-1 border-t p-2 sm:grid-cols-2" role="group" aria-label={f.label}>
                   {f.options.map((option,index)=>{
                     const selected=Array.isArray(value)?value:[];
                     const checked=selected.includes(option);

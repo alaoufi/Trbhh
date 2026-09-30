@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { redirectLegacyApex, requestHostname } from '@/lib/public-origin';
 import { SITE } from '@/lib/constants';
-import { isReadOnlyPreview, readOnlyPreviewResponse } from '@/lib/read-only-preview';
+import { isReadOnlyPreview, previewRobotsHeader, readOnlyPreviewResponse } from '@/lib/read-only-preview';
 
 // subdomains that are the platform itself, never a store handle
 const RESERVED_SUB = new Set(['www', 'api', 'm', 'admin', 'mail', 'ftp', 'cdn', 'static', 'assets', 'app', 'apps', 'store', 'stores', 'trbhh', 'ns1', 'ns2', 'blog', 'help', 'support', 'dev', 'test', 'staging']);
@@ -78,6 +78,8 @@ export function middleware(req: NextRequest) {
     res.headers.set('Vary', 'Cookie');
   }
   if (isReadOnlyPreview()) res.headers.set('X-Trbhh-Preview-Mode', 'read-only');
+  const robotsHeader=previewRobotsHeader();
+  if(robotsHeader)res.headers.set('X-Robots-Tag',robotsHeader);
   return res;
 }
 

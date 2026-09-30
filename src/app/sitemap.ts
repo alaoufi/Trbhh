@@ -1,11 +1,13 @@
 import type { MetadataRoute } from 'next';
 import { prisma } from '@/lib/prisma';
 import { primaryOrigin } from '@/lib/public-origin';
+import { isReadOnlyPreview } from '@/lib/read-only-preview';
 
 // Rendered on demand so the build never needs a live database.
 export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  if(isReadOnlyPreview())return [];
   const base = primaryOrigin;
   const [dealsOn, auctionsOn] = await Promise.all([
     import('@/lib/store-extras').then((m) => m.dealsEnabled()).catch(() => false),

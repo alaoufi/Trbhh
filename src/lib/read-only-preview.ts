@@ -37,6 +37,10 @@ export function isReadOnlyPreview(): boolean {
   return process.env.TRBHH_READ_ONLY_PREVIEW === '1';
 }
 
+export function previewRobotsHeader(): string | null {
+  return isReadOnlyPreview() ? 'noindex, nofollow, noarchive' : null;
+}
+
 /** Reject every write except login, whose preview path only reads MySQL and writes its cookie/rate limit to Redis. */
 export function readOnlyPreviewResponse(method: string, pathname = ''): Response | null {
   const normalizedMethod = method.toUpperCase();
@@ -44,6 +48,6 @@ export function readOnlyPreviewResponse(method: string, pathname = ''): Response
   if (normalizedMethod === 'POST' && PREVIEW_ACTION_PATHS.has(pathname)) return null;
   return Response.json(
     { error: 'read_only_preview', message: 'هذه معاينة للقراءة فقط؛ الحفظ والشراء معطلان.' },
-    { status: 405, headers: { Allow: 'GET, HEAD, OPTIONS', 'Cache-Control': 'no-store', 'X-Trbhh-Preview-Mode': 'read-only' } },
+    { status: 405, headers: { Allow: 'GET, HEAD, OPTIONS', 'Cache-Control': 'no-store', 'X-Trbhh-Preview-Mode': 'read-only', 'X-Robots-Tag':'noindex, nofollow, noarchive' } },
   );
 }

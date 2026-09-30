@@ -32,7 +32,7 @@ it('renders only bounded category results in one grid, preserves query order and
  const tree=elements(await HomePage({searchParams:Promise.resolve({category:'90'})}));
  const grids=tree.filter(e=>e.type===AdGrid);
  expect(grids).toHaveLength(1);expect(grids[0].props.ads).toEqual([{id:90},{id:89}]);
- expect(state.search).toHaveBeenCalledWith({categoryId:90,take:24,skip:0});
+ expect(state.search).toHaveBeenCalledWith({categoryIds:[90],take:24,skip:0});
  expect(state.featured).not.toHaveBeenCalled();expect(state.latest).not.toHaveBeenCalled();expect(state.personalized).not.toHaveBeenCalled();
  expect(tree.some(e=>e.props.href==='/search?category=90')).toBe(true);
 });
@@ -143,6 +143,6 @@ it('keeps category results and their browse target during the seasonal treatment
    expect.objectContaining({id:'national-leadership',href:null,cta:''}),
    expect.objectContaining({id:'national-flag',href:null,cta:''}),
   ]);
-  expect(state.search).toHaveBeenCalledWith({categoryId:90,take:24,skip:0});
+  expect(state.search).toHaveBeenCalledWith({categoryIds:[90],take:24,skip:0});
  } finally {flag.mockRestore();clock.mockRestore();}
 });

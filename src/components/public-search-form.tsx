@@ -5,6 +5,7 @@ import { SearchSuggestInput } from '@/components/search-suggest';
 import { Search } from 'lucide-react';
 import type {CategoryFormConfig} from '@/lib/ad-categories/contracts';
 import {fieldApplies,type CategoryField} from '@/lib/ad-categories/validation';
+import {publicCategoryGroups} from '@/lib/home-feed';
 
 type Region = { id: number; name: string; countryId?: number };
 type Area = { id: number; name: string; cityId: number };
@@ -17,14 +18,15 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
   const [category,setCategory]=useState(params.category||'');
   const [subcategory,setSubcategory]=useState(params.subcategory||'');
   const [listingType,setListingType]=useState(params.listingType||'');
-  const subcategories=useMemo(()=>categoryConfig?.subcategories.filter(item=>item.active&&item.version>0&&String(item.categoryId)===category)||[],[category,categoryConfig]);
+  const groups=useMemo(()=>categoryConfig?publicCategoryGroups(categoryConfig).filter(group=>categoryConfig.subcategories.some(item=>item.active&&item.version>0&&(item.groupKey||String(item.categoryId))===group.key)):[],[categoryConfig]);
+  const subcategories=useMemo(()=>categoryConfig?.subcategories.filter(item=>item.active&&item.version>0&&(item.groupKey||String(item.categoryId))===category)||[],[category,categoryConfig]);
   const selectedSub=subcategories.find(item=>String(item.id)===subcategory);
   const listingTypes=selectedSub?.listingPolicy?.types||[];
   const dependentValues=Object.fromEntries(Object.entries(params).filter(([key])=>key.startsWith('attr_')).map(([key,value])=>[key.slice(5),value||'']));
   const dynamicFields=(selectedSub?.fields||[]).filter(item=>item.filterable&&fieldApplies(item,{listingType,values:dependentValues}));
   const categoryFilters=categoryConfig?.enabled?<>
     <label className="space-y-1 text-xs font-semibold text-foreground">القسم
-      <select name="category" value={category} className={field} onChange={event=>{setCategory(event.target.value);setSubcategory('');setListingType('');}}><option value="">كل الأقسام</option>{categoryConfig.categories.filter(item=>item.active&&categoryConfig.subcategories.some(sub=>sub.active&&sub.version>0&&sub.categoryId===item.id)).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>
+      <select name="category" value={category} className={field} onChange={event=>{setCategory(event.target.value);setSubcategory('');setListingType('');}}><option value="">كل الأقسام</option>{groups.map(item=><option key={item.key} value={item.key}>{item.name}</option>)}</select>
     </label>
     <label className="space-y-1 text-xs font-semibold text-foreground">القسم الفرعي
       <select name="subcategory" value={subcategory} disabled={!category} className={field} onChange={event=>{setSubcategory(event.target.value);setListingType('');}}><option value="">كل الأقسام الفرعية</option>{subcategories.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>

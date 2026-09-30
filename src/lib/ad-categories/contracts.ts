@@ -3,8 +3,17 @@ import type {ListingPolicy} from './listing-policy';
 export const CATEGORY_KINDS = ['goods','property','jobs','service','livestock','plants','other'] as const;
 export type CategoryKind = typeof CATEGORY_KINDS[number];
 export type CategoryOption = {id:number;name:string;active:boolean;order:number};
-export type SubcategoryOption = CategoryOption & {categoryId:number;version:number;kind:CategoryKind;priceEnabled:boolean;goodsEnabled:boolean;fields:CategoryField[];listingPolicy?:ListingPolicy};
-export type CategoryFormConfig = {enabled:boolean;useLatestTemplates?:boolean;categories:CategoryOption[];subcategories:SubcategoryOption[];labels:Record<string,string>};
+export type CategoryGroupOption = {key:string;name:string;order:number;categoryIds:number[]};
+export type SubcategoryOption = CategoryOption & {
+  categoryId:number;version:number;kind:CategoryKind;priceEnabled:boolean;goodsEnabled:boolean;
+  fields:CategoryField[];listingPolicy?:ListingPolicy;
+  /** Stable built-in schema key. Persisted ids remain the database authority. */
+  templateKey?:string;
+  /** Presentation-only public taxonomy metadata; never written as a category id. */
+  groupKey?:string;
+  sourceSubcategoryIds?:number[];
+};
+export type CategoryFormConfig = {enabled:boolean;useLatestTemplates?:boolean;categories:CategoryOption[];subcategories:SubcategoryOption[];groups?:CategoryGroupOption[];labels:Record<string,string>};
 export const CATEGORY_LABELS = {section:'تصنيف الإعلان',category:'القسم',subcategory:'القسم الفرعي',choose:'اختر',error:'راجع القسم والحقول؛ ربما تغيّر تعريفها. أعد تحميل الصفحة ثم حاول مجدداً.',details:'مواصفات الإعلان',preserve:'إبقاء التصنيف الحالي دون تغيير',reclassify:'اختيار تصنيف جديد',preserveHint:'التصنيف الحالي غير متاح للاختيار. يمكنك تصحيح الإعلان مع إبقاء تصنيفه وقيمه وأسعاره الحالية، أو اختيار تصنيف جديد.',browse:'عرض الإعلانات',clear:'مسح التصفية',resultsTitle:'{category} — عرض حتى {limit} إعلانًا',emptyText:'لا توجد إعلانات متاحة في هذا القسم حاليًا.'};
 export const categoryEnabled = (v:unknown) => v === '1';
 export function categoryPolicy(c:{kind:string;priceEnabled:boolean;goodsEnabled:boolean}) {

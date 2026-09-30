@@ -497,7 +497,9 @@ export async function getAdsByCategory(categoryId: number, take = 24, skip = 0) 
 type SearchParamsT = {
   q?: string;
   categoryId?: number;
+  categoryIds?: number[];
   subcategoryId?: number;
+  subcategoryIds?: number[];
   listingType?: string;
   attributeFilters?:CategoryAttributeFilter[];
   searchableFields?:Pick<CategoryField,'key'>[];
@@ -514,8 +516,8 @@ type SearchParamsT = {
   textMatch?: 'all' | 'any';
 };
 
-async function categoryAttributeAdIds(subcategoryId:number,filters:CategoryAttributeFilter[]):Promise<bigint[]>{
-  if(!filters.length)return [];
+async function categoryAttributeAdIds(subcategoryIds:number[],filters:CategoryAttributeFilter[]):Promise<bigint[]>{
+  if(!subcategoryIds.length||!filters.length)return [];
   const clauses=filters.map(filter=>{
     const path=`$.${filter.key}`;
     if(filter.mode==='min')return Prisma.sql`CAST(JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) AS DECIMAL(30,4)) >= ${filter.value}`;
@@ -524,14 +526,14 @@ async function categoryAttributeAdIds(subcategoryId:number,filters:CategoryAttri
     if(filter.mode==='array_contains')return Prisma.sql`JSON_CONTAINS(JSON_EXTRACT(values_json, ${path}), JSON_QUOTE(${String(filter.value)})) = 1`;
     return Prisma.sql`JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) = ${String(filter.value)}`;
   });
-  const rows=await prisma.$queryRaw<{ad_id:bigint}[]>(Prisma.sql`SELECT ad_id FROM ad_category_values WHERE subcategory_id=${subcategoryId} AND ${Prisma.join(clauses,' AND ')}`);
+  const rows=await prisma.$queryRaw<{ad_id:bigint}[]>(Prisma.sql`SELECT ad_id FROM ad_category_values WHERE subcategory_id IN (${Prisma.join(subcategoryIds)}) AND ${Prisma.join(clauses,' AND ')}`);
   return rows.map(row=>row.ad_id);
 }
 
-async function categorySearchAdIds(subcategoryId:number,fields:Pick<CategoryField,'key'>[],variants:string[]):Promise<bigint[]>{
-  if(!fields.length||!variants.length)return [];
+async function categorySearchAdIds(subcategoryIds:number[],fields:Pick<CategoryField,'key'>[],variants:string[]):Promise<bigint[]>{
+  if(!subcategoryIds.length||!fields.length||!variants.length)return [];
   const clauses=fields.flatMap(field=>variants.map(value=>Prisma.sql`JSON_UNQUOTE(JSON_EXTRACT(values_json, ${`$.${field.key}`})) LIKE ${`%${value}%`}`));
-  const rows=await prisma.$queryRaw<{ad_id:bigint}[]>(Prisma.sql`SELECT ad_id FROM ad_category_values WHERE subcategory_id=${subcategoryId} AND (${Prisma.join(clauses,' OR ')})`);
+  const rows=await prisma.$queryRaw<{ad_id:bigint}[]>(Prisma.sql`SELECT ad_id FROM ad_category_values WHERE subcategory_id IN (${Prisma.join(subcategoryIds)}) AND (${Prisma.join(clauses,' OR ')})`);
   return rows.map(row=>row.ad_id);
 }
 
@@ -562,7 +564,7 @@ const getSearchAreaIds = cache(async (areaId: number, cityId: number) => {
   return equivalentAreaIds(areas.map((area) => ({ id: toInt(area.id), name: area.name, cityId: area.city_id })), areaId, cityId);
 });
 
-async function buildSearchWhere({ q, categoryId, subcategoryId, listingType, attributeFilters=[], searchableFields=[], countryId, cityId, areaId, type, special, minPrice, maxPrice, textMatch = 'all' }: SearchParamsT) {
+async function buildSearchWhere({ q, categoryId,categoryIds=[], subcategoryId,subcategoryIds=[], listingType, attributeFilters=[], searchableFields=[], countryId, cityId, areaId, type, special, minPrice, maxPrice, textMatch = 'all' }: SearchParamsT) {
   const range = normalizePriceRange(minPrice, maxPrice);
   const visibility = await activeAdWhere();
   // بحث ذكي: تُقسَّم العبارة كلمات، وكل كلمة تُطابق العنوان أو التفاصيل بأي ترتيب،
@@ -577,16 +579,18 @@ async function buildSearchWhere({ q, categoryId, subcategoryId, listingType, att
   const textClauses = await Promise.all(tokens.map(async(t) => {
     const variants = Array.from(new Set(expandSearchToken(t, synonymGroups).flatMap((term) =>
       [term, norm(term), term.replace(/ه$/, 'ة'), term.replace(/ة$/, 'ه'), term.replace(/ي$/, 'ى'), term.replace(/ى$/, 'ي')])));
-    const attributeIds=subcategoryId?await categorySearchAdIds(subcategoryId,searchableFields,variants):[];
+    const selectedSubcategoryIds=subcategoryIds.length?subcategoryIds:(subcategoryId?[subcategoryId]:[]);
+    const attributeIds=selectedSubcategoryIds.length?await categorySearchAdIds(selectedSubcategoryIds,searchableFields,variants):[];
     return { OR: [...variants.flatMap((v) => [{ title: { contains: v } }, { detail: { contains: v } }]),...(attributeIds.length?[{id:{in:attributeIds}}]:[])] };
   }));
   const textFilter = textMatch === 'any' && textClauses.length ? [{ OR: textClauses }] : textClauses;
-  const attributeIds=subcategoryId&&attributeFilters.length?await categoryAttributeAdIds(subcategoryId,attributeFilters):undefined;
+  const selectedSubcategoryIds=subcategoryIds.length?subcategoryIds:(subcategoryId?[subcategoryId]:[]);
+  const attributeIds=selectedSubcategoryIds.length&&attributeFilters.length?await categoryAttributeAdIds(selectedSubcategoryIds,attributeFilters):undefined;
   return {
     ...visibility,
     AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textFilter,...(listingType?[exactListingWhere(listingType)]:[])],
-    ...(categoryId ? { category_id: BigInt(categoryId) } : {}),
-    ...(subcategoryId ? { subcategory_id: subcategoryId } : {}),
+    ...(categoryIds.length ? {category_id:{in:categoryIds.map(BigInt)}} : categoryId ? { category_id: BigInt(categoryId) } : {}),
+    ...(selectedSubcategoryIds.length ? { subcategory_id:selectedSubcategoryIds.length===1?selectedSubcategoryIds[0]:{in:selectedSubcategoryIds} } : {}),
     ...(attributeIds ? {id:{in:attributeIds}}:{}),
     ...(countryId ? { country_id: countryId } : {}),
     ...(cityId ? { city_id: BigInt(cityId) } : {}),
@@ -640,7 +644,7 @@ export async function searchAds(params: SearchParamsT) {
  */
 export async function searchAdsRelaxed(params: SearchParamsT) {
   const hasOriginalFilter = !!(
-    params.q?.trim() || params.categoryId || params.cityId || params.areaId || params.type ||
+    params.q?.trim() || params.categoryId || params.categoryIds?.length || params.cityId || params.areaId || params.type ||
     params.special || params.minPrice !== undefined || params.maxPrice !== undefined
   );
   if (!hasOriginalFilter) return [];

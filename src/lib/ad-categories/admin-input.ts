@@ -1,6 +1,7 @@
 import {CATEGORY_KINDS,categoryPolicy,type CategoryKind} from './contracts';
 import {CategoryValidationError,validateDefinition} from './validation';
 import {defaultListingPolicy,validateListingPolicy} from './listing-policy';
+import {CATEGORY_SEED_TEMPLATES} from './seed-templates';
 export function nextCategoryFieldKey(fields:readonly {key:string}[]):string {
   const used=new Set(fields.map(f=>f.key));
   let n=1;
@@ -20,5 +21,8 @@ export function parseSubcategoryDefinition(fd:FormData) {
     let policyRaw:unknown;try{policyRaw=JSON.parse(policyText);}catch{throw new CategoryValidationError('','سياسة أنواع الإعلان غير صالحة');}
     listingPolicy=validateListingPolicy(policyRaw);
   }
-  return {kind,...categoryPolicy({kind,priceEnabled:fd.get('price_enabled')==='1',goodsEnabled:fd.get('goods_enabled')==='1'}),fields:validateDefinition(raw),listingPolicy};
+  const rawTemplateKey=String(fd.get('template_key')||'').trim();
+  const templateKey=rawTemplateKey&&CATEGORY_SEED_TEMPLATES.some(item=>item.key===rawTemplateKey)?rawTemplateKey:undefined;
+  if(rawTemplateKey&&!templateKey)throw new CategoryValidationError('','قالب القسم غير صالح');
+  return {kind,...categoryPolicy({kind,priceEnabled:fd.get('price_enabled')==='1',goodsEnabled:fd.get('goods_enabled')==='1'}),fields:validateDefinition(raw),listingPolicy,templateKey};
 }

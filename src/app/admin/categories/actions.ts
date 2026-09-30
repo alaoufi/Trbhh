@@ -75,7 +75,7 @@ export async function saveSubcategory(fd:FormData){
         }
         sid=BigInt(id);await tx.sub_categories.update({where:{id:sid},data:{name,order}});
       }else sid=(await tx.sub_categories.create({data:{name,order,category_id:cid,active:0}})).id;
-      const stored=encodeStoredCategoryDefinition(def.fields,def.listingPolicy);
+      const stored=encodeStoredCategoryDefinition(def.fields,def.listingPolicy,def.templateKey);
       await tx.$executeRaw`INSERT INTO ad_category_definitions(subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (${sid},1,${def.kind},${Number(def.priceEnabled)},${Number(def.goodsEnabled)},${JSON.stringify(stored)}) ON DUPLICATE KEY UPDATE version=version+1,kind=VALUES(kind),price_enabled=VALUES(price_enabled),goods_enabled=VALUES(goods_enabled),fields_json=VALUES(fields_json)`;
       await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'save_subcategory',${JSON.stringify({id:Number(sid),categoryId:cid,name,...def})})`;
     });

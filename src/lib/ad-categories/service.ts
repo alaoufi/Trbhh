@@ -10,13 +10,16 @@ import {previewHashGetAll} from '@/lib/redis';
 import {defaultListingPolicy,inferLegacyListingType,normalizeListingSubmission,validateListingPolicy,type NormalizedListingSubmission} from './listing-policy';
 import {decodeStoredCategoryDefinition} from './storage';
 import {categorySeedDefinition,findCategorySeedTemplate} from './seed-templates';
+import {buildPublicCategoryTaxonomy} from './taxonomy';
 type Tx=Prisma.TransactionClient;
 type DefinitionRow={subcategory_id:bigint;version:number;kind:string;price_enabled:number;goods_enabled:number;fields_json:unknown};
 const json=(v:unknown):unknown=>typeof v==='string'?JSON.parse(v):v;
 function definition(r:DefinitionRow, names?:{categoryName:string;subcategoryName:string;useLatestTemplates:boolean}) {
   const stored=decodeStoredCategoryDefinition(r.fields_json);
   const base={version:r.version,kind:r.kind as SubcategoryOption['kind'],...categoryPolicy({kind:r.kind,priceEnabled:r.price_enabled===1,goodsEnabled:r.goods_enabled===1}),fields:validateDefinition(stored.fields),listingPolicy:stored.listingPolicy?validateListingPolicy(stored.listingPolicy):defaultListingPolicy(r.kind),fieldsFingerprint:categoryFieldsFingerprint(stored.fields)};
-  return names?resolveCategoryDefinition(base,names.categoryName,names.subcategoryName,names.useLatestTemplates):{...base,upgradedFromBuiltInV1:false};
+  const template=names?findCategorySeedTemplate(names.categoryName,names.subcategoryName):undefined;
+  const resolved=names?resolveCategoryDefinition(base,names.categoryName,names.subcategoryName,names.useLatestTemplates):{...base,upgradedFromBuiltInV1:false};
+  return {...resolved,templateKey:stored.templateKey||template?.key};
 }
 function seededDefinition(categoryName:string,subcategoryName:string){
   const template=findCategorySeedTemplate(categoryName,subcategoryName);
@@ -28,7 +31,7 @@ export async function getCategoryFormConfig(admin=false):Promise<CategoryFormCon
   const enabled=categoryEnabled(enabledValue),useLatestTemplates=categoryEnabled(latestTemplatesValue);
   const labels={...CATEGORY_LABELS};
   for(const k of Object.keys(labels) as (keyof typeof labels)[]) labels[k]=await getSetting(`categories_v2_label_${k}`,labels[k]);
-  if(!enabled&&!admin) return {enabled,useLatestTemplates,labels,categories:[],subcategories:[]};
+  if(!enabled&&!admin) return {enabled,useLatestTemplates,labels,categories:[],subcategories:[],groups:[]};
   const [cats,subs,defs]=await Promise.all([prisma.categories.findMany({orderBy:{ordered:'asc'}}),prisma.sub_categories.findMany({orderBy:{order:'asc'}}),prisma.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions`]);
   const dm=new Map(defs.map(d=>[Number(d.subcategory_id),d]));
   const catById=new Map(cats.map(c=>[Number(c.id),c]));
@@ -44,7 +47,9 @@ export async function getCategoryFormConfig(admin=false):Promise<CategoryFormCon
     ?applyPreviewCategoryVisibility(baseCategories,baseSubcategories,parsePreviewCategoryVisibility(await previewHashGetAll(PREVIEW_CATEGORY_VISIBILITY_KEY)))
     :{categories:baseCategories,subcategories:baseSubcategories};
   const activeCategoryIds=new Set(resolved.categories.filter(c=>c.active).map(c=>c.id));
-  return {enabled,useLatestTemplates,labels,categories:resolved.categories.filter(c=>admin||c.active),subcategories:resolved.subcategories.filter(s=>admin||(s.active&&s.version>0&&activeCategoryIds.has(s.categoryId)))};
+  const availableSubcategories=resolved.subcategories.filter(s=>s.active&&s.version>0&&activeCategoryIds.has(s.categoryId));
+  const publicTaxonomy=buildPublicCategoryTaxonomy(resolved.categories,availableSubcategories);
+  return {enabled,useLatestTemplates,labels,categories:resolved.categories.filter(c=>admin||c.active),subcategories:admin?resolved.subcategories:publicTaxonomy.subcategories,groups:publicTaxonomy.groups};
 }
 export type CategorySelection={category_id:bigint;subcategory_id:number;cat_reviewed:number;priceEnabled:boolean;goodsEnabled:boolean;listing:NormalizedListingSubmission};
 export type CategoryEditContext={adId:bigint;memberId:bigint};

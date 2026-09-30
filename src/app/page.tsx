@@ -66,7 +66,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
   const [featured, latest, mostViewed, topRated, stats, homeStats, clsText] = await Promise.all([
     selectedCategory ? Promise.resolve([]) : getFeaturedAds(8),
-    selectedCategory ? searchAds({ categoryId: selectedCategory.id, take: 24, skip: 0 }) : getHomeLatestAds(8),
+    selectedCategory ? searchAds({ categoryIds: selectedCategory.categoryIds, take: 24, skip: 0 }) : getHomeLatestAds(8),
     selectedCategory ? Promise.resolve([]) : getMostViewedAds(8),
     selectedCategory ? Promise.resolve([]) : getTopRatedAds(8),
     getStats(),
@@ -93,7 +93,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     : [];
   const storeAds = selectedCategory ? [] : await homeFeaturedAds().catch(() => []);
   const feedAds = selectedCategory ? latest : mergeHomeAds(featured, latest, storeAds, mostViewed, topRated);
-  const feedSearchHref = selectedCategory ? `/search?category=${selectedCategory.id}` : '/search';
+  const feedSearchHref = selectedCategory ? `/search?category=${selectedCategory.key}` : '/search';
   const feedTexts = await getFeedBannerItems().catch(() => []);
   // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
   const [homeActionsOn, supportWhatsappOn, supportPhoneOn, supportWhatsapp, supportPhone] = await Promise.all([
@@ -171,7 +171,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
               <h2 className="text-lg font-extrabold text-[#16294a]">وش تبحث عنه اليوم؟</h2>
               <Link href="/ads/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>
             </div>
-            <PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.id.toString() }} priceOn={priceOn} placeholder={discoveryPlaceholder} compact />
+             <PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.key }} priceOn={priceOn} placeholder={discoveryPlaceholder} compact />
           </div>
         </section>
       )}

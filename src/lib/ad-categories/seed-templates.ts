@@ -298,6 +298,7 @@ export function findCategorySeedTemplate(categoryName: string, subcategoryName: 
 
 export function categorySeedDefinition(template: CategorySeedTemplate) {
   return {
+    templateKey:template.key,
     version: 1,
     kind: template.kind,
     priceEnabled: template.priceEnabled,

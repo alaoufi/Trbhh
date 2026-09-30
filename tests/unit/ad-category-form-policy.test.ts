@@ -56,12 +56,19 @@ const choiceConfig:CategoryFormConfig={
 };
 it('offers only active categories with an active configured child and only eligible dependent options',()=>{
   const html=form(choiceConfig);
-  const category=html.match(/<select[^>]*name="category_id"[^>]*>([\s\S]*?)<\/select>/)?.[1]||'';
+  const category=html.match(/<select[^>]*name="taxonomy_group"[^>]*>([\s\S]*?)<\/select>/)?.[1]||'';
   const subcategory=html.match(/<select[^>]*name="subcategory_id"[^>]*>([\s\S]*?)<\/select>/)?.[1]||'';
   expect(category).toContain('الوظائف');
   expect(category).not.toContain('عروض أخرى');expect(category).not.toContain('غير مفعّل');
   expect(subcategory).toContain('وظائف إدارية');
   expect(subcategory).not.toContain('بلا تعريف');expect(subcategory).not.toContain('فرعي مخفي');
+});
+it('uses a public group selector while posting the selected leaf database ids',()=>{
+  const grouped:CategoryFormConfig={...cfg,groups:[{key:'jobs-business',name:'وظائف وأعمال',order:1,categoryIds:[12]}],subcategories:cfg.subcategories.map(item=>({...item,groupKey:'jobs-business',sourceSubcategoryIds:[item.id]}))};
+  const html=form(grouped);
+  expect(html).toMatch(/<select[^>]*name="taxonomy_group"/);
+  expect(html).toContain('وظائف وأعمال');
+  expect(html).toMatch(/<input[^>]*type="hidden"[^>]*name="category_id"[^>]*value="12"/);
 });
 it('preserves legacy fallback editing without forcing an empty required subcategory',()=>{
   const html=renderToStaticMarkup(React.createElement(AdForm,{action:async()=>{},countries:[],cities:[],submitLabel:'حفظ',initial:{id:1,categoryId:90,subcategoryId:37},categoryConfig:choiceConfig}));

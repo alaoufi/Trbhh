@@ -35,6 +35,13 @@ beforeEach(() => {
 });
 
 describe('public search query integration', () => {
+  it('queries every source category and legacy leaf represented by the public taxonomy',async()=>{
+    await countSearchAds({categoryIds:[10,20]});
+    expect(db.ads.count.mock.calls[0][0].where).toMatchObject({category_id:{in:[10n,20n]}});
+    await countSearchAds({subcategoryIds:[101,201]});
+    expect(db.ads.count.mock.calls[1][0].where).toMatchObject({subcategory_id:{in:[101,201]}});
+    vi.useRealTimers();
+  });
   it('partitions newest by explicit checked flag rather than descending strings', async () => {
     db.ads.count.mockResolvedValue(1);
     db.ads.findMany.mockImplementation(async ({where,skip,take,orderBy}) => {

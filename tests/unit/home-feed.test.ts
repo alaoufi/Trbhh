@@ -17,10 +17,10 @@ describe('continuous home feed', () => {
   });
   it('wires a bounded selected-only grid and suppresses unrelated recommendations', () => {
     const page=readFileSync('src/app/page.tsx','utf8');
-    expect(page).toContain('searchAds({ categoryId: selectedCategory.id, take: 24, skip: 0 })');
+    expect(page).toContain('searchAds({ categoryIds: selectedCategory.categoryIds, take: 24, skip: 0 })');
     expect(page).toMatch(/<AdGrid\s+ads=\{feedAds\}(?:\s+appearance="marketplace")?\s*\/>/);
     expect(page).toContain('personalizedDiscoveryOn && personalizedAds.length');
-    expect(page).toContain('category=${selectedCategory.id}');
+    expect(page).toContain('category=${selectedCategory.key}');
   });
   it('places featured first and removes duplicates without mutating sources', () => {
     const featured = [{ id: 2 }, { id: 1 }];

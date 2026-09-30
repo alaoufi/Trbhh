@@ -15,6 +15,7 @@ import { saveSearchAction, deleteSavedSearchAction } from './actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import {getCategoryFormConfig} from '@/lib/ad-categories/service';
 import {fieldApplies} from '@/lib/ad-categories/validation';
+import {selectedHomeCategory} from '@/lib/home-feed';
 
 export const metadata = {
   title: 'بحث متقدم',
@@ -38,22 +39,23 @@ export default async function SearchPage({
   const cityId = cities.some((item) => item.countryId === 1 && item.id === sq.cityId) ? sq.cityId : undefined;
   const areaId = cityId && areas.some((item) => item.cityId === cityId && item.id === sq.areaId) ? sq.areaId : undefined;
   const requestedSubcategory=positiveSearchId(sp.subcategory);
-  const selectedSubcategory=categoryConfig.subcategories.find(item=>item.active&&item.version>0&&item.id===requestedSubcategory&&(!sq.categoryId||item.categoryId===sq.categoryId));
+  const selectedGroup=selectedHomeCategory(categoryConfig,sp.category);
+  const selectedSubcategory=categoryConfig.subcategories.find(item=>item.active&&item.version>0&&requestedSubcategory!==undefined&&(item.sourceSubcategoryIds||[item.id]).includes(requestedSubcategory)&&(selectedGroup?item.groupKey===selectedGroup.key:true));
   const listingType=selectedSubcategory?.listingPolicy?.types.some(item=>item.key===sp.listingType)?sp.listingType:undefined;
   const dependencyValues=Object.fromEntries(Object.entries(sp).filter(([key,value])=>key.startsWith('attr_')&&!key.endsWith('_min')&&!key.endsWith('_max')&&value).map(([key,value])=>[key.slice(5),value!]));
   const visibleFilterFields=(selectedSubcategory?.fields||[]).filter(field=>field.filterable&&fieldApplies(field,{listingType,values:dependencyValues}));
   const attributes=normalizeCategoryAttributeFilters(visibleFilterFields,sp,listingType,dependencyValues);
-  const query = { ...sq,categoryId:selectedSubcategory?.categoryId??sq.categoryId,subcategoryId:selectedSubcategory?.id,listingType,attributeFilters:attributes.filters,searchableFields:(selectedSubcategory?.fields||[]).filter(field=>field.searchable).map(field=>({key:field.key})), cityId, areaId };
+  const query = { ...sq,categoryId:undefined,categoryIds:selectedSubcategory?undefined:selectedGroup?.categoryIds,subcategoryId:undefined,subcategoryIds:selectedSubcategory?.sourceSubcategoryIds||[],listingType,attributeFilters:attributes.filters,searchableFields:(selectedSubcategory?.fields||[]).filter(field=>field.searchable).map(field=>({key:field.key})), cityId, areaId };
   const PAGE_SIZE = 48;
   const total = await countSearchAds(query);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(positiveSearchId(sp.page) || 1, pages);
   const ads = await searchAds({ ...query, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE });
-  const hasFilters = !!(query.categoryId || query.subcategoryId || query.listingType || query.attributeFilters.length || query.q || cityId || query.type || query.special || query.minPrice !== undefined || query.maxPrice !== undefined);
+  const hasFilters = !!(query.categoryIds?.length || query.subcategoryIds.length || query.listingType || query.attributeFilters.length || query.q || cityId || query.type || query.special || query.minPrice !== undefined || query.maxPrice !== undefined);
   const relaxedAds = ads.length === 0 && hasFilters && recoveryOn ? await searchAdsRelaxed(query) : [];
   const params = {
-    category: query.categoryId?.toString(),
-    subcategory:query.subcategoryId?.toString(),listingType:query.listingType,
+    category:selectedGroup?.key,
+    subcategory:selectedSubcategory?.id.toString(),listingType:query.listingType,
     q: query.q, city: cityId?.toString(), area: areaId?.toString(), type: query.type,
     sort: query.sort, special: query.special ? '1' : undefined,
     minPrice: query.minPrice?.toString(), maxPrice: query.maxPrice?.toString(),

@@ -11,11 +11,11 @@ export function AdCategoryEditor({initial,categoryId,action}:{initial?:Subcatego
   const [kind,setKind]=useState<CategoryKind>(initial?.kind||'other');
   const [listingPolicy,setListingPolicy]=useState<ListingPolicy>(initial?.listingPolicy??defaultListingPolicy(initial?.kind||'other'));
   const [price,setPrice]=useState(initial?.priceEnabled??false),[goods,setGoods]=useState(initial?.goodsEnabled??false);
-  const [template,setTemplate]=useState('');
+  const [template,setTemplate]=useState(initial?.templateKey||'');
   const update=(i:number,patch:Partial<CategoryField>)=>setFields(fields.map((f,n)=>n===i?{...f,...patch}:f));
   return <form action={action} className="space-y-3 rounded-xl border p-3">
     {initial&&<input type="hidden" name="id" value={initial.id}/>}
-    <input type="hidden" name="category_id" value={categoryId}/><input type="hidden" name="version" value={initial?.version??0}/><input type="hidden" name="fields_json" value={JSON.stringify(fields)}/><input type="hidden" name="listing_policy_json" value={JSON.stringify(listingPolicy)}/>
+    <input type="hidden" name="category_id" value={categoryId}/><input type="hidden" name="version" value={initial?.version??0}/><input type="hidden" name="fields_json" value={JSON.stringify(fields)}/><input type="hidden" name="listing_policy_json" value={JSON.stringify(listingPolicy)}/><input type="hidden" name="template_key" value={template}/>
     <div className="grid gap-2 sm:grid-cols-3"><label>اسم القسم الفرعي<input name="name" className={input} required maxLength={200} defaultValue={initial?.name}/></label><label>الترتيب<input name="order" type="number" min={0} max={10000} className={input} defaultValue={initial?.order??0}/></label><label>النوع<select name="kind" className={input} value={kind} onChange={e=>{const next=e.target.value as CategoryKind;setKind(next);setListingPolicy(defaultListingPolicy(next));if(next==='jobs'){setPrice(false);setGoods(false);}}}>{CATEGORY_KINDS.map(k=><option key={k} value={k}>{({goods:'سلع',property:'عقارات',jobs:'وظائف',service:'خدمات',livestock:'مواشٍ',plants:'نباتات',other:'أخرى'})[k]}</option>)}</select></label></div>
     <div className="flex flex-wrap gap-4"><label><input type="checkbox" name="price_enabled" value="1" checked={kind!=='jobs'&&price} disabled={kind==='jobs'} onChange={e=>setPrice(e.target.checked)}/> إظهار السعر العام</label><label><input type="checkbox" name="goods_enabled" value="1" checked={kind!=='jobs'&&goods} disabled={kind==='jobs'} onChange={e=>setGoods(e.target.checked)}/> إظهار تفاصيل السلع العامة</label></div>
     <fieldset className="space-y-2 rounded-xl border border-amber-300 bg-amber-50/50 p-3"><legend className="px-2 font-bold">أنواع الإعلان والتسعير المسموح</legend>

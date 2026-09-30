@@ -7,6 +7,7 @@ import { allowAutomaticPrompt, claimPromptSession, PROMPT_SESSION_KEY } from '@/
 import { PublicSearchForm } from '@/components/public-search-form';
 import { AdCard, AdCardList, AdCardShop } from '@/components/ad-card';
 import type { AdCard as Card } from '@/lib/data';
+import {CATEGORY_LABELS,type CategoryFormConfig} from '@/lib/ad-categories/contracts';
 
 vi.mock('next/headers', () => ({ cookies: vi.fn() }));
 vi.mock('next/image', () => ({ default: ({ src, alt }: { src: string; alt: string }) => createElement('img', { src, alt }) }));
@@ -86,6 +87,14 @@ describe('public search form controls', () => {
     const html = renderToStaticMarkup(createElement(PublicSearchForm, { ...location, compact: true }));
     expect(html.match(/<form[^>]*role="search"[^>]*>/)?.[0]).toContain('space-y-2');
     expect(html.match(/<details[^>]*>/)?.[0]).toContain('py-1.5');
+  });
+  it('shows one canonical group and omits an exact legacy duplicate leaf',()=>{
+    const base={active:true,order:1,version:1,kind:'goods' as const,priceEnabled:true,goodsEnabled:true,fields:[]};
+    const categoryConfig:CategoryFormConfig={enabled:true,labels:CATEGORY_LABELS,categories:[{id:10,name:'الحديث',active:true,order:1},{id:20,name:'القديم',active:true,order:2}],groups:[{key:'vehicles-equipment',name:'سيارات ونقليات ومعدات',order:1,categoryIds:[10,20]}],subcategories:[{...base,id:101,categoryId:10,name:'سيارات',groupKey:'vehicles-equipment',sourceSubcategoryIds:[101,201]}]};
+    const html=renderToStaticMarkup(createElement(PublicSearchForm,{...location,categoryConfig,params:{category:'vehicles-equipment'}}));
+    expect(html.match(/>سيارات ونقليات ومعدات</g)).toHaveLength(1);
+    expect(html.match(/>سيارات</g)).toHaveLength(1);
+    expect(html).not.toContain('القديم');
   });
 });
 

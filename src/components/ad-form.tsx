@@ -21,6 +21,7 @@ import type { CategoryFormConfig } from '@/lib/ad-categories/contracts';
 import type { CategoryValues } from '@/lib/ad-categories/validation';
 import {AdListingPolicyFields} from '@/components/ad-listing-policy-fields';
 import {defaultListingPolicy,inferLegacyListingType,inferLegacyPricingMode,isRequestListingType,PRICING_LABELS,type ListingTypeKey,type PricingModeKey} from '@/lib/ad-categories/listing-policy';
+import {publicCategoryGroups} from '@/lib/home-feed';
 
 const MAX_VIDEO = 25 * 1024 * 1024; // 25MB
 
@@ -92,12 +93,14 @@ export function AdForm({
   const [adsType, setAdsType] = useState(initial?.adsType === 'request' ? 'request' : 'offer');
   const [listingType,setListingType]=useState<ListingTypeKey>(inferLegacyListingType({listingType:initial?.listingType,adsType:initial?.adsType,priceType:initial?.priceType}));
   const [pricingMode,setPricingMode]=useState<PricingModeKey>(inferLegacyPricingMode({priceType:initial?.priceType,rentPeriod:initial?.rentPeriod}));
-  const [categoryId, setCategoryId] = useState(String(initial?.categoryId || ''));
+  const initialCategoryOption=categoryConfig?.subcategories.find(s=>s.id===initial?.subcategoryId&&s.categoryId===initial?.categoryId);
+  const [categoryGroup, setCategoryGroup] = useState(initialCategoryOption?.groupKey||String(initial?.categoryId || ''));
   const [subcategoryId, setSubcategoryId] = useState(String(initial?.subcategoryId || ''));
   const [categoryValues, setCategoryValues] = useState<CategoryValues>(initial?.categoryValues || {});
   const eligibleSubs = categoryConfig?.subcategories.filter(s => s.active && s.version > 0 && categoryConfig.categories.some(c => c.id === s.categoryId && c.active)) || [];
   const eligibleCategories = categoryConfig?.categories.filter(c => c.active && eligibleSubs.some(s => s.categoryId === c.id)) || [];
-  const selectedSub = eligibleSubs.find(s => String(s.id) === subcategoryId && String(s.categoryId) === categoryId);
+  const eligibleGroups=categoryConfig?publicCategoryGroups({...categoryConfig,categories:eligibleCategories}).filter(group=>eligibleSubs.some(sub=>(sub.groupKey||String(sub.categoryId))===group.key)):[];
+  const selectedSub = eligibleSubs.find(s => String(s.id) === subcategoryId && (s.groupKey||String(s.categoryId)) === categoryGroup);
   const categoryOn = categoryConfig?.enabled === true;
   const canPreserveCategory = !!initial?.id && !categoryConfig?.subcategories.some(s => s.id === initial.subcategoryId && s.categoryId === initial.categoryId && s.active && s.version > 0 && categoryConfig.categories.some(c => c.id === s.categoryId && c.active));
   const [categoryMode, setCategoryMode] = useState(canPreserveCategory ? 'preserve' : 'select');
@@ -327,17 +330,18 @@ export function AdForm({
       <Section icon={Tag} title={isReq ? 'بيانات الطلب' : 'بيانات العرض'}>
         {categoryOn && <fieldset className="space-y-2 rounded-xl border border-primary/20 p-3">
           <legend className="px-2 text-sm font-bold">{categoryConfig.labels.section}</legend>
-          {canPreserveCategory && <label className={lbl}>{categoryConfig.labels.preserveHint}<select name="category_mode" className={field} value={categoryMode} onChange={e=>{setCategoryMode(e.target.value);setCategoryId('');setSubcategoryId('');setCategoryValues({});}}>
+          {canPreserveCategory && <label className={lbl}>{categoryConfig.labels.preserveHint}<select name="category_mode" className={field} value={categoryMode} onChange={e=>{setCategoryMode(e.target.value);setCategoryGroup('');setSubcategoryId('');setCategoryValues({});}}>
             <option value="preserve">{categoryConfig.labels.preserve}</option><option value="select">{categoryConfig.labels.reclassify}</option>
           </select></label>}
           {!preservingCategory && <><div className="grid gap-2 sm:grid-cols-2">
-            <label className={lbl}>{categoryConfig.labels.category}<select className={field} name="category_id" required value={categoryId} onChange={e=>{setCategoryId(e.target.value);setSubcategoryId('');setCategoryValues({});}}>
-              <option value="">{categoryConfig.labels.choose}</option>{eligibleCategories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            <label className={lbl}>{categoryConfig.labels.category}<select className={field} name="taxonomy_group" required value={categoryGroup} onChange={e=>{setCategoryGroup(e.target.value);setSubcategoryId('');setCategoryValues({});}}>
+              <option value="">{categoryConfig.labels.choose}</option>{eligibleGroups.map(group=><option key={group.key} value={group.key}>{group.name}</option>)}
             </select></label>
             <label className={lbl}>{categoryConfig.labels.subcategory}<select className={field} name="subcategory_id" required value={subcategoryId} onChange={e=>{const value=e.target.value;setSubcategoryId(value);setCategoryValues({});const next=eligibleSubs.find(s=>String(s.id)===value);const nextPolicy=next?.listingPolicy??defaultListingPolicy(next?.kind||'other');setListingType(nextPolicy.types[0].key);setPricingMode(nextPolicy.types[0].pricing[0]);}}>
-              <option value="">{categoryConfig.labels.choose}</option>{eligibleSubs.filter(s=>String(s.categoryId)===categoryId).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+              <option value="">{categoryConfig.labels.choose}</option>{eligibleSubs.filter(s=>(s.groupKey||String(s.categoryId))===categoryGroup).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
             </select></label>
           </div>
+          <input type="hidden" name="category_id" value={selectedSub?.categoryId||''}/>
           <input type="hidden" name="category_version" value={selectedSub?.version || ''}/>
           {selectedSub&&<AdListingPolicyFields policy={listingPolicy} listingType={effectiveListingType} pricingMode={effectivePricingMode} onListingType={value=>{setListingType(value);setCategoryValues({});}} onPricingMode={setPricingMode} initialPrice={initial?.price} priceEnabled={priceEnabled}/>} 
           {selectedSub && <AdCategoryFields key={`${selectedSub.id}:${selectedSub.version}:${effectiveListingType}`} fields={selectedSub.fields} values={categoryValues} onChange={setCategoryValues} listingType={effectiveListingType}/>}

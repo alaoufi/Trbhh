@@ -67,9 +67,9 @@ const decor = [condition, m('material', 'المادة', ['صوف', 'قطن', 'أ
 const rugDecor = decor.map(field => field.key === 'material'
   ? s('material', 'المادة', ['صوف', 'قطن', 'ألياف صناعية', 'خشب', 'معدن', 'زجاج', 'أخرى'])
   : field);
-const equipment = [f('manufacturer', 'المصنع'), f('model', 'الطراز'), { ...n('year', 'سنة الصنع'), min: 1900, max: 2100 }, condition,
-  n('operating_hours', 'ساعات التشغيل', 'ساعة'), n('engine_power_kw', 'قدرة المحرك', 'كيلوواط'),
-  n('operating_weight_t', 'الوزن التشغيلي', 'طن'), s('power_source', 'مصدر الطاقة', ['ديزل','بنزين','غاز','كهرباء','هجين','أخرى']),
+const equipment = [f('manufacturer', 'المصنع'), f('model', 'الطراز'), { ...n('year', 'سنة الصنع'), min: 1900, max: 2100, step:1 }, condition,
+  {...n('operating_hours', 'ساعات التشغيل', 'ساعة'),min:0,max:200000,step:1}, {...n('engine_power_kw', 'قدرة المحرك', 'كيلوواط'),min:1,max:5000,step:1},
+  {...n('operating_weight_t', 'الوزن التشغيلي', 'طن'),min:0.1,max:1000,step:0.1}, s('power_source', 'مصدر الطاقة', ['ديزل','بنزين','غاز','كهرباء','هجين','أخرى']),
   s('drive','نظام الحركة',['دفع ثنائي','دفع رباعي','مجنزرة','أخرى'],'المواصفات الفنية'),f('origin_country','بلد المنشأ','text',[],'المواصفات الفنية'),
   {...yes('operator_included', 'يشمل المشغل','الإيجار'),...when('listing_type','rent')},
   {...yes('transport_included','يشمل نقل المعدة','الإيجار'),...when('listing_type','rent')},
@@ -179,11 +179,11 @@ const CORE_CATEGORY_SEED_TEMPLATES: CategorySeedTemplate[] = [
   template('contracting', 'مواد بناء ومقاولات', 'مقاولات وتشطيبات', 'service', [m('trade', 'التخصص', ['عظم', 'تشطيب', 'بلاط', 'دهان', 'سباكة', 'كهرباء', 'عزل']), n('work_area_m2', 'مساحة الأعمال', 'م²'), s('contract_scope', 'نطاق التعاقد', ['عمل فقط', 'مواد وعمل', 'توريد فقط']), n('duration_days', 'مدة التنفيذ', 'يوم'), f('service_coverage', 'نطاق التغطية'), f('warranty', 'ضمان العمل')], ['trade', 'contract_scope']),
   template('earthmoving', 'نقليات ومعدات ثقيلة', 'معدات حفر وتحميل', 'goods', [s('equipment_kind', 'نوع المعدة', ['حفار', 'شيول', 'بلدوزر', 'أخرى']), ...equipment, m('attachments', 'الملحقات', ['باكت', 'مطرقة', 'شوك', 'أخرى']), {...n('bucket_m3', 'سعة الباكت', 'م³'),...when('equipment_kind',['حفار','شيول'])},{...n('blade_width_m','عرض الشفرة','متر'),...when('equipment_kind','بلدوزر')}], ['equipment_kind', 'manufacturer', 'model', 'year', 'condition','power_source']),
   template('lifting', 'نقليات ومعدات ثقيلة', 'رافعات ومناولة', 'goods', [s('equipment_kind', 'نوع المعدة', ['رافعة', 'رافعة شوكية', 'مناولة تلسكوبية','رافعة مقصية','رافعة أشخاص']), ...equipment,
-    {...n('capacity_t', 'حمولة الرفع المقننة', 'طن'),...when('equipment_kind',['رافعة','رافعة شوكية','مناولة تلسكوبية'])},
-    n('lift_height_m', 'ارتفاع الرفع أو العمل', 'متر'),
+    {...n('capacity_t', 'حمولة الرفع المقننة', 'طن'),min:0.1,max:2000,step:0.1,...when('equipment_kind',['رافعة','رافعة شوكية','مناولة تلسكوبية'])},
+    {...n('lift_height_m', 'ارتفاع الرفع أو العمل', 'متر'),min:0.1,max:250,step:0.1},
     {...n('mast_stages','عدد مراحل السارية','مرحلة'),...when('equipment_kind','رافعة شوكية')},
     {...n('boom_length_m','طول الذراع','متر'),...when('equipment_kind',['رافعة','مناولة تلسكوبية'])},
-    {...n('platform_capacity_kg','حمولة المنصة','كجم'),...when('equipment_kind',['رافعة مقصية','رافعة أشخاص'])}], ['equipment_kind', 'manufacturer', 'model', 'year', 'condition','power_source','lift_height_m']),
+    {...n('platform_capacity_kg','حمولة المنصة','كجم'),min:50,max:2000,step:1,...when('equipment_kind',['رافعة مقصية','رافعة أشخاص'])}], ['equipment_kind', 'manufacturer', 'model', 'year', 'condition','power_source','lift_height_m']),
   template('commercial_vehicles', 'نقليات ومعدات ثقيلة', 'شاحنات ومقطورات', 'goods', [...vehicle, s('truck_type', 'النوع', ['قلاب', 'سطحة', 'قاطرة', 'مقطورة', 'براد', 'صهريج', 'أخرى']), n('capacity_t', 'الحمولة', 'طن'), n('axles', 'عدد المحاور')], ['make', 'model', 'year', 'condition', 'truck_type']),
   template('transport_service', 'نقليات ومعدات ثقيلة', 'خدمات نقل وتشغيل', 'service', [s('service_kind', 'الخدمة', ['نقل بضائع', 'نقل معدات', 'نقل أثاث', 'تشغيل معدات']), f('service_route', 'مسار النقل'), n('capacity_t', 'الحمولة', 'طن'), yes('operator_included', 'يشمل المشغل'), yes('loading_included', 'يشمل التحميل والتنزيل'), f('availability', 'مواعيد التوفر')], ['service_kind', 'service_route']),
 ];

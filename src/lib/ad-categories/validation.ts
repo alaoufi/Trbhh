@@ -4,7 +4,7 @@ export type ConditionEffect = 'show' | 'hide' | 'require';
 export type CategoryField = {
   key: string; label: string; type: CategoryFieldType; group: string;
   required: boolean; visible: boolean; order: number;
-  options: string[]; min?: number; max?: number; unit?: string;
+  options: string[]; min?: number; max?: number; step?: number; unit?: string;
   placeholder?: string; helpText?: string;
   searchable?: boolean; filterable?: boolean; comparable?: boolean; showInCard?: boolean; showInDetails?: boolean;
   dependsOn?: string; dependencyOperator?: DependencyOperator; dependencyValue?: string | number | boolean | string[]; conditionEffect?: ConditionEffect;
@@ -16,6 +16,16 @@ const TYPES = new Set(['text', 'textarea', 'number', 'decimal', 'select', 'multi
 const DEPENDENCY_OPERATORS = new Set<DependencyOperator>(['equals','not_equals','in','not_in','truthy']);
 const CONDITION_EFFECTS = new Set<ConditionEffect>(['show','hide','require']);
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const UNIT_ALIASES:Record<string,string>={
+  kg:'كجم',kilogram:'كجم','كيلوجرام':'كجم',ton:'طن',tonne:'طن',km:'كم',kilometer:'كم',
+  hour:'ساعة',hours:'ساعة',kw:'كيلوواط',hp:'حصان',meter:'متر',metre:'متر',m:'متر',
+  'm2':'م²','m²':'م²',liter:'لتر',litre:'لتر',l:'لتر',cm:'سم',mm:'مم','m3':'م³','m³':'م³',
+};
+
+export function canonicalCategoryUnit(value:string){
+  const unit=value.trim();
+  return UNIT_ALIASES[unit.toLowerCase()]||unit;
+}
 
 export class CategoryValidationError extends Error {
   constructor(public readonly fieldKey: string, message: string) { super(message); }
@@ -50,7 +60,9 @@ export function validateDefinition(raw: unknown): CategoryField[] {
       }
     }
     if (typeof f.min === 'number' && typeof f.max === 'number' && f.min > f.max) throw new CategoryValidationError(key, 'الحد الأدنى أكبر من الأعلى');
-    if (f.unit !== undefined && (typeof f.unit !== 'string' || f.unit.length > 30)) throw new CategoryValidationError(key, 'وحدة القياس غير صالحة');
+    if(f.step!==undefined&&(typeof f.step!=='number'||!Number.isFinite(f.step)||f.step<=0))throw new CategoryValidationError(key,'خطوة الحقل غير صالحة');
+    if(f.step!==undefined&&!['number','decimal','year','range'].includes(String(f.type)))throw new CategoryValidationError(key,'خطوة الحقل لا تناسب نوعه');
+    if (f.unit !== undefined && (typeof f.unit !== 'string' || f.unit.length > 30 || /[<>]/.test(f.unit))) throw new CategoryValidationError(key, 'وحدة القياس غير صالحة');
     for(const prop of ['placeholder','helpText'] as const)if(f[prop]!==undefined&&(typeof f[prop]!=='string'||f[prop].length>(prop==='helpText'?500:160)))throw new CategoryValidationError(key,'النص الإرشادي غير صالح');
     for(const prop of ['searchable','filterable','comparable','showInCard','showInDetails'] as const)if(f[prop]!==undefined&&typeof f[prop]!=='boolean')throw new CategoryValidationError(key,'خصائص العرض غير صالحة');
     if(f.dependsOn!==undefined&&(typeof f.dependsOn!=='string'||(f.dependsOn!=='listing_type'&&!/^[a-z][a-z0-9_]{0,47}$/.test(f.dependsOn))))throw new CategoryValidationError(key,'الحقل المتحكم غير صالح');
@@ -60,7 +72,8 @@ export function validateDefinition(raw: unknown): CategoryField[] {
     return { key, label: f.label.trim(), type: f.type as CategoryFieldType, group: f.group.trim(),
       required: f.required, visible: f.visible, order: f.order as number, options,
       ...(typeof f.min === 'number' ? { min: f.min } : {}), ...(typeof f.max === 'number' ? { max: f.max } : {}),
-      ...(typeof f.unit === 'string' ? { unit: f.unit.trim() } : {}),
+      ...(typeof f.step === 'number' ? { step: f.step } : {}),
+      ...(typeof f.unit === 'string' ? { unit: canonicalCategoryUnit(f.unit) } : {}),
       ...(typeof f.placeholder==='string'&&f.placeholder.trim()?{placeholder:f.placeholder.trim()}:{}),
       ...(typeof f.helpText==='string'&&f.helpText.trim()?{helpText:f.helpText.trim()}:{}),
       searchable:f.searchable===true,filterable:f.filterable===true,comparable:f.comparable===true,showInCard:f.showInCard===true,showInDetails:f.showInDetails!==false,
@@ -74,6 +87,11 @@ function empty(value: unknown) {
 }
 
 export type CategoryFieldContext={listingType?:string;values?:CategoryValues;grandfatherMissingRequired?:ReadonlySet<string>};
+function matchesStep(value:number,field:CategoryField){
+  if(field.step===undefined)return true;
+  const base=field.min??0,quotient=(value-base)/field.step;
+  return Math.abs(quotient-Math.round(quotient))<=1e-8;
+}
 function equal(a:unknown,b:unknown){return String(a)===String(b);}
 function fieldConditionMatches(field:CategoryField,context:CategoryFieldContext):boolean{
   if(!field.dependsOn)return true;
@@ -116,7 +134,7 @@ export function validateCategoryValues(fields: CategoryField[], raw: unknown, co
       case 'number': case 'decimal': case 'year': {
         if (typeof value !== 'number' && (typeof value !== 'string' || !/^-?\d+(?:\.\d+)?$/.test(value.trim()))) fail();
         const n = Number(value);
-        if (!Number.isFinite(n) || Math.abs(n) > Number.MAX_SAFE_INTEGER || (f.min !== undefined && n < f.min) || (f.max !== undefined && n > f.max)) fail();
+        if (!Number.isFinite(n) || Math.abs(n) > Number.MAX_SAFE_INTEGER || (f.min !== undefined && n < f.min) || (f.max !== undefined && n > f.max) || !matchesStep(n,f)) fail();
         out[f.key] = n;
         break;
       }
@@ -132,7 +150,7 @@ export function validateCategoryValues(fields: CategoryField[], raw: unknown, co
       case 'range': {
         if(!value||typeof value!=='object'||Array.isArray(value))fail();
         const range=value as Record<string,unknown>,min=Number(range.min),max=Number(range.max);
-        if(!Number.isFinite(min)||!Number.isFinite(max)||min>max||(f.min!==undefined&&min<f.min)||(f.max!==undefined&&max>f.max))fail();
+        if(!Number.isFinite(min)||!Number.isFinite(max)||min>max||(f.min!==undefined&&min<f.min)||(f.max!==undefined&&max>f.max)||!matchesStep(min,f)||!matchesStep(max,f))fail();
         out[f.key]={min,max};
         break;
       }

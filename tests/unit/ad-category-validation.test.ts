@@ -45,6 +45,14 @@ describe('real-ad subcategory field validation', () => {
     expect(() => validateDefinition([{ ...field(), type: ['select'] }])).toThrow();
     expect(() => validateDefinition([{ ...field(), type: { toString: () => 'select' } }])).toThrow();
   });
+  it('enforces an explicit numeric step and normalizes common unit aliases', () => {
+    const numeric = field({ type: 'decimal', key: 'capacity', min: 0.1, max: 200, step: 0.1, unit: 'ton' });
+    const [definition] = validateDefinition([numeric]);
+    expect(definition).toMatchObject({ min: 0.1, max: 200, step: 0.1, unit: 'طن' });
+    expect(validateCategoryValues([definition], { capacity: 12.3 })).toEqual({ capacity: 12.3 });
+    expect(() => validateCategoryValues([definition], { capacity: 12.34 })).toThrow('قيمة غير صالحة');
+    expect(() => validateDefinition([field({ type: 'number', step: 0 })])).toThrow('خطوة الحقل غير صالحة');
+  });
   it('normalizes display, search and help metadata while preserving old definitions', () => {
     const [normalized] = validateDefinition([{...field(), placeholder:'اختر الاستخدام', helpText:'اختر الأقرب', searchable:true, filterable:true, comparable:true, showInCard:true, showInDetails:false}]);
     expect(normalized).toMatchObject({placeholder:'اختر الاستخدام',helpText:'اختر الأقرب',searchable:true,filterable:true,comparable:true,showInCard:true,showInDetails:false});

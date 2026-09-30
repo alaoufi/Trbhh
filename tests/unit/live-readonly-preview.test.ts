@@ -134,6 +134,15 @@ describe('Hostinger live-data read-only preview', () => {
     expect(workflow).not.toMatch(/prisma\s+db\s+push/);
   });
 
+  test('packages the read-only quality audit without granting it a write path', () => {
+    const dockerfile = readFileSync(path.join(root, 'Dockerfile'), 'utf8');
+    const audit = readFileSync(path.join(root, 'scripts/release/audit-live-ad-quality.cjs'), 'utf8');
+    expect(dockerfile).toContain('audit-live-ad-quality.cjs');
+    expect(audit).toContain('SHOW GRANTS FOR CURRENT_USER()');
+    expect(audit).toContain('audit_requires_read_only_database_user');
+    expect(audit).not.toMatch(/\$executeRaw|\b(UPDATE|DELETE|INSERT|DROP|TRUNCATE|ALTER)\s+(TABLE|FROM|INTO|ads)\b/i);
+  });
+
   test('publishes the read-only preview through a direct public HTTPS reverse proxy', () => {
     const compose = readFileSync(path.join(root, 'docker-compose.staging.yml'), 'utf8');
     const workflow = readFileSync(path.join(root, '.github/workflows/deploy-staging.yml'), 'utf8');

@@ -61,6 +61,15 @@ const LEGACY_ACTIVE_SUBCATEGORIES = [
   ['دعاية واعلان', 'تصميم واخراج'],
 ] as const;
 describe('editable specialist subcategory seed templates', () => {
+  it('gives safety-critical lifting fields explicit category-specific bounds, steps and units', () => {
+    const lifting = CATEGORY_SEED_TEMPLATES.find(template => template.key === 'lifting');
+    expect(lifting).toBeTruthy();
+    const fields = new Map(lifting!.fields.map(field => [field.key, field]));
+    expect(fields.get('capacity_t')).toMatchObject({ min: 0.1, max: 2000, step: 0.1, unit: 'طن' });
+    expect(fields.get('lift_height_m')).toMatchObject({ min: 0.1, max: 250, step: 0.1, unit: 'متر' });
+    expect(fields.get('platform_capacity_kg')).toMatchObject({ min: 50, max: 2000, step: 1, unit: 'كجم' });
+    expect(fields.get('engine_power_kw')).toMatchObject({ min: 1, max: 5000, step: 1, unit: 'كيلوواط' });
+  });
   it('covers every active legacy database subcategory explicitly', () => {
     const pairs = new Set(CATEGORY_SEED_TEMPLATES.map(template => `${template.categoryName}\u0000${template.name}`));
     expect(LEGACY_ACTIVE_SUBCATEGORIES).toHaveLength(55);

@@ -16,7 +16,7 @@ it('seeds only an empty dedicated loopback preview with synthetic accounts', asy
     expect(await db.ads.count()).toBe(0);
     // Prisma cannot express MySQL collations; restore the commerce DDL's strict
     // identifier collation on this EMPTY, disposable db-push fixture only.
-    for (const table of ['commerce_products', 'commerce_orders', 'commerce_order_items', 'commerce_payment_attempts', 'commerce_notifications', 'commerce_audit_events']) {
+    for (const table of ['commerce_products', 'commerce_orders', 'commerce_order_items', 'commerce_payment_attempts', 'commerce_notifications', 'commerce_audit_events', 'commerce_receipts']) {
       await db.$executeRawUnsafe(`ALTER TABLE ${table} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`);
     }
     for (const ddl of CATEGORY_DDL) await db.$executeRawUnsafe(ddl);

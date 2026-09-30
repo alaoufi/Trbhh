@@ -12,6 +12,7 @@ describe('isolated pre-production browser gate', () => {
     expect(setup).toContain("url.hostname !== '127.0.0.1'");
     expect(setup).toContain("url.pathname !== '/trbhh_commerce_preview_20260919'");
     expect(setup).toContain("COMMERCE_PREVIEW_FIXTURE !== '1'");
+    expect(setup).toContain("'commerce_receipts'");
   });
 
   it('runs the browser journey in CI and keeps its screenshots', () => {

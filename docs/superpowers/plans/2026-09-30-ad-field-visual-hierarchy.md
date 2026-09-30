@@ -15,17 +15,17 @@
 **Files:**
 - Modify: `tests/unit/ad-category-fields.test.ts`
 
-- [ ] **Step 1: Write failing markup tests**
+- [x] **Step 1: Write failing markup tests**
 
 Add assertions for `data-field-group`, `data-required`, red required styling, green optional styling, compact spacing, and required range controls.
 
-- [ ] **Step 2: Run the focused test and verify failure**
+- [x] **Step 2: Run the focused test and verify failure**
 
 Run: `pnpm test -- tests/unit/ad-category-fields.test.ts`
 
 Expected: FAIL because the new semantic attributes and required range behavior do not exist yet.
 
-- [ ] **Step 3: Keep the failure focused**
+- [x] **Step 3: Keep the failure focused**
 
 Confirm the failure references the new visual hierarchy assertions rather than an unrelated import or environment error.
 
@@ -34,23 +34,23 @@ Confirm the failure references the new visual hierarchy assertions rather than a
 **Files:**
 - Modify: `src/components/ad-category-fields.tsx`
 
-- [ ] **Step 1: Add local invalid state helpers**
+- [x] **Step 1: Add local invalid state helpers**
 
 Use `Set<string>` state, mark keys from each control's `onInvalid`, and clear them from value updates.
 
-- [ ] **Step 2: Apply compact group and field layouts**
+- [x] **Step 2: Apply compact group and field layouts**
 
 Use `space-y-2`, `gap-2`, compact group padding, and field cards with required red or optional green backgrounds.
 
-- [ ] **Step 3: Apply accessible invalid feedback**
+- [x] **Step 3: Apply accessible invalid feedback**
 
 Set `aria-invalid`, connect controls to one error message using `aria-describedby`, and apply a strong red border/ring only after native validation fails.
 
-- [ ] **Step 4: Require both range endpoints when configured**
+- [x] **Step 4: Require both range endpoints when configured**
 
 Add `required={f.required}` and invalid handlers to both range inputs while retaining their existing value shape.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run: `pnpm test -- tests/unit/ad-category-fields.test.ts tests/unit/ad-category-dynamic-ui.test.ts`
 
@@ -61,11 +61,11 @@ Expected: PASS.
 **Files:**
 - Modify: `tests/preview/browser.cjs`
 
-- [ ] **Step 1: Add stable visual hierarchy assertions**
+- [x] **Step 1: Add stable visual hierarchy assertions**
 
 Assert that a required field has `data-required="true"`, an optional field has `data-required="false"`, and grouped fieldsets expose `data-field-group`.
 
-- [ ] **Step 2: Preserve existing dynamic-field assertions**
+- [x] **Step 2: Preserve existing dynamic-field assertions**
 
 Keep all current category-switching and conditional-field checks unchanged.
 
@@ -76,11 +76,11 @@ Keep all current category-switching and conditional-field checks unchanged.
 - Modify: `src/app/guide/store/page.tsx`
 - Modify: `src/app/admin/guide/page.tsx`
 
-- [ ] **Step 1: Document member-facing visual meaning**
+- [x] **Step 1: Document member-facing visual meaning**
 
 Explain that light red cards are required, light green cards are optional, and strong red borders identify missing required values after submission.
 
-- [ ] **Step 2: Document admin behavior**
+- [x] **Step 2: Document admin behavior**
 
 Clarify that required/optional styling follows the saved field setting automatically and does not override admin configuration.
 
@@ -91,27 +91,26 @@ Clarify that required/optional styling follows the saved field setting automatic
 - Test: `tests/unit/ad-category-dynamic-ui.test.ts`
 - Test: `tests/preview/browser.cjs`
 
-- [ ] **Step 1: Run focused tests**
+- [x] **Step 1: Run focused tests**
 
 Run: `pnpm test -- tests/unit/ad-category-fields.test.ts tests/unit/ad-category-dynamic-ui.test.ts`
 
 Expected: all focused tests pass.
 
-- [ ] **Step 2: Run repository quality gates**
+- [x] **Step 2: Run repository quality gates**
 
 Run: `npx tsc --noEmit`, `pnpm lint`, `pnpm build`, and `pnpm test`.
 
 Expected: zero new errors; existing warnings are reported separately.
 
-- [ ] **Step 3: Review the branch diff**
+- [x] **Step 3: Review the branch diff**
 
 Confirm no schema, migration, payment, supplier-order, or production configuration changes exist.
 
-- [ ] **Step 4: Synchronize safely and commit**
+- [x] **Step 4: Synchronize safely and commit**
 
 Fetch the remote branch, compare local and remote HEAD, preserve any remote advancement, then commit in Arabic and push only the current feature branch.
 
-- [ ] **Step 5: Verify staging visually**
+- [x] **Step 5: Verify staging visually**
 
 Open the staging ad form at desktop and mobile widths, exercise native required validation without creating an ad, and confirm no new entry appears in `/admin/errors`.
-

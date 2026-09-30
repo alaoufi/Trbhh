@@ -1,18 +1,20 @@
 export type CategoryFieldType = 'text' | 'textarea' | 'number' | 'decimal' | 'select' | 'multiselect' | 'boolean' | 'radio' | 'date' | 'year' | 'range';
 export type DependencyOperator = 'equals' | 'not_equals' | 'in' | 'not_in' | 'truthy';
+export type ConditionEffect = 'show' | 'hide' | 'require';
 export type CategoryField = {
   key: string; label: string; type: CategoryFieldType; group: string;
   required: boolean; visible: boolean; order: number;
   options: string[]; min?: number; max?: number; unit?: string;
   placeholder?: string; helpText?: string;
   searchable?: boolean; filterable?: boolean; comparable?: boolean; showInCard?: boolean; showInDetails?: boolean;
-  dependsOn?: string; dependencyOperator?: DependencyOperator; dependencyValue?: string | number | boolean | string[];
+  dependsOn?: string; dependencyOperator?: DependencyOperator; dependencyValue?: string | number | boolean | string[]; conditionEffect?: ConditionEffect;
 };
 export type CategoryRange = {min:number;max:number};
 export type CategoryValue = string | number | boolean | string[] | CategoryRange;
 export type CategoryValues = Record<string, CategoryValue>;
 const TYPES = new Set(['text', 'textarea', 'number', 'decimal', 'select', 'multiselect', 'boolean', 'radio', 'date', 'year', 'range']);
 const DEPENDENCY_OPERATORS = new Set<DependencyOperator>(['equals','not_equals','in','not_in','truthy']);
+const CONDITION_EFFECTS = new Set<ConditionEffect>(['show','hide','require']);
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 export class CategoryValidationError extends Error {
@@ -53,6 +55,7 @@ export function validateDefinition(raw: unknown): CategoryField[] {
     for(const prop of ['searchable','filterable','comparable','showInCard','showInDetails'] as const)if(f[prop]!==undefined&&typeof f[prop]!=='boolean')throw new CategoryValidationError(key,'خصائص العرض غير صالحة');
     if(f.dependsOn!==undefined&&(typeof f.dependsOn!=='string'||(f.dependsOn!=='listing_type'&&!/^[a-z][a-z0-9_]{0,47}$/.test(f.dependsOn))))throw new CategoryValidationError(key,'الحقل المتحكم غير صالح');
     if(f.dependsOn!==undefined&&(!DEPENDENCY_OPERATORS.has(f.dependencyOperator as DependencyOperator)||f.dependencyValue===undefined))throw new CategoryValidationError(key,'شرط الحقل غير مكتمل');
+    if(f.conditionEffect!==undefined&&(!f.dependsOn||!CONDITION_EFFECTS.has(f.conditionEffect as ConditionEffect)))throw new CategoryValidationError(key,'تأثير الشرط غير صالح');
     if(f.dependencyValue!==undefined&&!['string','number','boolean'].includes(typeof f.dependencyValue)&&!(Array.isArray(f.dependencyValue)&&f.dependencyValue.every(v=>typeof v==='string')))throw new CategoryValidationError(key,'قيمة الشرط غير صالحة');
     return { key, label: f.label.trim(), type: f.type as CategoryFieldType, group: f.group.trim(),
       required: f.required, visible: f.visible, order: f.order as number, options,
@@ -61,7 +64,7 @@ export function validateDefinition(raw: unknown): CategoryField[] {
       ...(typeof f.placeholder==='string'&&f.placeholder.trim()?{placeholder:f.placeholder.trim()}:{}),
       ...(typeof f.helpText==='string'&&f.helpText.trim()?{helpText:f.helpText.trim()}:{}),
       searchable:f.searchable===true,filterable:f.filterable===true,comparable:f.comparable===true,showInCard:f.showInCard===true,showInDetails:f.showInDetails!==false,
-      ...(typeof f.dependsOn==='string'?{dependsOn:f.dependsOn,dependencyOperator:f.dependencyOperator as DependencyOperator,dependencyValue:f.dependencyValue as CategoryField['dependencyValue']}:{}),
+      ...(typeof f.dependsOn==='string'?{dependsOn:f.dependsOn,dependencyOperator:f.dependencyOperator as DependencyOperator,dependencyValue:f.dependencyValue as CategoryField['dependencyValue'],...(typeof f.conditionEffect==='string'?{conditionEffect:f.conditionEffect as ConditionEffect}:{})}:{}),
     };
   }).sort((a, b) => a.order - b.order);
 }
@@ -72,8 +75,7 @@ function empty(value: unknown) {
 
 export type CategoryFieldContext={listingType?:string;values?:CategoryValues;grandfatherMissingRequired?:ReadonlySet<string>};
 function equal(a:unknown,b:unknown){return String(a)===String(b);}
-export function fieldApplies(field:CategoryField,context:CategoryFieldContext):boolean{
-  if(!field.visible)return false;
+function fieldConditionMatches(field:CategoryField,context:CategoryFieldContext):boolean{
   if(!field.dependsOn)return true;
   const source=field.dependsOn==='listing_type'?context.listingType:context.values?.[field.dependsOn];
   const expected=field.dependencyValue,operator=field.dependencyOperator;
@@ -81,6 +83,16 @@ export function fieldApplies(field:CategoryField,context:CategoryFieldContext):b
   const list=Array.isArray(expected)?expected:[expected];
   const includes=list.some(value=>equal(source,value));
   return operator==='not_equals'||operator==='not_in'?!includes:includes;
+}
+export function fieldApplies(field:CategoryField,context:CategoryFieldContext):boolean{
+  if(!field.visible)return false;
+  if(!field.dependsOn||field.conditionEffect==='require')return true;
+  const matches=fieldConditionMatches(field,context);
+  return field.conditionEffect==='hide'?!matches:matches;
+}
+export function fieldIsRequired(field:CategoryField,context:CategoryFieldContext):boolean{
+  if(!fieldApplies(field,context))return false;
+  return field.required||(field.conditionEffect==='require'&&fieldConditionMatches(field,context));
 }
 
 export function validateCategoryValues(fields: CategoryField[], raw: unknown, context:CategoryFieldContext={}): CategoryValues {
@@ -96,7 +108,7 @@ export function validateCategoryValues(fields: CategoryField[], raw: unknown, co
   for (const f of active.values()) {
     const value = Object.hasOwn(input, f.key) ? input[f.key] : undefined;
     if (empty(value)) {
-      if (f.required&&!context.grandfatherMissingRequired?.has(f.key)) throw new CategoryValidationError(f.key, `الحقل مطلوب: ${f.label}`);
+      if (fieldIsRequired(f,{...context,values:conditionValues})&&!context.grandfatherMissingRequired?.has(f.key)) throw new CategoryValidationError(f.key, `الحقل مطلوب: ${f.label}`);
       continue;
     }
     const fail = () => { throw new CategoryValidationError(f.key, `قيمة غير صالحة: ${f.label}`); };

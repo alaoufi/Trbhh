@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardCategoryValues, comparableCategoryValues, validateDefinition, validateCategoryValues, visibleCategoryValues, type CategoryField } from '@/lib/ad-categories/validation';
+import { cardCategoryValues, comparableCategoryValues, fieldApplies, fieldIsRequired, validateDefinition, validateCategoryValues, visibleCategoryValues, type CategoryField } from '@/lib/ad-categories/validation';
 
 const field = (extra: Partial<CategoryField> = {}): CategoryField => ({ key: 'use', label: 'استخدام الأرض', type: 'select', group: 'التفاصيل', required: true, visible: true, order: 1, options: ['سكني', 'تجاري'], ...extra });
 describe('real-ad subcategory field validation', () => {
@@ -71,5 +71,25 @@ describe('real-ad subcategory field validation', () => {
   it('grandfathers only explicitly missing required fields for legacy edits',()=>{
     expect(validateCategoryValues([field()],{},{grandfatherMissingRequired:new Set(['use'])})).toEqual({});
     expect(()=>validateCategoryValues([field()],{},{})).toThrow('الحقل مطلوب');
+  });
+  it('supports explicit show, hide and required conditional effects',()=>{
+    const show=field({required:false,dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent',conditionEffect:'show'});
+    const hide=field({required:false,dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent',conditionEffect:'hide'});
+    const requiredIf=field({required:false,dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent',conditionEffect:'require'});
+    expect(fieldApplies(show,{listingType:'sale'})).toBe(false);
+    expect(fieldApplies(show,{listingType:'rent'})).toBe(true);
+    expect(fieldApplies(hide,{listingType:'sale'})).toBe(true);
+    expect(fieldApplies(hide,{listingType:'rent'})).toBe(false);
+    expect(fieldApplies(requiredIf,{listingType:'sale'})).toBe(true);
+    expect(fieldApplies(requiredIf,{listingType:'rent'})).toBe(true);
+    expect(fieldIsRequired(requiredIf,{listingType:'sale'})).toBe(false);
+    expect(fieldIsRequired(requiredIf,{listingType:'rent'})).toBe(true);
+    expect(validateCategoryValues([requiredIf],{},{listingType:'sale'})).toEqual({});
+    expect(()=>validateCategoryValues([requiredIf],{},{listingType:'rent'})).toThrow('الحقل مطلوب');
+  });
+  it('rejects invalid conditional effects in administrator definitions',()=>{
+    expect(()=>validateDefinition([field({dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent',conditionEffect:'unknown' as never})])).toThrow();
+    expect(validateDefinition([field({dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent',conditionEffect:'require'})])[0])
+      .toMatchObject({conditionEffect:'require'});
   });
 });

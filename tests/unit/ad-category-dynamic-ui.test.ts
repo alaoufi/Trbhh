@@ -27,3 +27,11 @@ it('shows rental-only attributes only for rental listings',()=>{
   const rent=renderToStaticMarkup(React.createElement(AdCategoryFields,{fields,values:{},listingType:'rent',onChange:()=>{}}));
   expect(sale).not.toContain('يشمل المشغل');expect(rent).toContain('يشمل المشغل');
 });
+
+it('keeps required-if fields visible and marks them required only when the condition matches',()=>{
+  const fields:CategoryField[]=[{key:'deposit',label:'التأمين',type:'number',group:'الإيجار',required:false,visible:true,order:1,options:[],dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent',conditionEffect:'require'}];
+  const sale=renderToStaticMarkup(React.createElement(AdCategoryFields,{fields,values:{},listingType:'sale',onChange:()=>{}}));
+  const rent=renderToStaticMarkup(React.createElement(AdCategoryFields,{fields,values:{},listingType:'rent',onChange:()=>{}}));
+  expect(sale).toContain('التأمين');expect(sale).toContain('data-required="false"');expect(sale).not.toContain('required=""');
+  expect(rent).toContain('التأمين');expect(rent).toContain('data-required="true"');expect(rent).toContain('required=""');
+});

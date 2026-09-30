@@ -73,6 +73,15 @@ export function categoryFieldsFingerprint(rawFields: unknown): string {
   return createHash('sha256').update(stableJson(rawFields)).digest('hex');
 }
 
+function knownSystemFingerprints(template: (typeof CATEGORY_SEED_TEMPLATES)[number]): string[] {
+  const fingerprints = [LEGACY_V1_FIELD_FINGERPRINTS[template.key], PRE_POLICY_FIELD_FINGERPRINTS[template.key]].filter((value): value is string => Boolean(value));
+  if (template.key === 'rugs') {
+    const previousFields = template.fields.map(field => field.key === 'material' ? { ...field, type: 'multiselect' as const } : field);
+    fingerprints.push(categoryFieldsFingerprint(previousFields));
+  }
+  return fingerprints;
+}
+
 export function resolveCategoryDefinition(
   definition: ResolvableDefinition,
   categoryName: string,
@@ -81,7 +90,7 @@ export function resolveCategoryDefinition(
 ) {
   const template = CATEGORY_SEED_TEMPLATES.find(item => item.categoryName === categoryName && item.name === subcategoryName);
   const untouchedBuiltInV1 = useLatestTemplates && definition.version === 1 && template
-    && [LEGACY_V1_FIELD_FINGERPRINTS[template.key],PRE_POLICY_FIELD_FINGERPRINTS[template.key]].includes(definition.fieldsFingerprint||'');
+    && knownSystemFingerprints(template).includes(definition.fieldsFingerprint||'');
   const { fieldsFingerprint: _fingerprint, ...visibleDefinition } = definition;
   if (!untouchedBuiltInV1 || !template) return { ...visibleDefinition, upgradedFromBuiltInV1: false };
   return {

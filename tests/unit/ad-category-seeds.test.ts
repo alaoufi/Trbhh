@@ -117,6 +117,12 @@ describe('editable specialist subcategory seed templates', () => {
     }
     expect(CATEGORY_SEED_TEMPLATES.find(item=>item.key==='car')!.fields.map(field=>field.key)).not.toContain('minimum_order');
   });
+  it('uses a simple dropdown for rug material without changing multi-material decor fields',()=>{
+    const rugs=CATEGORY_SEED_TEMPLATES.find(item=>item.key==='rugs')!;
+    const curtains=CATEGORY_SEED_TEMPLATES.find(item=>item.key==='curtains')!;
+    expect(rugs.fields.find(field=>field.key==='material')).toMatchObject({type:'select',required:true});
+    expect(curtains.fields.find(field=>field.key==='material')).toMatchObject({type:'multiselect',required:true});
+  });
   it('validates representative sale and rental scenarios without leaking hidden values',()=>{
     const car=CATEGORY_SEED_TEMPLATES.find(item=>item.key==='car')!;
     const fresh=validateCategoryValues(car.fields,{make:'تويوتا',model:'كامري',year:2026,condition:'جديد',odometer_km:15},{listingType:'sale'});

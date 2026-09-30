@@ -26,6 +26,16 @@ describe('safe category template upgrades', () => {
     const resolved=resolveCategoryDefinition({version:1,kind:'goods',priceEnabled:true,goodsEnabled:true,fields:[],fieldsFingerprint:'9d5f62072037611f0423d812094f7a6a38771741f229fac823ce057846a84bf6'},current.categoryName,current.name,true);
     expect(resolved).toMatchObject({fields:current.fields,listingPolicy:current.listingPolicy,upgradedFromBuiltInV1:true});
   });
+  it('upgrades the untouched rug multi-select material to the current dropdown',()=>{
+    const current=CATEGORY_SEED_TEMPLATES.find(template=>template.key==='rugs')!;
+    const previousFields=current.fields.map(field=>field.key==='material'?{...field,type:'multiselect' as const}:field);
+    const resolved=resolveCategoryDefinition({
+      version:1,kind:'goods',priceEnabled:true,goodsEnabled:true,
+      fields:previousFields,fieldsFingerprint:categoryFieldsFingerprint(previousFields),
+    },current.categoryName,current.name,true);
+    expect(resolved.fields.find(field=>field.key==='material')).toMatchObject({type:'select'});
+    expect(resolved.upgradedFromBuiltInV1).toBe(true);
+  });
 
   it.each([
     ['disabled', false, 1, '5cf4148a9517012e201e997297ca5145bbb9b55005d04cb113e46ff4c40fce59'],

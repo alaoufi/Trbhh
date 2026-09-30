@@ -64,6 +64,9 @@ const home = [f('brand', 'العلامة التجارية'), condition,
 const decor = [condition, m('material', 'المادة', ['صوف', 'قطن', 'ألياف صناعية', 'خشب', 'معدن', 'زجاج', 'أخرى']),
   f('color', 'اللون'), s('style', 'الطراز', ['عصري', 'كلاسيكي', 'تراثي', 'بسيط', 'أخرى']), ...dimensions,
   s('placement', 'مكان الاستخدام', ['داخلي', 'خارجي', 'كلاهما']), ...delivery];
+const rugDecor = decor.map(field => field.key === 'material'
+  ? s('material', 'المادة', ['صوف', 'قطن', 'ألياف صناعية', 'خشب', 'معدن', 'زجاج', 'أخرى'])
+  : field);
 const equipment = [f('manufacturer', 'المصنع'), f('model', 'الطراز'), { ...n('year', 'سنة الصنع'), min: 1900, max: 2100 }, condition,
   n('operating_hours', 'ساعات التشغيل', 'ساعة'), n('engine_power_kw', 'قدرة المحرك', 'كيلوواط'),
   n('operating_weight_t', 'الوزن التشغيلي', 'طن'), s('power_source', 'مصدر الطاقة', ['ديزل','بنزين','غاز','كهرباء','هجين','أخرى']),
@@ -166,7 +169,7 @@ const CORE_CATEGORY_SEED_TEMPLATES: CategorySeedTemplate[] = [
   template('cookware', 'أوانٍ منزلية', 'أواني طبخ', 'goods', [s('item_kind', 'نوع الإناء', ['قدر', 'مقلاة', 'صينية', 'طقم']), ...home, n('capacity_l', 'السعة', 'لتر'), n('diameter_cm', 'القطر', 'سم'), m('compatibility', 'الاستخدام المتوافق حسب المنتج', ['غاز', 'كهرباء', 'حث', 'فرن', 'ميكروويف']), m('care_features', 'العناية', ['غسالة أطباق', 'غسل يدوي', 'قابل للتكديس'])], ['item_kind', 'condition', 'material']),
   template('tableware', 'أوانٍ منزلية', 'تقديم ومائدة', 'goods', [f('item_kind', 'نوع الطقم'), ...home, n('persons', 'عدد الأشخاص'), m('care_features', 'العناية', ['غسالة أطباق', 'غسل يدوي'])], ['item_kind', 'condition', 'piece_count']),
   template('storage', 'أوانٍ منزلية', 'حفظ وتنظيم', 'goods', [f('item_kind', 'نوع الحافظة أو المنظم'), ...home, n('capacity_l', 'السعة', 'لتر'), yes('airtight', 'محكم الإغلاق')], ['item_kind', 'condition', 'material']),
-  template('rugs', 'ديكورات منزلية', 'سجاد', 'goods', [...decor, s('shape', 'الشكل', ['مستطيل', 'مربع', 'دائري', 'بيضاوي']), s('weave', 'نوع النسيج', ['يدوي', 'آلي', 'مسطح', 'وبر', 'غير معروف'])], ['condition', 'material', 'shape']),
+  template('rugs', 'ديكورات منزلية', 'سجاد', 'goods', [...rugDecor, s('shape', 'الشكل', ['مستطيل', 'مربع', 'دائري', 'بيضاوي']), s('weave', 'نوع النسيج', ['يدوي', 'آلي', 'مسطح', 'وبر', 'غير معروف'])], ['condition', 'material', 'shape']),
   template('curtains', 'ديكورات منزلية', 'ستائر', 'goods', [...decor, s('opacity', 'نفاذية الضوء', ['شفافة', 'ترشيح ضوء', 'تعتيم']), s('mounting', 'طريقة التركيب', ['حلقات', 'سكة', 'رول', 'أخرى'])], ['condition', 'material', 'opacity']),
   template('wall_decor', 'ديكورات منزلية', 'مرايا ولوحات', 'goods', [s('item_kind', 'نوع القطعة', ['مرآة', 'لوحة', 'إطار', 'زينة حائط']), ...decor], ['item_kind', 'condition', 'material']),
   template('decor_service', 'ديكورات منزلية', 'تفصيل وتركيب ديكور', 'service', [m('service_scope', 'الخدمات', ['قياس', 'تفصيل', 'تركيب', 'فك ونقل', 'تصميم']), f('specialty', 'التخصص'), n('work_area_m2', 'المساحة', 'م²'), s('materials_included', 'المواد', ['شامل المواد', 'عمل فقط', 'حسب الاتفاق']), n('lead_time_days', 'مدة التنفيذ', 'يوم'), f('service_coverage', 'نطاق التغطية'), f('warranty', 'ضمان العمل إن وجد')], ['service_scope', 'specialty', 'materials_included']),

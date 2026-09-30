@@ -42,6 +42,7 @@ describe('isolated pre-production browser gate', () => {
     expect(browser).toContain("journey:'edit-ad'");
     expect(browser).toContain("journey:'search-ad'");
     expect(browser).toContain("journey:'delete-ad'");
+    expect(browser).toContain("journey:'commerce-product-auth-guard'");
     expect(browser).toContain('PREVIEW_ARTIFACTS_DIR');
     expect(browser).toContain('fillRequiredCategoryFields');
     for (const width of [360, 390, 412, 768, 1024, 1440]) expect(browser).toContain(String(width));

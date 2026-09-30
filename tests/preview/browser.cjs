@@ -222,7 +222,10 @@ async function run(){
   await page.goto(origin+'/shop');
   assert((await page.locator('body').innerText()).includes('سلعة اختبار محلي فقط'));
   for(const name of supplierNames)assert(!(await page.locator('body').innerText()).includes(name),'supplier identity must stay private');
-  assert.equal(await page.locator('a[href="/shop/1"]').count(),0);
+  assert((await page.locator('a[href="/shop/1"]').count())>0,'approved product links remain available');
+  await page.goto(origin+'/shop/1');
+  await page.waitForURL(u=>u.pathname==='/login');
+  console.log(JSON.stringify({journey:'commerce-product-auth-guard',status:'passed'}));
   console.log(JSON.stringify({publicCatalog:'passed',livePayment:'disabled'}));
   // Guest category discovery: same-origin only; uses synthetic preview ads.
   const homeErrors=[];page.on('pageerror',e=>homeErrors.push(e.message));

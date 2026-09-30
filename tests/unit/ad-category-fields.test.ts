@@ -15,7 +15,9 @@ describe('single-page grouped category fields', () => {
     const html = renderToStaticMarkup(createElement(AdCategoryFields, { fields, values: {}, onChange: () => {} }));
     expect(html).toContain('تفاصيل الوظيفة');
     expect(html).toContain('متطلبات الوظيفة');
-    expect(html).toContain('multiple');
+    expect(html).not.toContain('multiple');
+    expect(html).toContain('type="checkbox"');
+    expect(html).toContain('اختر من القائمة');
     expect(html).not.toContain('مستعمل');
     expect(html).not.toContain('مخفي');
     expect(html).toContain('name="category_values"');

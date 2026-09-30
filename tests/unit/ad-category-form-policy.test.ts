@@ -30,6 +30,7 @@ it('shows stale-category error even after the global feature is switched off',()
 it('public values escape user input and preserve meaningful false/zero',()=>{
   const html=renderToStaticMarkup(React.createElement(AdCategorySummary,{fields:[{key:'x',label:'قيمة',group:'تفاصيل',value:'<script>bad</script>'},{key:'b',label:'متاح',group:'',value:false},{key:'n',label:'عدد',group:'',value:0}]}));
   expect(html).not.toContain('<script>');expect(html).toContain('&lt;script&gt;');expect(html).toContain('لا');expect(html).toContain('>0<');
+  expect(html).toContain('grid-cols-1');expect(html).toContain('sm:grid-cols-2');
 });
 it.each([null,99])('allows keeping unavailable classification %s on edit without required selectors',subcategoryId=>{
   const html=renderToStaticMarkup(React.createElement(AdForm,{action:async()=>{},countries:[],cities:[],submitLabel:'حفظ',initial:{id:1,categoryId:12,subcategoryId},categoryConfig:cfg}));

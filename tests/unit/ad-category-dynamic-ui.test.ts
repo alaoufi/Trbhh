@@ -35,3 +35,11 @@ it('keeps required-if fields visible and marks them required only when the condi
   expect(sale).toContain('التأمين');expect(sale).toContain('data-required="false"');expect(sale).not.toContain('required=""');
   expect(rent).toContain('التأمين');expect(rent).toContain('data-required="true"');expect(rent).toContain('required=""');
 });
+
+it('applies required-if to textareas as well as compact controls',()=>{
+  const fields:CategoryField[]=[{key:'notes',label:'ملاحظات الإيجار',type:'textarea',group:'الإيجار',required:false,visible:true,order:1,options:[],dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent',conditionEffect:'require'}];
+  const sale=renderToStaticMarkup(React.createElement(AdCategoryFields,{fields,values:{},listingType:'sale',onChange:()=>{}}));
+  const rent=renderToStaticMarkup(React.createElement(AdCategoryFields,{fields,values:{},listingType:'rent',onChange:()=>{}}));
+  expect(sale.match(/<textarea[^>]*>/)?.[0]).not.toContain('required');
+  expect(rent.match(/<textarea[^>]*>/)?.[0]).toContain('required=""');
+});

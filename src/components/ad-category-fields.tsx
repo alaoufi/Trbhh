@@ -2,7 +2,7 @@
 import React from 'react';
 import { fieldApplies, fieldIsRequired, type CategoryField, type CategoryValues, type CategoryValue, type CategoryRange } from '@/lib/ad-categories/validation';
 
-const controlBase = 'mt-1 h-9 min-h-9 w-full rounded-lg border bg-white px-2 py-1 text-sm outline-none transition-colors focus:ring-2';
+const controlBase = 'mt-1 h-11 min-h-11 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none transition-colors focus:ring-2';
 
 function controlClass(invalid: boolean, multiline = false) {
   return `${controlBase} ${multiline ? 'h-auto min-h-20 py-2' : ''} ${invalid
@@ -69,13 +69,28 @@ export function AdCategoryFields({ fields, values, onChange, listingType }: {
                 {required ? 'مطلوب' : 'اختياري'}
               </span>
             </label>
-            {f.type === 'select' || f.type === 'multiselect'
-              ? <select id={id} className={controlClass(invalid)} required={required} multiple={f.type === 'multiselect'} {...invalidProps}
-                value={f.type === 'multiselect' ? (Array.isArray(value) ? value : []) : String(value ?? '')}
-                onChange={e => update(f.key, f.type === 'multiselect' ? [...e.currentTarget.selectedOptions].map(o => o.value) : e.target.value)}>
-                {f.type !== 'multiselect' && <option value="">—</option>}
+            {f.type === 'select'
+              ? <select id={id} className={controlClass(invalid)} required={required} {...invalidProps}
+                value={String(value ?? '')}
+                onChange={e => update(f.key, e.target.value)}>
+                <option value="">—</option>
                 {f.options.map(option => <option key={option} value={option}>{option}</option>)}
               </select>
+              : f.type === 'multiselect' ? <details className={`mt-1 rounded-lg border bg-white ${invalid?'border-red-600 ring-2 ring-red-200':'border-primary/25'}`}>
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+                  <span className="min-w-0 truncate">{Array.isArray(value)&&value.length?value.join('، '):'اختر من القائمة'}</span><span aria-hidden="true">⌄</span>
+                </summary>
+                <div className="grid gap-1 border-t p-2 sm:grid-cols-2" role="group" aria-label={f.label} aria-required={required}>
+                  {f.options.map((option,index)=>{
+                    const selected=Array.isArray(value)?value:[];
+                    const checked=selected.includes(option);
+                    return <label key={option} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-primary/5">
+                      <input id={index===0?id:undefined} type="checkbox" checked={checked} required={required&&selected.length===0&&index===0} {...(index===0?invalidProps:{})}
+                        onChange={event=>update(f.key,event.target.checked?[...selected,option]:selected.filter(item=>item!==option))}/><span>{option}</span>
+                    </label>;
+                  })}
+                </div>
+              </details>
               : f.type === 'radio' ? <div className="mt-1.5 flex flex-wrap gap-1.5" role="group">
                 {f.options.map((option, index) => <label key={option} className={`rounded-lg border px-2.5 py-1.5 text-sm transition-colors ${value === option ? 'border-primary bg-primary/10' : 'border-slate-200 bg-white'}`}>
                   <input id={index === 0 ? id : undefined} type="radio" name={`category_${f.key}`} required={required} checked={value === option} {...invalidProps} onChange={() => update(f.key, option)} className="ml-1" />
@@ -91,7 +106,7 @@ export function AdCategoryFields({ fields, values, onChange, listingType }: {
                     onChange(next);
                   } else update(f.key, e.target.value === 'true');
                 }}><option value="">—</option><option value="true">نعم</option><option value="false">لا</option></select>
-                : f.type === 'textarea' ? <textarea id={id} className={controlClass(invalid, true)} required={f.required} {...invalidProps} maxLength={3000} rows={3} placeholder={f.placeholder}
+                : f.type === 'textarea' ? <textarea id={id} className={controlClass(invalid, true)} required={required} {...invalidProps} maxLength={3000} rows={3} placeholder={f.placeholder}
                   value={String(value ?? '')} onChange={e => update(f.key, e.target.value)} />
                   : f.type === 'range' ? <div className="grid grid-cols-2 gap-2">
                     <input id={id} aria-label={`${f.label} من`} className={controlClass(invalid)} type="number" required={required} {...invalidProps} min={f.min} max={f.max} value={String((value as CategoryRange | undefined)?.min ?? '')} onChange={e => update(f.key, { min: Number(e.target.value), max: Number((value as CategoryRange | undefined)?.max ?? e.target.value) })} />

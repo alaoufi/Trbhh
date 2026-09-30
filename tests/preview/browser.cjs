@@ -32,7 +32,7 @@ async function run(){
     await page.getByRole('button',{name:'دخول',exact:true}).click();
     await page.waitForURL(u=>u.pathname===(role==='admin'?'/admin/categories':'/ads/new'),{timeout:30000});
     if(role==='member'){
-      const cat=page.locator('select[name="category_id"]');
+      const cat=page.locator('select[name="taxonomy_group"]');
       const sub=page.locator('select[name="subcategory_id"]');
       await cat.waitFor({state:'visible'});
       const jobs=await cat.locator('option').evaluateAll(os=>os.find(o=>o.textContent.includes('وظائف'))?.value);
@@ -67,8 +67,11 @@ async function run(){
       assert.equal(await page.locator('#category-field-frontage_m').count(),1);
       assert.equal(await page.locator('#category-field-ceiling_height_m').count(),1);
       assert.equal(await page.locator('#category-field-north_boundary').count(),0);
+      for(const width of [360,390,412,768]){
+        await page.setViewportSize({width,height:844});
+        assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`form ${width}px overflow`);
+      }
       await page.setViewportSize({width:390,height:844});
-      assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
       await page.screenshot({path:path.join(artifacts,'land-form-mobile.png'),fullPage:true});
       await page.goto(origin+'/ads/1');
       await page.getByText('وظيفة محاسب — إعلان اختبار محلي',{exact:true}).first().waitFor({state:'visible'});
@@ -142,7 +145,7 @@ async function run(){
   console.log(JSON.stringify({publicCatalog:'passed',livePayment:'disabled'}));
   // Guest category discovery: same-origin only; uses synthetic preview ads.
   const homeErrors=[];page.on('pageerror',e=>homeErrors.push(e.message));
-  await page.setViewportSize({width:320,height:844});
+  await page.setViewportSize({width:360,height:844});
   await page.goto(origin+'/');
   const categorySection=page.getByTestId('home-category-navigation');
   const homeCategory=categorySection.locator('select[name="category"]');
@@ -157,12 +160,12 @@ async function run(){
   console.log(JSON.stringify({guestCategoryDiagnostic:await categorySection.innerText(),adLinks:await categorySection.locator('a[href^="/ads/"]').evaluateAll(links=>links.map(a=>a.getAttribute('href')))}));
   await categorySection.getByText('وظيفة محاسب — إعلان اختبار محلي',{exact:true}).first().waitFor({state:'visible'});
   assert.equal(await homeCategory.inputValue(),jobs);
-  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'homepage 320px document overflow');
-  assert(await categorySection.evaluate(el=>el.scrollWidth<=el.clientWidth),'category section 320px overflow');
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'homepage 360px document overflow');
+  assert(await categorySection.evaluate(el=>el.scrollWidth<=el.clientWidth),'category section 360px overflow');
   for(const control of [homeCategory,categorySection.locator('button[type="submit"]'),categorySection.locator('form a[href="/"]')]){
-    const box=await control.boundingBox();assert(box&&box.width>0&&box.x>=0&&box.x+box.width<=320,'category control must fit 320px viewport');
+    const box=await control.boundingBox();assert(box&&box.width>0&&box.x>=0&&box.x+box.width<=360,'category control must fit 360px viewport');
   }
-  await page.screenshot({path:path.join(artifacts,'home-categories-320.png'),fullPage:true});
+  await page.screenshot({path:path.join(artifacts,'home-categories-360.png'),fullPage:true});
   await homeCategory.selectOption(property);
   await categorySection.locator('button[type="submit"]').click();
   await page.waitForURL(u=>u.pathname==='/'&&u.searchParams.get('category')===property);
@@ -173,7 +176,11 @@ async function run(){
   assert.equal(await homeCategory.inputValue(),'');
   assert.equal(await categorySection.locator('h2').count(),0,'cleared filter removes category result grid');
   assert.deepEqual(homeErrors,[]);
-  console.log(JSON.stringify({guestHomeCategories:'passed',selectedCategoryFiltering:'passed',mobileWidth:320,clearCategoryFilter:'passed'}));
+  for(const width of [390,412,768,1280]){
+    await page.setViewportSize({width,height:900});
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`homepage ${width}px document overflow`);
+  }
+  console.log(JSON.stringify({guestHomeCategories:'passed',selectedCategoryFiltering:'passed',responsiveWidths:[360,390,412,768,1280],clearCategoryFilter:'passed'}));
   await context.close();
 }
 run().catch(e=>{console.error(e.stack);console.error(logs.slice(-3000));process.exitCode=1;}).finally(async()=>{

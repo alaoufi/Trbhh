@@ -33,6 +33,7 @@ describe('isolated pre-production browser gate', () => {
     expect(deploy).toContain('x-robots-tag');
     expect(deploy).toContain('noindex, nofollow, noarchive');
     expect(deploy).toContain("'/search' '/deals' '/nearby' '/companies' '/shop' '/guide' '/site-map'");
+    expect(deploy).toContain('previewRecentLogs=clean');
   });
 
   it('covers create, details, edit, search, and delete for a synthetic ad', () => {

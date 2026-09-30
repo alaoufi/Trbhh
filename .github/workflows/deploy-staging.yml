@@ -280,6 +280,14 @@ jobs:
             test -n "$quality_summary"
             printf 'AD_QUALITY_SUMMARY=%s\n' "$quality_summary"
           fi
+          preview_logs=$(docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml logs --since 10m --no-color app 2>&1)
+          if printf '%s\n' "$preview_logs" | grep -Eiq 'uncaught exception|unhandled rejection|fatal error|PrismaClientInitializationError'; then
+            printf '%s\n' "$preview_logs" >&2
+            echo 'previewRecentLogs=runtime-errors-found' >&2
+            exit 1
+          fi
+          unset preview_logs
+          echo 'previewRecentLogs=clean'
           rm -f "$readonly_script"
           docker rm -f trbhh-staging-tunnel >/dev/null 2>&1 || true
           docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps

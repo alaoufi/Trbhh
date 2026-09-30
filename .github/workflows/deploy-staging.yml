@@ -227,6 +227,16 @@ jobs:
           for service in nginx caddy traefik; do
             if systemctl is-active --quiet "$service" 2>/dev/null; then echo "$service=active"; else echo "$service=inactive-or-unavailable"; fi
           done
+          echo 'previewTlsToolsAudit'
+          for command_name in nginx certbot acme.sh clpctl; do
+            if command -v "$command_name" >/dev/null 2>&1; then
+              printf '%s=%s\n' "$command_name" "$(command -v "$command_name")"
+            else
+              printf '%s=unavailable\n' "$command_name"
+            fi
+          done
+          clpctl site:add:reverse-proxy --help 2>&1 | head -80 || true
+          clpctl lets-encrypt:install:certificate --help 2>&1 | head -80 || true
           docker exec "$container" node -e "if((process.env.AUTH_SECRET||'').length<32)process.exit(1)"
           if [[ "$live_read_only" == true ]]; then
             docker exec -i "$container" node - <<'VERIFY'

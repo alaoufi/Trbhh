@@ -24,6 +24,13 @@ export default async function ComparePage() {
   if (!(await getSettingBool('compare_on', true).catch(() => true))) notFound();
   const ids = await readCompareIds();
   const ads = await getAdsByIdsCards(ids);
+  const comparisonFields=[...new Map(ads.flatMap(ad=>(ad.comparableCategoryFields||[]).map(field=>[field.key,{key:field.key,label:field.label,unit:field.unit}]))).values()];
+  const comparisonValue=(ad:typeof ads[number],key:string)=>{
+    const field=ad.comparableCategoryFields?.find(item=>item.key===key);
+    if(!field)return '—';
+    const value=Array.isArray(field.value)?field.value.join('، '):typeof field.value==='boolean'?(field.value?'نعم':'لا'):typeof field.value==='object'?`${field.value.min}–${field.value.max}`:String(field.value);
+    return field.unit?`${value} ${field.unit}`:value;
+  };
   return (
     <div className="space-y-4">
       <Breadcrumb items={[{ label: 'مقارنة الإعلانات' }]} />
@@ -62,6 +69,7 @@ export default async function ComparePage() {
               <Row label="المعلن" values={ads.map((a) => a.sellerName || '—')} />
               <Row label="التقييم" values={ads.map((a) => (a.ratingCount ?? 0) > 0 ? `⭐ ${a.ratingAvg} (${a.ratingCount})` : '—')} />
               <Row label="مميّز" values={ads.map((a) => a.special ? '⭐ نعم' : '—')} />
+              {comparisonFields.map(field=><Row key={field.key} label={field.label} values={ads.map(ad=>comparisonValue(ad,field.key))} />)}
               <Row label="" values={ads.map((a) => <Link key={a.id} href={`/ads/${a.id}`} className="inline-block rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white">عرض التفاصيل</Link>)} />
             </tbody>
           </table>

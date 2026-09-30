@@ -1,16 +1,41 @@
+'use client';
+import {useMemo,useState} from 'react';
 import { SearchAreaPicker } from '@/components/search-area-picker';
 import { SearchSuggestInput } from '@/components/search-suggest';
 import { Search } from 'lucide-react';
+import type {CategoryFormConfig} from '@/lib/ad-categories/contracts';
+import {fieldApplies,type CategoryField} from '@/lib/ad-categories/validation';
 
 type Region = { id: number; name: string; countryId?: number };
 type Area = { id: number; name: string; cityId: number };
 
-export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, placeholder = 'ماذا تبحث عنه؟', compact = false }: {
+export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, placeholder = 'ماذا تبحث عنه؟', compact = false,categoryConfig }: {
   regions: Region[]; areas: Area[]; params?: Record<string, string | undefined>;
-  priceOn?: boolean; placeholder?: string; compact?: boolean;
+  priceOn?: boolean; placeholder?: string; compact?: boolean;categoryConfig?:CategoryFormConfig;
 }) {
   const field = 'h-11 min-w-0 w-full rounded-lg border bg-background px-3 text-sm text-foreground';
+  const [category,setCategory]=useState(params.category||'');
+  const [subcategory,setSubcategory]=useState(params.subcategory||'');
+  const [listingType,setListingType]=useState(params.listingType||'');
+  const subcategories=useMemo(()=>categoryConfig?.subcategories.filter(item=>item.active&&item.version>0&&String(item.categoryId)===category)||[],[category,categoryConfig]);
+  const selectedSub=subcategories.find(item=>String(item.id)===subcategory);
+  const listingTypes=selectedSub?.listingPolicy?.types||[];
+  const dependentValues=Object.fromEntries(Object.entries(params).filter(([key])=>key.startsWith('attr_')).map(([key,value])=>[key.slice(5),value||'']));
+  const dynamicFields=(selectedSub?.fields||[]).filter(item=>item.filterable&&fieldApplies(item,{listingType,values:dependentValues}));
+  const categoryFilters=categoryConfig?.enabled?<>
+    <label className="space-y-1 text-xs font-semibold text-foreground">القسم
+      <select name="category" value={category} className={field} onChange={event=>{setCategory(event.target.value);setSubcategory('');setListingType('');}}><option value="">كل الأقسام</option>{categoryConfig.categories.filter(item=>item.active&&categoryConfig.subcategories.some(sub=>sub.active&&sub.version>0&&sub.categoryId===item.id)).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>
+    </label>
+    <label className="space-y-1 text-xs font-semibold text-foreground">القسم الفرعي
+      <select name="subcategory" value={subcategory} disabled={!category} className={field} onChange={event=>{setSubcategory(event.target.value);setListingType('');}}><option value="">كل الأقسام الفرعية</option>{subcategories.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select>
+    </label>
+    {listingTypes.length>0&&<label className="space-y-1 text-xs font-semibold text-foreground">نوع العملية
+      <select name="listingType" value={listingType} className={field} onChange={event=>setListingType(event.target.value)}><option value="">الكل</option>{listingTypes.map(item=><option key={item.key} value={item.key}>{item.label}</option>)}</select>
+    </label>}
+    {dynamicFields.map(item=><CategoryFilterField key={item.key} field={item} params={params} inputClass={field}/>)}
+  </>:null;
   const filters = <>
+    {categoryFilters}
     <SearchAreaPicker regions={regions} areas={areas} region={params.city || ''} area={params.area || ''} className={field} />
     <label className="space-y-1 text-xs font-semibold text-foreground">نوع الإعلان
       <select name="type" defaultValue={params.type || ''} className={field}>
@@ -32,7 +57,7 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
     </label>}
   </>;
   return <form action="/search" method="get" role="search" className={compact ? 'space-y-2' : 'space-y-3'}>
-    {params.category && <input name="category" type="hidden" value={params.category} />}
+    {!categoryConfig?.enabled&&params.category && <input name="category" type="hidden" value={params.category} />}
     <div className="flex items-end gap-2">
       <label className="min-w-0 flex-1 space-y-1 text-xs font-semibold text-foreground">البحث في الإعلانات
         <SearchSuggestInput key={params.q || ''} name="q" defaultValue={params.q || ''} placeholder={placeholder} />
@@ -45,4 +70,12 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
       <div className="mt-3 grid grid-cols-2 items-end gap-3 sm:grid-cols-3">{filters}</div>
     </details> : <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-3">{filters}</div>}
   </form>;
+}
+
+function CategoryFilterField({field,params,inputClass}:{field:CategoryField;params:Record<string,string|undefined>;inputClass:string}){
+  const name=`attr_${field.key}`;
+  if(['number','decimal','year','range'].includes(field.type))return <div className="grid grid-cols-2 gap-2"><label className="space-y-1 text-xs font-semibold">{field.label} من<input name={`${name}_min`} type="number" step="any" min={field.min} max={field.max} defaultValue={params[`${name}_min`]||''} className={inputClass}/></label><label className="space-y-1 text-xs font-semibold">{field.label} إلى<input name={`${name}_max`} type="number" step="any" min={field.min} max={field.max} defaultValue={params[`${name}_max`]||''} className={inputClass}/></label></div>;
+  if(field.type==='select'||field.type==='radio'||field.type==='multiselect')return <label className="space-y-1 text-xs font-semibold">{field.label}<select name={name} defaultValue={params[name]||''} className={inputClass}><option value="">الكل</option>{field.options.map(option=><option key={option} value={option}>{option}</option>)}</select></label>;
+  if(field.type==='boolean')return <label className="space-y-1 text-xs font-semibold">{field.label}<select name={name} defaultValue={params[name]||''} className={inputClass}><option value="">الكل</option><option value="1">نعم</option><option value="0">لا</option></select></label>;
+  return <label className="space-y-1 text-xs font-semibold">{field.label}<input name={name} defaultValue={params[name]||''} maxLength={120} className={inputClass}/></label>;
 }

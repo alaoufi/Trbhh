@@ -1,4 +1,5 @@
 import 'server-only';
+import {Prisma} from '@prisma/client';
 import { cache } from 'react';
 import { prisma } from './prisma';
 import { cached, cacheDel, cacheDelPattern } from './redis';
@@ -11,7 +12,8 @@ import { toInt } from './utils';
 import { currentPlatformAdPublicWhere, platformDealAdPublicWhere } from './platform-ad-visibility';
 import { getPlatformAdLifecycleConfig, getSetting, getStoreSubPricing } from './settings';
 import { publicStoreWhere } from './store-subscription-access';
-import { equivalentAreaIds, normalizePriceRange } from './search-filters';
+import { equivalentAreaIds, normalizePriceRange, type CategoryAttributeFilter } from './search-filters';
+import type {CategoryField} from './ad-categories/validation';
 import { compactAdTitle } from './ad-presentation';
 import { searchCardVisibility } from './search-card-visibility';
 import { featuredSearchPage } from './featured-search-page';
@@ -22,6 +24,8 @@ export type AdCard = {
   priceEnabled?: boolean;
   goodsEnabled?: boolean;
   categoryFields?: PublicCategory['categoryFields'];
+  categoryCardFields?: PublicCategory['categoryCardFields'];
+  comparableCategoryFields?: PublicCategory['comparableCategoryFields'];
   id: number;
   title: string;
   price: number;
@@ -493,6 +497,10 @@ export async function getAdsByCategory(categoryId: number, take = 24, skip = 0) 
 type SearchParamsT = {
   q?: string;
   categoryId?: number;
+  subcategoryId?: number;
+  listingType?: string;
+  attributeFilters?:CategoryAttributeFilter[];
+  searchableFields?:Pick<CategoryField,'key'>[];
   countryId?: number;
   cityId?: number;
   areaId?: number;
@@ -505,6 +513,33 @@ type SearchParamsT = {
   maxPrice?: number;
   textMatch?: 'all' | 'any';
 };
+
+async function categoryAttributeAdIds(subcategoryId:number,filters:CategoryAttributeFilter[]):Promise<bigint[]>{
+  if(!filters.length)return [];
+  const clauses=filters.map(filter=>{
+    const path=`$.${filter.key}`;
+    if(filter.mode==='min')return Prisma.sql`CAST(JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) AS DECIMAL(30,4)) >= ${filter.value}`;
+    if(filter.mode==='max')return Prisma.sql`CAST(JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) AS DECIMAL(30,4)) <= ${filter.value}`;
+    if(filter.mode==='contains')return Prisma.sql`JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) LIKE ${`%${String(filter.value)}%`}`;
+    if(filter.mode==='array_contains')return Prisma.sql`JSON_CONTAINS(JSON_EXTRACT(values_json, ${path}), JSON_QUOTE(${String(filter.value)})) = 1`;
+    return Prisma.sql`JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) = ${String(filter.value)}`;
+  });
+  const rows=await prisma.$queryRaw<{ad_id:bigint}[]>(Prisma.sql`SELECT ad_id FROM ad_category_values WHERE subcategory_id=${subcategoryId} AND ${Prisma.join(clauses,' AND ')}`);
+  return rows.map(row=>row.ad_id);
+}
+
+async function categorySearchAdIds(subcategoryId:number,fields:Pick<CategoryField,'key'>[],variants:string[]):Promise<bigint[]>{
+  if(!fields.length||!variants.length)return [];
+  const clauses=fields.flatMap(field=>variants.map(value=>Prisma.sql`JSON_UNQUOTE(JSON_EXTRACT(values_json, ${`$.${field.key}`})) LIKE ${`%${value}%`}`));
+  const rows=await prisma.$queryRaw<{ad_id:bigint}[]>(Prisma.sql`SELECT ad_id FROM ad_category_values WHERE subcategory_id=${subcategoryId} AND (${Prisma.join(clauses,' OR ')})`);
+  return rows.map(row=>row.ad_id);
+}
+
+function exactListingWhere(listingType:string):Prisma.adsWhereInput{
+  const request=['wanted','wanted_rent','service_request','job_seeker'].includes(listingType);
+  const legacyPrice:Prisma.StringNullableFilter|string=listingType==='rent'||listingType==='wanted_rent'?'rent':{not:'rent'};
+  return {OR:[{sale_type:listingType},{AND:[{OR:[{sale_type:null},{sale_type:''}]},{adsType:request?'request':'offer'},{price_type:legacyPrice}]}]};
+}
 
 const getSearchCardVisibility = cache(async () => {
   const now = new Date();
@@ -527,7 +562,7 @@ const getSearchAreaIds = cache(async (areaId: number, cityId: number) => {
   return equivalentAreaIds(areas.map((area) => ({ id: toInt(area.id), name: area.name, cityId: area.city_id })), areaId, cityId);
 });
 
-async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type, special, minPrice, maxPrice, textMatch = 'all' }: SearchParamsT) {
+async function buildSearchWhere({ q, categoryId, subcategoryId, listingType, attributeFilters=[], searchableFields=[], countryId, cityId, areaId, type, special, minPrice, maxPrice, textMatch = 'all' }: SearchParamsT) {
   const range = normalizePriceRange(minPrice, maxPrice);
   const visibility = await activeAdWhere();
   // بحث ذكي: تُقسَّم العبارة كلمات، وكل كلمة تُطابق العنوان أو التفاصيل بأي ترتيب،
@@ -539,16 +574,20 @@ async function buildSearchWhere({ q, categoryId, countryId, cityId, areaId, type
   const synonymGroups = synonymsOn
     ? parseSearchSynonyms(await getSetting('search_synonyms', DEFAULT_SEARCH_SYNONYMS).catch(() => DEFAULT_SEARCH_SYNONYMS))
     : new Map<string, string[]>();
-  const textClauses = tokens.map((t) => {
+  const textClauses = await Promise.all(tokens.map(async(t) => {
     const variants = Array.from(new Set(expandSearchToken(t, synonymGroups).flatMap((term) =>
       [term, norm(term), term.replace(/ه$/, 'ة'), term.replace(/ة$/, 'ه'), term.replace(/ي$/, 'ى'), term.replace(/ى$/, 'ي')])));
-    return { OR: variants.flatMap((v) => [{ title: { contains: v } }, { detail: { contains: v } }]) };
-  });
+    const attributeIds=subcategoryId?await categorySearchAdIds(subcategoryId,searchableFields,variants):[];
+    return { OR: [...variants.flatMap((v) => [{ title: { contains: v } }, { detail: { contains: v } }]),...(attributeIds.length?[{id:{in:attributeIds}}]:[])] };
+  }));
   const textFilter = textMatch === 'any' && textClauses.length ? [{ OR: textClauses }] : textClauses;
+  const attributeIds=subcategoryId&&attributeFilters.length?await categoryAttributeAdIds(subcategoryId,attributeFilters):undefined;
   return {
     ...visibility,
-    AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textFilter],
+    AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textFilter,...(listingType?[exactListingWhere(listingType)]:[])],
     ...(categoryId ? { category_id: BigInt(categoryId) } : {}),
+    ...(subcategoryId ? { subcategory_id: subcategoryId } : {}),
+    ...(attributeIds ? {id:{in:attributeIds}}:{}),
     ...(countryId ? { country_id: countryId } : {}),
     ...(cityId ? { city_id: BigInt(cityId) } : {}),
     ...(areaId ? { area_id: cityId ? { in: await getSearchAreaIds(areaId, cityId) } : areaId } : {}),

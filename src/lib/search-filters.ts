@@ -34,6 +34,42 @@ export function normalizeSearchParams(sp: Record<string, string | undefined>) {
   } as const;
 }
 
+export type CategoryAttributeFilter={key:string;mode:'equals'|'contains'|'array_contains'|'min'|'max';value:string|number|boolean};
+
+const safeDecimal=(value:string|undefined)=>{
+  if(!value||!(/^-?\d+(?:\.\d{1,2})?$/).test(value.trim()))return undefined;
+  const number=Number(value);
+  return Number.isFinite(number)&&Math.abs(number)<=Number.MAX_SAFE_INTEGER?number:undefined;
+};
+
+/** URL attribute filters are accepted only when the active subcategory definition allows them. */
+export function normalizeCategoryAttributeFilters(fields:CategoryField[],sp:Record<string,string|undefined>,listingType?:string){
+  const filters:CategoryAttributeFilter[]=[],params:Record<string,string>={};
+  for(const field of fields.filter(item=>item.filterable&&fieldApplies(item,{listingType}))){
+    const name=`attr_${field.key}`;
+    if(['number','decimal','year','range'].includes(field.type)){
+      for(const [suffix,mode] of [['_min','min'],['_max','max']] as const){
+        const raw=sp[`${name}${suffix}`],value=safeDecimal(raw);
+        if(value===undefined)continue;
+        if(field.min!==undefined&&value<field.min||field.max!==undefined&&value>field.max)continue;
+        filters.push({key:field.key,mode,value});params[`${name}${suffix}`]=String(value);
+      }
+      continue;
+    }
+    const raw=sp[name]?.trim();if(!raw)continue;
+    if(field.type==='boolean'){
+      if(raw!=='1'&&raw!=='0')continue;
+      filters.push({key:field.key,mode:'equals',value:raw==='1'});params[name]=raw;continue;
+    }
+    if(field.type==='select'||field.type==='radio'||field.type==='multiselect'){
+      if(!field.options.includes(raw))continue;
+      filters.push({key:field.key,mode:field.type==='multiselect'?'array_contains':'equals',value:raw});params[name]=raw;continue;
+    }
+    if(raw.length<=120){filters.push({key:field.key,mode:'contains',value:raw});params[name]=raw;}
+  }
+  return {filters,params};
+}
+
 export function canonicalAreaName(name: string): string {
   return name.trim().replace(/\s+/g, ' ').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي');
 }
@@ -45,3 +81,4 @@ export function equivalentAreaIds(areas: { id: number; name: string; cityId: num
   const canonical = canonicalAreaName(selected.name);
   return [...new Set(areas.filter((area) => area.cityId === regionId && canonicalAreaName(area.name) === canonical).map((area) => area.id))];
 }
+import {fieldApplies,type CategoryField} from './ad-categories/validation';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateDefinition, validateCategoryValues, visibleCategoryValues, type CategoryField } from '@/lib/ad-categories/validation';
+import { cardCategoryValues, comparableCategoryValues, validateDefinition, validateCategoryValues, visibleCategoryValues, type CategoryField } from '@/lib/ad-categories/validation';
 
 const field = (extra: Partial<CategoryField> = {}): CategoryField => ({ key: 'use', label: 'استخدام الأرض', type: 'select', group: 'التفاصيل', required: true, visible: true, order: 1, options: ['سكني', 'تجاري'], ...extra });
 describe('real-ad subcategory field validation', () => {
@@ -58,5 +58,14 @@ describe('real-ad subcategory field validation', () => {
     expect(visibleCategoryValues([field({type:'boolean'})], {use:'true'})).toEqual([]);
     expect(visibleCategoryValues([field({type:'multiselect',options:['سكني']})], {use:['سكني','تجاري']})).toEqual([]);
     expect(visibleCategoryValues([field({type:'number'})], {use:'15'})[0].value).toBe(15);
+  });
+  it('projects only fields explicitly selected for cards and comparison',()=>{
+    const fields=validateDefinition([
+      field({key:'make',label:'الماركة',showInCard:true,comparable:true}),
+      field({key:'secret',label:'داخلي',showInCard:false,comparable:false}),
+    ]);
+    const values={make:'سكني',secret:'تجاري'};
+    expect(cardCategoryValues(fields,values).map(item=>item.key)).toEqual(['make']);
+    expect(comparableCategoryValues(fields,values).map(item=>item.key)).toEqual(['make']);
   });
 });

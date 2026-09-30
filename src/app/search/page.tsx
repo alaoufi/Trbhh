@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { normalizeSearchParams, positiveSearchId } from '@/lib/search-filters';
+import { normalizeCategoryAttributeFilters, normalizeSearchParams, positiveSearchId } from '@/lib/search-filters';
 import { getSettingBool } from '@/lib/settings';
 import { PublicSearchForm } from '@/components/public-search-form';
 import { Bell, Trash2 } from 'lucide-react';
@@ -13,6 +13,8 @@ import { getSession } from '@/lib/auth';
 import { listSavedSearches, savedSearchEnabled, searchSuggestEnabled } from '@/lib/saved-search';
 import { saveSearchAction, deleteSavedSearchAction } from './actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
+import {getCategoryFormConfig} from '@/lib/ad-categories/service';
+import {fieldApplies} from '@/lib/ad-categories/validation';
 
 export const metadata = {
   title: 'بحث متقدم',
@@ -25,35 +27,43 @@ export default async function SearchPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const sp = await searchParams;
-  const [cities, areas, session, alertsOn, recoveryOn, priceOn] = await Promise.all([
+  const [cities, areas, session, alertsOn, recoveryOn, priceOn,categoryConfig] = await Promise.all([
     getCities(), getAreas(), getSession(), savedSearchEnabled(), searchSuggestEnabled(),
     getSettingBool('search_price_filter_on', true),
+    getCategoryFormConfig(),
   ]);
   const saved = session && alertsOn ? await listSavedSearches(session.uid) : [];
   const sq = normalizeSearchParams(priceOn ? sp : { ...sp, minPrice: undefined, maxPrice: undefined });
   // Accept only Saudi regions and a city belonging to that region.
   const cityId = cities.some((item) => item.countryId === 1 && item.id === sq.cityId) ? sq.cityId : undefined;
   const areaId = cityId && areas.some((item) => item.cityId === cityId && item.id === sq.areaId) ? sq.areaId : undefined;
-  const query = { ...sq, cityId, areaId };
+  const requestedSubcategory=positiveSearchId(sp.subcategory);
+  const selectedSubcategory=categoryConfig.subcategories.find(item=>item.active&&item.version>0&&item.id===requestedSubcategory&&(!sq.categoryId||item.categoryId===sq.categoryId));
+  const listingType=selectedSubcategory?.listingPolicy?.types.some(item=>item.key===sp.listingType)?sp.listingType:undefined;
+  const visibleFilterFields=(selectedSubcategory?.fields||[]).filter(field=>field.filterable&&fieldApplies(field,{listingType}));
+  const attributes=normalizeCategoryAttributeFilters(visibleFilterFields,sp,listingType);
+  const query = { ...sq,categoryId:selectedSubcategory?.categoryId??sq.categoryId,subcategoryId:selectedSubcategory?.id,listingType,attributeFilters:attributes.filters,searchableFields:(selectedSubcategory?.fields||[]).filter(field=>field.searchable).map(field=>({key:field.key})), cityId, areaId };
   const PAGE_SIZE = 48;
   const total = await countSearchAds(query);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(positiveSearchId(sp.page) || 1, pages);
   const ads = await searchAds({ ...query, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE });
-  const hasFilters = !!(query.categoryId || query.q || cityId || query.type || query.special || query.minPrice !== undefined || query.maxPrice !== undefined);
+  const hasFilters = !!(query.categoryId || query.subcategoryId || query.listingType || query.attributeFilters.length || query.q || cityId || query.type || query.special || query.minPrice !== undefined || query.maxPrice !== undefined);
   const relaxedAds = ads.length === 0 && hasFilters && recoveryOn ? await searchAdsRelaxed(query) : [];
   const params = {
     category: query.categoryId?.toString(),
+    subcategory:query.subcategoryId?.toString(),listingType:query.listingType,
     q: query.q, city: cityId?.toString(), area: areaId?.toString(), type: query.type,
     sort: query.sort, special: query.special ? '1' : undefined,
     minPrice: query.minPrice?.toString(), maxPrice: query.maxPrice?.toString(),
+    ...attributes.params,
   };
   return (
     <div className="space-y-4">
       <Breadcrumb items={[{ label: 'بحث متقدم' }]} />
       <section className="rounded-xl border bg-card p-4 shadow-sm">
         <h1 className="mb-3 text-xl font-bold text-foreground">البحث في الإعلانات</h1>
-        <PublicSearchForm key={JSON.stringify(params)} regions={cities} areas={areas} params={params} priceOn={priceOn} />
+        <PublicSearchForm key={JSON.stringify(params)} regions={cities} areas={areas} params={params} priceOn={priceOn} categoryConfig={categoryConfig} />
         {hasFilters && <Link href="/search" className="mt-3 inline-block text-sm font-semibold text-primary underline underline-offset-4">مسح الفلاتر</Link>}
       </section>
       {/* تنبيهات البحث المحفوظ — للأعضاء وعند تفعيلها من الإدارة */}

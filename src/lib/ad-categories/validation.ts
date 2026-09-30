@@ -145,7 +145,13 @@ export function validateCategoryValues(fields: CategoryField[], raw: unknown, co
 
 /** Preserve historical storage, but only render values compatible with today's definition. */
 export function visibleCategoryValues(fields: CategoryField[], values: CategoryValues, context:CategoryFieldContext={}) {
-  return fields.filter(f => f.showInDetails!==false&&fieldApplies(f,{...context,values}) && Object.hasOwn(values, f.key) && !empty(values[f.key]))
+  return projectCategoryValues(fields,values,'details',context);
+}
+
+export type CategoryProjection='details'|'card'|'compare';
+export function projectCategoryValues(fields:CategoryField[],values:CategoryValues,projection:CategoryProjection,context:CategoryFieldContext={}){
+  const included=(field:CategoryField)=>projection==='card'?field.showInCard===true:projection==='compare'?field.comparable===true:field.showInDetails!==false;
+  return fields.filter(f => included(f)&&fieldApplies(f,{...context,values}) && Object.hasOwn(values, f.key) && !empty(values[f.key]))
     .sort((a, b) => a.order - b.order)
     .flatMap(f => {
       try {
@@ -157,3 +163,6 @@ export function visibleCategoryValues(fields: CategoryField[], values: CategoryV
       }
     });
 }
+
+export const cardCategoryValues=(fields:CategoryField[],values:CategoryValues,context:CategoryFieldContext={})=>projectCategoryValues(fields,values,'card',context);
+export const comparableCategoryValues=(fields:CategoryField[],values:CategoryValues,context:CategoryFieldContext={})=>projectCategoryValues(fields,values,'compare',context);

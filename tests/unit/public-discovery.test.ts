@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { normalizePriceRange, normalizeSearchParams, positiveSearchId } from '@/lib/search-filters';
+import { normalizeCategoryAttributeFilters, normalizePriceRange, normalizeSearchParams, positiveSearchId } from '@/lib/search-filters';
 import { adPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
 import { allowAutomaticPrompt, claimPromptSession, PROMPT_SESSION_KEY } from '@/lib/prompt-policy';
 import { PublicSearchForm } from '@/components/public-search-form';
@@ -86,5 +86,21 @@ describe('public search form controls', () => {
     const html = renderToStaticMarkup(createElement(PublicSearchForm, { ...location, compact: true }));
     expect(html.match(/<form[^>]*role="search"[^>]*>/)?.[0]).toContain('space-y-2');
     expect(html.match(/<details[^>]*>/)?.[0]).toContain('py-1.5');
+  });
+});
+
+describe('subcategory attribute filters',()=>{
+  const fields=[
+    {key:'capacity',label:'الحمولة',type:'number' as const,group:'فني',required:false,visible:true,order:1,options:[],min:1,max:100,filterable:true},
+    {key:'power',label:'الطاقة',type:'select' as const,group:'فني',required:false,visible:true,order:2,options:['ديزل','كهرباء'],filterable:true},
+    {key:'operator',label:'المشغل',type:'boolean' as const,group:'إيجار',required:false,visible:true,order:3,options:[],filterable:true,dependsOn:'listing_type',dependencyOperator:'equals' as const,dependencyValue:'rent'},
+    {key:'private',label:'خاص',type:'text' as const,group:'',required:false,visible:true,order:4,options:[],filterable:false},
+  ];
+  it('accepts only configured values and active conditional fields',()=>{
+    const input={attr_capacity_min:'5',attr_capacity_max:'999',attr_power:'ديزل',attr_operator:'1',attr_private:'leak',attr_forged:'x'};
+    const sale=normalizeCategoryAttributeFilters(fields,input,'sale');
+    expect(sale.filters).toEqual([{key:'capacity',mode:'min',value:5},{key:'power',mode:'equals',value:'ديزل'}]);
+    const rent=normalizeCategoryAttributeFilters(fields,input,'rent');
+    expect(rent.params).toEqual({attr_capacity_min:'5',attr_power:'ديزل',attr_operator:'1'});
   });
 });

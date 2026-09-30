@@ -81,6 +81,7 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
             {compactAdTitle(ad.title)}
           </h3>
           <CardPrice ad={ad} />
+          <CategoryCardFacts ad={ad} />
           {ad.storeName && <div className="mt-1 min-w-0"><StoreTag name={ad.storeName} /></div>}
           {(ad.ratingCount ?? 0) > 0 && (
             <div className="mt-1 flex flex-wrap items-center gap-1 text-xs font-extrabold text-amber-600">
@@ -146,6 +147,14 @@ function CardPrice({ ad }: { ad: AdCardType }) {
   </div>;
 }
 
+function CategoryCardFacts({ad}:{ad:AdCardType}){
+  if(!ad.categoryCardFields?.length)return null;
+  return <div className="mt-1 flex flex-wrap gap-1">{ad.categoryCardFields.slice(0,2).map(field=>{
+    const value=Array.isArray(field.value)?field.value.join('، '):typeof field.value==='boolean'?(field.value?'نعم':'لا'):typeof field.value==='object'?`${field.value.min}–${field.value.max}`:String(field.value);
+    return <span key={field.key} className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-foreground/80">{field.label}: {value}{field.unit?` ${field.unit}`:''}</span>;
+  })}</div>;
+}
+
 function Cell({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-col items-center justify-start">{children}</div>;
 }
@@ -191,7 +200,7 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
           {ad.cityName && <span className="flex min-w-0 items-center gap-0.5 truncate"><MapPin className="h-3 w-3 shrink-0" /> <span className="truncate">{ad.cityName}</span></span>}
         </div>
         <div className="mt-auto flex items-end justify-between gap-1 pt-0.5">
-          <CardPrice ad={ad} />
+          <div><CardPrice ad={ad} /><CategoryCardFacts ad={ad} /></div>
           <span className="shrink-0 text-[9px] text-muted-foreground">{timeShort(ad.createdAt)}</span>
         </div>
       </div>
@@ -217,6 +226,7 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
         </div>
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground/90">{compactAdTitle(ad.title)}</h3>
         <CardPrice ad={ad} />
+        <CategoryCardFacts ad={ad} />
         <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-0.5 pt-1.5 text-[11px] text-muted-foreground">
           {(ad.ratingCount ?? 0) > 0 && <span className="flex items-center gap-0.5 font-extrabold text-amber-600"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {ad.ratingAvg} ({ad.ratingCount})</span>}
           <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" /> {new Intl.NumberFormat('en-US').format(ad.views)}</span>
@@ -258,6 +268,7 @@ export function AdCardMarketplace({ ad }: { ad: AdCardType }) {
     <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
       <div className="flex flex-wrap items-baseline gap-1.5"><strong className="text-base font-extrabold text-[#16294a] sm:text-xl">{adPriceLabel(ad)}</strong><OldPrice ad={ad} /><DiscountChip ad={ad} /></div>
       <h3 className="line-clamp-2 min-h-10 break-words text-sm font-bold leading-5 text-slate-800">{compactAdTitle(ad.title)}</h3>
+      <CategoryCardFacts ad={ad} />
       {ad.storeName && <StoreTag name={ad.storeName} />}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
         {ad.cityName && <span className="inline-flex min-w-0 items-center gap-1"><MapPin className="h-3 w-3 shrink-0" />{ad.cityName}</span>}

@@ -23,6 +23,36 @@ import { getActiveProfile, ensureDefaultProfile, backfillProfileContact } from '
 import { normalizeAr, similarity, isKeywordStuffing } from '@/domain/text';
 import { writeAdWithCategory } from '@/lib/ad-categories/service';
 import { CategoryValidationError } from '@/lib/ad-categories/validation';
+import { inferLegacyListingType, type NormalizedListingSubmission } from '@/lib/ad-categories/listing-policy';
+import {
+  normalizeAdPriceDetails,
+  normalizeLegacyListingSubmission,
+  normalizeSaudiLocation,
+  type SaudiLocation,
+} from '@/lib/ads/submission-validation';
+
+async function submittedSaudiLocation(formData: FormData): Promise<SaudiLocation | null> {
+  return normalizeSaudiLocation({
+    countryId: formData.get('country_id'),
+    regionId: formData.get('city_id'),
+    cityId: formData.get('area_id'),
+  }, {
+    regionExists: async (regionId, countryId) => Boolean(await prisma.cities.findFirst({
+      where: { id: BigInt(regionId), country_id: countryId },
+      select: { id: true },
+    })),
+    cityBelongs: async (cityId, regionId) => Boolean(await prisma.areas.findFirst({
+      where: { id: BigInt(cityId), city_id: regionId },
+      select: { id: true },
+    })),
+  });
+}
+
+function submissionErrorCode(error: CategoryValidationError): 'price' | 'location' | 'category' {
+  if (error.fieldKey === 'price' || error.fieldKey === 'old_price') return 'price';
+  if (['country_id', 'city_id', 'area_id'].includes(error.fieldKey)) return 'location';
+  return 'category';
+}
 
 /** Resolve coordinates from a pasted maps link — follows shortened goo.gl links. */
 async function resolveMapsUrl(input: string): Promise<LatLng | null> {
@@ -197,16 +227,21 @@ export async function createAdAction(formData: FormData) {
 
   const title = String(formData.get('title') || '').trim();
   const detail = String(formData.get('detail') || '').trim();
-  const adsType = String(formData.get('adsType')) === 'request' ? 'request' : 'offer';
-  // نوع السعر (للمعروض): rent سعر + مدة تأجير / sale سعر بيع / som على السوم بلا سعر
-  const ptRaw = String(formData.get('priceType') || '');
-  const priceType = adsType === 'offer' && ['rent', 'sale', 'som'].includes(ptRaw) ? ptRaw : null;
-  const rentPeriod = priceType === 'rent' ? String(formData.get('rentPeriod') || '').trim().slice(0, 20) || 'شهري' : null;
-  const price = priceType === 'som' ? 0 : parseFloat(String(formData.get('price') || '0')) || 0;
-  // Explicit selection is validated inside the same transaction as the ad.
-  const cityId = String(formData.get('city_id') || '0');
-  const areaRaw = String(formData.get('area_id') || '');
-  const countryRaw = String(formData.get('country_id') || '');
+  const rawAdsType = formData.get('adsType');
+  // Explicit category/listing selection is validated inside the same transaction as the ad.
+  // Location uses the same existing Saudi dataset and is validated before any profile write.
+  let location: SaudiLocation | null;
+  try {
+    location = await submittedSaudiLocation(formData);
+  } catch (error) {
+    if (error instanceof CategoryValidationError) {
+      const destSuffix = String(formData.get('dest') || '') === 'store' ? '&dest=store' : '';
+      redirect(`/ads/new?error=${submissionErrorCode(error)}${destSuffix}`);
+    }
+    throw error;
+  }
+  const cityId = String(location?.regionId ?? 0);
+  const areaRaw = location ? String(location.cityId) : '';
   const phone = String(formData.get('phone') || '').trim();
   const whatsapp = String(formData.get('whatsapp') || '').trim();
   let lat = String(formData.get('lat') || '').trim();
@@ -396,14 +431,23 @@ export async function createAdAction(formData: FormData) {
   }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
-  const ad = await writeAdWithCategory(prisma, formData, (tx, category) => tx.ads.create({
+  const ad = await writeAdWithCategory(prisma, formData, (tx, category) => {
+    const listing = category?.listing ?? normalizeLegacyListingSubmission({
+      adsType: rawAdsType,
+      priceType: formData.get('priceType'),
+      rentPeriod: formData.get('rentPeriod'),
+      price: formData.get('price'),
+    });
+    const priceDetails = normalizeAdPriceDetails(listing, formData.get('old_price'), category ? category.priceEnabled && category.goodsEnabled : true);
+    const submissionFlags = [flagTerms, priceDetails.warning === 'suspicious_discount' ? `خصم مرتفع محسوب (${priceDetails.discountPercent}٪)` : ''].filter(Boolean).join(' — ');
+    return tx.ads.create({
     data: {
-      title: finalTitle, detail: finalDetail, price:category?.listing.price??price, adsType:category?.listing.adsType??adsType,
+      title: finalTitle, detail: finalDetail, price:listing.price, adsType:listing.adsType,
       category_id: catId,
       subcategory_id: null,
       city_id: BigInt(cityId || '0'),
       area_id: areaRaw ? Number(areaRaw) : null,
-      country_id: countryRaw ? Number(countryRaw) : (user?.country_id ?? null),
+      country_id: location?.countryId ?? (user?.country_id ?? null),
       user_id: BigInt(session.uid),
       profile_id: profileId ? BigInt(profileId) : null,
       video_path: video || '',
@@ -414,12 +458,12 @@ export async function createAdAction(formData: FormData) {
       adsSpecial: 'no',
       state: 'active',
       status: requireApproval ? 0 : 1,
-      flag_terms: flagTerms || null,
-      price_type: category?category.listing.priceType:priceType,
-      rent_period: category?category.listing.rentPeriod:rentPeriod,
-      sale_type: category?.listing.listingType??null,
+      flag_terms: submissionFlags || null,
+      price_type: listing.priceType,
+      rent_period: listing.rentPeriod,
+      sale_type: listing.listingType,
       // عروض اليوم + حالة التوفر (يظهر الحقلان عند تفعيلهما من التحكم)
-      old_price: (category?category.listing.priceType:priceType) === 'som' ? 0 : Math.max(0, parseFloat(String(formData.get('old_price') || '0')) || 0),
+      old_price: priceDetails.oldPrice,
       stock_state: [0, 1, 2].includes(Number(formData.get('stock_state'))) ? Number(formData.get('stock_state')) : 0,
       store_only: dest === 'store' ? 1 : 0, // عزل تام: إعلان المتجر لا يظهر في تربح
       cat_reviewed: aiClassified ? 0 : 1, // تصنيف آلي؟ ينتظر مراجعة الإدارة
@@ -431,8 +475,9 @@ export async function createAdAction(formData: FormData) {
         ...(!category.goodsEnabled ? { stock_state: 0, old_price: 0 } : {}),
       } : {}),
     },
-  })).catch(error => {
-    if (error instanceof CategoryValidationError) redirect(`/ads/new?error=category${q}`);
+  });
+  }).catch(error => {
+    if (error instanceof CategoryValidationError) redirect(`/ads/new?error=${submissionErrorCode(error)}${q}`);
     throw error;
   });
 
@@ -499,7 +544,7 @@ export async function createAdAction(formData: FormData) {
     // تنبيهات البحث المحفوظ + مطابقة عرض/طلب — لإعلانات تربح فقط (عزل المتاجر)
     import('@/lib/saved-search').then((m) => {
       m.notifySavedSearches(toInt(ad.id), title, detail, session.uid).catch(() => {});
-      m.notifyOppositeType(toInt(ad.id), title, Number(ad.category_id), Number(cityId || '0'), adsType as 'offer' | 'request', session.uid).catch(() => {});
+      m.notifyOppositeType(toInt(ad.id), title, Number(ad.category_id), Number(cityId || '0'), ad.adsType as 'offer' | 'request', session.uid).catch(() => {});
     }).catch(() => {});
   }
   // كلمات مخالفة قليلة: نُشر الإعلان للعامة بعد حجب تلك الكلمات بنجمات — أعلِم صاحبه بذلك.
@@ -556,6 +601,13 @@ export async function updateAdAction(formData: FormData) {
   const eFinalTitle = eGuard.parts[0] || eTitle;
   const eFinalDetail = eGuard.parts[1] || eDetail;
   const eFlagTerms = eGuard.hits.length ? summarizeHits(eGuard.hits) : '';
+  let editLocation: SaudiLocation | null;
+  try {
+    editLocation = await submittedSaudiLocation(formData);
+  } catch (error) {
+    if (error instanceof CategoryValidationError) redirect(`/ads/${toInt(adId)}/edit?error=${submissionErrorCode(error)}`);
+    throw error;
+  }
   await prisma.users.update({
     where: { id: BigInt(session.uid) },
     data: {
@@ -572,34 +624,50 @@ export async function updateAdAction(formData: FormData) {
   }
   // العنوان والتفاصيل إجباريان في التعديل أيضاً (كالإضافة)
   if (!eTitle || !eDetail) redirect(`/ads/${toInt(adId)}/edit?error=missing`);
-  // نوع السعر عند التعديل: نفس منطق الإضافة (على السوم = صفر بلا سعر)
-  const eType = String(formData.get('adsType')) === 'request' ? 'request' : 'offer';
-  const ePtRaw = String(formData.get('priceType') || '');
-  const ePriceType = eType === 'offer' && ['rent', 'sale', 'som'].includes(ePtRaw) ? ePtRaw : null;
-  const eRentPeriod = ePriceType === 'rent' ? String(formData.get('rentPeriod') || '').trim().slice(0, 20) || 'شهري' : null;
-  const newPrice = ePriceType === 'som' ? 0 : parseFloat(String(formData.get('price') || '0')) || 0;
   const oldPrice = ad.price || 0;
-  const updatedAd = await writeAdWithCategory(prisma, formData, (tx, category, preserved) => tx.ads.update({
+  const updatedAd = await writeAdWithCategory(prisma, formData, (tx, category, preserved) => {
+    const preservedListing: NormalizedListingSubmission | null = preserved ? {
+      listingType: inferLegacyListingType({ listingType: preserved.sale_type, adsType: ad.adsType, priceType: preserved.price_type }),
+      adsType: ad.adsType as 'offer' | 'request',
+      priceType: ['sale', 'rent', 'som'].includes(String(preserved.price_type)) ? preserved.price_type as 'sale' | 'rent' | 'som' : null,
+      rentPeriod: preserved.rent_period,
+      price: preserved.price,
+    } : null;
+    const listing = category?.listing ?? preservedListing ?? normalizeLegacyListingSubmission({
+      adsType: formData.get('adsType'),
+      priceType: formData.get('priceType'),
+      rentPeriod: formData.get('rentPeriod'),
+      price: formData.get('price'),
+    });
+    const oldPriceEligible = (category ? category.priceEnabled && category.goodsEnabled : true)
+      && listing.adsType === 'offer' && listing.priceType !== null && listing.priceType !== 'som' && listing.price > 0;
+    const priceDetails = !oldPriceEligible
+      ? normalizeAdPriceDetails(listing, 0, false)
+      : formData.has('old_price')
+        ? normalizeAdPriceDetails(listing, formData.get('old_price'), true)
+        : { oldPrice: ad.old_price, discountPercent: null, warning: null } as const;
+    const submissionFlags = [eFlagTerms, priceDetails.warning === 'suspicious_discount' ? `خصم مرتفع محسوب (${priceDetails.discountPercent}٪)` : ''].filter(Boolean).join(' — ');
+    return tx.ads.update({
     where: { id: adId },
     data: {
       title: eFinalTitle,
       detail: eFinalDetail,
-      flag_terms: eFlagTerms || null,
-      price: category?.listing.price??newPrice,
-      adsType: category?.listing.adsType??eType,
-      price_type: category?category.listing.priceType:ePriceType,
-      rent_period: category?category.listing.rentPeriod:eRentPeriod,
-      sale_type: category?.listing.listingType??ad.sale_type,
-      ...((category?category.listing.priceType:ePriceType) === 'som' ? { old_price: 0 } : {}),
+      flag_terms: submissionFlags || null,
+      price: listing.price,
+      adsType: listing.adsType,
+      price_type: listing.priceType,
+      rent_period: listing.rentPeriod,
+      sale_type: listing.listingType,
       // Category changes are applied only from the transaction's validated selection.
-      city_id: BigInt(String(formData.get('city_id') || '0')),
-      area_id: formData.get('area_id') ? Number(formData.get('area_id')) : null,
+      city_id: BigInt(editLocation?.regionId ?? 0),
+      area_id: editLocation?.cityId ?? null,
+      country_id: editLocation?.countryId ?? ad.country_id,
       lat: eLat || null,
       lng: eLng || null,
       phoneAllow: formData.get('phoneAllow') ? 1 : 0,
       commentAllow: formData.get('commentAllow') ? 1 : 0,
       // لا تُصفَّر القيم إذا كانت الميزة موقوفة من التحكم (الحقل غير معروض أصلاً)
-      ...(formData.get('old_price') !== null ? { old_price: Math.max(0, parseFloat(String(formData.get('old_price') || '0')) || 0) } : {}),
+      old_price: priceDetails.oldPrice,
       ...(formData.get('stock_state') !== null ? { stock_state: [0, 1, 2].includes(Number(formData.get('stock_state'))) ? Number(formData.get('stock_state')) : 0 } : {}),
       ...(category ? { category_id: category.category_id, subcategory_id: category.subcategory_id, cat_reviewed: 1,
         ...(!category.priceEnabled ? { price: 0, price_type: null, rent_period: null, old_price: 0 } : {}),
@@ -607,8 +675,9 @@ export async function updateAdAction(formData: FormData) {
       } : {}),
       ...preserved,
     },
-  }), { adId: ad.id, memberId: BigInt(session.uid) }).catch(error => {
-    if (error instanceof CategoryValidationError) redirect(`/ads/${toInt(adId)}/edit?error=category`);
+  });
+  }, { adId: ad.id, memberId: BigInt(session.uid) }).catch(error => {
+    if (error instanceof CategoryValidationError) redirect(`/ads/${toInt(adId)}/edit?error=${submissionErrorCode(error)}`);
     throw error;
   });
 
@@ -616,7 +685,7 @@ export async function updateAdAction(formData: FormData) {
   if (updatedAd.price > 0 && oldPrice > updatedAd.price) {
     const favs = await prisma.favorites.findMany({ where: { ads_id: adId, user_id: { not: BigInt(session.uid) } }, select: { user_id: true }, take: 3000 }).catch(() => []);
     if (favs.length) {
-      const title = `📉 انخفض سعر إعلان في مفضّلتك: «${(eFinalTitle || '').slice(0, 45)}» — الآن ${new Intl.NumberFormat('en-US').format(newPrice)} ر.س`;
+      const title = `📉 انخفض سعر إعلان في مفضّلتك: «${(eFinalTitle || '').slice(0, 45)}» — الآن ${new Intl.NumberFormat('en-US').format(updatedAd.price)} ر.س`;
       const route = `/ads/${toInt(adId)}`;
       await prisma.notfications.createMany({ data: favs.map((f) => ({ title, route, user_id: String(toInt(f.user_id)), type: 'other' })) }).catch(() => {});
     }

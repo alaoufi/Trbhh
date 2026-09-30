@@ -252,6 +252,11 @@ export function AdForm({
           <b>{rejection?.title}:</b> {rejection?.reason} {rejection?.nextStep}
         </div>
       )}
+      {(error === 'price' || error === 'location' || error === 'category') && rejection && (
+        <div role="alert" className="rounded-lg border-2 border-red-500 bg-red-50 p-3 text-sm font-bold text-red-900">
+          <b>{rejection.title}:</b> {rejection.reason} {rejection.nextStep}
+        </div>
+      )}
       {(error === 'free-duplicate' || error === 'duplicate') && (
         <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-medium text-red-800">
           ⚠️ <b>{adPublishRejection('free-duplicate').title}:</b> {adPublishRejection('free-duplicate').reason} {adPublishRejection('free-duplicate').nextStep}

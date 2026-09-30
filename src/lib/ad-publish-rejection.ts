@@ -6,7 +6,7 @@
 export type AdPublishRejectionCode =
   | 'missing' | 'contact' | 'pledge' | 'blocked' | 'toomany' | 'image'
   | 'flood' | 'repeat' | 'free-duplicate' | 'crossdup' | 'needdup'
-  | 'needcredit' | 'banned' | 'editWindow' | 'limit' | 'gap';
+  | 'needcredit' | 'banned' | 'editWindow' | 'limit' | 'gap' | 'price' | 'location' | 'category';
 
 export type AdPublishRejection = {
   title: string;
@@ -33,6 +33,9 @@ const REJECTIONS: Record<AdPublishRejectionCode, AdPublishRejection> = {
   editWindow: { title: 'تعذر حفظ التعديل', reason: 'انتهت المهلة المسموح بها لتعديل الإعلان.', nextStep: 'لا يمكن تعديل الإعلان بعد انتهاء المهلة المحددة في النظام.' },
   limit: { title: 'لم يُنشر الإعلان', reason: 'استخدمت كامل عدد الإعلانات المتاح لك اليوم.', nextStep: 'انتظر حتى يبدأ اليوم التالي أو اشترك في باقة بعدد إعلانات أكبر.', actionHref: '/packages', actionLabel: 'عرض الباقات المتاحة' },
   gap: { title: 'لم يُنشر الإعلان', reason: 'لم يكتمل الفاصل الزمني المطلوب بين الإعلانات في باقتك.', nextStep: 'انتظر المدة المتبقية أو اشترك في باقة بفاصل أقل.', actionHref: '/packages', actionLabel: 'عرض الباقات المتاحة' },
+  price: { title: 'تعذر حفظ السعر', reason: 'السعر أو السعر السابق غير صالح لطريقة التسعير المختارة.', nextStep: 'راجع السعر، ويجب أن يكون السعر السابق أكبر من السعر الحالي.' },
+  location: { title: 'تعذر حفظ الموقع', reason: 'المنطقة والمدينة غير مكتملتين أو لا تتطابقان.', nextStep: 'اختر المنطقة أولًا ثم اختر مدينة تابعة لها.' },
+  category: { title: 'تعذر حفظ مواصفات الإعلان', reason: 'بعض حقول القسم غير مكتملة أو لا تطابق القيم المسموحة.', nextStep: 'راجع الحقول المعلّمة ثم أعد الحفظ.' },
 };
 
 export function adPublishRejection(code: AdPublishRejectionCode): AdPublishRejection {

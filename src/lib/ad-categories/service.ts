@@ -11,6 +11,7 @@ import {defaultListingPolicy,inferLegacyListingType,normalizeListingSubmission,v
 import {decodeStoredCategoryDefinition} from './storage';
 import {categorySeedDefinition,findCategorySeedTemplate} from './seed-templates';
 import {buildPublicCategoryTaxonomy} from './taxonomy';
+import {publicCategoryFieldTrust,type PublicCategoryTrustReason} from './public-trust';
 type Tx=Prisma.TransactionClient;
 type DefinitionRow={subcategory_id:bigint;version:number;kind:string;price_enabled:number;goods_enabled:number;fields_json:unknown};
 const json=(v:unknown):unknown=>typeof v==='string'?JSON.parse(v):v;
@@ -107,13 +108,13 @@ export async function getCategoryEditValues(id:bigint):Promise<CategoryValues> {
   const rows=await prisma.$queryRaw<{values_json:unknown}[]>`SELECT values_json FROM ad_category_values WHERE ad_id=${id}`;
   return rows.length?json(rows[0].values_json) as CategoryValues:{};
 }
-export type PublicCategory={priceEnabled:boolean;goodsEnabled:boolean;listingType:string;categoryFields:ReturnType<typeof visibleCategoryValues>;categoryCardFields:ReturnType<typeof cardCategoryValues>;comparableCategoryFields:ReturnType<typeof comparableCategoryValues>;subcategoryName?:string};
+export type PublicCategory={priceEnabled:boolean;goodsEnabled:boolean;listingType:string;categoryFieldsTrusted:boolean;categoryFieldsSuppressedReason?:PublicCategoryTrustReason;categoryFields:ReturnType<typeof visibleCategoryValues>;categoryCardFields:ReturnType<typeof cardCategoryValues>;comparableCategoryFields:ReturnType<typeof comparableCategoryValues>;subcategoryName?:string};
 export async function getPublicCategories(ids:bigint[]):Promise<Map<number,PublicCategory>> {
   const out=new Map<number,PublicCategory>();
   const [enabledValue,latestTemplatesValue]=await Promise.all([getSetting('categories_v2_enabled',process.env.CATEGORIES_DEFAULT_ENABLED==='1'?'1':'0'),getSetting(CATEGORY_LATEST_TEMPLATES_SETTING,'1')]);
   if(!ids.length||!categoryEnabled(enabledValue)) return out;
   const [rows,previewVisibility]=await Promise.all([
-    prisma.$queryRaw<((Omit<DefinitionRow,'subcategory_id'|'version'|'kind'|'price_enabled'|'goods_enabled'> & {subcategory_id:bigint|null;version:number|null;kind:string|null;price_enabled:number|null;goods_enabled:number|null})&{ad_id:bigint;category_id:bigint;selected_subcategory_id:bigint;values_json:unknown;subcategory_name:string;category_name:string;active:number;is_active:string;sale_type:string|null;adsType:string;price_type:string|null})[]>(Prisma.sql`SELECT a.id AS ad_id,a.sale_type,a.adsType,a.price_type,c.id AS category_id,s.id AS selected_subcategory_id,d.*,v.values_json,s.name AS subcategory_name,c.name AS category_name,s.active,c.is_active FROM ads a JOIN sub_categories s ON s.id=a.subcategory_id AND s.category_id=a.category_id JOIN categories c ON c.id=a.category_id LEFT JOIN ad_category_definitions d ON d.subcategory_id=s.id LEFT JOIN ad_category_values v ON v.ad_id=a.id AND v.subcategory_id=s.id WHERE a.id IN (${Prisma.join(ids)})`),
+    prisma.$queryRaw<((Omit<DefinitionRow,'subcategory_id'|'version'|'kind'|'price_enabled'|'goods_enabled'> & {subcategory_id:bigint|null;version:number|null;kind:string|null;price_enabled:number|null;goods_enabled:number|null})&{ad_id:bigint;title:string;category_id:bigint;selected_subcategory_id:bigint;values_json:unknown;subcategory_name:string;category_name:string;active:number;is_active:string;sale_type:string|null;adsType:string;price_type:string|null})[]>(Prisma.sql`SELECT a.id AS ad_id,a.title,a.sale_type,a.adsType,a.price_type,c.id AS category_id,s.id AS selected_subcategory_id,d.*,v.values_json,s.name AS subcategory_name,c.name AS category_name,s.active,c.is_active FROM ads a JOIN sub_categories s ON s.id=a.subcategory_id AND s.category_id=a.category_id JOIN categories c ON c.id=a.category_id LEFT JOIN ad_category_definitions d ON d.subcategory_id=s.id LEFT JOIN ad_category_values v ON v.ad_id=a.id AND v.subcategory_id=s.id WHERE a.id IN (${Prisma.join(ids)})`),
     isReadOnlyPreview()?previewHashGetAll(PREVIEW_CATEGORY_VISIBILITY_KEY).then(parsePreviewCategoryVisibility):Promise.resolve(parsePreviewCategoryVisibility({})),
   ]);
   for(const r of rows){
@@ -125,7 +126,8 @@ export async function getPublicCategories(ids:bigint[]):Promise<Map<number,Publi
     const active=visibility.categories[0].active&&visibility.subcategories[0].active;
     const values=(json(r.values_json)||{}) as CategoryValues,listingType=inferLegacyListingType({listingType:r.sale_type,adsType:r.adsType,priceType:r.price_type});
     const context={listingType};
-    out.set(Number(r.ad_id),{priceEnabled:d.priceEnabled,goodsEnabled:d.goodsEnabled,listingType,subcategoryName:active?r.subcategory_name:undefined,categoryFields:active?visibleCategoryValues(d.fields,values,context):[],categoryCardFields:active?cardCategoryValues(d.fields,values,context).slice(0,2):[],comparableCategoryFields:active?comparableCategoryValues(d.fields,values,context):[]});
+    const trust=publicCategoryFieldTrust({templateKey:d.templateKey,title:r.title||'',values}),project=active&&trust.trusted;
+    out.set(Number(r.ad_id),{priceEnabled:d.priceEnabled,goodsEnabled:d.goodsEnabled,listingType,categoryFieldsTrusted:trust.trusted,...(!trust.trusted?{categoryFieldsSuppressedReason:trust.reason}:{}),subcategoryName:active?r.subcategory_name:undefined,categoryFields:project?visibleCategoryValues(d.fields,values,context):[],categoryCardFields:project?cardCategoryValues(d.fields,values,context).slice(0,2):[],comparableCategoryFields:project?comparableCategoryValues(d.fields,values,context):[]});
   }
   return out;
 }

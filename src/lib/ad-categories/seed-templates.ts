@@ -68,7 +68,7 @@ const rugDecor = decor.map(field => field.key === 'material'
   ? s('material', 'المادة', ['صوف', 'قطن', 'ألياف صناعية', 'خشب', 'معدن', 'زجاج', 'أخرى'])
   : field);
 const equipment = [f('manufacturer', 'المصنع'), f('model', 'الطراز'), { ...n('year', 'سنة الصنع'), min: 1900, max: 2100, step:1 }, condition,
-  {...n('operating_hours', 'ساعات التشغيل', 'ساعة'),min:0,max:200000,step:1}, {...n('engine_power_kw', 'قدرة المحرك', 'كيلوواط'),min:1,max:5000,step:1},
+  {...n('operating_hours', 'ساعات التشغيل', 'ساعة'),min:0,max:200000,step:1}, {...n('engine_power_kw', 'قدرة المحرك', 'كيلوواط'),min:2,max:5000,step:1},
   {...n('operating_weight_t', 'الوزن التشغيلي', 'طن'),min:0.1,max:1000,step:0.1}, s('power_source', 'مصدر الطاقة', ['ديزل','بنزين','غاز','كهرباء','هجين','أخرى']),
   s('drive','نظام الحركة',['دفع ثنائي','دفع رباعي','مجنزرة','أخرى'],'المواصفات الفنية'),f('origin_country','بلد المنشأ','text',[],'المواصفات الفنية'),
   {...yes('operator_included', 'يشمل المشغل','الإيجار'),...when('listing_type','rent')},
@@ -96,8 +96,8 @@ const TEMPLATE_LISTING_POLICIES:Record<string,ListingPolicy>={
   transport_service:policy(service(['fixed','hour','day','month','trip','project','quote']),serviceRequest()),
 };
 const SEARCHABLE_KEYS=new Set(['manufacturer','brand','make','model','part_number','compatible_make','compatible_model','breed','job_title','employer','specialty']);
-const FILTERABLE_KEYS=new Set(['condition','year','fuel','power_source','equipment_kind','truck_type','property_use','land_use','rooms','bathrooms','area_m2','capacity_t','lift_height_m','operating_hours','service_kind','contract','workplace','species','feed_kind','material_kind','sale_channel','supply_unit','brand','make','manufacturer','model']);
-const CARD_KEYS=new Set(['condition','year','make','manufacturer','model','area_m2','rooms','capacity_t','lift_height_m','equipment_kind','service_kind','head_count']);
+const FILTERABLE_KEYS=new Set(['condition','year','fuel','power_source','equipment_kind','truck_type','property_use','land_use','rooms','bathrooms','area_m2','capacity_t','crane_capacity_t','forklift_capacity_t','telehandler_capacity_t','platform_capacity_kg','lift_height_m','operating_hours','service_kind','contract','workplace','species','feed_kind','material_kind','sale_channel','supply_unit','brand','make','manufacturer','model']);
+const CARD_KEYS=new Set(['condition','year','make','manufacturer','model','area_m2','rooms','capacity_t','crane_capacity_t','forklift_capacity_t','telehandler_capacity_t','platform_capacity_kg','lift_height_m','equipment_kind','service_kind','head_count']);
 const COMPARABLE_KEYS=new Set([...FILTERABLE_KEYS,'engine_power_kw','operating_weight_t','odometer_km','building_age_years','quantity','minimum_order']);
 function template(
   key: string,
@@ -176,10 +176,12 @@ const CORE_CATEGORY_SEED_TEMPLATES: CategorySeedTemplate[] = [
   template('tiles', 'مواد بناء ومقاولات', 'بلاط وأرضيات', 'goods', [s('material_kind', 'نوع البلاط', ['سيراميك', 'بورسلين', 'رخام', 'جرانيت', 'أخرى']), f('brand', 'المصنع'), m('application', 'الاستخدام', ['أرضيات', 'جدران', 'واجهات', 'داخلي', 'خارجي']), n('length_mm', 'الطول', 'مم'), n('width_mm', 'العرض', 'مم'), n('thickness_mm', 'السماكة', 'مم'), s('finish', 'التشطيب', ['مطفي', 'لامع', 'محبب']), n('quantity_m2', 'الكمية', 'م²'), ...b2bSupply,...delivery], ['material_kind', 'application', 'quantity_m2']),
   template('building_materials', 'مواد بناء ومقاولات', 'مواد بناء أساسية', 'goods', [s('material_kind', 'نوع المادة', ['أسمنت', 'بلوك', 'طوب', 'حديد', 'رمل', 'حصى', 'أخرى']), f('brand', 'المصنع'), f('grade_spec', 'الدرجة أو المواصفة من المصنع'), n('quantity', 'الكمية'), s('supply_unit', 'وحدة التوريد', ['م²', 'م³', 'كيس', 'طن', 'قطعة', 'متر طولي']), f('dimensions_spec', 'الأبعاد أو المقاس'), ...b2bSupply,...delivery], ['material_kind', 'quantity', 'supply_unit']),
   template('sanitary', 'مواد بناء ومقاولات', 'أدوات صحية', 'goods', [s('item_kind', 'نوع الأداة', ['مغسلة', 'خلاط', 'مرحاض', 'دش', 'أخرى']), ...home, f('connection_size', 'مقاس التوصيل'), f('installation', 'طريقة التركيب')], ['item_kind', 'condition']),
-  template('contracting', 'مواد بناء ومقاولات', 'مقاولات وتشطيبات', 'service', [m('trade', 'التخصص', ['عظم', 'تشطيب', 'بلاط', 'دهان', 'سباكة', 'كهرباء', 'عزل']), n('work_area_m2', 'مساحة الأعمال', 'م²'), s('contract_scope', 'نطاق التعاقد', ['عمل فقط', 'مواد وعمل', 'توريد فقط']), n('duration_days', 'مدة التنفيذ', 'يوم'), f('service_coverage', 'نطاق التغطية'), f('warranty', 'ضمان العمل')], ['trade', 'contract_scope']),
+  template('contracting', 'مواد بناء ومقاولات', 'مقاولات وتشطيبات', 'service', [m('trade', 'التخصص', ['عظم', 'تشطيب', 'بلاط', 'دهان', 'سباكة', 'كهرباء', 'عزل', 'أسوار وشبوك', 'أعمال نخيل', 'تنسيق وزراعة']), n('work_area_m2', 'مساحة الأعمال', 'م²'), s('contract_scope', 'نطاق التعاقد', ['عمل فقط', 'مواد وعمل', 'توريد فقط']), n('duration_days', 'مدة التنفيذ', 'يوم'), f('service_coverage', 'نطاق التغطية'), f('warranty', 'ضمان العمل')], ['trade', 'contract_scope']),
   template('earthmoving', 'نقليات ومعدات ثقيلة', 'معدات حفر وتحميل', 'goods', [s('equipment_kind', 'نوع المعدة', ['حفار', 'شيول', 'بلدوزر', 'أخرى']), ...equipment, m('attachments', 'الملحقات', ['باكت', 'مطرقة', 'شوك', 'أخرى']), {...n('bucket_m3', 'سعة الباكت', 'م³'),...when('equipment_kind',['حفار','شيول'])},{...n('blade_width_m','عرض الشفرة','متر'),...when('equipment_kind','بلدوزر')}], ['equipment_kind', 'manufacturer', 'model', 'year', 'condition','power_source']),
   template('lifting', 'نقليات ومعدات ثقيلة', 'رافعات ومناولة', 'goods', [s('equipment_kind', 'نوع المعدة', ['رافعة', 'رافعة شوكية', 'مناولة تلسكوبية','رافعة مقصية','رافعة أشخاص']), ...equipment,
-    {...n('capacity_t', 'حمولة الرفع المقننة', 'طن'),min:0.1,max:2000,step:0.1,...when('equipment_kind',['رافعة','رافعة شوكية','مناولة تلسكوبية'])},
+    {...n('crane_capacity_t', 'حمولة الرافعة المقننة', 'طن'),min:0.5,max:2000,step:0.1,...when('equipment_kind','رافعة')},
+    {...n('forklift_capacity_t', 'حمولة الرافعة الشوكية', 'طن'),min:0.5,max:80,step:0.1,...when('equipment_kind','رافعة شوكية')},
+    {...n('telehandler_capacity_t', 'حمولة المناولة التلسكوبية', 'طن'),min:0.5,max:50,step:0.1,...when('equipment_kind','مناولة تلسكوبية')},
     {...n('lift_height_m', 'ارتفاع الرفع أو العمل', 'متر'),min:0.1,max:250,step:0.1},
     {...n('mast_stages','عدد مراحل السارية','مرحلة'),...when('equipment_kind','رافعة شوكية')},
     {...n('boom_length_m','طول الذراع','متر'),...when('equipment_kind',['رافعة','مناولة تلسكوبية'])},

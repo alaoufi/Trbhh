@@ -65,10 +65,21 @@ describe('editable specialist subcategory seed templates', () => {
     const lifting = CATEGORY_SEED_TEMPLATES.find(template => template.key === 'lifting');
     expect(lifting).toBeTruthy();
     const fields = new Map(lifting!.fields.map(field => [field.key, field]));
-    expect(fields.get('capacity_t')).toMatchObject({ min: 0.1, max: 2000, step: 0.1, unit: 'طن' });
+    expect(fields.get('crane_capacity_t')).toMatchObject({ min: 0.5, max: 2000, step: 0.1, unit: 'طن',dependsOn:'equipment_kind',dependencyValue:'رافعة' });
+    expect(fields.get('forklift_capacity_t')).toMatchObject({ min: 0.5, max: 80, step: 0.1, unit: 'طن',dependsOn:'equipment_kind',dependencyValue:'رافعة شوكية' });
+    expect(fields.get('telehandler_capacity_t')).toMatchObject({ min: 0.5, max: 50, step: 0.1, unit: 'طن',dependsOn:'equipment_kind',dependencyValue:'مناولة تلسكوبية' });
     expect(fields.get('lift_height_m')).toMatchObject({ min: 0.1, max: 250, step: 0.1, unit: 'متر' });
     expect(fields.get('platform_capacity_kg')).toMatchObject({ min: 50, max: 2000, step: 1, unit: 'كجم' });
-    expect(fields.get('engine_power_kw')).toMatchObject({ min: 1, max: 5000, step: 1, unit: 'كيلوواط' });
+    expect(fields.get('engine_power_kw')).toMatchObject({ min: 2, max: 5000, step: 1, unit: 'كيلوواط' });
+    const common={manufacturer:'China',model:'2',year:2026,condition:'جديد',power_source:'كهرباء',lift_height_m:18};
+    expect(()=>validateCategoryValues(lifting!.fields,{equipment_kind:'رافعة مقصية',...common,crane_capacity_t:640,engine_power_kw:1})).toThrow();
+    expect(validateCategoryValues(lifting!.fields,{equipment_kind:'رافعة مقصية',...common,platform_capacity_kg:640,engine_power_kw:2})).toMatchObject({platform_capacity_kg:640});
+    expect(()=>validateCategoryValues(lifting!.fields,{equipment_kind:'رافعة شوكية',...common,forklift_capacity_t:640})).toThrow();
+  });
+
+  it('offers fencing and palm work in contracting instead of forcing a tools schema',()=>{
+    const contracting=CATEGORY_SEED_TEMPLATES.find(template=>template.key==='contracting')!;
+    expect(contracting.fields.find(field=>field.key==='trade')?.options).toEqual(expect.arrayContaining(['أسوار وشبوك','أعمال نخيل','تنسيق وزراعة']));
   });
   it('covers every active legacy database subcategory explicitly', () => {
     const pairs = new Set(CATEGORY_SEED_TEMPLATES.map(template => `${template.categoryName}\u0000${template.name}`));
@@ -146,7 +157,7 @@ describe('editable specialist subcategory seed templates', () => {
     expect(car.fields.find(f=>f.key==='odometer_km')).toMatchObject({dependsOn:'condition',dependencyOperator:'in',dependencyValue:['مستعمل','مجدد']});
     const lifting=CATEGORY_SEED_TEMPLATES.find(t=>t.key==='lifting')!;
     expect(lifting.fields.find(f=>f.key==='operator_included')).toMatchObject({dependsOn:'listing_type',dependencyValue:'rent'});
-    expect(lifting.fields.map(f=>f.key)).toEqual(expect.arrayContaining(['power_source','capacity_t','lift_height_m','mast_stages','boom_length_m','platform_capacity_kg']));
+    expect(lifting.fields.map(f=>f.key)).toEqual(expect.arrayContaining(['power_source','crane_capacity_t','forklift_capacity_t','telehandler_capacity_t','lift_height_m','mast_stages','boom_length_m','platform_capacity_kg']));
   });
   it('does not duplicate property rental price and period inside attributes',()=>{
     for(const template of CATEGORY_SEED_TEMPLATES.filter(t=>t.kind==='property')){

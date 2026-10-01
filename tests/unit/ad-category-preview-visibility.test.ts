@@ -63,4 +63,16 @@ describe('preview-only category visibility', () => {
 
     expect(categories.get(500)).toEqual(expect.objectContaining({ subcategoryName: undefined, categoryFields: [] }));
   });
+
+  it('preserves raw legacy values but suppresses untrusted specifications from public projections',async()=>{
+    state.previewState.mockResolvedValue({});
+    state.raw.mockResolvedValue([{
+      ad_id:3412n,title:'مقاول شبوك ونخيل وتركيب أسوار',subcategory_id:null,selected_subcategory_id:255n,category_id:17n,
+      category_name:'مقاولات مواد بناء',subcategory_name:'ادوات بناء',version:null,kind:null,price_enabled:null,goods_enabled:null,
+      active:1,is_active:'yes',fields_json:null,values_json:{building_tool_kind:'أخرى',brand:'مقاول شبوك ونخيل',condition:'جديد'},
+      sale_type:'sale',adsType:'offer',price_type:'sale',
+    }]);
+    const category=(await getPublicCategories([3412n])).get(3412);
+    expect(category).toMatchObject({categoryFieldsTrusted:false,categoryFieldsSuppressedReason:'service_in_goods_leaf',categoryFields:[],categoryCardFields:[],comparableCategoryFields:[]});
+  });
 });

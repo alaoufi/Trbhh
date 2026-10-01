@@ -38,7 +38,13 @@ async function fillRequiredCategoryFields(page){
       continue;
     }
     const type=(await control.getAttribute('type')||'text').toLowerCase();
-    if(type==='checkbox'||type==='radio'){await control.check();continue;}
+    if(type==='checkbox'||type==='radio'){
+      if(!await control.isVisible()){
+        const disclosure=field.locator('details summary');
+        if(await disclosure.count())await disclosure.click();
+      }
+      await control.check();continue;
+    }
     if(type==='date'){await control.fill('2026-10-01');continue;}
     if(type==='number'){
       const min=await control.getAttribute('min');

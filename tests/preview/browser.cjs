@@ -11,6 +11,14 @@ const database=process.env.COMMERCE_PREVIEW_DATABASE_URL||'mysql://root:local_di
 const responsiveWidths=[360,390,412,768,1024,1440];
 let server,browser,logs='';
 const supplierNames=[];
+const schemaFamilies=[
+  {family:'goods',category:/سيارات/,leaf:/^سيارات$/},
+  {family:'property',category:/عقارات/,leaf:/أراض/},
+  {family:'jobs',category:/وظائف/,leaf:/فرص عمل/},
+  {family:'service',category:/زراعة ومشاتل/,leaf:/خدمات زراعة وحدائق/},
+  {family:'livestock',category:/مواشي/,leaf:/أغنام وماعز/},
+  {family:'plants',category:/زراعة ومشاتل/,leaf:/شتلات ونباتات/},
+];
 async function assertResponsive(page,label,widths=responsiveWidths){
   for(const width of widths){
     await page.setViewportSize({width,height:width<768?844:1000});
@@ -39,6 +47,31 @@ async function fillRequiredCategoryFields(page){
     }
     await control.fill(`قيمة اختبار ${index+1}`);
   }
+}
+async function reviewSchemaFamilyForm(page,journey){
+  await page.goto(origin+'/ads/new');
+  const category=page.locator('select[name="taxonomy_group"]'),subcategory=page.locator('select[name="subcategory_id"]');
+  await category.waitFor({state:'visible'});
+  const categoryValue=await category.locator('option').evaluateAll((options,pattern)=>options.find(option=>option.value&&new RegExp(pattern).test(option.textContent||''))?.value||'',journey.category.source);
+  assert(categoryValue,`${journey.family} main category exists`);
+  await category.selectOption(categoryValue);
+  const leafValue=await subcategory.locator('option').evaluateAll((options,pattern)=>options.find(option=>option.value&&new RegExp(pattern).test(option.textContent||''))?.value||'',journey.leaf.source);
+  assert(leafValue,`${journey.family} leaf exists`);
+  await subcategory.selectOption(leafValue);
+  const fields=page.locator('[data-field-key]'),required=page.locator('[data-field-key][data-required="true"]');
+  assert(await fields.count()>0,`${journey.family} renders specialised fields`);
+  assert(await required.count()>0,`${journey.family} has reviewed required fields`);
+  assert.equal(await page.locator('input[name="listingType"]').count(),1,`${journey.family} listing policy`);
+  assert.equal(await page.locator('input[name="pricingMode"]').count(),1,`${journey.family} pricing policy`);
+  await fillRequiredCategoryFields(page);
+  for(let index=0;index<await required.count();index++){
+    const control=required.nth(index).locator('input:not([type="hidden"]),select,textarea').first();
+    if(await control.count())assert(await control.evaluate(element=>element.checkValidity()),`${journey.family} required field ${index+1}`);
+  }
+  await page.setViewportSize({width:390,height:844});
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${journey.family} form mobile overflow`);
+  await page.screenshot({path:path.join(artifacts,`schema-family-${journey.family}.png`),fullPage:true});
+  console.log(JSON.stringify({journey:'schema-family-form',family:journey.family,status:'passed',fields:await fields.count(),required:await required.count()}));
 }
 async function run(){
   await mkdir(artifacts,{recursive:true});
@@ -143,6 +176,8 @@ async function run(){
       await assertResponsive(page,'add form');
       await page.setViewportSize({width:390,height:844});
       await page.screenshot({path:path.join(artifacts,'land-form-mobile.png'),fullPage:true});
+      for(const journey of schemaFamilies)await reviewSchemaFamilyForm(page,journey);
+      console.log(JSON.stringify({schemaFamilyJourneys:6,status:'passed'}));
       await page.goto(origin+'/ads/1');
       await page.getByText('وظيفة محاسب — إعلان اختبار محلي',{exact:true}).first().waitFor({state:'visible'});
       assert.equal(await page.getByText('مستعمل',{exact:true}).count(),0);

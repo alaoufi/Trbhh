@@ -275,7 +275,15 @@ jobs:
             quality_summary=$(docker exec "$container" node -e '
               const {execFileSync}=require("node:child_process");
               const report=JSON.parse(execFileSync(process.execPath,["scripts/release/audit-live-ad-quality.cjs"],{encoding:"utf8",maxBuffer:64*1024*1024}));
-              process.stdout.write(JSON.stringify({summary:report.summary,taxonomy:report.taxonomy}));
+              process.stdout.write(JSON.stringify({
+                summary:report.summary,
+                publicSummary:report.publicSummary,
+                taxonomy:report.taxonomy,
+                schema:report.schema,
+                countAlignment:report.countAlignment,
+                autoFixPlan:report.autoFixPlan,
+                confirmedCases:report.records.filter((row)=>["3412","3420"].includes(String(row.id))),
+              }));
             ')
             test -n "$quality_summary"
             printf 'AD_QUALITY_SUMMARY=%s\n' "$quality_summary"
@@ -323,6 +331,9 @@ jobs:
           for public_route in '/search' '/deals' '/nearby' '/companies' '/shop' '/guide' '/site-map'; do
             test "$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' -H 'Cookie:' -H 'Authorization:' "$preview_url$public_route")" = 200
           done
+          crawl_report=$(node scripts/release/crawl-public-preview.cjs "$preview_url")
+          test -n "$crawl_report"
+          printf 'PUBLIC_CRAWL=%s\n' "$crawl_report"
           if [[ "$LIVE_READ_ONLY" == 'true' ]]; then
             external_preview_mode=$(curl -sSI --max-time 25 "$preview_url/" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-trbhh-preview-mode"{print tolower($2)}' | tail -1)
             test "$external_preview_mode" = read-only
@@ -331,4 +342,4 @@ jobs:
           fi
           quality_summary=$(sed -n 's/^AD_QUALITY_SUMMARY=//p' "$remote_log" | tail -1)
           rm -f "$remote_log"
-          printf '### معاينة Hostinger\n\n- HTTPS URL: %s\n- Direct URL: http://%s:3081/\n- Commit: `%s`\n- Live read-only: `%s`\n- External verification: `anonymous GPTBot GET = HTTP 200, no Authorization/Cookie`\n- Public routes: `search, deals, nearby, companies, shop, guide, site-map = HTTP 200`\n- SEO isolation: `X-Robots-Tag + robots.txt verified`\n- Read-only ad audit: `%s`\n' "$preview_url" "$VPS_HOST" "$DEPLOY_SHA" "$LIVE_READ_ONLY" "${quality_summary:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          printf '### معاينة Hostinger\n\n- HTTPS URL: %s\n- Direct URL: http://%s:3081/\n- Commit: `%s`\n- Live read-only: `%s`\n- External verification: `anonymous GPTBot GET = HTTP 200, no Authorization/Cookie`\n- Public routes: `search, deals, nearby, companies, shop, guide, site-map = HTTP 200`\n- Public crawl: `%s`\n- SEO isolation: `X-Robots-Tag + robots.txt verified`\n- Read-only ad audit: `%s`\n' "$preview_url" "$VPS_HOST" "$DEPLOY_SHA" "$LIVE_READ_ONLY" "${crawl_report:-not-run}" "${quality_summary:-not-run}" >> "$GITHUB_STEP_SUMMARY"

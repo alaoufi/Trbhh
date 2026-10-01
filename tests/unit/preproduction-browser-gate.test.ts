@@ -16,6 +16,8 @@ describe('isolated pre-production browser gate', () => {
     expect(setup).toContain("'commerce_receipts'");
     expect(setup).toContain('PREVIEW_SEEDED_AD_AGE_MS');
     expect(dockerfile).toContain('COPY --from=builder --chown=nextjs:nodejs /app/scripts/release/audit-live-ad-quality.cjs');
+    expect(dockerfile).toContain('activate-categories.cjs build > scripts/release/category-seeds.json');
+    expect(dockerfile).toContain('/app/scripts/release/category-seeds.json ./scripts/release/category-seeds.json');
   });
 
   it('runs the browser journey in CI and keeps its screenshots', () => {
@@ -32,6 +34,10 @@ describe('isolated pre-production browser gate', () => {
     const deploy = readFileSync('.github/workflows/deploy-staging.yml', 'utf8');
     expect(deploy).toContain('audit-live-ad-quality.cjs');
     expect(deploy).toContain('AD_QUALITY_SUMMARY=');
+    expect(deploy).toContain('crawl-public-preview.cjs');
+    expect(deploy).toContain('PUBLIC_CRAWL=');
+    expect(deploy).toContain('report.schema');
+    expect(deploy).toContain('report.countAlignment');
     expect(deploy).toContain('x-robots-tag');
     expect(deploy).toContain('noindex, nofollow, noarchive');
     expect(deploy).toContain("'/search' '/deals' '/nearby' '/companies' '/shop' '/guide' '/site-map'");
@@ -45,6 +51,9 @@ describe('isolated pre-production browser gate', () => {
     expect(browser).toContain("journey:'search-ad'");
     expect(browser).toContain("journey:'delete-ad'");
     expect(browser).toContain("journey:'commerce-product-auth-guard'");
+    expect(browser).toContain('schemaFamilyJourneys:6');
+    expect(browser).toContain("family:'livestock'");
+    expect(browser).toContain("family:'plants'");
     expect(browser).toContain('PREVIEW_ARTIFACTS_DIR');
     expect(browser).toContain('fillRequiredCategoryFields');
     for (const width of [360, 390, 412, 768, 1024, 1440]) expect(browser).toContain(String(width));

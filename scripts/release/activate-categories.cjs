@@ -17,7 +17,7 @@ function check(ok,code){if(!ok)throw new Error(code);}
 function buildPayload(){
   const ts=require('typescript');
   const root=resolve(__dirname,'../..');
-  const sources=['seed-templates.ts','validation.ts'].map(name=>readFileSync(resolve(root,'src/lib/ad-categories',name),'utf8'));
+  const sources=['seed-templates.ts','validation.ts','quality-review.ts'].map(name=>readFileSync(resolve(root,'src/lib/ad-categories',name),'utf8'));
   const load=source=>{
     const exports={};
     const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
@@ -26,7 +26,8 @@ function buildPayload(){
   };
   const seeds=load(sources[0]).CATEGORY_SEED_TEMPLATES;
   const validate=load(sources[1]).validateDefinition;
-  return JSON.parse(JSON.stringify({format:'trbhh-category-activation-v1',sourceSha256:sha256(sources.join('\n')),templates:seeds.map(t=>({...t,fields:validate(t.fields)}))}));
+  const review=load(sources[2]).templateQualityReview;
+  return JSON.parse(JSON.stringify({format:'trbhh-category-activation-v1',sourceSha256:sha256(sources.join('\n')),templates:seeds.map(t=>({...t,fields:validate(t.fields)})),qualityReviews:seeds.map(t=>({key:t.key,...review(t)}))}));
 }
 const columns={
   categories:['id','name','photo_path','is_active','ordered'],

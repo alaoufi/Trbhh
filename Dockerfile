@@ -20,6 +20,7 @@ RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm prisma generate
+RUN node scripts/release/activate-categories.cjs build > scripts/release/category-seeds.json
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
@@ -49,6 +50,7 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/database ./database
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/release/seed-staging-categories.cjs ./scripts/release/seed-staging-categories.cjs
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/release/audit-live-ad-quality.cjs ./scripts/release/audit-live-ad-quality.cjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/release/category-seeds.json ./scripts/release/category-seeds.json
 
 # Writable, persistent upload dir owned by the runtime user. A named volume
 # mounted here inherits this ownership, so uploads (ad/classified/promo images)

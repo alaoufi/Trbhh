@@ -83,6 +83,8 @@ describe('operator category activation',()=>{
   it('builds exactly the current real templates with the real validator',()=>{
     const payload=script.buildPayload();
     expect(payload.templates).toEqual(CATEGORY_SEED_TEMPLATES.map(t=>({...t,fields:validateDefinition(t.fields)})));
+    expect(payload.qualityReviews).toHaveLength(CATEGORY_SEED_TEMPLATES.length);
+    expect(payload.qualityReviews.every((review:{key:string;status:string;reason:string})=>review.key&&review.status&&review.reason)).toBe(true);
     expect(payload.sourceSha256).toMatch(/^[a-f0-9]{64}$/);
   });
   it('refuses apply before any connection unless backup, baseline, database and payload hash are explicit',async()=>{

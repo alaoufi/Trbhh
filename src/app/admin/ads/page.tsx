@@ -111,6 +111,7 @@ export default async function AdminAds({ searchParams }: { searchParams: Promise
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-bold text-primary">الإعلانات</h1>
         <div className="flex flex-wrap gap-2 text-sm">
+          <Link href="/admin/ad-quality" className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 font-bold text-amber-900">مراجعة جودة التصنيف والحقول</Link>
           <Link href={tabHref('all')} className={tabCls('all')}>الكل {badge(allCount, 'bg-primary/80')}</Link>
           <Link href={tabHref('special')} className={tabCls('special')}>المميزة {badge(specialCount, 'bg-amber-500')}</Link>
           <Link href={tabHref('normal')} className={tabCls('normal')}>العادية {badge(normalCount, 'bg-emerald-600')}</Link>

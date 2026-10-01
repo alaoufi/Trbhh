@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Megaphone, Flag, ShieldCheck, Copy, Sparkles, Ban,
   Crown, Settings, MonitorPlay, BookOpen, ShieldAlert, DatabaseBackup, KeyRound, MessageSquare, Coins,
   Store, MessagesSquare, FileText, Shield, HandCoins, ScrollText, BellRing, Search as SearchIcon, Link2 as LinkIcon,
-   Archive, AlertTriangle, CreditCard, WalletCards, Landmark,
+   Archive, AlertTriangle, CreditCard, WalletCards, Landmark, ClipboardCheck,
 } from 'lucide-react';
 import type { Perm } from '@/lib/roles';
 
@@ -37,6 +37,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
     key: 'content', title: 'الإعلانات والمحتوى', icon: Megaphone, color: '#0ea5e9',
     items: [
       { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone, perm: 'ads' },
+      { href: '/admin/ad-quality', label: 'مراجعة جودة الإعلانات', icon: ClipboardCheck, perm: 'ads', description: 'تصنيفات وحقول ومواقع تحتاج مراجعة بشرية' },
       { href: '/admin/categories', label: 'الأقسام وحقولها', icon: Megaphone, perm: 'categories' },
       { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy, perm: 'duplicates' },
       { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles, perm: 'classified' },

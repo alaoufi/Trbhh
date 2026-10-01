@@ -268,7 +268,7 @@ async function run(){
       await page.waitForURL(u=>u.pathname==='/login');
       console.log(JSON.stringify({journey:'logout-and-auth-guard',status:'passed'}));
     }else{
-      assert((await page.locator('body').innerText()).includes('إدارة الأقسام والحقول'));
+      await page.getByRole('heading',{name:'إدارة الأقسام والحقول',exact:true}).waitFor({state:'visible',timeout:30000});
       await page.locator('summary').filter({hasText:/^وظائف —/}).click();
       await page.locator('summary').filter({hasText:/^فرص عمل —/}).click();
       const editor=page.locator('form').filter({has:page.locator('input[name="name"][value="فرص عمل"]')});

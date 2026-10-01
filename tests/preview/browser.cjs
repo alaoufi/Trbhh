@@ -15,10 +15,18 @@ const schemaFamilies=[
   {family:'goods',category:/سيارات/,leaf:/^سيارات$/},
   {family:'property',category:/عقارات/,leaf:/أراض/},
   {family:'jobs',category:/وظائف/,leaf:/فرص عمل/},
+  {family:'heavy-equipment',category:/نقليات ومعدات ثقيلة/,leaf:/^رافعات ومناولة$/},
+  {family:'contracting',category:/مواد بناء ومقاولات/,leaf:/مقاولات وتشطيبات/},
   {family:'service',category:/زراعة ومشاتل/,leaf:/خدمات زراعة وحدائق/},
   {family:'livestock',category:/مواشي/,leaf:/أغنام وماعز/},
   {family:'plants',category:/زراعة ومشاتل/,leaf:/شتلات ونباتات/},
+  {family:'electronics',category:/^الكترونيات$/,leaf:/^جوالات$/},
+  {family:'appliances',category:/اجهزة كهربائية/,leaf:/اجهزة مطبخ/},
+  {family:'decor',category:/ديكورات منزلية/,leaf:/^سجاد$/},
+  {family:'food',category:/الأسر المنتجة/,leaf:/اطعمة ومأكولات/},
+  {family:'furniture',category:/اثاث مفروشات ديكورات/,leaf:/مفروشات/},
 ];
+const accountPhone=id=>`0500000${String(id).padStart(3,'0')}`;
 async function assertResponsive(page,label,widths=responsiveWidths){
   for(const width of widths){
     await page.setViewportSize({width,height:width<768?844:1000});
@@ -106,7 +114,7 @@ async function runSchemaFamilyLifecycle(journey,accountId){
     const editedTitle=`${createdTitle} محدث`;
     await page.locator('[name="title"]').fill(createdTitle);
     await page.locator('[name="detail"]').fill(`إعلان اصطناعي معزول لاختبار دورة ${journey.family} كاملة من الإنشاء حتى البحث المصفى والحذف.`);
-    await page.locator('[name="phone"]').fill(`050000000${accountId}`);
+    await page.locator('[name="phone"]').fill(accountPhone(accountId));
     await page.locator('[name="pledge"]').check();
     await page.getByRole('button',{name:'نشر الإعلان',exact:true}).click();
     await page.waitForURL(url=>url.pathname==='/'&&/^\d+$/.test(url.searchParams.get('published')||''),{timeout:30000});
@@ -247,7 +255,7 @@ async function run(){
       await page.setViewportSize({width:390,height:844});
       await page.screenshot({path:path.join(artifacts,'land-form-mobile.png'),fullPage:true});
       for(const journey of schemaFamilies)await reviewSchemaFamilyForm(page,journey);
-      console.log(JSON.stringify({schemaFamilyJourneys:6,status:'passed'}));
+      console.log(JSON.stringify({schemaFamilyJourneys:schemaFamilies.length,status:'passed'}));
       await page.goto(origin+'/ads/1');
       await page.getByText('وظيفة محاسب — إعلان اختبار محلي',{exact:true}).first().waitFor({state:'visible'});
       assert.equal(await page.getByText('مستعمل',{exact:true}).count(),0);
@@ -317,6 +325,9 @@ async function run(){
       await page.goto(origin+'/admin/commerce/accounts');
       assert((await page.locator('body').innerText()).includes('إيصال')||(await page.locator('body').innerText()).includes('الإيصالات'));
       await page.screenshot({path:path.join(artifacts,'supplier-accounts.png'),fullPage:true});
+      await page.goto(origin+'/admin/ad-quality');
+      await page.getByRole('heading',{name:'مراجعة جودة الإعلانات',exact:true}).waitFor({state:'visible'});
+      assert.equal(await page.locator('form').count(),0,'quality review remains read-only');
     }
     assert.deepEqual(errors,[]);
     console.log(JSON.stringify({role,pageErrors:errors.length,checks:'passed',artifacts}));
@@ -324,8 +335,8 @@ async function run(){
   }
   const lifecycleFamilies=schemaFamilies.filter(journey=>journey.family!=='jobs');
   for(const [index,journey] of lifecycleFamilies.entries())await runSchemaFamilyLifecycle(journey,index+3);
-  assert.equal(lifecycleFamilies.length+1,6,'all schema families complete their lifecycle');
-  console.log(JSON.stringify({schemaFamilyLifecycleJourneys:6,status:'passed'}));
+  assert.equal(lifecycleFamilies.length+1,schemaFamilies.length,'all schema families complete their lifecycle');
+  console.log(JSON.stringify({schemaFamilyLifecycleJourneys:schemaFamilies.length,status:'passed'}));
   const context=await browser.newContext();const page=await context.newPage();
   await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
   await page.goto(origin+'/shop');

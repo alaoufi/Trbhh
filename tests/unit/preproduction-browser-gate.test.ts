@@ -51,13 +51,16 @@ describe('isolated pre-production browser gate', () => {
     expect(browser).toContain("journey:'search-ad'");
     expect(browser).toContain("journey:'delete-ad'");
     expect(browser).toContain("journey:'commerce-product-auth-guard'");
-    expect(browser).toContain('schemaFamilyJourneys:6');
-    expect(browser).toContain('schemaFamilyLifecycleJourneys:6');
+    expect(browser).toContain('schemaFamilyJourneys:schemaFamilies.length');
+    expect(browser).toContain('schemaFamilyLifecycleJourneys:schemaFamilies.length');
     expect(browser).toContain("journey:'schema-family-lifecycle'");
     expect(browser).toContain("searchParams.set('category',categoryValue)");
     expect(browser).toContain("searchParams.set('subcategory',leafValue)");
     expect(browser).toContain("family:'livestock'");
     expect(browser).toContain("family:'plants'");
+    for (const family of ['heavy-equipment','contracting','electronics','appliances','decor','food','furniture']) {
+      expect(browser).toContain(`family:'${family}'`);
+    }
     expect(browser).toContain('PREVIEW_ARTIFACTS_DIR');
     expect(browser).toContain('fillRequiredCategoryFields');
     for (const width of [360, 390, 412, 768, 1024, 1440]) expect(browser).toContain(String(width));

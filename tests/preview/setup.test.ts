@@ -31,13 +31,20 @@ it('seeds only an empty dedicated loopback preview with synthetic accounts', asy
       [2, 'member'],
       [3, 'goods'],
       [4, 'property'],
-      [5, 'service'],
-      [6, 'livestock'],
-      [7, 'plants'],
+      [5, 'heavy-equipment'],
+      [6, 'contracting'],
+      [7, 'service'],
+      [8, 'livestock'],
+      [9, 'plants'],
+      [10, 'electronics'],
+      [11, 'appliances'],
+      [12, 'decor'],
+      [13, 'food'],
+      [14, 'furniture'],
     ] as const;
     for (const [id, role] of previewUsers) {
       await db.users.create({ data: { id: BigInt(id), userName: `commerce-preview-${role}`, name: `تجربة ${role}`,
-        phoneNumber: `050000000${id}`, password, type: 'user', is_admin: id === 1 ? 1 : 0, auth_session_version: randomUUID(), country_id: 1 } });
+        phoneNumber: `0500000${String(id).padStart(3,'0')}`, password, type: 'user', is_admin: id === 1 ? 1 : 0, auth_session_version: randomUUID(), country_id: 1 } });
     }
     await db.countries.create({ data: { id: 1, name: 'السعودية', key: '966' } });
     await db.cities.create({ data: { id: 1n, name: 'الرياض', country_id: 1 } });

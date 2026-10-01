@@ -163,6 +163,17 @@ async function run(){
   browser=await chromium.launch({headless:true,channel:'chrome'});
   for(const role of ['member','admin']){
     const context=await browser.newContext({viewport:{width:1280,height:900}});
+    if(role==='member')await context.addInitScript(()=>{
+      window.__geoCalls=Number(sessionStorage.getItem('preview_geo_calls')||0);
+      Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition(success,error){
+        window.__geoCalls+=1;sessionStorage.setItem('preview_geo_calls',String(window.__geoCalls));
+        const mode=sessionStorage.getItem('preview_geo_mode')||'success';
+        if(mode==='denied')return error({code:1});
+        if(mode==='unavailable')return error({code:2});
+        if(mode==='timeout')return error({code:3});
+        success({coords:{latitude:24.713612,longitude:46.675312}});
+      }}});
+    });
     await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
     const page=await context.newPage();page.setDefaultTimeout(15000);
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -172,6 +183,15 @@ async function run(){
     await page.getByRole('button',{name:'دخول',exact:true}).click();
     await page.waitForURL(u=>u.pathname===(role==='admin'?'/admin/categories':'/ads/new'),{timeout:30000});
     if(role==='member'){
+      assert.equal(await page.evaluate(()=>window.__geoCalls),0,'geolocation is not requested on page load');
+      await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','denied'));
+      await page.getByRole('button',{name:'استخدام موقعي الحالي',exact:true}).click();
+      await page.getByText(/لم تسمح بمشاركة الموقع/).waitFor({state:'visible'});
+      await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','success'));
+      await page.getByRole('button',{name:'استخدام موقعي الحالي',exact:true}).click();
+      await page.getByText('تم تحديد الموقع',{exact:true}).waitFor({state:'visible'});
+      await page.locator('input[name="show_exact_location_publicly"]').check();
+      assert.equal((await page.locator('body').innerText()).includes('24.713612'),false,'raw latitude is not displayed');
       const cat=page.locator('select[name="taxonomy_group"]');
       const sub=page.locator('select[name="subcategory_id"]');
       await cat.waitFor({state:'visible'});
@@ -199,17 +219,25 @@ async function run(){
       console.log(JSON.stringify({journey:'create-ad',status:'passed',adId}));
       await page.goto(origin+`/ads/${adId}`);
       await page.getByText(createdTitle,{exact:true}).first().waitFor({state:'visible'});
+      await page.getByRole('link',{name:'الاتجاهات إلى الموقع',exact:true}).waitFor({state:'visible'});
+      await page.getByRole('button',{name:'احسب المسافة',exact:true}).click();
+      await page.getByText(/يبعد عنك تقريبًا/).waitFor({state:'visible'});
       await page.screenshot({path:path.join(artifacts,'synthetic-ad-details.png'),fullPage:true});
       await assertResponsive(page,'ad details');
       console.log(JSON.stringify({journey:'ad-details',status:'passed',adId}));
+      const callsBeforeEdit=await page.evaluate(()=>window.__geoCalls);
       await page.goto(origin+`/ads/${adId}/edit`);
       await assertResponsive(page,'edit ad');
+      await page.getByText('يوجد موقع محدد لهذا الإعلان',{exact:true}).waitFor({state:'visible'});
+      assert.equal(await page.evaluate(()=>window.__geoCalls),callsBeforeEdit,'edit does not request geolocation automatically');
+      await page.getByRole('button',{name:'إزالة الموقع الدقيق',exact:true}).click();
       await page.locator('[name="title"]').fill(editedTitle);
       await page.locator('[name="detail"]').fill('تم تعديل الإعلان الاصطناعي داخل قاعدة الاختبار المعزولة للتحقق من دورة الحياة كاملة.');
       await page.locator('[name="pledge"]').check();
       await page.getByRole('button',{name:'حفظ التعديلات',exact:true}).click();
       await page.waitForURL(u=>u.pathname===`/ads/${adId}`,{timeout:30000});
       await page.getByText(editedTitle,{exact:true}).first().waitFor({state:'visible'});
+      assert.equal(await page.getByText('موقع الإعلان',{exact:true}).count(),0,'removed exact location is absent from details');
       console.log(JSON.stringify({journey:'edit-ad',status:'passed',adId}));
       const jobSearchParams=new URLSearchParams({q:editedTitle,category:jobs,subcategory:job});
       await page.goto(origin+'/search?'+jobSearchParams.toString());
@@ -226,6 +254,10 @@ async function run(){
       await assertResponsive(page,'account ads');
       console.log(JSON.stringify({journey:'delete-ad',status:'passed',adId}));
       await page.goto(origin+'/ads/new');
+      await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','timeout'));
+      await page.getByRole('button',{name:'استخدام موقعي الحالي',exact:true}).click();
+      await page.getByText(/مهلة تحديد الموقع/).waitFor({state:'visible'});
+      assert.equal(await page.locator('[name="title"]').count(),1,'timeout does not block the create form');
       await cat.waitFor({state:'visible'});
       const property=await cat.locator('option').evaluateAll(os=>os.find(o=>o.textContent.includes('عقار'))?.value);
       await cat.selectOption(property);

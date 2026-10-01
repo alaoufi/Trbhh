@@ -248,7 +248,13 @@ async function run(){
       await page.screenshot({path:path.join(artifacts,'location-create-without-gps.png'),fullPage:true});
       console.log(JSON.stringify({journey:'location-create-without-gps',status:'passed',adId:noGpsAdId,permissionDenied:'passed',positionUnavailable:'passed'}));
 
-      await page.goto(origin+'/ads/new');
+      await page.goto(origin+'/logout');
+      await page.waitForURL(url=>url.pathname==='/'||url.pathname==='/login');
+      await page.goto(origin+'/login?next='+encodeURIComponent('/ads/new'));
+      await page.locator('#login-identifier').fill('commerce-preview-goods');
+      await page.locator('#login-password').fill('Preview-only-2026!');
+      await page.getByRole('button',{name:'دخول',exact:true}).click();
+      await page.waitForURL(url=>url.pathname==='/ads/new',{timeout:30000});
       assert.equal(await page.evaluate(()=>window.__geoCalls),2,'new form does not request GPS automatically after earlier failures');
       await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','success'));
       await page.getByRole('button',{name:'استخدام موقعي الحالي',exact:true}).click();
@@ -348,9 +354,8 @@ async function run(){
       assert.equal(await page.locator('select[name="subcategory"]').inputValue(),job);
       console.log(JSON.stringify({journey:'search-ad',status:'passed',adId}));
       await deleteOwnedAd(page,adId,editedTitle);
-      await deleteOwnedAd(page,noGpsAdId,noGpsTitle);
       await assertResponsive(page,'account ads');
-      console.log(JSON.stringify({journey:'delete-location-test-ads',status:'passed',adIds:[adId,noGpsAdId]}));
+      console.log(JSON.stringify({journey:'delete-location-test-ads',status:'passed',deletedAdIds:[adId],disposableNoGpsFixture:noGpsAdId}));
       await page.goto(origin+'/ads/new');
       await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','timeout'));
       await page.getByRole('button',{name:'استخدام موقعي الحالي',exact:true}).click();

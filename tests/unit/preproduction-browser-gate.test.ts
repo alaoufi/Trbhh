@@ -38,6 +38,8 @@ describe('isolated pre-production browser gate', () => {
     expect(deploy).toContain('PUBLIC_CRAWL=');
     expect(deploy).toContain('report.schema');
     expect(deploy).toContain('report.countAlignment');
+    expect(deploy).toContain('report.taxonomyResolution');
+    expect(deploy).toContain('report.businessDecisions');
     expect(deploy).toContain('x-robots-tag');
     expect(deploy).toContain('noindex, nofollow, noarchive');
     expect(deploy).toContain("'/search' '/deals' '/nearby' '/companies' '/shop' '/guide' '/site-map'");

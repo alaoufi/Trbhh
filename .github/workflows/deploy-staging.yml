@@ -281,6 +281,8 @@ jobs:
                 taxonomy:report.taxonomy,
                 schema:report.schema,
                 countAlignment:report.countAlignment,
+                taxonomyResolution:report.taxonomyResolution,
+                businessDecisions:report.businessDecisions,
                 autoFixPlan:report.autoFixPlan,
                 confirmedCases:report.records.filter((row)=>["3412","3420"].includes(String(row.id))),
               }));

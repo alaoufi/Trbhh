@@ -35,6 +35,22 @@ describe('live read-only ad quality report',()=>{
     expect(report.impacts).toMatchObject({BLOCKING_PUBLIC:0,NEEDS_EDITOR_REVIEW:1,SAFE_LEGACY:1});
   });
 
+  it('proves invalid legacy fields are hidden instead of leaking to public projections',()=>{
+    const report=audit.summarize([{
+      ...base,id:7,city_id:1,area_id:1,location_matches:1,price:0,old_price:0,
+      fields_json:[{key:'hours',type:'number',min:2,max:10,step:1,unit:'ساعة'}],
+      values_json:{hours:1,capacity_t:640},
+    }],[]).summary;
+    expect(report.legacyFields).toEqual({invalidHidden:2,invalidVisible:0,unitMismatches:0,rangeViolations:1});
+  });
+
+  it('reports taxonomy resolution without claiming read-only fixes were applied',()=>{
+    expect(audit.buildResolutionSummary({
+      subcategoryReasons:{subcategory_missing:395,ad_points_to_wrong_leaf:25,category_remapped:0},
+      needsEditorReview:420,impacts:{BLOCKING_PUBLIC:0,SAFE_LEGACY:0,EDITORIAL_ONLY:0,NEEDS_EDITOR_REVIEW:420},
+    })).toEqual({before:420,autoFixCandidates:0,autoFixed:0,needsEditorReview:420,remainingBlocking:0});
+  });
+
   it('keeps unresolved taxonomy for editors after public labels, fields and filters are suppressed',()=>{
     const issues=audit.auditRow({...base,id:9,subcategory_matches:0,city_id:1,area_id:1,location_matches:1,price:0,old_price:0});
     expect(issues.find((issue:{code:string})=>issue.code==='invalid_subcategory')).toMatchObject({

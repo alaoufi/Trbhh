@@ -75,7 +75,7 @@ function auditRow(row){
 }
 
 function summarize(rows,duplicates){
-  const summary={records:rows.length,clean:0,AUTO_FIX_SAFE:0,NEEDS_REVIEW:0,INVALID_BUT_PRESERVE:0,needsEditorReview:0,issues:{},impacts:{BLOCKING_PUBLIC:0,SAFE_LEGACY:0,EDITORIAL_ONLY:0,NEEDS_EDITOR_REVIEW:0},subcategoryReasons:{},locationReasons:{missing_location:0,location_mismatch:0},duplicateCandidates:duplicates.length};
+  const summary={records:rows.length,clean:0,AUTO_FIX_SAFE:0,NEEDS_REVIEW:0,INVALID_BUT_PRESERVE:0,needsEditorReview:0,issues:{},impacts:{BLOCKING_PUBLIC:0,SAFE_LEGACY:0,EDITORIAL_ONLY:0,NEEDS_EDITOR_REVIEW:0},subcategoryReasons:{},locationReasons:{missing_location:0,location_mismatch:0},legacyFields:{invalidHidden:0,invalidVisible:0,unitMismatches:0,rangeViolations:0},duplicateCandidates:duplicates.length};
   const records=[];
   for(const row of rows){
     const issues=auditRow(row);
@@ -83,6 +83,11 @@ function summarize(rows,duplicates){
     const kinds=new Set(issues.map(issue=>issue.classification));for(const kind of kinds)summary[kind]++;
     for(const issue of issues){
       summary.issues[issue.code]=(summary.issues[issue.code]||0)+1;
+      if(['field_not_in_category','impossible_field_range','invalid_unit'].includes(issue.code)){
+        if(issue.publiclySuppressed)summary.legacyFields.invalidHidden++;else summary.legacyFields.invalidVisible++;
+        if(issue.code==='invalid_unit')summary.legacyFields.unitMismatches++;
+        if(issue.code==='impossible_field_range')summary.legacyFields.rangeViolations++;
+      }
       if(issue.code==='invalid_subcategory'&&issue.reason)summary.subcategoryReasons[issue.reason]=(summary.subcategoryReasons[issue.reason]||0)+1;
       if(issue.code==='missing_or_mismatched_location'&&issue.reason)summary.locationReasons[issue.reason]=(summary.locationReasons[issue.reason]||0)+1;
     }
@@ -113,6 +118,17 @@ function buildCountAlignment(rows,{plans,subscriptions,now}){
   return {
     previewRuntime:searchVisibilityBreakdown(rows,{plans:[],subscriptions:[],now}),
     configuredPackagePolicySimulation:searchVisibilityBreakdown(rows,{plans,subscriptions,now}),
+  };
+}
+
+function buildResolutionSummary(summary){
+  const reasons=summary.subcategoryReasons||{};
+  return {
+    before:Object.values(reasons).reduce((total,value)=>total+number(value),0),
+    autoFixCandidates:number(reasons.category_remapped),
+    autoFixed:0,
+    needsEditorReview:number(summary.needsEditorReview),
+    remainingBlocking:number(summary.impacts?.BLOCKING_PUBLIC),
   };
 }
 
@@ -175,12 +191,14 @@ async function main(){
     const activeBase=rows.filter(row=>isActiveRow(row)&&(lifecycleEnabled?(row.trbhh_until&&new Date(row.trbhh_until)>now):(Number(row.store_only)===0||(row.trbhh_until&&new Date(row.trbhh_until)>now))));
     const report=summarize(rows,duplicates);
     report.publicSummary=summarize(activeBase,duplicates).summary;
+    report.taxonomyResolution={all:buildResolutionSummary(report.summary),public:buildResolutionSummary(report.publicSummary)};
     report.taxonomy={mainCategories:Number(mainCategories[0]?.count||0),subcategories:Number(subcategories[0]?.count||0),leafCategories:Number(leafDefinitions[0]?.count||0)};
     report.schema=buildSchemaReport(leafRows,manifest);
     report.countAlignment=buildCountAlignment(activeBase,{plans,subscriptions,now});
+    report.businessDecisions={packageExpiry:{status:'PENDING',featureFlag:'platform_ad_lifecycle_enabled',enabled:lifecycleEnabled,previewMode:'read_only_safe_fallback',destructiveAction:false}};
     report.autoFixPlan=report.records.filter(record=>record.issues.some(issue=>issue.classification==='AUTO_FIX_SAFE')).map(record=>({adId:record.id,action:'category_remap_requires_separate_write_approval'}));
     process.stdout.write(JSON.stringify(report));
   }finally{await db.$disconnect();}
 }
 if(require.main===module)main().catch(error=>{console.error(error?.message||String(error));process.exitCode=1;});
-module.exports={auditRow,summarize,classifySubcategoryReason,searchVisibilityBreakdown,buildCountAlignment,buildSchemaReport,publicFieldTrust,isActiveRow};
+module.exports={auditRow,summarize,classifySubcategoryReason,searchVisibilityBreakdown,buildCountAlignment,buildResolutionSummary,buildSchemaReport,publicFieldTrust,isActiveRow};

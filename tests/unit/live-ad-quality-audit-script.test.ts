@@ -25,6 +25,15 @@ describe('live read-only ad quality report',()=>{
     ]));
   });
 
+  it('counts location reasons and uncertain category relations independently',()=>{
+    const report=audit.summarize([
+      {...base,id:1,city_id:null,area_id:null,price:0,old_price:0},
+      {...base,id:2,subcategory_matches:0,city_id:1,area_id:1,location_matches:0,price:0,old_price:0},
+    ],[]).summary;
+    expect(report.locationReasons).toEqual({missing_location:1,location_mismatch:1});
+    expect(report.needsEditorReview).toBe(1);
+  });
+
   it('separates active-but-hidden search cards by exact exclusion reason',()=>{
     const now=new Date('2026-10-01T00:00:00Z');
     const rows=[

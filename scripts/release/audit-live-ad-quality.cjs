@@ -50,7 +50,7 @@ function auditRow(row){
   const issues=[];
   if(!row.category_exists)add(issues,'invalid_category','INVALID_BUT_PRESERVE','BLOCKING_PUBLIC');
   const subcategoryReason=classifySubcategoryReason(row);
-  if(subcategoryReason!=='other')add(issues,'invalid_subcategory',subcategoryReason==='category_remapped'?'AUTO_FIX_SAFE':'INVALID_BUT_PRESERVE','BLOCKING_PUBLIC',{reason:subcategoryReason});
+  if(subcategoryReason!=='other')add(issues,'invalid_subcategory',subcategoryReason==='category_remapped'?'AUTO_FIX_SAFE':'INVALID_BUT_PRESERVE','BLOCKING_PUBLIC',{reason:subcategoryReason,...(subcategoryReason==='category_remapped'?{}:{reviewDisposition:'NEEDS_EDITOR_REVIEW'})});
   if(!row.city_id||!row.area_id||!row.location_matches)add(issues,'missing_or_mismatched_location','NEEDS_REVIEW','SAFE_LEGACY',{reason:!row.city_id||!row.area_id?'missing_location':'location_mismatch',excludedFromGeo:true});
   const price=number(row.price),oldPrice=number(row.old_price);
   if(price<0)add(issues,'invalid_price','INVALID_BUT_PRESERVE','BLOCKING_PUBLIC',{fieldKey:'price'});
@@ -75,13 +75,18 @@ function auditRow(row){
 }
 
 function summarize(rows,duplicates){
-  const summary={records:rows.length,clean:0,AUTO_FIX_SAFE:0,NEEDS_REVIEW:0,INVALID_BUT_PRESERVE:0,issues:{},impacts:{BLOCKING_PUBLIC:0,SAFE_LEGACY:0,EDITORIAL_ONLY:0,NEEDS_EDITOR_REVIEW:0},subcategoryReasons:{},duplicateCandidates:duplicates.length};
+  const summary={records:rows.length,clean:0,AUTO_FIX_SAFE:0,NEEDS_REVIEW:0,INVALID_BUT_PRESERVE:0,needsEditorReview:0,issues:{},impacts:{BLOCKING_PUBLIC:0,SAFE_LEGACY:0,EDITORIAL_ONLY:0,NEEDS_EDITOR_REVIEW:0},subcategoryReasons:{},locationReasons:{missing_location:0,location_mismatch:0},duplicateCandidates:duplicates.length};
   const records=[];
   for(const row of rows){
     const issues=auditRow(row);
     if(!issues.length){summary.clean++;continue;}
     const kinds=new Set(issues.map(issue=>issue.classification));for(const kind of kinds)summary[kind]++;
-    for(const issue of issues){summary.issues[issue.code]=(summary.issues[issue.code]||0)+1;if(issue.code==='invalid_subcategory'&&issue.reason)summary.subcategoryReasons[issue.reason]=(summary.subcategoryReasons[issue.reason]||0)+1;}
+    for(const issue of issues){
+      summary.issues[issue.code]=(summary.issues[issue.code]||0)+1;
+      if(issue.code==='invalid_subcategory'&&issue.reason)summary.subcategoryReasons[issue.reason]=(summary.subcategoryReasons[issue.reason]||0)+1;
+      if(issue.code==='missing_or_mismatched_location'&&issue.reason)summary.locationReasons[issue.reason]=(summary.locationReasons[issue.reason]||0)+1;
+    }
+    if(issues.some(issue=>issue.reviewDisposition==='NEEDS_EDITOR_REVIEW'))summary.needsEditorReview++;
     const impact=issues.map(issue=>issue.impact).sort((a,b)=>impactRank[b]-impactRank[a])[0];summary.impacts[impact]++;
     records.push({id:String(row.id),classification:issues.reduce((best,issue)=>classificationRank[issue.classification]>classificationRank[best]?issue.classification:best,'AUTO_FIX_SAFE'),impact,issues});
   }

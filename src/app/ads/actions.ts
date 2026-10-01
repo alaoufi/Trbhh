@@ -27,9 +27,11 @@ import { inferLegacyListingType, type NormalizedListingSubmission } from '@/lib/
 import {
   normalizeAdPriceDetails,
   normalizeLegacyListingSubmission,
+  normalizeOptionalCoordinates,
   normalizeSaudiLocation,
   type SaudiLocation,
 } from '@/lib/ads/submission-validation';
+import { exactLocationConsent, setAdLocationPrivacy } from '@/lib/ads/location-privacy';
 
 async function submittedSaudiLocation(formData: FormData): Promise<SaudiLocation | null> {
   return normalizeSaudiLocation({
@@ -244,12 +246,22 @@ export async function createAdAction(formData: FormData) {
   const areaRaw = location ? String(location.cityId) : '';
   const phone = String(formData.get('phone') || '').trim();
   const whatsapp = String(formData.get('whatsapp') || '').trim();
-  let lat = String(formData.get('lat') || '').trim();
-  let lng = String(formData.get('lng') || '').trim();
-  // اختياري: استخراج الإحداثيات من رابط خرائط قوقل الملصق
-  if (!lat || !lng) {
-    const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
-    if (ll) { lat = String(ll.lat); lng = String(ll.lng); }
+  let coordinates;
+  try {
+    let rawLat: unknown = formData.get('lat');
+    let rawLng: unknown = formData.get('lng');
+    // رابط الخرائط بديل اختياري فقط عندما يكون الزوج فارغًا بالكامل.
+    if (!String(rawLat ?? '').trim() && !String(rawLng ?? '').trim()) {
+      const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
+      if (ll) { rawLat = ll.lat; rawLng = ll.lng; }
+    }
+    coordinates = normalizeOptionalCoordinates({ lat: rawLat, lng: rawLng });
+  } catch (error) {
+    if (error instanceof CategoryValidationError) {
+      const destSuffix = String(formData.get('dest') || '') === 'store' ? '&dest=store' : '';
+      redirect(`/ads/new?error=location${destSuffix}`);
+    }
+    throw error;
   }
   // هوية النشر: الوجهة تُحسم من اختيار النموذج الصريح فقط («باسمي الشخصي» بلا dest، أو «باسم
   // متجري» بـ dest=store). لا يُسمح لكوكي الهوية المنزلق (تصفّح سابق بهوية المتجر) بأن يحوّل
@@ -431,7 +443,7 @@ export async function createAdAction(formData: FormData) {
   }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
 
-  const ad = await writeAdWithCategory(prisma, formData, (tx, category) => {
+  const ad = await writeAdWithCategory(prisma, formData, async (tx, category) => {
     const listing = category?.listing ?? normalizeLegacyListingSubmission({
       adsType: rawAdsType,
       priceType: formData.get('priceType'),
@@ -440,7 +452,7 @@ export async function createAdAction(formData: FormData) {
     });
     const priceDetails = normalizeAdPriceDetails(listing, formData.get('old_price'), category ? category.priceEnabled && category.goodsEnabled : true);
     const submissionFlags = [flagTerms, priceDetails.warning === 'suspicious_discount' ? `خصم مرتفع محسوب (${priceDetails.discountPercent}٪)` : ''].filter(Boolean).join(' — ');
-    return tx.ads.create({
+    const created = await tx.ads.create({
     data: {
       title: finalTitle, detail: finalDetail, price:listing.price, adsType:listing.adsType,
       category_id: catId,
@@ -451,8 +463,8 @@ export async function createAdAction(formData: FormData) {
       user_id: BigInt(session.uid),
       profile_id: profileId ? BigInt(profileId) : null,
       video_path: video || '',
-      lat: lat || null,
-      lng: lng || null,
+      lat: coordinates?.lat ?? null,
+      lng: coordinates?.lng ?? null,
       phoneAllow: formData.get('phoneAllow') ? 1 : 0,
       commentAllow: formData.get('commentAllow') ? 1 : 0,
       adsSpecial: 'no',
@@ -476,6 +488,8 @@ export async function createAdAction(formData: FormData) {
       } : {}),
     },
   });
+    await setAdLocationPrivacy(tx, created.id, exactLocationConsent(formData.get('show_exact_location_publicly'), Boolean(coordinates)));
+    return created;
   }).catch(error => {
     if (error instanceof CategoryValidationError) redirect(`/ads/new?error=${submissionErrorCode(error)}${q}`);
     throw error;
@@ -616,16 +630,23 @@ export async function updateAdAction(formData: FormData) {
     },
   }).catch(() => {});
 
-  let eLat = String(formData.get('lat') || '').trim();
-  let eLng = String(formData.get('lng') || '').trim();
-  if (!eLat || !eLng) {
-    const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
-    if (ll) { eLat = String(ll.lat); eLng = String(ll.lng); }
+  let editCoordinates;
+  try {
+    let rawLat: unknown = formData.get('lat');
+    let rawLng: unknown = formData.get('lng');
+    if (!String(rawLat ?? '').trim() && !String(rawLng ?? '').trim()) {
+      const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
+      if (ll) { rawLat = ll.lat; rawLng = ll.lng; }
+    }
+    editCoordinates = normalizeOptionalCoordinates({ lat: rawLat, lng: rawLng });
+  } catch (error) {
+    if (error instanceof CategoryValidationError) redirect(`/ads/${toInt(adId)}/edit?error=location`);
+    throw error;
   }
   // العنوان والتفاصيل إجباريان في التعديل أيضاً (كالإضافة)
   if (!eTitle || !eDetail) redirect(`/ads/${toInt(adId)}/edit?error=missing`);
   const oldPrice = ad.price || 0;
-  const updatedAd = await writeAdWithCategory(prisma, formData, (tx, category, preserved) => {
+  const updatedAd = await writeAdWithCategory(prisma, formData, async (tx, category, preserved) => {
     const preservedListing: NormalizedListingSubmission | null = preserved ? {
       listingType: inferLegacyListingType({ listingType: preserved.sale_type, adsType: ad.adsType, priceType: preserved.price_type }),
       adsType: ad.adsType as 'offer' | 'request',
@@ -647,7 +668,7 @@ export async function updateAdAction(formData: FormData) {
         ? normalizeAdPriceDetails(listing, formData.get('old_price'), true)
         : { oldPrice: ad.old_price, discountPercent: null, warning: null } as const;
     const submissionFlags = [eFlagTerms, priceDetails.warning === 'suspicious_discount' ? `خصم مرتفع محسوب (${priceDetails.discountPercent}٪)` : ''].filter(Boolean).join(' — ');
-    return tx.ads.update({
+    const updated = await tx.ads.update({
     where: { id: adId },
     data: {
       title: eFinalTitle,
@@ -662,8 +683,8 @@ export async function updateAdAction(formData: FormData) {
       city_id: BigInt(editLocation?.regionId ?? 0),
       area_id: editLocation?.cityId ?? null,
       country_id: editLocation?.countryId ?? ad.country_id,
-      lat: eLat || null,
-      lng: eLng || null,
+      lat: editCoordinates?.lat ?? null,
+      lng: editCoordinates?.lng ?? null,
       phoneAllow: formData.get('phoneAllow') ? 1 : 0,
       commentAllow: formData.get('commentAllow') ? 1 : 0,
       // لا تُصفَّر القيم إذا كانت الميزة موقوفة من التحكم (الحقل غير معروض أصلاً)
@@ -676,6 +697,8 @@ export async function updateAdAction(formData: FormData) {
       ...preserved,
     },
   });
+    await setAdLocationPrivacy(tx, updated.id, exactLocationConsent(formData.get('show_exact_location_publicly'), Boolean(editCoordinates)));
+    return updated;
   }, { adId: ad.id, memberId: BigInt(session.uid) }).catch(error => {
     if (error instanceof CategoryValidationError) redirect(`/ads/${toInt(adId)}/edit?error=${submissionErrorCode(error)}`);
     throw error;

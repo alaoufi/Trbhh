@@ -1,5 +1,3 @@
-import { cookies } from 'next/headers';
-
 export type LatLng = { lat: number; lng: number };
 
 /** Parse a "lat,lng" string into numbers, or null if invalid. */
@@ -11,12 +9,6 @@ export function parseLatLng(v?: string | null): LatLng | null {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
   return { lat, lng };
-}
-
-/** Read the viewer's location from the `trbhh_geo` cookie (set client-side). */
-export async function getViewerLocation(): Promise<LatLng | null> {
-  const c = (await cookies()).get('trbhh_geo')?.value;
-  return parseLatLng(c);
 }
 
 /** Great-circle distance in kilometres between two points. */
@@ -31,9 +23,9 @@ export function haversineKm(a: LatLng, b: LatLng): number {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
-/** Human, Arabic distance label (e.g. "يبعد عنك ~٣ كم"). */
+/** Human, Arabic distance label without implying false precision. */
 export function formatDistanceAr(km: number): string {
   const fmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: km < 10 ? 1 : 0 });
-  if (km < 1) return `يبعد عنك ~${new Intl.NumberFormat('en-US').format(Math.round(km * 1000))} م`;
-  return `يبعد عنك ~${fmt.format(km)} كم`;
+  if (km < 1) return `يبعد عنك تقريبًا ${new Intl.NumberFormat('en-US').format(Math.round(km * 1000))} م`;
+  return `يبعد عنك تقريبًا ${fmt.format(km)} كم`;
 }

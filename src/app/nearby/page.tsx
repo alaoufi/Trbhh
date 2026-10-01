@@ -8,6 +8,7 @@ import { SearchAreaPicker } from '@/components/search-area-picker';
 import { toInt } from '@/lib/utils';
 import { normalizeSaudiAreaSelection, positiveSearchId } from '@/lib/search-filters';
 import { AdminPager } from '@/components/admin-pager';
+import { NearbyGpsResults } from '@/components/nearby-gps-results';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'قريب منك' };
@@ -37,6 +38,8 @@ export default async function NearbyPage({ searchParams }: { searchParams: Promi
   return (
     <div className="space-y-4">
       <h1 className="flex items-center gap-2 text-xl font-bold text-primary"><MapPin className="h-6 w-6" /> قريب منك</h1>
+
+      <NearbyGpsResults />
 
       {/* اختيار المنطقة ثم المدينة — يظهر دائماً للتبديل السريع */}
       <form className="card-3d flex flex-wrap items-center gap-2 rounded-xl p-3">

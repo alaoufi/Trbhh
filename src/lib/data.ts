@@ -20,6 +20,8 @@ import { featuredSearchPage } from './featured-search-page';
 import { DEFAULT_SEARCH_SYNONYMS, expandSearchToken, parseSearchSynonyms } from './search-synonyms';
 import { getPublicCategories, getCategoryEditValues, type PublicCategory } from './ad-categories/service';
 import { safeDealDiscount } from './ads/deals';
+import { rankNearbyAds } from './ads/nearby';
+import { formatDistanceAr, type LatLng } from './geo';
 
 export type AdCard = {
   priceEnabled?: boolean;
@@ -50,6 +52,8 @@ export type AdCard = {
   /** تقييم الإعلان (تجارب العملاء) — متوسط النجوم وعددها؛ يظهر كدليل اجتماعي على البطاقة */
   ratingAvg?: number;
   ratingCount?: number;
+  /** Present only in explicit GPS-nearby results; never fabricated from city names. */
+  distanceLabel?: string;
 };
 
 async function sellerInfo(ids: bigint[]): Promise<Map<number, { name: string; trusted: boolean; banned: boolean }>> {
@@ -711,6 +715,27 @@ export async function searchAds(params: SearchParamsT) {
 }
 
 /**
+ * Explicit GPS-only discovery. Visitor coordinates are used for this request
+ * and are never written to the database or attached to an account.
+ */
+export async function getNearbyAdsByCoordinates(visitor: LatLng, take = 48): Promise<AdCard[]> {
+  const where = await buildSearchWhere({ geoTrustedOnly: true });
+  const rows = await prisma.ads.findMany({
+    where: { AND: [where, { lat: { not: null } }, { lng: { not: null } }] },
+    select: { ...adSelect, lat: true, lng: true },
+    orderBy: { id: 'desc' },
+    take: 500,
+  });
+  const ranked = rankNearbyAds(visitor, rows.map((row) => ({ ...row, id: toInt(row.id) })));
+  const selected = ranked.slice(0, Math.min(Math.max(take, 1), 48));
+  const cards = await toCards(selected.map(({ distanceKm: _distanceKm, lat: _lat, lng: _lng, ...row }) => ({ ...row, id: BigInt(row.id) })));
+  const distances = new Map(selected.map((row) => [row.id, formatDistanceAr(row.distanceKm)]));
+  return cards
+    .map((card) => ({ ...card, distanceLabel: distances.get(card.id) }))
+    .sort((a, b) => selected.findIndex((row) => row.id === a.id) - selected.findIndex((row) => row.id === b.id));
+}
+
+/**
  * نتائج مساندة عند فشل البحث الصارم: نحافظ على المنطقة ونوع الإعلان، ونزيل
  * الفلاتر الاختيارية الضيقة، ثم نطابق أي كلمة بدلاً من اشتراط جميع الكلمات.
  */
@@ -881,7 +906,10 @@ export async function getAreas() {
 export async function getAdForEdit(id: number, userId: number) {
   const ad = await prisma.ads.findUnique({ where: { id: BigInt(id) } });
   if (!ad || toInt(ad.user_id) !== userId) return null;
-  const owner = await prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { phoneNumber: true, phone_whatsapp: true } });
+  const [owner, showExactLocationPublicly] = await Promise.all([
+    prisma.users.findUnique({ where: { id: BigInt(userId) }, select: { phoneNumber: true, phone_whatsapp: true } }),
+    import('@/lib/ads/location-privacy').then((module) => module.getAdLocationPrivacy(ad.id)).catch(() => false),
+  ]);
   return {
     categoryValues: await getCategoryEditValues(ad.id),
     id: toInt(ad.id),
@@ -900,6 +928,7 @@ export async function getAdForEdit(id: number, userId: number) {
     whatsapp: owner?.phone_whatsapp ?? '',
     lat: ad.lat ?? null,
     lng: ad.lng ?? null,
+    showExactLocationPublicly,
     oldPrice: ad.old_price ?? 0,
     stockState: ad.stock_state ?? 0,
     priceType: ad.price_type ?? null,

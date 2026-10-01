@@ -32,6 +32,31 @@ it('public values escape user input and preserve meaningful false/zero',()=>{
   expect(html).not.toContain('<script>');expect(html).toContain('&lt;script&gt;');expect(html).toContain('لا');expect(html).toContain('>0<');
   expect(html).toContain('grid-cols-1');expect(html).toContain('sm:grid-cols-2');
 });
+it('does not render empty optional values in advertisement details',()=>{
+  const html=renderToStaticMarkup(React.createElement(AdCategorySummary,{fields:[
+    {key:'empty',label:'حقل فارغ',group:'تفاصيل',value:''},
+    {key:'spaces',label:'مسافات',group:'تفاصيل',value:'   '},
+    {key:'array',label:'قائمة فارغة',group:'تفاصيل',value:[]},
+    {key:'value',label:'الحالة',group:'تفاصيل',value:'جديد'},
+  ]}));
+  expect(html).not.toContain('حقل فارغ');
+  expect(html).not.toContain('مسافات');
+  expect(html).not.toContain('قائمة فارغة');
+  expect(html).toContain('الحالة');
+  expect(html).toContain('جديد');
+});
+it('presents precise location as optional without exposing raw coordinates',()=>{
+  const html=renderToStaticMarkup(React.createElement(AdForm,{action:async()=>{},countries:[{id:1,name:'السعودية'}],cities:[],areas:[],submitLabel:'حفظ',initial:{id:1,lat:'24.713612',lng:'46.675312',showExactLocationPublicly:false},categoryConfig:{...cfg,enabled:false}}));
+  expect(html).toContain('يوجد موقع محدد لهذا الإعلان');
+  expect(html).toContain('تحديث موقعي الحالي');
+  expect(html).toContain('إزالة الموقع الدقيق');
+  expect(html).toContain('إظهار نقطة الوصول والاتجاهات للزوار');
+  expect(html).not.toContain('تم تحديد الموقع (');
+  expect(html).toContain('type="hidden" name="lat"');
+  expect(html).toContain('type="hidden" name="lng"');
+  expect(html).not.toContain('required="" name="lat"');
+  expect(html).not.toContain('required="" name="lng"');
+});
 it.each([null,99])('allows keeping unavailable classification %s on edit without required selectors',subcategoryId=>{
   const html=renderToStaticMarkup(React.createElement(AdForm,{action:async()=>{},countries:[],cities:[],submitLabel:'حفظ',initial:{id:1,categoryId:12,subcategoryId},categoryConfig:cfg}));
   expect(html).toContain('name="category_mode"');expect(html).toContain('value="preserve"');

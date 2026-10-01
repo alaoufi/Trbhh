@@ -22,6 +22,7 @@ import type { CategoryValues } from '@/lib/ad-categories/validation';
 import {AdListingPolicyFields} from '@/components/ad-listing-policy-fields';
 import {defaultListingPolicy,inferLegacyListingType,inferLegacyPricingMode,isRequestListingType,PRICING_LABELS,type ListingTypeKey,type PricingModeKey} from '@/lib/ad-categories/listing-policy';
 import {publicCategoryGroups} from '@/lib/home-feed';
+import { BrowserGeolocationError, geolocationErrorMessage, requestCurrentCoordinates } from '@/lib/geolocation-client';
 
 const MAX_VIDEO = 25 * 1024 * 1024; // 25MB
 
@@ -48,6 +49,7 @@ type Initial = Partial<{
   categoryId: number; subcategoryId: number | null; countryId: number | null; cityId: number; areaId: number | null;
   phoneAllow: boolean; commentAllow: boolean; phone: string; whatsapp: string;
   lat: string | null; lng: string | null;
+  showExactLocationPublicly: boolean;
   oldPrice: number; stockState: number;
   priceType: string | null; rentPeriod: string | null;listingType:string|null;
   categoryValues: CategoryValues;
@@ -125,34 +127,42 @@ export function AdForm({
   const [geo, setGeo] = useState<{ lat: string; lng: string } | null>(
     initial?.lat && initial?.lng ? { lat: initial.lat, lng: initial.lng } : null,
   );
+  const initialHasGeo = Boolean(initial?.lat && initial?.lng);
+  const [showExactLocationPublicly, setShowExactLocationPublicly] = useState(Boolean(initial?.showExactLocationPublicly));
   const [geoBusy, setGeoBusy] = useState(false);
   const [mapLink, setMapLink] = useState('');
   const [mapErr, setMapErr] = useState('');
+  const [geoMessage, setGeoMessage] = useState(initialHasGeo ? 'يوجد موقع محدد لهذا الإعلان' : '');
   // المكان اختياري بالكامل: افتراضياً «غير مطلوب» (مطوي) إلا عند تعديل إعلان له مكان محدد مسبقاً
   const [wantLocation, setWantLocation] = useState<boolean>(!!(initial?.cityId));
 
   function applyMapLink() {
     const ll = parseMapsUrl(mapLink);
     if (ll) {
-      setGeo({ lat: ll.lat.toFixed(5), lng: ll.lng.toFixed(5) });
+      setGeo({ lat: ll.lat.toFixed(6), lng: ll.lng.toFixed(6) });
       setMapErr('');
+      setGeoMessage(initial?.id ? 'تم تحديث الموقع' : 'تم تحديد الموقع');
     } else if (mapLink.trim()) {
       // couldn't read it here (e.g. shortened goo.gl link) — the server will try on submit
       setMapErr('سيتم محاولة قراءة الموقع من الرابط عند الحفظ. أو استخدم «موقعي الحالي».');
     }
   }
 
-  function useMyLocation() {
-    if (!navigator.geolocation) return;
+  async function useMyLocation() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGeoMessage(geolocationErrorMessage(2));
+      return;
+    }
     setGeoBusy(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGeo({ lat: pos.coords.latitude.toFixed(5), lng: pos.coords.longitude.toFixed(5) });
-        setGeoBusy(false);
-      },
-      () => setGeoBusy(false),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+    setGeoMessage('');
+    try {
+      setGeo(await requestCurrentCoordinates(navigator.geolocation));
+      setGeoMessage(initial?.id ? 'تم تحديث الموقع' : 'تم تحديد الموقع');
+    } catch (error) {
+      setGeoMessage(error instanceof BrowserGeolocationError ? error.message : geolocationErrorMessage(2));
+    } finally {
+      setGeoBusy(false);
+    }
   }
   const regions = useMemo(() => cities.filter((c) => c.countryId === saudiId), [cities, saudiId]);
 
@@ -438,31 +448,40 @@ export function AdForm({
         />
       </Section>}
 
-      <Section icon={MapPin} title="المكان">
-        {/* هل تحديد المكان مطلوب؟ اختيار «غير مطلوب» يطوي الخيارات فلا تزحم النموذج */}
+      <Section icon={MapPin} title="الموقع" hint="المنطقة والمدينة والموقع الدقيق بيانات اختيارية، ويمكنك نشر الإعلان بدونها.">
+        <p className="text-xs font-bold text-foreground">المنطقة والمدينة <span className="font-normal text-muted-foreground">(اختياري)</span></p>
         <div className="flex gap-2">
           <button type="button" onClick={() => setWantLocation(false)} className={`flex-1 rounded-lg border-2 px-3 py-2 text-sm font-bold ${!wantLocation ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
-            المكان غير مطلوب
+            بدون منطقة أو مدينة
           </button>
           <button type="button" onClick={() => setWantLocation(true)} className={`flex-1 rounded-lg border-2 px-3 py-2 text-sm font-bold ${wantLocation ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
-            تحديد المكان
+            تحديد المنطقة والمدينة
           </button>
         </div>
         {wantLocation && (
         <>
         <input type="hidden" name="country_id" value={saudiId} />
         <RegionCityPicker regions={regions} areas={areas} initialRegion={initial?.cityId} initialArea={initial?.areaId} />
+        </>
+        )}
         <div className="rounded-lg border-2 border-dashed border-primary/25 bg-accent/30 p-3">
           <p className="mb-2 text-sm font-bold text-primary">تحديد الموقع بدقّة <span className="font-normal text-muted-foreground">(اختياري)</span></p>
           <input type="hidden" name="lat" value={geo?.lat ?? ''} />
           <input type="hidden" name="lng" value={geo?.lng ?? ''} />
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" onClick={useMyLocation} disabled={geoBusy} className="flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white disabled:opacity-60">
-              <MapPin className="h-4 w-4" /> {geoBusy ? 'جارٍ تحديد الموقع…' : 'استخدم موقعي الحالي'}
+              <MapPin className="h-4 w-4" /> {geoBusy ? 'جارٍ تحديد الموقع…' : geo ? 'تحديث موقعي الحالي' : 'استخدام موقعي الحالي'}
             </button>
-            {geo && <span className="text-xs font-medium text-green-700">✓ تم تحديد الموقع ({geo.lat}, {geo.lng})</span>}
-            {geo && <button type="button" onClick={() => setGeo(null)} className="text-xs text-red-600 hover:underline">إزالة</button>}
+            {geo && <span className="text-xs font-medium text-green-700">✓ {geoMessage || (initialHasGeo ? 'يوجد موقع محدد لهذا الإعلان' : 'تم تحديد الموقع')}</span>}
+            {geo && <button type="button" onClick={() => { setGeo(null); setShowExactLocationPublicly(false); setMapLink(''); setGeoMessage('تمت إزالة الموقع الدقيق'); }} className="text-xs font-bold text-red-600 hover:underline">إزالة الموقع الدقيق</button>}
           </div>
+          {!geo && geoMessage && <p role="status" className="mt-2 text-xs font-bold text-amber-800">{geoMessage}</p>}
+          {geo && (
+            <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs font-medium text-amber-950">
+              <input type="checkbox" name="show_exact_location_publicly" value="1" checked={showExactLocationPublicly} onChange={(event) => setShowExactLocationPublicly(event.target.checked)} className="mt-0.5 accent-primary" />
+              <span><b>إظهار نقطة الوصول والاتجاهات للزوار</b><br />بدون هذا الاختيار تُستخدم الإحداثيات لحساب المسافة فقط ولا يظهر رابط الوصول الدقيق.</span>
+            </label>
+          )}
           {/* أو الصق رابط الموقع من خرائط قوقل (اختياري) */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
@@ -478,8 +497,6 @@ export function AdForm({
           </div>
           {mapErr && <p className="mt-1 text-xs font-bold text-red-600">{mapErr}</p>}
         </div>
-        </>
-        )}
       </Section>
 
       <Section icon={ImageIcon} title="الصور" hint={initial?.id ? 'أضِف المزيد من الصور (تُضغط تلقائياً للرفع السريع).' : 'حتى 10 صور — تُضغط تلقائياً للرفع السريع.'}>

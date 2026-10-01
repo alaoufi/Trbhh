@@ -97,6 +97,41 @@ export type SaudiLocationLookup = {
   cityBelongs(cityId: number, regionId: number): Promise<boolean>;
 };
 
+export type OptionalCoordinatesInput = {
+  lat?: unknown;
+  lng?: unknown;
+};
+
+export type StoredCoordinates = {
+  lat: string;
+  lng: string;
+};
+
+/**
+ * Precise coordinates are optional, but they are one atomic value: accepting
+ * only one half would create misleading distance/directions behavior.
+ */
+export function normalizeOptionalCoordinates(input: OptionalCoordinatesInput): StoredCoordinates | null {
+  const rawLat = String(input.lat ?? '').trim();
+  const rawLng = String(input.lng ?? '').trim();
+  if (!rawLat && !rawLng) return null;
+  if (!rawLat || !rawLng) {
+    throw new CategoryValidationError('location', 'يجب إرسال خط العرض وخط الطول معًا');
+  }
+  const lat = Number(rawLat);
+  const lng = Number(rawLng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new CategoryValidationError('location', 'إحداثيات الموقع غير صالحة');
+  }
+  if (lat < -90 || lat > 90) {
+    throw new CategoryValidationError('location', 'خط العرض يجب أن يكون بين -90 و90');
+  }
+  if (lng < -180 || lng > 180) {
+    throw new CategoryValidationError('location', 'خط الطول يجب أن يكون بين -180 و180');
+  }
+  return { lat: lat.toFixed(6), lng: lng.toFixed(6) };
+}
+
 function positiveId(value: unknown): number | null {
   const text = String(value ?? '').trim();
   if (!text) return null;

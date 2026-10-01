@@ -111,6 +111,13 @@ const STATEMENTS: string[] = [
   `ALTER TABLE stores ADD COLUMN sub_until DATETIME NULL`,
   `ALTER TABLE stores ADD COLUMN on_trial TINYINT NOT NULL DEFAULT 0`,
   `ALTER TABLE ads ADD COLUMN expires_at DATETIME NULL`,
+  /* Exact ad coordinates are saved independently from the advertiser's explicit
+     consent to expose the destination publicly. Existing ads default to private. */
+  `CREATE TABLE IF NOT EXISTS ad_location_privacy (
+    ad_id BIGINT UNSIGNED PRIMARY KEY,
+    show_exact_location_publicly TINYINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE INDEX ads_expires_at ON ads (expires_at)`,
   /* فهارس مركّبة لمسار القوائم الساخن: WHERE status,state + ORDER BY bumped_at/created_at
      (كان مسحاً كاملاً + filesort في كل تحميل للرئيسية/الأقسام/القوائم). */

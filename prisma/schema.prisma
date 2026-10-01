@@ -292,6 +292,14 @@ model ad_category_values {
   @@index([subcategory_id], map: "ad_category_values_sub")
 }
 
+/// Advertiser consent for public use of the exact saved destination.
+/// Coordinates remain on the legacy ads row; public exposure is off by default.
+model ad_location_privacy {
+  ad_id                        BigInt   @id @db.UnsignedBigInt
+  show_exact_location_publicly Int      @default(0) @db.TinyInt
+  updated_at                   DateTime @default(now()) @updatedAt @db.Timestamp(0)
+}
+
 model ad_category_audit {
   id BigInt @id @default(autoincrement()) @db.UnsignedBigInt
   actor_id BigInt @db.UnsignedBigInt

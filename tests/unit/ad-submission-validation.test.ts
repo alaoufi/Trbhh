@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { normalizeAdPriceDetails, normalizeLegacyListingSubmission, normalizeSaudiLocation } from '@/lib/ads/submission-validation';
+import { normalizeAdPriceDetails, normalizeLegacyListingSubmission, normalizeOptionalCoordinates, normalizeSaudiLocation } from '@/lib/ads/submission-validation';
 import type { NormalizedListingSubmission } from '@/lib/ad-categories/listing-policy';
 
 const fixedSale = (price: number): NormalizedListingSubmission => ({
@@ -80,6 +80,31 @@ describe('Saudi region and city validation', () => {
       countryId: 1,
       regionId: 1,
       cityId: 101,
+    });
+  });
+});
+
+describe('optional precise advertisement coordinates', () => {
+  it('allows omitting both coordinates', () => {
+    expect(normalizeOptionalCoordinates({ lat: '', lng: '' })).toBeNull();
+    expect(normalizeOptionalCoordinates({ lat: null, lng: undefined })).toBeNull();
+  });
+
+  it('requires a complete coordinate pair', () => {
+    expect(() => normalizeOptionalCoordinates({ lat: '24.7136', lng: '' })).toThrow('معًا');
+    expect(() => normalizeOptionalCoordinates({ lat: '', lng: '46.6753' })).toThrow('معًا');
+  });
+
+  it('rejects malformed or out-of-range coordinates', () => {
+    expect(() => normalizeOptionalCoordinates({ lat: 'north', lng: '46' })).toThrow('غير صالحة');
+    expect(() => normalizeOptionalCoordinates({ lat: '90.1', lng: '46' })).toThrow('خط العرض');
+    expect(() => normalizeOptionalCoordinates({ lat: '24', lng: '-180.1' })).toThrow('خط الطول');
+  });
+
+  it('returns canonical coordinates with privacy-safe precision', () => {
+    expect(normalizeOptionalCoordinates({ lat: '24.713612345', lng: '46.675312345' })).toEqual({
+      lat: '24.713612',
+      lng: '46.675312',
     });
   });
 });

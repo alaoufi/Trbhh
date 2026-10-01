@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import {
   MapPin, Eye, Phone, MessageCircle, Timer, Flag, Send,
-  User, BadgeCheck, Hash, ArrowLeftRight, Star, Share2, Heart, Navigation,
+  User, BadgeCheck, Hash, ArrowLeftRight, Star, Share2, Heart,
   ShieldAlert, Trash2, Archive, Ban, Store, EyeOff, Check, Pencil,
 } from 'lucide-react';
 import { SplashSuppress } from '@/components/splash-suppress';
@@ -34,7 +34,7 @@ import { getResponseSpeed } from '@/lib/response-time';
 import { readCompareIds, toggleCompareAction } from '@/app/compare/actions';
 import { Scale } from 'lucide-react';
 import { AdReviews } from '@/components/ad-reviews';
-import { getViewerLocation, parseLatLng, haversineKm, formatDistanceAr } from '@/lib/geo';
+import { parseLatLng } from '@/lib/geo';
 import { addCommentAction } from '@/app/ads/comment-actions';
 import { buyUrgentAction, featureAdAction, bumpAdAction, deleteAdAction, archiveAdAction, restoreArchivedAdAction } from '@/app/account/actions';
 import { buyAdShowAction } from '@/app/account/company/actions';
@@ -44,6 +44,8 @@ import { mediaUrl } from '@/lib/media';
 import { AdGallery } from '@/components/ad-gallery';
 import { Breadcrumb } from '@/components/breadcrumb';
 import { sellerContactPolicy } from '@/lib/contact-policy';
+import { AdLocationActions } from '@/components/ad-location-actions';
+import { getAdLocationPrivacy } from '@/lib/ads/location-privacy';
 
 export const dynamic = 'force-dynamic';
 
@@ -241,10 +243,11 @@ export default async function AdPage({ params, searchParams }: { params: Promise
   const bumpCost = bumpFree ? 0 : (urgentExtras?.bumpPrice ?? 0);
   const canBump = bumpCost <= 0 || ownerBalance >= bumpCost;
 
-  // Distance between the visitor (from the trbhh_geo cookie) and the ad location
-  const viewerLoc = await getViewerLocation();
   const adLoc = parseLatLng(ad.lat && ad.lng ? `${ad.lat},${ad.lng}` : null);
-  const distanceLabel = viewerLoc && adLoc ? formatDistanceAr(haversineKm(viewerLoc, adLoc)) : null;
+  const showExactLocationPublicly = adLoc ? await getAdLocationPrivacy(BigInt(ad.id)).catch(() => false) : false;
+  const directionsUrl = adLoc && showExactLocationPublicly
+    ? `https://www.google.com/maps/dir/?api=1&destination=${adLoc.lat},${adLoc.lng}`
+    : null;
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -551,7 +554,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
       <div className="card-3d grid grid-cols-2 gap-x-3 gap-y-3 rounded-2xl p-4">
         <InfoItem icon={ArrowLeftRight}>{ad.adsType === 'offer' ? 'عرض' : 'طلب'}</InfoItem>
         <InfoItem icon={Timer}>{timeAgo(ad.createdAt)}</InfoItem>
-        <InfoItem icon={MapPin}>{ad.area ? `${ad.area} - ${ad.city}` : (ad.city || 'غير محدد')}</InfoItem>
+        {(ad.area || ad.city) && <InfoItem icon={MapPin}>{ad.area ? `${ad.area}${ad.city ? ` - ${ad.city}` : ''}` : ad.city}</InfoItem>}
         <div className="flex items-center gap-2 text-primary">
           <span className="relative">
             {identityIsStore ? <Store className="h-5 w-5" /> : <User className="h-5 w-5" />}
@@ -568,7 +571,6 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <InfoItem icon={Star}>{sellerRating.count ? `${sellerRating.avg} (${sellerRating.count})` : '0/0'}</InfoItem>
         <InfoItem icon={Hash}>#{ad.id}</InfoItem>
         <InfoItem icon={Eye}>{ad.views} مشاهدة</InfoItem>
-        {distanceLabel && <InfoItem icon={Navigation}>{distanceLabel}</InfoItem>}
       </div>
 
       {/* مصداقية البائع — إشارة ثقة مجمّعة من تجارب العملاء على كل إعلاناته (تعزّز قرار الشراء) */}
@@ -618,27 +620,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         </div>
       )}
 
-      {/* الموقع على الخريطة — يظهر عند تحديد المعلن لموقع الإعلان */}
-      {adLoc && (
-        <div className="card-3d rounded-2xl p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><MapPin className="h-4 w-4" /> موقع الإعلان</div>
-          {distanceLabel ? (
-            <div className="mb-3 flex items-center gap-2 rounded-xl bg-primary/5 p-2.5 text-sm font-bold text-primary">
-              <Navigation className="h-4 w-4 shrink-0" /> {distanceLabel}
-            </div>
-          ) : (
-            <p className="mb-3 text-xs text-muted-foreground">فعّل موقعك لعرض المسافة بينك وبين الإعلان.</p>
-          )}
-          <a
-            href={`https://www.google.com/maps/search/?api=1&query=${adLoc.lat},${adLoc.lng}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:bg-primary/90"
-          >
-            <Navigation className="h-5 w-5" /> افتح في خرائط قوقل
-          </a>
-        </div>
-      )}
+      {/* لا يُطلب موقع الزائر عند فتح الصفحة؛ الحساب يبدأ بفعل صريح أو موقع محفوظ لهذه الجلسة فقط. */}
+      {adLoc && <AdLocationActions adId={ad.id} directionsUrl={directionsUrl} />}
 
 
       {/* Paid banner — inside ad details */}

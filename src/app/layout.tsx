@@ -8,7 +8,6 @@ import { Footer } from '@/components/footer';
 import { MobileNav } from '@/components/mobile-nav';
 import { ChromeGate } from '@/components/chrome-gate';
 import { PwaRegister } from '@/components/pwa-register';
-import { GeoPrompt } from '@/components/geo-prompt';
 import { ForceUpdateGate } from '@/components/force-update-gate';
 import { InstallPrompt } from '@/components/install-prompt';
 import { ClassifiedSplash } from '@/components/classified-splash';
@@ -163,7 +162,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             __html: "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__bipEvent=e;try{window.dispatchEvent(new Event('bipready'))}catch(_){}});window.addEventListener('appinstalled',function(){window.__bipEvent=null;});",
           }}
         />
-        <GeoPrompt />
         <ForceUpdateGate />
         <InstallPrompt />
         <PwaRegister />

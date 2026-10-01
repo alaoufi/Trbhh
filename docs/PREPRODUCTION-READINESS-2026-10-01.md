@@ -15,8 +15,8 @@
 
 - الرابط: https://preview.88-223-92-124.sslip.io/
 - الفرع: `codex/trbhh-platform-enhancement-20260929`
-- نسخة الكود المنشورة والمختبرة: `84581189`
-- نتيجة النشر: نجاح — [GitHub Actions run 36827103745](https://github.com/alaoufi/Trbhh/actions/runs/36827103745)
+- نسخة الفرع المنشورة والمختبرة: `cde3dea4`
+- نتيجة النشر: نجاح — [GitHub Actions run 36828500066](https://github.com/alaoufi/Trbhh/actions/runs/36828500066)
 - تحقق خارجي مجهول من دون Cookie أو Authorization: `/` و`/search` و`/deals` و`/nearby` و`/companies` و`/shop` و`/guide` و`/site-map` أعادت HTTP 200.
 - رؤوس الحماية: `X-Trbhh-Preview-Mode: read-only` و`X-Robots-Tag: noindex, nofollow, noarchive`، ولا يوجد `WWW-Authenticate`.
 - منفذ المعاينة منشور على `0.0.0.0:3081` و`[::]:3081` خلف HTTPS.
@@ -85,7 +85,7 @@
 - MySQL integration: المصادقة، اختيار المورد، منسق طلب المورد، ومعاملات الأقسام — ناجحة، كل منها على قاعدة معزولة.
 - Build: ناجح. توجد 3 تحذيرات تتبع Turbopack حالية في `src/lib/storage.ts` ولا تغير ناتج البناء.
 - E2E: ناجح، ويشمل الدخول والخروج وحماية المسارات والإدارة، إنشاء/عرض/تعديل/بحث/حذف إعلان، متجر الموردين، تعطيل الدفع الحي، والفحص المتجاوب عند 360 و390 و412 و768 و1024 و1440 بكسل.
-- CI النهائي للكود: نجاح — [GitHub Actions run 36826669351](https://github.com/alaoufi/Trbhh/actions/runs/36826669351).
+- CI النهائي للنسخة المنشورة: نجاح — [GitHub Actions run 36828025699](https://github.com/alaoufi/Trbhh/actions/runs/36828025699).
 
 ## الحسابات والبيانات التجريبية
 
@@ -140,7 +140,9 @@
 15. `b8040182` تصحيح تحقق تصفية الرئيسية
 16. `84581189` إصلاح صلاحيات سكربتات معاينة Docker
 
-نقطة بداية هذه الجولة: `6d3d3314`. يضاف commit التوثيق النهائي بعد اعتماد هذا الملف في Git.
+17. `cde3dea4` توثيق جاهزية ما قبل الإنتاج
+
+نقطة بداية هذه الجولة: `6d3d3314`. وقد يتبعها commit توثيق فقط لتثبيت روابط نتائج CI والنشر النهائية؛ لا يغير سلوك التطبيق المنشور.
 
 ## خطة النقل إلى trbhh.sa — لا تنفذ ضمن هذه المهمة
 

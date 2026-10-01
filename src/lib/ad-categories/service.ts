@@ -127,7 +127,7 @@ export async function getPublicCategories(ids:bigint[]):Promise<Map<number,Publi
     const values=(json(r.values_json)||{}) as CategoryValues,listingType=inferLegacyListingType({listingType:r.sale_type,adsType:r.adsType,priceType:r.price_type});
     const context={listingType};
     const trust=publicCategoryFieldTrust({templateKey:d.templateKey,title:r.title||'',values}),project=active&&trust.trusted;
-    out.set(Number(r.ad_id),{priceEnabled:d.priceEnabled,goodsEnabled:d.goodsEnabled,listingType,categoryFieldsTrusted:trust.trusted,...(!trust.trusted?{categoryFieldsSuppressedReason:trust.reason}:{}),subcategoryName:active?r.subcategory_name:undefined,categoryFields:project?visibleCategoryValues(d.fields,values,context):[],categoryCardFields:project?cardCategoryValues(d.fields,values,context).slice(0,2):[],comparableCategoryFields:project?comparableCategoryValues(d.fields,values,context):[]});
+    out.set(Number(r.ad_id),{priceEnabled:d.priceEnabled,goodsEnabled:d.goodsEnabled,listingType,categoryFieldsTrusted:trust.trusted,...(!trust.trusted?{categoryFieldsSuppressedReason:trust.reason}:{}),subcategoryName:project?r.subcategory_name:undefined,categoryFields:project?visibleCategoryValues(d.fields,values,context):[],categoryCardFields:project?cardCategoryValues(d.fields,values,context).slice(0,2):[],comparableCategoryFields:project?comparableCategoryValues(d.fields,values,context):[]});
   }
   return out;
 }

@@ -163,9 +163,10 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
     })
     .map((r) => {
       const s = sellers.get(toInt(r.user_id));
+      const publicCategory=categoryData.get(toInt(r.id));
       return {
         id: toInt(r.id),
-        ...categoryData.get(toInt(r.id)),
+        ...publicCategory,
         title: compactAdTitle(censorSync(r.title)),
         price: r.price,
         priceType: r.price_type ?? null,
@@ -173,7 +174,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         adsType: r.adsType,
         image: images.get(toInt(r.id)) ?? PLACEHOLDER,
         cityName: areaNames.get(r.area_id || 0) || cities.get(toInt(r.city_id)) || null,
-        categoryName: cats.get(toInt(r.category_id)) ?? null,
+        categoryName: publicCategory?.categoryFieldsTrusted&&publicCategory.subcategoryName ? cats.get(toInt(r.category_id)) ?? null : null,
         // الوقت الظاهر على البطاقة = آخر نشاط (التحديث ⬆ إن كان أحدث من النشر) ليطابق الترتيب
         createdAt: (r.bumped_at && r.created_at && r.bumped_at > r.created_at ? r.bumped_at : r.created_at)?.toISOString() ?? null,
         special: r.adsSpecial === 'checked',
@@ -182,7 +183,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         sellerName: s?.name ?? null,
         sellerTrusted: s?.trusted ?? false,
         tier: adMeta.get(toInt(r.user_id))?.tier ?? '',
-        oldPrice: categoryData.get(toInt(r.id))?.goodsEnabled === false ? 0 : (r.old_price && r.old_price > r.price ? r.old_price : 0),
+        oldPrice: publicCategory?.goodsEnabled === false ? 0 : (r.old_price && r.old_price > r.price ? r.old_price : 0),
         ratingAvg: ratings.get(toInt(r.id))?.avg ?? 0,
         ratingCount: ratings.get(toInt(r.id))?.count ?? 0,
       };
@@ -525,33 +526,76 @@ type SearchParamsT = {
 
 async function categoryAttributeAdIds(subcategoryIds:number[],filters:CategoryAttributeFilter[]):Promise<bigint[]>{
   if(!subcategoryIds.length||!filters.length)return [];
-  const clauses=filters.map(filter=>{
-    const path=`$.${filter.key}`;
-    if(filter.mode==='min')return Prisma.sql`CAST(JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) AS DECIMAL(30,4)) >= ${filter.value}`;
-    if(filter.mode==='max')return Prisma.sql`CAST(JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) AS DECIMAL(30,4)) <= ${filter.value}`;
-    // A stored range is {min,max}. Search bounds use overlap semantics:
-    // stored.max >= requested minimum AND stored.min <= requested maximum.
-    if(filter.mode==='range_min')return Prisma.sql`CAST(JSON_UNQUOTE(JSON_EXTRACT(values_json, ${`${path}.max`})) AS DECIMAL(30,4)) >= ${filter.value}`;
-    if(filter.mode==='range_max')return Prisma.sql`CAST(JSON_UNQUOTE(JSON_EXTRACT(values_json, ${`${path}.min`})) AS DECIMAL(30,4)) <= ${filter.value}`;
-    if(filter.mode==='contains')return Prisma.sql`JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) LIKE ${`%${String(filter.value)}%`}`;
-    if(filter.mode==='array_contains')return Prisma.sql`JSON_CONTAINS(JSON_EXTRACT(values_json, ${path}), JSON_QUOTE(${String(filter.value)})) = 1`;
-    if(filter.mode==='array_contains_any'){
-      const values=Array.isArray(filter.value)?filter.value:[];
-      return values.length
-        ? Prisma.sql`(${Prisma.join(values.map(value=>Prisma.sql`JSON_CONTAINS(JSON_EXTRACT(values_json, ${path}), JSON_QUOTE(${value})) = 1`),' OR ')})`
-        : Prisma.sql`0 = 1`;
-    }
-    return Prisma.sql`JSON_UNQUOTE(JSON_EXTRACT(values_json, ${path})) = ${String(filter.value)}`;
-  });
-  const rows=await prisma.$queryRaw<{ad_id:bigint}[]>(Prisma.sql`SELECT ad_id FROM ad_category_values WHERE subcategory_id IN (${Prisma.join(subcategoryIds)}) AND ${Prisma.join(clauses,' AND ')}`);
-  return rows.map(row=>row.ad_id);
+  const rows=await structuredSearchCandidates(subcategoryIds);
+  const categories=await getPublicCategories(rows.map(row=>row.ad_id));
+  return rows.filter(row=>matchesStructuredFilters(categories.get(toInt(row.ad_id)),filters)).map(row=>row.ad_id);
 }
 
 async function categorySearchAdIds(subcategoryIds:number[],fields:Pick<CategoryField,'key'>[],variants:string[]):Promise<bigint[]>{
   if(!subcategoryIds.length||!fields.length||!variants.length)return [];
-  const clauses=fields.flatMap(field=>variants.map(value=>Prisma.sql`JSON_UNQUOTE(JSON_EXTRACT(values_json, ${`$.${field.key}`})) LIKE ${`%${value}%`}`));
-  const rows=await prisma.$queryRaw<{ad_id:bigint}[]>(Prisma.sql`SELECT ad_id FROM ad_category_values WHERE subcategory_id IN (${Prisma.join(subcategoryIds)}) AND (${Prisma.join(clauses,' OR ')})`);
-  return rows.map(row=>row.ad_id);
+  const rows=await structuredSearchCandidates(subcategoryIds),keys=new Set(fields.map(field=>field.key));
+  const categories=await getPublicCategories(rows.map(row=>row.ad_id));
+  return rows.filter(row=>{
+    const category=categories.get(toInt(row.ad_id));
+    if(!category?.categoryFieldsTrusted)return false;
+    return category.categoryFields.some(field=>keys.has(field.key)&&variants.some(variant=>structuredText(field.value).includes(structuredText(variant))));
+  }).map(row=>row.ad_id);
+}
+
+async function structuredSearchCandidates(subcategoryIds:number[]){
+  return prisma.$queryRaw<{ad_id:bigint}[]>(Prisma.sql`
+    SELECT v.ad_id /* structured_search_candidate */
+    FROM ad_category_values v
+    INNER JOIN ads a ON a.id=v.ad_id AND a.subcategory_id=v.subcategory_id
+    WHERE v.subcategory_id IN (${Prisma.join(subcategoryIds)})
+  `);
+}
+
+function structuredText(value:unknown){
+  return (Array.isArray(value)?value.join(' '):String(value??'')).normalize('NFKC').toLowerCase();
+}
+
+function matchesStructuredFilters(category:PublicCategory|undefined,filters:CategoryAttributeFilter[]){
+  if(!category?.categoryFieldsTrusted)return false;
+  const values=new Map(category.categoryFields.map(field=>[field.key,field.value]));
+  return filters.every(filter=>{
+    const stored=values.get(filter.key);
+    if(stored===undefined)return false;
+    if(filter.mode==='min'||filter.mode==='max'){
+      const number=Number(stored);
+      return Number.isFinite(number)&&(filter.mode==='min'?number>=Number(filter.value):number<=Number(filter.value));
+    }
+    if(filter.mode==='range_min'||filter.mode==='range_max'){
+      if(!stored||typeof stored!=='object'||Array.isArray(stored))return false;
+      const range=stored as {min?:unknown;max?:unknown},number=Number(filter.mode==='range_min'?range.max:range.min);
+      return Number.isFinite(number)&&(filter.mode==='range_min'?number>=Number(filter.value):number<=Number(filter.value));
+    }
+    if(filter.mode==='contains')return structuredText(stored).includes(structuredText(filter.value));
+    if(filter.mode==='array_contains'||filter.mode==='array_contains_any'){
+      const storedValues=Array.isArray(stored)?stored.map(String):[],wanted=Array.isArray(filter.value)?filter.value.map(String):[String(filter.value)];
+      return wanted.some(value=>storedValues.includes(value));
+    }
+    return String(stored)===String(filter.value);
+  });
+}
+
+async function taxonomyFilterAdIds(categoryIds:number[],subcategoryIds:number[]):Promise<bigint[]>{
+  if(!categoryIds.length&&!subcategoryIds.length)return [];
+  const clauses:Prisma.Sql[]=[Prisma.sql`s.active=1`,Prisma.sql`c.is_active='yes'`];
+  if(categoryIds.length)clauses.push(Prisma.sql`a.category_id IN (${Prisma.join(categoryIds.map(BigInt))})`);
+  if(subcategoryIds.length)clauses.push(Prisma.sql`a.subcategory_id IN (${Prisma.join(subcategoryIds)})`);
+  const rows=await prisma.$queryRaw<{ad_id:bigint}[]>(Prisma.sql`
+    SELECT a.id AS ad_id /* taxonomy_filter_candidate */
+    FROM ads a
+    INNER JOIN sub_categories s ON s.id=a.subcategory_id AND s.category_id=CAST(a.category_id AS UNSIGNED)
+    INNER JOIN categories c ON c.id=a.category_id
+    WHERE ${Prisma.join(clauses,' AND ')}
+  `);
+  const categories=await getPublicCategories(rows.map(row=>row.ad_id));
+  return rows.filter(row=>{
+    const category=categories.get(toInt(row.ad_id));
+    return category?.categoryFieldsTrusted===true&&Boolean(category.subcategoryName);
+  }).map(row=>row.ad_id);
 }
 
 function exactListingWhere(listingType:string):Prisma.adsWhereInput{
@@ -611,10 +655,12 @@ async function buildSearchWhere({ q, categoryId,categoryIds=[], subcategoryId,su
   const textFilter = textMatch === 'any' && textClauses.length ? [{ OR: textClauses }] : textClauses;
   const selectedSubcategoryIds=subcategoryIds.length?subcategoryIds:(subcategoryId?[subcategoryId]:[]);
   const attributeIds=selectedSubcategoryIds.length&&attributeFilters.length?await categoryAttributeAdIds(selectedSubcategoryIds,attributeFilters):undefined;
+  const selectedCategoryIds=categoryIds.length?categoryIds:(categoryId?[categoryId]:[]);
+  const taxonomyIds=selectedCategoryIds.length||selectedSubcategoryIds.length?await taxonomyFilterAdIds(selectedCategoryIds,selectedSubcategoryIds):undefined;
   const trustedGeoIds=geoTrustedOnly?await geoTrustedAdIds():undefined;
   return {
     ...visibility,
-    AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textFilter,...(listingType?[exactListingWhere(listingType)]:[]),...(trustedGeoIds?[{id:{in:trustedGeoIds}}]:[])],
+    AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textFilter,...(listingType?[exactListingWhere(listingType)]:[]),...(trustedGeoIds?[{id:{in:trustedGeoIds}}]:[]),...(taxonomyIds?[{id:{in:taxonomyIds}}]:[])],
     ...(categoryIds.length ? {category_id:{in:categoryIds.map(BigInt)}} : categoryId ? { category_id: BigInt(categoryId) } : {}),
     ...(selectedSubcategoryIds.length ? { subcategory_id:selectedSubcategoryIds.length===1?selectedSubcategoryIds[0]:{in:selectedSubcategoryIds} } : {}),
     ...(attributeIds ? {id:{in:attributeIds}}:{}),
@@ -764,7 +810,7 @@ async function getAdImpl(id: number) {
     views,
     city: city?.name ?? null,
     area: area?.name ?? null,
-    category: category ? { id: toInt(category.id), name: category.name } : null,
+    category: category&&categoryData?.categoryFieldsTrusted&&categoryData.subcategoryName ? { id: toInt(category.id), name: category.name } : null,
     // الهوية الافتراضية تعرض بيانات الحساب الحيّة (فلا يتقادم الاسم بعد تغييره)؛
     // الهويات الفرعية فقط تعرض لقطة بياناتها المستقلة المحفوظة.
     seller: seller
@@ -914,6 +960,8 @@ function simTokens(text: string): string[] {
  */
 export async function getSimilarAds(adId: number, categoryId: number, take = 6) {
   const src = await prisma.ads.findUnique({ where: { id: BigInt(adId) }, select: { title: true, detail: true,subcategory_id:true,city_id:true,area_id:true,price:true } }).catch(() => null);
+  const sourcePublicCategory=(await getPublicCategories([BigInt(adId)]).catch(()=>new Map<number,PublicCategory>())).get(adId);
+  const sourceTaxonomyTrusted=sourcePublicCategory?.categoryFieldsTrusted===true&&Boolean(sourcePublicCategory.subcategoryName);
   const titleTokens = new Set(simTokens(src?.title || ''));
   const detailTokens = new Set(simTokens((src?.detail || '').slice(0, 400)));
 
@@ -921,16 +969,16 @@ export async function getSimilarAds(adId: number, categoryId: number, take = 6) 
   const topWords = [...titleTokens].sort((a, b) => b.length - a.length).slice(0, 3);
   const visibility=await activeAdWhere();
   const [sameLeaf,sameCat, byTitle] = await Promise.all([
-    src?.subcategory_id?prisma.ads.findMany({
+    sourceTaxonomyTrusted&&src?.subcategory_id?prisma.ads.findMany({
       where:{...visibility,subcategory_id:src.subcategory_id,id:{not:BigInt(adId)}},
       orderBy:{id:'desc'},take:150,select:{...adSelect,subcategory_id:true},
     }):Promise.resolve([]),
-    prisma.ads.findMany({
+    sourceTaxonomyTrusted?prisma.ads.findMany({
       where: { ...visibility, category_id: BigInt(categoryId), id: { not: BigInt(adId) } },
       orderBy: { id: 'desc' },
       take: 150,
       select: { ...adSelect,subcategory_id:true },
-    }),
+    }):Promise.resolve([]),
     topWords.length
       ? prisma.ads.findMany({
           where: { ...visibility, id: { not: BigInt(adId) }, OR: topWords.map((w) => ({ title: { contains: w } })) },
@@ -947,8 +995,8 @@ export async function getSimilarAds(adId: number, categoryId: number, take = 6) 
   const areaCities=new Map(areaRows.map(area=>[toInt(area.id),Number(area.city_id)]));
   const geoTrusted=(row:{city_id:bigint;area_id:number|null|undefined})=>Boolean(row.area_id&&areaCities.get(row.area_id)===Number(row.city_id));
   const sourceGeoTrusted=Boolean(src&&geoTrusted(src));
-  const categoryValues=await getPublicCategories([BigInt(adId),...candidates.map(item=>item.id)]).catch(()=>new Map<number,PublicCategory>());
-  const sourceComparable=new Map((categoryValues.get(adId)?.comparableCategoryFields||[]).map(field=>[field.key,JSON.stringify(field.value)]));
+  const categoryValues=await getPublicCategories(candidates.map(item=>item.id)).catch(()=>new Map<number,PublicCategory>());
+  const sourceComparable=new Map((sourcePublicCategory?.comparableCategoryFields||[]).map(field=>[field.key,JSON.stringify(field.value)]));
 
   // الترتيب: نفس الورقة ثم الموقع والمواصفات والسعر القريب، مع تشابه النص.
   const scored = candidates
@@ -959,7 +1007,8 @@ export async function getSimilarAds(adId: number, categoryId: number, take = 6) 
         if (titleTokens.has(t)) score += 2;
         else if (detailTokens.has(t)) score += 1;
       }
-      if(src?.subcategory_id&&r.subcategory_id===src.subcategory_id)score+=100;
+      const candidateCategory=categoryValues.get(toInt(r.id));
+      if(sourceTaxonomyTrusted&&candidateCategory?.categoryFieldsTrusted&&src?.subcategory_id&&r.subcategory_id===src.subcategory_id)score+=100;
       if(sourceGeoTrusted&&geoTrusted(r)){
         if(src?.area_id&&r.area_id===src.area_id)score+=25;
         else if(src?.city_id&&r.city_id===src.city_id)score+=15;

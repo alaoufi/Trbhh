@@ -73,6 +73,6 @@ describe('preview-only category visibility', () => {
       sale_type:'sale',adsType:'offer',price_type:'sale',
     }]);
     const category=(await getPublicCategories([3412n])).get(3412);
-    expect(category).toMatchObject({categoryFieldsTrusted:false,categoryFieldsSuppressedReason:'service_in_goods_leaf',categoryFields:[],categoryCardFields:[],comparableCategoryFields:[]});
+    expect(category).toMatchObject({categoryFieldsTrusted:false,categoryFieldsSuppressedReason:'service_in_goods_leaf',subcategoryName:undefined,categoryFields:[],categoryCardFields:[],comparableCategoryFields:[]});
   });
 });

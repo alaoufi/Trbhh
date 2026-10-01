@@ -48,9 +48,9 @@ function publicFieldTrust(row){
 
 function auditRow(row){
   const issues=[];
-  if(!row.category_exists)add(issues,'invalid_category','INVALID_BUT_PRESERVE','BLOCKING_PUBLIC');
+  if(!row.category_exists)add(issues,'invalid_category','INVALID_BUT_PRESERVE','NEEDS_EDITOR_REVIEW',{reviewDisposition:'NEEDS_EDITOR_REVIEW',publicTaxonomySuppressed:true});
   const subcategoryReason=classifySubcategoryReason(row);
-  if(subcategoryReason!=='other')add(issues,'invalid_subcategory',subcategoryReason==='category_remapped'?'AUTO_FIX_SAFE':'INVALID_BUT_PRESERVE','BLOCKING_PUBLIC',{reason:subcategoryReason,...(subcategoryReason==='category_remapped'?{}:{reviewDisposition:'NEEDS_EDITOR_REVIEW'})});
+  if(subcategoryReason!=='other')add(issues,'invalid_subcategory',subcategoryReason==='category_remapped'?'AUTO_FIX_SAFE':'INVALID_BUT_PRESERVE','NEEDS_EDITOR_REVIEW',{reason:subcategoryReason,publicTaxonomySuppressed:true,...(subcategoryReason==='category_remapped'?{}:{reviewDisposition:'NEEDS_EDITOR_REVIEW'})});
   if(!row.city_id||!row.area_id||!row.location_matches)add(issues,'missing_or_mismatched_location','NEEDS_REVIEW','SAFE_LEGACY',{reason:!row.city_id||!row.area_id?'missing_location':'location_mismatch',excludedFromGeo:true});
   const price=number(row.price),oldPrice=number(row.old_price);
   if(price<0)add(issues,'invalid_price','INVALID_BUT_PRESERVE','BLOCKING_PUBLIC',{fieldKey:'price'});
@@ -69,7 +69,7 @@ function auditRow(row){
     if(field.unit&&typeof field.unit!=='string')add(issues,'invalid_unit','INVALID_BUT_PRESERVE','SAFE_LEGACY',{fieldKey:key,publiclySuppressed:true});
   }
   const trust=publicFieldTrust(row);
-  if(!trust.trusted)add(issues,'wrong_leaf_semantic','NEEDS_REVIEW','BLOCKING_PUBLIC',{reason:'ad_points_to_wrong_leaf',publicFieldsSuppressed:true,trustReason:trust.reason});
+  if(!trust.trusted)add(issues,'wrong_leaf_semantic','NEEDS_REVIEW','NEEDS_EDITOR_REVIEW',{reason:'ad_points_to_wrong_leaf',reviewDisposition:'NEEDS_EDITOR_REVIEW',publicFieldsSuppressed:true,publicTaxonomySuppressed:true,trustReason:trust.reason});
   if(row.subcategory_id&&!row.values_json)add(issues,'legacy_values_not_migrated','NEEDS_REVIEW','EDITORIAL_ONLY');
   return issues;
 }

@@ -5,6 +5,7 @@ const db = vi.hoisted(() => ({
   areas: { findMany: vi.fn() }, cities: { findMany: vi.fn() }, categories: { findMany: vi.fn(),count:vi.fn() },
   photos: { findMany: vi.fn() }, ads_views: { groupBy: vi.fn(),count:vi.fn() }, $queryRaw: vi.fn(),
 }));
+const categoryService=vi.hoisted(()=>({publicCategories:vi.fn(),editValues:vi.fn()}));
 vi.mock('@/lib/prisma', () => ({ prisma: db }));
 vi.mock('@/lib/redis', () => ({ cached: vi.fn(async(_key:string,_ttl:number,load:()=>unknown)=>load()), cacheDel: vi.fn(), cacheDelPattern: vi.fn() }));
 vi.mock('@/lib/censor', () => ({ loadBanned: vi.fn(), censorSync: (value: string) => value }));
@@ -16,6 +17,10 @@ vi.mock('@/lib/ad-reviews', () => ({ getAdRatingsBrief: async () => new Map() })
 vi.mock('@/lib/packages', () => ({
   sweepExpiredFeatured: vi.fn(), getFeaturedTierMap: vi.fn(), getUsersAdMeta: async () => new Map(),
   getPackages: async () => [], getDefaultPackage: async () => ({ adDays: 0 }), FREE_FALLBACK: { adDays: 0 },
+}));
+vi.mock('@/lib/ad-categories/service',()=>({
+  getPublicCategories:categoryService.publicCategories,
+  getCategoryEditValues:categoryService.editValues,
 }));
 import { countSearchAds, getSimilarAds, getStats, searchAds, searchAdsRelaxed } from '@/lib/data';
 
@@ -36,6 +41,11 @@ beforeEach(() => {
   db.photos.findMany.mockResolvedValue([]);
   db.ads_views.groupBy.mockResolvedValue([]);
   db.$queryRaw.mockResolvedValue([]);
+  categoryService.publicCategories.mockImplementation(async(ids:bigint[])=>new Map(ids.map(id=>[Number(id),{
+    priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:true,subcategoryName:'قسم',
+    categoryFields:[],categoryCardFields:[],comparableCategoryFields:[],
+  }])));
+  categoryService.editValues.mockResolvedValue({});
 });
 
 describe('public search query integration', () => {
@@ -76,11 +86,35 @@ describe('public search query integration', () => {
     expect(db.ads.count.mock.calls[0][0].where).toMatchObject({city_id:1n,AND:expect.arrayContaining([{id:{in:[42n]}}])});
     vi.useRealTimers();
   });
-  it('queries every source category and legacy leaf represented by the public taxonomy',async()=>{
+  it('uses only taxonomy-valid public rows for category and leaf filters',async()=>{
+    db.$queryRaw.mockImplementation(async(query:unknown)=>{
+      const sql=String((query as {strings?:string[]})?.strings?.join('')||'');
+      return sql.includes('taxonomy_filter_candidate')?[{ad_id:42n},{ad_id:43n}]:[];
+    });
+    categoryService.publicCategories.mockResolvedValue(new Map([
+      [42,{priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:true,subcategoryName:'معدات',categoryFields:[],categoryCardFields:[],comparableCategoryFields:[]}],
+      [43,{priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:false,categoryFields:[],categoryCardFields:[],comparableCategoryFields:[]}],
+    ]));
     await countSearchAds({categoryIds:[10,20]});
-    expect(db.ads.count.mock.calls[0][0].where).toMatchObject({category_id:{in:[10n,20n]}});
+    expect(db.$queryRaw.mock.calls.some(([query])=>String(query.strings?.join('')||'').includes('taxonomy_filter_candidate'))).toBe(true);
+    expect(db.ads.count.mock.calls[0][0].where).toMatchObject({category_id:{in:[10n,20n]},AND:expect.arrayContaining([{id:{in:[42n]}}])});
     await countSearchAds({subcategoryIds:[101,201]});
-    expect(db.ads.count.mock.calls[1][0].where).toMatchObject({subcategory_id:{in:[101,201]}});
+    expect(db.ads.count.mock.calls[1][0].where).toMatchObject({subcategory_id:{in:[101,201]},AND:expect.arrayContaining([{id:{in:[42n]}}])});
+    vi.useRealTimers();
+  });
+  it('matches attribute filters and structured text only against validated public projections',async()=>{
+    db.$queryRaw.mockImplementation(async(query:unknown)=>{
+      const sql=String((query as {strings?:string[]})?.strings?.join('')||'');
+      if(sql.includes('structured_search_candidate'))return [{ad_id:42n},{ad_id:43n}];
+      if(sql.includes('taxonomy_filter_candidate'))return [{ad_id:42n},{ad_id:43n}];
+      return [];
+    });
+    categoryService.publicCategories.mockResolvedValue(new Map([
+      [42,{priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:true,subcategoryName:'معدات',categoryFields:[{key:'forklift_capacity_t',label:'الحمولة',group:'فني',unit:'طن',value:4},{key:'model',label:'الطراز',group:'فني',value:'8FG'}],categoryCardFields:[],comparableCategoryFields:[]}],
+      [43,{priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:false,categoryFields:[],categoryCardFields:[],comparableCategoryFields:[]}],
+    ]));
+    await countSearchAds({q:'8FG',subcategoryIds:[101],searchableFields:[{key:'model'}],attributeFilters:[{key:'forklift_capacity_t',mode:'min',value:3}]});
+    expect(db.ads.count.mock.calls[0][0].where).toMatchObject({id:{in:[42n]},AND:expect.arrayContaining([{id:{in:[42n]}}])});
     vi.useRealTimers();
   });
   it('partitions newest by explicit checked flag rather than descending strings', async () => {
@@ -99,6 +133,28 @@ describe('public search query integration', () => {
       expect(args.take).toBeLessThanOrEqual(2);
       expect(args.orderBy).toEqual([{bumped_at:{sort:'desc',nulls:'last'}},{id:'desc'}]);
     }
+    vi.useRealTimers();
+  });
+  it('does not use an untrusted legacy category to seed similar-ad taxonomy recommendations',async()=>{
+    db.ads.findUnique.mockResolvedValue({title:'مقاول شبوك وتركيب',detail:'خدمة تركيب',subcategory_id:5,city_id:1n,area_id:2,price:1000});
+    categoryService.publicCategories.mockResolvedValue(new Map([[1,{
+      priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:false,
+      categoryFields:[],categoryCardFields:[],comparableCategoryFields:[],
+    }]]));
+    db.ads.findMany.mockResolvedValue([]);
+    await getSimilarAds(1,10,6);
+    expect(db.ads.findMany.mock.calls.some(([args])=>args.where.subcategory_id===5)).toBe(false);
+    expect(db.ads.findMany.mock.calls.some(([args])=>args.where.category_id===10n)).toBe(false);
+    vi.useRealTimers();
+  });
+  it('does not display an untrusted legacy category label on public cards',async()=>{
+    db.categories.findMany.mockResolvedValue([{id:1n,name:'قسم قديم خاطئ'}]);
+    categoryService.publicCategories.mockResolvedValue(new Map([[42,{
+      priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:false,
+      categoryFields:[],categoryCardFields:[],comparableCategoryFields:[],
+    }]]));
+    const cards=await searchAds({sort:'price_asc',take:1});
+    expect(cards[0]).toMatchObject({id:42,categoryName:null,categoryFields:[]});
     vi.useRealTimers();
   });
   it('matches every equivalent city ID in the selected region without crossing regions', async () => {

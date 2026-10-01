@@ -32,6 +32,14 @@ describe('live read-only ad quality report',()=>{
     ],[]).summary;
     expect(report.locationReasons).toEqual({missing_location:1,location_mismatch:1});
     expect(report.needsEditorReview).toBe(1);
+    expect(report.impacts).toMatchObject({BLOCKING_PUBLIC:0,NEEDS_EDITOR_REVIEW:1,SAFE_LEGACY:1});
+  });
+
+  it('keeps unresolved taxonomy for editors after public labels, fields and filters are suppressed',()=>{
+    const issues=audit.auditRow({...base,id:9,subcategory_matches:0,city_id:1,area_id:1,location_matches:1,price:0,old_price:0});
+    expect(issues.find((issue:{code:string})=>issue.code==='invalid_subcategory')).toMatchObject({
+      impact:'NEEDS_EDITOR_REVIEW',reviewDisposition:'NEEDS_EDITOR_REVIEW',publicTaxonomySuppressed:true,
+    });
   });
 
   it('separates active-but-hidden search cards by exact exclusion reason',()=>{

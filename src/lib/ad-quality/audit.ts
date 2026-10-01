@@ -3,13 +3,14 @@ import {CategoryValidationError, validateCategoryValues, type CategoryField, typ
 export type AuditClassification='AUTO_FIX_SAFE'|'NEEDS_REVIEW'|'INVALID_BUT_PRESERVE';
 export type AuditImpact='BLOCKING_PUBLIC'|'SAFE_LEGACY'|'EDITORIAL_ONLY'|'NEEDS_EDITOR_REVIEW';
 export type InvalidSubcategoryReason='subcategory_missing'|'subcategory_not_found'|'legacy_id'|'duplicate_category'|'category_remapped'|'ad_points_to_wrong_leaf'|'parent_child_mismatch'|'other';
-export type AuditIssue={code:string;classification:AuditClassification;impact:AuditImpact;fieldKey?:string;message:string;reason?:InvalidSubcategoryReason};
+export type AuditIssue={code:string;classification:AuditClassification;impact:AuditImpact;fieldKey?:string;message:string;reason?:InvalidSubcategoryReason;publicTaxonomySuppressed?:boolean};
 export type AuditableAd={
   id:number;categoryId:number|null;subcategoryId:number|null;categoryValid:boolean;subcategoryValid:boolean;
   regionId:number|null;cityId:number|null;locationValid:boolean;title:string;price:number;oldPrice:number;
   listingType:string|null;priceType:string|null;rentPeriod:string|null;fields:CategoryField[];values:CategoryValues;
   subcategoryExists?:boolean;subcategoryActive?:boolean;subcategoryParentMatches?:boolean;duplicateCategory?:boolean;
   categoryRemapTargetId?:number|null;leafSemanticallyValid?:boolean|null;locationExcludedFromGeo?:boolean;publicFieldsSuppressed?:boolean;
+  publicTaxonomySuppressed?:boolean;
 };
 
 export function invalidSubcategoryReason(ad:AuditableAd):InvalidSubcategoryReason{
@@ -27,8 +28,8 @@ export function invalidSubcategoryReason(ad:AuditableAd):InvalidSubcategoryReaso
 
 export function auditAdQuality(ad:AuditableAd):AuditIssue[]{
   const issues:AuditIssue[]=[];
-  if(!ad.categoryId||!ad.categoryValid)issues.push({code:'invalid_category',classification:'INVALID_BUT_PRESERVE',impact:'BLOCKING_PUBLIC',message:'القسم مفقود أو غير صالح'});
-  if(!ad.subcategoryId||!ad.subcategoryValid){const reason=invalidSubcategoryReason(ad);issues.push({code:'invalid_subcategory',classification:'INVALID_BUT_PRESERVE',impact:'BLOCKING_PUBLIC',reason,message:'القسم الفرعي مفقود أو لا يتبع القسم'});}
+  if(!ad.categoryId||!ad.categoryValid)issues.push({code:'invalid_category',classification:'INVALID_BUT_PRESERVE',impact:ad.publicTaxonomySuppressed?'NEEDS_EDITOR_REVIEW':'BLOCKING_PUBLIC',publicTaxonomySuppressed:ad.publicTaxonomySuppressed,message:'القسم مفقود أو غير صالح'});
+  if(!ad.subcategoryId||!ad.subcategoryValid){const reason=invalidSubcategoryReason(ad);issues.push({code:'invalid_subcategory',classification:'INVALID_BUT_PRESERVE',impact:ad.publicTaxonomySuppressed?'NEEDS_EDITOR_REVIEW':'BLOCKING_PUBLIC',publicTaxonomySuppressed:ad.publicTaxonomySuppressed,reason,message:'القسم الفرعي مفقود أو لا يتبع القسم'});}
   if(!ad.regionId||!ad.cityId||!ad.locationValid)issues.push({code:'missing_or_mismatched_location',classification:'NEEDS_REVIEW',impact:ad.locationExcludedFromGeo?'SAFE_LEGACY':'BLOCKING_PUBLIC',message:'المنطقة أو المدينة مفقودة أو غير مترابطة'});
   if(ad.price<0||ad.oldPrice<0||ad.oldPrice>0&&ad.oldPrice<=ad.price)issues.push({code:'invalid_price',classification:'INVALID_BUT_PRESERVE',impact:'BLOCKING_PUBLIC',message:'السعر الحالي أو السابق غير صالح'});
   if(ad.price>0&&ad.oldPrice>ad.price&&Math.round((ad.oldPrice-ad.price)*100/ad.oldPrice)>=80)issues.push({code:'suspicious_discount',classification:'NEEDS_REVIEW',impact:'EDITORIAL_ONLY',message:'نسبة الخصم مرتفعة جدًا وتحتاج مراجعة'});

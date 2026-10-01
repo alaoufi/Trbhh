@@ -51,15 +51,15 @@ describe('legacy ad quality audit',()=>{
     const issues=auditAdQuality({...base,
       subcategoryValid:false,subcategoryExists:true,subcategoryParentMatches:false,
       locationValid:false,locationExcludedFromGeo:true,
-      fields:[field],values:{material:'خشب',removed:'قديم'},publicFieldsSuppressed:true,
+      fields:[field],values:{material:'خشب',removed:'قديم'},publicFieldsSuppressed:true,publicTaxonomySuppressed:true,
       price:100,oldPrice:1000,
     });
-    expect(issues.find(issue=>issue.code==='invalid_subcategory')).toMatchObject({impact:'BLOCKING_PUBLIC',reason:'parent_child_mismatch'});
+    expect(issues.find(issue=>issue.code==='invalid_subcategory')).toMatchObject({impact:'NEEDS_EDITOR_REVIEW',reason:'parent_child_mismatch'});
     expect(issues.find(issue=>issue.code==='missing_or_mismatched_location')).toMatchObject({impact:'SAFE_LEGACY'});
     expect(issues.find(issue=>issue.code==='field_not_in_category')).toMatchObject({impact:'SAFE_LEGACY'});
     expect(issues.find(issue=>issue.code==='suspicious_discount')).toMatchObject({impact:'EDITORIAL_ONLY'});
-    expect(summarizeAdQualityAudit([{...base,subcategoryValid:false,subcategoryExists:true,subcategoryParentMatches:false}])).toMatchObject({
-      impacts:{BLOCKING_PUBLIC:1,SAFE_LEGACY:0,EDITORIAL_ONLY:0,NEEDS_EDITOR_REVIEW:0},
+    expect(summarizeAdQualityAudit([{...base,subcategoryValid:false,subcategoryExists:true,subcategoryParentMatches:false,publicTaxonomySuppressed:true}])).toMatchObject({
+      impacts:{BLOCKING_PUBLIC:0,SAFE_LEGACY:0,EDITORIAL_ONLY:0,NEEDS_EDITOR_REVIEW:1},
       subcategoryReasons:{parent_child_mismatch:1},
     });
   });

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { MapPin } from 'lucide-react';
+import { ChevronDown, MapPin, Search } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { searchAds, countSearchAds, getCities, getAreas } from '@/lib/data';
@@ -41,17 +41,23 @@ export default async function NearbyPage({ searchParams }: { searchParams: Promi
 
       <NearbyGpsResults />
 
-      {/* اختيار المنطقة ثم المدينة — يظهر دائماً للتبديل السريع */}
-      <form className="card-3d flex flex-wrap items-center gap-2 rounded-xl p-3">
-        <SearchAreaPicker
-          regions={cities}
-          areas={areas}
-          region={cityId ? String(cityId) : ''}
-          area={areaId ? String(areaId) : ''}
-          className="h-10 flex-1 rounded-lg border bg-background px-2 text-sm sm:max-w-[11rem]"
-        />
-        <button className="btn-3d h-10 rounded-lg bg-primary px-4 text-sm font-bold text-white">عرض</button>
-      </form>
+      {/* البحث النصي يبقى مضغوطاً حتى يطلبه الزائر، لتتقدم الإعلانات بصرياً. */}
+      <details className="group card-3d rounded-xl [&_summary::-webkit-details-marker]:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-bold text-primary">
+          <span className="flex items-center gap-2"><Search className="h-4 w-4" /> بحث</span>
+          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+        </summary>
+        <form className="flex flex-wrap items-center gap-2 border-t border-primary/10 p-3">
+          <SearchAreaPicker
+            regions={cities}
+            areas={areas}
+            region={cityId ? String(cityId) : ''}
+            area={areaId ? String(areaId) : ''}
+            className="h-10 flex-1 rounded-lg border bg-background px-2 text-sm sm:max-w-[11rem]"
+          />
+          <button className="btn-3d h-10 rounded-lg bg-primary px-4 text-sm font-bold text-white">عرض</button>
+        </form>
+      </details>
 
       {!cityId && (
         <p className="py-10 text-center text-muted-foreground">اختر منطقتك بالأعلى لعرض إعلاناتها{session ? '' : ' — وسجّل الدخول ليتذكّر الموقع منطقتك تلقائياً'}.</p>

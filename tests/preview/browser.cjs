@@ -205,6 +205,7 @@ async function run(){
     const context=await browser.newContext({viewport:{width:1280,height:900}});
     if(role==='member')await context.addInitScript(()=>{
       window.__geoCalls=Number(sessionStorage.getItem('preview_geo_calls')||0);
+      Object.defineProperty(navigator,'permissions',{configurable:true,value:{query:async()=>({state:sessionStorage.getItem('preview_geo_permission')||'prompt'})}});
       Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition(success,error){
         window.__geoCalls+=1;sessionStorage.setItem('preview_geo_calls',String(window.__geoCalls));
         const mode=sessionStorage.getItem('preview_geo_mode')||'success';
@@ -287,14 +288,12 @@ async function run(){
       assert(!detailsText.includes('24.713612')&&!detailsText.includes('46.675312'),'details UI does not display raw coordinates');
       const callsBeforeDistance=await page.evaluate(()=>window.__geoCalls);
       assert.equal(callsBeforeDistance,3,'details do not request visitor GPS automatically');
-      await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','denied'));
-      await page.getByRole('button',{name:'احسب المسافة',exact:true}).click();
-      await page.getByText(/لم تسمح بمشاركة الموقع/).waitFor({state:'visible'});
+      assert.equal(await page.getByRole('button',{name:'احسب المسافة',exact:true}).count(),0,'details have no manual distance button');
       assert.equal((await page.locator('body').innerText()).includes('0 كم'),false,'denied visitor never receives a fake zero distance');
-      await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','visitor'));
-      await page.getByRole('button',{name:'احسب المسافة',exact:true}).click();
+      await page.evaluate(()=>{sessionStorage.setItem('preview_geo_mode','visitor');sessionStorage.setItem('preview_geo_permission','granted');});
+      await page.reload();
       await page.getByText('يبعد عنك تقريبًا 9.3 كم',{exact:true}).waitFor({state:'visible'});
-      assert.equal(await page.evaluate(()=>window.__geoCalls),callsBeforeDistance+2,'GPS is requested only for explicit distance actions');
+      assert.equal(await page.evaluate(()=>window.__geoCalls),callsBeforeDistance+1,'already-granted GPS is reused automatically without a prompt');
       for(const width of [360,390,412,1280]){
         await page.setViewportSize({width,height:width<768?844:900});
         assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`location details ${width}px overflow`);
@@ -331,6 +330,10 @@ async function run(){
 
       const callsBeforeNearby=await page.evaluate(()=>window.__geoCalls);
       await page.goto(origin+'/nearby');
+      const nearbySearch=page.locator('details').filter({has:page.getByText('بحث',{exact:true})}).first();
+      assert.equal(await nearbySearch.getAttribute('open'),null,'nearby search controls start collapsed');
+      await nearbySearch.locator('summary').click();
+      await nearbySearch.locator('form').waitFor({state:'visible'});
       const gpsNearby=page.locator('section[aria-labelledby="gps-nearby-heading"]');
       await gpsNearby.getByText(editedTitle,{exact:true}).waitFor({state:'visible'});
       assert.equal(await page.evaluate(()=>window.__geoCalls),callsBeforeNearby,'Nearby reuses session coordinates without another browser prompt');

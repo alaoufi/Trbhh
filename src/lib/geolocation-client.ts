@@ -27,6 +27,21 @@ export function requestCurrentCoordinates(geolocation: Geolocation): Promise<Bro
   });
 }
 
+/** Reuses location silently only when the browser has already granted access. */
+export async function readCoordinatesWhenPermissionGranted(input: {
+  geolocation?: Geolocation;
+  permissions?: Pick<Permissions, 'query'>;
+}): Promise<BrowserCoordinates | null> {
+  if (!input.geolocation || !input.permissions) return null;
+  try {
+    const permission = await input.permissions.query({ name: 'geolocation' });
+    if (permission.state !== 'granted') return null;
+    return await requestCurrentCoordinates(input.geolocation);
+  } catch {
+    return null;
+  }
+}
+
 export const VISITOR_LOCATION_SESSION_KEY = 'trbhh_visitor_location';
 
 export function readSessionCoordinates(storage: Pick<Storage, 'getItem'>): BrowserCoordinates | null {

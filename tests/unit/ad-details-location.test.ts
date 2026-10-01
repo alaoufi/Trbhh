@@ -24,7 +24,8 @@ describe('private advertisement distance UX', () => {
     const component = readFileSync(resolve(process.cwd(), 'src/components/ad-location-actions.tsx'), 'utf8');
     const route = readFileSync(resolve(process.cwd(), 'src/app/api/ads/[id]/distance/route.ts'), 'utf8');
     const detail = readFileSync(resolve(process.cwd(), 'src/app/ads/[id]/page.tsx'), 'utf8');
-    expect(component).toContain('احسب المسافة');
+    expect(component).not.toContain('احسب المسافة');
+    expect(component).toContain('readCoordinatesWhenPermissionGranted');
     expect(component).toContain('sessionStorage');
     expect(component).toContain('/api/ads/${adId}/distance');
     expect(route).toContain('haversineKm');

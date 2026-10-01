@@ -21,6 +21,9 @@ describe('nearby advertisements by precise coordinates', () => {
     const client = readFileSync(resolve(process.cwd(), 'src/components/nearby-gps-results.tsx'), 'utf8');
     const route = readFileSync(resolve(process.cwd(), 'src/app/api/nearby/route.ts'), 'utf8');
     expect(page).toContain('NearbyGpsResults');
+    expect(page).toContain('<details');
+    expect(page).toContain('<summary');
+    expect(page).toContain('بحث');
     expect(client).toContain('عرض الأقرب لموقعي');
     expect(client).toContain('اضغط الزر لإظهار المسافة بالكيلومتر');
     expect(client).toContain('requestCurrentCoordinates');

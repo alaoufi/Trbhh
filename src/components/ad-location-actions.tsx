@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { MapPin, Navigation } from 'lucide-react';
 import {
-  BrowserGeolocationError,
-  geolocationErrorMessage,
+  readCoordinatesWhenPermissionGranted,
   readSessionCoordinates,
-  requestCurrentCoordinates,
   saveSessionCoordinates,
   type BrowserCoordinates,
 } from '@/lib/geolocation-client';
@@ -38,38 +36,32 @@ export function AdLocationActions({ adId, directionsUrl }: { adId: number; direc
 
   useEffect(() => {
     const saved = readSessionCoordinates(sessionStorage);
-    if (saved) void calculate(saved);
-  }, [calculate]);
-
-  async function requestDistance() {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setError(geolocationErrorMessage(2));
+    if (saved) {
+      void calculate(saved);
       return;
     }
-    setBusy(true);
-    setError('');
-    try {
-      const coordinates = await requestCurrentCoordinates(navigator.geolocation);
+    if (typeof navigator === 'undefined') return;
+    void readCoordinatesWhenPermissionGranted({
+      geolocation: navigator.geolocation,
+      permissions: navigator.permissions,
+    }).then((coordinates) => {
+      if (!coordinates) return;
       saveSessionCoordinates(sessionStorage, coordinates);
-      await calculate(coordinates);
-    } catch (caught) {
-      setBusy(false);
-      setError(caught instanceof BrowserGeolocationError ? caught.message : geolocationErrorMessage(2));
-    }
-  }
+      void calculate(coordinates);
+    });
+  }, [calculate]);
+
+  if (!directionsUrl && !distance && !busy && !error) return null;
 
   return (
     <div className="card-3d rounded-2xl p-4">
       <div className="mb-2 flex items-center gap-2 text-sm font-bold text-primary"><MapPin className="h-4 w-4" /> موقع الإعلان</div>
-      {distance ? (
+      {distance && (
         <div className="mb-3 flex items-center gap-2 rounded-xl bg-primary/5 p-2.5 text-sm font-bold text-primary">
           <Navigation className="h-4 w-4 shrink-0" /> {distance}
         </div>
-      ) : (
-        <button type="button" onClick={requestDistance} disabled={busy} className="mb-3 rounded-xl border-2 border-primary/30 bg-white px-4 py-2 text-sm font-bold text-primary disabled:opacity-60">
-          {busy ? 'جارٍ حساب المسافة…' : 'احسب المسافة'}
-        </button>
       )}
+      {busy && !distance && <p className="mb-3 text-xs font-medium text-muted-foreground">جارٍ حساب المسافة…</p>}
       {error && <p role="status" className="mb-3 text-xs font-medium text-amber-800">{error}</p>}
       {directionsUrl && (
         <a href={directionsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white hover:bg-primary/90">

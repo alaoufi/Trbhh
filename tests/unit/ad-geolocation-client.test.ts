@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { geolocationErrorMessage, requestCurrentCoordinates } from '@/lib/geolocation-client';
+import { geolocationErrorMessage, readCoordinatesWhenPermissionGranted, requestCurrentCoordinates } from '@/lib/geolocation-client';
 
 describe('explicit browser geolocation', () => {
   it('does not call the browser until the request function is invoked', async () => {
@@ -13,5 +13,22 @@ describe('explicit browser geolocation', () => {
     expect(geolocationErrorMessage(1)).toContain('لم تسمح');
     expect(geolocationErrorMessage(2)).toContain('تعذر تحديد موقعك');
     expect(geolocationErrorMessage(3)).toContain('مهلة');
+  });
+
+  it('reads coordinates automatically only when browser permission is already granted', async () => {
+    const getCurrentPosition = vi.fn((success: PositionCallback) => success({ coords: { latitude: 24.71361234, longitude: 46.67531234 } } as GeolocationPosition));
+    const query = vi.fn().mockResolvedValue({ state: 'prompt' });
+    await expect(readCoordinatesWhenPermissionGranted({
+      geolocation: { getCurrentPosition } as unknown as Geolocation,
+      permissions: { query } as unknown as Permissions,
+    })).resolves.toBeNull();
+    expect(getCurrentPosition).not.toHaveBeenCalled();
+
+    query.mockResolvedValue({ state: 'granted' });
+    await expect(readCoordinatesWhenPermissionGranted({
+      geolocation: { getCurrentPosition } as unknown as Geolocation,
+      permissions: { query } as unknown as Permissions,
+    })).resolves.toEqual({ lat: '24.713612', lng: '46.675312' });
+    expect(getCurrentPosition).toHaveBeenCalledOnce();
   });
 });

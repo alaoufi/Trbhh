@@ -48,4 +48,11 @@ describe('live read-only ad quality report',()=>{
     const source=readFileSync('scripts/release/audit-live-ad-quality.cjs','utf8');
     expect(source).toContain('report.publicSummary=summarize(activeBase,duplicates).summary');
   });
+
+  it('recognises both raw MySQL and Prisma names for the active ad state',()=>{
+    expect(audit.isActiveRow({status:1,state:'1'})).toBe(true);
+    expect(audit.isActiveRow({status:1,state:'active'})).toBe(true);
+    expect(audit.isActiveRow({status:1,state:'0'})).toBe(false);
+    expect(audit.isActiveRow({status:0,state:'1'})).toBe(false);
+  });
 });

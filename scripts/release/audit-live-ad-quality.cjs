@@ -19,6 +19,7 @@ function pathKey(category,subcategory){return `${normalize(category)}\u0000${nor
 function definitionFields(raw){const parsed=json(raw,[]);return Array.isArray(parsed)?parsed:Array.isArray(parsed?.fields)?parsed.fields:[];}
 function matchesStep(value,field){if(!(field.step>0))return true;const q=(value-number(field.min))/number(field.step);return Math.abs(q-Math.round(q))<=1e-8;}
 function add(issues,code,classification,impact,detail={}){issues.push({code,classification,impact,...detail});}
+function isActiveRow(row){const state=String(row.state??'');return Number(row.status)===1&&(state==='1'||state==='active');}
 
 function classifySubcategoryReason(row){
   if(!row.subcategory_id)return 'subcategory_missing';
@@ -159,7 +160,7 @@ async function main(){
       db.$queryRawUnsafe('SELECT user_id,package_id,expires_at FROM user_packages'),
     ]);
     const lifecycleEnabled=String(settings[0]?.v||'0')==='1',now=new Date();
-    const activeBase=rows.filter(row=>Number(row.status)===1&&row.state==='active'&&(lifecycleEnabled?(row.trbhh_until&&new Date(row.trbhh_until)>now):(Number(row.store_only)===0||(row.trbhh_until&&new Date(row.trbhh_until)>now))));
+    const activeBase=rows.filter(row=>isActiveRow(row)&&(lifecycleEnabled?(row.trbhh_until&&new Date(row.trbhh_until)>now):(Number(row.store_only)===0||(row.trbhh_until&&new Date(row.trbhh_until)>now))));
     const report=summarize(rows,duplicates);
     report.publicSummary=summarize(activeBase,duplicates).summary;
     report.taxonomy={mainCategories:Number(mainCategories[0]?.count||0),subcategories:Number(subcategories[0]?.count||0),leafCategories:Number(leafDefinitions[0]?.count||0)};
@@ -170,4 +171,4 @@ async function main(){
   }finally{await db.$disconnect();}
 }
 if(require.main===module)main().catch(error=>{console.error(error?.message||String(error));process.exitCode=1;});
-module.exports={auditRow,summarize,classifySubcategoryReason,searchVisibilityBreakdown,buildSchemaReport,publicFieldTrust};
+module.exports={auditRow,summarize,classifySubcategoryReason,searchVisibilityBreakdown,buildSchemaReport,publicFieldTrust,isActiveRow};

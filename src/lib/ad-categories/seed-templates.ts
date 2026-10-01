@@ -75,6 +75,21 @@ const equipment = [f('manufacturer', 'المصنع'), f('model', 'الطراز')
   {...yes('transport_included','يشمل نقل المعدة','الإيجار'),...when('listing_type','rent')},
   {...n('minimum_rental_period','الحد الأدنى لمدة الإيجار',undefined,'الإيجار'),...when('listing_type','rent')}, ...delivery];
 
+const equipmentSubtypeFields=(kindKey:string):SeedField[]=>[
+  {...n('bucket_m3','سعة الباكت','م³','المواصفات الفنية'),min:0.1,max:50,step:0.1,...when(kindKey,['حفار','شيول'])},
+  {...n('blade_width_m','عرض الشفرة','متر','المواصفات الفنية'),min:0.5,max:15,step:0.1,...when(kindKey,'بلدوزر')},
+  {...n('crane_capacity_t','حمولة الرافعة المقننة','طن','المواصفات الفنية'),required:true,min:0.5,max:2000,step:0.1,...when(kindKey,'رافعة')},
+  {...n('forklift_capacity_t','حمولة الرافعة الشوكية','طن','المواصفات الفنية'),required:true,min:0.5,max:80,step:0.1,...when(kindKey,'رافعة شوكية')},
+  {...n('telehandler_capacity_t','حمولة المناولة التلسكوبية','طن','المواصفات الفنية'),required:true,min:0.5,max:50,step:0.1,...when(kindKey,'مناولة تلسكوبية')},
+  {...n('lift_height_m','ارتفاع الرفع','متر','المواصفات الفنية'),required:true,min:0.1,max:100,step:0.1,...when(kindKey,['رافعة شوكية','مناولة تلسكوبية'])},
+  {...n('mast_height_m','ارتفاع السارية','متر','المواصفات الفنية'),min:0.5,max:30,step:0.1,...when(kindKey,'رافعة شوكية')},
+  {...n('boom_length_m','طول الذراع','متر','المواصفات الفنية'),min:0.5,max:250,step:0.1,...when(kindKey,['رافعة','مناولة تلسكوبية','رافعة أشخاص'])},
+  {...n('platform_capacity_kg','حمولة المنصة','كجم','المواصفات الفنية'),required:true,min:50,max:2000,step:1,...when(kindKey,['رافعة مقصية','رافعة أشخاص'])},
+  {...n('work_height_m','ارتفاع العمل','متر','المواصفات الفنية'),required:true,min:0.1,max:250,step:0.1,...when(kindKey,['رافعة مقصية','رافعة أشخاص'])},
+  {...n('generator_power_kva','قدرة المولد','ك.ف.أ','المواصفات الفنية'),required:true,min:1,max:5000,step:1,...when(kindKey,'مولد')},
+  {...n('payload_t','حمولة الشاحنة','طن','المواصفات الفنية'),required:true,min:0.5,max:250,step:0.1,...when(kindKey,'شاحنة')},
+];
+
 const pricing=(key:ListingTypeKey,label:string,modes:PricingModeKey[])=>({key,label,pricing:modes});
 const policy=(...types:ReturnType<typeof pricing>[]):ListingPolicy=>({types});
 const sale=()=>pricing('sale','للبيع',['fixed','bidding']);
@@ -225,7 +240,10 @@ const LEGACY_CATEGORY_SEED_TEMPLATES:CategorySeedTemplate[]=[
   template('legacy_garden_tools','المشاتل ومستلزماتها','ادوات الحدائق','goods',[s('garden_tool_kind','نوع الأداة',['أداة يدوية','آلة قص','رشاش','مضخة','خرطوم وري','أصيص','أخرى']),f('brand','العلامة'),condition,s('power_source','مصدر الطاقة',['يدوي','كهرباء','بطارية','بنزين','أخرى']),f('size_spec','المقاس أو المواصفة'),n('quantity','الكمية'),...delivery],['garden_tool_kind','condition'],goodsPolicy),
   template('legacy_home_food','الأسر المنتجة','اطعمة ومأكولات','goods',[s('food_kind','نوع المنتج',['وجبات','حلويات','مخبوزات','تمور','مخللات','أخرى']),...foodSupply],['food_kind','supply_unit'],goodsPolicy),
   template('legacy_childrenswear','ملابس وعطورات','ملابس اطفال','goods',[s('childrenswear_kind','نوع الملابس',['مواليد','أطفال','مدرسي','مناسبات','رياضي','أخرى']),s('age_group','الفئة العمرية',['مواليد','1-3 سنوات','4-6 سنوات','7-12 سنة','13-16 سنة']),...apparel],['childrenswear_kind','age_group','condition','size'],goodsPolicy),
-  template('legacy_heavy_equipment','نقليات سيارات معدات','معدات','goods',[s('legacy_equipment_kind','نوع المعدة',['حفار','شيول','بلدوزر','رافعة','رافعة شوكية','مولد','أخرى']),...equipment,n('capacity_t','الحمولة','طن'),n('lift_height_m','ارتفاع العمل','متر')],['legacy_equipment_kind','manufacturer','model','year','condition','power_source'],rentableGoodsPolicy),
+  template('legacy_heavy_equipment','نقليات سيارات معدات','معدات','goods',[
+    s('legacy_equipment_kind','نوع المعدة',['حفار','شيول','بلدوزر','رافعة','رافعة شوكية','مناولة تلسكوبية','رافعة مقصية','رافعة أشخاص','مولد','أخرى']),
+    ...equipment,...equipmentSubtypeFields('legacy_equipment_kind'),
+  ],['legacy_equipment_kind','manufacturer','model','year','condition','power_source'],rentableGoodsPolicy),
   template('legacy_sheep','المواشي والحيوانات ومستلزماتها','ضأن','livestock',[s('sheep_kind','نوع الضأن',['نعيمي','نجدي','حري','سواكني','بربري','أخرى']),...animal],['sheep_kind','breed','head_count','sale_basis'],goodsPolicy),
   template('legacy_furniture','اثاث مفروشات ديكورات','مفروشات','goods',[...furniture,f('style','الطراز')],['furniture_kind','condition','material'],goodsPolicy),
   template('legacy_farm_feed','المزارع و منتجاتها','اعلاف','plants',[s('farm_feed_kind','نوع العلف',['برسيم','تبن','شعير','مركب','أخرى']),m('target_animals','الحيوانات المستهدفة',['أغنام','ماعز','إبل','أبقار','خيل','دواجن']),n('package_weight_kg','وزن العبوة أو البالة','كجم'),n('quantity','الكمية'),s('supply_unit','وحدة البيع',['كيس','بالة','كجم','طن']),...b2bSupply,...delivery],['farm_feed_kind','package_weight_kg','quantity','supply_unit'],goodsPolicy),
@@ -248,7 +266,15 @@ const LEGACY_CATEGORY_SEED_TEMPLATES:CategorySeedTemplate[]=[
   template('legacy_perfumes','ملابس وعطورات','عطورات','goods',[s('perfume_kind','نوع العطر',['عطر','دهن عود','بخور','مسك','معطر منزلي','أخرى']),f('brand','العلامة'),condition,n('volume_ml','السعة','مل'),s('concentration','التركيز',['بارفان','أو دو بارفان','أو دو تواليت','زيتي','أخرى']),n('quantity','الكمية'),...delivery],['perfume_kind','condition','volume_ml'],goodsPolicy),
   template('legacy_horses','المواشي والحيوانات ومستلزماتها','خيول ومستلزماتها','livestock',[s('horse_listing_kind','نوع المعروض',['خيل','سرج','لجام','عناية وتغذية','معدات إسطبل','أخرى']),f('breed','السلالة أو العلامة'),s('item_state','حالة المعروض',['جديد','مستعمل','لا ينطبق']),s('sex','الجنس',['ذكر','أنثى','لا ينطبق']),n('age_months','العمر','شهر'),f('health_notes','الحالة أو الملاحظات','textarea'),...delivery],['horse_listing_kind','item_state'],goodsPolicy),
   template('legacy_birds','المواشي والحيوانات ومستلزماتها','طيور','livestock',[s('bird_kind','نوع الطيور',['دواجن','حمام','طيور زينة','صقور','أخرى']),f('breed','السلالة'),s('sex','الجنس',['ذكر','أنثى','مجموعة مختلطة']),n('head_count','العدد','طائر'),n('age_months','العمر','شهر'),f('health_notes','الحالة الصحية بحسب إفادة المعلن','textarea'),...delivery],['bird_kind','breed','head_count'],goodsPolicy),
-  template('legacy_equipment_rental','نقليات سيارات معدات','تأجير','service',[s('rental_equipment_kind','نوع المعدة المؤجرة',['رافعة','رافعة شوكية','حفار','شيول','مولد','شاحنة','أخرى']),f('brand','العلامة أو المصنع'),f('model','الموديل'),n('year','سنة الصنع'),n('capacity_t','الحمولة','طن'),n('work_height_m','ارتفاع العمل','متر'),yes('operator_included','يشمل المشغل'),yes('transport_included','يشمل النقل')],['rental_equipment_kind'],policy(service(['hour','day','week','month','project','quote']),serviceRequest())),
+  template('legacy_equipment_rental','نقليات سيارات معدات','تأجير','service',[
+    s('rental_equipment_kind','نوع المعدة المؤجرة',['رافعة','رافعة شوكية','مناولة تلسكوبية','رافعة مقصية','رافعة أشخاص','حفار','شيول','بلدوزر','مولد','شاحنة','أخرى']),
+    f('brand','العلامة أو المصنع'),f('model','الموديل'),{...n('year','سنة الصنع'),min:1900,max:2100,step:1},condition,
+    {...n('operating_hours','ساعات التشغيل','ساعة'),min:0,max:200000,step:1},
+    {...n('engine_power_kw','قدرة المحرك','كيلوواط'),min:2,max:5000,step:1},
+    {...n('operating_weight_t','الوزن التشغيلي','طن'),min:0.1,max:1000,step:0.1},
+    s('power_source','مصدر الطاقة',['ديزل','بنزين','غاز','كهرباء','هجين','أخرى']),
+    ...equipmentSubtypeFields('rental_equipment_kind'),yes('operator_included','يشمل المشغل'),yes('transport_included','يشمل النقل'),
+  ],['rental_equipment_kind'],policy(service(['hour','day','week','month','project','quote']),serviceRequest())),
   template('legacy_fitness','الصحة واللياقة','رياضة ولياقة','goods',[s('fitness_item_kind','نوع المعروض',['جهاز رياضي','أوزان','ملابس رياضية','اشتراك','خدمة تدريب','أخرى']),f('brand','العلامة'),condition,f('size_or_capacity','المقاس أو السعة'),f('usage_notes','الاستخدام أو الحالة','textarea'),n('quantity','الكمية'),...delivery],['fitness_item_kind','condition'],policy(sale(),wanted(),service(),serviceRequest())),
   template('legacy_ad_campaigns','دعاية واعلان','حملات اعلانية','service',[s('campaign_kind','نوع الحملة',['رقمية','شبكات اجتماعية','بحث','ميدانية','إطلاق منتج','أخرى']),...serviceFields,f('target_audience','الجمهور المستهدف'),f('campaign_channels','القنوات المطلوبة')],['campaign_kind','service_scope'],servicesPolicy),
   template('legacy_device_repair','الكترونيات','صيانة اجهزة','service',[s('repair_device_kind','نوع الجهاز',['جوال','تابلت','كمبيوتر','تلفزيون','جهاز منزلي','أخرى']),...serviceFields,m('service_kind','الخدمة',['فحص','إصلاح','تركيب','برمجة','استبدال قطع'])],['repair_device_kind','service_scope'],servicesPolicy),

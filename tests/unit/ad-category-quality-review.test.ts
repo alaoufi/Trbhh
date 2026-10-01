@@ -14,7 +14,8 @@ describe('professional leaf schema review registry',()=>{
   it('records the reviewed decisions for the confirmed service and lifting cases',()=>{
     expect(templateQualityReview(CATEGORY_SEED_TEMPLATES.find(template=>template.key==='lifting')!)).toMatchObject({status:'PASS'});
     expect(templateQualityReview(CATEGORY_SEED_TEMPLATES.find(template=>template.key==='contracting')!)).toMatchObject({status:'PASS'});
-    expect(templateQualityReview(CATEGORY_SEED_TEMPLATES.find(template=>template.key==='legacy_heavy_equipment')!)).toMatchObject({status:'NEEDS_CONDITIONAL_CHANGE'});
-    expect(templateQualityReview(CATEGORY_SEED_TEMPLATES.find(template=>template.key==='legacy_equipment_rental')!)).toMatchObject({status:'NEEDS_CONDITIONAL_CHANGE'});
+    expect(templateQualityReview(CATEGORY_SEED_TEMPLATES.find(template=>template.key==='legacy_heavy_equipment')!)).toMatchObject({status:'PASS'});
+    expect(templateQualityReview(CATEGORY_SEED_TEMPLATES.find(template=>template.key==='legacy_equipment_rental')!)).toMatchObject({status:'PASS'});
+    expect(CATEGORY_SEED_TEMPLATES.filter(template=>templateQualityReview(template).status==='PASS')).toHaveLength(85);
   });
 });

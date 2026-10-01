@@ -1,11 +1,7 @@
 export type TemplateQualityStatus='PASS'|'NEEDS_FIELD_CHANGE'|'NEEDS_REQUIRED_CHANGE'|'NEEDS_OPTIONAL_CHANGE'|'NEEDS_CONDITIONAL_CHANGE'|'NEEDS_INPUT_TYPE_CHANGE';
 export type TemplateQualityReview={status:TemplateQualityStatus;reason:string};
-type ReviewableTemplate={key:string;kind:string;fields:readonly {required:boolean;dependsOn?:string;type:string}[]};
-
-const REVIEW_EXCEPTIONS:Record<string,TemplateQualityReview>={
-  legacy_heavy_equipment:{status:'NEEDS_CONDITIONAL_CHANGE',reason:'ورقة المعدات القديمة تجمع أنواع رفع وحفر مختلفة في حقول حمولة وارتفاع عامة بلا شروط نوعية كافية.'},
-  legacy_equipment_rental:{status:'NEEDS_CONDITIONAL_CHANGE',reason:'ورقة التأجير القديمة تحتاج ربط حقول القدرة والحمولة والارتفاع بنوع المعدة قبل اعتماد مواصفاتها مهنيًا.'},
-};
+type ReviewableField={key:string;required:boolean;dependsOn?:string;dependencyValue?:unknown;type:string;unit?:string;min?:number;max?:number};
+type ReviewableTemplate={key:string;kind:string;fields:readonly ReviewableField[]};
 
 const PASS_REASON:Record<string,string>={
   property:'حقول المساحة والاستخدام والبناء والخدمات مفصولة عن التسعير ومناسبة لقرار العقار.',
@@ -18,8 +14,20 @@ const PASS_REASON:Record<string,string>={
 
 /** سجل مراجعة مهني قابل لإعادة التشغيل؛ الاستثناءات تبقى ظاهرة حتى إصلاحها واختبارها. */
 export function templateQualityReview(template:ReviewableTemplate):TemplateQualityReview{
-  const exception=REVIEW_EXCEPTIONS[template.key];
-  if(exception)return exception;
+  if(template.key==='legacy_heavy_equipment'||template.key==='legacy_equipment_rental'){
+    const selector=template.key==='legacy_heavy_equipment'?'legacy_equipment_kind':'rental_equipment_kind';
+    const expected=[
+      ['crane_capacity_t','طن','رافعة'],['forklift_capacity_t','طن','رافعة شوكية'],
+      ['telehandler_capacity_t','طن','مناولة تلسكوبية'],['platform_capacity_kg','كجم',['رافعة مقصية','رافعة أشخاص']],
+      ['work_height_m','متر',['رافعة مقصية','رافعة أشخاص']],['generator_power_kva','ك.ف.أ','مولد'],
+    ] as const;
+    const complete=expected.every(([key,unit,value])=>{
+      const field=template.fields.find(item=>item.key===key);
+      return field?.required===true&&field.dependsOn===selector&&field.unit===unit&&field.min!==undefined&&field.max!==undefined
+        &&JSON.stringify(field.dependencyValue)===JSON.stringify(value);
+    })&&!template.fields.some(field=>field.key==='capacity_t');
+    if(!complete)return {status:'NEEDS_CONDITIONAL_CHANGE',reason:'حقول السعة والارتفاع والطاقة العامة لم تُفصل بعد حسب نوع المعدة مع حدود ووحدات إلزامية.'};
+  }
   const conditional=template.fields.some(field=>field.dependsOn);
   const required=template.fields.some(field=>field.required);
   const optional=template.fields.some(field=>!field.required);

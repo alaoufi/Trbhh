@@ -77,6 +77,33 @@ describe('editable specialist subcategory seed templates', () => {
     expect(()=>validateCategoryValues(lifting!.fields,{equipment_kind:'رافعة شوكية',...common,forklift_capacity_t:640})).toThrow();
   });
 
+  it.each([
+    ['legacy_heavy_equipment','legacy_equipment_kind'],
+    ['legacy_equipment_rental','rental_equipment_kind'],
+  ] as const)('keeps %s subtype measurements conditional, bounded and unit-safe', (templateKey,kindKey) => {
+    const template=CATEGORY_SEED_TEMPLATES.find(item=>item.key===templateKey)!;
+    const fields=new Map(template.fields.map(field=>[field.key,field]));
+    expect(fields.get('crane_capacity_t')).toMatchObject({unit:'طن',min:0.5,max:2000,dependsOn:kindKey,dependencyValue:'رافعة',required:true});
+    expect(fields.get('forklift_capacity_t')).toMatchObject({unit:'طن',min:0.5,max:80,dependsOn:kindKey,dependencyValue:'رافعة شوكية',required:true});
+    expect(fields.get('telehandler_capacity_t')).toMatchObject({unit:'طن',min:0.5,max:50,dependsOn:kindKey,dependencyValue:'مناولة تلسكوبية',required:true});
+    expect(fields.get('platform_capacity_kg')).toMatchObject({unit:'كجم',min:50,max:2000,dependsOn:kindKey,dependencyValue:['رافعة مقصية','رافعة أشخاص'],required:true});
+    expect(fields.get('work_height_m')).toMatchObject({unit:'متر',min:0.1,max:250,dependsOn:kindKey,dependencyValue:['رافعة مقصية','رافعة أشخاص'],required:true});
+    expect(fields.get('generator_power_kva')).toMatchObject({unit:'ك.ف.أ',min:1,max:5000,dependsOn:kindKey,dependencyValue:'مولد',required:true});
+    expect(template.fields.some(field=>field.key==='capacity_t')).toBe(false);
+  });
+
+  it('rejects impossible new legacy equipment values and never treats tonnes as platform kilograms',()=>{
+    const template=CATEGORY_SEED_TEMPLATES.find(item=>item.key==='legacy_heavy_equipment')!;
+    const common={legacy_equipment_kind:'رافعة مقصية',manufacturer:'جينّي',model:'GS-3246',year:2022,condition:'مستعمل',power_source:'كهرباء'};
+    expect(()=>validateCategoryValues(template.fields,{...common,work_height_m:12,platform_capacity_kg:640,engine_power_kw:1},{listingType:'sale'})).toThrow('قدرة المحرك');
+    expect(validateCategoryValues(template.fields,{...common,work_height_m:12,platform_capacity_kg:640,crane_capacity_t:640,engine_power_kw:2},{listingType:'sale'}))
+      .toMatchObject({platform_capacity_kg:640,work_height_m:12});
+    expect(validateCategoryValues(template.fields,{...common,work_height_m:12,platform_capacity_kg:640,crane_capacity_t:640,engine_power_kw:2},{listingType:'sale'}))
+      .not.toHaveProperty('crane_capacity_t');
+    expect(()=>validateCategoryValues(template.fields,{...common,work_height_m:12},{listingType:'sale'})).toThrow('حمولة المنصة');
+    expect(()=>validateCategoryValues(template.fields,{...common,legacy_equipment_kind:'رافعة شوكية',forklift_capacity_t:640,mast_height_m:4},{listingType:'sale'})).toThrow('حمولة الرافعة الشوكية');
+  });
+
   it('offers fencing and palm work in contracting instead of forcing a tools schema',()=>{
     const contracting=CATEGORY_SEED_TEMPLATES.find(template=>template.key==='contracting')!;
     expect(contracting.fields.find(field=>field.key==='trade')?.options).toEqual(expect.arrayContaining(['أسوار وشبوك','أعمال نخيل','تنسيق وزراعة']));

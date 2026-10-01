@@ -134,6 +134,19 @@ describe('Hostinger live-data read-only preview', () => {
     expect(workflow).not.toMatch(/prisma\s+db\s+push/);
   });
 
+  test('restores the isolated staging database after leaving live-readonly mode', () => {
+    const workflow = readFileSync(path.join(root, '.github/workflows/deploy-staging.yml'), 'utf8');
+
+    expect(workflow).toContain('read_env_value DB_USER .env');
+    expect(workflow).toContain('read_env_value DB_PASSWORD .env');
+    expect(workflow).toContain('read_env_value DB_NAME .env');
+    expect(workflow).toContain('urlencode_env_value "$staging_db_user"');
+    expect(workflow).toContain('urlencode_env_value "$staging_db_password"');
+    expect(workflow).toContain('set_env DATABASE_URL "$staging_database_url" .env');
+    expect(workflow).toContain('set_env LEGACY_MEDIA_BASE "" .env');
+    expect(workflow).toContain('set_env NEXT_PUBLIC_MEDIA_BASE "" .env');
+  });
+
   test('packages the read-only quality audit without granting it a write path', () => {
     const dockerfile = readFileSync(path.join(root, 'Dockerfile'), 'utf8');
     const audit = readFileSync(path.join(root, 'scripts/release/audit-live-ad-quality.cjs'), 'utf8');

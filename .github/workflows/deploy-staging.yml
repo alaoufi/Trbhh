@@ -102,6 +102,26 @@ jobs:
             mv "$tmp" "$file"
           }
 
+          read_env_value() {
+            key=$1
+            file=$2
+            [[ "$key" =~ ^[A-Z0-9_]+$ ]]
+            test -f "$file"
+            grep -m1 "^${key}=" "$file" | cut -d= -f2- | tr -d '\r'
+          }
+
+          urlencode_env_value() {
+            local LC_ALL=C input=$1 encoded='' char hex index
+            for ((index = 0; index < ${#input}; index++)); do
+              char=${input:index:1}
+              case "$char" in
+                [a-zA-Z0-9.~_-]) encoded+="$char" ;;
+                *) printf -v hex '%%%02X' "'$char"; encoded+="$hex" ;;
+              esac
+            done
+            printf '%s' "$encoded"
+          }
+
           staging_auth_secret=$(grep -m1 '^AUTH_SECRET=' .env | cut -d= -f2- || true)
           if (( ${#staging_auth_secret} < 32 )); then
             staging_auth_secret=$(openssl rand -hex 32)
@@ -196,8 +216,24 @@ jobs:
             set_env LEGACY_MEDIA_BASE https://trbhh.sa/media .env
             set_env NEXT_PUBLIC_MEDIA_BASE https://trbhh.sa .env
           else
+            staging_db_user=$(read_env_value DB_USER .env)
+            staging_db_password=$(read_env_value DB_PASSWORD .env)
+            staging_db_name=$(read_env_value DB_NAME .env)
+            test -n "$staging_db_user"
+            test -n "$staging_db_password"
+            [[ "$staging_db_name" =~ ^[A-Za-z0-9_]{1,64}$ ]]
+            encoded_staging_db_user=$(urlencode_env_value "$staging_db_user")
+            encoded_staging_db_password=$(urlencode_env_value "$staging_db_password")
+            staging_database_url="mysql://${encoded_staging_db_user}:${encoded_staging_db_password}@db:3306/${staging_db_name}"
+            set_env DATABASE_URL "$staging_database_url" .env
+            unset staging_db_user staging_db_password staging_db_name encoded_staging_db_user encoded_staging_db_password staging_database_url
             set_env TRBHH_READ_ONLY_PREVIEW 0 .env
             set_env SUPPLIER_ALLOW_LIVE_ORDERS false .env
+            set_env CATEGORIES_DEFAULT_ENABLED 0 .env
+            set_env COOKIE_SECURE false .env
+            set_env APP_PORT 3081 .env
+            set_env LEGACY_MEDIA_BASE "" .env
+            set_env NEXT_PUBLIC_MEDIA_BASE "" .env
           fi
 
           docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis

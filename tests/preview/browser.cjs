@@ -79,6 +79,67 @@ async function reviewSchemaFamilyForm(page,journey){
   await page.screenshot({path:path.join(artifacts,`schema-family-${journey.family}.png`),fullPage:true});
   console.log(JSON.stringify({journey:'schema-family-form',family:journey.family,status:'passed',fields:await fields.count(),required:await required.count()}));
 }
+async function runSchemaFamilyLifecycle(journey,accountId){
+  const context=await browser.newContext({viewport:{width:1280,height:900}});
+  await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+  const page=await context.newPage();page.setDefaultTimeout(20000);
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  try{
+    await page.goto(origin+'/login?next='+encodeURIComponent('/ads/new'));
+    await page.locator('#login-identifier').fill('commerce-preview-'+journey.family);
+    await page.locator('#login-password').fill('Preview-only-2026!');
+    await page.getByRole('button',{name:'دخول',exact:true}).click();
+    await page.waitForURL(url=>url.pathname==='/ads/new',{timeout:30000});
+    const category=page.locator('select[name="taxonomy_group"]'),subcategory=page.locator('select[name="subcategory_id"]');
+    await category.waitFor({state:'visible'});
+    const categoryValue=await category.locator('option').evaluateAll((options,pattern)=>options.find(option=>option.value&&new RegExp(pattern).test(option.textContent||''))?.value||'',journey.category.source);
+    assert(categoryValue,`${journey.family} lifecycle main category exists`);
+    await category.selectOption(categoryValue);
+    const leafValue=await subcategory.locator('option').evaluateAll((options,pattern)=>options.find(option=>option.value&&new RegExp(pattern).test(option.textContent||''))?.value||'',journey.leaf.source);
+    assert(leafValue,`${journey.family} lifecycle leaf exists`);
+    await subcategory.selectOption(leafValue);
+    await fillRequiredCategoryFields(page);
+    const requiredPrice=page.locator('input[name="price"][required]:visible');
+    if(await requiredPrice.count())await requiredPrice.first().fill('100');
+    const unique=`${journey.family}-${Date.now()}`;
+    const createdTitle=`إعلان اختبار عائلة ${unique}`;
+    const editedTitle=`${createdTitle} محدث`;
+    await page.locator('[name="title"]').fill(createdTitle);
+    await page.locator('[name="detail"]').fill(`إعلان اصطناعي معزول لاختبار دورة ${journey.family} كاملة من الإنشاء حتى البحث المصفى والحذف.`);
+    await page.locator('[name="phone"]').fill(`050000000${accountId}`);
+    await page.locator('[name="pledge"]').check();
+    await page.getByRole('button',{name:'نشر الإعلان',exact:true}).click();
+    await page.waitForURL(url=>url.pathname==='/'&&/^\d+$/.test(url.searchParams.get('published')||''),{timeout:30000});
+    const adId=new URL(page.url()).searchParams.get('published');
+    assert(adId,`${journey.family} created ad id`);
+    await page.goto(origin+`/ads/${adId}`);
+    await page.getByText(createdTitle,{exact:true}).first().waitFor({state:'visible'});
+    await page.goto(origin+`/ads/${adId}/edit`);
+    await page.locator('[name="title"]').fill(editedTitle);
+    await page.locator('[name="detail"]').fill(`تم تعديل إعلان عائلة ${journey.family} داخل قاعدة الاختبار المعزولة.`);
+    await page.locator('[name="pledge"]').check();
+    await page.getByRole('button',{name:'حفظ التعديلات',exact:true}).click();
+    await page.waitForURL(url=>url.pathname===`/ads/${adId}`,{timeout:30000});
+    await page.getByText(editedTitle,{exact:true}).first().waitFor({state:'visible'});
+    const searchParams=new URLSearchParams({q:editedTitle});
+    searchParams.set('category',categoryValue);
+    searchParams.set('subcategory',leafValue);
+    await page.goto(origin+'/search?'+searchParams.toString());
+    await page.getByText(editedTitle,{exact:true}).first().waitFor({state:'visible'});
+    assert.equal(await page.locator('select[name="category"]').inputValue(),categoryValue);
+    assert.equal(await page.locator('select[name="subcategory"]').inputValue(),leafValue);
+    await page.goto(origin+`/ads/${adId}`);
+    const deleteForm=page.locator(`form:has(input[name="adId"][value="${adId}"])`).filter({has:page.getByRole('button',{name:/حذف/})}).first();
+    await deleteForm.getByRole('button',{name:/حذف/}).click();
+    await page.getByRole('dialog').getByRole('button',{name:'موافق',exact:true}).click();
+    await page.waitForURL(url=>url.pathname==='/account/ads',{timeout:30000});
+    assert.equal(await page.getByText(editedTitle,{exact:true}).count(),0);
+    assert.deepEqual(errors,[]);
+    console.log(JSON.stringify({journey:'schema-family-lifecycle',family:journey.family,status:'passed',adId,categoryValue,leafValue}));
+  }finally{
+    await context.close();
+  }
+}
 async function run(){
   await mkdir(artifacts,{recursive:true});
   const url=new URL(database);
@@ -142,8 +203,11 @@ async function run(){
       await page.waitForURL(u=>u.pathname===`/ads/${adId}`,{timeout:30000});
       await page.getByText(editedTitle,{exact:true}).first().waitFor({state:'visible'});
       console.log(JSON.stringify({journey:'edit-ad',status:'passed',adId}));
-      await page.goto(origin+'/search?q='+encodeURIComponent(editedTitle));
+      const jobSearchParams=new URLSearchParams({q:editedTitle,category:jobs,subcategory:job});
+      await page.goto(origin+'/search?'+jobSearchParams.toString());
       await page.getByText(editedTitle,{exact:true}).first().waitFor({state:'visible'});
+      assert.equal(await page.locator('select[name="category"]').inputValue(),jobs);
+      assert.equal(await page.locator('select[name="subcategory"]').inputValue(),job);
       console.log(JSON.stringify({journey:'search-ad',status:'passed',adId}));
       await page.goto(origin+`/ads/${adId}`);
       const deleteForm=page.locator(`form:has(input[name="adId"][value="${adId}"])`).filter({has:page.getByRole('button',{name:/حذف/})}).first();
@@ -258,6 +322,10 @@ async function run(){
     console.log(JSON.stringify({role,pageErrors:errors.length,checks:'passed',artifacts}));
     await context.close();
   }
+  const lifecycleFamilies=schemaFamilies.filter(journey=>journey.family!=='jobs');
+  for(const [index,journey] of lifecycleFamilies.entries())await runSchemaFamilyLifecycle(journey,index+3);
+  assert.equal(lifecycleFamilies.length+1,6,'all schema families complete their lifecycle');
+  console.log(JSON.stringify({schemaFamilyLifecycleJourneys:6,status:'passed'}));
   const context=await browser.newContext();const page=await context.newPage();
   await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
   await page.goto(origin+'/shop');

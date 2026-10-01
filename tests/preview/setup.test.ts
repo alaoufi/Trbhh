@@ -26,7 +26,16 @@ it('seeds only an empty dedicated loopback preview with synthetic accounts', asy
     for (const ddl of CATEGORY_DDL) await db.$executeRawUnsafe(ddl);
     await assertCommerceSchemaReady(db);
     const password = await bcrypt.hash('Preview-only-2026!', 4);
-    for (const [id, role] of [[1, 'admin'], [2, 'member']] as const) {
+    const previewUsers = [
+      [1, 'admin'],
+      [2, 'member'],
+      [3, 'goods'],
+      [4, 'property'],
+      [5, 'service'],
+      [6, 'livestock'],
+      [7, 'plants'],
+    ] as const;
+    for (const [id, role] of previewUsers) {
       await db.users.create({ data: { id: BigInt(id), userName: `commerce-preview-${role}`, name: `تجربة ${role}`,
         phoneNumber: `050000000${id}`, password, type: 'user', is_admin: id === 1 ? 1 : 0, auth_session_version: randomUUID(), country_id: 1 } });
     }

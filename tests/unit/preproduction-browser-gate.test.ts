@@ -52,6 +52,10 @@ describe('isolated pre-production browser gate', () => {
     expect(browser).toContain("journey:'delete-ad'");
     expect(browser).toContain("journey:'commerce-product-auth-guard'");
     expect(browser).toContain('schemaFamilyJourneys:6');
+    expect(browser).toContain('schemaFamilyLifecycleJourneys:6');
+    expect(browser).toContain("journey:'schema-family-lifecycle'");
+    expect(browser).toContain("searchParams.set('category',categoryValue)");
+    expect(browser).toContain("searchParams.set('subcategory',leafValue)");
     expect(browser).toContain("family:'livestock'");
     expect(browser).toContain("family:'plants'");
     expect(browser).toContain('PREVIEW_ARTIFACTS_DIR');

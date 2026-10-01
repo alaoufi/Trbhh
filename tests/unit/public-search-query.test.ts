@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
-  ads: { findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn() }, users: { findMany: vi.fn() },
-  areas: { findMany: vi.fn() }, cities: { findMany: vi.fn() }, categories: { findMany: vi.fn() },
-  photos: { findMany: vi.fn() }, ads_views: { groupBy: vi.fn() }, $queryRaw: vi.fn(),
+  ads: { findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn() }, users: { findMany: vi.fn(),count:vi.fn() },
+  areas: { findMany: vi.fn() }, cities: { findMany: vi.fn() }, categories: { findMany: vi.fn(),count:vi.fn() },
+  photos: { findMany: vi.fn() }, ads_views: { groupBy: vi.fn(),count:vi.fn() }, $queryRaw: vi.fn(),
 }));
 vi.mock('@/lib/prisma', () => ({ prisma: db }));
-vi.mock('@/lib/redis', () => ({ cached: vi.fn(), cacheDel: vi.fn(), cacheDelPattern: vi.fn() }));
+vi.mock('@/lib/redis', () => ({ cached: vi.fn(async(_key:string,_ttl:number,load:()=>unknown)=>load()), cacheDel: vi.fn(), cacheDelPattern: vi.fn() }));
 vi.mock('@/lib/censor', () => ({ loadBanned: vi.fn(), censorSync: (value: string) => value }));
 vi.mock('@/lib/profiles', () => ({ getProfileDisplay: vi.fn() }));
 vi.mock('@/lib/seed-areas', () => ({ ensureSaudiAreas: vi.fn() }));
@@ -17,13 +17,16 @@ vi.mock('@/lib/packages', () => ({
   sweepExpiredFeatured: vi.fn(), getFeaturedTierMap: vi.fn(), getUsersAdMeta: async () => new Map(),
   getPackages: async () => [], getDefaultPackage: async () => ({ adDays: 0 }), FREE_FALLBACK: { adDays: 0 },
 }));
-import { countSearchAds, getSimilarAds, searchAds, searchAdsRelaxed } from '@/lib/data';
+import { countSearchAds, getSimilarAds, getStats, searchAds, searchAdsRelaxed } from '@/lib/data';
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-09-10T12:00:00Z'));
   db.ads.count.mockResolvedValue(1);
+  db.users.count.mockResolvedValue(10);
+  db.categories.count.mockResolvedValue(20);
+  db.ads_views.count.mockResolvedValue(30);
   db.ads.findMany.mockResolvedValue([{ id: 42n, user_id: 1n, city_id: 1n, area_id: 2, category_id: 1n, title: 'شاليه', price: 500, price_type: 'rent', rent_period: 'يومي', adsType: 'offer', adsSpecial: '', created_at: new Date(), expires_at: null }]);
   db.ads.findUnique.mockResolvedValue(null);
   db.users.findMany.mockImplementation(({ where }) => Promise.resolve(where.ban ? [] : [{ id: 1n, name: 'المعلن', trusted: 0, ban: '' }]));
@@ -48,6 +51,29 @@ describe('public search query integration', () => {
     });
     const cards=await getSimilarAds(1,10,2);
     expect(cards.map(card=>card.id)).toEqual([2,3]);
+    vi.useRealTimers();
+  });
+  it('does not boost legacy rows whose area does not belong to their recorded city',async()=>{
+    db.ads.findUnique.mockResolvedValue({title:'معدات رفع',detail:'',subcategory_id:5,city_id:1n,area_id:2,price:1000});
+    const row=(id:number,cityId:bigint,areaId:number)=>({id:BigInt(id),subcategory_id:5,user_id:1n,city_id:cityId,area_id:areaId,category_id:10n,title:'معدات',price:1000,price_type:'sale',rent_period:null,adsType:'offer',adsSpecial:'',created_at:new Date(),expires_at:null});
+    db.ads.findMany.mockImplementation(async({where})=>where.subcategory_id===5?[row(2,2n,2),row(3,1n,3)]:[]);
+    db.areas.findMany.mockResolvedValue([{id:2,name:'الخرج',city_id:1},{id:3,name:'الرياض',city_id:1}]);
+    expect((await getSimilarAds(1,10,2)).map(card=>card.id)).toEqual([3,2]);
+    vi.useRealTimers();
+  });
+  it('uses the same public visibility predicate for the homepage active count and empty search',async()=>{
+    await countSearchAds({});
+    const searchWhere=db.ads.count.mock.calls[0][0].where;
+    vi.clearAllMocks();
+    db.ads.count.mockResolvedValue(7);db.users.count.mockResolvedValue(10);db.categories.count.mockResolvedValue(20);db.ads_views.count.mockResolvedValue(30);
+    expect(await getStats()).toMatchObject({ads:7});
+    expect(db.ads.count.mock.calls[0][0].where).toEqual(searchWhere);
+    vi.useRealTimers();
+  });
+  it('can require a trusted city-area relationship for nearby queries',async()=>{
+    db.$queryRaw.mockResolvedValue([{ad_id:42n}]);
+    await countSearchAds({cityId:1,geoTrustedOnly:true});
+    expect(db.ads.count.mock.calls[0][0].where).toMatchObject({city_id:1n,AND:expect.arrayContaining([{id:{in:[42n]}}])});
     vi.useRealTimers();
   });
   it('queries every source category and legacy leaf represented by the public taxonomy',async()=>{

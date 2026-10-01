@@ -28,10 +28,10 @@ export default async function NearbyPage({ searchParams }: { searchParams: Promi
   const region = cities.find((c) => c.id === cityId);
   const area = areas.find((a) => a.id === areaId && a.cityId === cityId);
   const pageSize=48;
-  const total=cityId?await countSearchAds({cityId,areaId}):0;
+  const total=cityId?await countSearchAds({cityId,areaId,geoTrustedOnly:true}):0;
   const pages=Math.max(1,Math.ceil(total/pageSize));
   const page=Math.min(positiveSearchId(sp.page)||1,pages);
-  const ads = cityId ? await searchAds({ cityId, areaId, take: pageSize,skip:(page-1)*pageSize }) : [];
+  const ads = cityId ? await searchAds({ cityId, areaId, geoTrustedOnly:true,take: pageSize,skip:(page-1)*pageSize }) : [];
   const label = area?.name || region?.name || 'منطقتك';
 
   return (

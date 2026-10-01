@@ -470,7 +470,7 @@ export async function getStats() {
   return cached('stats:home', 120, async () => {
     const [users, ads, cats, views] = await Promise.all([
       prisma.users.count(),
-      activeAdWhere().then((where) => prisma.ads.count({ where })),
+      countSearchAds({}),
       prisma.categories.count({ where: { is_active: 'yes' } }),
       prisma.ads_views.count(),
     ]);
@@ -520,6 +520,7 @@ type SearchParamsT = {
   minPrice?: number;
   maxPrice?: number;
   textMatch?: 'all' | 'any';
+  geoTrustedOnly?:boolean;
 };
 
 async function categoryAttributeAdIds(subcategoryIds:number[],filters:CategoryAttributeFilter[]):Promise<bigint[]>{
@@ -580,7 +581,15 @@ const getSearchAreaIds = cache(async (areaId: number, cityId: number) => {
   return equivalentAreaIds(areas.map((area) => ({ id: toInt(area.id), name: area.name, cityId: area.city_id })), areaId, cityId);
 });
 
-async function buildSearchWhere({ q, categoryId,categoryIds=[], subcategoryId,subcategoryIds=[], listingType, attributeFilters=[], searchableFields=[], countryId, cityId, areaId, type, special, minPrice, maxPrice, textMatch = 'all' }: SearchParamsT) {
+async function geoTrustedAdIds():Promise<bigint[]>{
+  const rows=await prisma.$queryRaw<{ad_id:bigint}[]>`
+    SELECT a.id AS ad_id FROM ads a
+    INNER JOIN areas ar ON ar.id=a.area_id AND ar.city_id=CAST(a.city_id AS UNSIGNED)
+  `;
+  return rows.map(row=>row.ad_id);
+}
+
+async function buildSearchWhere({ q, categoryId,categoryIds=[], subcategoryId,subcategoryIds=[], listingType, attributeFilters=[], searchableFields=[], countryId, cityId, areaId, type, special, minPrice, maxPrice, textMatch = 'all',geoTrustedOnly=false }: SearchParamsT) {
   const range = normalizePriceRange(minPrice, maxPrice);
   const visibility = await activeAdWhere();
   // بحث ذكي: تُقسَّم العبارة كلمات، وكل كلمة تُطابق العنوان أو التفاصيل بأي ترتيب،
@@ -602,9 +611,10 @@ async function buildSearchWhere({ q, categoryId,categoryIds=[], subcategoryId,su
   const textFilter = textMatch === 'any' && textClauses.length ? [{ OR: textClauses }] : textClauses;
   const selectedSubcategoryIds=subcategoryIds.length?subcategoryIds:(subcategoryId?[subcategoryId]:[]);
   const attributeIds=selectedSubcategoryIds.length&&attributeFilters.length?await categoryAttributeAdIds(selectedSubcategoryIds,attributeFilters):undefined;
+  const trustedGeoIds=geoTrustedOnly?await geoTrustedAdIds():undefined;
   return {
     ...visibility,
-    AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textFilter,...(listingType?[exactListingWhere(listingType)]:[])],
+    AND: [...(visibility.AND || []), await getSearchCardVisibility(), ...textFilter,...(listingType?[exactListingWhere(listingType)]:[]),...(trustedGeoIds?[{id:{in:trustedGeoIds}}]:[])],
     ...(categoryIds.length ? {category_id:{in:categoryIds.map(BigInt)}} : categoryId ? { category_id: BigInt(categoryId) } : {}),
     ...(selectedSubcategoryIds.length ? { subcategory_id:selectedSubcategoryIds.length===1?selectedSubcategoryIds[0]:{in:selectedSubcategoryIds} } : {}),
     ...(attributeIds ? {id:{in:attributeIds}}:{}),
@@ -932,6 +942,11 @@ export async function getSimilarAds(adId: number, categoryId: number, take = 6) 
   ]);
   const seen = new Set<number>();
   const candidates = [...sameLeaf,...sameCat, ...byTitle].filter((r) => (seen.has(toInt(r.id)) ? false : (seen.add(toInt(r.id)), true)));
+  const areaIds=[...new Set([src?.area_id,...candidates.map(item=>item.area_id)].filter((id):id is number=>Number.isInteger(id)&&Number(id)>0))];
+  const areaRows=areaIds.length?await prisma.areas.findMany({where:{id:{in:areaIds.map(BigInt)}},select:{id:true,city_id:true}}):[];
+  const areaCities=new Map(areaRows.map(area=>[toInt(area.id),Number(area.city_id)]));
+  const geoTrusted=(row:{city_id:bigint;area_id:number|null|undefined})=>Boolean(row.area_id&&areaCities.get(row.area_id)===Number(row.city_id));
+  const sourceGeoTrusted=Boolean(src&&geoTrusted(src));
   const categoryValues=await getPublicCategories([BigInt(adId),...candidates.map(item=>item.id)]).catch(()=>new Map<number,PublicCategory>());
   const sourceComparable=new Map((categoryValues.get(adId)?.comparableCategoryFields||[]).map(field=>[field.key,JSON.stringify(field.value)]));
 
@@ -945,8 +960,10 @@ export async function getSimilarAds(adId: number, categoryId: number, take = 6) 
         else if (detailTokens.has(t)) score += 1;
       }
       if(src?.subcategory_id&&r.subcategory_id===src.subcategory_id)score+=100;
-      if(src?.area_id&&r.area_id===src.area_id)score+=25;
-      else if(src?.city_id&&r.city_id===src.city_id)score+=15;
+      if(sourceGeoTrusted&&geoTrusted(r)){
+        if(src?.area_id&&r.area_id===src.area_id)score+=25;
+        else if(src?.city_id&&r.city_id===src.city_id)score+=15;
+      }
       const comparable=categoryValues.get(toInt(r.id))?.comparableCategoryFields||[];
       score+=comparable.filter(field=>sourceComparable.get(field.key)===JSON.stringify(field.value)).length*8;
       if((src?.price||0)>0&&r.price>0){

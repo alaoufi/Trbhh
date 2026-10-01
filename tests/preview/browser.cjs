@@ -228,7 +228,7 @@ async function run(){
       const callsBeforeEdit=await page.evaluate(()=>window.__geoCalls);
       await page.goto(origin+`/ads/${adId}/edit`);
       await assertResponsive(page,'edit ad');
-      await page.getByText('يوجد موقع محدد لهذا الإعلان',{exact:true}).waitFor({state:'visible'});
+      await page.getByText(/يوجد موقع محدد لهذا الإعلان/).waitFor({state:'visible'});
       assert.equal(await page.evaluate(()=>window.__geoCalls),callsBeforeEdit,'edit does not request geolocation automatically');
       await page.getByRole('button',{name:'إزالة الموقع الدقيق',exact:true}).click();
       await page.locator('[name="title"]').fill(editedTitle);

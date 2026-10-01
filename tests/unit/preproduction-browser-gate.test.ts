@@ -49,11 +49,19 @@ describe('isolated pre-production browser gate', () => {
   });
 
   it('covers create, details, edit, search, and delete for a synthetic ad', () => {
-    expect(browser).toContain("journey:'create-ad'");
-    expect(browser).toContain("journey:'ad-details'");
-    expect(browser).toContain("journey:'edit-ad'");
+    expect(browser).toContain("journey:'location-create-without-gps'");
+    expect(browser).toContain("journey:'location-create-with-gps'");
+    expect(browser).toContain("journey:'location-details'");
+    expect(browser).toContain("journey:'location-edit'");
+    expect(browser).toContain("journey:'location-errors'");
     expect(browser).toContain("journey:'search-ad'");
-    expect(browser).toContain("journey:'delete-ad'");
+    expect(browser).toContain("journey:'delete-location-test-ads'");
+    expect(browser).toContain("haversineKm:9.290582150657464");
+    expect(browser).toContain("directionsDestination:'24.713612,46.675312'");
+    expect(browser).toContain("permissionDenied:'passed'");
+    expect(browser).toContain("positionUnavailable:'passed'");
+    expect(browser).toContain("timeout:'passed'");
+    expect(browser).toContain("Nearby reuses session coordinates without another browser prompt");
     expect(browser).toContain("journey:'commerce-product-auth-guard'");
     expect(browser).toContain('schemaFamilyJourneys:schemaFamilies.length');
     expect(browser).toContain('schemaFamilyLifecycleJourneys:schemaFamilies.length');

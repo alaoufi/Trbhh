@@ -15,16 +15,16 @@ const schemaFamilies=[
   {family:'goods',category:/سيارات/,leaf:/^سيارات$/},
   {family:'property',category:/عقارات/,leaf:/أراض/},
   {family:'jobs',category:/وظائف/,leaf:/فرص عمل/},
-  {family:'heavy-equipment',category:/نقليات ومعدات ثقيلة/,leaf:/^رافعات ومناولة$/},
-  {family:'contracting',category:/مواد بناء ومقاولات/,leaf:/مقاولات وتشطيبات/},
+  {family:'heavy-equipment',category:/سيارات ونقليات ومعدات/,leaf:/^رافعات ومناولة$/},
+  {family:'contracting',category:/بناء ومقاولات/,leaf:/مقاولات وتشطيبات/},
   {family:'service',category:/زراعة ومشاتل/,leaf:/خدمات زراعة وحدائق/},
   {family:'livestock',category:/مواشي/,leaf:/أغنام وماعز/},
   {family:'plants',category:/زراعة ومشاتل/,leaf:/شتلات ونباتات/},
-  {family:'electronics',category:/^الكترونيات$/,leaf:/^جوالات$/},
-  {family:'appliances',category:/اجهزة كهربائية/,leaf:/اجهزة مطبخ/},
-  {family:'decor',category:/ديكورات منزلية/,leaf:/^سجاد$/},
-  {family:'food',category:/الأسر المنتجة/,leaf:/اطعمة ومأكولات/},
-  {family:'furniture',category:/اثاث مفروشات ديكورات/,leaf:/مفروشات/},
+  {family:'electronics',category:/إلكترونيات/,leaf:/^جوالات$/},
+  {family:'appliances',category:/أوانٍ وأجهزة منزلية/,leaf:/اجهزة مطبخ/},
+  {family:'decor',category:/أثاث وديكور/,leaf:/^سجاد$/},
+  {family:'food',category:/أسر منتجة وأغذية/,leaf:/اطعمة ومأكولات/},
+  {family:'furniture',category:/أثاث وديكور/,leaf:/مفروشات/},
 ];
 const accountPhone=id=>`0500000${String(id).padStart(3,'0')}`;
 async function assertResponsive(page,label,widths=responsiveWidths){

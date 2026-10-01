@@ -214,8 +214,23 @@ jobs:
           printf 'previewDockerPorts=%s\n' "$(printf '%s' "$published_ports" | tr '\n' ' ')"
           printf '%s\n' "$published_ports" | grep -Fx '0.0.0.0:3081'
           ss -lntp | grep -E '(^|:)3081\b'
-          curl -fsS --max-time 20 http://127.0.0.1:3081/ -o /dev/null
-          curl -fsS --max-time 20 "http://$public_host:3081/" -o /dev/null
+          wait_for_preview_200() {
+            label=$1
+            url=$2
+            status=000
+            for attempt in $(seq 1 30); do
+              status=$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' "$url" || true)
+              if [[ "$status" == 200 ]]; then
+                printf 'previewHttpReady=%s status=%s attempt=%s\n' "$label" "$status" "$attempt"
+                return 0
+              fi
+              sleep 2
+            done
+            printf 'previewHttpReady=%s status=%s failed\n' "$label" "$status" >&2
+            return 1
+          }
+          wait_for_preview_200 loopback http://127.0.0.1:3081/
+          wait_for_preview_200 public-port "http://$public_host:3081/"
 
           echo 'previewFirewallAudit=ufw'
           if command -v ufw >/dev/null 2>&1; then ufw status verbose || true; else echo 'ufw unavailable'; fi

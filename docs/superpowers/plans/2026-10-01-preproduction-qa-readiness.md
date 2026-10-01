@@ -23,7 +23,7 @@
 - Test: `tests/unit/ad-category-seeds.test.ts`
 - Test: `tests/unit/ad-quality-audit.test.ts`
 
-- [ ] **Step 1: Write failing tests for step, canonical units, and audit classification**
+- [x] **Step 1: Write failing tests for step, canonical units, and audit classification**
 
 ```ts
 expect(() => validateCategoryValues([numeric({ step: 0.5 })], { capacity: 1.2 })).toThrow('قيمة غير صالحة');
@@ -31,13 +31,13 @@ expect(validateDefinition([numeric({ unit: 'طن', step: 0.1 })])[0]).toMatchObj
 expect(auditAdQuality(impossibleLiftFixture)).toContainEqual(expect.objectContaining({ severity: 'INVALID_BUT_PRESERVE' }));
 ```
 
-- [ ] **Step 2: Run targeted tests and verify RED**
+- [x] **Step 2: Run targeted tests and verify RED**
 
 Run: `pnpm exec vitest run tests/unit/ad-category-validation.test.ts tests/unit/ad-category-seeds.test.ts tests/unit/ad-quality-audit.test.ts`
 
 Expected: failure because `step` and `auditAdQuality` are not implemented.
 
-- [ ] **Step 3: Implement minimal canonical validation and read-only audit**
+- [x] **Step 3: Implement minimal canonical validation and read-only audit**
 
 ```ts
 export const CANONICAL_UNITS = ['كجم','طن','كم','ساعة','كيلوواط','حصان','متر','م²','لتر','سم','يوم'] as const;
@@ -46,13 +46,13 @@ export type CategoryField = { /* existing fields */ step?: number };
 
 The audit must return only `AUTO_FIX_SAFE`, `NEEDS_REVIEW`, or `INVALID_BUT_PRESERVE`; it must not execute `UPDATE`, `DELETE`, `DROP`, `TRUNCATE`, migrations, or seeds.
 
-- [ ] **Step 4: Run targeted tests and verify GREEN**
+- [x] **Step 4: Run targeted tests and verify GREEN**
 
 Run: `pnpm exec vitest run tests/unit/ad-category-validation.test.ts tests/unit/ad-category-seeds.test.ts tests/unit/ad-quality-audit.test.ts`
 
 Expected: all selected tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/ad-categories src/components/ad-category-fields.tsx src/components/ad-category-editor.tsx src/lib/ad-quality scripts/release/audit-live-ad-quality.cjs tests/unit
@@ -70,7 +70,7 @@ git commit -m "إضافة تدقيق جودة البيانات والتحقق ا
 - Test: `tests/unit/ad-actions-category.test.ts`
 - Test: `tests/unit/deals.test.ts`
 
-- [ ] **Step 1: Write failing tests for current/old price and region-city relationship**
+- [x] **Step 1: Write failing tests for current/old price and region-city relationship**
 
 ```ts
 expect(() => normalizeAdPricing({ price: '0', oldPrice: '', pricingMode: 'fixed' })).toThrow('أكبر من صفر');
@@ -78,11 +78,11 @@ expect(() => normalizeAdPricing({ price: '100', oldPrice: '90', pricingMode: 'fi
 await expect(validateSaudiLocation(adapter, { regionId: 1, cityId: 99 })).rejects.toThrow('لا تتبع المنطقة');
 ```
 
-- [ ] **Step 2: Run targeted tests and verify RED**
+- [x] **Step 2: Run targeted tests and verify RED**
 
 Run: `pnpm exec vitest run tests/unit/ad-submission-validation.test.ts tests/unit/ad-actions-category.test.ts tests/unit/deals.test.ts`
 
-- [ ] **Step 3: Implement server-side pricing and location validation**
+- [x] **Step 3: Implement server-side pricing and location validation**
 
 ```ts
 export type NormalizedAdPricing = { price: number; oldPrice: number; discountPercent: number | null; warning: string | null };
@@ -91,11 +91,11 @@ export async function validateSaudiLocation(db: LocationReader, input: { regionI
 
 Use the existing `cities` table as region and `areas` table as city; do not create a second dataset. Calculate discount on the server and never trust a submitted percentage.
 
-- [ ] **Step 4: Run targeted tests and verify GREEN**
+- [x] **Step 4: Run targeted tests and verify GREEN**
 
 Run: `pnpm exec vitest run tests/unit/ad-submission-validation.test.ts tests/unit/ad-actions-category.test.ts tests/unit/deals.test.ts`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/ads src/app/ads/actions.ts src/components/ad-form.tsx src/lib/data.ts tests/unit
@@ -116,7 +116,7 @@ git commit -m "إصلاح تحقق الأسعار والموقع الجغراف�
 - Test: `tests/unit/similar-ads.test.ts`
 - Test: `tests/unit/deals.test.ts`
 
-- [ ] **Step 1: Write failing tests for leaf filters and relevance ordering**
+- [x] **Step 1: Write failing tests for leaf filters and relevance ordering**
 
 ```ts
 expect(normalizeCategoryAttributeFilters(fields, { attr_capacity_min: '2' }, 'rent').filters).toEqual([expect.objectContaining({ key: 'capacity', min: 2 })]);
@@ -124,11 +124,11 @@ expect(similarOrder[0]).toMatchObject({ subcategoryId: source.subcategoryId });
 expect(isValidDeal({ price: 100, oldPrice: 90, priceType: 'sale' })).toBe(false);
 ```
 
-- [ ] **Step 2: Verify RED, implement server-side behavior, then verify GREEN**
+- [x] **Step 2: Verify RED, implement server-side behavior, then verify GREEN**
 
 Run before and after implementation: `pnpm exec vitest run tests/unit/public-search-query.test.ts tests/unit/public-discovery.test.ts tests/unit/similar-ads.test.ts tests/unit/deals.test.ts`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/lib/search-filters.ts src/app/search src/components/public-search-form.tsx src/lib/data.ts src/app/deals src/app/nearby tests/unit
@@ -148,18 +148,18 @@ git commit -m "إكمال الفلاتر الديناميكية وترتيب ا�
 - Test: `tests/unit/home-category-page.test.ts`
 - Test: `tests/unit/ad-category-all-leaf-scenarios.test.ts`
 
-- [ ] **Step 1: Add a failing source-identity regression test**
+- [x] **Step 1: Add a failing source-identity regression test**
 
 ```ts
 expect(homeTaxonomy.subcategories.map(x => x.id)).toEqual(formTaxonomy.subcategories.map(x => x.id));
 expect(searchTaxonomy.groups).toEqual(homeTaxonomy.groups);
 ```
 
-- [ ] **Step 2: Verify RED if any consumer diverges, then route all public consumers through `buildPublicCategoryTaxonomy`**
+- [x] **Step 2: Verify RED if any consumer diverges, then route all public consumers through `buildPublicCategoryTaxonomy`**
 
 Run: `pnpm exec vitest run tests/unit/ad-category-public-taxonomy.test.ts tests/unit/home-category-page.test.ts tests/unit/ad-category-all-leaf-scenarios.test.ts`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/lib/ad-categories src/app/page.tsx src/components/home-category-navigation.tsx src/components/ad-form.tsx src/app/admin/categories/page.tsx tests/unit
@@ -176,24 +176,24 @@ git commit -m "توحيد مصدر التصنيفات في الواجهات ال
 - Modify: `src/app/ads/[id]/edit/page.tsx`
 - Modify: `src/components/ad-form.tsx`
 
-- [ ] **Step 1: Add failing isolated tests for ownership, create, edit, category change, and preservation**
+- [x] **Step 1: Add failing isolated tests for ownership, create, edit, category change, and preservation**
 
 ```ts
 expect(await attemptEdit(otherMember, ad.id)).toMatchObject({ forbidden: true });
 expect(await loadSavedAd(owner, ad.id)).toMatchObject({ listingType: 'rent', categoryValues: expect.any(Object) });
 ```
 
-- [ ] **Step 2: Run integration test against the disposable loopback database and verify RED**
+- [x] **Step 2: Run integration test against the disposable loopback database and verify RED**
 
 Run: `pnpm exec vitest run tests/integration/ad-create-edit-mysql.test.ts --maxWorkers=1`
 
 Expected: the new assertions expose any missing invariant without touching production.
 
-- [ ] **Step 3: Implement the smallest fixes and extend Playwright across 360, 390, 412, 768, 1024, and 1440**
+- [x] **Step 3: Implement the smallest fixes and extend Playwright across 360, 390, 412, 768, 1024, and 1440**
 
 The browser run must cover login/logout, create/edit/search/details and admin access using synthetic accounts only. External requests are aborted and payments/supplier orders remain disabled.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/preview tests/integration .github/workflows/ci.yml src/app/ads src/components/ad-form.tsx
@@ -211,7 +211,7 @@ git commit -m "تثبيت مسارات الدخول وإنشاء وتعديل ا
 - Create: `tests/unit/preproduction-security.test.ts`
 - Modify: `tests/preview/browser.cjs`
 
-- [ ] **Step 1: Write failing tests for preview noindex and guard invariants**
+- [x] **Step 1: Write failing tests for preview noindex and guard invariants**
 
 ```ts
 expect(previewHeaders.get('X-Robots-Tag')).toBe('noindex, nofollow, noarchive');
@@ -219,11 +219,11 @@ expect(readOnlyPreviewResponse('POST', '/ads/new')?.status).toBe(405);
 expect(publicErrorText).not.toMatch(/DATABASE_URL|PrismaClient|at .*src\//);
 ```
 
-- [ ] **Step 2: Verify RED, add preview-only noindex and public-route checks, then verify GREEN**
+- [x] **Step 2: Verify RED, add preview-only noindex and public-route checks, then verify GREEN**
 
 Run: `pnpm exec vitest run tests/unit/live-readonly-preview.test.ts tests/unit/preproduction-security.test.ts`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/middleware.ts src/app/robots.ts src/app/sitemap.ts src/app/site-map tests/unit tests/preview/browser.cjs
@@ -240,7 +240,7 @@ git commit -m "تقوية أمان المعاينة وصفحاتها العام�
 - Modify: `src/app/guide/store/page.tsx`
 - Modify: `src/app/admin/guide/page.tsx`
 
-- [ ] **Step 1: Add safe audit execution to the read-only preview workflow**
+- [x] **Step 1: Add safe audit execution to the read-only preview workflow**
 
 ```bash
 docker exec "$container" node scripts/release/audit-live-ad-quality.cjs --json > /tmp/ad-quality.json
@@ -248,7 +248,7 @@ docker exec "$container" node scripts/release/audit-live-ad-quality.cjs --json >
 
 The workflow verifies grants are read-only before running the audit and never runs migrations or seeds in live-readonly mode.
 
-- [ ] **Step 2: Run all gates**
+- [x] **Step 2: Run all gates**
 
 Run:
 
@@ -262,7 +262,7 @@ pnpm build
 
 Expected: exit code 0 for every command; lint may retain only documented pre-existing warnings.
 
-- [ ] **Step 3: Push branch, wait for CI, deploy preview only, and run browser/audit checks**
+- [x] **Step 3: Push branch, wait for CI, deploy preview only, and run browser/audit checks**
 
 ```bash
 git push origin codex/trbhh-platform-enhancement-20260929
@@ -271,11 +271,11 @@ gh workflow run deploy-staging.yml --ref codex/trbhh-platform-enhancement-202609
 
 Expected: preview returns HTTP 200, `X-Trbhh-Preview-Mode: read-only`, `X-Robots-Tag: noindex, nofollow, noarchive`, and no write-capable DB grants.
 
-- [ ] **Step 4: Record exact counts and classify release gate**
+- [x] **Step 4: Record exact counts and classify release gate**
 
 The report records main/sub/leaf counts, tested leaf count, audit classifications, P0/P1/P2/P3, test/account scenarios, commits, deployment order, backup, smoke test, and rollback. `READY FOR PRODUCTION` is allowed only when P0=0 and P1=0.
 
-- [ ] **Step 5: Final cleanup commit**
+- [x] **Step 5: Final cleanup commit**
 
 ```bash
 git add docs دليل-المطور.md src/app/guide src/app/admin/guide .github/workflows/deploy-staging.yml

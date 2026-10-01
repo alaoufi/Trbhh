@@ -8,7 +8,7 @@
  *
  * Accounts: preview (member) and preview-store (merchant), same supplied password.
  * Both are ordinary members. No administrator, financial transaction, message,
- * notification, external contact detail, payment credential or MFA secret is seeded.
+ * notification, real external contact detail, payment credential or MFA secret is seeded.
  * Images use the repository's own public/placeholder-ad.svg; no media is fetched.
  * Re-runs only recognize this exact seed marker and make no changes.
  */
@@ -18,7 +18,7 @@ import { randomUUID } from 'node:crypto';
 
 const DATABASE = 'trbhh_preview_audit';
 const MARKER = 'preview_audit_seed';
-const VERSION = '2026-10-01-location-v2';
+const VERSION = '2026-10-02-location-contact-v3';
 const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', 'preview-db']);
 const DAY = 86_400_000;
 
@@ -76,6 +76,7 @@ async function seed() {
         site_share_title: 'تربح — معاينة مستقلة ببيانات تجريبية',
         site_share_desc: 'هذه نسخة معاينة مستقلة؛ جميع الحسابات والإعلانات والأسعار والإحصاءات تجريبية.',
         home_discovery_on: '1', search_price_filter_on: '1', ad_mobile_contact_on: '1',
+        seller_whatsapp_on: '1',
         store_landing_on: '1', store_onboarding_on: '1',
         home_discovery_title: 'تربح — معاينة تجريبية',
         home_discovery_subtitle: 'جرّب التصميم والبحث والمتاجر. جميع البيانات هنا تجريبية وليست عروضًا للبيع.',
@@ -111,11 +112,13 @@ async function seed() {
         { id: 5n, name: 'المدينة المنورة', city_id: 3 }, { id: 6n, name: 'الخبر', city_id: 5 },
       ] });
       await db.users.createMany({ data: [
-        { id: member, userName: 'preview', name: 'عضو المعاينة', email: 'member@example.test', city_id: 1n },
-        { id: merchant, userName: 'preview-store', name: 'تاجر المعاينة', email: 'merchant@example.test', city_id: 2n },
+        { id: member, userName: 'preview', name: 'عضو المعاينة', email: 'member@example.test', city_id: 1n,
+          phoneNumber: '0500000001', phone_whatsapp: '0500000001' },
+        { id: merchant, userName: 'preview-store', name: 'تاجر المعاينة', email: 'merchant@example.test', city_id: 2n,
+          phoneNumber: '0500000002', phone_whatsapp: '0500000002' },
       ].map((user) => ({ ...user, password: hash, type: 'user', is_admin: 0, country_id: 1,
         auth_session_version: randomUUID(), created_at: before(90), updated_at: now,
-        allow_phone: 0, whatsapp: 0, phoneNumber: null, balance: 0, balance_halala: 0,
+        allow_phone: 0, whatsapp: 1, balance: 0, balance_halala: 0,
       })) });
       await db.stores.createMany({ data: [
         { id: 1n, user_id: Number(merchant), store_name: 'متجر المعاينة', handle: 'preview-shop',

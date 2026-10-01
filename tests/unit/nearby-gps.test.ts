@@ -22,8 +22,16 @@ describe('nearby advertisements by precise coordinates', () => {
     const route = readFileSync(resolve(process.cwd(), 'src/app/api/nearby/route.ts'), 'utf8');
     expect(page).toContain('NearbyGpsResults');
     expect(client).toContain('عرض الأقرب لموقعي');
+    expect(client).toContain('اضغط الزر لإظهار المسافة بالكيلومتر');
     expect(client).toContain('requestCurrentCoordinates');
     expect(route).toContain('getNearbyAdsByCoordinates');
     expect(route).not.toMatch(/NextResponse\.json\([^)]*(lat|lng)/);
+  });
+
+  it('keeps the isolated preview seller contactable through WhatsApp', () => {
+    const seed = readFileSync(resolve(process.cwd(), 'scripts/preview/seed.mjs'), 'utf8');
+    expect(seed).toContain("seller_whatsapp_on: '1'");
+    expect(seed).toMatch(/phone_whatsapp:\s*'0500000001'/);
+    expect(seed).toMatch(/whatsapp:\s*1/);
   });
 });

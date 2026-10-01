@@ -67,7 +67,7 @@ export function NearbyGpsResults() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 id="gps-nearby-heading" className="flex items-center gap-2 text-sm font-extrabold text-primary"><Navigation className="h-4 w-4" /> الأقرب إلى موقعك الفعلي</h2>
-          <p className="mt-1 text-xs text-muted-foreground">اختياري؛ يستخدم موقعك لهذه الجلسة ولا يحفظه في حسابك.</p>
+          <p className="mt-1 text-xs text-muted-foreground">اضغط الزر لإظهار المسافة بالكيلومتر. موقعك اختياري ويُستخدم لهذه الجلسة فقط ولا يُحفظ في حسابك.</p>
         </div>
         <button type="button" onClick={enableNearby} disabled={busy} className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
           {busy ? 'جارٍ التحديد…' : items ? 'تحديث موقعي' : 'عرض الأقرب لموقعي'}

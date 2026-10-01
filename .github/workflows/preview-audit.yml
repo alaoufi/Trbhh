@@ -3,6 +3,7 @@ on:
   push:
     branches: [codex/trbhh-audit-fixes-20260910]
     paths: ['scripts/preview/**', '.github/workflows/preview-audit.yml']
+  workflow_dispatch:
 permissions:
   contents: read
   actions: read
@@ -11,6 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   preview:
+    if: github.ref == 'refs/heads/codex/trbhh-audit-fixes-20260910' || github.ref == 'refs/heads/codex/trbhh-platform-enhancement-20260929'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     services:

@@ -18,7 +18,7 @@ import { randomUUID } from 'node:crypto';
 
 const DATABASE = 'trbhh_preview_audit';
 const MARKER = 'preview_audit_seed';
-const VERSION = '2026-09-10-v1';
+const VERSION = '2026-10-01-location-v2';
 const ALLOWED_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', 'preview-db']);
 const DAY = 86_400_000;
 
@@ -141,7 +141,7 @@ async function seed() {
         { id: 1005n, user_id: merchant, type: 'store', store_id: 3n, name: 'متجر قيد المراجعة — معاينة', status: 1 },
       ] });
       const fixtures = [
-        { id: 101n, title: 'كنبة عصرية بحالة ممتازة — تجريبي', price: 1450, old_price: 1800, city_id: 1n, area_id: 1 },
+        { id: 101n, title: 'كنبة عصرية بحالة ممتازة — تجريبي', price: 1450, old_price: 1800, city_id: 1n, area_id: 1, lat: '24.713612', lng: '46.675312' },
         { id: 102n, title: 'كرسي مكتب مريح — تجريبي', price: 320, city_id: 1n, area_id: 2 },
         { id: 103n, title: 'معدات تخييم للإيجار اليومي — تجريبي', price: 120, price_type: 'rent', rent_period: 'يومي', city_id: 2n, area_id: 3 },
         { id: 104n, title: 'مطلوب طاولة مكتب — تجريبي', price: 0, adsType: 'request', city_id: 3n, area_id: 5 },
@@ -165,6 +165,7 @@ async function seed() {
           video_path: '', phoneAllow: 0, commentAllow: 0, price_type: 'fixed',
           created_at: before(index / 3), updated_at: now, ...ad };
       }) });
+      await db.ad_location_privacy.create({ data: { ad_id: 101n, show_exact_location_publicly: 1 } });
       await db.uploads.createMany({ data: fixtures.map((ad) => ({ id: ad.id,
         file_original_name: 'preview-placeholder.svg', file_name: '/placeholder-ad.svg', extension: 'svg', type: 'image',
         user_id: Number(ad.id >= 201n && ad.id <= 204n ? merchant : member), created_at: now, updated_at: now })) });

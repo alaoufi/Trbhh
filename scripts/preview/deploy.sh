@@ -27,6 +27,19 @@ else
   docker compose -p trbhh-preview-audit -f compose.yml exec -T preview-db \
     sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" mysqldump --no-tablespaces -upreview trbhh_preview_audit' \
     > "backups/$stamp.sql"
+
+  # This stack contains synthetic preview data only. Refresh its dedicated DB
+  # from the reviewed bundle so the public preview and the E2E fixture are the
+  # same revision. The prior database is retained above as a rollback dump.
+  docker compose -p trbhh-preview-audit -f compose.yml down
+  db_volume=trbhh-preview-audit_preview-db
+  if docker volume inspect "$db_volume" >/dev/null 2>&1; then
+    [[ "$(docker volume inspect -f '{{ index .Labels "com.docker.compose.project" }}' "$db_volume")" == 'trbhh-preview-audit' ]] || exit 1
+    [[ "$(docker volume inspect -f '{{ index .Labels "com.docker.compose.volume" }}' "$db_volume")" == 'preview-db' ]] || exit 1
+    docker volume rm "$db_volume" >/dev/null
+  fi
+  cp "releases/$revision/preview.sql" bootstrap.sql
+  chmod 0644 bootstrap.sql
 fi
 sed -i '/^PREVIEW_REV=/d' .env
 printf 'PREVIEW_REV=%s\n' "$revision" >> .env

@@ -62,6 +62,46 @@ async function fillRequiredCategoryFields(page){
     await control.fill(`قيمة اختبار ${index+1}`);
   }
 }
+async function selectJobCategory(page){
+  const category=page.locator('select[name="taxonomy_group"]');
+  const subcategory=page.locator('select[name="subcategory_id"]');
+  await category.waitFor({state:'visible'});
+  const categoryValue=await category.locator('option').evaluateAll(options=>options.find(option=>option.textContent.includes('وظائف'))?.value||'');
+  assert(categoryValue,'jobs category exists');
+  await category.selectOption(categoryValue);
+  const leafValue=await subcategory.locator('option').evaluateAll(options=>options.find(option=>option.value)?.value||'');
+  assert(leafValue,'job leaf exists');
+  await subcategory.selectOption(leafValue);
+  return {category,subcategory,categoryValue,leafValue};
+}
+async function fillJobAd(page,{title,detail}){
+  const selected=await selectJobCategory(page);
+  assert.equal(await page.locator('[name="price"]').count(),0);
+  assert.equal(await page.locator('[name="condition"]').count(),0);
+  assert.equal(await page.locator('#category-field-job_title').count(),1);
+  await page.locator('[name="title"]').fill(title);
+  await page.locator('[name="detail"]').fill(detail);
+  await fillRequiredCategoryFields(page);
+  await page.locator('#category-field-job_title').fill('محاسب اختبار');
+  await page.locator('[name="phone"]').fill('0500000002');
+  await page.locator('[name="pledge"]').check();
+  return selected;
+}
+async function publishCurrentAd(page){
+  await page.getByRole('button',{name:'نشر الإعلان',exact:true}).click();
+  await page.waitForURL(url=>url.pathname==='/'&&/^\d+$/.test(url.searchParams.get('published')||''),{timeout:30000});
+  const adId=new URL(page.url()).searchParams.get('published');
+  assert(adId,'created ad id');
+  return adId;
+}
+async function deleteOwnedAd(page,adId,title){
+  await page.goto(origin+`/ads/${adId}`);
+  const deleteForm=page.locator(`form:has(input[name="adId"][value="${adId}"])`).filter({has:page.getByRole('button',{name:/حذف/})}).first();
+  await deleteForm.getByRole('button',{name:/حذف/}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'موافق',exact:true}).click();
+  await page.waitForURL(url=>url.pathname==='/account/ads',{timeout:30000});
+  assert.equal(await page.getByText(title,{exact:true}).count(),0);
+}
 async function reviewSchemaFamilyForm(page,journey){
   await page.goto(origin+'/ads/new');
   const category=page.locator('select[name="taxonomy_group"]'),subcategory=page.locator('select[name="subcategory_id"]');
@@ -171,6 +211,8 @@ async function run(){
         if(mode==='denied')return error({code:1});
         if(mode==='unavailable')return error({code:2});
         if(mode==='timeout')return error({code:3});
+        if(mode==='visitor')return success({coords:{latitude:24.774265,longitude:46.738586}});
+        if(mode==='updated')return success({coords:{latitude:24.700000,longitude:46.600000}});
         success({coords:{latitude:24.713612,longitude:46.675312}});
       }}});
     });
@@ -184,80 +226,139 @@ async function run(){
     await page.waitForURL(u=>u.pathname===(role==='admin'?'/admin/categories':'/ads/new'),{timeout:30000});
     if(role==='member'){
       assert.equal(await page.evaluate(()=>window.__geoCalls),0,'geolocation is not requested on page load');
+      await page.goto(origin+'/');
+      assert.equal(await page.evaluate(()=>window.__geoCalls),0,'homepage never requests geolocation automatically');
+      await page.screenshot({path:path.join(artifacts,'location-home-no-prompt-desktop.png'),fullPage:true});
+      await page.goto(origin+'/ads/new');
+      await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','unavailable'));
+      await page.getByRole('button',{name:'استخدام موقعي الحالي',exact:true}).click();
+      await page.getByText(/تعذر تحديد موقعك/).waitFor({state:'visible'});
       await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','denied'));
       await page.getByRole('button',{name:'استخدام موقعي الحالي',exact:true}).click();
       await page.getByText(/لم تسمح بمشاركة الموقع/).waitFor({state:'visible'});
+
+      const unique=Date.now();
+      const noGpsTitle=`إعلان بلا موقع دقيق ${unique}`;
+      await fillJobAd(page,{title:noGpsTitle,detail:'إعلان اصطناعي معزول يثبت أن رفض GPS لا يمنع النشر وأن الإحداثيات اختيارية.'});
+      const noGpsAdId=await publishCurrentAd(page);
+      await page.goto(origin+`/ads/${noGpsAdId}`);
+      await page.getByText(noGpsTitle,{exact:true}).first().waitFor({state:'visible'});
+      assert.equal(await page.getByText('موقع الإعلان',{exact:true}).count(),0,'ad without GPS has no location controls');
+      assert.equal(await page.getByRole('link',{name:'الاتجاهات إلى الموقع',exact:true}).count(),0,'ad without GPS has no directions');
+      await page.screenshot({path:path.join(artifacts,'location-create-without-gps.png'),fullPage:true});
+      console.log(JSON.stringify({journey:'location-create-without-gps',status:'passed',adId:noGpsAdId,permissionDenied:'passed',positionUnavailable:'passed'}));
+
+      await page.goto(origin+'/ads/new');
+      assert.equal(await page.evaluate(()=>window.__geoCalls),2,'new form does not request GPS automatically after earlier failures');
       await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','success'));
       await page.getByRole('button',{name:'استخدام موقعي الحالي',exact:true}).click();
       await page.getByText(/تم تحديد الموقع/).waitFor({state:'visible'});
+      assert.equal(await page.locator('input[name="lat"]').inputValue(),'24.713612');
+      assert.equal(await page.locator('input[name="lng"]').inputValue(),'46.675312');
       await page.locator('input[name="show_exact_location_publicly"]').check();
       assert.equal((await page.locator('body').innerText()).includes('24.713612'),false,'raw latitude is not displayed');
-      const cat=page.locator('select[name="taxonomy_group"]');
-      const sub=page.locator('select[name="subcategory_id"]');
-      await cat.waitFor({state:'visible'});
-      const jobs=await cat.locator('option').evaluateAll(os=>os.find(o=>o.textContent.includes('وظائف'))?.value);
-      assert(jobs,'jobs category exists');await cat.selectOption(jobs);
-      const job=await sub.locator('option').evaluateAll(os=>os.find(o=>o.value)?.value);
-      await sub.selectOption(job);
-      assert.equal(await page.locator('[name="price"]').count(),0);
-      assert.equal(await page.locator('[name="condition"]').count(),0);
-      assert.equal(await page.locator('#category-field-job_title').count(),1);
+      await page.getByRole('button',{name:'تحديد المنطقة والمدينة',exact:true}).click();
+      const region=page.locator('select[name="city_id"]');
+      const regionValue=await region.locator('option').evaluateAll(options=>options.find(option=>option.value&&option.textContent.includes('الرياض'))?.value||options.find(option=>option.value)?.value||'');
+      await region.selectOption(regionValue);
+      const cityPicker=page.locator('input[name="area_id"]').locator('..');
+      await cityPicker.locator('button').first().click();
+      await cityPicker.locator('button').nth(1).click();
       await page.screenshot({path:path.join(artifacts,'job-form-desktop.png'),fullPage:true});
-      const unique=Date.now();
       const createdTitle=`وظيفة محاسب اختبار شامل ${unique}`;
       const editedTitle=`${createdTitle} محدث`;
-      await page.locator('[name="title"]').fill(createdTitle);
-      await page.locator('[name="detail"]').fill('إعلان اصطناعي معزول لاختبار رحلة الإنشاء والتفاصيل والتعديل والبحث والحذف دون المساس بأي بيانات حقيقية.');
-      await fillRequiredCategoryFields(page);
-      await page.locator('#category-field-job_title').fill('محاسب اختبار');
-      await page.locator('[name="phone"]').fill('0500000002');
-      await page.locator('[name="pledge"]').check();
-      await page.getByRole('button',{name:'نشر الإعلان',exact:true}).click();
-      await page.waitForURL(u=>u.pathname==='/'&&/^\d+$/.test(u.searchParams.get('published')||''),{timeout:30000});
-      const adId=new URL(page.url()).searchParams.get('published');
-      assert(adId,'created ad id');
-      console.log(JSON.stringify({journey:'create-ad',status:'passed',adId}));
+      const {categoryValue:jobs,leafValue:job}=await fillJobAd(page,{title:createdTitle,detail:'إعلان اصطناعي معزول لاختبار رحلة الموقع الكاملة دون المساس بأي بيانات حقيقية.'});
+      const adId=await publishCurrentAd(page);
+      console.log(JSON.stringify({journey:'location-create-with-gps',status:'passed',adId,latitude:'saved',longitude:'saved'}));
       await page.goto(origin+`/ads/${adId}`);
       await page.getByText(createdTitle,{exact:true}).first().waitFor({state:'visible'});
-      await page.getByRole('link',{name:'الاتجاهات إلى الموقع',exact:true}).waitFor({state:'visible'});
+      const directions=page.getByRole('link',{name:'الاتجاهات إلى الموقع',exact:true});
+      await directions.waitFor({state:'visible'});
+      const directionsUrl=new URL(await directions.getAttribute('href'));
+      assert.equal(directionsUrl.hostname,'www.google.com');
+      assert.equal(directionsUrl.searchParams.get('destination'),'24.713612,46.675312');
+      const detailsText=await page.locator('body').innerText();
+      assert(!detailsText.includes('24.713612')&&!detailsText.includes('46.675312'),'details UI does not display raw coordinates');
+      const callsBeforeDistance=await page.evaluate(()=>window.__geoCalls);
+      assert.equal(callsBeforeDistance,3,'details do not request visitor GPS automatically');
+      await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','denied'));
       await page.getByRole('button',{name:'احسب المسافة',exact:true}).click();
-      await page.getByText(/يبعد عنك تقريبًا/).waitFor({state:'visible'});
-      await page.screenshot({path:path.join(artifacts,'synthetic-ad-details.png'),fullPage:true});
+      await page.getByText(/لم تسمح بمشاركة الموقع/).waitFor({state:'visible'});
+      assert.equal((await page.locator('body').innerText()).includes('0 كم'),false,'denied visitor never receives a fake zero distance');
+      await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','visitor'));
+      await page.getByRole('button',{name:'احسب المسافة',exact:true}).click();
+      await page.getByText('يبعد عنك تقريبًا 9.3 كم',{exact:true}).waitFor({state:'visible'});
+      assert.equal(await page.evaluate(()=>window.__geoCalls),callsBeforeDistance+2,'GPS is requested only for explicit distance actions');
+      for(const width of [360,390,412,1280]){
+        await page.setViewportSize({width,height:width<768?844:900});
+        assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`location details ${width}px overflow`);
+        await page.screenshot({path:path.join(artifacts,`location-details-${width}.png`),fullPage:true});
+      }
       await assertResponsive(page,'ad details');
-      console.log(JSON.stringify({journey:'ad-details',status:'passed',adId}));
+      console.log(JSON.stringify({journey:'location-details',status:'passed',adId,haversineKm:9.290582150657464,displayed:'9.3 كم',directionsDestination:'24.713612,46.675312'}));
+
       const callsBeforeEdit=await page.evaluate(()=>window.__geoCalls);
       await page.goto(origin+`/ads/${adId}/edit`);
       await assertResponsive(page,'edit ad');
       await page.getByText(/يوجد موقع محدد لهذا الإعلان/).waitFor({state:'visible'});
       assert.equal(await page.evaluate(()=>window.__geoCalls),callsBeforeEdit,'edit does not request geolocation automatically');
-      await page.getByRole('button',{name:'إزالة الموقع الدقيق',exact:true}).click();
       await page.locator('[name="title"]').fill(editedTitle);
-      await page.locator('[name="detail"]').fill('تم تعديل الإعلان الاصطناعي داخل قاعدة الاختبار المعزولة للتحقق من دورة الحياة كاملة.');
       await page.locator('[name="pledge"]').check();
       await page.getByRole('button',{name:'حفظ التعديلات',exact:true}).click();
       await page.waitForURL(u=>u.pathname===`/ads/${adId}`,{timeout:30000});
       await page.getByText(editedTitle,{exact:true}).first().waitFor({state:'visible'});
+      await page.getByRole('link',{name:'الاتجاهات إلى الموقع',exact:true}).waitFor({state:'visible'});
+
+      await page.goto(origin+`/ads/${adId}/edit`);
+      await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','updated'));
+      await page.getByRole('button',{name:'تحديث موقعي الحالي',exact:true}).click();
+      await page.getByText(/تم تحديث الموقع/).waitFor({state:'visible'});
+      assert.equal(await page.locator('input[name="lat"]').inputValue(),'24.700000');
+      assert.equal(await page.locator('input[name="lng"]').inputValue(),'46.600000');
+      await page.locator('input[name="show_exact_location_publicly"]').uncheck();
+      await page.locator('[name="pledge"]').check();
+      await page.getByRole('button',{name:'حفظ التعديلات',exact:true}).click();
+      await page.waitForURL(u=>u.pathname===`/ads/${adId}`,{timeout:30000});
+      assert.equal(await page.getByRole('link',{name:'الاتجاهات إلى الموقع',exact:true}).count(),0,'directions are hidden without advertiser consent');
+      await page.getByText(/يبعد عنك تقريبًا/).waitFor({state:'visible'});
+      assert(!(await page.locator('body').innerText()).includes('24.700000'),'updated raw coordinates are not displayed');
+
+      const callsBeforeNearby=await page.evaluate(()=>window.__geoCalls);
+      await page.goto(origin+'/nearby');
+      const gpsNearby=page.locator('section[aria-labelledby="gps-nearby-heading"]');
+      await gpsNearby.getByText(editedTitle,{exact:true}).waitFor({state:'visible'});
+      assert.equal(await page.evaluate(()=>window.__geoCalls),callsBeforeNearby,'Nearby reuses session coordinates without another browser prompt');
+      assert.equal(await gpsNearby.getByText(noGpsTitle,{exact:true}).count(),0,'ad without coordinates has no fake nearby distance');
+      assert.equal(await gpsNearby.getByText('وظيفة محاسب — إعلان اختبار محلي',{exact:true}).count(),0,'legacy untrusted location is excluded from precise ranking');
+      assert((await gpsNearby.getByText(/يبعد عنك تقريبًا/).count())>0,'ranked GPS ad has a real distance');
+      await page.screenshot({path:path.join(artifacts,'location-nearby-session-reuse.png'),fullPage:true});
+
+      await page.goto(origin+`/ads/${adId}/edit`);
+      await page.getByRole('button',{name:'إزالة الموقع الدقيق',exact:true}).click();
+      await page.locator('[name="pledge"]').check();
+      await page.getByRole('button',{name:'حفظ التعديلات',exact:true}).click();
+      await page.waitForURL(u=>u.pathname===`/ads/${adId}`,{timeout:30000});
       assert.equal(await page.getByText('موقع الإعلان',{exact:true}).count(),0,'removed exact location is absent from details');
-      console.log(JSON.stringify({journey:'edit-ad',status:'passed',adId}));
+      console.log(JSON.stringify({journey:'location-edit',status:'passed',adId,keep:'passed',update:'passed',remove:'passed',automaticPrompt:false}));
+
       const jobSearchParams=new URLSearchParams({q:editedTitle,category:jobs,subcategory:job});
       await page.goto(origin+'/search?'+jobSearchParams.toString());
       await page.getByText(editedTitle,{exact:true}).first().waitFor({state:'visible'});
       assert.equal(await page.locator('select[name="category"]').inputValue(),jobs);
       assert.equal(await page.locator('select[name="subcategory"]').inputValue(),job);
       console.log(JSON.stringify({journey:'search-ad',status:'passed',adId}));
-      await page.goto(origin+`/ads/${adId}`);
-      const deleteForm=page.locator(`form:has(input[name="adId"][value="${adId}"])`).filter({has:page.getByRole('button',{name:/حذف/})}).first();
-      await deleteForm.getByRole('button',{name:/حذف/}).click();
-      await page.getByRole('dialog').getByRole('button',{name:'موافق',exact:true}).click();
-      await page.waitForURL(u=>u.pathname==='/account/ads',{timeout:30000});
-      assert.equal(await page.getByText(editedTitle,{exact:true}).count(),0);
+      await deleteOwnedAd(page,adId,editedTitle);
+      await deleteOwnedAd(page,noGpsAdId,noGpsTitle);
       await assertResponsive(page,'account ads');
-      console.log(JSON.stringify({journey:'delete-ad',status:'passed',adId}));
+      console.log(JSON.stringify({journey:'delete-location-test-ads',status:'passed',adIds:[adId,noGpsAdId]}));
       await page.goto(origin+'/ads/new');
       await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','timeout'));
       await page.getByRole('button',{name:'استخدام موقعي الحالي',exact:true}).click();
       await page.getByText(/مهلة تحديد الموقع/).waitFor({state:'visible'});
       assert.equal(await page.locator('[name="title"]').count(),1,'timeout does not block the create form');
+      console.log(JSON.stringify({journey:'location-errors',status:'passed',permissionDenied:'passed',positionUnavailable:'passed',timeout:'passed'}));
+      const cat=page.locator('select[name="taxonomy_group"]');
+      const sub=page.locator('select[name="subcategory_id"]');
       await cat.waitFor({state:'visible'});
       const property=await cat.locator('option').evaluateAll(os=>os.find(o=>o.textContent.includes('عقار'))?.value);
       await cat.selectOption(property);

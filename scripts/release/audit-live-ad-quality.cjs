@@ -104,6 +104,13 @@ function searchVisibilityBreakdown(rows,{plans,subscriptions,now}){
   return {activeBase:rows.length,searchVisible:visible,excluded};
 }
 
+function buildCountAlignment(rows,{plans,subscriptions,now}){
+  return {
+    previewRuntime:searchVisibilityBreakdown(rows,{plans:[],subscriptions:[],now}),
+    configuredPackagePolicySimulation:searchVisibilityBreakdown(rows,{plans,subscriptions,now}),
+  };
+}
+
 function buildSchemaReport(rows,manifest){
   const templates=new Map((manifest.templates||[]).map(template=>[pathKey(template.categoryName,template.name),template]));
   const reviews=new Map((manifest.qualityReviews||[]).map(review=>[review.key,review]));
@@ -165,10 +172,10 @@ async function main(){
     report.publicSummary=summarize(activeBase,duplicates).summary;
     report.taxonomy={mainCategories:Number(mainCategories[0]?.count||0),subcategories:Number(subcategories[0]?.count||0),leafCategories:Number(leafDefinitions[0]?.count||0)};
     report.schema=buildSchemaReport(leafRows,manifest);
-    report.countAlignment=searchVisibilityBreakdown(activeBase,{plans,subscriptions,now});
+    report.countAlignment=buildCountAlignment(activeBase,{plans,subscriptions,now});
     report.autoFixPlan=report.records.filter(record=>record.issues.some(issue=>issue.classification==='AUTO_FIX_SAFE')).map(record=>({adId:record.id,action:'category_remap_requires_separate_write_approval'}));
     process.stdout.write(JSON.stringify(report));
   }finally{await db.$disconnect();}
 }
 if(require.main===module)main().catch(error=>{console.error(error?.message||String(error));process.exitCode=1;});
-module.exports={auditRow,summarize,classifySubcategoryReason,searchVisibilityBreakdown,buildSchemaReport,publicFieldTrust,isActiveRow};
+module.exports={auditRow,summarize,classifySubcategoryReason,searchVisibilityBreakdown,buildCountAlignment,buildSchemaReport,publicFieldTrust,isActiveRow};

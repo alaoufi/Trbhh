@@ -34,6 +34,10 @@ describe('live read-only ad quality report',()=>{
       {id:4n,user_id:3n,created_at:new Date('2026-08-01'),adsSpecial:'checked',expires_at:new Date('2026-10-02'),urgent_until:null,ban:''},
     ];
     expect(audit.searchVisibilityBreakdown(rows,{plans:[{id:1,ad_days:30,is_default:1,price:0}],subscriptions:[],now})).toEqual({activeBase:4,searchVisible:2,excluded:{banned_seller:1,package_age:1}});
+    expect(audit.buildCountAlignment(rows,{plans:[{id:1,ad_days:30,is_default:1,price:0}],subscriptions:[],now})).toEqual({
+      previewRuntime:{activeBase:4,searchVisible:3,excluded:{banned_seller:1,package_age:0}},
+      configuredPackagePolicySimulation:{activeBase:4,searchVisible:2,excluded:{banned_seller:1,package_age:1}},
+    });
   });
 
   it('reports a source and review state for every live leaf without an unknown generic fallback',()=>{

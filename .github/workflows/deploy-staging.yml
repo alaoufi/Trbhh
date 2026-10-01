@@ -245,7 +245,21 @@ jobs:
 
           container=$(docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps -q app)
           test -n "$container"
-          test "$(docker inspect -f '{{.State.Running}}' "$container")" = true
+          wait_for_preview_container() {
+            state=false
+            for attempt in $(seq 1 30); do
+              state=$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || true)
+              if [[ "$state" == true ]]; then
+                printf 'previewContainerReady=running attempt=%s\n' "$attempt"
+                return 0
+              fi
+              sleep 2
+            done
+            docker logs --tail 100 "$container" >&2 || true
+            printf 'previewContainerReady=%s failed\n' "$state" >&2
+            return 1
+          }
+          wait_for_preview_container
           published_ports=$(docker port "$container" 3000)
           printf 'previewDockerPorts=%s\n' "$(printf '%s' "$published_ports" | tr '\n' ' ')"
           printf '%s\n' "$published_ports" | grep -Fx '0.0.0.0:3081'

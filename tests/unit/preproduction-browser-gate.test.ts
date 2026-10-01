@@ -46,6 +46,8 @@ describe('isolated pre-production browser gate', () => {
     expect(deploy).toContain("'/search' '/deals' '/nearby' '/companies' '/shop' '/guide' '/site-map'");
     expect(deploy).toContain('previewRecentLogs=clean');
     expect(deploy).toContain('wait_for_preview_200');
+    expect(deploy).toContain('wait_for_preview_container');
+    expect(deploy).toContain('previewContainerReady=running');
     expect(deploy).toContain('previewHttpReady=');
   });
 

@@ -47,7 +47,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # schema kept for reference / optional CLI use
 COPY --from=builder /app/prisma ./prisma
 # Kept in the runtime image for the idempotent, admin-only dynamic-ads lab bootstrap.
-COPY --from=builder /app/database ./database
+COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/release/seed-staging-categories.cjs ./scripts/release/seed-staging-categories.cjs
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/release/audit-live-ad-quality.cjs ./scripts/release/audit-live-ad-quality.cjs
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/release/category-seeds.json ./scripts/release/category-seeds.json

@@ -15,6 +15,7 @@ describe('isolated pre-production browser gate', () => {
     expect(setup).toContain("COMMERCE_PREVIEW_FIXTURE !== '1'");
     expect(setup).toContain("'commerce_receipts'");
     expect(setup).toContain('PREVIEW_SEEDED_AD_AGE_MS');
+    expect(dockerfile).toContain('COPY --from=builder --chown=nextjs:nodejs /app/database ./database');
     expect(dockerfile).toContain('COPY --from=builder --chown=nextjs:nodejs /app/scripts/release/audit-live-ad-quality.cjs');
     expect(dockerfile).toContain('activate-categories.cjs build > scripts/release/category-seeds.json');
     expect(dockerfile).toContain('/app/scripts/release/category-seeds.json ./scripts/release/category-seeds.json');

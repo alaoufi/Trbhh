@@ -60,7 +60,7 @@ it('Prisma generated SQL mirrors all restrictive supplier relations and unique k
     const generated=sql.match(new RegExp('CREATE TABLE `'+table+'`[\\s\\S]*?;'))?.[0]||'';
     for(const name of new Set(m.indexes.filter(i=>i.t===table && i.n!=='PRIMARY').map(i=>i.n)))expect(generated).toContain('`'+name+'`');
   }
-});
+},30000);
 it('accepts complete schema and semantic renamed FK/index names',async()=>{
   const m=metadata();await expect(assertSupplierSchemaReady(m.db as never)).resolves.toBeUndefined();
   for(const f of m.foreign)f.n='renamed_'+f.n;

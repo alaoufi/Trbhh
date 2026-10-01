@@ -47,8 +47,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 # Kept in the runtime image for the idempotent, admin-only dynamic-ads lab bootstrap.
 COPY --from=builder /app/database ./database
-COPY --from=builder /app/scripts/release/seed-staging-categories.cjs ./scripts/release/seed-staging-categories.cjs
-COPY --from=builder /app/scripts/release/audit-live-ad-quality.cjs ./scripts/release/audit-live-ad-quality.cjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/release/seed-staging-categories.cjs ./scripts/release/seed-staging-categories.cjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/release/audit-live-ad-quality.cjs ./scripts/release/audit-live-ad-quality.cjs
 
 # Writable, persistent upload dir owned by the runtime user. A named volume
 # mounted here inherits this ownership, so uploads (ad/classified/promo images)

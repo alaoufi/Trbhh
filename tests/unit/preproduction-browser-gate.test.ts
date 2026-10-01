@@ -5,6 +5,7 @@ const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
 const setup = readFileSync('tests/preview/setup.test.ts', 'utf8');
 const browser = readFileSync('tests/preview/browser.cjs', 'utf8');
 const vitestConfig = readFileSync('vitest.config.ts', 'utf8');
+const dockerfile = readFileSync('Dockerfile', 'utf8');
 
 describe('isolated pre-production browser gate', () => {
   it('keeps the synthetic fixture on the dedicated loopback database', () => {
@@ -14,6 +15,7 @@ describe('isolated pre-production browser gate', () => {
     expect(setup).toContain("COMMERCE_PREVIEW_FIXTURE !== '1'");
     expect(setup).toContain("'commerce_receipts'");
     expect(setup).toContain('PREVIEW_SEEDED_AD_AGE_MS');
+    expect(dockerfile).toContain('COPY --from=builder --chown=nextjs:nodejs /app/scripts/release/audit-live-ad-quality.cjs');
   });
 
   it('runs the browser journey in CI and keeps its screenshots', () => {

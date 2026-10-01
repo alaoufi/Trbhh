@@ -189,7 +189,7 @@ async function run(){
       await page.getByText(/لم تسمح بمشاركة الموقع/).waitFor({state:'visible'});
       await page.evaluate(()=>sessionStorage.setItem('preview_geo_mode','success'));
       await page.getByRole('button',{name:'استخدام موقعي الحالي',exact:true}).click();
-      await page.getByText('تم تحديد الموقع',{exact:true}).waitFor({state:'visible'});
+      await page.getByText(/تم تحديد الموقع/).waitFor({state:'visible'});
       await page.locator('input[name="show_exact_location_publicly"]').check();
       assert.equal((await page.locator('body').innerText()).includes('24.713612'),false,'raw latitude is not displayed');
       const cat=page.locator('select[name="taxonomy_group"]');

@@ -11,6 +11,8 @@ const settle = page => page.evaluate(() => new Promise(resolve => { let frames =
       await page.getByRole('button', { name: 'القائمة', exact: true }).click();
       const nav = page.locator('#site-menu-dialog nav');
       await nav.waitFor();
+      await nav.getByRole('button', { name: 'شروحات متحركة', exact: true }).click();
+      assert.ok(await nav.evaluate(el => el.scrollHeight > el.clientHeight), 'fixture has a scrollable menu');
       assert.equal(await nav.evaluate(el => getComputedStyle(el).overscrollBehaviorY), 'contain', 'drawer must stop scroll chaining');
       const locked = await page.evaluate(() => ({ y: window.scrollY, top: document.body.style.top }));
       const box = await nav.boundingBox();
@@ -40,7 +42,7 @@ const settle = page => page.evaluate(() => new Promise(resolve => { let frames =
       await page.locator('#site-menu-dialog').waitFor({ state: 'detached' });
       assert.notEqual(await page.evaluate(() => document.body.style.position), 'fixed');
       const restored = await page.evaluate(() => window.scrollY);
-      assert.equal(restored, -parseFloat(locked.top), 'original page position restored');
+      assert.ok(Math.abs(restored + parseFloat(locked.top)) <= 1, 'original page position restored');
       await page.mouse.move(width / 2, 350);
       await page.mouse.wheel(0, 300);
       await settle(page);

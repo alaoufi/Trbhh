@@ -1,11 +1,8 @@
 import Link from 'next/link';
 import { ChevronDown, MapPin, Search } from 'lucide-react';
-import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
 import { searchAds, countSearchAds, getCities, getAreas } from '@/lib/data';
 import { AdGrid } from '@/components/ad-card';
 import { SearchAreaPicker } from '@/components/search-area-picker';
-import { toInt } from '@/lib/utils';
 import { normalizeSaudiAreaSelection, positiveSearchId } from '@/lib/search-filters';
 import { AdminPager } from '@/components/admin-pager';
 import { NearbyGpsResults } from '@/components/nearby-gps-results';
@@ -20,17 +17,11 @@ export const metadata = publicPageMetadata({
 
 export default async function NearbyPage({ searchParams }: { searchParams: Promise<{ city?: string; area?: string; page?: string }> }) {
   const sp = await searchParams;
-  const session = await getSession();
   const [allCities, areas] = await Promise.all([getCities(), getAreas()]);
   const cities = allCities.filter((c) => c.countryId === 1); // السعودية فقط
 
-  // المنطقة المعروضة: من الرابط، وإلا منطقة العضو المسجّلة
-  let {cityId,areaId}=normalizeSaudiAreaSelection(cities,areas,sp.city,sp.area);
-  if (!cityId && session) {
-    const u = await prisma.users.findUnique({ where: { id: BigInt(session.uid) }, select: { city_id: true } }).catch(() => null);
-    const saved=u?.city_id?toInt(u.city_id):0;
-    cityId=cities.some(city=>city.id===saved)?saved:undefined;
-  }
+  // الاختيار من الرابط فقط؛ إحداثيات الزائر تبقى في جلسة المتصفح.
+  const {cityId,areaId}=normalizeSaudiAreaSelection(cities,areas,sp.city,sp.area);
   const region = cities.find((c) => c.id === cityId);
   const area = areas.find((a) => a.id === areaId && a.cityId === cityId);
   const pageSize=48;
@@ -65,7 +56,7 @@ export default async function NearbyPage({ searchParams }: { searchParams: Promi
       </details>
 
       {!cityId && (
-        <p className="py-10 text-center text-muted-foreground">اختر منطقتك بالأعلى لعرض إعلاناتها{session ? '' : ' — وسجّل الدخول ليتذكّر الموقع منطقتك تلقائياً'}.</p>
+        <p className="py-10 text-center text-muted-foreground">يمكنك اختيار المنطقة والمدينة من «بحث»، أو استخدام موقعك اختياريًا لعرض الأقرب. لا يلزم تسجيل الدخول أو مشاركة موقعك للتصفح.</p>
       )}
       {cityId && (
         <>

@@ -25,7 +25,7 @@ export async function getStores() {
       if (storeHiddenByBanState(owner?.ban, owner?.ban_until, owner?.ban_source, shieldOn)) return null;
       return {
         id: toInt(s.id),
-        name: owner?.name || owner?.userName || 'شركة',
+        name: s.store_name || owner?.name || owner?.userName || 'متجر',
         trusted: owner?.trusted === 1,
         description: s.description,
         address: s.address,

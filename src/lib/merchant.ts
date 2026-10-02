@@ -877,9 +877,14 @@ export async function decidePlatformRequest(storeId: number, approve: boolean) {
  *  independent of the products feed, which needs a separate approval).
  *  Cached briefly: each card is several queries and the home page is dynamic. */
 export async function homeStoreCards(limit = 12) {
+  const { getStores } = await import('./stores');
   const cards = await cached(`stores:cards:${limit}`, 120, () => loadHomeStoreCards(limit));
-  const visible = await visiblePlacementIds(cards.map((card) => card?.id ?? 0), false);
-  return cards.filter((card): card is NonNullable<typeof card> => card !== null && visible.has(card.id));
+  const [visible, directory] = await Promise.all([
+    visiblePlacementIds(cards.map((card) => card?.id ?? 0), false),
+    getStores(),
+  ]);
+  const directoryIds = new Set(directory.map(store => store.id));
+  return cards.filter((card): card is NonNullable<typeof card> => card !== null && visible.has(card.id) && directoryIds.has(card.id));
 }
 async function loadHomeStoreCards(limit: number) {
   await ensure();

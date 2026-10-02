@@ -2,7 +2,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { BadgeCheck, Store, MapPin } from 'lucide-react';
 import { getStores } from '@/lib/stores';
-import { approvedStoreIds } from '@/lib/merchant';
 import { getEmptyText } from '@/lib/settings';
 import { Breadcrumb } from '@/components/breadcrumb';
 import { publicPageMetadata } from '@/lib/public-metadata';
@@ -15,8 +14,7 @@ export const metadata = publicPageMetadata({
 });
 
 export default async function CompaniesPage() {
-  const [all, approved] = await Promise.all([getStores(), approvedStoreIds()]);
-  const stores = all.filter((s) => approved.has(s.id));
+  const stores = await getStores();
   const emptyStores = await getEmptyText('stores').catch(() => 'لا توجد متاجر معتمدة بعد.');
   return (
     <div className="space-y-4">

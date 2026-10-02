@@ -35,7 +35,7 @@ export function Footer() {
           </div>
         </div>
         <div className="mt-6 border-t border-white/15 pt-5 text-center text-xs text-white/60 md:mt-8 md:pt-6">
-          جميع الحقوق محفوظة لمنصة {SITE.name} © 2015
+          جميع الحقوق محفوظة لمنصة {SITE.name} © {new Date().getFullYear()}
         </div>
       </div>
     </footer>

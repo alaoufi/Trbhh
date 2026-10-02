@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+const directory=vi.hoisted(()=>({ids:[2]}));
+vi.mock('@/lib/stores',()=>({getStores:async()=>directory.ids.map(id=>({id}))}));
 const now = new Date('2026-09-10T12:00:00Z');
 const rows = [
   { id: 1n, status: 1, sub_until: new Date('2022-01-01'), home_featured: 1, show_on_platform: 1, show_until: null },
@@ -31,5 +33,9 @@ describe('cached public store eligibility', () => {
   it('rechecks the same gates for cached product cards', async () => {
     vi.useFakeTimers(); vi.setSystemTime(now);
     expect((await homeFeaturedAds()).map((ad) => ad.id)).toEqual([102]);
+  });
+  it('never returns a home card excluded by directory visibility, even from cache',async()=>{
+    directory.ids=[];
+    try{expect(await homeStoreCards()).toEqual([]);}finally{directory.ids=[2];}
   });
 });

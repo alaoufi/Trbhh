@@ -10,9 +10,9 @@ import {publicCategoryGroups} from '@/lib/home-feed';
 type Region = { id: number; name: string; countryId?: number };
 type Area = { id: number; name: string; cityId: number };
 
-export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, placeholder = 'ماذا تبحث عنه؟', compact = false,categoryConfig }: {
+export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, placeholder = 'ماذا تبحث عنه؟', compact = false,collapseFilters = true,categoryConfig }: {
   regions: Region[]; areas: Area[]; params?: Record<string, string | undefined>;
-  priceOn?: boolean; placeholder?: string; compact?: boolean;categoryConfig?:CategoryFormConfig;
+  priceOn?: boolean; placeholder?: string; compact?: boolean;collapseFilters?:boolean;categoryConfig?:CategoryFormConfig;
 }) {
   const field = 'h-11 min-w-0 w-full rounded-lg border bg-background px-3 text-sm text-foreground';
   const [advancedOpen,setAdvancedOpen]=useState(false);
@@ -73,7 +73,7 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
       <button type="submit" className="flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground hover:opacity-90"><Search className="h-4 w-4" /> بحث</button>
     </div>
     {params.special === '1' && <input name="special" type="hidden" value="1" />}
-    {compact ? <>
+    {compact && collapseFilters ? <>
       <button type="button" aria-expanded={advancedOpen} aria-controls={advancedId} onClick={()=>setAdvancedOpen(open=>!open)} className="flex min-h-11 items-center gap-2 rounded-lg border bg-background px-3 text-sm font-semibold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
         بحث متقدم<ChevronDown aria-hidden="true" className={`h-4 w-4 transition-transform duration-200 motion-reduce:transition-none ${advancedOpen?'rotate-180':''}`}/>
       </button>

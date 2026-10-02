@@ -171,16 +171,18 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
               slides={heroSlides}
             />
           </NationalDayHeroFrame>
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-extrabold text-[#16294a]">وش تبحث عنه اليوم؟</h2>
-              <Link href="/ads/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>
-            </div>
-             <PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.key }} priceOn={priceOn} placeholder={discoveryPlaceholder} compact />
-          </div>
         </section>
       )}
-      <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} visual />
+      <details data-home-search className="rounded-xl border border-slate-200 bg-white px-3 shadow-sm sm:px-4">
+        <summary className="cursor-pointer list-none py-3 text-lg font-extrabold text-[#16294a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">وش تبحث عنه اليوم؟</summary>
+        <div className="space-y-3 pb-3">
+          {discoveryOn && <>
+            <Link href="/ads/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>
+            <PublicSearchForm regions={cities} areas={areas} params={{ category: selectedCategory?.key }} priceOn={priceOn} placeholder={discoveryPlaceholder} compact collapseFilters={false} />
+          </>}
+          <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} visual />
+        </div>
+      </details>
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 

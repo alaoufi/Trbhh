@@ -20,3 +20,11 @@ it('keeps the full search page filters available',()=>{
   expect(html).not.toContain('aria-expanded=');
   for(const name of ['city','area','type','minPrice','maxPrice','sort'])expect(html).toContain(`name="${name}"`);
 });
+
+it('shows all filters together inside the homepage disclosure without a nested toggle',()=>{
+  const html=renderToStaticMarkup(createElement(PublicSearchForm,{compact:true,collapseFilters:false,regions:[],areas:[]}));
+  expect(html).not.toContain('aria-expanded=');
+  expect(html).not.toContain('inert=');
+  expect(html).not.toContain('name="sort"');
+  for(const name of ['q','city','area','type','minPrice','maxPrice'])expect(html).toContain(`name="${name}"`);
+});

@@ -100,11 +100,13 @@ it('keeps the discovery controls and homepage sections visually compact',async()
   expect(root?.props.className).toContain('space-y-4 sm:space-y-5');
   const discovery=tree.find(e=>e.props['aria-label']==='اكتشف سوق تربح');
   expect(discovery?.props.className).toContain('space-y-3');
-  const searchCard=tree.find(e=>typeof e.props.className==='string'&&e.props.className.includes('border-slate-200'));
-  expect(searchCard?.props.className).toContain('p-3');
-  expect(searchCard?.props.className).toContain('sm:p-4');
-  const searchHeadingRow=tree.find(e=>typeof e.props.className==='string'&&e.props.className.includes('flex-wrap items-center justify-between'));
-  expect(searchHeadingRow?.props.className).toContain('mb-2');
+  const searchCard=tree.find(e=>e.type==='details'&&e.props['data-home-search']!==undefined);
+  expect(searchCard).toBeDefined();
+  expect(searchCard?.props.open).toBeUndefined();
+  const children=elements(searchCard?.props.children);
+  expect(children.find(e=>e.type==='summary')?.props.children).toBe('وش تبحث عنه اليوم؟');
+  expect(children.find(e=>e.type===PublicSearchForm)?.props.collapseFilters).toBe(false);
+  expect(children.some(e=>typeof e.type==='function'&&e.type.name==='HomeCategoryNavigation')).toBe(true);
  } finally {flag.mockRestore();}
 });
 it.each([

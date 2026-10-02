@@ -10,7 +10,8 @@ candidate=3e88277b4851483cd9d42b9355a36b875894bfe6
 [[ "$(git -C /root/trbhh-staging rev-parse HEAD)" == "$candidate" ]]
 base=/root/trbhh-release-backups
 backup="$base/final-$run"
-[[ ! -L "$base" && ! -e "$backup" ]]
+[[ ! -L "$base" && ! -L "$backup" ]]
+if [[ ! -e "$backup" ]]; then
 mkdir -p "$base"
 mkdir "$backup"
 chmod 700 "$backup"
@@ -39,13 +40,24 @@ tar -czf "$backup/storage.tar.gz" -C "$storage" .
 gzip -t "$backup/storage.tar.gz" "$backup/runtime-config.tar.gz"
 (cd "$backup" && sha256sum database.sql storage.tar.gz runtime-config.tar.gz > SHA256SUMS && sha256sum --check --status SHA256SUMS)
 printf 'BACKUP_FILES_VERIFIED\n'
+else
+  [[ "$(cat "$backup/preview-sha.txt")" == "$candidate" ]]
+  image=$(cat "$backup/preview-image.txt")
+  [[ "$image" == "$(docker inspect -f '{{.Image}}' trbhh-staging-app)" ]]
+  [[ "$(cat "$backup/production-image.txt")" == "$(docker inspect -f '{{.Image}}' trbhh-app)" ]]
+  (cd "$backup" && sha256sum --check --status SHA256SUMS)
+fi
 # Test network has no outbound route; the cloned database is never publicly exposed.
 network="trbhh-final-$run"
 db="trbhh-final-db-$run"
 redis="trbhh-final-redis-$run"
 app="trbhh-final-app-$run"
-docker network create --internal --label "trbhh.final-gate=$run" "$network" >/dev/null
+if ! docker network inspect "$network" >/dev/null 2>&1; then
+  docker network create --internal --label "trbhh.final-gate=$run" "$network" >/dev/null
+fi
+[[ "$(docker network inspect -f '{{.Internal}}' "$network")" == true ]]
 export GATE_BACKUP="$backup" GATE_DB="$db" GATE_REDIS="$redis"
+if [[ ! -f "$backup/mysql.env" ]]; then
 python3 - <<'PY'
 import json,os,secrets,urllib.parse,pathlib
 p=pathlib.Path(os.environ['GATE_BACKUP'])
@@ -62,14 +74,21 @@ app={'DATABASE_URL':'mysql://root:'+password+'@'+os.environ['GATE_DB']+':3306/'+
  'STORAGE_DIR':'/app/storage','TZ':'Asia/Riyadh'}
 (p/'test-app.env').write_text(''.join(k+'='+v+'\n' for k,v in app.items()))
 PY
-docker run -d --name "$db" --network "$network" --label "trbhh.final-gate=$run" --env-file "$backup/mysql.env" mysql:8.0 --event-scheduler=OFF >/dev/null
+fi
+if ! docker inspect "$db" >/dev/null 2>&1; then
+  docker run -d --name "$db" --network "$network" --label "trbhh.final-gate=$run" --env-file "$backup/mysql.env" mysql:8.0 --event-scheduler=OFF >/dev/null
+fi
+[[ "$(docker inspect -f '{{index .Config.Labels "trbhh.final-gate"}}' "$db")" == "$run" ]]
 deadline=$((SECONDS+120))
-until docker exec "$db" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysqladmin ping -uroot --silent' >/dev/null 2>&1; do
+until docker exec "$db" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT 1"' >/dev/null 2>&1; do
   (( SECONDS < deadline )) || { echo 'ISOLATED_DATABASE_NOT_READY'; exit 1; }
   sleep 2
 done
 [[ "$(docker inspect -f '{{index .Config.Labels "trbhh.final-gate"}}' "$db")" == "$run" ]]
-docker exec -i "$db" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot' < "$backup/database.sql" 2> "$backup/restore-errors.private.log"
+if [[ ! -f "$backup/RESTORE_VERIFIED" ]]; then
+  docker exec -i "$db" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot' < "$backup/database.sql" 2> "$backup/restore-errors.private.log"
+  printf '%s\n' "$run" > "$backup/RESTORE_VERIFIED"
+fi
 docker run -d --name "$redis" --network "$network" --label "trbhh.final-gate=$run" redis:7-alpine >/dev/null
 mkdir "$backup/test-storage"
 tar -xzf "$backup/storage.tar.gz" -C "$backup/test-storage"

@@ -30,6 +30,7 @@ jobs:
           persist-credentials: false
       - name: Backup and isolated exact-image preparation only
         env:
+          REUSE_BACKUP: ${{ inputs.backup_id }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
@@ -47,10 +48,12 @@ jobs:
           [[ "$PORT" =~ ^[0-9]+$ && "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
           SSH=(ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -i ~/.ssh/deploy_key -p "$PORT")
           SCP=(scp -o StrictHostKeyChecking=yes -i ~/.ssh/deploy_key -P "$PORT")
-          remote="/root/trbhh-release-tools/final-$GITHUB_RUN_ID"
+          backup_run="${REUSE_BACKUP:-$GITHUB_RUN_ID}"
+          [[ "$backup_run" =~ ^[0-9]+$ ]]
+          remote="/root/trbhh-release-tools/final-$backup_run"
           "${SSH[@]}" "$VPS_USER@$VPS_HOST" "umask 077; mkdir -p '$remote'"
           "${SCP[@]}" scripts/release/final-gate-prepare.sh scripts/release/database-proof.cjs "$VPS_USER@$VPS_HOST:$remote/"
-          "${SSH[@]}" "$VPS_USER@$VPS_HOST" bash "$remote/final-gate-prepare.sh" "$GITHUB_RUN_ID" "$remote"
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" bash "$remote/final-gate-prepare.sh" "$backup_run" "$remote"
   release_inspect:
     if: inputs.action == 'release_inspect' && github.ref == 'refs/heads/codex/trbhh-platform-enhancement-20260929'
     runs-on: ubuntu-latest

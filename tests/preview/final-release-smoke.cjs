@@ -1,0 +1,100 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {chromium}=require('playwright');
+const origin=process.env.FINAL_GATE_ORIGIN;
+const run=process.env.FINAL_GATE_RUN;
+const password=process.env.FINAL_GATE_PASSWORD;
+assert(origin==='http://localhost:4197'&&/^\d+$/.test(run)&&password,'isolated smoke configuration');
+async function requiredFields(page){
+  const fields=page.locator('[data-field-key][data-required="true"]');
+  for(let i=0;i<await fields.count();i++){
+    const c=fields.nth(i).locator('input:not([type="hidden"]),select,textarea').first();
+    if(!await c.count())continue;
+    if(await c.evaluate(e=>e.tagName)==='SELECT'){
+      const value=await c.locator('option').evaluateAll(opts=>opts.find(o=>o.value&&!o.disabled)?.value);
+      if(value)await c.selectOption(value);
+    }else{
+      const type=await c.getAttribute('type');
+      if(type==='checkbox'||type==='radio')await c.check();
+      else if(type==='number')await c.fill((await c.getAttribute('min'))||'1');
+      else if(type==='date')await c.fill('2026-10-02');
+      else await c.fill('بيانات اختبار الإطلاق');
+    }
+  }
+}
+(async()=>{
+  const browser=await chromium.launch({headless:true});
+  try{
+    for(const gps of [false,true]){
+      const context=await browser.newContext({viewport:{width:390,height:844}});
+      await context.addInitScript(()=>{
+        window.__geoCalls=0;
+        Object.defineProperty(navigator,'permissions',{value:{query:async()=>({state:'prompt'})}});
+        Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition(success){window.__geoCalls++;success({coords:{latitude:24.713612,longitude:46.675312}})}}});
+      });
+      const page=await context.newPage();page.setDefaultTimeout(20000);
+      const errors=[];page.on('pageerror',e=>errors.push(e.message));
+      for(const route of gps?[]:['/','/search','/companies','/nearby']){
+        const r=await page.goto(origin+route,{waitUntil:'domcontentloaded'});
+        assert.equal(r.status(),200,route);
+        await page.locator('main').waitFor();
+        assert(!(await page.locator('body').innerText()).includes('حدث خطأ غير متوقع'),route);
+        assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),route+' mobile overflow');
+        assert.equal(await page.evaluate(()=>window.__geoCalls),0,'no automatic permission prompt');
+        console.log('PASS public '+route+' mobile390');
+      }
+      await page.goto(origin+'/login?next=%2Fads%2Fnew');
+      await page.locator('#login-identifier').fill(`finalgate-${run}-${gps?1:0}`);
+      await page.locator('#login-password').fill(password);
+      await page.getByRole('button',{name:'دخول',exact:true}).click();
+      await page.waitForURL(u=>u.pathname==='/ads/new');
+      console.log('PASS login');
+      const group=page.locator('select[name="taxonomy_group"]');
+      await group.waitFor();
+      const groupValue=await group.locator('option').evaluateAll(opts=>opts.find(o=>o.textContent.includes('وظائف'))?.value);
+      assert(groupValue,'jobs taxonomy available');await group.selectOption(groupValue);
+      const leaf=page.locator('select[name="subcategory_id"]');
+      const leafValue=await leaf.locator('option').evaluateAll(opts=>opts.find(o=>o.value)?.value);
+      assert(leafValue);await leaf.selectOption(leafValue);
+      await requiredFields(page);
+      const title=gps?`فحص تقني لوظيفة محاسبية بالموقع ${run}`:`تجربة نشر فرصة إدارية بلا موقع ${run}`;
+      await page.locator('[name="title"]').fill(title);
+      await page.locator('[name="detail"]').fill(gps?'اختبار معزول للإحداثيات لوظيفة محاسب إداري. لا يمثل هذا الإعلان فرصة توظيف حقيقية.':'سجل تجريبي لفحص بوابة الإصدار وإضافة إعلان لوظيفة منسق مكتبي دون تحديد المكان الدقيق. ليس عرض عمل فعلياً.');
+      await page.locator('#category-field-job_title').fill(gps?'محاسب':'منسق');
+      await page.locator('[name="phone"]').fill(gps?'0500000002':'0500000001');
+      await page.locator('[name="pledge"]').check();
+      if(gps){
+        await page.getByRole('button',{name:'استخدام موقعي الحالي',exact:true}).click();
+        await page.getByText(/تم تحديد الموقع/).waitFor();
+        assert.equal(await page.locator('[name="lat"]').inputValue(),'24.713612');
+        await page.locator('[name="show_exact_location_publicly"]').check();
+      }else assert.equal(await page.locator('[name="lat"]').inputValue(),'');
+      await page.getByRole('button',{name:'نشر الإعلان',exact:true}).click();
+      await page.waitForURL(u=>u.pathname==='/'&&/^\d+$/.test(u.searchParams.get('published')||''));
+      const id=new URL(page.url()).searchParams.get('published');
+      console.log('PASS create '+(gps?'GPS':'withoutGPS')+' id='+id);
+      await page.goto(origin+'/ads/'+id);
+      await page.getByText(title,{exact:true}).first().waitFor();
+      if(gps)assert((await page.getByRole('link',{name:'الاتجاهات إلى الموقع',exact:true}).getAttribute('href')).includes('destination=24.713612'));
+      await page.goto(origin+'/ads/'+id+'/edit');
+      assert.equal(await page.evaluate(()=>window.__geoCalls),0,'edit does not request GPS');
+      await page.locator('[name="title"]').fill(title+' مراجع');
+      await page.locator('[name="pledge"]').check();
+      await page.getByRole('button',{name:'حفظ التعديلات',exact:true}).click();
+      await page.waitForURL(u=>u.pathname==='/ads/'+id);
+      await page.getByText(title+' مراجع',{exact:true}).first().waitFor();
+      console.log('PASS details/edit '+id);
+      const response=await page.goto(origin+'/search?q='+encodeURIComponent(title)+'&subcategory='+encodeURIComponent(leafValue));
+      assert.equal(response.status(),200);
+      assert(!(await page.locator('body').innerText()).includes('حدث خطأ غير متوقع'));
+      console.log('PASS search');
+      await page.goto(origin+'/logout');
+      await page.goto(origin+'/account');
+      await page.waitForURL(u=>u.pathname==='/login');
+      console.log('PASS logout');
+      assert.deepEqual(errors,[],'no browser runtime errors');
+      await context.close();
+    }
+    console.log('FINAL_ISOLATED_SMOKE_PASS');
+  }finally{await browser.close();}
+})().catch(e=>{console.error('FINAL_SMOKE_FAIL',e.message);process.exitCode=1;});

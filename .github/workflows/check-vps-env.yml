@@ -6,7 +6,7 @@ on:
       action:
         type: choice
         default: diagnose
-        options: [diagnose, activate_categories, release_inspect, release_prepare]
+        options: [diagnose, activate_categories, release_inspect, release_prepare, release_smoke]
         description: Diagnosis or post-deployment category activation
       backup_id:
         type: string
@@ -19,6 +19,53 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release_smoke:
+    if: inputs.action == 'release_smoke' && github.ref == 'refs/heads/codex/trbhh-platform-enhancement-20260929'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Smoke on isolated clone through private SSH tunnel
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          FINAL_GATE_RUN: ${{ inputs.backup_id }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$FINAL_GATE_RUN" =~ ^[0-9]+$ ]]
+          test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          PORT="${VPS_PORT:-22}"
+          [[ "$PORT" =~ ^[0-9]+$ ]]
+          SSH=(ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -i ~/.ssh/deploy_key -p "$PORT")
+          SCP=(scp -o StrictHostKeyChecking=yes -i ~/.ssh/deploy_key -P "$PORT")
+          remote="/root/trbhh-release-tools/final-$FINAL_GATE_RUN"
+          app="trbhh-final-app-$FINAL_GATE_RUN"
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" "test -f '/root/trbhh-release-backups/final-$FINAL_GATE_RUN/ISOLATED_READY'"
+          "${SCP[@]}" scripts/release/final-gate-account.cjs "$VPS_USER@$VPS_HOST:$remote/"
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" "docker cp '$remote/final-gate-account.cjs' '$app:/app/.final-gate-account.cjs'"
+          export FINAL_GATE_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$FINAL_GATE_PASSWORD"
+          node -e 'process.stdout.write(JSON.stringify({run:process.env.FINAL_GATE_RUN,password:process.env.FINAL_GATE_PASSWORD}))' | "${SSH[@]}" "$VPS_USER@$VPS_HOST" docker exec -i "$app" node /app/.final-gate-account.cjs
+          "${SSH[@]}" -f -N -o ExitOnForwardFailure=yes -L 4197:127.0.0.1:3097 "$VPS_USER@$VPS_HOST"
+          npm install --prefix "$RUNNER_TEMP/smoke" --no-package-lock playwright@1.49.1
+          "$RUNNER_TEMP/smoke/node_modules/.bin/playwright" install --with-deps chromium
+          export NODE_PATH="$RUNNER_TEMP/smoke/node_modules"
+          export FINAL_GATE_ORIGIN=http://localhost:4197
+          node tests/preview/final-release-smoke.cjs
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" "umask 077; cp '/root/trbhh-release-backups/final-$FINAL_GATE_RUN/preview-image.txt' '/root/trbhh-release-backups/final-$FINAL_GATE_RUN/SMOKE_PASSED_IMAGE'"
   release_prepare:
     if: inputs.action == 'release_prepare' && github.ref == 'refs/heads/codex/trbhh-platform-enhancement-20260929'
     runs-on: ubuntu-latest

@@ -22,7 +22,7 @@ vi.mock('@/lib/ad-categories/service',()=>({
   getPublicCategories:categoryService.publicCategories,
   getCategoryEditValues:categoryService.editValues,
 }));
-import { countSearchAds, getSimilarAds, getStats, searchAds, searchAdsRelaxed } from '@/lib/data';
+import { countSearchAds, getHomeLatestAds, getSimilarAds, getStats, searchAds, searchAdsRelaxed } from '@/lib/data';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -49,6 +49,17 @@ beforeEach(() => {
 });
 
 describe('public search query integration', () => {
+  it('applies search visibility before limiting the homepage SSR batch',async()=>{
+    db.users.findMany.mockImplementation(({where})=>Promise.resolve(where?.ban==='checked'?[{id:999n}]:[{id:1n,name:'المعلن',trusted:0,ban:''}]));
+    db.ads.findMany.mockResolvedValue([]);
+    await getHomeLatestAds(8);
+    expect(db.ads.findMany.mock.calls[0][0].where).toMatchObject({
+      AND:expect.arrayContaining([expect.objectContaining({
+        AND:expect.arrayContaining([{user_id:{notIn:[999n]}}]),
+      })]),
+    });
+    vi.useRealTimers();
+  });
   it('prioritizes the same leaf and nearby location in similar ads',async()=>{
     db.ads.findUnique.mockResolvedValue({title:'رافعة شوكية',detail:'معدات مستعملة',subcategory_id:5,city_id:1n,area_id:2,price:1000});
     const row=(id:number,subcategoryId:number,cityId:bigint,areaId:number,price:number)=>({

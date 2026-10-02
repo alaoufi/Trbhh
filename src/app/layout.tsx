@@ -23,15 +23,17 @@ import { SealReposition } from '@/components/seal-reposition';
 import { NavigationProgress } from '@/components/navigation-progress';
 import { customerServiceContactPolicy } from '@/lib/contact-policy';
 import { isPreviewDeployment } from '@/lib/read-only-preview';
+import { normalizeMarketplaceMetadata } from '@/lib/public-metadata';
 
 const cairo = Cairo({ subsets: ['arabic', 'latin'], variable: '--font-cairo', display: 'swap' });
 
 // عنوان ووصف مشاركة الموقع قابلان للتعديل من الإدارة ← النصوص ← عام
 export async function generateMetadata(): Promise<Metadata> {
-  const [shareTitle, shareDesc] = await Promise.all([
+  const [configuredTitle, configuredDescription] = await Promise.all([
     import('@/lib/settings').then((m) => m.getSetting(m.SETTING_SITE_SHARE_TITLE, `${SITE.name} | ${SITE.tagline}`)),
     import('@/lib/settings').then((m) => m.getSetting(m.SETTING_SITE_SHARE_DESC, SITE.description)),
   ]).catch(() => [`${SITE.name} | ${SITE.tagline}`, SITE.description]);
+  const { title: shareTitle, description: shareDesc } = normalizeMarketplaceMetadata(configuredTitle, configuredDescription);
   return {
     metadataBase: new URL(primaryOrigin),
     alternates: { canonical: '/' },

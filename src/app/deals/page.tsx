@@ -2,13 +2,17 @@ import { Flame } from 'lucide-react';
 import { getDealAds } from '@/lib/data';
 import { dealsEnabled } from '@/lib/store-extras';
 import { AdGrid } from '@/components/ad-card';
+import { publicPageMetadata } from '@/lib/public-metadata';
 
 export const dynamic = 'force-dynamic';
 export async function generateMetadata() {
   const enabled = await dealsEnabled().catch(() => false);
   return {
-    title: 'عروض اليوم',
-    description: 'أقوى التخفيضات والعروض الحالية على منصة تربح',
+    ...publicPageMetadata({
+      title: 'عروض اليوم',
+      description: 'أقوى التخفيضات والعروض الحالية على منصة تربح.',
+      path: '/deals',
+    }),
     robots: enabled ? undefined : { index: false, follow: false },
   };
 }

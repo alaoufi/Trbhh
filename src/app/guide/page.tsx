@@ -6,9 +6,14 @@ import { GuideView, type GuideSection } from '@/components/guide-view';
 import { getCommerceConfig } from '@/lib/commerce/settings';
 import { getSetting } from '@/lib/settings';
 import { CATEGORY_LABELS } from '@/lib/ad-categories/contracts';
+import { publicPageMetadata } from '@/lib/public-metadata';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'دليل المستخدم' };
+export const metadata = publicPageMetadata({
+  title: 'دليل المستخدم',
+  description: 'دليل استخدام منصة تربح: إنشاء الحساب، إضافة الإعلان، المتاجر، التواصل والخدمات.',
+  path: '/guide',
+});
 
 // بدء سريع بأيقونات وأرقام
 const QUICK: { icon: React.ElementType; title: string; text: string; from: string; to: string }[] = [

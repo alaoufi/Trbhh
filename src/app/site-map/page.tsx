@@ -4,12 +4,14 @@ import { auctionsEnabled } from '@/lib/settings';
 import { dealsEnabled } from '@/lib/store-extras';
 import { Breadcrumb } from '@/components/breadcrumb';
 import { SITE } from '@/lib/constants';
+import { publicPageMetadata } from '@/lib/public-metadata';
 
 export const dynamic = 'force-dynamic';
-export const metadata = {
+export const metadata = publicPageMetadata({
   title: 'خارطة الموقع',
   description: `دليل شامل لكل أقسام وصفحات منصة ${SITE.name}: الإعلانات المبوّبة، المتاجر، البحث، والصفحات الثابتة.`,
-};
+  path: '/site-map',
+});
 
 type Item = { label: string; href: string };
 type Group = { title: string; icon: React.ElementType; items: Item[] };

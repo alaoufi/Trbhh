@@ -8,6 +8,7 @@ import { notFound } from 'next/navigation';
 import { SITE, DISCLAIMER } from '@/lib/constants';
 import { FaqAccordion, type QA } from '@/components/faq-accordion';
 import { Breadcrumb } from '@/components/breadcrumb';
+import { publicPageMetadata } from '@/lib/public-metadata';
 
 const waPhone = SITE.phone.replace(/\D/g, '').replace(/^00/, ''); // 966XXXXXXXXX
 const telPhone = '+' + waPhone;
@@ -63,7 +64,12 @@ const VALID = ['about', 'faq', 'privacy', 'terms', 'contact'];
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  return { title: HERO[slug]?.title ?? 'صفحة' };
+  const hero = HERO[slug];
+  return publicPageMetadata({
+    title: hero?.title ?? 'صفحة',
+    description: hero?.subtitle ?? `معلومات منصة ${SITE.name}`,
+    path: `/pages/${slug}`,
+  });
 }
 
 export function generateStaticParams() {

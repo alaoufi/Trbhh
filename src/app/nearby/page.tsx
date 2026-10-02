@@ -9,9 +9,14 @@ import { toInt } from '@/lib/utils';
 import { normalizeSaudiAreaSelection, positiveSearchId } from '@/lib/search-filters';
 import { AdminPager } from '@/components/admin-pager';
 import { NearbyGpsResults } from '@/components/nearby-gps-results';
+import { publicPageMetadata } from '@/lib/public-metadata';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'قريب منك' };
+export const metadata = publicPageMetadata({
+  title: 'قريب منك',
+  description: 'اكتشف إعلانات تربح القريبة منك حسب موقع تختاره أو بإذن موقعك الاختياري.',
+  path: '/nearby',
+});
 
 export default async function NearbyPage({ searchParams }: { searchParams: Promise<{ city?: string; area?: string; page?: string }> }) {
   const sp = await searchParams;

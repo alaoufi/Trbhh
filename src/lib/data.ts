@@ -1,5 +1,6 @@
 import 'server-only';
 import {Prisma} from '@prisma/client';
+import { createHash } from 'node:crypto';
 import { cache } from 'react';
 import { prisma } from './prisma';
 import { cached, cacheDel, cacheDelPattern } from './redis';
@@ -197,6 +198,15 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
 // عزل المتاجر: إعلان المتجر لا يدخل قوائم تربح إلا بعرض مدفوع ساري المفعول (trbhh_until)
 const activeAdWhere = () => currentPlatformAdPublicWhere();
 
+function publicDataCacheScope() {
+  try {
+    const url = new URL(process.env.DATABASE_URL || '');
+    return createHash('sha256').update(`${url.hostname}:${url.port}${url.pathname}`).digest('hex').slice(0, 12);
+  } catch {
+    return 'default';
+  }
+}
+
 const adSelect = {
   id: true,
   title: true,
@@ -311,6 +321,7 @@ export async function bustAdCaches(): Promise<void> {
     cacheDelPattern('ads:*'),
     cacheDelPattern('stores:*'),
     cacheDel('stats:home'),
+    cacheDelPattern('stats:home:*'),
   ]);
 }
 
@@ -334,13 +345,16 @@ export async function getLatestAds(take = 12) {
  *  عند خلوّ الشهر من إعلانات نعرض أحدث ١٢ حتى لا تبدو الرئيسية فارغة. */
 export async function getHomeLatestAds(take = 20) {
   const safeTake = Math.min(Math.max(Math.floor(take) || 20, 1), 60);
-  return cached(`ads:home-latest:30d:${safeTake}`, 60, async () => {
+  return cached(`ads:${publicDataCacheScope()}:home-latest:30d:${safeTake}`, 60, async () => {
     sweepExpiredArchived().catch(() => {});
     sweepExpiredPaidAds().catch(() => {});
     sweepOldAdsToArchive().catch(() => {});
     const since = new Date(Date.now() - 30 * 86400000);
+    // طبّق نفس صلاحية البحث داخل SQL قبل LIMIT؛ تصفية الدفعة بعد تحديدها كانت
+    // تجعل SSR للرئيسية فارغاً إذا كانت أحدث الصفوف منتهية رغم وجود نتائج صالحة أقدم.
+    const publicWhere = await buildSearchWhere({});
     const rows = await prisma.ads.findMany({
-      where: { ...(await activeAdWhere()), created_at: { gte: since } },
+      where: { AND: [publicWhere, { created_at: { gte: since } }] },
       orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }],
       // بطاقة الإعلانات تحمل بيانات وصوراً كثيرة؛ الرئيسية تحتاج أول دفعة فقط.
       // نقرأ هامشاً صغيراً لإعادة ترتيب آخر نشاط ثم نرسل العدد المطلوب للعميل.
@@ -349,8 +363,9 @@ export async function getHomeLatestAds(take = 20) {
     });
     // الترتيب الحقيقي بآخر نشاط (نشر أو تحديث ⬆) — يطابق الوقت الظاهر على البطاقة
     rows.sort((a, b) => activityMs(b) - activityMs(a));
-    if (rows.length > 0) return toCards(rows.slice(0, safeTake));
-    const fallback = await prisma.ads.findMany({ where: await activeAdWhere(), orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: 12, select: adSelect });
+    const recent = await toCards(rows.slice(0, safeTake));
+    if (recent.length > 0) return recent;
+    const fallback = await prisma.ads.findMany({ where: publicWhere, orderBy: [{ bumped_at: { sort: 'desc', nulls: 'last' } }, { id: 'desc' }], take: 12, select: adSelect });
     return toCards(fallback.slice(0, safeTake));
   });
 }
@@ -472,10 +487,10 @@ async function loadMostViewedAds(take: number) {
 }
 
 export async function getStats() {
-  return cached('stats:home', 120, async () => {
+  return cached(`stats:home:${publicDataCacheScope()}`, 120, async () => {
     const [users, ads, cats, views] = await Promise.all([
       prisma.users.count(),
-      countSearchAds({}),
+      countSearchAdsStrict({}),
       prisma.categories.count({ where: { is_active: 'yes' } }),
       prisma.ads_views.count(),
     ]);
@@ -682,7 +697,11 @@ async function buildSearchWhere({ q, categoryId,categoryIds=[], subcategoryId,su
 
 /** إجمالي نتائج البحث — للترقيم المرقّم. */
 export async function countSearchAds(params: SearchParamsT): Promise<number> {
-  return prisma.ads.count({ where: await buildSearchWhere(params) }).catch(() => 0);
+  return countSearchAdsStrict(params).catch(() => 0);
+}
+
+async function countSearchAdsStrict(params: SearchParamsT): Promise<number> {
+  return prisma.ads.count({ where: await buildSearchWhere(params) });
 }
 
 export async function searchAds(params: SearchParamsT) {

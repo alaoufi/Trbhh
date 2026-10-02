@@ -5,9 +5,14 @@ import { getStores } from '@/lib/stores';
 import { approvedStoreIds } from '@/lib/merchant';
 import { getEmptyText } from '@/lib/settings';
 import { Breadcrumb } from '@/components/breadcrumb';
+import { publicPageMetadata } from '@/lib/public-metadata';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'المتاجر' };
+export const metadata = publicPageMetadata({
+  title: 'المتاجر',
+  description: 'اكتشف متاجر وموردي تربح المعتمدين وتصفح إعلاناتهم وتواصل معهم مباشرة.',
+  path: '/companies',
+});
 
 export default async function CompaniesPage() {
   const [all, approved] = await Promise.all([getStores(), approvedStoreIds()]);

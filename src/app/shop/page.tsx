@@ -9,8 +9,14 @@ import { getCommerceGateway } from '@/lib/commerce/runtime';
 import { CommerceHome, type CommerceHomeSection, type CommerceBanner, type CommerceCategory } from '@/components/commerce/commerce-home';
 import { firstImageUrl, type CommerceCardItem } from '@/components/commerce/catalog';
 import type { HeroSlide } from '@/components/commerce/commerce-hero';
+import { publicPageMetadata } from '@/lib/public-metadata';
 
 export const dynamic = 'force-dynamic';
+export const metadata = publicPageMetadata({
+  title: 'كتالوج تربح',
+  description: 'تصفح السلع المعتمدة المعروضة في كتالوج تربح ومعلومات المورد والمخزون المتاح.',
+  path: '/shop',
+});
 
 // نفس منطق backend المعتمد (الإعداد/المخطط/الاستعلام/بوّابة الدفع) لم يتغيّر — التغيير في العرض فقط.
 type Row = { id: bigint; title: string; price_minor: number; stock_available: number; images: unknown; description: string | null; featured: number | null };

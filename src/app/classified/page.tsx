@@ -4,9 +4,14 @@ import { getClassifieds } from '@/lib/classified';
 import { getEmptyText } from '@/lib/settings';
 import { ClassifiedGrid } from '@/components/classified-card';
 import { Breadcrumb } from '@/components/breadcrumb';
+import { publicPageMetadata } from '@/lib/public-metadata';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'الإعلانات المبوّبة' };
+export const metadata = publicPageMetadata({
+  title: 'الإعلانات المبوّبة',
+  description: 'تصفح الإعلانات المبوّبة المصممة على تربح أو أنشئ إعلانك وتواصل مباشرة مع المهتمين.',
+  path: '/classified',
+});
 
 export default async function ClassifiedPage({ searchParams }: { searchParams: Promise<{ created?: string }> }) {
   const [items, sp] = await Promise.all([getClassifieds(60), searchParams]);

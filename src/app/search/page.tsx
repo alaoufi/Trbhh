@@ -16,11 +16,13 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 import {getCategoryFormConfig} from '@/lib/ad-categories/service';
 import {fieldApplies} from '@/lib/ad-categories/validation';
 import {selectedHomeCategory} from '@/lib/home-feed';
+import { publicPageMetadata } from '@/lib/public-metadata';
 
-export const metadata = {
+export const metadata = publicPageMetadata({
   title: 'بحث متقدم',
   description: 'ابحث بين آلاف إعلانات البيع والشراء من متاجر وأفراد — فلترة بالمنطقة والمدينة والسعر والنوع (عرض/طلب) على منصة تربح.',
-};
+  path: '/search',
+});
 
 export default async function SearchPage({
   searchParams,

@@ -103,6 +103,10 @@ it('keeps the discovery controls and homepage sections visually compact',async()
   const searchCard=tree.find(e=>e.type==='details'&&e.props['data-home-search']!==undefined);
   expect(searchCard).toBeDefined();
   expect(searchCard?.props.open).toBeUndefined();
+  const desktopAdd=tree.find(e=>e.props['data-home-search-add']!==undefined);
+  expect(desktopAdd?.props.href).toBe('/ads/new');
+  expect(desktopAdd?.props.className).toContain('hidden lg:inline-flex');
+  expect(tree.some(e=>e.props['data-home-search-shell']!==undefined)).toBe(true);
   const children=elements(searchCard?.props.children);
   expect(children.find(e=>e.type==='summary')?.props.children).toBe('وش تبحث عنه اليوم؟');
   expect(children.find(e=>e.type===PublicSearchForm)?.props.collapseFilters).toBe(false);

@@ -173,8 +173,9 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
           </NationalDayHeroFrame>
         </section>
       )}
+      <div data-home-search-shell className="relative">
       <details data-home-search className="rounded-xl border border-slate-200 bg-white px-3 shadow-sm sm:px-4">
-        <summary className="cursor-pointer list-none py-3 text-lg font-extrabold text-[#16294a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary [&::-webkit-details-marker]:hidden">وش تبحث عنه اليوم؟</summary>
+        <summary className="cursor-pointer list-none py-3 text-lg font-extrabold text-[#16294a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary lg:min-h-16 lg:pl-44 lg:py-4 [&::-webkit-details-marker]:hidden">وش تبحث عنه اليوم؟</summary>
         <div className="space-y-3 pb-3">
           {discoveryOn && <>
             <Link href="/ads/new" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>
@@ -183,6 +184,8 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
           <HomeCategoryNavigation selectedCategory={sp.category} config={categoryConfig} visual />
         </div>
       </details>
+      {discoveryOn && <Link data-home-search-add href="/ads/new" className="absolute left-4 top-2.5 hidden lg:inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff6a1a] px-4 py-2 text-sm font-extrabold text-[#16294a]"><Megaphone className="h-4 w-4" />{discoveryAddLabel}</Link>}
+      </div>
       {/* Paid banner — top of home */}
       <PromoSlot placement="home_top" />
 

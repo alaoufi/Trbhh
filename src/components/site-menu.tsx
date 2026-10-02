@@ -170,6 +170,9 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
           </div>
         ) : (
           <div className="flex-1 p-2">
+            <div data-desktop-menu-add className="hidden lg:block">
+              <Item href="/ads/new" icon={PlusCircle} onClick={close}>أضف إعلان</Item>
+            </div>
             {/* 🎭 مبدّل الهوية — اختياري: يظهر لمن له صفة إضافية (متجر/إدارة) أو حسابات مرتبطة.
                 يعرض صفات الحساب الحالي (عضو/متجر/إدارة) + التبديل للحسابات المرتبطة بنفس المالك. */}
             {isAuthed && (myStoreId > 0 || isAdmin || linkedAccounts.length > 1) && (
@@ -268,7 +271,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
             )}
 
             <Section title="النشر والإعلان" icon={PlusCircle}>
-              {isAuthed && <Item href="/ads/new" icon={PlusCircle} onClick={close}>أضف إعلان</Item>}
+              {isAuthed && <div className="lg:hidden"><Item href="/ads/new" icon={PlusCircle} onClick={close}>أضف إعلان</Item></div>}
               {isAuthed && <Item href="/classified/new" icon={Sparkles} onClick={close}>المصمم الذكي (إعلان مبوّب)</Item>}
               <Item href="/promote" icon={Megaphone} onClick={close}>أعلن معنا</Item>
             </Section>

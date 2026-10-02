@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@media (min-width: 1024px) {
+  [data-home-search-shell]:has(> details[open]) > [data-home-search-add] {
+    display: none;
+  }
+}
+
 @keyframes navigation-progress {
   0% { transform: scaleX(0.08); }
   60% { transform: scaleX(0.72); }

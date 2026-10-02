@@ -54,6 +54,11 @@ async function requiredFields(page){
       console.log('PASS login');
       const group=page.locator('select[name="taxonomy_group"]');
       await group.waitFor();
+      // SSR renders the selector before React attaches its dependent-field handler.
+      await page.waitForFunction(()=>{
+        const el=document.querySelector('select[name="taxonomy_group"]');
+        return el&&Object.keys(el).some(key=>key.startsWith('__reactProps$')&&typeof el[key]?.onChange==='function');
+      });
       const groupValue=await group.locator('option').evaluateAll(opts=>opts.find(o=>o.textContent.includes('وظائف'))?.value);
       assert(groupValue,'jobs taxonomy available');await group.selectOption(groupValue);
       const leaf=page.locator('select[name="subcategory_id"]');

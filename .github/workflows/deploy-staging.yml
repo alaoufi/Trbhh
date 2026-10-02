@@ -243,8 +243,24 @@ jobs:
               node scripts/release/seed-staging-categories.cjs
           fi
 
-          container=trbhh-staging-app
-          docker inspect "$container" >/dev/null
+          printf 'previewSeed=complete\n'
+          find_preview_container() {
+            container=''
+            for attempt in $(seq 1 30); do
+              container=$(docker ps -aq \
+                --filter label=com.docker.compose.project=trbhh-staging \
+                --filter label=com.docker.compose.service=app | sed -n '1p')
+              if [[ -n "$container" ]] && docker inspect "$container" >/dev/null 2>&1; then
+                printf 'previewContainerDiscovered=%s attempt=%s\n' "$container" "$attempt"
+                return 0
+              fi
+              sleep 2
+            done
+            docker ps -a --no-trunc >&2 || true
+            printf 'previewContainerDiscovered=missing failed\n' >&2
+            return 1
+          }
+          find_preview_container
           wait_for_preview_container() {
             state=false
             for attempt in $(seq 1 30); do

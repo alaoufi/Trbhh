@@ -48,7 +48,10 @@ describe('isolated pre-production browser gate', () => {
     expect(deploy).toContain('wait_for_preview_200');
     expect(deploy).toContain('wait_for_preview_container');
     expect(deploy).toContain('previewContainerReady=running');
-    expect(deploy).toContain('container=trbhh-staging-app');
+    expect(deploy).toContain('find_preview_container');
+    expect(deploy).toContain('label=com.docker.compose.project=trbhh-staging');
+    expect(deploy).toContain('label=com.docker.compose.service=app');
+    expect(deploy).toContain('previewContainerDiscovered=');
     expect(deploy).toContain('previewHttpReady=');
   });
 

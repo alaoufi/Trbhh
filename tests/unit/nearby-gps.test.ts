@@ -38,10 +38,11 @@ describe('nearby advertisements by precise coordinates', () => {
     expect(seed).toMatch(/whatsapp:\s*1/);
   });
 
-  it('does not require a city-area join for GPS-ranked results', () => {
+  it('uses only explicitly saved GPS rows without requiring a city-area join', () => {
     const data = readFileSync(resolve(process.cwd(), 'src/lib/data.ts'), 'utf8');
-    expect(data).toContain('const where = await buildSearchWhere({});');
-    expect(data).not.toContain('buildSearchWhere({ geoTrustedOnly: true });');
+    expect(data).toContain('const where = await buildSearchWhere({geoTrustedOnly:true});');
+    expect(data).toContain('INNER JOIN ad_location_privacy lp ON lp.ad_id=a.id');
+    expect(data).not.toContain('INNER JOIN areas ar');
     expect(data).toContain("{ lat: { not: null } }, { lng: { not: null } }");
   });
 });

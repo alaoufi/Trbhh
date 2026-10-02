@@ -632,8 +632,9 @@ const getSearchAreaIds = cache(async (areaId: number, cityId: number) => {
 async function geoTrustedAdIds():Promise<bigint[]>{
   const rows=await prisma.$queryRaw<{ad_id:bigint}[]>`
     SELECT a.id AS ad_id FROM ads a
-    INNER JOIN areas ar ON ar.id=a.area_id AND ar.city_id=CAST(a.city_id AS UNSIGNED)
-  `;
+    INNER JOIN ad_location_privacy lp ON lp.ad_id=a.id
+    WHERE a.lat IS NOT NULL AND a.lng IS NOT NULL
+  `.catch(()=>[]);
   return rows.map(row=>row.ad_id);
 }
 
@@ -719,9 +720,9 @@ export async function searchAds(params: SearchParamsT) {
  * and are never written to the database or attached to an account.
  */
 export async function getNearbyAdsByCoordinates(visitor: LatLng, take = 48): Promise<AdCard[]> {
-  // GPS is independent from the optional Saudi region/city fields. Rank every
-  // advertisement with a valid coordinate pair; rankNearbyAds drops malformed pairs.
-  const where = await buildSearchWhere({});
+  // GPS is independent from optional region/city fields, but only coordinates
+  // explicitly saved through the new location flow enter precise ranking.
+  const where = await buildSearchWhere({geoTrustedOnly:true});
   const rows = await prisma.ads.findMany({
     where: { AND: [where, { lat: { not: null } }, { lng: { not: null } }] },
     select: { ...adSelect, lat: true, lng: true },

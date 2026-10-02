@@ -25,6 +25,7 @@ services:
       CATEGORIES_DEFAULT_ENABLED: "${CATEGORIES_DEFAULT_ENABLED:-0}"
       STAGING_DATABASE_NAME: "${STAGING_DATABASE_NAME:-trbhhdb}"
       TRBHH_READ_ONLY_PREVIEW: "${TRBHH_READ_ONLY_PREVIEW:-0}"
+      TRBHH_PREVIEW_MODE: "${TRBHH_PREVIEW_MODE:-1}"
       # Preview is accessed directly over HTTP on port 3081; Secure cookies would loop back to login.
       COOKIE_SECURE: "false"
     # المنفذ يُضبط من APP_PORT في .env التجريب (=3081). لا نضيف ports هنا حتى لا

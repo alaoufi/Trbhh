@@ -6,6 +6,10 @@ import { readOnlyPreviewResponse } from '@/lib/read-only-preview';
 const root = process.cwd();
 
 describe('Hostinger live-data read-only preview', () => {
+  test('passes the independent preview marker into the staging container',()=>{
+    const compose=readFileSync('docker-compose.staging.yml','utf8');
+    expect(compose).toContain('TRBHH_PREVIEW_MODE: "${TRBHH_PREVIEW_MODE:-1}"');
+  });
   test('allows only login actions while keeping every other write blocked', () => {
     process.env.TRBHH_READ_ONLY_PREVIEW = '1';
     expect(readOnlyPreviewResponse('POST', '/login')).toBeNull();

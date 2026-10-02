@@ -49,12 +49,22 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
   const close = () => setOpen(false);
   useEffect(() => setMounted(true), []);
 
-  // lock body scroll while the drawer is open
+  // Freeze the background (including touch browsers) without losing its scroll position.
   useEffect(() => {
     if (open) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = prev; };
+      const body = document.body;
+      const root = document.documentElement;
+      const x = window.scrollX;
+      const y = window.scrollY;
+      const previous = { overflow: body.style.overflow, position: body.style.position, top: body.style.top, left: body.style.left, width: body.style.width };
+      const rootOverflow = root.style.overflow;
+      root.style.overflow = 'hidden';
+      Object.assign(body.style, { overflow: 'hidden', position: 'fixed', top: `-${y}px`, left: `-${x}px`, width: '100%' });
+      return () => {
+        Object.assign(body.style, previous);
+        root.style.overflow = rootOverflow;
+        window.scrollTo({ left: x, top: y, behavior: 'instant' });
+      };
     }
   }, [open]);
 
@@ -107,7 +117,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
         if (state.ariaHidden === null) state.element.removeAttribute('aria-hidden');
         else state.element.setAttribute('aria-hidden', state.ariaHidden);
       }
-      trigger?.focus();
+      trigger?.focus({ preventScroll: true });
     };
   }, [open]);
 
@@ -137,7 +147,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
   const drawer = open ? (
     <div ref={drawerRef} id="site-menu-dialog" className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby="site-menu-title" tabIndex={-1}>
       <div className="absolute inset-0 bg-black/40" aria-hidden="true" onClick={close} />
-      <nav className="absolute inset-y-0 right-0 flex w-80 max-w-[85%] flex-col overflow-y-auto bg-card text-card-foreground shadow-2xl">
+      <nav className="absolute inset-y-0 right-0 flex w-80 max-w-[85%] flex-col overflow-y-auto overscroll-contain bg-card text-card-foreground shadow-2xl">
         <div className="flex items-center justify-between border-b border-primary/15 bg-accent/60 p-4">
           <span id="site-menu-title" className="text-lg font-bold text-primary">{adminMode ? 'قائمة الإدارة' : 'القائمة'}</span>
           <button onClick={close} aria-label="إغلاق" className="text-primary"><X className="h-6 w-6" /></button>

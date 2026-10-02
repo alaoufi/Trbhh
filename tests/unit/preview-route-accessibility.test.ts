@@ -24,7 +24,11 @@ describe('preview routes and site menu accessibility', () => {
     expect(menu).toContain('id="site-menu-title"');
     expect(menu).toContain("event.key === 'Escape'");
     expect(menu).toContain("event.key !== 'Tab'");
-    expect(menu).toContain('trigger?.focus()');
+    expect(menu).toContain('trigger?.focus({ preventScroll: true })');
+    expect(menu).toContain('overscroll-contain');
+    expect(menu).toContain("root.style.overflow = 'hidden'");
+    expect(menu).toContain("position: 'fixed'");
+    expect(menu).toContain("window.scrollTo({ left: x, top: y, behavior: 'instant' })");
     expect(menu).toContain("setAttribute('inert', '')");
     expect(menu).toContain('removeAttribute(\'inert\')');
   });

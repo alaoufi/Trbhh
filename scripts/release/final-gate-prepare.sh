@@ -6,7 +6,7 @@ umask 077
 run=$1
 tools_dir=$2
 [[ "$run" =~ ^[0-9]+$ && "$tools_dir" == "/root/trbhh-release-tools/final-$run" ]]
-candidate=3e88277b4851483cd9d42b9355a36b875894bfe6
+candidate=41eb3b929bbd54c05e30ca24bf97378d7df5488a
 [[ "$(git -C /root/trbhh-staging rev-parse HEAD)" == "$candidate" ]]
 base=/root/trbhh-release-backups
 backup="$base/final-$run"
@@ -17,12 +17,14 @@ mkdir "$backup"
 chmod 700 "$backup"
 docker inspect trbhh-app > "$backup/production-container.json"
 docker inspect trbhh-staging-app > "$backup/preview-container.json"
-git -C /root/trbhh rev-parse HEAD > "$backup/production-sha.txt"
+production_sha=$(docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' trbhh-app)
+[[ "$production_sha" =~ ^[0-9a-f]{40}$ ]]
+printf '%s\n' "$production_sha" > "$backup/production-sha.txt"
 printf '%s\n' "$candidate" > "$backup/preview-sha.txt"
 git -C /root/trbhh diff --binary > "$backup/production-working-tree.patch"
 docker inspect -f '{{.Image}}' trbhh-app > "$backup/production-image.txt"
 image=$(docker inspect -f '{{.Image}}' trbhh-staging-app)
-[[ "$image" == sha256:9be9b27c720819af5d8d6fea270b719ba7b8797bc875798df4cd99ebe8ac8108 ]]
+[[ "$image" == sha256:613086d317e68277b1616b2b18db3ef4110cfc17b4b037188b9d837c6d6b690b ]]
 printf '%s\n' "$image" > "$backup/preview-image.txt"
 docker image tag "$(cat "$backup/production-image.txt")" "trbhh-rollback:final-$run"
 docker image tag "$image" "trbhh-release:final-$run"
@@ -96,7 +98,7 @@ if ! docker inspect "$app" >/dev/null 2>&1; then
   mkdir "$backup/test-storage"
   tar -xzf "$backup/storage.tar.gz" -C "$backup/test-storage"
   chown -R 1001:1001 "$backup/test-storage"
-  docker run -d --name "$app" --network "$network" --label "trbhh.final-gate=$run" --env-file "$backup/test-app.env" -p 127.0.0.1:3097:3000 -v "$backup/test-storage:/app/storage" "$image" >/dev/null
+  docker run -d --name "$app" --network "$network" --label "trbhh.final-gate=$run" --env-file "$backup/test-app.env" -v "$backup/test-storage:/app/storage" "$image" >/dev/null
 fi
 [[ "$(docker inspect -f '{{index .Config.Labels "trbhh.final-gate"}}' "$app")" == "$run" ]]
 deadline=$((SECONDS+90))

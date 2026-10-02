@@ -8,7 +8,7 @@ import socket
 import subprocess
 import sys
 
-CANDIDATE = '3e88277b4851483cd9d42b9355a36b875894bfe6'
+CANDIDATE = '41eb3b929bbd54c05e30ca24bf97378d7df5488a'
 
 
 class DockerConnection(http.client.HTTPConnection):

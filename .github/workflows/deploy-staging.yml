@@ -239,7 +239,7 @@ jobs:
           docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis
           if [[ "$live_read_only" != true ]]; then
             timeout 180s docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml \
-              exec -T -e STAGING_CATEGORY_SEED=1 -e STAGING_DATABASE_NAME=trbhhdb app \
+              run --rm --no-deps -e STAGING_CATEGORY_SEED=1 -e STAGING_DATABASE_NAME=trbhhdb app \
               node scripts/release/seed-staging-categories.cjs
           fi
 

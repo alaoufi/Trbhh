@@ -1,8 +1,8 @@
 'use client';
-import {useMemo,useState} from 'react';
+import {useId,useMemo,useState} from 'react';
 import { SearchAreaPicker } from '@/components/search-area-picker';
 import { SearchSuggestInput } from '@/components/search-suggest';
-import { Search } from 'lucide-react';
+import { ChevronDown, Search } from 'lucide-react';
 import type {CategoryFormConfig} from '@/lib/ad-categories/contracts';
 import {fieldApplies,type CategoryField} from '@/lib/ad-categories/validation';
 import {publicCategoryGroups} from '@/lib/home-feed';
@@ -15,6 +15,8 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
   priceOn?: boolean; placeholder?: string; compact?: boolean;categoryConfig?:CategoryFormConfig;
 }) {
   const field = 'h-11 min-w-0 w-full rounded-lg border bg-background px-3 text-sm text-foreground';
+  const [advancedOpen,setAdvancedOpen]=useState(false);
+  const advancedId=useId();
   const [category,setCategory]=useState(params.category||'');
   const [subcategory,setSubcategory]=useState(params.subcategory||'');
   const [listingType,setListingType]=useState(params.listingType||'');
@@ -71,10 +73,14 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
       <button type="submit" className="flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-primary px-5 text-sm font-bold text-primary-foreground hover:opacity-90"><Search className="h-4 w-4" /> بحث</button>
     </div>
     {params.special === '1' && <input name="special" type="hidden" value="1" />}
-    {compact ? <details className="rounded-lg border bg-background px-3 py-1.5 text-foreground">
-      <summary className="cursor-pointer text-sm font-semibold">المنطقة والمدينة · نوع الإعلان{priceOn ? ' · السعر' : ''}</summary>
-      <div className="mt-3 grid grid-cols-2 items-end gap-3 sm:grid-cols-3">{filters}</div>
-    </details> : <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-3">{filters}</div>}
+    {compact ? <>
+      <button type="button" aria-expanded={advancedOpen} aria-controls={advancedId} onClick={()=>setAdvancedOpen(open=>!open)} className="flex min-h-11 items-center gap-2 rounded-lg border bg-background px-3 text-sm font-semibold text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+        بحث متقدم<ChevronDown aria-hidden="true" className={`h-4 w-4 transition-transform duration-200 motion-reduce:transition-none ${advancedOpen?'rotate-180':''}`}/>
+      </button>
+      <div id={advancedId} inert={!advancedOpen} aria-hidden={!advancedOpen} className={`grid transition-[grid-template-rows,visibility] duration-200 motion-reduce:transition-none ${advancedOpen?'visible grid-rows-[1fr]':'invisible grid-rows-[0fr]'}`}>
+        <div className="min-h-0 overflow-hidden"><div className="grid grid-cols-1 items-end gap-3 pb-1 sm:grid-cols-3">{filters}</div></div>
+      </div>
+    </> : <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-3">{filters}</div>}
   </form>;
 }
 

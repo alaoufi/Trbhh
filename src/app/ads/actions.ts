@@ -16,7 +16,7 @@ import { setAdMedia } from '@/lib/ad-media';
 import { setUserArea } from '@/lib/user-location';
 import { scanContent, censorGuard, summarizeHits, CATEGORY_LABEL } from '@/lib/content-guard';
 import { scanImages, imageModerationEnabled } from '@/lib/nsfw';
-import { parseMapsUrl, type LatLng } from '@/lib/maps';
+import { resolveGoogleMapsCoordinates } from '@/lib/maps-server';
 import { toInt } from '@/lib/utils';
 import { isApprovedStoreOwner } from '@/lib/merchant';
 import { getActiveProfile, ensureDefaultProfile, backfillProfileContact } from '@/lib/profiles';
@@ -56,25 +56,7 @@ function submissionErrorCode(error: CategoryValidationError): 'price' | 'locatio
   return 'category';
 }
 
-/** Resolve coordinates from a pasted maps link — follows shortened goo.gl links. */
-async function resolveMapsUrl(input: string): Promise<LatLng | null> {
-  const s = (input || '').trim();
-  if (!s) return null;
-  const direct = parseMapsUrl(s);
-  if (direct) return direct;
-  if (/^https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl|g\.co)\//i.test(s)) {
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 6000);
-      const res = await fetch(s, { redirect: 'follow', signal: ctrl.signal });
-      clearTimeout(t);
-      return parseMapsUrl(res.url) || parseMapsUrl(await res.text().catch(() => ''));
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
+const resolveMapsUrl = resolveGoogleMapsCoordinates;
 
 /** Save a raw media file (video/audio) from the form; returns the stored path or null. */
 async function saveMediaFile(formData: FormData, key: string, maxBytes: number, exts: string[]): Promise<string | null> {
@@ -634,8 +616,9 @@ export async function updateAdAction(formData: FormData) {
   try {
     let rawLat: unknown = formData.get('lat');
     let rawLng: unknown = formData.get('lng');
-    if (!String(rawLat ?? '').trim() && !String(rawLng ?? '').trim()) {
-      const ll = await resolveMapsUrl(String(formData.get('mapLink') || ''));
+    const submittedMapLink = String(formData.get('mapLink') || '').trim();
+    if (submittedMapLink) {
+      const ll = await resolveMapsUrl(submittedMapLink);
       if (ll) { rawLat = ll.lat; rawLng = ll.lng; }
     }
     editCoordinates = normalizeOptionalCoordinates({ lat: rawLat, lng: rawLng });

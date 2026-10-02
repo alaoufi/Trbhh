@@ -18,7 +18,7 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
-import { getCategoryFormConfig, getPublicCategories } from '@/lib/ad-categories/service';
+import { getCategoryEditValues, getCategoryFormConfig, getPublicCategories } from '@/lib/ad-categories/service';
 
 describe('preview-only category visibility', () => {
   beforeEach(() => {
@@ -74,5 +74,13 @@ describe('preview-only category visibility', () => {
     }]);
     const category=(await getPublicCategories([3412n])).get(3412);
     expect(category).toMatchObject({categoryFieldsTrusted:false,categoryFieldsSuppressedReason:'service_in_goods_leaf',subcategoryName:undefined,categoryFields:[],categoryCardFields:[],comparableCategoryFields:[]});
+  });
+
+  it('does not preload values from a mismatched stored subcategory',async()=>{
+    state.raw.mockResolvedValue([{values_json:{condition:'مستعمل'}}]);
+    await getCategoryEditValues(500n,101);
+    const [strings,...values]=state.raw.mock.calls.at(-1)!;
+    expect((strings as TemplateStringsArray).join('')).toContain('subcategory_id=');
+    expect(values).toContain(101);
   });
 });

@@ -1,6 +1,7 @@
 import {describe,expect,it} from 'vitest';
 import {CATEGORY_SEED_TEMPLATES} from '@/lib/ad-categories/seed-templates';
 import {buildPublicCategoryTaxonomy,CLASSIFIED_TAXONOMY_GROUPS,templateTaxonomyGroup} from '@/lib/ad-categories/taxonomy';
+import * as taxonomy from '@/lib/ad-categories/taxonomy';
 import type {CategoryOption,SubcategoryOption} from '@/lib/ad-categories/contracts';
 
 const category=(id:number,name:string):CategoryOption=>({id,name,active:true,order:id});
@@ -48,5 +49,20 @@ describe('public classified taxonomy',()=>{
     const result=buildPublicCategoryTaxonomy([category(77,'قسم مخصص')],[sub(88,77,'فرع مخصص')]);
     expect(result.groups).toEqual([expect.objectContaining({key:'category-77',name:'قسم مخصص',categoryIds:[77]})]);
     expect(result.subcategories[0]).toEqual(expect.objectContaining({groupKey:'category-77',sourceSubcategoryIds:[88]}));
+  });
+
+  it('maps an aliased legacy edit leaf to its canonical public group',()=>{
+    const resolve=(taxonomy as typeof taxonomy & {resolveEditSubcategory?:(items:SubcategoryOption[],categoryId:number,subcategoryId:number)=>{subcategory:SubcategoryOption;aliased:boolean}|undefined}).resolveEditSubcategory;
+    expect(typeof resolve).toBe('function');
+    if(!resolve)return;
+    const canonical={...sub(11,1,'سيارات','car'),groupKey:'vehicles-equipment',sourceSubcategoryIds:[11,22]};
+    expect(resolve([canonical],2,22)).toEqual({subcategory:canonical,aliased:true});
+  });
+
+  it('does not classify an active aliased edit leaf as unavailable',()=>{
+    const resolve=(taxonomy as typeof taxonomy & {resolveEditSubcategory?:(items:SubcategoryOption[],categoryId:number,subcategoryId:number)=>unknown}).resolveEditSubcategory;
+    expect(typeof resolve).toBe('function');
+    if(!resolve)return;
+    expect(resolve([{...sub(11,1,'سيارات','car'),sourceSubcategoryIds:[11,22]}],2,22)).toBeTruthy();
   });
 });

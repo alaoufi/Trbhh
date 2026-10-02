@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -43,7 +43,10 @@ type LinkedAcct = { id: number; name: string; hasStore: boolean; storeName: stri
 export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, auctionsOn = false, compareOn = true, requestsOn = true, myStoreId = 0, myStoreName = '', currentUid = 0, activeName = '', activeType = 'personal', linkedAccounts = [] }: { isAuthed: boolean; isAdmin: boolean; adminHrefs?: string[]; dealsOn?: boolean; auctionsOn?: boolean; compareOn?: boolean; requestsOn?: boolean; myStoreId?: number; myStoreName?: string; currentUid?: number; activeName?: string; activeType?: 'personal' | 'store'; linkedAccounts?: LinkedAcct[] }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname() || '';
+  const close = () => setOpen(false);
   useEffect(() => setMounted(true), []);
 
   // lock body scroll while the drawer is open
@@ -55,7 +58,58 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
     }
   }, [open]);
 
-  const close = () => setOpen(false);
+  useEffect(() => {
+    if (!open || !drawerRef.current) return;
+    const drawer = drawerRef.current;
+    const trigger = triggerRef.current;
+    const focusableSelector = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+    const background = Array.from(document.body.children).filter((element) => element !== drawer);
+    const previousBackgroundState = background.map((element) => ({
+      element,
+      inert: element.hasAttribute('inert'),
+      ariaHidden: element.getAttribute('aria-hidden'),
+    }));
+    for (const element of background) {
+      element.setAttribute('inert', '');
+      element.setAttribute('aria-hidden', 'true');
+    }
+
+    const focusable = () => Array.from(drawer.querySelectorAll<HTMLElement>(focusableSelector));
+    focusable()[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      if (!items.length) {
+        event.preventDefault();
+        drawer.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      for (const state of previousBackgroundState) {
+        if (!state.inert) state.element.removeAttribute('inert');
+        if (state.ariaHidden === null) state.element.removeAttribute('aria-hidden');
+        else state.element.setAttribute('aria-hidden', state.ariaHidden);
+      }
+      trigger?.focus();
+    };
+  }, [open]);
 
   // داخل لوحة الإدارة: القائمة = قائمة الإدارة (المصرّح بها فقط) بدل قائمة الموقع
   const adminMode = isAdmin && pathname.startsWith('/admin');
@@ -81,11 +135,11 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
   }
 
   const drawer = open ? (
-    <div className="fixed inset-0 z-[100]" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/40" onClick={close} />
+    <div ref={drawerRef} id="site-menu-dialog" className="fixed inset-0 z-[100]" role="dialog" aria-modal="true" aria-labelledby="site-menu-title" tabIndex={-1}>
+      <div className="absolute inset-0 bg-black/40" aria-hidden="true" onClick={close} />
       <nav className="absolute inset-y-0 right-0 flex w-80 max-w-[85%] flex-col overflow-y-auto bg-card text-card-foreground shadow-2xl">
         <div className="flex items-center justify-between border-b border-primary/15 bg-accent/60 p-4">
-          <span className="text-lg font-bold text-primary">{adminMode ? 'قائمة الإدارة' : 'القائمة'}</span>
+          <span id="site-menu-title" className="text-lg font-bold text-primary">{adminMode ? 'قائمة الإدارة' : 'القائمة'}</span>
           <button onClick={close} aria-label="إغلاق" className="text-primary"><X className="h-6 w-6" /></button>
         </div>
 
@@ -270,7 +324,7 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
 
   return (
     <>
-      <button onClick={() => setOpen(true)} aria-label="القائمة" className="flex items-center gap-0.5 text-[#f0b429]">
+      <button ref={triggerRef} onClick={() => setOpen(true)} aria-label="القائمة" aria-expanded={open} aria-controls="site-menu-dialog" className="flex items-center gap-0.5 text-[#f0b429]">
         <Menu className="h-7 w-7" />
         <ChevronDown className="h-3.5 w-3.5" />
       </button>

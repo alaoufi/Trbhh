@@ -41,6 +41,21 @@ const EXACT_LEAF_ALIASES:Record<string,string>={
   legacy_farm_feed:'feed',
   legacy_tiles:'tiles',
 };
+const PUBLIC_LEAF_LABELS:Record<string,string>={
+  legacy_beauty_tools_salon:'معدات وأدوات المشاغل',
+  legacy_beauty_tools_apparel:'أدوات تجميل شخصية',
+};
+
+export const canonicalTemplateKey=(templateKey:string|undefined)=>templateKey?EXACT_LEAF_ALIASES[templateKey]:undefined;
+export const isExactLeafAlias=(templateKey:string|undefined)=>Boolean(canonicalTemplateKey(templateKey));
+
+export function resolveEditSubcategory(subcategories:readonly SubcategoryOption[],categoryId:number,subcategoryId:number){
+  const eligible=subcategories.filter(item=>item.active&&item.version>0);
+  const direct=eligible.find(item=>item.id===subcategoryId&&item.categoryId===categoryId);
+  if(direct)return {subcategory:direct,aliased:false};
+  const canonical=eligible.find(item=>item.sourceSubcategoryIds?.includes(subcategoryId));
+  return canonical?{subcategory:canonical,aliased:true}:undefined;
+}
 
 export function templateTaxonomyGroup(templateKey:string){return TEMPLATE_GROUPS[templateKey];}
 
@@ -57,7 +72,7 @@ export function buildPublicCategoryTaxonomy(categories:readonly CategoryOption[]
     const aliasTarget=item.templateKey&&EXACT_LEAF_ALIASES[item.templateKey];
     if(aliasTarget&&presentTemplateKeys.has(aliasTarget)) return [];
     const groupKey=(item.templateKey&&templateTaxonomyGroup(item.templateKey))||`category-${item.categoryId}`;
-    return [{...item,groupKey,sourceSubcategoryIds:[item.id,...(item.templateKey?aliasesByCanonical.get(item.templateKey)||[]:[])]}];
+    return [{...item,name:(item.templateKey&&PUBLIC_LEAF_LABELS[item.templateKey])||item.name,groupKey,sourceSubcategoryIds:[item.id,...(item.templateKey?aliasesByCanonical.get(item.templateKey)||[]:[])]}];
   });
   const groupByKey=new Map<string,CategoryGroupOption>();
   const knownGroups=new Map<string,(typeof CLASSIFIED_TAXONOMY_GROUPS)[number]>(CLASSIFIED_TAXONOMY_GROUPS.map(item=>[item.key,item]));
@@ -67,8 +82,9 @@ export function buildPublicCategoryTaxonomy(categories:readonly CategoryOption[]
     const known=knownGroups.get(groupKey);
     const current=groupByKey.get(groupKey);
     const categoryIds=new Set([...(current?.categoryIds||[]),item.categoryId]);
+    const subcategoryIds=new Set([...(current?.subcategoryIds||[]),item.id]);
     groupByKey.set(groupKey,{
-      key:groupKey,name:known?.name||category.name,order:known?.order??1000+category.order,categoryIds:[...categoryIds],
+      key:groupKey,name:known?.name||category.name,order:known?.order??1000+category.order,categoryIds:[...categoryIds],subcategoryIds:[...subcategoryIds],
     });
   }
   const groups=[...groupByKey.values()].sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'ar'));

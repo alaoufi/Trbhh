@@ -3,9 +3,13 @@ export type LatLng = { lat: number; lng: number };
 /** Parse a "lat,lng" string into numbers, or null if invalid. */
 export function parseLatLng(v?: string | null): LatLng | null {
   if (!v) return null;
-  const [a, b] = v.split(',');
-  const lat = parseFloat(a);
-  const lng = parseFloat(b);
+  const parts = v.split(',');
+  if (parts.length !== 2) return null;
+  const [a, b] = parts.map((part) => part.trim());
+  const decimal = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+  if (!a || !b || !decimal.test(a) || !decimal.test(b)) return null;
+  const lat = Number(a);
+  const lng = Number(b);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
   return { lat, lng };

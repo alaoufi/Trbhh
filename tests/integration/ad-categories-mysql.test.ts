@@ -7,7 +7,7 @@ import {CATEGORY_DDL} from '@/lib/ad-categories/schema';
 const fixture=vi.hoisted(()=>({client:undefined as PrismaClient|undefined}));
 vi.mock('@/lib/prisma',()=>({get prisma(){return fixture.client;}}));
 vi.mock('@/lib/settings',()=>({getSetting:async(k:string,fallback:string)=>{const r=await fixture.client!.site_settings.findUnique({where:{k}});return r?.v??fallback;}}));
-import {writeAdWithCategory,getCategoryFormConfig,getPublicCategories} from '@/lib/ad-categories/service';
+import {writeAdWithCategory,getCategoryEditValues,getCategoryFormConfig,getPublicCategories} from '@/lib/ad-categories/service';
 const enabled=process.env.CATEGORIES_DB_TESTS==='1';
 let client:PrismaClient,admin:PrismaClient,created=false;
 const f={key:'condition',label:'الحالة',type:'select',group:'المواصفات',required:true,visible:true,order:0,options:['جديد','مستعمل']};
@@ -104,6 +104,22 @@ describe.skipIf(!enabled)('real ad category MySQL integration',()=>{
     const fd=form();fd.set('category_values','{}');
     await expect(writeAdWithCategory(client,fd,tx=>tx.ads.update({where:{id:ad.id},data:{detail:'Legacy correction'}}),{adId:ad.id,memberId:1n})).resolves.toMatchObject({detail:'Legacy correction'});
     await expect(create(fd)).rejects.toThrow('الحقل مطلوب');
+  });
+  it('server-preserves incompatible historical values during reclassification in MySQL',async()=>{
+    const ad=await create();
+    await client.ad_category_values.update({where:{ad_id:ad.id},data:{values_json:{condition:'جديد',legacy_only:'محفوظ'}}});
+    await client.sub_categories.create({data:{id:35n,category_id:12,name:'مكاتب',active:1}});
+    const nextField={...f,key:'shared',required:false,options:['نعم','لا']};
+    const stored={schemaVersion:2,fields:[nextField],listingPolicy:{types:[{key:'sale',label:'للبيع',pricing:['fixed','bidding']}]}};
+    await client.$executeRaw`INSERT INTO ad_category_definitions (subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (35,1,'goods',1,1,${JSON.stringify(stored)})`;
+    const fd=form();fd.set('subcategory_id','35');fd.set('category_values','{"shared":"نعم"}');
+    await writeAdWithCategory(client,fd,(tx,selection)=>tx.ads.update({where:{id:ad.id},data:{category_id:selection!.category_id,subcategory_id:selection!.subcategory_id}}),{adId:ad.id,memberId:1n});
+    expect((await client.ad_category_values.findUniqueOrThrow({where:{ad_id:ad.id}})).values_json).toEqual({condition:'جديد',legacy_only:'محفوظ',shared:'نعم'});
+  });
+  it('does not preload values from a mismatched stored subcategory in MySQL',async()=>{
+    const ad=await create();
+    await client.ad_category_values.update({where:{ad_id:ad.id},data:{subcategory_id:99n}});
+    expect(await getCategoryEditValues(ad.id,34)).toEqual({});
   });
   it('rolls back ads.create if saving values fails',async()=>{
     await client.$executeRawUnsafe('ALTER TABLE ad_category_values ADD CONSTRAINT fixture_reject_values CHECK (definition_version > 100)');

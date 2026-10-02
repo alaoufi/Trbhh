@@ -1,6 +1,7 @@
 import {describe,it,expect,vi} from 'vitest';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
+import {resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {CATEGORY_SEED_TEMPLATES} from '@/lib/ad-categories/seed-templates';
 import {validateDefinition} from '@/lib/ad-categories/validation';
@@ -86,6 +87,11 @@ describe('operator category activation',()=>{
     expect(payload.qualityReviews).toHaveLength(CATEGORY_SEED_TEMPLATES.length);
     expect(payload.qualityReviews.every((review:{key:string;status:string;reason:string})=>review.key&&review.status&&review.reason)).toBe(true);
     expect(payload.sourceSha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+  it('hashes the complete canonical manifest sources deterministically',()=>{
+    const root=resolve(process.cwd(),'src/lib/ad-categories');
+    const sources=['seed-templates.ts','validation.ts','quality-review.ts'].map(name=>readFileSync(resolve(root,name),'utf8'));
+    expect(script.buildPayload().sourceSha256).toBe(script.sha256(sources.join('\n')));
   });
   it('refuses apply before any connection unless backup, baseline, database and payload hash are explicit',async()=>{
     const db={$transaction:vi.fn()};

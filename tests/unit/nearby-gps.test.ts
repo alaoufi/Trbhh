@@ -37,4 +37,11 @@ describe('nearby advertisements by precise coordinates', () => {
     expect(seed).toMatch(/phone_whatsapp:\s*'0500000001'/);
     expect(seed).toMatch(/whatsapp:\s*1/);
   });
+
+  it('does not require a city-area join for GPS-ranked results', () => {
+    const data = readFileSync(resolve(process.cwd(), 'src/lib/data.ts'), 'utf8');
+    expect(data).toContain('const where = await buildSearchWhere({});');
+    expect(data).not.toContain('buildSearchWhere({ geoTrustedOnly: true });');
+    expect(data).toContain("{ lat: { not: null } }, { lng: { not: null } }");
+  });
 });

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createElement, Children, isValidElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CATEGORY_LABELS } from '@/lib/ad-categories/contracts';
+import { publicCategoryGroups } from '@/lib/home-feed';
 const state = vi.hoisted(() => ({ config: vi.fn(), search: vi.fn(), setting: vi.fn() }));
 vi.mock('@/lib/settings', () => ({ getSetting: state.setting }));
 vi.mock('@/lib/ad-categories/service', () => ({ getCategoryFormConfig: state.config }));
@@ -88,5 +89,11 @@ describe('homepage category discovery', () => {
     expect(section).toContain('p-3');
     expect(html.match(/<select[^>]*name="category"[^>]*>/)?.[0]).toContain('h-10');
     expect(html.match(/<button[^>]*type="submit"[^>]*>/)?.[0]).toContain('min-h-10');
+  });
+  it('derives leaf ids for legacy fallback groups, including canonical aliases',()=>{
+    const groups=publicCategoryGroups({...config,subcategories:[
+      {id:20,categoryId:12,name:'سيارات',active:true,order:1,version:1,kind:'goods',priceEnabled:true,goodsEnabled:true,fields:[],sourceSubcategoryIds:[20,21]},
+    ]});
+    expect(groups[0]).toMatchObject({categoryIds:[12],subcategoryIds:[20,21]});
   });
 });

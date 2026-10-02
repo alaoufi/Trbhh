@@ -24,6 +24,7 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
   const listingTypes=selectedSub?.listingPolicy?.types||[];
   const dependentValues=Object.fromEntries(Object.entries(params).filter(([key])=>key.startsWith('attr_')).map(([key,value])=>[key.slice(5),value||'']));
   const dynamicFields=(selectedSub?.fields||[]).filter(item=>item.filterable&&fieldApplies(item,{listingType,values:dependentValues}));
+  const dynamicGroups=[...new Set(dynamicFields.map(item=>item.group||'مواصفات'))].map(group=>({group,fields:dynamicFields.filter(item=>(item.group||'مواصفات')===group)}));
   const categoryFilters=categoryConfig?.enabled?<>
     <label className="space-y-1 text-xs font-semibold text-foreground">القسم
       <select name="category" value={category} className={field} onChange={event=>{setCategory(event.target.value);setSubcategory('');setListingType('');}}><option value="">كل الأقسام</option>{groups.map(item=><option key={item.key} value={item.key}>{item.name}</option>)}</select>
@@ -34,7 +35,10 @@ export function PublicSearchForm({ regions, areas, params = {}, priceOn = true, 
     {listingTypes.length>0&&<label className="space-y-1 text-xs font-semibold text-foreground">نوع العملية
       <select name="listingType" value={listingType} className={field} onChange={event=>setListingType(event.target.value)}><option value="">الكل</option>{listingTypes.map(item=><option key={item.key} value={item.key}>{item.label}</option>)}</select>
     </label>}
-    {dynamicFields.map(item=><CategoryFilterField key={item.key} field={item} params={params} inputClass={field}/>)}
+    {dynamicGroups.map(({group,fields})=><fieldset key={group} data-filter-group={group} className="col-span-full rounded-lg border bg-muted/20 p-2.5">
+      <legend className="px-1 text-xs font-bold text-foreground">{group}</legend>
+      <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-2 md:grid-cols-3">{fields.map(item=><CategoryFilterField key={item.key} field={item} params={params} inputClass={field}/>)}</div>
+    </fieldset>)}
   </>:null;
   const filters = <>
     {categoryFilters}
@@ -78,17 +82,17 @@ function CategoryFilterField({field,params,inputClass}:{field:CategoryField;para
   const name=`attr_${field.key}`;
   const label=field.unit?`${field.label} (${field.unit})`:field.label;
   if(['number','decimal','year','range'].includes(field.type))return <div className="grid grid-cols-2 gap-2"><label className="space-y-1 text-xs font-semibold">{label} من<input name={`${name}_min`} type="number" step={field.step??'any'} min={field.min} max={field.max} defaultValue={params[`${name}_min`]||''} className={inputClass}/></label><label className="space-y-1 text-xs font-semibold">{label} إلى<input name={`${name}_max`} type="number" step={field.step??'any'} min={field.min} max={field.max} defaultValue={params[`${name}_max`]||''} className={inputClass}/></label></div>;
-  if(field.type==='multiselect')return <MultiSelectCategoryFilter field={field} name={name} initial={params[name]||''}/>;
+  if(field.type==='multiselect')return <MultiSelectCategoryFilter field={field} label={label} name={name} initial={params[name]||''}/>;
   if(field.type==='select'||field.type==='radio')return <label className="space-y-1 text-xs font-semibold">{label}<select name={name} defaultValue={params[name]||''} className={inputClass}><option value="">الكل</option>{field.options.map(option=><option key={option} value={option}>{option}</option>)}</select></label>;
-  if(field.type==='boolean')return <label className="space-y-1 text-xs font-semibold">{field.label}<select name={name} defaultValue={params[name]||''} className={inputClass}><option value="">الكل</option><option value="1">نعم</option><option value="0">لا</option></select></label>;
-  return <label className="space-y-1 text-xs font-semibold">{field.label}<input name={name} defaultValue={params[name]||''} maxLength={120} className={inputClass}/></label>;
+  if(field.type==='boolean')return <label className="space-y-1 text-xs font-semibold">{label}<select name={name} defaultValue={params[name]||''} className={inputClass}><option value="">الكل</option><option value="1">نعم</option><option value="0">لا</option></select></label>;
+  return <label className="space-y-1 text-xs font-semibold">{label}<input name={name} defaultValue={params[name]||''} maxLength={120} className={inputClass}/></label>;
 }
 
-function MultiSelectCategoryFilter({field,name,initial}:{field:CategoryField;name:string;initial:string}){
+function MultiSelectCategoryFilter({field,label,name,initial}:{field:CategoryField;label:string;name:string;initial:string}){
   const [selected,setSelected]=useState(()=>initial.split(',').filter(value=>field.options.includes(value)));
   const toggle=(value:string)=>setSelected(current=>current.includes(value)?current.filter(item=>item!==value):[...current,value]);
   return <fieldset className="rounded-lg border bg-background p-2">
-    <legend className="px-1 text-xs font-semibold">{field.label}</legend>
+    <legend className="px-1 text-xs font-semibold">{label}</legend>
     <input type="hidden" name={name} value={selected.join(',')}/>
     <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
       {field.options.map(option=><label key={option} className={`cursor-pointer rounded-full border px-2 py-1 text-xs font-semibold ${selected.includes(option)?'border-primary bg-primary text-white':'bg-white text-foreground'}`}>

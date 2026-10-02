@@ -4,7 +4,12 @@ export type SelectedHomeCategory=CategoryGroupOption&{id?:number};
 
 export function publicCategoryGroups(config:CategoryFormConfig):CategoryGroupOption[]{
   if(config.groups?.length)return config.groups;
-  return config.categories.filter(item=>item.active).map(item=>({key:String(item.id),name:item.name,order:item.order,categoryIds:[item.id]}));
+  return config.categories.filter(item=>item.active).map(item=>({
+    key:String(item.id),name:item.name,order:item.order,categoryIds:[item.id],
+    subcategoryIds:config.subcategories
+      .filter(subcategory=>subcategory.active&&subcategory.categoryId===item.id)
+      .flatMap(subcategory=>subcategory.sourceSubcategoryIds?.length?subcategory.sourceSubcategoryIds:[subcategory.id]),
+  }));
 }
 
 /** Browsing includes legacy active categories without configured form fields. */

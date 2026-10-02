@@ -10,7 +10,7 @@ describe('production security headers', () => {
     expect(headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(headers.get('X-Frame-Options')).toBe('SAMEORIGIN');
     expect(headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
-    expect(headers.get('Permissions-Policy')).toContain('camera=()');
+    expect(headers.get('Permissions-Policy')).toBe('camera=(), geolocation=(self), microphone=()');
     expect(headers.get('Content-Security-Policy')).toContain("frame-ancestors 'self'");
     expect(headers.get('Content-Security-Policy')).toContain("frame-src 'self' https://eauthenticate.saudibusiness.gov.sa");
   });

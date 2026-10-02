@@ -34,7 +34,7 @@ export class CategoryValidationError extends Error {
 export function validateDefinition(raw: unknown): CategoryField[] {
   if (!Array.isArray(raw) || raw.length > 80) throw new CategoryValidationError('', 'تعريف الحقول غير صالح');
   const keys = new Set<string>();
-  return raw.map((item: unknown) => {
+  const fields=raw.map((item: unknown) => {
     if (!item || typeof item !== 'object') throw new CategoryValidationError('', 'تعريف حقل غير صالح');
     const f = item as Record<string, unknown>;
     const key = f.key;
@@ -80,6 +80,19 @@ export function validateDefinition(raw: unknown): CategoryField[] {
       ...(typeof f.dependsOn==='string'?{dependsOn:f.dependsOn,dependencyOperator:f.dependencyOperator as DependencyOperator,dependencyValue:f.dependencyValue as CategoryField['dependencyValue'],...(typeof f.conditionEffect==='string'?{conditionEffect:f.conditionEffect as ConditionEffect}:{})}:{}),
     };
   }).sort((a, b) => a.order - b.order);
+  const byKey=new Map(fields.map(field=>[field.key,field]));
+  for(const field of fields){
+    if(!field.dependsOn||field.dependsOn==='listing_type')continue;
+    const controller=byKey.get(field.dependsOn);
+    if(!controller)throw new CategoryValidationError(field.key,'الحقل المتحكم غير موجود');
+    if(['select','multiselect','radio'].includes(controller.type)){
+      const expected=Array.isArray(field.dependencyValue)?field.dependencyValue:[field.dependencyValue];
+      if(expected.some(value=>!controller.options.includes(String(value)))){
+        throw new CategoryValidationError(field.key,'قيمة الشرط غير موجودة في خيارات الحقل المتحكم');
+      }
+    }
+  }
+  return fields;
 }
 
 function empty(value: unknown) {
@@ -178,9 +191,13 @@ export function visibleCategoryValues(fields: CategoryField[], values: CategoryV
   return projectCategoryValues(fields,values,'details',context);
 }
 
-export type CategoryProjection='details'|'card'|'compare';
+export type CategoryProjection='details'|'card'|'compare'|'filter'|'search';
 export function projectCategoryValues(fields:CategoryField[],values:CategoryValues,projection:CategoryProjection,context:CategoryFieldContext={}){
-  const included=(field:CategoryField)=>projection==='card'?field.showInCard===true:projection==='compare'?field.comparable===true:field.showInDetails!==false;
+  const included=(field:CategoryField)=>projection==='card'?field.showInCard===true
+    :projection==='compare'?field.comparable===true
+      :projection==='filter'?field.filterable===true
+        :projection==='search'?field.searchable===true
+          :field.showInDetails!==false;
   return fields.filter(f => included(f)&&fieldApplies(f,{...context,values}) && Object.hasOwn(values, f.key) && !empty(values[f.key]))
     .sort((a, b) => a.order - b.order)
     .flatMap(f => {
@@ -196,3 +213,30 @@ export function projectCategoryValues(fields:CategoryField[],values:CategoryValu
 
 export const cardCategoryValues=(fields:CategoryField[],values:CategoryValues,context:CategoryFieldContext={})=>projectCategoryValues(fields,values,'card',context);
 export const comparableCategoryValues=(fields:CategoryField[],values:CategoryValues,context:CategoryFieldContext={})=>projectCategoryValues(fields,values,'compare',context);
+export const filterCategoryValues=(fields:CategoryField[],values:CategoryValues,context:CategoryFieldContext={})=>projectCategoryValues(fields,values,'filter',context);
+export const searchableCategoryValues=(fields:CategoryField[],values:CategoryValues,context:CategoryFieldContext={})=>projectCategoryValues(fields,values,'search',context);
+
+/** Values shown/submitted by the current leaf; the caller may retain the complete draft separately. */
+export function editableCategoryValues(fields:CategoryField[],values:CategoryValues,context:CategoryFieldContext={}):CategoryValues{
+  const out:CategoryValues={};
+  for(const field of fields.filter(item=>fieldApplies(item,{...context,values}))){
+    if(!Object.hasOwn(values,field.key)||empty(values[field.key]))continue;
+    try{
+      const valid=validateCategoryValues([field],{[field.key]:values[field.key]},{...context,values});
+      if(Object.hasOwn(valid,field.key))out[field.key]=valid[field.key];
+    }catch(error){
+      if(!(error instanceof CategoryValidationError))throw error;
+    }
+  }
+  return out;
+}
+
+/** Replace active values while retaining inactive or historical keys from the locked database row. */
+export function mergeStoredCategoryValues(previous:CategoryValues,fields:CategoryField[],submitted:CategoryValues,context:CategoryFieldContext={}):CategoryValues{
+  // حالة الحقول الشرطية يحددها النموذج الحالي فقط. استخدام قيمة المتحكم
+  // القديمة بعد مسحها كان يعتبر الحقل التابع نشطاً ويحذف قيمته بصمت.
+  const conditionValues={...submitted};
+  const activeKeys=new Set(fields.filter(field=>fieldApplies(field,{...context,values:conditionValues})).map(field=>field.key));
+  const preserved=Object.fromEntries(Object.entries(previous).filter(([key])=>!activeKeys.has(key)&&!UNSAFE_KEYS.has(key))) as CategoryValues;
+  return {...preserved,...submitted};
+}

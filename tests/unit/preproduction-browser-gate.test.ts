@@ -43,6 +43,8 @@ describe('isolated pre-production browser gate', () => {
     expect(deploy).toContain('report.businessDecisions');
     expect(deploy).toContain('x-robots-tag');
     expect(deploy).toContain('noindex, nofollow, noarchive');
+    expect(deploy).toContain('TRBHH_PREVIEW_MODE');
+    expect(deploy).toContain('NEXT_HTTP_ERROR_FALLBACK;404');
     expect(deploy).toContain("'/search' '/deals' '/nearby' '/companies' '/shop' '/guide' '/site-map'");
     expect(deploy).toContain('previewRecentLogs=clean');
     expect(deploy).toContain('wait_for_preview_200');

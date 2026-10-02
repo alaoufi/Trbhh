@@ -99,6 +99,7 @@ describe('public search form controls', () => {
 });
 
 describe('subcategory attribute filters',()=>{
+  const location={regions:[{id:1,name:'منطقة الرياض',countryId:1}],areas:[]};
   const fields=[
     {key:'capacity',label:'الحمولة',type:'number' as const,group:'فني',required:false,visible:true,order:1,options:[],min:1,max:100,filterable:true},
     {key:'power',label:'الطاقة',type:'select' as const,group:'فني',required:false,visible:true,order:2,options:['ديزل','كهرباء'],filterable:true},
@@ -124,6 +125,26 @@ describe('subcategory attribute filters',()=>{
       {key:'features',mode:'array_contains_any',value:['GPS','مكيف']},
     ]);
     expect(normalized.params).toMatchObject({attr_reach_min:'20',attr_reach_max:'40',attr_features:'GPS,مكيف'});
+  });
+  it('groups category filters by canonical schema group',()=>{
+    const base={active:true,order:1,version:1,kind:'goods' as const,priceEnabled:true,goodsEnabled:true};
+    const categoryConfig:CategoryFormConfig={enabled:true,labels:CATEGORY_LABELS,categories:[{id:10,name:'معدات',active:true,order:1}],groups:[{key:'vehicles-equipment',name:'معدات',order:1,categoryIds:[10]}],subcategories:[{...base,id:101,categoryId:10,name:'رافعات',groupKey:'vehicles-equipment',sourceSubcategoryIds:[101],fields}]};
+    const html=renderToStaticMarkup(createElement(PublicSearchForm,{...location,categoryConfig,params:{category:'vehicles-equipment',subcategory:'101',listingType:'rent'}}));
+    expect(html).toContain('data-filter-group="فني"');
+    expect(html).toContain('data-filter-group="إيجار"');
+  });
+  it('shows configured units for every filter control type',()=>{
+    const unitFields=[
+      {...fields[2],label:'المشغل',unit:'ساعة'},
+      {...fields[5],label:'المزايا',unit:'وحدة'},
+      {...fields[3],key:'note',label:'ملاحظة',unit:'سم',filterable:true},
+    ];
+    const base={active:true,order:1,version:1,kind:'goods' as const,priceEnabled:true,goodsEnabled:true};
+    const categoryConfig:CategoryFormConfig={enabled:true,labels:CATEGORY_LABELS,categories:[{id:10,name:'معدات',active:true,order:1}],groups:[{key:'vehicles-equipment',name:'معدات',order:1,categoryIds:[10]}],subcategories:[{...base,id:101,categoryId:10,name:'رافعات',groupKey:'vehicles-equipment',sourceSubcategoryIds:[101],fields:unitFields}]};
+    const html=renderToStaticMarkup(createElement(PublicSearchForm,{...location,categoryConfig,params:{category:'vehicles-equipment',subcategory:'101',listingType:'rent'}}));
+    expect(html).toContain('المشغل (ساعة)');
+    expect(html).toContain('المزايا (وحدة)');
+    expect(html).toContain('ملاحظة (سم)');
   });
 });
 

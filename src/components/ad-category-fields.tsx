@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { fieldApplies, fieldIsRequired, type CategoryField, type CategoryValues, type CategoryValue, type CategoryRange } from '@/lib/ad-categories/validation';
+import { editableCategoryValues, fieldApplies, fieldIsRequired, type CategoryField, type CategoryValues, type CategoryValue, type CategoryRange } from '@/lib/ad-categories/validation';
 
 const controlBase = 'mt-1 h-11 min-h-11 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none transition-colors focus:ring-2';
 
@@ -18,7 +18,7 @@ export function AdCategoryFields({ fields, values, onChange, listingType }: {
 }) {
   const [invalidKeys, setInvalidKeys] = React.useState<Set<string>>(() => new Set());
   const active = fields.filter(f => fieldApplies(f, { listingType, values })).sort((a, b) => a.order - b.order);
-  const current = Object.fromEntries(active.filter(f => Object.hasOwn(values, f.key)).map(f => [f.key, values[f.key]]));
+  const current = editableCategoryValues(fields,values,{listingType});
   const groups = [...new Set(active.map(f => f.group))];
 
   function markInvalid(key: string) {
@@ -36,7 +36,7 @@ export function AdCategoryFields({ fields, values, onChange, listingType }: {
 
   function update(key: string, value: CategoryValue) {
     clearInvalid(key);
-    onChange({ ...current, [key]: value });
+    onChange({ ...values, [key]: value });
   }
 
   return <div className="space-y-2">
@@ -101,7 +101,7 @@ export function AdCategoryFields({ fields, values, onChange, listingType }: {
                 onChange={e => {
                   clearInvalid(f.key);
                   if (!e.target.value) {
-                    const next = { ...current };
+                    const next = { ...values };
                     delete next[f.key];
                     onChange(next);
                   } else update(f.key, e.target.value === 'true');

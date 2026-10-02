@@ -66,7 +66,12 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   import('@/lib/data').then((m0) => m0.promoteScheduledAds()).catch(() => {});
   const [featured, latest, mostViewed, topRated, stats, homeStats, clsText] = await Promise.all([
     selectedCategory ? Promise.resolve([]) : getFeaturedAds(8),
-    selectedCategory ? searchAds({ categoryIds: selectedCategory.categoryIds, take: 24, skip: 0 }) : getHomeLatestAds(8),
+    selectedCategory ? searchAds({
+      ...(selectedCategory.subcategoryIds?.length
+        ? { subcategoryIds: selectedCategory.subcategoryIds }
+        : { categoryIds: selectedCategory.categoryIds }),
+      take: 24, skip: 0,
+    }) : getHomeLatestAds(8),
     selectedCategory ? Promise.resolve([]) : getMostViewedAds(8),
     selectedCategory ? Promise.resolve([]) : getTopRatedAds(8),
     getStats(),

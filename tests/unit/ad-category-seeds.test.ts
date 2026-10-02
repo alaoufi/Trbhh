@@ -175,7 +175,7 @@ describe('editable specialist subcategory seed templates', () => {
     const fresh=validateCategoryValues(car.fields,{make:'تويوتا',model:'كامري',year:2026,condition:'جديد',odometer_km:15},{listingType:'sale'});
     expect(fresh).not.toHaveProperty('odometer_km');
     const lifting=CATEGORY_SEED_TEMPLATES.find(item=>item.key==='lifting')!;
-    const base={equipment_kind:'رافعة شوكية',manufacturer:'تويوتا',model:'8FG',year:2022,condition:'مستعمل',power_source:'غاز',lift_height_m:4};
+    const base={equipment_kind:'رافعة شوكية',manufacturer:'تويوتا',model:'8FG',year:2022,condition:'مستعمل',power_source:'غاز',lift_height_m:4,forklift_capacity_t:3};
     expect(validateCategoryValues(lifting.fields,{...base,operator_included:true},{listingType:'sale'})).not.toHaveProperty('operator_included');
     expect(validateCategoryValues(lifting.fields,{...base,operator_included:true,transport_included:false,minimum_rental_period:1},{listingType:'rent'})).toMatchObject({operator_included:true,transport_included:false});
   });

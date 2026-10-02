@@ -36,6 +36,19 @@ describe('safe category template upgrades', () => {
     expect(resolved.fields.find(field=>field.key==='material')).toMatchObject({type:'select'});
     expect(resolved.upgradedFromBuiltInV1).toBe(true);
   });
+  it.each([
+    ['legacy_heavy_equipment','ee83430decfa35ae00ccadfe1c6ecfdf3feae74bd7cc5441ff2cd8cb6230551e'],
+    ['legacy_horses','745c75b154900a65dd5608c8956aeb93393092e6936afe9bf0311715e214e0ad'],
+    ['legacy_fitness','56a4ad788a4d445ceab2149eb700cb1ef924ae19ad99a397a26af98c9cd9ea76'],
+    ['lifting','b6324b60eecc3d07970756d1cae6e1fb79e2db642231eeae4b51a161497cb8ad'],
+  ])('upgrades the untouched pre-audit %s schema', (key,fieldsFingerprint)=>{
+    const current=CATEGORY_SEED_TEMPLATES.find(template=>template.key===key)!;
+    const resolved=resolveCategoryDefinition({
+      version:1,kind:current.kind,priceEnabled:current.priceEnabled,goodsEnabled:current.goodsEnabled,
+      fields:[],fieldsFingerprint,
+    },current.categoryName,current.name,true);
+    expect(resolved).toMatchObject({fields:current.fields,upgradedFromBuiltInV1:true});
+  });
 
   it.each([
     ['disabled', false, 1, '5cf4148a9517012e201e997297ca5145bbb9b55005d04cb113e46ff4c40fce59'],

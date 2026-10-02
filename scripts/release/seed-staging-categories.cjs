@@ -7,7 +7,7 @@ const { PrismaClient } = require('@prisma/client');
 
 async function main() {
   if (process.env.STAGING_CATEGORY_SEED !== '1') throw new Error('staging_seed_disabled');
-  const payload = JSON.parse(fs.readFileSync('/app/database/category-seeds.json', 'utf8'));
+  const payload = JSON.parse(fs.readFileSync('/app/scripts/release/category-seeds.json', 'utf8'));
   const db = new PrismaClient({ log: [] });
   try {
     const [{ db: database }] = await db.$queryRawUnsafe('SELECT DATABASE() AS db');

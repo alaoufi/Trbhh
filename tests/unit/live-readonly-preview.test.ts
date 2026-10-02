@@ -115,6 +115,7 @@ describe('Hostinger live-data read-only preview', () => {
 
     expect(workflow).toContain('live_read_only');
     expect(workflow).toContain('set_env TRBHH_READ_ONLY_PREVIEW 1');
+    expect(workflow).toContain('set_env TRBHH_PREVIEW_MODE 1 .env');
     expect(workflow).toContain('set_env SUPPLIER_ALLOW_LIVE_ORDERS false');
     expect(workflow).toContain('set_env AUTH_SECRET "$staging_auth_secret" .env');
     expect(workflow).toContain("(process.env.AUTH_SECRET||'').length<32");
@@ -180,6 +181,14 @@ describe('Hostinger live-data read-only preview', () => {
     expect(workflow).toContain("-A 'GPTBot/1.0'");
     expect(workflow).toContain('test "$anonymous_status" = 200');
     expect(workflow).toContain("! grep -qi '^www-authenticate:'");
+  });
+
+  test('fails staging deployment when a required route renders a soft 404 body', () => {
+    const workflow = readFileSync(path.join(root, '.github/workflows/deploy-staging.yml'), 'utf8');
+
+    expect(workflow).toContain('NEXT_HTTP_ERROR_FALLBACK;404');
+    expect(workflow).toContain('This page could not be found');
+    expect(workflow).toContain('preview-route-body');
   });
 
   test('records listener, Docker publication and firewall diagnostics without changing production', () => {

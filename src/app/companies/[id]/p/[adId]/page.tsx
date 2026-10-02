@@ -24,6 +24,8 @@ import { StoreBottomNav } from '@/components/store-bottomnav';
 import { StoreContactLink } from '@/components/store-contact-link';
 import { getAdAudio } from '@/lib/ad-media';
 import { sellerContactPolicy } from '@/lib/contact-policy';
+import { getAdLocationPrivacy } from '@/lib/ads/location-privacy';
+import { parseLatLng } from '@/lib/geo';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,6 +103,13 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
   const wa = storeContact.whatsappHref;
   const storePhoneHref = storeContact.phoneHref;
   const audioPath = await getAdAudio(ad.id).catch(() => null);
+  const adLocation = parseLatLng(ad.lat && ad.lng ? `${ad.lat},${ad.lng}` : null);
+  const showExactLocationPublicly = adLocation
+    ? await getAdLocationPrivacy(BigInt(ad.id)).catch(() => false)
+    : false;
+  const directionsUrl = adLocation && showExactLocationPublicly
+    ? `https://www.google.com/maps/search/?api=1&query=${adLocation.lat},${adLocation.lng}`
+    : null;
   // حالة التوفر + السعر قبل الخصم (تفعيلهما العام من التحكم)
   const xtr = await import('@/lib/store-extras');
   const [stockOn, dealsOn] = await Promise.all([xtr.stockEnabled(), xtr.dealsEnabled()]);
@@ -220,9 +229,9 @@ export default async function StoreProductPage({ params }: { params: Promise<{ i
         )}
 
         {/* الموقع على الخريطة */}
-        {ad.lat && ad.lng && (
+        {directionsUrl && (
           <a
-            href={`https://www.google.com/maps/search/?api=1&query=${ad.lat},${ad.lng}`}
+            href={directionsUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold text-white"

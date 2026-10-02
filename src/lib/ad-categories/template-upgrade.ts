@@ -61,6 +61,15 @@ const PRE_POLICY_FIELD_FINGERPRINTS:Record<string,string>={
   earthmoving:'9e0a13cd90f35063a2c407c11c56c30059d617190677a1c082a80cc735323e41',lifting:'9d5f62072037611f0423d812094f7a6a38771741f229fac823ce057846a84bf6',commercial_vehicles:'d3d36e4bf9fc19f7155e7e959f1da53e2ef4b6c04053a95d4e72f2dd4d635e2a',transport_service:'5accaaf8999cd974db086ad9a5bc175802e161a18a6bdaec1124007a79284f70',
 };
 
+// آخر قوالب نظامية سبقت تدقيق شجرة الحقول الشامل. تُقبل هذه البصمات فقط
+// للترقية الآلية؛ أي تعريف إداري مختلف يظل محفوظاً كما هو.
+const PRE_SCHEMA_AUDIT_FIELD_FINGERPRINTS:Record<string,string>={
+  legacy_heavy_equipment:'ee83430decfa35ae00ccadfe1c6ecfdf3feae74bd7cc5441ff2cd8cb6230551e',
+  legacy_horses:'745c75b154900a65dd5608c8956aeb93393092e6936afe9bf0311715e214e0ad',
+  legacy_fitness:'56a4ad788a4d445ceab2149eb700cb1ef924ae19ad99a397a26af98c9cd9ea76',
+  lifting:'b6324b60eecc3d07970756d1cae6e1fb79e2db642231eeae4b51a161497cb8ad',
+};
+
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -74,7 +83,11 @@ export function categoryFieldsFingerprint(rawFields: unknown): string {
 }
 
 function knownSystemFingerprints(template: (typeof CATEGORY_SEED_TEMPLATES)[number]): string[] {
-  const fingerprints = [LEGACY_V1_FIELD_FINGERPRINTS[template.key], PRE_POLICY_FIELD_FINGERPRINTS[template.key]].filter((value): value is string => Boolean(value));
+  const fingerprints = [
+    LEGACY_V1_FIELD_FINGERPRINTS[template.key],
+    PRE_POLICY_FIELD_FINGERPRINTS[template.key],
+    PRE_SCHEMA_AUDIT_FIELD_FINGERPRINTS[template.key],
+  ].filter((value): value is string => Boolean(value));
   if (template.key === 'rugs') {
     const previousFields = template.fields.map(field => field.key === 'material' ? { ...field, type: 'multiselect' as const } : field);
     fingerprints.push(categoryFieldsFingerprint(previousFields));

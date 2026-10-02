@@ -1,16 +1,30 @@
-import { notFound } from 'next/navigation';
 import { Flame } from 'lucide-react';
 import { getDealAds } from '@/lib/data';
 import { dealsEnabled } from '@/lib/store-extras';
 import { AdGrid } from '@/components/ad-card';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'عروض اليوم', description: 'أقوى التخفيضات والعروض الحالية على منصة تربح' };
+export async function generateMetadata() {
+  const enabled = await dealsEnabled().catch(() => false);
+  return {
+    title: 'عروض اليوم',
+    description: 'أقوى التخفيضات والعروض الحالية على منصة تربح',
+    robots: enabled ? undefined : { index: false, follow: false },
+  };
+}
 
 /** عروض اليوم: كل إعلان حدد معلنه «سعراً قبل الخصم» أعلى من سعره الحالي.
  *  تُفعَّل الصفحة من التحكم (الإعدادات ← الميزات التفاعلية). */
 export default async function DealsPage() {
-  if (!(await dealsEnabled())) notFound();
+  if (!(await dealsEnabled())) {
+    return (
+      <section className="mx-auto max-w-2xl rounded-2xl border border-border bg-card p-6 text-center shadow-sm" aria-labelledby="deals-disabled-title">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-rose-500/10 text-rose-700"><Flame className="h-6 w-6" /></span>
+        <h1 id="deals-disabled-title" className="mt-3 text-xl font-extrabold text-primary">العروض غير مفعّلة حالياً</h1>
+        <p className="mt-2 text-sm text-muted-foreground">يمكنك متابعة الإعلانات المتاحة، وستظهر عروض اليوم هنا عند تفعيلها.</p>
+      </section>
+    );
+  }
   const ads = await getDealAds(60).catch(() => []);
   return (
     <div className="space-y-4">

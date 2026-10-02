@@ -3,7 +3,7 @@ import type {ListingPolicy} from './listing-policy';
 export const CATEGORY_KINDS = ['goods','property','jobs','service','livestock','plants','other'] as const;
 export type CategoryKind = typeof CATEGORY_KINDS[number];
 export type CategoryOption = {id:number;name:string;active:boolean;order:number};
-export type CategoryGroupOption = {key:string;name:string;order:number;categoryIds:number[]};
+export type CategoryGroupOption = {key:string;name:string;order:number;categoryIds:number[];subcategoryIds?:number[]};
 export type SubcategoryOption = CategoryOption & {
   categoryId:number;version:number;kind:CategoryKind;priceEnabled:boolean;goodsEnabled:boolean;
   fields:CategoryField[];listingPolicy?:ListingPolicy;

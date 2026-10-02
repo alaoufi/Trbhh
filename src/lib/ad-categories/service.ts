@@ -3,14 +3,14 @@ import {Prisma, type PrismaClient} from '@prisma/client';
 import {prisma} from '@/lib/prisma';
 import {getSetting} from '@/lib/settings';
 import {CATEGORY_LABELS, categoryEnabled, categoryId, categoryPolicy, parseCategorySubmission, type CategoryFormConfig, type SubcategoryOption} from './contracts';
-import {CategoryValidationError,cardCategoryValues,comparableCategoryValues, validateDefinition, visibleCategoryValues, type CategoryValues} from './validation';
+import {CategoryValidationError,cardCategoryValues,comparableCategoryValues,filterCategoryValues,mergeStoredCategoryValues,searchableCategoryValues, validateDefinition, visibleCategoryValues, type CategoryValues} from './validation';
 import {CATEGORY_LATEST_TEMPLATES_SETTING, categoryFieldsFingerprint, resolveCategoryDefinition} from './template-upgrade';
 import {applyPreviewCategoryVisibility,isReadOnlyPreview,parsePreviewCategoryVisibility,PREVIEW_CATEGORY_VISIBILITY_KEY} from '@/lib/read-only-preview';
 import {previewHashGetAll} from '@/lib/redis';
 import {defaultListingPolicy,inferLegacyListingType,normalizeListingSubmission,validateListingPolicy,type NormalizedListingSubmission} from './listing-policy';
 import {decodeStoredCategoryDefinition} from './storage';
 import {categorySeedDefinition,findCategorySeedTemplate} from './seed-templates';
-import {buildPublicCategoryTaxonomy} from './taxonomy';
+import {buildPublicCategoryTaxonomy,isExactLeafAlias} from './taxonomy';
 import {publicCategoryFieldTrust,type PublicCategoryTrustReason} from './public-trust';
 type Tx=Prisma.TransactionClient;
 type DefinitionRow={subcategory_id:bigint;version:number;kind:string;price_enabled:number;goods_enabled:number;fields_json:unknown};
@@ -68,8 +68,11 @@ export async function writeAdWithCategory<T extends {id:bigint}>(db:PrismaClient
       if(['category_id','subcategory_id','category_version','category_values'].some(k=>fd.has(k))) throw new CategoryValidationError('','لا يمكن تغيير التصنيف في وضع الإبقاء');
       const cats=await tx.$queryRaw<{id:bigint;name:string}[]>`SELECT id,name FROM categories WHERE id=${existing.category_id} AND is_active='yes' FOR SHARE`;
       const subs=existing.subcategory_id===null?[]:await tx.$queryRaw<{id:bigint;name:string}[]>`SELECT id,name FROM sub_categories WHERE id=${existing.subcategory_id} AND category_id=${existing.category_id} AND active=1 FOR SHARE`;
-      const defs=existing.subcategory_id===null?[]:await tx.$queryRaw<{subcategory_id:bigint}[]>`SELECT subcategory_id FROM ad_category_definitions WHERE subcategory_id=${existing.subcategory_id} FOR SHARE`;
-      if(cats.length&&subs.length&&(defs.length||seededDefinition(cats[0].name,subs[0].name))) throw new CategoryValidationError('','التصنيف نشط؛ يجب التحقق من حقوله');
+      const defs=existing.subcategory_id===null?[]:await tx.$queryRaw<DefinitionRow[]>`SELECT * FROM ad_category_definitions WHERE subcategory_id=${existing.subcategory_id} FOR SHARE`;
+      const currentDefinition=cats.length&&subs.length
+        ?(defs.length?definition(defs[0],{categoryName:cats[0].name,subcategoryName:subs[0].name,useLatestTemplates:categoryEnabled(settings.get(CATEGORY_LATEST_TEMPLATES_SETTING)??'1')}):seededDefinition(cats[0].name,subs[0].name))
+        :undefined;
+      if(currentDefinition&&!isExactLeafAlias(currentDefinition.templateKey)) throw new CategoryValidationError('','التصنيف نشط؛ يجب التحقق من حقوله');
       const {price,price_type,rent_period,sale_type,old_price,stock_state}=existing;
       const ad=await write(tx,null,{price,price_type,rent_period,sale_type,old_price,stock_state});
       if(ad.id!==edit.adId) throw new CategoryValidationError('','الإعلان غير مطابق');
@@ -91,24 +94,27 @@ export async function writeAdWithCategory<T extends {id:bigint}>(db:PrismaClient
       :seededDefinition(cats[0].name,subs[0].name);
     if(!def) throw new CategoryValidationError('','القسم غير متاح');
     const listing=normalizeListingSubmission(def.listingPolicy,{listingType:fd.get('listingType'),pricingMode:fd.get('pricingMode'),price:fd.get('price')});
+    const previousRows=edit?await tx.$queryRaw<{subcategory_id:bigint;values_json:unknown}[]>`SELECT subcategory_id,values_json FROM ad_category_values WHERE ad_id=${edit.adId} FOR SHARE`:[];
+    const previousMatchesExisting=Boolean(existing?.subcategory_id!==null&&previousRows.length&&Number(previousRows[0].subcategory_id)===existing?.subcategory_id);
+    const previous=(previousMatchesExisting?json(previousRows[0].values_json):{}) as CategoryValues;
     let grandfatherMissingRequired:ReadonlySet<string>|undefined;
     if(edit&&existing&&Number(existing.category_id)===cid&&existing.subcategory_id===sid){
-      const previousRows=await tx.$queryRaw<{values_json:unknown}[]>`SELECT values_json FROM ad_category_values WHERE ad_id=${edit.adId} AND subcategory_id=${sid} FOR SHARE`;
-      const previous=(previousRows.length?json(previousRows[0].values_json):{}) as CategoryValues;
       grandfatherMissingRequired=new Set(def.fields.filter(field=>field.required&&!Object.hasOwn(previous,field.key)).map(field=>field.key));
     }
-    const values=parseCategorySubmission(fd,{...def,id:sid,categoryId:cid},listing.listingType,grandfatherMissingRequired);
+    const submittedValues=parseCategorySubmission(fd,{...def,id:sid,categoryId:cid},listing.listingType,grandfatherMissingRequired);
+    const values=edit?mergeStoredCategoryValues(previous,def.fields,submittedValues,{listingType:listing.listingType}):submittedValues;
     const ad=await write(tx,{category_id:BigInt(cid),subcategory_id:sid,cat_reviewed:1,priceEnabled:def.priceEnabled,goodsEnabled:def.goodsEnabled,listing});
     await tx.$executeRaw`INSERT INTO ad_category_values (ad_id,subcategory_id,definition_version,values_json) VALUES (${ad.id},${sid},${def.version},${JSON.stringify(values)}) ON DUPLICATE KEY UPDATE subcategory_id=VALUES(subcategory_id),definition_version=VALUES(definition_version),values_json=VALUES(values_json)`;
     return ad;
   });
 }
-export async function getCategoryEditValues(id:bigint):Promise<CategoryValues> {
+export async function getCategoryEditValues(id:bigint,subcategoryId:number|null):Promise<CategoryValues> {
   if(!categoryEnabled(await getSetting('categories_v2_enabled',process.env.CATEGORIES_DEFAULT_ENABLED==='1'?'1':'0'))) return {};
-  const rows=await prisma.$queryRaw<{values_json:unknown}[]>`SELECT values_json FROM ad_category_values WHERE ad_id=${id}`;
+  if(subcategoryId===null)return {};
+  const rows=await prisma.$queryRaw<{values_json:unknown}[]>`SELECT values_json FROM ad_category_values WHERE ad_id=${id} AND subcategory_id=${subcategoryId}`;
   return rows.length?json(rows[0].values_json) as CategoryValues:{};
 }
-export type PublicCategory={priceEnabled:boolean;goodsEnabled:boolean;listingType:string;categoryFieldsTrusted:boolean;categoryFieldsSuppressedReason?:PublicCategoryTrustReason;categoryFields:ReturnType<typeof visibleCategoryValues>;categoryCardFields:ReturnType<typeof cardCategoryValues>;comparableCategoryFields:ReturnType<typeof comparableCategoryValues>;subcategoryName?:string};
+export type PublicCategory={priceEnabled:boolean;goodsEnabled:boolean;listingType:string;categoryFieldsTrusted:boolean;categoryFieldsSuppressedReason?:PublicCategoryTrustReason;categoryFields:ReturnType<typeof visibleCategoryValues>;categoryCardFields:ReturnType<typeof cardCategoryValues>;comparableCategoryFields:ReturnType<typeof comparableCategoryValues>;filterCategoryFields?:ReturnType<typeof filterCategoryValues>;searchCategoryFields?:ReturnType<typeof searchableCategoryValues>;subcategoryName?:string};
 export async function getPublicCategories(ids:bigint[]):Promise<Map<number,PublicCategory>> {
   const out=new Map<number,PublicCategory>();
   const [enabledValue,latestTemplatesValue]=await Promise.all([getSetting('categories_v2_enabled',process.env.CATEGORIES_DEFAULT_ENABLED==='1'?'1':'0'),getSetting(CATEGORY_LATEST_TEMPLATES_SETTING,'1')]);
@@ -127,7 +133,7 @@ export async function getPublicCategories(ids:bigint[]):Promise<Map<number,Publi
     const values=(json(r.values_json)||{}) as CategoryValues,listingType=inferLegacyListingType({listingType:r.sale_type,adsType:r.adsType,priceType:r.price_type});
     const context={listingType};
     const trust=publicCategoryFieldTrust({templateKey:d.templateKey,title:r.title||'',values}),project=active&&trust.trusted;
-    out.set(Number(r.ad_id),{priceEnabled:d.priceEnabled,goodsEnabled:d.goodsEnabled,listingType,categoryFieldsTrusted:trust.trusted,...(!trust.trusted?{categoryFieldsSuppressedReason:trust.reason}:{}),subcategoryName:project?r.subcategory_name:undefined,categoryFields:project?visibleCategoryValues(d.fields,values,context):[],categoryCardFields:project?cardCategoryValues(d.fields,values,context).slice(0,2):[],comparableCategoryFields:project?comparableCategoryValues(d.fields,values,context):[]});
+    out.set(Number(r.ad_id),{priceEnabled:d.priceEnabled,goodsEnabled:d.goodsEnabled,listingType,categoryFieldsTrusted:trust.trusted,...(!trust.trusted?{categoryFieldsSuppressedReason:trust.reason}:{}),subcategoryName:project?r.subcategory_name:undefined,categoryFields:project?visibleCategoryValues(d.fields,values,context):[],categoryCardFields:project?cardCategoryValues(d.fields,values,context).slice(0,2):[],comparableCategoryFields:project?comparableCategoryValues(d.fields,values,context):[],filterCategoryFields:project?filterCategoryValues(d.fields,values,context):[],searchCategoryFields:project?searchableCategoryValues(d.fields,values,context):[]});
   }
   return out;
 }

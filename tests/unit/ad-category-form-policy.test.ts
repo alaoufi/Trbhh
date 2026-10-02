@@ -102,3 +102,13 @@ it('preserves legacy fallback editing without forcing an empty required subcateg
   expect(html).not.toContain('name="category_id"');expect(html).not.toContain('name="subcategory_id"');
   expect(html).not.toContain('name="category_version"');
 });
+it('migrates an alias only after explicit reclassification without losing values',()=>{
+  const canonical={...cfg.subcategories[0],id:11,categoryId:1,name:'سيارات',groupKey:'vehicles-equipment',sourceSubcategoryIds:[11,22]};
+  const aliasConfig:CategoryFormConfig={...cfg,categories:[{id:1,name:'سيارات حديثة',active:true,order:1},{id:2,name:'سيارات قديمة',active:true,order:2}],groups:[{key:'vehicles-equipment',name:'سيارات ونقليات ومعدات',order:1,categoryIds:[1,2]}],subcategories:[canonical]};
+  const html=renderToStaticMarkup(React.createElement(AdForm,{action:async()=>{},countries:[],cities:[],submitLabel:'حفظ',initial:{id:1,categoryId:2,subcategoryId:22,categoryValues:{condition:'مستعمل'}},categoryConfig:aliasConfig}));
+  expect(html).toContain('name="category_mode"');
+  expect(html).toContain('مرتبط بالتصنيف الموحد');
+  expect(html).not.toContain('التصنيف الحالي غير متاح');
+  expect(html).not.toContain('name="category_id"');
+  expect(html).not.toContain('name="subcategory_id"');
+});

@@ -542,7 +542,7 @@ async function categorySearchAdIds(subcategoryIds:number[],fields:Pick<CategoryF
   return rows.filter(row=>{
     const category=categories.get(toInt(row.ad_id));
     if(!category?.categoryFieldsTrusted)return false;
-    return category.categoryFields.some(field=>keys.has(field.key)&&variants.some(variant=>structuredText(field.value).includes(structuredText(variant))));
+    return (category.searchCategoryFields||[]).some(field=>keys.has(field.key)&&variants.some(variant=>structuredText(field.value).includes(structuredText(variant))));
   }).map(row=>row.ad_id);
 }
 
@@ -561,7 +561,7 @@ function structuredText(value:unknown){
 
 function matchesStructuredFilters(category:PublicCategory|undefined,filters:CategoryAttributeFilter[]){
   if(!category?.categoryFieldsTrusted)return false;
-  const values=new Map(category.categoryFields.map(field=>[field.key,field.value]));
+  const values=new Map((category.filterCategoryFields||[]).map(field=>[field.key,field.value]));
   return filters.every(filter=>{
     const stored=values.get(filter.key);
     if(stored===undefined)return false;
@@ -719,7 +719,9 @@ export async function searchAds(params: SearchParamsT) {
  * and are never written to the database or attached to an account.
  */
 export async function getNearbyAdsByCoordinates(visitor: LatLng, take = 48): Promise<AdCard[]> {
-  const where = await buildSearchWhere({ geoTrustedOnly: true });
+  // GPS is independent from the optional Saudi region/city fields. Rank every
+  // advertisement with a valid coordinate pair; rankNearbyAds drops malformed pairs.
+  const where = await buildSearchWhere({});
   const rows = await prisma.ads.findMany({
     where: { AND: [where, { lat: { not: null } }, { lng: { not: null } }] },
     select: { ...adSelect, lat: true, lng: true },
@@ -911,7 +913,7 @@ export async function getAdForEdit(id: number, userId: number) {
     import('@/lib/ads/location-privacy').then((module) => module.getAdLocationPrivacy(ad.id)).catch(() => false),
   ]);
   return {
-    categoryValues: await getCategoryEditValues(ad.id),
+    categoryValues: await getCategoryEditValues(ad.id,ad.subcategory_id),
     id: toInt(ad.id),
     title: ad.title,
     detail: ad.detail,

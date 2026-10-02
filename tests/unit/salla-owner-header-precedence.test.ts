@@ -34,7 +34,7 @@ describe('owner OAuth header precedence', () => {
     expect(response.headers.get('referrer-policy')).toBe('strict-origin');
     expect(response.headers.get('x-frame-options')).toBe('DENY');
     expect(response.headers.get('strict-transport-security')).toBe('max-age=31536000');
-    expect(response.headers.get('permissions-policy')).toBe('camera=(), geolocation=(), microphone=()');
+    expect(response.headers.get('permissions-policy')).toBe('camera=(), geolocation=(self), microphone=()');
   });
 
   it.each(['/', '/login', '/api/integrations/salla/webhooks', '/api/integrations/salla/authorize-other', '/api/integrations/salla/authorize/child'])('preserves global security for %s', async pathname => {

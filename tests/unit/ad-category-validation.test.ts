@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cardCategoryValues, comparableCategoryValues, fieldApplies, fieldIsRequired, validateDefinition, validateCategoryValues, visibleCategoryValues, type CategoryField } from '@/lib/ad-categories/validation';
+import * as categoryValidation from '@/lib/ad-categories/validation';
 
 const field = (extra: Partial<CategoryField> = {}): CategoryField => ({ key: 'use', label: 'استخدام الأرض', type: 'select', group: 'التفاصيل', required: true, visible: true, order: 1, options: ['سكني', 'تجاري'], ...extra });
 describe('real-ad subcategory field validation', () => {
@@ -99,5 +100,74 @@ describe('real-ad subcategory field validation', () => {
     expect(()=>validateDefinition([field({dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent',conditionEffect:'unknown' as never})])).toThrow();
     expect(validateDefinition([field({dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent',conditionEffect:'require'})])[0])
       .toMatchObject({conditionEffect:'require'});
+  });
+  it('rejects missing controllers and unreachable dependency values in administrator definitions',()=>{
+    expect(()=>validateDefinition([field({key:'dependent',dependsOn:'missing',dependencyOperator:'equals',dependencyValue:'x'})]))
+      .toThrow('الحقل المتحكم غير موجود');
+    expect(()=>validateDefinition([
+      field({key:'controller',options:['متاح']}),
+      field({key:'dependent',dependsOn:'controller',dependencyOperator:'equals',dependencyValue:'غير متاح'}),
+    ])).toThrow('قيمة الشرط غير موجودة');
+  });
+
+  it('retains compatible values when an edit changes leaf',()=>{
+    const project=(categoryValidation as typeof categoryValidation & {editableCategoryValues?:(fields:CategoryField[],values:Record<string,unknown>,context?:{listingType?:string})=>Record<string,unknown>}).editableCategoryValues;
+    expect(typeof project).toBe('function');
+    if(!project)return;
+    const nextFields=[
+      field({key:'shared',required:false,options:['نعم','لا']}),
+      field({key:'changed',required:false,options:['حديث']}),
+    ];
+    const draft={shared:'نعم',changed:'قديم',legacy_only:'محفوظ'};
+    expect(project(nextFields,draft)).toEqual({shared:'نعم'});
+    expect(draft).toEqual({shared:'نعم',changed:'قديم',legacy_only:'محفوظ'});
+  });
+
+  it('preserves conditionally hidden values when listing type changes and restores them when switched back',()=>{
+    const project=(categoryValidation as typeof categoryValidation & {editableCategoryValues?:(fields:CategoryField[],values:Record<string,unknown>,context?:{listingType?:string})=>Record<string,unknown>}).editableCategoryValues;
+    expect(typeof project).toBe('function');
+    if(!project)return;
+    const conditional=field({key:'rent_hours',type:'number',options:[],required:false,dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent',conditionEffect:'show'});
+    const draft={rent_hours:8};
+    expect(project([conditional],draft,{listingType:'sale'})).toEqual({});
+    expect(project([conditional],draft,{listingType:'rent'})).toEqual({rent_hours:8});
+  });
+
+  it('server-preserves incompatible historical values during reclassification',()=>{
+    const merge=(categoryValidation as typeof categoryValidation & {mergeStoredCategoryValues?:(previous:Record<string,unknown>,fields:CategoryField[],submitted:Record<string,unknown>,context?:{listingType?:string})=>Record<string,unknown>}).mergeStoredCategoryValues;
+    expect(typeof merge).toBe('function');
+    if(!merge)return;
+    const currentFields=[
+      field({key:'shared',required:false}),
+      field({key:'cleared',required:false}),
+      field({key:'rent_hours',type:'number',options:[],required:false,dependsOn:'listing_type',dependencyOperator:'equals',dependencyValue:'rent',conditionEffect:'show'}),
+    ];
+    expect(merge({legacy_only:'محفوظ',shared:'سكني',cleared:'تجاري',rent_hours:8},currentFields,{shared:'تجاري'},{listingType:'sale'})).toEqual({
+      legacy_only:'محفوظ',rent_hours:8,shared:'تجاري',
+    });
+  });
+  it('does not silently delete a dependent value when its controller is cleared',()=>{
+    const fields=[
+      field({key:'kind',required:false,options:['تأجير','بيع']}),
+      field({key:'rent_hours',type:'number',options:[],required:false,dependsOn:'kind',dependencyOperator:'equals',dependencyValue:'تأجير',conditionEffect:'show'}),
+    ];
+    expect(categoryValidation.mergeStoredCategoryValues({kind:'تأجير',rent_hours:8},fields,{kind:''})).toEqual({rent_hours:8,kind:''});
+  });
+
+  it('matches a filterable value when showInDetails is false',()=>{
+    const project=(categoryValidation as typeof categoryValidation & {filterCategoryValues?:(fields:CategoryField[],values:Record<string,unknown>)=>Array<{key:string;value:unknown}>}).filterCategoryValues;
+    expect(typeof project).toBe('function');
+    if(!project)return;
+    const fields=validateDefinition([field({key:'private_filter',required:false,filterable:true,showInDetails:false})]);
+    expect(visibleCategoryValues(fields,{private_filter:'سكني'})).toEqual([]);
+    expect(project(fields,{private_filter:'سكني'})).toEqual([expect.objectContaining({key:'private_filter',value:'سكني'})]);
+  });
+
+  it('searches a searchable value when showInDetails is false',()=>{
+    const project=(categoryValidation as typeof categoryValidation & {searchableCategoryValues?:(fields:CategoryField[],values:Record<string,unknown>)=>Array<{key:string;value:unknown}>}).searchableCategoryValues;
+    expect(typeof project).toBe('function');
+    if(!project)return;
+    const fields=validateDefinition([field({key:'private_search',required:false,searchable:true,showInDetails:false})]);
+    expect(project(fields,{private_search:'تجاري'})).toEqual([expect.objectContaining({key:'private_search',value:'تجاري'})]);
   });
 });

@@ -47,7 +47,7 @@ describe('all classified-listing leaf category scenarios', () => {
       expect(fields.length, template.key).toBeGreaterThan(0);
       expect(new Set(fields.map(field => field.key)).size, template.key).toBe(fields.length);
       expect(fields.every(field => field.group.trim().length > 0), template.key).toBe(true);
-      expect(fields.some(field => fieldIsRequired(field, {})), template.key).toBe(true);
+      expect(template.listingPolicy.types.some(listing=>fields.some(field => fieldIsRequired(field, {listingType:listing.key}))), template.key).toBe(true);
       expect(fields.some(field => !fieldIsRequired(field, {})), template.key).toBe(true);
     }
   });

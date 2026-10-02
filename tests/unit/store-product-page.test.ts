@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 const m = vi.hoisted(() => ({
   ad: vi.fn(), store: vi.fn(), meta: vi.fn(), products: vi.fn(), partners: vi.fn(),
   session: vi.fn(), admin: vi.fn(), sub: vi.fn(), ban: vi.fn(),
   storeRow: vi.fn(), adRow: vi.fn(), ownerRow: vi.fn(), settings: vi.fn(), membership: vi.fn(),
+  locationPrivacy: vi.fn(),
 }));
 vi.mock('@/lib/data', () => ({ getAd: m.ad, recordView: async () => {} }));
 vi.mock('@/lib/stores', () => ({ getStore: m.store }));
@@ -17,6 +19,7 @@ vi.mock('@/app/account/actions', () => ({ deleteAdAction: vi.fn(), archiveAdActi
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('NOT_FOUND'); }, useRouter: vi.fn(), usePathname: vi.fn() }));
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/lib/ad-media', () => ({ getAdAudio: async () => null }));
+vi.mock('@/lib/ads/location-privacy', () => ({ getAdLocationPrivacy: m.locationPrivacy }));
 vi.mock('@/lib/store-extras', () => ({ stockEnabled: async () => false, dealsEnabled: async () => false }));
 vi.mock('@/lib/settings', () => ({ getSettingBool: async () => true, parseTemplates: () => [], fillTemplate: () => '', SETTING_SUB_ENABLED: 'sub_store_enabled', SETTING_SUB_GRACE_DAYS: 'sub_grace_days', SETTING_STORE_SHIELD: 'store_shield_on' }));
 import Page, { generateMetadata } from '@/app/companies/[id]/p/[adId]/page';
@@ -24,7 +27,7 @@ import Page, { generateMetadata } from '@/app/companies/[id]/p/[adId]/page';
 const params = () => ({ params: Promise.resolve({ id: '1', adId: '7' }) });
 beforeEach(() => {
   vi.resetAllMocks();
-  m.ad.mockResolvedValue({ id: 7, title: 'PRIVATE_TITLE', detail: 'PRIVATE_DETAIL', images: ['/private.jpg'], status: 1, state: 'active', archived: false, storeOnly: true, price: 0, seller: { id: 2 } });
+  m.ad.mockResolvedValue({ id: 7, title: 'PRIVATE_TITLE', detail: 'PRIVATE_DETAIL', images: ['/private.jpg'], categoryFields: [], status: 1, state: 'active', archived: false, storeOnly: true, price: 0, lat: '24.713612', lng: '46.675312', seller: { id: 2 } });
   m.store.mockResolvedValue({ id: 1, userId: 2, name: 'store', logo: '/logo.png' });
   m.meta.mockResolvedValue({ status: 1, storeName: 'store' });
   m.products.mockResolvedValue([7]); m.partners.mockResolvedValue([]);
@@ -35,11 +38,26 @@ beforeEach(() => {
   m.adRow.mockResolvedValue({ status: 1, state: 'active', data_archive: null, paused_by_owner: 0, publish_at: null });
   m.ownerRow.mockResolvedValue({ ban: null, ban_until: null, ban_source: null });
   m.settings.mockResolvedValue([{ k: 'sub_store_enabled', v: '1' }, { k: 'sub_grace_days', v: '10' }, { k: 'store_shield_on', v: '0' }]);
+  m.locationPrivacy.mockResolvedValue(false);
 });
 describe('store product page and metadata access', () => {
   it('keeps eligible store-only products public without platform entitlement', async () => {
     expect((await generateMetadata(params())).title).toContain('PRIVATE_TITLE');
     expect(await Page(params())).toBeTruthy();
+  });
+  it('does not serialize store-product coordinates or directions without exact-location consent', async () => {
+    const serialized = renderToStaticMarkup(await Page(params()));
+    expect(m.locationPrivacy).toHaveBeenCalledWith(7n);
+    expect(serialized).not.toContain('24.713612');
+    expect(serialized).not.toContain('46.675312');
+    expect(serialized).not.toContain('google.com/maps');
+  });
+  it('serializes the Google Maps destination only after exact-location consent', async () => {
+    m.locationPrivacy.mockResolvedValue(true);
+    const serialized = renderToStaticMarkup(await Page(params()));
+    expect(serialized).toContain('google.com/maps');
+    expect(serialized).toContain('24.713612');
+    expect(serialized).toContain('46.675312');
   });
   it.each([
     { status: 0 }, { state: 'hidden' }, { data_archive: '2026-01-01' },

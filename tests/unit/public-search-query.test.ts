@@ -110,12 +110,45 @@ describe('public search query integration', () => {
       return [];
     });
     categoryService.publicCategories.mockResolvedValue(new Map([
-      [42,{priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:true,subcategoryName:'معدات',categoryFields:[{key:'forklift_capacity_t',label:'الحمولة',group:'فني',unit:'طن',value:4},{key:'model',label:'الطراز',group:'فني',value:'8FG'}],categoryCardFields:[],comparableCategoryFields:[]}],
+      [42,{priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:true,subcategoryName:'معدات',categoryFields:[],categoryCardFields:[],comparableCategoryFields:[],filterCategoryFields:[{key:'forklift_capacity_t',label:'الحمولة',group:'فني',unit:'طن',value:4}],searchCategoryFields:[{key:'model',label:'الطراز',group:'فني',value:'8FG'}]}],
       [43,{priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:false,categoryFields:[],categoryCardFields:[],comparableCategoryFields:[]}],
     ]));
     await countSearchAds({q:'8FG',subcategoryIds:[101],searchableFields:[{key:'model'}],attributeFilters:[{key:'forklift_capacity_t',mode:'min',value:3}]});
     expect(db.ads.count.mock.calls[0][0].where).toMatchObject({id:{in:[42n]},AND:expect.arrayContaining([{id:{in:[42n]}}])});
     vi.useRealTimers();
+  });
+  it('matches a filterable value when showInDetails is false',async()=>{
+    db.$queryRaw.mockResolvedValue([{ad_id:42n}]);
+    categoryService.publicCategories.mockResolvedValue(new Map([[42,{
+      priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:true,subcategoryName:'معدات',
+      categoryFields:[],categoryCardFields:[],comparableCategoryFields:[],
+      filterCategoryFields:[{key:'capacity',label:'الحمولة',group:'فني',value:4}],searchCategoryFields:[],
+    }]]));
+    await countSearchAds({subcategoryIds:[101],attributeFilters:[{key:'capacity',mode:'min',value:3}]});
+    expect(db.ads.count.mock.calls[0][0].where).toMatchObject({AND:expect.arrayContaining([{id:{in:[42n]}}])});
+  });
+  it('searches a searchable value when showInDetails is false',async()=>{
+    db.$queryRaw.mockResolvedValue([{ad_id:42n}]);
+    categoryService.publicCategories.mockResolvedValue(new Map([[42,{
+      priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:true,subcategoryName:'معدات',
+      categoryFields:[],categoryCardFields:[],comparableCategoryFields:[],filterCategoryFields:[],
+      searchCategoryFields:[{key:'model',label:'الطراز',group:'فني',value:'8FG'}],
+    }]]));
+    await countSearchAds({q:'8FG',subcategoryIds:[101],searchableFields:[{key:'model'}]});
+    expect(db.ads.count.mock.calls[0][0].where.AND).toEqual(expect.arrayContaining([
+      expect.objectContaining({OR:expect.arrayContaining([{id:{in:[42n]}}])}),
+    ]));
+  });
+  it('keeps untrusted category values excluded from search projections',async()=>{
+    db.$queryRaw.mockResolvedValue([{ad_id:42n}]);
+    categoryService.publicCategories.mockResolvedValue(new Map([[42,{
+      priceEnabled:true,goodsEnabled:true,listingType:'sale',categoryFieldsTrusted:false,
+      categoryFields:[],categoryCardFields:[],comparableCategoryFields:[],
+      filterCategoryFields:[{key:'capacity',label:'الحمولة',group:'فني',value:4}],
+      searchCategoryFields:[{key:'model',label:'الطراز',group:'فني',value:'8FG'}],
+    }]]));
+    await countSearchAds({q:'8FG',subcategoryIds:[101],searchableFields:[{key:'model'}],attributeFilters:[{key:'capacity',mode:'min',value:3}]});
+    expect(db.ads.count.mock.calls[0][0].where).toMatchObject({id:{in:[]},AND:expect.arrayContaining([{id:{in:[]}}])});
   });
   it('partitions newest by explicit checked flag rather than descending strings', async () => {
     db.ads.count.mockResolvedValue(1);

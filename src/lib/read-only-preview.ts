@@ -37,8 +37,13 @@ export function isReadOnlyPreview(): boolean {
   return process.env.TRBHH_READ_ONLY_PREVIEW === '1';
 }
 
+/** Staging/preview deployment marker. It is deliberately independent from database write access. */
+export function isPreviewDeployment(): boolean {
+  return process.env.TRBHH_PREVIEW_MODE === '1';
+}
+
 export function previewRobotsHeader(): string | null {
-  return isReadOnlyPreview() ? 'noindex, nofollow, noarchive' : null;
+  return isPreviewDeployment() ? 'noindex, nofollow, noarchive' : null;
 }
 
 /** Reject every write except login, whose preview path only reads MySQL and writes its cookie/rate limit to Redis. */

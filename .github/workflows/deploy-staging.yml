@@ -128,6 +128,9 @@ jobs:
           fi
           set_env AUTH_SECRET "$staging_auth_secret" .env
           unset staging_auth_secret
+          # SEO isolation belongs to every staging deployment, regardless of
+          # whether its database is isolated or the live SELECT-only mirror.
+          set_env TRBHH_PREVIEW_MODE 1 .env
 
           if [[ "$live_read_only" == true ]]; then
             test -f "$readonly_script"
@@ -416,14 +419,23 @@ jobs:
           test "$anonymous_status" = 200
           ! grep -qi '^www-authenticate:' "$anonymous_headers"
           robots_header=$(tr -d '\r' < "$anonymous_headers" | awk -F': ' 'tolower($1)=="x-robots-tag"{print tolower($2)}' | tail -1)
-          if [[ "$LIVE_READ_ONLY" == 'true' ]]; then
-            test "$robots_header" = 'noindex, nofollow, noarchive'
-            curl -fsS --max-time 25 "$preview_url/robots.txt" | grep -F 'Disallow: /'
-          fi
+          test "$robots_header" = 'noindex, nofollow, noarchive'
+          curl -fsS --max-time 25 "$preview_url/robots.txt" | grep -F 'Disallow: /'
           rm -f "$anonymous_headers"
           for public_route in '/search' '/deals' '/nearby' '/companies' '/shop' '/guide' '/site-map'; do
-            test "$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' -H 'Cookie:' -H 'Authorization:' "$preview_url$public_route")" = 200
+            route_body=$(mktemp /tmp/trbhh-preview-route-body.XXXXXX)
+            route_status=$(curl -sS --max-time 30 -o "$route_body" -w '%{http_code}' -H 'Cookie:' -H 'Authorization:' "$preview_url$public_route")
+            test "$route_status" = 200
+            if grep -Fq 'NEXT_HTTP_ERROR_FALLBACK;404' "$route_body" || grep -Fq 'This page could not be found' "$route_body"; then
+              echo "previewSoft404=$public_route" >&2
+              rm -f "$route_body"
+              exit 1
+            fi
+            rm -f "$route_body"
           done
+          missing_route="/__preview_missing_${DEPLOY_SHA}"
+          missing_status=$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' -H 'Cookie:' -H 'Authorization:' "$preview_url$missing_route")
+          test "$missing_status" = 404
           crawl_report=$(node scripts/release/crawl-public-preview.cjs "$preview_url")
           test -n "$crawl_report"
           printf 'PUBLIC_CRAWL=%s\n' "$crawl_report"
@@ -435,4 +447,4 @@ jobs:
           fi
           quality_summary=$(sed -n 's/^AD_QUALITY_SUMMARY=//p' "$remote_log" | tail -1)
           rm -f "$remote_log"
-          printf '### معاينة Hostinger\n\n- HTTPS URL: %s\n- Direct URL: http://%s:3081/\n- Commit: `%s`\n- Live read-only: `%s`\n- External verification: `anonymous GPTBot GET = HTTP 200, no Authorization/Cookie`\n- Public routes: `search, deals, nearby, companies, shop, guide, site-map = HTTP 200`\n- Public crawl: `%s`\n- SEO isolation: `X-Robots-Tag + robots.txt verified`\n- Read-only ad audit: `%s`\n' "$preview_url" "$VPS_HOST" "$DEPLOY_SHA" "$LIVE_READ_ONLY" "${crawl_report:-not-run}" "${quality_summary:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          printf '### معاينة Hostinger\n\n- HTTPS URL: %s\n- Direct URL: http://%s:3081/\n- Commit: `%s`\n- Live read-only: `%s`\n- External verification: `anonymous GPTBot GET = HTTP 200, no Authorization/Cookie`\n- Public routes: `search, deals, nearby, companies, shop, guide, site-map = HTTP 200`\n- Unknown route: `HTTP 404`\n- Public crawl: `%s`\n- SEO isolation: `X-Robots-Tag + robots.txt verified`\n- Read-only ad audit: `%s`\n' "$preview_url" "$VPS_HOST" "$DEPLOY_SHA" "$LIVE_READ_ONLY" "${crawl_report:-not-run}" "${quality_summary:-not-run}" >> "$GITHUB_STEP_SUMMARY"

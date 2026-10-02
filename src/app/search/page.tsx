@@ -45,13 +45,13 @@ export default async function SearchPage({
   const dependencyValues=Object.fromEntries(Object.entries(sp).filter(([key,value])=>key.startsWith('attr_')&&!key.endsWith('_min')&&!key.endsWith('_max')&&value).map(([key,value])=>[key.slice(5),value!]));
   const visibleFilterFields=(selectedSubcategory?.fields||[]).filter(field=>field.filterable&&fieldApplies(field,{listingType,values:dependencyValues}));
   const attributes=normalizeCategoryAttributeFilters(visibleFilterFields,sp,listingType,dependencyValues);
-  const query = { ...sq,categoryId:undefined,categoryIds:selectedSubcategory?undefined:selectedGroup?.categoryIds,subcategoryId:undefined,subcategoryIds:selectedSubcategory?.sourceSubcategoryIds||[],listingType,attributeFilters:attributes.filters,searchableFields:(selectedSubcategory?.fields||[]).filter(field=>field.searchable).map(field=>({key:field.key})), cityId, areaId };
+  const query = { ...sq,categoryId:undefined,categoryIds:undefined,subcategoryId:undefined,subcategoryIds:selectedSubcategory?.sourceSubcategoryIds||selectedGroup?.subcategoryIds||[],listingType,attributeFilters:attributes.filters,searchableFields:(selectedSubcategory?.fields||[]).filter(field=>field.searchable).map(field=>({key:field.key})), cityId, areaId };
   const PAGE_SIZE = 48;
   const total = await countSearchAds(query);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(positiveSearchId(sp.page) || 1, pages);
   const ads = await searchAds({ ...query, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE });
-  const hasFilters = !!(query.categoryIds?.length || query.subcategoryIds.length || query.listingType || query.attributeFilters.length || query.q || cityId || query.type || query.special || query.minPrice !== undefined || query.maxPrice !== undefined);
+  const hasFilters = !!(query.subcategoryIds.length || query.listingType || query.attributeFilters.length || query.q || cityId || query.type || query.special || query.minPrice !== undefined || query.maxPrice !== undefined);
   const relaxedAds = ads.length === 0 && hasFilters && recoveryOn ? await searchAdsRelaxed(query) : [];
   const params = {
     category:selectedGroup?.key,

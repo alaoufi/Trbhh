@@ -78,6 +78,7 @@ export async function cacheDelPattern(pattern: string): Promise<void> {
    يعمل عبر Redis عند توفّره، وإلا يسقط لعدّاد في الذاكرة داخل العملية (احتياط
    يظلّ يحدّ من محاولات التخمين على العقدة الواحدة). */
 const rlMem = new Map<string, { n: number; exp: number }>();
+const RL_MEM_MAX=2000;
 const previewHashMem = new Map<string, Record<string, string>>();
 
 /** Small mutable preview state. Redis is preferred; memory keeps local preview usable if it is unavailable. */
@@ -107,12 +108,18 @@ export async function previewHashSet(key: string, field: string, value: string):
 export async function rateHit(key: string, windowSec: number): Promise<number> {
   if (redis) {
     try {
-      const n = await redis.incr(key);
-      if (n === 1) await redis.expire(key, windowSec);
-      return n;
+      const n=await redis.eval(
+        "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]); end; return n",
+        1,key,String(windowSec),
+      );
+      return Number(n);
     } catch { /* fall through to memory */ }
   }
   const now = Date.now();
+  if(rlMem.size>=RL_MEM_MAX){
+    for(const [memoryKey,value] of rlMem)if(now>value.exp)rlMem.delete(memoryKey);
+    while(rlMem.size>=RL_MEM_MAX){const oldest=rlMem.keys().next().value as string|undefined;if(!oldest)break;rlMem.delete(oldest);}
+  }
   const e = rlMem.get(key);
   if (!e || now > e.exp) { rlMem.set(key, { n: 1, exp: now + windowSec * 1000 }); return 1; }
   e.n += 1;

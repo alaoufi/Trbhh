@@ -5,7 +5,8 @@ const origin=process.env.FINAL_GATE_ORIGIN;
 const run=process.env.FINAL_GATE_RUN;
 const attempt=process.env.GITHUB_RUN_ID;
 const password=process.env.FINAL_GATE_PASSWORD;
-assert(origin==='http://localhost:4197'&&/^\d+$/.test(run)&&password,'isolated smoke configuration');
+const production=process.env.FINAL_GATE_PRODUCTION==='1';
+assert(origin===(production?'https://trbhh.sa':'http://localhost:4197')&&/^\d+$/.test(run)&&password,'explicit smoke configuration');
 async function requiredFields(page){
   const fields=page.locator('[data-field-key][data-required="true"]');
   for(let i=0;i<await fields.count();i++){
@@ -26,7 +27,7 @@ async function requiredFields(page){
 (async()=>{
   const browser=await chromium.launch({headless:true});
   try{
-    for(const gps of [false,true]){
+    for(const gps of production?[false]:[false,true]){
       const context=await browser.newContext({viewport:{width:390,height:844}});
       await context.addInitScript(()=>{
         window.__geoCalls=0;
@@ -94,6 +95,13 @@ async function requiredFields(page){
       assert(!(await page.locator('body').innerText()).includes('حدث خطأ غير متوقع'));
       await page.locator('a[href="/ads/'+id+'"]').first().waitFor();
       console.log('PASS search/filter finds created ad');
+      // Delete only this newly created test ad using the member's own normal UI.
+      await go(origin+'/ads/'+id);
+      const deleteForm=page.locator('form:has(input[name="adId"][value="'+id+'"])').filter({has:page.getByRole('button',{name:/حذف/})}).first();
+      await deleteForm.getByRole('button',{name:/حذف/}).click();
+      await page.getByRole('dialog').getByRole('button',{name:'موافق',exact:true}).click();
+      await page.waitForURL(u=>u.pathname==='/account/ads',{waitUntil:'domcontentloaded'});
+      console.log('PASS removed own new test ad '+id);
       await go(origin+'/logout');
       await go(origin+'/account');
       await page.waitForURL(u=>u.pathname==='/login',{waitUntil:'domcontentloaded'});
@@ -101,6 +109,6 @@ async function requiredFields(page){
       assert.deepEqual(errors,[],'no browser runtime errors');
       await context.close();
     }
-    console.log('FINAL_ISOLATED_SMOKE_PASS');
+    console.log(production?'FINAL_PRODUCTION_SMOKE_PASS':'FINAL_ISOLATED_SMOKE_PASS');
   }finally{await browser.close();}
 })().catch(e=>{console.error('FINAL_SMOKE_FAIL',e.message);process.exitCode=1;});

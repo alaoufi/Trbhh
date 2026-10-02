@@ -6,7 +6,7 @@ on:
       action:
         type: choice
         default: diagnose
-        options: [diagnose, activate_categories, release_inspect, release_prepare, release_smoke]
+        options: [diagnose, activate_categories, release_inspect, release_prepare, release_smoke, release_promote]
         description: Diagnosis or post-deployment category activation
       backup_id:
         type: string
@@ -19,8 +19,64 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release_promote:
+    needs: release_smoke
+    if: inputs.action == 'release_promote' && github.ref == 'refs/heads/codex/trbhh-platform-enhancement-20260929'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify rollback configuration
+        run: python3 tests/preview/final-gate-cutover.test.py
+      - name: Promote exact image and immediately smoke production
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          FINAL_GATE_RUN: ${{ inputs.backup_id }}
+          FINAL_GATE_ORIGIN: https://trbhh.sa
+          FINAL_GATE_PRODUCTION: '1'
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$FINAL_GATE_RUN" =~ ^[0-9]+$ ]]
+          npm install --prefix "$RUNNER_TEMP/smoke" --no-package-lock playwright@1.49.1 bcryptjs@2.4.3
+          "$RUNNER_TEMP/smoke/node_modules/.bin/playwright" install --with-deps chromium
+          export NODE_PATH="$RUNNER_TEMP/smoke/node_modules"
+          test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          PORT="${VPS_PORT:-22}"
+          [[ "$PORT" =~ ^[0-9]+$ ]]
+          SSH=(ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -i ~/.ssh/deploy_key -p "$PORT")
+          SCP=(scp -o StrictHostKeyChecking=yes -i ~/.ssh/deploy_key -P "$PORT")
+          remote="/root/trbhh-release-tools/final-$FINAL_GATE_RUN"
+          backup="/root/trbhh-release-backups/final-$FINAL_GATE_RUN"
+          "${SCP[@]}" scripts/release/final-gate-cutover.py scripts/release/final-gate-account.cjs "$VPS_USER@$VPS_HOST:$remote/"
+          # Roll back immediately on any failed command after promotion starts.
+          confirmed=0
+          trap 'result=$?; if [[ "$confirmed" != 1 ]]; then "${SSH[@]}" "$VPS_USER@$VPS_HOST" python3 "$remote/final-gate-cutover.py" rollback "$FINAL_GATE_RUN" || true; fi; exit "$result"' EXIT
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" python3 "$remote/final-gate-cutover.py" promote "$FINAL_GATE_RUN"
+          curl --fail --silent --show-error --retry 8 --retry-delay 2 --retry-all-errors --max-time 20 -o /dev/null https://trbhh.sa/
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" "docker cp '$remote/final-gate-account.cjs' trbhh-app:/app/.final-gate-account.cjs"
+          export FINAL_GATE_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$FINAL_GATE_PASSWORD"
+          node -e 'process.stdout.write(JSON.stringify({run:process.env.FINAL_GATE_RUN,attempt:process.env.GITHUB_RUN_ID,production:true,passwordHash:require("bcryptjs").hashSync(process.env.FINAL_GATE_PASSWORD,12)}))' | "${SSH[@]}" "$VPS_USER@$VPS_HOST" docker exec -i -e "FINAL_GATE_PRODUCTION_CONFIRM=$FINAL_GATE_RUN" trbhh-app node /app/.final-gate-account.cjs
+          node tests/preview/final-release-smoke.cjs
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" "umask 077; cp '$backup/preview-image.txt' '$backup/PRODUCTION_SMOKE_PASSED'"
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" python3 "$remote/final-gate-cutover.py" confirm "$FINAL_GATE_RUN"
+          confirmed=1
   release_smoke:
-    if: inputs.action == 'release_smoke' && github.ref == 'refs/heads/codex/trbhh-platform-enhancement-20260929'
+    if: (inputs.action == 'release_smoke' || inputs.action == 'release_promote') && github.ref == 'refs/heads/codex/trbhh-platform-enhancement-20260929'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

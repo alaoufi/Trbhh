@@ -7,6 +7,7 @@ const { chromium } = require('playwright');
     for (const width of [390, 1024, 1440]) {
       const page = await browser.newPage({ viewport: { width, height: 900 } });
       await page.goto(process.env.HOME_SEARCH_TEST_URL || 'https://preview.88-223-92-124.sslip.io/', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('load');
       const panel = page.locator('details[data-home-search]');
       const outside = page.locator('[data-home-search-add]');
       await panel.waitFor();

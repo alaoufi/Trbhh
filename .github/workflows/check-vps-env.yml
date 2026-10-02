@@ -80,6 +80,15 @@ jobs:
             git -C "$dir" rev-parse HEAD
             git -C "$dir" status --short --untracked-files=no
           done
+          python3 - <<'DIAGNOSTIC'
+          import pathlib,re
+          p=pathlib.Path('/root/trbhh-release-backups/final-37048483962/restore-errors.private.log')
+          if p.exists():
+            s=p.read_text()
+            print('RESTORE_ERROR_CODES',re.findall(r'ERROR [0-9]+ \([A-Z0-9]+\)(?: at line [0-9]+)?',s))
+            for token in ['Unknown command','Unknown collation','Access denied','syntax','already exists','Unknown database','DEFINER','mysql_native_password','sandbox','No database selected']:
+              if token.lower() in s.lower(): print('RESTORE_DIAGNOSTIC',token)
+          DIAGNOSTIC
           df -Pk /root
           for name in trbhh-app trbhh-staging-app; do
             docker inspect -f '{{.Name}} image={{.Image}} running={{.State.Running}}' "$name"

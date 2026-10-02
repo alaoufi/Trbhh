@@ -6,7 +6,7 @@ on:
       action:
         type: choice
         default: diagnose
-        options: [diagnose, activate_categories, release_inspect]
+        options: [diagnose, activate_categories, release_inspect, release_prepare]
         description: Diagnosis or post-deployment category activation
       backup_id:
         type: string
@@ -19,6 +19,38 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release_prepare:
+    if: inputs.action == 'release_prepare' && github.ref == 'refs/heads/codex/trbhh-platform-enhancement-20260929'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Backup and isolated exact-image preparation only
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          PORT="${VPS_PORT:-22}"
+          [[ "$PORT" =~ ^[0-9]+$ && "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
+          SSH=(ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -i ~/.ssh/deploy_key -p "$PORT")
+          SCP=(scp -o StrictHostKeyChecking=yes -i ~/.ssh/deploy_key -P "$PORT")
+          remote="/root/trbhh-release-tools/final-$GITHUB_RUN_ID"
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" "umask 077; mkdir -p '$remote'"
+          "${SCP[@]}" scripts/release/final-gate-prepare.sh scripts/release/database-proof.cjs "$VPS_USER@$VPS_HOST:$remote/"
+          "${SSH[@]}" "$VPS_USER@$VPS_HOST" bash "$remote/final-gate-prepare.sh" "$GITHUB_RUN_ID" "$remote"
   release_inspect:
     if: inputs.action == 'release_inspect' && github.ref == 'refs/heads/codex/trbhh-platform-enhancement-20260929'
     runs-on: ubuntu-latest

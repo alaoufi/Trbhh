@@ -392,6 +392,18 @@ export async function getAdsByIdsCards(ids: number[], limit = 4) {
   return cards.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
 }
 
+/** اختيار الإدارة للبانر مع تطبيق شروط الظهور العام دون بدائل تلقائية. */
+export async function getHomeHeroAds(ids: number[]) {
+  const selected = [...new Set(ids.filter(id => Number.isSafeInteger(id) && id > 0))].slice(0, 10);
+  if (!selected.length) return [];
+  const rows = await prisma.ads.findMany({
+    where: { AND: [await activeAdWhere(), { id: { in: selected.map(BigInt) }, OR: [{ data_archive: null }, { data_archive: '' }] }] },
+    select: adSelect,
+  });
+  const cards = await toCards(rows);
+  return selected.flatMap(id => cards.filter(card => card.id === id));
+}
+
 /** إعلانات نفس المعلن (ذات صلة): بقية إعلاناته النشطة في تربح عدا الإعلان المفتوح. */
 export async function getSellerAds(sellerId: number, excludeAdId: number, take = 6) {
   const rows = await prisma.ads.findMany({

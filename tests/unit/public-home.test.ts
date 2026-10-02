@@ -24,7 +24,7 @@ describe('public marketplace hero', () => {
   });
   it('bounds rotating ad slides without dropping any data from the input feed', () => {
     const ads = Array.from({ length: 24 }, (_, i) => ({ ...ad, id: i + 1 }));
-    expect(publicHomeHero(ads, '', '')).toHaveLength(3);
+    expect(publicHomeHero(ads, '', '')).toHaveLength(11);
     expect(ads).toHaveLength(24);
   });
 });

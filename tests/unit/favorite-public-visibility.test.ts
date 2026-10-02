@@ -17,7 +17,7 @@ vi.mock('@/lib/packages', () => ({
   sweepExpiredFeatured: vi.fn(), getFeaturedTierMap: vi.fn(), getUsersAdMeta: async () => new Map(),
   getPackages: async () => [], getDefaultPackage: async () => ({ adDays: 0 }), FREE_FALLBACK: { adDays: 0 },
 }));
-import { getAdsByIdsCards } from '@/lib/data';
+import { getAdsByIdsCards, getHomeHeroAds } from '@/lib/data';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -43,6 +43,15 @@ function matches(row: Record<string, unknown>, where: Record<string, unknown>): 
   });
 }
 describe('favorites and comparison eligibility', () => {
+  it('hero obeys public visibility, explicit selection and ordering without fallback', async () => {
+    const base = { user_id: 1n, city_id: 1n, area_id: 2, category_id: 1n, title: 'منتج', price: 500, adsType: 'offer', adsSpecial: '', created_at: new Date(), expires_at: null, status: 1, state: 'active', data_archive: null, store_only: 0 };
+    const rows = [{ ...base, id: 1n, status: 0 }, { ...base, id: 2n, state: 'inactive' }, { ...base, id: 3n, data_archive: '2026-09-01' }, { ...base, id: 4n }, { ...base, id: 5n, store_only: 1 }, { ...base, id: 6n }, { ...base, id: 7n }];
+    db.ads.findMany.mockImplementation(async ({ where }) => rows.filter((row) => matches(row, where)));
+    expect((await getHomeHeroAds([6,5,1,4,2,3,6,999])).map(ad=>ad.id)).toEqual([6,4]);
+    db.ads.findMany.mockClear();
+    expect(await getHomeHeroAds([])).toEqual([]);
+    expect(db.ads.findMany).not.toHaveBeenCalled();
+  });
   it('omits hidden or archived ads while retaining valid direct store products and caller ordering', async () => {
     const base = { user_id: 1n, city_id: 1n, area_id: 2, category_id: 1n, title: 'منتج', price: 500, adsType: 'offer', adsSpecial: '', created_at: new Date(), expires_at: null, status: 1, state: 'active', data_archive: null, store_only: 0 };
     const rows = [{ ...base, id: 1n, status: 0 }, { ...base, id: 2n, state: 'inactive' }, { ...base, id: 3n, data_archive: '2026-09-01' }, { ...base, id: 4n }, { ...base, id: 5n, store_only: 1 }];

@@ -1,11 +1,12 @@
 import {beforeEach,expect,it,vi} from 'vitest';
 import {isValidElement,type ReactElement} from 'react';
 import {CATEGORY_LABELS} from '@/lib/ad-categories/contracts';
-const state=vi.hoisted(()=>({enabled:true,search:vi.fn(),featured:vi.fn(),latest:vi.fn(),personalized:vi.fn()}));
+const state=vi.hoisted(()=>({enabled:true,search:vi.fn(),featured:vi.fn(),latest:vi.fn(),personalized:vi.fn(),hero:vi.fn().mockResolvedValue([])}));
 vi.mock('next/headers',()=>({cookies:async()=>({get:()=>undefined})}));
 vi.mock('@/lib/auth',()=>({getSession:async()=>({uid:1})}));
 vi.mock('@/lib/ad-categories/service',()=>({getCategoryFormConfig:async()=>({enabled:state.enabled,labels:CATEGORY_LABELS,categories:[{id:90,name:'Other',active:true,order:0},{id:91,name:'Hidden',active:false,order:1}],subcategories:[]})}));
 vi.mock('@/lib/data',()=>({
+ getHomeHeroAds:state.hero,
  getFeaturedAds:state.featured,getHomeLatestAds:state.latest,searchAds:state.search,getPersonalizedAds:state.personalized,
  getMostViewedAds:async()=>[],getTopRatedAds:async()=>[],getStats:async()=>({ads:0,users:0,views:0}),getCities:async()=>[],getAreas:async()=>[],promoteScheduledAds:async()=>{},
 }));
@@ -22,6 +23,16 @@ import {AdGrid} from '@/components/ad-card';
 import {PublicSearchForm} from '@/components/public-search-form';
 import {CommerceHero} from '@/components/commerce/commerce-hero';
 import {NationalDayBanner,NationalDayHeroFrame} from '@/components/national-day-banner';
+it('loads only administrator-selected advertisements for the carousel',async()=>{
+ const settings=await import('@/lib/settings');
+ const flag=vi.spyOn(settings,'getSettingBool').mockImplementation(async key=>key==='home_discovery_on');
+ const value=vi.spyOn(settings,'getSetting').mockImplementation(async(key,fallback)=>key==='home_hero_ad_ids'?'19,12':fallback ?? '');
+ try {
+  const tree=elements(await HomePage({searchParams:Promise.resolve({})}));
+  expect(state.hero).toHaveBeenCalledWith([19,12]);
+  expect(tree.find(e=>e.type===CommerceHero)?.props.slides).toEqual([expect.objectContaining({id:'trbhh-market'})]);
+ } finally {flag.mockRestore();value.mockRestore();}
+});
 function elements(value:unknown):ReactElement<Record<string,unknown>>[]{
  if(Array.isArray(value))return value.flatMap(elements);
  if(!isValidElement<Record<string,unknown>>(value))return [];

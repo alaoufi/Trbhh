@@ -37,6 +37,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
       </div>
 
       {saved === '1' && <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-800"><Check className="h-4 w-4" /> تم الحفظ.</div>}
+      <Link href="/admin/home-hero" className="block rounded-xl border border-primary/30 bg-card p-4 font-bold text-primary">اختيار وترتيب إعلانات البانر المتحرك ←</Link>
       {saveError === 'save' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">تعذّر حفظ الإعدادات — سُجِّل الخطأ في «سجل الأخطاء». حاول مجدداً.</div>}
 
       <form action={saveSettingsAction} className="space-y-2 rounded-xl border border-primary/20 bg-card p-4">

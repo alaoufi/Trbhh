@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const origin=process.env.FINAL_GATE_ORIGIN;
 const run=process.env.FINAL_GATE_RUN;
+const attempt=process.env.GITHUB_RUN_ID;
 const password=process.env.FINAL_GATE_PASSWORD;
 assert(origin==='http://localhost:4197'&&/^\d+$/.test(run)&&password,'isolated smoke configuration');
 async function requiredFields(page){
@@ -44,7 +45,7 @@ async function requiredFields(page){
         console.log('PASS public '+route+' mobile390');
       }
       await page.goto(origin+'/login?next=%2Fads%2Fnew');
-      await page.locator('#login-identifier').fill(`finalgate-${run}-${gps?1:0}`);
+      await page.locator('#login-identifier').fill(`finalgate-${run}-${attempt}-${gps?1:0}`);
       await page.locator('#login-password').fill(password);
       await page.getByRole('button',{name:'دخول',exact:true}).click();
       await page.waitForURL(u=>u.pathname==='/ads/new');

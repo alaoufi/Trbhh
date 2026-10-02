@@ -59,9 +59,10 @@ async function requiredFields(page){
       const leafValue=await leaf.locator('option').evaluateAll(opts=>opts.find(o=>o.value)?.value);
       assert(leafValue);await leaf.selectOption(leafValue);
       await requiredFields(page);
-      const title=gps?`فحص تقني لوظيفة محاسبية بالموقع ${attempt}`:`تجربة نشر فرصة إدارية بلا موقع ${attempt}`;
+      const fixtureId=()=>require('node:crypto').randomBytes(5).toString('hex');
+      const title=`اختبار تقني ${gps?'محاسب':'منسق'} ${fixtureId()} ${fixtureId()} ${fixtureId()}`;
       await page.locator('[name="title"]').fill(title);
-      await page.locator('[name="detail"]').fill(gps?'اختبار معزول للإحداثيات لوظيفة محاسب إداري. لا يمثل هذا الإعلان فرصة توظيف حقيقية.':'سجل تجريبي لفحص بوابة الإصدار وإضافة إعلان لوظيفة منسق مكتبي دون تحديد المكان الدقيق. ليس عرض عمل فعلياً.');
+      await page.locator('[name="detail"]').fill('بيانات اختبار اصطناعية معزولة وليست فرصة عمل حقيقية. معرفات الحالة المستقلة: '+Array.from({length:20},fixtureId).join(' '));
       await page.locator('#category-field-job_title').fill(gps?'محاسب':'منسق');
       await page.locator('[name="phone"]').fill(gps?'0500000002':'0500000001');
       await page.locator('[name="pledge"]').check();

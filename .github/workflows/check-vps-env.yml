@@ -139,6 +139,12 @@ jobs:
             for token in ['Unknown command','Unknown collation','Access denied','syntax','already exists','Unknown database','DEFINER','mysql_native_password','sandbox','No database selected']:
               if token.lower() in s.lower(): print('RESTORE_DIAGNOSTIC',token)
           DIAGNOSTIC
+          if docker inspect trbhh-final-app-37048483962 >/dev/null 2>&1; then
+            docker inspect -f 'ISOLATED running={{.State.Running}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}}' trbhh-final-app-37048483962
+            curl --max-time 10 -s -o /dev/null -w 'ISOLATED_HOST_HTTP=%{http_code}\n' http://127.0.0.1:3097/ || true
+            docker exec trbhh-final-app-37048483962 node -e 'fetch("http://127.0.0.1:3000/",{signal:AbortSignal.timeout(10000)}).then(r=>console.log("ISOLATED_CONTAINER_HTTP="+r.status)).catch(()=>console.log("ISOLATED_CONTAINER_UNREACHABLE"))' || true
+            docker logs --tail 120 trbhh-final-app-37048483962 2>&1 | python3 -c 'import sys,re; s=sys.stdin.read(); print("ISOLATED_ERROR_CODES",sorted(set(re.findall(r"P[0-9]{4}|ECONNREFUSED|ENOTFOUND|EACCES|ETIMEDOUT|TypeError|ReferenceError|SyntaxError|RangeError",s)))); print("ISOLATED_LOG",re.sub(r"mysql://\S+|redis://\S+|password[^\n]*", "[REDACTED]",s,flags=re.I)[-4000:])'
+          fi
           df -Pk /root
           for name in trbhh-app trbhh-staging-app; do
             docker inspect -f '{{.Name}} image={{.Image}} running={{.State.Running}}' "$name"

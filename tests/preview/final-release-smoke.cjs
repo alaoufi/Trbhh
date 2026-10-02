@@ -56,8 +56,10 @@ async function requiredFields(page){
       const groupValue=await group.locator('option').evaluateAll(opts=>opts.find(o=>o.textContent.includes('وظائف'))?.value);
       assert(groupValue,'jobs taxonomy available');await group.selectOption(groupValue);
       const leaf=page.locator('select[name="subcategory_id"]');
+      await page.waitForFunction(()=>Array.from(document.querySelector('select[name="subcategory_id"]')?.options||[]).some(o=>o.value));
       const leafValue=await leaf.locator('option').evaluateAll(opts=>opts.find(o=>o.value)?.value);
       assert(leafValue);await leaf.selectOption(leafValue);
+      await page.locator('#category-field-job_title').waitFor();
       await requiredFields(page);
       const fixtureId=()=>require('node:crypto').randomBytes(5).toString('hex');
       const title=`اختبار تقني ${gps?'محاسب':'منسق'} ${fixtureId()} ${fixtureId()} ${fixtureId()}`;
@@ -90,7 +92,8 @@ async function requiredFields(page){
       const response=await go(origin+'/search?q='+encodeURIComponent(title)+'&subcategory='+encodeURIComponent(leafValue));
       assert.equal(response.status(),200);
       assert(!(await page.locator('body').innerText()).includes('حدث خطأ غير متوقع'));
-      console.log('PASS search');
+      await page.locator('a[href="/ads/'+id+'"]').first().waitFor();
+      console.log('PASS search/filter finds created ad');
       await go(origin+'/logout');
       await go(origin+'/account');
       await page.waitForURL(u=>u.pathname==='/login',{waitUntil:'domcontentloaded'});

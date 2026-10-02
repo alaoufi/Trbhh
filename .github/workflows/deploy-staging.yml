@@ -238,9 +238,19 @@ jobs:
 
           docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build app redis
           if [[ "$live_read_only" != true ]]; then
-            timeout 180s docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml \
-              run --rm --no-deps -e STAGING_CATEGORY_SEED=1 -e STAGING_DATABASE_NAME=trbhhdb app \
-              node scripts/release/seed-staging-categories.cjs
+            preview_network=$(docker network ls -q \
+              --filter label=com.docker.compose.project=trbhh-staging \
+              --filter label=com.docker.compose.network=trbhh | sed -n '1p')
+            test -n "$preview_network"
+            set +e
+            timeout 180s docker run --rm --network "$preview_network" --env-file .env \
+              -e STAGING_CATEGORY_SEED=1 -e STAGING_DATABASE_NAME=trbhhdb \
+              trbhh-staging-app node scripts/release/seed-staging-categories.cjs
+            preview_seed_exit=$?
+            set -e
+            printf 'previewSeedExit=%s\n' "$preview_seed_exit"
+            test "$preview_seed_exit" -eq 0
+            unset preview_network preview_seed_exit
           fi
 
           printf 'previewSeed=complete\n'

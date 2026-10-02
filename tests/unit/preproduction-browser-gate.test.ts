@@ -52,7 +52,9 @@ describe('isolated pre-production browser gate', () => {
     expect(deploy).toContain('label=com.docker.compose.project=trbhh-staging');
     expect(deploy).toContain('label=com.docker.compose.service=app');
     expect(deploy).toContain('previewContainerDiscovered=');
-    expect(deploy).toContain('run --rm --no-deps');
+    expect(deploy).toContain('label=com.docker.compose.network=trbhh');
+    expect(deploy).toContain('docker run --rm --network "$preview_network" --env-file .env');
+    expect(deploy).toContain('previewSeedExit=');
     expect(deploy).not.toContain('exec -T -e STAGING_CATEGORY_SEED=1');
     expect(deploy).toContain('previewHttpReady=');
   });

@@ -89,13 +89,18 @@ if [[ ! -f "$backup/RESTORE_VERIFIED" ]]; then
   docker exec -i "$db" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot' < "$backup/database.sql" 2> "$backup/restore-errors.private.log"
   printf '%s\n' "$run" > "$backup/RESTORE_VERIFIED"
 fi
-docker run -d --name "$redis" --network "$network" --label "trbhh.final-gate=$run" redis:7-alpine >/dev/null
-mkdir "$backup/test-storage"
-tar -xzf "$backup/storage.tar.gz" -C "$backup/test-storage"
-chown -R 1001:1001 "$backup/test-storage"
-docker run -d --name "$app" --network "$network" --label "trbhh.final-gate=$run" --env-file "$backup/test-app.env" -p 127.0.0.1:3097:3000 -v "$backup/test-storage:/app/storage" "$image" >/dev/null
+if ! docker inspect "$redis" >/dev/null 2>&1; then
+  docker run -d --name "$redis" --network "$network" --label "trbhh.final-gate=$run" redis:7-alpine >/dev/null
+fi
+if ! docker inspect "$app" >/dev/null 2>&1; then
+  mkdir "$backup/test-storage"
+  tar -xzf "$backup/storage.tar.gz" -C "$backup/test-storage"
+  chown -R 1001:1001 "$backup/test-storage"
+  docker run -d --name "$app" --network "$network" --label "trbhh.final-gate=$run" --env-file "$backup/test-app.env" -p 127.0.0.1:3097:3000 -v "$backup/test-storage:/app/storage" "$image" >/dev/null
+fi
+[[ "$(docker inspect -f '{{index .Config.Labels "trbhh.final-gate"}}' "$app")" == "$run" ]]
 deadline=$((SECONDS+90))
-until curl --fail --silent -o /dev/null http://127.0.0.1:3097/; do
+until docker exec "$app" node -e 'fetch("http://127.0.0.1:3000/",{signal:AbortSignal.timeout(10000)}).then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))'; do
   (( SECONDS < deadline )) || { echo 'ISOLATED_APPLICATION_NOT_READY'; exit 1; }
   sleep 2
 done

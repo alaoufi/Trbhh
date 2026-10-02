@@ -59,7 +59,9 @@ jobs:
           export FINAL_GATE_PASSWORD="$(openssl rand -hex 24)"
           echo "::add-mask::$FINAL_GATE_PASSWORD"
           node -e 'process.stdout.write(JSON.stringify({run:process.env.FINAL_GATE_RUN,password:process.env.FINAL_GATE_PASSWORD}))' | "${SSH[@]}" "$VPS_USER@$VPS_HOST" docker exec -i "$app" node /app/.final-gate-account.cjs
-          "${SSH[@]}" -f -N -o ExitOnForwardFailure=yes -L 4197:127.0.0.1:3097 "$VPS_USER@$VPS_HOST"
+          test_ip=$("${SSH[@]}" "$VPS_USER@$VPS_HOST" docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$app")
+          [[ "$test_ip" =~ ^172\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          "${SSH[@]}" -f -N -o ExitOnForwardFailure=yes -L "4197:$test_ip:3000" "$VPS_USER@$VPS_HOST"
           npm install --prefix "$RUNNER_TEMP/smoke" --no-package-lock playwright@1.49.1
           "$RUNNER_TEMP/smoke/node_modules/.bin/playwright" install --with-deps chromium
           export NODE_PATH="$RUNNER_TEMP/smoke/node_modules"

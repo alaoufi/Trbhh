@@ -34,6 +34,7 @@ async function requiredFields(page){
         Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition(success){window.__geoCalls++;success({coords:{latitude:24.713612,longitude:46.675312}})}}});
       });
       const page=await context.newPage();page.setDefaultTimeout(20000);
+      const go=url=>page.goto(url,{waitUntil:'domcontentloaded'});
       const errors=[];page.on('pageerror',e=>errors.push(e.message));
       for(const route of gps?[]:['/','/search','/companies','/nearby']){
         const r=await page.goto(origin+route,{waitUntil:'domcontentloaded'});
@@ -44,11 +45,11 @@ async function requiredFields(page){
         assert.equal(await page.evaluate(()=>window.__geoCalls),0,'no automatic permission prompt');
         console.log('PASS public '+route+' mobile390');
       }
-      await page.goto(origin+'/login?next=%2Fads%2Fnew');
+      await go(origin+'/login?next=%2Fads%2Fnew');
       await page.locator('#login-identifier').fill(`finalgate-${run}-${attempt}-${gps?1:0}`);
       await page.locator('#login-password').fill(password);
       await page.getByRole('button',{name:'دخول',exact:true}).click();
-      await page.waitForURL(u=>u.pathname==='/ads/new');
+      await page.waitForURL(u=>u.pathname==='/ads/new',{waitUntil:'domcontentloaded'});
       console.log('PASS login');
       const group=page.locator('select[name="taxonomy_group"]');
       await group.waitFor();
@@ -58,7 +59,7 @@ async function requiredFields(page){
       const leafValue=await leaf.locator('option').evaluateAll(opts=>opts.find(o=>o.value)?.value);
       assert(leafValue);await leaf.selectOption(leafValue);
       await requiredFields(page);
-      const title=gps?`فحص تقني لوظيفة محاسبية بالموقع ${run}`:`تجربة نشر فرصة إدارية بلا موقع ${run}`;
+      const title=gps?`فحص تقني لوظيفة محاسبية بالموقع ${attempt}`:`تجربة نشر فرصة إدارية بلا موقع ${attempt}`;
       await page.locator('[name="title"]').fill(title);
       await page.locator('[name="detail"]').fill(gps?'اختبار معزول للإحداثيات لوظيفة محاسب إداري. لا يمثل هذا الإعلان فرصة توظيف حقيقية.':'سجل تجريبي لفحص بوابة الإصدار وإضافة إعلان لوظيفة منسق مكتبي دون تحديد المكان الدقيق. ليس عرض عمل فعلياً.');
       await page.locator('#category-field-job_title').fill(gps?'محاسب':'منسق');
@@ -71,27 +72,27 @@ async function requiredFields(page){
         await page.locator('[name="show_exact_location_publicly"]').check();
       }else assert.equal(await page.locator('[name="lat"]').inputValue(),'');
       await page.getByRole('button',{name:'نشر الإعلان',exact:true}).click();
-      await page.waitForURL(u=>u.pathname==='/'&&/^\d+$/.test(u.searchParams.get('published')||''));
+      await page.waitForURL(u=>u.pathname==='/'&&/^\d+$/.test(u.searchParams.get('published')||''),{waitUntil:'domcontentloaded'});
       const id=new URL(page.url()).searchParams.get('published');
       console.log('PASS create '+(gps?'GPS':'withoutGPS')+' id='+id);
-      await page.goto(origin+'/ads/'+id);
+      await go(origin+'/ads/'+id);
       await page.getByText(title,{exact:true}).first().waitFor();
       if(gps)assert((await page.getByRole('link',{name:'الاتجاهات إلى الموقع',exact:true}).getAttribute('href')).includes('destination=24.713612'));
-      await page.goto(origin+'/ads/'+id+'/edit');
+      await go(origin+'/ads/'+id+'/edit');
       assert.equal(await page.evaluate(()=>window.__geoCalls),0,'edit does not request GPS');
       await page.locator('[name="title"]').fill(title+' مراجع');
       await page.locator('[name="pledge"]').check();
       await page.getByRole('button',{name:'حفظ التعديلات',exact:true}).click();
-      await page.waitForURL(u=>u.pathname==='/ads/'+id);
+      await page.waitForURL(u=>u.pathname==='/ads/'+id,{waitUntil:'domcontentloaded'});
       await page.getByText(title+' مراجع',{exact:true}).first().waitFor();
       console.log('PASS details/edit '+id);
-      const response=await page.goto(origin+'/search?q='+encodeURIComponent(title)+'&subcategory='+encodeURIComponent(leafValue));
+      const response=await go(origin+'/search?q='+encodeURIComponent(title)+'&subcategory='+encodeURIComponent(leafValue));
       assert.equal(response.status(),200);
       assert(!(await page.locator('body').innerText()).includes('حدث خطأ غير متوقع'));
       console.log('PASS search');
-      await page.goto(origin+'/logout');
-      await page.goto(origin+'/account');
-      await page.waitForURL(u=>u.pathname==='/login');
+      await go(origin+'/logout');
+      await go(origin+'/account');
+      await page.waitForURL(u=>u.pathname==='/login',{waitUntil:'domcontentloaded'});
       console.log('PASS logout');
       assert.deepEqual(errors,[],'no browser runtime errors');
       await context.close();

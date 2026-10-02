@@ -35,7 +35,7 @@ if(!origin)throw new Error('HOME_SEARCH_TEST_URL is required');
       await Promise.all([page.waitForURL('**/search?**'),form.getByRole('button',{name:'بحث',exact:true}).click()]);
       const query=new URL(page.url()).searchParams;
       for(const key of ['city','area','type','minPrice','maxPrice'])assert.equal(query.get(key),before[key]);
-      assert(await page.locator('form[role="search"] [name="minPrice"]').isVisible());
+      await page.locator('form[role="search"] [name="minPrice"]').waitFor({state:'visible'});
       console.log(`PASS ${width}: collapsed SSR/hydration, toggle, retained values, GET search, no overflow`);
       await context.close();
     }

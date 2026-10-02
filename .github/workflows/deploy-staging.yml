@@ -243,8 +243,8 @@ jobs:
               node scripts/release/seed-staging-categories.cjs
           fi
 
-          container=$(docker compose -p trbhh-staging -f docker-compose.yml -f docker-compose.staging.yml ps -aq app)
-          test -n "$container"
+          container=trbhh-staging-app
+          docker inspect "$container" >/dev/null
           wait_for_preview_container() {
             state=false
             for attempt in $(seq 1 30); do

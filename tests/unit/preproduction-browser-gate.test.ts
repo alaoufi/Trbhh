@@ -48,7 +48,7 @@ describe('isolated pre-production browser gate', () => {
     expect(deploy).toContain('wait_for_preview_200');
     expect(deploy).toContain('wait_for_preview_container');
     expect(deploy).toContain('previewContainerReady=running');
-    expect(deploy).toContain('ps -aq app');
+    expect(deploy).toContain('container=trbhh-staging-app');
     expect(deploy).toContain('previewHttpReady=');
   });
 

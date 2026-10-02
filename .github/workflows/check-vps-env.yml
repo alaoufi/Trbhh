@@ -6,7 +6,7 @@ on:
       action:
         type: choice
         default: diagnose
-        options: [diagnose, activate_categories]
+        options: [diagnose, activate_categories, release_inspect]
         description: Diagnosis or post-deployment category activation
       backup_id:
         type: string
@@ -19,6 +19,56 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release_inspect:
+    if: inputs.action == 'release_inspect' && github.ref == 'refs/heads/codex/trbhh-platform-enhancement-20260929'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read-only final release evidence
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          PORT="${VPS_PORT:-22}"
+          [[ "$PORT" =~ ^[0-9]+$ ]]
+          ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" bash -s <<'INSPECT'
+          set -euo pipefail
+          for dir in /root/trbhh /root/trbhh-staging; do
+            printf 'CHECKOUT %s\n' "$dir"
+            git -C "$dir" rev-parse HEAD
+            git -C "$dir" status --short --untracked-files=no
+          done
+          df -Pk /root
+          for name in trbhh-app trbhh-staging-app; do
+            docker inspect -f '{{.Name}} image={{.Image}} running={{.State.Running}}' "$name"
+            docker inspect -f '{{range .Mounts}}{{.Type}} {{.Source}} -> {{.Destination}}{{println}}{{end}}' "$name"
+            docker exec -i "$name" node <<'NODE'
+          const {PrismaClient}=require('@prisma/client');
+          const db=new PrismaClient({log:[]});
+          (async()=>{
+            console.log(JSON.stringify({readOnly:process.env.TRBHH_READ_ONLY_PREVIEW==='1',preview:process.env.TRBHH_PREVIEW_MODE==='1',liveOrders:process.env.SUPPLIER_ALLOW_LIVE_ORDERS==='true'}));
+            const checks={
+              legacyReceiptBackfill:"SELECT COUNT(*) AS n FROM wallet_topups WHERE receipt_hash IS NOT NULL AND receipt_hash != '-' AND CHAR_LENGTH(receipt_hash)<100",
+              legacyModerationBackfill:"SELECT COUNT(*) AS n FROM mod_log WHERE (ad_id IS NULL AND kind IN ('duplicate','duplicate_cross') AND snippet REGEXP '#[0-9]+') OR (action='banned' AND kind='content' AND snippet LIKE 'حظر إعلان نهائياً:%') OR (action='banned' AND kind='account' AND snippet='account deleted at owner request')"
+            };
+            for(const [name,sql] of Object.entries(checks)) {
+              try {const rows=await db.$queryRawUnsafe(sql);console.log(name+'='+String(rows[0].n));}
+              catch {console.log(name+'=UNVERIFIED');}
+            }
+          })().catch(()=>{console.error('READ_ONLY_INSPECTION_FAILED');process.exitCode=1}).finally(()=>db.$disconnect());
+          NODE
+          done
+          INSPECT
   check:
     if: inputs.action == 'diagnose'
     runs-on: ubuntu-latest

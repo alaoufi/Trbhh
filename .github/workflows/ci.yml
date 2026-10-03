@@ -104,6 +104,12 @@ jobs:
           SUPPLIER_ALLOW_LIVE_ORDERS: 'false'
         run: node tests/preview/browser.cjs
 
+      - name: Ad publishing matrix on isolated MySQL
+        env:
+          COMMERCE_PREVIEW_DATABASE_URL: mysql://root:ci_root_password@127.0.0.1:33309/trbhh_commerce_preview_20260919
+          SUPPLIER_ALLOW_LIVE_ORDERS: 'false'
+        run: node tests/preview/ad-publish-matrix.cjs
+
       - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@v4

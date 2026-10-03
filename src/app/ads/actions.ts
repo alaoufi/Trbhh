@@ -24,7 +24,7 @@ import { normalizeAr, similarity, isKeywordStuffing } from '@/domain/text';
 import { writeAdWithCategory } from '@/lib/ad-categories/service';
 import { CategoryValidationError } from '@/lib/ad-categories/validation';
 import {adValidationFailure,publicationDestination} from '@/lib/ad-submission-result';
-import {createPublishTrace,publicationOutcome} from '@/lib/ads/publication-trace';
+import {createPublishTrace,publicationOutcome,safePublicationDiagnostic} from '@/lib/ads/publication-trace';
 import {currentPlatformAdPublicWhere} from '@/lib/platform-ad-visibility';
 import { inferLegacyListingType, type NormalizedListingSubmission } from '@/lib/ad-categories/listing-policy';
 import {
@@ -213,7 +213,8 @@ export async function createAdAction(formData: FormData) {
   catch(error){
     unstable_rethrow(error);
     if(trace.createdAdId){
-      await logClientError({message:'P1: post-create publication step failed',digest:trace.id,url:`/ads/${trace.createdAdId}`});
+      const diagnostic=safePublicationDiagnostic(error);
+      await logClientError({message:`P1: post-create ${trace.currentOperation} failed; stage=${trace.currentStage}; ${diagnostic.kind}/${diagnostic.code}`,stack:diagnostic.frames,digest:trace.id,url:`/ads/${trace.createdAdId}`,userId:trace.userId});
       redirect(`/account/ads?scope=all&publish_issue=${trace.createdAdId}&trace=${trace.id}`);
     }
     throw error;
@@ -285,6 +286,7 @@ async function createAdSubmission(formData:FormData,trace:ReturnType<typeof crea
     if(!store)return adValidationFailure(new CategoryValidationError('dest','المتجر غير متاح للنشر'));
     const st = store.status;
     if (st === 2 || st === 3) redirect(st === 3 ? '/store?error=suspended_perm' : '/store?error=suspended');
+    if(st!==1)return adValidationFailure(new CategoryValidationError('dest','المتجر بانتظار اعتماد الإدارة ولا يظهر للزوار بعد. يمكنك النشر في تربح العام أو انتظار اعتماد المتجر'));
     // انتهاء اشتراك المتجر لا يُحوّل العضو إلى شاشة خطأ عامة: يُنقل إلى التجديد
     // حيث يرى رصيده والخطط وخيار الشحن إن لم يكفِ الرصيد.
     const storeId = publishingStoreId;
@@ -505,13 +507,16 @@ async function createAdSubmission(formData:FormData,trace:ReturnType<typeof crea
   if (ad instanceof CategoryValidationError) return adValidationFailure(ad);
   trace.stage('DB_CREATED',{adId:toInt(ad.id),userId:session.uid,profileId,categoryId:Number(ad.category_id),subcategoryId:ad.subcategory_id});
   trace.stage('PUBLICATION_STATE_ASSIGNED',{status:ad.status,state:ad.state,store_only:ad.store_only,publish_at:ad.publish_at?.toISOString()??null,requireApproval});
+  trace.operation('MEDIA_SAVE');
 
   // إعلان المتجر: العلامة المائية هوية المتجر (شعار/اسم حسب اختيار المالك) بدل «تربح»
   const wm = dest === 'store' ? await (await import('@/lib/merchant')).getStoreWatermark(session.uid) : undefined;
   await storeImages(images, session.uid, ad.id, wm);
   const audio = await saveMediaFile(formData, 'audio', 8 * 1024 * 1024, ['webm', 'ogg', 'mp3', 'm4a', 'wav']);
   if (audio) await setAdMedia(ad.id, 'audio', audio).catch(() => {});
+  trace.operation('QUOTA_LOG');
   await logAdPublish(session.uid); // سجل ثابت لحدّ الباقة — لا يتأثر بحذف الإعلان لاحقاً
+  trace.operation('PUBLICATION_EXTRAS');
   // لا تصفير لعدّاد محاولات التكرار هنا: تصفيره عند أي نشر ناجح كان يتيح
   // للمخالف التناوب بين إعلان سليم وآخر مكرّر بلا نهاية دون بلوغ حدّ الحظر
   // (bumpDupAttempts أدناه يتكفّل بتقادم العدّاد تلقائياً بعد ٢٤ ساعة هدوء).
@@ -564,8 +569,10 @@ async function createAdSubmission(formData:FormData,trace:ReturnType<typeof crea
       }
     }
   }
+  trace.operation('CACHE_INVALIDATION');
   await bustAdCaches();
   trace.stage('CACHE_BUSTED');
+  trace.operation('PUBLIC_VISIBILITY');
   const publicMatch=await prisma.ads.findFirst({where:{id:ad.id,...await currentPlatformAdPublicWhere()},select:{id:true}});
   trace.stage('PUBLIC_VISIBILITY_CHECKED');
   const outcome=publicationOutcome(ad,Boolean(publicMatch));
@@ -588,6 +595,7 @@ async function createAdSubmission(formData:FormData,trace:ReturnType<typeof crea
   // نشر من المتجر: أدرِج الإعلان في واجهة المتجر، ثم انتقل إلى إعلانات المتجر (لا للرجوع لصفحة الإضافة)
   if (dest === 'store') {
     const { addStoreProduct, getActiveStoreId, staffStoreId } = await import('@/lib/merchant');
+    trace.operation('STORE_LINK');
     await addStoreProduct(session.uid, toInt(ad.id));
     const linked=await prisma.store_products.findFirst({where:{ad_id:toInt(ad.id),store_id:publishingStoreId},select:{store_id:true}});
     if(!linked){
@@ -609,6 +617,7 @@ async function createAdSubmission(formData:FormData,trace:ReturnType<typeof crea
   const needFlags = extraFlags.filter((f) => f.includes('need')).map((f) => `&${f}`).join('');
   // Keep the member's ordinary account list on the identity they just published as.
   // Destination has already been explicitly resolved and persisted server-side.
+  trace.operation('PROFILE_COOKIE');
   if(profileId)await setActiveProfileCookie(profileId);
   trace.outcome(outcome);trace.stage('REDIRECT_SUCCESS');
   if (scheduledAt) redirect(`/account/ads?scope=all&scheduled=1${flagTerms ? '&censored=1' : ''}${needFlags}`);

@@ -1,6 +1,12 @@
 import {describe,it,expect} from 'vitest';
-import {createPublishTrace,publicationOutcome} from '@/lib/ads/publication-trace';
+import {createPublishTrace,publicationOutcome,safePublicationDiagnostic} from '@/lib/ads/publication-trace';
 describe('publication trace',()=>{
+  it('keeps actionable error classification and function frames without messages or paths',()=>{
+    const error=Object.assign(new Error('mysql://root:SECRET@host/db'),{code:'P2002'});
+    error.stack='Error: SECRET\n    at storeImages (/private/SECRET.ts:42:3)';
+    expect(safePublicationDiagnostic(error)).toEqual({kind:'Error',code:'P2002',frames:'storeImages'});
+    expect(JSON.stringify(safePublicationDiagnostic(error))).not.toContain('SECRET');
+  });
   it('assigns one terminal outcome and never logs content or arbitrary properties',()=>{
     const logs:string[]=[];
     const trace=createPublishTrace(line=>logs.push(line));

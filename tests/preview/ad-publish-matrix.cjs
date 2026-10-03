@@ -56,14 +56,14 @@ async function run(){
     {...common,key:'pipeline_conditional',label:'قيمة شرطية',type:'number',order:92,min:1,dependsOn:'pipeline_toggle',dependencyOperator:'equals',dependencyValue:true,conditionEffect:'show'});
   await db.$executeRaw`UPDATE ad_category_definitions SET fields_json=${JSON.stringify(definition)} WHERE subcategory_id=${leaf.id}`;
   browser=await chromium.launch({headless:true,channel:'chrome'});
-  for(const testCase of ['A','B','C','D','E','F','G','H','I','J']){
+  for(const testCase of ['A','B','C','D','E','F','G','H','I','J','K']){
     await settings({categories_v2_latest_templates:'0',ads_require_approval:testCase==='G'?'1':'0',schedule_on:testCase==='H'?'1':'0',platform_ad_lifecycle_enabled:'0',commerce_purchasing_enabled:'0'});
     await start(); // Fresh settings cache for each independent policy case.
     const username=`pipeline-${testCase}-${randomUUID()}`;
     const member=await db.users.create({data:{userName:username,name:'عضو اختبار معزول',password:hash,type:'user',country_id:1,auth_session_version:randomUUID()}});
     let storeProfile;
-    if(['E','F'].includes(testCase)){
-      const store=await db.stores.create({data:{user_id:Number(member.id),store_name:'متجر اختبار النشر',status:1,sub_until:new Date(Date.now()+86400000*30)}});
+    if(['E','F','K'].includes(testCase)){
+      const store=await db.stores.create({data:{user_id:Number(member.id),store_name:'متجر اختبار النشر',status:testCase==='K'?0:1,sub_until:new Date(Date.now()+86400000*30)}});
       storeProfile=await db.profiles.create({data:{user_id:member.id,type:'store',store_id:store.id,name:'متجر اختبار النشر'}});
     }
     const context=await browser.newContext({viewport:{width:390,height:844}});
@@ -74,7 +74,7 @@ async function run(){
       await page.goto(origin+'/login?next=%2Fads%2Fnew');
       await page.locator('#login-identifier').fill(username);await page.locator('#login-password').fill(password);
       await page.getByRole('button',{name:'دخول',exact:true}).click();await page.waitForURL(u=>u.pathname==='/ads/new');
-      if(storeProfile){await context.addCookies([{name:'trbhh_profile',value:String(storeProfile.id),url:origin}]);await page.goto(origin+'/ads/new'+(testCase==='F'?'?dest=store':''));}
+      if(storeProfile){await context.addCookies([{name:'trbhh_profile',value:String(storeProfile.id),url:origin}]);await page.goto(origin+'/ads/new'+(['F','K'].includes(testCase)?'?dest=store':''));}
       if(testCase==='E')assert.equal(await page.locator('[name="dest"][value="store"]').count(),0,'active store never preselects store publishing');
       const group=page.locator('[name="taxonomy_group"]');
       await page.waitForFunction(()=>{const e=document.querySelector('[name="taxonomy_group"]');return e&&Object.keys(e).some(k=>k.startsWith('__reactProps$')&&e[k]?.onChange)});
@@ -95,7 +95,7 @@ async function run(){
       }
       if(testCase==='J')await page.locator('[name="category_values"]').evaluate(e=>{const v=JSON.parse(e.value);v.job_title={invalid:true};e.value=JSON.stringify(v)});
       await page.getByRole('button',{name:'نشر الإعلان',exact:true}).click();
-      if(['I','J'].includes(testCase)){
+      if(['I','J','K'].includes(testCase)){
         await page.locator('[data-submission-error]').waitFor();
         assert.equal(await page.locator('[name="title"]').inputValue(),title);
         assert.equal(await db.ads.count({where:{user_id:member.id}}),0);
@@ -124,10 +124,10 @@ async function run(){
       results.push({case:testCase,status:'PASS'});console.log('PUBLISH_MATRIX_PASS',testCase);
     }finally{await context.close();}
   }
-  assert.equal(results.length,10);
+  assert.equal(results.length,11);
   const outcomes=logs.split(/\r?\n/).flatMap(line=>{try{const row=JSON.parse(line);return row.publishTraceId&&row.outcome?[row]:[]}catch{return []}});
-  assert.deepEqual(outcomes.map(row=>row.outcome),['PUBLIC_NOW','PUBLIC_NOW','PUBLIC_NOW','PUBLIC_NOW','PUBLIC_NOW','STORE_ONLY','PENDING_APPROVAL','SCHEDULED','REJECTED','REJECTED']);
-  assert.equal(new Set(outcomes.map(row=>row.publishTraceId)).size,10,'one trace and one terminal outcome per submission');
+  assert.deepEqual(outcomes.map(row=>row.outcome),['PUBLIC_NOW','PUBLIC_NOW','PUBLIC_NOW','PUBLIC_NOW','PUBLIC_NOW','STORE_ONLY','PENDING_APPROVAL','SCHEDULED','REJECTED','REJECTED','REJECTED']);
+  assert.equal(new Set(outcomes.map(row=>row.publishTraceId)).size,11,'one trace and one terminal outcome per submission');
   await writeFile(path.join(artifacts,'publish-matrix.json'),JSON.stringify({results,outcomes},null,2));
 }
 run().catch(error=>{console.error('PUBLISH_MATRIX_FAIL',error.message);process.exitCode=1;}).finally(async()=>{await browser?.close();await stop();await db.$disconnect();});

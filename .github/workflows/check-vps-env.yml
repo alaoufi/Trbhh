@@ -191,7 +191,7 @@ jobs:
           done
           python3 - <<'DIAGNOSTIC'
           import pathlib,re
-          p=pathlib.Path('/root/trbhh-release-backups/final-37048483962/restore-errors.private.log')
+          p=pathlib.Path('/root/trbhh-release-backups/final-37129301968/restore-errors.private.log')
           if p.exists():
             s=p.read_text()
             print('RESTORE_ERROR_CODES',re.findall(r'ERROR [0-9]+ \([A-Z0-9]+\)(?: at line [0-9]+)?',s))

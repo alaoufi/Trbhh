@@ -24,11 +24,19 @@ it('supports separate requirement and display selectors without relaxing route v
   expect(isCategoryAdminView('display')).toBe(true);
   expect(isCategoryAdminView('__proto__')).toBe(false);
 });
+it('gives ad filters explicit labels independent from option text',async()=>{
+  const {CategoryAdminFilters}=await import('@/components/category-admin-filters');
+  const html=renderToStaticMarkup(React.createElement(CategoryAdminFilters,{view:'ads',categories:[],subcategories:[],initialCategory:null,initialSubcategory:null,review:false}));
+  expect(html).toContain('<label for="category-filter-main">القسم الرئيسي</label>');
+  expect(html).toContain('<label for="category-filter-sub">القسم الفرعي</label>');
+});
 it('starts with a disabled subcategory and no editor, and opens only a compatible selected subcategory',async()=>{
   const {CategoryFieldPicker}=await import('@/components/category-field-picker');
   const props={categories:[{id:1,name:'معدات'},{id:2,name:'أثاث'}],subcategories:[{id:4,name:'رافعات',categoryId:1}],section:'requirements' as const,initialCategory:null,initialSubcategory:null};
   const empty=renderToStaticMarkup(React.createElement(CategoryFieldPicker,props));
   expect(empty).toContain('disabled');expect(empty).not.toContain('href=');expect(empty).not.toContain('fields_json');
+  expect(empty).toContain('<label for="field-picker-category">القسم الرئيسي</label>');
+  expect(empty).toContain('<label for="field-picker-subcategory">القسم الفرعي</label>');
   const selected=renderToStaticMarkup(React.createElement(CategoryFieldPicker,{...props,initialCategory:1,initialSubcategory:4}));
   expect(selected).toContain('/admin/categories/subcategories/4/requirements');
   const incompatible=renderToStaticMarkup(React.createElement(CategoryFieldPicker,{...props,initialCategory:2,initialSubcategory:4}));

@@ -42,7 +42,7 @@ export async function getCategoryFormConfig(admin=false):Promise<CategoryFormCon
     const configured=dm.has(Number(s.id))
       ?definition(dm.get(Number(s.id))!,{categoryName,subcategoryName:s.name,useLatestTemplates})
       :seededDefinition(categoryName,s.name);
-    return {id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(configured??{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[],listingPolicy:defaultListingPolicy('other')})};
+    return {id:Number(s.id),categoryId:s.category_id,name:s.name,active:s.active===1,order:s.order,...(configured??{version:0,kind:'other' as const,priceEnabled:true,goodsEnabled:false,fields:[],listingPolicy:defaultListingPolicy('other')}),...(admin?{version:dm.get(Number(s.id))?.version??0}:{})};
   });
   const resolved=isReadOnlyPreview()
     ?applyPreviewCategoryVisibility(baseCategories,baseSubcategories,parsePreviewCategoryVisibility(await previewHashGetAll(PREVIEW_CATEGORY_VISIBILITY_KEY)))

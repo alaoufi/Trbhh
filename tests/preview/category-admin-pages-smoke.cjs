@@ -10,9 +10,9 @@ exports.run=async({page,outsider,origin})=>{
     await page.getByLabel('القسم الرئيسي',{exact:true}).selectOption(parent);
     const ids=await page.getByLabel('القسم الفرعي',{exact:true}).locator('option').evaluateAll(options=>options.filter(o=>o.value).map(o=>o.value));
     paths.push(...ids.map(id=>`/admin/categories/subcategories/${id}/requirements`));
-    if(paths.length>=20)break;
   }
   assert(paths.length>0,'dedicated administration links missing');
+  await require('./category-admin-all-save-smoke.cjs').run({page,origin,paths:[...new Set(paths)]});
   let original,path,field;
   for(const candidate of paths.slice(0,20)){
     await page.goto(origin+candidate);
@@ -53,6 +53,16 @@ exports.run=async({page,outsider,origin})=>{
   await page.getByRole('button',{name:'إضافة حقل',exact:true}).click();
   const testLabel='حقل اختبار إدارة معزول';
   await page.getByLabel('اسم الحقل',{exact:true}).last().fill(testLabel);
+  const testGroup=page.getByRole('group',{name:testLabel,exact:true});
+  await testGroup.getByLabel('النوع',{exact:true}).selectOption('number');
+  await testGroup.getByLabel('الحد الأدنى',{exact:true}).fill('10');
+  await testGroup.getByLabel('الحد الأعلى',{exact:true}).fill('1');
+  await page.getByRole('button',{name:'حفظ القسم والحقول',exact:true}).click();
+  await page.getByRole('alert').waitFor();
+  assert((await page.getByRole('alert').innerText()).includes(testLabel));
+  assert.equal(await testGroup.getByLabel('الحد الأدنى',{exact:true}).inputValue(),'10');
+  assert.equal(await testGroup.getByLabel('الحد الأعلى',{exact:true}).inputValue(),'1');
+  await testGroup.getByLabel('الحد الأعلى',{exact:true}).fill('100');
   await save('حفظ القسم والحقول');
   actual=JSON.parse(await page.locator('[name="fields_json"]').inputValue());
   assert.equal(actual.length,original.length+1);

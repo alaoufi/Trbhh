@@ -19,6 +19,7 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 import { getCategoryEditValues, getCategoryFormConfig, getPublicCategories } from '@/lib/ad-categories/service';
+import {CATEGORY_SEED_TEMPLATES} from '@/lib/ad-categories/seed-templates';
 
 describe('preview-only category visibility', () => {
   beforeEach(() => {
@@ -82,5 +83,16 @@ describe('preview-only category visibility', () => {
     const [strings,...values]=state.raw.mock.calls.at(-1)!;
     expect((strings as TemplateStringsArray).join('')).toContain('subcategory_id=');
     expect(values).toContain(101);
+  });
+  it('uses persisted revision zero for an unsaved admin template instead of inventing a concurrent edit',async()=>{
+    const template=CATEGORY_SEED_TEMPLATES[0];
+    state.previewState.mockResolvedValue({});
+    state.categories.mockResolvedValue([{id:10n,name:template.categoryName,is_active:'yes',ordered:0}]);
+    state.subcategories.mockResolvedValue([{id:101n,category_id:10,name:template.name,active:1,order:0}]);
+    state.raw.mockResolvedValue([]);
+    const config=await getCategoryFormConfig(true);
+    expect(config.subcategories[0].fields.length).toBeGreaterThan(0);
+    expect(config.subcategories[0].version).toBe(0);
+    expect((await getCategoryFormConfig()).subcategories.find(s=>s.id===101)?.version).toBe(1);
   });
 });

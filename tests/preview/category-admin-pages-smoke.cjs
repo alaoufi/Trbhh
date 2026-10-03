@@ -58,8 +58,8 @@ exports.run=async({page,outsider,origin})=>{
   await testGroup.getByLabel('الحد الأدنى',{exact:true}).fill('10');
   await testGroup.getByLabel('الحد الأعلى',{exact:true}).fill('1');
   await page.getByRole('button',{name:'حفظ القسم والحقول',exact:true}).click();
-  await page.getByRole('alert').waitFor();
-  assert((await page.getByRole('alert').innerText()).includes(testLabel));
+  await page.getByRole('alert').filter({hasText:'لم يتم الحفظ'}).waitFor();
+  assert((await page.getByRole('alert').filter({hasText:'لم يتم الحفظ'}).innerText()).includes(testLabel));
   assert.equal(await testGroup.getByLabel('الحد الأدنى',{exact:true}).inputValue(),'10');
   assert.equal(await testGroup.getByLabel('الحد الأعلى',{exact:true}).inputValue(),'1');
   await testGroup.getByLabel('الحد الأعلى',{exact:true}).fill('100');

@@ -14,7 +14,7 @@ exports.run=async({page,origin,paths})=>{
     await page.locator('form').filter({has:page.locator('[name="fields_json"]')}).getByRole('button',{name:/^حفظ/}).click();
     await Promise.race([
       page.waitForURL(u=>u.searchParams.get('saved')==='1'),
-      page.getByRole('alert').waitFor().then(async()=>{throw Error(await page.getByRole('alert').innerText());}),
+      page.getByRole('alert').filter({hasText:'لم يتم الحفظ'}).waitFor().then(async()=>{throw Error(await page.getByRole('alert').filter({hasText:'لم يتم الحفظ'}).innerText());}),
     ]);
   };
   let path;

@@ -82,13 +82,14 @@ if ! docker inspect "$db" >/dev/null 2>&1; then
 fi
 [[ "$(docker inspect -f '{{index .Config.Labels "trbhh.final-gate"}}' "$db")" == "$run" ]]
 deadline=$((SECONDS+120))
-until docker exec "$db" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -Nse "SELECT 1"' >/dev/null 2>&1; do
+# The initialization server exposes a temporary socket before its restart; wait for final TCP.
+until docker exec "$db" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -uroot -Nse "SELECT 1"' >/dev/null 2>&1; do
   (( SECONDS < deadline )) || { echo 'ISOLATED_DATABASE_NOT_READY'; exit 1; }
   sleep 2
 done
 [[ "$(docker inspect -f '{{index .Config.Labels "trbhh.final-gate"}}' "$db")" == "$run" ]]
 if [[ ! -f "$backup/RESTORE_VERIFIED" ]]; then
-  docker exec -i "$db" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot' < "$backup/database.sql" 2> "$backup/restore-errors.private.log"
+  docker exec -i "$db" sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql --protocol=TCP -h127.0.0.1 -uroot' < "$backup/database.sql" 2> "$backup/restore-errors.private.log"
   printf '%s\n' "$run" > "$backup/RESTORE_VERIFIED"
 fi
 if ! docker inspect "$redis" >/dev/null 2>&1; then

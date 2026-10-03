@@ -8,10 +8,11 @@ import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { resolveReportAction, reviewModLogAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { SubmittedReportList } from '@/components/submitted-report-list';
-import { getSettingBool } from '@/lib/settings';
+import { getSetting, getSettingBool } from '@/lib/settings';
 import { hasAction } from '@/lib/roles';
 import { REPORT_FOLLOWUP_ENABLED } from '@/lib/report-followup';
-import { toggleReportFollowup } from './followup-actions';
+import { toggleReportFollowup, saveReportReasons } from './followup-actions';
+import { REPORT_COMMON_REASONS, DEFAULT_REPORT_REASONS } from '@/lib/report-reasons';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'البلاغات' };
@@ -33,12 +34,13 @@ const TABS = [
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
-export default async function AdminReportsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function AdminReportsPage({ searchParams }: { searchParams: Promise<{ tab?: string; reasonsError?: string }> }) {
   const session = await requirePerm('reports');
-  const { tab } = await searchParams;
+  const { tab, reasonsError } = await searchParams;
   const active: TabKey = tab === 'auto' ? 'auto' : tab === 'followup' ? 'followup' : 'members';
   const enabled = await getSettingBool(REPORT_FOLLOWUP_ENABLED, true);
   const canToggle = await hasAction(session.uid, 'reports', 'edit');
+  const commonReasons = await getSetting(REPORT_COMMON_REASONS, DEFAULT_REPORT_REASONS);
   const pendingCount = await prisma.repord_ads.count({ where: { status: 0 } }).catch(() => 0);
 
   return (
@@ -66,6 +68,13 @@ export default async function AdminReportsPage({ searchParams }: { searchParams:
           <button className="rounded-lg bg-primary px-3 py-1 text-white">حفظ</button>
         </form>}
         <SubmittedReportList admin />
+        {canToggle && <form action={saveReportReasons} className="space-y-2 rounded-xl border p-3">
+          <label htmlFor="common-report-reasons" className="block font-bold">أسباب البلاغات الشائعة</label>
+          <p className="text-sm text-muted-foreground">سبب في كل سطر؛ حتى 40 سببًا و80 حرفًا لكل سبب. تُضاف إلى الأسباب الموجودة، ويظل «سبب آخر» متاحًا مع توضيح إلزامي.</p>
+          {reasonsError && <p role="alert" className="text-destructive">تجاوزت عدد الأسباب أو طول أحدها. راجع الحدود المذكورة.</p>}
+          <textarea id="common-report-reasons" name="commonReasons" rows={5} maxLength={3240} defaultValue={commonReasons} className="w-full rounded-lg border bg-background p-2" />
+          <button className="rounded-lg bg-primary px-3 py-2 text-white">حفظ أسباب البلاغات</button>
+        </form>}
       </> : active === 'members' ? <MemberReportsTab /> : <AutoReportsTab />}
     </div>
   );

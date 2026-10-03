@@ -22,11 +22,25 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
     const memberId = profile.split('/').pop(); assert(/^\d+$/.test(memberId));
     for (const [type, id] of [['site', '0'], ['member', memberId], ['ad', adId]]) {
       await page.goto(`${origin}/report?type=${type}&id=${id}`);
-      await page.locator('[name="message"]').fill(`بلاغ اختبار متابعة ${type} ${run}`);
+      assert.equal(await page.locator('#report-reason').inputValue(), '');
+      assert.equal(await page.locator('#report-reason').evaluate(el => el.checkValidity()), false);
+      const explanation = `بلاغ اختبار متابعة ${type} ${run} ` + 'تفاصيل خاصة للمعالجة '.repeat(20);
+      await page.locator('[name="message"]').fill(explanation);
+      // Bypass native validation to prove the server also refuses a missing reason.
+      await page.locator('#report-reason').evaluate(el => { el.form.noValidate = true; });
+      await page.getByRole('button', { name: 'إرسال البلاغ', exact: true }).click();
+      await page.getByRole('alert').filter({ hasText: 'اختر سبب البلاغ' }).waitFor();
+      assert.equal(await page.locator('[name="message"]').inputValue(), explanation);
+      await page.locator('#report-reason').selectOption('other');
+      await page.locator('[name="message"]').fill(' ');
+      await page.getByRole('button', { name: 'إرسال البلاغ', exact: true }).click();
+      await page.getByRole('alert').filter({ hasText: 'اكتب توضيحًا' }).waitFor();
+      await page.locator('[name="message"]').fill(explanation);
       await page.getByRole('button', { name: 'إرسال البلاغ', exact: true }).click();
       await page.waitForURL(u => u.pathname.startsWith('/account/submitted-reports/') && /\d+$/.test(u.pathname));
       const path = new URL(page.url()).pathname;
       const adminPath = path.replace('/account/submitted-reports', '/admin/reports');
+      await page.locator('ol').getByText(explanation.trim(), { exact: true }).waitFor();
       for (let i = 1; i <= 2; i++) {
         await staff.p.goto(origin + adminPath);
         await staff.p.locator('#report-reply').fill(`استفسار الإدارة ${type} ${i}`);
@@ -38,7 +52,7 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
         await page.getByRole('button', { name: 'إرسال الرد', exact: true }).click();
         await page.locator('ol').getByText(`متابعة العضو ${type} ${i}`, { exact: true }).waitFor();
       }
-      assert.equal(await page.locator('ol[aria-label="ردود البلاغ"] > li').count(), 4);
+      assert.equal(await page.locator('ol[aria-label="ردود البلاغ"] > li').count(), 5);
       assert.equal(await page.getByRole('link', { name: 'مراسلة المُبلّغ عنه', exact: true }).count(), 0);
       await staff.p.goto(origin + adminPath);
       const contact = staff.p.getByRole('link', { name: 'مراسلة المُبلّغ عنه', exact: true });
@@ -69,7 +83,7 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
       assert(!(await outsider.p.locator('body').innerText()).includes(`متابعة العضو ${type}`));
       await outsider.p.goto(origin + adminPath);
       assert.equal(await outsider.p.locator('#report-reply').count(), 0);
-      console.log(`PASS report_followup ${type}: create + 4 persistent replies + owner isolation + admin authorization + mobile390`);
+      console.log(`PASS report_followup ${type}: required reason + other explanation + preserved input + full private explanation + 4 replies + isolation + mobile390`);
     }
     await staff.p.goto(origin + '/admin/reports?tab=followup');
     await staff.p.locator('[name="enabled"]').uncheck();
@@ -77,7 +91,7 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
     await staff.p.waitForLoadState('networkidle');
     await page.reload();
     assert.equal(await page.locator('#report-reply').count(), 0);
-    assert.equal(await page.locator('ol[aria-label="ردود البلاغ"] > li').count(), 4);
+    assert.equal(await page.locator('ol[aria-label="ردود البلاغ"] > li').count(), 5);
     await staff.p.locator('[name="enabled"]').check();
     await staff.p.getByRole('button', { name: 'حفظ', exact: true }).click();
     await staff.p.waitForLoadState('networkidle');

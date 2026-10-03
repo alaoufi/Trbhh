@@ -412,6 +412,8 @@ async function run(){
       await page.getByRole('heading',{name:'إدارة الأقسام والحقول',exact:true}).waitFor({state:'visible',timeout:30000});
       await page.locator('summary').filter({hasText:/^وظائف —/}).click();
       await page.locator('summary').filter({hasText:/^فرص عمل —/}).click();
+      await page.getByRole('navigation',{name:'إدارة حقول فرص عمل',exact:true}).getByRole('link',{name:'إضافة وتعديل الحقول',exact:true}).click();
+      await page.getByRole('heading',{name:'إضافة وتعديل الحقول — فرص عمل',exact:true}).waitFor();
       const editor=page.locator('form').filter({has:page.locator('input[name="name"][value="فرص عمل"]')});
       const editableFields=editor.locator('fieldset').filter({has:page.getByRole('button',{name:/إزالة من التعريف/})});
       const before=await editableFields.count();

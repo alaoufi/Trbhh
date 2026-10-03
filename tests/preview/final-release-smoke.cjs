@@ -100,6 +100,7 @@ async function requiredFields(page){
       assert(!(await page.locator('body').innerText()).includes('حدث خطأ غير متوقع'));
       await page.locator('a[href="/ads/'+id+'"]').first().waitFor();
       console.log('PASS search/filter finds created ad');
+      if(!production&&!gps) await require('./report-followup-smoke.cjs').run({browser,page,adId:id,origin,run,attempt,password});
       // Delete only this newly created test ad using the member's own normal UI.
       await go(origin+'/ads/'+id);
       const deleteForm=page.locator('form:has(input[name="adId"][value="'+id+'"])').filter({has:page.getByRole('button',{name:/حذف/})}).first();

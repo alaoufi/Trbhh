@@ -25,6 +25,18 @@ import { isReadOnlyPreview } from '@/lib/read-only-preview';
  */
 
 const STATEMENTS: string[] = [
+  `CREATE TABLE IF NOT EXISTS report_replies (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    report_kind VARCHAR(16) NOT NULL,
+    report_id BIGINT UNSIGNED NOT NULL,
+    author_id BIGINT UNSIGNED NOT NULL,
+    is_staff BOOLEAN NOT NULL DEFAULT FALSE,
+    body TEXT NOT NULL,
+    nonce VARCHAR(36) NOT NULL,
+    created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    UNIQUE KEY report_reply_submission (author_id, nonce),
+    KEY report_reply_thread (report_kind, report_id, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   ...COMMERCE_DDL,
   ...CATEGORY_DDL,
   ...SUPPLIER_DDL,

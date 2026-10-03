@@ -10,11 +10,11 @@ const db=new PrismaClient({log:[]});
   if(input.production===true){
     if(process.env.FINAL_GATE_PRODUCTION_CONFIRM!==input.run)throw Error('Production test confirmation missing');
   }else if(url.hostname!==`trbhh-final-db-${input.run}`)throw Error('Not the isolated clone');
-  for(const i of input.production===true?[0]:[0,1]){
+  for(const i of input.production===true?[0]:[0,1,2]){
     const userName=`finalgate-${input.run}-${input.attempt}-${i}`;
     if(await db.users.findFirst({where:{userName}}))throw Error('Test account already exists');
     await db.users.create({data:{userName,name:'اختبار الإطلاق المعزول',email:`${userName}@example.test`,
-      password:input.passwordHash,type:'user',is_admin:0,country_id:1,
+      password:input.passwordHash,type:'user',is_admin:input.production!==true&&i===2?1:0,country_id:1,
       created_at:new Date(),updated_at:new Date(),auth_session_version:require('node:crypto').randomUUID()}});
   }
   console.log('ISOLATED_TEST_ACCOUNTS_READY');

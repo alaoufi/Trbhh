@@ -7,6 +7,11 @@ import { getModLog } from '@/lib/moderation';
 import { CATEGORY_LABEL, type GuardCategory } from '@/lib/content-guard';
 import { resolveReportAction, reviewModLogAction } from '../actions';
 import { ConfirmSubmit } from '@/components/confirm-submit';
+import { SubmittedReportList } from '@/components/submitted-report-list';
+import { getSettingBool } from '@/lib/settings';
+import { hasAction } from '@/lib/roles';
+import { REPORT_FOLLOWUP_ENABLED } from '@/lib/report-followup';
+import { toggleReportFollowup } from './followup-actions';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'البلاغات' };
@@ -22,15 +27,18 @@ const KIND_LABEL: Record<string, { label: string; icon: React.ElementType }> = {
 };
 
 const TABS = [
+  { key: 'followup', label: 'متابعة البلاغات والردود', icon: Flag },
   { key: 'members', label: 'بلاغات الأعضاء', icon: Flag },
   { key: 'auto', label: 'بلاغات الرصد الآلي', icon: Bot },
 ] as const;
 type TabKey = typeof TABS[number]['key'];
 
 export default async function AdminReportsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  await requirePerm('reports');
+  const session = await requirePerm('reports');
   const { tab } = await searchParams;
-  const active: TabKey = tab === 'auto' ? 'auto' : 'members';
+  const active: TabKey = tab === 'auto' ? 'auto' : tab === 'followup' ? 'followup' : 'members';
+  const enabled = await getSettingBool(REPORT_FOLLOWUP_ENABLED, true);
+  const canToggle = await hasAction(session.uid, 'reports', 'edit');
   const pendingCount = await prisma.repord_ads.count({ where: { status: 0 } }).catch(() => 0);
 
   return (
@@ -52,7 +60,13 @@ export default async function AdminReportsPage({ searchParams }: { searchParams:
         ))}
       </div>
 
-      {active === 'members' ? <MemberReportsTab /> : <AutoReportsTab />}
+      {active === 'followup' ? <>
+        {canToggle && <form action={toggleReportFollowup} className="flex flex-wrap gap-3 rounded-xl border p-3">
+          <label><input type="checkbox" name="enabled" value="1" defaultChecked={enabled} /> السماح بالردود المتعددة على البلاغات</label>
+          <button className="rounded-lg bg-primary px-3 py-1 text-white">حفظ</button>
+        </form>}
+        <SubmittedReportList admin />
+      </> : active === 'members' ? <MemberReportsTab /> : <AutoReportsTab />}
     </div>
   );
 }
@@ -99,6 +113,7 @@ async function MemberReportsTab() {
               <div className="mt-2 rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-sm text-emerald-900"><b>ردّ صاحب الإعلان:</b> {respById.get(toInt(r.id))}</div>
             )}
             <form action={resolveReportAction} className="mt-3 flex flex-wrap gap-2">
+              <Link href={`/admin/reports/ad/${r.id}`} className="rounded-lg border px-3 py-1.5 text-sm font-bold text-primary">مراسلة صاحب البلاغ</Link>
               <input type="hidden" name="reportId" value={toInt(r.id)} />
               <ConfirmSubmit name="action" value="ban" msg="حظر صاحب هذا الإعلان؟ سيصله إشعار بالحظر، ويصل المُبلِّغ إشعار تأكيد." className="flex items-center gap-1 rounded-lg bg-destructive px-3 py-1.5 text-xs font-bold text-white hover:bg-destructive/90"><Ban className="h-3.5 w-3.5" /> حظر الناشر</ConfirmSubmit>
               <ConfirmSubmit name="action" value="delete" msg="حذف (أرشفة) هذا الإعلان؟ سيصل صاحبه إشعار بالإزالة، ويصل المُبلِّغ إشعار تأكيد." className="flex items-center gap-1 rounded-lg border-2 border-destructive px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> حذف الإعلان</ConfirmSubmit>

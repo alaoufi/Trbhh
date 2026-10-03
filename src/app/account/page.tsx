@@ -175,6 +175,9 @@ export default async function AccountHome({ searchParams }: { searchParams?: Pro
           <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><Star className="h-5 w-5" /></span>
           <div><div className="font-bold">تقييماتي</div><div className="text-xs text-muted-foreground">{rating.count ? `${rating.avg} من 5 (${en(rating.count)} تقييم)` : 'لا تقييمات بعد'}</div></div>
         </Link>
+        <Link href="/account/submitted-reports" className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
+          <Flag className="h-5 w-5" /><div><div className="font-bold">بلاغاتي المرسلة</div><div className="text-xs text-muted-foreground">ردود الإدارة ومتابعة بلاغاتي واستفساراتي</div></div>
+        </Link>
         <Link href="/account/reports" className="flex items-center gap-3 card-3d rounded-xl p-4 hover:border-primary">
           <span className="grid h-11 w-11 place-items-center rounded-lg bg-accent text-accent-foreground"><Flag className="h-5 w-5" /></span>
           <div><div className="font-bold">البلاغات على إعلاناتي</div><div className="text-xs text-muted-foreground">راجع البلاغات وأرسل ردّك للإدارة</div></div>

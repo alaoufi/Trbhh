@@ -70,6 +70,7 @@ export default async function UserProfilePage({ params, searchParams }: { params
     <div className="space-y-4">
       {/* Paid banner — member page */}
       <PromoSlot placement="member" />
+      {!isOwnProfile && <Link href={`/report?type=member&id=${uid}`} className="inline-block text-sm text-primary underline">الإبلاغ عن هذا العضو</Link>}
 
       <div className="card-3d rounded-xl p-5">
         <div className="flex items-center gap-4">

@@ -118,7 +118,7 @@ jobs:
           export NODE_PATH="$RUNNER_TEMP/smoke/node_modules"
           node -e 'process.stdout.write(JSON.stringify({run:process.env.FINAL_GATE_RUN,attempt:process.env.GITHUB_RUN_ID,passwordHash:require("bcryptjs").hashSync(process.env.FINAL_GATE_PASSWORD,12)}))' | "${SSH[@]}" "$VPS_USER@$VPS_HOST" docker exec -i "$app" node /app/.final-gate-account.cjs
           test_ip=$("${SSH[@]}" "$VPS_USER@$VPS_HOST" "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' '$app'")
-          [[ "$test_ip" =~ ^172\.[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          node scripts/release/private-test-ip.cjs "$test_ip"
           "${SSH[@]}" -f -N -o ExitOnForwardFailure=yes -L "4197:$test_ip:3000" "$VPS_USER@$VPS_HOST"
           "$RUNNER_TEMP/smoke/node_modules/.bin/playwright" install --with-deps chromium
           export NODE_PATH="$RUNNER_TEMP/smoke/node_modules"

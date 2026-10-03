@@ -86,7 +86,9 @@ describe('public search form controls', () => {
   it('uses tighter vertical rhythm only in the compact homepage form', () => {
     const html = renderToStaticMarkup(createElement(PublicSearchForm, { ...location, compact: true }));
     expect(html.match(/<form[^>]*role="search"[^>]*>/)?.[0]).toContain('space-y-2');
-    expect(html.match(/<details[^>]*>/)?.[0]).toContain('py-1.5');
+    // The approved compact search uses an accessible, initially collapsed button.
+    expect(html.match(/<button[^>]*aria-expanded="false"[^>]*>/)?.[0]).toContain('min-h-11');
+    expect(html).toContain('invisible grid-rows-[0fr]');
   });
   it('shows one canonical group and omits an exact legacy duplicate leaf',()=>{
     const base={active:true,order:1,version:1,kind:'goods' as const,priceEnabled:true,goodsEnabled:true,fields:[]};

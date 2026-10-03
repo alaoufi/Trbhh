@@ -10,13 +10,15 @@ const script=readFileSync('scripts/release/safeguards.sh','utf8');
 const runtime=readFileSync('scripts/release/verify-runtime.cjs','utf8');
 const baseline='1a2111ccd9a17c151a2f47cf793f3bddf4d0451f';
 const candidate='a'.repeat(40);
+// Windows process startup makes the filesystem proof chain take ~83 seconds.
+const proofTimeout=process.platform==='win32'?180000:30000;
 const bash=process.platform==='win32'?'C:/Program Files/Git/bin/bash.exe':'bash';
 function shell(source:string,env:Record<string,string>={}){return spawnSync(bash,['-c',source],{encoding:'utf8',timeout:10000,env:{...process.env,...env}});}
 describe('public homepage preservation release',()=>{
   it('runs real filesystem chain and historical raw-proof review in CI',()=>{
-    const result=spawnSync(process.execPath,['--test','scripts/release/home-media-reference.test.cjs'],{encoding:'utf8',timeout:30000});
+    const result=spawnSync(process.execPath,['--test','scripts/release/home-media-reference.test.cjs'],{encoding:'utf8',timeout:proofTimeout});
     expect(result.error).toBeUndefined();expect(result.status,result.stdout+'\n'+result.stderr).toBe(0);
-  },35000);
+  },proofTimeout+5000);
   it('selects public_home only on exact feature branch and reviewed checkpoint',()=>{
     const expression=workflow.match(/^          RELEASE_PROFILE: \$\{\{ (.+) \}\}$/m)?.[1];expect(expression).toBeDefined();
     for(const [ref,reuse,profile] of [

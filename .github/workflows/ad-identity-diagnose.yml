@@ -1,0 +1,36 @@
+name: فحص هوية الإعلان للقراءة فقط
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/trbhh-platform-enhancement-20260929]
+    paths:
+      - .github/workflows/ad-identity-diagnose.yml
+      - scripts/release/ad-identity-diagnose.cjs
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Read scoped production state without data changes
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$VPS_KNOWN_HOSTS"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          PORT="${VPS_PORT:-22}"
+          [[ "$PORT" =~ ^[0-9]+$ ]]
+          ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=25 -i ~/.ssh/deploy_key -p "$PORT" "$VPS_USER@$VPS_HOST" 'docker exec -i trbhh-app node' < scripts/release/ad-identity-diagnose.cjs

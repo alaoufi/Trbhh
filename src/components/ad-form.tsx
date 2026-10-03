@@ -1,5 +1,6 @@
 'use client';
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useActionState, useEffect, startTransition } from 'react';
+import type {AdSubmissionState} from '@/lib/ad-submission-result';
 import Link from 'next/link';
 import { useFormStatus } from 'react-dom';
 import { Tag, MapPin, Image as ImageIcon, Video, Mic, Phone, ShieldCheck, Eye, X, ArrowLeftRight, Timer, Star, User, Store } from 'lucide-react';
@@ -59,8 +60,9 @@ type Initial = Partial<{
 // مدد التأجير المتاحة عند اختيار «سعر تأجير»
 const RENT_PERIODS = ['بالساعة', 'يومي', 'أسبوعي', 'شهري', 'سنوي'];
 
-function Submit({ label }: { label: string }) {
-  const { pending } = useFormStatus();
+function Submit({ label, submitting }: { label: string; submitting?:boolean }) {
+  const { pending: formPending } = useFormStatus();
+  const pending=submitting||formPending;
   return <Button size="lg" disabled={pending}>{pending ? 'جارٍ الحفظ...' : label}</Button>;
 }
 
@@ -77,7 +79,7 @@ function InfoItem({ icon: Icon, children }: { icon: React.ElementType; children:
 export function AdForm({
   action, countries, cities, areas = [], initial, submitLabel, error, dupLeft, dupId, needPrice, needBal, dest, limitMax, gapHours, gapWait, blockCat, banned, allowSchedule, scheduleMaxDays = 30, allowOldPrice, allowStock, urgentOffer, featuredOffer, identity, categoryConfig,
 }: {
-  action: (fd: FormData) => void | Promise<void>;
+  action: (fd: FormData) => void | AdSubmissionState | Promise<void | AdSubmissionState>;
   categoryConfig?: CategoryFormConfig;
   countries: Country[]; cities: City[]; areas?: Area[];
   initial?: Initial; submitLabel: string; error?: string; dupLeft?: string; dupId?: string;
@@ -178,6 +180,21 @@ export function AdForm({
   // معاينة الإعلان قبل النشر (حيّة في المتصفح، بلا إنشاء مسودّة على الخادم) — مطابِقة تماماً
   // لتخطيط صفحة الإعلان الحقيقية (نفس المعرض والترتيب والأصناف).
   const formRef = useRef<HTMLFormElement>(null);
+  const [submission, submitAction, submitting] = useActionState<AdSubmissionState, FormData>(
+    async (_previous, data) => (await action(data)) ?? {}, {},
+  );
+  useEffect(() => {
+    if (!submission.error || !formRef.current) return;
+    const form = formRef.current;
+    const key = submission.error.fieldKey;
+    const categoryField = Array.from(form.querySelectorAll<HTMLElement>('[data-field-key]'))
+      .find(element => element.dataset.fieldKey === key);
+    const target = categoryField?.querySelector<HTMLElement>('input:not([type="hidden"]),select,textarea,summary')
+      ?? Array.from(form.querySelectorAll<HTMLElement>('[name]')).find(element => element.getAttribute('name') === key && element.getAttribute('type') !== 'hidden')
+      ?? form.querySelector<HTMLElement>('[data-submission-error]');
+    target?.focus();
+    target?.scrollIntoView({block:'center',behavior:'smooth'});
+  }, [submission]);
   const previewUrlsRef = useRef<string[]>([]);
   type PreviewData = { title: string; detail: string; price: number; oldPrice: number; images: string[]; cityName: string; areaName: string; urgent: boolean; featured: boolean };
   const [preview, setPreview] = useState<PreviewData | null>(null);
@@ -216,8 +233,16 @@ export function AdForm({
   const lbl = 'mb-1 block text-sm font-bold text-foreground';
 
   return (
-    <form action={action} ref={formRef} className="max-w-2xl space-y-4">
-      <SubmitOverlay label="جارٍ رفع الإعلان…" />
+    <form action={submitAction} onSubmit={event=>{
+      event.preventDefault();
+      if(submitting)return;
+      const data=new FormData(event.currentTarget);
+      // Manual dispatch avoids React's automatic successful-action form reset on validation replies.
+      startTransition(()=>submitAction(data));
+    }} ref={formRef} className="max-w-2xl space-y-4">
+      <SubmitOverlay label="جارٍ رفع الإعلان…" pendingOverride={submitting} />
+      {submission.error && <p role="alert" tabIndex={-1} data-submission-error className="rounded-lg border-2 border-red-500 bg-red-50 p-3 text-sm font-bold text-red-800">{submission.error.message} — بيانات النموذج محفوظة، صحّح الحقل ثم أعد الحفظ.</p>}
+      {submission.error&&submission.publishTraceId&&<p className="text-xs text-muted-foreground">رقم متابعة المحاولة: <bdi>{submission.publishTraceId}</bdi></p>}
       {initial?.id && <input type="hidden" name="adId" value={initial.id} />}
       {dest && <input type="hidden" name="dest" value={dest} />}
       {error === 'category' && categoryConfig && <p role="alert" className="rounded border border-red-300 p-3 text-sm text-red-700">{categoryConfig.labels.error}</p>}
@@ -364,7 +389,7 @@ export function AdForm({
           <input type="hidden" name="category_id" value={selectedSub?.categoryId||''}/>
           <input type="hidden" name="category_version" value={selectedSub?.version || ''}/>
           {selectedSub&&<AdListingPolicyFields policy={listingPolicy} listingType={effectiveListingType} pricingMode={effectivePricingMode} onListingType={setListingType} onPricingMode={setPricingMode} initialPrice={initial?.price} priceEnabled={priceEnabled}/>}
-          {selectedSub && <AdCategoryFields key={`${selectedSub.id}:${selectedSub.version}:${effectiveListingType}`} fields={selectedSub.fields} values={categoryValues} onChange={setCategoryValues} listingType={effectiveListingType}/>}
+          {selectedSub && <AdCategoryFields key={`${selectedSub.id}:${selectedSub.version}:${effectiveListingType}`} fields={selectedSub.fields} values={categoryValues} onChange={setCategoryValues} listingType={effectiveListingType} serverError={submission.error}/>}
           </>}
         </fieldset>}
         <div>
@@ -633,7 +658,7 @@ export function AdForm({
         <button type="button" onClick={openPreview} className="inline-flex h-11 items-center gap-1.5 rounded-lg border-2 border-primary/40 bg-white px-4 text-sm font-extrabold text-primary shadow-sm transition hover:bg-primary/5">
           <Eye className="h-4 w-4" /> معاينة الإعلان
         </button>
-        <Submit label={submitLabel} />
+        <Submit label={submitLabel} submitting={submitting} />
       </div>
 
       {/* معاينة الإعلان قبل النشر — تُطابق تخطيط صفحة الإعلان الحقيقية بالكامل (نفس المعرض والترتيب) */}

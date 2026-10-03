@@ -3,8 +3,10 @@ import Image from 'next/image';
 import { Pencil, Trash2, Eye, EyeOff, Wallet, Archive } from 'lucide-react';
 import { AdStatsCard } from '@/components/ad-stats-card';
 import { requireUser } from '@/lib/auth';
-import { getMyIdentityAds } from '@/lib/account';
+import { getMyIdentityAds, getMyAds } from '@/lib/account';
 import { getActiveProfile } from '@/lib/profiles';
+import {prisma} from '@/lib/prisma';
+import {currentPlatformAdPublicWhere} from '@/lib/platform-ad-visibility';
 import { getAdPeriodStats } from '@/lib/analytics';
 import { getServicePricing, serviceHasPrice, DURATIONS, DUR_DAYS, getAdExtras, getSettingBool, getAdRestoreFee, getMemberWindows, adWindowState } from '@/lib/settings';
 import { getBalance } from '@/lib/wallet';
@@ -16,15 +18,16 @@ import { deleteAdAction, toggleAdStatusAction, featureAdAction, buyUrgentAction,
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'إعلاناتي' };
 
-export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string; censored?: string }> }) {
+export default async function MyAdsPage({ searchParams }: { searchParams: Promise<{ scope?:string;publish_issue?:string;trace?:string;pending?: string; error?: string; hours?: string; featured?: string; price?: string; bal?: string; urgent?: string; urgentneed?: string; featuredneed?: string; bumped?: string; bumpwait?: string; scheduled?: string; restored?: string; censored?: string }> }) {
   const session = await requireUser();
   const sp = await searchParams;
   const [ads, servicePricing, balance, extras, bumpOn, contactStatsOn, auctionOn, restoreFee, memberWindows, active, lifecycleOn] = await Promise.all([
-    getMyIdentityAds(session.uid), getServicePricing(), getBalance(session.uid), getAdExtras(),
+    sp.scope==='all'?getMyAds(session.uid):getMyIdentityAds(session.uid), getServicePricing(), getBalance(session.uid), getAdExtras(),
     getSettingBool('bump_on', false), getSettingBool('ad_contact_stats_on', true), getSettingBool('auction_on', false),
     getAdRestoreFee(), getMemberWindows(), getActiveProfile(session.uid).catch(() => null), getSettingBool('platform_ad_lifecycle_enabled', false),
   ]);
   const periodStats = await getAdPeriodStats(contactStatsOn ? ads.map((a) => a.id) : []);
+  const publicIds=new Set((ads.length?await prisma.ads.findMany({where:{id:{in:ads.map(ad=>BigInt(ad.id))},...await currentPlatformAdPublicWhere()},select:{id:true}}):[]).map(ad=>Number(ad.id)));
   const now = Date.now();
   const featuredSold = serviceHasPrice(servicePricing.featured);
   const en = (n: number) => new Intl.NumberFormat('en-US').format(n);
@@ -36,7 +39,8 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h1 className="text-xl font-bold">إعلاناتي ({ads.length})</h1>
-          {active && (
+          {sp.scope==='all'&&<p className="text-xs text-muted-foreground">جميع إعلانات حسابك عبر هوياتك الشخصية ومتاجرك.</p>}
+          {sp.scope!=='all'&&active && (
             <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-extrabold text-white" style={{ background: active.type === 'store' ? '#059669' : '#0284c7' }}>{active.type === 'store' ? 'متجر' : 'حساب'}</span>
               <span className="truncate">إعلانات هوية «{active.name}» فقط — بدّل الهوية أعلى الصفحة لعرض غيرها.</span>
@@ -53,7 +57,8 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {sp.bumped === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">⬆ تم تحديث إعلانك — أصبح في مقدمة القوائم.</div>}
       {sp.bumpwait && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold text-amber-900">⬆ التحديث المجاني متاح بعد {sp.bumpwait} يوم — أو فعّل التحديث المدفوع إن وُفّر.</div>}
       {sp.scheduled === '1' && <div className="rounded-lg border border-sky-300 bg-sky-50 p-3 text-sm font-bold text-sky-800">🕒 حُفظ إعلانك وسيُنشر تلقائياً في الموعد الذي حددته.</div>}
-      {sp.censored === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">✳️ نُشر إعلانك للعامة بعد حجب كلمات مخالفة بنجمات. إن رأيت المنع خطأً راسل الإدارة.</div>}
+      {sp.censored === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">حُفظ إعلانك بعد حجب كلمات مخالفة بنجمات. راجع حالة ظهوره أدناه.</div>}
+      {sp.publish_issue&&ads.some(ad=>String(ad.id)===sp.publish_issue)&&<div role="alert" className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm text-red-800">حُفظ الإعلان لكن لم نتمكن من تأكيد ظهوره في الوجهة المطلوبة. لا تعِد إنشاءه؛ تواصل مع الدعم برقم الإعلان {sp.publish_issue}. {sp.trace&&/^[0-9a-f-]{36}$/.test(sp.trace)&&<>رقم المتابعة: <bdi>{sp.trace}</bdi></>}</div>}
       {sp.restored === '1' && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">📤 أُعيد إعلانك للظهور من الأرشيف وعاد لمقدمة القوائم.</div>}
       {sp.error === 'adminhidden' && <div className="rounded-lg border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">🚫 هذا الإعلان أخفته الإدارة عن النشر لمخالفة — لا يمكنك إعادة نشره بنفسك. عالِج سبب المخالفة (المذكور تحت الإعلان) وراسل الإدارة لإعادة نشره.</div>}
       {sp.error === 'needcredit' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 رصيدك لا يكفي{sp.price ? <> (المطلوب {sp.price} ر.س</> : ''}{sp.bal !== undefined ? <>، ورصيدك {sp.bal} ر.س)</> : ')'}. <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم أعد المحاولة.</div>}
@@ -61,7 +66,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
       {sp.featuredneed === '1' && <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">💳 حُفظ إعلانك، لكن رصيدك لا يغطي رسوم التمييز ⭐ — <Link href="/account/wallet#topup" className="text-primary underline">اشحن رصيدك من هنا</Link> ثم ميّزه من «تمييز الإعلان (مدفوع)» أسفل الإعلان.</div>}
       {sp.pending === '1' && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          إعلانك مشابه لإعلان قائم (تطابق ٩٠٪ في العنوان/التفاصيل أو الصور)، فتم حفظه <b>بانتظار موافقة الإدارة</b> قبل نشره.
+          حُفظ إعلانك <b>بانتظار موافقة الإدارة</b> قبل نشره.
         </div>
       )}
       {sp.error === 'deleteWindow' && (
@@ -85,7 +90,7 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                 <div className="flex shrink-0 gap-1">
                   {ad.special && <Badge variant="special">مميّز</Badge>}
                   {ad.urgentUntil && new Date(ad.urgentUntil).getTime() > now && <span className="animate-pulse rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-extrabold text-white">🔥 عاجل</span>}
-                  <Badge variant={ad.status === 1 ? 'trusted' : 'special'}>{ad.status === 1 ? 'نشط' : ad.hiddenReason ? 'مخفيّ من الإدارة' : ad.archived ? 'مؤرشف' : ad.pausedByOwner ? 'موقوف (أوقفته أنت)' : ad.publishAt ? `مجدول: ${fmtDay(ad.publishAt)}` : 'بانتظار الموافقة'}</Badge>
+                  <Badge variant={publicIds.has(ad.id) ? 'trusted' : 'special'}>{publicIds.has(ad.id) ? 'ظاهر في تربح العام' : ad.hiddenReason ? 'مخفيّ من الإدارة' : ad.archived ? 'مؤرشف' : ad.pausedByOwner ? 'موقوف (أوقفته أنت)' : ad.publishAt&&new Date(ad.publishAt).getTime()>now ? `مجدول: ${fmtDay(ad.publishAt)}` : ad.status!==1 ? 'بانتظار الموافقة' : ad.storeOnly ? 'داخل المتجر فقط' : 'غير ظاهر في تربح العام'}</Badge>
                 </div>
               </div>
               <span className="text-sm font-bold text-primary">{formatPrice(ad.price, 'ر.س', ad.adsType)}</span>
@@ -117,7 +122,9 @@ export default async function MyAdsPage({ searchParams }: { searchParams: Promis
                     ? <>📦 <b>مؤرشف</b> — لم يعد ظاهراً للعامة (مضت مدة عرضه أو أرشفته الإدارة). يظهر لك وحدك، واضغط <b>«أعِد للظهور»</b>{restoreFee > 0 ? <> ليعود بخصم <b>{restoreFee} ر.س</b> من رصيدك</> : ' ليعود مجاناً'}.</>
                     : ad.pausedByOwner
                     ? <>سبب عدم الظهور: <b>أوقفته أنت</b> — اضغط <b>«تفعيل»</b> ليعود للعرض فوراً.</>
-                    : <>سبب عدم الظهور: الإعلان <b>بانتظار الموافقة</b> — غالباً لتشابهه مع إعلان قائم (٩٠٪+) أو تفعيل مراجعة الإعلانات. اضغط <b>«تفعيل»</b> لعرضه فوراً، أو احذف النسخة المكرّرة.</>}
+                    : ad.publishAt&&new Date(ad.publishAt).getTime()>now
+                    ? <>سبب عدم الظهور: النشر مجدول في {fmtDay(ad.publishAt)}.</>
+                    : <>سبب عدم الظهور: الإعلان <b>بانتظار موافقة الإدارة</b>.</>}
                 </span>
               )}
 

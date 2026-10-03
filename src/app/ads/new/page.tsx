@@ -7,6 +7,7 @@ import { AdForm } from '@/components/ad-form';
 import { getCategoryFormConfig } from '@/lib/ad-categories/service';
 import { getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { createAdAction } from '../actions';
+import {publicationDestination} from '@/lib/ad-submission-result';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'أضف إعلان' };
@@ -23,11 +24,13 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   const session = await getSession();
   if (!session) redirect('/login?next=%2Fads%2Fnew');
   const { error, left, max, hours, wait, cat, banned, dup, price, bal, dest } = await searchParams;
-  // الهوية الفعّالة الحالية (نفس مصدر createAdAction) — لعرضها صريحةً وتحديد المجال افتراضياً
-  const active = await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).catch(() => null);
-  // الوجهة: المعامل الصريح يفصل (store/personal)، وإلا تُشتقّ من مجال الهوية الفعّالة —
-  // فما تراه في المبدّل هو ما تنشر فيه فعلاً. استقلالية تامّة: هوية تربح ⇐ تربح، هوية متجر ⇐ متجرها.
-  const publishingAsStore = dest === 'store' || (dest !== 'personal' && active?.type === 'store');
+  // الهوية للعرض فقط؛ وجهة النشر لا تُستنتج من كوكي المتجر.
+  let active = await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).catch(() => null);
+  // النشر العام افتراضي، والمتجر يحتاج اختياراً صريحاً.
+  const publishingAsStore = publicationDestination(dest) === 'store';
+  if (!publishingAsStore && active?.type === 'store') {
+    active = await import('@/lib/profiles').then(m=>m.ensureDefaultProfile(session.uid));
+  }
   const quota = !publishingAsStore
     ? await import('@/lib/packages').then(async (m) => m.adQuota((await m.getUserPackage(session.uid)).adsPerDay, await m.countAdsToday(session.uid))).catch(() => null)
     : null;
@@ -112,10 +115,10 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
       {/* اختيار الهوية: باسمي الشخصي أو باسم متجري — يمنع تداخل النشر بين الهويات */}
       {myStore && (
         <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-3">
-          <div className="mb-2 text-sm font-extrabold text-primary">🎭 أنشر باسم</div>
+          <div className="mb-2 text-sm font-extrabold text-primary">وجهة النشر</div>
           <div className="grid grid-cols-2 gap-2">
             <Link href="/ads/new?dest=personal" className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold ${!publishingAsStore ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
-              👤 باسمي الشخصي (تربح)
+              👤 تربح العام — باسمي الشخصي
             </Link>
             <Link href="/ads/new?dest=store" className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold ${publishingAsStore ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
               🏬 باسم متجر «{myStore.name}»

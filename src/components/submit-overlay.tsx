@@ -8,8 +8,9 @@ import { Loader2 } from 'lucide-react';
  * Must be rendered INSIDE the <form>. Shows a live elapsed-seconds counter so
  * the user can tell the upload is still working (not frozen).
  */
-export function SubmitOverlay({ label = 'جارٍ الرفع والنشر…' }: { label?: string }) {
-  const { pending } = useFormStatus();
+export function SubmitOverlay({ label = 'جارٍ الرفع والنشر…', pendingOverride }: { label?: string; pendingOverride?:boolean }) {
+  const { pending: formPending } = useFormStatus();
+  const pending=pendingOverride??formPending;
   const [sec, setSec] = useState(0);
 
   useEffect(() => {

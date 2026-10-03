@@ -1,5 +1,5 @@
 'use server';
-import { redirect } from 'next/navigation';
+import { redirect, unstable_rethrow } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createHash } from 'crypto';
 import { prisma } from '@/lib/prisma';
@@ -23,6 +23,9 @@ import { getActiveProfile, ensureDefaultProfile, backfillProfileContact } from '
 import { normalizeAr, similarity, isKeywordStuffing } from '@/domain/text';
 import { writeAdWithCategory } from '@/lib/ad-categories/service';
 import { CategoryValidationError } from '@/lib/ad-categories/validation';
+import {adValidationFailure,publicationDestination} from '@/lib/ad-submission-result';
+import {createPublishTrace,publicationOutcome} from '@/lib/ads/publication-trace';
+import {currentPlatformAdPublicWhere} from '@/lib/platform-ad-visibility';
 import { inferLegacyListingType, type NormalizedListingSubmission } from '@/lib/ad-categories/listing-policy';
 import {
   normalizeAdPriceDetails,
@@ -205,7 +208,22 @@ export async function crossUserDuplicateOf(userId: number, title: string, detail
 }
 
 export async function createAdAction(formData: FormData) {
+  const trace=createPublishTrace();
+  try { return {...await createAdSubmission(formData,trace),publishTraceId:trace.id}; }
+  catch(error){
+    unstable_rethrow(error);
+    if(trace.createdAdId){
+      await logClientError({message:'P1: post-create publication step failed',digest:trace.id,url:`/ads/${trace.createdAdId}`});
+      redirect(`/account/ads?scope=all&publish_issue=${trace.createdAdId}&trace=${trace.id}`);
+    }
+    throw error;
+  }
+  finally {trace.finish();}
+}
+
+async function createAdSubmission(formData:FormData,trace:ReturnType<typeof createPublishTrace>) {
   const session = await requireUser();
+  trace.stage('AUTH_OK',{userId:session.uid});
   const user = await prisma.users.findUnique({ where: { id: BigInt(session.uid) } });
   if (await isUserBanned(session.uid)) redirect('/ads/new?error=banned');
 
@@ -219,8 +237,7 @@ export async function createAdAction(formData: FormData) {
     location = await submittedSaudiLocation(formData);
   } catch (error) {
     if (error instanceof CategoryValidationError) {
-      const destSuffix = String(formData.get('dest') || '') === 'store' ? '&dest=store' : '';
-      redirect(`/ads/new?error=${submissionErrorCode(error)}${destSuffix}`);
+      return adValidationFailure(error);
     }
     throw error;
   }
@@ -240,8 +257,7 @@ export async function createAdAction(formData: FormData) {
     coordinates = normalizeOptionalCoordinates({ lat: rawLat, lng: rawLng });
   } catch (error) {
     if (error instanceof CategoryValidationError) {
-      const destSuffix = String(formData.get('dest') || '') === 'store' ? '&dest=store' : '';
-      redirect(`/ads/new?error=location${destSuffix}`);
+      return adValidationFailure(error);
     }
     throw error;
   }
@@ -250,29 +266,35 @@ export async function createAdAction(formData: FormData) {
   // «باسمي الشخصي» إلى منتج متجر معزول عن تربح بصمت — هذا الانزلاق كان يُخفي إعلانات الأعضاء
   // عن تربح العام دون علمهم، ويجعلهم يظنّون أن الإعلان «اختفى».
   let active = await getActiveProfile(session.uid);
-  const asStore = String(formData.get('dest') || '') === 'store';
+  const asStore = publicationDestination(formData.get('dest')) === 'store';
   const dest = asStore ? 'store' : '';
+  trace.stage('DESTINATION_RESOLVED',{destination:asStore?'store':'personal'});
   // اختير «باسمي الشخصي» بينما الهوية الفعّالة متجر: ثبّت على الهوية الشخصية الافتراضية حتى
   // يُنشر الإعلان في تربح العام لا داخل المتجر (تصحيح الانزلاق مصدره الكوكي).
   if (!asStore && active.type === 'store') {
     active = await ensureDefaultProfile(session.uid);
   }
   const q = dest ? '&dest=store' : '';
+  let publishingStoreId=0;
   // متجر موقوف (مؤقتاً أو نهائياً): لا يُسمح بنشر إعلانات منه
   if (dest === 'store') {
-    const { storeStatusOfUser, storeIdOfUser } = await import('@/lib/merchant');
-    const st = await storeStatusOfUser(session.uid).catch(() => 1);
+    const { getActiveStoreId, staffStoreId } = await import('@/lib/merchant');
+    publishingStoreId=(await getActiveStoreId(session.uid))||(await staffStoreId(session.uid));
+    if(!publishingStoreId)return adValidationFailure(new CategoryValidationError('dest','لا يوجد متجر متاح لهذه الهوية؛ اختر تربح العام أو راجع صلاحية المتجر'));
+    const store=await prisma.stores.findUnique({where:{id:BigInt(publishingStoreId)},select:{status:true}});
+    if(!store)return adValidationFailure(new CategoryValidationError('dest','المتجر غير متاح للنشر'));
+    const st = store.status;
     if (st === 2 || st === 3) redirect(st === 3 ? '/store?error=suspended_perm' : '/store?error=suspended');
     // انتهاء اشتراك المتجر لا يُحوّل العضو إلى شاشة خطأ عامة: يُنقل إلى التجديد
     // حيث يرى رصيده والخطط وخيار الشحن إن لم يكفِ الرصيد.
-    const storeId = await storeIdOfUser(session.uid).catch(() => 0);
+    const storeId = publishingStoreId;
     if (storeId) {
       const { isStoreSubBlocked } = await import('@/lib/subscription');
       if (await isStoreSubBlocked(storeId)) redirect('/store?sub=expired&from=ad#sub');
     }
   }
   // حقول إجبارية — أظهِر السبب بدل الرجوع الصامت
-  if (!title || !detail) redirect(`/ads/new?error=missing${q}`);
+  if (!title || !detail) return adValidationFailure(new CategoryValidationError(!title?'title':'detail','أكمل العنوان ووصف الإعلان'));
   // Legacy fallback only; the transaction replaces this with the explicit,
   // validated selection when categories are enabled. No bulk classification.
   let catId = 0n;
@@ -285,11 +307,12 @@ export async function createAdAction(formData: FormData) {
     if (catId <= 0n) redirect(`/ads/new?error=missing${q}`);
   }
   // تعهّد صحة الإعلان وتحمّل المسؤولية إجباري
-  if (!formData.get('pledge')) redirect(`/ads/new?error=pledge${q}`);
+  if (!formData.get('pledge')) return adValidationFailure(new CategoryValidationError('pledge','وافق على تعهد صحة الإعلان قبل النشر'));
   // جوال أو واتساب إجباري حتى يستطيع العملاء التواصل مع صاحب الإعلان
-  if (!phone && !whatsapp) redirect(`/ads/new?error=contact${q}`);
+  if (!phone && !whatsapp) return adValidationFailure(new CategoryValidationError('phone','أدخل رقم جوال أو واتساب للتواصل'));
   // منع حشو الكلمات (تكرار العبارات لخداع محرك البحث)
   if (isKeywordStuffing(title, detail)) redirect('/ads/new?error=repeat');
+  trace.stage('BASE_VALIDATION_OK');
 
   // سياسة المحتوى النصّي (متّفق عليها): الكلمة المخالفة لا تحجب الإعلان إطلاقاً — تُشفَّر بنجوم
   // فقط ويُنشر الإعلان، إلا إن كانت من الكلمات المستثناة (قائمة السماح مثل «وايت سكس») فتبقى كما هي.
@@ -308,7 +331,7 @@ export async function createAdAction(formData: FormData) {
   if (pkg.adsPerDay > 0 && (await countAdsToday(session.uid)) >= pkg.adsPerDay) {
     await logMod(session.uid, { kind: 'limit', action: 'blocked', snippet: `تجاوز الحد اليومي (${pkg.adsPerDay}/يوم) — العنوان: ${title.slice(0, 60)}` });
     await notifyModBlock(session.uid, `⚠️ لقد تجاوزت الحد المسموح لك من الإعلانات اليوم (${pkg.adsPerDay}/يوم). هل ترغب بالترقية إلى باقة أفضل للحصول على عدد إعلانات أكبر يومياً؟`, '/packages');
-    redirect(`/ads/new?error=limit&max=${pkg.adsPerDay}`);
+    return adValidationFailure(new CategoryValidationError('','وصلت إلى الحد اليومي لباقتك. بيانات النموذج باقية؛ يمكنك المحاولة بعد تجدد الرصيد اليومي'));
   }
   if (pkg.gapHours > 0) {
     const last = await lastAdAt(session.uid);
@@ -323,11 +346,12 @@ export async function createAdAction(formData: FormData) {
     }
   }
 
+  trace.stage('PACKAGE_OK');
   // هوية النشر: الهوية الفعّالة (شخصية أو متجر). إن كان dest=store من النموذج بينما
   // الهوية الشخصية فعّالة، نربطه بهوية المتجر.
   let profileId: number | null = active.id;
   if (dest === 'store' && active.type !== 'store') {
-    const sp = await prisma.profiles.findFirst({ where: { user_id: BigInt(session.uid), type: 'store' }, orderBy: { id: 'asc' }, select: { id: true } }).catch(() => null);
+    const sp = await prisma.profiles.findFirst({ where: { user_id: BigInt(session.uid), type: 'store',store_id:BigInt(publishingStoreId) }, orderBy: { id: 'asc' }, select: { id: true } });
     profileId = sp ? toInt(sp.id) : null;
   }
   const publishingAsDefault = active.type === 'personal' && active.isDefault;
@@ -424,6 +448,7 @@ export async function createAdAction(formData: FormData) {
     }
   }
   const video = await saveMediaFile(formData, 'video', 25 * 1024 * 1024, ['mp4', 'webm', 'mov', 'm4v']);
+  trace.stage('DUPLICATE_CHECK_OK');
 
   const ad = await writeAdWithCategory(prisma, formData, async (tx, category) => {
     const listing = category?.listing ?? normalizeLegacyListingSubmission({
@@ -433,6 +458,7 @@ export async function createAdAction(formData: FormData) {
       price: formData.get('price'),
     });
     const priceDetails = normalizeAdPriceDetails(listing, formData.get('old_price'), category ? category.priceEnabled && category.goodsEnabled : true);
+    trace.stage('CATEGORY_VALIDATION_OK');
     const submissionFlags = [flagTerms, priceDetails.warning === 'suspicious_discount' ? `خصم مرتفع محسوب (${priceDetails.discountPercent}٪)` : ''].filter(Boolean).join(' — ');
     const created = await tx.ads.create({
     data: {
@@ -473,9 +499,12 @@ export async function createAdAction(formData: FormData) {
     await setAdLocationPrivacy(tx, created.id, exactLocationConsent(formData.get('show_exact_location_publicly'), Boolean(coordinates)));
     return created;
   }).catch(error => {
-    if (error instanceof CategoryValidationError) redirect(`/ads/new?error=${submissionErrorCode(error)}${q}`);
+    if (error instanceof CategoryValidationError) return error;
     throw error;
   });
+  if (ad instanceof CategoryValidationError) return adValidationFailure(ad);
+  trace.stage('DB_CREATED',{adId:toInt(ad.id),userId:session.uid,profileId,categoryId:Number(ad.category_id),subcategoryId:ad.subcategory_id});
+  trace.stage('PUBLICATION_STATE_ASSIGNED',{status:ad.status,state:ad.state,store_only:ad.store_only,publish_at:ad.publish_at?.toISOString()??null,requireApproval});
 
   // إعلان المتجر: العلامة المائية هوية المتجر (شعار/اسم حسب اختيار المالك) بدل «تربح»
   const wm = dest === 'store' ? await (await import('@/lib/merchant')).getStoreWatermark(session.uid) : undefined;
@@ -535,7 +564,16 @@ export async function createAdAction(formData: FormData) {
       }
     }
   }
-  await bustAdCaches().catch(() => {}); // يظهر الإعلان فوراً في الرئيسية/البحث/المتاجر
+  await bustAdCaches();
+  trace.stage('CACHE_BUSTED');
+  const publicMatch=await prisma.ads.findFirst({where:{id:ad.id,...await currentPlatformAdPublicWhere()},select:{id:true}});
+  trace.stage('PUBLIC_VISIBILITY_CHECKED');
+  const outcome=publicationOutcome(ad,Boolean(publicMatch));
+  if(outcome==='REJECTED'){
+    await logClientError({message:'P1: saved ad failed public visibility verification',digest:trace.id,url:`/ads/${toInt(ad.id)}`,userId:session.uid});
+    trace.outcome(outcome);
+    redirect(`/account/ads?scope=all&publish_issue=${toInt(ad.id)}&trace=${trace.id}`);
+  }
   if (!requireApproval && dest !== 'store' && !scheduledAt) {
     // تنبيهات البحث المحفوظ + مطابقة عرض/طلب — لإعلانات تربح فقط (عزل المتاجر)
     import('@/lib/saved-search').then((m) => {
@@ -545,12 +583,18 @@ export async function createAdAction(formData: FormData) {
   }
   // كلمات مخالفة قليلة: نُشر الإعلان للعامة بعد حجب تلك الكلمات بنجمات — أعلِم صاحبه بذلك.
   if (flagTerms) {
-    await notifyModBlock(session.uid, `نُشر إعلانك «${finalTitle.slice(0, 40)}» بعد حجب كلمات مخالفة بنجمات (${flagTerms}). إن رأيت المنع خطأً راسل الإدارة.`, `/ads/${toInt(ad.id)}`).catch(() => {});
+    await notifyModBlock(session.uid, `حُفظ إعلانك «${finalTitle.slice(0, 40)}» بعد حجب كلمات مخالفة بنجمات (${flagTerms}). تابع حالة النشر في إعلاناتي.`, `/account/ads?scope=all`).catch(() => {});
   }
   // نشر من المتجر: أدرِج الإعلان في واجهة المتجر، ثم انتقل إلى إعلانات المتجر (لا للرجوع لصفحة الإضافة)
   if (dest === 'store') {
     const { addStoreProduct, getActiveStoreId, staffStoreId } = await import('@/lib/merchant');
-    await addStoreProduct(session.uid, toInt(ad.id)).catch(() => {});
+    await addStoreProduct(session.uid, toInt(ad.id));
+    const linked=await prisma.store_products.findFirst({where:{ad_id:toInt(ad.id),store_id:publishingStoreId},select:{store_id:true}});
+    if(!linked){
+      await logClientError({message:'P1: saved store ad missing store relation',digest:trace.id,url:`/ads/${toInt(ad.id)}`,userId:session.uid});
+      redirect(`/account/ads?scope=all&publish_issue=${toInt(ad.id)}&trace=${trace.id}`);
+    }
+    trace.outcome(outcome);trace.stage('REDIRECT_SUCCESS');
     if (requireApproval) redirect('/store?added=pending'); // بانتظار الموافقة → لا يظهر بعد
     // المالك أو الموظف — كلاهما يعود لواجهة المتجر الفعّال نفسه
     const sid = (await getActiveStoreId(session.uid).catch(() => 0)) || (await staffStoreId(session.uid).catch(() => 0));
@@ -563,9 +607,10 @@ export async function createAdAction(formData: FormData) {
   if (featuredState === 'ok') extraFlags.push('featured=1');
   if (featuredState === 'need') extraFlags.push('featuredneed=1');
   const needFlags = extraFlags.filter((f) => f.includes('need')).map((f) => `&${f}`).join('');
-  if (flagTerms && !scheduledAt) redirect(`/account/ads?censored=1${needFlags}`);
-  if (scheduledAt) redirect(`/account/ads?scheduled=1${flagTerms ? '&censored=1' : ''}${needFlags}`);
-  if (requireApproval) redirect(`/account/ads?pending=1${needFlags}`);
+  trace.outcome(outcome);trace.stage('REDIRECT_SUCCESS');
+  if (scheduledAt) redirect(`/account/ads?scope=all&scheduled=1${flagTerms ? '&censored=1' : ''}${needFlags}`);
+  if (requireApproval) redirect(`/account/ads?scope=all&pending=1${needFlags}`);
+  if (flagTerms) redirect(`/account/ads?scope=all&censored=1${needFlags}`);
   // نجاح فوري بلا رسوم إضافية معلّقة: رسالة «تم نشر إعلانك» + تحويل للصفحة الرئيسية حيث يظهر.
   if (extraFlags.length === 0) redirect(`/?published=${toInt(ad.id)}`);
   // شراء «عاجل/مميز» أو نقص رصيدهما: ابقَ على صفحة الإعلان لإتمام/معالجة ذلك قربه.

@@ -11,11 +11,12 @@ function controlClass(invalid: boolean, multiline = false) {
     : 'border-primary/25 focus:border-primary/50 focus:ring-primary/30'}`;
 }
 
-export function AdCategoryFields({ fields, values, onChange, listingType }: {
+export function AdCategoryFields({ fields, values, onChange, listingType, serverError }: {
   fields: CategoryField[];
   values: CategoryValues;
   onChange: (next: CategoryValues) => void;
   listingType?: string;
+  serverError?: {fieldKey:string;message:string};
 }) {
   const [invalidKeys, setInvalidKeys] = React.useState<Set<string>>(() => new Set());
   const active = fields.filter(f => fieldApplies(f, { listingType, values })).sort((a, b) => a.order - b.order);
@@ -50,7 +51,7 @@ export function AdCategoryFields({ fields, values, onChange, listingType }: {
           const id = `category-field-${f.key}`;
           const errorId = `${id}-error`;
           const label = `${f.label}${f.unit ? ` (${f.unit})` : ''}`;
-          const invalid = invalidKeys.has(f.key);
+          const invalid = invalidKeys.has(f.key) || serverError?.fieldKey === f.key;
           const required = fieldIsRequired(f, { listingType, values });
           const fieldCard = `${f.type === 'textarea' ? 'sm:col-span-2' : ''} rounded-lg border p-2 transition-colors ${invalid
             ? 'border-red-500 bg-red-100/80 ring-1 ring-red-300'
@@ -113,10 +114,10 @@ export function AdCategoryFields({ fields, values, onChange, listingType }: {
                     <input id={id} aria-label={`${f.label} من`} className={controlClass(invalid)} type="number" required={required||Boolean(value)} {...invalidProps} min={f.min} max={f.max} step={f.step??'any'} value={String((value as CategoryRange | undefined)?.min ?? '')} onChange={e => update(f.key,rangeDraftValue(value,'min',e.target.value))} />
                     <input id={`${id}-max`} aria-label={`${f.label} إلى`} className={controlClass(invalid)} type="number" required={required||Boolean(value)} {...invalidProps} min={f.min} max={f.max} step={f.step??'any'} value={String((value as CategoryRange | undefined)?.max ?? '')} onChange={e => update(f.key,rangeDraftValue(value,'max',e.target.value))} />
                   </div>
-                    : <input id={id} className={controlClass(invalid)} required={required} {...invalidProps} type={f.type === 'year' ? 'number' : f.type} min={f.min} max={f.max}
+                    : <input id={id} className={controlClass(invalid)} required={required} {...invalidProps} type={f.type === 'year' || f.type === 'decimal' ? 'number' : f.type} min={f.min} max={f.max}
                       placeholder={f.placeholder} step={f.type === 'number' || f.type === 'decimal' || f.type === 'year' ? f.step??'any' : undefined} maxLength={f.type === 'text' ? 500 : undefined}
                       value={String(value ?? '')} onChange={e => update(f.key, e.target.value)} />}
-            {invalid && <p id={errorId} role="alert" className="mt-1 text-xs font-bold text-red-700">{f.type==='range'?'أكمل طرفي النطاق، أو امسحهما إن كان الحقل اختياريًا.':'راجع قيمة هذا الحقل قبل المتابعة.'}</p>}
+            {invalid && <p id={errorId} role="alert" className="mt-1 text-xs font-bold text-red-700">{serverError?.fieldKey===f.key?serverError.message:f.type==='range'?'أكمل طرفي النطاق، أو امسحهما إن كان الحقل اختياريًا.':'راجع قيمة هذا الحقل قبل المتابعة.'}</p>}
             {f.helpText && <p className="mt-1 text-xs text-muted-foreground">{f.helpText}</p>}
           </div>;
         })}

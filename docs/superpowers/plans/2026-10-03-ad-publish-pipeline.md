@@ -17,25 +17,25 @@
 ## 2. Safe form errors
 - [x] Add typed action error state; use authoritative `CategoryValidationError.fieldKey` and messages, never raw database errors.
 - [x] Repair `src/app/ads/actions.ts` and `src/components/ad-form.tsx` so rejected category submissions keep all inputs/files and focus the offending field; reuse AdCategoryFields red/error association. Real browser fixture PASS 390/1440; mocked action, no DB. React automatic reset was reproduced and fixed through manual action dispatch.
-- [ ] Regression-test min/max, required and quota rejection. No redirect that discards a draft for these errors.
+- [x] Regression-test min/max, required and quota rejection. Matrix I/J preserves the draft and focuses the required field.
 
 ## 3. Destination, trace and outcomes
-- [ ] Reproduce active-store cookie preselect in `src/app/ads/new/page.tsx`; default to personal unless `dest=store` was explicitly selected. Server verifies store ownership/availability.
-- [x] Record server-generated trace IDs and allowlisted stage metadata, no titles/contact/coordinates/secrets. Unit tested; remote logs not yet verified.
-- [ ] Resolve exactly one outcome: PUBLIC_NOW, PENDING_APPROVAL, SCHEDULED, STORE_ONLY, REJECTED. PUBLIC_NOW requires the actual shared database public predicate to match the inserted ad; mismatch is P1, never success.
-- [ ] Show truthful outcome and link in the post-create screen; update `/account/ads` using actual status/state/store/schedule/archive/owner-pause fields. Preserve current financial policy.
+- [x] Default to personal unless `dest=store` was explicitly selected. Matrix E/F/K verifies profile cookie, explicit store, and unapproved store rejection.
+- [x] Record server-generated trace IDs and allowlisted stage metadata, no titles/contact/coordinates/secrets. Unit tested and 11 unique terminal trace outcomes verified in isolated CI runtime.
+- [x] Resolve exactly one outcome: PUBLIC_NOW, PENDING_APPROVAL, SCHEDULED, STORE_ONLY, REJECTED. PUBLIC_NOW requires the actual shared database public predicate to match the inserted ad; mismatch is P1, never success.
+- [x] Show truthful outcome and link in the post-create screen; update `/account/ads` using actual status/state/store/schedule/archive/owner-pause fields. Preserve current financial policy.
 - [x] Update member/store/admin guides only for this workflow.
 
 ## Current checkpoint evidence
-- Targeted draft/schema/trace results: 108 passing; form/submission regressions: 28 passing.
-- TypeScript and targeted ESLint passed before the final trace exception guard; rerun gates before push.
-- Production build passed with the trace exception guard.
-- Full regression started; result pending. No push/deployment for this task yet.
-- Next: finish full gates, isolated DB A–J and actual leaf publishing. Do not label browser-fixture success as end-to-end publishing success.
+- App candidate `362057872642630f3dd734b15af582e2e6343213`, CI `37152844174` SUCCESS.
+- 1745 unit passed / 8 skipped; 110 category MySQL tests including all 85 templates; 13 schema-family browser lifecycles; A–K 11/11.
+- TypeScript, ESLint, build PASS. Independent review P2 findings fixed and re-reviewed.
+- Preview workflow `37152845877` SUCCESS; external HTTP 200; read-only database.
+- Release preparation `37153349662` in progress; do not claim production until its exact-image smoke gate and promotion succeed.
 
 ## 4. Verification and release
-- [ ] Unit tests for optional untouched/cleared/false/0, partial range, required range, conditions and all 85+ leaf schemas.
-- [ ] Isolated E2E A–J: personal, optional blank/range/condition, store profile public, explicit store, approval, scheduled, quota, field error preservation.
-- [ ] For PUBLIC_NOW assert details, account state, search by title and correct category. Never write these tests to production data.
-- [ ] TypeScript, lint, full tests, build; commit Arabic messages.
+- [x] Unit tests for optional untouched/cleared/false/0, partial range, required range, conditions and all 85 templates.
+- [x] Isolated E2E A–K: personal, optional blank/range/condition, store profile public, explicit store, approval, scheduled, quota, field error preservation, unapproved store rejection.
+- [x] For PUBLIC_NOW assert details, account state, search by title and correct category. Matrix writes isolated test data only.
+- [x] TypeScript, lint, full tests, build; commit Arabic messages.
 - [ ] Preview exact candidate, backup and isolated gate; retain rollback. Record proven results and unknowns; no unsupported 100% claim.

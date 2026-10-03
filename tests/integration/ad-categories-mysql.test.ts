@@ -8,6 +8,9 @@ const fixture=vi.hoisted(()=>({client:undefined as PrismaClient|undefined}));
 vi.mock('@/lib/prisma',()=>({get prisma(){return fixture.client;}}));
 vi.mock('@/lib/settings',()=>({getSetting:async(k:string,fallback:string)=>{const r=await fixture.client!.site_settings.findUnique({where:{k}});return r?.v??fallback;}}));
 import {writeAdWithCategory,getCategoryEditValues,getCategoryFormConfig,getPublicCategories} from '@/lib/ad-categories/service';
+import {CATEGORY_SEED_TEMPLATES} from '@/lib/ad-categories/seed-templates';
+import {fieldApplies,fieldIsRequired,type CategoryField,type CategoryValue,type CategoryValues} from '@/lib/ad-categories/validation';
+import {platformAdPublicWhere} from '@/lib/platform-ad-visibility';
 const enabled=process.env.CATEGORIES_DB_TESTS==='1';
 let client:PrismaClient,admin:PrismaClient,created=false;
 const f={key:'condition',label:'الحالة',type:'select',group:'المواصفات',required:true,visible:true,order:0,options:['جديد','مستعمل']};
@@ -15,6 +18,35 @@ function form(version='1'){const fd=new FormData();for(const [k,v] of Object.ent
 const base={title:'Fixture ad',detail:'Original details',price:50,adsType:'offer' as const,user_id:1n,city_id:1n,category_id:12n,video_path:'',adsSpecial:'no' as const,state:'active' as const};
 const create=(fd=form())=>writeAdWithCategory(client,fd,(tx,s)=>tx.ads.create({data:{...base,...(s?{category_id:s.category_id,subcategory_id:s.subcategory_id}: {})}}));
 describe.skipIf(!enabled)('real ad category MySQL integration',()=>{
+  it.each(CATEGORY_SEED_TEMPLATES)('commits required-only $key and finds it through public SQL',async(template)=>{
+    const sample=(field:CategoryField):CategoryValue=>{
+      switch(field.type){
+        case 'select':case 'radio':return field.options[0];
+        case 'multiselect':return [field.options[0]];
+        case 'boolean':return false;
+        case 'number':case 'decimal':case 'year':return field.min??1;
+        case 'range':return {min:field.min??1,max:field.min??1};
+        case 'date':return '2026-10-03';
+        default:return 'بيانات اختبار';
+      }
+    };
+    await client.site_settings.upsert({where:{k:'categories_v2_latest_templates'},create:{k:'categories_v2_latest_templates',v:'0'},update:{v:'0'}});
+    await client.categories.update({where:{id:12n},data:{name:template.categoryName}});
+    await client.sub_categories.update({where:{id:34n},data:{name:template.name}});
+    const stored=JSON.stringify({schemaVersion:2,templateKey:template.key,fields:template.fields,listingPolicy:template.listingPolicy});
+    await client.$executeRaw`UPDATE ad_category_definitions SET kind=${template.kind},price_enabled=${Number(template.priceEnabled)},goods_enabled=${Number(template.goodsEnabled)},fields_json=${stored} WHERE subcategory_id=34`;
+    for(const listing of template.listingPolicy.types){
+      const values:CategoryValues={};
+      for(let pass=0;pass<template.fields.length;pass++)for(const field of template.fields){
+        if(fieldIsRequired(field,{listingType:listing.key,values})&&!Object.hasOwn(values,field.key))values[field.key]=sample(field);
+      }
+      for(const key of Object.keys(values))if(!fieldApplies(template.fields.find(field=>field.key===key)!,{listingType:listing.key,values}))delete values[key];
+      const fd=form();fd.set('category_values',JSON.stringify(values));fd.set('listingType',listing.key);fd.set('pricingMode',listing.pricing[0]);
+      const ad=await writeAdWithCategory(client,fd,(tx,selection)=>tx.ads.create({data:{...base,title:`minimal ${template.key} ${listing.key}`,status:1,store_only:0,category_id:selection!.category_id,subcategory_id:selection!.subcategory_id,adsType:selection!.listing.adsType,price:selection!.listing.price,price_type:selection!.listing.priceType,rent_period:selection!.listing.rentPeriod,sale_type:selection!.listing.listingType}}));
+      expect(await client.ads.findFirst({where:{id:ad.id,...platformAdPublicWhere(new Date(),false)},select:{id:true}})).toEqual({id:ad.id});
+      expect(await getCategoryEditValues(ad.id,34)).toEqual(values);
+    }
+  },30000);
   beforeAll(async()=>{
     const url=new URL(process.env.CATEGORIES_TEST_DATABASE_URL||'');
     if(url.protocol!=='mysql:'||url.hostname!=='127.0.0.1'||url.port!=='33309'||url.pathname!=='/trbhh_categories_test'||url.search||url.hash)throw new Error('Refusing non-isolated category database');

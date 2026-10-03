@@ -6,9 +6,11 @@ exports.run=async({page,outsider,origin})=>{
     await page.setViewportSize({width,height:900});
     for(const path of ['/admin/categories','/admin/categories/manage','/admin/categories/fields','/admin/categories/ads','/admin/categories/settings']){
       const response=await page.goto(origin+path);assert.equal(response.status(),200);
+      await page.getByRole('heading',{level:1}).waitFor();
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${path} width ${width}`);
       assert.equal(await page.locator('main table').count(),0);
     }
+    console.log(`PASS category_admin_hub viewport ${width}`);
   }
   await page.goto(origin+'/admin/categories/manage');
   const name=`قسم اختبار الإدارة المعزول ${Date.now()}`;
@@ -35,6 +37,7 @@ exports.run=async({page,outsider,origin})=>{
   await page.waitForURL(u=>u.pathname==='/admin/categories/manage'&&u.searchParams.get('saved')==='1');
   await page.locator('summary').filter({hasText:name+' معدل'}).click();
   await page.getByRole('heading',{name:'قسم فرعي اختبار معزول — مخفي',exact:true}).waitFor();
+  console.log('PASS category_admin_hub category mutations on isolated data');
   await page.goto(origin+'/admin/categories/ads');
   const main=page.getByLabel('القسم الرئيسي',{exact:true}),sub=page.getByLabel('القسم الفرعي',{exact:true});
   const first=await sub.locator('option').evaluateAll(options=>options.find(o=>o.value)?.value);
@@ -42,6 +45,7 @@ exports.run=async({page,outsider,origin})=>{
   await page.getByRole('button',{name:'عرض النتائج',exact:true}).click();
   await page.getByRole('heading',{name:'إعلانات الأقسام',exact:true}).waitFor();
   await outsider.goto(origin+'/admin/categories/manage');
+  await outsider.waitForURL(u=>u.pathname==='/');
   assert.equal(await outsider.getByLabel('اسم القسم الجديد',{exact:true}).count(),0);
   console.log('PASS category_admin_hub: five pages 360/390/412/1440, isolated add/edit/show/hide, create hidden subcategory mobile, dependent filters, member denied');
 };

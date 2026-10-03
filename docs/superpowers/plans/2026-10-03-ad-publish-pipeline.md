@@ -31,11 +31,11 @@
 - 1745 unit passed / 8 skipped; 110 category MySQL tests including all 85 templates; 13 schema-family browser lifecycles; A–K 11/11.
 - TypeScript, ESLint, build PASS. Independent review P2 findings fixed and re-reviewed.
 - Preview workflow `37152845877` SUCCESS; external HTTP 200; read-only database.
-- Release preparation `37153349662` in progress; do not claim production until its exact-image smoke gate and promotion succeed.
+- Release preparation `37153349662` PASS; full backup and restore verified. Release `37153493184` PASS: isolated smoke, exact-image promotion, production smoke, RELEASE_CONFIRMED.
 
 ## 4. Verification and release
 - [x] Unit tests for optional untouched/cleared/false/0, partial range, required range, conditions and all 85 templates.
 - [x] Isolated E2E A–K: personal, optional blank/range/condition, store profile public, explicit store, approval, scheduled, quota, field error preservation, unapproved store rejection.
 - [x] For PUBLIC_NOW assert details, account state, search by title and correct category. Matrix writes isolated test data only.
 - [x] TypeScript, lint, full tests, build; commit Arabic messages.
-- [ ] Preview exact candidate, backup and isolated gate; retain rollback. Record proven results and unknowns; no unsupported 100% claim.
+- [x] Preview and production exact candidate `362057872642630f3dd734b15af582e2e6343213`, backup and isolated gate PASS; rollback retained, not required. Production test ad 3433 removed after passing. Detailed evidence in `docs/AD-PUBLISH-PIPELINE-2026-10-03.md`; no untested historical claims.

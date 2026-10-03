@@ -35,6 +35,15 @@ describe('قفل تعديل الإعلانات (خصوصية)', () => {
 });
 
 describe('سلامة تعريف الأدوار', () => {
+  it('يسجل صلاحيات الرد وإعداد متابعة البلاغات للمدير دون منحها تلقائياً للمراقبين', () => {
+    const reports = SERVICES.find((s) => s.key === 'reports');
+    for (const action of ['add', 'edit']) {
+      expect(reports!.actions).toContain(action);
+      expect(ROLE_PRESET.manager).toContain(`reports:${action}`);
+      expect(ROLE_PRESET.monitor).not.toContain(`reports:${action}`);
+      expect(ROLE_PRESET.member).not.toContain(`reports:${action}`);
+    }
+  });
   it('المدير العام يملك كل المفاتيح', () => {
     expect(ROLE_PRESET.manager).toEqual(ALL_KEYS);
   });

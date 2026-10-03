@@ -25,7 +25,7 @@ export const SERVICES: { key: Service; label: string; actions: Action[] }[] = [
   { key: 'duplicates',    label: 'الإعلانات المكررة',   actions: ['view', 'delete'] },
   { key: 'classified',    label: 'الإعلانات المبوّبة',   actions: ['view', 'edit', 'suspend', 'delete'] },
   { key: 'words',         label: 'الكلمات المرفوضة',    actions: ['view', 'add', 'delete'] },
-  { key: 'reports',       label: 'البلاغات',           actions: ['view', 'delete'] },
+  { key: 'reports',       label: 'البلاغات',           actions: ['view', 'add', 'edit', 'delete'] },
   { key: 'messages',      label: 'مراقبة المراسلات',    actions: ['view', 'delete'] },
   { key: 'verifications', label: 'طلبات التوثيق',       actions: ['view', 'edit'] },
   { key: 'comments',      label: 'التعليقات',          actions: ['view', 'delete'] },

@@ -5,6 +5,7 @@ import { ensureSchema } from '@/data/schema-sync';
 import { toInt } from './utils';
 import { mediaUrl, PLACEHOLDER } from './media';
 import { normTheme, themeHex } from './identity-themes';
+import { distinctPublishingProfiles } from './profile-primary-selection';
 
 /**
  * نظام هويات النشر المتعددة تحت دخول واحد.
@@ -79,20 +80,27 @@ function normColor(v: string | null | undefined): string | null {
 /** الهوية الشخصية الافتراضية للمستخدم — تُنشأ من بياناته الحالية إن لم توجد. */
 export async function ensureDefaultProfile(userId: number): Promise<Profile> {
   await ensure();
-  const existing = await prisma.profiles.findFirst({ where: { user_id: BigInt(userId), is_default: 1 } }).catch(() => null);
+  const existing = await prisma.profiles.findFirst({ where: { user_id: BigInt(userId), type: 'personal', is_default: 1 }, orderBy: { id: 'asc' } });
   if (existing) return toProfile(existing as Row, await avatarUrls([existing.avatar || 0]));
-  const u = await prisma.users.findUnique({
+  const created = await prisma.$transaction(async tx => {
+  // Header and page can initialize the same account concurrently. Serialize only creation.
+  await tx.$queryRaw`SELECT id FROM users WHERE id=${BigInt(userId)} FOR UPDATE`;
+  const current=await tx.profiles.findFirst({where:{user_id:BigInt(userId),type:'personal',is_default:1},orderBy:{id:'asc'}});
+  if(current)return current;
+  const u = await tx.users.findUnique({
     where: { id: BigInt(userId) },
     select: { name: true, userName: true, phoneNumber: true, phone_whatsapp: true, email: true },
-  }).catch(() => null);
-  const created = await prisma.profiles.create({
+  });
+  if(!u)throw new Error('Profile owner unavailable');
+  return tx.profiles.create({
     data: {
       user_id: BigInt(userId), type: 'personal', is_default: 1,
       name: (u?.name || u?.userName || 'حسابي').slice(0, 120),
       phone: u?.phoneNumber || null, whatsapp: u?.phone_whatsapp || null, email: u?.email || null,
     },
   });
-  return toProfile(created as Row, new Map());
+  });
+  return toProfile(created as Row, await avatarUrls([created.avatar || 0]));
 }
 
 /** يضمن وجود صف هوية «متجر» لكل متجر يملكه المستخدم (idempotent). */
@@ -121,7 +129,8 @@ export async function getUserProfiles(userId: number): Promise<Profile[]> {
   await syncStoreProfiles(userId);
   const rows = await prisma.profiles.findMany({ where: { user_id: BigInt(userId) }, orderBy: [{ is_default: 'desc' }, { id: 'asc' }] }).catch(() => []);
   const avatarMap = await avatarUrls(rows.map((r) => r.avatar || 0));
-  return rows.map((r) => toProfile(r as Row, avatarMap));
+  const activeId=Number((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value || 0);
+  return distinctPublishingProfiles(rows.map((r) => toProfile(r as Row, avatarMap)),activeId);
 }
 
 /** الهوية الفعّالة الحالية (من الكوكي، وإلا الافتراضية). */
@@ -175,7 +184,7 @@ export async function backfillProfileContact(profileId: number, phone: string, w
 /** عدّ هويات المستخدم (بلا مزامنة ثقيلة) — للهيدر. */
 export async function countUserProfiles(userId: number): Promise<number> {
   await ensure();
-  return prisma.profiles.count({ where: { user_id: BigInt(userId) } }).catch(() => 0);
+  return (await getUserProfiles(userId)).length;
 }
 
 export async function setActiveProfileCookie(profileId: number): Promise<void> {
@@ -259,8 +268,8 @@ export async function deletePersonalProfile(userId: number, profileId: number): 
   await ensure();
   const p = await ownedPersonalProfile(userId, profileId);
   if (!p || p.is_default === 1) return false;
-  await prisma.profiles.delete({ where: { id: BigInt(profileId) } }).catch(() => {});
-  return true;
+  const deleted = await prisma.profiles.deleteMany({ where: { id: BigInt(profileId), user_id: BigInt(userId), type: 'personal', is_default: 0 } });
+  return deleted.count === 1;
 }
 
 function normalizeHandle(v: string): string {

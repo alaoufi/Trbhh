@@ -99,8 +99,22 @@ export async function setProfileThemeAction(profileId: number, theme: string) {
 export async function deleteProfileAction(formData: FormData) {
   const session = await requireUser();
   const profileId = Number(formData.get('profileId') || 0);
-  await deletePersonalProfile(session.uid, profileId);
-  revalidatePath('/account/profiles');
+  let removed = false;
+  try {
+    removed = await deletePersonalProfile(session.uid, profileId);
+  } catch {
+    const { logClientError } = await import('@/lib/error-log');
+    await logClientError({ message: 'Profile deletion failed', url: '/account/profiles', userId: session.uid });
+    redirect('/account/profiles?error=delete_failed');
+  }
+  if (!removed) redirect('/account/profiles?error=delete_not_allowed');
+  const { ACTIVE_PROFILE_COOKIE, ensureDefaultProfile, setThemeCookie } = await import('@/lib/profiles');
+  if ((await cookies()).get(ACTIVE_PROFILE_COOKIE)?.value === String(profileId)) {
+    const fallback = await ensureDefaultProfile(session.uid);
+    await setActiveProfileCookie(fallback.id);
+    await setThemeCookie(fallback.theme);
+  }
+  revalidatePath('/', 'layout');
   redirect('/account/profiles?deleted=1');
 }
 

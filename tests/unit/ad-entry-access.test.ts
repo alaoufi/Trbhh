@@ -1,0 +1,20 @@
+import {beforeEach,describe,it,expect,vi} from 'vitest';
+const m=vi.hoisted(()=>({user:vi.fn(),ban:vi.fn(),pkg:vi.fn(),count:vi.fn(),last:vi.fn(),store:vi.fn(),sid:vi.fn(),staff:vi.fn(),sub:vi.fn()}));
+vi.mock('@/lib/prisma',()=>({prisma:{users:{findUnique:m.user},stores:{findUnique:m.store}}}));
+vi.mock('@/lib/moderation',()=>({getBanInfo:m.ban}));
+vi.mock('@/lib/packages',()=>({getUserPackage:m.pkg,countAdsToday:m.count,lastAdAt:m.last}));
+vi.mock('@/lib/merchant',()=>({getActiveStoreId:m.sid,staffStoreId:m.staff}));
+vi.mock('@/lib/subscription',()=>({isStoreSubBlocked:m.sub}));
+import {getAdEntryAccess} from '@/lib/ad-entry-access';
+beforeEach(()=>{vi.clearAllMocks();m.user.mockResolvedValue({archived_at:null});m.ban.mockResolvedValue(null);m.pkg.mockResolvedValue({adsPerDay:1,gapHours:0});m.count.mockResolvedValue(0);m.last.mockResolvedValue(null);m.sid.mockResolvedValue(5);m.staff.mockResolvedValue(0);m.store.mockResolvedValue({status:1});m.sub.mockResolvedValue(false);});
+describe('server-side entry gate before ad form',()=>{
+ it('allows a member with remaining quota without requiring money',async()=>{expect(await getAdEntryAccess(7,false)).toBeNull();});
+ it('blocks a banned member with the reason',async()=>{m.ban.mockResolvedValue({reason:'مخالفة شروط النشر'});expect(await getAdEntryAccess(7,false)).toMatchObject({code:'banned',message:expect.stringContaining('مخالفة شروط النشر')});});
+ it('blocks archived accounts',async()=>{m.user.mockResolvedValue({archived_at:new Date()});expect(await getAdEntryAccess(7,false)).toMatchObject({code:'account'});});
+ it('blocks exhausted quota and offers packages and topup',async()=>{m.count.mockResolvedValue(1);expect(await getAdEntryAccess(7,false)).toMatchObject({code:'quota',href:'/packages',topup:true});});
+ it('blocks the package waiting interval',async()=>{m.pkg.mockResolvedValue({adsPerDay:0,gapHours:2});m.last.mockResolvedValue(new Date());expect(await getAdEntryAccess(7,false)).toMatchObject({code:'gap'});});
+ it('rejects store publishing without ownership or staff access',async()=>{m.sid.mockResolvedValue(0);expect(await getAdEntryAccess(7,true)).toMatchObject({code:'store'});});
+ it.each([0,2,3])('blocks store status %s before the form',async status=>{m.store.mockResolvedValue({status});expect(await getAdEntryAccess(7,true)).toMatchObject({code:'store'});});
+ it('directs an expired store to renewal without charging',async()=>{m.sub.mockResolvedValue(true);expect(await getAdEntryAccess(7,true)).toMatchObject({code:'subscription',href:'/store?sub=expired&from=ad#sub',topup:true});});
+ it('does not silently permit publishing on database failure',async()=>{m.user.mockRejectedValue(new Error('unavailable'));await expect(getAdEntryAccess(7,false)).rejects.toThrow();});
+});

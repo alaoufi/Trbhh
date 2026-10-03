@@ -8,6 +8,7 @@ import { getCategoryFormConfig } from '@/lib/ad-categories/service';
 import { getSettingBool, SETTING_ADS_APPROVAL } from '@/lib/settings';
 import { createAdAction } from '../actions';
 import {publicationDestination} from '@/lib/ad-submission-result';
+import {getAdEntryAccess} from '@/lib/ad-entry-access';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'أضف إعلان' };
@@ -24,6 +25,19 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
   const session = await getSession();
   if (!session) redirect('/login?next=%2Fads%2Fnew');
   const { error, left, max, hours, wait, cat, banned, dup, price, bal, dest } = await searchParams;
+  const access = await getAdEntryAccess(session.uid, publicationDestination(dest) === 'store');
+  if(access) return (
+    <section data-ad-entry-block={access.code} className="mx-auto max-w-2xl space-y-4 rounded-2xl border-2 border-amber-300 bg-amber-50 p-5">
+      <h1 className="text-xl font-bold">لا يمكنك إضافة إعلان الآن</h1>
+      <p role="alert">{access.message}</p>
+      <div className="flex flex-wrap gap-3">
+        <Link className="rounded-lg bg-primary px-4 py-3 font-bold text-white" href={access.href}>{access.label}</Link>
+        {access.topup && <Link className="rounded-lg border bg-white px-4 py-3" href="/account/wallet#topup">شحن الرصيد</Link>}
+        {dest === 'store' && <Link className="rounded-lg border bg-white px-4 py-3" href="/ads/new?dest=personal">النشر في تربح العام</Link>}
+        <Link className="px-4 py-3 underline" href="/account/ads?scope=all">إعلاناتي وحالة النشر</Link>
+      </div>
+    </section>
+  );
   // الهوية للعرض فقط؛ وجهة النشر لا تُستنتج من كوكي المتجر.
   let active = await import('@/lib/profiles').then((m) => m.getActiveProfile(session.uid)).catch(() => null);
   // النشر العام افتراضي، والمتجر يحتاج اختياراً صريحاً.
@@ -118,7 +132,7 @@ export default async function NewAdPage({ searchParams }: { searchParams: Promis
           <div className="mb-2 text-sm font-extrabold text-primary">وجهة النشر</div>
           <div className="grid grid-cols-2 gap-2">
             <Link href="/ads/new?dest=personal" className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold ${!publishingAsStore ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
-              👤 تربح العام — باسمي الشخصي
+              👤 {active?.type === 'personal' ? `أنشر باسم «${active.name}» في تربح العام` : 'أنشر بهويتي الشخصية في تربح العام'}
             </Link>
             <Link href="/ads/new?dest=store" className={`rounded-xl border-2 px-3 py-2.5 text-center text-sm font-bold ${publishingAsStore ? 'border-primary bg-primary text-white' : 'border-primary/25 bg-white text-primary'}`}>
               🏬 باسم متجر «{myStore.name}»

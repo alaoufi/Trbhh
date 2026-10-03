@@ -63,7 +63,7 @@ async function run(){
     const member=await db.users.create({data:{userName:username,name:'عضو اختبار معزول',password:hash,type:'user',country_id:1,auth_session_version:randomUUID()}});
     let storeProfile;
     if(['E','F','K'].includes(testCase)){
-      const store=await db.stores.create({data:{user_id:Number(member.id),store_name:'متجر اختبار النشر',status:testCase==='K'?0:1,sub_until:new Date(Date.now()+86400000*30)}});
+      const store=await db.stores.create({data:{user_id:Number(member.id),store_name:'متجر اختبار النشر',status:1,sub_until:new Date(Date.now()+86400000*30)}});
       storeProfile=await db.profiles.create({data:{user_id:member.id,type:'store',store_id:store.id,name:'متجر اختبار النشر'}});
     }
     const context=await browser.newContext({viewport:{width:390,height:844}});
@@ -74,6 +74,7 @@ async function run(){
       await page.goto(origin+'/login?next=%2Fads%2Fnew');
       await page.locator('#login-identifier').fill(username);await page.locator('#login-password').fill(password);
       await page.getByRole('button',{name:'دخول',exact:true}).click();await page.waitForURL(u=>u.pathname==='/ads/new');
+      assert.equal(await db.profiles.count({where:{user_id:member.id,type:'personal',is_default:1}}),1,'concurrent header/form initialization creates one primary identity');
       if(storeProfile){await context.addCookies([{name:'trbhh_profile',value:String(storeProfile.id),url:origin}]);await page.goto(origin+'/ads/new'+(['F','K'].includes(testCase)?'?dest=store':''));}
       if(testCase==='E')assert.equal(await page.locator('[name="dest"][value="store"]').count(),0,'active store never preselects store publishing');
       const group=page.locator('[name="taxonomy_group"]');
@@ -94,12 +95,18 @@ async function run(){
         await db.ad_publish_log.create({data:{user_id:member.id,created_at:new Date()}});
       }
       if(testCase==='J')await page.locator('[name="category_values"]').evaluate(e=>{const v=JSON.parse(e.value);v.job_title={invalid:true};e.value=JSON.stringify(v)});
+      if(testCase==='K')await db.stores.update({where:{id:storeProfile.store_id},data:{status:0}});
       await page.getByRole('button',{name:'نشر الإعلان',exact:true}).click();
       if(['I','J','K'].includes(testCase)){
         await page.locator('[data-submission-error]').waitFor();
         assert.equal(await page.locator('[name="title"]').inputValue(),title);
         assert.equal(await db.ads.count({where:{user_id:member.id}}),0);
         if(testCase==='J')assert.equal(await page.evaluate(()=>document.activeElement.id),'category-field-job_title');
+        if(testCase==='I'||testCase==='K'){
+          await page.reload();await page.locator(`[data-ad-entry-block="${testCase==='I'?'quota':'store'}"]`).waitFor();
+          assert.equal(await page.locator('[name="title"]').count(),0,'blocked members never receive the ad form');
+          if(testCase==='I')await page.locator('a[href="/account/wallet#topup"]').waitFor();
+        }
       }else{
         await page.waitForURL(u=>u.pathname!=='/ads/new');
         const ad=await db.ads.findFirst({where:{user_id:member.id},orderBy:{id:'desc'}});assert(ad,'saved ad');
@@ -119,6 +126,22 @@ async function run(){
           await page.goto(origin+'/account/ads');await page.getByText(title,{exact:true}).first().waitFor();
           await page.getByText('ظاهر في تربح العام',{exact:true}).first().waitFor();
         }
+      }
+      if(testCase==='A'){
+        const duplicate=await db.profiles.create({data:{user_id:member.id,type:'personal',is_default:1,name:'رئيسية مكررة للاختبار'}});
+        const extra=await db.profiles.create({data:{user_id:member.id,type:'personal',is_default:0,name:'هوية اختبار الحذف'}});
+        await context.addCookies([{name:'trbhh_profile',value:String(extra.id),url:origin}]);
+        await page.goto(origin+'/account/profiles');
+        assert.equal(await page.locator(`input[name="profileId"][value="${duplicate.id}"]`).count(),0,'duplicate primary omitted without removing historic data');
+        assert(await db.profiles.findUnique({where:{id:duplicate.id}}));
+        const deleteForm=page.locator('form').filter({has:page.locator(`input[name="profileId"][value="${extra.id}"]`)}).filter({has:page.getByRole('button',{name:'حذف الهوية',exact:true})});
+        await deleteForm.evaluate(e=>{const d=e.closest('details');if(d)d.open=true});
+        await deleteForm.getByRole('button',{name:'حذف الهوية',exact:true}).click();
+        await page.getByRole('dialog').getByRole('button',{name:'موافق',exact:true}).click();
+        await page.waitForURL(u=>u.searchParams.get('deleted')==='1');
+        assert.equal(await db.profiles.findUnique({where:{id:extra.id}}),null);
+        assert.equal(await page.locator(`input[name="profileId"][value="${extra.id}"]`).count(),0);
+        assert.notEqual((await context.cookies()).find(c=>c.name==='trbhh_profile')?.value,String(extra.id));
       }
       assert.deepEqual(errors,[]);await page.screenshot({path:path.join(artifacts,`publish-${testCase}.png`),fullPage:true});
       results.push({case:testCase,status:'PASS'});console.log('PUBLISH_MATRIX_PASS',testCase);

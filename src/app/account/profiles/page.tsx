@@ -116,7 +116,9 @@ export default async function ProfilesPage({ searchParams }: { searchParams: Pro
       {sp.error === 'limit' && <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-bold text-amber-900">بلغت الحد الأقصى لعدد الهويات الشخصية{sp.max ? ` (${sp.max})` : ''}.</div>}
       {sp.error === 'handle' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">المعرّف الظاهر مستخدم مسبقاً — اختر غيره.</div>}
       {sp.error === 'name' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">الاسم الظاهر مطلوب.</div>}
-      {(sp.added || sp.saved || sp.deleted) && <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم الحفظ.</div>}
+      {sp.error === 'delete_failed' && <p role="alert" className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm text-red-900">تعذر حذف الهوية. لم تُحذف؛ أعد المحاولة لاحقًا.</p>}
+      {sp.error === 'delete_not_allowed' && <p role="alert" className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm text-red-900">لم يتم الحذف: الهوية الرئيسية لا تُحذف، أو أن هذه الهوية لم تعد متاحة لحسابك. أعد تحميل الصفحة.</p>}
+      {(sp.added || sp.saved || sp.deleted) && <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">{sp.deleted ? '✓ حُذفت الهوية من قائمة النشر. إعلاناتها السابقة محفوظة.' : '✓ تم الحفظ.'}</div>}
       {sp.linked && <div className="rounded-xl border-2 border-emerald-400 bg-emerald-50 p-3 text-sm font-bold text-emerald-800">✓ تم ربط الحساب{sp.lname ? ` «${sp.lname}»` : ''} بحسابك — يبقى مستقلاً بإعلاناته ورسائله ورصيده، وتقدر تتنقّل إليه من قائمة «حساباتي المرتبطة» أدناه.</div>}
       {sp.merror === 'creds' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">أكمل بيانات الحساب الآخر.</div>}
       {sp.merror === 'verify' && <div className="rounded-xl border-2 border-red-400 bg-red-50 p-3 text-sm font-bold text-red-800">بيانات دخول الحساب الآخر غير صحيحة.</div>}

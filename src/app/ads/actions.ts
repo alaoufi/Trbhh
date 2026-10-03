@@ -227,6 +227,9 @@ async function createAdSubmission(formData:FormData,trace:ReturnType<typeof crea
   trace.stage('AUTH_OK',{userId:session.uid});
   const user = await prisma.users.findUnique({ where: { id: BigInt(session.uid) } });
   if (await isUserBanned(session.uid)) redirect('/ads/new?error=banned');
+  const {getAdEntryAccess}=await import('@/lib/ad-entry-access');
+  const access=await getAdEntryAccess(session.uid,publicationDestination(formData.get('dest'))==='store');
+  if(access)return adValidationFailure(new CategoryValidationError('',access.message));
 
   const title = String(formData.get('title') || '').trim();
   const detail = String(formData.get('detail') || '').trim();

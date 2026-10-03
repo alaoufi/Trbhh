@@ -11,7 +11,7 @@ export async function getReportReasons(): Promise<ReportReason[]> {
   const options: ReportReason[] = [];
   function add(value: string, text: string, legacyId: number) {
     const label = text.trim();
-    if (!label || label.length > 80 || seen.has(label)) return;
+    if (!label || label.length > 80 || seen.has(label) || /^(?:(?:سبب\s+)?(?:آخر|اخر|أخرى|اخرى)|other)$/i.test(label)) return;
     seen.add(label); options.push({ value, label, legacyId });
   }
   for (const row of rows) if (row.id > 0n && row.id <= 2147483647n) add(`db:${row.id}`, row.reason, Number(row.id));

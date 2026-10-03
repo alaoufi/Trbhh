@@ -21,6 +21,11 @@ describe('shared report reasons', () => {
     const reasons = await (await import('@/lib/report-reasons')).getReportReasons();
     expect(reasons.map(r => r.label)).toEqual(['احتيال', 'خلل تقني', 'سبب آخر']);
   });
+  it('keeps only the required-explanation Other option across legacy spellings', async () => {
+    m.rows.mockResolvedValue([{ id: 5n, reason: 'أخرى' }, { id: 6n, reason: 'سبب اخر' }]);
+    m.setting.mockResolvedValue('other\nاخرى\nسبب آخر');
+    expect(await (await import('@/lib/report-reasons')).getReportReasons()).toEqual([{ value: 'other', label: 'سبب آخر', legacyId: 0 }]);
+  });
   it('allows editing the list only with reports:edit, blocks preview and rejects invalid lengths', async () => {
     const { saveReportReasons } = await import('@/app/admin/reports/followup-actions'); const f = new FormData(); f.set('commonReasons', 'سبب معروف');
     m.permission.mockRejectedValueOnce(new Error('forbidden'));

@@ -34,14 +34,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 </Link>
               ))
             ) : (
-              <details key={g.key} open={g.items.some((n) => pathname === n.href || pathname.startsWith(n.href + '/'))} className="overflow-hidden rounded-lg border" style={{ borderColor: `${g.color}40` }}>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-extrabold text-white" style={{ background: g.color }}>
+              <details key={g.key} open={g.key === 'categories' ? pathname.startsWith('/admin/categories') : g.items.some((n) => pathname === n.href || pathname.startsWith(n.href + '/'))} className="overflow-hidden rounded-lg border" style={{ borderColor: `${g.color}40` }}>
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-extrabold text-white" style={{ background: g.color }}>
                   <span className="flex items-center gap-2"><g.icon className="h-4 w-4" /> {g.title}</span>
                   <ChevronDown className="h-4 w-4 opacity-80" />
                 </summary>
                 <div className="space-y-0.5 p-1" style={{ background: `${g.color}0d` }}>
                   {g.items.map(({ href, label, icon: Icon }) => (
-                    <Link key={href} href={`${href}#admin-content`} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold hover:bg-white/70 ${pathname === href ? 'bg-white shadow-sm' : ''}`} style={{ color: g.color }}>
+                    <Link key={href} href={`${href}#admin-content`} className={`flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold hover:bg-white/70 ${pathname === href ? 'bg-white shadow-sm' : ''}`} style={{ color: g.color }}>
                       <Icon className="h-4 w-4" /> {label}
                     </Link>
                   ))}

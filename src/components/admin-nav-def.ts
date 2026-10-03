@@ -5,6 +5,7 @@ import {
    Archive, AlertTriangle, CreditCard, WalletCards, Landmark, ClipboardCheck,
 } from 'lucide-react';
 import type { Perm } from '@/lib/roles';
+import { CATEGORY_ADMIN_PAGES } from '@/lib/ad-categories/admin-navigation';
 
 export type AdminNavItem = { href: string; label: string; icon: React.ElementType; perm: Perm | null; description?: string; keywords?: string[] };
 export type AdminNavGroup = { key: string; title: string; icon: React.ElementType; color: string; items: AdminNavItem[] };
@@ -38,11 +39,14 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
     items: [
       { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone, perm: 'ads' },
       { href: '/admin/ad-quality', label: 'مراجعة جودة الإعلانات', icon: ClipboardCheck, perm: 'ads', description: 'تصنيفات وحقول ومواقع تحتاج مراجعة بشرية' },
-      { href: '/admin/categories', label: 'الأقسام وإدارتها', icon: Megaphone, perm: 'categories' },
       { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy, perm: 'duplicates' },
       { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles, perm: 'classified' },
       { href: '/admin/promos', label: 'الإعلانات الترويجية', icon: MonitorPlay, perm: 'promos', description: 'مراجعة ونشر الإعلانات المدفوعة', keywords: ['ترويج', 'إعلان مدفوع', 'بانر عضو'] },
     ],
+  },
+  {
+    key: 'categories', title: 'الأقسام وحقولها', icon: Megaphone, color: '#b45309',
+    items: Object.entries(CATEGORY_ADMIN_PAGES).map(([view,page])=>({href:`/admin/categories/${view}`,label:page.title,description:page.description,icon:Megaphone,perm:'categories' as const})),
   },
   {
     key: 'stores', title: 'المتاجر', icon: Store, color: '#0d9488',

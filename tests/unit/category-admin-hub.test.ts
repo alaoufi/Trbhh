@@ -6,7 +6,7 @@ it('offers separate mobile administration destinations with clear Arabic titles'
   const {CategoryAdminNavigation}=await import('@/components/category-admin-navigation');
   const html=renderToStaticMarkup(React.createElement(CategoryAdminNavigation,{home:true}));
   for(const route of ['ads','manage','fields','settings'])expect(html).toContain(`/admin/categories/${route}`);
-  for(const label of ['إعلانات الأقسام','إضافة حقول الأقسام وإدارتها','إضافة وتعديل وإظهار وإخفاء الأقسام'])expect(html).toContain(label);
+  for(const label of ['إعلانات الأقسام','إضافة وتعديل الحقول','إضافة وتعديل وإظهار وإخفاء الأقسام'])expect(html).toContain(label);
   expect(html).toContain('min-h-11');expect(html).not.toContain('<table');
 });
 it('rejects invented sections and bounds pagination/filter ids',async()=>{

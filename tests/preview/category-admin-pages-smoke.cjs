@@ -3,8 +3,15 @@ const assert=require('node:assert/strict');
 exports.run=async({page,outsider,origin})=>{
   assert.equal(origin,'http://localhost:4197');
   await require('./category-admin-hub-smoke.cjs').run({page,outsider,origin});
-  await page.goto(origin+'/admin/categories/fields');
-  const paths=await page.locator('a[href$="/requirements"]').evaluateAll(links=>links.map(link=>link.getAttribute('href')));
+  await page.goto(origin+'/admin/categories/requirements');
+  const parents=await page.getByLabel('القسم الرئيسي',{exact:true}).locator('option').evaluateAll(options=>options.filter(o=>o.value).map(o=>o.value));
+  const paths=[];
+  for(const parent of parents){
+    await page.getByLabel('القسم الرئيسي',{exact:true}).selectOption(parent);
+    const ids=await page.getByLabel('القسم الفرعي',{exact:true}).locator('option').evaluateAll(options=>options.filter(o=>o.value).map(o=>o.value));
+    paths.push(...ids.map(id=>`/admin/categories/subcategories/${id}/requirements`));
+    if(paths.length>=20)break;
+  }
   assert(paths.length>0,'dedicated administration links missing');
   let original,path,field;
   for(const candidate of paths.slice(0,20)){

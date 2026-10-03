@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import {CategoryFieldPicker} from '@/components/category-field-picker';
 import {CategoryAdminFilters} from '@/components/category-admin-filters';
 import {notFound} from 'next/navigation';
 import {getCategoryFormConfig} from '@/lib/ad-categories/service';
@@ -6,7 +7,7 @@ import {prisma} from '@/lib/prisma';
 import {CategoryAdminNavigation} from '@/components/category-admin-navigation';
 import {AdCategoryEditor} from '@/components/ad-category-editor';
 import {CATEGORY_ADMIN_PAGES,categoryAdminQuery,type CategoryAdminQuery,type CategoryAdminView} from '@/lib/ad-categories/admin-navigation';
-import {CATEGORY_EDITOR_SECTIONS,categoryEditorPath,isCategoryEditorSection} from '@/lib/ad-categories/admin-presentation';
+import {categoryEditorPath} from '@/lib/ad-categories/admin-presentation';
 import {saveCategory,saveCategorySettings,saveSubcategory,toggleCategory} from './actions';
 const input='min-h-11 w-full min-w-0 rounded-lg border bg-white p-2 text-sm';
 const button='inline-flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium';
@@ -25,12 +26,13 @@ export async function CategoryAdminWorkspace({view,query:q}:{view:CategoryAdminV
     <h1 className="text-xl font-bold">{title}</h1><CategoryAdminNavigation current={view}/>
     {q.error&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm">{q.error==='read-only'?'هذه معاينة محمية؛ لا يمكن حفظ تعديل البيانات هنا.':'لم يتم الحفظ. راجع المدخلات أو أعد تحميل الصفحة إذا تغيّر التعريف.'}</p>}
     {q.saved&&<p role="status" className="rounded-lg bg-emerald-50 p-3">{q.saved==='preview'?'تم تحديث الظهور في المعاينة فقط — قاعدة الإنتاج لم تتغير.':'تم الحفظ'}</p>}
-    {(view==='ads'||view==='fields')&&<CategoryAdminFilters key={`${view}:${filter.category}:${filter.subcategory}`} view={view} categories={cfg.categories} subcategories={cfg.subcategories.map(({id,name,categoryId})=>({id,name,categoryId}))} initialCategory={filter.category} initialSubcategory={filter.subcategory} review={q.review==='1'}/>}
+    {view==='ads'&&<CategoryAdminFilters key={`${view}:${filter.category}:${filter.subcategory}`} view={view} categories={cfg.categories} subcategories={cfg.subcategories.map(({id,name,categoryId})=>({id,name,categoryId}))} initialCategory={filter.category} initialSubcategory={filter.subcategory} review={q.review==='1'}/>}
+    {(view==='fields'||view==='requirements'||view==='display')&&<CategoryFieldPicker key={`${view}:${filter.category}:${filter.subcategory}`} section={view} categories={cfg.categories} subcategories={cfg.subcategories.map(({id,name,categoryId})=>({id,name,categoryId}))} initialCategory={filter.category} initialSubcategory={filter.subcategory}/>}
     {view==='manage'&&<section className="space-y-3 rounded-xl border p-3"><h2 className="font-bold">إضافة قسم رئيسي</h2><form action={saveCategory} className="grid min-w-0 gap-3 sm:grid-cols-3"><label>اسم القسم الجديد<input className={input} name="name" maxLength={200} required/></label><label>ترتيب العرض<input className={input} name="order" type="number" min={0} max={10000} defaultValue={0}/></label><button className={`${button} bg-primary text-white`}>إضافة قسم مخفي</button></form></section>}
-    {(view==='manage'||view==='fields')&&categories.map(c=><details key={c.id} className="min-w-0 space-y-3 rounded-xl border p-3" open={Boolean(filter.category)}><summary className="min-h-11 cursor-pointer break-words font-bold">{c.name} — {c.active?'ظاهر':'مخفي'}</summary>
+    {view==='manage'&&categories.map(c=><details key={c.id} className="min-w-0 space-y-3 rounded-xl border p-3" open={Boolean(filter.category)}><summary className="min-h-11 cursor-pointer break-words font-bold">{c.name} — {c.active?'ظاهر':'مخفي'}</summary>
       {view==='manage'&&<><form action={saveCategory} className="grid min-w-0 gap-3 sm:grid-cols-3"><input type="hidden" name="id" value={c.id}/><label>اسم القسم<input className={input} name="name" maxLength={200} required defaultValue={c.name}/></label><label>ترتيب العرض<input className={input} name="order" type="number" min={0} max={10000} defaultValue={c.order}/></label><button className={button}>حفظ القسم</button></form><form action={toggleCategory}><input type="hidden" name="id" value={c.id}/><input type="hidden" name="active" value={c.active?'0':'1'}/><button className={button}>{c.active?'إخفاء القسم':'إظهار القسم'}</button></form><Link href={`/admin/categories/create?category=${c.id}`} className={button}>إضافة قسم فرعي مخفي</Link></>}
       {cfg.subcategories.filter(s=>s.categoryId===c.id).map(s=><section key={s.id} className="min-w-0 space-y-2 rounded-lg border bg-slate-50 p-3"><h2 className="break-words font-bold">{s.name} — {s.active?'ظاهر':'مخفي'}</h2>
-        {view==='fields'?<nav aria-label={`إدارة حقول ${s.name}`} className="grid min-w-0 gap-2 sm:grid-cols-3">{Object.entries(CATEGORY_EDITOR_SECTIONS).map(([key,label])=>isCategoryEditorSection(key)&&<Link key={key} className={button} href={categoryEditorPath(s.id,key)}>{label}</Link>)}</nav>:<div className="grid gap-2 sm:grid-cols-3"><Link className={button} href={categoryEditorPath(s.id,'fields')}>تعديل القسم الفرعي وحقوله</Link><Link className={button} href={`/admin/categories/ads?category=${c.id}&subcategory=${s.id}`}>إعلانات هذا القسم</Link><form action={toggleCategory}><input type="hidden" name="sub" value="1"/><input type="hidden" name="id" value={s.id}/><input type="hidden" name="active" value={s.active?'0':'1'}/><button className={`${button} w-full`}>{s.active?'إخفاء القسم الفرعي':'إظهار القسم الفرعي'}</button></form></div>}
+        <div className="grid gap-2 sm:grid-cols-3"><Link className={button} href={categoryEditorPath(s.id,'fields')}>تعديل القسم الفرعي وحقوله</Link><Link className={button} href={`/admin/categories/ads?category=${c.id}&subcategory=${s.id}`}>إعلانات هذا القسم</Link><form action={toggleCategory}><input type="hidden" name="sub" value="1"/><input type="hidden" name="id" value={s.id}/><input type="hidden" name="active" value={s.active?'0':'1'}/><button className={`${button} w-full`}>{s.active?'إخفاء القسم الفرعي':'إظهار القسم الفرعي'}</button></form></div>
       </section>)}
       {!cfg.subcategories.some(s=>s.categoryId===c.id)&&<p className="text-sm">لا توجد أقسام فرعية بعد. أضفها من صفحة التحكم بالأقسام.</p>}
     </details>)}

@@ -409,10 +409,11 @@ async function run(){
       await page.waitForURL(u=>u.pathname==='/login');
       console.log(JSON.stringify({journey:'logout-and-auth-guard',status:'passed'}));
     }else{
-      await page.getByRole('heading',{name:'الأقسام وإدارتها',exact:true}).waitFor({state:'visible',timeout:30000});
-      await page.getByRole('link',{name:/إضافة حقول الأقسام وإدارتها/}).click();
-      await page.locator('summary').filter({hasText:/^وظائف —/}).click();
-      await page.getByRole('navigation',{name:'إدارة حقول فرص عمل',exact:true}).getByRole('link',{name:'إضافة وتعديل الحقول',exact:true}).click();
+      await page.getByRole('heading',{name:'الأقسام وحقولها',exact:true}).waitFor({state:'visible',timeout:30000});
+      await page.goto(origin+'/admin/categories/fields');
+      await page.getByLabel('القسم الرئيسي',{exact:true}).selectOption({label:'وظائف'});
+      await page.getByLabel('القسم الفرعي',{exact:true}).selectOption({label:'فرص عمل'});
+      await page.getByRole('link',{name:'فتح حقول فرص عمل',exact:true}).click();
       await page.getByRole('heading',{name:'إضافة وتعديل الحقول — فرص عمل',exact:true}).waitFor();
       const editor=page.locator('form').filter({has:page.locator('input[name="name"][value="فرص عمل"]')});
       const editableFields=editor.locator('fieldset').filter({has:page.getByRole('button',{name:/إزالة من التعريف/})});

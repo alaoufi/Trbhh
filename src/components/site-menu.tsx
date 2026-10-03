@@ -160,14 +160,14 @@ export function SiteMenu({ isAuthed, isAdmin, adminHrefs = [], dealsOn = false, 
               g.key === 'top' ? (
                 g.items.map((n) => <Item key={n.href} href={n.href} icon={n.icon} onClick={close}>{n.label}</Item>)
               ) : (
-                <details key={g.key} open={g.items.some((n) => pathname === n.href || pathname.startsWith(n.href + '/'))} className="overflow-hidden rounded-lg border" style={{ borderColor: `${g.color}40` }}>
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-[15px] font-extrabold text-white" style={{ background: g.color }}>
+                <details key={g.key} open={g.key === 'categories' ? pathname.startsWith('/admin/categories') : g.items.some((n) => pathname === n.href || pathname.startsWith(n.href + '/'))} className="overflow-hidden rounded-lg border" style={{ borderColor: `${g.color}40` }}>
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-[15px] font-extrabold text-white" style={{ background: g.color }}>
                     <span className="flex items-center gap-3"><g.icon className="h-5 w-5" /> {g.title}</span>
                     <ChevronDown className="h-5 w-5 opacity-80" />
                   </summary>
                   <div className="space-y-0.5 p-1" style={{ background: `${g.color}0d` }}>
                     {g.items.map((n) => (
-                      <Link key={n.href} href={n.href} onClick={close} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium hover:bg-white/70" style={{ color: g.color }}>
+                      <Link key={n.href} href={n.href} onClick={close} className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium hover:bg-white/70" style={{ color: g.color }}>
                         <n.icon className="h-5 w-5 shrink-0" /> <span>{n.label}</span>
                       </Link>
                     ))}

@@ -1,8 +1,10 @@
 export const CATEGORY_ADMIN_PAGES={
+  manage:{title:'إضافة وتعديل الأقسام',description:'إضافة وتعديل وإظهار وإخفاء الأقسام الرئيسية والفرعية.'},
   ads:{title:'إعلانات الأقسام',description:'استعراض الإعلانات حسب القسم والقسم الفرعي، وفتح تفاصيلها.'},
-  manage:{title:'التحكم بالأقسام وإدارتها',description:'إضافة وتعديل وإظهار وإخفاء الأقسام الرئيسية والفرعية.'},
-  fields:{title:'إضافة حقول الأقسام وإدارتها',description:'إضافة الحقول وتعديلها، وتحديد الإجباري والاختياري وأماكن ظهورها.'},
-  settings:{title:'إعدادات الأقسام والنصوص',description:'التفعيل العام والنصوص التي تظهر للأعضاء.'},
+  fields:{title:'إضافة وتعديل الحقول',description:'اختر القسم ثم أضف الحقول أو عدّل أسماءها وأنواعها وخياراتها.'},
+  requirements:{title:'الحقول الإجبارية والاختيارية',description:'اختر القسم ثم حدد الحقول التي يجب تعبئتها والتي يمكن تركها فارغة.'},
+  display:{title:'أين تظهر الحقول؟',description:'اختر القسم ثم حدد ظهور الحقل في النموذج والبحث والبطاقات والتفاصيل.'},
+  settings:{title:'إعدادات الأقسام',description:'التفعيل العام والنصوص التي تظهر للأعضاء.'},
 } as const;
 export type CategoryAdminView=keyof typeof CATEGORY_ADMIN_PAGES|'create';
 export function isCategoryAdminView(value:string):value is CategoryAdminView{return value==='create'||Object.hasOwn(CATEGORY_ADMIN_PAGES,value);}

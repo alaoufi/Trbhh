@@ -4,11 +4,30 @@ exports.run=async({page,outsider,origin})=>{
   assert.equal(origin,'http://localhost:4197');
   for(const width of [360,390,412,1440]){
     await page.setViewportSize({width,height:900});
-    for(const path of ['/admin/categories','/admin/categories/manage','/admin/categories/fields','/admin/categories/ads','/admin/categories/settings']){
+    for(const path of ['/admin/categories','/admin/categories/manage','/admin/categories/fields','/admin/categories/requirements','/admin/categories/display','/admin/categories/ads','/admin/categories/settings']){
       const response=await page.goto(origin+path);assert.equal(response.status(),200);
       await page.getByRole('heading',{level:1}).waitFor();
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${path} width ${width}`);
       assert.equal(await page.locator('main table').count(),0);
+    }
+    await page.goto(origin+'/admin/categories/fields');
+    const group=page.locator('#admin-nav details').filter({has:page.locator('summary').filter({hasText:'الأقسام وحقولها'})});
+    assert.equal(await group.count(),1);
+    assert.equal(await group.locator('a').count(),6);
+    assert.equal(await group.getAttribute('open'),'');
+    const selector=page.getByRole('region',{name:'اختيار القسم لإدارة الحقول'});
+    assert(await selector.getByLabel('القسم الفرعي',{exact:true}).isDisabled());
+    assert.equal(await page.locator('[name="fields_json"]').count(),0);
+    const parent=await selector.getByLabel('القسم الرئيسي',{exact:true}).locator('option').evaluateAll(options=>options.find(o=>o.value)?.value);
+    if(parent){
+      await selector.getByLabel('القسم الرئيسي',{exact:true}).selectOption(parent);
+      const sub=await selector.getByLabel('القسم الفرعي',{exact:true}).locator('option').evaluateAll(options=>options.find(o=>o.value)?.value);
+      if(sub){
+        await selector.getByLabel('القسم الفرعي',{exact:true}).selectOption(sub);
+        assert.equal(await selector.getByRole('link').getAttribute('href'),`/admin/categories/subcategories/${sub}/fields`);
+        await selector.getByLabel('القسم الرئيسي',{exact:true}).selectOption('');
+        assert.equal(await selector.getByRole('link').count(),0);
+      }
     }
     console.log(`PASS category_admin_hub viewport ${width}`);
   }
@@ -47,5 +66,5 @@ exports.run=async({page,outsider,origin})=>{
   await outsider.goto(origin+'/admin/categories/manage');
   await outsider.waitForURL(u=>u.pathname==='/');
   assert.equal(await outsider.getByLabel('اسم القسم الجديد',{exact:true}).count(),0);
-  console.log('PASS category_admin_hub: five pages 360/390/412/1440, isolated add/edit/show/hide, create hidden subcategory mobile, dependent filters, member denied');
+  console.log('PASS category_admin_hub: seven pages 360/390/412/1440, six submenu links, dependent field picker, isolated add/edit/show/hide, create hidden subcategory mobile, dependent filters, member denied');
 };

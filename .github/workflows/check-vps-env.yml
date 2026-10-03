@@ -205,6 +205,7 @@ jobs:
             docker logs --tail 120 trbhh-final-app-37048483962 2>&1 | python3 -c 'import sys,re; s=sys.stdin.read(); print("ISOLATED_ERROR_CODES",sorted(set(re.findall(r"P[0-9]{4}|ECONNREFUSED|ENOTFOUND|EACCES|ETIMEDOUT|TypeError|ReferenceError|SyntaxError|RangeError",s)))); print("ISOLATED_LOG",re.sub(r"mysql://\S+|redis://\S+|password[^\n]*", "[REDACTED]",s,flags=re.I)[-4000:])'
           fi
           df -Pk /root
+          docker inspect -f 'CURRENT_ISOLATED_IP={{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' trbhh-final-app-37129301968
           for name in trbhh-app trbhh-staging-app; do
             docker inspect -f '{{.Name}} image={{.Image}} running={{.State.Running}}' "$name"
             docker inspect -f '{{range .Mounts}}{{.Type}} {{.Source}} -> {{.Destination}}{{println}}{{end}}' "$name"

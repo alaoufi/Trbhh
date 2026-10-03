@@ -40,6 +40,19 @@ function filterParams(field: CategoryField) {
 }
 
 describe('all classified-listing leaf category scenarios', () => {
+  it.each(CATEGORY_SEED_TEMPLATES)('accepts required-only values for $key with every optional field omitted',template=>{
+    const fields=validateDefinition(template.fields);
+    for(const listing of template.listingPolicy.types){
+      const values:CategoryValues={};
+      for(let pass=0;pass<fields.length;pass++)for(const field of fields){
+        if(fieldIsRequired(field,{listingType:listing.key,values})&&!Object.hasOwn(values,field.key))values[field.key]=sampleValue(field);
+      }
+      const active=Object.fromEntries(Object.entries(values).filter(([key])=>fieldApplies(fields.find(f=>f.key===key)!,{listingType:listing.key,values})));
+      const result=validateCategoryValues(fields,active,{listingType:listing.key});
+      expect(Object.keys(result).sort(),template.key+'/'+listing.key).toEqual(Object.keys(active).sort());
+      expect(Object.keys(result).every(key=>fieldIsRequired(fields.find(f=>f.key===key)!,{listingType:listing.key,values:active}))).toBe(true);
+    }
+  });
   it('covers every current leaf with a unique, valid and grouped schema', () => {
     expect(CATEGORY_SEED_TEMPLATES.length).toBeGreaterThanOrEqual(85);
     for (const template of CATEGORY_SEED_TEMPLATES) {

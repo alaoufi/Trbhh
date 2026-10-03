@@ -9,7 +9,8 @@ export type CategoryField = {
   searchable?: boolean; filterable?: boolean; comparable?: boolean; showInCard?: boolean; showInDetails?: boolean;
   dependsOn?: string; dependencyOperator?: DependencyOperator; dependencyValue?: string | number | boolean | string[]; conditionEffect?: ConditionEffect;
 };
-export type CategoryRange = {min:number;max:number};
+// Empty endpoints exist only in an in-progress form; validation emits numbers only.
+export type CategoryRange = {min:number|'';max:number|''};
 export type CategoryValue = string | number | boolean | string[] | CategoryRange;
 export type CategoryValues = Record<string, CategoryValue>;
 const TYPES = new Set(['text', 'textarea', 'number', 'decimal', 'select', 'multiselect', 'boolean', 'radio', 'date', 'year', 'range']);
@@ -138,7 +139,9 @@ export function validateCategoryValues(fields: CategoryField[], raw: unknown, co
   const out: CategoryValues = {};
   for (const f of active.values()) {
     const value = Object.hasOwn(input, f.key) ? input[f.key] : undefined;
-    if (empty(value)) {
+    const blankRange=f.type==='range'&&value&&typeof value==='object'&&!Array.isArray(value)
+      &&empty((value as Record<string,unknown>).min)&&empty((value as Record<string,unknown>).max);
+    if (empty(value)||blankRange) {
       if (fieldIsRequired(f,{...context,values:conditionValues})&&!context.grandfatherMissingRequired?.has(f.key)) throw new CategoryValidationError(f.key, `الحقل مطلوب: ${f.label}`);
       continue;
     }
@@ -162,7 +165,10 @@ export function validateCategoryValues(fields: CategoryField[], raw: unknown, co
         break;
       case 'range': {
         if(!value||typeof value!=='object'||Array.isArray(value))fail();
-        const range=value as Record<string,unknown>,min=Number(range.min),max=Number(range.max);
+        const range=value as Record<string,unknown>;
+        if(empty(range.min)||empty(range.max))throw new CategoryValidationError(f.key,'أكمل طرفي النطاق أو امسحهما لترك الحقل الاختياري فارغًا');
+        if([range.min,range.max].some(v=>typeof v!=='number'&&(typeof v!=='string'||!/^[-]?\d+(?:\.\d+)?$/.test(v.trim()))))fail();
+        const min=Number(range.min),max=Number(range.max);
         if(!Number.isFinite(min)||!Number.isFinite(max)||min>max||(f.min!==undefined&&min<f.min)||(f.max!==undefined&&max>f.max)||!matchesStep(min,f)||!matchesStep(max,f))fail();
         out[f.key]={min,max};
         break;

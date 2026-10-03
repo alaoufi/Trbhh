@@ -1,6 +1,7 @@
 'use client';
 import React from 'react';
-import { editableCategoryValues, fieldApplies, fieldIsRequired, type CategoryField, type CategoryValues, type CategoryValue, type CategoryRange } from '@/lib/ad-categories/validation';
+import { fieldApplies, fieldIsRequired, type CategoryField, type CategoryValues, type CategoryValue, type CategoryRange } from '@/lib/ad-categories/validation';
+import {categoryDraftValues,setCategoryDraftValue,rangeDraftValue} from '@/lib/ad-categories/drafts';
 
 const controlBase = 'mt-1 h-11 min-h-11 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none transition-colors focus:ring-2';
 
@@ -18,7 +19,7 @@ export function AdCategoryFields({ fields, values, onChange, listingType }: {
 }) {
   const [invalidKeys, setInvalidKeys] = React.useState<Set<string>>(() => new Set());
   const active = fields.filter(f => fieldApplies(f, { listingType, values })).sort((a, b) => a.order - b.order);
-  const current = editableCategoryValues(fields,values,{listingType});
+  const current = categoryDraftValues(fields,values,{listingType});
   const groups = [...new Set(active.map(f => f.group))];
 
   function markInvalid(key: string) {
@@ -36,7 +37,7 @@ export function AdCategoryFields({ fields, values, onChange, listingType }: {
 
   function update(key: string, value: CategoryValue) {
     clearInvalid(key);
-    onChange({ ...values, [key]: value });
+    onChange(setCategoryDraftValue(values,key,value));
   }
 
   return <div className="space-y-2">
@@ -109,13 +110,13 @@ export function AdCategoryFields({ fields, values, onChange, listingType }: {
                 : f.type === 'textarea' ? <textarea id={id} className={controlClass(invalid, true)} required={required} {...invalidProps} maxLength={3000} rows={3} placeholder={f.placeholder}
                   value={String(value ?? '')} onChange={e => update(f.key, e.target.value)} />
                   : f.type === 'range' ? <div className="grid grid-cols-2 gap-2">
-                    <input id={id} aria-label={`${f.label} من`} className={controlClass(invalid)} type="number" required={required} {...invalidProps} min={f.min} max={f.max} step={f.step??'any'} value={String((value as CategoryRange | undefined)?.min ?? '')} onChange={e => update(f.key, { min: Number(e.target.value), max: Number((value as CategoryRange | undefined)?.max ?? e.target.value) })} />
-                    <input id={`${id}-max`} aria-label={`${f.label} إلى`} className={controlClass(invalid)} type="number" required={required} {...invalidProps} min={f.min} max={f.max} step={f.step??'any'} value={String((value as CategoryRange | undefined)?.max ?? '')} onChange={e => update(f.key, { min: Number((value as CategoryRange | undefined)?.min ?? e.target.value), max: Number(e.target.value) })} />
+                    <input id={id} aria-label={`${f.label} من`} className={controlClass(invalid)} type="number" required={required||Boolean(value)} {...invalidProps} min={f.min} max={f.max} step={f.step??'any'} value={String((value as CategoryRange | undefined)?.min ?? '')} onChange={e => update(f.key,rangeDraftValue(value,'min',e.target.value))} />
+                    <input id={`${id}-max`} aria-label={`${f.label} إلى`} className={controlClass(invalid)} type="number" required={required||Boolean(value)} {...invalidProps} min={f.min} max={f.max} step={f.step??'any'} value={String((value as CategoryRange | undefined)?.max ?? '')} onChange={e => update(f.key,rangeDraftValue(value,'max',e.target.value))} />
                   </div>
                     : <input id={id} className={controlClass(invalid)} required={required} {...invalidProps} type={f.type === 'year' ? 'number' : f.type} min={f.min} max={f.max}
                       placeholder={f.placeholder} step={f.type === 'number' || f.type === 'decimal' || f.type === 'year' ? f.step??'any' : undefined} maxLength={f.type === 'text' ? 500 : undefined}
                       value={String(value ?? '')} onChange={e => update(f.key, e.target.value)} />}
-            {invalid && <p id={errorId} role="alert" className="mt-1 text-xs font-bold text-red-700">هذا الحقل مطلوب قبل المتابعة.</p>}
+            {invalid && <p id={errorId} role="alert" className="mt-1 text-xs font-bold text-red-700">{f.type==='range'?'أكمل طرفي النطاق، أو امسحهما إن كان الحقل اختياريًا.':'راجع قيمة هذا الحقل قبل المتابعة.'}</p>}
             {f.helpText && <p className="mt-1 text-xs text-muted-foreground">{f.helpText}</p>}
           </div>;
         })}

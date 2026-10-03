@@ -16,6 +16,8 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
   const staff = await login(2);
   const outsider = await login(1);
   try {
+    const staffProfile = await staff.p.locator('a[href^="/users/"]').first().getAttribute('href');
+    const staffId = staffProfile.split('/').pop(); assert(/^\d+$/.test(staffId));
     const profile = await outsider.p.locator('a[href^="/users/"]').first().getAttribute('href');
     const memberId = profile.split('/').pop(); assert(/^\d+$/.test(memberId));
     for (const [type, id] of [['site', '0'], ['member', memberId], ['ad', adId]]) {
@@ -37,6 +39,30 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
         await page.locator('ol').getByText(`متابعة العضو ${type} ${i}`, { exact: true }).waitFor();
       }
       assert.equal(await page.locator('ol[aria-label="ردود البلاغ"] > li').count(), 4);
+      assert.equal(await page.getByRole('link', { name: 'مراسلة المُبلّغ عنه', exact: true }).count(), 0);
+      await staff.p.goto(origin + adminPath);
+      const contact = staff.p.getByRole('link', { name: 'مراسلة المُبلّغ عنه', exact: true });
+      if (type === 'site') assert.equal(await contact.count(), 0);
+      if (type === 'member') {
+        assert.equal(await contact.getAttribute('href'), `/messages/${memberId}`);
+        await contact.click();
+        const question = `استفسار خاص من الإدارة ${run}`;
+        await staff.p.getByPlaceholder('اكتب رسالة...').fill(question);
+        await staff.p.getByRole('button', { name: 'إرسال', exact: true }).click();
+        await staff.p.getByText(question, { exact: true }).waitFor();
+        await outsider.p.goto(`${origin}/messages/${staffId}`);
+        await outsider.p.getByText(question, { exact: true }).waitFor();
+        const privateBody = await outsider.p.locator('body').innerText();
+        assert(!privateBody.includes(`بلاغ اختبار متابعة ${type}`));
+        assert(!privateBody.includes(`متابعة العضو ${type}`));
+        const response = `توضيح العضو المعني ${run}`;
+        await outsider.p.getByPlaceholder('اكتب رسالة...').fill(response);
+        await outsider.p.getByRole('button', { name: 'إرسال', exact: true }).click();
+        await outsider.p.getByText(response, { exact: true }).waitFor();
+        await staff.p.reload();
+        await staff.p.getByText(response, { exact: true }).waitFor();
+        console.log('PASS reported_member_contact: separate two-way chat, no reporter content leaked');
+      }
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       await outsider.p.goto(origin + path);
       assert.equal(await outsider.p.locator('#report-reply').count(), 0);

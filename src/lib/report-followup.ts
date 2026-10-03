@@ -24,11 +24,30 @@ async function authorizedReport(kind: string, id: string, admin: boolean, writin
     ? await prisma.repord_ads.findUnique({ where: { id: ref.id } })
     : await prisma.reports.findUnique({ where: { id: ref.id } });
   if (!original || (!admin && Number(original.user_id) !== session.uid)) throw new ReportAccessError('بلاغ غير متاح.');
-  return { ref, uid: session.uid, report: {
+  return { ref, uid: session.uid, original, report: {
     ownerId: Number(original.user_id),
     body: 'comment' in original ? original.comment || 'بلاغ على إعلان' : original.message,
     title: 'ads_id' in original ? `بلاغ على إعلان #${original.ads_id}` : 'بلاغ موقع / عضو / محتوى',
   } };
+}
+
+/** Staff-only shortcut to the existing private chat; never copies report content. */
+export async function getReportedMemberContact(kind: string, id: string): Promise<{ id: string } | null> {
+  const { original, uid } = await authorizedReport(kind, id, true, true);
+  if (!(await getSettingBool(REPORT_FOLLOWUP_ENABLED, true))) return null;
+  let target: bigint | null = null;
+  if ('ads_id' in original) {
+    const ad = await prisma.ads.findUnique({ where: { id: BigInt(original.ads_id) }, select: { user_id: true } });
+    target = ad?.user_id ?? null;
+  } else {
+    // Only the server-generated member-report prefix identifies a member.
+    // Legacy comment_id may refer to content, not an account: never guess.
+    const match = /^بلاغ عن عضو #([1-9]\d*) — /.exec(original.message);
+    if (match && BigInt(match[1]) === original.comment_id) target = original.comment_id;
+  }
+  if (!target || target <= 0n || target === BigInt(uid) || target > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  const member = await prisma.users.findUnique({ where: { id: target }, select: { id: true } });
+  return member ? { id: String(member.id) } : null;
 }
 
 export async function getReportConversation(kind: string, id: string, admin = false) {

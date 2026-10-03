@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => ({
   user: vi.fn(), permission: vi.fn(), enabled: vi.fn(), readonly: vi.fn(),
-  ad: vi.fn(), general: vi.fn(), list: vi.fn(), create: vi.fn(), notify: vi.fn(), admin: vi.fn(),
+  ad: vi.fn(), general: vi.fn(), list: vi.fn(), create: vi.fn(), notify: vi.fn(), admin: vi.fn(), targetAd: vi.fn(), targetUser: vi.fn(),
 }));
 vi.mock('@/lib/auth', () => ({ requireUser: m.user }));
 vi.mock('@/lib/roles', () => ({ hasAction: m.permission }));
@@ -11,7 +11,7 @@ vi.mock('@/lib/read-only-preview', () => ({ isReadOnlyPreview: m.readonly }));
 vi.mock('@/data/schema-sync', () => ({ ensureSchema: vi.fn() }));
 vi.mock('@/lib/admin-inbox', () => ({ getPrimaryAdminId: m.admin }));
 vi.mock('@/lib/prisma', () => {
-  const db = { repord_ads: { findUnique: m.ad }, reports: { findUnique: m.general },
+  const db = { ads: { findUnique: m.targetAd }, users: { findUnique: m.targetUser }, repord_ads: { findUnique: m.ad }, reports: { findUnique: m.general },
     report_replies: { findMany: m.list, create: m.create }, notfications: { create: m.notify } };
   return { prisma: { ...db, $transaction: (fn: (tx: typeof db) => unknown) => fn(db) } };
 });
@@ -26,6 +26,35 @@ describe('private report follow-up', () => {
     m.list.mockResolvedValue([]); m.create.mockResolvedValue({ id: 1n }); m.notify.mockResolvedValue({});
   });
   async function api() { return import('@/lib/report-followup'); }
+  it('resolves the reported ad owner for authorized staff without report content', async () => {
+    m.permission.mockResolvedValue(true); m.targetAd.mockResolvedValue({ user_id: 22n }); m.targetUser.mockResolvedValue({ id: 22n });
+    expect(await (await api()).getReportedMemberContact('ad', '3')).toEqual({ id: '22' });
+  });
+  it('resolves an explicitly identified member and rejects ambiguous legacy reports', async () => {
+    m.permission.mockResolvedValue(true); m.targetUser.mockResolvedValue({ id: 22n });
+    m.general.mockResolvedValue({ user_id: 7n, comment_id: 22n, message: 'بلاغ عن عضو #22 — شكوى' });
+    expect(await (await api()).getReportedMemberContact('general', '3')).toEqual({ id: '22' });
+    m.general.mockResolvedValue({ user_id: 7n, comment_id: 22n, message: 'بلاغ محتوى #22 — شكوى' });
+    expect(await (await api()).getReportedMemberContact('general', '3')).toBeNull();
+    m.general.mockResolvedValue({ user_id: 7n, comment_id: 23n, message: 'بلاغ عن عضو #22 — شكوى' });
+    expect(await (await api()).getReportedMemberContact('general', '3')).toBeNull();
+  });
+  it('requires staff write permission even when the caller owns the report', async () => {
+    await expect((await api()).getReportedMemberContact('ad', '3')).rejects.toThrow();
+    expect(m.targetAd).not.toHaveBeenCalled();
+    m.permission.mockImplementation(async (_id, _service, action) => action === 'view');
+    await expect((await api()).getReportedMemberContact('ad', '3')).rejects.toThrow();
+  });
+  it('does not invent a recipient for site reports or missing users/ads, and honors disable', async () => {
+    m.permission.mockResolvedValue(true);
+    expect(await (await api()).getReportedMemberContact('general', '3')).toBeNull();
+    m.targetAd.mockResolvedValue(null);
+    expect(await (await api()).getReportedMemberContact('ad', '3')).toBeNull();
+    m.targetAd.mockResolvedValue({ user_id: 22n }); m.targetUser.mockResolvedValue(null);
+    expect(await (await api()).getReportedMemberContact('ad', '3')).toBeNull();
+    m.enabled.mockResolvedValue(false);
+    expect(await (await api()).getReportedMemberContact('ad', '3')).toBeNull();
+  });
   it('allows the reporter to read either existing report kind', async () => {
     const { getReportConversation } = await api();
     expect((await getReportConversation('ad', '3')).report.ownerId).toBe(7);

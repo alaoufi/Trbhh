@@ -40,6 +40,7 @@ exports.run=async({page,outsider,origin})=>{
   await check().setChecked(field.showInCard===true);
   await save('حفظ إعدادات الظهور');
   await page.goto(origin+path.replace(/requirements$/,'fields'));
+  await page.getByRole('heading',{level:1}).waitFor();
   assert.equal(await page.getByRole('button',{name:'إضافة حقل',exact:true}).count(),1);
   assert.equal(await page.getByRole('combobox',{name:/تعبئة الحقل:/}).count(),0);
   await page.getByRole('button',{name:'إضافة حقل',exact:true}).click();
@@ -59,6 +60,7 @@ exports.run=async({page,outsider,origin})=>{
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   }
   await outsider.goto(origin+path);
+  await outsider.waitForURL(u=>u.pathname==='/');
   assert.equal(await outsider.locator('[name="fields_json"]').count(),0);
   console.log('PASS category_admin_pages: separate pages, add/remove isolated field, required/optional save+reload, display independent, preserved definitions, permissions, 390/1440');
 };

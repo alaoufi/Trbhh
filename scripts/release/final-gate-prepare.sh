@@ -6,7 +6,7 @@ umask 077
 run=$1
 tools_dir=$2
 [[ "$run" =~ ^[0-9]+$ && "$tools_dir" == "/root/trbhh-release-tools/final-$run" ]]
-candidate=362057872642630f3dd734b15af582e2e6343213
+candidate=69012629d8a704506aeee1c547ccbd80d36717cd
 [[ "$(git -C /root/trbhh-staging rev-parse HEAD)" == "$candidate" ]]
 base=/root/trbhh-release-backups
 backup="$base/final-$run"
@@ -24,7 +24,7 @@ printf '%s\n' "$candidate" > "$backup/preview-sha.txt"
 git -C /root/trbhh diff --binary > "$backup/production-working-tree.patch"
 docker inspect -f '{{.Image}}' trbhh-app > "$backup/production-image.txt"
 image=$(docker inspect -f '{{.Image}}' trbhh-staging-app)
-[[ "$image" == sha256:35547e0e27fccbe1ae80d1e12e1e07c5a5a0d7547f197d5b0685c4656eda44c5 ]]
+[[ "$image" == sha256:2a3124ea8c75a5ad8cc6210592d52d0af02ac217ea36390711987913409d2939 ]]
 printf '%s\n' "$image" > "$backup/preview-image.txt"
 docker image tag "$(cat "$backup/production-image.txt")" "trbhh-rollback:final-$run"
 docker image tag "$image" "trbhh-release:final-$run"

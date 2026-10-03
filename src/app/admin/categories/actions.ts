@@ -1,4 +1,5 @@
 'use server';
+import {categoryEditorPath,isCategoryEditorSection} from '@/lib/ad-categories/admin-presentation';
 import {redirect} from 'next/navigation';
 import {revalidatePath} from 'next/cache';
 import {prisma} from '@/lib/prisma';
@@ -13,7 +14,7 @@ import {isReadOnlyPreview,PREVIEW_CATEGORY_VISIBILITY_KEY} from '@/lib/read-only
 import {previewHashSet} from '@/lib/redis';
 import {decodeStoredCategoryDefinition,encodeStoredCategoryDefinition} from '@/lib/ad-categories/storage';
 
-async function refresh(){await bustAdCaches();revalidatePath('/admin/categories');revalidatePath('/ads/new');revalidatePath('/ads/[id]','page');revalidatePath('/companies/[id]/p/[adId]','page');}
+async function refresh(){await bustAdCaches();revalidatePath('/admin/categories');revalidatePath('/admin/categories/subcategories/[id]/[section]','page');revalidatePath('/ads/new');revalidatePath('/ads/[id]','page');revalidatePath('/companies/[id]/p/[adId]','page');}
 function nameAndOrder(fd:FormData){const name=String(fd.get('name')||'').trim(),order=Number(fd.get('order')||0);if(!name||name.length>200||!Number.isSafeInteger(order)||order<0||order>10000)throw new CategoryValidationError('','الاسم أو الترتيب غير صالح');return {name,order};}
 function rejectUnsupportedPreviewEdit(){if(!isReadOnlyPreview())return false;redirect('/admin/categories?error=read-only');return true;}
 export async function saveCategorySettings(fd:FormData){
@@ -53,7 +54,9 @@ export async function toggleCategory(fd:FormData){
 export async function saveSubcategory(fd:FormData){
   const id=fd.get('id')?categoryId(fd.get('id')):null;
   const actor=await requireAction('categories',id?'edit':'add');
-  if(rejectUnsupportedPreviewEdit())return;
+  const section=fd.get('editor_section');
+  const returnPath=id&&isCategoryEditorSection(section)?categoryEditorPath(id,section):'/admin/categories';
+  if(isReadOnlyPreview())return redirect(`${returnPath}?error=read-only`);
   try{
     const {name,order}=nameAndOrder(fd),cid=categoryId(fd.get('category_id')),def=parseSubcategoryDefinition(fd);
     await prisma.$transaction(async tx=>{
@@ -79,6 +82,6 @@ export async function saveSubcategory(fd:FormData){
       await tx.$executeRaw`INSERT INTO ad_category_definitions(subcategory_id,version,kind,price_enabled,goods_enabled,fields_json) VALUES (${sid},1,${def.kind},${Number(def.priceEnabled)},${Number(def.goodsEnabled)},${JSON.stringify(stored)}) ON DUPLICATE KEY UPDATE version=version+1,kind=VALUES(kind),price_enabled=VALUES(price_enabled),goods_enabled=VALUES(goods_enabled),fields_json=VALUES(fields_json)`;
       await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'save_subcategory',${JSON.stringify({id:Number(sid),categoryId:cid,name,...def})})`;
     });
-  }catch(e){if(e instanceof CategoryValidationError)redirect('/admin/categories?error=input');throw e;}
-  await refresh();redirect('/admin/categories?saved=1');
+  }catch(e){if(e instanceof CategoryValidationError)redirect(`${returnPath}?error=input`);throw e;}
+  await refresh();redirect(`${returnPath}?saved=1`);
 }

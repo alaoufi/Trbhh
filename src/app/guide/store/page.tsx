@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
   Store, Rocket, Palette, KeyRound, PlusCircle, MessageSquare, Share2, Crown,
-  BarChart3, Handshake, ArrowRight, SlidersHorizontal, Sparkles,
+  BarChart3, Handshake, ArrowRight, SlidersHorizontal, Sparkles, Flag,
 } from 'lucide-react';
 import { GuideView, type GuideSection } from '@/components/guide-view';
 import { getCommerceConfig } from '@/lib/commerce/settings';
@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'دليل المتجر' };
 
 const SECTIONS: GuideSection[] = [
+  {id:'field-administration',title:'الحقول الإجبارية والاختيارية',icon:Flag,from:'#142b45',to:'#234768',goal:'إعدادات واضحة للحقول.',steps:['حقول الإعلان تختلف حسب القسم وإعدادات الإدارة. الحقل الإجباري يجب تعبئته عندما يظهر؛ الحقل الاختياري يمكن تركه فارغًا ولا تعرض قيمته الفارغة في التفاصيل. قد يصبح حقل إجباريًا بحسب اختيارك في حقل آخر، والحقول المخفية لا تمنع النشر.']},
   { id: 'report-reason', title: 'أسباب البلاغات', icon: MessageSquare, from: '#142b45', to: '#234768', goal: 'توضيح سبب الشكوى.', steps: ['كل بلاغ يحتاج اختيار سبب من القائمة. أضف شرحًا اختياريًا حتى 2000 حرف، أو شرحًا إلزاميًا عند اختيار «سبب آخر». التوضيح محفوظ في محادثة البلاغ الخاصة بصاحبه والإدارة.'] },
   { id: 'report-contact', title: 'استفسارات الإدارة', icon: MessageSquare, from: '#142b45', to: '#234768', goal: 'التواصل مع الطرف المعني عند الحاجة.', steps: ['إذا راسلتك الإدارة بخصوص بلاغ، تابع الردود من المراسلات الخاصة في حسابك. هذه المحادثة مستقلة عن محادثة صاحب البلاغ، ولا تُنسخ رسائله الخاصة إليها تلقائيًا.'] },
   { id: 'report-followup', title: 'متابعة البلاغات', icon: MessageSquare, from: '#142b45', to: '#234768', goal: 'استفسارات متتابعة للإدارة.', steps: ['من حساب العضو افتح «بلاغاتي المرسلة»، واختر البلاغ لإرسال توضيحات وردود متعددة للإدارة. تصلك إشعارات الرد، ولا تُكشف المحادثة أو هوية صاحب البلاغ للطرف المُبلّغ عنه.'] },

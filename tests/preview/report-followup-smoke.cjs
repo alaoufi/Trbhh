@@ -96,5 +96,6 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
     await staff.p.getByRole('button', { name: 'حفظ', exact: true }).click();
     await staff.p.waitForLoadState('networkidle');
     console.log('PASS report_followup administrative toggle preserves history');
+    await require('./category-admin-pages-smoke.cjs').run({page:staff.p,outsider:outsider.p,origin});
   } finally { await staff.context.close(); await outsider.context.close(); }
 };

@@ -54,7 +54,8 @@ exports.run=async({page,outsider,origin})=>{
   const testLabel='حقل اختبار إدارة معزول';
   await page.getByLabel('اسم الحقل',{exact:true}).last().fill(testLabel);
   const testGroup=page.getByRole('group',{name:testLabel,exact:true});
-  await testGroup.getByLabel('النوع',{exact:true}).selectOption('number');
+  // The legacy wrapping label includes option text in its accessible name.
+  await testGroup.getByRole('combobox').first().selectOption('number');
   await testGroup.getByLabel('الحد الأدنى',{exact:true}).fill('10');
   await testGroup.getByLabel('الحد الأعلى',{exact:true}).fill('1');
   await page.getByRole('button',{name:'حفظ القسم والحقول',exact:true}).click();

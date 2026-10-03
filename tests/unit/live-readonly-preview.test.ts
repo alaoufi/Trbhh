@@ -85,7 +85,7 @@ describe('Hostinger live-data read-only preview', () => {
   });
 
   test('explains preview-only category changes without implying production was edited', () => {
-    const page = readFileSync(path.join(root, 'src/app/admin/categories/page.tsx'), 'utf8');
+    const page = readFileSync(path.join(root, 'src/app/admin/categories/workspace.tsx'), 'utf8');
     expect(page).toContain('تم تحديث الظهور في المعاينة فقط');
     expect(page).toContain('قاعدة الإنتاج لم تتغير');
   });

@@ -82,6 +82,8 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
       assert.equal(await outsider.p.locator('#report-reply').count(), 0);
       assert(!(await outsider.p.locator('body').innerText()).includes(`متابعة العضو ${type}`));
       await outsider.p.goto(origin + adminPath);
+      // A streamed Next.js permission redirect may finish after goto resolves.
+      await outsider.p.waitForURL(u => u.pathname === '/', {waitUntil:'domcontentloaded'});
       assert.equal(await outsider.p.locator('#report-reply').count(), 0);
       console.log(`PASS report_followup ${type}: required reason + other explanation + preserved input + full private explanation + 4 replies + isolation + mobile390`);
     }

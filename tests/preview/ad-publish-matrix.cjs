@@ -134,7 +134,7 @@ async function run(){
         await page.goto(origin+'/account/profiles');
         assert.equal(await page.locator(`input[name="profileId"][value="${duplicate.id}"]`).count(),0,'duplicate primary omitted without removing historic data');
         assert(await db.profiles.findUnique({where:{id:duplicate.id}}));
-        const deleteForm=page.locator('form').filter({has:page.locator(`input[name="profileId"][value="${extra.id}"]`)}).filter({has:page.getByRole('button',{name:'حذف الهوية',exact:true})});
+          const deleteForm=page.locator('form').filter({has:page.locator(`input[name="profileId"][value="${extra.id}"]`)}).filter({has:page.getByRole('button',{name:'حذف الهوية',exact:true,includeHidden:true})});
         await deleteForm.evaluate(e=>{const d=e.closest('details');if(d)d.open=true});
         await deleteForm.getByRole('button',{name:'حذف الهوية',exact:true}).click();
         await page.getByRole('dialog').getByRole('button',{name:'موافق',exact:true}).click();

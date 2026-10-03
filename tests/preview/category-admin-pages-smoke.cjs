@@ -2,7 +2,8 @@
 const assert=require('node:assert/strict');
 exports.run=async({page,outsider,origin})=>{
   assert.equal(origin,'http://localhost:4197');
-  await page.goto(origin+'/admin/categories');
+  await require('./category-admin-hub-smoke.cjs').run({page,outsider,origin});
+  await page.goto(origin+'/admin/categories/fields');
   const paths=await page.locator('a[href$="/requirements"]').evaluateAll(links=>links.map(link=>link.getAttribute('href')));
   assert(paths.length>0,'dedicated administration links missing');
   let original,path,field;

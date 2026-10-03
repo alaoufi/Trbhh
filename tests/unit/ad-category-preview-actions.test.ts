@@ -38,7 +38,7 @@ describe('category visibility actions in live read-only preview', () => {
     expect(state.previewSet).toHaveBeenCalledWith(PREVIEW_CATEGORY_VISIBILITY_KEY, 'category:10', '0');
     expect(state.transaction).not.toHaveBeenCalled();
     expect(state.bust).toHaveBeenCalled();
-    expect(state.redirect).toHaveBeenCalledWith('/admin/categories?saved=preview');
+    expect(state.redirect).toHaveBeenCalledWith('/admin/categories/manage?saved=preview');
   });
 
   it('keeps subcategory visibility isolated under a distinct preview key', async () => {
@@ -62,6 +62,6 @@ describe('category visibility actions in live read-only preview', () => {
     await saveCategory(form);
 
     expect(state.transaction).not.toHaveBeenCalled();
-    expect(state.redirect).toHaveBeenCalledWith('/admin/categories?error=read-only');
+    expect(state.redirect).toHaveBeenCalledWith('/admin/categories/manage?error=read-only');
   });
 });

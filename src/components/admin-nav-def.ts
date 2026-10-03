@@ -38,7 +38,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
     items: [
       { href: '/admin/ads', label: 'الإعلانات', icon: Megaphone, perm: 'ads' },
       { href: '/admin/ad-quality', label: 'مراجعة جودة الإعلانات', icon: ClipboardCheck, perm: 'ads', description: 'تصنيفات وحقول ومواقع تحتاج مراجعة بشرية' },
-      { href: '/admin/categories', label: 'الأقسام وحقولها', icon: Megaphone, perm: 'categories' },
+      { href: '/admin/categories', label: 'الأقسام وإدارتها', icon: Megaphone, perm: 'categories' },
       { href: '/admin/duplicates', label: 'الإعلانات المكررة', icon: Copy, perm: 'duplicates' },
       { href: '/admin/classified', label: 'الإعلانات المبوّبة', icon: Sparkles, perm: 'classified' },
       { href: '/admin/promos', label: 'الإعلانات الترويجية', icon: MonitorPlay, perm: 'promos', description: 'مراجعة ونشر الإعلانات المدفوعة', keywords: ['ترويج', 'إعلان مدفوع', 'بانر عضو'] },

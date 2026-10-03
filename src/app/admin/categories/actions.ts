@@ -14,16 +14,16 @@ import {isReadOnlyPreview,PREVIEW_CATEGORY_VISIBILITY_KEY} from '@/lib/read-only
 import {previewHashSet} from '@/lib/redis';
 import {decodeStoredCategoryDefinition,encodeStoredCategoryDefinition} from '@/lib/ad-categories/storage';
 
-async function refresh(){await bustAdCaches();revalidatePath('/admin/categories');revalidatePath('/admin/categories/subcategories/[id]/[section]','page');revalidatePath('/ads/new');revalidatePath('/ads/[id]','page');revalidatePath('/companies/[id]/p/[adId]','page');}
+async function refresh(){await bustAdCaches();revalidatePath('/admin/categories','layout');revalidatePath('/admin/categories/subcategories/[id]/[section]','page');revalidatePath('/ads/new');revalidatePath('/ads/[id]','page');revalidatePath('/companies/[id]/p/[adId]','page');}
 function nameAndOrder(fd:FormData){const name=String(fd.get('name')||'').trim(),order=Number(fd.get('order')||0);if(!name||name.length>200||!Number.isSafeInteger(order)||order<0||order>10000)throw new CategoryValidationError('','الاسم أو الترتيب غير صالح');return {name,order};}
-function rejectUnsupportedPreviewEdit(){if(!isReadOnlyPreview())return false;redirect('/admin/categories?error=read-only');return true;}
+function rejectUnsupportedPreviewEdit(target='/admin/categories/manage'){if(!isReadOnlyPreview())return false;redirect(`${target}?error=read-only`);return true;}
 export async function saveCategorySettings(fd:FormData){
   await requireAction('categories','edit');
-  if(rejectUnsupportedPreviewEdit())return;
+  if(rejectUnsupportedPreviewEdit('/admin/categories/settings'))return;
   await setSetting('categories_v2_enabled',fd.get('enabled')==='1'?'1':'0');
   await setSetting(CATEGORY_LATEST_TEMPLATES_SETTING,fd.get('latest_templates')==='1'?'1':'0');
   for(const [k,fallback] of Object.entries(CATEGORY_LABELS)) await setSetting(`categories_v2_label_${k}`,String(fd.get(`label_${k}`)||fallback).trim().slice(0,500));
-  await refresh();redirect('/admin/categories?saved=1');
+  await refresh();redirect('/admin/categories/settings?saved=1');
 }
 export async function saveCategory(fd:FormData){
   const id=fd.get('id')?categoryId(fd.get('id')):null;
@@ -35,27 +35,27 @@ export async function saveCategory(fd:FormData){
       const c=id?await tx.categories.update({where:{id:BigInt(id)},data:{name,ordered:order}}):await tx.categories.create({data:{name,ordered:order,photo_path:'',is_active:'no'}});
       await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'save_category',${JSON.stringify({id:Number(c.id),name,order})})`;
     });
-  }catch(e){if(e instanceof CategoryValidationError)redirect('/admin/categories?error=input');throw e;}
-  await refresh();redirect('/admin/categories?saved=1');
+  }catch(e){if(e instanceof CategoryValidationError)redirect('/admin/categories/manage?error=input');throw e;}
+  await refresh();redirect('/admin/categories/manage?saved=1');
 }
 export async function toggleCategory(fd:FormData){
   const actor=await requireAction('categories','suspend');const id=categoryId(fd.get('id'));const sub=fd.get('sub')==='1';const active=fd.get('active')==='1';
   if(isReadOnlyPreview()){
     await previewHashSet(PREVIEW_CATEGORY_VISIBILITY_KEY,`${sub?'subcategory':'category'}:${id}`,active?'1':'0');
     await refresh();
-    return redirect('/admin/categories?saved=preview');
+    return redirect('/admin/categories/manage?saved=preview');
   }
   await prisma.$transaction(async tx=>{
     if(sub)await tx.sub_categories.update({where:{id:BigInt(id)},data:{active:active?1:0}});
     else await tx.categories.update({where:{id:BigInt(id)},data:{is_active:active?'yes':'no'}});
     await tx.$executeRaw`INSERT INTO ad_category_audit(actor_id,action,payload) VALUES (${actor.uid},'visibility',${JSON.stringify({id,sub,active})})`;
-  });await refresh();redirect('/admin/categories?saved=1');
+  });await refresh();redirect('/admin/categories/manage?saved=1');
 }
 export async function saveSubcategory(fd:FormData){
   const id=fd.get('id')?categoryId(fd.get('id')):null;
   const actor=await requireAction('categories',id?'edit':'add');
   const section=fd.get('editor_section');
-  const returnPath=id&&isCategoryEditorSection(section)?categoryEditorPath(id,section):'/admin/categories';
+  const returnPath=id&&isCategoryEditorSection(section)?categoryEditorPath(id,section):'/admin/categories/manage';
   if(isReadOnlyPreview())return redirect(`${returnPath}?error=read-only`);
   try{
     const {name,order}=nameAndOrder(fd),cid=categoryId(fd.get('category_id')),def=parseSubcategoryDefinition(fd);

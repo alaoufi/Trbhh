@@ -494,6 +494,12 @@ async function run(){
   await page.goto(origin+'/');
   const categorySection=page.getByTestId('home-category-navigation');
   const homeCategory=categorySection.locator('select[name="category"]');
+  const openHomeSearch=async()=>{
+    const panel=page.locator('details[data-home-search]');
+    if(await panel.getAttribute('open')===null)await panel.locator('summary').click();
+  };
+  // Search/category tools are intentionally collapsed in the approved homepage.
+  await openHomeSearch();
   await homeCategory.waitFor({state:'visible'});
   const options=await homeCategory.locator('option').evaluateAll(os=>os.map(o=>({value:o.value,text:o.textContent})));
   const jobs=options.find(o=>o.value&&o.text.includes('وظائف'))?.value;
@@ -502,6 +508,7 @@ async function run(){
   await homeCategory.selectOption(jobs);
   await categorySection.locator('button[type="submit"]').click();
   await page.waitForURL(u=>u.pathname==='/'&&u.searchParams.get('category')===jobs);
+  await openHomeSearch();
   console.log(JSON.stringify({guestCategoryDiagnostic:await categorySection.innerText(),adLinks:await categorySection.locator('a[href^="/ads/"]').evaluateAll(links=>links.map(a=>a.getAttribute('href')))}));
   await page.getByText('وظيفة محاسب — إعلان اختبار محلي',{exact:true}).first().waitFor({state:'visible'});
   assert.equal(await homeCategory.inputValue(),jobs);
@@ -514,10 +521,12 @@ async function run(){
   await homeCategory.selectOption(property);
   await categorySection.locator('button[type="submit"]').click();
   await page.waitForURL(u=>u.pathname==='/'&&u.searchParams.get('category')===property);
+  await openHomeSearch();
   assert.equal(await homeCategory.inputValue(),property);
   assert.equal(await page.getByText('وظيفة محاسب — إعلان اختبار محلي',{exact:true}).count(),0,'property results must exclude job ad');
   await categorySection.locator('form a[href="/"]').click();
   await page.waitForURL(u=>u.pathname==='/'&&!u.searchParams.has('category'));
+  await openHomeSearch();
   assert.equal(await homeCategory.inputValue(),'');
   assert.equal(await categorySection.locator('form a[href="/"]').count(),0,'cleared filter removes its reset control');
   assert.equal(await page.locator('section[aria-label="السوق"]').count(),1,'cleared filter restores the default feed');

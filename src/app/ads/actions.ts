@@ -19,7 +19,7 @@ import { scanImages, imageModerationEnabled } from '@/lib/nsfw';
 import { resolveGoogleMapsCoordinates } from '@/lib/maps-server';
 import { toInt } from '@/lib/utils';
 import { isApprovedStoreOwner } from '@/lib/merchant';
-import { getActiveProfile, ensureDefaultProfile, backfillProfileContact } from '@/lib/profiles';
+import { getActiveProfile, ensureDefaultProfile, backfillProfileContact, setActiveProfileCookie } from '@/lib/profiles';
 import { normalizeAr, similarity, isKeywordStuffing } from '@/domain/text';
 import { writeAdWithCategory } from '@/lib/ad-categories/service';
 import { CategoryValidationError } from '@/lib/ad-categories/validation';
@@ -607,6 +607,9 @@ async function createAdSubmission(formData:FormData,trace:ReturnType<typeof crea
   if (featuredState === 'ok') extraFlags.push('featured=1');
   if (featuredState === 'need') extraFlags.push('featuredneed=1');
   const needFlags = extraFlags.filter((f) => f.includes('need')).map((f) => `&${f}`).join('');
+  // Keep the member's ordinary account list on the identity they just published as.
+  // Destination has already been explicitly resolved and persisted server-side.
+  if(profileId)await setActiveProfileCookie(profileId);
   trace.outcome(outcome);trace.stage('REDIRECT_SUCCESS');
   if (scheduledAt) redirect(`/account/ads?scope=all&scheduled=1${flagTerms ? '&censored=1' : ''}${needFlags}`);
   if (requireApproval) redirect(`/account/ads?scope=all&pending=1${needFlags}`);

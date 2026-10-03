@@ -103,6 +103,10 @@ async function run(){
       }else{
         await page.waitForURL(u=>u.pathname!=='/ads/new');
         const ad=await db.ads.findFirst({where:{user_id:member.id},orderBy:{id:'desc'}});assert(ad,'saved ad');
+        const [attributeRow]=await db.$queryRaw`SELECT values_json FROM ad_category_values WHERE ad_id=${ad.id}`;
+        const attributes=typeof attributeRow.values_json==='string'?JSON.parse(attributeRow.values_json):attributeRow.values_json;
+        assert(!Object.hasOwn(attributes,'pipeline_range'),'untouched/cleared optional range is absent in database');
+        assert(!Object.hasOwn(attributes,'pipeline_conditional'),'inactive optional field is absent in database');
         if(testCase==='G'){assert.equal(ad.status,0);assert(new URL(page.url()).searchParams.has('pending'));}
         else if(testCase==='H'){assert.equal(ad.status,0);assert(ad.publish_at>Date.now());assert(new URL(page.url()).searchParams.has('scheduled'));}
         else if(testCase==='F'){assert.equal(ad.store_only,1);assert(await db.store_products.findFirst({where:{ad_id:Number(ad.id)}}));}
@@ -112,7 +116,7 @@ async function run(){
           await page.getByText(title,{exact:true}).first().waitFor();
           await page.goto(origin+'/search?q='+encodeURIComponent(title)+'&subcategory='+leaf.id);
           await page.locator(`a[href="/ads/${ad.id}"]`).first().waitFor();
-          await page.goto(origin+'/account/ads?scope=all');await page.getByText(title,{exact:true}).first().waitFor();
+          await page.goto(origin+'/account/ads');await page.getByText(title,{exact:true}).first().waitFor();
           await page.getByText('ظاهر في تربح العام',{exact:true}).first().waitFor();
         }
       }
@@ -121,6 +125,9 @@ async function run(){
     }finally{await context.close();}
   }
   assert.equal(results.length,10);
-  await writeFile(path.join(artifacts,'publish-matrix.json'),JSON.stringify({results},null,2));
+  const outcomes=logs.split(/\r?\n/).flatMap(line=>{try{const row=JSON.parse(line);return row.publishTraceId&&row.outcome?[row]:[]}catch{return []}});
+  assert.deepEqual(outcomes.map(row=>row.outcome),['PUBLIC_NOW','PUBLIC_NOW','PUBLIC_NOW','PUBLIC_NOW','PUBLIC_NOW','STORE_ONLY','PENDING_APPROVAL','SCHEDULED','REJECTED','REJECTED']);
+  assert.equal(new Set(outcomes.map(row=>row.publishTraceId)).size,10,'one trace and one terminal outcome per submission');
+  await writeFile(path.join(artifacts,'publish-matrix.json'),JSON.stringify({results,outcomes},null,2));
 }
 run().catch(error=>{console.error('PUBLISH_MATRIX_FAIL',error.message);process.exitCode=1;}).finally(async()=>{await browser?.close();await stop();await db.$disconnect();});

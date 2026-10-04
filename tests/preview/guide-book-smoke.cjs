@@ -3,6 +3,8 @@ exports.run=async({page,origin,admin=false})=>{
  for(const route of admin?['/admin/guide']:['/guide','/guide/store']){
   const response=await page.goto(origin+route,{waitUntil:'domcontentloaded'});assert.equal(response.status(),200);
   const book=page.locator('[data-guide-book][data-enhanced="true"]');await book.waitFor();
+  assert.equal(await book.locator('article:visible').count(),0);
+  await book.getByRole('button',{name:'افتح الكتاب',exact:true}).click();
   assert.equal(await book.locator('article:visible').count(),1);
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'guide mobile overflow');
   const toggle=book.getByRole('button',{name:'الفهرس والبحث',exact:true});if(await toggle.isVisible())await toggle.click();

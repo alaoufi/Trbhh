@@ -6,19 +6,20 @@ import {guideGroup,guideHashIndex,searchGuide,type GuideChapter} from '@/lib/gui
 import styles from './guide-book.module.css';
 
 export function GuideBook({topId,title,subtitle,sections,children}:{topId:string;title:string;subtitle:string;sections:GuideChapter[];children?:React.ReactNode}){
- const [active,setActive]=useState(0),[ready,setReady]=useState(false),[query,setQuery]=useState(''),[indexOpen,setIndexOpen]=useState(false),[animate,setAnimate]=useState(false);
+ const [active,setActive]=useState(0),[ready,setReady]=useState(false),[query,setQuery]=useState(''),[indexOpen,setIndexOpen]=useState(false),[animate,setAnimate]=useState(true);
  const [image,setImage]=useState<{src:string;alt:string}|null>(null);
+ const [opened,setOpened]=useState(false);
  const dialog=useRef<HTMLDialogElement>(null),focusPage=useRef(false),indexRef=useRef<HTMLElement>(null);
  const matches=useMemo(()=>searchGuide(sections,query),[sections,query]);
  const groups=useMemo(()=>Array.from(new Set(sections.map(guideGroup))),[sections]);
  useEffect(()=>{
-  function sync(){const index=guideHashIndex(sections,window.location.hash);if(index>=0){setActive(index);focusPage.current=true;}else if(!window.location.hash)setActive(0);else if(window.location.hash==='#guide-index')setIndexOpen(true);setReady(true);}
+  function sync(){const index=guideHashIndex(sections,window.location.hash);if(index>=0){setActive(index);setOpened(true);focusPage.current=true;}else if(!window.location.hash)setActive(0);else if(window.location.hash==='#guide-index'){setIndexOpen(true);setOpened(true);}setReady(true);}
   sync();window.addEventListener('hashchange',sync);window.addEventListener('popstate',sync);
   return ()=>{window.removeEventListener('hashchange',sync);window.removeEventListener('popstate',sync);};
  },[sections]);
  useEffect(()=>{
   if(ready&&focusPage.current){document.getElementById(`${topId}-heading-${active}`)?.focus();focusPage.current=false;}
- },[active,ready,topId]);
+ },[active,ready,topId,opened]);
  useEffect(()=>{if(image&&!dialog.current?.open)dialog.current?.showModal();},[image]);
  function go(index:number){
   if(index<0||index>=sections.length)return;
@@ -27,8 +28,25 @@ export function GuideBook({topId,title,subtitle,sections,children}:{topId:string
   if(index===active){document.getElementById(`${topId}-heading-${index}`)?.focus();focusPage.current=false;}
  }
  function showIndex(){setIndexOpen(true);requestAnimationFrame(()=>indexRef.current?.querySelector<HTMLInputElement>('input')?.focus());}
+ function openBook(){focusPage.current=true;setOpened(true);}
+ function closeBook(){setOpened(false);requestAnimationFrame(()=>document.getElementById(`${topId}-open`)?.focus());}
  return <div id={topId} dir="rtl" data-guide-book data-enhanced={ready?'true':'false'} className={styles.book}>
-  <header className={styles.cover}><div className={styles.brand}><BookOpen aria-hidden="true" size={26}/><span>مكتبة تربح · دليل تفاعلي</span></div><h1>{title}</h1><p>{subtitle}</p><div className={styles.coverMeta}><span>{sections.length} موضوعًا</span><span>اقرأ · ابحث · انتقل مباشرة</span></div></header>
+  {ready&&!opened&&<div className={styles.jacketScene}>
+   <div className={styles.closedBook}>
+    <div className={styles.paperEdge} aria-hidden="true"/>
+    <div className={styles.spine} aria-hidden="true">تربح · {title}</div>
+    <header className={styles.cover}>
+     <div className={styles.brand}><BookOpen aria-hidden="true" size={25}/><span>مكتبة تربح التوضيحية</span></div>
+     <div className={styles.emblem} aria-hidden="true"><BookOpen size={72} strokeWidth={1}/></div>
+     <h1>{title}</h1><p>{subtitle}</p>
+     <div className={styles.coverBadges}><span>شرح مصوّر</span><span>فهرس وبحث</span><span>{sections.length} موضوعًا</span></div>
+     <button id={`${topId}-open`} type="button" className={styles.openBook} onClick={openBook}>افتح الكتاب<ChevronLeft size={20} aria-hidden="true"/></button>
+     <div className={styles.coverFoot}>دليل عملي · خطوة بخطوة</div>
+    </header>
+   </div>
+  </div>}
+  <div className={styles.readerShell} hidden={ready&&!opened}>
+  <div className={styles.bookBar}><h1>{title}</h1>{ready&&<button type="button" onClick={closeBook}>إغلاق الكتاب<BookOpen size={18} aria-hidden="true"/></button>}</div>
   {children&&<details className={styles.quick}><summary>البداية السريعة والاختصارات</summary><div>{children}</div></details>}
   <div className={styles.binding}>
    <button type="button" className={styles.mobileIndex} aria-expanded={indexOpen} aria-controls={`${topId}-index`} onClick={()=>setIndexOpen(!indexOpen)}><List aria-hidden="true" size={19}/>الفهرس والبحث</button>
@@ -45,7 +63,7 @@ export function GuideBook({topId,title,subtitle,sections,children}:{topId:string
    <div className={styles.reading} role="region" aria-label="صفحات الدليل">
     {ready&&<div className={styles.toolbar}><span role="status">صفحة {sections.length?active+1:0} من {sections.length}</span><label><input type="checkbox" checked={animate} onChange={e=>setAnimate(e.target.checked)}/>حركة تقليب خفيفة</label></div>}
     {!sections.length&&<p className={styles.page}>لا توجد موضوعات متاحة حاليًا.</p>}
-    {sections.map((section,i)=><article key={section.id} id={section.id} hidden={ready&&active!==i} className={`${styles.page} ${animate?styles.animated:''}`}>
+    {sections.map((section,i)=><article key={section.id} id={section.id} hidden={ready&&active!==i} data-color={i%4} className={`${styles.page} ${animate?styles.animated:''}`}>
      <div className={styles.chapterTag}>{guideGroup(section)} · {String(i+1).padStart(2,'0')}</div>
      <h2 id={`${topId}-heading-${i}`} tabIndex={-1}>{section.title}</h2>
      <p className={styles.goal}>{section.goal}</p>
@@ -56,6 +74,7 @@ export function GuideBook({topId,title,subtitle,sections,children}:{topId:string
     </article>)}
     {ready&&sections.length>0&&<nav className={styles.pager} aria-label="تقليب صفحات الدليل"><button type="button" disabled={active===0} onClick={()=>go(active-1)}><ChevronRight aria-hidden="true" size={18}/>السابق</button><span>{active+1} / {sections.length}</span><button type="button" disabled={active===sections.length-1} onClick={()=>go(active+1)}>التالي<ChevronLeft aria-hidden="true" size={18}/></button></nav>}
    </div>
+  </div>
   </div>
   <dialog ref={dialog} className={styles.dialog} aria-label="تكبير اللقطة التوضيحية" onClose={()=>setImage(null)} onClick={e=>{if(e.target===e.currentTarget)dialog.current?.close();}}><button type="button" autoFocus onClick={()=>dialog.current?.close()} className={styles.close}>إغلاق الصورة <X size={19}/></button>{image&&<Image unoptimized src={image.src} alt={image.alt} width={780} height={900} className={styles.picture}/>}</dialog>
  </div>;

@@ -119,10 +119,16 @@ async function run(){
         else if(testCase==='F'){assert.equal(ad.store_only,1);assert(await db.store_products.findFirst({where:{ad_id:Number(ad.id)}}));}
         else{
           assert.equal(ad.status,1);assert.equal(ad.store_only,0);
+          if(testCase==='B'){
+            const identity=await db.profiles.create({data:{user_id:member.id,type:'personal',is_default:0,name:'هوية النشر الإضافية'}});
+            await db.ads.update({where:{id:ad.id},data:{profile_id:identity.id}});
+          }
           const response=await page.goto(origin+`/ads/${ad.id}`);assert.equal(response.status(),200);
           await page.getByText(title,{exact:true}).first().waitFor();
+          if(testCase==='B')assert((await page.locator('[data-advertiser-name]').first().innerText()).includes('هوية النشر الإضافية'));
           await page.goto(origin+'/search?q='+encodeURIComponent(title)+'&subcategory='+leaf.id);
           await page.locator(`a[href="/ads/${ad.id}"]`).first().waitFor();
+          if(testCase==='B')assert((await page.locator(`a[href="/ads/${ad.id}"] [data-advertiser-name]`).first().innerText()).includes('هوية النشر الإضافية'));
           await page.goto(origin+'/account/ads');await page.getByText(title,{exact:true}).first().waitFor();
           await page.getByText('ظاهر في تربح العام',{exact:true}).first().waitFor();
         }

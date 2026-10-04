@@ -9,6 +9,7 @@ import { loadBanned, censorSync } from './censor';
 import { sweepExpiredFeatured, getFeaturedTierMap, getUsersAdMeta } from './packages';
 import { ensureSaudiAreas } from './seed-areas';
 import { getProfileDisplay } from './profiles';
+import { getAdPersonalNames } from './ad-personal-names';
 import { toInt } from './utils';
 import { currentPlatformAdPublicWhere, platformDealAdPublicWhere } from './platform-ad-visibility';
 import { getPlatformAdLifecycleConfig, getSetting, getStoreSubPricing } from './settings';
@@ -118,6 +119,7 @@ async function primaryImages(adIds: bigint[]): Promise<Map<number, string>> {
 
 type AdRow = {
   id: bigint;
+  profile_id?: bigint | null;
   title: string;
   price: number;
   price_type?: string | null;
@@ -139,7 +141,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
   const ids = rows.map((r) => r.id);
   const categoryData = await getPublicCategories(ids);
   const { getAdRatingsBrief } = await import('./ad-reviews');
-  const [images, views, cities, cats, sellers, adMeta, ratings, areas] = await Promise.all([
+  const [images, views, cities, cats, sellers, adMeta, ratings, areas, personalNames] = await Promise.all([
     primaryImages(ids),
     viewCounts(ids),
     cityNames(rows.map((r) => r.city_id)),
@@ -148,6 +150,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
     getUsersAdMeta(rows.map((r) => toInt(r.user_id))).catch(() => new Map()),
     getAdRatingsBrief(rows.map((r) => toInt(r.id))).catch(() => new Map()),
     prisma.areas.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.area_id || 0).filter(Boolean))] } }, select: { id: true, name: true } }).catch(() => []),
+    getAdPersonalNames(rows),
   ]);
   const areaNames = new Map(areas.map((area) => [Number(area.id), area.name]));
   await loadBanned();
@@ -185,7 +188,7 @@ async function toCards(rows: AdRow[]): Promise<AdCard[]> {
         special: r.adsSpecial === 'checked',
         urgent: !!(r.urgent_until && r.urgent_until.getTime() > now),
         views: views.get(toInt(r.id)) ?? 0,
-        sellerName: s?.name ?? null,
+        sellerName: personalNames.get(toInt(r.id)) || s?.name || null,
         sellerTrusted: s?.trusted ?? false,
         tier: adMeta.get(toInt(r.user_id))?.tier ?? '',
         oldPrice: publicCategory?.goodsEnabled === false ? 0 : (r.old_price && r.old_price > r.price ? r.old_price : 0),
@@ -209,6 +212,7 @@ function publicDataCacheScope() {
 
 const adSelect = {
   id: true,
+  profile_id: true,
   title: true,
   price: true,
   price_type: true,

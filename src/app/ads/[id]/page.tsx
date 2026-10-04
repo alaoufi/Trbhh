@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AdAdvertiserName } from '@/components/ad-advertiser-name';
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import {
@@ -555,7 +556,7 @@ export default async function AdPage({ params, searchParams }: { params: Promise
         <InfoItem icon={ArrowLeftRight}>{ad.adsType === 'offer' ? 'عرض' : 'طلب'}</InfoItem>
         <InfoItem icon={Timer}>{timeAgo(ad.createdAt)}</InfoItem>
         {(ad.area || ad.city) && <InfoItem icon={MapPin}>{ad.area ? `${ad.area}${ad.city ? ` - ${ad.city}` : ''}` : ad.city}</InfoItem>}
-        <div className="flex items-center gap-2 text-primary">
+        <div className="col-span-2 row-start-1 flex min-w-0 items-center gap-2 border-b border-primary/15 pb-3 text-primary">
           <span className="relative">
             {identityIsStore ? <Store className="h-5 w-5" /> : <User className="h-5 w-5" />}
             {ad.seller?.trusted ? (
@@ -564,8 +565,8 @@ export default async function AdPage({ params, searchParams }: { params: Promise
               <span className="absolute -bottom-0.5 -left-0.5 h-2 w-2 rounded-full bg-red-500" />
             )}
           </span>
-          <Link href={identityHref} className="line-clamp-1 text-sm font-medium hover:underline">
-            {identityName}{identityIsStore && <span className="mr-1 rounded bg-primary/10 px-1 text-[10px] font-bold text-primary">متجر</span>}
+            <Link href={identityHref} className="min-w-0 hover:underline">
+              <AdAdvertiserName name={identityName} />{identityIsStore && <span className="mr-1 rounded bg-primary/10 px-1 text-[10px] font-bold text-primary">متجر</span>}
           </Link>
         </div>
         <InfoItem icon={Star}>{sellerRating.count ? `${sellerRating.avg} (${sellerRating.count})` : '0/0'}</InfoItem>

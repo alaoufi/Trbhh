@@ -6,6 +6,7 @@ import type { AdCard as AdCardType } from '@/lib/data';
 import { adPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
 import { timeAgo, cn } from '@/lib/utils';
 import { homeGridClass, pickHomeLayout } from '@/lib/commerce/home-layout';
+import { AdAdvertiserName } from './ad-advertiser-name';
 
 function timeShort(iso: string | null) {
   const s = timeAgo(iso); // e.g. "قبل 3 يوم"
@@ -121,7 +122,7 @@ export function AdCard({ ad, variant = 'raised' }: { ad: AdCardType; variant?: '
               <span className="absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 rounded-full bg-red-500" />
             )}
           </span>
-          <span className="mt-1 line-clamp-1 text-xs text-primary/90">{ad.sellerName || '—'}</span>
+          <AdAdvertiserName name={ad.sellerName} storeName={ad.storeName} />
         </Cell>
         <Cell>
           <Timer className="icon-badge mx-auto h-6 w-6 text-primary" />
@@ -193,6 +194,7 @@ export function AdCardShop({ ad }: { ad: AdCardType }) {
       </div>
       <div className="flex flex-1 flex-col gap-0.5 p-2">
         <h3 className="line-clamp-2 min-h-[2.2rem] text-[13px] font-bold leading-snug text-foreground/90">{compactAdTitle(ad.title)}</h3>
+        <AdAdvertiserName name={ad.sellerName} storeName={ad.storeName} />
         {ad.storeName && <StoreTag name={ad.storeName} />}
         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
           {(ad.ratingCount ?? 0) > 0 && <span className="flex items-center gap-0.5 font-extrabold text-amber-600"><Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {ad.ratingAvg} ({ad.ratingCount})</span>}
@@ -225,6 +227,7 @@ export function AdCardList({ ad }: { ad: AdCardType }) {
           {ad.storeName && <StoreTag name={ad.storeName} />}
         </div>
         <h3 className="line-clamp-2 text-sm font-bold leading-snug text-foreground/90">{compactAdTitle(ad.title)}</h3>
+        <AdAdvertiserName name={ad.sellerName} storeName={ad.storeName} />
         <CardPrice ad={ad} />
         <CategoryCardFacts ad={ad} />
         <div className="mt-auto flex flex-wrap items-center gap-x-2.5 gap-y-0.5 pt-1.5 text-[11px] text-muted-foreground">
@@ -275,7 +278,7 @@ export function AdCardMarketplace({ ad }: { ad: AdCardType }) {
         <span>{timeShort(ad.createdAt)}</span>
       </div>
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[10px] text-slate-500">
-        <span className="inline-flex min-w-0 items-center gap-1">{ad.sellerTrusted && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-label="بائع موثق" />}<span className="truncate">{ad.sellerName || 'المعلن'}</span></span>
+        <span className="inline-flex min-w-0 items-center gap-1">{ad.sellerTrusted && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-label="بائع موثق" />}<AdAdvertiserName name={ad.sellerName} storeName={ad.storeName} /></span>
         {(ad.ratingCount ?? 0) > 0 && <span className="inline-flex items-center gap-1"><Star className="h-3 w-3 fill-amber-400 text-amber-500" />{ad.ratingAvg} ({ad.ratingCount})</span>}
         <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" />{ad.views}</span>
       </div>

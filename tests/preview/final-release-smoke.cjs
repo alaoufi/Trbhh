@@ -84,8 +84,15 @@ async function requiredFields(page){
       await page.waitForURL(u=>u.pathname==='/'&&/^\d+$/.test(u.searchParams.get('published')||''),{waitUntil:'domcontentloaded'});
       const id=new URL(page.url()).searchParams.get('published');
       console.log('PASS create '+(gps?'GPS':'withoutGPS')+' id='+id);
+      const cardAdvertiser=page.locator(`a[href="/ads/${id}"] [data-advertiser-name]`).first();
+      await cardAdvertiser.waitFor({state:'visible'});
+      assert((await cardAdvertiser.innerText()).includes('اختبار الإطلاق المعزول'),'home advertiser identity');
       await go(origin+'/ads/'+id);
       await page.getByText(title,{exact:true}).first().waitFor();
+      const detailAdvertiser=page.locator('[data-advertiser-name]').first();
+      await detailAdvertiser.waitFor({state:'visible'});
+      assert((await detailAdvertiser.innerText()).includes('اختبار الإطلاق المعزول'),'detail advertiser identity');
+      console.log('PASS advertiser name visible on home and details');
       if(gps)assert((await page.getByRole('link',{name:'الاتجاهات إلى الموقع',exact:true}).getAttribute('href')).includes('destination=24.713612'));
       await go(origin+'/ads/'+id+'/edit');
       assert.equal(await page.evaluate(()=>window.__geoCalls),0,'edit does not request GPS');

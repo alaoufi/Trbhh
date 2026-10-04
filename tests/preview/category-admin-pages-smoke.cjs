@@ -2,6 +2,7 @@
 const assert=require('node:assert/strict');
 exports.run=async({page,outsider,origin})=>{
   assert.equal(origin,'http://localhost:4197');
+  await require('./admin-help-smoke.cjs').run({page,outsider,origin});
   await require('./category-admin-hub-smoke.cjs').run({page,outsider,origin});
   await page.goto(origin+'/admin/categories/requirements');
   const parents=await page.getByLabel('القسم الرئيسي',{exact:true}).locator('option').evaluateAll(options=>options.filter(o=>o.value).map(o=>o.value));

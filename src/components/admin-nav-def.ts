@@ -21,7 +21,7 @@ export const ADMIN_GROUPS: AdminNavGroup[] = [
       { href: '/admin', label: 'لوحة الإدارة', icon: LayoutDashboard, perm: null },
       { href: '/admin/search', label: 'بحث الإدارة', icon: SearchIcon, perm: null },
       { href: '/admin/archive', label: 'الأرشيف', icon: Archive, perm: null },
-      { href: '/admin/guide', label: 'دليل الإدارة', icon: BookOpen, perm: null },
+      { href: '/admin/help', label: 'المساعدة ودليل الاستخدام', icon: BookOpen, perm: null },
     ],
   },
   {

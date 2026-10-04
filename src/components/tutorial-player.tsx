@@ -35,11 +35,11 @@ export function CountUp({ active, to = 100, step = 5 }: { active: boolean; to?: 
 }
 
 /** مشغّل الشروحات المتحركة الموحّد: شرائح تلقائية + تحكّم + مشاركة + زر بدء. */
-export function TutorialPlayer({ slides, shareTitle, ctaHref, ctaLabel }: {
-  slides: TutorialSlide[]; shareTitle: string; ctaHref: string; ctaLabel: string;
+export function TutorialPlayer({ slides, shareTitle, ctaHref, ctaLabel, initialPlaying = true }: {
+  slides: TutorialSlide[]; shareTitle: string; ctaHref: string; ctaLabel: string; initialPlaying?: boolean;
 }) {
   const [i, setI] = useState(0);
-  const [playing, setPlaying] = useState(true);
+  const [playing, setPlaying] = useState(initialPlaying);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
   const [shared, setShared] = useState(false);
   const n = slides.length;

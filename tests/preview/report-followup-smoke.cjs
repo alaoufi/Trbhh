@@ -99,5 +99,6 @@ exports.run = async ({ browser, page, adId, origin, run, attempt, password }) =>
     await staff.p.waitForLoadState('networkidle');
     console.log('PASS report_followup administrative toggle preserves history');
     await require('./category-admin-pages-smoke.cjs').run({page:staff.p,outsider:outsider.p,origin});
+    await require('./guide-book-smoke.cjs').run({page:staff.p,origin,admin:true});
   } finally { await staff.context.close(); await outsider.context.close(); }
 };

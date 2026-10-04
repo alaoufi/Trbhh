@@ -46,6 +46,7 @@ async function requiredFields(page){
         assert.equal(await page.evaluate(()=>window.__geoCalls),0,'no automatic permission prompt');
         console.log('PASS public '+route+' mobile390');
       }
+      if(!gps)await require('./guide-book-smoke.cjs').run({page,origin});
       await go(origin+'/login?next=%2Fads%2Fnew');
       await page.locator('#login-identifier').fill(`finalgate-${run}-${attempt}-${gps?1:0}`);
       await page.locator('#login-password').fill(password);

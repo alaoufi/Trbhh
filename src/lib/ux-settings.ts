@@ -1,5 +1,6 @@
 /** Admin-editable controls for the approved site audit. */
 export const AUDIT_UX_FLAGS = [
+  ['guide_book_enabled', 'عرض أدلة الاستخدام ككتاب تفاعلي بالفهرس والبحث'],
   ['home_discovery_on', 'إظهار البحث والإضافة في مقدمة الرئيسية'],
   ['personalized_discovery_on', 'إظهار التوصيات المخصصة «يهمّك الآن»'],
   ['compare_on', 'تفعيل مقارنة الإعلانات'],

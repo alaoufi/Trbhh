@@ -122,6 +122,7 @@ async function run(){
           if(testCase==='B'){
             const identity=await db.profiles.create({data:{user_id:member.id,type:'personal',is_default:0,name:'هوية النشر الإضافية'}});
             await db.ads.update({where:{id:ad.id},data:{profile_id:identity.id}});
+            await context.addCookies([{name:'trbhh_profile',value:String(identity.id),url:origin}]);
           }
           const response=await page.goto(origin+`/ads/${ad.id}`);assert.equal(response.status(),200);
           await page.getByText(title,{exact:true}).first().waitFor();

@@ -11,4 +11,10 @@ describe('wide home card proportions',()=>{
     expect(css).toMatch(/:nth-child\(9n\+3\)>div:first-child\s*\{[^}]*height:160px/);
     expect(css).toMatch(/:nth-child\(9n\+3\)>div:first-child img\s*\{[^}]*object-fit:contain/);
   });
+  it('lets every home card fit its content instead of stretching to the tallest card',()=>{
+    expect(css).toMatch(/\[data-home-feed-grid\]\s*\{[^}]*align-items:start/);
+    expect(css).toMatch(/h3\s*\{[^}]*min-height:0/);
+    expect(css).toMatch(/>div:nth-child\(2\)\s*\{[^}]*flex:0 0 auto/);
+    expect(css).toMatch(/>div:nth-child\(2\)>div:last-child\s*\{[^}]*margin-top:0/);
+  });
 });

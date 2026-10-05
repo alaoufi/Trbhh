@@ -4,6 +4,10 @@ import { CATEGORY_LABELS } from '@/lib/ad-categories/contracts';
 import { readFileSync } from 'node:fs';
 
 describe('continuous home feed', () => {
+  it('provides enough unique inventory for the compact moving strip and mixed cards',()=>{
+    expect(readFileSync('src/app/page.tsx','utf8')).toContain('getHomeLatestAds(24)');
+    expect(readFileSync('src/components/ad-card.tsx','utf8')).toContain('data-mosaic={ads.length>=6}');
+  });
   const config = {enabled:true, labels:CATEGORY_LABELS, categories:[{id:90,name:'Other',active:true,order:0},{id:91,name:'Hidden',active:false,order:1}],subcategories:[]};
   it('allows active legacy Other without requiring configured subcategories', () => {
     expect(selectedHomeCategory(config,'90')?.id).toBe(90);

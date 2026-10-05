@@ -75,7 +75,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
         ? { subcategoryIds: selectedCategory.subcategoryIds }
         : { categoryIds: selectedCategory.categoryIds }),
       take: 24, skip: 0,
-    }) : getHomeLatestAds(8),
+    }) : getHomeLatestAds(24),
     selectedCategory ? Promise.resolve([]) : getMostViewedAds(8),
     selectedCategory ? Promise.resolve([]) : getTopRatedAds(8),
     getStats(),

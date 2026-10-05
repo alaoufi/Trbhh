@@ -1,5 +1,18 @@
 type PriceData = { price: number; adsType?: string; priceType?: string | null; rentPeriod?: string | null; priceEnabled?:boolean };
 
+/** Presentation only: callers must pass the schema's public projection. */
+export function formatAdSpecification(value: unknown): string {
+  if (typeof value === 'boolean') return value ? 'نعم' : 'لا';
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '';
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string' && item.trim() !== '').map(item => item.trim()).join('، ');
+  if (value && typeof value === 'object' && 'min' in value && 'max' in value) {
+    const { min, max } = value;
+    if (typeof min === 'number' && typeof max === 'number' && Number.isFinite(min) && Number.isFinite(max) && min <= max) return `${min}–${max}`;
+  }
+  return '';
+}
+
 export function adPriceLabel(ad: PriceData): string {
   if(ad.priceEnabled === false) return '';
   if (!Number.isFinite(ad.price) || ad.price <= 0) {

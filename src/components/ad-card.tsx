@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { cookies } from 'next/headers';
 import { MapPin, Eye, Timer, User, BadgeCheck, Star, Crown, Store } from 'lucide-react';
 import type { AdCard as AdCardType } from '@/lib/data';
-import { adPriceLabel, compactAdTitle } from '@/lib/ad-presentation';
+import { adPriceLabel, compactAdTitle, formatAdSpecification } from '@/lib/ad-presentation';
 import { timeAgo, cn } from '@/lib/utils';
 import { homeGridClass, pickHomeLayout } from '@/lib/commerce/home-layout';
 import { AdAdvertiserName } from './ad-advertiser-name';
@@ -149,11 +149,11 @@ function CardPrice({ ad }: { ad: AdCardType }) {
 }
 
 function CategoryCardFacts({ad}:{ad:AdCardType}){
-  if(!ad.categoryCardFields?.length)return null;
-  return <div className="mt-1 flex flex-wrap gap-1">{ad.categoryCardFields.slice(0,2).map(field=>{
-    const value=Array.isArray(field.value)?field.value.join('، '):typeof field.value==='boolean'?(field.value?'نعم':'لا'):typeof field.value==='object'?`${field.value.min}–${field.value.max}`:String(field.value);
-    return <span key={field.key} className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-foreground/80">{field.label}: {value}{field.unit?` ${field.unit}`:''}</span>;
-  })}</div>;
+  const facts=(ad.categoryCardFields || []).map(field=>({...field,text:formatAdSpecification(field.value)})).filter(field=>field.text!=='').slice(0,3);
+  if(!facts.length)return null;
+  return <dl className="mt-1.5 flex min-w-0 flex-wrap gap-1.5">{facts.map(field=><div key={field.key} className="min-w-0 max-w-full rounded-lg border border-primary/10 bg-secondary/60 px-2 py-1 text-[11px] leading-4">
+    <dt className="inline text-muted-foreground">{field.label}: </dt><dd className="inline break-words font-bold text-primary"><bdi>{field.text}</bdi>{field.unit?` ${field.unit}`:''}</dd>
+  </div>)}</dl>;
 }
 
 function Cell({ children }: { children: React.ReactNode }) {

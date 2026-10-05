@@ -1,5 +1,6 @@
 /** Admin-editable controls for the approved site audit. */
 export const AUDIT_UX_FLAGS = [
+  ['home_compact_strip_on', 'تنويع الرئيسية بشريط إعلانات صغيرة بين البطاقات'],
   ['guide_book_enabled', 'عرض أدلة الاستخدام ككتاب تفاعلي بالفهرس والبحث'],
   ['home_discovery_on', 'إظهار البحث والإضافة في مقدمة الرئيسية'],
   ['personalized_discovery_on', 'إظهار التوصيات المخصصة «يهمّك الآن»'],
@@ -15,6 +16,8 @@ export const AUDIT_UX_FLAGS = [
   ['store_onboarding_on', 'إعداد المتجر على خطوات'],
 ] as const;
 export const AUDIT_UX_TEXTS = [
+  ['home_compact_strip_title', 'عنوان شريط الإعلانات الصغيرة', 'لمحة من السوق'],
+  ['home_compact_strip_hint', 'تلميح شريط الإعلانات الصغيرة', 'تصفّح المزيد بالسحب أو التمرير'],
   ['home_discovery_title', 'عنوان مقدمة الرئيسية', 'تربح — إعلانات ومتاجر قريبة منك'],
   ['home_discovery_subtitle', 'وصف مقدمة الرئيسية', 'ابحث عن عرضك القادم أو أضف إعلانك وتواصل مباشرة مع المعلن.'],
   ['home_discovery_search_placeholder', 'تلميح البحث', 'ماذا تبحث عنه؟'],

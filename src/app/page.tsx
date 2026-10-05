@@ -16,7 +16,8 @@ import {
 import { PublicSearchForm } from '@/components/public-search-form';
 import { HomeCategoryNavigation } from '@/components/home-category-navigation';
 import { AdGrid } from '@/components/ad-card';
-import { mergeHomeAds, selectedHomeCategory } from '@/lib/home-feed';
+import { mergeHomeAds, selectedHomeCategory, splitHomeFeed } from '@/lib/home-feed';
+import { HomeCompactStrip } from '@/components/home-compact-strip';
 import { getCategoryFormConfig } from '@/lib/ad-categories/service';
 import { CollapsibleSection } from '@/components/collapsible-section';
 import { PromoSlot } from '@/components/promo-slot';
@@ -100,6 +101,13 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
     : [];
   const storeAds = selectedCategory ? [] : await homeFeaturedAds().catch(() => []);
   const feedAds = selectedCategory ? latest : mergeHomeAds(featured, latest, storeAds, mostViewed, topRated);
+  const design = (await cookies()).get('design')?.value;
+  const compactStripOn = !selectedCategory && !['shop','list'].includes(design || '') && await getSettingBool('home_compact_strip_on',true).catch(()=>false);
+  const compactFeed = splitHomeFeed(feedAds);
+  const [compactStripTitle,compactStripHint] = compactStripOn ? await Promise.all([
+    getSetting('home_compact_strip_title','لمحة من السوق'),
+    getSetting('home_compact_strip_hint','تصفّح المزيد بالسحب أو التمرير'),
+  ]) : ['',''];
   const feedSearchHref = selectedCategory ? `/search?category=${selectedCategory.key}` : '/search';
   const feedTexts = await getFeedBannerItems().catch(() => []);
   // أزرار تواصل الموقع تحت الإحصائيات — قابلة للتعطيل من التحكم
@@ -199,7 +207,11 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
         <div className="space-y-4">
           {selectedCategory && !feedAds.length
             ? <p className="text-sm text-muted-foreground">{categoryConfig?.labels.emptyText}</p>
-            : <AdGrid ads={feedAds} appearance="marketplace" />}
+            : compactStripOn && compactFeed.strip.length ? <>
+              <AdGrid ads={compactFeed.before} appearance="marketplace" />
+              <HomeCompactStrip ads={compactFeed.strip} title={compactStripTitle} hint={compactStripHint}/>
+              {compactFeed.after.length>0&&<AdGrid ads={compactFeed.after} appearance="marketplace" />}
+            </> : <AdGrid ads={feedAds} appearance="marketplace" />}
           <PromoSlot placement="feed" />
           {feedTexts.length > 0 && <FeedTextBanner items={feedTexts} />}
           {/* تُعرض أحدث دفعة بسرعة؛ البحث يبقى السجل الكامل دون تحميله مسبقاً في الرئيسية. */}

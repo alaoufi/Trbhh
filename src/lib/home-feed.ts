@@ -1,5 +1,11 @@
 import type { CategoryFormConfig,CategoryGroupOption } from './ad-categories/contracts';
 
+/** Change presentation only; preserve ranking, identities and the original input. */
+export function splitHomeFeed<T>(ads: readonly T[]): {before:T[];strip:T[];after:T[]} {
+  if(ads.length<12)return {before:[...ads],strip:[],after:[]};
+  return {before:ads.slice(0,8),strip:ads.slice(8,14),after:ads.slice(14)};
+}
+
 export type SelectedHomeCategory=CategoryGroupOption&{id?:number};
 
 export function publicCategoryGroups(config:CategoryFormConfig):CategoryGroupOption[]{

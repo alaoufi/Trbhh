@@ -10,7 +10,8 @@ describe('home feed first load', () => {
     const batch = homePage.match(/getHomeLatestAds\((\d+)\)/);
     expect(batch).not.toBeNull();
     expect(Number(batch![1])).toBeGreaterThan(0);
-    expect(Number(batch![1])).toBeLessThanOrEqual(20);
+    // The approved dense feed uses 24 items; retain a bounded initial payload.
+    expect(Number(batch![1])).toBeLessThanOrEqual(24);
     expect(homePage).not.toContain('getHomeLatestAds()');
     expect(homePage).not.toContain('ProgressiveReveal');
   });
